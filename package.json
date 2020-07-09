@@ -1,8 +1,8 @@
 {
   "name": "rocketcrab",
+  "version": "0.0.1",
   "author": "Tanner Krewson",
   "license": "MIT",
-  "version": "0.0.1",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -11,22 +11,19 @@
     "format": "prettier --write **/*.{js,ts,tsx}",
     "lint": "eslint . --ext ts --ext tsx --ext js",
     "test": "jest",
-    "test-all": "yarn lint && yarn type-check && yarn test"
+    "test-all": "run-s lint type-check test"
   },
   "husky": {
     "hooks": {
       "pre-commit": "lint-staged",
-      "pre-push": "yarn run type-check"
+      "pre-push": "npm run type-check"
     }
   },
   "lint-staged": {
-    "*.@(ts|tsx)": [
-      "yarn lint",
-      "yarn format"
-    ]
+    "*.@(ts|tsx)": "run-s lint format"
   },
   "dependencies": {
-    "next": "latest",
+    "next": "^9.4.4",
     "react": "^16.13.1",
     "react-dom": "^16.13.1"
   },
@@ -46,7 +43,16 @@
     "jest": "^25.2.3",
     "jest-watch-typeahead": "^0.5.0",
     "lint-staged": "^10.0.10",
+    "npm-run-all": "^4.1.5",
     "prettier": "^2.0.2",
     "typescript": "^3.8.3"
-  }
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tannerkrewson/rocketcrab.git"
+  },
+  "bugs": {
+    "url": "https://github.com/tannerkrewson/rocketcrab/issues"
+  },
+  "homepage": "https://github.com/tannerkrewson/rocketcrab#readme"
 }
