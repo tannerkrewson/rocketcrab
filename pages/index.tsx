@@ -1,5 +1,6 @@
 import Head from "next/head";
 import Footer from "../components/Footer";
+import { Button, Grid } from "@zeit-ui/react";
 
 export const Home = (): JSX.Element => {
     const host = "rocketcrab.com"; // window.location.host
@@ -18,17 +19,40 @@ export const Home = (): JSX.Element => {
                     <h2>{title}</h2>
                 </div>
 
-                <p className="description">
-                    Get started by editing <code>pages/index.tsx</code>
-                </p>
+                <div className="description">
+                    all the best mobile web party games
+                </div>
 
-                <button
-                    onClick={() => {
-                        window.alert("With typescript and Jest");
-                    }}
-                >
-                    Test Button
-                </button>
+                <Grid.Container gap={1} justify="center">
+                    <Grid>
+                        <Button
+                            onClick={() => {
+                                window.alert("With typescript and Jest");
+                            }}
+                            type="secondary"
+                            size="large"
+                            ghost
+                            shadow
+                            auto
+                        >
+                            Join Lobby
+                        </Button>
+                    </Grid>
+                    <Grid>
+                        <Button
+                            onClick={() => {
+                                window.alert("With typescript and Jest");
+                            }}
+                            type="secondary"
+                            size="large"
+                            ghost
+                            shadow
+                            auto
+                        >
+                            New Lobby
+                        </Button>
+                    </Grid>
+                </Grid.Container>
             </main>
 
             <Footer />
@@ -57,46 +81,29 @@ export const Home = (): JSX.Element => {
                     text-decoration: none;
                 }
 
-                .title a {
-                    color: #0070f3;
-                    text-decoration: none;
-                }
-
-                .title a:hover,
-                .title a:focus,
-                .title a:active {
-                    text-decoration: underline;
-                }
-
-                .title {
-                    margin: 0;
-                    line-height: 1.15;
-                    font-size: 1em;
-                }
-
                 .title,
                 .description {
                     text-align: center;
                 }
 
                 .description {
-                    line-height: 1.5;
-                    font-size: 1.5rem;
+                    margin-bottom: 2em;
                 }
             `}</style>
 
             <style jsx global>{`
+                @import url("https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;600&display=swap");
+
                 html,
                 body {
                     padding: 0;
                     margin: 0;
-                    font-family: -apple-system, BlinkMacSystemFont, Segoe UI,
-                        Roboto, Oxygen, Ubuntu, Cantarell, Fira Sans, Droid Sans,
-                        Helvetica Neue, sans-serif;
                 }
 
                 * {
                     box-sizing: border-box;
+                    letter-spacing: normal !important;
+                    font-family: "Inconsolata", monospace;
                 }
             `}</style>
         </div>
