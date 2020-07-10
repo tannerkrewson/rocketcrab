@@ -7,21 +7,9 @@ export const Home = (): JSX.Element => (
         <div className="description">all the best mobile web party games</div>
 
         <ButtonGroup>
-            <PrimaryButton
-                onClick={() => {
-                    window.alert("With typescript and Jest");
-                }}
-            >
-                Join Lobby
-            </PrimaryButton>
+            <PrimaryButton href="/join">Join Lobby</PrimaryButton>
 
-            <PrimaryButton
-                onClick={() => {
-                    window.alert("With typescript and Jest");
-                }}
-            >
-                New Lobby
-            </PrimaryButton>
+            <PrimaryButton href="/new">New Lobby</PrimaryButton>
         </ButtonGroup>
         <style jsx>{`
             .description {

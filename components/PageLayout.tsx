@@ -27,7 +27,7 @@ const PageLayout = ({ children }) => (
             }
 
             main {
-                padding: 5rem 0;
+                padding: 5rem 0 15rem;
                 flex: 1;
                 display: flex;
                 flex-direction: column;
