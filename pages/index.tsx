@@ -1,7 +1,8 @@
 import Head from "next/head";
 import Footer from "../components/Footer";
-import { Button, Grid } from "@zeit-ui/react";
 import MainTitle from "../components/MainTitle";
+import PrimaryButton from "../components/PrimaryButton";
+import ButtonGroup from "../components/ButtonGroup";
 
 export const Home = (): JSX.Element => (
     <div className="container">
@@ -16,36 +17,23 @@ export const Home = (): JSX.Element => (
                 all the best mobile web party games
             </div>
 
-            <Grid.Container gap={1} justify="center">
-                <Grid>
-                    <Button
-                        onClick={() => {
-                            window.alert("With typescript and Jest");
-                        }}
-                        type="secondary"
-                        size="large"
-                        ghost
-                        shadow
-                        auto
-                    >
-                        Join Lobby
-                    </Button>
-                </Grid>
-                <Grid>
-                    <Button
-                        onClick={() => {
-                            window.alert("With typescript and Jest");
-                        }}
-                        type="secondary"
-                        size="large"
-                        ghost
-                        shadow
-                        auto
-                    >
-                        New Lobby
-                    </Button>
-                </Grid>
-            </Grid.Container>
+            <ButtonGroup>
+                <PrimaryButton
+                    onClick={() => {
+                        window.alert("With typescript and Jest");
+                    }}
+                >
+                    Join Lobby
+                </PrimaryButton>
+
+                <PrimaryButton
+                    onClick={() => {
+                        window.alert("With typescript and Jest");
+                    }}
+                >
+                    New Lobby
+                </PrimaryButton>
+            </ButtonGroup>
         </main>
 
         <Footer />
