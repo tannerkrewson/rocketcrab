@@ -3,8 +3,13 @@
 import { NextApiRequest, NextApiResponse } from "next";
 
 const handler = (req: NextApiRequest, res: NextApiResponse) => {
-    res.statusCode = 200;
-    res.json({ name: "John Doe" });
+    if (req.method !== "POST") {
+        res.status(404);
+        res.end();
+        return;
+    }
+
+    res.status(200).json({ code: "abcd" });
 };
 
 export default handler;
