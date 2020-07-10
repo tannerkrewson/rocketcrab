@@ -9,9 +9,11 @@ const PageLayout = ({ children }) => (
         </Head>
 
         <main>
-            <MainTitle />
+            <div className="main-content">
+                <MainTitle />
 
-            {children}
+                {children}
+            </div>
         </main>
 
         <Footer />
@@ -27,12 +29,15 @@ const PageLayout = ({ children }) => (
             }
 
             main {
-                padding: 5rem 0 15rem;
                 flex: 1;
                 display: flex;
                 flex-direction: column;
                 justify-content: center;
                 align-items: center;
+            }
+
+            .main-content {
+                min-height: 20rem;
             }
 
             a {
