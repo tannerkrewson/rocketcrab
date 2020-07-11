@@ -5,6 +5,9 @@ node_modules
 .next
 .env*.local
 
+# express
+dist
+
 # testing
 coverage
 
