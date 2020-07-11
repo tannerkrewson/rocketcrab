@@ -1,10 +1,10 @@
 import React from "react";
 import { render } from "../testUtils";
-import { Home } from "../../pages/index";
+import { Join } from "../../pages/join";
 
-describe("pages/index.tsx", () => {
+describe("pages/join.tsx", () => {
     it("matches snapshot", () => {
-        const { asFragment } = render(<Home />, {});
+        const { asFragment } = render(<Join />, {});
         expect(asFragment()).toMatchSnapshot();
     });
 });

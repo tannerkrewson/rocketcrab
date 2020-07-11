@@ -13,6 +13,7 @@
         "format": "prettier --write **/*.{js,ts,tsx,json}",
         "lint": "eslint . --ext ts --ext tsx --ext js",
         "test": "jest",
+        "test:watch": "jest --watch",
         "test-all": "run-s lint type-check test"
     },
     "husky": {

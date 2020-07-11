@@ -5,7 +5,7 @@ import PageLayout from "../components/PageLayout";
 
 const socket = socketIOClient();
 
-const Code = () => {
+export const Code = () => {
     const router = useRouter();
     const { code } = router.query;
 

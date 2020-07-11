@@ -4,7 +4,9 @@ import Link from "next/link";
 const PrimaryButton = (props) =>
     props.href ? (
         <Link href={props.href} as={props.as}>
-            <ButtonWrapper {...props} />
+            <>
+                <ButtonWrapper {...props} />
+            </>
         </Link>
     ) : (
         <ButtonWrapper {...props} />

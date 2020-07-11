@@ -5,16 +5,16 @@ export const initRocketCrab = (): RocketCrab => ({
     lobbyList: [],
 });
 
-export const newLobby = ({ lobbyList }: RocketCrab) => {
+export const newLobby = (lobbyList: Array<Lobby>) => {
     const code: string = getUniqueGameCode(lobbyList);
     lobbyList.push({ status: LobbyStatus.lobby, playerList: [], code });
     return code;
 };
 
-export const getLobby = (newCode: string, { lobbyList }: RocketCrab) =>
+export const getLobby = (newCode: string, lobbyList: Array<Lobby>) =>
     lobbyList.find(({ code }) => code === newCode);
 
-export const addPlayer = (player: Player, { playerList }: Lobby) =>
+export const addPlayer = (player: Player, playerList: Array<Player>) =>
     playerList.push(player);
 
 export const sendUpdatedLobby = (lobby: Lobby, io: SocketIO.Server) =>

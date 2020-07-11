@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`pages/index.tsx matches snapshot 1`] = `
+exports[`pages/join.tsx matches snapshot 1`] = `
 <DocumentFragment>
   <div
     class="jsx-3301757404 container"
@@ -26,9 +26,56 @@ exports[`pages/index.tsx matches snapshot 1`] = `
           </h2>
         </div>
         <div
-          class="jsx-613440105 description"
+          class="jsx-1007359504 description"
         >
-          all the best mobile web party games
+          Join Lobby
+        </div>
+        <div
+          class="jsx-1007359504 input-container"
+        >
+          <div
+            class="jsx-2152825435 with-label"
+          >
+            <div
+              class="jsx-2152825435 input-container "
+            >
+              <div
+                class="jsx-2152825435 input-wrapper   "
+              >
+                <input
+                  autocomplete="off"
+                  class="jsx-2152825435  "
+                  maxlength="4"
+                  placeholder="ex. abcd"
+                  type="text"
+                  value=""
+                />
+                <div
+                  class="jsx-1930334660 clear-icon "
+                >
+                  <svg
+                    class="jsx-1930334660"
+                    fill="none"
+                    shape-rendering="geometricPrecision"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="1.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      class="jsx-1930334660"
+                      d="M18 6L6 18"
+                    />
+                    <path
+                      class="jsx-1930334660"
+                      d="M6 6l12 12"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
         </div>
         <div
           class="jsx-1938348541 item justify jsx-1720607024 "
@@ -38,13 +85,13 @@ exports[`pages/index.tsx matches snapshot 1`] = `
           >
             <button
               class="jsx-2376802331 btn "
-              href="/join"
+              href="/"
               type="button"
             >
               <div
                 class="text"
               >
-                Join Lobby
+                Back
               </div>
             </button>
           </div>
@@ -52,13 +99,15 @@ exports[`pages/index.tsx matches snapshot 1`] = `
             class="jsx-974242038 item  jsx-4216129763 "
           >
             <button
+              as="/"
               class="jsx-2376802331 btn "
+              href="/[code]"
               type="button"
             >
               <div
                 class="text"
               >
-                New Lobby
+                Join
               </div>
             </button>
           </div>

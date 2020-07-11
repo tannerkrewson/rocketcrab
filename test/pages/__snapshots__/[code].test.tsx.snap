@@ -1,6 +1,6 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
-exports[`pages/index.tsx matches snapshot 1`] = `
+exports[`pages/[code].tsx matches snapshot 1`] = `
 <DocumentFragment>
   <div
     class="jsx-3301757404 container"
@@ -25,43 +25,8 @@ exports[`pages/index.tsx matches snapshot 1`] = `
             rocketcrab.com
           </h2>
         </div>
-        <div
-          class="jsx-613440105 description"
-        >
-          all the best mobile web party games
-        </div>
-        <div
-          class="jsx-1938348541 item justify jsx-1720607024 "
-        >
-          <div
-            class="jsx-974242038 item  jsx-4216129763 "
-          >
-            <button
-              class="jsx-2376802331 btn "
-              href="/join"
-              type="button"
-            >
-              <div
-                class="text"
-              >
-                Join Lobby
-              </div>
-            </button>
-          </div>
-          <div
-            class="jsx-974242038 item  jsx-4216129763 "
-          >
-            <button
-              class="jsx-2376802331 btn "
-              type="button"
-            >
-              <div
-                class="text"
-              >
-                New Lobby
-              </div>
-            </button>
-          </div>
+        <div>
+          Loading...
         </div>
       </div>
     </main>
