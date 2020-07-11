@@ -1,5 +1,5 @@
 import { getLobby, addPlayer, sendUpdatedLobby } from "./rocketcrab";
-import { JoinLobbyResponse } from "./types";
+import { JoinLobbyResponse } from "../types/types";
 
 export default (io, rocketCrab) =>
     io.on("connection", (socket) => {

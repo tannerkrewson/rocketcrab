@@ -1,5 +1,5 @@
-import { RocketCrab, Lobby, Player } from "../types";
-import { LobbyStatus } from "../enums";
+import { RocketCrab, Lobby, Player } from "../types/types";
+import { LobbyStatus } from "../types/enums";
 
 export const initRocketCrab = (): RocketCrab => ({
     lobbyList: [],
