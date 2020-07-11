@@ -6,6 +6,7 @@ import socketio from "socket.io";
 
 import attachAPIHandlers from "./api";
 import attachSocketHandlers from "./socket";
+import { initRocketCrab } from "./rocketcrab";
 
 const port = process.env.PORT || 3000;
 const dev = process.env.NODE_ENV !== "production";
@@ -22,8 +23,10 @@ const nextHandler = nextApp.getRequestHandler();
     const http = createServer(app);
     const io = socketio(http);
 
-    attachAPIHandlers(app);
-    attachSocketHandlers(io);
+    const rocketCrab = initRocketCrab();
+
+    attachAPIHandlers(app, rocketCrab);
+    attachSocketHandlers(io, rocketCrab);
 
     app.get("*", nextHandler);
 
