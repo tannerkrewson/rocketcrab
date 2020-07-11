@@ -1,8 +1,9 @@
 import Head from "next/head";
 import Footer from "../components/Footer";
 import MainTitle from "../components/MainTitle";
+import { PageLayoutParams } from "../types/types";
 
-const PageLayout = ({ children }) => (
+const PageLayout = ({ children, path }: PageLayoutParams) => (
     <div className="container">
         <Head>
             <title>🚀🦀 rocketcrab</title>
@@ -10,7 +11,7 @@ const PageLayout = ({ children }) => (
 
         <main>
             <div className="main-content">
-                <MainTitle />
+                <MainTitle path={path} />
 
                 {children}
             </div>

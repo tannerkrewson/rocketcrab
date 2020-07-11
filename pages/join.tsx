@@ -8,12 +8,13 @@ export const Join = (): JSX.Element => {
     const { state: code, bindings } = useInput("");
 
     return (
-        <PageLayout>
+        <PageLayout path={code}>
             <div className="description">Join Lobby</div>
             <div className="input-container">
                 <Input
                     placeholder="ex. abcd"
                     size="large"
+                    width="8rem"
                     clearable
                     maxLength={4}
                     {...bindings}
@@ -35,6 +36,7 @@ export const Join = (): JSX.Element => {
                 }
                 .input-container {
                     margin-bottom: 2em;
+                    text-align: center;
                 }
             `}</style>
         </PageLayout>

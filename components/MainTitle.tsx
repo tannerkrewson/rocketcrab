@@ -1,7 +1,6 @@
-const MainTitle = () => {
-    const host = "rocketcrab.com"; // window.location.host
-    const path = ""; // window.location.pathname === "/" ? "" : window.location.pathname;
-    const title = host + path;
+const MainTitle = ({ path = "" }) => {
+    const host = "rocketcrab.com";
+    const title = host + (path !== "" ? "/" + path : "");
 
     return (
         <div className="title">

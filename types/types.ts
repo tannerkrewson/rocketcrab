@@ -23,3 +23,8 @@ export type JoinLobbyResponse = {
     code: string;
     name?: string;
 };
+
+export type PageLayoutParams = {
+    children: JSX.Element[] | JSX.Element;
+    path?: string;
+};

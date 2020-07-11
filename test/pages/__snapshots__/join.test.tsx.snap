@@ -26,25 +26,25 @@ exports[`pages/join.tsx matches snapshot 1`] = `
           </h2>
         </div>
         <div
-          class="jsx-1007359504 description"
+          class="jsx-2322376654 description"
         >
           Join Lobby
         </div>
         <div
-          class="jsx-1007359504 input-container"
+          class="jsx-2322376654 input-container"
         >
           <div
-            class="jsx-2152825435 with-label"
+            class="jsx-1274958171 with-label"
           >
             <div
-              class="jsx-2152825435 input-container "
+              class="jsx-1274958171 input-container "
             >
               <div
-                class="jsx-2152825435 input-wrapper   "
+                class="jsx-1274958171 input-wrapper   "
               >
                 <input
                   autocomplete="off"
-                  class="jsx-2152825435  "
+                  class="jsx-1274958171  "
                   maxlength="4"
                   placeholder="ex. abcd"
                   type="text"
@@ -83,33 +83,37 @@ exports[`pages/join.tsx matches snapshot 1`] = `
           <div
             class="jsx-974242038 item  jsx-4216129763 "
           >
-            <button
-              class="jsx-2376802331 btn "
-              href="/"
-              type="button"
-            >
-              <div
-                class="text"
+            <div>
+              <button
+                class="jsx-2376802331 btn "
+                href="/"
+                type="button"
               >
-                Back
-              </div>
-            </button>
+                <div
+                  class="text"
+                >
+                  Back
+                </div>
+              </button>
+            </div>
           </div>
           <div
             class="jsx-974242038 item  jsx-4216129763 "
           >
-            <button
-              as="/"
-              class="jsx-2376802331 btn "
-              href="/[code]"
-              type="button"
-            >
-              <div
-                class="text"
+            <div>
+              <button
+                as="/"
+                class="jsx-2376802331 btn "
+                href="/[code]"
+                type="button"
               >
-                Join
-              </div>
-            </button>
+                <div
+                  class="text"
+                >
+                  Join
+                </div>
+              </button>
+            </div>
           </div>
         </div>
       </div>

@@ -35,7 +35,7 @@ export const Code = () => {
     const showLobby = status.startsWith("lobby");
 
     return (
-        <PageLayout>
+        <PageLayout path={code}>
             {showLoading && <div>Loading...</div>}
             {!showLoading && (
                 <>
