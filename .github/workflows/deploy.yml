@@ -1,0 +1,24 @@
+name: deploy
+
+on:
+    push:
+        branches:
+            - master
+
+jobs:
+    build:
+        runs-on: ubuntu-latest
+
+        steps:
+            - uses: actions/checkout@v2
+              with:
+                  ref: "master"
+                  fetch-depth: "0"
+
+            - name: Dokku deploy
+              uses: vitalyliber/dokku-github-action@v5.0
+              env:
+                  PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
+                  HOST: 134.209.222.77
+                  PROJECT: rocketcrab
+                  BRANCH: master
