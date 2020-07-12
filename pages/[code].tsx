@@ -20,6 +20,7 @@ export const Code = () => {
         socket.on("update", (newLobbyState) => {
             setLobbyState(newLobbyState);
         });
+        socket.on("invalid-name", () => alert("Name already in use"));
 
         return () => {
             socket.close();

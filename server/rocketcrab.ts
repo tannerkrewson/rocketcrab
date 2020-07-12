@@ -44,6 +44,25 @@ export const deleteLobbyIfEmpty = (lobby: Lobby, lobbyList: Array<Lobby>) => {
     }
 };
 
+export const setName = (
+    name: string,
+    playerToName: Player,
+    playerList: Array<Player>
+): void => {
+    const validLength = name.length > 1 && name.length <= 24;
+
+    if (!findPlayerByName(name, playerList) && validLength) {
+        // TODO: strip tags?
+        playerToName.name = name;
+    } else {
+        playerToName.name = "";
+        playerToName.socket.emit("invalid-name");
+    }
+};
+
+const findPlayerByName = (nameToFind: string, playerList: Array<Player>) =>
+    playerList.find(({ name }) => name === nameToFind);
+
 const disconnectAllPlayers = (playerList: Array<Player>) =>
     playerList.forEach(({ socket }) => socket.disconnect(true));
 

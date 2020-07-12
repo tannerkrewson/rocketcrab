@@ -4,6 +4,7 @@ import {
     sendStateToAll,
     removePlayer,
     deleteLobbyIfEmpty,
+    setName,
 } from "./rocketcrab";
 import { JoinLobbyResponse, Player, Lobby } from "../types/types";
 
@@ -36,6 +37,11 @@ const attachLobbyListenersToPlayer = (
     socket.on("disconnect", () => {
         removePlayer(player, playerList);
         deleteLobbyIfEmpty(lobby, lobbyList);
+        sendStateToAll(lobby);
+    });
+
+    socket.on("name", (name) => {
+        setName(name, player, playerList);
         sendStateToAll(lobby);
     });
 };

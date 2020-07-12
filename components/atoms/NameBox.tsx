@@ -8,7 +8,7 @@ const NameBox = ({ name }) => (
                 textAlign: "center",
             }}
         >
-            Larry {name}
+            {name}
         </div>
     </>
 );
