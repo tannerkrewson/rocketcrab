@@ -1,4 +1,3 @@
-import Head from "next/head";
 import { Loading } from "@zeit-ui/react";
 import Footer from "../atoms/Footer";
 import MainTitle from "../atoms/MainTitle";
@@ -6,10 +5,6 @@ import { PageLayoutParams } from "../../types/types";
 
 const PageLayout = ({ children, path, loading }: PageLayoutParams) => (
     <div className="container">
-        <Head>
-            <title>🚀🦀 rocketcrab</title>
-        </Head>
-
         <main>
             <div className="main-content">
                 <MainTitle path={path} />
@@ -49,8 +44,6 @@ const PageLayout = ({ children, path, loading }: PageLayoutParams) => (
         `}</style>
 
         <style jsx global>{`
-            @import url("https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;600&display=swap");
-
             html,
             body {
                 padding: 0;
@@ -59,8 +52,6 @@ const PageLayout = ({ children, path, loading }: PageLayoutParams) => (
 
             * {
                 box-sizing: border-box;
-                letter-spacing: normal !important;
-                font-family: "Inconsolata", monospace;
             }
         `}</style>
     </div>

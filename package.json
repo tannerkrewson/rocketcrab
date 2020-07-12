@@ -32,6 +32,7 @@
         "body-parser": "^1.19.0",
         "cross-env": "^7.0.2",
         "express": "^4.17.1",
+        "fontsource-inconsolata": "^2.1.4",
         "next": "^9.4.4",
         "react": "^16.13.1",
         "react-dom": "^16.13.1",

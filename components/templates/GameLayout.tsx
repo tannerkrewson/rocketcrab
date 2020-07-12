@@ -30,14 +30,6 @@ const GameLayout = ({ gameState }) => {
                     border: 0;
                 }
             `}</style>
-            <style jsx global>{`
-                @import url("https://fonts.googleapis.com/css2?family=Inconsolata:wght@400;600&display=swap");
-
-                * {
-                    letter-spacing: normal !important;
-                    font-family: "Inconsolata", monospace;
-                }
-            `}</style>
         </div>
     );
 };

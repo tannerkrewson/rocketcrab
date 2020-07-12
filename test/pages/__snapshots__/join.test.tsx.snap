@@ -3,13 +3,13 @@
 exports[`pages/join.tsx matches snapshot 1`] = `
 <DocumentFragment>
   <div
-    class="jsx-3301757404 container"
+    class="jsx-597424146 container"
   >
     <main
-      class="jsx-3301757404"
+      class="jsx-597424146"
     >
       <div
-        class="jsx-3301757404 main-content"
+        class="jsx-597424146 main-content"
       >
         <div
           class="jsx-1789987802 title"
