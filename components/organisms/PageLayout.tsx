@@ -1,7 +1,7 @@
 import Head from "next/head";
-import Footer from "../components/Footer";
-import MainTitle from "../components/MainTitle";
-import { PageLayoutParams } from "../types/types";
+import Footer from "../atoms/Footer";
+import MainTitle from "../atoms/MainTitle";
+import { PageLayoutParams } from "../../types/types";
 
 const PageLayout = ({ children, path }: PageLayoutParams) => (
     <div className="container">

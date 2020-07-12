@@ -1,8 +1,8 @@
 import { Input, useInput } from "@zeit-ui/react";
 
-import PrimaryButton from "../components/PrimaryButton";
-import ButtonGroup from "../components/ButtonGroup";
-import PageLayout from "../components/PageLayout";
+import PrimaryButton from "../components/atoms/PrimaryButton";
+import ButtonGroup from "../components/molecules/ButtonGroup";
+import PageLayout from "../components/organisms/PageLayout";
 
 export const Join = (): JSX.Element => {
     const { state: code, bindings } = useInput("");

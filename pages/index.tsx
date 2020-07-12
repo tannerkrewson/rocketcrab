@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { useRouter } from "next/router";
 
-import PrimaryButton from "../components/PrimaryButton";
-import ButtonGroup from "../components/ButtonGroup";
-import PageLayout from "../components/PageLayout";
+import PrimaryButton from "../components/atoms/PrimaryButton";
+import ButtonGroup from "../components/molecules/ButtonGroup";
+import PageLayout from "../components/organisms/PageLayout";
 import { postJson } from "../utils/utils";
 
 export const Home = (): JSX.Element => {

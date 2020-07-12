@@ -1,7 +1,8 @@
 import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import socketIOClient from "socket.io-client";
-import PageLayout from "../components/PageLayout";
+import PageLayout from "../components/organisms/PageLayout";
+import Lobby from "../components/organisms/Lobby";
 
 const socket = socketIOClient();
 
@@ -35,13 +36,13 @@ export const Code = () => {
     const showLobby = status.startsWith("lobby");
 
     return (
-        <PageLayout path={code}>
+        <PageLayout path={code as string}>
             {showLoading && <div>Loading...</div>}
             {!showLoading && (
                 <>
                     {showLobby && (
                         <>
-                            <div>Lobby placeholder</div>
+                            <Lobby playerList={lobbyState.playerList} />
                             <div>{JSON.stringify(lobbyState)}</div>
                         </>
                     )}
