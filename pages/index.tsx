@@ -21,9 +21,7 @@ export const Home = (): JSX.Element => {
 
     return (
         <PageLayout>
-            <div className="description">
-                all the best mobile web party games
-            </div>
+            <div className="description">party games for your phone</div>
 
             <ButtonGroup>
                 <PrimaryButton href="/join" size="large">

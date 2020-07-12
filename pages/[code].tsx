@@ -78,16 +78,13 @@ export const Code = () => {
                             />
                         )}
                         {showLobby && (
-                            <>
-                                <Lobby
-                                    playerList={playerList}
-                                    gameList={gameList}
-                                    onGameSelect={onGameSelect}
-                                    selectedGame={selectedGame}
-                                    onStartGame={onStartGame}
-                                />
-                                <div>{JSON.stringify(lobbyState)}</div>
-                            </>
+                            <Lobby
+                                playerList={playerList}
+                                gameList={gameList}
+                                onGameSelect={onGameSelect}
+                                selectedGame={selectedGame}
+                                onStartGame={onStartGame}
+                            />
                         )}
                     </>
                 </PageLayout>

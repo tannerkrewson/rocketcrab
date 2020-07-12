@@ -2,7 +2,9 @@
 
 ### Play now at [rocketcrab.com](https://rocketcrab.com/)
 
-rocketcrab is a launcher and matching service for mobile web party games.
+rocketcrab is a launcher and matchmaking service for mobile web party games.
+
+## Development
 
 This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) using the [`with-typescript-eslint-jest`](https://github.com/vercel/next.js/tree/v9.4.4/examples/with-typescript-eslint-jest) template, which includes:
 
@@ -12,7 +14,7 @@ This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next
 -   Linting, typechecking and formatting on by default using [`husky`](https://github.com/typicode/husky) for commit hooks
 -   Testing with [Jest](https://jestjs.io/) and [`react-testing-library`](https://testing-library.com/docs/react-testing-library/intro)
 
-## Getting Started
+### Getting Started
 
 First, run the development server:
 
@@ -24,7 +26,7 @@ Open [http://localhost:3000](http://localhost:3000) with your browser to see the
 
 You can start editing the page by modifying `pages/index.js`. The page auto-updates as you edit the file.
 
-## Learn More
+### Learn More
 
 To learn more about Next.js, take a look at the following resources:
 
