@@ -1,3 +1,5 @@
+import { Loading } from "@zeit-ui/react";
+
 const NameBox = ({ name }) => (
     <>
         <div
@@ -8,7 +10,7 @@ const NameBox = ({ name }) => (
                 textAlign: "center",
             }}
         >
-            {name}
+            {name ? name : <Loading />}
         </div>
     </>
 );
