@@ -1,13 +1,21 @@
-const GameLayout = () => {
+import { GameStatus } from "../../types/enums";
+import { Loading } from "@zeit-ui/react";
+
+const GameLayout = ({ gameState }) => {
+    const { status, url } = gameState;
+    const showLoading = status === GameStatus.loading;
+    const showGameFrame = status === GameStatus.inprogress;
     return (
         <div className="layout">
             <div className="status">
                 <h4>🚀🦀 rocketcrab</h4>
             </div>
-            <iframe
-                className="frame"
-                src="https://spyfall.tannerkrewson.com/"
-            ></iframe>
+            {showLoading && (
+                <div className="frame">
+                    <Loading />
+                </div>
+            )}
+            {showGameFrame && <iframe className="frame" src={url}></iframe>}
             <style jsx>{`
                 .layout {
                     display: flex;

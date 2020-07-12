@@ -14,7 +14,14 @@ export const Code = () => {
     const { code } = router.query;
 
     const [lobbyState, setLobbyState] = useState(initLobbyState());
-    const { status, me, playerList, gameList, selectedGame } = lobbyState;
+    const {
+        status,
+        me,
+        playerList,
+        gameList,
+        selectedGame,
+        gameState,
+    } = lobbyState;
 
     // only ran with initial value due to the []
     useEffect(() => {
@@ -81,7 +88,7 @@ export const Code = () => {
                     </>
                 </PageLayout>
             )}
-            {showGame && <GameLayout />}
+            {showGame && <GameLayout gameState={gameState} />}
         </>
     );
 };
@@ -92,6 +99,7 @@ const initLobbyState = () => ({
     gameList: [],
     me: { name: undefined },
     selectedGame: "",
+    gameState: {},
 });
 
 export default Code;
