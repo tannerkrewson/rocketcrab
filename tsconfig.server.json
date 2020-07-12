@@ -7,5 +7,10 @@
         "isolatedModules": false,
         "noEmit": false
     },
-    "include": ["server/**/*.ts"]
+    "include": [
+        "server/**/*.ts",
+        "games/**/*.ts",
+        "types/**/*.ts",
+        "utils/**/*.ts"
+    ]
 }
