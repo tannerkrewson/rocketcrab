@@ -1,4 +1,4 @@
-import { LobbyStatus } from "./enums";
+import { LobbyStatus, GameStatus } from "./enums";
 
 export type RocketCrab = {
     lobbyList: Array<Lobby>;
@@ -10,6 +10,7 @@ export type Lobby = {
     code: string;
     selectedGame: string;
     gameList: Array<Game>;
+    gameState: GameState;
 };
 
 export type Player = {
@@ -17,7 +18,15 @@ export type Player = {
     socket: SocketIO.Socket;
 };
 
-export type Game = any;
+export type Game = {
+    name: string;
+    getJoinGameUrl: () => Promise<string>;
+};
+
+export type GameState = {
+    status: GameStatus;
+    url?: string;
+};
 
 export type JoinLobbyResponse = {
     code: string;

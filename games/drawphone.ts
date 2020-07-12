@@ -1,4 +1,8 @@
-export default {
+import { Game } from "../types/types";
+
+const game: Game = {
     name: "Drawphone",
-    getNewGameUrl: () => "https://drawphone.tannerkrewson.com",
+    getJoinGameUrl: async () => "https://drawphone.tannerkrewson.com",
 };
+
+export default game;

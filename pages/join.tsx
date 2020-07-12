@@ -3,7 +3,7 @@ import { Input, useInput } from "@zeit-ui/react";
 
 import PrimaryButton from "../components/atoms/PrimaryButton";
 import ButtonGroup from "../components/molecules/ButtonGroup";
-import PageLayout from "../components/organisms/PageLayout";
+import PageLayout from "../components/templates/PageLayout";
 
 export const Join = (): JSX.Element => {
     const router = useRouter();

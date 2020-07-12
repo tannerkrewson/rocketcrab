@@ -3,3 +3,8 @@ export enum LobbyStatus {
     lobby = "lobby",
     ingame = "ingame",
 }
+
+export enum GameStatus {
+    loading = "loading",
+    inprogress = "inprogress",
+}

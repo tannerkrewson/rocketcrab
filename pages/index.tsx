@@ -3,7 +3,7 @@ import { useRouter } from "next/router";
 
 import PrimaryButton from "../components/atoms/PrimaryButton";
 import ButtonGroup from "../components/molecules/ButtonGroup";
-import PageLayout from "../components/organisms/PageLayout";
+import PageLayout from "../components/templates/PageLayout";
 import { postJson } from "../utils/utils";
 
 export const Home = (): JSX.Element => {

@@ -2,9 +2,10 @@ import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
 import socketIOClient from "socket.io-client";
 
-import PageLayout from "../components/organisms/PageLayout";
+import PageLayout from "../components/templates/PageLayout";
 import Lobby from "../components/organisms/Lobby";
 import NameEntry from "../components/organisms/NameEntry";
+import GameLayout from "../components/templates/GameLayout";
 
 const socket = socketIOClient();
 
@@ -44,34 +45,44 @@ export const Code = () => {
         socket.emit("game-select", gameName);
     };
 
+    const onStartGame = () => {
+        socket.emit("game-start");
+    };
+
     const showLoading = status === "loading";
     const showNameEntry = !showLoading && !me.name;
-    const showLobby =
-        !showLoading && !showNameEntry && status.startsWith("lobby");
+    const showLobby = !showLoading && !showNameEntry && status === "lobby";
+    const showGame = !showLoading && !showNameEntry && status === "ingame";
 
     return (
-        <PageLayout path={code as string} loading={showLoading}>
-            <>
-                {showNameEntry && (
-                    <NameEntry
-                        onNameEntry={onNameEntry}
-                        code={code}
-                        socket={socket}
-                    />
-                )}
-                {showLobby && (
+        <>
+            {!showGame && (
+                <PageLayout path={code as string} loading={showLoading}>
                     <>
-                        <Lobby
-                            playerList={playerList}
-                            gameList={gameList}
-                            onGameSelect={onGameSelect}
-                            selectedGame={selectedGame}
-                        />
-                        <div>{JSON.stringify(lobbyState)}</div>
+                        {showNameEntry && (
+                            <NameEntry
+                                onNameEntry={onNameEntry}
+                                code={code}
+                                socket={socket}
+                            />
+                        )}
+                        {showLobby && (
+                            <>
+                                <Lobby
+                                    playerList={playerList}
+                                    gameList={gameList}
+                                    onGameSelect={onGameSelect}
+                                    selectedGame={selectedGame}
+                                    onStartGame={onStartGame}
+                                />
+                                <div>{JSON.stringify(lobbyState)}</div>
+                            </>
+                        )}
                     </>
-                )}
-            </>
-        </PageLayout>
+                </PageLayout>
+            )}
+            {showGame && <GameLayout />}
+        </>
     );
 };
 

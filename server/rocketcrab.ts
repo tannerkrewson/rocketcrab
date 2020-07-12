@@ -1,7 +1,7 @@
-import { RocketCrab, Lobby, Player } from "../types/types";
-import { LobbyStatus } from "../types/enums";
+import { RocketCrab, Lobby, Player, GameState, Game } from "../types/types";
+import { LobbyStatus, GameStatus } from "../types/enums";
 import getGameList from "../games";
-const GAME_LIST = getGameList();
+const GAME_LIST: Array<Game> = getGameList();
 
 export const initRocketCrab = (): RocketCrab => ({
     lobbyList: [],
@@ -15,6 +15,7 @@ export const newLobby = (lobbyList: Array<Lobby>) => {
         code,
         selectedGame: "",
         gameList: GAME_LIST,
+        gameState: { status: GameStatus.loading },
     });
     return code;
 };
@@ -69,13 +70,40 @@ export const setName = (
 };
 
 export const setGame = (gameName: string, lobby: Lobby) => {
-    if (GAME_LIST.find(({ name }) => name === gameName)) {
+    if (findGameByName(gameName)) {
         lobby.selectedGame = gameName;
     }
 };
 
-const findPlayerByName = (nameToFind: string, playerList: Array<Player>) =>
-    playerList.find(({ name }) => name === nameToFind);
+export const startGame = (lobby: Lobby) => {
+    // TODO: check if ready
+    const { gameState, selectedGame } = lobby;
+
+    const game: Game = findGameByName(selectedGame);
+    if (!game) return;
+
+    lobby.status = LobbyStatus.ingame;
+    gameState.status = GameStatus.loading;
+
+    game.getJoinGameUrl().then((url) => {
+        //TODO handle failed to get url
+        setJoinGameUrl(url, gameState);
+        sendStateToAll(lobby);
+    });
+};
+
+export const setJoinGameUrl = (url: string, gameState: GameState) => {
+    gameState.status = GameStatus.inprogress;
+    gameState.url = url;
+};
+
+const findPlayerByName = (
+    nameToFind: string,
+    playerList: Array<Player>
+): Player => playerList.find(({ name }) => name === nameToFind);
+
+const findGameByName = (gameName: string): Game =>
+    GAME_LIST.find(({ name }) => name === gameName);
 
 const disconnectAllPlayers = (playerList: Array<Player>) =>
     playerList.forEach(({ socket }) => socket.disconnect(true));
