@@ -97,6 +97,14 @@ export const setJoinGameUrl = (url: string, gameState: GameState) => {
     gameState.url = url;
 };
 
+export const exitGame = (lobby: Lobby) => {
+    lobby.status = LobbyStatus.lobby;
+
+    const { gameState } = lobby;
+    gameState.status = GameStatus.loading;
+    gameState.url = undefined;
+};
+
 const findPlayerByName = (
     nameToFind: string,
     playerList: Array<Player>

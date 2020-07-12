@@ -32,9 +32,11 @@ export const Join = (): JSX.Element => {
             </div>
 
             <ButtonGroup>
-                <PrimaryButton href="/">Back</PrimaryButton>
+                <PrimaryButton href="/" size="large">
+                    Back
+                </PrimaryButton>
 
-                <PrimaryButton href="/[code]" as={"/" + code}>
+                <PrimaryButton href="/[code]" as={"/" + code} size="large">
                     Join
                 </PrimaryButton>
             </ButtonGroup>

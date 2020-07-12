@@ -56,6 +56,10 @@ export const Code = () => {
         socket.emit("game-start");
     };
 
+    const onExitGame = () => {
+        socket.emit("game-exit");
+    };
+
     const showLoading = status === "loading";
     const showNameEntry = !showLoading && !me.name;
     const showLobby = !showLoading && !showNameEntry && status === "lobby";
@@ -88,7 +92,9 @@ export const Code = () => {
                     </>
                 </PageLayout>
             )}
-            {showGame && <GameLayout gameState={gameState} />}
+            {showGame && (
+                <GameLayout gameState={gameState} onExitGame={onExitGame} />
+            )}
         </>
     );
 };

@@ -23,8 +23,14 @@ const Lobby = ({
         />
         <Spacer y={1} />
         <ButtonGroup>
-            <PrimaryButton href="/">Leave Lobby</PrimaryButton>
-            <PrimaryButton disabled={!selectedGame} onClick={onStartGame}>
+            <PrimaryButton href="/" size="large">
+                Leave Lobby
+            </PrimaryButton>
+            <PrimaryButton
+                disabled={!selectedGame}
+                onClick={onStartGame}
+                size="large"
+            >
                 Start Game
             </PrimaryButton>
         </ButtonGroup>

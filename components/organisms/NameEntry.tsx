@@ -55,9 +55,13 @@ const NameEntry = ({ onNameEntry, code, socket }) => {
             </div>
 
             <ButtonGroup>
-                <PrimaryButton onClick={handleBack}>Back</PrimaryButton>
+                <PrimaryButton onClick={handleBack} size="large">
+                    Back
+                </PrimaryButton>
 
-                <PrimaryButton onClick={handleJoin}>Confirm</PrimaryButton>
+                <PrimaryButton onClick={handleJoin} size="large">
+                    Confirm
+                </PrimaryButton>
             </ButtonGroup>
 
             <style jsx>{`

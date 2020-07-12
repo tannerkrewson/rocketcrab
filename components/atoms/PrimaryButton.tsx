@@ -13,7 +13,7 @@ const PrimaryButton = (props) =>
     );
 
 const ButtonWrapper = (props) => (
-    <Button type="secondary" size="large" ghost shadow auto {...props} />
+    <Button type="secondary" ghost shadow auto {...props} />
 );
 
 export default PrimaryButton;

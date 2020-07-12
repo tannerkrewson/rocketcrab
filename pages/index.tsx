@@ -26,9 +26,15 @@ export const Home = (): JSX.Element => {
             </div>
 
             <ButtonGroup>
-                <PrimaryButton href="/join">Join Lobby</PrimaryButton>
+                <PrimaryButton href="/join" size="large">
+                    Join Lobby
+                </PrimaryButton>
 
-                <PrimaryButton onClick={onClickNew} loading={newLoading}>
+                <PrimaryButton
+                    onClick={onClickNew}
+                    loading={newLoading}
+                    size="large"
+                >
                     New Lobby
                 </PrimaryButton>
             </ButtonGroup>

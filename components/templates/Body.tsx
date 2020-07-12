@@ -11,6 +11,11 @@ const Body = ({ children }) => (
         </Head>
         {children}
         <style jsx global>{`
+            html,
+            body,
+            #__next {
+                height: 100%;
+            }
             * {
                 letter-spacing: normal !important;
                 font-family: "Inconsolata", monospace;

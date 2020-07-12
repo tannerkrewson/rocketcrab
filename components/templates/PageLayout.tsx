@@ -17,7 +17,7 @@ const PageLayout = ({ children, path, loading }: PageLayoutParams) => (
 
         <style jsx>{`
             .container {
-                min-height: 100vh;
+                min-height: 100%;
                 padding: 0 0.5rem;
                 display: flex;
                 flex-direction: column;
