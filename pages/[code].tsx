@@ -17,6 +17,8 @@ export const Code = () => {
 
     // only ran with initial value due to the []
     useEffect(() => {
+        socket.open();
+
         socket.on("update", (newLobbyState) => setLobbyState(newLobbyState));
         socket.on("invalid-name", () => alert("Name already in use"));
 
@@ -44,33 +46,31 @@ export const Code = () => {
 
     const showLoading = status === "loading";
     const showNameEntry = !showLoading && !me.name;
-    const showLobby = !showNameEntry && status.startsWith("lobby");
+    const showLobby =
+        !showLoading && !showNameEntry && status.startsWith("lobby");
 
     return (
-        <PageLayout path={code as string}>
-            {showLoading && <div>Loading...</div>}
-            {!showLoading && (
-                <>
-                    {showNameEntry && (
-                        <NameEntry
-                            onNameEntry={onNameEntry}
-                            code={code}
-                            socket={socket}
+        <PageLayout path={code as string} loading={showLoading}>
+            <>
+                {showNameEntry && (
+                    <NameEntry
+                        onNameEntry={onNameEntry}
+                        code={code}
+                        socket={socket}
+                    />
+                )}
+                {showLobby && (
+                    <>
+                        <Lobby
+                            playerList={playerList}
+                            gameList={gameList}
+                            onGameSelect={onGameSelect}
+                            selectedGame={selectedGame}
                         />
-                    )}
-                    {showLobby && (
-                        <>
-                            <Lobby
-                                playerList={playerList}
-                                gameList={gameList}
-                                onGameSelect={onGameSelect}
-                                selectedGame={selectedGame}
-                            />
-                            <div>{JSON.stringify(lobbyState)}</div>
-                        </>
-                    )}
-                </>
-            )}
+                        <div>{JSON.stringify(lobbyState)}</div>
+                    </>
+                )}
+            </>
         </PageLayout>
     );
 };
@@ -80,6 +80,7 @@ const initLobbyState = () => ({
     playerList: [],
     gameList: [],
     me: { name: undefined },
+    selectedGame: "",
 });
 
 export default Code;

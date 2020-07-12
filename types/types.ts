@@ -27,4 +27,5 @@ export type JoinLobbyResponse = {
 export type PageLayoutParams = {
     children: JSX.Element[] | JSX.Element;
     path?: string;
+    loading?: boolean;
 };

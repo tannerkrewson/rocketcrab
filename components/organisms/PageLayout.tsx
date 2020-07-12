@@ -1,9 +1,10 @@
 import Head from "next/head";
+import { Loading } from "@zeit-ui/react";
 import Footer from "../atoms/Footer";
 import MainTitle from "../atoms/MainTitle";
 import { PageLayoutParams } from "../../types/types";
 
-const PageLayout = ({ children, path }: PageLayoutParams) => (
+const PageLayout = ({ children, path, loading }: PageLayoutParams) => (
     <div className="container">
         <Head>
             <title>🚀🦀 rocketcrab</title>
@@ -13,7 +14,7 @@ const PageLayout = ({ children, path }: PageLayoutParams) => (
             <div className="main-content">
                 <MainTitle path={path} />
 
-                {children}
+                {loading ? <Loading /> : children}
             </div>
         </main>
 
