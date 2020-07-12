@@ -1,5 +1,7 @@
 import { RocketCrab, Lobby, Player } from "../types/types";
 import { LobbyStatus } from "../types/enums";
+import getGameList from "../games";
+const GAME_LIST = getGameList();
 
 export const initRocketCrab = (): RocketCrab => ({
     lobbyList: [],
@@ -68,6 +70,7 @@ const disconnectAllPlayers = (playerList: Array<Player>) =>
 
 const getJsonLobby = ({ playerList, ...lobby }: Lobby) => ({
     playerList: playerList.map(({ name }) => ({ name })),
+    gameList: GAME_LIST,
     ...lobby,
 });
 

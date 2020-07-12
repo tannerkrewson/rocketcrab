@@ -17,9 +17,7 @@ export const Code = () => {
 
     // only ran with initial value due to the []
     useEffect(() => {
-        socket.on("update", (newLobbyState) => {
-            setLobbyState(newLobbyState);
-        });
+        socket.on("update", (newLobbyState) => setLobbyState(newLobbyState));
         socket.on("invalid-name", () => alert("Name already in use"));
 
         return () => {
@@ -40,7 +38,7 @@ export const Code = () => {
         // TODO: store in cookie
     };
 
-    const { me } = lobbyState;
+    const { me, playerList, gameList } = lobbyState;
 
     const showLoading = status === "loading";
     const showNameEntry = !showLoading && !me.name;
@@ -60,7 +58,10 @@ export const Code = () => {
                     )}
                     {showLobby && (
                         <>
-                            <Lobby playerList={lobbyState.playerList} />
+                            <Lobby
+                                playerList={playerList}
+                                gameList={gameList}
+                            />
                             <div>{JSON.stringify(lobbyState)}</div>
                         </>
                     )}
@@ -73,6 +74,7 @@ export const Code = () => {
 const initLobbyState = () => ({
     status: "loading",
     playerList: [],
+    gameList: [],
     me: { name: undefined },
 });
 
