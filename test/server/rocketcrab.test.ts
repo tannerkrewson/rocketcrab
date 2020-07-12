@@ -4,6 +4,8 @@ import {
     getLobby,
     addPlayer,
     sendUpdatedLobby,
+    removePlayer,
+    deleteLobbyIfEmpty,
 } from "../../server/rocketcrab";
 import { Lobby, Player } from "../../types/types";
 import { LobbyStatus } from "../../types/enums";
@@ -45,12 +47,12 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("addPlayer works", () => {
-        const newPlayer = { name: "foo", socket: {} as SocketIO.Socket };
+        const mockPlayer = { name: "foo", socket: {} as SocketIO.Socket };
         const playerList: Array<Player> = [];
-        addPlayer(newPlayer, playerList);
+        addPlayer(mockPlayer, playerList);
 
         expect(playerList.length).toBe(1);
-        expect(playerList).toContain(newPlayer);
+        expect(playerList).toContain(mockPlayer);
     });
 
     it("sendUpdatedLobby works", () => {
@@ -70,5 +72,51 @@ describe("server/rocketcrab.ts", () => {
 
         expect(to).toBeCalledWith(mockLobby.code);
         expect(emit).toBeCalledWith("update", mockLobby);
+    });
+
+    it("removePlayer works", () => {
+        const disconnect = jest.fn();
+        const mockPlayer = {
+            name: "foo",
+            socket: ({ disconnect } as unknown) as SocketIO.Socket,
+        };
+        const playerList: Array<Player> = [mockPlayer];
+
+        removePlayer(mockPlayer, playerList);
+
+        expect(playerList.length).toBe(0);
+        expect(playerList).not.toContain(mockPlayer);
+        expect(disconnect).toHaveBeenCalledWith(true);
+    });
+
+    it("deleteLobbyIfEmpty deletes empty lobby", () => {
+        const mockLobby: Lobby = {
+            status: LobbyStatus.lobby,
+            playerList: [],
+            code: "efgh",
+        };
+        const lobbyList: Array<Lobby> = [mockLobby];
+
+        deleteLobbyIfEmpty(mockLobby, lobbyList);
+
+        expect(lobbyList.length).toBe(0);
+    });
+
+    it("deleteLobbyIfEmpty doesn't delete non-empty lobby", () => {
+        const mockLobby: Lobby = {
+            status: LobbyStatus.lobby,
+            playerList: [
+                {
+                    name: "foo",
+                    socket: {} as SocketIO.Socket,
+                },
+            ],
+            code: "efgh",
+        };
+        const lobbyList: Array<Lobby> = [mockLobby];
+
+        deleteLobbyIfEmpty(mockLobby, lobbyList);
+
+        expect(lobbyList).toContain(mockLobby);
     });
 });

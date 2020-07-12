@@ -20,6 +20,31 @@ export const addPlayer = (player: Player, playerList: Array<Player>) =>
 export const sendUpdatedLobby = (lobby: Lobby, io: SocketIO.Server) =>
     io.to(lobby.code).emit("update", getJsonLobby(lobby));
 
+export const removePlayer = (player: Player, playerList: Array<Player>) => {
+    const { socket } = player;
+
+    if (socket && socket.disconnect) {
+        socket.disconnect(true);
+    }
+
+    deleteFromArray(player, playerList);
+};
+
+export const deleteLobbyIfEmpty = (lobby: Lobby, lobbyList: Array<Lobby>) => {
+    const { playerList, code } = lobby;
+
+    if (playerList.length === 0 && code !== "ffff") {
+        // the only players that could possibly
+        // be left are unnamed players
+        disconnectAllPlayers(playerList);
+
+        deleteFromArray(lobby, lobbyList);
+    }
+};
+
+const disconnectAllPlayers = (playerList: Array<Player>) =>
+    playerList.forEach(({ socket }) => socket.disconnect(true));
+
 const getJsonLobby = ({ playerList, ...lobby }: Lobby) => ({
     playerList: playerList.map(({ name }) => ({ name })),
     ...lobby,
@@ -43,4 +68,11 @@ const getRandomFourLetters = () => {
     }
 
     return code;
+};
+
+const deleteFromArray = (item: any, array: Array<any>) => {
+    const index = array.indexOf(item);
+    if (index > -1) {
+        array.splice(index, 1);
+    }
 };
