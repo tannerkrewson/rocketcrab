@@ -5,6 +5,7 @@ import {
     removePlayer,
     deleteLobbyIfEmpty,
     setName,
+    setGame,
 } from "./rocketcrab";
 import { JoinLobbyResponse, Player, Lobby } from "../types/types";
 
@@ -42,6 +43,11 @@ const attachLobbyListenersToPlayer = (
 
     socket.on("name", (name) => {
         setName(name, player, playerList);
+        sendStateToAll(lobby);
+    });
+
+    socket.on("game-select", (gameName) => {
+        setGame(gameName, lobby);
         sendStateToAll(lobby);
     });
 };

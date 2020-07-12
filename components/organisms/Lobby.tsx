@@ -4,13 +4,17 @@ import ButtonGroup from "../molecules/ButtonGroup";
 import { Spacer } from "@zeit-ui/react";
 import GameSelector from "../molecules/GameSelector";
 
-const Lobby = ({ playerList, gameList }) => (
+const Lobby = ({ playerList, gameList, onGameSelect, selectedGame }) => (
     <div style={{ textAlign: "center" }}>
         <div>Players</div>
         <PlayerList playerList={playerList} />
         <Spacer y={1} />
         <div>Games</div>
-        <GameSelector gameList={gameList} />
+        <GameSelector
+            gameList={gameList}
+            onGameSelect={onGameSelect}
+            selectedGame={selectedGame}
+        />
         <Spacer y={1} />
         <ButtonGroup>
             <PrimaryButton href="/">Leave Lobby</PrimaryButton>

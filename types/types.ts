@@ -8,6 +8,8 @@ export type Lobby = {
     status: LobbyStatus;
     playerList: Array<Player>;
     code: string;
+    selectedGame: string;
+    gameList: Array<Game>;
 };
 
 export type Player = {
@@ -15,9 +17,7 @@ export type Player = {
     socket: SocketIO.Socket;
 };
 
-export type Game = {
-    newUrl: string;
-};
+export type Game = any;
 
 export type JoinLobbyResponse = {
     code: string;

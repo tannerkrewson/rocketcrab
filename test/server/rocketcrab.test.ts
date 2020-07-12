@@ -6,9 +6,16 @@ import {
     sendStateToAll,
     removePlayer,
     deleteLobbyIfEmpty,
+    setGame,
 } from "../../server/rocketcrab";
 import { Lobby, Player } from "../../types/types";
 import { LobbyStatus } from "../../types/enums";
+
+const MOCK_GAME_LIST = [{ name: "FooGame" }, { name: "CoolGame" }];
+
+jest.mock("../../games", () =>
+    jest.fn(() => [{ name: "FooGame" }, { name: "CoolGame" }])
+);
 
 describe("server/rocketcrab.ts", () => {
     it("initRocketCrab works", () => {
@@ -66,6 +73,8 @@ describe("server/rocketcrab.ts", () => {
                 },
             ],
             code: "efgh",
+            selectedGame: "FooGame",
+            gameList: MOCK_GAME_LIST,
         };
 
         const jsonLobby = {
@@ -79,6 +88,8 @@ describe("server/rocketcrab.ts", () => {
             me: {
                 name: "foo",
             },
+            selectedGame: "FooGame",
+            gameList: MOCK_GAME_LIST,
         };
 
         sendStateToAll(mockLobby);
@@ -106,6 +117,8 @@ describe("server/rocketcrab.ts", () => {
             status: LobbyStatus.lobby,
             playerList: [],
             code: "efgh",
+            selectedGame: "FooGame",
+            gameList: MOCK_GAME_LIST,
         };
         const lobbyList: Array<Lobby> = [mockLobby];
 
@@ -124,11 +137,31 @@ describe("server/rocketcrab.ts", () => {
                 },
             ],
             code: "efgh",
+            selectedGame: "FooGame",
+            gameList: MOCK_GAME_LIST,
         };
         const lobbyList: Array<Lobby> = [mockLobby];
 
         deleteLobbyIfEmpty(mockLobby, lobbyList);
 
         expect(lobbyList).toContain(mockLobby);
+    });
+
+    it("setGame works", () => {
+        const mockLobby: Lobby = {
+            status: LobbyStatus.lobby,
+            playerList: [
+                {
+                    name: "foo",
+                    socket: {} as SocketIO.Socket,
+                },
+            ],
+            code: "efgh",
+            selectedGame: "",
+            gameList: MOCK_GAME_LIST,
+        };
+        setGame("CoolGame", mockLobby);
+
+        expect(mockLobby.selectedGame).toBe("CoolGame");
     });
 });

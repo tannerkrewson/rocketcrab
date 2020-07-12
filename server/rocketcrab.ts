@@ -9,7 +9,13 @@ export const initRocketCrab = (): RocketCrab => ({
 
 export const newLobby = (lobbyList: Array<Lobby>) => {
     const code: string = getUniqueGameCode(lobbyList);
-    lobbyList.push({ status: LobbyStatus.lobby, playerList: [], code });
+    lobbyList.push({
+        status: LobbyStatus.lobby,
+        playerList: [],
+        code,
+        selectedGame: "",
+        gameList: GAME_LIST,
+    });
     return code;
 };
 
@@ -62,6 +68,12 @@ export const setName = (
     }
 };
 
+export const setGame = (gameName: string, lobby: Lobby) => {
+    if (GAME_LIST.find(({ name }) => name === gameName)) {
+        lobby.selectedGame = gameName;
+    }
+};
+
 const findPlayerByName = (nameToFind: string, playerList: Array<Player>) =>
     playerList.find(({ name }) => name === nameToFind);
 
@@ -70,7 +82,6 @@ const disconnectAllPlayers = (playerList: Array<Player>) =>
 
 const getJsonLobby = ({ playerList, ...lobby }: Lobby) => ({
     playerList: playerList.map(({ name }) => ({ name })),
-    gameList: GAME_LIST,
     ...lobby,
 });
 

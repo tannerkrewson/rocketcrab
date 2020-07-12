@@ -13,7 +13,7 @@ export const Code = () => {
     const { code } = router.query;
 
     const [lobbyState, setLobbyState] = useState(initLobbyState());
-    const { status } = lobbyState;
+    const { status, me, playerList, gameList, selectedGame } = lobbyState;
 
     // only ran with initial value due to the []
     useEffect(() => {
@@ -38,7 +38,9 @@ export const Code = () => {
         // TODO: store in cookie
     };
 
-    const { me, playerList, gameList } = lobbyState;
+    const onGameSelect = (gameName: string) => {
+        socket.emit("game-select", gameName);
+    };
 
     const showLoading = status === "loading";
     const showNameEntry = !showLoading && !me.name;
@@ -61,6 +63,8 @@ export const Code = () => {
                             <Lobby
                                 playerList={playerList}
                                 gameList={gameList}
+                                onGameSelect={onGameSelect}
+                                selectedGame={selectedGame}
                             />
                             <div>{JSON.stringify(lobbyState)}</div>
                         </>
