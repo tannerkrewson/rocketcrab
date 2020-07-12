@@ -1,7 +1,7 @@
 import {
     getLobby,
     addPlayer,
-    sendUpdatedLobby,
+    sendStateToAll,
     removePlayer,
     deleteLobbyIfEmpty,
 } from "./rocketcrab";
@@ -15,8 +15,8 @@ export default (io, { lobbyList }) =>
                 const player = { name, socket };
                 addPlayer(player, lobby.playerList);
 
-                attachLobbyListenersToPlayer(player, lobby, lobbyList, io);
-                sendUpdatedLobby(lobby, io);
+                attachLobbyListenersToPlayer(player, lobby, lobbyList);
+                sendStateToAll(lobby);
             } else {
                 socket.emit("invalid-lobby", { code });
             }
@@ -26,8 +26,7 @@ export default (io, { lobbyList }) =>
 const attachLobbyListenersToPlayer = (
     player: Player,
     lobby: Lobby,
-    lobbyList: Array<Lobby>,
-    io: SocketIO.Server
+    lobbyList: Array<Lobby>
 ) => {
     const { socket } = player;
     const { code, playerList } = lobby;
@@ -37,6 +36,6 @@ const attachLobbyListenersToPlayer = (
     socket.on("disconnect", () => {
         removePlayer(player, playerList);
         deleteLobbyIfEmpty(lobby, lobbyList);
-        sendUpdatedLobby(lobby, io);
+        sendStateToAll(lobby);
     });
 };

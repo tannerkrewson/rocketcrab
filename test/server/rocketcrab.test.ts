@@ -3,7 +3,7 @@ import {
     newLobby,
     getLobby,
     addPlayer,
-    sendUpdatedLobby,
+    sendStateToAll,
     removePlayer,
     deleteLobbyIfEmpty,
 } from "../../server/rocketcrab";
@@ -55,7 +55,7 @@ describe("server/rocketcrab.ts", () => {
         expect(playerList).toContain(mockPlayer);
     });
 
-    it("sendUpdatedLobby works", () => {
+    it("sendStateToAll works", () => {
         const mockLobby: Lobby = {
             status: LobbyStatus.lobby,
             playerList: [],
@@ -68,7 +68,7 @@ describe("server/rocketcrab.ts", () => {
             to,
         } as unknown) as SocketIO.Server;
 
-        sendUpdatedLobby(mockLobby, mockIO);
+        sendStateToAll(mockLobby, mockIO);
 
         expect(to).toBeCalledWith(mockLobby.code);
         expect(emit).toBeCalledWith("update", mockLobby);

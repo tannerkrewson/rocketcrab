@@ -17,8 +17,10 @@ export const getLobby = (newCode: string, lobbyList: Array<Lobby>) =>
 export const addPlayer = (player: Player, playerList: Array<Player>) =>
     playerList.push(player);
 
-export const sendUpdatedLobby = (lobby: Lobby, io: SocketIO.Server) =>
-    io.to(lobby.code).emit("update", getJsonLobby(lobby));
+export const sendStateToAll = (lobby: Lobby) =>
+    lobby.playerList.forEach(({ socket, ...player }) =>
+        socket.emit("update", { me: player, ...getJsonLobby(lobby) })
+    );
 
 export const removePlayer = (player: Player, playerList: Array<Player>) => {
     const { socket } = player;
