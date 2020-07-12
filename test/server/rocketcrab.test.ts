@@ -56,22 +56,34 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("sendStateToAll works", () => {
+        const emit = jest.fn();
         const mockLobby: Lobby = {
             status: LobbyStatus.lobby,
-            playerList: [],
+            playerList: [
+                {
+                    name: "foo",
+                    socket: ({ emit } as unknown) as SocketIO.Socket,
+                },
+            ],
             code: "efgh",
         };
 
-        const emit = jest.fn();
-        const to = jest.fn(() => ({ emit }));
-        const mockIO: SocketIO.Server = ({
-            to,
-        } as unknown) as SocketIO.Server;
+        const jsonLobby = {
+            status: LobbyStatus.lobby,
+            playerList: [
+                {
+                    name: "foo",
+                },
+            ],
+            code: "efgh",
+            me: {
+                name: "foo",
+            },
+        };
 
-        sendStateToAll(mockLobby, mockIO);
+        sendStateToAll(mockLobby);
 
-        expect(to).toBeCalledWith(mockLobby.code);
-        expect(emit).toBeCalledWith("update", mockLobby);
+        expect(emit).toBeCalledWith("update", jsonLobby);
     });
 
     it("removePlayer works", () => {
