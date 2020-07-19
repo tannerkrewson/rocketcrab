@@ -36,7 +36,7 @@ export type GameCategory = {
     id: string;
     name: string;
     color: string;
-    "background-color": string;
+    backgroundColor: string;
 };
 
 export type ClientGameLibrary = {

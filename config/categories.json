@@ -3,12 +3,18 @@
         "id": "deduction",
         "name": "🕵️ Deduction",
         "color": "white",
-        "background-color": "blue"
+        "backgroundColor": "#0070f3"
     },
     {
         "id": "drawing",
         "name": "✏️ Drawing",
         "color": "black",
-        "background-color": "white"
+        "backgroundColor": "LemonChiffon"
+    },
+    {
+        "id": "social",
+        "name": "🗣️ Social",
+        "color": "white",
+        "backgroundColor": "#ee0000"
     }
 ]

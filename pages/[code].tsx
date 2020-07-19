@@ -16,8 +16,6 @@ const socket = socketIOClient();
 export const Code = ({
     gameLibrary = { gameList: [], categories: [] },
 }: CodeProps): JSX.Element => {
-    const { gameList } = gameLibrary;
-
     const router = useRouter();
     const { code } = router.query;
 
@@ -81,7 +79,7 @@ export const Code = ({
                         {showLobby && (
                             <Lobby
                                 playerList={playerList}
-                                gameList={gameList}
+                                gameLibrary={gameLibrary}
                                 onGameSelect={onGameSelect}
                                 selectedGame={selectedGame}
                                 onStartGame={onStartGame}
