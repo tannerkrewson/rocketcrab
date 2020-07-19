@@ -1,10 +1,10 @@
-import { ServerGame } from "../types/types";
+import { ServerGame } from "../../types/types";
 
 const game: ServerGame = {
     name: "Drawphone",
     author: "Tanner Krewson",
     description: "Telephone with pictures",
-    category: ["Drawing"],
+    category: ["drawing"],
     players: "1+",
     familyFriendly: false,
     minPlayers: 1,

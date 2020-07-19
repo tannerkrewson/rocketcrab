@@ -11,15 +11,15 @@ import {
 import { Lobby, Player, GameState } from "../../types/types";
 import { LobbyStatus } from "../../types/enums";
 
-jest.mock("../../games", () => ({
-    getServerGameList: jest.fn(() => [
-        { name: "FooGame" },
-        { name: "CoolGame" },
-    ]),
-    getClientGameList: jest.fn(() => [
-        { name: "FooGame" },
-        { name: "CoolGame" },
-    ]),
+jest.mock("../../config", () => ({
+    getServerGameLibrary: jest.fn(() => ({
+        gameList: [{ name: "FooGame" }, { name: "CoolGame" }],
+        categories: [],
+    })),
+    getClientGameLibrary: jest.fn(() => ({
+        gameList: [{ name: "FooGame" }, { name: "CoolGame" }],
+        categories: [],
+    })),
 }));
 
 describe("server/rocketcrab.ts", () => {

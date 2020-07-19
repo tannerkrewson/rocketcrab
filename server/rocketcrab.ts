@@ -6,8 +6,8 @@ import {
     ServerGame,
 } from "../types/types";
 import { LobbyStatus, GameStatus } from "../types/enums";
-import { getServerGameList } from "../games";
-const SERVER_GAME_LIST: Array<ServerGame> = getServerGameList();
+import { getServerGameLibrary } from "../config";
+const SERVER_GAME_LIST: Array<ServerGame> = getServerGameLibrary().gameList;
 
 export const initRocketCrab = (): RocketCrab => ({
     lobbyList: [],

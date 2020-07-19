@@ -32,6 +32,23 @@ export type ServerGame = ClientGame & {
     getJoinGameUrl: () => Promise<string>;
 };
 
+export type GameCategory = {
+    id: string;
+    name: string;
+    color: string;
+    "background-color": string;
+};
+
+export type ClientGameLibrary = {
+    categories: Array<GameCategory>;
+    gameList: Array<ClientGame>;
+};
+
+export type ServerGameLibrary = {
+    categories: Array<GameCategory>;
+    gameList: Array<ServerGame>;
+};
+
 export type GameState = {
     status: GameStatus;
     url?: string;
@@ -46,4 +63,8 @@ export type PageLayoutParams = {
     children: JSX.Element[] | JSX.Element;
     path?: string;
     loading?: boolean;
+};
+
+export type CodeProps = {
+    gameLibrary: ClientGameLibrary;
 };

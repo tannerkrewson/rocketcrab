@@ -1,11 +1,11 @@
-import { ServerGame } from "../types/types";
-import { postJson } from "../utils/utils";
+import { ServerGame } from "../../types/types";
+import { postJson } from "../../utils/utils";
 
 const game: ServerGame = {
     name: "Spyfall",
     author: "Tanner Krewson",
     description: "formerly Crabhat",
-    category: ["Deduction"],
+    category: ["deduction"],
     players: "4+",
     familyFriendly: true,
     minPlayers: 1,

@@ -9,7 +9,7 @@
     },
     "include": [
         "server/**/*.ts",
-        "games/**/*.ts",
+        "config/**/*.ts",
         "types/**/*.ts",
         "utils/**/*.ts"
     ]

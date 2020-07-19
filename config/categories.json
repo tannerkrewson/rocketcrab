@@ -1,0 +1,14 @@
+[
+    {
+        "id": "deduction",
+        "name": "🕵️ Deduction",
+        "color": "white",
+        "background-color": "blue"
+    },
+    {
+        "id": "drawing",
+        "name": "✏️ Drawing",
+        "color": "black",
+        "background-color": "white"
+    }
+]

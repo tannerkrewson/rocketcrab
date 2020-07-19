@@ -1,17 +1,23 @@
-import { useRouter } from "next/router";
 import { useEffect, useState } from "react";
+import { GetStaticProps, GetStaticPaths } from "next";
+import { useRouter } from "next/router";
 import socketIOClient from "socket.io-client";
 
 import PageLayout from "../components/templates/PageLayout";
 import Lobby from "../components/organisms/Lobby";
 import NameEntry from "../components/organisms/NameEntry";
 import GameLayout from "../components/templates/GameLayout";
-import { getClientGameList } from "../games";
-import { GetStaticProps, GetStaticPaths } from "next";
+
+import { CodeProps } from "../types/types";
+import { getClientGameLibrary } from "../config";
 
 const socket = socketIOClient();
 
-export const Code = ({ gameList = [] }) => {
+export const Code = ({
+    gameLibrary = { gameList: [], categories: [] },
+}: CodeProps): JSX.Element => {
+    const { gameList } = gameLibrary;
+
     const router = useRouter();
     const { code } = router.query;
 
@@ -100,7 +106,7 @@ const initLobbyState = () => ({
 });
 
 export const getStaticProps: GetStaticProps = async () => ({
-    props: { gameList: getClientGameList() },
+    props: { gameLibrary: getClientGameLibrary() },
 });
 
 export const getStaticPaths: GetStaticPaths = async () => ({
