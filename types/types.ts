@@ -9,7 +9,6 @@ export type Lobby = {
     playerList: Array<Player>;
     code: string;
     selectedGame: string;
-    gameList: Array<Game>;
     gameState: GameState;
 };
 
@@ -18,8 +17,18 @@ export type Player = {
     socket: SocketIO.Socket;
 };
 
-export type Game = {
+export type ClientGame = {
     name: string;
+    author?: string;
+    description?: string;
+    category?: Array<string>;
+    players?: string;
+    familyFriendly: boolean;
+    minPlayers: number;
+    maxPlayers: number;
+};
+
+export type ServerGame = ClientGame & {
     getJoinGameUrl: () => Promise<string>;
 };
 

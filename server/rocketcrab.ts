@@ -1,7 +1,13 @@
-import { RocketCrab, Lobby, Player, GameState, Game } from "../types/types";
+import {
+    RocketCrab,
+    Lobby,
+    Player,
+    GameState,
+    ServerGame,
+} from "../types/types";
 import { LobbyStatus, GameStatus } from "../types/enums";
-import getGameList from "../games";
-const GAME_LIST: Array<Game> = getGameList();
+import { getServerGameList } from "../games";
+const SERVER_GAME_LIST: Array<ServerGame> = getServerGameList();
 
 export const initRocketCrab = (): RocketCrab => ({
     lobbyList: [],
@@ -14,7 +20,6 @@ export const newLobby = (lobbyList: Array<Lobby>) => {
         playerList: [],
         code,
         selectedGame: "",
-        gameList: GAME_LIST,
         gameState: { status: GameStatus.loading },
     });
     return code;
@@ -79,7 +84,7 @@ export const startGame = (lobby: Lobby) => {
     // TODO: check if ready
     const { gameState, selectedGame } = lobby;
 
-    const game: Game = findGameByName(selectedGame);
+    const game: ServerGame = findGameByName(selectedGame);
     if (!game) return;
 
     lobby.status = LobbyStatus.ingame;
@@ -110,8 +115,8 @@ const findPlayerByName = (
     playerList: Array<Player>
 ): Player => playerList.find(({ name }) => name === nameToFind);
 
-const findGameByName = (gameName: string): Game =>
-    GAME_LIST.find(({ name }) => name === gameName);
+const findGameByName = (gameName: string): ServerGame =>
+    SERVER_GAME_LIST.find(({ name }) => name === gameName);
 
 const disconnectAllPlayers = (playerList: Array<Player>) =>
     playerList.forEach(({ socket }) => socket.disconnect(true));

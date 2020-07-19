@@ -6,22 +6,17 @@ import PageLayout from "../components/templates/PageLayout";
 import Lobby from "../components/organisms/Lobby";
 import NameEntry from "../components/organisms/NameEntry";
 import GameLayout from "../components/templates/GameLayout";
+import { getClientGameList } from "../games";
+import { GetStaticProps, GetStaticPaths } from "next";
 
 const socket = socketIOClient();
 
-export const Code = () => {
+export const Code = ({ gameList = [] }) => {
     const router = useRouter();
     const { code } = router.query;
 
     const [lobbyState, setLobbyState] = useState(initLobbyState());
-    const {
-        status,
-        me,
-        playerList,
-        gameList,
-        selectedGame,
-        gameState,
-    } = lobbyState;
+    const { status, me, playerList, selectedGame, gameState } = lobbyState;
 
     // only ran with initial value due to the []
     useEffect(() => {
@@ -99,10 +94,18 @@ export const Code = () => {
 const initLobbyState = () => ({
     status: "loading",
     playerList: [],
-    gameList: [],
     me: { name: undefined },
     selectedGame: "",
     gameState: {},
+});
+
+export const getStaticProps: GetStaticProps = async () => ({
+    props: { gameList: getClientGameList() },
+});
+
+export const getStaticPaths: GetStaticPaths = async () => ({
+    paths: [],
+    fallback: true,
 });
 
 export default Code;

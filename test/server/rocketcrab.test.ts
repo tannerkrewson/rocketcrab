@@ -8,14 +8,19 @@ import {
     deleteLobbyIfEmpty,
     setGame,
 } from "../../server/rocketcrab";
-import { Lobby, Player } from "../../types/types";
+import { Lobby, Player, GameState } from "../../types/types";
 import { LobbyStatus } from "../../types/enums";
 
-const MOCK_GAME_LIST = [{ name: "FooGame" }, { name: "CoolGame" }];
-
-jest.mock("../../games", () =>
-    jest.fn(() => [{ name: "FooGame" }, { name: "CoolGame" }])
-);
+jest.mock("../../games", () => ({
+    getServerGameList: jest.fn(() => [
+        { name: "FooGame" },
+        { name: "CoolGame" },
+    ]),
+    getClientGameList: jest.fn(() => [
+        { name: "FooGame" },
+        { name: "CoolGame" },
+    ]),
+}));
 
 describe("server/rocketcrab.ts", () => {
     it("initRocketCrab works", () => {
@@ -74,7 +79,7 @@ describe("server/rocketcrab.ts", () => {
             ],
             code: "efgh",
             selectedGame: "FooGame",
-            gameList: MOCK_GAME_LIST,
+            gameState: {} as GameState,
         };
 
         const jsonLobby = {
@@ -89,7 +94,7 @@ describe("server/rocketcrab.ts", () => {
                 name: "foo",
             },
             selectedGame: "FooGame",
-            gameList: MOCK_GAME_LIST,
+            gameState: {} as GameState,
         };
 
         sendStateToAll(mockLobby);
@@ -118,7 +123,7 @@ describe("server/rocketcrab.ts", () => {
             playerList: [],
             code: "efgh",
             selectedGame: "FooGame",
-            gameList: MOCK_GAME_LIST,
+            gameState: {} as GameState,
         };
         const lobbyList: Array<Lobby> = [mockLobby];
 
@@ -138,7 +143,7 @@ describe("server/rocketcrab.ts", () => {
             ],
             code: "efgh",
             selectedGame: "FooGame",
-            gameList: MOCK_GAME_LIST,
+            gameState: {} as GameState,
         };
         const lobbyList: Array<Lobby> = [mockLobby];
 
@@ -158,7 +163,7 @@ describe("server/rocketcrab.ts", () => {
             ],
             code: "efgh",
             selectedGame: "",
-            gameList: MOCK_GAME_LIST,
+            gameState: {} as GameState,
         };
         setGame("CoolGame", mockLobby);
 
