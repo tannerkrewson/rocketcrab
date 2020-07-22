@@ -17,9 +17,8 @@ const GameSelector = ({ gameLibrary, onGameSelect }) => {
                 <Input
                     icon="🔎"
                     placeholder="Search"
-                    width="80%"
+                    width="100%"
                     clearable
-                    style={{ margin: "0 auto" }}
                     {...bindings}
                 />
             )}

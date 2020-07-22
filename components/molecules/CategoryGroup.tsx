@@ -6,7 +6,7 @@ const CategoryGroup = ({
     categories,
     onSelectCategory,
 }: CategoryGroupProps): JSX.Element => (
-    <Grid.Container gap={1} style={{ maxWidth: "18em", margin: "0 auto" }}>
+    <Grid.Container gap={1}>
         {categories.map((category, i) => (
             <Grid xs={12} key={i}>
                 <CategoryBox category={category} onClick={onSelectCategory} />

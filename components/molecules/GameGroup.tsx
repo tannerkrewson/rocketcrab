@@ -8,7 +8,7 @@ const GameGroup = ({
     categoryFilter,
     onSelectGame,
 }: GameGroupProps): JSX.Element => (
-    <Grid.Container gap={1} style={{ maxWidth: "18em", margin: "0 auto" }}>
+    <Grid.Container gap={1} style={{ maxWidth: "18em" }}>
         {gameList
             .filter(
                 ({ category }) =>
