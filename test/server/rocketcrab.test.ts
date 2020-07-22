@@ -40,6 +40,17 @@ describe("server/rocketcrab.ts", () => {
         expect(lobbyList[0].playerList.length).toBe(0);
     });
 
+    it("newLobby works with custom code", () => {
+        const lobbyList: Array<Lobby> = [];
+
+        newLobby(lobbyList, "abcd");
+
+        expect(lobbyList.length).toBe(1);
+        expect(lobbyList[0].status).toBe(LobbyStatus.lobby);
+        expect(lobbyList[0].code).toBe("abcd");
+        expect(lobbyList[0].playerList.length).toBe(0);
+    });
+
     it("getLobby finds existing lobby", () => {
         const lobbyList: Array<Lobby> = [];
 

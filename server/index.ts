@@ -23,7 +23,7 @@ const nextHandler = nextApp.getRequestHandler();
     const http = createServer(app);
     const io = socketio(http);
 
-    const rocketCrab = initRocketCrab();
+    const rocketCrab = initRocketCrab(dev);
 
     attachAPIHandlers(app, rocketCrab);
     attachSocketHandlers(io, rocketCrab);

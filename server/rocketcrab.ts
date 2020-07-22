@@ -9,12 +9,16 @@ import { LobbyStatus, GameStatus } from "../types/enums";
 import { getServerGameLibrary } from "../config";
 const SERVER_GAME_LIST: Array<ServerGame> = getServerGameLibrary().gameList;
 
-export const initRocketCrab = (): RocketCrab => ({
-    lobbyList: [],
-});
+export const initRocketCrab = (isDevMode?: boolean): RocketCrab => {
+    const lobbyList: Array<Lobby> = [];
 
-export const newLobby = (lobbyList: Array<Lobby>) => {
-    const code: string = getUniqueGameCode(lobbyList);
+    if (isDevMode) newLobby(lobbyList, "ffff");
+
+    return { lobbyList };
+};
+
+export const newLobby = (lobbyList: Array<Lobby>, gameCode?: string) => {
+    const code: string = gameCode || getUniqueGameCode(lobbyList);
     lobbyList.push({
         status: LobbyStatus.lobby,
         playerList: [],
