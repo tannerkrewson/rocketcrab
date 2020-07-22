@@ -1,32 +1,47 @@
 import CategoryGroup from "../molecules/CategoryGroup";
-import { Input } from "@zeit-ui/react";
+import { Input, useInput } from "@zeit-ui/react";
 import GameGroup from "../molecules/GameGroup";
+import { useState, useEffect } from "react";
 
 const GameSelector = ({ gameLibrary, onGameSelect }) => {
+    const { state: search, bindings } = useInput("");
+    const [selectedCategory, setSelectedCategory] = useState("");
+
+    useEffect(() => {
+        if (!search) setSelectedCategory("");
+    }, [search]);
+
     return (
         <>
-            <Input
-                icon="🔎"
-                placeholder="Search"
-                width="80%"
-                clearable
-                style={{ margin: "0 auto" }}
-            />
-            {true && (
-                <CategoryGroup
-                    categories={gameLibrary.categories}
-                    onSelectCategory={(category) => {
-                        // eslint-disable-next-line no-console
-                        console.log(category);
-                    }}
+            {!selectedCategory && (
+                <Input
+                    icon="🔎"
+                    placeholder="Search"
+                    width="80%"
+                    clearable
+                    style={{ margin: "0 auto" }}
+                    {...bindings}
                 />
             )}
-            {true && (
+            {selectedCategory && (
+                <div onClick={() => setSelectedCategory("")}>
+                    ↩️ Back to categories
+                </div>
+            )}
+            {!selectedCategory && !search && (
+                <CategoryGroup
+                    categories={gameLibrary.categories}
+                    onSelectCategory={setSelectedCategory}
+                />
+            )}
+            {(selectedCategory || search) && (
                 <GameGroup
                     gameList={gameLibrary.gameList}
                     onSelectGame={(game) => {
                         onGameSelect(game);
                     }}
+                    nameFilter={search}
+                    categoryFilter={selectedCategory}
                 />
             )}
         </>
