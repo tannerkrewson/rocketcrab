@@ -3,6 +3,7 @@ import PrimaryButton from "../atoms/PrimaryButton";
 import ButtonGroup from "../molecules/ButtonGroup";
 import { Spacer } from "@zeit-ui/react";
 import GameSelector from "./GameSelector";
+import GameBox from "../atoms/GameBox";
 
 const Lobby = ({
     playerList,
@@ -14,6 +15,19 @@ const Lobby = ({
     <div style={{ textAlign: "center" }}>
         <div>Players</div>
         <PlayerList playerList={playerList} />
+        <Spacer y={1} />
+        {selectedGame ? (
+            <div>
+                Selected game:{" "}
+                <GameBox
+                    game={gameLibrary.gameList.find(
+                        ({ name }) => name === selectedGame
+                    )}
+                />
+            </div>
+        ) : (
+            <div>No Game Selected</div>
+        )}
         <Spacer y={1} />
         <div>Games</div>
         <GameSelector gameLibrary={gameLibrary} onGameSelect={onGameSelect} />

@@ -1,7 +1,10 @@
 import { ClientGame } from "../../types/types";
 import { Card } from "@zeit-ui/react";
 
-const GameBox = ({ game, onClick }: GameBoxProps): JSX.Element => (
+const GameBox = ({
+    game,
+    onClick = () => false,
+}: GameBoxProps): JSX.Element => (
     <Card onClick={() => onClick(game.name)}>
         <Card.Body style={{ padding: "8pt", textAlign: "initial" }}>
             <b>{game.name}</b>
@@ -12,7 +15,7 @@ const GameBox = ({ game, onClick }: GameBoxProps): JSX.Element => (
 
 type GameBoxProps = {
     game: ClientGame;
-    onClick: (name: string) => void;
+    onClick?: (name: string) => void;
 };
 
 export default GameBox;
