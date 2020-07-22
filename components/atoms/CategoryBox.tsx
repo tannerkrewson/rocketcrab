@@ -1,4 +1,4 @@
-import { Card } from "@zeit-ui/react";
+import { Button } from "@zeit-ui/react";
 import { GameCategory } from "../../types/types";
 
 const CategoryBox = ({
@@ -6,13 +6,22 @@ const CategoryBox = ({
     onClick,
 }: CategoryBoxProps): JSX.Element => (
     <>
-        <Card
+        <Button
             shadow
-            style={{ color, backgroundColor }}
+            style={{
+                color,
+                backgroundColor,
+                minWidth: "100%",
+                width: "100%",
+                height: "3.5em",
+                padding: "0",
+            }}
             onClick={() => onClick(id)}
+            type="abort"
+            size="large"
         >
-            <Card.Body style={{ padding: "8pt" }}>{name}</Card.Body>
-        </Card>
+            {name}
+        </Button>
     </>
 );
 
