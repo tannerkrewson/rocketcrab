@@ -1,17 +1,31 @@
 import { useRouter } from "next/router";
-import { Input, useInput } from "@zeit-ui/react";
+import { Input } from "@zeit-ui/react";
 
 import PrimaryButton from "../components/atoms/PrimaryButton";
 import ButtonGroup from "../components/molecules/ButtonGroup";
 import PageLayout from "../components/templates/PageLayout";
+import { useState } from "react";
 
 export const Join = (): JSX.Element => {
     const router = useRouter();
-    const { state: code, bindings } = useInput("");
+    const { invalid } = router.query;
 
-    const onEnter = (e) => {
-        if (e.key !== "Enter") return;
+    const [joinLoading, setJoinLoading] = useState(false);
+    const { code, bindings } = useCodeInput("");
 
+    const onKey = (e) => {
+        // if they entered anything but a letter
+        if (/[^A-Za-z]/g.test(e.key)) {
+            e.preventDefault();
+        }
+
+        if (e.key === "Enter") {
+            onJoin();
+        }
+    };
+
+    const onJoin = () => {
+        setJoinLoading(true);
         router.push("/[code]", "/" + code);
     };
 
@@ -23,24 +37,35 @@ export const Join = (): JSX.Element => {
                     placeholder="ex. abcd"
                     size="large"
                     width="8rem"
-                    clearable
+                    clearable={!joinLoading}
                     maxLength={4}
                     autoFocus
-                    onKeyDown={onEnter}
+                    onKeyDown={onKey}
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    disabled={joinLoading}
                     {...bindings}
                 />
             </div>
-
+            {invalid && (
+                <div className="description" style={{ color: "red" }}>
+                    {invalid} does not exist 😞
+                </div>
+            )}
             <ButtonGroup>
                 <PrimaryButton href="/" size="large">
                     Back
                 </PrimaryButton>
 
-                <PrimaryButton href="/[code]" as={"/" + code} size="large">
+                <PrimaryButton
+                    onClick={onJoin}
+                    size="large"
+                    disabled={code.length !== 4}
+                    loading={joinLoading}
+                >
                     Join
                 </PrimaryButton>
             </ButtonGroup>
-
             <style jsx>{`
                 .description {
                     text-align: center;
@@ -53,6 +78,22 @@ export const Join = (): JSX.Element => {
             `}</style>
         </PageLayout>
     );
+};
+
+const useCodeInput = (initialCode) => {
+    const [code, setCode] = useState(initialCode);
+
+    const restrictedSetCode = (newCode: string): void =>
+        setCode(newCode.toLowerCase().substring(0, 4));
+
+    return {
+        code,
+        setCode: restrictedSetCode,
+        bindings: {
+            value: code,
+            onChange: ({ target: { value } }) => restrictedSetCode(value),
+        },
+    };
 };
 
 export default Join;

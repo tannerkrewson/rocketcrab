@@ -43,7 +43,9 @@ exports[`pages/join.tsx matches snapshot 1`] = `
                 class="jsx-1274958171 input-wrapper hover  "
               >
                 <input
+                  autocapitalize="none"
                   autocomplete="off"
+                  autocorrect="off"
                   class="jsx-1274958171  "
                   maxlength="4"
                   placeholder="ex. abcd"
@@ -78,6 +80,12 @@ exports[`pages/join.tsx matches snapshot 1`] = `
           </div>
         </div>
         <div
+          class="jsx-2322376654 description"
+          style="color: red;"
+        >
+          wxyz does not exist 😞
+        </div>
+        <div
           class="jsx-1938348541 item justify jsx-1720607024 "
         >
           <div
@@ -100,20 +108,17 @@ exports[`pages/join.tsx matches snapshot 1`] = `
           <div
             class="jsx-974242038 item  jsx-4216129763 "
           >
-            <div>
-              <button
-                as="/"
-                class="jsx-2376802331 btn "
-                href="/[code]"
-                type="button"
+            <button
+              class="jsx-3840732666 btn "
+              disabled=""
+              type="button"
+            >
+              <div
+                class="text"
               >
-                <div
-                  class="text"
-                >
-                  Join
-                </div>
-              </button>
-            </div>
+                Join
+              </div>
+            </button>
           </div>
         </div>
       </div>
