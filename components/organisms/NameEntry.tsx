@@ -4,7 +4,7 @@ import { Input } from "@zeit-ui/react";
 import PrimaryButton from "../atoms/PrimaryButton";
 import ButtonGroup from "../molecules/ButtonGroup";
 
-const NameEntry = ({ onNameEntry, code, socket }) => {
+const NameEntry = ({ onNameEntry, code }: NameEntryProps): JSX.Element => {
     const [name, setName] = useState("");
 
     // if dev game, pick random name and submit
@@ -23,9 +23,6 @@ const NameEntry = ({ onNameEntry, code, socket }) => {
 
     const handleBack = (e) => {
         e.preventDefault();
-
-        //prevents a redirect back to /[code]
-        socket.off("disconnect");
 
         Router.push("/");
     };
@@ -76,6 +73,11 @@ const NameEntry = ({ onNameEntry, code, socket }) => {
             `}</style>
         </>
     );
+};
+
+type NameEntryProps = {
+    onNameEntry: (name: string) => any;
+    code: string | string[];
 };
 
 export default NameEntry;

@@ -3,7 +3,11 @@ import Footer from "../atoms/Footer";
 import MainTitle from "../atoms/MainTitle";
 import { PageLayoutParams } from "../../types/types";
 
-const PageLayout = ({ children, path, loading }: PageLayoutParams) => (
+const PageLayout = ({
+    children,
+    path,
+    loading,
+}: PageLayoutParams): JSX.Element => (
     <div className="container">
         <main>
             <div className="main-content">

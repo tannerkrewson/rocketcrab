@@ -2,8 +2,12 @@ import { GameStatus } from "../../types/enums";
 import { Loading } from "@zeit-ui/react";
 import PrimaryButton from "../atoms/PrimaryButton";
 import { useState } from "react";
+import { GameState } from "../../types/types";
 
-const GameLayout = ({ gameState, onExitGame }) => {
+const GameLayout = ({
+    gameState,
+    onExitGame,
+}: GameLayoutProps): JSX.Element => {
     const { status, url } = gameState;
 
     const [statusCollapsed, setStatusCollapsed] = useState(false);
@@ -63,6 +67,11 @@ const GameLayout = ({ gameState, onExitGame }) => {
             `}</style>
         </div>
     );
+};
+
+type GameLayoutProps = {
+    gameState: GameState;
+    onExitGame: () => void;
 };
 
 export default GameLayout;

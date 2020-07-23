@@ -1,4 +1,4 @@
-const Footer = () => (
+const Footer = (): JSX.Element => (
     <footer>
         rocketcrab by{" "}
         <a

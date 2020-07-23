@@ -9,9 +9,12 @@ import {
     startGame,
     exitGame,
 } from "./rocketcrab";
-import { JoinLobbyResponse, Player, Lobby } from "../types/types";
+import { JoinLobbyResponse, Player, Lobby, RocketCrab } from "../types/types";
 
-export default (io, { lobbyList }) =>
+export default (
+    io: SocketIO.Server,
+    { lobbyList }: RocketCrab
+): SocketIO.Namespace =>
     io.on("connection", (socket) => {
         socket.on("join-lobby", ({ code, name }: JoinLobbyResponse) => {
             const lobby = getLobby(code, lobbyList);

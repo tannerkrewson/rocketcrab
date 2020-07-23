@@ -4,14 +4,15 @@ import ButtonGroup from "../molecules/ButtonGroup";
 import { Spacer } from "@zeit-ui/react";
 import GameSelector from "./GameSelector";
 import GameBox from "../atoms/GameBox";
+import { Player, ClientGameLibrary } from "../../types/types";
 
 const Lobby = ({
     playerList,
     gameLibrary,
-    onGameSelect,
+    onSelectGame,
     selectedGame,
     onStartGame,
-}) => (
+}: LobbyProps): JSX.Element => (
     <div style={{ textAlign: "center" }}>
         <div>Players</div>
         <PlayerList playerList={playerList} />
@@ -30,7 +31,7 @@ const Lobby = ({
         )}
         <Spacer y={1} />
         <div>Games</div>
-        <GameSelector gameLibrary={gameLibrary} onGameSelect={onGameSelect} />
+        <GameSelector gameLibrary={gameLibrary} onSelectGame={onSelectGame} />
         <Spacer y={1} />
         <ButtonGroup>
             <PrimaryButton href="/" size="large">
@@ -46,5 +47,13 @@ const Lobby = ({
         </ButtonGroup>
     </div>
 );
+
+type LobbyProps = {
+    playerList: Array<Player>;
+    gameLibrary: ClientGameLibrary;
+    onSelectGame: (gameName: string) => void;
+    selectedGame: string;
+    onStartGame: () => void;
+};
 
 export default Lobby;

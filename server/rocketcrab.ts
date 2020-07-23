@@ -17,7 +17,10 @@ export const initRocketCrab = (isDevMode?: boolean): RocketCrab => {
     return { lobbyList };
 };
 
-export const newLobby = (lobbyList: Array<Lobby>, gameCode?: string) => {
+export const newLobby = (
+    lobbyList: Array<Lobby>,
+    gameCode?: string
+): string => {
     const code: string = gameCode || getUniqueGameCode(lobbyList);
     lobbyList.push({
         status: LobbyStatus.lobby,
@@ -29,18 +32,21 @@ export const newLobby = (lobbyList: Array<Lobby>, gameCode?: string) => {
     return code;
 };
 
-export const getLobby = (newCode: string, lobbyList: Array<Lobby>) =>
+export const getLobby = (newCode: string, lobbyList: Array<Lobby>): Lobby =>
     lobbyList.find(({ code }) => code === newCode);
 
-export const addPlayer = (player: Player, playerList: Array<Player>) =>
+export const addPlayer = (player: Player, playerList: Array<Player>): number =>
     playerList.push(player);
 
-export const sendStateToAll = (lobby: Lobby) =>
+export const sendStateToAll = (lobby: Lobby): void =>
     lobby.playerList.forEach(({ socket, ...player }) =>
         socket.emit("update", { me: player, ...getJsonLobby(lobby) })
     );
 
-export const removePlayer = (player: Player, playerList: Array<Player>) => {
+export const removePlayer = (
+    player: Player,
+    playerList: Array<Player>
+): void => {
     const { socket } = player;
 
     if (socket && socket.disconnect) {
@@ -50,7 +56,10 @@ export const removePlayer = (player: Player, playerList: Array<Player>) => {
     deleteFromArray(player, playerList);
 };
 
-export const deleteLobbyIfEmpty = (lobby: Lobby, lobbyList: Array<Lobby>) => {
+export const deleteLobbyIfEmpty = (
+    lobby: Lobby,
+    lobbyList: Array<Lobby>
+): void => {
     const { playerList, code } = lobby;
 
     if (playerList.length === 0 && code !== "ffff") {
@@ -78,13 +87,13 @@ export const setName = (
     }
 };
 
-export const setGame = (gameName: string, lobby: Lobby) => {
+export const setGame = (gameName: string, lobby: Lobby): void => {
     if (findGameByName(gameName)) {
         lobby.selectedGame = gameName;
     }
 };
 
-export const startGame = (lobby: Lobby) => {
+export const startGame = (lobby: Lobby): void => {
     // TODO: check if ready
     const { gameState, selectedGame } = lobby;
 
@@ -101,12 +110,12 @@ export const startGame = (lobby: Lobby) => {
     });
 };
 
-export const setJoinGameUrl = (url: string, gameState: GameState) => {
+export const setJoinGameUrl = (url: string, gameState: GameState): void => {
     gameState.status = GameStatus.inprogress;
     gameState.url = url;
 };
 
-export const exitGame = (lobby: Lobby) => {
+export const exitGame = (lobby: Lobby): void => {
     lobby.status = LobbyStatus.lobby;
 
     const { gameState } = lobby;
@@ -122,7 +131,7 @@ const findPlayerByName = (
 const findGameByName = (gameName: string): ServerGame =>
     SERVER_GAME_LIST.find(({ name }) => name === gameName);
 
-const disconnectAllPlayers = (playerList: Array<Player>) =>
+const disconnectAllPlayers = (playerList: Array<Player>): void =>
     playerList.forEach(({ socket }) => socket.disconnect(true));
 
 const getJsonLobby = ({ playerList, ...lobby }: Lobby) => ({
@@ -130,7 +139,7 @@ const getJsonLobby = ({ playerList, ...lobby }: Lobby) => ({
     ...lobby,
 });
 
-const getUniqueGameCode = (ll: Array<Lobby>) => {
+const getUniqueGameCode = (ll: Array<Lobby>): string => {
     let newCode;
     do {
         newCode = getRandomFourLetters();
@@ -138,7 +147,7 @@ const getUniqueGameCode = (ll: Array<Lobby>) => {
     return newCode;
 };
 
-const getRandomFourLetters = () => {
+const getRandomFourLetters = (): string => {
     const len = 4;
     const possible = "abcdefghijklmnopqrstuvwxyz";
 
@@ -150,7 +159,7 @@ const getRandomFourLetters = () => {
     return code;
 };
 
-const deleteFromArray = (item: any, array: Array<any>) => {
+const deleteFromArray = (item: any, array: Array<any>): void => {
     const index = array.indexOf(item);
     if (index > -1) {
         array.splice(index, 1);

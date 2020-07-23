@@ -8,7 +8,7 @@ import Lobby from "../components/organisms/Lobby";
 import NameEntry from "../components/organisms/NameEntry";
 import GameLayout from "../components/templates/GameLayout";
 
-import { CodeProps } from "../types/types";
+import { CodeProps, GameState } from "../types/types";
 import { getClientGameLibrary } from "../config";
 
 const socket = socketIOClient();
@@ -47,7 +47,7 @@ export const Code = ({
         // TODO: store in cookie
     };
 
-    const onGameSelect = (gameName: string) => {
+    const onSelectGame = (gameName: string) => {
         socket.emit("game-select", gameName);
     };
 
@@ -70,17 +70,13 @@ export const Code = ({
                 <PageLayout path={code as string} loading={showLoading}>
                     <>
                         {showNameEntry && (
-                            <NameEntry
-                                onNameEntry={onNameEntry}
-                                code={code}
-                                socket={socket}
-                            />
+                            <NameEntry onNameEntry={onNameEntry} code={code} />
                         )}
                         {showLobby && (
                             <Lobby
                                 playerList={playerList}
                                 gameLibrary={gameLibrary}
-                                onGameSelect={onGameSelect}
+                                onSelectGame={onSelectGame}
                                 selectedGame={selectedGame}
                                 onStartGame={onStartGame}
                             />
@@ -96,11 +92,11 @@ export const Code = ({
 };
 
 const initLobbyState = () => ({
-    status: "loading",
+    status: "loading" as string,
     playerList: [],
     me: { name: undefined },
     selectedGame: "",
-    gameState: {},
+    gameState: {} as GameState,
 });
 
 export const getStaticProps: GetStaticProps = async () => ({

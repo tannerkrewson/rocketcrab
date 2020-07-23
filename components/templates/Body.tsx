@@ -1,6 +1,6 @@
 import Head from "next/head";
 
-const Body = ({ children }) => (
+const Body = ({ children }: BodyProps): JSX.Element => (
     <>
         <Head>
             <title>🚀🦀 rocketcrab</title>
@@ -23,5 +23,9 @@ const Body = ({ children }) => (
         `}</style>
     </>
 );
+
+type BodyProps = {
+    children: React.ReactNode;
+};
 
 export default Body;

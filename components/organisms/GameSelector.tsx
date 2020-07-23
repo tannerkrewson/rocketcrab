@@ -2,8 +2,12 @@ import CategoryGroup from "../molecules/CategoryGroup";
 import { Input, useInput } from "@zeit-ui/react";
 import GameGroup from "../molecules/GameGroup";
 import { useState, useEffect } from "react";
+import { ClientGameLibrary } from "../../types/types";
 
-const GameSelector = ({ gameLibrary, onGameSelect }) => {
+const GameSelector = ({
+    gameLibrary,
+    onSelectGame,
+}: GameSelectorProps): JSX.Element => {
     const { state: search, bindings } = useInput("");
     const [selectedCategory, setSelectedCategory] = useState("");
 
@@ -36,15 +40,18 @@ const GameSelector = ({ gameLibrary, onGameSelect }) => {
             {(selectedCategory || search) && (
                 <GameGroup
                     gameList={gameLibrary.gameList}
-                    onSelectGame={(game) => {
-                        onGameSelect(game);
-                    }}
+                    onSelectGame={onSelectGame}
                     nameFilter={search}
                     categoryFilter={selectedCategory}
                 />
             )}
         </>
     );
+};
+
+type GameSelectorProps = {
+    gameLibrary: ClientGameLibrary;
+    onSelectGame: (gameName: string) => void;
 };
 
 export default GameSelector;
