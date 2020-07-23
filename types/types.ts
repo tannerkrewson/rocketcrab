@@ -64,7 +64,3 @@ export type PageLayoutParams = {
     path?: string;
     loading?: boolean;
 };
-
-export type CodeProps = {
-    gameLibrary: ClientGameLibrary;
-};

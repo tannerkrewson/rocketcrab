@@ -35,6 +35,7 @@
         "express": "^4.17.1",
         "fontsource-inconsolata": "^2.1.4",
         "next": "^9.4.4",
+        "nookies": "^2.3.2",
         "react": "^16.13.1",
         "react-dom": "^16.13.1",
         "socket.io": "^2.3.0"

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { GetStaticProps, GetStaticPaths } from "next";
+import { GetServerSidePropsContext, GetServerSideProps } from "next";
 import { useRouter } from "next/router";
 import socketIOClient from "socket.io-client";
 
@@ -8,13 +8,16 @@ import Lobby from "../components/organisms/Lobby";
 import NameEntry from "../components/organisms/NameEntry";
 import GameLayout from "../components/templates/GameLayout";
 
-import { CodeProps, GameState } from "../types/types";
+import { GameState, ClientGameLibrary } from "../types/types";
 import { getClientGameLibrary } from "../config";
+import { parseCookies, setCookie } from "nookies";
 
+const CLIENT_GAME_LIBRARY = getClientGameLibrary();
 const socket = socketIOClient();
 
 export const Code = ({
     gameLibrary = { gameList: [], categories: [] },
+    name,
 }: CodeProps): JSX.Element => {
     const router = useRouter();
     const { code } = router.query;
@@ -37,14 +40,15 @@ export const Code = ({
 
     useEffect(() => {
         // "code" will be undefined during Automatic Static Optimization
-        if (code) socket.emit("join-lobby", { code });
+        if (code) socket.emit("join-lobby", { code, name });
 
         socket.on("invalid-lobby", () => router.push("/join?invalid=" + code));
     }, [code]);
 
     const onNameEntry = (name) => {
         socket.emit("name", name);
-        // TODO: store in cookie
+
+        setCookie(null, "name", name, {});
     };
 
     const onSelectGame = (gameName: string) => {
@@ -99,13 +103,19 @@ const initLobbyState = () => ({
     gameState: {} as GameState,
 });
 
-export const getStaticProps: GetStaticProps = async () => ({
-    props: { gameLibrary: getClientGameLibrary() },
-});
+export const getServerSideProps: GetServerSideProps = async (
+    ctx: GetServerSidePropsContext
+): Promise<any> => {
+    const { name = "" } = parseCookies(ctx);
 
-export const getStaticPaths: GetStaticPaths = async () => ({
-    paths: [],
-    fallback: true,
-});
+    return {
+        props: { gameLibrary: CLIENT_GAME_LIBRARY, name },
+    };
+};
+
+type CodeProps = {
+    gameLibrary: ClientGameLibrary;
+    name?: string;
+};
 
 export default Code;
