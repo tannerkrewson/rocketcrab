@@ -1,17 +1,17 @@
 import { Loading } from "@zeit-ui/react";
 import Footer from "../atoms/Footer";
 import MainTitle from "../atoms/MainTitle";
-import { PageLayoutParams } from "../../types/types";
 
 const PageLayout = ({
     children,
     path,
     loading,
+    disablePhonetic,
 }: PageLayoutParams): JSX.Element => (
     <div className="container">
         <main>
             <div className="main-content">
-                <MainTitle path={path} />
+                <MainTitle path={path} disablePhonetic={disablePhonetic} />
 
                 {loading ? <Loading /> : children}
             </div>
@@ -60,5 +60,12 @@ const PageLayout = ({
         `}</style>
     </div>
 );
+
+type PageLayoutParams = {
+    children: JSX.Element[] | JSX.Element;
+    path?: string;
+    loading?: boolean;
+    disablePhonetic?: boolean;
+};
 
 export default PageLayout;

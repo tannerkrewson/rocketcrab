@@ -36,6 +36,7 @@
         "fontsource-inconsolata": "^2.1.4",
         "next": "^9.4.4",
         "nookies": "^2.3.2",
+        "phonetic-alphabet-converter": "^0.2.0",
         "react": "^16.13.1",
         "react-dom": "^16.13.1",
         "socket.io": "^2.3.0"

@@ -30,7 +30,7 @@ export const Join = (): JSX.Element => {
     };
 
     return (
-        <PageLayout path={code}>
+        <PageLayout path={code} disablePhonetic={true}>
             <div className="description">Join Lobby</div>
             <div className="input-container">
                 <Input
