@@ -70,12 +70,14 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("addPlayer works", () => {
-        const mockPlayer = { name: "foo", socket: {} as SocketIO.Socket };
+        const mockSocket = {} as SocketIO.Socket;
         const playerList: Array<Player> = [];
-        addPlayer(mockPlayer, playerList);
+        const mockPlayer = addPlayer("foo", mockSocket, playerList);
 
         expect(playerList.length).toBe(1);
         expect(playerList).toContain(mockPlayer);
+        expect(playerList[0].name).toBe("foo");
+        expect(playerList[0].socket).toBe(mockSocket);
     });
 
     it("sendStateToAll works", () => {

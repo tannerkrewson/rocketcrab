@@ -12,6 +12,7 @@ const Lobby = ({
     onSelectGame,
     selectedGame,
     onStartGame,
+    resetName,
 }: LobbyProps): JSX.Element => (
     <div style={{ textAlign: "center" }}>
         <div>Players</div>
@@ -33,6 +34,11 @@ const Lobby = ({
         <div>Games</div>
         <GameSelector gameLibrary={gameLibrary} onSelectGame={onSelectGame} />
         <Spacer y={1} />
+
+        <PrimaryButton onClick={resetName} size="medium">
+            Change my name
+        </PrimaryButton>
+
         <ButtonGroup>
             <PrimaryButton href="/" size="large">
                 Leave Lobby
@@ -54,6 +60,7 @@ type LobbyProps = {
     onSelectGame: (gameName: string) => void;
     selectedGame: string;
     onStartGame: () => void;
+    resetName: () => void;
 };
 
 export default Lobby;

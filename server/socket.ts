@@ -19,8 +19,7 @@ export default (
         socket.on("join-lobby", ({ code, name }: JoinLobbyResponse) => {
             const lobby = getLobby(code, lobbyList);
             if (lobby) {
-                const player = { name, socket };
-                addPlayer(player, lobby.playerList);
+                const player = addPlayer(name, socket, lobby.playerList);
 
                 attachLobbyListenersToPlayer(player, lobby, lobbyList);
                 sendStateToAll(lobby);

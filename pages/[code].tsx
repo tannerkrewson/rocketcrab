@@ -83,6 +83,7 @@ export const Code = ({
                                 onSelectGame={onSelectGame}
                                 selectedGame={selectedGame}
                                 onStartGame={onStartGame}
+                                resetName={() => onNameEntry("")}
                             />
                         )}
                     </>

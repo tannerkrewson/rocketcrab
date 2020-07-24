@@ -35,8 +35,18 @@ export const newLobby = (
 export const getLobby = (newCode: string, lobbyList: Array<Lobby>): Lobby =>
     lobbyList.find(({ code }) => code === newCode);
 
-export const addPlayer = (player: Player, playerList: Array<Player>): number =>
+export const addPlayer = (
+    name: string,
+    socket: SocketIO.Socket,
+    playerList: Array<Player>
+): Player => {
+    const player = { name: "", socket };
     playerList.push(player);
+
+    setName(name, player, playerList);
+
+    return player;
+};
 
 export const sendStateToAll = (lobby: Lobby): void =>
     lobby.playerList.forEach(({ socket, ...player }) =>
@@ -76,14 +86,17 @@ export const setName = (
     playerToName: Player,
     playerList: Array<Player>
 ): void => {
-    const validLength = name.length > 1 && name.length <= 24;
+    const validLength = name.length <= 24;
 
     if (!findPlayerByName(name, playerList) && validLength) {
-        // TODO: strip tags?
         playerToName.name = name;
     } else {
         playerToName.name = "";
-        playerToName.socket.emit("invalid-name");
+
+        // prevents error if no cookie was set
+        if (name) {
+            playerToName.socket.emit("invalid-name");
+        }
     }
 };
 

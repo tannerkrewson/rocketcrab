@@ -16,8 +16,10 @@ const NameEntry = ({ onNameEntry, code }: NameEntryProps): JSX.Element => {
     }, []);
 
     const handleNameChange = ({ target: { value } }) => setName(value);
+
     const handleJoin = (e?) => {
         if (e) e.preventDefault();
+        if (name.length < 1) return;
         onNameEntry(name);
     };
 
@@ -56,7 +58,11 @@ const NameEntry = ({ onNameEntry, code }: NameEntryProps): JSX.Element => {
                     Back
                 </PrimaryButton>
 
-                <PrimaryButton onClick={handleJoin} size="large">
+                <PrimaryButton
+                    onClick={handleJoin}
+                    disabled={name.length < 1}
+                    size="large"
+                >
                     Confirm
                 </PrimaryButton>
             </ButtonGroup>
