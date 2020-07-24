@@ -17,8 +17,16 @@ const GameSelector = ({
         if (!search) setSelectedCategory("");
     }, [search]);
 
+    const fullCategory = gameLibrary.categories.find(
+        ({ id }) => id === selectedCategory
+    );
+
+    const categoryName = fullCategory ? fullCategory.name + " " : "";
+
     return (
         <>
+            <div>{categoryName}Games</div>
+            <Spacer y={1} />
             {!selectedCategory && (
                 <>
                     <Input
@@ -38,8 +46,8 @@ const GameSelector = ({
                         onSelectCategory={setSelectedCategory}
                     />
                     <Spacer y={1} />
-                    <PrimaryButton onClick={onDone} size="large">
-                        Back to lobby
+                    <PrimaryButton onClick={onDone} size="medium">
+                        ↩️ Back to lobby
                     </PrimaryButton>
                 </>
             )}
@@ -47,7 +55,10 @@ const GameSelector = ({
                 <>
                     <GameGroup
                         gameList={gameLibrary.gameList}
-                        onSelectGame={onSelectGame}
+                        onSelectGame={(game) => {
+                            onSelectGame(game);
+                            onDone();
+                        }}
                         nameFilter={search}
                         categoryFilter={selectedCategory}
                     />

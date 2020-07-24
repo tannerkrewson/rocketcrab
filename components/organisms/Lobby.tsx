@@ -19,15 +19,11 @@ const Lobby = ({
     return (
         <div style={{ textAlign: "center" }}>
             {showGameSelector ? (
-                <>
-                    <div>Games</div>
-                    <Spacer y={1} />
-                    <GameSelector
-                        gameLibrary={gameLibrary}
-                        onSelectGame={onSelectGame}
-                        onDone={() => setShowGameSelector(false)}
-                    />
-                </>
+                <GameSelector
+                    gameLibrary={gameLibrary}
+                    onSelectGame={onSelectGame}
+                    onDone={() => setShowGameSelector(false)}
+                />
             ) : (
                 <>
                     {selectedGame ? (
