@@ -122,6 +122,7 @@ exports[`pages/join.tsx matches snapshot 1`] = `
     </main>
     <footer
       class="jsx-727442817"
+      style="margin-top: 1em;"
     >
       rocketcrab by 
       <a

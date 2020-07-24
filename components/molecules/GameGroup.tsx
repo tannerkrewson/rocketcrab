@@ -7,23 +7,27 @@ const GameGroup = ({
     nameFilter,
     categoryFilter,
     onSelectGame,
-}: GameGroupProps): JSX.Element => (
-    <Grid.Container gap={1}>
-        {gameList
-            .filter(
-                ({ category }) =>
-                    !categoryFilter || category.includes(categoryFilter)
-            )
-            .filter(({ name }) =>
-                name.toLowerCase().includes(nameFilter.toLowerCase().trim())
-            )
-            .map((game, i) => (
-                <Grid xs={24} key={i}>
-                    <GameBox game={game} onClick={onSelectGame} />
-                </Grid>
-            ))}
-    </Grid.Container>
-);
+}: GameGroupProps): JSX.Element => {
+    const games = gameList
+        .filter(
+            ({ category }) =>
+                !categoryFilter || category.includes(categoryFilter)
+        )
+        .filter(({ name }) =>
+            name.toLowerCase().includes(nameFilter.toLowerCase().trim())
+        )
+        .map((game, i) => (
+            <Grid xs={24} key={i}>
+                <GameBox game={game} onClick={onSelectGame} />
+            </Grid>
+        ));
+
+    if (!games.length) {
+        return <div>No games found 😭</div>;
+    }
+
+    return <Grid.Container gap={1}>{games}</Grid.Container>;
+};
 
 type GameGroupProps = {
     gameList: Array<ClientGame>;

@@ -1,5 +1,5 @@
 const Footer = (): JSX.Element => (
-    <footer>
+    <footer style={{ marginTop: "1em" }}>
         rocketcrab by{" "}
         <a
             href="https://www.tannerkrewson.com/"
