@@ -38,6 +38,7 @@ export const Join = (): JSX.Element => {
                     size="large"
                     width="8rem"
                     clearable={!joinLoading}
+                    type="text"
                     maxLength={4}
                     autoFocus
                     onKeyDown={onKey}

@@ -2,7 +2,7 @@
 
 ### Play now at [rocketcrab.com](https://rocketcrab.com/)
 
-rocketcrab is a launcher and matchmaking service for mobile web party games.
+rocketcrab is a lobby service and launcher for mobile web party games.
 
 ## Development
 

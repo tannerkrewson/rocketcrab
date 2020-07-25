@@ -24,6 +24,7 @@ type PrimaryButtonProps = {
     as?: string;
     children?: React.ReactNode;
     loading?: boolean;
+    type?: string;
 };
 
 export default PrimaryButton;

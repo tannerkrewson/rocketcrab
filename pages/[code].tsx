@@ -90,7 +90,11 @@ export const Code = ({
                 </PageLayout>
             )}
             {showGame && (
-                <GameLayout gameState={gameState} onExitGame={onExitGame} />
+                <GameLayout
+                    path={code as string}
+                    gameState={gameState}
+                    onExitGame={onExitGame}
+                />
             )}
         </>
     );
