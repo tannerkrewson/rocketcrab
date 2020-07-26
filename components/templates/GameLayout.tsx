@@ -1,10 +1,11 @@
 import { GameStatus } from "../../types/enums";
-import { Loading } from "@zeit-ui/react";
+import { Loading, Spacer } from "@zeit-ui/react";
 import PrimaryButton from "../atoms/PrimaryButton";
 import { useState } from "react";
-import { GameState, ClientGameLibrary } from "../../types/types";
+import { GameState, ClientGameLibrary, Player } from "../../types/types";
 import GameMenu from "../organisms/GameMenu";
 import GameSelector from "../organisms/GameSelector";
+import PlayerList from "../molecules/PlayerList";
 
 const GameLayout = ({
     gameState,
@@ -12,12 +13,14 @@ const GameLayout = ({
     onExitGame,
     onStartGame,
     gameLibrary,
+    playerList,
 }: GameLayoutProps): JSX.Element => {
     const { status, url } = gameState;
 
     const [statusCollapsed, setStatusCollapsed] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const [showGameLibrary, setShowGameLibrary] = useState(false);
+    const [showPlayerList, setShowPlayerList] = useState(false);
 
     // https://stackoverflow.com/a/48830513
     const [frameRefresh, setFrameRefresh] = useState(0);
@@ -31,7 +34,12 @@ const GameLayout = ({
             <div className={statusClass}>
                 <h4
                     className="logo"
-                    onClick={() => setStatusCollapsed(!statusCollapsed)}
+                    onClick={() => {
+                        setStatusCollapsed(!statusCollapsed);
+                        setShowMenu(false);
+                        setShowGameLibrary(false);
+                        setShowPlayerList(false);
+                    }}
                 >
                     🚀🦀
                 </h4>
@@ -42,6 +50,7 @@ const GameLayout = ({
                             onClick={() => {
                                 setShowMenu(!showMenu);
                                 setShowGameLibrary(false);
+                                setShowPlayerList(false);
                             }}
                             size="small"
                         >
@@ -66,6 +75,10 @@ const GameLayout = ({
                                     setShowMenu(false);
                                     setShowGameLibrary(true);
                                 }}
+                                onViewPlayers={() => {
+                                    setShowMenu(false);
+                                    setShowPlayerList(true);
+                                }}
                             />
                         )}
                     </>
@@ -88,6 +101,17 @@ const GameLayout = ({
                         onSelectGame={() => {}}
                         backToLabel="game"
                     />
+                </div>
+            )}
+            {showPlayerList && (
+                <div className="component-frame">
+                    <div>🚀🦀 Players:</div>
+                    <Spacer y={0.5} />
+                    <PlayerList playerList={playerList} />
+                    <Spacer y={0.5} />
+                    <PrimaryButton onClick={() => setShowPlayerList(false)}>
+                        Close
+                    </PrimaryButton>
                 </div>
             )}
             <style jsx>{`
@@ -130,9 +154,12 @@ const GameLayout = ({
                     padding: 1em;
                     text-align: center;
                     position: absolute;
+                    right: 1em;
                     top: 3em;
                     background: white;
                     border: 1px solid LightGrey;
+                    min-width: 15em;
+                    max-width: 100%;
                 }
             `}</style>
         </div>
@@ -145,6 +172,7 @@ type GameLayoutProps = {
     onExitGame: () => void;
     onStartGame: () => void;
     gameLibrary: ClientGameLibrary;
+    playerList: Array<Player>;
 };
 
 export default GameLayout;

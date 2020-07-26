@@ -6,10 +6,15 @@ const GameMenu = ({
     onReloadMine,
     onStartGame,
     onViewGames,
+    onViewPlayers,
 }: GameMenuProps): JSX.Element => (
     <div className="game-menu">
         <PrimaryButton size="small" onClick={onReloadMine}>
             Reload my game
+        </PrimaryButton>
+        <Spacer y={0.5} />
+        <PrimaryButton size="small" onClick={onViewPlayers}>
+            View players
         </PrimaryButton>
         <Spacer y={0.5} />
         <PrimaryButton size="small" onClick={onViewGames}>
@@ -45,6 +50,7 @@ type GameMenuProps = {
     onReloadMine: () => void;
     onStartGame: () => void;
     onViewGames: () => void;
+    onViewPlayers: () => void;
 };
 
 export default GameMenu;
