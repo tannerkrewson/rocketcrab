@@ -28,6 +28,7 @@ export const newLobby = (
         code,
         selectedGame: "",
         gameState: { status: GameStatus.loading },
+        nextPlayerId: 0,
     });
     return code;
 };
@@ -38,12 +39,26 @@ export const getLobby = (newCode: string, lobbyList: Array<Lobby>): Lobby =>
 export const addPlayer = (
     name: string,
     socket: SocketIO.Socket,
-    playerList: Array<Player>
+    lobby: Lobby,
+    previousId?: number
 ): Player => {
-    const player = { name: "", socket };
-    playerList.push(player);
+    const idNotInUse = !isIDinUse(previousId, lobby.playerList);
+    const usePreviousId = Number.isInteger(previousId) && idNotInUse;
+    const id = usePreviousId ? previousId : lobby.nextPlayerId++;
 
-    setName(name, player, playerList);
+    // this is mostly only important for the ffff dev lobby
+    if (id > lobby.nextPlayerId) {
+        lobby.nextPlayerId = id + 1;
+    }
+
+    const player: Player = {
+        id,
+        name: "",
+        socket,
+    };
+    lobby.playerList.push(player);
+
+    setName(name, player, lobby.playerList);
 
     return player;
 };
@@ -148,7 +163,7 @@ const disconnectAllPlayers = (playerList: Array<Player>): void =>
     playerList.forEach(({ socket }) => socket.disconnect(true));
 
 const getJsonLobby = ({ playerList, ...lobby }: Lobby) => ({
-    playerList: playerList.map(({ name }) => ({ name })),
+    playerList: playerList.map(({ id, name }) => ({ id, name })),
     ...lobby,
 });
 
@@ -178,3 +193,6 @@ const deleteFromArray = (item: any, array: Array<any>): void => {
         array.splice(index, 1);
     }
 };
+
+const isIDinUse = (previousId: number, playerList: Array<Player>): boolean =>
+    !!playerList.find(({ id }) => id === previousId);

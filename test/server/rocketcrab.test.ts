@@ -71,13 +71,96 @@ describe("server/rocketcrab.ts", () => {
 
     it("addPlayer works", () => {
         const mockSocket = {} as SocketIO.Socket;
-        const playerList: Array<Player> = [];
-        const mockPlayer = addPlayer("foo", mockSocket, playerList);
+        const playerList = [];
+        const mockLobby: Lobby = {
+            status: LobbyStatus.lobby,
+            playerList,
+            code: "efgh",
+            selectedGame: "FooGame",
+            gameState: {} as GameState,
+            nextPlayerId: 0,
+        };
+        const mockPlayer = addPlayer("foo", mockSocket, mockLobby);
 
         expect(playerList.length).toBe(1);
         expect(playerList).toContain(mockPlayer);
+        expect(playerList[0].id).toBe(0);
         expect(playerList[0].name).toBe("foo");
         expect(playerList[0].socket).toBe(mockSocket);
+    });
+
+    it("addPlayer uses previousId if valid", () => {
+        const mockSocket = {} as SocketIO.Socket;
+        const playerList = [
+            {
+                id: 1,
+                name: "bar",
+                socket: {} as SocketIO.Socket,
+            },
+        ];
+        const mockLobby: Lobby = {
+            status: LobbyStatus.lobby,
+            playerList,
+            code: "efgh",
+            selectedGame: "FooGame",
+            gameState: {} as GameState,
+            nextPlayerId: 2,
+        };
+        const mockPlayer = addPlayer("foo", mockSocket, mockLobby, 0);
+
+        expect(playerList.length).toBe(2);
+        expect(playerList).toContain(mockPlayer);
+        expect(playerList[1].id).toBe(0);
+        expect(playerList[1].name).toBe("foo");
+        expect(playerList[1].socket).toBe(mockSocket);
+    });
+
+    it("addPlayer doesn't use previousId if it's invalid", () => {
+        const mockSocket = {} as SocketIO.Socket;
+        const playerList = [
+            {
+                id: 0,
+                name: "foo",
+                socket: {} as SocketIO.Socket,
+            },
+        ];
+        const mockLobby: Lobby = {
+            status: LobbyStatus.lobby,
+            playerList,
+            code: "efgh",
+            selectedGame: "FooGame",
+            gameState: {} as GameState,
+            nextPlayerId: 1,
+        };
+        const mockPlayer = addPlayer("bar", mockSocket, mockLobby, 0);
+
+        expect(playerList.length).toBe(2);
+        expect(playerList).toContain(mockPlayer);
+        expect(playerList[1].id).toBe(1);
+        expect(playerList[1].name).toBe("bar");
+        expect(playerList[1].socket).toBe(mockSocket);
+    });
+
+    it("addPlayer sets nextPlayerId if it's too low", () => {
+        const mockSocket = {} as SocketIO.Socket;
+        const playerList = [];
+        const mockLobby: Lobby = {
+            status: LobbyStatus.lobby,
+            playerList,
+            code: "efgh",
+            selectedGame: "FooGame",
+            gameState: {} as GameState,
+            nextPlayerId: 0,
+        };
+        const mockPlayer = addPlayer("bar", mockSocket, mockLobby, 123);
+
+        expect(playerList.length).toBe(1);
+        expect(playerList).toContain(mockPlayer);
+        expect(playerList[0].id).toBe(123);
+        expect(playerList[0].name).toBe("bar");
+        expect(playerList[0].socket).toBe(mockSocket);
+
+        expect(mockLobby.nextPlayerId).toBe(124);
     });
 
     it("sendStateToAll works", () => {
@@ -86,6 +169,7 @@ describe("server/rocketcrab.ts", () => {
             status: LobbyStatus.lobby,
             playerList: [
                 {
+                    id: 0,
                     name: "foo",
                     socket: ({ emit } as unknown) as SocketIO.Socket,
                 },
@@ -93,21 +177,25 @@ describe("server/rocketcrab.ts", () => {
             code: "efgh",
             selectedGame: "FooGame",
             gameState: {} as GameState,
+            nextPlayerId: 1,
         };
 
         const jsonLobby = {
             status: LobbyStatus.lobby,
             playerList: [
                 {
+                    id: 0,
                     name: "foo",
                 },
             ],
             code: "efgh",
             me: {
+                id: 0,
                 name: "foo",
             },
             selectedGame: "FooGame",
             gameState: {} as GameState,
+            nextPlayerId: 1,
         };
 
         sendStateToAll(mockLobby);
@@ -118,6 +206,7 @@ describe("server/rocketcrab.ts", () => {
     it("removePlayer works", () => {
         const disconnect = jest.fn();
         const mockPlayer = {
+            id: 0,
             name: "foo",
             socket: ({ disconnect } as unknown) as SocketIO.Socket,
         };
@@ -137,6 +226,7 @@ describe("server/rocketcrab.ts", () => {
             code: "efgh",
             selectedGame: "FooGame",
             gameState: {} as GameState,
+            nextPlayerId: 123,
         };
         const lobbyList: Array<Lobby> = [mockLobby];
 
@@ -150,6 +240,7 @@ describe("server/rocketcrab.ts", () => {
             status: LobbyStatus.lobby,
             playerList: [
                 {
+                    id: 0,
                     name: "foo",
                     socket: {} as SocketIO.Socket,
                 },
@@ -157,6 +248,7 @@ describe("server/rocketcrab.ts", () => {
             code: "efgh",
             selectedGame: "FooGame",
             gameState: {} as GameState,
+            nextPlayerId: 1,
         };
         const lobbyList: Array<Lobby> = [mockLobby];
 
@@ -170,6 +262,7 @@ describe("server/rocketcrab.ts", () => {
             status: LobbyStatus.lobby,
             playerList: [
                 {
+                    id: 0,
                     name: "foo",
                     socket: {} as SocketIO.Socket,
                 },
@@ -177,6 +270,7 @@ describe("server/rocketcrab.ts", () => {
             code: "efgh",
             selectedGame: "",
             gameState: {} as GameState,
+            nextPlayerId: 1,
         };
         setGame("CoolGame", mockLobby);
 

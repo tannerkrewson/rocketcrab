@@ -10,14 +10,15 @@ import GameLayout from "../components/templates/GameLayout";
 
 import { GameState, ClientGameLibrary } from "../types/types";
 import { getClientGameLibrary } from "../config";
-import { parseCookies, setCookie } from "nookies";
+import { parseCookies, setCookie as setNookie } from "nookies";
 
 const CLIENT_GAME_LIBRARY = getClientGameLibrary();
 const socket = socketIOClient();
 
 export const Code = ({
     gameLibrary = { gameList: [], categories: [] },
-    name,
+    previousName,
+    previousId,
 }: CodeProps): JSX.Element => {
     const router = useRouter();
     const { code } = router.query;
@@ -40,15 +41,26 @@ export const Code = ({
 
     useEffect(() => {
         // "code" will be undefined during Automatic Static Optimization
-        if (code) socket.emit("join-lobby", { code, name });
+        if (code)
+            socket.emit("join-lobby", {
+                code,
+                id: previousId,
+                name: previousName,
+            });
 
         socket.on("invalid-lobby", () => router.push("/join?invalid=" + code));
     }, [code]);
 
-    const onNameEntry = (name) => {
-        socket.emit("name", name);
+    useEffect(() => {
+        if (!Number.isInteger(me.id)) return;
 
-        setCookie(null, "name", name, {});
+        setCookie("previousCode", code as string);
+        setCookie("previousId", me.id);
+    }, [me.id]);
+
+    const onNameEntry = (enteredName) => {
+        socket.emit("name", enteredName);
+        setCookie("previousName", enteredName);
     };
 
     const onSelectGame = (gameName: string) => {
@@ -106,24 +118,36 @@ export const Code = ({
 const initLobbyState = () => ({
     status: "loading" as string,
     playerList: [],
-    me: { name: undefined },
+    me: { id: undefined, name: undefined },
     selectedGame: "",
     gameState: {} as GameState,
 });
 
+const setCookie = (key: string, value: any) => setNookie(null, key, value, {});
+
 export const getServerSideProps: GetServerSideProps = async (
     ctx: GetServerSidePropsContext
 ): Promise<any> => {
-    const { name = "" } = parseCookies(ctx);
+    const {
+        query: { code },
+    } = ctx;
+    const { previousCode, previousId, previousName = "" } = parseCookies(ctx);
+
+    const isReconnect = previousCode === code;
 
     return {
-        props: { gameLibrary: CLIENT_GAME_LIBRARY, name },
+        props: {
+            gameLibrary: CLIENT_GAME_LIBRARY,
+            previousName,
+            previousId: isReconnect ? Number.parseInt(previousId) : null,
+        },
     };
 };
 
 type CodeProps = {
     gameLibrary: ClientGameLibrary;
-    name?: string;
+    previousName?: string;
+    previousId?: number;
 };
 
 export default Code;

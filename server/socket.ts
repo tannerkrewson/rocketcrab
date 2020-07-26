@@ -16,10 +16,11 @@ export default (
     { lobbyList }: RocketCrab
 ): SocketIO.Namespace =>
     io.on("connection", (socket) => {
-        socket.on("join-lobby", ({ code, name }: JoinLobbyResponse) => {
+        socket.on("join-lobby", ({ code, id, name }: JoinLobbyResponse) => {
             const lobby = getLobby(code, lobbyList);
+
             if (lobby) {
-                const player = addPlayer(name, socket, lobby.playerList);
+                const player = addPlayer(name, socket, lobby, id);
 
                 attachLobbyListenersToPlayer(player, lobby, lobbyList);
                 sendStateToAll(lobby);

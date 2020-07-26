@@ -28,6 +28,10 @@ const nextHandler = nextApp.getRequestHandler();
     attachAPIHandlers(app, rocketCrab);
     attachSocketHandlers(io, rocketCrab);
 
+    app.get("/favicon.ico", (req, res) => {
+        res.sendStatus(404);
+    });
+
     app.get("*", (nextHandler as unknown) as RequestHandler);
 
     await http.listen(port);

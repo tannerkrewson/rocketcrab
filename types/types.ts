@@ -10,9 +10,11 @@ export type Lobby = {
     code: string;
     selectedGame: string;
     gameState: GameState;
+    nextPlayerId: number;
 };
 
 export type Player = {
+    id: number;
     name: string;
     socket: SocketIO.Socket;
 };
@@ -56,5 +58,6 @@ export type GameState = {
 
 export type JoinLobbyResponse = {
     code: string;
+    id?: number;
     name?: string;
 };
