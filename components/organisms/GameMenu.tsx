@@ -1,7 +1,11 @@
 import PrimaryButton from "../atoms/PrimaryButton";
 import { Spacer } from "@zeit-ui/react";
 
-const GameMenu = ({ onExitGame, onReloadMine }: GameMenuProps): JSX.Element => (
+const GameMenu = ({
+    onExitGame,
+    onReloadMine,
+    onStartGame,
+}: GameMenuProps): JSX.Element => (
     <div className="game-menu">
         <PrimaryButton type="error" size="small" onClick={onExitGame}>
             Exit to lobby
@@ -9,6 +13,10 @@ const GameMenu = ({ onExitGame, onReloadMine }: GameMenuProps): JSX.Element => (
         <Spacer y={0.5} />
         <PrimaryButton size="small" onClick={onReloadMine}>
             Reload my game
+        </PrimaryButton>{" "}
+        <Spacer y={0.5} />
+        <PrimaryButton size="small" type="error" onClick={onStartGame}>
+            Reload all
         </PrimaryButton>
         <style jsx>{`
             .game-menu {
@@ -30,6 +38,7 @@ const GameMenu = ({ onExitGame, onReloadMine }: GameMenuProps): JSX.Element => (
 type GameMenuProps = {
     onExitGame: () => void;
     onReloadMine: () => void;
+    onStartGame: () => void;
 };
 
 export default GameMenu;

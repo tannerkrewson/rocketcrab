@@ -9,6 +9,7 @@ const GameLayout = ({
     gameState,
     path,
     onExitGame,
+    onStartGame,
 }: GameLayoutProps): JSX.Element => {
     const { status, url } = gameState;
 
@@ -47,6 +48,7 @@ const GameLayout = ({
                                 onReloadMine={() =>
                                     setFrameRefresh(frameRefresh + 1)
                                 }
+                                onStartGame={onStartGame}
                             />
                         )}
                     </>
@@ -104,6 +106,7 @@ type GameLayoutProps = {
     gameState: GameState;
     path: string;
     onExitGame: () => void;
+    onStartGame: () => void;
 };
 
 export default GameLayout;

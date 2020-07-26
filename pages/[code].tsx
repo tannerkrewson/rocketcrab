@@ -94,6 +94,7 @@ export const Code = ({
                     path={code as string}
                     gameState={gameState}
                     onExitGame={onExitGame}
+                    onStartGame={onStartGame}
                 />
             )}
         </>
