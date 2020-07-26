@@ -15,6 +15,9 @@ const GameLayout = ({
     const [statusCollapsed, setStatusCollapsed] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
 
+    // https://stackoverflow.com/a/48830513
+    const [frameRefresh, setFrameRefresh] = useState(0);
+
     const showLoading = status === GameStatus.loading;
     const showGameFrame = status === GameStatus.inprogress;
 
@@ -38,7 +41,14 @@ const GameLayout = ({
                             {showMenu ? "▼" : "▲"} Menu
                         </PrimaryButton>
 
-                        {showMenu && <GameMenu onExitGame={onExitGame} />}
+                        {showMenu && (
+                            <GameMenu
+                                onExitGame={onExitGame}
+                                onReloadMine={() =>
+                                    setFrameRefresh(frameRefresh + 1)
+                                }
+                            />
+                        )}
                     </>
                 )}
             </div>
@@ -47,7 +57,9 @@ const GameLayout = ({
                     <Loading />
                 </div>
             )}
-            {showGameFrame && <iframe className="frame" src={url}></iframe>}
+            {showGameFrame && (
+                <iframe className="frame" src={url} key={frameRefresh}></iframe>
+            )}
             <style jsx>{`
                 .layout {
                     display: flex;
