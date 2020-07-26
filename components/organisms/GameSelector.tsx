@@ -9,6 +9,7 @@ const GameSelector = ({
     gameLibrary,
     onSelectGame,
     onDone,
+    backToLabel,
 }: GameSelectorProps): JSX.Element => {
     const { state: search, setState: setSearch, bindings } = useInput("");
     const [selectedCategory, setSelectedCategory] = useState("");
@@ -47,7 +48,7 @@ const GameSelector = ({
                     />
                     <Spacer y={1} />
                     <PrimaryButton onClick={onDone} size="medium">
-                        ↩️ Back to lobby
+                        ↩️ Back to {backToLabel}
                     </PrimaryButton>
                 </>
             )}
@@ -81,6 +82,7 @@ type GameSelectorProps = {
     gameLibrary: ClientGameLibrary;
     onSelectGame: (gameName: string) => void;
     onDone: () => void;
+    backToLabel: string;
 };
 
 export default GameSelector;

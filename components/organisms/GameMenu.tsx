@@ -5,18 +5,23 @@ const GameMenu = ({
     onExitGame,
     onReloadMine,
     onStartGame,
+    onViewGames,
 }: GameMenuProps): JSX.Element => (
     <div className="game-menu">
-        <PrimaryButton type="error" size="small" onClick={onExitGame}>
-            Exit to lobby
-        </PrimaryButton>
-        <Spacer y={0.5} />
         <PrimaryButton size="small" onClick={onReloadMine}>
             Reload my game
-        </PrimaryButton>{" "}
+        </PrimaryButton>
+        <Spacer y={0.5} />
+        <PrimaryButton size="small" onClick={onViewGames}>
+            View games
+        </PrimaryButton>
         <Spacer y={0.5} />
         <PrimaryButton size="small" type="error" onClick={onStartGame}>
             Reload all
+        </PrimaryButton>
+        <Spacer y={0.5} />
+        <PrimaryButton type="error" size="small" onClick={onExitGame}>
+            Exit to lobby
         </PrimaryButton>
         <style jsx>{`
             .game-menu {
@@ -39,6 +44,7 @@ type GameMenuProps = {
     onExitGame: () => void;
     onReloadMine: () => void;
     onStartGame: () => void;
+    onViewGames: () => void;
 };
 
 export default GameMenu;

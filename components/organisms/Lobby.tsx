@@ -23,6 +23,7 @@ const Lobby = ({
                     gameLibrary={gameLibrary}
                     onSelectGame={onSelectGame}
                     onDone={() => setShowGameSelector(false)}
+                    backToLabel="lobby"
                 />
             ) : (
                 <>

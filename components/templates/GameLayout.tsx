@@ -2,19 +2,22 @@ import { GameStatus } from "../../types/enums";
 import { Loading } from "@zeit-ui/react";
 import PrimaryButton from "../atoms/PrimaryButton";
 import { useState } from "react";
-import { GameState } from "../../types/types";
+import { GameState, ClientGameLibrary } from "../../types/types";
 import GameMenu from "../organisms/GameMenu";
+import GameSelector from "../organisms/GameSelector";
 
 const GameLayout = ({
     gameState,
     path,
     onExitGame,
     onStartGame,
+    gameLibrary,
 }: GameLayoutProps): JSX.Element => {
     const { status, url } = gameState;
 
     const [statusCollapsed, setStatusCollapsed] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
+    const [showGameLibrary, setShowGameLibrary] = useState(false);
 
     // https://stackoverflow.com/a/48830513
     const [frameRefresh, setFrameRefresh] = useState(0);
@@ -36,7 +39,10 @@ const GameLayout = ({
                     <>
                         <div className="url">rocketcrab.com/{path}</div>
                         <PrimaryButton
-                            onClick={() => setShowMenu(!showMenu)}
+                            onClick={() => {
+                                setShowMenu(!showMenu);
+                                setShowGameLibrary(false);
+                            }}
                             size="small"
                         >
                             {showMenu ? "▼" : "▲"} Menu
@@ -44,11 +50,22 @@ const GameLayout = ({
 
                         {showMenu && (
                             <GameMenu
-                                onExitGame={onExitGame}
-                                onReloadMine={() =>
-                                    setFrameRefresh(frameRefresh + 1)
-                                }
-                                onStartGame={onStartGame}
+                                onExitGame={() => {
+                                    setShowMenu(false);
+                                    onExitGame();
+                                }}
+                                onReloadMine={() => {
+                                    setShowMenu(false);
+                                    setFrameRefresh(frameRefresh + 1);
+                                }}
+                                onStartGame={() => {
+                                    setShowMenu(false);
+                                    onStartGame();
+                                }}
+                                onViewGames={() => {
+                                    setShowMenu(false);
+                                    setShowGameLibrary(true);
+                                }}
                             />
                         )}
                     </>
@@ -61,6 +78,17 @@ const GameLayout = ({
             )}
             {showGameFrame && (
                 <iframe className="frame" src={url} key={frameRefresh}></iframe>
+            )}
+            {showGameLibrary && (
+                <div className="component-frame">
+                    <GameSelector
+                        gameLibrary={gameLibrary}
+                        onDone={() => setShowGameLibrary(false)}
+                        // eslint-disable-next-line @typescript-eslint/no-empty-function
+                        onSelectGame={() => {}}
+                        backToLabel="game"
+                    />
+                </div>
             )}
             <style jsx>{`
                 .layout {
@@ -97,6 +125,15 @@ const GameLayout = ({
                     margin: auto 0;
                     font-weight: bold;
                 }
+                .component-frame {
+                    margin: 1em;
+                    padding: 1em;
+                    text-align: center;
+                    position: absolute;
+                    top: 3em;
+                    background: white;
+                    border: 1px solid LightGrey;
+                }
             `}</style>
         </div>
     );
@@ -107,6 +144,7 @@ type GameLayoutProps = {
     path: string;
     onExitGame: () => void;
     onStartGame: () => void;
+    gameLibrary: ClientGameLibrary;
 };
 
 export default GameLayout;
