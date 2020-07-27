@@ -41,7 +41,7 @@ const attachLobbyListenersToPlayer = (
     socket.join(code); // https://socket.io/docs/rooms/
 
     socket.on("disconnect", () => {
-        removePlayer(player, playerList);
+        removePlayer(player, lobby);
         deleteLobbyIfEmpty(lobby, lobbyList);
         sendStateToAll(lobby);
     });

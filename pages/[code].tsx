@@ -36,7 +36,10 @@ export const Code = ({
             setLobbyState(newLobbyState);
             setShowReconnecting(false);
         });
-        socket.on("invalid-name", () => alert("Name already in use"));
+        socket.on("invalid-name", () => {
+            if (code === "ffff") return;
+            alert("Name already in use");
+        });
 
         socket.on("disconnect", (reason) => {
             // if the disconnection was initiated by the server

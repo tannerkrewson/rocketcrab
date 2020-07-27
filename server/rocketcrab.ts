@@ -29,6 +29,7 @@ export const newLobby = (
         selectedGame: "",
         gameState: { status: GameStatus.loading },
         nextPlayerId: 0,
+        idealHostId: 0,
     });
     return code;
 };
@@ -55,10 +56,17 @@ export const addPlayer = (
         id,
         name: "",
         socket,
+        isHost: false,
     };
     lobby.playerList.push(player);
 
     setName(name, player, lobby.playerList);
+
+    if (!lobby.idealHostId) {
+        lobby.idealHostId = id;
+    }
+
+    setHost(lobby.idealHostId, lobby.playerList);
 
     return player;
 };
@@ -68,10 +76,8 @@ export const sendStateToAll = (lobby: Lobby): void =>
         socket.emit("update", { me: player, ...getJsonLobby(lobby) })
     );
 
-export const removePlayer = (
-    player: Player,
-    playerList: Array<Player>
-): void => {
+export const removePlayer = (player: Player, lobby: Lobby): void => {
+    const { playerList, idealHostId } = lobby;
     const { socket } = player;
 
     if (socket && socket.disconnect) {
@@ -79,6 +85,10 @@ export const removePlayer = (
     }
 
     deleteFromArray(player, playerList);
+
+    if (player.isHost) {
+        setHost(idealHostId, playerList);
+    }
 };
 
 export const deleteLobbyIfEmpty = (
@@ -163,7 +173,11 @@ const disconnectAllPlayers = (playerList: Array<Player>): void =>
     playerList.forEach(({ socket }) => socket.disconnect(true));
 
 const getJsonLobby = ({ playerList, ...lobby }: Lobby) => ({
-    playerList: playerList.map(({ id, name }) => ({ id, name })),
+    playerList: playerList.map(({ id, name, isHost }) => ({
+        id,
+        name,
+        isHost,
+    })),
     ...lobby,
 });
 
@@ -196,3 +210,20 @@ const deleteFromArray = (item: any, array: Array<any>): void => {
 
 const isIDinUse = (previousId: number, playerList: Array<Player>): boolean =>
     !!playerList.find(({ id }) => id === previousId);
+
+const setHost = (idealHostId: number, playerList: Array<Player>): void => {
+    playerList.forEach((player) => (player.isHost = false));
+
+    const idealHost = playerList.find(({ id }) => id === idealHostId);
+
+    if (idealHost) {
+        idealHost.isHost = true;
+        return;
+    }
+
+    // make the player with the lowest id the host
+    playerList.reduce((acc, cur) => (acc.id < cur.id ? acc : cur), {
+        id: Number.MAX_SAFE_INTEGER,
+        isHost: null,
+    }).isHost = true;
+};

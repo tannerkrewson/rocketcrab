@@ -11,12 +11,14 @@ export type Lobby = {
     selectedGame: string;
     gameState: GameState;
     nextPlayerId: number;
+    idealHostId: number;
 };
 
 export type Player = {
     id: number;
     name: string;
     socket: SocketIO.Socket;
+    isHost: boolean;
 };
 
 export type ClientGame = {

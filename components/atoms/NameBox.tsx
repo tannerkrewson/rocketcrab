@@ -1,9 +1,14 @@
 import { Loading, Card } from "@zeit-ui/react";
 
-const NameBox = ({ name, onEditName }: NameBoxProps): JSX.Element => (
+const NameBox = ({
+    name,
+    color,
+    label = [],
+    onEditName,
+}: NameBoxProps): JSX.Element => (
     <Card
         style={{
-            border: "1pt solid LightGrey",
+            border: "1pt solid " + (color || "LightGrey"),
             borderRadius: "0",
         }}
     >
@@ -24,12 +29,27 @@ const NameBox = ({ name, onEditName }: NameBoxProps): JSX.Element => (
             ) : (
                 false
             )}
+            <div
+                style={{
+                    position: "absolute",
+                    textAlign: "right",
+                    right: ".3em",
+                    bottom: "0",
+                    color: "Grey",
+                    fontSize: ".8em",
+                    fontStyle: "italic",
+                }}
+            >
+                {label.join(", ")}
+            </div>
         </Card.Body>
     </Card>
 );
 
 type NameBoxProps = {
     name?: string;
+    color?: string;
+    label?: string[];
     onEditName?: () => void;
 };
 
