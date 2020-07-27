@@ -11,6 +11,7 @@ import GameLayout from "../components/templates/GameLayout";
 import { GameState, ClientGameLibrary } from "../types/types";
 import { getClientGameLibrary } from "../config";
 import { parseCookies, setCookie as setNookie } from "nookies";
+import Connecting from "../components/atoms/Connecting";
 
 const CLIENT_GAME_LIBRARY = getClientGameLibrary();
 const socket = socketIOClient();
@@ -24,14 +25,34 @@ export const Code = ({
     const { code } = router.query;
 
     const [lobbyState, setLobbyState] = useState(initLobbyState());
+    const [showReconnecting, setShowReconnecting] = useState(false);
     const { status, me, playerList, selectedGame, gameState } = lobbyState;
 
     // only ran with initial value due to the []
     useEffect(() => {
         socket.open();
 
-        socket.on("update", (newLobbyState) => setLobbyState(newLobbyState));
+        socket.on("update", (newLobbyState) => {
+            setLobbyState(newLobbyState);
+            setShowReconnecting(false);
+        });
         socket.on("invalid-name", () => alert("Name already in use"));
+
+        socket.on("disconnect", (reason) => {
+            // if the disconnection was initiated by the server
+            if (reason === "io server disconnect") {
+                // reconnect manually
+                socket.connect();
+            }
+            // else the socket will automatically try to reconnect
+
+            setShowReconnecting(true);
+        });
+
+        socket.on("reconnect", () => {
+            joinLobby();
+            setShowReconnecting(false);
+        });
 
         return () => {
             socket.close();
@@ -41,14 +62,14 @@ export const Code = ({
 
     useEffect(() => {
         // "code" will be undefined during Automatic Static Optimization
-        if (code)
-            socket.emit("join-lobby", {
-                code,
-                id: previousId,
-                name: previousName,
-            });
+        if (code) {
+            joinLobby();
+        }
 
-        socket.on("invalid-lobby", () => router.push("/join?invalid=" + code));
+        socket.on("invalid-lobby", () => {
+            // todo: don't do this if showGame is true
+            router.push("/join?invalid=" + code);
+        });
     }, [code]);
 
     useEffect(() => {
@@ -73,6 +94,14 @@ export const Code = ({
 
     const onExitGame = () => {
         socket.emit("game-exit");
+    };
+
+    const joinLobby = () => {
+        socket.emit("join-lobby", {
+            code,
+            id: previousId,
+            name: previousName,
+        });
     };
 
     const showLoading = status === "loading";
@@ -111,6 +140,7 @@ export const Code = ({
                     playerList={playerList}
                 />
             )}
+            {showReconnecting && <Connecting />}
         </>
     );
 };

@@ -101,7 +101,7 @@ export const setName = (
     playerToName: Player,
     playerList: Array<Player>
 ): void => {
-    const validLength = name.length <= 24;
+    const validLength = typeof name === "string" && name.length <= 24;
 
     if (!findPlayerByName(name, playerList) && validLength) {
         playerToName.name = name;
