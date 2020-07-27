@@ -51,6 +51,7 @@ const Lobby = ({
                             disabled={!selectedGame}
                             onClick={onStartGame}
                             size="large"
+                            type="error"
                         >
                             Start Game
                         </PrimaryButton>
@@ -62,7 +63,7 @@ const Lobby = ({
                         meId={meId}
                     />
                     <Spacer y={1} />
-                    <PrimaryButton href="/" size="small" type="error">
+                    <PrimaryButton href="/" size="small">
                         Leave Lobby
                     </PrimaryButton>
                 </>

@@ -52,16 +52,22 @@ const attachLobbyListenersToPlayer = (
     });
 
     socket.on("game-select", (gameName) => {
+        if (!player.isHost) return;
+
         setGame(gameName, lobby);
         sendStateToAll(lobby);
     });
 
     socket.on("game-start", () => {
+        if (!player.isHost) return;
+
         startGame(lobby);
         sendStateToAll(lobby);
     });
 
     socket.on("game-exit", () => {
+        if (!player.isHost) return;
+
         exitGame(lobby);
         sendStateToAll(lobby);
     });

@@ -142,6 +142,7 @@ export const Code = ({
                     onStartGame={onStartGame}
                     gameLibrary={gameLibrary}
                     playerList={playerList}
+                    isHost={me.isHost}
                 />
             )}
             {showReconnecting && <Connecting />}
@@ -152,7 +153,7 @@ export const Code = ({
 const initLobbyState = () => ({
     status: "loading" as string,
     playerList: [],
-    me: { id: undefined, name: undefined },
+    me: { id: undefined, name: undefined, isHost: undefined },
     selectedGame: "",
     gameState: {} as GameState,
 });

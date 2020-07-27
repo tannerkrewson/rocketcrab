@@ -14,6 +14,7 @@ const GameLayout = ({
     onStartGame,
     gameLibrary,
     playerList,
+    isHost,
 }: GameLayoutProps): JSX.Element => {
     const { status, url } = gameState;
 
@@ -59,6 +60,7 @@ const GameLayout = ({
 
                         {showMenu && (
                             <GameMenu
+                                isHost={isHost}
                                 onExitGame={() => {
                                     setShowMenu(false);
                                     onExitGame();
@@ -173,6 +175,7 @@ type GameLayoutProps = {
     onStartGame: () => void;
     gameLibrary: ClientGameLibrary;
     playerList: Array<Player>;
+    isHost: boolean;
 };
 
 export default GameLayout;

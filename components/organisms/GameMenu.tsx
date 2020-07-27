@@ -7,6 +7,7 @@ const GameMenu = ({
     onStartGame,
     onViewGames,
     onViewPlayers,
+    isHost,
 }: GameMenuProps): JSX.Element => (
     <div className="game-menu">
         <PrimaryButton size="small" onClick={onReloadMine}>
@@ -20,14 +21,18 @@ const GameMenu = ({
         <PrimaryButton size="small" onClick={onViewGames}>
             View games
         </PrimaryButton>
-        <Spacer y={0.5} />
-        <PrimaryButton size="small" type="error" onClick={onStartGame}>
-            Reload all
-        </PrimaryButton>
-        <Spacer y={0.5} />
-        <PrimaryButton type="error" size="small" onClick={onExitGame}>
-            Exit to lobby
-        </PrimaryButton>
+        {isHost && (
+            <>
+                <Spacer y={0.5} />
+                <PrimaryButton size="small" type="error" onClick={onStartGame}>
+                    Reload all
+                </PrimaryButton>
+                <Spacer y={0.5} />
+                <PrimaryButton size="small" type="error" onClick={onExitGame}>
+                    Exit to lobby
+                </PrimaryButton>
+            </>
+        )}
         <style jsx>{`
             .game-menu {
                 position: fixed;
@@ -51,6 +56,7 @@ type GameMenuProps = {
     onStartGame: () => void;
     onViewGames: () => void;
     onViewPlayers: () => void;
+    isHost: boolean;
 };
 
 export default GameMenu;
