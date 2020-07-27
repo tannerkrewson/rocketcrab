@@ -6,6 +6,7 @@ import GameSelector from "./GameSelector";
 import GameBox from "../atoms/GameBox";
 import { Player, ClientGameLibrary } from "../../types/types";
 import { useState } from "react";
+import NameBox from "../atoms/NameBox";
 
 const Lobby = ({
     playerList,
@@ -14,6 +15,7 @@ const Lobby = ({
     selectedGame,
     onStartGame,
     resetName,
+    meId,
 }: LobbyProps): JSX.Element => {
     const [showGameSelector, setShowGameSelector] = useState(false);
     return (
@@ -27,40 +29,23 @@ const Lobby = ({
                 />
             ) : (
                 <>
+                    <Spacer y={2} />
                     {selectedGame ? (
-                        <div>
-                            Selected game:
-                            <GameBox
-                                game={gameLibrary.gameList.find(
-                                    ({ name }) => name === selectedGame
-                                )}
-                            />
-                        </div>
+                        <GameBox
+                            game={gameLibrary.gameList.find(
+                                ({ name }) => name === selectedGame
+                            )}
+                        />
                     ) : (
-                        <div>No Game Selected</div>
+                        <NameBox name="No Game Selected" />
                     )}
                     <Spacer y={1} />
-
-                    <div>Players:</div>
-                    <PlayerList playerList={playerList} />
-                    <Spacer y={1} />
-
                     <ButtonGroup>
                         <PrimaryButton
                             onClick={() => setShowGameSelector(true)}
-                            size="medium"
+                            size="large"
                         >
                             View games
-                        </PrimaryButton>
-                        <PrimaryButton onClick={resetName} size="medium">
-                            Change my name
-                        </PrimaryButton>
-                    </ButtonGroup>
-                    <Spacer y={1} />
-
-                    <ButtonGroup>
-                        <PrimaryButton href="/" size="large">
-                            Leave Lobby
                         </PrimaryButton>
                         <PrimaryButton
                             disabled={!selectedGame}
@@ -70,6 +55,16 @@ const Lobby = ({
                             Start Game
                         </PrimaryButton>
                     </ButtonGroup>
+                    <Spacer y={2} />
+                    <PlayerList
+                        playerList={playerList}
+                        onEditName={resetName}
+                        meId={meId}
+                    />
+                    <Spacer y={1} />
+                    <PrimaryButton href="/" size="small" type="error">
+                        Leave Lobby
+                    </PrimaryButton>
                 </>
             )}
         </div>
@@ -83,6 +78,7 @@ type LobbyProps = {
     selectedGame: string;
     onStartGame: () => void;
     resetName: () => void;
+    meId: number;
 };
 
 export default Lobby;
