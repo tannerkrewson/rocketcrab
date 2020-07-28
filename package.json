@@ -15,7 +15,8 @@
         "lint:staged": "lint-staged",
         "test": "jest",
         "test:watch": "jest --watch",
-        "test:all": "run-s lint type-check test"
+        "test:all": "run-s lint type-check test",
+        "test:coverage": "jest --coverage"
     },
     "husky": {
         "hooks": {

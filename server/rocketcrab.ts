@@ -154,17 +154,17 @@ export const startGame = (lobby: Lobby): void => {
     });
 };
 
-export const setJoinGameUrl = (url: string, gameState: GameState): void => {
-    gameState.status = GameStatus.inprogress;
-    gameState.url = url;
-};
-
 export const exitGame = (lobby: Lobby): void => {
     lobby.status = LobbyStatus.lobby;
 
     const { gameState } = lobby;
     gameState.status = GameStatus.loading;
     gameState.url = undefined;
+};
+
+const setJoinGameUrl = (url: string, gameState: GameState): void => {
+    gameState.status = GameStatus.inprogress;
+    gameState.url = url;
 };
 
 const findPlayerByName = (

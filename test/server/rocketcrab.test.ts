@@ -7,13 +7,19 @@ import {
     removePlayer,
     deleteLobbyIfEmpty,
     setGame,
+    setName,
+    startGame,
+    exitGame,
 } from "../../server/rocketcrab";
 import { Lobby, GameState, Player } from "../../types/types";
-import { LobbyStatus } from "../../types/enums";
+import { LobbyStatus, GameStatus } from "../../types/enums";
 
 jest.mock("../../config", () => ({
     getServerGameLibrary: jest.fn(() => ({
-        gameList: [{ name: "FooGame" }, { name: "CoolGame" }],
+        gameList: [
+            { name: "FooGame", getJoinGameUrl: async () => "foogame.com" },
+            { name: "CoolGame" },
+        ],
         categories: [],
     })),
     getClientGameLibrary: jest.fn(() => ({
@@ -141,7 +147,7 @@ describe("server/rocketcrab.ts", () => {
         const mockLobby: Lobby = generateMockLobby({
             playerList: generateMockPlayerList(3, (player, i) => ({
                 ...player,
-                socket: ({ emit: emits[i] } as unknown) as SocketIO.Socket,
+                socket: { emit: emits[i] } as Partial<SocketIO.Socket>,
             })),
         });
 
@@ -210,9 +216,9 @@ describe("server/rocketcrab.ts", () => {
         const mockLobby: Lobby = generateMockLobby({
             playerList: generateMockPlayerList(2, (player) => ({
                 ...player,
-                socket: ({
+                socket: {
                     disconnect: jest.fn(),
-                } as unknown) as SocketIO.Socket,
+                } as Partial<SocketIO.Socket>,
             })),
         });
 
@@ -253,6 +259,79 @@ describe("server/rocketcrab.ts", () => {
         setGame("CoolGame", mockLobby);
 
         expect(mockLobby.selectedGame).toBe("CoolGame");
+    });
+
+    it("setName works", () => {
+        const mockPlayerList = generateMockPlayerList(4, (player, i) => ({
+            ...player,
+            name: i === 0 ? "" : player.name,
+        }));
+
+        setName("Bob", mockPlayerList[0], mockPlayerList);
+
+        expect(mockPlayerList[0].name).toBe("Bob");
+    });
+
+    it("setName fails if name already in use", () => {
+        const mockPlayerList = generateMockPlayerList(4, (player, i) => ({
+            ...player,
+            name: i === 0 ? "" : player.name,
+            socket: { emit: jest.fn() } as Partial<SocketIO.Socket>,
+        }));
+
+        setName("name1", mockPlayerList[0], mockPlayerList);
+
+        expect(mockPlayerList[0].name).toBe("");
+        expect(mockPlayerList[0].socket.emit).toBeCalledWith("invalid-name");
+    });
+
+    it("startGame works", () => {
+        const mockLobby = generateMockLobby({
+            status: LobbyStatus.lobby,
+            selectedGame: "FooGame",
+            gameState: {
+                status: undefined,
+            },
+        });
+
+        startGame(mockLobby);
+
+        expect(mockLobby.status).toBe(LobbyStatus.ingame);
+        expect(mockLobby.gameState.status).toBe(GameStatus.loading);
+
+        // TODO: test call to getJoinGameUrl
+    });
+
+    it("startGame fails if game doesn't exist", () => {
+        const mockLobby = generateMockLobby({
+            status: LobbyStatus.lobby,
+            selectedGame: "GameThatDoesntExist",
+            gameState: {
+                status: undefined,
+            },
+        });
+
+        startGame(mockLobby);
+
+        expect(mockLobby.status).toBe(LobbyStatus.lobby);
+        expect(mockLobby.gameState.status).toBeUndefined();
+    });
+
+    it("exitGame works", () => {
+        const mockLobby = generateMockLobby({
+            status: LobbyStatus.ingame,
+            selectedGame: "FooGame",
+            gameState: {
+                status: GameStatus.inprogress,
+                url: "foogame.com",
+            },
+        });
+
+        exitGame(mockLobby);
+
+        expect(mockLobby.status).toBe(LobbyStatus.lobby);
+        expect(mockLobby.gameState.status).toBe(GameStatus.loading);
+        expect(mockLobby.gameState.url).toBeUndefined();
     });
 });
 
