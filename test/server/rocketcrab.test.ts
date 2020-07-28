@@ -8,7 +8,7 @@ import {
     deleteLobbyIfEmpty,
     setGame,
 } from "../../server/rocketcrab";
-import { Lobby, GameState } from "../../types/types";
+import { Lobby, GameState, Player } from "../../types/types";
 import { LobbyStatus } from "../../types/enums";
 
 jest.mock("../../config", () => ({
@@ -70,205 +70,151 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("addPlayer works", () => {
-        const mockSocket = {} as SocketIO.Socket;
-        const playerList = [];
-        const mockLobby: Lobby = {
-            status: LobbyStatus.lobby,
-            playerList,
-            code: "efgh",
-            selectedGame: "FooGame",
-            gameState: {} as GameState,
-            nextPlayerId: 0,
-            idealHostId: undefined,
-        };
-        const mockPlayer = addPlayer("foo", mockSocket, mockLobby);
+        const mockLobby: Lobby = generateMockLobby({ nextPlayerId: 0 });
+        const { playerList } = mockLobby;
+
+        const mockSocket0 = {} as SocketIO.Socket;
+        const mockPlayer0 = addPlayer("foo", mockSocket0, mockLobby);
 
         expect(playerList.length).toBe(1);
-        expect(playerList).toContain(mockPlayer);
+
+        const mockSocket1 = {} as SocketIO.Socket;
+        const mockPlayer1 = addPlayer("bar", mockSocket1, mockLobby);
+
+        expect(playerList.length).toBe(2);
+
+        expect(playerList).toContain(mockPlayer0);
         expect(playerList[0].id).toBe(0);
         expect(playerList[0].name).toBe("foo");
-        expect(playerList[0].socket).toBe(mockSocket);
+        expect(playerList[0].socket).toBe(mockSocket0);
         expect(playerList[0].isHost).toBe(true);
+        expect(mockLobby.idealHostId).toBe(0);
+
+        expect(playerList).toContain(mockPlayer1);
+        expect(playerList[1].id).toBe(1);
+        expect(playerList[1].name).toBe("bar");
+        expect(playerList[1].socket).toBe(mockSocket1);
+        expect(playerList[1].isHost).toBe(false);
         expect(mockLobby.idealHostId).toBe(0);
     });
 
     it("addPlayer uses previousId if valid", () => {
-        const mockSocket = {} as SocketIO.Socket;
-        const playerList = [
-            {
-                id: 1,
-                name: "bar",
-                socket: {} as SocketIO.Socket,
-                isHost: true,
-            },
-        ];
-        const mockLobby: Lobby = {
-            status: LobbyStatus.lobby,
+        const playerList = [generateMockPlayer({ id: 1 })];
+        const mockLobby: Lobby = generateMockLobby({
             playerList,
-            code: "efgh",
-            selectedGame: "FooGame",
-            gameState: {} as GameState,
             nextPlayerId: 2,
-            idealHostId: 1,
-        };
-        const mockPlayer = addPlayer("foo", mockSocket, mockLobby, 0);
+        });
 
-        expect(playerList.length).toBe(2);
-        expect(playerList).toContain(mockPlayer);
+        const mockSocket = {} as SocketIO.Socket;
+        addPlayer("bar", mockSocket, mockLobby, 0);
+
         expect(playerList[1].id).toBe(0);
-        expect(playerList[1].name).toBe("foo");
-        expect(playerList[1].socket).toBe(mockSocket);
-        expect(playerList[1].isHost).toBe(false);
     });
 
     it("addPlayer doesn't use previousId if it's invalid", () => {
-        const mockSocket = {} as SocketIO.Socket;
-        const playerList = [
-            {
-                id: 0,
-                name: "foo",
-                socket: {} as SocketIO.Socket,
-                isHost: true,
-            },
-        ];
-        const mockLobby: Lobby = {
-            status: LobbyStatus.lobby,
-            playerList,
-            code: "efgh",
-            selectedGame: "FooGame",
-            gameState: {} as GameState,
-            nextPlayerId: 1,
-            idealHostId: 1,
-        };
-        const mockPlayer = addPlayer("bar", mockSocket, mockLobby, 1);
+        const playerList = [generateMockPlayer({ id: 0, isHost: true })];
+        const mockLobby: Lobby = generateMockLobby({ playerList });
 
-        expect(playerList.length).toBe(2);
-        expect(playerList).toContain(mockPlayer);
+        const mockSocket = {} as SocketIO.Socket;
+        addPlayer("bar", mockSocket, mockLobby, 0);
+
+        expect(playerList[0].id).toBe(0);
         expect(playerList[1].id).toBe(1);
-        expect(playerList[1].name).toBe("bar");
-        expect(playerList[1].socket).toBe(mockSocket);
-        expect(playerList[1].isHost).toBe(true);
     });
 
     it("addPlayer sets nextPlayerId if it's too low", () => {
-        const mockSocket = {} as SocketIO.Socket;
-        const playerList = [];
-        const mockLobby: Lobby = {
-            status: LobbyStatus.lobby,
-            playerList,
-            code: "efgh",
-            selectedGame: "FooGame",
-            gameState: {} as GameState,
+        const mockLobby: Lobby = generateMockLobby({
             nextPlayerId: 0,
-            idealHostId: 21,
-        };
-        const mockPlayer = addPlayer("bar", mockSocket, mockLobby, 123);
+        });
 
-        expect(playerList.length).toBe(1);
-        expect(playerList).toContain(mockPlayer);
-        expect(playerList[0].id).toBe(123);
-        expect(playerList[0].name).toBe("bar");
-        expect(playerList[0].socket).toBe(mockSocket);
-        expect(playerList[0].isHost).toBe(true);
+        const mockSocket = {} as SocketIO.Socket;
+        addPlayer("foo", mockSocket, mockLobby, 100);
 
-        expect(mockLobby.nextPlayerId).toBe(124);
-        expect(mockLobby.idealHostId).toBe(21);
+        const { playerList } = mockLobby;
+        expect(playerList[0].id).toBe(100);
+
+        expect(mockLobby.nextPlayerId).toBe(101);
     });
 
     it("sendStateToAll works", () => {
-        const emit = jest.fn();
-        const mockLobby: Lobby = {
-            status: LobbyStatus.lobby,
-            playerList: [
-                {
-                    id: 0,
-                    name: "foo",
-                    socket: ({ emit } as unknown) as SocketIO.Socket,
-                    isHost: true,
-                },
-            ],
-            code: "efgh",
-            selectedGame: "FooGame",
-            gameState: {} as GameState,
-            nextPlayerId: 1,
-            idealHostId: 0,
-        };
-
-        const jsonLobby = {
-            status: LobbyStatus.lobby,
-            playerList: [
-                {
-                    id: 0,
-                    name: "foo",
-                    isHost: true,
-                },
-            ],
-            code: "efgh",
-            me: {
-                id: 0,
-                name: "foo",
-                isHost: true,
-            },
-            selectedGame: "FooGame",
-            gameState: {} as GameState,
-            nextPlayerId: 1,
-            idealHostId: 0,
-        };
+        const emits = [jest.fn(), jest.fn(), jest.fn()];
+        const mockLobby: Lobby = generateMockLobby({
+            playerList: generateMockPlayerList(3, (player, i) => ({
+                ...player,
+                socket: ({ emit: emits[i] } as unknown) as SocketIO.Socket,
+            })),
+        });
 
         sendStateToAll(mockLobby);
 
-        expect(emit).toBeCalledWith("update", jsonLobby);
+        const jsonPlayerList = [
+            {
+                id: 0,
+                name: "name0",
+                isHost: true,
+            },
+            {
+                id: 1,
+                name: "name1",
+                isHost: false,
+            },
+            {
+                id: 2,
+                name: "name2",
+                isHost: false,
+            },
+        ];
+        const jsonLobby = {
+            status: LobbyStatus.lobby,
+            playerList: jsonPlayerList,
+            code: "efgh",
+            selectedGame: "FooGame",
+            gameState: {} as GameState,
+            nextPlayerId: 1,
+            idealHostId: 0,
+        };
+
+        expect(emits[0]).toBeCalledWith("update", {
+            ...jsonLobby,
+            me: jsonPlayerList[0],
+        });
+        expect(emits[1]).toBeCalledWith("update", {
+            ...jsonLobby,
+            me: jsonPlayerList[1],
+        });
+        expect(emits[2]).toBeCalledWith("update", {
+            ...jsonLobby,
+            me: jsonPlayerList[2],
+        });
     });
 
     it("removePlayer works", () => {
         const disconnect = jest.fn();
-        const mockPlayer = {
-            id: 0,
-            name: "foo",
+        const mockPlayer = generateMockPlayer({
             socket: ({ disconnect } as unknown) as SocketIO.Socket,
-            isHost: true,
-        };
-        const mockLobby: Lobby = {
-            status: LobbyStatus.lobby,
-            playerList: [mockPlayer],
-            code: "efgh",
-            selectedGame: "FooGame",
-            gameState: {} as GameState,
-            nextPlayerId: 1,
-            idealHostId: 0,
-        };
+        });
+
+        const playerList = [mockPlayer];
+        const mockLobby: Lobby = generateMockLobby({
+            playerList,
+        });
 
         removePlayer(mockPlayer, mockLobby);
 
-        expect(mockLobby.playerList.length).toBe(0);
-        expect(mockLobby.playerList).not.toContain(mockPlayer);
+        expect(playerList.length).toBe(0);
+        expect(playerList).not.toContain(mockPlayer);
         expect(disconnect).toHaveBeenCalledWith(true);
     });
 
     it("removePlayer sets new host", () => {
-        const disconnect = jest.fn();
-        const mockLobby: Lobby = {
-            status: LobbyStatus.lobby,
-            playerList: [
-                {
-                    id: 0,
-                    name: "foo",
-                    socket: ({ disconnect } as unknown) as SocketIO.Socket,
-                    isHost: true,
-                },
-                {
-                    id: 1,
-                    name: "foo",
-                    socket: ({ disconnect } as unknown) as SocketIO.Socket,
-                    isHost: false,
-                },
-            ],
-            code: "efgh",
-            selectedGame: "FooGame",
-            gameState: {} as GameState,
-            nextPlayerId: 1,
-            idealHostId: 0,
-        };
+        const mockLobby: Lobby = generateMockLobby({
+            playerList: generateMockPlayerList(2, (player) => ({
+                ...player,
+                socket: ({
+                    disconnect: jest.fn(),
+                } as unknown) as SocketIO.Socket,
+            })),
+        });
 
         const playerToRemove = mockLobby.playerList[0];
         removePlayer(playerToRemove, mockLobby);
@@ -280,15 +226,7 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("deleteLobbyIfEmpty deletes empty lobby", () => {
-        const mockLobby: Lobby = {
-            status: LobbyStatus.lobby,
-            playerList: [],
-            code: "efgh",
-            selectedGame: "FooGame",
-            gameState: {} as GameState,
-            nextPlayerId: 123,
-            idealHostId: 0,
-        };
+        const mockLobby: Lobby = generateMockLobby();
         const lobbyList: Array<Lobby> = [mockLobby];
 
         deleteLobbyIfEmpty(mockLobby, lobbyList);
@@ -297,22 +235,9 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("deleteLobbyIfEmpty doesn't delete non-empty lobby", () => {
-        const mockLobby: Lobby = {
-            status: LobbyStatus.lobby,
-            playerList: [
-                {
-                    id: 0,
-                    name: "foo",
-                    socket: {} as SocketIO.Socket,
-                    isHost: true,
-                },
-            ],
-            code: "efgh",
-            selectedGame: "FooGame",
-            gameState: {} as GameState,
-            nextPlayerId: 1,
-            idealHostId: 0,
-        };
+        const mockLobby: Lobby = generateMockLobby({
+            playerList: generateMockPlayerList(1),
+        });
         const lobbyList: Array<Lobby> = [mockLobby];
 
         deleteLobbyIfEmpty(mockLobby, lobbyList);
@@ -321,24 +246,55 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("setGame works", () => {
-        const mockLobby: Lobby = {
-            status: LobbyStatus.lobby,
-            playerList: [
-                {
-                    id: 0,
-                    name: "foo",
-                    socket: {} as SocketIO.Socket,
-                    isHost: true,
-                },
-            ],
-            code: "efgh",
-            selectedGame: "",
-            gameState: {} as GameState,
-            nextPlayerId: 1,
-            idealHostId: 0,
-        };
+        const mockLobby: Lobby = generateMockLobby({
+            playerList: generateMockPlayerList(1),
+        });
+
         setGame("CoolGame", mockLobby);
 
         expect(mockLobby.selectedGame).toBe("CoolGame");
     });
 });
+
+const generateMockLobby = ({
+    status = LobbyStatus.lobby,
+    playerList = [],
+    code = "efgh",
+    selectedGame = "FooGame",
+    gameState = {} as GameState,
+    nextPlayerId = 1,
+    idealHostId = 0,
+}: Partial<Lobby> = {}): Lobby => ({
+    status,
+    playerList,
+    code,
+    selectedGame,
+    gameState,
+    nextPlayerId,
+    idealHostId,
+});
+
+const generateMockPlayer = ({
+    id = 0,
+    name = "foo",
+    socket = {} as SocketIO.Socket,
+    isHost = false,
+}: Partial<Player> = {}): Player => ({
+    id,
+    name,
+    socket,
+    isHost,
+});
+
+const generateMockPlayerList = (numPlayers, modifyPlayer?): Array<Player> => {
+    const playerList: Array<Player> = [];
+    for (let i = 0; i < numPlayers; i++) {
+        const player = generateMockPlayer({
+            id: i,
+            name: "name" + i,
+            isHost: i === 0,
+        });
+        playerList.push(modifyPlayer ? modifyPlayer(player, i) : player);
+    }
+    return playerList;
+};

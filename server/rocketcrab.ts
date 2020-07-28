@@ -43,11 +43,17 @@ export const addPlayer = (
     lobby: Lobby,
     previousId?: number
 ): Player => {
+    const { playerList } = lobby;
+
     const idNotInUse = !isIDinUse(previousId, lobby.playerList);
     const usePreviousId = Number.isInteger(previousId) && idNotInUse;
     const id = usePreviousId ? previousId : lobby.nextPlayerId++;
 
+    const isFirstPlayer = playerList.length === 0;
+
     // this is mostly only important for the ffff dev lobby
+    // in which ids are previousIds that were not created
+    // in this instance of the lobby are being used
     if (id > lobby.nextPlayerId) {
         lobby.nextPlayerId = id + 1;
     }
@@ -58,15 +64,15 @@ export const addPlayer = (
         socket,
         isHost: false,
     };
-    lobby.playerList.push(player);
+    playerList.push(player);
 
-    setName(name, player, lobby.playerList);
+    setName(name, player, playerList);
 
-    if (!lobby.idealHostId) {
+    if (isFirstPlayer) {
         lobby.idealHostId = id;
     }
 
-    setHost(lobby.idealHostId, lobby.playerList);
+    setHost(lobby.idealHostId, playerList);
 
     return player;
 };
