@@ -17,7 +17,7 @@ export type Lobby = {
 export type Player = {
     id: number;
     name: string;
-    socket: SocketIO.Socket;
+    socket?: SocketIO.Socket;
     isHost: boolean;
 };
 
@@ -33,7 +33,13 @@ export type ClientGame = {
 };
 
 export type ServerGame = ClientGame & {
-    getJoinGameUrl: () => Promise<string>;
+    getJoinGameUrl: () => Promise<JoinGameURL>;
+};
+
+export type JoinGameURL = {
+    playerURL: string;
+    hostURL?: string;
+    code?: string;
 };
 
 export type GameCategory = {
@@ -55,7 +61,7 @@ export type ServerGameLibrary = {
 
 export type GameState = {
     status: GameStatus;
-    url?: string;
+    joinGameURL?: JoinGameURL;
 };
 
 export type JoinLobbyResponse = {

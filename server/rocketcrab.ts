@@ -1,10 +1,4 @@
-import {
-    RocketCrab,
-    Lobby,
-    Player,
-    GameState,
-    ServerGame,
-} from "../types/types";
+import { RocketCrab, Lobby, Player, ServerGame } from "../types/types";
 import { LobbyStatus, GameStatus } from "../types/enums";
 import { getServerGameLibrary } from "../config";
 const SERVER_GAME_LIST: Array<ServerGame> = getServerGameLibrary().gameList;
@@ -27,7 +21,10 @@ export const newLobby = (
         playerList: [],
         code,
         selectedGame: "",
-        gameState: { status: GameStatus.loading },
+        gameState: {
+            status: GameStatus.loading,
+            joinGameURL: { playerURL: "", hostURL: "" },
+        },
         nextPlayerId: 0,
         idealHostId: 0,
     });
@@ -137,21 +134,30 @@ export const setGame = (gameName: string, lobby: Lobby): void => {
     }
 };
 
-export const startGame = (lobby: Lobby): void => {
+export const startGame = async (lobby: Lobby): Promise<void> => {
     // TODO: check if ready
-    const { gameState, selectedGame } = lobby;
+    const { gameState, selectedGame, playerList } = lobby;
 
     const game: ServerGame = findGameByName(selectedGame);
     if (!game) return;
 
     lobby.status = LobbyStatus.ingame;
-    gameState.status = GameStatus.loading;
+    gameState.status = GameStatus.waitingforhost;
 
-    game.getJoinGameUrl().then((url) => {
-        //TODO handle failed to get url
-        setJoinGameUrl(url, gameState);
+    //TODO handle failed to get url
+    gameState.joinGameURL = await game.getJoinGameUrl();
+
+    if (!gameState.joinGameURL.hostURL) {
+        gameState.joinGameURL.hostURL = gameState.joinGameURL.playerURL;
+    }
+
+    const host = getHost(playerList);
+    host.socket.once("host-game-loaded", () => {
+        gameState.status = GameStatus.inprogress;
         sendStateToAll(lobby);
     });
+
+    sendStateToAll(lobby);
 };
 
 export const exitGame = (lobby: Lobby): void => {
@@ -159,12 +165,7 @@ export const exitGame = (lobby: Lobby): void => {
 
     const { gameState } = lobby;
     gameState.status = GameStatus.loading;
-    gameState.url = undefined;
-};
-
-const setJoinGameUrl = (url: string, gameState: GameState): void => {
-    gameState.status = GameStatus.inprogress;
-    gameState.url = url;
+    gameState.joinGameURL = { playerURL: "", hostURL: "" };
 };
 
 const findPlayerByName = (
@@ -233,3 +234,6 @@ const setHost = (idealHostId: number, playerList: Array<Player>): void => {
         isHost: null,
     }).isHost = true;
 };
+
+const getHost = (playerList: Array<Player>): Player =>
+    playerList.find(({ isHost }) => isHost);

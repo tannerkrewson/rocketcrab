@@ -7,4 +7,5 @@ export enum LobbyStatus {
 export enum GameStatus {
     loading = "loading",
     inprogress = "inprogress",
+    waitingforhost = "waitingforhost",
 }

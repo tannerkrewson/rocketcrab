@@ -12,11 +12,26 @@ const GameLayout = ({
     path,
     onExitGame,
     onStartGame,
+    onHostGameLoaded,
     gameLibrary,
     playerList,
-    isHost,
+    thisPlayer,
 }: GameLayoutProps): JSX.Element => {
-    const { status, url } = gameState;
+    const {
+        status,
+        joinGameURL: { playerURL, hostURL, code },
+    } = gameState;
+
+    const { name, isHost } = thisPlayer;
+
+    const appendToUrl =
+        "?" +
+        new URLSearchParams({
+            rocketcrab: "true",
+            name,
+            ishost: isHost.toString(),
+            ...(code ? { code } : {}),
+        }).toString();
 
     const [statusCollapsed, setStatusCollapsed] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
@@ -27,7 +42,12 @@ const GameLayout = ({
     const [frameRefresh, setFrameRefresh] = useState(0);
 
     const showLoading = status === GameStatus.loading;
-    const showGameFrame = status === GameStatus.inprogress;
+    const showWaitingForHost = !isHost && status === GameStatus.waitingforhost;
+    const showGameFrame = !isHost && status === GameStatus.inprogress;
+    const showHostGameFrame =
+        isHost &&
+        (status === GameStatus.inprogress ||
+            status === GameStatus.waitingforhost);
 
     const statusClass = "status " + (statusCollapsed ? "status-collapsed" : "");
     return (
@@ -86,13 +106,31 @@ const GameLayout = ({
                     </>
                 )}
             </div>
-            {showLoading && (
+            {(showLoading || showWaitingForHost) && (
                 <div className="frame">
-                    <Loading />
+                    <Loading type={showWaitingForHost ? "error" : "default"}>
+                        {showWaitingForHost ? (
+                            <span>Waiting for host</span>
+                        ) : (
+                            <span>Loading game</span>
+                        )}
+                    </Loading>
                 </div>
             )}
             {showGameFrame && (
-                <iframe className="frame" src={url} key={frameRefresh}></iframe>
+                <iframe
+                    className="frame"
+                    src={playerURL + appendToUrl}
+                    key={frameRefresh}
+                ></iframe>
+            )}
+            {showHostGameFrame && (
+                <iframe
+                    className="frame"
+                    src={hostURL + appendToUrl}
+                    key={frameRefresh}
+                    onLoad={onHostGameLoaded}
+                ></iframe>
             )}
             {showGameLibrary && (
                 <div className="component-frame">
@@ -173,9 +211,10 @@ type GameLayoutProps = {
     path: string;
     onExitGame: () => void;
     onStartGame: () => void;
+    onHostGameLoaded: () => void;
     gameLibrary: ClientGameLibrary;
     playerList: Array<Player>;
-    isHost: boolean;
+    thisPlayer: Player;
 };
 
 export default GameLayout;

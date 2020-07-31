@@ -297,7 +297,7 @@ describe("server/rocketcrab.ts", () => {
         startGame(mockLobby);
 
         expect(mockLobby.status).toBe(LobbyStatus.ingame);
-        expect(mockLobby.gameState.status).toBe(GameStatus.loading);
+        expect(mockLobby.gameState.status).toBe(GameStatus.waitingforhost);
 
         // TODO: test call to getJoinGameUrl
     });
@@ -323,7 +323,10 @@ describe("server/rocketcrab.ts", () => {
             selectedGame: "FooGame",
             gameState: {
                 status: GameStatus.inprogress,
-                url: "foogame.com",
+                joinGameURL: {
+                    playerURL: "test.com",
+                    hostURL: "host.com",
+                },
             },
         });
 
@@ -331,7 +334,8 @@ describe("server/rocketcrab.ts", () => {
 
         expect(mockLobby.status).toBe(LobbyStatus.lobby);
         expect(mockLobby.gameState.status).toBe(GameStatus.loading);
-        expect(mockLobby.gameState.url).toBeUndefined();
+        expect(mockLobby.gameState.joinGameURL.playerURL).toBe("");
+        expect(mockLobby.gameState.joinGameURL.hostURL).toBe("");
     });
 });
 

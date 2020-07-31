@@ -13,7 +13,9 @@ const game: ServerGame = {
     getJoinGameUrl: async () => {
         const newUrl = "https://spyfall.tannerkrewson.com/new";
         const { gameCode } = await postJson(newUrl);
-        return "https://spyfall.tannerkrewson.com/" + gameCode;
+        return {
+            playerURL: "https://spyfall.tannerkrewson.com/" + gameCode,
+        };
     },
 };
 

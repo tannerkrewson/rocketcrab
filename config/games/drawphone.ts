@@ -9,7 +9,10 @@ const game: ServerGame = {
     familyFriendly: false,
     minPlayers: 1,
     maxPlayers: Infinity,
-    getJoinGameUrl: async () => "https://drawphone.tannerkrewson.com",
+    getJoinGameUrl: async () => ({
+        playerURL: "https://drawphone.tannerkrewson.com",
+        code: "abcd",
+    }),
 };
 
 export default game;

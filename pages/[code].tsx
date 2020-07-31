@@ -8,7 +8,7 @@ import Lobby from "../components/organisms/Lobby";
 import NameEntry from "../components/organisms/NameEntry";
 import GameLayout from "../components/templates/GameLayout";
 
-import { GameState, ClientGameLibrary } from "../types/types";
+import { GameState, ClientGameLibrary, JoinGameURL } from "../types/types";
 import { getClientGameLibrary } from "../config";
 import { parseCookies, setCookie as setNookie } from "nookies";
 import Connecting from "../components/atoms/Connecting";
@@ -99,6 +99,10 @@ export const Code = ({
         socket.emit("game-exit");
     };
 
+    // give the host a little extra time (TODO probably remove)
+    const onHostGameLoaded = () =>
+        setTimeout(() => socket.emit("host-game-loaded"), 2000);
+
     const joinLobby = () => {
         socket.emit("join-lobby", {
             code,
@@ -140,9 +144,10 @@ export const Code = ({
                     gameState={gameState}
                     onExitGame={onExitGame}
                     onStartGame={onStartGame}
+                    onHostGameLoaded={onHostGameLoaded}
                     gameLibrary={gameLibrary}
                     playerList={playerList}
-                    isHost={me.isHost}
+                    thisPlayer={me}
                 />
             )}
             {showReconnecting && <Connecting />}
@@ -155,7 +160,10 @@ const initLobbyState = () => ({
     playerList: [],
     me: { id: undefined, name: undefined, isHost: undefined },
     selectedGame: "",
-    gameState: {} as GameState,
+    gameState: {
+        status: undefined,
+        joinGameURL: {} as JoinGameURL,
+    } as GameState,
 });
 
 const setCookie = (key: string, value: any) => setNookie(null, key, value, {});
