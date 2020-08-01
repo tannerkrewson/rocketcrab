@@ -11,9 +11,18 @@ const GameBox = ({ game, onClick }: GameBoxProps): JSX.Element => (
             borderRadius: "0",
         }}
     >
-        <Card.Body style={{ padding: "8pt", textAlign: "initial" }}>
+        <Card.Body
+            style={{
+                padding: "8pt",
+                textAlign: "initial",
+                position: "relative",
+            }}
+        >
             <b>{game.name}</b>
             &nbsp;by {game.author}
+            {onClick && (
+                <span style={{ position: "absolute", right: ".5em" }}>➡️</span>
+            )}
         </Card.Body>
     </Card>
 );

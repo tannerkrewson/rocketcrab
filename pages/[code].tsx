@@ -28,6 +28,8 @@ export const Code = ({
     const [showReconnecting, setShowReconnecting] = useState(false);
     const { status, me, playerList, selectedGame, gameState } = lobbyState;
 
+    const { isHost } = me;
+
     // only ran with initial value due to the []
     useEffect(() => {
         socket.open();
@@ -133,6 +135,7 @@ export const Code = ({
                                 onStartGame={onStartGame}
                                 resetName={() => onNameEntry("")}
                                 meId={me.id}
+                                isHost={isHost}
                             />
                         )}
                     </>

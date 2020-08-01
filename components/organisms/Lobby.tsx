@@ -3,10 +3,10 @@ import PrimaryButton from "../atoms/PrimaryButton";
 import ButtonGroup from "../molecules/ButtonGroup";
 import { Spacer } from "@zeit-ui/react";
 import GameSelector from "./GameSelector";
-import GameBox from "../atoms/GameBox";
 import { Player, ClientGameLibrary } from "../../types/types";
 import { useState } from "react";
 import NameBox from "../atoms/NameBox";
+import GameDetailBox from "../atoms/GameDetailBox";
 
 const Lobby = ({
     playerList,
@@ -16,6 +16,7 @@ const Lobby = ({
     onStartGame,
     resetName,
     meId,
+    isHost,
 }: LobbyProps): JSX.Element => {
     const [showGameSelector, setShowGameSelector] = useState(false);
     return (
@@ -26,15 +27,19 @@ const Lobby = ({
                     onSelectGame={onSelectGame}
                     onDone={() => setShowGameSelector(false)}
                     backToLabel="lobby"
+                    isHost={isHost}
                 />
             ) : (
                 <>
-                    <Spacer y={2} />
+                    <Spacer y={1.25} />
                     {selectedGame ? (
-                        <GameBox
+                        <GameDetailBox
                             game={gameLibrary.gameList.find(
                                 ({ name }) => name === selectedGame
                             )}
+                            allCategories={gameLibrary.categories}
+                            readyToPlay={true}
+                            showOnlyHostMessage={false}
                         />
                     ) : (
                         <NameBox name="No Game Selected" />
@@ -48,7 +53,7 @@ const Lobby = ({
                             View games
                         </PrimaryButton>
                         <PrimaryButton
-                            disabled={!selectedGame}
+                            disabled={!selectedGame || !isHost}
                             onClick={onStartGame}
                             size="large"
                             type="error"
@@ -80,6 +85,7 @@ type LobbyProps = {
     onStartGame: () => void;
     resetName: () => void;
     meId: number;
+    isHost: boolean;
 };
 
 export default Lobby;

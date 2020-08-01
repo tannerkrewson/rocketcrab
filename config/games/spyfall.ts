@@ -5,6 +5,8 @@ const game: ServerGame = {
     name: "Spyfall",
     author: "Tanner Krewson",
     description: "formerly Crabhat",
+    displayUrlText: "spyfall.tannerkrewson.com",
+    displayUrlHref: "https://spyfall.tannerkrewson.com/",
     category: ["deduction"],
     players: "4+",
     familyFriendly: true,

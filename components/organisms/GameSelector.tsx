@@ -4,15 +4,18 @@ import GameGroup from "../molecules/GameGroup";
 import { useState, useEffect } from "react";
 import { ClientGameLibrary } from "../../types/types";
 import PrimaryButton from "../atoms/PrimaryButton";
+import GameDetailBox from "../atoms/GameDetailBox";
 
 const GameSelector = ({
     gameLibrary,
     onSelectGame,
     onDone,
     backToLabel,
+    isHost,
 }: GameSelectorProps): JSX.Element => {
     const { state: search, setState: setSearch, bindings } = useInput("");
     const [selectedCategory, setSelectedCategory] = useState("");
+    const [viewingGame, setViewingGame] = useState("");
 
     useEffect(() => {
         if (!search) setSelectedCategory("");
@@ -26,9 +29,13 @@ const GameSelector = ({
 
     return (
         <>
-            <div>{categoryName}Games</div>
-            <Spacer y={1} />
-            {!selectedCategory && (
+            {!viewingGame && (
+                <>
+                    <div>{categoryName}Games</div>
+                    <Spacer y={1} />
+                </>
+            )}
+            {!selectedCategory && !viewingGame && (
                 <>
                     <Input
                         icon="🔎"
@@ -40,7 +47,7 @@ const GameSelector = ({
                     <Spacer y={1} />
                 </>
             )}
-            {!selectedCategory && !search && (
+            {!selectedCategory && !search && !viewingGame && (
                 <>
                     <CategoryGroup
                         categories={gameLibrary.categories}
@@ -52,13 +59,12 @@ const GameSelector = ({
                     </PrimaryButton>
                 </>
             )}
-            {(selectedCategory || search) && (
+            {(selectedCategory || search) && !viewingGame && (
                 <>
                     <GameGroup
                         gameList={gameLibrary.gameList}
                         onSelectGame={(game) => {
-                            onSelectGame(game);
-                            onDone();
+                            setViewingGame(game);
                         }}
                         nameFilter={search}
                         categoryFilter={selectedCategory}
@@ -74,6 +80,33 @@ const GameSelector = ({
                     </PrimaryButton>
                 </>
             )}
+            {viewingGame && (
+                <>
+                    <GameDetailBox
+                        game={gameLibrary.gameList.find(
+                            ({ name }) => name === viewingGame
+                        )}
+                        allCategories={gameLibrary.categories}
+                        onSelectGame={
+                            isHost
+                                ? (game) => {
+                                      onSelectGame(game);
+                                      onDone();
+                                  }
+                                : undefined
+                        }
+                        showOnlyHostMessage={!isHost}
+                    />
+                    <Spacer y={1} />
+                    <PrimaryButton
+                        onClick={() => {
+                            setViewingGame("");
+                        }}
+                    >
+                        ↩️ Back to search
+                    </PrimaryButton>
+                </>
+            )}
         </>
     );
 };
@@ -83,6 +116,7 @@ type GameSelectorProps = {
     onSelectGame: (gameName: string) => void;
     onDone: () => void;
     backToLabel: string;
+    isHost: boolean;
 };
 
 export default GameSelector;

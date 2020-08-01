@@ -140,6 +140,7 @@ const GameLayout = ({
                         // eslint-disable-next-line @typescript-eslint/no-empty-function
                         onSelectGame={() => {}}
                         backToLabel="game"
+                        isHost={isHost}
                     />
                 </div>
             )}

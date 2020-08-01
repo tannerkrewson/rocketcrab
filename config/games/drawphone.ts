@@ -4,6 +4,8 @@ const game: ServerGame = {
     name: "Drawphone",
     author: "Tanner Krewson",
     description: "Telephone with pictures",
+    displayUrlText: "drawphone.tannerkrewson.com",
+    displayUrlHref: "https://drawphone.tannerkrewson.com/",
     category: ["drawing"],
     players: "1+",
     familyFriendly: false,
