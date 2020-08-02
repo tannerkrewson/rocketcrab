@@ -44,6 +44,18 @@ const GameDetailBox = ({
                     {game.displayUrlText}
                 </a>
             </div>
+            {game.donationUrlHref && game.donationUrlText && (
+                <div>
+                    <span className="emoji">💲</span>{" "}
+                    <a
+                        href={game.donationUrlHref}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        {game.donationUrlText}
+                    </a>
+                </div>
+            )}
             <GameBadges game={game} allCategories={allCategories} />
             <Spacer y={1} />
             <Tabs initialValue="1">

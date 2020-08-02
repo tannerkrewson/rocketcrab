@@ -7,6 +7,8 @@ const game: ServerGame = {
     description: "formerly Crabhat",
     displayUrlText: "spyfall.tannerkrewson.com",
     displayUrlHref: "https://spyfall.tannerkrewson.com/",
+    donationUrlText: "Buy Tanner a taco!",
+    donationUrlHref: "https://www.buymeacoffee.com/tannerkrewson",
     category: ["deduction"],
     players: "4+",
     familyFriendly: true,

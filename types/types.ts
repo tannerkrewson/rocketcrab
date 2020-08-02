@@ -27,6 +27,8 @@ export type ClientGame = {
     description?: string;
     displayUrlText: string;
     displayUrlHref: string;
+    donationUrlText?: string;
+    donationUrlHref?: string;
     category?: Array<string>;
     players?: string;
     familyFriendly: boolean;
