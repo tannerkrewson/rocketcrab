@@ -1,5 +1,5 @@
 import { ClientGame, GameCategory } from "../../types/types";
-import { Card, Badge, Description } from "@zeit-ui/react";
+import { Card, Badge, Description, Tabs, Spacer } from "@zeit-ui/react";
 import PrimaryButton from "./PrimaryButton";
 
 const GameDetailBox = ({
@@ -45,7 +45,18 @@ const GameDetailBox = ({
                 </a>
             </div>
             <GameBadges game={game} allCategories={allCategories} />
-            <p>{game.description}</p>
+            <Spacer y={1} />
+            <Tabs initialValue="1">
+                <Tabs.Item label="Info" value="1">
+                    <p>{game.description}</p>
+                </Tabs.Item>
+                <Tabs.Item label="Guide" value="2">
+                    TODO: Similar games coming soon...
+                </Tabs.Item>
+                <Tabs.Item label="Pics" value="3">
+                    TODO: Screenshots coming soon...
+                </Tabs.Item>
+            </Tabs>
             {onSelectGame && (
                 <PrimaryButton onClick={() => onSelectGame(game.name)}>
                     Select game
@@ -64,6 +75,9 @@ const GameDetailBox = ({
                 font-size: 0.8em;
                 display: inline-block;
                 text-align: center;
+            }
+            p {
+                margin: 0;
             }
         `}</style>
     </Card>
