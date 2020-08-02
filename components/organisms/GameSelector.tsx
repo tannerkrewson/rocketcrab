@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { ClientGameLibrary } from "../../types/types";
 import PrimaryButton from "../atoms/PrimaryButton";
 import GameDetailBox from "../atoms/GameDetailBox";
+import ButtonGroup from "../molecules/ButtonGroup";
 
 const GameSelector = ({
     gameLibrary,
@@ -87,24 +88,28 @@ const GameSelector = ({
                             ({ name }) => name === viewingGame
                         )}
                         allCategories={gameLibrary.categories}
-                        onSelectGame={
-                            isHost
-                                ? (game) => {
-                                      onSelectGame(game);
-                                      onDone();
-                                  }
-                                : undefined
-                        }
                         showOnlyHostMessage={!isHost}
                     />
                     <Spacer y={1} />
-                    <PrimaryButton
-                        onClick={() => {
-                            setViewingGame("");
-                        }}
-                    >
-                        ↩️ Back to search
-                    </PrimaryButton>
+                    <ButtonGroup>
+                        <PrimaryButton
+                            onClick={() => {
+                                setViewingGame("");
+                            }}
+                        >
+                            ↩️ Back to search
+                        </PrimaryButton>
+                        {isHost && (
+                            <PrimaryButton
+                                onClick={() => {
+                                    onSelectGame(viewingGame);
+                                    onDone();
+                                }}
+                            >
+                                Select Game
+                            </PrimaryButton>
+                        )}
+                    </ButtonGroup>
                 </>
             )}
         </>
