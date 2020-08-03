@@ -11,11 +11,13 @@ import categories from "./categories.json";
 
 const SERVER_GAME_LIST: Array<ServerGame> = fs
     .readdirSync(path.join(process.cwd(), "config", "games"))
-    .filter((file) => !file.startsWith("index."))
-    .map((file) => {
+    .filter((file) => !file.startsWith("index.") && file.endsWith(".ts"))
+    .reduce((games, file) => {
         const name = file.substr(0, file.indexOf("."));
-        return require("./games/" + name).default;
-    });
+        const exported = require("./games/" + name).default;
+        const newGames = Array.isArray(exported) ? exported : [exported];
+        return [...games, ...newGames];
+    }, []);
 
 const getClientGameList = (): Array<ClientGame> =>
     SERVER_GAME_LIST.map(

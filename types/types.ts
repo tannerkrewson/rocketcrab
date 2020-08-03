@@ -32,8 +32,8 @@ export type ClientGame = {
     category?: Array<string>;
     players?: string;
     familyFriendly: boolean;
-    minPlayers: number;
-    maxPlayers: number;
+    minPlayers?: number;
+    maxPlayers?: number;
 };
 
 export type ServerGame = ClientGame & {
