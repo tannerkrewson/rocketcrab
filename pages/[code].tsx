@@ -169,7 +169,10 @@ const initLobbyState = () => ({
     } as GameState,
 });
 
-const setCookie = (key: string, value: any) => setNookie(null, key, value, {});
+const setCookie = (key: string, value: any) =>
+    setNookie(null, key, value, {
+        maxAge: 2147483647,
+    });
 
 export const getServerSideProps: GetServerSideProps = async (
     ctx: GetServerSidePropsContext
