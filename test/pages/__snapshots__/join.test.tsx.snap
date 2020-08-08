@@ -50,10 +50,10 @@ exports[`pages/join.tsx matches snapshot 1`] = `
                   value=""
                 />
                 <div
-                  class="jsx-1930334660 clear-icon "
+                  class="jsx-1724197483 clear-icon "
                 >
                   <svg
-                    class="jsx-1930334660"
+                    class="jsx-1724197483"
                     fill="none"
                     shape-rendering="geometricPrecision"
                     stroke="currentColor"
@@ -63,11 +63,11 @@ exports[`pages/join.tsx matches snapshot 1`] = `
                     viewBox="0 0 24 24"
                   >
                     <path
-                      class="jsx-1930334660"
+                      class="jsx-1724197483"
                       d="M18 6L6 18"
                     />
                     <path
-                      class="jsx-1930334660"
+                      class="jsx-1724197483"
                       d="M6 6l12 12"
                     />
                   </svg>
