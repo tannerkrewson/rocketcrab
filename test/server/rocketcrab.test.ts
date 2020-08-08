@@ -11,17 +11,30 @@ import {
     startGame,
     exitGame,
 } from "../../server/rocketcrab";
-import { Lobby, GameState, Player } from "../../types/types";
+import {
+    Lobby,
+    GameState,
+    Player,
+    ServerGameLibrary,
+    ServerGame,
+} from "../../types/types";
 import { LobbyStatus, GameStatus } from "../../types/enums";
 
 jest.mock("../../config", () => ({
-    getServerGameLibrary: jest.fn(() => ({
-        gameList: [
-            { name: "FooGame", getJoinGameUrl: async () => "foogame.com" },
-            { name: "CoolGame" },
-        ],
-        categories: [],
-    })),
+    getServerGameLibrary: jest.fn(
+        (): ServerGameLibrary => ({
+            gameList: [
+                {
+                    name: "FooGame",
+                    getJoinGameUrl: async () => ({
+                        playerURL: "foogame.com",
+                    }),
+                } as ServerGame,
+                { name: "CoolGame" } as ServerGame,
+            ],
+            categories: [],
+        })
+    ),
     getClientGameLibrary: jest.fn(() => ({
         gameList: [{ name: "FooGame" }, { name: "CoolGame" }],
         categories: [],
@@ -285,19 +298,26 @@ describe("server/rocketcrab.ts", () => {
         expect(mockPlayerList[0].socket.emit).toBeCalledWith("invalid-name");
     });
 
-    it("startGame works", () => {
+    it("startGame works", async () => {
         const mockLobby = generateMockLobby({
             status: LobbyStatus.lobby,
             selectedGame: "FooGame",
             gameState: {
                 status: undefined,
             },
+            playerList: generateMockPlayerList(1, (player) => ({
+                ...player,
+                socket: ({
+                    emit: jest.fn(),
+                    once: jest.fn(),
+                } as unknown) as SocketIO.Socket,
+            })),
         });
 
-        startGame(mockLobby);
+        await startGame(mockLobby);
 
         expect(mockLobby.status).toBe(LobbyStatus.ingame);
-        expect(mockLobby.gameState.status).toBe(GameStatus.loading);
+        expect(mockLobby.gameState.status).toBe(GameStatus.waitingforhost);
 
         // TODO: test call to getJoinGameUrl
     });
@@ -369,7 +389,10 @@ const generateMockPlayer = ({
     isHost,
 });
 
-const generateMockPlayerList = (numPlayers, modifyPlayer?): Array<Player> => {
+const generateMockPlayerList = (
+    numPlayers,
+    modifyPlayer?: (Player, number) => Player
+): Array<Player> => {
     const playerList: Array<Player> = [];
     for (let i = 0; i < numPlayers; i++) {
         const player = generateMockPlayer({
