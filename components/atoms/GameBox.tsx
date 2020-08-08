@@ -1,5 +1,5 @@
 import { ClientGame } from "../../types/types";
-import { Card } from "@zeit-ui/react";
+import { Card, Description } from "@zeit-ui/react";
 
 const GameBox = ({ game, onClick }: GameBoxProps): JSX.Element => (
     <Card
@@ -19,9 +19,20 @@ const GameBox = ({ game, onClick }: GameBoxProps): JSX.Element => (
             }}
         >
             <b>{game.name}</b>
-            &nbsp;by {game.author}
+            <Description
+                style={{ width: "fit-content" }}
+                title={"by " + game.author}
+            />
             {onClick && (
-                <span style={{ position: "absolute", right: ".5em" }}>➡️</span>
+                <span
+                    style={{
+                        position: "absolute",
+                        right: ".5em",
+                        top: "1.2em",
+                    }}
+                >
+                    ➡️
+                </span>
             )}
         </Card.Body>
     </Card>

@@ -27,6 +27,7 @@ const PageLayout = ({
                 flex-direction: column;
                 justify-content: center;
                 align-items: center;
+                width: 100%;
             }
 
             main {
@@ -39,6 +40,8 @@ const PageLayout = ({
 
             .main-content {
                 min-height: 20rem;
+                max-width: 24em;
+                width: 100%;
             }
 
             a {
