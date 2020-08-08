@@ -10,7 +10,7 @@ const gameTemplate = (
         familyFriendly,
     }: Partial<ServerGame>
 ): ServerGame => ({
-    name: name + " on Netgames.io",
+    name: name,
     author: "Luke Tsekouras",
     description,
     displayUrlText: "netgames.io",
@@ -33,7 +33,7 @@ const games: Array<ServerGame> = [
         name: "Avalon",
         description:
             "Evil players try to sabotage the good as they undertake quests for the Holy Grail.",
-        category: ["deduction", "social"],
+        category: ["deduction", "netgamesio"],
         players: "5-10",
         familyFriendly: true,
     }),
@@ -41,7 +41,7 @@ const games: Array<ServerGame> = [
         name: "Love Letter",
         description:
             "Compete for the heart of the Princess through deception and betrayal.",
-        category: ["deduction", "social"],
+        category: ["deduction", "netgamesio"],
         players: "2-4",
         familyFriendly: true,
     }),
@@ -49,7 +49,7 @@ const games: Array<ServerGame> = [
         name: "Spyfall",
         description:
             "Discover who the spy is by asking careful questions, but don't let them know too much.",
-        category: ["deduction", "social"],
+        category: ["deduction", "netgamesio"],
         players: "3+",
         familyFriendly: true,
     }),
@@ -57,7 +57,7 @@ const games: Array<ServerGame> = [
         name: "Secret Hitler",
         description:
             "The Liberals and the Fascists fight for political power in pre-war Germany.",
-        category: ["deduction", "social"],
+        category: ["deduction", "netgamesio"],
         players: "5-10",
         familyFriendly: true,
     }),
@@ -65,7 +65,7 @@ const games: Array<ServerGame> = [
         name: "Codewords",
         description:
             "Rival Codebreakers try to identify their Codewords before the enemy discovers theirs.",
-        category: ["deduction", "social"],
+        category: ["deduction", "netgamesio"],
         players: "4+",
         familyFriendly: true,
     }),
@@ -73,7 +73,7 @@ const games: Array<ServerGame> = [
         name: "One Night Ultimate Werewolf",
         description:
             "Find the Werewolves hiding amongst you, but you only have one night.",
-        category: ["deduction", "social"],
+        category: ["deduction", "netgamesio"],
         players: "3-18",
         familyFriendly: true,
     }),
@@ -81,7 +81,7 @@ const games: Array<ServerGame> = [
         name: "Enigma",
         description:
             "Send secret messages to your comrades while intercepting those of your enemy.",
-        category: ["deduction", "social"],
+        category: ["deduction", "netgamesio"],
         players: "4+",
         familyFriendly: true,
     }),
