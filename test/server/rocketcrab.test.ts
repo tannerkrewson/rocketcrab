@@ -297,7 +297,7 @@ describe("server/rocketcrab.ts", () => {
         startGame(mockLobby);
 
         expect(mockLobby.status).toBe(LobbyStatus.ingame);
-        expect(mockLobby.gameState.status).toBe(GameStatus.waitingforhost);
+        expect(mockLobby.gameState.status).toBe(GameStatus.loading);
 
         // TODO: test call to getJoinGameUrl
     });
