@@ -1,9 +1,21 @@
 [
     {
-        "id": "deduction",
-        "name": "🕵️ Deduction",
+        "id": "easy",
+        "name": "🟢 Very simple",
         "color": "white",
-        "backgroundColor": "#0070f3"
+        "backgroundColor": "green"
+    },
+    {
+        "id": "medium",
+        "name": "🟡​ Easy to explain",
+        "color": "black",
+        "backgroundColor": "Gold"
+    },
+    {
+        "id": "hard",
+        "name": "🛑 Know the rules first",
+        "color": "white",
+        "backgroundColor": "FireBrick"
     },
     {
         "id": "drawing",
@@ -21,6 +33,6 @@
         "id": "trivia",
         "name": "🎓 Trivia",
         "color": "white",
-        "backgroundColor": "orange"
+        "backgroundColor": "Indigo"
     }
 ]

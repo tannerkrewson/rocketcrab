@@ -7,7 +7,7 @@ const game: ServerGame = {
     description: "A cooperative word guessing game",
     displayUrlText: "just1.herokuapp.com",
     displayUrlHref: "https://just1.herokuapp.com/",
-    category: ["trivia"],
+    category: ["easy"],
     players: "1+",
     familyFriendly: true,
     getJoinGameUrl: async () => {

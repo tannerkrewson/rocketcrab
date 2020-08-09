@@ -7,7 +7,7 @@ const game: ServerGame = {
     description: "Quizbowl practice",
     displayUrlText: "protobowl.com",
     displayUrlHref: "https://protobowl.com/",
-    category: ["trivia"],
+    category: ["trivia", "medium"],
     players: "1+",
     familyFriendly: true,
     getJoinGameUrl: async () => {

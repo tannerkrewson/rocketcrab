@@ -9,7 +9,7 @@ const game: ServerGame = {
     displayUrlHref: "https://snakeout.tannerkrewson.com/",
     donationUrlText: "Buy Tanner a taco!",
     donationUrlHref: "https://www.buymeacoffee.com/tannerkrewson",
-    category: ["deduction"],
+    category: ["medium"],
     players: "5-10",
     familyFriendly: true,
     getJoinGameUrl: async () => {

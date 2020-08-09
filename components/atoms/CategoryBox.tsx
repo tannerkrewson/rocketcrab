@@ -13,8 +13,10 @@ const CategoryBox = ({
                 backgroundColor,
                 minWidth: "100%",
                 width: "100%",
-                height: "3.5em",
+                minHeight: "3.5em",
                 padding: "0",
+                whiteSpace: "normal",
+                lineHeight: "normal",
             }}
             onClick={() => onClick(id)}
             type="abort"
