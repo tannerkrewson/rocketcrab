@@ -2,23 +2,21 @@ import { ServerGame } from "../../types/types";
 import { postJson } from "../../utils/utils";
 
 const game: ServerGame = {
-    name: "Drawphone",
+    name: "Snakeout",
     author: "Tanner Krewson",
-    description: "Telephone with pictures",
-    displayUrlText: "drawphone.tannerkrewson.com",
-    displayUrlHref: "https://drawphone.tannerkrewson.com/",
+    description: "Out the snake, or be outed as a snake",
+    displayUrlText: "snakeout.tannerkrewson.com",
+    displayUrlHref: "https://snakeout.tannerkrewson.com/",
     donationUrlText: "Buy Tanner a taco!",
     donationUrlHref: "https://www.buymeacoffee.com/tannerkrewson",
-    category: ["drawing"],
-    players: "1+",
-    familyFriendly: false,
-    minPlayers: 1,
-    maxPlayers: Infinity,
+    category: ["deduction"],
+    players: "5-10",
+    familyFriendly: true,
     getJoinGameUrl: async () => {
-        const newUrl = "https://drawphone.tannerkrewson.com/new";
+        const newUrl = "https://snakeout.tannerkrewson.com/new";
         const { gameCode } = await postJson(newUrl);
         return {
-            playerURL: "https://drawphone.tannerkrewson.com/",
+            playerURL: "https://snakeout.tannerkrewson.com/",
             code: gameCode,
         };
     },
