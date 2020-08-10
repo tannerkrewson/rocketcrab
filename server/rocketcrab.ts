@@ -148,8 +148,15 @@ export const startGame = async (lobby: Lobby): Promise<void> => {
     gameState.status = GameStatus.loading;
     sendStateToAll(lobby);
 
-    //TODO handle failed to get url
-    gameState.joinGameURL = await game.getJoinGameUrl();
+    try {
+        gameState.joinGameURL = await game.getJoinGameUrl();
+    } catch (e) {
+        gameState.status = GameStatus.error;
+        gameState.error = "❌ Can't connect to " + game.name;
+        sendStateToAll(lobby);
+        return;
+    }
+
     gameState.status = GameStatus.waitingforhost;
 
     // if config does not provide a specific url for the host,

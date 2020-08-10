@@ -8,4 +8,5 @@ export enum GameStatus {
     loading = "loading",
     inprogress = "inprogress",
     waitingforhost = "waitingforhost",
+    error = "error",
 }

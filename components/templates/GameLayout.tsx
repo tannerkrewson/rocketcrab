@@ -42,6 +42,7 @@ const GameLayout = ({
     const [frameRefresh, setFrameRefresh] = useState(0);
 
     const showLoading = status === GameStatus.loading;
+    const showError = status === GameStatus.error;
     const showWaitingForHost = !isHost && status === GameStatus.waitingforhost;
     const showGameFrame = !isHost && status === GameStatus.inprogress;
     const showHostGameFrame =
@@ -115,6 +116,20 @@ const GameLayout = ({
                             <span>Loading game</span>
                         )}
                     </Loading>
+                </div>
+            )}
+            {showError && (
+                <div className="frame">
+                    <div
+                        style={{
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            height: "100%",
+                        }}
+                    >
+                        {gameState.error}
+                    </div>
                 </div>
             )}
             {showGameFrame && (

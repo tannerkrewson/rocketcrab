@@ -67,6 +67,7 @@ export type ServerGameLibrary = {
 
 export type GameState = {
     status: GameStatus;
+    error?: string;
     joinGameURL?: JoinGameURL;
 };
 
