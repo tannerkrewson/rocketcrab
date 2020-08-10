@@ -1,7 +1,7 @@
 import { ServerGame } from "../../types/types";
 
 const gameTemplate = (
-    id: string,
+    urlId: string,
     {
         name,
         description,
@@ -10,6 +10,7 @@ const gameTemplate = (
         familyFriendly,
     }: Partial<ServerGame>
 ): ServerGame => ({
+    id: "netgamesio-" + urlId,
     name: name,
     author: "Luke Tsekouras",
     description,
@@ -21,7 +22,9 @@ const gameTemplate = (
     players,
     familyFriendly,
     getJoinGameUrl: async () => {
-        const newGame = await fetch("https://netgames.io/games/" + id + "/new");
+        const newGame = await fetch(
+            "https://netgames.io/games/" + urlId + "/new"
+        );
         return {
             playerURL: newGame.url,
         };

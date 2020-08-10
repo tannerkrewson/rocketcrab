@@ -131,9 +131,9 @@ export const setName = (
     }
 };
 
-export const setGame = (gameName: string, lobby: Lobby): void => {
-    if (findGameByName(gameName)) {
-        lobby.selectedGame = gameName;
+export const setGame = (gameId: string, lobby: Lobby): void => {
+    if (findGameById(gameId)) {
+        lobby.selectedGame = gameId;
     }
 };
 
@@ -141,7 +141,7 @@ export const startGame = async (lobby: Lobby): Promise<void> => {
     // TODO: check if ready
     const { gameState, selectedGame, playerList } = lobby;
 
-    const game: ServerGame = findGameByName(selectedGame);
+    const game: ServerGame = findGameById(selectedGame);
     if (!game) return;
 
     lobby.status = LobbyStatus.ingame;
@@ -180,8 +180,8 @@ const findPlayerByName = (
     playerList: Array<Player>
 ): Player => playerList.find(({ name }) => name === nameToFind);
 
-const findGameByName = (gameName: string): ServerGame =>
-    SERVER_GAME_LIST.find(({ name }) => name === gameName);
+const findGameById = (gameId: string): ServerGame =>
+    SERVER_GAME_LIST.find(({ id }) => id === gameId);
 
 const disconnectAllPlayers = (playerList: Array<Player>): void =>
     playerList.forEach(({ socket }) => socket.disconnect(true));

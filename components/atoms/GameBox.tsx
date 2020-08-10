@@ -3,7 +3,7 @@ import { Card, Description } from "@zeit-ui/react";
 
 const GameBox = ({ game, onClick }: GameBoxProps): JSX.Element => (
     <Card
-        onClick={() => onClick && onClick(game.name)}
+        onClick={() => onClick && onClick(game.id)}
         style={{
             cursor: onClick ? "pointer" : "default",
             userSelect: "none",

@@ -2,8 +2,9 @@ import { ServerGame } from "../../types/types";
 import { randomBytes } from "crypto";
 
 const game: ServerGame = {
+    id: "cjq-justone",
     name: "Just One",
-    author: "Kevin Kwok",
+    author: "CJ Quines",
     description: "A cooperative word guessing game",
     displayUrlText: "just1.herokuapp.com",
     displayUrlHref: "https://just1.herokuapp.com/",

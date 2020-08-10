@@ -35,7 +35,7 @@ const Lobby = ({
                     {selectedGame ? (
                         <GameDetailBox
                             game={gameLibrary.gameList.find(
-                                ({ name }) => name === selectedGame
+                                ({ id }) => id === selectedGame
                             )}
                             allCategories={gameLibrary.categories}
                             readyToPlay={true}
@@ -80,7 +80,7 @@ const Lobby = ({
 type LobbyProps = {
     playerList: Array<Player>;
     gameLibrary: ClientGameLibrary;
-    onSelectGame: (gameName: string) => void;
+    onSelectGame: (gameId: string) => void;
     selectedGame: string;
     onStartGame: () => void;
     resetName: () => void;

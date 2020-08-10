@@ -35,7 +35,7 @@ describe("server/api.ts", () => {
         const req = {
             query: {
                 uuid: "12345",
-                gameid: "Drawphone",
+                gameid: "tk-drawphone",
                 name: "John",
             },
         };
@@ -60,7 +60,7 @@ describe("server/api.ts", () => {
             {
                 query: {
                     uuid: "12345",
-                    gameid: "Drawphone",
+                    gameid: "tk-drawphone",
                     name: "John",
                 },
             },
@@ -70,7 +70,7 @@ describe("server/api.ts", () => {
             {
                 query: {
                     uuid: "12345",
-                    gameid: "Drawphone",
+                    gameid: "tk-srawphone",
                     name: "Bob",
                 },
             },

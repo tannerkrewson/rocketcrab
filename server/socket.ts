@@ -51,10 +51,10 @@ const attachLobbyListenersToPlayer = (
         sendStateToAll(lobby);
     });
 
-    socket.on("game-select", (gameName) => {
+    socket.on("game-select", (gameId) => {
         if (!player.isHost) return;
 
-        setGame(gameName, lobby);
+        setGame(gameId, lobby);
         sendStateToAll(lobby);
     });
 

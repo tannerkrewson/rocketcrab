@@ -89,8 +89,8 @@ export const Code = ({
         setCookie("previousName", enteredName);
     };
 
-    const onSelectGame = (gameName: string) => {
-        socket.emit("game-select", gameName);
+    const onSelectGame = (gameId: string) => {
+        socket.emit("game-select", gameId);
     };
 
     const onStartGame = () => {

@@ -25,12 +25,13 @@ jest.mock("../../config", () => ({
         (): ServerGameLibrary => ({
             gameList: [
                 {
+                    id: "jd-foogame",
                     name: "FooGame",
                     getJoinGameUrl: async () => ({
                         playerURL: "foogame.com",
                     }),
                 } as ServerGame,
-                { name: "CoolGame" } as ServerGame,
+                { id: "lk-coolgame", name: "CoolGame" } as ServerGame,
             ],
             categories: [],
         })
@@ -269,9 +270,9 @@ describe("server/rocketcrab.ts", () => {
             playerList: generateMockPlayerList(1),
         });
 
-        setGame("CoolGame", mockLobby);
+        setGame("lk-coolgame", mockLobby);
 
-        expect(mockLobby.selectedGame).toBe("CoolGame");
+        expect(mockLobby.selectedGame).toBe("lk-coolgame");
     });
 
     it("setName works", () => {
@@ -301,7 +302,7 @@ describe("server/rocketcrab.ts", () => {
     it("startGame works", async () => {
         const mockLobby = generateMockLobby({
             status: LobbyStatus.lobby,
-            selectedGame: "FooGame",
+            selectedGame: "jd-foogame",
             gameState: {
                 status: undefined,
             },

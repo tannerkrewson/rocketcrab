@@ -23,6 +23,7 @@ export type Player = {
 };
 
 export type ClientGame = {
+    id: string;
     name: string;
     author?: string;
     description?: string;

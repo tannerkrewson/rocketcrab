@@ -2,6 +2,7 @@ import { ServerGame } from "../../types/types";
 import { postJson } from "../../utils/utils";
 
 const game: ServerGame = {
+    id: "tk-spyfall",
     name: "Spyfall",
     author: "Tanner Krewson",
     description: "formerly Crabhat",

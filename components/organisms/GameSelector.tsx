@@ -16,7 +16,7 @@ const GameSelector = ({
 }: GameSelectorProps): JSX.Element => {
     const { state: search, setState: setSearch, bindings } = useInput("");
     const [selectedCategory, setSelectedCategory] = useState("");
-    const [viewingGame, setViewingGame] = useState("");
+    const [viewingGameId, setViewingGameId] = useState("");
 
     useEffect(() => {
         if (!search) setSelectedCategory("");
@@ -30,13 +30,13 @@ const GameSelector = ({
 
     return (
         <>
-            {!viewingGame && (
+            {!viewingGameId && (
                 <>
                     <div>{categoryName}Games</div>
                     <Spacer y={1} />
                 </>
             )}
-            {!selectedCategory && !viewingGame && (
+            {!selectedCategory && !viewingGameId && (
                 <>
                     <Input
                         icon="🔎"
@@ -48,7 +48,7 @@ const GameSelector = ({
                     <Spacer y={1} />
                 </>
             )}
-            {!selectedCategory && !search && !viewingGame && (
+            {!selectedCategory && !search && !viewingGameId && (
                 <>
                     <CategoryGroup
                         categories={gameLibrary.categories}
@@ -60,12 +60,12 @@ const GameSelector = ({
                     </PrimaryButton>
                 </>
             )}
-            {(selectedCategory || search) && !viewingGame && (
+            {(selectedCategory || search) && !viewingGameId && (
                 <>
                     <GameGroup
                         gameList={gameLibrary.gameList}
-                        onSelectGame={(game) => {
-                            setViewingGame(game);
+                        onSelectGame={(gameId) => {
+                            setViewingGameId(gameId);
                         }}
                         nameFilter={search}
                         categoryFilter={selectedCategory}
@@ -81,11 +81,11 @@ const GameSelector = ({
                     </PrimaryButton>
                 </>
             )}
-            {viewingGame && (
+            {viewingGameId && (
                 <>
                     <GameDetailBox
                         game={gameLibrary.gameList.find(
-                            ({ name }) => name === viewingGame
+                            ({ id }) => id === viewingGameId
                         )}
                         allCategories={gameLibrary.categories}
                         showOnlyHostMessage={!isHost}
@@ -94,7 +94,7 @@ const GameSelector = ({
                     <ButtonGroup>
                         <PrimaryButton
                             onClick={() => {
-                                setViewingGame("");
+                                setViewingGameId("");
                             }}
                         >
                             ↩️ Back to search
@@ -102,7 +102,7 @@ const GameSelector = ({
                         {isHost && (
                             <PrimaryButton
                                 onClick={() => {
-                                    onSelectGame(viewingGame);
+                                    onSelectGame(viewingGameId);
                                     onDone();
                                 }}
                             >
@@ -118,7 +118,7 @@ const GameSelector = ({
 
 type GameSelectorProps = {
     gameLibrary: ClientGameLibrary;
-    onSelectGame: (gameName: string) => void;
+    onSelectGame: (gameId: string) => void;
     onDone: () => void;
     backToLabel: string;
     isHost: boolean;

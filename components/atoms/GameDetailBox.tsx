@@ -70,7 +70,7 @@ const GameDetailBox = ({
                 </Tabs.Item>
             </Tabs>
             {onSelectGame && (
-                <PrimaryButton onClick={() => onSelectGame(game.name)}>
+                <PrimaryButton onClick={() => onSelectGame(game.id)}>
                     Select game
                 </PrimaryButton>
             )}
@@ -130,7 +130,7 @@ const SpaceBadge = ({ children, style = {} }) => (
 type GameDetailBoxProps = {
     game: ClientGame;
     allCategories: Array<GameCategory>;
-    onSelectGame?: (name: string) => void;
+    onSelectGame?: (id: string) => void;
     readyToPlay?: boolean;
     showOnlyHostMessage?: boolean;
 };

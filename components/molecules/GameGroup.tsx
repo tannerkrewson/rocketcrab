@@ -33,7 +33,7 @@ type GameGroupProps = {
     gameList: Array<ClientGame>;
     nameFilter: string;
     categoryFilter: string;
-    onSelectGame: (name: string) => void;
+    onSelectGame: (id: string) => void;
 };
 
 export default GameGroup;

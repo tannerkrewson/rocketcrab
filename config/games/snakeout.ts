@@ -2,6 +2,7 @@ import { ServerGame } from "../../types/types";
 import { postJson } from "../../utils/utils";
 
 const game: ServerGame = {
+    id: "tk-snakeout",
     name: "Snakeout",
     author: "Tanner Krewson",
     description: "Out the snake, or be outed as a snake",
