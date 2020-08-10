@@ -8,6 +8,7 @@ export type Lobby = {
     status: LobbyStatus;
     playerList: Array<Player>;
     code: string;
+    uuid?: string;
     selectedGame: string;
     gameState: GameState;
     nextPlayerId: number;

@@ -73,7 +73,7 @@ describe("server/rocketcrab.ts", () => {
     it("getLobby finds existing lobby", () => {
         const lobbyList: Array<Lobby> = [];
 
-        const code = newLobby(lobbyList);
+        const { code } = newLobby(lobbyList);
         const lobby = getLobby(code, lobbyList);
 
         expect(lobby.code).toBe(code);

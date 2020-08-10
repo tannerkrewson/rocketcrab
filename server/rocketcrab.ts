@@ -13,13 +13,15 @@ export const initRocketCrab = (isDevMode?: boolean): RocketCrab => {
 
 export const newLobby = (
     lobbyList: Array<Lobby>,
-    gameCode?: string
-): string => {
+    gameCode?: string,
+    uuid?: string
+): Lobby => {
     const code: string = gameCode || getUniqueGameCode(lobbyList);
-    lobbyList.push({
+    const newLobby: Lobby = {
         status: LobbyStatus.lobby,
         playerList: [],
         code,
+        uuid,
         selectedGame: "",
         gameState: {
             status: GameStatus.loading,
@@ -27,8 +29,9 @@ export const newLobby = (
         },
         nextPlayerId: 0,
         idealHostId: 0,
-    });
-    return code;
+    };
+    lobbyList.push(newLobby);
+    return newLobby;
 };
 
 export const getLobby = (newCode: string, lobbyList: Array<Lobby>): Lobby =>
