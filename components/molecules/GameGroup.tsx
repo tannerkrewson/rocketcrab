@@ -13,8 +13,10 @@ const GameGroup = ({
             ({ category }) =>
                 !categoryFilter || category.includes(categoryFilter)
         )
-        .filter(({ name }) =>
-            name.toLowerCase().includes(nameFilter.toLowerCase().trim())
+        .filter(({ name, author }) =>
+            (name + author)
+                .toLowerCase()
+                .includes(nameFilter.toLowerCase().trim())
         )
         .map((game, i) => (
             <Grid xs={24} key={i}>
