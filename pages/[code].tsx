@@ -12,6 +12,7 @@ import { GameState, ClientGameLibrary, JoinGameURL } from "../types/types";
 import { getClientGameLibrary } from "../config";
 import { parseCookies, setCookie as setNookie } from "nookies";
 import Connecting from "../components/atoms/Connecting";
+import { logEvent } from "../utils/analytics";
 
 const CLIENT_GAME_LIBRARY = getClientGameLibrary();
 const socket = socketIOClient();
@@ -95,6 +96,9 @@ export const Code = ({
 
     const onStartGame = () => {
         socket.emit("game-start");
+
+        logEvent("lobby-numberOfPlayers", playerList.length.toString());
+        logEvent("lobby-game", selectedGame);
     };
 
     const onExitGame = () => {
