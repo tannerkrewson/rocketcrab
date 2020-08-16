@@ -34,4 +34,16 @@ export default (server: Application, { lobbyList }: RocketCrab): void => {
 
         res.redirect("/" + lobby.code);
     });
+    server.get("/api/stats", (req: Request, res: Response) => {
+        res.json(
+            lobbyList.map(
+                ({ status, gameState, selectedGame, playerList }) => ({
+                    lobbyStatus: status,
+                    gameStatus: gameState.status,
+                    selectedGame,
+                    numberOfPlayers: playerList.length,
+                })
+            )
+        );
+    });
 };
