@@ -20,6 +20,10 @@ const Footer = (): JSX.Element => (
             font-size: 12px;
             text-align: center;
             margin-bottom: 2em;
+
+            a:hover {
+                text-decoration: underline;
+            }
         `}</style>
     </footer>
 );

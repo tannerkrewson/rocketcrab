@@ -21,7 +21,7 @@ export const Home = (): JSX.Element => {
 
     return (
         <PageLayout>
-            <div className="description">party games for your phone</div>
+            <div className="description">party games for phones</div>
 
             <ButtonGroup>
                 <PrimaryButton href="/join" size="large">
@@ -36,10 +36,44 @@ export const Home = (): JSX.Element => {
                     New Lobby
                 </PrimaryButton>
             </ButtonGroup>
+            <div className="links">
+                <a
+                    href="https://discord.gg/MvYRVCP"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    Discord
+                </a>
+                <span>|</span>
+                <a
+                    href="https://github.com/tannerkrewson/rocketcrab/#-for-developers"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    Developers
+                </a>
+            </div>
             <style jsx>{`
                 .description {
                     text-align: center;
                     margin-bottom: 2em;
+                }
+                .links {
+                    margin-top: 1.5em;
+                    display: flex;
+                    justify-content: center;
+                }
+                .links a {
+                    display: inline-block;
+                    margin: 0 0.5em;
+                    font-size: 12px;
+                }
+                .links a:hover {
+                    text-decoration: underline;
+                }
+                .links span {
+                    line-height: 1em;
+                    color: grey;
                 }
             `}</style>
         </PageLayout>

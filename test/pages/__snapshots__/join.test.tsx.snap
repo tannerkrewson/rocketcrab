@@ -121,12 +121,12 @@ exports[`pages/join.tsx matches snapshot 1`] = `
       </div>
     </main>
     <footer
-      class="jsx-727442817"
+      class="jsx-3128977650"
       style="margin-top: 1em;"
     >
       rocketcrab by 
       <a
-        class="jsx-727442817"
+        class="jsx-3128977650"
         href="https://www.tannerkrewson.com/"
         rel="noopener noreferrer"
         target="_blank"
@@ -134,10 +134,10 @@ exports[`pages/join.tsx matches snapshot 1`] = `
         Tanner Krewson
       </a>
       <br
-        class="jsx-727442817"
+        class="jsx-3128977650"
       />
       <a
-        class="jsx-727442817"
+        class="jsx-3128977650"
         href="https://github.com/tannerkrewson/rocketcrab"
         rel="noopener noreferrer"
         target="_blank"
