@@ -97,4 +97,36 @@ describe("server/api.ts", () => {
         expect(res.status).toBeCalledWith(400);
         expect(end).toBeCalled();
     });
+
+    it("/game/:gameid works", () => {
+        expect(app.get.mock.calls[1][0]).toEqual("/game/:gameid");
+        const handler = app.get.mock.calls[1][1];
+        const req = {
+            params: {
+                gameid: "tk-drawphone",
+            },
+        };
+        const res = {
+            redirect: jest.fn(),
+        };
+        handler(req, res);
+
+        expect(rocketcrab.lobbyList[0].selectedGame).toEqual(req.params.gameid);
+    });
+
+    it("/game/:gameid works if gameid invalid", () => {
+        expect(app.get.mock.calls[1][0]).toEqual("/game/:gameid");
+        const handler = app.get.mock.calls[1][1];
+        const req = {
+            params: {
+                gameid: "game-that-doesnt-exist",
+            },
+        };
+        const res = {
+            redirect: jest.fn(),
+        };
+        handler(req, res);
+
+        expect(rocketcrab.lobbyList[0].selectedGame).toBe("");
+    });
 });

@@ -34,6 +34,14 @@ export default (server: Application, { lobbyList }: RocketCrab): void => {
 
         res.redirect("/" + lobby.code);
     });
+    server.get("/game/:gameid", (req: Request, res: Response) => {
+        const { gameid } = req.params;
+
+        const lobby = newLobby(lobbyList);
+        setGame(gameid as string, lobby);
+
+        res.redirect("/" + lobby.code);
+    });
     server.get("/api/stats", (req: Request, res: Response) => {
         res.json(
             lobbyList.map(
