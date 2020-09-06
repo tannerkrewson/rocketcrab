@@ -29,13 +29,15 @@ describe("server/api.ts", () => {
         );
     });
 
-    it("/api/transfer create lobby", () => {
-        expect(app.get.mock.calls[0][0]).toEqual("/api/transfer");
+    it("/transfer create lobby", () => {
+        expect(app.get.mock.calls[0][0]).toEqual("/transfer/:gameid/:uuid?");
         const handler = app.get.mock.calls[0][1];
         const req = {
-            query: {
-                uuid: "12345",
+            params: {
+                uuid: "1234567890",
                 gameid: "tk-drawphone",
+            },
+            query: {
                 name: "John",
             },
         };
@@ -45,12 +47,12 @@ describe("server/api.ts", () => {
         };
         handler(req, res);
 
-        expect(rocketcrab.lobbyList[0].uuid).toEqual(req.query.uuid);
-        expect(rocketcrab.lobbyList[0].selectedGame).toEqual(req.query.gameid);
+        expect(rocketcrab.lobbyList[0].uuid).toEqual(req.params.uuid);
+        expect(rocketcrab.lobbyList[0].selectedGame).toEqual(req.params.gameid);
         expect(res.cookie.mock.calls[0][1]).toEqual(req.query.name);
     });
 
-    it("/api/transfer doesn't create lobby if already made", () => {
+    it("/transfer doesn't create lobby if already made", () => {
         const handler = app.get.mock.calls[0][1];
         const res = {
             cookie: jest.fn(),
@@ -58,9 +60,11 @@ describe("server/api.ts", () => {
         };
         handler(
             {
-                query: {
-                    uuid: "12345",
+                params: {
+                    uuid: "1234567890",
                     gameid: "tk-drawphone",
+                },
+                query: {
                     name: "John",
                 },
             },
@@ -68,10 +72,12 @@ describe("server/api.ts", () => {
         );
         handler(
             {
+                params: {
+                    uuid: "1234567890",
+                    gameid: "tk-drawphone",
+                },
                 query: {
-                    uuid: "12345",
-                    gameid: "tk-srawphone",
-                    name: "Bob",
+                    name: "Jack",
                 },
             },
             res
@@ -80,12 +86,13 @@ describe("server/api.ts", () => {
         expect(rocketcrab.lobbyList.length).toEqual(1);
     });
 
-    it("/api/transfer doesn't create lobby if uuid invalid", () => {
+    it("/transfer doesn't create lobby if uuid invalid", () => {
         const handler = app.get.mock.calls[0][1];
         const req = {
-            query: {
-                uuid: "123",
+            params: {
+                uuid: "12345",
             },
+            query: {},
         };
         const end = jest.fn();
         const res = {
@@ -98,13 +105,13 @@ describe("server/api.ts", () => {
         expect(end).toBeCalled();
     });
 
-    it("/game/:gameid works", () => {
-        expect(app.get.mock.calls[1][0]).toEqual("/game/:gameid");
-        const handler = app.get.mock.calls[1][1];
+    it("/transfer works without uuid", () => {
+        const handler = app.get.mock.calls[0][1];
         const req = {
             params: {
                 gameid: "tk-drawphone",
             },
+            query: {},
         };
         const res = {
             redirect: jest.fn(),
@@ -114,13 +121,13 @@ describe("server/api.ts", () => {
         expect(rocketcrab.lobbyList[0].selectedGame).toEqual(req.params.gameid);
     });
 
-    it("/game/:gameid works if gameid invalid", () => {
-        expect(app.get.mock.calls[1][0]).toEqual("/game/:gameid");
-        const handler = app.get.mock.calls[1][1];
+    it("/transfer works without uuid even if gameid invalid", () => {
+        const handler = app.get.mock.calls[0][1];
         const req = {
             params: {
                 gameid: "game-that-doesnt-exist",
             },
+            query: {},
         };
         const res = {
             redirect: jest.fn(),

@@ -7,18 +7,24 @@ export default (server: Application, { lobbyList }: RocketCrab): void => {
         const { code } = newLobby(lobbyList);
         res.json({ code });
     });
-    server.get("/api/transfer", (req: Request, res: Response) => {
-        const { uuid: givenUuid, gameid, name } = req.query;
+    server.get("/transfer/:gameid/:uuid?", (req: Request, res: Response) => {
+        const { uuid: givenUuid, gameid } = req.params;
+        const { name } = req.query;
 
         // uuid should be 36 characters long, but i'll be nice
-        if (!givenUuid || givenUuid.length < 5) {
+        if (givenUuid && givenUuid.length < 10) {
             res.status(400).end();
             return;
         }
 
-        const lobby =
-            lobbyList.find(({ uuid }) => uuid === givenUuid) ||
-            newLobby(lobbyList, undefined, givenUuid as string);
+        let lobby;
+        if (givenUuid) {
+            lobby =
+                lobbyList.find(({ uuid }) => uuid === givenUuid) ||
+                newLobby(lobbyList, undefined, givenUuid as string);
+        } else {
+            lobby = newLobby(lobbyList);
+        }
 
         if (gameid && !lobby.selectedGame) {
             setGame(gameid as string, lobby);
@@ -31,14 +37,6 @@ export default (server: Application, { lobbyList }: RocketCrab): void => {
                 maxAge: 2147483647,
             });
         }
-
-        res.redirect("/" + lobby.code);
-    });
-    server.get("/game/:gameid", (req: Request, res: Response) => {
-        const { gameid } = req.params;
-
-        const lobby = newLobby(lobbyList);
-        setGame(gameid as string, lobby);
 
         res.redirect("/" + lobby.code);
     });
