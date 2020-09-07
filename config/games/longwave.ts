@@ -1,0 +1,28 @@
+import { ServerGame } from "../../types/types";
+import { randomBytes } from "crypto";
+
+const game: ServerGame = {
+    id: "longwave",
+    name: "Longwave",
+    author: "Evan Bailey & Margarethe Schoen",
+    basedOn: {
+        game: "Wavelength",
+        author: "Wolfgang Warsch, Alex Hague, & Justin Vickers",
+        link: "https://www.wavelength.zone/",
+    },
+    description:
+        "Wavelength is a social guessing game where two teams compete to read each other's minds. It’s a thrilling experience of TALKING and THINKING and HIGH FIVING that anyone can play—but it also has some of that deep word game sorcery, like Codenames, where your decisions feel tense, strategic, meaningful. ",
+    displayUrlText: "longwave.web.app",
+    displayUrlHref: "https://longwave.web.app/",
+    category: ["easy"],
+    players: "2-12+",
+    familyFriendly: true,
+    getJoinGameUrl: async () => {
+        const id = randomBytes(8).toString("hex");
+        return {
+            playerURL: "https://longwave.web.app/rocketcrab-" + id,
+        };
+    },
+};
+
+export default game;
