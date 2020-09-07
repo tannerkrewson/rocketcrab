@@ -11,7 +11,7 @@ import categories from "./categories.json";
 
 const SERVER_GAME_LIST: Array<ServerGame> = fs
     .readdirSync(path.join(process.cwd(), "config", "games"))
-    .filter((file) => !file.startsWith("index.") && file.endsWith(".ts"))
+    .filter((file) => !file.startsWith("_") && file.endsWith(".ts"))
     .reduce((games, file) => {
         const name = file.substr(0, file.indexOf("."));
         const exported = require("./games/" + name).default;

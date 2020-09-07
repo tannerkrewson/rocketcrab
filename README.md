@@ -25,7 +25,7 @@ That's it! Many existing games already offer these, and can work with rocketcrab
 
 ### Step 2: Creating a config file
 
-The config files, as mentioned above, should be fairly self explanatory. Feel free to use any of the existing config files as templates. The most important part, which will be explained here, is the `getJoinGameUrl` function. This function:
+The config files, as mentioned above, should be fairly self explanatory. Along with the [config template](https://github.com/tannerkrewson/rocketcrab/blob/master/config/games/_template.ts), check out the config files of other games to see how they implement rocketcrab. The most important part, which will be explained here, is the `getJoinGameUrl` function. This function:
 
 -   is `async`, which will allow you to use `await` to make `GET` or `POST` requests.
 -   needs to return an object with these properties:
