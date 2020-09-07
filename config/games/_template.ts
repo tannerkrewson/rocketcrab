@@ -1,5 +1,12 @@
 import { ServerGame } from "../../types/types";
 
+// PLEASE REMOVE ALL COMMENTS AFTER COPYING THIS TEMPLATE
+// (you can add your own comments tho if you like :D )
+
+// you can name this config file whatever you like; doesn't have to match the id.
+// any config files in this folder (besides ones that start with _) will automatically
+// be picked up
+
 const game: ServerGame = {
     // author's initials, hypen, game name in lowercase with no spaces or hyphens
     id: "jd-coolgame", // required
@@ -36,8 +43,8 @@ const game: ServerGame = {
     // this is just for show. make this the recommended number of players or something
     players: "4-9", // optional
 
-    // if there is explicit content in the game that can't be turned off, set this as true
-    familyFriendly: false, // required
+    // if there is explicit content in the game that can't be turned off, set this as false
+    familyFriendly: true, // required
 
     // you can add a min and/or max players if you would like disable the "Start Game" button
     // if the number of players in the rocketcrab lobby is not within range. this can be different
@@ -47,6 +54,7 @@ const game: ServerGame = {
 
     // see https://github.com/tannerkrewson/rocketcrab#step-2-creating-a-config-file
     // note that this will be running on the rocketcrab server, and will run once per lobby, not per player.
+    // this function will be ran in a try catch, so no need to worry about crashing the server! 😆
     getJoinGameUrl: async () => {
         // this is an example of one way it could be done. you could put any code here to do what you need to do!
         // check other config files for more exmaples.
@@ -62,6 +70,26 @@ const game: ServerGame = {
             code: jsonRes, // optional. will be appended to playerURL and hostURL as a query param. so like ?code=abcd
         };
     }, // required
+
+    /* DEPRECATED: don't use unless you need to.
+
+       By default, rocketcrab will automatically apply some params to playerURL like so:
+
+       https://yourgame.com/?rocketcrab=true&name=Mary&ishost=true&code=abcd
+
+       If you need those values to have different key names, use renameParams. For example,
+       the below renameParams will make the above look like this instead:
+
+       https://yourgame.com/?boosterfish=true&nickname=Mary&admin=true&gamecode=abcd
+
+       You don't need to include all of them; just the ones you need.
+    */
+    renameParams: {
+        rocketcrab: "boosterfish",
+        name: "nickname",
+        ishost: "admin",
+        code: "gamecode",
+    }, // optional
 };
 
 export default game;

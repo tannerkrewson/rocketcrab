@@ -10,6 +10,7 @@ import PlayerList from "../molecules/PlayerList";
 const GameLayout = ({
     gameState,
     path,
+    selectedGame,
     onExitGame,
     onStartGame,
     onHostGameLoaded,
@@ -22,16 +23,36 @@ const GameLayout = ({
         joinGameURL: { playerURL, hostURL, code },
     } = gameState;
 
+    const { renameParams } = gameLibrary.gameList.find(
+        ({ id }) => id == selectedGame
+    );
+
     const { name, isHost } = thisPlayer;
 
-    const appendToUrl =
-        "?" +
-        new URLSearchParams({
-            rocketcrab: "true",
-            name,
-            ishost: isHost.toString(),
-            ...(code ? { code } : {}),
-        }).toString();
+    const paramKeys = {
+        rocketcrab: "rocketcrab",
+        name: "name",
+        ishost: "ishost",
+        ...(code ? { code: "code" } : {}),
+        ...renameParams,
+    };
+
+    const defaultParams = {
+        rocketcrab: "true",
+        name,
+        ishost: isHost.toString(),
+        ...(code ? { code } : {}),
+    };
+
+    const params = Object.keys(paramKeys).reduce(
+        (acc, name) => ({
+            ...acc,
+            [paramKeys[name]]: defaultParams[name],
+        }),
+        {}
+    );
+
+    const appendToUrl = "?" + new URLSearchParams(params).toString();
 
     const [statusCollapsed, setStatusCollapsed] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
@@ -224,6 +245,7 @@ const GameLayout = ({
 
 type GameLayoutProps = {
     gameState: GameState;
+    selectedGame: string;
     path: string;
     onExitGame: () => void;
     onStartGame: () => void;

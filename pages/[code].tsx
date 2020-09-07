@@ -149,6 +149,7 @@ export const Code = ({
                 <GameLayout
                     path={code as string}
                     gameState={gameState}
+                    selectedGame={selectedGame}
                     onExitGame={onExitGame}
                     onStartGame={onStartGame}
                     onHostGameLoaded={onHostGameLoaded}

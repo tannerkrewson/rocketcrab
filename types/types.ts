@@ -37,6 +37,7 @@ export type ClientGame = {
     familyFriendly: boolean;
     minPlayers?: number;
     maxPlayers?: number;
+    renameParams?: Record<string, string>;
 };
 
 export type BasedOn = {
