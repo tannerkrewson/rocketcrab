@@ -2,7 +2,7 @@ import { ServerGame } from "../../types/types";
 import { randomBytes } from "crypto";
 
 const game: ServerGame = {
-    id: "cjq-justone",
+    id: "justone",
     name: "Just One",
     author: "CJ Quines",
     basedOn: {

@@ -35,7 +35,7 @@ describe("server/api.ts", () => {
         const req = {
             params: {
                 uuid: "1234567890",
-                gameid: "tk-drawphone",
+                gameid: "drawphone",
             },
             query: {
                 name: "John",
@@ -62,7 +62,7 @@ describe("server/api.ts", () => {
             {
                 params: {
                     uuid: "1234567890",
-                    gameid: "tk-drawphone",
+                    gameid: "drawphone",
                 },
                 query: {
                     name: "John",
@@ -74,7 +74,7 @@ describe("server/api.ts", () => {
             {
                 params: {
                     uuid: "1234567890",
-                    gameid: "tk-drawphone",
+                    gameid: "drawphone",
                 },
                 query: {
                     name: "Jack",
@@ -109,7 +109,7 @@ describe("server/api.ts", () => {
         const handler = app.get.mock.calls[0][1];
         const req = {
             params: {
-                gameid: "tk-drawphone",
+                gameid: "drawphone",
             },
             query: {},
         };

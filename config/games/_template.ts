@@ -8,9 +8,7 @@ import { ServerGame } from "../../types/types";
 // be picked up
 
 const game: ServerGame = {
-    // author's initials, hypen, game name in lowercase with no spaces or hyphens
-    id: "jd-coolgame", // required
-
+    id: "coolgame", // required
     name: "Cool Game Online", // required
     author: "John Doe", // required
 
