@@ -31,8 +31,28 @@ const GameDetailBox = ({
             <div style={{ fontSize: "1.2em", fontWeight: "bold" }}>
                 {game.name}
             </div>
+            {game.basedOn && (
+                <div>
+                    <span className="emoji">🎲</span> Based on{" "}
+                    {game.basedOn.link ? (
+                        <a
+                            href={game.basedOn.link}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            {game.basedOn.game}
+                        </a>
+                    ) : (
+                        game.basedOn.game
+                    )}
+                    {game.basedOn.author && (
+                        <span> by {game.basedOn.author}</span>
+                    )}
+                </div>
+            )}
             <div>
-                <span className="emoji">🧍</span> by {game.author}
+                <span className="emoji">🧍</span>{" "}
+                {game.basedOn ? "Adapted for 🚀🦀 by " : "by "} {game.author}
             </div>
             <div>
                 <span className="emoji">🔗</span>{" "}

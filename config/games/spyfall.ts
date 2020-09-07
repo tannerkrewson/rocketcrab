@@ -5,6 +5,11 @@ const game: ServerGame = {
     id: "tk-spyfall",
     name: "Spyfall",
     author: "Tanner Krewson",
+    basedOn: {
+        game: "Spyfall",
+        author: "Alexandr Ushan",
+        link: "https://www.cryptozoic.com/spyfall",
+    },
     description: "formerly Crabhat",
     displayUrlText: "spyfall.tannerkrewson.com",
     displayUrlHref: "https://spyfall.tannerkrewson.com/",

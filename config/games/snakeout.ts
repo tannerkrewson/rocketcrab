@@ -5,6 +5,12 @@ const game: ServerGame = {
     id: "tk-snakeout",
     name: "Snakeout",
     author: "Tanner Krewson",
+    basedOn: {
+        game: "The Resistance",
+        author: "Don Eskridge",
+        link:
+            "https://www.amazon.com/The-Resistance-Dystopian-Universe/dp/B008A2BA8G/",
+    },
     description: "Out the snake, or be outed as a snake",
     displayUrlText: "snakeout.tannerkrewson.com",
     displayUrlHref: "https://snakeout.tannerkrewson.com/",

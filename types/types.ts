@@ -26,6 +26,7 @@ export type ClientGame = {
     id: string;
     name: string;
     author?: string;
+    basedOn?: BasedOn;
     description?: string;
     displayUrlText: string;
     displayUrlHref: string;
@@ -36,6 +37,12 @@ export type ClientGame = {
     familyFriendly: boolean;
     minPlayers?: number;
     maxPlayers?: number;
+};
+
+export type BasedOn = {
+    game: string;
+    author?: string;
+    link?: string;
 };
 
 export type ServerGame = ClientGame & {
