@@ -16,7 +16,7 @@ const game: ServerGame = {
     getJoinGameUrl: async () => {
         const {
             game: { name },
-            player: { credential: creds1 },
+            player: { credential },
         } = await postJson("https://lobby.codenames.game/game/create", {
             nickname:
                 "🚀🦀 after 10 sec, click Menu -> Reload my game, and I will leave!",
@@ -25,7 +25,7 @@ const game: ServerGame = {
         setTimeout(async () => {
             await postJson(
                 "https://lobby.codenames.game/game/" + name + "/leave",
-                { credentials: creds1 } // why did they have to add an "s" 😭😆
+                { credentials: credential } // why did they have to add an "s" 😭😆
             );
         }, 10 * 1000);
 
