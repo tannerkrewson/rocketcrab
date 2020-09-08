@@ -151,6 +151,8 @@ export const startGame = async (lobby: Lobby): Promise<void> => {
     try {
         gameState.joinGameURL = await game.getJoinGameUrl();
     } catch (e) {
+        console.error(e);
+
         gameState.status = GameStatus.error;
         gameState.error = "❌ Can't connect to " + game.name;
         sendStateToAll(lobby);
