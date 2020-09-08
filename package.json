@@ -41,7 +41,8 @@
         "react": "^16.13.1",
         "react-dom": "^16.13.1",
         "react-ga": "^3.1.2",
-        "socket.io": "^2.3.0"
+        "socket.io": "^2.3.0",
+        "ws": "^7.3.1"
     },
     "devDependencies": {
         "@testing-library/react": "^10.4.8",
@@ -52,6 +53,7 @@
         "@types/socket.io": "^2.1.10",
         "@types/testing-library__react": "^10.2.0",
         "@types/webpack-env": "^1.15.2",
+        "@types/ws": "^7.2.6",
         "@typescript-eslint/eslint-plugin": "^4.0.0-alpha.5",
         "@typescript-eslint/parser": "^4.0.0-alpha.5",
         "babel-jest": "^26.2.2",
