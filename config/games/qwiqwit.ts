@@ -13,33 +13,9 @@ const game: ServerGame = {
     players: "3-25",
     familyFriendly: true,
     getJoinGameUrl: async () => {
-        const name = "rocketcrab";
-
-        const {
-            authUser: { parentId },
-        } = await postJson("https://www.qwiqwit.com/login", {
-            name,
-        });
-
-        const { roomCode } = await fetch(
-            "https://www.qwiqwit.com/createprivate",
-            {
-                method: "POST",
-                credentials: "include",
-                headers: {
-                    "Content-Type": "application/json",
-                    Cookie:
-                        "08.AuthCookie.authId=" +
-                        parentId +
-                        "; 08.AuthCookie.name=" +
-                        name,
-                },
-            }
-        ).then((res) => res.json());
-
         return {
-            playerURL: "https://www.qwiqwit.com/room/" + roomCode,
-        };
+            playerURL: "https://www.qwiqwit.com/autojoin"
+        }
     },
 };
 
