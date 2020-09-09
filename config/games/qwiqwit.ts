@@ -9,6 +9,8 @@ const game: ServerGame = {
         "In QwiqWit, there's no right or wrong answers. Just enter what you think is funny. Your answers will go head-to-head against other players. The rest of the players in the room will vote on their favorite answer. Be sure to vote! It could be worth extra points (eventually).",
     displayUrlText: "qwiqwit.com",
     displayUrlHref: "https://www.qwiqwit.com/",
+    donationUrlText: "Buy the developers a coffee!",
+    donationUrlHref: "https://www.buymeacoffee.com/qwiqwit",
     category: ["easy"],
     players: "3-25",
     familyFriendly: true,

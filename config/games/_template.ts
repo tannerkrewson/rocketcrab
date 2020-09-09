@@ -30,6 +30,9 @@ const game: ServerGame = {
     displayUrlText: "coolgame.com", // required
     displayUrlHref: "https://coolgameonline.com", // required
 
+    donationUrlText: "Support John on Patreon!", // optional
+    donationUrlHref: "https://www.patreon.gov/johndoe", // optional
+
     // see categories.json, feel free to add a category if you feel one is missing!
     category: ["medium", "drawing"], // required
     /* Pick one of:
