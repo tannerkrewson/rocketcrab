@@ -1,5 +1,5 @@
 import { ServerGame } from "../../types/types";
-import { postJson } from "../../utils/utils";
+import { randomBytes } from "crypto";
 
 const game: ServerGame = {
     id: "qwiqwit",
@@ -14,8 +14,10 @@ const game: ServerGame = {
     familyFriendly: true,
     getJoinGameUrl: async () => {
         return {
-            playerURL: "https://www.qwiqwit.com/autojoin"
-        }
+            playerURL:
+                "https://www.qwiqwit.com/autojoin/" +
+                randomBytes(8).toString("hex"),
+        };
     },
 };
 
