@@ -13,11 +13,11 @@ const game: ServerGame = {
             "https://oinkgames.com/en/games/analog/a-fake-artist-goes-to-new-york/",
     },
     description:
-        "Everyone is drawing one picture together...and one doesn't even know what they draw. There is a fake artist hiding among the real artists - can you find out who it is? The fake artist has to be careful not to be identified and the real artists have to be careful not to make it too easy for the deceiver.",
+        "Everyone is drawing one picture together...and one doesn't even know what they draw. There is a Fake Artist hiding among the real artists - can you find out who it is? The Fake Artist has to be careful not to be give himself away and guess what is being drawn while the real artists have to signal the other artists with their drawing that they know the word, without making the drawing too obvious for the Fake Artist. The catch? you only get to draw one line.",
     displayUrlText: "fake-artist.herokuapp.com",
     displayUrlHref: "https://fake-artist.herokuapp.com/",
     category: ["medium"],
-    players: "5-10",
+    players: "4-10",
     familyFriendly: true,
     getJoinGameUrl: async () => {
         const ws = new WebSocket(

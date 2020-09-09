@@ -12,7 +12,7 @@ const game: ServerGame = {
         link: "https://oinkgames.com/en/games/analog/insider/",
     },
     description:
-        '"Insider" combines two fun components: finding the answer to a quiz and revealing the Insider. While communicating to others you have to find the right answers to a quiz and also find the "Insider" that is manipulating the discussion. The Insider will do everything to hide their identity while misleading the others.',
+        '"Insider" combines two fun components: finding out what the secret word is and revealing the Insider. The Insider knows the secret word and tries to hide their identity while carefully manipulating the other players to the right answer.',
     displayUrlText: "insider-online.herokuapp.com",
     displayUrlHref: "https://insider-online.herokuapp.com/",
     category: ["medium"],
