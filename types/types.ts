@@ -1,4 +1,5 @@
 import { LobbyStatus, GameStatus } from "./enums";
+import WebSocket from "ws";
 
 export type RocketCrab = {
     lobbyList: Array<Lobby>;
@@ -83,4 +84,10 @@ export type JoinLobbyResponse = {
     code: string;
     id?: number;
     name?: string;
+};
+
+export type PromiseWebSocket = WebSocket & {
+    onOpen: () => Promise<void>;
+    onMessage: () => Promise<string>;
+    untilMessage: (msgChecker: (msg: string) => boolean) => Promise<string>;
 };
