@@ -1,42 +1,45 @@
 import { ServerGame } from "../../types/types";
-import WebSocket from "ws";
 import { randomBytes } from "crypto";
+import { newPromiseWebSocket } from "../../utils/utils";
 
 const getJoinGameUrl = (wsUrl, baseUrl) => async () => {
-    const ws = new WebSocket(wsUrl);
+    const ws = newPromiseWebSocket(wsUrl);
 
+    // random 5-digit number
     const accessCode = (Math.floor(Math.random() * 90000) + 10000).toString();
 
-    ws.on("open", () => {
-        ws.on("message", (msg: string) => {
-            if (!msg.startsWith('a["{\\"msg\\":\\"connected\\",')) return;
+    await ws.onOpen();
 
-            const createGamePayload = JSON.stringify({
-                msg: "method",
-                method: "/games/insert",
-                params: [
-                    {
-                        accessCode,
-                        state: "waitingForPlayers",
-                        word: null,
-                        lengthInMinutes: 5,
-                        endTime: null,
-                        paused: false,
-                        pausedTime: null,
-                    },
-                ],
-                id: "3",
-                randomSeed: randomBytes(10).toString("hex"),
-            }).replace(/"/g, '\\"');
+    ws.send(
+        '["{\\"msg\\":\\"connect\\",\\"version\\":\\"1\\",\\"support\\":[\\"1\\",\\"pre2\\",\\"pre1\\"]}"]'
+    );
 
-            ws.send('["' + createGamePayload + '"]');
-        });
+    await ws.untilMessage((msg) =>
+        msg.startsWith('a["{\\"msg\\":\\"connected\\",')
+    );
 
-        ws.send(
-            '["{\\"msg\\":\\"connect\\",\\"version\\":\\"1\\",\\"support\\":[\\"1\\",\\"pre2\\",\\"pre1\\"]}"]',
-            () => setTimeout(() => ws.close(), 10 * 1000)
-        );
-    });
+    const createGamePayload = JSON.stringify({
+        msg: "method",
+        method: "/games/insert",
+        params: [
+            {
+                accessCode,
+                state: "waitingForPlayers",
+                word: null,
+                lengthInMinutes: 5,
+                endTime: null,
+                paused: false,
+                pausedTime: null,
+            },
+        ],
+        id: "3",
+        randomSeed: randomBytes(10).toString("hex"),
+    }).replace(/"/g, '\\"');
+
+    ws.send('["' + createGamePayload + '"]');
+
+    await ws.onMessage();
+    ws.close();
 
     return {
         playerURL: baseUrl + accessCode,
