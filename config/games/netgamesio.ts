@@ -119,9 +119,10 @@ const games: Array<ServerGame> = [
         description:
             "Send secret messages to your comrades while intercepting those of your enemy.",
         basedOn: {
-            game: "Enigma",
-            author: "Touko Tahkokallio",
-            link: "https://boardgamegeek.com/boardgame/127312/enigma",
+            game: "Decrypto",
+            author: "Thomas Dagenais-Lespérance",
+            link:
+                "https://www.amazon.com/IELLO-IEL00072-Decrypto-Board-Game/dp/B0765KL7B8",
         },
         category: ["netgamesio", "hard"],
         players: "4+",
