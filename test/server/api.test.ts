@@ -48,7 +48,9 @@ describe("server/api.ts", () => {
         handler(req, res);
 
         expect(rocketcrab.lobbyList[0].uuid).toEqual(req.params.uuid);
-        expect(rocketcrab.lobbyList[0].selectedGame).toEqual(req.params.gameid);
+        expect(rocketcrab.lobbyList[0].selectedGameId).toEqual(
+            req.params.gameid
+        );
         expect(res.cookie.mock.calls[0][1]).toEqual(req.query.name);
     });
 
@@ -118,7 +120,9 @@ describe("server/api.ts", () => {
         };
         handler(req, res);
 
-        expect(rocketcrab.lobbyList[0].selectedGame).toEqual(req.params.gameid);
+        expect(rocketcrab.lobbyList[0].selectedGameId).toEqual(
+            req.params.gameid
+        );
     });
 
     it("/transfer works without uuid even if gameid invalid", () => {
@@ -134,6 +138,6 @@ describe("server/api.ts", () => {
         };
         handler(req, res);
 
-        expect(rocketcrab.lobbyList[0].selectedGame).toBe("");
+        expect(rocketcrab.lobbyList[0].selectedGameId).toBe("");
     });
 });

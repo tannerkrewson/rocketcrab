@@ -10,10 +10,19 @@ export type Lobby = {
     playerList: Array<Player>;
     code: string;
     uuid?: string;
-    selectedGame: string;
+    selectedGameId: string;
     gameState: GameState;
     nextPlayerId: number;
     idealHostId: number;
+    me?: Player;
+};
+
+export type ClientLobby = {
+    status: LobbyStatus;
+    playerList: Array<Player>;
+    me: Player;
+    selectedGameId: "";
+    gameState: GameState;
 };
 
 export type Player = {

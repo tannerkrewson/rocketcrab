@@ -4,15 +4,21 @@ import { useRouter } from "next/router";
 import socketIOClient from "socket.io-client";
 
 import PageLayout from "../components/templates/PageLayout";
-import Lobby from "../components/organisms/Lobby";
+import LobbyScreen from "../components/organisms/LobbyScreen";
 import NameEntry from "../components/organisms/NameEntry";
 import GameLayout from "../components/templates/GameLayout";
 
-import { GameState, ClientGameLibrary, JoinGameURL } from "../types/types";
+import {
+    GameState,
+    ClientGameLibrary,
+    JoinGameURL,
+    ClientLobby,
+} from "../types/types";
 import { getClientGameLibrary } from "../config";
 import { parseCookies, setCookie as setNookie } from "nookies";
 import Connecting from "../components/atoms/Connecting";
 import { logEvent } from "../utils/analytics";
+import { LobbyStatus } from "../types/enums";
 
 const CLIENT_GAME_LIBRARY = getClientGameLibrary();
 const socket = socketIOClient();
@@ -27,7 +33,7 @@ export const Code = ({
 
     const [lobbyState, setLobbyState] = useState(initLobbyState());
     const [showReconnecting, setShowReconnecting] = useState(false);
-    const { status, me, playerList, selectedGame, gameState } = lobbyState;
+    const { status, me, playerList, selectedGameId, gameState } = lobbyState;
 
     const { isHost } = me;
 
@@ -35,7 +41,7 @@ export const Code = ({
     useEffect(() => {
         socket.open();
 
-        socket.on("update", (newLobbyState) => {
+        socket.on("update", (newLobbyState: ClientLobby) => {
             setLobbyState(newLobbyState);
             setShowReconnecting(false);
         });
@@ -98,7 +104,7 @@ export const Code = ({
         socket.emit("game-start");
 
         logEvent("lobby-numberOfPlayers", playerList.length.toString());
-        logEvent("lobby-game", selectedGame);
+        logEvent("lobby-game", selectedGameId);
     };
 
     const onExitGame = () => {
@@ -131,11 +137,11 @@ export const Code = ({
                             <NameEntry onNameEntry={onNameEntry} code={code} />
                         )}
                         {showLobby && (
-                            <Lobby
+                            <LobbyScreen
                                 playerList={playerList}
                                 gameLibrary={gameLibrary}
                                 onSelectGame={onSelectGame}
-                                selectedGame={selectedGame}
+                                selectedGameId={selectedGameId}
                                 onStartGame={onStartGame}
                                 resetName={() => onNameEntry("")}
                                 meId={me.id}
@@ -149,7 +155,7 @@ export const Code = ({
                 <GameLayout
                     path={code as string}
                     gameState={gameState}
-                    selectedGame={selectedGame}
+                    selectedGameId={selectedGameId}
                     onExitGame={onExitGame}
                     onStartGame={onStartGame}
                     onHostGameLoaded={onHostGameLoaded}
@@ -163,11 +169,11 @@ export const Code = ({
     );
 };
 
-const initLobbyState = () => ({
-    status: "loading" as string,
+const initLobbyState = (): ClientLobby => ({
+    status: LobbyStatus.loading,
     playerList: [],
     me: { id: undefined, name: undefined, isHost: undefined },
-    selectedGame: "",
+    selectedGameId: "",
     gameState: {
         status: undefined,
         joinGameURL: {} as JoinGameURL,

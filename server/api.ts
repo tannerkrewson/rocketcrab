@@ -43,10 +43,10 @@ export default (server: Application, { lobbyList }: RocketCrab): void => {
     server.get("/api/stats", (req: Request, res: Response) => {
         res.json(
             lobbyList.map(
-                ({ status, gameState, selectedGame, playerList }) => ({
+                ({ status, gameState, selectedGameId, playerList }) => ({
                     lobbyStatus: status,
                     gameStatus: gameState.status,
-                    selectedGame,
+                    selectedGameId,
                     numberOfPlayers: playerList.length,
                 })
             )

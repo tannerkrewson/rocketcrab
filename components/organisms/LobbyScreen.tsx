@@ -5,14 +5,13 @@ import { Spacer } from "@zeit-ui/react";
 import GameSelector from "./GameSelector";
 import { Player, ClientGameLibrary } from "../../types/types";
 import { useState } from "react";
-import NameBox from "../atoms/NameBox";
-import GameDetailBox from "../atoms/GameDetailBox";
+import LobbyStatus from "../molecules/LobbyStatus";
 
 const Lobby = ({
     playerList,
     gameLibrary,
     onSelectGame,
-    selectedGame,
+    selectedGameId,
     onStartGame,
     resetName,
     meId,
@@ -32,18 +31,11 @@ const Lobby = ({
             ) : (
                 <>
                     <Spacer y={1.25} />
-                    {selectedGame ? (
-                        <GameDetailBox
-                            game={gameLibrary.gameList.find(
-                                ({ id }) => id === selectedGame
-                            )}
-                            allCategories={gameLibrary.categories}
-                            readyToPlay={true}
-                            showOnlyHostMessage={false}
-                        />
-                    ) : (
-                        <NameBox name="No Game Selected" />
-                    )}
+                    <LobbyStatus
+                        selectedGame={gameLibrary.gameList.find(
+                            ({ id }) => id === selectedGameId
+                        )}
+                    />
                     <Spacer y={1} />
                     <ButtonGroup>
                         <PrimaryButton
@@ -53,7 +45,7 @@ const Lobby = ({
                             View games
                         </PrimaryButton>
                         <PrimaryButton
-                            disabled={!selectedGame || !isHost}
+                            disabled={!selectedGameId || !isHost}
                             onClick={onStartGame}
                             size="large"
                             type="error"
@@ -81,7 +73,7 @@ type LobbyProps = {
     playerList: Array<Player>;
     gameLibrary: ClientGameLibrary;
     onSelectGame: (gameId: string) => void;
-    selectedGame: string;
+    selectedGameId: string;
     onStartGame: () => void;
     resetName: () => void;
     meId: number;

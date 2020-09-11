@@ -188,7 +188,7 @@ describe("server/rocketcrab.ts", () => {
             status: LobbyStatus.lobby,
             playerList: jsonPlayerList,
             code: "efgh",
-            selectedGame: "FooGame",
+            selectedGameId: "FooGame",
             gameState: {} as GameState,
             nextPlayerId: 1,
             idealHostId: 0,
@@ -272,7 +272,7 @@ describe("server/rocketcrab.ts", () => {
 
         setGame("lk-coolgame", mockLobby);
 
-        expect(mockLobby.selectedGame).toBe("lk-coolgame");
+        expect(mockLobby.selectedGameId).toBe("lk-coolgame");
     });
 
     it("setName works", () => {
@@ -302,7 +302,7 @@ describe("server/rocketcrab.ts", () => {
     it("startGame works", async () => {
         const mockLobby = generateMockLobby({
             status: LobbyStatus.lobby,
-            selectedGame: "jd-foogame",
+            selectedGameId: "jd-foogame",
             gameState: {
                 status: undefined,
             },
@@ -326,7 +326,7 @@ describe("server/rocketcrab.ts", () => {
     it("startGame fails if game doesn't exist", () => {
         const mockLobby = generateMockLobby({
             status: LobbyStatus.lobby,
-            selectedGame: "GameThatDoesntExist",
+            selectedGameId: "GameThatDoesntExist",
             gameState: {
                 status: undefined,
             },
@@ -341,7 +341,7 @@ describe("server/rocketcrab.ts", () => {
     it("exitGame works", () => {
         const mockLobby = generateMockLobby({
             status: LobbyStatus.ingame,
-            selectedGame: "FooGame",
+            selectedGameId: "FooGame",
             gameState: {
                 status: GameStatus.inprogress,
                 joinGameURL: {
@@ -364,7 +364,7 @@ const generateMockLobby = ({
     status = LobbyStatus.lobby,
     playerList = [],
     code = "efgh",
-    selectedGame = "FooGame",
+    selectedGameId = "FooGame",
     gameState = {} as GameState,
     nextPlayerId = 1,
     idealHostId = 0,
@@ -372,7 +372,7 @@ const generateMockLobby = ({
     status,
     playerList,
     code,
-    selectedGame,
+    selectedGameId,
     gameState,
     nextPlayerId,
     idealHostId,

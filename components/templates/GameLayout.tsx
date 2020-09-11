@@ -10,7 +10,7 @@ import PlayerList from "../molecules/PlayerList";
 const GameLayout = ({
     gameState,
     path,
-    selectedGame,
+    selectedGameId,
     onExitGame,
     onStartGame,
     onHostGameLoaded,
@@ -24,7 +24,7 @@ const GameLayout = ({
     } = gameState;
 
     const { renameParams } = gameLibrary.gameList.find(
-        ({ id }) => id == selectedGame
+        ({ id }) => id == selectedGameId
     );
 
     const { name, isHost } = thisPlayer;
@@ -245,7 +245,7 @@ const GameLayout = ({
 
 type GameLayoutProps = {
     gameState: GameState;
-    selectedGame: string;
+    selectedGameId: string;
     path: string;
     onExitGame: () => void;
     onStartGame: () => void;

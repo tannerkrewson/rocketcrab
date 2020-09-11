@@ -22,7 +22,7 @@ export const newLobby = (
         playerList: [],
         code,
         uuid,
-        selectedGame: "",
+        selectedGameId: "",
         gameState: {
             status: GameStatus.loading,
             joinGameURL: { playerURL: "", hostURL: "" },
@@ -133,15 +133,15 @@ export const setName = (
 
 export const setGame = (gameId: string, lobby: Lobby): void => {
     if (findGameById(gameId)) {
-        lobby.selectedGame = gameId;
+        lobby.selectedGameId = gameId;
     }
 };
 
 export const startGame = async (lobby: Lobby): Promise<void> => {
     // TODO: check if ready
-    const { gameState, selectedGame, playerList } = lobby;
+    const { gameState, selectedGameId, playerList } = lobby;
 
-    const game: ServerGame = findGameById(selectedGame);
+    const game: ServerGame = findGameById(selectedGameId);
     if (!game) return;
 
     lobby.status = LobbyStatus.ingame;
