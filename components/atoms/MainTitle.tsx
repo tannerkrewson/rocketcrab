@@ -10,7 +10,7 @@ const MainTitle = ({
     return (
         <div className="title" style={{ textAlign: "center" }}>
             <h2>🚀🦀</h2>
-            <h2>{title}</h2>
+            <h2 className="lobby-url">{title}</h2>
             {path && !disablePhonetic && (
                 <div
                     style={{
@@ -23,6 +23,20 @@ const MainTitle = ({
                     ({converter(path).join(" ")})
                 </div>
             )}
+
+            <style jsx>
+                {`
+                    .lobby-url {
+                        font-size: 1.7em;
+                    }
+
+                    @media only screen and (min-width: 385px) {
+                        .lobby-url {
+                            font-size: 2.5em;
+                        }
+                    }
+                `}
+            </style>
         </div>
     );
 };
