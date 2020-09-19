@@ -1,11 +1,11 @@
-import { GameStatus } from "../../types/enums";
-import { Loading, Spacer } from "@zeit-ui/react";
+import { Spacer } from "@zeit-ui/react";
 import PrimaryButton from "../atoms/PrimaryButton";
 import { useState } from "react";
 import { GameState, ClientGameLibrary, Player } from "../../types/types";
 import GameMenu from "../organisms/GameMenu";
 import GameSelector from "../organisms/GameSelector";
 import PlayerList from "../molecules/PlayerList";
+import GameFrame from "../molecules/GameFrame";
 
 const GameLayout = ({
     gameState,
@@ -18,41 +18,11 @@ const GameLayout = ({
     playerList,
     thisPlayer,
 }: GameLayoutProps): JSX.Element => {
-    const {
-        status,
-        joinGameURL: { playerURL, hostURL, code },
-    } = gameState;
-
-    const { renameParams } = gameLibrary.gameList.find(
+    const thisGame = gameLibrary.gameList.find(
         ({ id }) => id == selectedGameId
     );
 
-    const { name, isHost } = thisPlayer;
-
-    const paramKeys = {
-        rocketcrab: "rocketcrab",
-        name: "name",
-        ishost: "ishost",
-        ...(code ? { code: "code" } : {}),
-        ...renameParams,
-    };
-
-    const defaultParams = {
-        rocketcrab: "true",
-        name,
-        ishost: isHost.toString(),
-        ...(code ? { code } : {}),
-    };
-
-    const params = Object.keys(paramKeys).reduce(
-        (acc, name) => ({
-            ...acc,
-            [paramKeys[name]]: defaultParams[name],
-        }),
-        {}
-    );
-
-    const appendToUrl = "?" + new URLSearchParams(params).toString();
+    const { isHost } = thisPlayer;
 
     const [statusCollapsed, setStatusCollapsed] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
@@ -61,15 +31,6 @@ const GameLayout = ({
 
     // https://stackoverflow.com/a/48830513
     const [frameRefresh, setFrameRefresh] = useState(0);
-
-    const showLoading = status === GameStatus.loading;
-    const showError = status === GameStatus.error;
-    const showWaitingForHost = !isHost && status === GameStatus.waitingforhost;
-    const showGameFrame = !isHost && status === GameStatus.inprogress;
-    const showHostGameFrame =
-        isHost &&
-        (status === GameStatus.inprogress ||
-            status === GameStatus.waitingforhost);
 
     const statusClass = "status " + (statusCollapsed ? "status-collapsed" : "");
     return (
@@ -128,46 +89,14 @@ const GameLayout = ({
                     </>
                 )}
             </div>
-            {(showLoading || showWaitingForHost) && (
-                <div className="frame">
-                    <Loading type={showWaitingForHost ? "error" : "default"}>
-                        {showWaitingForHost ? (
-                            <span>Waiting for host</span>
-                        ) : (
-                            <span>Loading game</span>
-                        )}
-                    </Loading>
-                </div>
-            )}
-            {showError && (
-                <div className="frame">
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            height: "100%",
-                        }}
-                    >
-                        {gameState.error}
-                    </div>
-                </div>
-            )}
-            {showGameFrame && (
-                <iframe
-                    className="frame"
-                    src={playerURL + appendToUrl}
-                    key={frameRefresh}
-                ></iframe>
-            )}
-            {showHostGameFrame && (
-                <iframe
-                    className="frame"
-                    src={hostURL + appendToUrl}
-                    key={frameRefresh}
-                    onLoad={onHostGameLoaded}
-                ></iframe>
-            )}
+            <GameFrame
+                gameState={gameState}
+                selectedGameId={selectedGameId}
+                onHostGameLoaded={onHostGameLoaded}
+                thisPlayer={thisPlayer}
+                thisGame={thisGame}
+                frameRefreshCount={frameRefresh}
+            />
             {showGameLibrary && (
                 <div className="component-frame">
                     <GameSelector
