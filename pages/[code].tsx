@@ -33,6 +33,7 @@ export const Code = ({
 
     const [lobbyState, setLobbyState] = useState(initLobbyState());
     const [showReconnecting, setShowReconnecting] = useState(false);
+    const [deemphasize, setDeemphasize] = useState(false);
     const { status, me, playerList, selectedGameId, gameState } = lobbyState;
 
     const { isHost } = me;
@@ -117,6 +118,11 @@ export const Code = ({
         []
     );
 
+    const onInOutLobby = useCallback(
+        (outOfLobby) => setDeemphasize(outOfLobby),
+        [setDeemphasize]
+    );
+
     const joinLobby = useCallback(() => {
         socket.emit("join-lobby", {
             code,
@@ -133,7 +139,11 @@ export const Code = ({
     return (
         <>
             {!showGame && (
-                <PageLayout path={code as string} loading={showLoading}>
+                <PageLayout
+                    path={code as string}
+                    loading={showLoading}
+                    deemphasize={deemphasize}
+                >
                     <>
                         {showNameEntry && (
                             <NameEntry onNameEntry={onNameEntry} code={code} />
@@ -148,6 +158,7 @@ export const Code = ({
                                 resetName={() => onNameEntry("")}
                                 meId={me.id}
                                 isHost={isHost}
+                                onInOutLobby={onInOutLobby}
                             />
                         )}
                     </>

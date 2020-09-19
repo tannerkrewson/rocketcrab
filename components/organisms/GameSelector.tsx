@@ -33,7 +33,7 @@ const GameSelector = ({
             {!viewingGameId && (
                 <>
                     <div>{categoryName}Games</div>
-                    <Spacer y={1} />
+                    <Spacer y={0.5} />
                 </>
             )}
             {!selectedCategory && !viewingGameId && (

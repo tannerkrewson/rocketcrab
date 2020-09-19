@@ -7,11 +7,16 @@ const PageLayout = ({
     path,
     loading,
     disablePhonetic,
+    deemphasize,
 }: PageLayoutParams): JSX.Element => (
     <div className="container">
         <main>
             <div className="main-content">
-                <MainTitle path={path} disablePhonetic={disablePhonetic} />
+                <MainTitle
+                    path={path}
+                    disablePhonetic={disablePhonetic}
+                    deemphasize={deemphasize}
+                />
 
                 {loading ? <Loading /> : children}
             </div>
@@ -67,6 +72,7 @@ type PageLayoutParams = {
     path?: string;
     loading?: boolean;
     disablePhonetic?: boolean;
+    deemphasize?: boolean;
 };
 
 export default PageLayout;

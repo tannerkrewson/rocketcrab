@@ -12,16 +12,15 @@ exports[`pages/[code].tsx matches snapshot 1`] = `
         class="jsx-903643084 main-content"
       >
         <div
-          class="jsx-3668335743 title"
-          style="text-align: center;"
+          class="jsx-1746893667 title"
         >
           <h2
-            class="jsx-3668335743"
+            class="jsx-1746893667"
           >
             🚀🦀
           </h2>
           <h2
-            class="jsx-3668335743 lobby-url"
+            class="jsx-1746893667 lobby-url"
           >
             rocketcrab.com
           </h2>
