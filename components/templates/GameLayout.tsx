@@ -156,7 +156,7 @@ const GameLayout = ({
                     height: 100%;
                 }
                 .status {
-                    border-bottom: 1px solid LightGrey;
+                    border-bottom: 1px solid #ddd
                     display: flex;
                     justify-content: space-between;
                     align-content: center;
@@ -176,7 +176,7 @@ const GameLayout = ({
                 .status-collapsed {
                     position: fixed;
                     width: fit-content;
-                    border-right: 1px solid LightGrey;
+                    border-right: 1px solid #ddd
                 }
                 .logo {
                     margin: 0;
@@ -197,7 +197,7 @@ const GameLayout = ({
                     top: 3em;
                     right: 0;
                     background: white;
-                    border: 1px solid LightGrey;
+                    border: 1px solid #ddd;
                     width: min(24em, 100vw - 3em);
                     margin: 0.5em;
                 }

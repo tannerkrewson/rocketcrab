@@ -8,7 +8,7 @@ const NameBox = ({
 }: NameBoxProps): JSX.Element => (
     <Card
         style={{
-            border: "1pt solid " + (color || "LightGrey"),
+            border: "1pt solid " + (color || "#ddd"),
             borderRadius: "0",
         }}
     >

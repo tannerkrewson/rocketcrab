@@ -23,7 +23,7 @@ const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => (
             .game-menu {
                 position: fixed;
                 width: fit-content;
-                border: 1px solid LightGrey;
+                border: 1px solid #ddd;
                 border-top: 1px solid white;
                 right: 0;
                 top: 3em;

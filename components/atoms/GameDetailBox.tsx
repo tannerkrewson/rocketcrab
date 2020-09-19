@@ -11,13 +11,12 @@ const GameDetailBox = ({
 }: GameDetailBoxProps): JSX.Element => (
     <Card
         style={{
-            border: "1pt solid LightGrey",
-            borderRadius: "0",
+            border: "none",
         }}
     >
         <Card.Body
             style={{
-                padding: "8pt",
+                padding: "4pt",
                 textAlign: "initial",
                 position: "relative",
             }}
@@ -28,11 +27,15 @@ const GameDetailBox = ({
                     title="Waiting for the host to start..."
                 />
             )}
-            <div style={{ fontSize: "1.2em", fontWeight: "bold" }}>
+            <h3
+                style={{
+                    textAlign: "center",
+                }}
+            >
                 {game.name}
-            </div>
+            </h3>
             {game.basedOn && (
-                <div>
+                <div className="info">
                     <span className="emoji">🎲</span> Based on{" "}
                     {game.basedOn.link ? (
                         <a
@@ -50,11 +53,11 @@ const GameDetailBox = ({
                     )}
                 </div>
             )}
-            <div>
+            <div className="info">
                 <span className="emoji">🧍</span>{" "}
                 {game.basedOn ? "Adapted for 🚀🦀 by " : "by "} {game.author}
             </div>
-            <div>
+            <div className="info">
                 <span className="emoji">🔗</span>{" "}
                 <a
                     href={game.displayUrlHref}
@@ -65,7 +68,7 @@ const GameDetailBox = ({
                 </a>
             </div>
             {game.donationUrlHref && game.donationUrlText && (
-                <div>
+                <div className="info">
                     <span className="emoji">💲</span>{" "}
                     <a
                         href={game.donationUrlHref}
@@ -102,6 +105,10 @@ const GameDetailBox = ({
             )}
         </Card.Body>
         <style jsx>{`
+            .info {
+                line-height: 0.85em;
+                padding-bottom: 0.8em;
+            }
             .emoji {
                 width: 1.5em;
                 font-size: 0.8em;

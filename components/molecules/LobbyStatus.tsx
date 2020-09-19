@@ -3,7 +3,12 @@ import { JellyfishSpinner } from "react-spinners-kit";
 import { ClientGame } from "../../types/types";
 
 const LobbyStatus = ({ selectedGame }: LobbyStatusProps): JSX.Element => (
-    <Card>
+    <Card
+        style={{
+            border: "1pt solid #ddd",
+            borderRadius: "0",
+        }}
+    >
         <JellyfishSpinner />
         <span>
             {selectedGame

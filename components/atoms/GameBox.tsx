@@ -7,7 +7,7 @@ const GameBox = ({ game, onClick }: GameBoxProps): JSX.Element => (
         style={{
             cursor: onClick ? "pointer" : "default",
             userSelect: "none",
-            border: "1pt solid LightGrey",
+            border: "1px solid #ddd",
             borderRadius: "0",
         }}
     >
