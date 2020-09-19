@@ -22,12 +22,10 @@ const PageLayout = ({
         <style jsx>{`
             .container {
                 min-height: 100%;
-                padding: 0 0.5rem;
                 display: flex;
                 flex-direction: column;
                 justify-content: center;
                 align-items: center;
-                width: 100%;
             }
 
             main {
@@ -40,8 +38,8 @@ const PageLayout = ({
 
             .main-content {
                 min-height: 20rem;
-                max-width: 24em;
-                width: 100%;
+                width: min(24em, 100vw);
+                padding: 0 0.5em;
             }
 
             a {

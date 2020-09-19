@@ -161,6 +161,17 @@ const GameLayout = ({
                     justify-content: space-between;
                     align-content: center;
                     padding: 0.5em;
+                    height: 2em;
+                }
+                @media only screen and (max-width: 385px) {
+                    .status {
+                        font-size: 0.9em;
+                        margin-bottom: 0em;
+                    }
+                    .logo {
+                        line-height: 2em;
+                        font-size: 1em;
+                    }
                 }
                 .status-collapsed {
                     position: fixed;
@@ -180,16 +191,15 @@ const GameLayout = ({
                     font-weight: bold;
                 }
                 .component-frame {
-                    margin: 1em;
                     padding: 1em;
                     text-align: center;
                     position: absolute;
-                    right: 1em;
                     top: 3em;
+                    right: 0;
                     background: white;
                     border: 1px solid LightGrey;
-                    min-width: 15em;
-                    max-width: 100%;
+                    width: min(24em, 100vw - 3em);
+                    margin: 0.5em;
                 }
             `}</style>
         </div>
