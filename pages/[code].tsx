@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { GetServerSidePropsContext, GetServerSideProps } from "next";
 import { useRouter } from "next/router";
 import socketIOClient from "socket.io-client";
@@ -91,37 +91,39 @@ export const Code = ({
         setCookie("previousId", me.id);
     }, [me.id]);
 
-    const onNameEntry = (enteredName) => {
+    const onNameEntry = useCallback((enteredName) => {
         socket.emit("name", enteredName);
         setCookie("previousName", enteredName);
-    };
+    }, []);
 
-    const onSelectGame = (gameId: string) => {
+    const onSelectGame = useCallback((gameId: string) => {
         socket.emit("game-select", gameId);
-    };
+    }, []);
 
-    const onStartGame = () => {
+    const onStartGame = useCallback(() => {
         socket.emit("game-start");
 
         logEvent("lobby-numberOfPlayers", playerList.length.toString());
         logEvent("lobby-game", selectedGameId);
-    };
+    }, [playerList, selectedGameId]);
 
-    const onExitGame = () => {
+    const onExitGame = useCallback(() => {
         socket.emit("game-exit");
-    };
+    }, []);
 
     // give the host a little extra time (TODO probably remove)
-    const onHostGameLoaded = () =>
-        setTimeout(() => socket.emit("host-game-loaded"), 2000);
+    const onHostGameLoaded = useCallback(
+        () => setTimeout(() => socket.emit("host-game-loaded"), 2000),
+        []
+    );
 
-    const joinLobby = () => {
+    const joinLobby = useCallback(() => {
         socket.emit("join-lobby", {
             code,
             id: previousId,
             name: previousName,
         });
-    };
+    }, []);
 
     const showLoading = status === "loading";
     const showNameEntry = !showLoading && !me.name;
