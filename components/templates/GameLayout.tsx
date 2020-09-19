@@ -1,8 +1,13 @@
 import { Spacer } from "@zeit-ui/react";
 import PrimaryButton from "../atoms/PrimaryButton";
-import { useState } from "react";
-import { GameState, ClientGameLibrary, Player } from "../../types/types";
-import GameMenu from "../organisms/GameMenu";
+import { useCallback, useState } from "react";
+import {
+    GameState,
+    ClientGameLibrary,
+    Player,
+    MenuButton,
+} from "../../types/types";
+import GameMenu from "../molecules/GameMenu";
 import GameSelector from "../organisms/GameSelector";
 import PlayerList from "../molecules/PlayerList";
 import GameFrame from "../molecules/GameFrame";
@@ -32,6 +37,49 @@ const GameLayout = ({
     // https://stackoverflow.com/a/48830513
     const [frameRefresh, setFrameRefresh] = useState(0);
 
+    const menuButtons: Array<MenuButton> = [
+        {
+            label: "Reload my game",
+            hostOnly: false,
+            onClick: useCallback(() => {
+                setShowMenu(false);
+                setFrameRefresh(frameRefresh + 1);
+            }, [frameRefresh]),
+        },
+        {
+            label: "View players",
+            hostOnly: false,
+            onClick: useCallback(() => {
+                setShowMenu(false);
+                setShowPlayerList(true);
+            }, []),
+        },
+        {
+            label: "View games",
+            hostOnly: false,
+            onClick: useCallback(() => {
+                setShowMenu(false);
+                setShowGameLibrary(true);
+            }, []),
+        },
+        {
+            label: "Reload all",
+            hostOnly: true,
+            onClick: useCallback(() => {
+                setShowMenu(false);
+                onStartGame();
+            }, [onStartGame]),
+        },
+        {
+            label: "Exit to lobby",
+            hostOnly: true,
+            onClick: useCallback(() => {
+                setShowMenu(false);
+                onExitGame();
+            }, [onExitGame]),
+        },
+    ];
+
     const statusClass = "status " + (statusCollapsed ? "status-collapsed" : "");
     return (
         <div className="layout">
@@ -58,32 +106,13 @@ const GameLayout = ({
                             }}
                             size="small"
                         >
-                            {showMenu ? "▼" : "▲"} Menu
+                            {showMenu ? "▲" : "▼"} Menu
                         </PrimaryButton>
 
                         {showMenu && (
                             <GameMenu
                                 isHost={isHost}
-                                onExitGame={() => {
-                                    setShowMenu(false);
-                                    onExitGame();
-                                }}
-                                onReloadMine={() => {
-                                    setShowMenu(false);
-                                    setFrameRefresh(frameRefresh + 1);
-                                }}
-                                onStartGame={() => {
-                                    setShowMenu(false);
-                                    onStartGame();
-                                }}
-                                onViewGames={() => {
-                                    setShowMenu(false);
-                                    setShowGameLibrary(true);
-                                }}
-                                onViewPlayers={() => {
-                                    setShowMenu(false);
-                                    setShowPlayerList(true);
-                                }}
+                                menuButtons={menuButtons}
                             />
                         )}
                     </>
@@ -137,11 +166,6 @@ const GameLayout = ({
                     position: fixed;
                     width: fit-content;
                     border-right: 1px solid LightGrey;
-                }
-
-                .frame {
-                    flex: 1 1 auto;
-                    border: 0;
                 }
                 .logo {
                     margin: 0;

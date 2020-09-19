@@ -100,3 +100,9 @@ export type PromiseWebSocket = WebSocket & {
     onMessage: () => Promise<string>;
     untilMessage: (msgChecker: (msg: string) => boolean) => Promise<string>;
 };
+
+export type MenuButton = {
+    label: string;
+    hostOnly: boolean;
+    onClick: () => void;
+};
