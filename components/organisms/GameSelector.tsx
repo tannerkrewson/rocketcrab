@@ -1,5 +1,5 @@
 import CategoryGroup from "../molecules/CategoryGroup";
-import { Input, useInput, Spacer } from "@zeit-ui/react";
+import { Input, useInput, Spacer } from "@geist-ui/react";
 import GameGroup from "../molecules/GameGroup";
 import { useState, useEffect } from "react";
 import { ClientGameLibrary } from "../../types/types";

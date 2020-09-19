@@ -1,5 +1,5 @@
 import { useRouter } from "next/router";
-import { Input } from "@zeit-ui/react";
+import { Input } from "@geist-ui/react";
 
 import PrimaryButton from "../components/atoms/PrimaryButton";
 import ButtonGroup from "../components/molecules/ButtonGroup";

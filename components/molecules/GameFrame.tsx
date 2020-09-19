@@ -1,5 +1,5 @@
 import { GameStatus } from "../../types/enums";
-import { Loading } from "@zeit-ui/react";
+import { Loading } from "@geist-ui/react";
 import { ClientGame, GameState, Player } from "../../types/types";
 
 const GameFrame = ({

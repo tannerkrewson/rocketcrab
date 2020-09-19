@@ -1,4 +1,4 @@
-import { Loading } from "@zeit-ui/react";
+import { Loading } from "@geist-ui/react";
 import Footer from "../atoms/Footer";
 import MainTitle from "../atoms/MainTitle";
 

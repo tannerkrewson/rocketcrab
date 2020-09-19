@@ -1,5 +1,5 @@
 import { ClientGame, GameCategory } from "../../types/types";
-import { Card, Badge, Description, Tabs, Spacer } from "@zeit-ui/react";
+import { Card, Badge, Description, Tabs, Spacer } from "@geist-ui/react";
 import PrimaryButton from "./PrimaryButton";
 
 const GameDetailBox = ({
@@ -27,13 +27,7 @@ const GameDetailBox = ({
                     title="Waiting for the host to start..."
                 />
             )}
-            <h3
-                style={{
-                    textAlign: "center",
-                }}
-            >
-                {game.name}
-            </h3>
+            <h3>{game.name}</h3>
             {game.basedOn && (
                 <div className="info">
                     <span className="emoji">🎲</span> Based on{" "}

@@ -1,5 +1,5 @@
 import { ClientGame } from "../../types/types";
-import { Card, Description } from "@zeit-ui/react";
+import { Card, Description } from "@geist-ui/react";
 
 const GameBox = ({ game, onClick }: GameBoxProps): JSX.Element => (
     <Card

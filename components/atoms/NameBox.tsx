@@ -1,4 +1,4 @@
-import { Loading, Card } from "@zeit-ui/react";
+import { Loading, Card } from "@geist-ui/react";
 
 const NameBox = ({
     name,

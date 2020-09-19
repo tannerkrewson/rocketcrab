@@ -1,7 +1,7 @@
 import PlayerList from "../molecules/PlayerList";
 import PrimaryButton from "../atoms/PrimaryButton";
 import ButtonGroup from "../molecules/ButtonGroup";
-import { Spacer } from "@zeit-ui/react";
+import { Spacer } from "@geist-ui/react";
 import GameSelector from "./GameSelector";
 import { Player, ClientGameLibrary } from "../../types/types";
 import { useState } from "react";

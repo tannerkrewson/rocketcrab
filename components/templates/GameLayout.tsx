@@ -1,4 +1,4 @@
-import { Spacer } from "@zeit-ui/react";
+import { Spacer } from "@geist-ui/react";
 import PrimaryButton from "../atoms/PrimaryButton";
 import { useCallback, useState } from "react";
 import {
@@ -156,7 +156,7 @@ const GameLayout = ({
                     height: 100%;
                 }
                 .status {
-                    border-bottom: 1px solid #ddd
+                    border-bottom: 1px solid #ddd;
                     display: flex;
                     justify-content: space-between;
                     align-content: center;
@@ -176,7 +176,7 @@ const GameLayout = ({
                 .status-collapsed {
                     position: fixed;
                     width: fit-content;
-                    border-right: 1px solid #ddd
+                    border-right: 1px solid #ddd;
                 }
                 .logo {
                     margin: 0;

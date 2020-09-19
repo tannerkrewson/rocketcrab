@@ -1,4 +1,4 @@
-import { Card } from "@zeit-ui/react";
+import { Card } from "@geist-ui/react";
 import { JellyfishSpinner } from "react-spinners-kit";
 import { ClientGame } from "../../types/types";
 

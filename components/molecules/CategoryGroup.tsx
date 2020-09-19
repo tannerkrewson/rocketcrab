@@ -1,6 +1,6 @@
 import CategoryBox from "../atoms/CategoryBox";
 import { GameCategory } from "../../types/types";
-import { Grid } from "@zeit-ui/react";
+import { Grid } from "@geist-ui/react";
 
 const CategoryGroup = ({
     categories,

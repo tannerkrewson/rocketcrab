@@ -1,5 +1,5 @@
 import PrimaryButton from "../atoms/PrimaryButton";
-import { Spacer } from "@zeit-ui/react";
+import { Spacer } from "@geist-ui/react";
 import { MenuButton } from "../../types/types";
 
 const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => (

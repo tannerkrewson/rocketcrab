@@ -1,4 +1,4 @@
-import { Grid } from "@zeit-ui/react";
+import { Grid } from "@geist-ui/react";
 import { ClientGame } from "../../types/types";
 import GameBox from "../atoms/GameBox";
 

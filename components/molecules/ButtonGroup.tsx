@@ -1,4 +1,4 @@
-import { Grid } from "@zeit-ui/react";
+import { Grid } from "@geist-ui/react";
 
 const ButtonGroup = ({ children }: ButtonGroupProps): JSX.Element => {
     const buttons = Array.isArray(children) ? children : [children];
