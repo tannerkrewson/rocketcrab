@@ -43,6 +43,7 @@
         "react-ga": "^3.1.2",
         "react-spinners-kit": "^1.9.1",
         "socket.io": "^2.3.0",
+        "swiper": "^6.2.0",
         "ws": "^7.3.1"
     },
     "devDependencies": {

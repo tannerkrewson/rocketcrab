@@ -1,6 +1,7 @@
 import { ClientGame, GameCategory } from "../../types/types";
 import { Card, Badge, Description, Tabs } from "@geist-ui/react";
 import PrimaryButton from "./PrimaryButton";
+import { Swiper, SwiperSlide } from "swiper/react";
 
 const GameDetailBox = ({
     game,
@@ -17,6 +18,11 @@ const GameDetailBox = ({
                 <SkinnyCard>
                     <GameInfo game={game} />
                 </SkinnyCard>
+                {game.pictures?.length && (
+                    <SkinnyCard>
+                        <GamePictures pictures={game.pictures} />
+                    </SkinnyCard>
+                )}
                 <SkinnyCard>
                     <GameBadges game={game} allCategories={allCategories} />
                 </SkinnyCard>
@@ -26,9 +32,6 @@ const GameDetailBox = ({
             </Tabs.Item>
             <Tabs.Item label="Guide" value="2">
                 TODO: Similar games coming soon...
-            </Tabs.Item>
-            <Tabs.Item label="Pics" value="3">
-                TODO: Screenshots coming soon...
             </Tabs.Item>
         </Tabs>
         {onSelectGame && (
@@ -145,6 +148,23 @@ const GameBadges = ({
             {game.familyFriendly ? "Family friendly" : "Adults only"}
         </SpaceBadge>
     </div>
+);
+
+const GamePictures = ({ pictures }) => (
+    <Swiper spaceBetween={16} slidesPerView={2.5}>
+        {pictures.map((picture) => (
+            <SwiperSlide key={picture}>
+                <img
+                    src={picture}
+                    style={{
+                        boxShadow: "2px 2px 6px rgba(0, 0, 0, 0.12)",
+                        borderRadius: "5px",
+                        border: "1px solid #eaeaea",
+                    }}
+                />
+            </SwiperSlide>
+        ))}
+    </Swiper>
 );
 
 const SpaceBadge = ({ children, style = {} }) => (

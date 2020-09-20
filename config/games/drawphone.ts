@@ -10,6 +10,12 @@ const game: ServerGame = {
     displayUrlHref: "https://drawphone.tannerkrewson.com/",
     donationUrlText: "Buy Tanner a taco!",
     donationUrlHref: "https://www.buymeacoffee.com/tannerkrewson",
+    pictures: [
+        "https://i.imgur.com/tHPfWpp.png",
+        "https://i.imgur.com/EFQiuyd.png",
+        "https://i.imgur.com/14aDZKn.png",
+        "https://i.imgur.com/CwsMi5k.png",
+    ],
     category: ["drawing", "easy"],
     players: "1+",
     familyFriendly: false,

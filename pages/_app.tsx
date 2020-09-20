@@ -6,6 +6,8 @@ import { initGA, logPageView } from "../utils/analytics";
 import { useState, useEffect } from "react";
 import Router from "next/router";
 
+import "swiper/swiper-bundle.css";
+
 const MyApp = ({ Component, pageProps }: AppPropsType): JSX.Element => {
     const [, setLoading] = useState(false);
     useEffect(() => {
