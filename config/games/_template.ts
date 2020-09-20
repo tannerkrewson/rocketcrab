@@ -21,9 +21,9 @@ const game: ServerGame = {
         link: "https://link.com", // optional
     }, // optional
 
-    // TODO: this is a work in progress. There will probably end up being a description property,
-    //       a rules property, and a screenshots property. For now, just a short sentence or two
-    //       works for this.
+    // The description should explain why someone should play your game!
+    // It can be a few sentences, or a few paragraphs!
+    // Don't add the rules here.
     description: "A really, really, really cool game.", // optional
 
     // these are just for showing a link in the game detail box, not for the iframe
@@ -32,6 +32,9 @@ const game: ServerGame = {
 
     donationUrlText: "Support John on Patreon!", // optional
     donationUrlHref: "https://www.patreon.gov/johndoe", // optional
+
+    // links to screenshots of your game
+    pictures: ["https://i.imgur.com/abcd.png", "https://i.imgur.com/efgh.png"], // optional
 
     // see categories.json, feel free to add a category if you feel one is missing!
     category: ["medium", "drawing"], // required
@@ -72,14 +75,13 @@ const game: ServerGame = {
         };
     }, // required
 
-    /* DEPRECATED: don't use unless you need to.
-
+    /*
        By default, rocketcrab will automatically apply some params to playerURL like so:
 
        https://yourgame.com/?rocketcrab=true&name=Mary&ishost=true&code=abcd
 
        If you need those values to have different key names, use renameParams. For example,
-       the below renameParams will make the above look like this instead:
+       the below renameParams will make the above URL look like this instead:
 
        https://yourgame.com/?boosterfish=true&nickname=Mary&admin=true&gamecode=abcd
 

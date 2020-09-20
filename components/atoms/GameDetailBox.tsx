@@ -33,6 +33,9 @@ const GameDetailBox = ({
                 </SkinnyCard>
             </Tabs.Item>
             <Tabs.Item label="Guide" value="2">
+                TODO: Guide coming soon...
+            </Tabs.Item>
+            <Tabs.Item label="Similar Games" value="3">
                 TODO: Similar games coming soon...
             </Tabs.Item>
         </Tabs>
