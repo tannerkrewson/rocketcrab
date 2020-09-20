@@ -26,7 +26,7 @@ exports[`pages/index.tsx matches snapshot 1`] = `
           </h2>
         </div>
         <div
-          class="jsx-2159491491 description"
+          class="jsx-1456828746 description"
         >
           party games for phones
         </div>
@@ -65,11 +65,14 @@ exports[`pages/index.tsx matches snapshot 1`] = `
             </button>
           </div>
         </div>
+        <span
+          class="jsx-3462447556 "
+        />
         <div
-          class="jsx-2159491491 links"
+          class="jsx-1456828746 links"
         >
           <a
-            class="jsx-2159491491"
+            class="jsx-1456828746 link"
             href="https://discord.gg/MvYRVCP"
             rel="noopener noreferrer"
             target="_blank"
@@ -77,18 +80,32 @@ exports[`pages/index.tsx matches snapshot 1`] = `
             Discord
           </a>
           <span
-            class="jsx-2159491491"
+            class="jsx-1456828746 spacer"
           >
             |
           </span>
           <a
-            class="jsx-2159491491"
+            class="jsx-1456828746 link"
             href="https://github.com/tannerkrewson/rocketcrab/#-for-developers"
             rel="noopener noreferrer"
             target="_blank"
           >
             Developers
           </a>
+          <span
+            class="jsx-1456828746 spacer"
+          >
+            |
+          </span>
+          <span
+            class="jsx-1456828746 link"
+          >
+            <a
+              href="/library"
+            >
+              Browse Games
+            </a>
+          </span>
         </div>
       </div>
     </main>

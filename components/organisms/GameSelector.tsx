@@ -1,11 +1,10 @@
-import CategoryGroup from "../molecules/CategoryGroup";
-import { Input, useInput, Spacer } from "@geist-ui/react";
-import GameGroup from "../molecules/GameGroup";
-import { useState, useEffect } from "react";
+import { Spacer } from "@geist-ui/react";
+import { useCallback, useState } from "react";
 import { ClientGameLibrary } from "../../types/types";
 import PrimaryButton from "../atoms/PrimaryButton";
 import GameDetailBox from "../atoms/GameDetailBox";
 import ButtonGroup from "../molecules/ButtonGroup";
+import GameLibrary from "../molecules/GameLibrary";
 
 const GameSelector = ({
     gameLibrary,
@@ -14,72 +13,26 @@ const GameSelector = ({
     backToLabel,
     isHost,
 }: GameSelectorProps): JSX.Element => {
-    const { state: search, setState: setSearch, bindings } = useInput("");
-    const [selectedCategory, setSelectedCategory] = useState("");
     const [viewingGameId, setViewingGameId] = useState("");
 
-    useEffect(() => {
-        if (!search) setSelectedCategory("");
-    }, [search]);
+    const onBackToSearch = useCallback(() => {
+        setViewingGameId("");
+    }, [setViewingGameId]);
 
-    const fullCategory = gameLibrary.categories.find(
-        ({ id }) => id === selectedCategory
-    );
-
-    const categoryName = fullCategory ? fullCategory.name + " " : "";
+    const onSelectGameButton = useCallback(() => {
+        onSelectGame(viewingGameId);
+        onDone();
+    }, [onSelectGame, viewingGameId, onDone]);
 
     return (
         <>
             {!viewingGameId && (
-                <>
-                    <div>{categoryName}Games</div>
-                    <Spacer y={0.5} />
-                </>
-            )}
-            {!selectedCategory && !viewingGameId && (
-                <>
-                    <Input
-                        icon="🔎"
-                        placeholder="Search"
-                        width="100%"
-                        clearable
-                        {...bindings}
-                    />
-                    <Spacer y={1} />
-                </>
-            )}
-            {!selectedCategory && !search && !viewingGameId && (
-                <>
-                    <CategoryGroup
-                        categories={gameLibrary.categories}
-                        onSelectCategory={setSelectedCategory}
-                    />
-                    <Spacer y={1} />
-                    <PrimaryButton onClick={onDone} size="medium">
-                        ↩️ Back to {backToLabel}
-                    </PrimaryButton>
-                </>
-            )}
-            {(selectedCategory || search) && !viewingGameId && (
-                <>
-                    <GameGroup
-                        gameList={gameLibrary.gameList}
-                        onSelectGame={(gameId) => {
-                            setViewingGameId(gameId);
-                        }}
-                        nameFilter={search}
-                        categoryFilter={selectedCategory}
-                    />
-                    <Spacer y={1} />
-                    <PrimaryButton
-                        onClick={() => {
-                            setSelectedCategory("");
-                            setSearch("");
-                        }}
-                    >
-                        ↩️ Back to categories
-                    </PrimaryButton>
-                </>
+                <GameLibrary
+                    gameLibrary={gameLibrary}
+                    onDone={onDone}
+                    backToLabel={backToLabel}
+                    setViewingGameId={setViewingGameId}
+                />
             )}
             {viewingGameId && (
                 <>
@@ -92,20 +45,11 @@ const GameSelector = ({
                     />
                     <Spacer y={1} />
                     <ButtonGroup>
-                        <PrimaryButton
-                            onClick={() => {
-                                setViewingGameId("");
-                            }}
-                        >
+                        <PrimaryButton onClick={onBackToSearch}>
                             ↩️ Back to search
                         </PrimaryButton>
                         {isHost && (
-                            <PrimaryButton
-                                onClick={() => {
-                                    onSelectGame(viewingGameId);
-                                    onDone();
-                                }}
-                            >
+                            <PrimaryButton onClick={onSelectGameButton}>
                                 Select Game
                             </PrimaryButton>
                         )}
