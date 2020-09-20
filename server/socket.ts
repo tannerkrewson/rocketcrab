@@ -1,74 +1,74 @@
 import {
-    getLobby,
+    getParty,
     addPlayer,
     sendStateToAll,
     removePlayer,
-    deleteLobbyIfEmpty,
+    deletePartyIfEmpty,
     setName,
     setGame,
     startGame,
     exitGame,
 } from "./rocketcrab";
-import { JoinLobbyResponse, Player, Lobby, RocketCrab } from "../types/types";
+import { JoinPartyResponse, Player, Party, RocketCrab } from "../types/types";
 
 export default (
     io: SocketIO.Server,
-    { lobbyList }: RocketCrab
+    { partyList }: RocketCrab
 ): SocketIO.Namespace =>
     io.on("connection", (socket) => {
-        socket.on("join-lobby", ({ code, id, name }: JoinLobbyResponse) => {
-            const lobby = getLobby(code, lobbyList);
+        socket.on("join-party", ({ code, id, name }: JoinPartyResponse) => {
+            const party = getParty(code, partyList);
 
-            if (lobby) {
-                const player = addPlayer(name, socket, lobby, id);
+            if (party) {
+                const player = addPlayer(name, socket, party, id);
 
-                attachLobbyListenersToPlayer(player, lobby, lobbyList);
-                sendStateToAll(lobby);
+                attachPartyListenersToPlayer(player, party, partyList);
+                sendStateToAll(party);
             } else {
-                socket.emit("invalid-lobby", { code });
+                socket.emit("invalid-party", { code });
             }
         });
     });
 
-const attachLobbyListenersToPlayer = (
+const attachPartyListenersToPlayer = (
     player: Player,
-    lobby: Lobby,
-    lobbyList: Array<Lobby>
+    party: Party,
+    partyList: Array<Party>
 ) => {
     const { socket } = player;
-    const { code, playerList } = lobby;
+    const { code, playerList } = party;
 
     socket.join(code); // https://socket.io/docs/rooms/
 
     socket.on("disconnect", () => {
-        removePlayer(player, lobby);
-        deleteLobbyIfEmpty(lobby, lobbyList);
-        sendStateToAll(lobby);
+        removePlayer(player, party);
+        deletePartyIfEmpty(party, partyList);
+        sendStateToAll(party);
     });
 
     socket.on("name", (name) => {
         setName(name, player, playerList);
-        sendStateToAll(lobby);
+        sendStateToAll(party);
     });
 
     socket.on("game-select", (gameId) => {
         if (!player.isHost) return;
 
-        setGame(gameId, lobby);
-        sendStateToAll(lobby);
+        setGame(gameId, party);
+        sendStateToAll(party);
     });
 
     socket.on("game-start", () => {
         if (!player.isHost) return;
 
-        startGame(lobby);
-        sendStateToAll(lobby);
+        startGame(party);
+        sendStateToAll(party);
     });
 
     socket.on("game-exit", () => {
         if (!player.isHost) return;
 
-        exitGame(lobby);
-        sendStateToAll(lobby);
+        exitGame(party);
+        sendStateToAll(party);
     });
 };

@@ -71,7 +71,7 @@ const GameLayout = ({
             }, [onStartGame]),
         },
         {
-            label: "Exit to lobby",
+            label: "Exit to party",
             hostOnly: true,
             onClick: useCallback(() => {
                 setShowMenu(false);

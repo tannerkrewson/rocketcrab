@@ -5,9 +5,9 @@ import { Spacer } from "@geist-ui/react";
 import GameSelector from "./GameSelector";
 import { Player, ClientGameLibrary } from "../../types/types";
 import { useCallback, useState } from "react";
-import LobbyStatus from "../molecules/LobbyStatus";
+import PartyStatus from "../molecules/PartyStatus";
 
-const Lobby = ({
+const PartyScreen = ({
     playerList,
     gameLibrary,
     onSelectGame,
@@ -16,19 +16,19 @@ const Lobby = ({
     resetName,
     meId,
     isHost,
-    onInOutLobby,
-}: LobbyProps): JSX.Element => {
+    onInOutParty,
+}: PartyScreenProps): JSX.Element => {
     const [gameSelectorVisible, setGameSelectorVisible] = useState(false);
 
     const showGameSelector = useCallback(() => {
-        onInOutLobby(true);
+        onInOutParty(true);
         setGameSelectorVisible(true);
-    }, [onInOutLobby, setGameSelectorVisible]);
+    }, [onInOutParty, setGameSelectorVisible]);
 
     const hideGameSelector = useCallback(() => {
-        onInOutLobby(false);
+        onInOutParty(false);
         setGameSelectorVisible(false);
-    }, [onInOutLobby, setGameSelectorVisible]);
+    }, [onInOutParty, setGameSelectorVisible]);
 
     return (
         <div style={{ textAlign: "center" }}>
@@ -37,13 +37,13 @@ const Lobby = ({
                     gameLibrary={gameLibrary}
                     onSelectGame={onSelectGame}
                     onDone={hideGameSelector}
-                    backToLabel="lobby"
+                    backToLabel="party"
                     isHost={isHost}
                 />
             ) : (
                 <>
                     <Spacer y={1.25} />
-                    <LobbyStatus
+                    <PartyStatus
                         selectedGame={gameLibrary.gameList.find(
                             ({ id }) => id === selectedGameId
                         )}
@@ -70,7 +70,7 @@ const Lobby = ({
                     />
                     <Spacer y={1} />
                     <PrimaryButton href="/" size="small">
-                        Leave Lobby
+                        Leave Party
                     </PrimaryButton>
                 </>
             )}
@@ -78,7 +78,7 @@ const Lobby = ({
     );
 };
 
-type LobbyProps = {
+type PartyScreenProps = {
     playerList: Array<Player>;
     gameLibrary: ClientGameLibrary;
     onSelectGame: (gameId: string) => void;
@@ -87,7 +87,7 @@ type LobbyProps = {
     resetName: () => void;
     meId: number;
     isHost: boolean;
-    onInOutLobby: (outOfLobby: boolean) => void;
+    onInOutParty: (outOfParty: boolean) => void;
 };
 
-export default Lobby;
+export default PartyScreen;

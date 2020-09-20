@@ -12,15 +12,15 @@ exports[`pages/index.tsx matches snapshot 1`] = `
         class="jsx-903643084 main-content"
       >
         <div
-          class="jsx-1746893667 title"
+          class="jsx-2202774700 title"
         >
           <h2
-            class="jsx-1746893667"
+            class="jsx-2202774700"
           >
             🚀🦀
           </h2>
           <h2
-            class="jsx-1746893667 lobby-url"
+            class="jsx-2202774700 party-url"
           >
             rocketcrab.com
           </h2>
@@ -45,7 +45,7 @@ exports[`pages/index.tsx matches snapshot 1`] = `
                 <div
                   class="text"
                 >
-                  Join Lobby
+                  Join Party
                 </div>
               </button>
             </div>
@@ -60,7 +60,7 @@ exports[`pages/index.tsx matches snapshot 1`] = `
               <div
                 class="text"
               >
-                New Lobby
+                New Party
               </div>
             </button>
           </div>

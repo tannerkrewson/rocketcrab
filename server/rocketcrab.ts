@@ -1,24 +1,24 @@
-import { RocketCrab, Lobby, Player, ServerGame } from "../types/types";
-import { LobbyStatus, GameStatus } from "../types/enums";
+import { RocketCrab, Party, Player, ServerGame } from "../types/types";
+import { PartyStatus, GameStatus } from "../types/enums";
 import { getServerGameLibrary } from "../config";
 const SERVER_GAME_LIST: Array<ServerGame> = getServerGameLibrary().gameList;
 
 export const initRocketCrab = (isDevMode?: boolean): RocketCrab => {
-    const lobbyList: Array<Lobby> = [];
+    const partyList: Array<Party> = [];
 
-    if (isDevMode) newLobby(lobbyList, "ffff");
+    if (isDevMode) newParty(partyList, "ffff");
 
-    return { lobbyList };
+    return { partyList };
 };
 
-export const newLobby = (
-    lobbyList: Array<Lobby>,
+export const newParty = (
+    partyList: Array<Party>,
     gameCode?: string,
     uuid?: string
-): Lobby => {
-    const code: string = gameCode || getUniqueGameCode(lobbyList);
-    const newLobby: Lobby = {
-        status: LobbyStatus.lobby,
+): Party => {
+    const code: string = gameCode || getUniqueGameCode(partyList);
+    const newParty: Party = {
+        status: PartyStatus.party,
         playerList: [],
         code,
         uuid,
@@ -30,32 +30,32 @@ export const newLobby = (
         nextPlayerId: 0,
         idealHostId: 0,
     };
-    lobbyList.push(newLobby);
-    return newLobby;
+    partyList.push(newParty);
+    return newParty;
 };
 
-export const getLobby = (newCode: string, lobbyList: Array<Lobby>): Lobby =>
-    lobbyList.find(({ code }) => code === newCode);
+export const getParty = (newCode: string, partyList: Array<Party>): Party =>
+    partyList.find(({ code }) => code === newCode);
 
 export const addPlayer = (
     name: string,
     socket: SocketIO.Socket,
-    lobby: Lobby,
+    party: Party,
     previousId?: number
 ): Player => {
-    const { playerList } = lobby;
+    const { playerList } = party;
 
-    const idNotInUse = !isIDinUse(previousId, lobby.playerList);
+    const idNotInUse = !isIDinUse(previousId, party.playerList);
     const usePreviousId = Number.isInteger(previousId) && idNotInUse;
-    const id = usePreviousId ? previousId : lobby.nextPlayerId++;
+    const id = usePreviousId ? previousId : party.nextPlayerId++;
 
     const isFirstPlayer = playerList.length === 0;
 
-    // this is mostly only important for the ffff dev lobby
+    // this is mostly only important for the ffff dev party
     // in which ids are previousIds that were not created
-    // in this instance of the lobby are being used
-    if (id > lobby.nextPlayerId) {
-        lobby.nextPlayerId = id + 1;
+    // in this instance of the party are being used
+    if (id > party.nextPlayerId) {
+        party.nextPlayerId = id + 1;
     }
 
     const player: Player = {
@@ -69,21 +69,21 @@ export const addPlayer = (
     setName(name, player, playerList);
 
     if (isFirstPlayer) {
-        lobby.idealHostId = id;
+        party.idealHostId = id;
     }
 
-    setHost(lobby.idealHostId, playerList);
+    setHost(party.idealHostId, playerList);
 
     return player;
 };
 
-export const sendStateToAll = (lobby: Lobby): void =>
-    lobby.playerList.forEach(({ socket, ...player }) =>
-        socket.emit("update", { me: player, ...getJsonLobby(lobby) })
+export const sendStateToAll = (party: Party): void =>
+    party.playerList.forEach(({ socket, ...player }) =>
+        socket.emit("update", { me: player, ...getJsonParty(party) })
     );
 
-export const removePlayer = (player: Player, lobby: Lobby): void => {
-    const { playerList, idealHostId } = lobby;
+export const removePlayer = (player: Player, party: Party): void => {
+    const { playerList, idealHostId } = party;
     const { socket } = player;
 
     if (socket && socket.disconnect) {
@@ -97,18 +97,18 @@ export const removePlayer = (player: Player, lobby: Lobby): void => {
     }
 };
 
-export const deleteLobbyIfEmpty = (
-    lobby: Lobby,
-    lobbyList: Array<Lobby>
+export const deletePartyIfEmpty = (
+    party: Party,
+    partyList: Array<Party>
 ): void => {
-    const { playerList, code } = lobby;
+    const { playerList, code } = party;
 
     if (playerList.length === 0 && code !== "ffff") {
         // the only players that could possibly
         // be left are unnamed players
         disconnectAllPlayers(playerList);
 
-        deleteFromArray(lobby, lobbyList);
+        deleteFromArray(party, partyList);
     }
 };
 
@@ -131,22 +131,22 @@ export const setName = (
     }
 };
 
-export const setGame = (gameId: string, lobby: Lobby): void => {
+export const setGame = (gameId: string, party: Party): void => {
     if (findGameById(gameId)) {
-        lobby.selectedGameId = gameId;
+        party.selectedGameId = gameId;
     }
 };
 
-export const startGame = async (lobby: Lobby): Promise<void> => {
+export const startGame = async (party: Party): Promise<void> => {
     // TODO: check if ready
-    const { gameState, selectedGameId, playerList } = lobby;
+    const { gameState, selectedGameId, playerList } = party;
 
     const game: ServerGame = findGameById(selectedGameId);
     if (!game) return;
 
-    lobby.status = LobbyStatus.ingame;
+    party.status = PartyStatus.ingame;
     gameState.status = GameStatus.loading;
-    sendStateToAll(lobby);
+    sendStateToAll(party);
 
     try {
         gameState.joinGameURL = await game.getJoinGameUrl();
@@ -155,7 +155,7 @@ export const startGame = async (lobby: Lobby): Promise<void> => {
 
         gameState.status = GameStatus.error;
         gameState.error = "❌ Can't connect to " + game.name;
-        sendStateToAll(lobby);
+        sendStateToAll(party);
         return;
     }
 
@@ -170,16 +170,16 @@ export const startGame = async (lobby: Lobby): Promise<void> => {
     const host = getHost(playerList);
     host.socket.once("host-game-loaded", () => {
         gameState.status = GameStatus.inprogress;
-        sendStateToAll(lobby);
+        sendStateToAll(party);
     });
 
-    sendStateToAll(lobby);
+    sendStateToAll(party);
 };
 
-export const exitGame = (lobby: Lobby): void => {
-    lobby.status = LobbyStatus.lobby;
+export const exitGame = (party: Party): void => {
+    party.status = PartyStatus.party;
 
-    const { gameState } = lobby;
+    const { gameState } = party;
     gameState.status = GameStatus.loading;
     gameState.joinGameURL = { playerURL: "", hostURL: "" };
 };
@@ -195,16 +195,16 @@ const findGameById = (gameId: string): ServerGame =>
 const disconnectAllPlayers = (playerList: Array<Player>): void =>
     playerList.forEach(({ socket }) => socket.disconnect(true));
 
-const getJsonLobby = ({ playerList, ...lobby }: Lobby) => ({
+const getJsonParty = ({ playerList, ...party }: Party) => ({
     playerList: playerList.map(({ id, name, isHost }) => ({
         id,
         name,
         isHost,
     })),
-    ...lobby,
+    ...party,
 });
 
-const getUniqueGameCode = (ll: Array<Lobby>): string => {
+const getUniqueGameCode = (ll: Array<Party>): string => {
     let newCode;
     do {
         newCode = getRandomFourLetters();

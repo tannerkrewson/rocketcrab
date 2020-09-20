@@ -4,7 +4,7 @@ import { useRouter } from "next/router";
 import socketIOClient from "socket.io-client";
 
 import PageLayout from "../components/templates/PageLayout";
-import LobbyScreen from "../components/organisms/LobbyScreen";
+import PartyScreen from "../components/organisms/PartyScreen";
 import NameEntry from "../components/organisms/NameEntry";
 import GameLayout from "../components/templates/GameLayout";
 
@@ -12,13 +12,13 @@ import {
     GameState,
     ClientGameLibrary,
     JoinGameURL,
-    ClientLobby,
+    ClientParty,
 } from "../types/types";
 import { getClientGameLibrary } from "../config";
 import { parseCookies, setCookie as setNookie } from "nookies";
 import Connecting from "../components/atoms/Connecting";
 import { logEvent } from "../utils/analytics";
-import { LobbyStatus } from "../types/enums";
+import { PartyStatus } from "../types/enums";
 
 const CLIENT_GAME_LIBRARY = getClientGameLibrary();
 const socket = socketIOClient();
@@ -31,10 +31,10 @@ export const Code = ({
     const router = useRouter();
     const { code } = router.query;
 
-    const [lobbyState, setLobbyState] = useState(initLobbyState());
+    const [partyState, setPartyState] = useState(initPartyState());
     const [showReconnecting, setShowReconnecting] = useState(false);
     const [deemphasize, setDeemphasize] = useState(false);
-    const { status, me, playerList, selectedGameId, gameState } = lobbyState;
+    const { status, me, playerList, selectedGameId, gameState } = partyState;
 
     const { isHost } = me;
 
@@ -42,8 +42,8 @@ export const Code = ({
     useEffect(() => {
         socket.open();
 
-        socket.on("update", (newLobbyState: ClientLobby) => {
-            setLobbyState(newLobbyState);
+        socket.on("update", (newPartyState: ClientParty) => {
+            setPartyState(newPartyState);
             setShowReconnecting(false);
         });
         socket.on("invalid-name", () => {
@@ -63,23 +63,23 @@ export const Code = ({
         });
 
         socket.on("reconnect", () => {
-            joinLobby();
+            joinParty();
             setShowReconnecting(false);
         });
 
         return () => {
             socket.close();
-            setLobbyState(initLobbyState());
+            setPartyState(initPartyState());
         };
     }, []);
 
     useEffect(() => {
         // "code" will be undefined during Automatic Static Optimization
         if (code) {
-            joinLobby();
+            joinParty();
         }
 
-        socket.on("invalid-lobby", () => {
+        socket.on("invalid-party", () => {
             // todo: don't do this if showGame is true
             router.push("/join?invalid=" + code);
         });
@@ -104,8 +104,8 @@ export const Code = ({
     const onStartGame = useCallback(() => {
         socket.emit("game-start");
 
-        logEvent("lobby-numberOfPlayers", playerList.length.toString());
-        logEvent("lobby-game", selectedGameId);
+        logEvent("party-numberOfPlayers", playerList.length.toString());
+        logEvent("party-game", selectedGameId);
     }, [playerList, selectedGameId]);
 
     const onExitGame = useCallback(() => {
@@ -118,13 +118,13 @@ export const Code = ({
         []
     );
 
-    const onInOutLobby = useCallback(
-        (outOfLobby) => setDeemphasize(outOfLobby),
+    const onInOutParty = useCallback(
+        (outOfParty) => setDeemphasize(outOfParty),
         [setDeemphasize]
     );
 
-    const joinLobby = useCallback(() => {
-        socket.emit("join-lobby", {
+    const joinParty = useCallback(() => {
+        socket.emit("join-party", {
             code,
             id: previousId,
             name: previousName,
@@ -133,7 +133,7 @@ export const Code = ({
 
     const showLoading = status === "loading";
     const showNameEntry = !showLoading && !me.name;
-    const showLobby = !showLoading && !showNameEntry && status === "lobby";
+    const showParty = !showLoading && !showNameEntry && status === "party";
     const showGame = !showLoading && !showNameEntry && status === "ingame";
 
     return (
@@ -148,8 +148,8 @@ export const Code = ({
                         {showNameEntry && (
                             <NameEntry onNameEntry={onNameEntry} code={code} />
                         )}
-                        {showLobby && (
-                            <LobbyScreen
+                        {showParty && (
+                            <PartyScreen
                                 playerList={playerList}
                                 gameLibrary={gameLibrary}
                                 onSelectGame={onSelectGame}
@@ -158,7 +158,7 @@ export const Code = ({
                                 resetName={() => onNameEntry("")}
                                 meId={me.id}
                                 isHost={isHost}
-                                onInOutLobby={onInOutLobby}
+                                onInOutParty={onInOutParty}
                             />
                         )}
                     </>
@@ -182,8 +182,8 @@ export const Code = ({
     );
 };
 
-const initLobbyState = (): ClientLobby => ({
-    status: LobbyStatus.loading,
+const initPartyState = (): ClientParty => ({
+    status: PartyStatus.loading,
     playerList: [],
     me: { id: undefined, name: undefined, isHost: undefined },
     selectedGameId: "",

@@ -2,7 +2,7 @@ import { Card } from "@geist-ui/react";
 import { JellyfishSpinner } from "react-spinners-kit";
 import { ClientGame } from "../../types/types";
 
-const LobbyStatus = ({ selectedGame }: LobbyStatusProps): JSX.Element => (
+const PartyStatus = ({ selectedGame }: PartyStatusProps): JSX.Element => (
     <Card
         style={{
             border: "1pt solid #ddd",
@@ -18,8 +18,8 @@ const LobbyStatus = ({ selectedGame }: LobbyStatusProps): JSX.Element => (
     </Card>
 );
 
-type LobbyStatusProps = {
+type PartyStatusProps = {
     selectedGame: ClientGame;
 };
 
-export default LobbyStatus;
+export default PartyStatus;

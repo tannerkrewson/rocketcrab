@@ -1,24 +1,24 @@
 import {
     initRocketCrab,
-    newLobby,
-    getLobby,
+    newParty,
+    getParty,
     addPlayer,
     sendStateToAll,
     removePlayer,
-    deleteLobbyIfEmpty,
+    deletePartyIfEmpty,
     setGame,
     setName,
     startGame,
     exitGame,
 } from "../../server/rocketcrab";
 import {
-    Lobby,
+    Party,
     GameState,
     Player,
     ServerGameLibrary,
     ServerGame,
 } from "../../types/types";
-import { LobbyStatus, GameStatus } from "../../types/enums";
+import { PartyStatus, GameStatus } from "../../types/enums";
 
 jest.mock("../../config", () => ({
     getServerGameLibrary: jest.fn(
@@ -45,61 +45,61 @@ jest.mock("../../config", () => ({
 describe("server/rocketcrab.ts", () => {
     it("initRocketCrab works", () => {
         expect(initRocketCrab()).toStrictEqual({
-            lobbyList: [],
+            partyList: [],
         });
     });
 
-    it("newLobby works", () => {
-        const lobbyList: Array<Lobby> = [];
+    it("newParty works", () => {
+        const partyList: Array<Party> = [];
 
-        newLobby(lobbyList);
+        newParty(partyList);
 
-        expect(lobbyList.length).toBe(1);
-        expect(lobbyList[0].status).toBe(LobbyStatus.lobby);
-        expect(lobbyList[0].code.length).toBe(4);
-        expect(lobbyList[0].playerList.length).toBe(0);
+        expect(partyList.length).toBe(1);
+        expect(partyList[0].status).toBe(PartyStatus.party);
+        expect(partyList[0].code.length).toBe(4);
+        expect(partyList[0].playerList.length).toBe(0);
     });
 
-    it("newLobby works with custom code", () => {
-        const lobbyList: Array<Lobby> = [];
+    it("newParty works with custom code", () => {
+        const partyList: Array<Party> = [];
 
-        newLobby(lobbyList, "abcd");
+        newParty(partyList, "abcd");
 
-        expect(lobbyList.length).toBe(1);
-        expect(lobbyList[0].status).toBe(LobbyStatus.lobby);
-        expect(lobbyList[0].code).toBe("abcd");
-        expect(lobbyList[0].playerList.length).toBe(0);
+        expect(partyList.length).toBe(1);
+        expect(partyList[0].status).toBe(PartyStatus.party);
+        expect(partyList[0].code).toBe("abcd");
+        expect(partyList[0].playerList.length).toBe(0);
     });
 
-    it("getLobby finds existing lobby", () => {
-        const lobbyList: Array<Lobby> = [];
+    it("getParty finds existing party", () => {
+        const partyList: Array<Party> = [];
 
-        const { code } = newLobby(lobbyList);
-        const lobby = getLobby(code, lobbyList);
+        const { code } = newParty(partyList);
+        const party = getParty(code, partyList);
 
-        expect(lobby.code).toBe(code);
+        expect(party.code).toBe(code);
     });
 
-    it("getLobby doesn't find non-existent lobby", () => {
-        const lobbyList: Array<Lobby> = [];
+    it("getParty doesn't find non-existent party", () => {
+        const partyList: Array<Party> = [];
         const code = "abcd";
 
-        const lobby = getLobby(code, lobbyList);
+        const party = getParty(code, partyList);
 
-        expect(lobby).toBeFalsy();
+        expect(party).toBeFalsy();
     });
 
     it("addPlayer works", () => {
-        const mockLobby: Lobby = generateMockLobby({ nextPlayerId: 0 });
-        const { playerList } = mockLobby;
+        const mockParty: Party = generateMockParty({ nextPlayerId: 0 });
+        const { playerList } = mockParty;
 
         const mockSocket0 = {} as SocketIO.Socket;
-        const mockPlayer0 = addPlayer("foo", mockSocket0, mockLobby);
+        const mockPlayer0 = addPlayer("foo", mockSocket0, mockParty);
 
         expect(playerList.length).toBe(1);
 
         const mockSocket1 = {} as SocketIO.Socket;
-        const mockPlayer1 = addPlayer("bar", mockSocket1, mockLobby);
+        const mockPlayer1 = addPlayer("bar", mockSocket1, mockParty);
 
         expect(playerList.length).toBe(2);
 
@@ -108,64 +108,64 @@ describe("server/rocketcrab.ts", () => {
         expect(playerList[0].name).toBe("foo");
         expect(playerList[0].socket).toBe(mockSocket0);
         expect(playerList[0].isHost).toBe(true);
-        expect(mockLobby.idealHostId).toBe(0);
+        expect(mockParty.idealHostId).toBe(0);
 
         expect(playerList).toContain(mockPlayer1);
         expect(playerList[1].id).toBe(1);
         expect(playerList[1].name).toBe("bar");
         expect(playerList[1].socket).toBe(mockSocket1);
         expect(playerList[1].isHost).toBe(false);
-        expect(mockLobby.idealHostId).toBe(0);
+        expect(mockParty.idealHostId).toBe(0);
     });
 
     it("addPlayer uses previousId if valid", () => {
         const playerList = [generateMockPlayer({ id: 1 })];
-        const mockLobby: Lobby = generateMockLobby({
+        const mockParty: Party = generateMockParty({
             playerList,
             nextPlayerId: 2,
         });
 
         const mockSocket = {} as SocketIO.Socket;
-        addPlayer("bar", mockSocket, mockLobby, 0);
+        addPlayer("bar", mockSocket, mockParty, 0);
 
         expect(playerList[1].id).toBe(0);
     });
 
     it("addPlayer doesn't use previousId if it's invalid", () => {
         const playerList = [generateMockPlayer({ id: 0, isHost: true })];
-        const mockLobby: Lobby = generateMockLobby({ playerList });
+        const mockParty: Party = generateMockParty({ playerList });
 
         const mockSocket = {} as SocketIO.Socket;
-        addPlayer("bar", mockSocket, mockLobby, 0);
+        addPlayer("bar", mockSocket, mockParty, 0);
 
         expect(playerList[0].id).toBe(0);
         expect(playerList[1].id).toBe(1);
     });
 
     it("addPlayer sets nextPlayerId if it's too low", () => {
-        const mockLobby: Lobby = generateMockLobby({
+        const mockParty: Party = generateMockParty({
             nextPlayerId: 0,
         });
 
         const mockSocket = {} as SocketIO.Socket;
-        addPlayer("foo", mockSocket, mockLobby, 100);
+        addPlayer("foo", mockSocket, mockParty, 100);
 
-        const { playerList } = mockLobby;
+        const { playerList } = mockParty;
         expect(playerList[0].id).toBe(100);
 
-        expect(mockLobby.nextPlayerId).toBe(101);
+        expect(mockParty.nextPlayerId).toBe(101);
     });
 
     it("sendStateToAll works", () => {
         const emits = [jest.fn(), jest.fn(), jest.fn()];
-        const mockLobby: Lobby = generateMockLobby({
+        const mockParty: Party = generateMockParty({
             playerList: generateMockPlayerList(3, (player, i) => ({
                 ...player,
                 socket: { emit: emits[i] } as Partial<SocketIO.Socket>,
             })),
         });
 
-        sendStateToAll(mockLobby);
+        sendStateToAll(mockParty);
 
         const jsonPlayerList = [
             {
@@ -184,8 +184,8 @@ describe("server/rocketcrab.ts", () => {
                 isHost: false,
             },
         ];
-        const jsonLobby = {
-            status: LobbyStatus.lobby,
+        const jsonParty = {
+            status: PartyStatus.party,
             playerList: jsonPlayerList,
             code: "efgh",
             selectedGameId: "FooGame",
@@ -195,15 +195,15 @@ describe("server/rocketcrab.ts", () => {
         };
 
         expect(emits[0]).toBeCalledWith("update", {
-            ...jsonLobby,
+            ...jsonParty,
             me: jsonPlayerList[0],
         });
         expect(emits[1]).toBeCalledWith("update", {
-            ...jsonLobby,
+            ...jsonParty,
             me: jsonPlayerList[1],
         });
         expect(emits[2]).toBeCalledWith("update", {
-            ...jsonLobby,
+            ...jsonParty,
             me: jsonPlayerList[2],
         });
     });
@@ -215,11 +215,11 @@ describe("server/rocketcrab.ts", () => {
         });
 
         const playerList = [mockPlayer];
-        const mockLobby: Lobby = generateMockLobby({
+        const mockParty: Party = generateMockParty({
             playerList,
         });
 
-        removePlayer(mockPlayer, mockLobby);
+        removePlayer(mockPlayer, mockParty);
 
         expect(playerList.length).toBe(0);
         expect(playerList).not.toContain(mockPlayer);
@@ -227,7 +227,7 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("removePlayer sets new host", () => {
-        const mockLobby: Lobby = generateMockLobby({
+        const mockParty: Party = generateMockParty({
             playerList: generateMockPlayerList(2, (player) => ({
                 ...player,
                 socket: {
@@ -236,43 +236,43 @@ describe("server/rocketcrab.ts", () => {
             })),
         });
 
-        const playerToRemove = mockLobby.playerList[0];
-        removePlayer(playerToRemove, mockLobby);
+        const playerToRemove = mockParty.playerList[0];
+        removePlayer(playerToRemove, mockParty);
 
-        expect(mockLobby.playerList.length).toBe(1);
-        expect(mockLobby.playerList).not.toContain(playerToRemove);
-        expect(mockLobby.playerList[0].isHost).toBe(true);
-        expect(mockLobby.idealHostId).toBe(0);
+        expect(mockParty.playerList.length).toBe(1);
+        expect(mockParty.playerList).not.toContain(playerToRemove);
+        expect(mockParty.playerList[0].isHost).toBe(true);
+        expect(mockParty.idealHostId).toBe(0);
     });
 
-    it("deleteLobbyIfEmpty deletes empty lobby", () => {
-        const mockLobby: Lobby = generateMockLobby();
-        const lobbyList: Array<Lobby> = [mockLobby];
+    it("deletePartyIfEmpty deletes empty party", () => {
+        const mockParty: Party = generateMockParty();
+        const partyList: Array<Party> = [mockParty];
 
-        deleteLobbyIfEmpty(mockLobby, lobbyList);
+        deletePartyIfEmpty(mockParty, partyList);
 
-        expect(lobbyList.length).toBe(0);
+        expect(partyList.length).toBe(0);
     });
 
-    it("deleteLobbyIfEmpty doesn't delete non-empty lobby", () => {
-        const mockLobby: Lobby = generateMockLobby({
+    it("deletePartyIfEmpty doesn't delete non-empty party", () => {
+        const mockParty: Party = generateMockParty({
             playerList: generateMockPlayerList(1),
         });
-        const lobbyList: Array<Lobby> = [mockLobby];
+        const partyList: Array<Party> = [mockParty];
 
-        deleteLobbyIfEmpty(mockLobby, lobbyList);
+        deletePartyIfEmpty(mockParty, partyList);
 
-        expect(lobbyList).toContain(mockLobby);
+        expect(partyList).toContain(mockParty);
     });
 
     it("setGame works", () => {
-        const mockLobby: Lobby = generateMockLobby({
+        const mockParty: Party = generateMockParty({
             playerList: generateMockPlayerList(1),
         });
 
-        setGame("lk-coolgame", mockLobby);
+        setGame("lk-coolgame", mockParty);
 
-        expect(mockLobby.selectedGameId).toBe("lk-coolgame");
+        expect(mockParty.selectedGameId).toBe("lk-coolgame");
     });
 
     it("setName works", () => {
@@ -300,8 +300,8 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("startGame works", async () => {
-        const mockLobby = generateMockLobby({
-            status: LobbyStatus.lobby,
+        const mockParty = generateMockParty({
+            status: PartyStatus.party,
             selectedGameId: "jd-foogame",
             gameState: {
                 status: undefined,
@@ -315,32 +315,32 @@ describe("server/rocketcrab.ts", () => {
             })),
         });
 
-        await startGame(mockLobby);
+        await startGame(mockParty);
 
-        expect(mockLobby.status).toBe(LobbyStatus.ingame);
-        expect(mockLobby.gameState.status).toBe(GameStatus.waitingforhost);
+        expect(mockParty.status).toBe(PartyStatus.ingame);
+        expect(mockParty.gameState.status).toBe(GameStatus.waitingforhost);
 
         // TODO: test call to getJoinGameUrl
     });
 
     it("startGame fails if game doesn't exist", () => {
-        const mockLobby = generateMockLobby({
-            status: LobbyStatus.lobby,
+        const mockParty = generateMockParty({
+            status: PartyStatus.party,
             selectedGameId: "GameThatDoesntExist",
             gameState: {
                 status: undefined,
             },
         });
 
-        startGame(mockLobby);
+        startGame(mockParty);
 
-        expect(mockLobby.status).toBe(LobbyStatus.lobby);
-        expect(mockLobby.gameState.status).toBeUndefined();
+        expect(mockParty.status).toBe(PartyStatus.party);
+        expect(mockParty.gameState.status).toBeUndefined();
     });
 
     it("exitGame works", () => {
-        const mockLobby = generateMockLobby({
-            status: LobbyStatus.ingame,
+        const mockParty = generateMockParty({
+            status: PartyStatus.ingame,
             selectedGameId: "FooGame",
             gameState: {
                 status: GameStatus.inprogress,
@@ -351,24 +351,24 @@ describe("server/rocketcrab.ts", () => {
             },
         });
 
-        exitGame(mockLobby);
+        exitGame(mockParty);
 
-        expect(mockLobby.status).toBe(LobbyStatus.lobby);
-        expect(mockLobby.gameState.status).toBe(GameStatus.loading);
-        expect(mockLobby.gameState.joinGameURL.playerURL).toBe("");
-        expect(mockLobby.gameState.joinGameURL.hostURL).toBe("");
+        expect(mockParty.status).toBe(PartyStatus.party);
+        expect(mockParty.gameState.status).toBe(GameStatus.loading);
+        expect(mockParty.gameState.joinGameURL.playerURL).toBe("");
+        expect(mockParty.gameState.joinGameURL.hostURL).toBe("");
     });
 });
 
-const generateMockLobby = ({
-    status = LobbyStatus.lobby,
+const generateMockParty = ({
+    status = PartyStatus.party,
     playerList = [],
     code = "efgh",
     selectedGameId = "FooGame",
     gameState = {} as GameState,
     nextPlayerId = 1,
     idealHostId = 0,
-}: Partial<Lobby> = {}): Lobby => ({
+}: Partial<Party> = {}): Party => ({
     status,
     playerList,
     code,

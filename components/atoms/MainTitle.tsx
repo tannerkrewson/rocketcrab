@@ -13,7 +13,7 @@ const MainTitle = ({
     return (
         <div className={titleClasses}>
             <h2>🚀🦀</h2>
-            <h2 className="lobby-url">{title}</h2>
+            <h2 className="party-url">{title}</h2>
             {path && !disablePhonetic && (
                 <div className="phonetic">({converter(path).join(" ")})</div>
             )}
@@ -30,12 +30,12 @@ const MainTitle = ({
                         filter: saturate(50%) opacity(50%) blur(1px);
                     }
 
-                    .lobby-url {
+                    .party-url {
                         font-size: 1.7em;
                     }
 
                     @media only screen and (min-width: 385px) {
-                        .lobby-url {
+                        .party-url {
                             font-size: 2.5em;
                         }
                     }

@@ -27,7 +27,7 @@ export const Home = (): JSX.Element => {
 
             <ButtonGroup>
                 <PrimaryButton href="/join" size="large">
-                    Join Lobby
+                    Join Party
                 </PrimaryButton>
 
                 <PrimaryButton
@@ -35,7 +35,7 @@ export const Home = (): JSX.Element => {
                     loading={newLoading}
                     size="large"
                 >
-                    New Lobby
+                    New Party
                 </PrimaryButton>
             </ButtonGroup>
             <Spacer y={0.5} />

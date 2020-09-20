@@ -48,13 +48,13 @@ const game: ServerGame = {
     familyFriendly: true, // required
 
     // you can add a min and/or max players if you would like disable the "Start Game" button
-    // if the number of players in the rocketcrab lobby is not within range. this can be different
+    // if the number of players in the rocketcrab party is not within range. this can be different
     // than the "players" property.
     minPlayers: 1, // optional. if you do use it, make this 1 or more
     maxPlayers: 6, // optional. if you do use it, make this 1 or more
 
     // see https://github.com/tannerkrewson/rocketcrab#step-2-creating-a-config-file
-    // note that this will be running on the rocketcrab server, and will run once per lobby, not per player.
+    // note that this will be running on the rocketcrab server, and will run once per party, not per player.
     // this function will be ran in a try catch, so no need to worry about crashing the server! 😆
     getJoinGameUrl: async () => {
         // this is an example of one way it could be done. you could put any code here to do what you need to do!
