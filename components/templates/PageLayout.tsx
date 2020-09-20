@@ -69,6 +69,11 @@ const PageLayout = ({
             * {
                 box-sizing: border-box;
             }
+
+            /* hide the fullscreen button */
+            .fslightbox-toolbar-button:first-child {
+                display: none;
+            }
         `}</style>
     </div>
 );
