@@ -8,6 +8,7 @@ const PageLayout = ({
     loading,
     disablePhonetic,
     deemphasize,
+    center,
 }: PageLayoutParams): JSX.Element => (
     <div className="container">
         <main>
@@ -20,6 +21,7 @@ const PageLayout = ({
 
                 {loading ? <Loading /> : children}
             </div>
+            {!center && <div className="height-expander"></div>}
         </main>
 
         <Footer />
@@ -51,6 +53,10 @@ const PageLayout = ({
                 color: inherit;
                 text-decoration: none;
             }
+
+            .height-expander {
+                flex-grow: 1;
+            }
         `}</style>
 
         <style jsx global>{`
@@ -73,6 +79,7 @@ type PageLayoutParams = {
     loading?: boolean;
     disablePhonetic?: boolean;
     deemphasize?: boolean;
+    center?: boolean;
 };
 
 export default PageLayout;

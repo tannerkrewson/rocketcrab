@@ -3,24 +3,35 @@
 exports[`pages/index.tsx matches snapshot 1`] = `
 <DocumentFragment>
   <div
-    class="jsx-903643084 container"
+    class="jsx-1975243687 container"
   >
     <main
-      class="jsx-903643084"
+      class="jsx-1975243687"
     >
       <div
-        class="jsx-903643084 main-content"
+        class="jsx-1975243687 main-content"
       >
         <div
-          class="jsx-2202774700 title"
+          class="jsx-1369873609 title"
         >
           <h2
-            class="jsx-2202774700"
+            class="jsx-1369873609"
           >
-            🚀🦀
+            <span
+              class="jsx-1369873609"
+              style="text-shadow: 0 0 10px cyan;"
+            >
+              🚀
+            </span>
+            <span
+              class="jsx-1369873609"
+              style="text-shadow: 0 0 10px #ff0000d9;"
+            >
+              🦀
+            </span>
           </h2>
           <h2
-            class="jsx-2202774700 party-url"
+            class="jsx-1369873609 party-url"
           >
             rocketcrab.com
           </h2>

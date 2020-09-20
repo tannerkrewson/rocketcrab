@@ -22,7 +22,7 @@ export const Home = (): JSX.Element => {
     };
 
     return (
-        <PageLayout>
+        <PageLayout center={true}>
             <div className="description">party games for phones</div>
 
             <ButtonGroup>

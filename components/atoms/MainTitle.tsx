@@ -12,7 +12,10 @@ const MainTitle = ({
 
     return (
         <div className={titleClasses}>
-            <h2>🚀🦀</h2>
+            <h2>
+                <span style={{ textShadow: "0 0 10px cyan" }}>🚀</span>
+                <span style={{ textShadow: "0 0 10px #ff0000d9" }}>🦀</span>
+            </h2>
             <h2 className="party-url">{title}</h2>
             {path && !disablePhonetic && (
                 <div className="phonetic">({converter(path).join(" ")})</div>
@@ -23,9 +26,11 @@ const MainTitle = ({
                     .title {
                         transition: all 0.1s ease-out;
                         text-align: center;
+                        margin: 2em 0 0 0;
                     }
                     .deemphasize {
-                        margin-bottom: -1.25em;
+                        margin-top: -0.25em;
+                        margin-bottom: -2em;
                         transform: scale(0.75);
                         filter: saturate(50%) opacity(50%) blur(1px);
                     }
@@ -36,7 +41,7 @@ const MainTitle = ({
 
                     @media only screen and (min-width: 385px) {
                         .party-url {
-                            font-size: 2.5em;
+                            font-size: 2.4em;
                         }
                     }
 

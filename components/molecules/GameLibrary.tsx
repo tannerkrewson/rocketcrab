@@ -26,8 +26,9 @@ const GameLibrary = ({
 
     return (
         <div style={{ textAlign: "center" }}>
-            <div>{categoryName}Games</div>
-            <Spacer y={0.5} />
+            <Spacer y={2} />
+            <h4>{categoryName}Games</h4>
+            <Spacer y={1} />
             {!selectedCategory && (
                 <>
                     <Input
