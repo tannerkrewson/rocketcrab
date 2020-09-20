@@ -20,7 +20,8 @@ const Body = ({ children }: BodyProps): JSX.Element => (
                 letter-spacing: normal !important;
                 font-family: "Inconsolata", monospace;
             }
-            .card .content dl dt {
+            .card .content dl dt,
+            .btn .text {
                 text-transform: none;
             }
         `}</style>

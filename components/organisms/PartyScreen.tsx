@@ -4,8 +4,9 @@ import ButtonGroup from "../molecules/ButtonGroup";
 import { Spacer } from "@geist-ui/react";
 import GameSelector from "./GameSelector";
 import { Player, ClientGameLibrary } from "../../types/types";
-import { useCallback, useState } from "react";
+import React, { useState } from "react";
 import PartyStatus from "../molecules/PartyStatus";
+import GameDetailBox from "../atoms/GameDetailBox";
 
 const PartyScreen = ({
     playerList,
@@ -18,62 +19,82 @@ const PartyScreen = ({
     isHost,
     onInOutParty,
 }: PartyScreenProps): JSX.Element => {
+    const selectedGame = gameLibrary.gameList.find(
+        ({ id }) => id === selectedGameId
+    );
+    const host = playerList.find(({ isHost }) => isHost);
+
     const [gameSelectorVisible, setGameSelectorVisible] = useState(false);
+    const [gameInfoVisible, setGameInfoVisible] = useState(false);
 
-    const showGameSelector = useCallback(() => {
-        onInOutParty(true);
-        setGameSelectorVisible(true);
-    }, [onInOutParty, setGameSelectorVisible]);
+    const showGameSelector = (visibility) => () => {
+        onInOutParty(visibility);
+        setGameSelectorVisible(visibility);
+    };
 
-    const hideGameSelector = useCallback(() => {
-        onInOutParty(false);
-        setGameSelectorVisible(false);
-    }, [onInOutParty, setGameSelectorVisible]);
+    const showGameInfo = (visibility) => () => {
+        onInOutParty(visibility);
+        setGameInfoVisible(visibility);
+    };
+
+    if (gameSelectorVisible) {
+        return (
+            <GameSelector
+                gameLibrary={gameLibrary}
+                onSelectGame={onSelectGame}
+                onDone={showGameSelector(false)}
+                backToLabel="party"
+                isHost={isHost}
+            />
+        );
+    }
+
+    if (gameInfoVisible) {
+        return (
+            <div style={{ textAlign: "center" }}>
+                <GameDetailBox
+                    game={selectedGame}
+                    allCategories={gameLibrary.categories}
+                />
+                <PrimaryButton onClick={showGameInfo(false)}>
+                    ↩️ Back to party
+                </PrimaryButton>
+            </div>
+        );
+    }
 
     return (
         <div style={{ textAlign: "center" }}>
-            {gameSelectorVisible ? (
-                <GameSelector
-                    gameLibrary={gameLibrary}
-                    onSelectGame={onSelectGame}
-                    onDone={hideGameSelector}
-                    backToLabel="party"
-                    isHost={isHost}
-                />
-            ) : (
-                <>
-                    <Spacer y={1.25} />
-                    <PartyStatus
-                        selectedGame={gameLibrary.gameList.find(
-                            ({ id }) => id === selectedGameId
-                        )}
-                    />
-                    <Spacer y={1} />
-                    <ButtonGroup>
-                        <PrimaryButton onClick={showGameSelector} size="large">
-                            View games
-                        </PrimaryButton>
-                        <PrimaryButton
-                            disabled={!selectedGameId || !isHost}
-                            onClick={onStartGame}
-                            size="large"
-                            type="error"
-                        >
-                            Start Game
-                        </PrimaryButton>
-                    </ButtonGroup>
-                    <Spacer y={2} />
-                    <PlayerList
-                        playerList={playerList}
-                        onEditName={resetName}
-                        meId={meId}
-                    />
-                    <Spacer y={1} />
-                    <PrimaryButton href="/" size="small">
-                        Leave Party
-                    </PrimaryButton>
-                </>
-            )}
+            <Spacer y={1.25} />
+            <PartyStatus
+                selectedGame={selectedGame}
+                host={host}
+                onShowGameInfo={showGameInfo(true)}
+            />
+            <Spacer y={1} />
+            <ButtonGroup>
+                <PrimaryButton onClick={showGameSelector(true)} size="large">
+                    Browse Games
+                </PrimaryButton>
+                <PrimaryButton
+                    disabled={!selectedGameId || !isHost}
+                    onClick={onStartGame}
+                    size="large"
+                    type="error"
+                >
+                    Start Game
+                </PrimaryButton>
+            </ButtonGroup>
+            <Spacer y={2} />
+            <PlayerList
+                playerList={playerList}
+                onEditName={resetName}
+                meId={meId}
+            />
+            <Spacer y={1} />
+            <PrimaryButton href="/" size="small">
+                Leave Party
+            </PrimaryButton>
         </div>
     );
 };
