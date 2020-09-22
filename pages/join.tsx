@@ -1,5 +1,5 @@
 import { useRouter } from "next/router";
-import { Input } from "@zeit-ui/react";
+import { Input } from "@geist-ui/react";
 
 import PrimaryButton from "../components/atoms/PrimaryButton";
 import ButtonGroup from "../components/molecules/ButtonGroup";
@@ -30,8 +30,8 @@ export const Join = (): JSX.Element => {
     };
 
     return (
-        <PageLayout path={code} disablePhonetic={true}>
-            <div className="description">Join Lobby</div>
+        <PageLayout path={code} disablePhonetic={true} center={true}>
+            <div className="description">Join Party</div>
             <div className="input-container">
                 <Input
                     placeholder="ex. abcd"

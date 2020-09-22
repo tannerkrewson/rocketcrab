@@ -3,25 +3,35 @@
 exports[`pages/[code].tsx matches snapshot 1`] = `
 <DocumentFragment>
   <div
-    class="jsx-1326350671 container"
+    class="jsx-1855009027 container"
   >
     <main
-      class="jsx-1326350671"
+      class="jsx-1855009027"
     >
       <div
-        class="jsx-1326350671 main-content"
+        class="jsx-1855009027 main-content"
       >
         <div
-          class="jsx-3668335743 title"
-          style="text-align: center;"
+          class="jsx-1369873609 title"
         >
           <h2
-            class="jsx-3668335743"
+            class="jsx-1369873609"
           >
-            🚀🦀
+            <span
+              class="jsx-1369873609"
+              style="text-shadow: 0 0 10px cyan;"
+            >
+              🚀
+            </span>
+            <span
+              class="jsx-1369873609"
+              style="text-shadow: 0 0 10px #ff0000d9;"
+            >
+              🦀
+            </span>
           </h2>
           <h2
-            class="jsx-3668335743 lobby-url"
+            class="jsx-1369873609 party-url"
           >
             rocketcrab.com
           </h2>
@@ -44,6 +54,9 @@ exports[`pages/[code].tsx matches snapshot 1`] = `
           </span>
         </div>
       </div>
+      <div
+        class="jsx-1855009027 height-expander"
+      />
     </main>
     <footer
       class="jsx-3128977650"

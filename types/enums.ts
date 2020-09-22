@@ -1,6 +1,6 @@
-export enum LobbyStatus {
+export enum PartyStatus {
     loading = "loading",
-    lobby = "lobby",
+    party = "party",
     ingame = "ingame",
 }
 

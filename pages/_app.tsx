@@ -1,10 +1,12 @@
-import { ZeitProvider, CssBaseline } from "@zeit-ui/react";
+import { GeistProvider, CssBaseline } from "@geist-ui/react";
 import Body from "../components/templates/Body";
 import "fontsource-inconsolata";
 import { AppPropsType } from "next/dist/next-server/lib/utils";
 import { initGA, logPageView } from "../utils/analytics";
 import { useState, useEffect } from "react";
 import Router from "next/router";
+
+import "swiper/swiper-bundle.css";
 
 const MyApp = ({ Component, pageProps }: AppPropsType): JSX.Element => {
     const [, setLoading] = useState(false);
@@ -27,12 +29,12 @@ const MyApp = ({ Component, pageProps }: AppPropsType): JSX.Element => {
         };
     }, []);
     return (
-        <ZeitProvider>
+        <GeistProvider>
             <CssBaseline />
             <Body>
                 <Component {...pageProps} />
             </Body>
-        </ZeitProvider>
+        </GeistProvider>
     );
 };
 

@@ -1,11 +1,16 @@
-import { GameStatus } from "../../types/enums";
-import { Loading, Spacer } from "@zeit-ui/react";
+import { Spacer } from "@geist-ui/react";
 import PrimaryButton from "../atoms/PrimaryButton";
-import { useState } from "react";
-import { GameState, ClientGameLibrary, Player } from "../../types/types";
-import GameMenu from "../organisms/GameMenu";
+import { useCallback, useState } from "react";
+import {
+    GameState,
+    ClientGameLibrary,
+    Player,
+    MenuButton,
+} from "../../types/types";
+import GameMenu from "../molecules/GameMenu";
 import GameSelector from "../organisms/GameSelector";
 import PlayerList from "../molecules/PlayerList";
+import GameFrame from "../molecules/GameFrame";
 
 const GameLayout = ({
     gameState,
@@ -18,41 +23,11 @@ const GameLayout = ({
     playerList,
     thisPlayer,
 }: GameLayoutProps): JSX.Element => {
-    const {
-        status,
-        joinGameURL: { playerURL, hostURL, code },
-    } = gameState;
-
-    const { renameParams } = gameLibrary.gameList.find(
+    const thisGame = gameLibrary.gameList.find(
         ({ id }) => id == selectedGameId
     );
 
-    const { name, isHost } = thisPlayer;
-
-    const paramKeys = {
-        rocketcrab: "rocketcrab",
-        name: "name",
-        ishost: "ishost",
-        ...(code ? { code: "code" } : {}),
-        ...renameParams,
-    };
-
-    const defaultParams = {
-        rocketcrab: "true",
-        name,
-        ishost: isHost.toString(),
-        ...(code ? { code } : {}),
-    };
-
-    const params = Object.keys(paramKeys).reduce(
-        (acc, name) => ({
-            ...acc,
-            [paramKeys[name]]: defaultParams[name],
-        }),
-        {}
-    );
-
-    const appendToUrl = "?" + new URLSearchParams(params).toString();
+    const { isHost } = thisPlayer;
 
     const [statusCollapsed, setStatusCollapsed] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
@@ -62,14 +37,48 @@ const GameLayout = ({
     // https://stackoverflow.com/a/48830513
     const [frameRefresh, setFrameRefresh] = useState(0);
 
-    const showLoading = status === GameStatus.loading;
-    const showError = status === GameStatus.error;
-    const showWaitingForHost = !isHost && status === GameStatus.waitingforhost;
-    const showGameFrame = !isHost && status === GameStatus.inprogress;
-    const showHostGameFrame =
-        isHost &&
-        (status === GameStatus.inprogress ||
-            status === GameStatus.waitingforhost);
+    const menuButtons: Array<MenuButton> = [
+        {
+            label: "Reload my game",
+            hostOnly: false,
+            onClick: useCallback(() => {
+                setShowMenu(false);
+                setFrameRefresh(frameRefresh + 1);
+            }, [frameRefresh]),
+        },
+        {
+            label: "View players",
+            hostOnly: false,
+            onClick: useCallback(() => {
+                setShowMenu(false);
+                setShowPlayerList(true);
+            }, []),
+        },
+        {
+            label: "View games",
+            hostOnly: false,
+            onClick: useCallback(() => {
+                setShowMenu(false);
+                setShowGameLibrary(true);
+            }, []),
+        },
+        {
+            label: "Reload all",
+            hostOnly: true,
+            onClick: useCallback(() => {
+                setShowMenu(false);
+                onStartGame();
+            }, [onStartGame]),
+        },
+        {
+            label: "Exit to party",
+            hostOnly: true,
+            onClick: useCallback(() => {
+                setShowMenu(false);
+                onExitGame();
+            }, [onExitGame]),
+        },
+    ];
 
     const statusClass = "status " + (statusCollapsed ? "status-collapsed" : "");
     return (
@@ -97,77 +106,26 @@ const GameLayout = ({
                             }}
                             size="small"
                         >
-                            {showMenu ? "▼" : "▲"} Menu
+                            {showMenu ? "▲" : "▼"} Menu
                         </PrimaryButton>
 
                         {showMenu && (
                             <GameMenu
                                 isHost={isHost}
-                                onExitGame={() => {
-                                    setShowMenu(false);
-                                    onExitGame();
-                                }}
-                                onReloadMine={() => {
-                                    setShowMenu(false);
-                                    setFrameRefresh(frameRefresh + 1);
-                                }}
-                                onStartGame={() => {
-                                    setShowMenu(false);
-                                    onStartGame();
-                                }}
-                                onViewGames={() => {
-                                    setShowMenu(false);
-                                    setShowGameLibrary(true);
-                                }}
-                                onViewPlayers={() => {
-                                    setShowMenu(false);
-                                    setShowPlayerList(true);
-                                }}
+                                menuButtons={menuButtons}
                             />
                         )}
                     </>
                 )}
             </div>
-            {(showLoading || showWaitingForHost) && (
-                <div className="frame">
-                    <Loading type={showWaitingForHost ? "error" : "default"}>
-                        {showWaitingForHost ? (
-                            <span>Waiting for host</span>
-                        ) : (
-                            <span>Loading game</span>
-                        )}
-                    </Loading>
-                </div>
-            )}
-            {showError && (
-                <div className="frame">
-                    <div
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            height: "100%",
-                        }}
-                    >
-                        {gameState.error}
-                    </div>
-                </div>
-            )}
-            {showGameFrame && (
-                <iframe
-                    className="frame"
-                    src={playerURL + appendToUrl}
-                    key={frameRefresh}
-                ></iframe>
-            )}
-            {showHostGameFrame && (
-                <iframe
-                    className="frame"
-                    src={hostURL + appendToUrl}
-                    key={frameRefresh}
-                    onLoad={onHostGameLoaded}
-                ></iframe>
-            )}
+            <GameFrame
+                gameState={gameState}
+                selectedGameId={selectedGameId}
+                onHostGameLoaded={onHostGameLoaded}
+                thisPlayer={thisPlayer}
+                thisGame={thisGame}
+                frameRefreshCount={frameRefresh}
+            />
             {showGameLibrary && (
                 <div className="component-frame">
                     <GameSelector
@@ -198,21 +156,27 @@ const GameLayout = ({
                     height: 100%;
                 }
                 .status {
-                    border-bottom: 1px solid LightGrey;
+                    border-bottom: 1px solid #ddd;
                     display: flex;
                     justify-content: space-between;
                     align-content: center;
                     padding: 0.5em;
+                    height: 2em;
+                }
+                @media only screen and (max-width: 385px) {
+                    .status {
+                        font-size: 0.9em;
+                        margin-bottom: 0em;
+                    }
+                    .logo {
+                        line-height: 2em;
+                        font-size: 1em;
+                    }
                 }
                 .status-collapsed {
                     position: fixed;
                     width: fit-content;
-                    border-right: 1px solid LightGrey;
-                }
-
-                .frame {
-                    flex: 1 1 auto;
-                    border: 0;
+                    border-right: 1px solid #ddd;
                 }
                 .logo {
                     margin: 0;
@@ -227,16 +191,15 @@ const GameLayout = ({
                     font-weight: bold;
                 }
                 .component-frame {
-                    margin: 1em;
                     padding: 1em;
                     text-align: center;
                     position: absolute;
-                    right: 1em;
                     top: 3em;
+                    right: 0;
                     background: white;
-                    border: 1px solid LightGrey;
-                    min-width: 15em;
-                    max-width: 100%;
+                    border: 1px solid #ddd;
+                    width: min(24em, 100vw - 3em);
+                    margin: 0.5em;
                 }
             `}</style>
         </div>

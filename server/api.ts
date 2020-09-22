@@ -1,10 +1,10 @@
-import { newLobby, setGame } from "./rocketcrab";
+import { newParty, setGame } from "./rocketcrab";
 import { RocketCrab } from "../types/types";
 import { Application, Request, Response } from "express";
 
-export default (server: Application, { lobbyList }: RocketCrab): void => {
+export default (server: Application, { partyList }: RocketCrab): void => {
     server.post("/api/new", (req: Request, res: Response) => {
-        const { code } = newLobby(lobbyList);
+        const { code } = newParty(partyList);
         res.json({ code });
     });
     server.get("/transfer/:gameid/:uuid?", (req: Request, res: Response) => {
@@ -17,19 +17,19 @@ export default (server: Application, { lobbyList }: RocketCrab): void => {
             return;
         }
 
-        let lobby;
+        let party;
         if (givenUuid) {
-            lobby =
-                lobbyList.find(({ uuid }) => uuid === givenUuid) ||
-                newLobby(lobbyList, undefined, givenUuid as string);
+            party =
+                partyList.find(({ uuid }) => uuid === givenUuid) ||
+                newParty(partyList, undefined, givenUuid as string);
         } else {
-            lobby = newLobby(lobbyList);
+            party = newParty(partyList);
         }
 
-        if (gameid && !lobby.selectedGame) {
-            setGame(gameid as string, lobby);
+        if (gameid && !party.selectedGame) {
+            setGame(gameid as string, party);
             //TODO: fix stuck on waiting for host
-            //startGame(lobby);
+            //startGame(party);
         }
 
         if (name) {
@@ -38,13 +38,13 @@ export default (server: Application, { lobbyList }: RocketCrab): void => {
             });
         }
 
-        res.redirect("/" + lobby.code);
+        res.redirect("/" + party.code);
     });
     server.get("/api/stats", (req: Request, res: Response) => {
         res.json(
-            lobbyList.map(
+            partyList.map(
                 ({ status, gameState, selectedGameId, playerList }) => ({
-                    lobbyStatus: status,
+                    partyStatus: status,
                     gameStatus: gameState.status,
                     selectedGameId,
                     numberOfPlayers: playerList.length,

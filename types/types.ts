@@ -1,12 +1,12 @@
-import { LobbyStatus, GameStatus } from "./enums";
+import { PartyStatus, GameStatus } from "./enums";
 import WebSocket from "ws";
 
 export type RocketCrab = {
-    lobbyList: Array<Lobby>;
+    partyList: Array<Party>;
 };
 
-export type Lobby = {
-    status: LobbyStatus;
+export type Party = {
+    status: PartyStatus;
     playerList: Array<Player>;
     code: string;
     uuid?: string;
@@ -17,8 +17,8 @@ export type Lobby = {
     me?: Player;
 };
 
-export type ClientLobby = {
-    status: LobbyStatus;
+export type ClientParty = {
+    status: PartyStatus;
     playerList: Array<Player>;
     me: Player;
     selectedGameId: "";
@@ -42,6 +42,7 @@ export type ClientGame = {
     displayUrlHref: string;
     donationUrlText?: string;
     donationUrlHref?: string;
+    pictures?: Array<string>;
     category?: Array<string>;
     players?: string;
     familyFriendly: boolean;
@@ -89,7 +90,7 @@ export type GameState = {
     joinGameURL?: JoinGameURL;
 };
 
-export type JoinLobbyResponse = {
+export type JoinPartyResponse = {
     code: string;
     id?: number;
     name?: string;
@@ -99,4 +100,10 @@ export type PromiseWebSocket = WebSocket & {
     onOpen: () => Promise<void>;
     onMessage: () => Promise<string>;
     untilMessage: (msgChecker: (msg: string) => boolean) => Promise<string>;
+};
+
+export type MenuButton = {
+    label: string;
+    hostOnly: boolean;
+    onClick: () => void;
 };

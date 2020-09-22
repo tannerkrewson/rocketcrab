@@ -12,7 +12,7 @@ describe("server/api.ts", () => {
         } as unknown) as Application;
 
         rocketcrab = {
-            lobbyList: [],
+            partyList: [],
         };
 
         api(app, rocketcrab);
@@ -24,12 +24,12 @@ describe("server/api.ts", () => {
         const res = { json: jest.fn() };
         handler(undefined, res);
 
-        expect(rocketcrab.lobbyList[0].code).toEqual(
+        expect(rocketcrab.partyList[0].code).toEqual(
             res.json.mock.calls[0][0].code
         );
     });
 
-    it("/transfer create lobby", () => {
+    it("/transfer create party", () => {
         expect(app.get.mock.calls[0][0]).toEqual("/transfer/:gameid/:uuid?");
         const handler = app.get.mock.calls[0][1];
         const req = {
@@ -47,14 +47,14 @@ describe("server/api.ts", () => {
         };
         handler(req, res);
 
-        expect(rocketcrab.lobbyList[0].uuid).toEqual(req.params.uuid);
-        expect(rocketcrab.lobbyList[0].selectedGameId).toEqual(
+        expect(rocketcrab.partyList[0].uuid).toEqual(req.params.uuid);
+        expect(rocketcrab.partyList[0].selectedGameId).toEqual(
             req.params.gameid
         );
         expect(res.cookie.mock.calls[0][1]).toEqual(req.query.name);
     });
 
-    it("/transfer doesn't create lobby if already made", () => {
+    it("/transfer doesn't create party if already made", () => {
         const handler = app.get.mock.calls[0][1];
         const res = {
             cookie: jest.fn(),
@@ -85,10 +85,10 @@ describe("server/api.ts", () => {
             res
         );
 
-        expect(rocketcrab.lobbyList.length).toEqual(1);
+        expect(rocketcrab.partyList.length).toEqual(1);
     });
 
-    it("/transfer doesn't create lobby if uuid invalid", () => {
+    it("/transfer doesn't create party if uuid invalid", () => {
         const handler = app.get.mock.calls[0][1];
         const req = {
             params: {
@@ -102,7 +102,7 @@ describe("server/api.ts", () => {
         };
         handler(req, res);
 
-        expect(rocketcrab.lobbyList.length).toEqual(0);
+        expect(rocketcrab.partyList.length).toEqual(0);
         expect(res.status).toBeCalledWith(400);
         expect(end).toBeCalled();
     });
@@ -120,7 +120,7 @@ describe("server/api.ts", () => {
         };
         handler(req, res);
 
-        expect(rocketcrab.lobbyList[0].selectedGameId).toEqual(
+        expect(rocketcrab.partyList[0].selectedGameId).toEqual(
             req.params.gameid
         );
     });
@@ -138,6 +138,6 @@ describe("server/api.ts", () => {
         };
         handler(req, res);
 
-        expect(rocketcrab.lobbyList[0].selectedGameId).toBe("");
+        expect(rocketcrab.partyList[0].selectedGameId).toBe("");
     });
 });

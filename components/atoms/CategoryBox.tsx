@@ -1,4 +1,4 @@
-import { Button } from "@zeit-ui/react";
+import { Button } from "@geist-ui/react";
 import { GameCategory } from "../../types/types";
 
 const CategoryBox = ({

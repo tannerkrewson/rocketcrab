@@ -30,11 +30,12 @@
         ]
     },
     "dependencies": {
-        "@zeit-ui/react": "^1.8.0-canary.8",
+        "@geist-ui/react": "^2.0.2",
         "body-parser": "^1.19.0",
         "cross-env": "^7.0.2",
         "express": "^4.17.1",
         "fontsource-inconsolata": "^3.0.5",
+        "fslightbox-react": "^1.5.0",
         "next": "^9.5.1",
         "nookies": "^2.4.0",
         "phonetic-alphabet-converter": "^0.2.0",
@@ -43,6 +44,7 @@
         "react-ga": "^3.1.2",
         "react-spinners-kit": "^1.9.1",
         "socket.io": "^2.3.0",
+        "swiper": "^6.2.0",
         "ws": "^7.3.1"
     },
     "devDependencies": {

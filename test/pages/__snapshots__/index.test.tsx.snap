@@ -3,31 +3,41 @@
 exports[`pages/index.tsx matches snapshot 1`] = `
 <DocumentFragment>
   <div
-    class="jsx-1326350671 container"
+    class="jsx-1855009027 container"
   >
     <main
-      class="jsx-1326350671"
+      class="jsx-1855009027"
     >
       <div
-        class="jsx-1326350671 main-content"
+        class="jsx-1855009027 main-content"
       >
         <div
-          class="jsx-3668335743 title"
-          style="text-align: center;"
+          class="jsx-1369873609 title"
         >
           <h2
-            class="jsx-3668335743"
+            class="jsx-1369873609"
           >
-            🚀🦀
+            <span
+              class="jsx-1369873609"
+              style="text-shadow: 0 0 10px cyan;"
+            >
+              🚀
+            </span>
+            <span
+              class="jsx-1369873609"
+              style="text-shadow: 0 0 10px #ff0000d9;"
+            >
+              🦀
+            </span>
           </h2>
           <h2
-            class="jsx-3668335743 lobby-url"
+            class="jsx-1369873609 party-url"
           >
             rocketcrab.com
           </h2>
         </div>
         <div
-          class="jsx-2159491491 description"
+          class="jsx-1456828746 description"
         >
           party games for phones
         </div>
@@ -39,14 +49,14 @@ exports[`pages/index.tsx matches snapshot 1`] = `
           >
             <div>
               <button
-                class="jsx-2376802331 btn "
+                class="jsx-2230649419 btn "
                 href="/join"
                 type="button"
               >
                 <div
                   class="text"
                 >
-                  Join Lobby
+                  Join Party
                 </div>
               </button>
             </div>
@@ -55,22 +65,25 @@ exports[`pages/index.tsx matches snapshot 1`] = `
             class="jsx-974242038 item  jsx-4216129763 "
           >
             <button
-              class="jsx-2376802331 btn "
+              class="jsx-2230649419 btn "
               type="button"
             >
               <div
                 class="text"
               >
-                New Lobby
+                New Party
               </div>
             </button>
           </div>
         </div>
+        <span
+          class="jsx-3462447556 "
+        />
         <div
-          class="jsx-2159491491 links"
+          class="jsx-1456828746 links"
         >
           <a
-            class="jsx-2159491491"
+            class="jsx-1456828746 link"
             href="https://discord.gg/MvYRVCP"
             rel="noopener noreferrer"
             target="_blank"
@@ -78,18 +91,32 @@ exports[`pages/index.tsx matches snapshot 1`] = `
             Discord
           </a>
           <span
-            class="jsx-2159491491"
+            class="jsx-1456828746 spacer"
           >
             |
           </span>
           <a
-            class="jsx-2159491491"
+            class="jsx-1456828746 link"
             href="https://github.com/tannerkrewson/rocketcrab/#-for-developers"
             rel="noopener noreferrer"
             target="_blank"
           >
             Developers
           </a>
+          <span
+            class="jsx-1456828746 spacer"
+          >
+            |
+          </span>
+          <span
+            class="jsx-1456828746 link"
+          >
+            <a
+              href="/library"
+            >
+              Browse Games
+            </a>
+          </span>
         </div>
       </div>
     </main>

@@ -1,5 +1,5 @@
 import NameBox from "../atoms/NameBox";
-import { Grid } from "@zeit-ui/react";
+import { Grid } from "@geist-ui/react";
 import { Player } from "../../types/types";
 
 const PlayerList = ({

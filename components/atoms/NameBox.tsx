@@ -1,4 +1,4 @@
-import { Loading, Card } from "@zeit-ui/react";
+import { Loading, Card } from "@geist-ui/react";
 
 const NameBox = ({
     name,
@@ -8,7 +8,7 @@ const NameBox = ({
 }: NameBoxProps): JSX.Element => (
     <Card
         style={{
-            border: "1pt solid " + (color || "LightGrey"),
+            border: "1pt solid " + (color || "#ddd"),
             borderRadius: "0",
         }}
     >
