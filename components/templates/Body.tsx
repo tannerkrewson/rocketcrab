@@ -25,6 +25,7 @@ const Body = ({ children }: BodyProps): JSX.Element => (
                 sizes="16x16"
                 href="/favicon-16x16.png"
             />
+            <link rel="shortcut icon" href="/favicon.ico" />
             <link rel="manifest" href="/manifest.webmanifest" />
             <link
                 rel="mask-icon"
@@ -33,6 +34,7 @@ const Body = ({ children }: BodyProps): JSX.Element => (
             />
             <meta name="msapplication-TileColor" content="#ffffff" />
             <meta name="theme-color" content="#ffffff" />
+            <meta name="description" content="party games for phones" />
         </Head>
         {children}
         <style jsx global>{`
