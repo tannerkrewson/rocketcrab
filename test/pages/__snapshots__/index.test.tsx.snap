@@ -77,6 +77,27 @@ exports[`pages/index.tsx matches snapshot 1`] = `
           </div>
         </div>
         <span
+          class="jsx-870436695 "
+        />
+        <div
+          class="jsx-1938348541 item justify jsx-1720607024 "
+        >
+          <div
+            class="jsx-974242038 item  jsx-4216129763 "
+          >
+            <button
+              class="jsx-459415554 btn btn-small btn-vertical"
+              type="button"
+            >
+              <div
+                class="text"
+              >
+                Add 🚀🦀 App
+              </div>
+            </button>
+          </div>
+        </div>
+        <span
           class="jsx-3462447556 "
         />
         <div
