@@ -57,7 +57,7 @@ const AddAppButton = () => {
             deferredPrompt.userChoice.then(() => setIsLoading(false));
         } else {
             alert(
-                "Failed to add Drawphone as an app on this device. Try again, or try on your phone!"
+                "Failed to add rocketcrab as an app on this device. Try again, or try on your phone!"
             );
             setIsLoading(false);
         }
