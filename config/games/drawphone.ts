@@ -10,6 +10,7 @@ const game: ServerGame = {
     displayUrlHref: "https://drawphone.tannerkrewson.com/",
     donationUrlText: "Buy Tanner a taco!",
     donationUrlHref: "https://www.buymeacoffee.com/tannerkrewson",
+    guideUrl: "https://drawphone.tannerkrewson.com/how-to-play",
     pictures: [
         "https://i.imgur.com/tHPfWpp.png",
         "https://i.imgur.com/EFQiuyd.png",

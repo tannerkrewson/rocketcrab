@@ -42,6 +42,7 @@ export type ClientGame = {
     displayUrlHref: string;
     donationUrlText?: string;
     donationUrlHref?: string;
+    guideUrl?: string;
     pictures?: Array<string>;
     category?: Array<string>;
     players?: string;
