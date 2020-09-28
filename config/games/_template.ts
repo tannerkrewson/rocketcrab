@@ -33,10 +33,14 @@ const game: ServerGame = {
     donationUrlText: "Support John on Patreon!", // optional
     donationUrlHref: "https://www.patreon.gov/johndoe", // optional
 
+    // the name of the markdown file of the rules for this game in the /config/guides directory
+    guideId: "coolgame", // optional
+
     // a link to the rule book or a guide for your game.
     // if a link to a website is provided, it will be displayed in an iframe.
-    // if a link to a pdf is provided, it will be displayed in an inline pdf viewer.
     guideUrl: "https://coolgameonline.com/rules", // optional
+
+    // only include a guideId, a guideUrl, or neither; not both.
 
     // links to screenshots of your game
     pictures: ["https://i.imgur.com/abcd.png", "https://i.imgur.com/efgh.png"], // optional

@@ -4,6 +4,7 @@ import PrimaryButton from "./PrimaryButton";
 import { Swiper, SwiperSlide } from "swiper/react";
 import FsLightbox from "fslightbox-react";
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
 
 const GameDetailBox = ({
     game,
@@ -45,6 +46,11 @@ const GameDetailBox = ({
                         </a>
                     </div>
                     <iframe src={game.guideUrl} />
+                </Tabs.Item>
+            )}
+            {game.guide && (
+                <Tabs.Item label="Guide" value="2">
+                    <ReactMarkdown source={game.guide} />
                 </Tabs.Item>
             )}
         </Tabs>

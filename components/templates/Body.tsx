@@ -51,6 +51,12 @@ const Body = ({ children }: BodyProps): JSX.Element => (
             .btn .text {
                 text-transform: none;
             }
+            /* fixes a weird geist bug where the dashes of unordered list move when you scroll */
+            .container ul li:before {
+                margin-right: 0.5em;
+                position: initial;
+                content: "•";
+            }
         `}</style>
     </>
 );

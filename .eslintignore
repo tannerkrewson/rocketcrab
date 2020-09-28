@@ -4,3 +4,4 @@
 **/dist/*
 **/public/sw*
 **/public/workbox-*
+**/*.md
