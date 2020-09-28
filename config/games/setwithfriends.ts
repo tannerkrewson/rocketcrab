@@ -22,39 +22,38 @@ const game: ServerGame = {
     familyFriendly: true,
 
     getJoinGameUrl: async () => {
-        const pool = [
-            "mutual-steadfast-underwear",
-            "unkempt-honest-sea",
-            "savvy-hilarious-bee",
-            "laughable-adorable-popcorn",
-            "quarrelsome-fluent-amount",
-            "merry-yummy-air",
-            "glossy-concerned-shape",
-            "near-sharp-kick",
-            "shaggy-flimsy-touch",
-            "merry-ubiquitous-advice",
-            "chivalrous-adaptable-boot",
-            "pleasant-sour-tramp",
-            "normal-rigid-hot",
-            "yummy-coherent-machine",
-            "ubiquitous-blue-pigs",
-            "dizzy-tired-wine",
-            "ablaze-quixotic-bucket",
-            "substantial-proper-breath",
-        ];
+        const roomName =
+            "rocketcrab-" + Math.random().toString(36).substring(8);
 
-        const roomName = pool[Math.floor(Math.random() * pool.length)];
+        const auth = await fetch(
+            "https://www.googleapis.com/identitytoolkit/v3/relyingparty/signupNewUser?key=AIzaSyCeKQ4rauZ_fq1rEIPJ8m5XfppwjtmTZBY",
+            {
+                method: "POST",
+                body: JSON.stringify({
+                    returnSecureToken: true,
+                }),
+                headers: {
+                    "content-type": "application/json",
+                    referer: "https://setwithfriends.com/",
+                },
+            }
+        );
+
+        const { idToken } = await auth.json();
+
         await fetch(
             "https://us-central1-setwithfriends.cloudfunctions.net/createGame",
             {
                 method: "POST",
                 body: JSON.stringify({
-                    gameId: roomName,
-                    access: "private",
+                    data: {
+                        gameId: roomName,
+                        access: "private",
+                    },
                 }),
                 headers: {
-                    authorization:
-                        "Bearer " + Math.random().toString(36).substring(10),
+                    authorization: "Bearer " + idToken,
+                    "content-type": "application/json",
                 },
             }
         );
