@@ -162,6 +162,7 @@ const GameLayout = ({
                     align-content: center;
                     padding: 0.5em;
                     height: 2em;
+                    z-index: 1;
                 }
                 @media only screen and (max-width: 385px) {
                     .status {

@@ -17,7 +17,17 @@ const SERVER_GAME_LIST: Array<ServerGame> = fs
         const exported = require("./games/" + name).default;
         const newGames = Array.isArray(exported) ? exported : [exported];
         return [...games, ...newGames];
-    }, []);
+    }, [])
+    .map((game) => {
+        if (!game.guideId) return game;
+
+        const guide = fs.readFileSync(
+            path.join(process.cwd(), "config", "guides", game.guideId + ".md"),
+            "utf8"
+        );
+
+        return { ...game, guide };
+    });
 
 const getClientGameList = (): Array<ClientGame> =>
     SERVER_GAME_LIST.map(

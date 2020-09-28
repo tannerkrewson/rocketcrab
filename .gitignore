@@ -5,6 +5,10 @@ node_modules
 .next
 .env*.local
 
+# next-pwa
+public/sw*
+public/workbox-*
+
 # express
 dist
 

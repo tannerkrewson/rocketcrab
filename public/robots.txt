@@ -1,0 +1,6 @@
+user-agent: *
+disallow: /
+allow: /$
+allow: /library
+allow: /join
+allow: /game

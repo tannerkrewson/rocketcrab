@@ -15,6 +15,7 @@ const game: ServerGame = {
     displayUrlHref: "https://spyfall.tannerkrewson.com/",
     donationUrlText: "Buy Tanner a taco!",
     donationUrlHref: "https://www.buymeacoffee.com/tannerkrewson",
+    guideId: "spyfall",
     category: ["medium"],
     players: "4+",
     familyFriendly: true,

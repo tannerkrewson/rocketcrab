@@ -3,6 +3,7 @@ import { useRouter } from "next/router";
 
 import PrimaryButton from "../components/atoms/PrimaryButton";
 import ButtonGroup from "../components/molecules/ButtonGroup";
+import AddAppButton from "../components/molecules/AddAppButton";
 import PageLayout from "../components/templates/PageLayout";
 import { postJson } from "../utils/utils";
 import Link from "next/link";
@@ -38,6 +39,7 @@ export const Home = (): JSX.Element => {
                     New Party
                 </PrimaryButton>
             </ButtonGroup>
+            <AddAppButton />
             <Spacer y={0.5} />
             <div className="links">
                 <a

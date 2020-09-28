@@ -4,6 +4,7 @@ import PrimaryButton from "./PrimaryButton";
 import { Swiper, SwiperSlide } from "swiper/react";
 import FsLightbox from "fslightbox-react";
 import { useState } from "react";
+import ReactMarkdown from "react-markdown";
 
 const GameDetailBox = ({
     game,
@@ -32,12 +33,26 @@ const GameDetailBox = ({
                     <p>{game.description}</p>
                 </SkinnyCard>
             </Tabs.Item>
-            <Tabs.Item label="Guide" value="2">
-                TODO: Guide coming soon...
-            </Tabs.Item>
-            <Tabs.Item label="Similar Games" value="3">
-                TODO: Similar games coming soon...
-            </Tabs.Item>
+            {game.guideUrl && (
+                <Tabs.Item label="Guide" value="2">
+                    <div className="info">
+                        <span className="emoji">🔗</span>{" "}
+                        <a
+                            href={game.guideUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            {game.guideUrl}
+                        </a>
+                    </div>
+                    <iframe src={game.guideUrl} />
+                </Tabs.Item>
+            )}
+            {game.guide && (
+                <Tabs.Item label="Guide" value="2">
+                    <ReactMarkdown source={game.guide} />
+                </Tabs.Item>
+            )}
         </Tabs>
         {onSelectGame && (
             <PrimaryButton onClick={() => onSelectGame(game.id)}>
@@ -53,6 +68,12 @@ const GameDetailBox = ({
         <style jsx>{`
             p {
                 margin: 0;
+            }
+            iframe {
+                width: 100vw;
+                height: 75vh;
+                position: relative;
+                left: calc((100vw - min(24em, 100vw)) / -2 - 0.5em);
             }
         `}</style>
     </div>

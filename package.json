@@ -10,7 +10,7 @@
         "build:server": "tsc --project tsconfig.server.json",
         "start": "cross-env NODE_ENV=production node dist/server/index.js",
         "type-check": "tsc --pretty --noEmit",
-        "format": "prettier --write **/*.{js,ts,tsx,json,yml}",
+        "format": "prettier --write **/*.{js,ts,tsx,json,yml,md}",
         "lint": "eslint . --ext ts --ext tsx --ext js",
         "lint:staged": "lint-staged",
         "test": "jest",
@@ -24,7 +24,7 @@
         }
     },
     "lint-staged": {
-        "*.@(js|ts|tsx|json)": [
+        "*.@(js|ts|tsx|json|md)": [
             "npm run lint",
             "npm run format"
         ]
@@ -37,11 +37,14 @@
         "fontsource-inconsolata": "^3.0.5",
         "fslightbox-react": "^1.5.0",
         "next": "^9.5.1",
+        "next-pwa": "^3.1.4",
         "nookies": "^2.4.0",
         "phonetic-alphabet-converter": "^0.2.0",
         "react": "^16.13.1",
         "react-dom": "^16.13.1",
         "react-ga": "^3.1.2",
+        "react-ios-pwa-prompt": "^1.8.0",
+        "react-markdown": "^4.3.1",
         "react-spinners-kit": "^1.9.1",
         "socket.io": "^2.3.0",
         "swiper": "^6.2.0",

@@ -2,3 +2,6 @@
 **/out/*
 **/.next/*
 **/dist/*
+**/public/sw*
+**/public/workbox-*
+**/*.md
