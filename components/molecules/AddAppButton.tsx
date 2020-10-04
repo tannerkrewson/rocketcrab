@@ -73,6 +73,7 @@ const AddAppButton = () => {
                             className="btn-small btn-vertical"
                             onClick={handleAddApp}
                             size="small"
+                            disabled={isLoading}
                         >
                             {isLoading ? "Loading..." : "Add 🚀🦀 App"}
                         </PrimaryButton>
