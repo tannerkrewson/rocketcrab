@@ -12,29 +12,33 @@ exports[`pages/join.tsx matches snapshot 1`] = `
         class="jsx-1855009027 main-content"
       >
         <div
-          class="jsx-1369873609 title"
+          class="jsx-13532065 title"
         >
           <h2
-            class="jsx-1369873609"
+            class="jsx-13532065"
           >
             <span
-              class="jsx-1369873609"
+              class="jsx-13532065"
               style="text-shadow: 0 0 10px cyan;"
             >
               🚀
             </span>
             <span
-              class="jsx-1369873609"
+              class="jsx-13532065"
               style="text-shadow: 0 0 10px #ff0000d9;"
             >
               🦀
             </span>
           </h2>
-          <h2
-            class="jsx-1369873609 party-url"
+          <div
+            class="jsx-418573366 tooltip "
           >
-            rocketcrab.com
-          </h2>
+            <h2
+              class="jsx-13532065 party-url"
+            >
+              rocketcrab.com
+            </h2>
+          </div>
         </div>
         <div
           class="jsx-2322376654 description"

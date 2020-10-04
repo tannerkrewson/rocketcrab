@@ -57,6 +57,20 @@ const Body = ({ children }: BodyProps): JSX.Element => (
                 position: initial;
                 content: "•";
             }
+            #geist-ui-tooltip .tooltip-content.transition-enter {
+                opacity: 0;
+            }
+            #geist-ui-tooltip .tooltip-content.transition-enter-active {
+                transition: opacity 0.2s ease-out;
+                opacity: 1;
+            }
+            #geist-ui-tooltip .tooltip-content.transition-leave {
+                opacity: 1;
+            }
+            #geist-ui-tooltip .tooltip-content.transition-leave-active {
+                transition: opacity 0.2s ease-out;
+                opacity: 0;
+            }
         `}</style>
     </>
 );
