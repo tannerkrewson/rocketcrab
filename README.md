@@ -1,4 +1,6 @@
-# 🚀🦀 rocketcrab
+<p align="center">
+  <img width="360" src="public/rocketcrab-logo-text.svg">
+</p>
 
 ### Play now at [rocketcrab.com](https://rocketcrab.com/)
 
@@ -8,11 +10,20 @@ rocketcrab is a lobby service and launcher for mobile web party games.
 
 ## 🚀🦀 for developers
 
+### Add your game to rocketcrab, tl;dr:
+
+1. Make sure your game has mobile support, and does not require a login or registration
+2. Add an API to your game that create a new room/lobby when called
+3. Copy `config/games/_template.ts` and fill it out for your game
+4. ...that's pretty much it. Submit a PR!!! If you'd like more detail, keep reading!
+
+### What's a "rocket crab"???
+
 Rocketcrab makes it easy for players to discover your game, and easily switch to and from your game without having to manually open a different website and enter a new game code. It accomplishs this by putting your game's page into an `iframe`, which allows any of your cookies, local storage, analytics, and advertising to continue working, while disallowing rocketcrab from manipulating your site. Integrating your game with rocketcrab should be a simple process, but please let me know by opening an issue or joining our Discord if there is any way it could be better!
 
 Games are added to rocketcrab via config files located [here](https://github.com/tannerkrewson/rocketcrab/tree/master/config/games). By looking at the config files of other games, you might be able to understand how other games implement rocketcrab, and how you might integrate rocketcrab into your game. Here's what you need to know:
 
-### Step 1: Ensuring compatability
+### Ensuring compatability
 
 Rocketcrab works by opening your game in an `iframe` on all of the players' devices. At minimum, for your game to work with rocketcrab, there must be:
 
@@ -21,9 +32,9 @@ Rocketcrab works by opening your game in an `iframe` on all of the players' devi
     -   generating a random id that your game will accept as a valid room code
 -   A way to construct a link to join a game using that game code (eg. `https://yourgame.com/abcd` will be opened on every player's browser, resulting in them all being in the same game together)
 
-That's it! Many existing games already offer these, and can work with rocketcrab without any changes! But, to make the experience of playing your game with rocketcrab even better, you may need to make a few minor changes, explained in step 3.
+That's it! Many existing games already offer these, and can work with rocketcrab without any changes! But, to make the experience of playing your game with rocketcrab even better, you may need to make a few minor changes, explained in the "The automatic query params" section below.
 
-### Step 2: Creating a config file
+### Creating a config file
 
 The config files, as mentioned above, should be fairly self explanatory. Along with the [config template](https://github.com/tannerkrewson/rocketcrab/blob/master/config/games/_template.ts), check out the config files of other games to see how they implement rocketcrab. The most important part, which will be explained here, is the `getJoinGameUrl` function. This function:
 
@@ -31,7 +42,7 @@ The config files, as mentioned above, should be fairly self explanatory. Along w
 -   needs to return an object with these properties:
     -   `playerURL` (required) string of the url that should be opened in every player's `iframe`.
     -   `hostURL` (optional) string of a url to be opened only in the "host" player's `iframe`. If not provided, the `playerURL` will be used.
-    -   `code` (optional) the code to be added to the `playerURL` as `code` (see step 3 for further explanation)
+    -   `code` (optional) the code to be added to the `playerURL` as `code` (see the next section for further explanation)
 
 Here are three examples of different `getJoinGameUrl` functions:
 
@@ -39,7 +50,7 @@ Here are three examples of different `getJoinGameUrl` functions:
 -   For [Spyfall](https://github.com/tannerkrewson/rocketcrab/blob/a3f796af7f6b70100b1dcf9ab141d73fea41e049/config/games/spyfall.ts#L18-L24), a new game can be generated in the exact same way as Drawphone. But, game links are required to take the format `spyfall.tannerkrewson.com/abcd`, and not `drawphone.tannerkrewson.com/?code=abcd` like the above example. So, instead of returning the game code from `getJoinGameUrl` in the `code` property, the game code is directly appended to the `playerURL` before it is returned from `getJoinGameUrl`.
 -   For [Just One](https://github.com/tannerkrewson/rocketcrab/blob/a3f796af7f6b70100b1dcf9ab141d73fea41e049/config/games/justone.ts#L14-L19), we can pick our own game code! So, instead of calling to some endpoint to get a game code like Drawphone and Spyfall, the `getJoinGameUrl` function can itself generate a code, and we cross our fingers and hope it's unique! 😂 The resulting `playerURL` will look something like this: `https://just1.herokuapp.com/room/rocketcrab-d5b30ccdd25855e5`.
 
-### Step 3: The automatic query params
+### The automatic query params
 
 The `playerURL` returned from `getJoinGameUrl` is automatically appended with 3 or 4 query params. Four if a `code` is returned `getJoinGameUrl`, four if not. The resulting `playerURL` that is opened in every player's `iframe` will look something like this:
 
@@ -49,20 +60,20 @@ https://yourgame.com/?rocketcrab=true&name=Mary&ishost=true&code=abcd
 
 -   `rocketcrab` will always be true, well, if you're using rocketcrab, that is! 😂 You can use this to put your game into a "rocketcrab" mode. Here are some ideas for how this could be helpful:
     -   Rocketcrab itself has it's own game code system, so if your game prominentely displays its own game code, your players may be confused. If `rocketcrab=true`, you should hide any UI in your game that shows the game code!
-    -   You should also hide any "Play on 🚀🦀" buttons (see step 4), because if `rocketcrab=true`, they're already playing with on rocketcrab! 😂
+    -   You should also hide any "Play on 🚀🦀" buttons (see the next section), because if `rocketcrab=true`, they're already playing with on rocketcrab! 😂
 -   `name` is a string of the name that each player has entered into rocketcrab. Use this instead of asking for your players' names a second time!
 -   `ishost` is `true` for the one player that is the host of the rocketcrab party, and `false` for all other players. A few caveats:
     -   I included this in case some one needed it, but implementing this in your game could allow any player that knows about it to make themselves host, especially outside of rocketcrab, so I don't recommend it.
     -   In Drawphone, for example, the first player who joins a party is made the host. So, rocketcrab will load the host's `iframe` first, and will wait a few seconds before opening the `iframe` of the rest of the players. This is not a guaranteed solution, as the `iframe` API does not allow rocketcrab to know when its page has loaded.
 -   `code` is the same `string` that is returned from `getJoinGameUrl`'s `code` property. If that `code` property is not provided, this query param will not be included.
 
-### Step 4: 🚀🦀 for your existing players
+### 🚀🦀 for your existing players
 
 If your game already has a player base, our goal is to make rocketcrab just as easy, if not easier, to use than how they already play. Rocketcrab is also a great way for your players to discover new games, which helps developers with no players yet find players for their games! So, we will want to make the process of discovering and jumping into a rocketcrab party from your game's existing lobby as painless as possible! Here's two features of rocketcrab to help:
 
 -   Place a button on the homepage of your game that links to `https://rocketcrab.com/transfer/[your game's id here]/`.
     -   This will place the user in a new rocketcrab party with your game already selected!
-    -   Your game's ID is the `id` that is set for your game in its config file. For example, Drawphone's is `drawphone`, so the link would look like `https://rocketcrab.com/transfer/drawphone/`.
+    -   Your game's ID is the `id` that is set for your game in its config file. For example, Drawphone's [is `drawphone`](https://github.com/tannerkrewson/rocketcrab/blob/00c36ef3b133d01f74969c14d5271461853325fb/config/games/drawphone.ts#L5), so the link would look like `https://rocketcrab.com/transfer/drawphone/`.
 -   Place a button in the party of your game that, when clicked by one player, will transfer all players to `https://rocketcrab.com/transfer/[your game's id here]/[insert a uuid here]`.
     -   The first time this link is followed, it will create a new rocketcrab party. Any subsequent time it is followed, it will place users into the same rocketcrab party that was created with the same `uuid`.
     -   Again, for the most seamless experience, when any player clicks the button, your game should automatically redirect all players in the lobby to this link right away.
