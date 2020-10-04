@@ -104,8 +104,10 @@ export const Code = ({
     const onStartGame = useCallback(() => {
         socket.emit("game-start");
 
-        logEvent("party-numberOfPlayers", playerList.length.toString());
-        logEvent("party-game", selectedGameId);
+        if (isHost) {
+            logEvent("party-numberOfPlayers", playerList.length.toString());
+            logEvent("party-game", selectedGameId);
+        }
     }, [playerList, selectedGameId]);
 
     const onExitGame = useCallback(() => {
