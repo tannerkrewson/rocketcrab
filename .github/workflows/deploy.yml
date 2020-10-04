@@ -3,7 +3,7 @@ name: deploy
 on:
     push:
         branches:
-            - master
+            - prod
 
 jobs:
     build:
@@ -12,7 +12,7 @@ jobs:
         steps:
             - uses: actions/checkout@v2
               with:
-                  ref: "master"
+                  ref: "prod"
                   fetch-depth: "0"
 
             - name: Dokku deploy
@@ -21,4 +21,4 @@ jobs:
                   PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
                   HOST: 134.209.222.77
                   PROJECT: rocketcrab
-                  BRANCH: master
+                  BRANCH: prod
