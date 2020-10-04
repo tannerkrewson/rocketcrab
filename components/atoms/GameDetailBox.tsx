@@ -221,7 +221,7 @@ const SpaceBadge = ({ children, style = {} }) => (
 );
 
 const SkinnyCard = ({ children }) => (
-    <Card style={{ marginBottom: "8pt" }}>
+    <Card style={{ marginBottom: "12pt" }}>
         <Card.Body style={{ padding: "8pt" }}>{children}</Card.Body>
     </Card>
 );

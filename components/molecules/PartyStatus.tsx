@@ -11,12 +11,7 @@ const PartyStatus = ({
     onShowGameInfo,
     isHost,
 }: PartyStatusProps): JSX.Element => (
-    <Card
-        style={{
-            border: "1pt solid #ddd",
-            borderRadius: "0",
-        }}
-    >
+    <Card>
         <Card.Content style={{ padding: "1em" }}>
             {selectedGame ? (
                 <>

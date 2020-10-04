@@ -76,6 +76,12 @@ const Body = ({ children }: BodyProps): JSX.Element => (
                 transition: opacity 0.2s ease-out;
                 opacity: 0;
             }
+
+            .card.card.card,
+            .card.card.card:hover {
+                box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
+                border-color: rgba(223, 225, 229, 0);
+            }
         `}</style>
     </>
 );
