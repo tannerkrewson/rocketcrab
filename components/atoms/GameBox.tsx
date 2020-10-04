@@ -22,6 +22,7 @@ const GameBox = ({ game, onClick }: GameBoxProps): JSX.Element => (
             <Description
                 style={{ width: "fit-content" }}
                 title={"by " + game.author}
+                className="remove-text-transform"
             />
             {onClick && (
                 <span

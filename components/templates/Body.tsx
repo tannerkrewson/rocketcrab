@@ -47,16 +47,21 @@ const Body = ({ children }: BodyProps): JSX.Element => (
                 letter-spacing: normal !important;
                 font-family: "Inconsolata", monospace;
             }
-            .card .content dl dt,
+
+            /* remove text-transform from "Description" element and buttons */
+            dl.remove-text-transform dt,
             .btn .text {
                 text-transform: none;
             }
+
             /* fixes a weird geist bug where the dashes of unordered list move when you scroll */
             .container ul li:before {
                 margin-right: 0.5em;
                 position: initial;
                 content: "•";
             }
+
+            /* "Copied!" tooltip animation */
             #geist-ui-tooltip .tooltip-content.transition-enter {
                 opacity: 0;
             }

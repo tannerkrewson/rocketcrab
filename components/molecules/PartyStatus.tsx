@@ -9,6 +9,7 @@ const PartyStatus = ({
     selectedGame,
     host: { name: hostName },
     onShowGameInfo,
+    isHost,
 }: PartyStatusProps): JSX.Element => (
     <Card
         style={{
@@ -28,7 +29,11 @@ const PartyStatus = ({
                     >
                         {selectedGame.name}
                     </h3>
-                    <div>Waiting for {hostName} to start...</div>
+                    <div>
+                        {isHost
+                            ? "As the host, you have to start the game!"
+                            : "Waiting for " + hostName + " to start..."}
+                    </div>
                     <Spacer y={1} />
                     <ButtonGroup>
                         <PrimaryButton onClick={onShowGameInfo} size="small">
@@ -50,7 +55,11 @@ const PartyStatus = ({
                             lineHeight: "1.2em",
                         }}
                     >
-                        {"Waiting for " + hostName + " to select a game..."}
+                        {isHost
+                            ? "As the host, you must select the game!"
+                            : "Waiting for " +
+                              hostName +
+                              " to select a game..."}
                     </div>
                 </div>
             )}
@@ -62,6 +71,7 @@ type PartyStatusProps = {
     selectedGame: ClientGame;
     host: Player;
     onShowGameInfo: () => void;
+    isHost: boolean;
 };
 
 export default PartyStatus;

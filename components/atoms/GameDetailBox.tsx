@@ -63,6 +63,7 @@ const GameDetailBox = ({
             <Description
                 style={{ margin: "0 auto", width: "fit-content" }}
                 title="Only the host can select a game."
+                className="remove-text-transform"
             />
         )}
         <style jsx>{`

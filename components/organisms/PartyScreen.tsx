@@ -70,6 +70,7 @@ const PartyScreen = ({
                 selectedGame={selectedGame}
                 host={host}
                 onShowGameInfo={showGameInfo(true)}
+                isHost={isHost}
             />
             <Spacer y={1} />
             <ButtonGroup>
