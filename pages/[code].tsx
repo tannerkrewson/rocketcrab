@@ -19,6 +19,7 @@ import { parseCookies, setCookie as setNookie } from "nookies";
 import Connecting from "../components/atoms/Connecting";
 import { logEvent } from "../utils/analytics";
 import { PartyStatus } from "../types/enums";
+import { RocketcrabDexie } from "../utils/dexie";
 
 const CLIENT_GAME_LIBRARY = getClientGameLibrary();
 const socket = socketIOClient();
@@ -103,6 +104,9 @@ export const Code = ({
 
     const onStartGame = useCallback(() => {
         socket.emit("game-start");
+
+        const db = new RocketcrabDexie();
+        db.addGame(selectedGameId);
 
         if (isHost) {
             logEvent("party-numberOfPlayers", playerList.length.toString());

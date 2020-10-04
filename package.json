@@ -33,6 +33,7 @@
         "@geist-ui/react": "^2.0.2",
         "body-parser": "^1.19.0",
         "cross-env": "^7.0.2",
+        "dexie": "^3.0.2",
         "express": "^4.17.1",
         "fontsource-inconsolata": "^3.0.5",
         "fslightbox-react": "^1.5.0",
