@@ -1,6 +1,7 @@
 import CategoryGroup from "../molecules/CategoryGroup";
 import { Input, useInput, Spacer } from "@geist-ui/react";
 import GameGroup from "../molecules/GameGroup";
+import RecentGameGroup from "../molecules/RecentGameGroup";
 import { useState, useEffect } from "react";
 import { ClientGameLibrary } from "../../types/types";
 import PrimaryButton from "../atoms/PrimaryButton";
@@ -23,6 +24,8 @@ const GameLibrary = ({
     );
 
     const categoryName = fullCategory ? fullCategory.name + " " : "";
+
+    const showRecentGames = selectedCategory === "recent";
 
     return (
         <div style={{ textAlign: "center" }}>
@@ -53,7 +56,7 @@ const GameLibrary = ({
                     </PrimaryButton>
                 </>
             )}
-            {(selectedCategory || search) && (
+            {(selectedCategory || search) && !showRecentGames && (
                 <>
                     <GameGroup
                         gameList={gameLibrary.gameList}
@@ -62,6 +65,25 @@ const GameLibrary = ({
                         }}
                         nameFilter={search}
                         categoryFilter={selectedCategory}
+                    />
+                    <Spacer y={1} />
+                    <PrimaryButton
+                        onClick={() => {
+                            setSelectedCategory("");
+                            setSearch("");
+                        }}
+                    >
+                        ↩️ Back to categories
+                    </PrimaryButton>
+                </>
+            )}
+            {showRecentGames && (
+                <>
+                    <RecentGameGroup
+                        gameList={gameLibrary.gameList}
+                        onSelectGame={(gameId) => {
+                            setViewingGameId(gameId);
+                        }}
                     />
                     <Spacer y={1} />
                     <PrimaryButton

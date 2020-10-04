@@ -1,5 +1,11 @@
 [
     {
+        "id": "recent",
+        "name": "✨ Recently played",
+        "color": "white",
+        "backgroundColor": "darkgrey"
+    },
+    {
         "id": "easy",
         "name": "🟢 Very simple",
         "color": "white",
