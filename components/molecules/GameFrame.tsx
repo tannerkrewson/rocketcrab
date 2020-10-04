@@ -72,9 +72,44 @@ const GameFrame = ({
                             alignItems: "center",
                             justifyContent: "center",
                             height: "100%",
+                            flexDirection: "column",
                         }}
                     >
-                        {gameState.error}
+                        <h4>{gameState.error}</h4>
+                        <p
+                            style={{
+                                color: "grey",
+                                margin: "1em",
+                                textAlign: "center",
+                            }}
+                        >
+                            {thisGame.name} may be down. 😭 You can check{" "}
+                            <a
+                                href={thisGame.displayUrlHref}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                {thisGame.displayUrlText}
+                            </a>
+                            , or try again later. If the problem continues, let
+                            us know on{" "}
+                            <a
+                                href="https://discord.gg/MvYRVCP"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                Discord
+                            </a>{" "}
+                            or{" "}
+                            <a
+                                href="https://github.com/tannerkrewson/rocketcrab/issues"
+                                target="_blank"
+                                rel="noopener noreferrer"
+                            >
+                                GitHub
+                            </a>
+                            . 😃
+                        </p>
                     </div>
                 </div>
             )}
