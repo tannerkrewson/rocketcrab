@@ -30,7 +30,7 @@ const GameDetailBox = ({
                     <GameBadges game={game} allCategories={allCategories} />
                 </SkinnyCard>
                 <SkinnyCard>
-                    <p>{game.description}</p>
+                    <div>{game.description}</div>
                 </SkinnyCard>
             </Tabs.Item>
             {game.guideUrl && (

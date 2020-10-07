@@ -190,6 +190,7 @@ const GameLayout = ({
                     height: 1em;
                     margin: auto 0;
                     font-weight: bold;
+                    font-family: "Inconsolata", monospace;
                 }
                 .component-frame {
                     padding: 1em;

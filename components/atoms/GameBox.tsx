@@ -40,6 +40,10 @@ const GameBox = ({ game, onClick }: GameBoxProps): JSX.Element => (
                 box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
                 transform: translate3d(0px, -1px, 0px);
             }
+            .shadow-button.shadow-button:active {
+                box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.12);
+                transform: none;
+            }
         `}</style>
     </button>
 );

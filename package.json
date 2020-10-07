@@ -36,6 +36,7 @@
         "dexie": "^3.0.2",
         "express": "^4.17.1",
         "fontsource-inconsolata": "^3.0.5",
+        "fontsource-mukta": "^3.0.5",
         "fslightbox-react": "^1.5.0",
         "next": "^9.5.1",
         "next-pwa": "^3.1.4",

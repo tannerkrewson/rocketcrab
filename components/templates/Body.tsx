@@ -45,7 +45,7 @@ const Body = ({ children }: BodyProps): JSX.Element => (
             }
             * {
                 letter-spacing: normal !important;
-                font-family: "Inconsolata", monospace;
+                font-family: "Mukta", sans-serif;
             }
 
             /* remove text-transform from "Description" element and buttons */

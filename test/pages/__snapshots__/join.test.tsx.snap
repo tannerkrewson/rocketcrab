@@ -12,19 +12,19 @@ exports[`pages/join.tsx matches snapshot 1`] = `
         class="jsx-1855009027 main-content"
       >
         <div
-          class="jsx-13532065 title"
+          class="jsx-1031890861 title"
         >
           <h2
-            class="jsx-13532065"
+            class="jsx-1031890861"
           >
             <span
-              class="jsx-13532065"
+              class="jsx-1031890861"
               style="text-shadow: 0 0 10px cyan;"
             >
               🚀
             </span>
             <span
-              class="jsx-13532065"
+              class="jsx-1031890861"
               style="text-shadow: 0 0 10px #ff0000d9;"
             >
               🦀
@@ -34,7 +34,7 @@ exports[`pages/join.tsx matches snapshot 1`] = `
             class="jsx-418573366 tooltip "
           >
             <h2
-              class="jsx-13532065 party-url"
+              class="jsx-1031890861 party-url"
             >
               rocketcrab.com
             </h2>

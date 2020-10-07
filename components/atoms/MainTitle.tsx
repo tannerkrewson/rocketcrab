@@ -63,6 +63,7 @@ const MainTitle = ({
                         transform: scale(1);
                         transition: transform 0.2s ease-out;
                         user-select: none;
+                        font-family: "Inconsolata", monospace;
                     }
 
                     .party-url:active {
