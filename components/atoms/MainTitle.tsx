@@ -24,21 +24,8 @@ const MainTitle = ({
     return (
         <div className={titleClasses}>
             <div style={{ margin: ".5em" }}>
-                <img
-                    src="/rocket.svg"
-                    style={{
-                        height: "2.6em",
-                        marginRight: ".7em",
-                        filter: "drop-shadow(0 0 6px cyan)",
-                    }}
-                />
-                <img
-                    src="/crab.svg"
-                    style={{
-                        height: "2.6em",
-                        filter: "drop-shadow(0 0 6px #ff0000d9)",
-                    }}
-                />
+                <img src="/rocket.svg" className="rocket" />
+                <img src="/crab.svg" className="crab" />
             </div>
             <Tooltip
                 text={"Copied!"}
@@ -68,6 +55,19 @@ const MainTitle = ({
                         margin-bottom: -2em;
                         transform: scale(0.75);
                         filter: saturate(50%) opacity(50%) blur(1px);
+                    }
+
+                    .logo {
+                        margin: 0.5em;
+                    }
+                    .rocket {
+                        height: 2.6em;
+                        margin-right: 0.7em;
+                        filter: drop-shadow(0 0 6px cyan);
+                    }
+                    .crab {
+                        height: 2.6em;
+                        filter: drop-shadow(0 0 6px #ff0000d9);
                     }
 
                     .party-url {

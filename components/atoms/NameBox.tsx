@@ -10,6 +10,7 @@ const NameBox = ({
         style={{
             border: "1pt solid " + (color || "#ddd"),
             borderRadius: "0",
+            boxShadow: "none",
         }}
     >
         <Card.Body style={{ padding: ".5em", position: "relative" }}>

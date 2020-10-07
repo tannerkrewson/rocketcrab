@@ -202,6 +202,7 @@ const GameLayout = ({
                     border: 1px solid #ddd;
                     width: min(24em, 100vw - 3em);
                     margin: 0.5em;
+                    box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
                 }
             `}</style>
         </div>

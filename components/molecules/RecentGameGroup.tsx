@@ -26,7 +26,30 @@ const RecentGameGroup = ({
                     )
                     .map((game, i) => (
                         <Grid xs={24} key={i}>
-                            <GameBox game={game} onClick={onSelectGame} />
+                            <div className="anim-box">
+                                <GameBox game={game} onClick={onSelectGame} />
+                            </div>
+                            <style jsx>{`
+                                .anim-box {
+                                    animation-name: fadein;
+                                    animation-duration: 0.25s;
+                                    animation-timing-function: ease-in-out;
+                                    animation-delay: ${i * 0.05}s;
+                                    animation-fill-mode: both;
+                                }
+                                @keyframes fadein {
+                                    from {
+                                        opacity: 0;
+                                        visibility: hidden;
+                                        transform: translateX(10%);
+                                    }
+                                    to {
+                                        opacity: 1;
+                                        visibility: visible;
+                                        transform: translateX(0%);
+                                    }
+                                }
+                            `}</style>
                         </Grid>
                     ))
             );
