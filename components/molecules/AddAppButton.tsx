@@ -9,7 +9,7 @@ import { useState, useEffect } from "react";
 import PrimaryButton from "../atoms/PrimaryButton";
 import { Spacer } from "@geist-ui/react";
 import ButtonGroup from "../molecules/ButtonGroup";
-import { logEvent } from "../../dist/utils/analytics";
+import { logEvent } from "../../utils/analytics";
 
 // https://github.com/chrisdancee/react-ios-pwa-prompt/issues/32#issuecomment-586762839
 const PWAPrompt = dynamic(() => import("react-ios-pwa-prompt"), {
