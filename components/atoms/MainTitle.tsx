@@ -23,10 +23,23 @@ const MainTitle = ({
 
     return (
         <div className={titleClasses}>
-            <h2>
-                <span style={{ textShadow: "0 0 10px cyan" }}>🚀</span>
-                <span style={{ textShadow: "0 0 10px #ff0000d9" }}>🦀</span>
-            </h2>
+            <div style={{ margin: ".5em" }}>
+                <img
+                    src="/rocket.svg"
+                    style={{
+                        height: "2.6em",
+                        marginRight: ".7em",
+                        filter: "drop-shadow(0 0 6px cyan)",
+                    }}
+                />
+                <img
+                    src="/crab.svg"
+                    style={{
+                        height: "2.6em",
+                        filter: "drop-shadow(0 0 6px #ff0000d9)",
+                    }}
+                />
+            </div>
             <Tooltip
                 text={"Copied!"}
                 visible={copiedTooltip}
