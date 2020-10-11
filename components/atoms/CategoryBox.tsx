@@ -6,11 +6,9 @@ const CategoryBox = ({
     count,
 }: CategoryBoxProps): JSX.Element => (
     <Grid xs={12} key={id}>
-        <div className="anim-box">
-            <button onClick={() => onClick(id)} className="category-box">
-                {name}
-            </button>
-        </div>
+        <button onClick={() => onClick(id)} className="category-box">
+            {name}
+        </button>
         <style jsx>{`
             .category-box {
                 overflow: hidden;
@@ -26,17 +24,16 @@ const CategoryBox = ({
                 background-color: ${backgroundColor};
                 box-shadow: ${backgroundColor} 0px 1px 8px 0px;
                 transition: transform 200ms ease 0ms, box-shadow 200ms ease 0ms;
-            }
-            .category-box:hover {
-                box-shadow: ${backgroundColor} 0 4px 12px;
-                transform: translate3d(0px, -1px, 0px);
-            }
-            .anim-box {
+
                 animation-name: fadein;
                 animation-duration: 0.25s;
                 animation-timing-function: ease-in-out;
                 animation-delay: ${count * 0.05}s;
                 animation-fill-mode: both;
+            }
+            .category-box:hover {
+                box-shadow: ${backgroundColor} 0 4px 12px;
+                transform: translate3d(0px, -1px, 0px);
             }
             @keyframes fadein {
                 from {
