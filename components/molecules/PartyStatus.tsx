@@ -1,5 +1,5 @@
 import { Card, Spacer } from "@geist-ui/react";
-import React from "react";
+
 import { JellyfishSpinner } from "react-spinners-kit";
 import { ClientGame, Player } from "../../types/types";
 import PrimaryButton from "../atoms/PrimaryButton";

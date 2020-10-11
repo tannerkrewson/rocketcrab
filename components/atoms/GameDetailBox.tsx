@@ -1,6 +1,5 @@
 import { ClientGame, GameCategory } from "../../types/types";
 import { Card, Badge, Description, Tabs } from "@geist-ui/react";
-import PrimaryButton from "./PrimaryButton";
 import { Swiper, SwiperSlide } from "swiper/react";
 import FsLightbox from "fslightbox-react";
 import { useState } from "react";
@@ -9,7 +8,6 @@ import ReactMarkdown from "react-markdown";
 const GameDetailBox = ({
     game,
     allCategories,
-    onSelectGame,
     showOnlyHostMessage,
 }: GameDetailBoxProps): JSX.Element => (
     <div style={{ textAlign: "left" }}>
@@ -54,11 +52,6 @@ const GameDetailBox = ({
                 </Tabs.Item>
             )}
         </Tabs>
-        {onSelectGame && (
-            <PrimaryButton onClick={() => onSelectGame(game.id)}>
-                Select game
-            </PrimaryButton>
-        )}
         {showOnlyHostMessage && (
             <Description
                 style={{ margin: "0 auto", width: "fit-content" }}
@@ -229,7 +222,6 @@ const SkinnyCard = ({ children }) => (
 type GameDetailBoxProps = {
     game: ClientGame;
     allCategories: Array<GameCategory>;
-    onSelectGame?: (id: string) => void;
     showOnlyHostMessage?: boolean;
 };
 

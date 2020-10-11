@@ -1,10 +1,9 @@
 import CategoryGroup from "../molecules/CategoryGroup";
 import { Input, useInput, Spacer } from "@geist-ui/react";
-import GameGroup from "../molecules/GameGroup";
+import FilteredGameGroup from "./FilteredGameGroup";
 import RecentGameGroup from "../molecules/RecentGameGroup";
 import { useState, useEffect } from "react";
 import { ClientGameLibrary } from "../../types/types";
-import PrimaryButton from "../atoms/PrimaryButton";
 
 const GameLibrary = ({
     gameLibrary,
@@ -28,77 +27,61 @@ const GameLibrary = ({
     const showRecentGames = selectedCategory === "recent";
 
     return (
-        <div style={{ textAlign: "center" }}>
+        <div style={{ textAlign: "center", justifyContent: "center" }}>
             <Spacer y={2} />
             <h4>{categoryName}Games</h4>
             <Spacer y={1} />
-            {!selectedCategory && (
-                <>
-                    <Input
-                        icon="🔎"
-                        placeholder="Search"
-                        width="100%"
-                        clearable
-                        {...bindings}
-                    />
-                    <Spacer y={1} />
-                </>
-            )}
+            {!selectedCategory && <SearchBox {...bindings} />}
             {!selectedCategory && !search && (
-                <>
-                    <CategoryGroup
-                        categories={gameLibrary.categories}
-                        onSelectCategory={setSelectedCategory}
-                    />
-                    <Spacer y={1} />
-                    <PrimaryButton onClick={onDone} size="medium">
-                        ↩️ Back to {backToLabel}
-                    </PrimaryButton>
-                </>
+                <CategoryGroup
+                    categories={gameLibrary.categories}
+                    onSelectCategory={setSelectedCategory}
+                    onDone={onDone}
+                    backToLabel={backToLabel}
+                />
             )}
             {(selectedCategory || search) && !showRecentGames && (
-                <>
-                    <GameGroup
-                        gameList={gameLibrary.gameList}
-                        onSelectGame={(gameId) => {
-                            setViewingGameId(gameId);
-                        }}
-                        nameFilter={search}
-                        categoryFilter={selectedCategory}
-                    />
-                    <Spacer y={1} />
-                    <PrimaryButton
-                        onClick={() => {
-                            setSelectedCategory("");
-                            setSearch("");
-                        }}
-                    >
-                        ↩️ Back to categories
-                    </PrimaryButton>
-                </>
+                <FilteredGameGroup
+                    gameList={gameLibrary.gameList}
+                    onSelectGame={(gameId) => {
+                        setViewingGameId(gameId);
+                    }}
+                    nameFilter={search}
+                    categoryFilter={selectedCategory}
+                    onBack={() => {
+                        setSelectedCategory("");
+                        setSearch("");
+                    }}
+                />
             )}
             {showRecentGames && (
-                <>
-                    <RecentGameGroup
-                        gameList={gameLibrary.gameList}
-                        onSelectGame={(gameId) => {
-                            setViewingGameId(gameId);
-                        }}
-                    />
-                    <Spacer y={1} />
-                    <PrimaryButton
-                        onClick={() => {
-                            setSelectedCategory("");
-                            setSearch("");
-                        }}
-                    >
-                        ↩️ Back to categories
-                    </PrimaryButton>
-                </>
+                <RecentGameGroup
+                    gameList={gameLibrary.gameList}
+                    onSelectGame={(gameId) => {
+                        setViewingGameId(gameId);
+                    }}
+                    onBack={() => {
+                        setSelectedCategory("");
+                        setSearch("");
+                    }}
+                />
             )}
         </div>
     );
 };
+
+const SearchBox = (props) => (
+    <>
+        <Input
+            icon="🔎"
+            placeholder="Search"
+            width="100%"
+            clearable
+            {...props}
+        />
+        <Spacer y={1} />
+    </>
+);
 
 type GameLibraryProps = {
     gameLibrary: ClientGameLibrary;

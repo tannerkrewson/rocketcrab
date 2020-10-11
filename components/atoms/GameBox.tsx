@@ -1,26 +1,39 @@
 import { ClientGame } from "../../types/types";
-import { Description } from "@geist-ui/react";
+import { Description, Grid } from "@geist-ui/react";
 
-const GameBox = ({ game, onClick }: GameBoxProps): JSX.Element => (
-    <button onClick={() => onClick(game.id)} className="shadow-button">
-        <b>{game.name}</b>
-        <Description
-            style={{ width: "fit-content" }}
-            title={"by " + game.author}
-            className="remove-text-transform"
-        />
-        {onClick && (
-            <span
-                style={{
-                    position: "absolute",
-                    right: ".5em",
-                    top: "1.2em",
-                }}
-            >
-                ➡️
-            </span>
-        )}
+const GameBox = ({ game, onClick, count = 0 }: GameBoxProps): JSX.Element => (
+    <Grid xs={24}>
+        <div className="anim-box">
+            <button onClick={() => onClick(game.id)} className="shadow-button">
+                <b>{game.name}</b>
+                <Description
+                    style={{ width: "fit-content" }}
+                    title={"by " + game.author}
+                    className="remove-text-transform"
+                />
+                <span className="back-emoji">➡️</span>
+            </button>
+        </div>
         <style jsx>{`
+            .anim-box {
+                animation-name: fadein;
+                animation-duration: 0.25s;
+                animation-timing-function: ease-in-out;
+                animation-delay: ${count * 0.05}s;
+                animation-fill-mode: both;
+            }
+            @keyframes fadein {
+                from {
+                    opacity: 0;
+                    visibility: hidden;
+                    transform: translateX(10%);
+                }
+                to {
+                    opacity: 1;
+                    visibility: visible;
+                    transform: translateX(0%);
+                }
+            }
             .shadow-button {
                 min-width: 100%;
                 line-height: normal;
@@ -44,13 +57,20 @@ const GameBox = ({ game, onClick }: GameBoxProps): JSX.Element => (
                 box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.12);
                 transform: none;
             }
+
+            .back-emoji {
+                position: absolute;
+                right: 0.5em;
+                top: 1.2em;
+            }
         `}</style>
-    </button>
+    </Grid>
 );
 
 type GameBoxProps = {
     game: ClientGame;
     onClick: (name: string) => void;
+    count: number;
 };
 
 export default GameBox;

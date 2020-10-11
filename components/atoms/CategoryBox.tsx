@@ -1,11 +1,16 @@
 import { GameCategory } from "../../types/types";
-
+import { Grid } from "@geist-ui/react";
 const CategoryBox = ({
     category: { id, name, color, backgroundColor },
     onClick,
+    count,
 }: CategoryBoxProps): JSX.Element => (
-    <button onClick={() => onClick(id)} className="category-box">
-        {name}
+    <Grid xs={12} key={id}>
+        <div className="anim-box">
+            <button onClick={() => onClick(id)} className="category-box">
+                {name}
+            </button>
+        </div>
         <style jsx>{`
             .category-box {
                 overflow: hidden;
@@ -26,13 +31,33 @@ const CategoryBox = ({
                 box-shadow: ${backgroundColor} 0 4px 12px;
                 transform: translate3d(0px, -1px, 0px);
             }
+            .anim-box {
+                animation-name: fadein;
+                animation-duration: 0.25s;
+                animation-timing-function: ease-in-out;
+                animation-delay: ${count * 0.05}s;
+                animation-fill-mode: both;
+            }
+            @keyframes fadein {
+                from {
+                    opacity: 0;
+                    visibility: hidden;
+                    transform: scale(0.8);
+                }
+                to {
+                    opacity: 1;
+                    visibility: visible;
+                    transform: scale(1);
+                }
+            }
         `}</style>
-    </button>
+    </Grid>
 );
 
 export type CategoryBoxProps = {
     category: GameCategory;
     onClick: (id: string) => void;
+    count: number;
 };
 
 export default CategoryBox;

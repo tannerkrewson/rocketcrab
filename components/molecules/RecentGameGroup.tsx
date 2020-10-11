@@ -1,12 +1,13 @@
-import { Grid } from "@geist-ui/react";
 import { useEffect, useState } from "react";
 import { ClientGame } from "../../types/types";
 import { RocketcrabDexie } from "../../utils/dexie";
 import GameBox from "../atoms/GameBox";
+import GameGroup from "./GameGroup";
 
 const RecentGameGroup = ({
     gameList,
     onSelectGame,
+    onBack,
 }: RecentGameGroupProps): JSX.Element => {
     const [games, setGames] = useState<Array<JSX.Element> | undefined>();
 
@@ -25,32 +26,12 @@ const RecentGameGroup = ({
                         gameList.find(({ id }) => id === gameId)
                     )
                     .map((game, i) => (
-                        <Grid xs={24} key={i}>
-                            <div className="anim-box">
-                                <GameBox game={game} onClick={onSelectGame} />
-                            </div>
-                            <style jsx>{`
-                                .anim-box {
-                                    animation-name: fadein;
-                                    animation-duration: 0.25s;
-                                    animation-timing-function: ease-in-out;
-                                    animation-delay: ${i * 0.05}s;
-                                    animation-fill-mode: both;
-                                }
-                                @keyframes fadein {
-                                    from {
-                                        opacity: 0;
-                                        visibility: hidden;
-                                        transform: translateX(10%);
-                                    }
-                                    to {
-                                        opacity: 1;
-                                        visibility: visible;
-                                        transform: translateX(0%);
-                                    }
-                                }
-                            `}</style>
-                        </Grid>
+                        <GameBox
+                            key={game.id}
+                            count={i}
+                            game={game}
+                            onClick={onSelectGame}
+                        />
                     ))
             );
         };
@@ -69,12 +50,13 @@ const RecentGameGroup = ({
         );
     }
 
-    return <Grid.Container gap={1}>{games}</Grid.Container>;
+    return <GameGroup games={games} onBack={onBack} />;
 };
 
 type RecentGameGroupProps = {
     gameList: Array<ClientGame>;
     onSelectGame: (id: string) => void;
+    onBack: () => void;
 };
 
 export default RecentGameGroup;

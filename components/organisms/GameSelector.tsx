@@ -48,8 +48,18 @@ const GameSelector = ({
                         <PrimaryButton onClick={onBackToSearch}>
                             ↩️ Back to search
                         </PrimaryButton>
+                        <PrimaryButton
+                            disabled={!isHost}
+                            onClick={onSelectGameButton}
+                            type="error"
+                        >
+                            Select game
+                        </PrimaryButton>
                         {isHost && (
-                            <PrimaryButton onClick={onSelectGameButton}>
+                            <PrimaryButton
+                                onClick={onSelectGameButton}
+                                type="error"
+                            >
                                 Select Game
                             </PrimaryButton>
                         )}
