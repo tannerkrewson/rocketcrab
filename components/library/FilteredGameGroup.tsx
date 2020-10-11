@@ -1,5 +1,5 @@
 import { ClientGame } from "../../types/types";
-import GameBox from "../atoms/GameBox";
+import GameBox from "./GameBox";
 import GameGroup from "./GameGroup";
 
 const FilteredGameGroup = ({

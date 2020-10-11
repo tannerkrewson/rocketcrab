@@ -1,9 +1,9 @@
-import CategoryBox from "../atoms/CategoryBox";
+import CategoryBox from "./CategoryBox";
 import { GameCategory } from "../../types/types";
 import { Grid, Spacer } from "@geist-ui/react";
 
-import PrimaryButton from "../atoms/PrimaryButton";
-import ButtonGroup from "./ButtonGroup";
+import PrimaryButton from "../common/PrimaryButton";
+import ButtonGroup from "../common/ButtonGroup";
 
 const CategoryGroup = ({
     categories,

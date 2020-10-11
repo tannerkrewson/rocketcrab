@@ -1,4 +1,4 @@
-import NameBox from "../atoms/NameBox";
+import NameBox from "./NameBox";
 import { Grid } from "@geist-ui/react";
 import { Player } from "../../types/types";
 

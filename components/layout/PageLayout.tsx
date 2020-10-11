@@ -1,6 +1,6 @@
 import { Loading } from "@geist-ui/react";
-import Footer from "../atoms/Footer";
-import MainTitle from "../atoms/MainTitle";
+import Footer from "./Footer";
+import MainTitle from "./MainTitle";
 
 const PageLayout = ({
     children,

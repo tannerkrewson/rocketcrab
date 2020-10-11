@@ -1,4 +1,4 @@
-import PrimaryButton from "../atoms/PrimaryButton";
+import PrimaryButton from "../common/PrimaryButton";
 import { Spacer } from "@geist-ui/react";
 import { MenuButton } from "../../types/types";
 

@@ -1,9 +1,9 @@
 import { GetStaticPaths, GetStaticProps, InferGetStaticPropsType } from "next";
 import { useRouter } from "next/router";
 import { useCallback } from "react";
-import GameDetailBox from "../../components/atoms/GameDetailBox";
-import PrimaryButton from "../../components/atoms/PrimaryButton";
-import PageLayout from "../../components/templates/PageLayout";
+import GameDetailBox from "../../components/library/GameDetailBox";
+import PrimaryButton from "../../components/common/PrimaryButton";
+import PageLayout from "../../components/layout/PageLayout";
 import { getClientGameLibrary } from "../../config";
 
 const CLIENT_GAME_LIBRARY = getClientGameLibrary();

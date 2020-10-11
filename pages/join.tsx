@@ -1,9 +1,9 @@
 import { useRouter } from "next/router";
 import { Input } from "@geist-ui/react";
 
-import PrimaryButton from "../components/atoms/PrimaryButton";
-import ButtonGroup from "../components/molecules/ButtonGroup";
-import PageLayout from "../components/templates/PageLayout";
+import PrimaryButton from "../components/common/PrimaryButton";
+import ButtonGroup from "../components/common/ButtonGroup";
+import PageLayout from "../components/layout/PageLayout";
 import { useState } from "react";
 
 export const Join = (): JSX.Element => {

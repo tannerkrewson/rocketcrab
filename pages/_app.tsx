@@ -1,5 +1,5 @@
 import { GeistProvider, CssBaseline } from "@geist-ui/react";
-import Body from "../components/templates/Body";
+import Body from "../components/layout/Body";
 import "fontsource-inconsolata";
 import "fontsource-mukta";
 import { AppPropsType } from "next/dist/next-server/lib/utils";

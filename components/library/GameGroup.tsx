@@ -1,6 +1,6 @@
 import { Grid, Spacer } from "@geist-ui/react";
-import PrimaryButton from "../atoms/PrimaryButton";
-import ButtonGroup from "./ButtonGroup";
+import PrimaryButton from "../common/PrimaryButton";
+import ButtonGroup from "../common/ButtonGroup";
 
 const GameGroup = ({ games, onBack }: GameGroupProps): JSX.Element => (
     <Grid.Container gap={1}>

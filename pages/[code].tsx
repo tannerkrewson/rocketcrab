@@ -3,10 +3,10 @@ import { GetServerSidePropsContext, GetServerSideProps } from "next";
 import { useRouter } from "next/router";
 import socketIOClient from "socket.io-client";
 
-import PageLayout from "../components/templates/PageLayout";
-import PartyScreen from "../components/organisms/PartyScreen";
-import NameEntry from "../components/organisms/NameEntry";
-import GameLayout from "../components/templates/GameLayout";
+import PageLayout from "../components/layout/PageLayout";
+import PartyScreen from "../components/party/PartyScreen";
+import NameEntry from "../components/party/NameEntry";
+import GameLayout from "../components/layout/GameLayout";
 
 import {
     GameState,
@@ -16,7 +16,7 @@ import {
 } from "../types/types";
 import { getClientGameLibrary } from "../config";
 import { parseCookies, setCookie as setNookie } from "nookies";
-import Connecting from "../components/atoms/Connecting";
+import Connecting from "../components/layout/Connecting";
 import { logEvent } from "../utils/analytics";
 import { PartyStatus } from "../types/enums";
 import { RocketcrabDexie } from "../utils/dexie";

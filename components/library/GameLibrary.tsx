@@ -1,7 +1,7 @@
-import CategoryGroup from "../molecules/CategoryGroup";
+import CategoryGroup from "./CategoryGroup";
 import { Input, useInput, Spacer } from "@geist-ui/react";
 import FilteredGameGroup from "./FilteredGameGroup";
-import RecentGameGroup from "../molecules/RecentGameGroup";
+import RecentGameGroup from "./RecentGameGroup";
 import { useState, useEffect } from "react";
 import { ClientGameLibrary } from "../../types/types";
 

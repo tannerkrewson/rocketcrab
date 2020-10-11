@@ -1,5 +1,5 @@
 import { Spacer } from "@geist-ui/react";
-import PrimaryButton from "../atoms/PrimaryButton";
+import PrimaryButton from "../common/PrimaryButton";
 import { useCallback, useState } from "react";
 import {
     GameState,
@@ -7,10 +7,10 @@ import {
     Player,
     MenuButton,
 } from "../../types/types";
-import GameMenu from "../molecules/GameMenu";
-import GameSelector from "../organisms/GameSelector";
-import PlayerList from "../molecules/PlayerList";
-import GameFrame from "../molecules/GameFrame";
+import GameMenu from "../in-game/GameMenu";
+import GameSelector from "../library/GameSelector";
+import PlayerList from "../party/PlayerList";
+import GameFrame from "../in-game/GameFrame";
 
 const GameLayout = ({
     gameState,

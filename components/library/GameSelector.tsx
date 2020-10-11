@@ -1,10 +1,10 @@
 import { Spacer } from "@geist-ui/react";
 import { useCallback, useState } from "react";
 import { ClientGameLibrary } from "../../types/types";
-import PrimaryButton from "../atoms/PrimaryButton";
-import GameDetailBox from "../atoms/GameDetailBox";
-import ButtonGroup from "../molecules/ButtonGroup";
-import GameLibrary from "../molecules/GameLibrary";
+import PrimaryButton from "../common/PrimaryButton";
+import GameDetailBox from "./GameDetailBox";
+import ButtonGroup from "../common/ButtonGroup";
+import GameLibrary from "./GameLibrary";
 
 const GameSelector = ({
     gameLibrary,

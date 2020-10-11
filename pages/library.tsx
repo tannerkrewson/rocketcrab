@@ -1,8 +1,8 @@
 import { GetServerSideProps } from "next";
 import { useRouter } from "next/router";
 import React, { useCallback } from "react";
-import GameLibrary from "../components/molecules/GameLibrary";
-import PageLayout from "../components/templates/PageLayout";
+import GameLibrary from "../components/library/GameLibrary";
+import PageLayout from "../components/layout/PageLayout";
 import { getClientGameLibrary } from "../config";
 import { ClientGameLibrary } from "../types/types";
 

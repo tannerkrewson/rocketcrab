@@ -1,10 +1,10 @@
 import React, { useState } from "react";
 import { useRouter } from "next/router";
 
-import PrimaryButton from "../components/atoms/PrimaryButton";
-import ButtonGroup from "../components/molecules/ButtonGroup";
-import AddAppButton from "../components/molecules/AddAppButton";
-import PageLayout from "../components/templates/PageLayout";
+import PrimaryButton from "../components/common/PrimaryButton";
+import ButtonGroup from "../components/common/ButtonGroup";
+import AddAppButton from "../components/layout/AddAppButton";
+import PageLayout from "../components/layout/PageLayout";
 import { postJson } from "../utils/utils";
 import Link from "next/link";
 import { Spacer } from "@geist-ui/react";

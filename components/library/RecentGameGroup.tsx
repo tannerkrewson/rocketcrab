@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { ClientGame } from "../../types/types";
 import { RocketcrabDexie } from "../../utils/dexie";
-import GameBox from "../atoms/GameBox";
+import GameBox from "./GameBox";
 import GameGroup from "./GameGroup";
 
 const RecentGameGroup = ({

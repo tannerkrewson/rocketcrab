@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from "react";
 import Router from "next/router";
 import { Input } from "@geist-ui/react";
-import PrimaryButton from "../atoms/PrimaryButton";
-import ButtonGroup from "../molecules/ButtonGroup";
+import PrimaryButton from "../common/PrimaryButton";
+import ButtonGroup from "../common/ButtonGroup";
 
 const NameEntry = ({ onNameEntry, code }: NameEntryProps): JSX.Element => {
     const [name, setName] = useState("");

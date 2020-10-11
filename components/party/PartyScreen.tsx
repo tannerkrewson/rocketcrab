@@ -1,12 +1,12 @@
-import PlayerList from "../molecules/PlayerList";
-import PrimaryButton from "../atoms/PrimaryButton";
-import ButtonGroup from "../molecules/ButtonGroup";
+import PlayerList from "./PlayerList";
+import PrimaryButton from "../common/PrimaryButton";
+import ButtonGroup from "../common/ButtonGroup";
 import { Spacer } from "@geist-ui/react";
-import GameSelector from "./GameSelector";
+import GameSelector from "../library/GameSelector";
 import { Player, ClientGameLibrary } from "../../types/types";
 import React, { useState } from "react";
-import PartyStatus from "../molecules/PartyStatus";
-import GameDetailBox from "../atoms/GameDetailBox";
+import PartyStatus from "./PartyStatus";
+import GameDetailBox from "../library/GameDetailBox";
 
 const PartyScreen = ({
     playerList,
