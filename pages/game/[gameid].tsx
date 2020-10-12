@@ -1,7 +1,7 @@
 import { GetStaticPaths, GetStaticProps, InferGetStaticPropsType } from "next";
 import { useRouter } from "next/router";
 import { useCallback } from "react";
-import GameDetailBox from "../../components/library/GameDetailBox";
+import GameDetail from "../../components/detail/GameDetail";
 import PrimaryButton from "../../components/common/PrimaryButton";
 import PageLayout from "../../components/layout/PageLayout";
 import { getClientGameLibrary } from "../../config";
@@ -17,7 +17,7 @@ export const GamePage = ({
 
     return (
         <PageLayout>
-            <GameDetailBox game={game} allCategories={allCategories} />
+            <GameDetail game={game} allCategories={allCategories} />
             <PrimaryButton onClick={onBack}>↩️ Back to search</PrimaryButton>
         </PageLayout>
     );

@@ -6,7 +6,7 @@ import GameSelector from "../library/GameSelector";
 import { Player, ClientGameLibrary } from "../../types/types";
 import React, { useState } from "react";
 import PartyStatus from "./PartyStatus";
-import GameDetailBox from "../library/GameDetailBox";
+import GameDetail from "../detail/GameDetail";
 
 const PartyScreen = ({
     playerList,
@@ -52,7 +52,7 @@ const PartyScreen = ({
     if (gameInfoVisible) {
         return (
             <div style={{ textAlign: "center" }}>
-                <GameDetailBox
+                <GameDetail
                     game={selectedGame}
                     allCategories={gameLibrary.categories}
                 />

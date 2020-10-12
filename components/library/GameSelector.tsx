@@ -2,7 +2,7 @@ import { Spacer } from "@geist-ui/react";
 import { useCallback, useState } from "react";
 import { ClientGameLibrary } from "../../types/types";
 import PrimaryButton from "../common/PrimaryButton";
-import GameDetailBox from "./GameDetailBox";
+import GameDetail from "../detail/GameDetail";
 import ButtonGroup from "../common/ButtonGroup";
 import GameLibrary from "./GameLibrary";
 
@@ -36,7 +36,7 @@ const GameSelector = ({
             )}
             {viewingGameId && (
                 <>
-                    <GameDetailBox
+                    <GameDetail
                         game={gameLibrary.gameList.find(
                             ({ id }) => id === viewingGameId
                         )}
@@ -55,14 +55,6 @@ const GameSelector = ({
                         >
                             Select game
                         </PrimaryButton>
-                        {isHost && (
-                            <PrimaryButton
-                                onClick={onSelectGameButton}
-                                type="error"
-                            >
-                                Select Game
-                            </PrimaryButton>
-                        )}
                     </ButtonGroup>
                 </>
             )}

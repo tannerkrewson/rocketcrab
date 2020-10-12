@@ -79,7 +79,7 @@ const PageLayout = ({
 );
 
 type PageLayoutParams = {
-    children: JSX.Element[] | JSX.Element;
+    children: React.ReactNode;
     path?: string;
     loading?: boolean;
     disablePhonetic?: boolean;

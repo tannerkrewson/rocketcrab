@@ -12,7 +12,7 @@ const ButtonGroup = ({ children }: ButtonGroupProps): JSX.Element => {
 };
 
 type ButtonGroupProps = {
-    children: JSX.Element[] | JSX.Element;
+    children: React.ReactNode;
 };
 
 export default ButtonGroup;
