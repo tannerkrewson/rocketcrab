@@ -82,6 +82,11 @@ const Body = ({ children }: BodyProps): JSX.Element => (
                 box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
                 border-color: rgba(223, 225, 229, 0);
             }
+
+            .btn-col .btn.btn {
+                padding: 0 1.1em;
+                min-width: initial;
+            }
         `}</style>
     </>
 );

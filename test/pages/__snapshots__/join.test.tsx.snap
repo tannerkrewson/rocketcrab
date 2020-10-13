@@ -107,6 +107,7 @@ exports[`pages/join.tsx matches snapshot 1`] = `
               <button
                 class="jsx-2230649419 btn "
                 href="/"
+                style="width: auto;"
                 type="button"
               >
                 <div
@@ -123,6 +124,7 @@ exports[`pages/join.tsx matches snapshot 1`] = `
             <button
               class="jsx-512623370 btn "
               disabled=""
+              style="width: auto;"
               type="button"
             >
               <div

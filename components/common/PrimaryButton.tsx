@@ -1,19 +1,45 @@
 import { Button } from "@geist-ui/react";
 import Link from "next/link";
 
-const PrimaryButton = (props: PrimaryButtonProps): JSX.Element =>
-    props.href ? (
-        <Link href={props.href} as={props.as}>
-            <div>
+const PrimaryButton = (props: PrimaryButtonProps): JSX.Element => {
+    if (props.href) {
+        return (
+            <Link href={props.href} as={props.as}>
+                <div>
+                    <ButtonWrapper {...props} />
+                </div>
+            </Link>
+        );
+    } else if (props.url) {
+        return (
+            <a
+                href={props.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="link"
+                style={{
+                    lineHeight: props.manualWidth ? "0" : "initial",
+                }}
+            >
                 <ButtonWrapper {...props} />
-            </div>
-        </Link>
-    ) : (
-        <ButtonWrapper {...props} />
-    );
+            </a>
+        );
+    } else {
+        return <ButtonWrapper {...props} />;
+    }
+};
 
 const ButtonWrapper = (props: PrimaryButtonProps) => (
-    <Button type="secondary" ghost shadow auto {...(props as any)} />
+    <Button
+        type="secondary"
+        ghost
+        shadow
+        auto={!props.manualWidth}
+        style={{
+            width: props.manualWidth ? "100%" : "auto",
+        }}
+        {...(props as any)}
+    />
 );
 
 type PrimaryButtonProps = {
@@ -25,6 +51,9 @@ type PrimaryButtonProps = {
     children?: React.ReactNode;
     loading?: boolean;
     type?: string;
+    url?: string;
+    manualWidth?: boolean;
+    style?: Record<string, string>;
 };
 
 export default PrimaryButton;

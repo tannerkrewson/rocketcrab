@@ -7,8 +7,6 @@
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
 import PrimaryButton from "../common/PrimaryButton";
-import { Spacer } from "@geist-ui/react";
-import ButtonGroup from "../common/ButtonGroup";
 import { logEvent } from "../../utils/analytics";
 
 // https://github.com/chrisdancee/react-ios-pwa-prompt/issues/32#issuecomment-586762839
@@ -68,19 +66,15 @@ const AddAppButton = () => {
     return (
         <>
             {!isAlreadyPWA && (
-                <>
-                    <Spacer y={1} />
-                    <ButtonGroup>
-                        <PrimaryButton
-                            className="btn-small btn-vertical"
-                            onClick={handleAddApp}
-                            size="small"
-                            disabled={isLoading}
-                        >
-                            {isLoading ? "Loading..." : "Add 🚀🦀 App"}
-                        </PrimaryButton>
-                    </ButtonGroup>
-                </>
+                <PrimaryButton
+                    className="btn-small btn-vertical"
+                    onClick={handleAddApp}
+                    disabled={isLoading}
+                    manualWidth
+                    type="default"
+                >
+                    {isLoading ? "Loading..." : "Add 🚀🦀 App"}
+                </PrimaryButton>
             )}
             {showiOS && (
                 <PWAPrompt

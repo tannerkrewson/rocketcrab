@@ -6,7 +6,6 @@ import ButtonGroup from "../components/common/ButtonGroup";
 import AddAppButton from "../components/layout/AddAppButton";
 import PageLayout from "../components/layout/PageLayout";
 import { postJson } from "../utils/utils";
-import Link from "next/link";
 import { Spacer } from "@geist-ui/react";
 
 export const Home = (): JSX.Element => {
@@ -28,7 +27,7 @@ export const Home = (): JSX.Element => {
 
             <ButtonGroup>
                 <PrimaryButton href="/join" size="large">
-                    Join Party
+                    &nbsp;Join Party&nbsp;
                 </PrimaryButton>
 
                 <PrimaryButton
@@ -36,55 +35,54 @@ export const Home = (): JSX.Element => {
                     loading={newLoading}
                     size="large"
                 >
-                    New Party
+                    Start Party
                 </PrimaryButton>
             </ButtonGroup>
-            <AddAppButton />
-            <Spacer y={0.5} />
-            <div className="links">
-                <a
-                    href="https://discord.gg/MvYRVCP"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="link"
+            <Spacer y={1.5} />
+            <div className="btn-col">
+                <AddAppButton />
+                <Spacer y={0.5} />
+                <PrimaryButton
+                    type="default"
+                    url="https://discord.gg/MvYRVCP"
+                    manualWidth
                 >
-                    Discord
-                </a>
-                <span className="spacer">|</span>
-                <a
-                    href="https://github.com/tannerkrewson/rocketcrab/#-for-developers"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="link"
+                    <img
+                        src="/Discord-Logo-Color.svg"
+                        className="discord-logo"
+                    />
+                    Join our Discord
+                </PrimaryButton>
+                <Spacer y={0.5} />
+                <PrimaryButton
+                    type="default"
+                    url="https://github.com/tannerkrewson/rocketcrab/#-for-developers"
+                    manualWidth
                 >
-                    Developers
-                </a>
-                <span className="spacer">|</span>
-                <span className="link">
-                    <Link href="/library">Browse Games</Link>
-                </span>
+                    Develop a game!
+                </PrimaryButton>
+                <Spacer y={0.5} />
+                <PrimaryButton type="default" href="/library" manualWidth>
+                    Browse Games
+                </PrimaryButton>
             </div>
+            <Spacer y={0.5} />
             <style jsx>{`
                 .description {
                     text-align: center;
                     margin-bottom: 2em;
                 }
-                .links {
-                    margin-top: 1.5em;
+                .discord-logo {
+                    width: 1.7em;
+                    margin-left: -0.35em;
+                    margin-right: 0.3em;
+                    margin-bottom: -0.1em;
+                }
+                .btn-col {
                     display: flex;
-                    justify-content: center;
-                }
-                .links .link {
-                    display: inline-block;
-                    margin: 0 0.5em;
-                    font-size: 12px;
-                }
-                .links .link:hover {
-                    text-decoration: underline;
-                }
-                .links .spacer {
-                    line-height: 1em;
-                    color: grey;
+                    flex-direction: column;
+                    width: fit-content;
+                    margin: 0 auto;
                 }
             `}</style>
         </PageLayout>

@@ -55,7 +55,7 @@ const GameLayout = ({
             }, []),
         },
         {
-            label: "View games",
+            label: "Browse games",
             hostOnly: false,
             onClick: useCallback(() => {
                 setShowMenu(false);

@@ -38,7 +38,7 @@ exports[`pages/index.tsx matches snapshot 1`] = `
           </div>
         </div>
         <div
-          class="jsx-1456828746 description"
+          class="jsx-4074410339 description"
         >
           party games for phones
         </div>
@@ -52,12 +52,13 @@ exports[`pages/index.tsx matches snapshot 1`] = `
               <button
                 class="jsx-2230649419 btn "
                 href="/join"
+                style="width: auto;"
                 type="button"
               >
                 <div
                   class="text"
                 >
-                  Join Party
+                   Join Party 
                 </div>
               </button>
             </div>
@@ -67,33 +68,98 @@ exports[`pages/index.tsx matches snapshot 1`] = `
           >
             <button
               class="jsx-2230649419 btn "
+              style="width: auto;"
               type="button"
             >
               <div
                 class="text"
               >
-                New Party
+                Start Party
               </div>
             </button>
           </div>
         </div>
         <span
-          class="jsx-870436695 "
+          class="jsx-446887637 "
         />
         <div
-          class="jsx-1938348541 item justify jsx-1720607024 "
+          class="jsx-4074410339 btn-col"
         >
-          <div
-            class="jsx-974242038 item  jsx-4216129763 "
+          <button
+            class="jsx-3131001525 btn btn-small btn-vertical"
+            style="width: 100%;"
+            type="button"
+          >
+            <div
+              class="text"
+            >
+              Add 🚀🦀 App
+            </div>
+          </button>
+          <span
+            class="jsx-3462447556 "
+          />
+          <a
+            class="link"
+            href="https://discord.gg/MvYRVCP"
+            rel="noopener noreferrer"
+            style="line-height: 0;"
+            target="_blank"
           >
             <button
-              class="jsx-459415554 btn btn-small btn-vertical"
+              class="jsx-3131001525 btn "
+              style="width: 100%;"
+              type="button"
+              url="https://discord.gg/MvYRVCP"
+            >
+              <div
+                class="text"
+              >
+                <img
+                  class="jsx-4074410339 discord-logo"
+                  src="/Discord-Logo-Color.svg"
+                />
+                Join our Discord
+              </div>
+            </button>
+          </a>
+          <span
+            class="jsx-3462447556 "
+          />
+          <a
+            class="link"
+            href="https://github.com/tannerkrewson/rocketcrab/#-for-developers"
+            rel="noopener noreferrer"
+            style="line-height: 0;"
+            target="_blank"
+          >
+            <button
+              class="jsx-3131001525 btn "
+              style="width: 100%;"
+              type="button"
+              url="https://github.com/tannerkrewson/rocketcrab/#-for-developers"
+            >
+              <div
+                class="text"
+              >
+                Develop a game!
+              </div>
+            </button>
+          </a>
+          <span
+            class="jsx-3462447556 "
+          />
+          <div>
+            <button
+              class="jsx-3131001525 btn "
+              href="/library"
+              style="width: 100%;"
               type="button"
             >
               <div
                 class="text"
               >
-                Add 🚀🦀 App
+                Browse Games
               </div>
             </button>
           </div>
@@ -101,45 +167,6 @@ exports[`pages/index.tsx matches snapshot 1`] = `
         <span
           class="jsx-3462447556 "
         />
-        <div
-          class="jsx-1456828746 links"
-        >
-          <a
-            class="jsx-1456828746 link"
-            href="https://discord.gg/MvYRVCP"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            Discord
-          </a>
-          <span
-            class="jsx-1456828746 spacer"
-          >
-            |
-          </span>
-          <a
-            class="jsx-1456828746 link"
-            href="https://github.com/tannerkrewson/rocketcrab/#-for-developers"
-            rel="noopener noreferrer"
-            target="_blank"
-          >
-            Developers
-          </a>
-          <span
-            class="jsx-1456828746 spacer"
-          >
-            |
-          </span>
-          <span
-            class="jsx-1456828746 link"
-          >
-            <a
-              href="/library"
-            >
-              Browse Games
-            </a>
-          </span>
-        </div>
       </div>
     </main>
     <footer
