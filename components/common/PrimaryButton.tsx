@@ -29,14 +29,14 @@ const PrimaryButton = (props: PrimaryButtonProps): JSX.Element => {
     }
 };
 
-const ButtonWrapper = (props: PrimaryButtonProps) => (
+const ButtonWrapper = ({ manualWidth, ...props }: PrimaryButtonProps) => (
     <Button
         type="secondary"
         ghost
         shadow
-        auto={!props.manualWidth}
+        auto={!manualWidth}
         style={{
-            width: props.manualWidth ? "100%" : "auto",
+            width: manualWidth ? "100%" : "auto",
         }}
         {...(props as any)}
     />
