@@ -5,6 +5,7 @@ import GameLibrary from "../components/library/GameLibrary";
 import PageLayout from "../components/layout/PageLayout";
 import { getClientGameLibrary } from "../config";
 import { ClientGameLibrary } from "../types/types";
+import { useLibraryState } from "../utils/utils";
 
 const CLIENT_GAME_LIBRARY = getClientGameLibrary();
 
@@ -20,6 +21,8 @@ export const Library = ({ gameLibrary }: LibraryProps): JSX.Element => {
         [router]
     );
 
+    const libraryState = useLibraryState();
+
     return (
         <PageLayout>
             <GameLibrary
@@ -27,6 +30,7 @@ export const Library = ({ gameLibrary }: LibraryProps): JSX.Element => {
                 backToLabel="rocketcrab.com"
                 onDone={onDone}
                 setViewingGameId={onViewGame}
+                libraryState={libraryState}
             />
         </PageLayout>
     );

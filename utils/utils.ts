@@ -1,5 +1,7 @@
-import { PromiseWebSocket } from "../types/types";
+import { LibraryState, PromiseWebSocket } from "../types/types";
 import WebSocket from "ws";
+import { useInput } from "@geist-ui/react";
+import { useState } from "react";
 
 export const postJson = (url = "", data = {}): Promise<any> =>
     fetch(url, {
@@ -35,4 +37,21 @@ export const newPromiseWebSocket = (url: string): PromiseWebSocket => {
         );
 
     return ws;
+};
+
+export const useLibraryState = (): LibraryState => {
+    const [selectedCategory, setSelectedCategory] = useState("");
+    const {
+        state: search,
+        setState: setSearch,
+        bindings: searchBindings,
+    } = useInput("");
+
+    return {
+        selectedCategory,
+        setSelectedCategory,
+        search,
+        setSearch,
+        searchBindings,
+    };
 };

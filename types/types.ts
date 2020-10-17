@@ -1,5 +1,7 @@
 import { PartyStatus, GameStatus } from "./enums";
 import WebSocket from "ws";
+import { Dispatch, SetStateAction } from "react";
+import { BindingsChangeTarget } from "@geist-ui/react/dist/input/use-input";
 
 export type RocketCrab = {
     partyList: Array<Party>;
@@ -109,4 +111,17 @@ export type MenuButton = {
     label: string;
     hostOnly: boolean;
     onClick: () => void;
+};
+
+export type LibraryState = {
+    selectedCategory: string;
+    setSelectedCategory: Dispatch<SetStateAction<string>>;
+    search: string;
+    setSearch: Dispatch<SetStateAction<string>>;
+    searchBindings: SearchBindingsType;
+};
+
+type SearchBindingsType = {
+    value: string;
+    onChange: (event: BindingsChangeTarget) => void;
 };

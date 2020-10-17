@@ -5,6 +5,7 @@ import PrimaryButton from "../common/PrimaryButton";
 import GameDetail from "../detail/GameDetail";
 import ButtonGroup from "../common/ButtonGroup";
 import GameLibrary from "./GameLibrary";
+import { useLibraryState } from "../../utils/utils";
 
 const GameSelector = ({
     gameLibrary,
@@ -24,6 +25,8 @@ const GameSelector = ({
         onDone();
     }, [onSelectGame, viewingGameId, onDone]);
 
+    const libraryState = useLibraryState();
+
     return (
         <>
             {!viewingGameId && (
@@ -32,6 +35,7 @@ const GameSelector = ({
                     onDone={onDone}
                     backToLabel={backToLabel}
                     setViewingGameId={setViewingGameId}
+                    libraryState={libraryState}
                 />
             )}
             {viewingGameId && (
