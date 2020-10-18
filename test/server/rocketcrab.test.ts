@@ -52,29 +52,31 @@ describe("server/rocketcrab.ts", () => {
     it("newParty works", () => {
         const partyList: Array<Party> = [];
 
-        newParty(partyList);
+        newParty({ partyList });
 
         expect(partyList.length).toBe(1);
         expect(partyList[0].status).toBe(PartyStatus.party);
         expect(partyList[0].code.length).toBe(4);
+        expect(partyList[0].uuid.length).toBe(36);
         expect(partyList[0].playerList.length).toBe(0);
     });
 
-    it("newParty works with custom code", () => {
+    it("newParty works with forced code & uuid", () => {
         const partyList: Array<Party> = [];
 
-        newParty(partyList, "abcd");
+        newParty({ partyList, forceGameCode: "abcd", forceUuid: "cool-uuid" });
 
         expect(partyList.length).toBe(1);
         expect(partyList[0].status).toBe(PartyStatus.party);
         expect(partyList[0].code).toBe("abcd");
+        expect(partyList[0].uuid).toBe("cool-uuid");
         expect(partyList[0].playerList.length).toBe(0);
     });
 
     it("getParty finds existing party", () => {
         const partyList: Array<Party> = [];
 
-        const { code } = newParty(partyList);
+        const { code } = newParty({ partyList });
         const party = getParty(code, partyList);
 
         expect(party.code).toBe(code);

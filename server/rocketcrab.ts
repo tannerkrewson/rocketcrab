@@ -1,27 +1,32 @@
 import { RocketCrab, Party, Player, ServerGame } from "../types/types";
 import { PartyStatus, GameStatus } from "../types/enums";
 import { getServerGameLibrary } from "../config";
+import { v4 as uuidv4 } from "uuid";
+
 const SERVER_GAME_LIST: Array<ServerGame> = getServerGameLibrary().gameList;
 
 export const initRocketCrab = (isDevMode?: boolean): RocketCrab => {
     const partyList: Array<Party> = [];
 
-    if (isDevMode) newParty(partyList, "ffff");
+    if (isDevMode) newParty({ partyList, forceGameCode: "ffff" });
 
     return { partyList };
 };
 
-export const newParty = (
-    partyList: Array<Party>,
-    gameCode?: string,
-    uuid?: string
-): Party => {
-    const code: string = gameCode || getUniqueGameCode(partyList);
+export const newParty = ({
+    partyList,
+    forceGameCode,
+    forceUuid,
+}: {
+    partyList: Array<Party>;
+    forceGameCode?: string;
+    forceUuid?: string;
+}): Party => {
     const newParty: Party = {
         status: PartyStatus.party,
         playerList: [],
-        code,
-        uuid,
+        code: forceGameCode || getUniqueGameCode(partyList),
+        uuid: forceUuid || uuidv4(),
         selectedGameId: "",
         gameState: {
             status: GameStatus.loading,

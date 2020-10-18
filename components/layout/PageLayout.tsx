@@ -88,7 +88,7 @@ type PageLayoutParams = {
     disablePhonetic?: boolean;
     deemphasize?: boolean;
     center?: boolean;
-    reconnecting: boolean;
+    reconnecting?: boolean;
 };
 
 export default PageLayout;

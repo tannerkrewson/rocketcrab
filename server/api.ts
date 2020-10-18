@@ -4,7 +4,7 @@ import { Application, Request, Response } from "express";
 
 export default (server: Application, { partyList }: RocketCrab): void => {
     server.post("/api/new", (req: Request, res: Response) => {
-        const { code } = newParty(partyList);
+        const { code } = newParty({ partyList });
         res.json({ code });
     });
     server.get("/transfer/:gameid/:uuid?", (req: Request, res: Response) => {
@@ -21,9 +21,9 @@ export default (server: Application, { partyList }: RocketCrab): void => {
         if (givenUuid) {
             party =
                 partyList.find(({ uuid }) => uuid === givenUuid) ||
-                newParty(partyList, undefined, givenUuid as string);
+                newParty({ partyList, forceUuid: givenUuid as string });
         } else {
-            party = newParty(partyList);
+            party = newParty({ partyList });
         }
 
         if (gameid && !party.selectedGame) {
