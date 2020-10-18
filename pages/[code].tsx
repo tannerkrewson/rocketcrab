@@ -10,7 +10,6 @@ import GameLayout from "../components/layout/GameLayout";
 import { ClientGameLibrary } from "../types/types";
 import { getClientGameLibrary } from "../config";
 import { parseCookies } from "nookies";
-import Connecting from "../components/layout/Connecting";
 
 import { useRocketcrabClientSocket } from "../utils/useRocketcrabClientSocket";
 
@@ -57,10 +56,6 @@ export const Code = ({
     //const showParty = !showLoading && !showNameEntry && status === "party";
     const showGame = !showLoading && !showNameEntry && status === "ingame";
 
-    if (showReconnecting) {
-        return <Connecting />;
-    }
-
     if (showGame) {
         return (
             <GameLayout
@@ -73,6 +68,7 @@ export const Code = ({
                 gameLibrary={gameLibrary}
                 playerList={playerList}
                 thisPlayer={me}
+                reconnecting={showReconnecting}
             />
         );
     }
@@ -82,6 +78,7 @@ export const Code = ({
             path={code as string}
             loading={showLoading}
             deemphasize={deemphasize}
+            reconnecting={showReconnecting}
         >
             {showNameEntry ? (
                 <NameEntry

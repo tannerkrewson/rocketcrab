@@ -1,4 +1,5 @@
 import { Loading } from "@geist-ui/react";
+import Connecting from "./Connecting";
 import Footer from "./Footer";
 import MainTitle from "./MainTitle";
 
@@ -9,6 +10,7 @@ const PageLayout = ({
     disablePhonetic,
     deemphasize,
     center,
+    reconnecting,
 }: PageLayoutParams): JSX.Element => (
     <div className="container">
         <main>
@@ -75,6 +77,7 @@ const PageLayout = ({
                 display: none;
             }
         `}</style>
+        {reconnecting && <Connecting />}
     </div>
 );
 
@@ -85,6 +88,7 @@ type PageLayoutParams = {
     disablePhonetic?: boolean;
     deemphasize?: boolean;
     center?: boolean;
+    reconnecting: boolean;
 };
 
 export default PageLayout;

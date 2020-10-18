@@ -11,6 +11,7 @@ import GameMenu from "../in-game/GameMenu";
 import GameSelector from "../library/GameSelector";
 import PlayerList from "../party/PlayerList";
 import GameFrame from "../in-game/GameFrame";
+import Connecting from "./Connecting";
 
 const GameLayout = ({
     gameState,
@@ -22,6 +23,7 @@ const GameLayout = ({
     gameLibrary,
     playerList,
     thisPlayer,
+    reconnecting,
 }: GameLayoutProps): JSX.Element => {
     const thisGame = gameLibrary.gameList.find(
         ({ id }) => id == selectedGameId
@@ -205,6 +207,7 @@ const GameLayout = ({
                     box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
                 }
             `}</style>
+            {reconnecting && <Connecting />}
         </div>
     );
 };
@@ -219,6 +222,7 @@ type GameLayoutProps = {
     gameLibrary: ClientGameLibrary;
     playerList: Array<Player>;
     thisPlayer: Player;
+    reconnecting: boolean;
 };
 
 export default GameLayout;
