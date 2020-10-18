@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { PartyStatus } from "../types/enums";
-import { ClientParty, GameState, JoinGameURL } from "../types/types";
+import { ClientParty } from "../types/types";
 import { logEvent } from "./analytics";
 import socketIOClient from "socket.io-client";
 import { RocketcrabDexie } from "./dexie";
@@ -11,14 +10,12 @@ const socket = socketIOClient();
 export const useRocketcrabClientSocket = ({
     code,
     router,
-    previousName,
-    previousId,
+    cookiePartyState,
 }: UseRocketcrabClientSocketProps): UseRocketcrabClientSocketReturn => {
-    const [partyState, setPartyState] = useState(initPartyState());
+    const [partyState, setPartyState] = useState(cookiePartyState);
     const [showReconnecting, setShowReconnecting] = useState(false);
 
-    const { me, playerList, selectedGameId } = partyState;
-    const { isHost } = me;
+    const { me, playerList, selectedGameId } = partyState || {};
 
     // only ran with initial value due to the []
     useEffect(() => {
@@ -27,6 +24,10 @@ export const useRocketcrabClientSocket = ({
         socket.on("update", (newPartyState: ClientParty) => {
             setPartyState(newPartyState);
             setShowReconnecting(false);
+
+            if (Number.isInteger(newPartyState.me.id)) {
+                setCookie("lastPartyState", JSON.stringify(newPartyState));
+            }
         });
         socket.on("invalid-name", () => {
             if (code === "ffff") return;
@@ -51,7 +52,7 @@ export const useRocketcrabClientSocket = ({
 
         return () => {
             socket.close();
-            setPartyState(initPartyState());
+            setPartyState(undefined);
         };
     }, []);
 
@@ -67,16 +68,8 @@ export const useRocketcrabClientSocket = ({
         });
     }, [code]);
 
-    useEffect(() => {
-        if (!Number.isInteger(me.id)) return;
-
-        setCookie("previousCode", code as string);
-        setCookie("previousId", me.id);
-    }, [me.id]);
-
     const onNameEntry = useCallback((enteredName) => {
         socket.emit("name", enteredName);
-        setCookie("previousName", enteredName);
     }, []);
 
     const onSelectGame = useCallback((gameId: string) => {
@@ -89,7 +82,7 @@ export const useRocketcrabClientSocket = ({
         const db = new RocketcrabDexie();
         db.addGame(selectedGameId);
 
-        if (isHost) {
+        if (me?.isHost) {
             logEvent("party-numberOfPlayers", playerList.length.toString());
             logEvent("party-game", selectedGameId);
         }
@@ -108,8 +101,7 @@ export const useRocketcrabClientSocket = ({
     const joinParty = useCallback(() => {
         socket.emit("join-party", {
             code,
-            id: previousId,
-            name: previousName,
+            lastPartyState: partyState,
         });
     }, []);
 
@@ -124,17 +116,6 @@ export const useRocketcrabClientSocket = ({
     };
 };
 
-const initPartyState = (): ClientParty => ({
-    status: PartyStatus.loading,
-    playerList: [],
-    me: { id: undefined, name: undefined, isHost: undefined },
-    selectedGameId: "",
-    gameState: {
-        status: undefined,
-        joinGameURL: {} as JoinGameURL,
-    } as GameState,
-});
-
 const setCookie = (key: string, value: any) =>
     setNookie(null, key, value, {
         maxAge: 2147483647,
@@ -143,8 +124,7 @@ const setCookie = (key: string, value: any) =>
 type UseRocketcrabClientSocketProps = {
     code: string | string[];
     router: NextRouter;
-    previousName: string;
-    previousId: number;
+    cookiePartyState?: ClientParty;
 };
 
 type UseRocketcrabClientSocketReturn = {

@@ -7,7 +7,7 @@ import PartyScreen from "../components/party/PartyScreen";
 import NameEntry from "../components/party/NameEntry";
 import GameLayout from "../components/layout/GameLayout";
 
-import { ClientGameLibrary } from "../types/types";
+import { ClientGameLibrary, ClientParty } from "../types/types";
 import { getClientGameLibrary } from "../config";
 import { parseCookies } from "nookies";
 
@@ -17,11 +17,12 @@ const CLIENT_GAME_LIBRARY = getClientGameLibrary();
 
 export const Code = ({
     gameLibrary = { gameList: [], categories: [] },
-    previousName,
-    previousId,
+    lastPartyState,
 }: CodeProps): JSX.Element => {
     const router = useRouter();
     const { code } = router.query;
+
+    const previousName = lastPartyState?.me?.name;
 
     const {
         partyState,
@@ -31,19 +32,23 @@ export const Code = ({
         onExitGame,
         onHostGameLoaded,
         showReconnecting,
-    } = useRocketcrabClientSocket({ code, router, previousName, previousId });
+    } = useRocketcrabClientSocket({
+        code,
+        router,
+        cookiePartyState: lastPartyState,
+    });
 
-    const { status, me, playerList, selectedGameId, gameState } = partyState;
-    const { isHost, name } = me;
+    const { status, me, playerList, selectedGameId, gameState } =
+        partyState || {};
 
     const [myLastValidName, setMyLastValidName] = useState("");
     useEffect(() => {
-        if (name) {
-            setMyLastValidName(name);
+        if (me?.name) {
+            setMyLastValidName(me?.name);
         } else if (previousName) {
             setMyLastValidName(previousName);
         }
-    }, [name, previousName]);
+    }, [me?.name, previousName]);
 
     const [deemphasize, setDeemphasize] = useState(false);
     const onInOutParty = useCallback(
@@ -52,7 +57,7 @@ export const Code = ({
     );
 
     const showLoading = status === "loading";
-    const showNameEntry = !showLoading && !me.name;
+    const showNameEntry = !showLoading && !me?.name;
     //const showParty = !showLoading && !showNameEntry && status === "party";
     const showGame = !showLoading && !showNameEntry && status === "ingame";
 
@@ -94,8 +99,8 @@ export const Code = ({
                     selectedGameId={selectedGameId}
                     onStartGame={onStartGame}
                     resetName={() => onNameEntry("")}
-                    meId={me.id}
-                    isHost={isHost}
+                    meId={me?.id}
+                    isHost={me?.isHost}
                     onInOutParty={onInOutParty}
                 />
             )}
@@ -109,23 +114,33 @@ export const getServerSideProps: GetServerSideProps = async (
     const {
         query: { code },
     } = ctx;
-    const { previousCode, previousId, previousName = "" } = parseCookies(ctx);
 
-    const isReconnect = previousCode === code;
+    let lastPartyState;
+
+    try {
+        lastPartyState = JSON.parse(
+            parseCookies(ctx).lastPartyState
+        ) as ClientParty;
+
+        const isReconnect = lastPartyState.code === code;
+        if (!isReconnect) {
+            lastPartyState.me.id = null;
+        }
+        // eslint-disable-next-line no-empty
+    } catch (error) {}
 
     return {
         props: {
             gameLibrary: CLIENT_GAME_LIBRARY,
-            previousName,
-            previousId: isReconnect ? Number.parseInt(previousId) : null,
+            ...(lastPartyState ? { lastPartyState } : {}),
         },
     };
 };
 
 type CodeProps = {
     gameLibrary: ClientGameLibrary;
-    previousName?: string;
-    previousId?: number;
+    lastPartyState?: ClientParty;
+    previousId?: string;
 };
 
 export default Code;

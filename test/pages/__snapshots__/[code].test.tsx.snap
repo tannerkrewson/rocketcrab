@@ -38,21 +38,92 @@ exports[`pages/[code].tsx matches snapshot 1`] = `
           </div>
         </div>
         <div
-          class="jsx-3429833361 loading-container"
+          class="jsx-2322376654 description"
         >
-          <span
-            class="jsx-3429833361 loading"
+          Enter your name:
+        </div>
+        <div
+          class="jsx-2322376654 input-container"
+        >
+          <div
+            class="jsx-2152825435 with-label"
           >
-            <i
-              class="jsx-3429833361"
-            />
-            <i
-              class="jsx-3429833361"
-            />
-            <i
-              class="jsx-3429833361"
-            />
-          </span>
+            <div
+              class="jsx-2152825435 input-container "
+            >
+              <div
+                class="jsx-2152825435 input-wrapper hover  "
+              >
+                <input
+                  autocomplete="off"
+                  class="jsx-2152825435  "
+                  id="player-name"
+                  maxlength="24"
+                  placeholder="Use your real name!"
+                  type="text"
+                  value=""
+                />
+                <div
+                  class="jsx-1724197483 clear-icon "
+                >
+                  <svg
+                    class="jsx-1724197483"
+                    fill="none"
+                    shape-rendering="geometricPrecision"
+                    stroke="currentColor"
+                    stroke-linecap="round"
+                    stroke-linejoin="round"
+                    stroke-width="1.5"
+                    viewBox="0 0 24 24"
+                  >
+                    <path
+                      class="jsx-1724197483"
+                      d="M18 6L6 18"
+                    />
+                    <path
+                      class="jsx-1724197483"
+                      d="M6 6l12 12"
+                    />
+                  </svg>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div
+          class="jsx-1938348541 item justify jsx-1720607024 "
+        >
+          <div
+            class="jsx-974242038 item  jsx-4216129763 "
+          >
+            <button
+              class="jsx-2230649419 btn "
+              style="width: auto;"
+              type="button"
+            >
+              <div
+                class="text"
+              >
+                Back
+              </div>
+            </button>
+          </div>
+          <div
+            class="jsx-974242038 item  jsx-4216129763 "
+          >
+            <button
+              class="jsx-512623370 btn "
+              disabled=""
+              style="width: auto;"
+              type="button"
+            >
+              <div
+                class="text"
+              >
+                Confirm
+              </div>
+            </button>
+          </div>
         </div>
       </div>
       <div

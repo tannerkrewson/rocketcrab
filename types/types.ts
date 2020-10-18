@@ -7,24 +7,19 @@ export type RocketCrab = {
     partyList: Array<Party>;
 };
 
-export type Party = {
-    status: PartyStatus;
-    playerList: Array<Player>;
-    code: string;
-    uuid?: string;
-    selectedGameId: string;
-    gameState: GameState;
+export type Party = ClientParty & {
     nextPlayerId: number;
-    idealHostId: number;
-    me?: Player;
 };
 
 export type ClientParty = {
     status: PartyStatus;
     playerList: Array<Player>;
-    me: Player;
-    selectedGameId: "";
+    code: string;
+    uuid: string;
+    me?: Player;
+    selectedGameId: string;
     gameState: GameState;
+    idealHostId: number;
 };
 
 export type Player = {
@@ -97,8 +92,7 @@ export type GameState = {
 
 export type JoinPartyResponse = {
     code: string;
-    id?: number;
-    name?: string;
+    lastPartyState: ClientParty;
 };
 
 export type PromiseWebSocket = WebSocket & {

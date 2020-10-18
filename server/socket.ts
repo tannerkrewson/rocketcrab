@@ -11,24 +11,28 @@ import {
 } from "./rocketcrab";
 import { JoinPartyResponse, Player, Party, RocketCrab } from "../types/types";
 
-export default (
-    io: SocketIO.Server,
-    { partyList }: RocketCrab
-): SocketIO.Namespace =>
+export default (io: SocketIO.Server, rocketcrab: RocketCrab): void => {
     io.on("connection", (socket) => {
-        socket.on("join-party", ({ code, id, name }: JoinPartyResponse) => {
-            const party = getParty(code, partyList);
-
-            if (party) {
-                const player = addPlayer(name, socket, party, id);
-
-                attachPartyListenersToPlayer(player, party, partyList);
-                sendStateToAll(party);
-            } else {
-                socket.emit("invalid-party", { code });
-            }
-        });
+        socket.on("join-party", onJoinParty(socket, rocketcrab));
     });
+};
+
+const onJoinParty = (socket: SocketIO.Socket, { partyList }: RocketCrab) => ({
+    code,
+    lastPartyState,
+}: JoinPartyResponse) => {
+    const party = getParty(code, partyList);
+
+    if (party) {
+        const { id, name } = lastPartyState?.me || {};
+        const player = addPlayer(name, socket, party, id);
+
+        attachPartyListenersToPlayer(player, party, partyList);
+        sendStateToAll(party);
+    } else {
+        socket.emit("invalid-party", { code });
+    }
+};
 
 const attachPartyListenersToPlayer = (
     player: Player,
