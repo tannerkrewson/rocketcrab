@@ -1,5 +1,4 @@
 import { ClientGame } from "../../types/types";
-import GameBox from "./GameBox";
 import GameGroup from "./GameGroup";
 
 const FilteredGameGroup = ({
@@ -18,21 +17,16 @@ const FilteredGameGroup = ({
             (name + author)
                 .toLowerCase()
                 .includes(nameFilter.toLowerCase().trim())
-        )
-        .map((game, i) => (
-            <GameBox
-                key={game.id}
-                count={i}
-                game={game}
-                onClick={onSelectGame}
-            />
-        ));
+        );
 
-    if (!games.length) {
-        return <div>No games found 😭</div>;
-    }
-
-    return <GameGroup games={games} onBack={onBack} />;
+    return (
+        <GameGroup
+            games={games}
+            onSelectGame={onSelectGame}
+            onBack={onBack}
+            errorMessage="No games found 😭"
+        />
+    );
 };
 
 type FilteredGameGroupProps = {
