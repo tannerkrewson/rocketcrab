@@ -1,4 +1,4 @@
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { GetServerSidePropsContext, GetServerSideProps } from "next";
 import { useRouter } from "next/router";
 
@@ -35,7 +35,16 @@ export const Code = ({
     } = useRocketcrabClientSocket({ code, router, previousName, previousId });
 
     const { status, me, playerList, selectedGameId, gameState } = partyState;
-    const { isHost } = me;
+    const { isHost, name } = me;
+
+    const [myLastValidName, setMyLastValidName] = useState("");
+    useEffect(() => {
+        if (name) {
+            setMyLastValidName(name);
+        } else if (previousName) {
+            setMyLastValidName(previousName);
+        }
+    }, [name, previousName]);
 
     const [deemphasize, setDeemphasize] = useState(false);
     const onInOutParty = useCallback(
@@ -75,7 +84,11 @@ export const Code = ({
             deemphasize={deemphasize}
         >
             {showNameEntry ? (
-                <NameEntry onNameEntry={onNameEntry} code={code} />
+                <NameEntry
+                    onNameEntry={onNameEntry}
+                    previousName={myLastValidName}
+                    code={code}
+                />
             ) : (
                 <PartyScreen
                     playerList={playerList}

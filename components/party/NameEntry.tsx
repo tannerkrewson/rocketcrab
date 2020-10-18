@@ -4,7 +4,11 @@ import { Input } from "@geist-ui/react";
 import PrimaryButton from "../common/PrimaryButton";
 import ButtonGroup from "../common/ButtonGroup";
 
-const NameEntry = ({ onNameEntry, code }: NameEntryProps): JSX.Element => {
+const NameEntry = ({
+    onNameEntry,
+    code,
+    previousName,
+}: NameEntryProps): JSX.Element => {
     const [name, setName] = useState("");
 
     // if dev game, pick random name and submit
@@ -17,22 +21,27 @@ const NameEntry = ({ onNameEntry, code }: NameEntryProps): JSX.Element => {
 
     const handleNameChange = ({ target: { value } }) => setName(value);
 
-    const handleJoin = (e?) => {
+    const handleConfirm = (e?) => {
         if (e) e.preventDefault();
         if (name.length < 1) return;
+
         onNameEntry(name);
     };
 
     const handleBack = (e) => {
         e.preventDefault();
 
-        Router.push("/");
+        if (previousName) {
+            onNameEntry(previousName);
+        } else {
+            Router.push("/");
+        }
     };
 
     const onEnter = (e) => {
         if (e.key !== "Enter") return;
 
-        handleJoin();
+        handleConfirm();
     };
 
     return (
@@ -59,7 +68,7 @@ const NameEntry = ({ onNameEntry, code }: NameEntryProps): JSX.Element => {
                 </PrimaryButton>
 
                 <PrimaryButton
-                    onClick={handleJoin}
+                    onClick={handleConfirm}
                     disabled={name.length < 1}
                     size="large"
                 >
@@ -84,6 +93,7 @@ const NameEntry = ({ onNameEntry, code }: NameEntryProps): JSX.Element => {
 type NameEntryProps = {
     onNameEntry: (name: string) => any;
     code: string | string[];
+    previousName: string;
 };
 
 export default NameEntry;
