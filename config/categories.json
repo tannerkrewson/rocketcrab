@@ -34,11 +34,5 @@
         "name": "💎 netgames.io",
         "color": "white",
         "backgroundColor": "#375a7f"
-    },
-    {
-        "id": "trivia",
-        "name": "🎓 Trivia",
-        "color": "white",
-        "backgroundColor": "Indigo"
     }
 ]
