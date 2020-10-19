@@ -93,6 +93,7 @@ export type GameState = {
 export type JoinPartyResponse = {
     code: string;
     lastPartyState: ClientParty;
+    reconnecting: boolean;
 };
 
 export type PromiseWebSocket = WebSocket & {

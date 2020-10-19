@@ -18,9 +18,10 @@ const CLIENT_GAME_LIBRARY = getClientGameLibrary();
 export const Code = ({
     gameLibrary = { gameList: [], categories: [] },
     lastPartyState,
+    isReconnect,
 }: CodeProps): JSX.Element => {
     const router = useRouter();
-    const { code } = router.query;
+    const code = router?.query?.code as string;
 
     const previousName = lastPartyState?.me?.name;
 
@@ -36,6 +37,7 @@ export const Code = ({
         code,
         router,
         cookiePartyState: lastPartyState,
+        isReconnect,
     });
 
     const { status, me, playerList, selectedGameId, gameState } =
@@ -111,18 +113,16 @@ export const Code = ({
 export const getServerSideProps: GetServerSideProps = async (
     ctx: GetServerSidePropsContext
 ): Promise<any> => {
-    const {
-        query: { code },
-    } = ctx;
+    const code = ctx?.query?.code;
 
-    let lastPartyState;
+    let lastPartyState, isReconnect;
 
     try {
         lastPartyState = JSON.parse(
             parseCookies(ctx).lastPartyState
         ) as ClientParty;
 
-        const isReconnect = lastPartyState.code === code;
+        isReconnect = lastPartyState.code === code;
         if (!isReconnect) {
             lastPartyState.me.id = null;
         }
@@ -141,6 +141,7 @@ type CodeProps = {
     gameLibrary: ClientGameLibrary;
     lastPartyState?: ClientParty;
     previousId?: string;
+    isReconnect?: boolean;
 };
 
 export default Code;

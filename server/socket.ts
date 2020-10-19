@@ -1,5 +1,4 @@
 import {
-    getParty,
     addPlayer,
     sendStateToAll,
     removePlayer,
@@ -8,6 +7,8 @@ import {
     setGame,
     startGame,
     exitGame,
+    getPartyByCode,
+    reconnectToParty,
 } from "./rocketcrab";
 import { JoinPartyResponse, Player, Party, RocketCrab } from "../types/types";
 
@@ -20,8 +21,11 @@ export default (io: SocketIO.Server, rocketcrab: RocketCrab): void => {
 const onJoinParty = (socket: SocketIO.Socket, { partyList }: RocketCrab) => ({
     code,
     lastPartyState,
+    reconnecting,
 }: JoinPartyResponse) => {
-    const party = getParty(code, partyList);
+    const party = reconnecting
+        ? reconnectToParty(lastPartyState, partyList)
+        : getPartyByCode(code, partyList);
 
     if (party) {
         const { id, name } = lastPartyState?.me || {};

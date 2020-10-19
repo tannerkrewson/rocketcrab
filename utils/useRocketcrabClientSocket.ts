@@ -11,8 +11,9 @@ export const useRocketcrabClientSocket = ({
     code,
     router,
     cookiePartyState,
+    isReconnect,
 }: UseRocketcrabClientSocketProps): UseRocketcrabClientSocketReturn => {
-    const [partyState, setPartyState] = useState(cookiePartyState);
+    const [partyState, setPartyState] = useState<ClientParty | undefined>();
     const [showReconnecting, setShowReconnecting] = useState(false);
 
     const { me, playerList, selectedGameId } = partyState || {};
@@ -45,11 +46,6 @@ export const useRocketcrabClientSocket = ({
             setShowReconnecting(true);
         });
 
-        socket.on("reconnect", () => {
-            joinParty();
-            setShowReconnecting(false);
-        });
-
         return () => {
             socket.close();
             setPartyState(undefined);
@@ -58,15 +54,23 @@ export const useRocketcrabClientSocket = ({
 
     useEffect(() => {
         // "code" will be undefined during Automatic Static Optimization
-        if (code) {
-            joinParty();
+        if (code && !partyState) {
+            joinParty(code, cookiePartyState, isReconnect);
         }
+
+        socket.off("reconnect");
+        socket.off("invalid-party");
+
+        socket.on("reconnect", () => {
+            joinParty(code, partyState || cookiePartyState, true);
+            setShowReconnecting(false);
+        });
 
         socket.on("invalid-party", () => {
             // todo: don't do this if showGame is true
             router.push("/join?invalid=" + code);
         });
-    }, [code]);
+    }, [code, partyState, isReconnect]);
 
     const onNameEntry = useCallback((enteredName) => {
         socket.emit("name", enteredName);
@@ -98,13 +102,6 @@ export const useRocketcrabClientSocket = ({
         []
     );
 
-    const joinParty = useCallback(() => {
-        socket.emit("join-party", {
-            code,
-            lastPartyState: partyState,
-        });
-    }, []);
-
     return {
         partyState,
         onNameEntry,
@@ -116,15 +113,30 @@ export const useRocketcrabClientSocket = ({
     };
 };
 
+const joinParty = (
+    code: string,
+    partyState: ClientParty,
+    reconnecting: boolean
+) => {
+    socket.emit("join-party", {
+        code,
+        // we don't need the playerList, so make it undefined.
+        // not strictly necessary
+        lastPartyState: { ...partyState, playerList: undefined },
+        reconnecting,
+    });
+};
+
 const setCookie = (key: string, value: any) =>
     setNookie(null, key, value, {
         maxAge: 2147483647,
     });
 
 type UseRocketcrabClientSocketProps = {
-    code: string | string[];
+    code: string;
     router: NextRouter;
     cookiePartyState?: ClientParty;
+    isReconnect: boolean;
 };
 
 type UseRocketcrabClientSocketReturn = {

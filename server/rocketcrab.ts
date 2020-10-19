@@ -1,4 +1,10 @@
-import { RocketCrab, Party, Player, ServerGame } from "../types/types";
+import {
+    RocketCrab,
+    Party,
+    Player,
+    ServerGame,
+    ClientParty,
+} from "../types/types";
 import { PartyStatus, GameStatus } from "../types/enums";
 import { getServerGameLibrary } from "../config";
 import { v4 as uuidv4 } from "uuid";
@@ -39,8 +45,52 @@ export const newParty = ({
     return newParty;
 };
 
-export const getParty = (newCode: string, partyList: Array<Party>): Party =>
-    partyList.find(({ code }) => code === newCode);
+export const getPartyByCode = (
+    newCode: string,
+    partyList: Array<Party>
+): Party => partyList.find(({ code }) => code === newCode);
+
+export const getPartyByUuid = (
+    newUuid: string,
+    partyList: Array<Party>
+): Party => partyList.find(({ uuid }) => uuid === newUuid);
+
+export const reconnectToParty = (
+    lastPartyState: ClientParty,
+    partyList: Array<Party>
+): Party => {
+    if (!lastPartyState || !lastPartyState.uuid) return;
+
+    const { code, uuid, status, selectedGameId, gameState, idealHostId } =
+        lastPartyState || {};
+
+    const partyAlreadyExists = getPartyByUuid(uuid, partyList);
+    if (partyAlreadyExists) return partyAlreadyExists;
+
+    const isValidCode =
+        code?.length === 4 &&
+        code?.match(/[a-z]/i) &&
+        !getPartyByCode(code, partyList);
+
+    const party = newParty({
+        partyList,
+        forceUuid: uuid,
+        ...(isValidCode ? { forceGameCode: code } : {}),
+    });
+
+    if (Object.values(PartyStatus).includes(status)) {
+        party.status = status;
+    }
+
+    if (findGameById(selectedGameId)) {
+        party.selectedGameId = selectedGameId;
+    }
+
+    party.gameState = gameState;
+    party.idealHostId = idealHostId;
+
+    return party;
+};
 
 export const addPlayer = (
     name: string,
@@ -58,8 +108,9 @@ export const addPlayer = (
 
     // this is mostly only important for the ffff dev party
     // in which ids are previousIds that were not created
-    // in this instance of the party are being used
-    if (id > party.nextPlayerId) {
+    // in this instance of the party are being used.
+    // also important for reconnectToParty.
+    if (id >= party.nextPlayerId) {
         party.nextPlayerId = id + 1;
     }
 

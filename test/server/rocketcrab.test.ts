@@ -1,7 +1,6 @@
 import {
     initRocketCrab,
     newParty,
-    getParty,
     addPlayer,
     sendStateToAll,
     removePlayer,
@@ -10,6 +9,9 @@ import {
     setName,
     startGame,
     exitGame,
+    getPartyByCode,
+    getPartyByUuid,
+    reconnectToParty,
 } from "../../server/rocketcrab";
 import {
     Party,
@@ -73,20 +75,38 @@ describe("server/rocketcrab.ts", () => {
         expect(partyList[0].playerList.length).toBe(0);
     });
 
-    it("getParty finds existing party", () => {
+    it("getPartyByCode finds existing party", () => {
         const partyList: Array<Party> = [];
 
         const { code } = newParty({ partyList });
-        const party = getParty(code, partyList);
+        const party = getPartyByCode(code, partyList);
 
         expect(party.code).toBe(code);
     });
 
-    it("getParty doesn't find non-existent party", () => {
+    it("getPartyByCode doesn't find non-existent party", () => {
         const partyList: Array<Party> = [];
         const code = "abcd";
 
-        const party = getParty(code, partyList);
+        const party = getPartyByCode(code, partyList);
+
+        expect(party).toBeFalsy();
+    });
+
+    it("getPartyByUuid finds existing party", () => {
+        const partyList: Array<Party> = [];
+
+        const { uuid } = newParty({ partyList });
+        const party = getPartyByUuid(uuid, partyList);
+
+        expect(party.uuid).toBe(uuid);
+    });
+
+    it("getPartyByUuid doesn't find non-existent party", () => {
+        const partyList: Array<Party> = [];
+        const uuid = "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d";
+
+        const party = getPartyByUuid(uuid, partyList);
 
         expect(party).toBeFalsy();
     });
@@ -186,15 +206,7 @@ describe("server/rocketcrab.ts", () => {
                 isHost: false,
             },
         ];
-        const jsonParty = {
-            status: PartyStatus.party,
-            playerList: jsonPlayerList,
-            code: "efgh",
-            selectedGameId: "FooGame",
-            gameState: {} as GameState,
-            nextPlayerId: 1,
-            idealHostId: 0,
-        };
+        const jsonParty = generateMockParty({ playerList: jsonPlayerList });
 
         expect(emits[0]).toBeCalledWith("update", {
             ...jsonParty,
@@ -248,7 +260,7 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("deletePartyIfEmpty deletes empty party", () => {
-        const mockParty: Party = generateMockParty();
+        const mockParty: Party = generateMockParty({});
         const partyList: Array<Party> = [mockParty];
 
         deletePartyIfEmpty(mockParty, partyList);
@@ -360,20 +372,60 @@ describe("server/rocketcrab.ts", () => {
         expect(mockParty.gameState.joinGameURL.playerURL).toBe("");
         expect(mockParty.gameState.joinGameURL.hostURL).toBe("");
     });
+
+    it("reconnectToParty uses matching existing party", () => {
+        const existingParty = generateMockParty({});
+        const partyList = [existingParty];
+        const newParty = reconnectToParty(existingParty, partyList);
+
+        expect(newParty.uuid).toBe(existingParty.uuid);
+        expect(partyList.length).toBe(1);
+    });
+
+    it("reconnectToParty creates identical party", () => {
+        const partyToRecreate = generateMockParty({ nextPlayerId: 0 });
+        const partyList = [];
+        const actualParty = reconnectToParty(partyToRecreate, partyList);
+
+        expect(actualParty).toMatchObject(partyToRecreate);
+    });
+
+    it("reconnectToParty generates new code if already in use", () => {
+        const partyToRecreate = generateMockParty({
+            nextPlayerId: 0,
+            code: "abcd",
+            uuid: "1",
+        });
+        const existingParty = generateMockParty({ code: "abcd", uuid: "2" });
+        const partyList = [existingParty];
+        const actualParty = reconnectToParty(partyToRecreate, partyList);
+
+        expect(actualParty.code).not.toBe("abcd");
+    });
+
+    it("reconnectToParty returns undefined if no lastPartyState given", () => {
+        const partyList = [];
+        const newParty = reconnectToParty(undefined, partyList);
+
+        expect(newParty).toBeUndefined();
+        expect(partyList.length).toBe(0);
+    });
 });
 
 const generateMockParty = ({
     status = PartyStatus.party,
     playerList = [],
     code = "efgh",
-    selectedGameId = "FooGame",
+    uuid = "9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d",
+    selectedGameId = "jd-foogame",
     gameState = {} as GameState,
     nextPlayerId = 1,
     idealHostId = 0,
-}: Partial<Party> = {}): Party => ({
+}: Partial<Party>): Party => ({
     status,
     playerList,
     code,
+    uuid,
     selectedGameId,
     gameState,
     nextPlayerId,
