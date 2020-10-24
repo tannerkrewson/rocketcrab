@@ -5,7 +5,15 @@ const game: ServerGame = {
     id: "drawphone",
     name: "Drawphone",
     author: "Tanner Krewson",
-    description: "Telephone with pictures",
+    description: `In Drawphone, there are no winners... only losers! Players 
+        take turns drawing pictures and guessing what those pictures are. If 
+        you guess correctly, nothing happens! If you guess wrong or draw like a 
+        toddler and ruin the chain of drawings and guesses, rest assured that 
+        you will be mercilessly mocked for your honest mistake (which 
+        ultimately don't matter in the grand scheme of the world).
+
+        Drawphone was inspired by Evan Brumley's 2015 online Spyfall 
+        implementation, Jackbox Games's Drawful, and Telestrations.`,
     displayUrlText: "drawphone.tannerkrewson.com",
     displayUrlHref: "https://drawphone.tannerkrewson.com/",
     donationUrlText: "Buy Tanner a taco!",
@@ -19,7 +27,7 @@ const game: ServerGame = {
     ],
     category: ["drawing", "easy"],
     players: "1+",
-    familyFriendly: false,
+    familyFriendly: true,
     minPlayers: 1,
     maxPlayers: Infinity,
     getJoinGameUrl: async () => {

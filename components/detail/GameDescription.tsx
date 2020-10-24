@@ -4,7 +4,13 @@ const GameDescription = ({
     description,
 }: GameDescriptionProps): JSX.Element => (
     <SkinnyCard>
-        <div>{description}</div>
+        <div>
+            {description.split("\n\n").map((str, i) => (
+                <div style={{ marginBottom: "1em" }} key={i}>
+                    {str}
+                </div>
+            ))}
+        </div>
     </SkinnyCard>
 );
 

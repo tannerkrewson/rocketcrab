@@ -17,6 +17,7 @@ const game: ServerGame = {
     category: ["easy"],
     players: "1+",
     familyFriendly: true,
+    guideId: "justone",
     getJoinGameUrl: async () => {
         const id = randomBytes(8).toString("hex");
         return {

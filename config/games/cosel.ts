@@ -12,7 +12,7 @@ const game: ServerGame = {
     },
 
     description:
-        "A drawing version of the broken telephone game. Try and communicate a word through a group of friends using drawings!",
+        "A drawing version of the broken telephone game based on the game Telestrations. Try and communicate a word through a group of friends using drawings! It was made during the quarantine period of COVID-19 so that people could still play with their friends and family.",
 
     displayUrlText: "cosel.io",
     displayUrlHref: "https://cosel.io/",
@@ -22,6 +22,8 @@ const game: ServerGame = {
     players: "4+",
 
     familyFriendly: true,
+
+    guideUrl: "https://cosel.io/how-to-play",
 
     getJoinGameUrl: async () => {
         const res = await fetch("https://warhol.cosel.io/api/games", {
