@@ -10,6 +10,7 @@ import { getServerGameLibrary } from "../config";
 import { v4 as uuidv4 } from "uuid";
 
 const SERVER_GAME_LIST: Array<ServerGame> = getServerGameLibrary().gameList;
+const PARTY_EXPIRATION_SEC = 60;
 
 export const initRocketCrab = (isDevMode?: boolean): RocketCrab => {
     const partyList: Array<Party> = [];
@@ -42,6 +43,12 @@ export const newParty = ({
         idealHostId: 0,
     };
     partyList.push(newParty);
+
+    setTimeout(
+        () => deletePartyIfEmpty(newParty, partyList),
+        PARTY_EXPIRATION_SEC * 1000
+    );
+
     return newParty;
 };
 
