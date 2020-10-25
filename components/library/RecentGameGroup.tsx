@@ -20,8 +20,8 @@ const RecentGameGroup = ({
                 .toArray();
 
             setGames(
-                sortedRecentGames.map(({ gameId }) =>
-                    gameList.find(({ id }) => id === gameId)
+                gameList.filter(({ id }) =>
+                    sortedRecentGames.find(({ gameId }) => id === gameId)
                 )
             );
         };
