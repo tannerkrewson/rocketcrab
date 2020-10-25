@@ -9,6 +9,8 @@ const gameTemplate = (
         category,
         players,
         familyFriendly,
+        guideUrl,
+        guideId,
     }: Partial<ServerGame>
 ): ServerGame => ({
     id: "netgamesio-" + urlId,
@@ -23,6 +25,8 @@ const gameTemplate = (
     category,
     players,
     familyFriendly,
+    ...(guideUrl ? { guideUrl } : {}),
+    ...(guideId ? { guideId } : {}),
     getJoinGameUrl: async () => {
         const newGame = await fetch(
             "https://netgames.io/games/" + urlId + "/new"
@@ -37,7 +41,7 @@ const games: Array<ServerGame> = [
     gameTemplate("avalon", {
         name: "Avalon",
         description:
-            "Evil players try to sabotage the good as they undertake quests for the Holy Grail.",
+            "The Loyal Servants of Arthur are on a quest for the Holy Grail. However, the evil Minions of Mordred are amidst the good, and they wish to destroy their prize. They are well hidden, and are colluding in secret. Merlin knows where the Evil ones lie, but cannot reveal his knowledge for he will die if they learn his identity. Can the quest succeed despite the treachery afoot?",
         basedOn: {
             game: "Avalon",
             author: "Don Eskridge",
@@ -47,11 +51,12 @@ const games: Array<ServerGame> = [
         category: ["netgamesio", "medium"],
         players: "5-10",
         familyFriendly: true,
+        guideUrl: "https://www.ultraboardgames.com/avalon/game-rules.php",
     }),
     gameTemplate("love-letter", {
         name: "Love Letter",
         description:
-            "Compete for the heart of the Princess through deception and betrayal.",
+            "Love Letter is a game of risk, deduction, and luck for 2–4 players. Your goal is to get your love letter into Princess Annette's hands while deflecting the letters from competing suitors. From a deck with only sixteen cards, each player starts with only one card in hand; one card is removed from play. On a turn, you draw one card, and play one card, trying to expose others and knock them from the game. Powerful cards lead to early gains, but make you a target. Rely on weaker cards for too long, however, and your letter may be tossed in the fire!",
         basedOn: {
             game: "Love Letter",
             author: "Seiji Kanai",
@@ -60,11 +65,12 @@ const games: Array<ServerGame> = [
         category: ["netgamesio", "medium"],
         players: "2-4",
         familyFriendly: true,
+        guideUrl: "https://www.ultraboardgames.com/love-letter/game-rules.php",
     }),
     gameTemplate("spyfall", {
         name: "Spyfall",
         description:
-            "Discover who the spy is by asking careful questions, but don't let them know too much.",
+            "There is a spy among you, and you have met to uncover them. You all share a piece of knowledge: the location of this strange meeting. All except the spy. Use this knowledge to weed the spy out, but don't let them discover your location or the consequences will be dire.",
         basedOn: {
             game: "Spyfall",
             author: "Alexandr Ushan",
@@ -73,11 +79,12 @@ const games: Array<ServerGame> = [
         category: ["netgamesio", "medium"],
         players: "3+",
         familyFriendly: true,
+        guide: "spyfall",
     }),
     gameTemplate("secret-hitler", {
         name: "Secret Hitler",
         description:
-            "The Liberals and the Fascists fight for political power in pre-war Germany.",
+            "It is pre-war Germany, and the political fight between the Fascists and Liberals is raging. Each party wishes to enact policies in line with their own agenda; if they enact enough, then the country will be under their control. Although the Fascists are outnumbered, they also remain hidden, and none more hidden than Hitler himself. If Hitler is elected Chancellor after only a few Fascist policies are in effect, the Fascists will seize control immediately. The Liberals might have to play dirty in order to stop this, enacting Fascist policies to perform investigations, and even to make an assassination attempt on Hitler himself..",
         basedOn: {
             game: "Secret Hitler",
             author: "Goat, Wolf, & Cabbage LLC",
@@ -86,11 +93,13 @@ const games: Array<ServerGame> = [
         category: ["netgamesio", "hard"],
         players: "5-10",
         familyFriendly: true,
+        guideUrl:
+            "https://www.ultraboardgames.com/secret-hitler/game-rules.php",
     }),
     gameTemplate("codewords", {
         name: "Codewords",
         description:
-            "Rival Codebreakers try to identify their Codewords before the enemy discovers theirs.",
+            "Rival Codebreakers race to identify which of the 25 Codewords are their own. They do this by listening to their Codemasters, who take turns giving one-word clues. The Codebreakers try to guess which words their Codemaster meant, one at a time. If they guess correctly, they may continue guessing until they either run out of ideas for the given clue or get a Codeword wrong. Then it is the other team's turn to give a clue and guess. The first team to reveal all their Codewords wins the game, but don't touch the Corrupted Codeword!",
         basedOn: {
             game: "Codenames",
             author: "Vlaada Chvátil",
@@ -99,11 +108,12 @@ const games: Array<ServerGame> = [
         category: ["netgamesio", "medium"],
         players: "4+",
         familyFriendly: true,
+        guideId: "codenames",
     }),
     gameTemplate("onu-werewolf", {
         name: "One Night Ultimate Werewolf",
         description:
-            "Find the Werewolves hiding amongst you, but you only have one night.",
+            "Each player takes on the role of a Villager, a Werewolf, or a special character. It’s your job to figure out who the Werewolves are and to kill at least one of them in order to win... unless you’ve become a Werewolf yourself.",
         basedOn: {
             game: "One Night Ultimate Werewolf",
             author: "Bezier Games",
@@ -113,11 +123,13 @@ const games: Array<ServerGame> = [
         category: ["netgamesio", "medium"],
         players: "3-18",
         familyFriendly: true,
+        guideUrl:
+            "https://www.ultraboardgames.com/one-night-ultimate-werewolf/game-rules.php",
     }),
     gameTemplate("enigma", {
         name: "Enigma",
         description:
-            "Send secret messages to your comrades while intercepting those of your enemy.",
+            'Two warring factions are trying to send secret messages to their comrades, but their communications are broadcast for the enemy to see. To keep their messages secret, each faction "encrypts" their messages using 4 keywords, known only to their comrades. Meanwhile, the enemy tries to intercept their messages by listening to their clues and figuring out the enemy\'s keywords. The first faction to intercept 2 messages from the other faction wins, unless a faction loses by miscommunicating 2 of their own messages.',
         basedOn: {
             game: "Decrypto",
             author: "Thomas Dagenais-Lespérance",
@@ -127,6 +139,7 @@ const games: Array<ServerGame> = [
         category: ["netgamesio", "hard"],
         players: "4+",
         familyFriendly: true,
+        guideUrl: "https://www.ultraboardgames.com/enigma/game-rules.php",
     }),
 ];
 

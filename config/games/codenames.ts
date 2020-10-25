@@ -12,6 +12,7 @@ const game: ServerGame = {
     category: ["medium"],
     players: "2-8+",
     familyFriendly: true,
+    guideId: "codenames",
 
     getJoinGameUrl: async () => {
         const {

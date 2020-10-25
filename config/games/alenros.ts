@@ -64,6 +64,8 @@ const game: Array<ServerGame> = [
         category: ["medium", "drawing"],
         players: "4-10",
         familyFriendly: true,
+        guideUrl:
+            "https://www.ultraboardgames.com/a-fake-artist-goes-to-new-york/game-rules.php",
         getJoinGameUrl: getJoinGameUrl(
             "wss://fake-artist.herokuapp.com/sockjs/rocketcrab/rocketcrab/websocket",
             "https://fake-artist.herokuapp.com/"
@@ -85,6 +87,8 @@ const game: Array<ServerGame> = [
         category: ["medium"],
         players: "4-8",
         familyFriendly: true,
+        guideUrl:
+            "https://www.ultraboardgames.com/a-fake-artist-goes-to-new-york/game-rules.php",
         getJoinGameUrl: getJoinGameUrl(
             "wss://insider-online.herokuapp.com/sockjs/rocketcrab/rocketcrab/websocket",
             "https://insider-online.herokuapp.com/"

@@ -11,7 +11,12 @@ const game: ServerGame = {
         link:
             "https://www.amazon.com/Repos-JOUS01-Just-One-dp-B07W3PJTL2/dp/B07W3PJTL2/",
     },
-    description: "A cooperative word guessing game",
+    description: `Just One is a cooperative party game in which you play 
+        together to discover as many mystery words as possible. Find the best 
+        clue to help your teammate. Be unique, as all identical clues will be 
+        cancelled! Everyone writes one-word clues to help a guesser guess their 
+        mystery word. The catch: you can't show the guesser clues that two or 
+        more people write.`,
     displayUrlText: "just1.herokuapp.com",
     displayUrlHref: "https://just1.herokuapp.com/",
     category: ["easy"],

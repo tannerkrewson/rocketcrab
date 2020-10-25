@@ -1,11 +1,4 @@
-Just One is a *cooperative game*.
-
-Everyone writes *one-word clues* to help a guesser guess their mystery word.
-The catch: you can't show the guesser clues that two or more people write.
-
-(This guide is available while you play, so don't worry if you forget!)
-
-In each round:
+**In each round:**
 
 1.  Without communicating, everyone writes a one-word clue.
 
@@ -25,7 +18,7 @@ In each round:
 
 4.  Keep playing for as long as you want!
 
-Tips:
+**Tips:**
 
 -   If you disconnect, joining with the exact same name puts you back.
 -   If someone leaves for real, you can kick them.

@@ -11,7 +11,13 @@ const game: ServerGame = {
         link:
             "https://www.amazon.com/The-Resistance-Dystopian-Universe/dp/B008A2BA8G/",
     },
-    description: "Out the snake, or be outed as a snake",
+    description: `Out the snake, or be outed as a snake! 🐍
+    
+        Snakeout is a game in which a team of loyalists is infiltrated by a 
+        group of snakes. The loyalists must try to figure out who the snakes 
+        are, and the snakes must try to keep the loyalists from figuring out 
+        their identity. The game is separated into five missions. The first 
+        team to "win" three missions wins the game.`,
     displayUrlText: "snakeout.tannerkrewson.com",
     displayUrlHref: "https://snakeout.tannerkrewson.com/",
     donationUrlText: "Buy Tanner a taco!",
@@ -19,6 +25,7 @@ const game: ServerGame = {
     category: ["medium"],
     players: "5-10",
     familyFriendly: true,
+    guideUrl: "https://snakeout.tannerkrewson.com/how-to-play",
     getJoinGameUrl: async () => {
         const newUrl = "https://snakeout.tannerkrewson.com/new";
         const { gameCode } = await postJson(newUrl);
