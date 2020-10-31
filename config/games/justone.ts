@@ -23,6 +23,13 @@ const game: ServerGame = {
     players: "1+",
     familyFriendly: true,
     guideId: "justone",
+    pictures: [
+        "https://i.imgur.com/KX3Sjsi.jpg",
+        "https://i.imgur.com/dDu2mMg.jpg",
+        "https://i.imgur.com/tZWRVvu.jpg",
+        "https://i.imgur.com/hMeiX8k.jpg",
+        "https://i.imgur.com/plGWABz.jpg",
+    ],
     getJoinGameUrl: async () => {
         const id = randomBytes(8).toString("hex");
         return {

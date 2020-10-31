@@ -13,6 +13,12 @@ const game: ServerGame = {
     players: "2-8+",
     familyFriendly: true,
     guideId: "codenames",
+    pictures: [
+        "https://i.imgur.com/Hiu7cAm.jpg",
+        "https://i.imgur.com/Ktrig7a.jpg",
+        "https://i.imgur.com/2atdwpN.jpg",
+        "https://i.imgur.com/fFKfyEN.jpg",
+    ],
 
     getJoinGameUrl: async () => {
         const {

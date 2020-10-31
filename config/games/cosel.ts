@@ -25,6 +25,14 @@ const game: ServerGame = {
 
     guideUrl: "https://cosel.io/how-to-play",
 
+    pictures: [
+        "https://i.imgur.com/qWRJ8VO.jpg",
+        "https://i.imgur.com/SP0iRNQ.jpg",
+        "https://i.imgur.com/7Ljm6kP.jpg",
+        "https://i.imgur.com/0jblGmw.jpg",
+        "https://i.imgur.com/EEHgiYM.jpg",
+    ],
+
     getJoinGameUrl: async () => {
         const res = await fetch("https://warhol.cosel.io/api/games", {
             method: "POST",

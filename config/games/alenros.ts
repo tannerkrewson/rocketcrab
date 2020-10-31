@@ -57,8 +57,17 @@ const game: Array<ServerGame> = [
             link:
                 "https://oinkgames.com/en/games/analog/a-fake-artist-goes-to-new-york/",
         },
-        description:
-            "Everyone is drawing one picture together...and one doesn't even know what they draw. There is a Fake Artist hiding among the real artists - can you find out who it is? The Fake Artist has to be careful not to be give himself away and guess what is being drawn while the real artists have to signal the other artists with their drawing that they know the word, without making the drawing too obvious for the Fake Artist. The catch? you only get to draw one line.",
+        description: `Please note: you will need a way for all players to draw 
+            together; it is not provided by the game.
+
+            Everyone is drawing one picture together...and one 
+            doesn't even know what they draw. There is a Fake Artist hiding 
+            among the real artists - can you find out who it is? The Fake 
+            Artist has to be careful not to be give himself away and guess what 
+            is being drawn while the real artists have to signal the other 
+            artists with their drawing that they know the word, without making 
+            the drawing too obvious for the Fake Artist. The catch? you only 
+            get to draw one line.`,
         displayUrlText: "fake-artist.herokuapp.com",
         displayUrlHref: "https://fake-artist.herokuapp.com/",
         category: ["medium", "drawing"],
@@ -66,6 +75,12 @@ const game: Array<ServerGame> = [
         familyFriendly: true,
         guideUrl:
             "https://www.ultraboardgames.com/a-fake-artist-goes-to-new-york/game-rules.php",
+        pictures: [
+            "https://i.imgur.com/U2Ds4OR.jpg",
+            "https://i.imgur.com/Q2rdGVQ.jpg",
+            "https://i.imgur.com/Zn9oupF.jpg",
+            "https://i.imgur.com/R0kbS1H.jpg",
+        ],
         getJoinGameUrl: getJoinGameUrl(
             "wss://fake-artist.herokuapp.com/sockjs/rocketcrab/rocketcrab/websocket",
             "https://fake-artist.herokuapp.com/"
@@ -89,6 +104,13 @@ const game: Array<ServerGame> = [
         familyFriendly: true,
         guideUrl:
             "https://www.ultraboardgames.com/a-fake-artist-goes-to-new-york/game-rules.php",
+        pictures: [
+            "https://i.imgur.com/i3rYxXt.jpg",
+            "https://i.imgur.com/yy0ZpvT.jpg",
+            "https://i.imgur.com/sIkwlKS.jpg",
+            "https://i.imgur.com/MasoMRt.jpg",
+            "https://i.imgur.com/3PBQodp.jpg",
+        ],
         getJoinGameUrl: getJoinGameUrl(
             "wss://insider-online.herokuapp.com/sockjs/rocketcrab/rocketcrab/websocket",
             "https://insider-online.herokuapp.com/"

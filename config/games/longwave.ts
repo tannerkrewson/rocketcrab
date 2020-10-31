@@ -18,6 +18,13 @@ const game: ServerGame = {
     players: "2-12+",
     familyFriendly: true,
     guideUrl: "https://www.ultraboardgames.com/wavelength/game-rules.php",
+    pictures: [
+        "https://i.imgur.com/yDx8aln.jpg",
+        "https://i.imgur.com/JrjlylN.jpg",
+        "https://i.imgur.com/57LlwWA.jpg",
+        "https://i.imgur.com/cuGMgKv.jpg",
+        "https://i.imgur.com/u36UW03.jpg",
+    ],
     getJoinGameUrl: async () => {
         const id = randomBytes(8).toString("hex");
         return {

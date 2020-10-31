@@ -14,6 +14,12 @@ const game: ServerGame = {
     category: ["easy"],
     players: "3-25",
     familyFriendly: true,
+    pictures: [
+        "https://i.imgur.com/5mX4zf7.jpg",
+        "https://i.imgur.com/cPZFcYr.jpg",
+        "https://i.imgur.com/690VrZJ.jpg",
+        "https://i.imgur.com/X4BZKmA.jpg",
+    ],
     getJoinGameUrl: async () => {
         return {
             playerURL:

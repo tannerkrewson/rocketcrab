@@ -11,6 +11,7 @@ const gameTemplate = (
         familyFriendly,
         guideUrl,
         guideId,
+        pictures,
     }: Partial<ServerGame>
 ): ServerGame => ({
     id: "netgamesio-" + urlId,
@@ -25,6 +26,7 @@ const gameTemplate = (
     category,
     players,
     familyFriendly,
+    pictures,
     ...(guideUrl ? { guideUrl } : {}),
     ...(guideId ? { guideId } : {}),
     getJoinGameUrl: async () => {
@@ -52,6 +54,14 @@ const games: Array<ServerGame> = [
         players: "5-10",
         familyFriendly: true,
         guideUrl: "https://www.ultraboardgames.com/avalon/game-rules.php",
+        pictures: [
+            "https://i.imgur.com/v8oxIRT.jpg",
+            "https://i.imgur.com/WUMpkhM.jpg",
+            "https://i.imgur.com/7uOSax6.jpg",
+            "https://i.imgur.com/BobyYTI.jpg",
+            "https://i.imgur.com/OPmUuiK.jpg",
+            "https://i.imgur.com/ROlMAgt.jpg",
+        ],
     }),
     gameTemplate("love-letter", {
         name: "Love Letter",
@@ -65,6 +75,13 @@ const games: Array<ServerGame> = [
         category: ["netgamesio", "medium"],
         players: "2-4",
         familyFriendly: true,
+        pictures: [
+            "https://i.imgur.com/AST27jv.jpg",
+            "https://i.imgur.com/h1eLGMu.jpg",
+            "https://i.imgur.com/s64xb9b.jpg",
+            "https://i.imgur.com/h5KTTlm.jpg",
+            "https://i.imgur.com/kTquWLO.jpg",
+        ],
         guideUrl: "https://www.ultraboardgames.com/love-letter/game-rules.php",
     }),
     gameTemplate("spyfall", {
@@ -80,6 +97,14 @@ const games: Array<ServerGame> = [
         players: "3+",
         familyFriendly: true,
         guide: "spyfall",
+        pictures: [
+            "https://i.imgur.com/yW8IO3b.jpg",
+            "https://i.imgur.com/qJas8PC.jpg",
+            "https://i.imgur.com/NWxJcDq.jpg",
+            "https://i.imgur.com/MiNe9cm.jpg",
+            "https://i.imgur.com/OIAwn6z.jpg",
+            "https://i.imgur.com/qVQv7RH.jpg",
+        ],
     }),
     gameTemplate("secret-hitler", {
         name: "Secret Hitler",
@@ -95,6 +120,14 @@ const games: Array<ServerGame> = [
         familyFriendly: true,
         guideUrl:
             "https://www.ultraboardgames.com/secret-hitler/game-rules.php",
+        pictures: [
+            "https://i.imgur.com/22vIUhH.jpg",
+            "https://i.imgur.com/T35jSu8.jpg",
+            "https://i.imgur.com/hp18Ixq.jpg",
+            "https://i.imgur.com/KKlKmM1.jpg",
+            "https://i.imgur.com/CvFWc9X.jpg",
+            "https://i.imgur.com/CNvGgbJ.jpg",
+        ],
     }),
     gameTemplate("codewords", {
         name: "Codewords",
@@ -109,6 +142,15 @@ const games: Array<ServerGame> = [
         players: "4+",
         familyFriendly: true,
         guideId: "codenames",
+        pictures: [
+            "https://i.imgur.com/fnrZNkH.jpg",
+            "https://i.imgur.com/MaGgXl2.jpg",
+            "https://i.imgur.com/LeCRShS.jpg",
+            "https://i.imgur.com/lX86Ckk.jpg",
+            "https://i.imgur.com/g1aUMBw.jpg",
+            "https://i.imgur.com/acBoU7U.jpg",
+            "https://i.imgur.com/tgTSLbV.jpg",
+        ],
     }),
     gameTemplate("onu-werewolf", {
         name: "One Night Ultimate Werewolf",
@@ -125,6 +167,15 @@ const games: Array<ServerGame> = [
         familyFriendly: true,
         guideUrl:
             "https://www.ultraboardgames.com/one-night-ultimate-werewolf/game-rules.php",
+        pictures: [
+            "https://i.imgur.com/zkl4wHv.jpg",
+            "https://i.imgur.com/wljtGCg.jpg",
+            "https://i.imgur.com/sRx8zxd.jpg",
+            "https://i.imgur.com/keMR7dH.jpg",
+            "https://i.imgur.com/vBDeKsc.jpg",
+            "https://i.imgur.com/NBOFU6r.jpg",
+            "https://i.imgur.com/p9ZxEhH.jpg",
+        ],
     }),
     gameTemplate("enigma", {
         name: "Enigma",
@@ -140,6 +191,13 @@ const games: Array<ServerGame> = [
         players: "4+",
         familyFriendly: true,
         guideUrl: "https://www.ultraboardgames.com/enigma/game-rules.php",
+        pictures: [
+            "https://i.imgur.com/QYstRgP.jpg",
+            "https://i.imgur.com/YgLUFYb.jpg",
+            "https://i.imgur.com/CoIo6yI.jpg",
+            "https://i.imgur.com/416bKnE.jpg",
+            "https://i.imgur.com/UjfApw6.jpg",
+        ],
     }),
 ];
 
