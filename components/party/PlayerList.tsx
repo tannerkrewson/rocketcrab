@@ -21,6 +21,12 @@ const PlayerList = ({
                 />
             </Grid>
         ))}
+        {playerList.length === 1 && (
+            <Grid xs={24}>
+                When your friends join, they&apos;ll appear here! <br />
+                (You have friends... right? 😆)
+            </Grid>
+        )}
     </Grid.Container>
 );
 

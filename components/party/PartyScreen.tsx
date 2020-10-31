@@ -71,6 +71,7 @@ const PartyScreen = ({
                 host={host}
                 onShowGameInfo={showGameInfo(true)}
                 isHost={isHost}
+                onlyOnePlayer={playerList.length === 1}
             />
             <Spacer y={1} />
             <ButtonGroup>

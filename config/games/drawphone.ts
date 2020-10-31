@@ -10,7 +10,7 @@ const game: ServerGame = {
         you guess correctly, nothing happens! If you guess wrong or draw like a 
         toddler and ruin the chain of drawings and guesses, rest assured that 
         you will be mercilessly mocked for your honest mistake (which 
-        ultimately don't matter in the grand scheme of the world).
+        ultimately doesn't even matter in the grand scheme of the world).
 
         Drawphone was inspired by Evan Brumley's 2015 online Spyfall 
         implementation, Jackbox Games's Drawful, and Telestrations.`,
