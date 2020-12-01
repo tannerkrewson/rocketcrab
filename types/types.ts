@@ -87,6 +87,7 @@ export type BasedOn = {
     game: string;
     author?: string;
     link?: string;
+    bggId?: number;
 };
 
 export type ServerGame = ClientGame & {

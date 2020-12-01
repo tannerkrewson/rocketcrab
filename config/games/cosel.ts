@@ -9,6 +9,7 @@ const game: ServerGame = {
         game: "Telestrations",
         author: "USAopoly",
         link: "https://theop.games/products/game/telestrations-upside-drawn/",
+        bggId: 46213,
     },
 
     description:

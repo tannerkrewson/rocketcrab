@@ -19,6 +19,9 @@ const game: ServerGame = {
 
         // if possible, make this a link to buy the game from the official manufacturer
         link: "https://link.com", // optional
+
+        // used for generating links to/from BoardGameGeek
+        bggId: 123456789, // optional
     }, // optional
 
     // The description should explain why someone should play your game!

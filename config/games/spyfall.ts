@@ -9,6 +9,7 @@ const game: ServerGame = {
         game: "Spyfall",
         author: "Alexandr Ushan",
         link: "https://www.cryptozoic.com/spyfall",
+        bggId: 166384,
     },
     description: `In Spyfall, one random player will become the spy, and all 
         others will be given a location and a role within the location. For 

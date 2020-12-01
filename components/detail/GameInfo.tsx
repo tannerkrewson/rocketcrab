@@ -5,7 +5,18 @@ const GameInfo = ({ game }: GameInfoProps): JSX.Element => (
     <SkinnyCard>
         {game.basedOn && (
             <div className="info">
-                <span className="emoji">🎲</span> Based on{" "}
+                {game.basedOn.bggId ? (
+                    <a
+                        href={`https://boardgamegeek.com/boardgame/${game.basedOn.bggId}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                    >
+                        <span className="emoji">🎲</span>
+                    </a>
+                ) : (
+                    <span className="emoji">🎲</span>
+                )}
+                Based on{" "}
                 {game.basedOn.link ? (
                     <a
                         href={game.basedOn.link}
