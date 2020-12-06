@@ -48,6 +48,8 @@ describe("server/rocketcrab.ts", () => {
     it("initRocketCrab works", () => {
         expect(initRocketCrab()).toStrictEqual({
             partyList: [],
+            isFinderActive: true,
+            finderSubscribers: [],
         });
     });
 
@@ -423,6 +425,7 @@ const generateMockParty = ({
     gameState = {} as GameState,
     nextPlayerId = 1,
     idealHostId = 0,
+    isPublic = false,
 }: Partial<Party>): Party => ({
     status,
     playerList,
@@ -432,6 +435,7 @@ const generateMockParty = ({
     gameState,
     nextPlayerId,
     idealHostId,
+    isPublic,
 });
 
 const generateMockPlayer = ({

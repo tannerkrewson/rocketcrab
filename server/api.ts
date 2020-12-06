@@ -3,10 +3,16 @@ import { RocketCrab } from "../types/types";
 import { Application, Request, Response } from "express";
 
 export default (server: Application, { partyList }: RocketCrab): void => {
-    server.post("/api/new", (req: Request, res: Response) => {
-        const { code } = newParty({ partyList });
+    const newPartyHandler = (isPublic: boolean) => (
+        req: Request,
+        res: Response
+    ) => {
+        const { code } = newParty({ partyList, isPublic });
         res.json({ code });
-    });
+    };
+    server.post("/api/new", newPartyHandler(false));
+    server.post("/api/new-public", newPartyHandler(true));
+
     server.get("/transfer/:gameid/:uuid?", (req: Request, res: Response) => {
         const { uuid: givenUuid, gameid } = req.params;
         const { name } = req.query;

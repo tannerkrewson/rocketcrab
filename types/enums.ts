@@ -23,4 +23,6 @@ export enum SocketEvent {
     NAME = "NAME",
     RECONNECT = "reconnect",
     UPDATE = "UPDATE",
+    FINDER_SUBSCRIBE = "FINDER_SUBSCRIBE",
+    FINDER_UPDATE = "FINDER_UPDATE",
 }

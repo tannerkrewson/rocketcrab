@@ -5,6 +5,8 @@ import { BindingsChangeTarget } from "@geist-ui/react/dist/input/use-input";
 
 export type RocketCrab = {
     partyList: Array<Party>;
+    isFinderActive: boolean;
+    finderSubscribers: Array<SocketIO.Socket>;
 };
 
 export type Party = ClientParty & {
@@ -20,6 +22,7 @@ export type ClientParty = {
     selectedGameId: string;
     gameState: GameState;
     idealHostId: number;
+    isPublic: boolean;
 };
 
 export type Player = {
@@ -114,6 +117,11 @@ export type LibraryState = {
     search: string;
     setSearch: Dispatch<SetStateAction<string>>;
     searchBindings: SearchBindingsType;
+};
+
+export type FinderState = {
+    isActive: boolean;
+    publicPartyList: Array<ClientParty>;
 };
 
 type SearchBindingsType = {

@@ -9,6 +9,7 @@ import {
     exitGame,
     getPartyByCode,
     reconnectToParty,
+    getFinderState,
 } from "./rocketcrab";
 import type {
     JoinPartyResponse,
@@ -22,14 +23,20 @@ import { SocketEvent } from "../types/enums";
 export default (io: Server, rocketcrab: RocketCrab): void => {
     io.on("connection", (socket) => {
         socket.on(SocketEvent.JOIN_PARTY, onJoinParty(socket, rocketcrab));
+        socket.on(
+            SocketEvent.FINDER_SUBSCRIBE,
+            onFinderSubscribe(socket, rocketcrab)
+        );
     });
 };
 
-const onJoinParty = (socket: SocketIO.Socket, { partyList }: RocketCrab) => ({
+const onJoinParty = (socket: SocketIO.Socket, rocketcrab: RocketCrab) => ({
     code,
     lastPartyState,
     reconnecting,
 }: JoinPartyResponse) => {
+    const { partyList } = rocketcrab;
+
     const party = reconnecting
         ? reconnectToParty(lastPartyState, partyList)
         : getPartyByCode(code, partyList);
@@ -38,8 +45,8 @@ const onJoinParty = (socket: SocketIO.Socket, { partyList }: RocketCrab) => ({
         const { id, name } = lastPartyState?.me || {};
         const player = addPlayer(name, socket, party, id);
 
-        attachPartyListenersToPlayer(player, party, partyList);
-        sendStateToAll(party);
+        attachPartyListenersToPlayer(player, party, rocketcrab);
+        sendStateToAll(party, rocketcrab);
     } else {
         socket.emit(SocketEvent.INVALID_PARTY, { code });
     }
@@ -48,8 +55,9 @@ const onJoinParty = (socket: SocketIO.Socket, { partyList }: RocketCrab) => ({
 const attachPartyListenersToPlayer = (
     player: Player,
     party: Party,
-    partyList: Array<Party>
+    rocketcrab: RocketCrab
 ) => {
+    const { partyList } = rocketcrab;
     const { socket } = player;
     const { code, playerList } = party;
 
@@ -58,32 +66,47 @@ const attachPartyListenersToPlayer = (
     socket.on(SocketEvent.DISCONNECT, () => {
         removePlayer(player, party);
         deletePartyIfEmpty(party, partyList);
-        sendStateToAll(party);
+        sendStateToAll(party, rocketcrab);
     });
 
     socket.on(SocketEvent.NAME, (name) => {
         setName(name, player, playerList);
-        sendStateToAll(party);
+        sendStateToAll(party, rocketcrab);
     });
 
     socket.on(SocketEvent.GAME_SELECT, (gameId) => {
         if (!player.isHost) return;
 
         setGame(gameId, party);
-        sendStateToAll(party);
+        sendStateToAll(party, rocketcrab);
     });
 
     socket.on(SocketEvent.GAME_START, () => {
         if (!player.isHost) return;
 
-        startGame(party);
-        sendStateToAll(party);
+        startGame(party, rocketcrab);
+        sendStateToAll(party, rocketcrab);
     });
 
     socket.on(SocketEvent.GAME_EXIT, () => {
         if (!player.isHost) return;
 
         exitGame(party);
-        sendStateToAll(party);
+        sendStateToAll(party, rocketcrab);
+    });
+};
+
+const onFinderSubscribe = (
+    socket: SocketIO.Socket,
+    rocketcrab: RocketCrab
+) => () => {
+    socket.emit(SocketEvent.FINDER_UPDATE, getFinderState(rocketcrab));
+
+    rocketcrab.finderSubscribers.push(socket);
+
+    socket.on(SocketEvent.DISCONNECT, () => {
+        rocketcrab.finderSubscribers = rocketcrab.finderSubscribers.filter(
+            (s) => s !== socket
+        );
     });
 };

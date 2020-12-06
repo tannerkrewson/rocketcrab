@@ -4,6 +4,7 @@ import {
     Player,
     ServerGame,
     ClientParty,
+    FinderState,
 } from "../types/types";
 import { PartyStatus, GameStatus, SocketEvent } from "../types/enums";
 import { getServerGameLibrary } from "../config";
@@ -17,17 +18,19 @@ export const initRocketCrab = (isDevMode?: boolean): RocketCrab => {
 
     if (isDevMode) newParty({ partyList, forceGameCode: "ffff" });
 
-    return { partyList };
+    return { partyList, isFinderActive: true, finderSubscribers: [] };
 };
 
 export const newParty = ({
     partyList,
     forceGameCode,
     forceUuid,
+    isPublic = false,
 }: {
     partyList: Array<Party>;
     forceGameCode?: string;
     forceUuid?: string;
+    isPublic?: boolean;
 }): Party => {
     const newParty: Party = {
         status: PartyStatus.party,
@@ -41,6 +44,7 @@ export const newParty = ({
         },
         nextPlayerId: 0,
         idealHostId: 0,
+        isPublic,
     };
     partyList.push(newParty);
 
@@ -140,10 +144,22 @@ export const addPlayer = (
     return player;
 };
 
-export const sendStateToAll = (party: Party): void =>
+export const sendStateToAll = (party: Party, rocketcrab?: RocketCrab): void => {
     party.playerList.forEach(({ socket, ...player }) =>
         socket.emit(SocketEvent.UPDATE, { me: player, ...getJsonParty(party) })
     );
+
+    if (
+        rocketcrab &&
+        rocketcrab.isFinderActive &&
+        rocketcrab.finderSubscribers.length > 0
+    ) {
+        // send updates to people looking at /find page
+        rocketcrab.finderSubscribers.forEach((socket) =>
+            socket.emit(SocketEvent.FINDER_UPDATE, getFinderState(rocketcrab))
+        );
+    }
+};
 
 export const removePlayer = (player: Player, party: Party): void => {
     const { playerList, idealHostId } = party;
@@ -200,7 +216,10 @@ export const setGame = (gameId: string, party: Party): void => {
     }
 };
 
-export const startGame = async (party: Party): Promise<void> => {
+export const startGame = async (
+    party: Party,
+    rocketcrab?: RocketCrab
+): Promise<void> => {
     // TODO: check if ready
     const { gameState, selectedGameId, playerList } = party;
 
@@ -209,7 +228,7 @@ export const startGame = async (party: Party): Promise<void> => {
 
     party.status = PartyStatus.ingame;
     gameState.status = GameStatus.loading;
-    sendStateToAll(party);
+    sendStateToAll(party, rocketcrab);
 
     try {
         gameState.joinGameURL = await game.getJoinGameUrl();
@@ -218,7 +237,7 @@ export const startGame = async (party: Party): Promise<void> => {
 
         gameState.status = GameStatus.error;
         gameState.error = "❌ Can't connect to " + game.name;
-        sendStateToAll(party);
+        sendStateToAll(party, rocketcrab);
         return;
     }
 
@@ -233,10 +252,10 @@ export const startGame = async (party: Party): Promise<void> => {
     const host = getHost(playerList);
     host.socket.once("host-game-loaded", () => {
         gameState.status = GameStatus.inprogress;
-        sendStateToAll(party);
+        sendStateToAll(party, rocketcrab);
     });
 
-    sendStateToAll(party);
+    sendStateToAll(party, rocketcrab);
 };
 
 export const exitGame = (party: Party): void => {
@@ -246,6 +265,18 @@ export const exitGame = (party: Party): void => {
     gameState.status = GameStatus.loading;
     gameState.joinGameURL = { playerURL: "", hostURL: "" };
 };
+
+export const getFinderState = ({
+    isFinderActive,
+    partyList,
+}: RocketCrab): FinderState => ({
+    isActive: isFinderActive,
+    publicPartyList: partyList
+        .filter(
+            ({ isPublic, status }) => isPublic && status === PartyStatus.party
+        )
+        .map((party) => getJsonParty(party)),
+});
 
 const findPlayerByName = (
     nameToFind: string,
