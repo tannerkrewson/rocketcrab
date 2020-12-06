@@ -5,7 +5,7 @@ import {
     ServerGame,
     ClientParty,
 } from "../types/types";
-import { PartyStatus, GameStatus } from "../types/enums";
+import { PartyStatus, GameStatus, SocketEvent } from "../types/enums";
 import { getServerGameLibrary } from "../config";
 import { v4 as uuidv4 } from "uuid";
 
@@ -142,7 +142,7 @@ export const addPlayer = (
 
 export const sendStateToAll = (party: Party): void =>
     party.playerList.forEach(({ socket, ...player }) =>
-        socket.emit("update", { me: player, ...getJsonParty(party) })
+        socket.emit(SocketEvent.UPDATE, { me: player, ...getJsonParty(party) })
     );
 
 export const removePlayer = (player: Player, party: Party): void => {
@@ -189,7 +189,7 @@ export const setName = (
 
         // prevents error if no cookie was set
         if (name) {
-            playerToName.socket.emit("invalid-name");
+            playerToName.socket.emit(SocketEvent.INVALID_NAME);
         }
     }
 };

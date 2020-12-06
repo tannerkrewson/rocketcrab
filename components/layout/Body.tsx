@@ -3,7 +3,7 @@ import Head from "next/head";
 const Body = ({ children }: BodyProps): JSX.Element => (
     <>
         <Head>
-            <title>🚀🦀 rocketcrab</title>
+            <title>rocketcrab</title>
             <meta
                 name="viewport"
                 content="width=device-width, initial-scale=1"

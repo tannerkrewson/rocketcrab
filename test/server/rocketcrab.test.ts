@@ -20,7 +20,7 @@ import {
     ServerGameLibrary,
     ServerGame,
 } from "../../types/types";
-import { PartyStatus, GameStatus } from "../../types/enums";
+import { PartyStatus, GameStatus, SocketEvent } from "../../types/enums";
 
 jest.mock("../../config", () => ({
     getServerGameLibrary: jest.fn(
@@ -208,15 +208,15 @@ describe("server/rocketcrab.ts", () => {
         ];
         const jsonParty = generateMockParty({ playerList: jsonPlayerList });
 
-        expect(emits[0]).toBeCalledWith("update", {
+        expect(emits[0]).toBeCalledWith(SocketEvent.UPDATE, {
             ...jsonParty,
             me: jsonPlayerList[0],
         });
-        expect(emits[1]).toBeCalledWith("update", {
+        expect(emits[1]).toBeCalledWith(SocketEvent.UPDATE, {
             ...jsonParty,
             me: jsonPlayerList[1],
         });
-        expect(emits[2]).toBeCalledWith("update", {
+        expect(emits[2]).toBeCalledWith(SocketEvent.UPDATE, {
             ...jsonParty,
             me: jsonPlayerList[2],
         });
@@ -310,7 +310,9 @@ describe("server/rocketcrab.ts", () => {
         setName("name1", mockPlayerList[0], mockPlayerList);
 
         expect(mockPlayerList[0].name).toBe("");
-        expect(mockPlayerList[0].socket.emit).toBeCalledWith("invalid-name");
+        expect(mockPlayerList[0].socket.emit).toBeCalledWith(
+            SocketEvent.INVALID_NAME
+        );
     });
 
     it("startGame works", async () => {

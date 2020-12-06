@@ -5,6 +5,7 @@ import { io } from "socket.io-client";
 import { RocketcrabDexie } from "./dexie";
 import { setCookie as setNookie } from "nookies";
 import { NextRouter } from "next/router";
+import { SocketEvent } from "../types/enums";
 
 const socket = io();
 
@@ -23,7 +24,7 @@ export const useRocketcrabClientSocket = ({
     useEffect(() => {
         socket.open();
 
-        socket.on("update", (newPartyState: ClientParty) => {
+        socket.on(SocketEvent.UPDATE, (newPartyState: ClientParty) => {
             setPartyState(newPartyState);
             setShowReconnecting(false);
 
@@ -31,12 +32,12 @@ export const useRocketcrabClientSocket = ({
                 setCookie("lastPartyState", JSON.stringify(newPartyState));
             }
         });
-        socket.on("invalid-name", () => {
+        socket.on(SocketEvent.INVALID_NAME, () => {
             if (code === "ffff") return;
             alert("Name already in use");
         });
 
-        socket.on("disconnect", (reason) => {
+        socket.on(SocketEvent.DISCONNECT, (reason) => {
             // if the disconnection was initiated by the server
             if (reason === "io server disconnect") {
                 // reconnect manually
@@ -59,30 +60,30 @@ export const useRocketcrabClientSocket = ({
             joinParty(code, cookiePartyState, isReconnect);
         }
 
-        socket.off("reconnect");
-        socket.off("invalid-party");
+        socket.off(SocketEvent.RECONNECT);
+        socket.off(SocketEvent.INVALID_PARTY);
 
-        socket.on("reconnect", () => {
+        socket.on(SocketEvent.RECONNECT, () => {
             joinParty(code, partyState || cookiePartyState, true);
             setShowReconnecting(false);
         });
 
-        socket.on("invalid-party", () => {
+        socket.on(SocketEvent.INVALID_PARTY, () => {
             // todo: don't do this if showGame is true
             router.push("/join?invalid=" + code);
         });
     }, [code, partyState, isReconnect]);
 
     const onNameEntry = useCallback((enteredName) => {
-        socket.emit("name", enteredName);
+        socket.emit(SocketEvent.NAME, enteredName);
     }, []);
 
     const onSelectGame = useCallback((gameId: string) => {
-        socket.emit("game-select", gameId);
+        socket.emit(SocketEvent.GAME_SELECT, gameId);
     }, []);
 
     const onStartGame = useCallback(() => {
-        socket.emit("game-start");
+        socket.emit(SocketEvent.GAME_START);
 
         const db = new RocketcrabDexie();
         db.addGame(selectedGameId);
@@ -94,12 +95,12 @@ export const useRocketcrabClientSocket = ({
     }, [playerList, selectedGameId]);
 
     const onExitGame = useCallback(() => {
-        socket.emit("game-exit");
+        socket.emit(SocketEvent.GAME_EXIT);
     }, []);
 
     // give the host a little extra time (TODO probably remove)
     const onHostGameLoaded = useCallback(
-        () => setTimeout(() => socket.emit("host-game-loaded"), 2000),
+        () => setTimeout(() => socket.emit(SocketEvent.HOST_GAME_LOADED), 2000),
         []
     );
 
@@ -119,7 +120,7 @@ const joinParty = (
     partyState: ClientParty,
     reconnecting: boolean
 ) => {
-    socket.emit("join-party", {
+    socket.emit(SocketEvent.JOIN_PARTY, {
         code,
         // we don't need the playerList, so make it undefined.
         // not strictly necessary
