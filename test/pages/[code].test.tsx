@@ -8,8 +8,7 @@ jest.mock("next/router", () => ({
 }));
 
 jest.mock("socket.io-client", () => ({
-    __esModule: true,
-    default: () =>
+    io: () =>
         (({
             open: jest.fn(),
             on: jest.fn(),

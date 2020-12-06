@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { ClientParty } from "../types/types";
 import { logEvent } from "./analytics";
-import socketIOClient from "socket.io-client";
+import { io } from "socket.io-client";
 import { RocketcrabDexie } from "./dexie";
 import { setCookie as setNookie } from "nookies";
 import { NextRouter } from "next/router";
-const socket = socketIOClient();
+
+const socket = io();
 
 export const useRocketcrabClientSocket = ({
     code,

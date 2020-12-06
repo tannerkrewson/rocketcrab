@@ -2,7 +2,7 @@ import next from "next";
 import express, { RequestHandler } from "express";
 import { json } from "body-parser";
 import { createServer } from "http";
-import socketio from "socket.io";
+import { Server } from "socket.io";
 
 import attachAPIHandlers from "./api";
 import attachSocketHandlers from "./socket";
@@ -21,7 +21,7 @@ const nextHandler = nextApp.getRequestHandler();
     app.use(json());
 
     const http = createServer(app);
-    const io: SocketIO.Server = socketio(http);
+    const io: Server = new Server(http);
 
     const rocketCrab = initRocketCrab(dev);
 

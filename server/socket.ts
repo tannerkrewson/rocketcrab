@@ -10,9 +10,15 @@ import {
     getPartyByCode,
     reconnectToParty,
 } from "./rocketcrab";
-import { JoinPartyResponse, Player, Party, RocketCrab } from "../types/types";
+import type {
+    JoinPartyResponse,
+    Player,
+    Party,
+    RocketCrab,
+} from "../types/types";
+import type { Server } from "socket.io";
 
-export default (io: SocketIO.Server, rocketcrab: RocketCrab): void => {
+export default (io: Server, rocketcrab: RocketCrab): void => {
     io.on("connection", (socket) => {
         socket.on("join-party", onJoinParty(socket, rocketcrab));
     });
