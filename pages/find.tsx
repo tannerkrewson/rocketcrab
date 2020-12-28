@@ -1,7 +1,7 @@
 import PrimaryButton from "../components/common/PrimaryButton";
 import ButtonGroup from "../components/common/ButtonGroup";
 import PageLayout from "../components/layout/PageLayout";
-import { useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { postJson } from "../utils/utils";
 import { useRouter } from "next/router";
 import { io } from "socket.io-client";
@@ -9,6 +9,8 @@ import { SocketEvent } from "../types/enums";
 import { ClientGameLibrary, FinderState } from "../types/types";
 import { GetServerSideProps } from "next";
 import { getClientGameLibrary } from "../config";
+import PublicGame from "../components/find/PublicGame";
+import { Spacer } from "@geist-ui/react";
 
 const socket = io();
 const CLIENT_GAME_LIBRARY = getClientGameLibrary();
@@ -59,37 +61,20 @@ export const Find = ({
 
     return (
         <PageLayout reconnecting={showReconnecting}>
-            <div className="description">Public Games</div>
+            <div className="description">Public Parties</div>
             <div>
-                {finderState?.publicPartyList?.map(
-                    ({ code, playerList, selectedGameId }) => {
-                        const selectedGame = gameLibrary.gameList.find(
-                            ({ id }) => id === selectedGameId
-                        );
-                        const host = playerList.find((p) => p.isHost);
-                        return (
-                            <div key={code}>
-                                <div>
-                                    {host.name}
-                                    &apos;s game{" "}
-                                    {selectedGame
-                                        ? "of " + selectedGame.name
-                                        : ""}
-                                </div>
-                                <div>
-                                    {playerList.length} player
-                                    {playerList.length !== 1 ? "s" : ""}
-                                </div>
-                                <PrimaryButton
-                                    onClick={() =>
-                                        router.push("/[code]", "/" + code)
-                                    }
-                                >
-                                    Join
-                                </PrimaryButton>
-                            </div>
-                        );
-                    }
+                {finderState?.publicPartyList?.map((party) => (
+                    <PublicGame
+                        key={party.code}
+                        party={party}
+                        gameLibrary={gameLibrary}
+                    />
+                ))}
+                {!finderState?.publicPartyList?.length && (
+                    <>
+                        No public parties found. 😞 You should make one! 🥰
+                        <Spacer y={1.5} />
+                    </>
                 )}
             </div>
             <ButtonGroup>

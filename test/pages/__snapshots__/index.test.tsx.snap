@@ -80,6 +80,31 @@ exports[`pages/index.tsx matches snapshot 1`] = `
           </div>
         </div>
         <span
+          class="jsx-870436695 "
+        />
+        <div
+          class="jsx-1938348541 item justify jsx-1720607024 "
+        >
+          <div
+            class="jsx-974242038 item  jsx-4216129763 "
+          >
+            <div>
+              <button
+                class="jsx-2230649419 btn "
+                href="/find"
+                style="width: auto;"
+                type="button"
+              >
+                <div
+                  class="text"
+                >
+                  Find Players
+                </div>
+              </button>
+            </div>
+          </div>
+        </div>
+        <span
           class="jsx-446887637 "
         />
         <div

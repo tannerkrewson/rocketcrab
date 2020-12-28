@@ -38,6 +38,12 @@ export const Home = (): JSX.Element => {
                     Start Party
                 </PrimaryButton>
             </ButtonGroup>
+            <Spacer y={1} />
+            <ButtonGroup>
+                <PrimaryButton href="/find" size="large">
+                    Find Players
+                </PrimaryButton>
+            </ButtonGroup>
             <Spacer y={1.5} />
             <div className="btn-col">
                 <AddAppButton />
