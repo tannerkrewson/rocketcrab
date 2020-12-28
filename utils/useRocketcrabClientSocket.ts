@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
+import Swal from "sweetalert2";
 import { ClientParty } from "../types/types";
 import { logEvent } from "./analytics";
 import { io } from "socket.io-client";
@@ -34,7 +35,7 @@ export const useRocketcrabClientSocket = ({
         });
         socket.on(SocketEvent.INVALID_NAME, () => {
             if (code === "ffff") return;
-            alert("Name already in use");
+            Swal.fire("Try again", "Name already in use", "error");
         });
 
         socket.on(SocketEvent.DISCONNECT, (reason) => {

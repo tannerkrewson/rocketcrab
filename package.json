@@ -50,6 +50,7 @@
         "react-spinners-kit": "^1.9.1",
         "socket.io": "^3.0.3",
         "socket.io-client": "^3.0.3",
+        "sweetalert2": "^10.12.6",
         "swiper": "^6.3.5",
         "uuid": "^8.3.1",
         "ws": "^7.4.1"

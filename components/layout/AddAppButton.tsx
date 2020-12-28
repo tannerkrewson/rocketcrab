@@ -6,6 +6,7 @@
 
 import dynamic from "next/dynamic";
 import { useState, useEffect } from "react";
+import Swal from "sweetalert2";
 import PrimaryButton from "../common/PrimaryButton";
 import { logEvent } from "../../utils/analytics";
 
@@ -56,8 +57,10 @@ const AddAppButton = () => {
             // Wait for the user to respond to the prompt
             deferredPrompt.userChoice.then(() => setIsLoading(false));
         } else {
-            alert(
-                "Failed to add rocketcrab as an app on this device. Try again, or try on your phone!"
+            Swal.fire(
+                "Hmm...",
+                "Failed to add rocketcrab as an app on this device. Try again, or try on your phone!",
+                "error"
             );
             setIsLoading(false);
         }
