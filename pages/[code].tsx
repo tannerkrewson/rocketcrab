@@ -40,7 +40,7 @@ export const Code = ({
         isReconnect,
     });
 
-    const { status, me, playerList, selectedGameId, gameState } =
+    const { status, me, playerList, selectedGameId, gameState, isPublic } =
         partyState || {};
 
     const [myLastValidName, setMyLastValidName] = useState("");
@@ -104,6 +104,7 @@ export const Code = ({
                     meId={me?.id}
                     isHost={me?.isHost}
                     onInOutParty={onInOutParty}
+                    isPublic={isPublic}
                 />
             )}
         </PageLayout>

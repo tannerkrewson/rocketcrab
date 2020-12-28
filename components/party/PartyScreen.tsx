@@ -18,6 +18,7 @@ const PartyScreen = ({
     meId,
     isHost,
     onInOutParty,
+    isPublic,
 }: PartyScreenProps): JSX.Element => {
     const selectedGame = gameLibrary.gameList.find(
         ({ id }) => id === selectedGameId
@@ -93,6 +94,16 @@ const PartyScreen = ({
                 onEditName={resetName}
                 meId={meId}
             />
+            {isPublic && (
+                <>
+                    <Spacer y={1} />
+                    <div>
+                        This is a public party! Anyone in the 🌏 can join
+                        without the code, but only <i>before</i> you start the
+                        game!
+                    </div>
+                </>
+            )}
             <Spacer y={1} />
             <PrimaryButton href="/" size="small">
                 Leave Party
@@ -111,6 +122,7 @@ type PartyScreenProps = {
     meId: number;
     isHost: boolean;
     onInOutParty: (outOfParty: boolean) => void;
+    isPublic: boolean;
 };
 
 export default PartyScreen;
