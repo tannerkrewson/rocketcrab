@@ -19,7 +19,7 @@ const GameLibrary = ({
         searchBindings,
     } = libraryState;
 
-    const fullCategory = gameLibrary.categories.find(
+    const fullCategory = gameLibrary?.categories?.find(
         ({ id }) => id === selectedCategory
     );
 

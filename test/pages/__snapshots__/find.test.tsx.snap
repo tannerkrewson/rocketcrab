@@ -1,0 +1,122 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`pages/find.tsx matches snapshot 1`] = `
+<DocumentFragment>
+  <div
+    class="jsx-1855009027 container"
+  >
+    <main
+      class="jsx-1855009027"
+    >
+      <div
+        class="jsx-1855009027 main-content"
+      >
+        <div
+          class="jsx-1758552329 title"
+        >
+          <div
+            class="jsx-1758552329"
+            style="margin: .5em;"
+          >
+            <img
+              class="jsx-1758552329 rocket"
+              src="/rocket.svg"
+            />
+            <img
+              class="jsx-1758552329 crab"
+              src="/crab.svg"
+            />
+          </div>
+          <div
+            class="jsx-418573366 tooltip "
+          >
+            <h2
+              class="jsx-1758552329 party-url"
+            >
+              rocketcrab.com
+            </h2>
+          </div>
+        </div>
+        <div
+          class="jsx-4062044106 description"
+        >
+          Public Parties
+        </div>
+        <div
+          class="jsx-4062044106"
+        >
+          No public parties found. 😞 You should make one! 🥰
+          <span
+            class="jsx-446887637 "
+          />
+        </div>
+        <div
+          class="jsx-1938348541 item justify jsx-1720607024 "
+        >
+          <div
+            class="jsx-974242038 item  jsx-4216129763 "
+          >
+            <div>
+              <button
+                class="jsx-2230649419 btn "
+                href="/"
+                style="width: auto;"
+                type="button"
+              >
+                <div
+                  class="text"
+                >
+                  Back
+                </div>
+              </button>
+            </div>
+          </div>
+          <div
+            class="jsx-974242038 item  jsx-4216129763 "
+          >
+            <button
+              class="jsx-2230649419 btn "
+              style="width: auto;"
+              type="button"
+            >
+              <div
+                class="text"
+              >
+                Start Public Party
+              </div>
+            </button>
+          </div>
+        </div>
+      </div>
+      <div
+        class="jsx-1855009027 height-expander"
+      />
+    </main>
+    <footer
+      class="jsx-3128977650"
+      style="margin-top: 1em;"
+    >
+      rocketcrab by 
+      <a
+        class="jsx-3128977650"
+        href="https://www.tannerkrewson.com/"
+        rel="noopener noreferrer"
+        target="_blank"
+      >
+        Tanner Krewson
+      </a>
+      <br
+        class="jsx-3128977650"
+      />
+      <a
+        class="jsx-3128977650"
+        href="https://github.com/tannerkrewson/rocketcrab"
+        rel="noopener noreferrer"
+        target="_blank"
+      >
+        View on GitHub
+      </a>
+    </footer>
+  </div>
+</DocumentFragment>
+`;

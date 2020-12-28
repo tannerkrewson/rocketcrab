@@ -13,7 +13,7 @@ const CategoryGroup = ({
 }: CategoryGroupProps): JSX.Element => (
     <>
         <Grid.Container gap={1}>
-            {categories.map((category, i) => (
+            {categories?.map((category, i) => (
                 <CategoryBox
                     key={category.id}
                     category={category}
