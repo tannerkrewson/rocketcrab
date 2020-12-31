@@ -46,7 +46,7 @@ const onJoinParty = (socket: SocketIO.Socket, rocketcrab: RocketCrab) => ({
         const player = addPlayer(name, socket, party, id);
 
         attachPartyListenersToPlayer(player, party, rocketcrab);
-        sendStateToAll(party, rocketcrab);
+        sendStateToAll(party, rocketcrab, { enableFinderCheck: true });
     } else {
         socket.emit(SocketEvent.INVALID_PARTY, { code });
     }
@@ -66,33 +66,33 @@ const attachPartyListenersToPlayer = (
     socket.on(SocketEvent.DISCONNECT, () => {
         removePlayer(player, party);
         deletePartyIfEmpty(party, partyList);
-        sendStateToAll(party, rocketcrab);
+        sendStateToAll(party, rocketcrab, { enableFinderCheck: true });
     });
 
     socket.on(SocketEvent.NAME, (name) => {
         setName(name, player, playerList);
-        sendStateToAll(party, rocketcrab);
+        sendStateToAll(party, rocketcrab, { enableFinderCheck: player.isHost });
     });
 
     socket.on(SocketEvent.GAME_SELECT, (gameId) => {
         if (!player.isHost) return;
 
         setGame(gameId, party);
-        sendStateToAll(party, rocketcrab);
+        sendStateToAll(party, rocketcrab, { enableFinderCheck: true });
     });
 
     socket.on(SocketEvent.GAME_START, () => {
         if (!player.isHost) return;
 
         startGame(party, rocketcrab);
-        sendStateToAll(party, rocketcrab);
+        // startGame does its own sendStateToAlls
     });
 
     socket.on(SocketEvent.GAME_EXIT, () => {
         if (!player.isHost) return;
 
         exitGame(party);
-        sendStateToAll(party, rocketcrab);
+        sendStateToAll(party, rocketcrab, { enableFinderCheck: true });
     });
 };
 

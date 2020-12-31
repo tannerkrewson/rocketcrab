@@ -11,9 +11,9 @@ describe("server/api.ts", () => {
             get: jest.fn(),
         } as unknown) as Application;
 
-        rocketcrab = {
+        rocketcrab = ({
             partyList: [],
-        };
+        } as Partial<RocketCrab>) as RocketCrab;
 
         api(app, rocketcrab);
     });

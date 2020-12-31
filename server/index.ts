@@ -6,7 +6,7 @@ import { Server } from "socket.io";
 
 import attachAPIHandlers from "./api";
 import attachSocketHandlers from "./socket";
-import { initRocketCrab } from "./rocketcrab";
+import { initCron, initRocketCrab } from "./rocketcrab";
 
 const port = process.env.PORT || 3000;
 const dev = process.env.NODE_ENV !== "production";
@@ -27,6 +27,7 @@ const nextHandler = nextApp.getRequestHandler();
 
     attachAPIHandlers(app, rocketCrab);
     attachSocketHandlers(io, rocketCrab);
+    initCron(rocketCrab);
 
     app.get("*", (nextHandler as unknown) as RequestHandler);
 

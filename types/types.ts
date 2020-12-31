@@ -7,6 +7,12 @@ export type RocketCrab = {
     partyList: Array<Party>;
     isFinderActive: boolean;
     finderSubscribers: Array<SocketIO.Socket>;
+    finderActiveDates?: FinderActiveDates;
+};
+
+export type FinderActiveDates = {
+    lastStart: Date;
+    nextStart: Date;
 };
 
 export type Party = ClientParty & {

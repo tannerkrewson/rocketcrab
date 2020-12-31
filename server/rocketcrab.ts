@@ -9,6 +9,7 @@ import {
 import { PartyStatus, GameStatus, SocketEvent } from "../types/enums";
 import { getServerGameLibrary } from "../config";
 import { v4 as uuidv4 } from "uuid";
+import { CronJob } from "cron";
 
 const SERVER_GAME_LIST: Array<ServerGame> = getServerGameLibrary().gameList;
 const PARTY_EXPIRATION_SEC = 60;
@@ -19,6 +20,41 @@ export const initRocketCrab = (isDevMode?: boolean): RocketCrab => {
     if (isDevMode) newParty({ partyList, forceGameCode: "ffff" });
 
     return { partyList, isFinderActive: true, finderSubscribers: [] };
+};
+
+export const initCron = (rocketcrab: RocketCrab): CronJob => {
+    const setDates = () => {
+        rocketcrab.finderActiveDates = {
+            lastStart: activateFinderJob.lastDate(),
+            nextStart: activateFinderJob.nextDate(),
+        };
+    };
+
+    const activateFinderJob = new CronJob(
+        "0 0/2 * * 4-6", // https://crontab.guru/#0_0/2_*_*_4-6
+        () => {
+            setDates();
+            rocketcrab.isFinderActive = true;
+            sendFinderStateToAll(rocketcrab);
+
+            setTimeout(() => {
+                rocketcrab.isFinderActive = false;
+
+                // ensure that a long-lived party is not shown on a subsequent
+                // activation of the finder
+                rocketcrab.partyList.forEach((party) => {
+                    party.isPublic = false;
+                });
+
+                sendFinderStateToAll(rocketcrab);
+            }, 10 * 60 * 1000); // 10 minutes
+        },
+        null,
+        true,
+        "America/Chicago"
+    );
+
+    setDates();
 };
 
 export const newParty = ({
@@ -144,21 +180,39 @@ export const addPlayer = (
     return player;
 };
 
-export const sendStateToAll = (party: Party, rocketcrab?: RocketCrab): void => {
+export const sendStateToAll = (
+    party: Party,
+    rocketcrab: RocketCrab,
+    {
+        enableFinderCheck,
+        forceFinderUpdate,
+    }: { enableFinderCheck?: boolean; forceFinderUpdate?: boolean } = {}
+): void => {
     party.playerList.forEach(({ socket, ...player }) =>
         socket.emit(SocketEvent.UPDATE, { me: player, ...getJsonParty(party) })
     );
 
     if (
-        rocketcrab &&
-        rocketcrab.isFinderActive &&
-        rocketcrab.finderSubscribers.length > 0
+        (enableFinderCheck && shouldSendFinderStateUpdate(party, rocketcrab)) ||
+        forceFinderUpdate
     ) {
-        // send updates to people looking at /find page
-        rocketcrab.finderSubscribers.forEach((socket) =>
-            socket.emit(SocketEvent.FINDER_UPDATE, getFinderState(rocketcrab))
-        );
+        sendFinderStateToAll(rocketcrab);
     }
+};
+
+const sendFinderStateToAll = (rocketcrab: RocketCrab): void => {
+    rocketcrab.finderSubscribers.forEach((socket) =>
+        socket.emit(SocketEvent.FINDER_UPDATE, getFinderState(rocketcrab))
+    );
+};
+
+export const shouldSendFinderStateUpdate = (
+    { status, isPublic }: Party,
+    { isFinderActive }: RocketCrab
+): boolean => {
+    const thisPartyIsShownOnFinder = status === PartyStatus.party && isPublic;
+
+    return isFinderActive && thisPartyIsShownOnFinder;
 };
 
 export const removePlayer = (player: Player, party: Party): void => {
@@ -223,12 +277,18 @@ export const startGame = async (
     // TODO: check if ready
     const { gameState, selectedGameId, playerList } = party;
 
+    const willSendFinderUpdate = shouldSendFinderStateUpdate(party, rocketcrab);
+    party.status === PartyStatus.party && party.isPublic;
+
     const game: ServerGame = findGameById(selectedGameId);
     if (!game) return;
 
     party.status = PartyStatus.ingame;
     gameState.status = GameStatus.loading;
-    sendStateToAll(party, rocketcrab);
+
+    sendStateToAll(party, rocketcrab, {
+        forceFinderUpdate: willSendFinderUpdate,
+    });
 
     try {
         gameState.joinGameURL = await game.getJoinGameUrl();
