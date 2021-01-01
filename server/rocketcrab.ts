@@ -148,7 +148,8 @@ export const addPlayer = (
     const { playerList } = party;
 
     const idNotInUse = !isIDinUse(previousId, party.playerList);
-    const usePreviousId = Number.isInteger(previousId) && idNotInUse;
+    const usePreviousId =
+        Number.isInteger(previousId) && previousId >= 0 && idNotInUse;
     const id = usePreviousId ? previousId : party.nextPlayerId++;
 
     const isFirstPlayer = playerList.length === 0;

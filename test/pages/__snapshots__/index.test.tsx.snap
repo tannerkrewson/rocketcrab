@@ -80,7 +80,7 @@ exports[`pages/index.tsx matches snapshot 1`] = `
           </div>
         </div>
         <span
-          class="jsx-870436695 "
+          class="jsx-3791690804 "
         />
         <div
           class="jsx-1938348541 item justify jsx-1720607024 "
@@ -105,7 +105,7 @@ exports[`pages/index.tsx matches snapshot 1`] = `
           </div>
         </div>
         <span
-          class="jsx-446887637 "
+          class="jsx-2523868958 "
         />
         <div
           class="jsx-4074410339 btn-col"
@@ -167,7 +167,7 @@ exports[`pages/index.tsx matches snapshot 1`] = `
               <div
                 class="text"
               >
-                Develop a game!
+                Add your game
               </div>
             </button>
           </a>

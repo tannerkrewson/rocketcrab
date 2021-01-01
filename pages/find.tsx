@@ -88,7 +88,7 @@ export const Find = ({
 
     return (
         <PageLayout reconnecting={showReconnecting}>
-            <div className="description">Public Parties</div>
+            <div className="description">Public Parties (beta)</div>
             {isActive ? (
                 <>
                     {publicPartyList?.map((party) => (
@@ -117,7 +117,7 @@ export const Find = ({
                             hour in your time zone from roughly Thursday to
                             Saturday.
                         </div>
-                        <Spacer y={1.5} />
+                        <Spacer y={1} />
                         <div>
                             Public parties will open next{" "}
                             {formatRelative(finderActiveDates.nextStart, time)},
@@ -131,7 +131,7 @@ export const Find = ({
                                 )}
                             </div>
                         </div>
-                        <Spacer y={1} />
+                        <Spacer y={1.1} />
                     </div>
                 )
             )}
@@ -141,13 +141,15 @@ export const Find = ({
                     Back
                 </PrimaryButton>
 
-                <PrimaryButton
-                    onClick={onClickNew}
-                    loading={newLoading}
-                    size="large"
-                >
-                    Start Public Party
-                </PrimaryButton>
+                {isActive && (
+                    <PrimaryButton
+                        onClick={onClickNew}
+                        loading={newLoading}
+                        size="large"
+                    >
+                        Start Public Party
+                    </PrimaryButton>
+                )}
             </ButtonGroup>
             <style jsx>{`
                 .description {

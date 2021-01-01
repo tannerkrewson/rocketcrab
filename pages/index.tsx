@@ -38,13 +38,13 @@ export const Home = (): JSX.Element => {
                     Start Party
                 </PrimaryButton>
             </ButtonGroup>
-            <Spacer y={1} />
+            <Spacer y={0.7} />
             <ButtonGroup>
                 <PrimaryButton href="/find" size="large">
                     Find Players
                 </PrimaryButton>
             </ButtonGroup>
-            <Spacer y={1.5} />
+            <Spacer y={1.2} />
             <div className="btn-col">
                 <AddAppButton />
                 <Spacer y={0.5} />
@@ -65,7 +65,7 @@ export const Home = (): JSX.Element => {
                     url="https://github.com/tannerkrewson/rocketcrab/#-for-developers"
                     manualWidth
                 >
-                    Develop a game!
+                    Add your game
                 </PrimaryButton>
                 <Spacer y={0.5} />
                 <PrimaryButton type="default" href="/library" manualWidth>

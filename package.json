@@ -4,7 +4,7 @@
     "author": "Tanner Krewson",
     "license": "MIT",
     "scripts": {
-        "dev": "nodemon",
+        "dev": "cross-env NODE_ENV=development nodemon",
         "build": "run-s build:client build:server",
         "build:client": "next build",
         "build:server": "tsc --project tsconfig.server.json",

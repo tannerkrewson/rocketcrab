@@ -40,7 +40,7 @@ exports[`pages/find.tsx matches snapshot 1`] = `
         <div
           class="jsx-58839709 description"
         >
-          Public Parties
+          Public Parties (beta)
         </div>
         <div
           class="jsx-1938348541 item justify jsx-1720607024 "
@@ -65,19 +65,7 @@ exports[`pages/find.tsx matches snapshot 1`] = `
           </div>
           <div
             class="jsx-974242038 item  jsx-4216129763 "
-          >
-            <button
-              class="jsx-2230649419 btn "
-              style="width: auto;"
-              type="button"
-            >
-              <div
-                class="text"
-              >
-                Start Public Party
-              </div>
-            </button>
-          </div>
+          />
         </div>
       </div>
       <div
