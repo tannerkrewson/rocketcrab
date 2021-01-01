@@ -14,6 +14,7 @@ export type FinderState = {
     isActive: boolean;
     publicPartyList: Array<ClientParty>;
     finderActiveDates: FinderActiveDates;
+    subscriberCount: number;
 };
 
 export type FinderActiveDates = {

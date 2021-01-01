@@ -10,6 +10,7 @@ import {
     getPartyByCode,
     reconnectToParty,
     getFinderState,
+    sendFinderStateToAll,
 } from "./rocketcrab";
 import type {
     JoinPartyResponse,
@@ -108,5 +109,17 @@ const onFinderSubscribe = (
         rocketcrab.finderSubscribers = rocketcrab.finderSubscribers.filter(
             (s) => s !== socket
         );
+        onFinderSubscriberUpdate(rocketcrab);
     });
+
+    onFinderSubscriberUpdate(rocketcrab);
+};
+
+const onFinderSubscriberUpdate = (rocketcrab: RocketCrab) => {
+    // this is to update the subscriber count. only do this when then finder is
+    // not active, because when it is, there are many other events happening
+    // that will also send the subscriber count.
+    if (!rocketcrab.isFinderActive) {
+        sendFinderStateToAll(rocketcrab);
+    }
 };

@@ -201,7 +201,7 @@ export const sendStateToAll = (
     }
 };
 
-const sendFinderStateToAll = (rocketcrab: RocketCrab): void => {
+export const sendFinderStateToAll = (rocketcrab: RocketCrab): void => {
     rocketcrab.finderSubscribers.forEach((socket) =>
         socket.emit(SocketEvent.FINDER_UPDATE, getFinderState(rocketcrab))
     );
@@ -342,6 +342,7 @@ export const getFinderState = ({
     isFinderActive,
     partyList,
     finderActiveDates,
+    finderSubscribers,
 }: RocketCrab): FinderState => ({
     isActive: isFinderActive,
     publicPartyList: partyList
@@ -350,6 +351,7 @@ export const getFinderState = ({
         )
         .map((party) => getJsonParty(party)),
     finderActiveDates,
+    subscriberCount: finderSubscribers.length - 1, // not counting the person it's being sent to
 });
 
 const findPlayerByName = (

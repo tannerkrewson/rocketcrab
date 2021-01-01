@@ -29,7 +29,8 @@ export const Find = ({
     const [showReconnecting, setShowReconnecting] = useState(false);
     const [finderState, setFinderState] = useState<FinderState | undefined>();
 
-    const { isActive, publicPartyList, finderActiveDates } = finderState ?? {};
+    const { isActive, publicPartyList, finderActiveDates, subscriberCount } =
+        finderState ?? {};
 
     const [time, setTime] = useState(Date.now());
 
@@ -86,6 +87,8 @@ export const Find = ({
         };
     }, []);
 
+    const scs = subscriberCount === 1;
+
     return (
         <PageLayout reconnecting={showReconnecting}>
             <div className="description">Public Parties (beta)</div>
@@ -99,11 +102,18 @@ export const Find = ({
                         />
                     ))}
                     {!finderState?.publicPartyList?.length && (
-                        <>
-                            No public parties found. 😞 You should make one! 🥰
-                            <Spacer y={1.5} />
-                        </>
+                        <>No public parties found. 😞 You should make one! 🥰</>
                     )}
+                    {subscriberCount > 0 && (
+                        <div style={{ textAlign: "center" }}>
+                            <Spacer y={1} />
+                            There {scs ? "is " : "are "}
+                            {subscriberCount} other
+                            {scs ? " person " : " people "}
+                            here still looking for a party to choose!
+                        </div>
+                    )}
+                    <Spacer y={1.1} />
                 </>
             ) : (
                 finderActiveDates && (
@@ -131,6 +141,15 @@ export const Find = ({
                                 )}
                             </div>
                         </div>
+                        {subscriberCount > 0 && (
+                            <div>
+                                <Spacer y={1} />
+                                There {scs ? "is " : "are "}
+                                {subscriberCount} other
+                                {scs ? " person " : " people "}
+                                waiting on this page.
+                            </div>
+                        )}
                         <Spacer y={1.1} />
                     </div>
                 )
