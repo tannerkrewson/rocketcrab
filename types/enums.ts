@@ -12,7 +12,8 @@ export enum GameStatus {
 }
 
 export enum SocketEvent {
-    DISCONNECT = "DISCONNECT",
+    DISCONNECT = "disconnect",
+    RECONNECT = "reconnect",
     GAME_EXIT = "GAME_EXIT",
     GAME_SELECT = "GAME_SELECT",
     GAME_START = "GAME_START",
@@ -21,7 +22,6 @@ export enum SocketEvent {
     INVALID_PARTY = "INVALID_PARTY",
     JOIN_PARTY = "JOIN_PARTY",
     NAME = "NAME",
-    RECONNECT = "reconnect",
     UPDATE = "UPDATE",
     FINDER_SUBSCRIBE = "FINDER_SUBSCRIBE",
     FINDER_UPDATE = "FINDER_UPDATE",
