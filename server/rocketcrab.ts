@@ -311,9 +311,20 @@ export const startGame = async (
     }
 
     const host = getHost(playerList);
-    host.socket.once("host-game-loaded", () => {
+
+    const onHostGameLoaded = () => {
         gameState.status = GameStatus.inprogress;
         sendStateToAll(party, rocketcrab);
+    };
+
+    // if, for some unknown reason, the host doesn't send this event, we'll
+    // just assume they're good after 10 seconds.
+    // added this because people were getting stuck on "Waiting for host..."
+    const hostGameLoadedBackup = setTimeout(onHostGameLoaded, 10 * 1000);
+
+    host.socket.once(SocketEvent.HOST_GAME_LOADED, () => {
+        clearTimeout(hostGameLoadedBackup);
+        onHostGameLoaded();
     });
 
     sendStateToAll(party, rocketcrab);
