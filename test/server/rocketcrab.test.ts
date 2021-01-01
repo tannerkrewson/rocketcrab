@@ -49,7 +49,7 @@ describe("server/rocketcrab.ts", () => {
     it("initRocketCrab works", () => {
         expect(initRocketCrab()).toStrictEqual({
             partyList: [],
-            isFinderActive: true,
+            isFinderActive: false,
             finderSubscribers: [],
         });
     });

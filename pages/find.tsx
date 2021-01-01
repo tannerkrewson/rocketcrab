@@ -11,6 +11,12 @@ import { GetServerSideProps } from "next";
 import { getClientGameLibrary } from "../config";
 import PublicGame from "../components/find/PublicGame";
 import { Spacer } from "@geist-ui/react";
+import {
+    formatDuration,
+    intervalToDuration,
+    getHours,
+    formatRelative,
+} from "date-fns";
 
 const socket = io();
 const CLIENT_GAME_LIBRARY = getClientGameLibrary();
@@ -22,6 +28,17 @@ export const Find = ({
     const [newLoading, setNewLoading] = useState(false);
     const [showReconnecting, setShowReconnecting] = useState(false);
     const [finderState, setFinderState] = useState<FinderState | undefined>();
+
+    const { isActive, publicPartyList, finderActiveDates } = finderState ?? {};
+
+    const [time, setTime] = useState(Date.now());
+
+    useEffect(() => {
+        const interval = setInterval(() => setTime(Date.now()), 1000);
+        return () => {
+            clearInterval(interval);
+        };
+    }, []);
 
     const onClickNew = async (e) => {
         e.preventDefault();
@@ -38,6 +55,16 @@ export const Find = ({
         socket.emit(SocketEvent.FINDER_SUBSCRIBE);
 
         socket.on(SocketEvent.FINDER_UPDATE, (newFinderState: FinderState) => {
+            if (newFinderState.finderActiveDates) {
+                newFinderState.finderActiveDates = {
+                    lastStart: new Date(
+                        newFinderState.finderActiveDates.lastStart
+                    ),
+                    nextStart: new Date(
+                        newFinderState.finderActiveDates.nextStart
+                    ),
+                };
+            }
             setFinderState(newFinderState);
             setShowReconnecting(false);
         });
@@ -62,21 +89,53 @@ export const Find = ({
     return (
         <PageLayout reconnecting={showReconnecting}>
             <div className="description">Public Parties</div>
-            <div>
-                {finderState?.publicPartyList?.map((party) => (
-                    <PublicGame
-                        key={party.code}
-                        party={party}
-                        gameLibrary={gameLibrary}
-                    />
-                ))}
-                {!finderState?.publicPartyList?.length && (
-                    <>
-                        No public parties found. 😞 You should make one! 🥰
+            {isActive ? (
+                <>
+                    {publicPartyList?.map((party) => (
+                        <PublicGame
+                            key={party.code}
+                            party={party}
+                            gameLibrary={gameLibrary}
+                        />
+                    ))}
+                    {!finderState?.publicPartyList?.length && (
+                        <>
+                            No public parties found. 😞 You should make one! 🥰
+                            <Spacer y={1.5} />
+                        </>
+                    )}
+                </>
+            ) : (
+                finderActiveDates && (
+                    <div style={{ textAlign: "center" }}>
+                        <div>
+                            To make sure there are enough players, come back at
+                            the beginning of any
+                            {getHours(finderActiveDates.nextStart) % 2 === 0
+                                ? " even "
+                                : " odd "}
+                            hour in your time zone from roughly Thursday to
+                            Saturday.
+                        </div>
                         <Spacer y={1.5} />
-                    </>
-                )}
-            </div>
+                        <div>
+                            Public parties will open next{" "}
+                            {formatRelative(finderActiveDates.nextStart, time)},
+                            in
+                            <div style={{ fontSize: "1.3em" }}>
+                                {formatDuration(
+                                    intervalToDuration({
+                                        start: finderActiveDates.nextStart,
+                                        end: time,
+                                    })
+                                )}
+                            </div>
+                        </div>
+                        <Spacer y={1} />
+                    </div>
+                )
+            )}
+
             <ButtonGroup>
                 <PrimaryButton href="/" size="large">
                     Back
@@ -92,6 +151,7 @@ export const Find = ({
             </ButtonGroup>
             <style jsx>{`
                 .description {
+                    font-size: 1.1em;
                     text-align: center;
                     margin-bottom: 1em;
                 }

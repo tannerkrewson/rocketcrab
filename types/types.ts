@@ -10,6 +10,12 @@ export type RocketCrab = {
     finderActiveDates?: FinderActiveDates;
 };
 
+export type FinderState = {
+    isActive: boolean;
+    publicPartyList: Array<ClientParty>;
+    finderActiveDates: FinderActiveDates;
+};
+
 export type FinderActiveDates = {
     lastStart: Date;
     nextStart: Date;
@@ -123,11 +129,6 @@ export type LibraryState = {
     search: string;
     setSearch: Dispatch<SetStateAction<string>>;
     searchBindings: SearchBindingsType;
-};
-
-export type FinderState = {
-    isActive: boolean;
-    publicPartyList: Array<ClientParty>;
 };
 
 type SearchBindingsType = {

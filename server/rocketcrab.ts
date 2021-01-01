@@ -19,7 +19,7 @@ export const initRocketCrab = (isDevMode?: boolean): RocketCrab => {
 
     if (isDevMode) newParty({ partyList, forceGameCode: "ffff" });
 
-    return { partyList, isFinderActive: true, finderSubscribers: [] };
+    return { partyList, isFinderActive: false, finderSubscribers: [] };
 };
 
 export const initCron = (rocketcrab: RocketCrab): CronJob => {
@@ -329,6 +329,7 @@ export const exitGame = (party: Party): void => {
 export const getFinderState = ({
     isFinderActive,
     partyList,
+    finderActiveDates,
 }: RocketCrab): FinderState => ({
     isActive: isFinderActive,
     publicPartyList: partyList
@@ -336,6 +337,7 @@ export const getFinderState = ({
             ({ isPublic, status }) => isPublic && status === PartyStatus.party
         )
         .map((party) => getJsonParty(party)),
+    finderActiveDates,
 });
 
 const findPlayerByName = (
