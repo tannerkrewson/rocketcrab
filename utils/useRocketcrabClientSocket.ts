@@ -61,10 +61,7 @@ export const useRocketcrabClientSocket = ({
             joinParty(code, cookiePartyState, isReconnect);
         }
 
-        socket.off(SocketEvent.RECONNECT);
-        socket.off(SocketEvent.INVALID_PARTY);
-
-        socket.on(SocketEvent.RECONNECT, () => {
+        socket.io.on(SocketEvent.RECONNECT, () => {
             joinParty(code, partyState || cookiePartyState, true);
             setShowReconnecting(false);
         });
@@ -73,6 +70,11 @@ export const useRocketcrabClientSocket = ({
             // todo: don't do this if showGame is true
             router.push("/join?invalid=" + code);
         });
+
+        return () => {
+            socket.io.off(SocketEvent.RECONNECT);
+            socket.off(SocketEvent.INVALID_PARTY);
+        };
     }, [code, partyState, isReconnect]);
 
     const onNameEntry = useCallback((enteredName) => {

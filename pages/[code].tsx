@@ -91,7 +91,6 @@ export const Code = ({
                 <NameEntry
                     onNameEntry={onNameEntry}
                     previousName={myLastValidName}
-                    code={code}
                 />
             ) : (
                 <PartyScreen
@@ -116,7 +115,8 @@ export const getServerSideProps: GetServerSideProps = async (
 ): Promise<any> => {
     const code = ctx?.query?.code;
 
-    let lastPartyState, isReconnect;
+    let lastPartyState: ClientParty = { me: {} } as ClientParty;
+    let isReconnect = false;
 
     try {
         lastPartyState = JSON.parse(
@@ -134,6 +134,7 @@ export const getServerSideProps: GetServerSideProps = async (
         props: {
             gameLibrary: CLIENT_GAME_LIBRARY,
             ...(lastPartyState ? { lastPartyState } : {}),
+            isReconnect,
         },
     };
 };
@@ -142,7 +143,7 @@ type CodeProps = {
     gameLibrary: ClientGameLibrary;
     lastPartyState?: ClientParty;
     previousId?: string;
-    isReconnect?: boolean;
+    isReconnect: boolean;
 };
 
 export default Code;
