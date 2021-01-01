@@ -121,6 +121,12 @@ const joinParty = (
     partyState: ClientParty,
     reconnecting: boolean
 ) => {
+    // if dev game, pick random name and submit
+    if (code === "ffff") {
+        const randFourDig = Math.floor(1000 + Math.random() * 9000);
+        partyState.me.name = String(randFourDig);
+    }
+
     socket.emit(SocketEvent.JOIN_PARTY, {
         code,
         // we don't need the playerList, so make it undefined.

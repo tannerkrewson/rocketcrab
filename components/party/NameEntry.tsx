@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState } from "react";
 import Router from "next/router";
 import { Input } from "@geist-ui/react";
 import PrimaryButton from "../common/PrimaryButton";
@@ -6,18 +6,9 @@ import ButtonGroup from "../common/ButtonGroup";
 
 const NameEntry = ({
     onNameEntry,
-    code,
     previousName,
 }: NameEntryProps): JSX.Element => {
     const [name, setName] = useState("");
-
-    // if dev game, pick random name and submit
-    useEffect(() => {
-        if (code === "ffff") {
-            const randFourDig = Math.floor(1000 + Math.random() * 9000);
-            onNameEntry(String(randFourDig));
-        }
-    }, []);
 
     const handleNameChange = ({ target: { value } }) => setName(value);
 
@@ -92,7 +83,6 @@ const NameEntry = ({
 
 type NameEntryProps = {
     onNameEntry: (name: string) => any;
-    code: string | string[];
     previousName: string;
 };
 
