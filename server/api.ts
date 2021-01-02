@@ -2,11 +2,19 @@ import { newParty, setGame } from "./rocketcrab";
 import { RocketCrab } from "../types/types";
 import { Application, Request, Response } from "express";
 
-export default (server: Application, { partyList }: RocketCrab): void => {
+export default (
+    server: Application,
+    { partyList, isFinderActive }: RocketCrab
+): void => {
     const newPartyHandler = (isPublic: boolean) => (
         req: Request,
         res: Response
     ) => {
+        if (isPublic && !isFinderActive) {
+            res.status(400).end();
+            return;
+        }
+
         const { code } = newParty({ partyList, isPublic });
         res.json({ code });
     };

@@ -17,6 +17,7 @@ import {
     getHours,
     formatRelative,
 } from "date-fns";
+import Swal from "sweetalert2";
 
 const socket = io();
 const CLIENT_GAME_LIBRARY = getClientGameLibrary();
@@ -45,9 +46,20 @@ export const Find = ({
         e.preventDefault();
         setNewLoading(true);
 
-        const { code } = await postJson("/api/new-public");
+        const result = await postJson("/api/new-public").catch(() => {
+            setNewLoading(false);
+            Swal.fire(
+                "Try again",
+                "The server is not allowing public parties to be created right now... maybe you were just a smidge too early? 😊",
+                "error"
+            );
+        });
 
-        router.push("/" + code);
+        if (result) {
+            const { code } = result;
+
+            router.push("/" + code);
+        }
     };
 
     useEffect(() => {
