@@ -22,6 +22,7 @@ export type FinderState = {
 export type FinderActiveDates = {
     lastStart: number;
     nextStart: number;
+    nextWeekOfStarts: number[];
 };
 
 export type Party = ClientParty & {

@@ -29,11 +29,16 @@ export const initCron = (rocketcrab: RocketCrab): void => {
         rocketcrab.finderActiveDates = {
             lastStart: getUnixTime(activateFinderJob.lastDate()) * 1000,
             nextStart: activateFinderJob.nextDate().valueOf(),
+            nextWeekOfStarts: activateFinderJob
+                .nextDates(24)
+                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+                // @ts-ignore
+                .map((momentDate) => momentDate.valueOf()),
         };
     };
 
     const activateFinderJob = new CronJob(
-        "0 0/2 * * 4-6", // https://crontab.guru/#0_0/2_*_*_4-6
+        "0 0/4 * * 4-6", // https://crontab.guru/#0_0/2_*_*_4-6
         () => {
             setDates();
             rocketcrab.isFinderActive = true;

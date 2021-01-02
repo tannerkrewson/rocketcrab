@@ -15,13 +15,9 @@ import { GetServerSideProps } from "next";
 import { getClientGameLibrary } from "../config";
 import PublicGame from "../components/find/PublicGame";
 import { Spacer } from "@geist-ui/react";
-import {
-    formatDuration,
-    intervalToDuration,
-    getHours,
-    formatRelative,
-} from "date-fns";
+import { formatDuration, intervalToDuration, formatRelative } from "date-fns";
 import Swal from "sweetalert2";
+import { FindTime } from "../components/find/FindTime";
 
 const socket = io();
 const CLIENT_GAME_LIBRARY = getClientGameLibrary();
@@ -145,16 +141,21 @@ export const Find = ({
                 finderActiveDates && (
                     <div style={{ textAlign: "center" }}>
                         <div>
-                            To make sure there are enough players, come back at
-                            the beginning of any
-                            {getHours(finderActiveDates.nextStart) % 2 === 0
-                                ? " even "
-                                : " odd "}
-                            hour in your time zone from roughly Thursday to
+                            To make sure there are enough players, public games
+                            open roughly every four hours from Thursday to
                             Saturday.
                         </div>
-                        <Spacer y={1} />
+                        {subscriberCount > 0 && (
+                            <div>
+                                <Spacer y={1} />
+                                There {scs ? "is " : "are "}
+                                {subscriberCount} other
+                                {scs ? " person " : " people "}
+                                waiting on this page.
+                            </div>
+                        )}
                         <div>
+                            <Spacer y={1} />
                             Public parties will open next{" "}
                             {formatRelative(finderActiveDates.nextStart, time)},
                             in
@@ -167,15 +168,12 @@ export const Find = ({
                                 )}
                             </div>
                         </div>
-                        {subscriberCount > 0 && (
-                            <div>
-                                <Spacer y={1} />
-                                There {scs ? "is " : "are "}
-                                {subscriberCount} other
-                                {scs ? " person " : " people "}
-                                waiting on this page.
-                            </div>
-                        )}
+
+                        <FindTime
+                            dates={finderActiveDates.nextWeekOfStarts}
+                            now={time}
+                        />
+
                         <Spacer y={1.1} />
                     </div>
                 )
