@@ -2,20 +2,19 @@ import { newParty, setGame } from "./rocketcrab";
 import { RocketCrab } from "../types/types";
 import { Application, Request, Response } from "express";
 
-export default (
-    server: Application,
-    { partyList, isFinderActive }: RocketCrab
-): void => {
+export default (server: Application, rocketcrab: RocketCrab): void => {
+    const { partyList } = rocketcrab;
+
     const newPartyHandler = (isPublic: boolean) => (
         req: Request,
         res: Response
     ) => {
-        if (isPublic && !isFinderActive) {
+        if (isPublic && !rocketcrab.isFinderActive) {
             res.status(400).end();
             return;
         }
 
-        const { code } = newParty({ partyList, isPublic });
+        const { code } = newParty({ rocketcrab, isPublic });
         res.json({ code });
     };
     server.post("/api/new", newPartyHandler(false));
@@ -35,9 +34,9 @@ export default (
         if (givenUuid) {
             party =
                 partyList.find(({ uuid }) => uuid === givenUuid) ||
-                newParty({ partyList, forceUuid: givenUuid as string });
+                newParty({ rocketcrab, forceUuid: givenUuid as string });
         } else {
-            party = newParty({ partyList });
+            party = newParty({ rocketcrab });
         }
 
         if (gameid && !party.selectedGame) {

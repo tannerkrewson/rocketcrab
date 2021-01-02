@@ -39,7 +39,7 @@ const onJoinParty = (socket: SocketIO.Socket, rocketcrab: RocketCrab) => ({
     const { partyList } = rocketcrab;
 
     const party = reconnecting
-        ? reconnectToParty(lastPartyState, partyList)
+        ? reconnectToParty(lastPartyState, rocketcrab)
         : getPartyByCode(code, partyList);
 
     if (party) {

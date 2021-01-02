@@ -2,20 +2,14 @@ import { Grid, Spacer } from "@geist-ui/react";
 import { formatRelative, differenceInCalendarDays, format } from "date-fns";
 import React from "react";
 
-export const FindTime = ({
-    dates,
-    now,
-}: {
-    dates: number[];
-    now: number;
-}): JSX.Element => (
+export const FindTime = ({ dates }: { dates: number[] }): JSX.Element => (
     <div style={{ fontSize: ".85em", padding: "0 2em" }}>
         <Spacer y={0.5} />
         {Object.entries(
             dates
                 .map((date) =>
-                    (differenceInCalendarDays(date, now) < 7
-                        ? formatRelative(date, now)
+                    (differenceInCalendarDays(date, Date.now()) < 7
+                        ? formatRelative(date, Date.now())
                         : format(date, "EEE, MMM do 'at' p")
                     )
                         .replaceAll(":00", "")

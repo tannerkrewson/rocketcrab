@@ -15,9 +15,9 @@ import { GetServerSideProps } from "next";
 import { getClientGameLibrary } from "../config";
 import PublicGame from "../components/find/PublicGame";
 import { Spacer } from "@geist-ui/react";
-import { formatDuration, intervalToDuration, formatRelative } from "date-fns";
 import Swal from "sweetalert2";
 import { FindTime } from "../components/find/FindTime";
+import { Countdown } from "../components/find/Countdown";
 
 const socket = io();
 const CLIENT_GAME_LIBRARY = getClientGameLibrary();
@@ -32,15 +32,6 @@ export const Find = ({
 
     const { isActive, publicPartyList, finderActiveDates, subscriberCount } =
         finderState ?? {};
-
-    const [time, setTime] = useState(Date.now());
-
-    useEffect(() => {
-        const interval = setInterval(() => setTime(Date.now()), 1000);
-        return () => {
-            clearInterval(interval);
-        };
-    }, []);
 
     const onClickNew = async (e) => {
         e.preventDefault();
@@ -115,25 +106,13 @@ export const Find = ({
                         </div>
                     )}
                     {finderActiveDates?.lastStart && (
-                        <div style={{ textAlign: "center" }}>
-                            <Spacer y={1} />
-                            Public parties will close{" "}
-                            {formatRelative(
-                                finderActiveDates.lastStart + FINDER_ACTIVE_MS,
-                                time
-                            )}
-                            , in
-                            <div style={{ fontSize: "1.3em" }}>
-                                {formatDuration(
-                                    intervalToDuration({
-                                        start:
-                                            finderActiveDates.lastStart +
-                                            FINDER_ACTIVE_MS,
-                                        end: time,
-                                    })
-                                )}
-                            </div>
-                        </div>
+                        <Countdown
+                            start={
+                                finderActiveDates.lastStart + FINDER_ACTIVE_MS
+                            }
+                        >
+                            Public parties will close
+                        </Countdown>
                     )}
                     <Spacer y={1.1} />
                 </>
@@ -154,25 +133,12 @@ export const Find = ({
                                 waiting on this page.
                             </div>
                         )}
-                        <div>
-                            <Spacer y={1} />
-                            Public parties will open next{" "}
-                            {formatRelative(finderActiveDates.nextStart, time)},
-                            in
-                            <div style={{ fontSize: "1.3em" }}>
-                                {formatDuration(
-                                    intervalToDuration({
-                                        start: finderActiveDates.nextStart,
-                                        end: time,
-                                    })
-                                )}
-                            </div>
-                        </div>
 
-                        <FindTime
-                            dates={finderActiveDates.nextWeekOfStarts}
-                            now={time}
-                        />
+                        <Countdown start={finderActiveDates.nextStart}>
+                            Public parties will open next
+                        </Countdown>
+
+                        <FindTime dates={finderActiveDates.nextWeekOfStarts} />
 
                         <Spacer y={1.1} />
                     </div>

@@ -19,9 +19,15 @@ const PARTY_EXPIRATION_SEC = 60;
 export const initRocketCrab = (isDevMode?: boolean): RocketCrab => {
     const partyList: Array<Party> = [];
 
-    if (isDevMode) newParty({ partyList, forceGameCode: "ffff" });
+    const rocketcrab = {
+        partyList,
+        isFinderActive: false,
+        finderSubscribers: [],
+    };
 
-    return { partyList, isFinderActive: false, finderSubscribers: [] };
+    if (isDevMode) newParty({ rocketcrab, forceGameCode: "ffff" });
+
+    return rocketcrab;
 };
 
 export const initCron = (rocketcrab: RocketCrab): void => {
@@ -67,12 +73,12 @@ export const initCron = (rocketcrab: RocketCrab): void => {
 };
 
 export const newParty = ({
-    partyList,
+    rocketcrab: { partyList, finderActiveDates },
     forceGameCode,
     forceUuid,
     isPublic = false,
 }: {
-    partyList: Array<Party>;
+    rocketcrab: RocketCrab;
     forceGameCode?: string;
     forceUuid?: string;
     isPublic?: boolean;
@@ -91,6 +97,11 @@ export const newParty = ({
         idealHostId: 0,
         isPublic,
     };
+
+    if (isPublic) {
+        newParty.publicEndDate = finderActiveDates.lastStart + FINDER_ACTIVE_MS;
+    }
+
     partyList.push(newParty);
 
     setTimeout(
@@ -106,15 +117,15 @@ export const getPartyByCode = (
     partyList: Array<Party>
 ): Party => partyList.find(({ code }) => code === newCode);
 
-export const getPartyByUuid = (
-    newUuid: string,
-    partyList: Array<Party>
-): Party => partyList.find(({ uuid }) => uuid === newUuid);
+export const getPartyByUuid = (newUuid: string, partyList: Party[]): Party =>
+    partyList.find(({ uuid }) => uuid === newUuid);
 
 export const reconnectToParty = (
     lastPartyState: ClientParty,
-    partyList: Array<Party>
+    rocketcrab: RocketCrab
 ): Party => {
+    const { partyList } = rocketcrab;
+
     if (!lastPartyState || !lastPartyState.uuid) return;
 
     const { code, uuid, status, selectedGameId, gameState, idealHostId } =
@@ -129,7 +140,7 @@ export const reconnectToParty = (
         !getPartyByCode(code, partyList);
 
     const party = newParty({
-        partyList,
+        rocketcrab,
         forceUuid: uuid,
         ...(isValidCode ? { forceGameCode: code } : {}),
     });

@@ -8,6 +8,7 @@ import React, { useState } from "react";
 import PartyStatus from "./PartyStatus";
 import GameDetail from "../detail/GameDetail";
 import SkinnyCard from "../common/SkinnyCard";
+import { Countdown } from "../find/Countdown";
 
 const PartyScreen = ({
     playerList,
@@ -20,6 +21,7 @@ const PartyScreen = ({
     isHost,
     onInOutParty,
     isPublic,
+    publicEndDate,
 }: PartyScreenProps): JSX.Element => {
     const selectedGame = gameLibrary.gameList.find(
         ({ id }) => id === selectedGameId
@@ -97,17 +99,23 @@ const PartyScreen = ({
                 meId={meId}
                 isPublic={isPublic}
             />
-            {isPublic && (
+            {publicEndDate && (
                 <>
                     <Spacer y={0.5} />
+
                     <SkinnyCard>
-                        This is a public party! Anyone in the 🌏 can join
-                        without the code! But, they can&apos;t join if you
-                        haven&apos;t selected a game, and they can&apos;t join
-                        after you&apos;ve started a game.
+                        {isPublic
+                            ? "This is a public party! Anyone in the 🌏 can join without the code! But, they can't join if you haven't selected a game, and they can't join after you've started a game."
+                            : "This public party is now closed. Have fun! 😀"}
+                        {isPublic && (
+                            <Countdown start={publicEndDate}>
+                                Public parties will close
+                            </Countdown>
+                        )}
                     </SkinnyCard>
                 </>
             )}
+
             <Spacer y={1} />
             <PrimaryButton href="/" size="small">
                 Leave Party
@@ -127,6 +135,7 @@ type PartyScreenProps = {
     isHost: boolean;
     onInOutParty: (outOfParty: boolean) => void;
     isPublic: boolean;
+    publicEndDate: number;
 };
 
 export default PartyScreen;

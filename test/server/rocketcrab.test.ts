@@ -55,9 +55,10 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("newParty works", () => {
-        const partyList: Array<Party> = [];
+        const rocketcrab = generateMocketCrab({});
+        const { partyList } = rocketcrab;
 
-        newParty({ partyList });
+        newParty({ rocketcrab });
 
         expect(partyList.length).toBe(1);
         expect(partyList[0].status).toBe(PartyStatus.party);
@@ -67,9 +68,10 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("newParty works with forced code & uuid", () => {
-        const partyList: Array<Party> = [];
+        const rocketcrab = generateMocketCrab({});
+        const { partyList } = rocketcrab;
 
-        newParty({ partyList, forceGameCode: "abcd", forceUuid: "cool-uuid" });
+        newParty({ rocketcrab, forceGameCode: "abcd", forceUuid: "cool-uuid" });
 
         expect(partyList.length).toBe(1);
         expect(partyList[0].status).toBe(PartyStatus.party);
@@ -79,9 +81,10 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("getPartyByCode finds existing party", () => {
-        const partyList: Array<Party> = [];
+        const rocketcrab = generateMocketCrab({});
+        const { partyList } = rocketcrab;
 
-        const { code } = newParty({ partyList });
+        const { code } = newParty({ rocketcrab });
         const party = getPartyByCode(code, partyList);
 
         expect(party.code).toBe(code);
@@ -97,9 +100,10 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("getPartyByUuid finds existing party", () => {
-        const partyList: Array<Party> = [];
+        const rocketcrab = generateMocketCrab({});
+        const { partyList } = rocketcrab;
 
-        const { uuid } = newParty({ partyList });
+        const { uuid } = newParty({ rocketcrab });
         const party = getPartyByUuid(uuid, partyList);
 
         expect(party.uuid).toBe(uuid);
@@ -434,7 +438,9 @@ describe("server/rocketcrab.ts", () => {
     it("reconnectToParty uses matching existing party", () => {
         const existingParty = generateMockParty({});
         const partyList = [existingParty];
-        const newParty = reconnectToParty(existingParty, partyList);
+        const rocketcrab = generateMocketCrab({ partyList });
+
+        const newParty = reconnectToParty(existingParty, rocketcrab);
 
         expect(newParty.uuid).toBe(existingParty.uuid);
         expect(partyList.length).toBe(1);
@@ -442,8 +448,8 @@ describe("server/rocketcrab.ts", () => {
 
     it("reconnectToParty creates identical party", () => {
         const partyToRecreate = generateMockParty({ nextPlayerId: 0 });
-        const partyList = [];
-        const actualParty = reconnectToParty(partyToRecreate, partyList);
+        const rocketcrab = generateMocketCrab({});
+        const actualParty = reconnectToParty(partyToRecreate, rocketcrab);
 
         expect(actualParty).toMatchObject(partyToRecreate);
     });
@@ -456,14 +462,16 @@ describe("server/rocketcrab.ts", () => {
         });
         const existingParty = generateMockParty({ code: "abcd", uuid: "2" });
         const partyList = [existingParty];
-        const actualParty = reconnectToParty(partyToRecreate, partyList);
+        const rocketcrab = generateMocketCrab({ partyList });
+        const actualParty = reconnectToParty(partyToRecreate, rocketcrab);
 
         expect(actualParty.code).not.toBe("abcd");
     });
 
     it("reconnectToParty returns undefined if no lastPartyState given", () => {
         const partyList = [];
-        const newParty = reconnectToParty(undefined, partyList);
+        const rocketcrab = generateMocketCrab({ partyList });
+        const newParty = reconnectToParty(undefined, rocketcrab);
 
         expect(newParty).toBeUndefined();
         expect(partyList.length).toBe(0);

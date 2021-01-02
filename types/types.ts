@@ -39,6 +39,7 @@ export type ClientParty = {
     gameState: GameState;
     idealHostId: number;
     isPublic: boolean;
+    publicEndDate?: number;
 };
 
 export type Player = {
