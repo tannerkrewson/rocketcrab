@@ -3,6 +3,8 @@ import WebSocket from "ws";
 import { Dispatch, SetStateAction } from "react";
 import { BindingsChangeTarget } from "@geist-ui/react/dist/input/use-input";
 
+export const FINDER_ACTIVE_MS = 10 * 60 * 1000;
+
 export type RocketCrab = {
     partyList: Array<Party>;
     isFinderActive: boolean;
@@ -18,8 +20,8 @@ export type FinderState = {
 };
 
 export type FinderActiveDates = {
-    lastStart: Date;
-    nextStart: Date;
+    lastStart: number;
+    nextStart: number;
 };
 
 export type Party = ClientParty & {

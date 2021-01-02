@@ -5,11 +5,13 @@ import {
     ServerGame,
     ClientParty,
     FinderState,
+    FINDER_ACTIVE_MS,
 } from "../types/types";
 import { PartyStatus, GameStatus, SocketEvent } from "../types/enums";
 import { getServerGameLibrary } from "../config";
 import { v4 as uuidv4 } from "uuid";
 import { CronJob } from "cron";
+import { getUnixTime } from "date-fns";
 
 const SERVER_GAME_LIST: Array<ServerGame> = getServerGameLibrary().gameList;
 const PARTY_EXPIRATION_SEC = 60;
@@ -22,11 +24,11 @@ export const initRocketCrab = (isDevMode?: boolean): RocketCrab => {
     return { partyList, isFinderActive: false, finderSubscribers: [] };
 };
 
-export const initCron = (rocketcrab: RocketCrab): CronJob => {
+export const initCron = (rocketcrab: RocketCrab): void => {
     const setDates = () => {
         rocketcrab.finderActiveDates = {
-            lastStart: activateFinderJob.lastDate(),
-            nextStart: activateFinderJob.nextDate(),
+            lastStart: getUnixTime(activateFinderJob.lastDate()) * 1000,
+            nextStart: activateFinderJob.nextDate().valueOf(),
         };
     };
 
@@ -49,7 +51,7 @@ export const initCron = (rocketcrab: RocketCrab): CronJob => {
                     });
                 });
                 sendFinderStateToAll(rocketcrab);
-            }, 10 * 60 * 1000); // 10 minutes
+            }, FINDER_ACTIVE_MS);
         },
         null,
         true,

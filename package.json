@@ -59,6 +59,7 @@
     },
     "devDependencies": {
         "@testing-library/react": "^11.2.2",
+        "@types/cron": "^1.7.2",
         "@types/express": "^4.17.9",
         "@types/jest": "^26.0.16",
         "@types/node": "^14.14.10",

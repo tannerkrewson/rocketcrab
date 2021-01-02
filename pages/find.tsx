@@ -6,7 +6,11 @@ import { postJson } from "../utils/utils";
 import { useRouter } from "next/router";
 import { io } from "socket.io-client";
 import { SocketEvent } from "../types/enums";
-import { ClientGameLibrary, FinderState } from "../types/types";
+import {
+    ClientGameLibrary,
+    FinderState,
+    FINDER_ACTIVE_MS,
+} from "../types/types";
 import { GetServerSideProps } from "next";
 import { getClientGameLibrary } from "../config";
 import PublicGame from "../components/find/PublicGame";
@@ -68,16 +72,6 @@ export const Find = ({
         socket.emit(SocketEvent.FINDER_SUBSCRIBE);
 
         socket.on(SocketEvent.FINDER_UPDATE, (newFinderState: FinderState) => {
-            if (newFinderState.finderActiveDates) {
-                newFinderState.finderActiveDates = {
-                    lastStart: new Date(
-                        newFinderState.finderActiveDates.lastStart
-                    ),
-                    nextStart: new Date(
-                        newFinderState.finderActiveDates.nextStart
-                    ),
-                };
-            }
             setFinderState(newFinderState);
             setShowReconnecting(false);
         });
@@ -113,9 +107,8 @@ export const Find = ({
                             gameLibrary={gameLibrary}
                         />
                     ))}
-                    {!finderState?.publicPartyList?.length && (
-                        <>No public parties found. 😞 You should make one! 🥰</>
-                    )}
+                    {!finderState?.publicPartyList?.length &&
+                        "No public parties found. 😞 You should make one! 🥰 "}
                     {subscriberCount > 0 && (
                         <div style={{ textAlign: "center" }}>
                             <Spacer y={1} />
@@ -123,6 +116,27 @@ export const Find = ({
                             {subscriberCount} other
                             {scs ? " person " : " people "}
                             here still looking for a party to choose!
+                        </div>
+                    )}
+                    {finderActiveDates?.lastStart && (
+                        <div style={{ textAlign: "center" }}>
+                            <Spacer y={1} />
+                            Public parties will close{" "}
+                            {formatRelative(
+                                finderActiveDates.lastStart + FINDER_ACTIVE_MS,
+                                time
+                            )}
+                            , in
+                            <div style={{ fontSize: "1.3em" }}>
+                                {formatDuration(
+                                    intervalToDuration({
+                                        start:
+                                            finderActiveDates.lastStart +
+                                            FINDER_ACTIVE_MS,
+                                        end: time,
+                                    })
+                                )}
+                            </div>
                         </div>
                     )}
                     <Spacer y={1.1} />
