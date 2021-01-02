@@ -44,8 +44,10 @@ export const initCron = (rocketcrab: RocketCrab): CronJob => {
                 // activation of the finder
                 rocketcrab.partyList.forEach((party) => {
                     party.isPublic = false;
+                    sendStateToAll(party, rocketcrab, {
+                        enableFinderCheck: false,
+                    });
                 });
-
                 sendFinderStateToAll(rocketcrab);
             }, 10 * 60 * 1000); // 10 minutes
         },
@@ -347,7 +349,8 @@ export const getFinderState = ({
     isActive: isFinderActive,
     publicPartyList: partyList
         .filter(
-            ({ isPublic, status }) => isPublic && status === PartyStatus.party
+            ({ isPublic, status, selectedGameId }) =>
+                isPublic && status === PartyStatus.party && selectedGameId
         )
         .map((party) => getJsonParty(party)),
     finderActiveDates,

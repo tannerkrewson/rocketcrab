@@ -144,7 +144,7 @@ const GameLayout = ({
                 <div className="component-frame">
                     <div>🚀🦀 Players:</div>
                     <Spacer y={0.5} />
-                    <PlayerList playerList={playerList} />
+                    <PlayerList playerList={playerList} isPublic={false} />
                     <Spacer y={0.5} />
                     <PrimaryButton onClick={() => setShowPlayerList(false)}>
                         Close

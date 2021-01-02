@@ -7,6 +7,7 @@ import { Player, ClientGameLibrary } from "../../types/types";
 import React, { useState } from "react";
 import PartyStatus from "./PartyStatus";
 import GameDetail from "../detail/GameDetail";
+import SkinnyCard from "../common/SkinnyCard";
 
 const PartyScreen = ({
     playerList,
@@ -73,6 +74,7 @@ const PartyScreen = ({
                 onShowGameInfo={showGameInfo(true)}
                 isHost={isHost}
                 onlyOnePlayer={playerList.length === 1}
+                isPublic={isPublic}
             />
             <Spacer y={1} />
             <ButtonGroup>
@@ -93,15 +95,17 @@ const PartyScreen = ({
                 playerList={playerList}
                 onEditName={resetName}
                 meId={meId}
+                isPublic={isPublic}
             />
             {isPublic && (
                 <>
-                    <Spacer y={1} />
-                    <div>
+                    <Spacer y={0.5} />
+                    <SkinnyCard>
                         This is a public party! Anyone in the 🌏 can join
-                        without the code, but only <i>before</i> you start the
-                        game!
-                    </div>
+                        without the code! But, they can&apos;t join if you
+                        haven&apos;t selected a game, and they can&apos;t join
+                        after you&apos;ve started a game.
+                    </SkinnyCard>
                 </>
             )}
             <Spacer y={1} />

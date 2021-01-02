@@ -11,6 +11,7 @@ const PartyStatus = ({
     onShowGameInfo,
     isHost,
     onlyOnePlayer,
+    isPublic,
 }: PartyStatusProps): JSX.Element => (
     <Card>
         <Card.Content style={{ padding: "1em" }}>
@@ -35,11 +36,12 @@ const PartyStatus = ({
                     <JellyfishSpinner size={4} sizeUnit="em" color="Grey" />
 
                     <div className="status-note">
-                        {onlyOnePlayer
-                            ? "⬆️ Give this link to your friends! ⬆️ \n (You can tap it to copy!)"
-                            : isHost
-                            ? "As the host, you must select the game!"
-                            : `Waiting for ${hostName} to select a game...`}
+                        {getPreSelectedGameStatus(
+                            onlyOnePlayer,
+                            isHost,
+                            hostName,
+                            isPublic
+                        )}
                     </div>
                 </div>
             )}
@@ -62,12 +64,30 @@ const PartyStatus = ({
     </Card>
 );
 
+const getPreSelectedGameStatus = (
+    onlyOnePlayer: boolean,
+    isHost: boolean,
+    hostName: string,
+    isPublic: boolean
+) => {
+    if (isPublic) {
+        return "You must select a game before others can join!";
+    }
+
+    return onlyOnePlayer
+        ? "⬆️ Give this link to your friends! ⬆️ \n (You can tap it to copy!)"
+        : isHost
+        ? "As the host, you must select the game!"
+        : `Waiting for ${hostName} to select a game...`;
+};
+
 type PartyStatusProps = {
     selectedGame: ClientGame;
     host: Player;
     onShowGameInfo: () => void;
     isHost: boolean;
     onlyOnePlayer: boolean;
+    isPublic: boolean;
 };
 
 export default PartyStatus;
