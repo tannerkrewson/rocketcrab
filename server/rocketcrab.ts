@@ -6,6 +6,10 @@ import {
     ClientParty,
     FinderState,
     FINDER_ACTIVE_MS,
+    MAX_CHAT_MSG_LEN,
+    MAX_CHATS_OVERALL,
+    MAX_CHATS_FROM_SINGLE_PLAYER,
+    MIN_MS_BETWEEN_MSGS,
 } from "../types/types";
 import { PartyStatus, GameStatus, SocketEvent } from "../types/enums";
 import { getServerGameLibrary } from "../config";
@@ -96,19 +100,7 @@ export const newParty = ({
         nextPlayerId: 0,
         idealHostId: 0,
         isPublic,
-        chat: [
-            {
-                playerName: "Tanny-Banany",
-                message:
-                    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
-                date: Date.now().valueOf(),
-            },
-            {
-                playerName: "Jessica",
-                message: "Lorem ipsum dolor sit amet",
-                date: Date.now().valueOf() + 10000,
-            },
-        ],
+        chat: [],
     };
 
     if (isPublic) {
@@ -387,6 +379,75 @@ export const getFinderState = ({
     finderActiveDates,
     subscriberCount: finderSubscribers.length - 1, // not counting the person it's being sent to
 });
+
+export const addChatMessage = (
+    message: string,
+    player: Player,
+    party: Party
+): boolean => {
+    if (!isChatMsgValid(message, player, party)) return false;
+
+    party.chat.push({
+        playerId: player.id,
+        playerName: player.name,
+        message,
+        date: Date.now().valueOf(),
+    });
+
+    purgeOverflowMsgs(player, party);
+
+    return true;
+};
+
+const isChatMsgValid = (
+    message: string,
+    player: Player,
+    party: Party
+): boolean => {
+    if (typeof message !== "string" || message.length > MAX_CHAT_MSG_LEN) {
+        return false;
+    }
+
+    const now = Date.now().valueOf();
+
+    const indexOfLatestMsgFromThisPlayer = party.chat
+        .map(({ playerId }) => playerId === player.id)
+        .lastIndexOf(true);
+
+    if (indexOfLatestMsgFromThisPlayer === -1) return true;
+
+    const latestMsgFromThisPlayer = party.chat[indexOfLatestMsgFromThisPlayer];
+
+    const timeBetweenLastMsgAndNow = now - latestMsgFromThisPlayer.date;
+
+    return timeBetweenLastMsgAndNow >= MIN_MS_BETWEEN_MSGS;
+};
+
+const purgeOverflowMsgs = (player: Player, party: Party): void => {
+    const numberOfMsgsFromThisPlayer = party.chat.reduce(
+        (prev, cur) => prev + (cur.playerId === player.id ? 1 : 0),
+        0
+    );
+
+    let numberOfMsgsToRemove =
+        numberOfMsgsFromThisPlayer - MAX_CHATS_FROM_SINGLE_PLAYER;
+
+    if (numberOfMsgsToRemove > 0) {
+        // removes from the beginning, which will be the oldest msgs
+        party.chat = party.chat.filter(({ playerId }) => {
+            if (playerId === player.id && numberOfMsgsToRemove > 0) {
+                numberOfMsgsToRemove--;
+                return false;
+            }
+            return true;
+        });
+    }
+
+    // remove overflow from the beginning (oldest)
+    if (party.chat.length > MAX_CHATS_OVERALL) {
+        party.chat.splice(0, party.chat.length - MAX_CHATS_OVERALL);
+    }
+};
 
 const findPlayerByName = (
     nameToFind: string,

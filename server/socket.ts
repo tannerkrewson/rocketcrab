@@ -11,6 +11,7 @@ import {
     reconnectToParty,
     getFinderState,
     sendFinderStateToAll,
+    addChatMessage,
 } from "./rocketcrab";
 import type {
     JoinPartyResponse,
@@ -94,6 +95,13 @@ const attachPartyListenersToPlayer = (
 
         exitGame(party);
         sendStateToAll(party, rocketcrab, { enableFinderCheck: true });
+    });
+
+    socket.on(SocketEvent.CHAT_MESSAGE, (message) => {
+        const isMessageValid = addChatMessage(message, player, party);
+        if (isMessageValid) {
+            sendStateToAll(party, rocketcrab, { enableFinderCheck: false });
+        }
     });
 };
 

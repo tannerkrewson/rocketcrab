@@ -107,6 +107,10 @@ export const useRocketcrabClientSocket = ({
         []
     );
 
+    const onSendChat = useCallback((message) => {
+        socket.emit(SocketEvent.CHAT_MESSAGE, message);
+    }, []);
+
     return {
         partyState,
         onNameEntry,
@@ -115,6 +119,7 @@ export const useRocketcrabClientSocket = ({
         onExitGame,
         onHostGameLoaded,
         showReconnecting,
+        onSendChat,
     };
 };
 
@@ -152,10 +157,11 @@ type UseRocketcrabClientSocketProps = {
 
 type UseRocketcrabClientSocketReturn = {
     partyState: ClientParty;
-    onNameEntry: (enteredName: any) => void;
+    onNameEntry: (enteredName: string) => void;
     onSelectGame: (gameId: string) => void;
     onStartGame: () => void;
     onExitGame: () => void;
     onHostGameLoaded: () => void;
     showReconnecting: boolean;
+    onSendChat: (message: string) => void;
 };

@@ -33,6 +33,7 @@ export const Code = ({
         onExitGame,
         onHostGameLoaded,
         showReconnecting,
+        onSendChat,
     } = useRocketcrabClientSocket({
         code,
         router,
@@ -113,6 +114,7 @@ export const Code = ({
                     onInOutParty={onInOutParty}
                     isPublic={isPublic}
                     publicEndDate={publicEndDate}
+                    onSendChat={onSendChat}
                 />
             )}
         </PageLayout>

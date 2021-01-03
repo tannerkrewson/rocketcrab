@@ -1,23 +1,24 @@
 import { Input, useInput } from "@geist-ui/react";
 import React, { useState } from "react";
-import { ChatMessage } from "../../types/types";
+import { ChatMessage, MAX_CHAT_MSG_LEN } from "../../types/types";
 import PrimaryButton from "../common/PrimaryButton";
 import SkinnyCard from "../common/SkinnyCard";
 
 export const ChatBox = ({
     chat,
+    onSendChat,
 }: {
     chat: Array<ChatMessage>;
+    onSendChat: (message: string) => void;
 }): JSX.Element => {
     const { state: msgToSend, bindings, reset } = useInput("");
     const [showChat, setShowChat] = useState(true);
 
     const handleConfirm = (e?) => {
         if (e) e.preventDefault();
-        if (msgToSend.length < 1) return;
+        if (msgToSend.length < 1 || msgToSend.length > MAX_CHAT_MSG_LEN) return;
 
-        //onMsgSend(msgToSend);
-        //console.log("sending", msgToSend);
+        onSendChat(msgToSend);
         reset();
     };
 
@@ -52,7 +53,7 @@ export const ChatBox = ({
                             {...bindings}
                             autoFocus
                             onKeyDown={onEnter}
-                            maxLength={280}
+                            maxLength={MAX_CHAT_MSG_LEN}
                             width="100%"
                         />
                         <div className="send-container">

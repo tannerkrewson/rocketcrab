@@ -3,7 +3,11 @@ import WebSocket from "ws";
 import { Dispatch, SetStateAction } from "react";
 import { BindingsChangeTarget } from "@geist-ui/react/dist/input/use-input";
 
-export const FINDER_ACTIVE_MS = 10 * 60 * 1000;
+export const FINDER_ACTIVE_MS = 10 * 60 * 1000; // 10 minutes
+export const MAX_CHAT_MSG_LEN = 100;
+export const MAX_CHATS_FROM_SINGLE_PLAYER = 3;
+export const MAX_CHATS_OVERALL = 20;
+export const MIN_MS_BETWEEN_MSGS = 5 * 1000; // 5 seconds
 
 export type RocketCrab = {
     partyList: Array<Party>;
@@ -138,6 +142,7 @@ export type LibraryState = {
 };
 
 export type ChatMessage = {
+    playerId: number;
     playerName: string;
     message: string;
     date: number;

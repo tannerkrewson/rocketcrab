@@ -24,6 +24,7 @@ const PartyScreen = ({
     isPublic,
     publicEndDate,
     partyState,
+    onSendChat,
 }: PartyScreenProps): JSX.Element => {
     const selectedGame = gameLibrary.gameList.find(
         ({ id }) => id === selectedGameId
@@ -97,10 +98,10 @@ const PartyScreen = ({
                 </PrimaryButton>
             </ButtonGroup>
             <Spacer y={2} />
-            {isOrWasPublic && (
+            {(isPublic || isOrWasPublic) && (
                 <>
                     <Spacer y={0.5} />
-                    <ChatBox chat={partyState.chat} />
+                    <ChatBox chat={partyState.chat} onSendChat={onSendChat} />
                 </>
             )}
             <PlayerList
@@ -147,6 +148,7 @@ type PartyScreenProps = {
     isPublic: boolean;
     publicEndDate: number;
     partyState: ClientParty;
+    onSendChat: (message: string) => void;
 };
 
 export default PartyScreen;
