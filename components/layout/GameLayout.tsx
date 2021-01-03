@@ -1,6 +1,6 @@
-import { Spacer } from "@geist-ui/react";
+import { Spacer, useToasts } from "@geist-ui/react";
 import PrimaryButton from "../common/PrimaryButton";
-import { useCallback, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ClientGameLibrary,
     Player,
@@ -14,6 +14,8 @@ import GameFrame from "../in-game/GameFrame";
 import Connecting from "./Connecting";
 import { ChatBox } from "../chat/ChatBox";
 import Swal from "sweetalert2";
+import { ToastAction } from "@geist-ui/react/dist/use-toasts/use-toast";
+import ButtonGroup from "../common/ButtonGroup";
 
 const GameLayout = ({
     partyState,
@@ -39,6 +41,63 @@ const GameLayout = ({
 
     // https://stackoverflow.com/a/48830513
     const [frameRefresh, setFrameRefresh] = useState(0);
+
+    const [enableToasts, setEnableToasts] = useState(true);
+    const [, setToast] = useToasts();
+    const [lastShownToastDate, setLastShownToastDate] = useState(-1);
+
+    const actions = useMemo(
+        (): ToastAction[] => [
+            {
+                name: "Mute",
+                passive: true,
+                handler: (event, cancel) => {
+                    cancel();
+                    promptMute();
+                },
+            },
+            {
+                name: "Reply",
+                passive: true,
+                handler: (event, cancel) => {
+                    cancel();
+                    setShowMenu(false);
+                    setShowChat(true);
+                },
+            },
+            {
+                name: "Dismiss",
+                passive: true,
+                handler: (event, cancel) => cancel(),
+            },
+        ],
+        []
+    );
+
+    useEffect(() => {
+        if (chat.length === 0) return;
+
+        const { playerId, playerName, message, date } = chat[chat.length - 1];
+
+        // don't show a toast if it has already been shown
+        // (this has to be done because every partyState update triggers a
+        // "change" to `chat`, even if it hasn't actually changed, causing msgs
+        // to be toasted multiple times)
+        if (lastShownToastDate === date) return;
+        setLastShownToastDate(date);
+
+        // don't show toasts if they were muted by the user
+        if (!enableToasts) return;
+
+        // don't show toasts if the chat is open
+        if (showChat) return;
+
+        // don't show toasts for your own messages
+        if (playerId === thisPlayer.id) return;
+
+        setToast({ text: "🚀🦀 " + playerName + ": " + message, actions });
+        setLastShownToastDate(date);
+    }, [chat]);
 
     const hostName = playerList.find(({ isHost }) => isHost).name;
 
@@ -132,6 +191,21 @@ const GameLayout = ({
         },
     ];
 
+    const promptMute = () => {
+        Swal.fire({
+            title: "Are your sure?",
+            text:
+                "New chat messages won't appear over your game, but you can still see them in the menu!",
+            showCancelButton: true,
+            confirmButtonText: "Mute chat",
+            icon: "question",
+        }).then(({ isConfirmed }) => {
+            if (isConfirmed) {
+                setEnableToasts(false);
+            }
+        });
+    };
+
     const hideAllWindows = useCallback(() => {
         setShowGameLibrary(false);
         setShowPlayerList(false);
@@ -214,9 +288,20 @@ const GameLayout = ({
                         disableHide={true}
                     />
                     <Spacer y={0.5} />
-                    <PrimaryButton onClick={hideAllWindows}>
-                        Close
-                    </PrimaryButton>
+                    <ButtonGroup>
+                        <PrimaryButton onClick={hideAllWindows}>
+                            Close
+                        </PrimaryButton>
+                        <PrimaryButton
+                            onClick={
+                                enableToasts
+                                    ? promptMute
+                                    : () => setEnableToasts(true)
+                            }
+                        >
+                            {enableToasts ? "Mute" : "Unmute"}
+                        </PrimaryButton>
+                    </ButtonGroup>
                 </div>
             )}
             <style jsx>{`
