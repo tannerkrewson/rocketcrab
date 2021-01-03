@@ -8,6 +8,7 @@ export const MAX_CHAT_MSG_LEN = 100;
 export const MAX_CHATS_FROM_SINGLE_PLAYER = 3;
 export const MAX_CHATS_OVERALL = 20;
 export const MIN_MS_BETWEEN_MSGS = 5 * 1000; // 5 seconds
+export const ENABLE_FILTER = true;
 
 export type RocketCrab = {
     partyList: Array<Party>;

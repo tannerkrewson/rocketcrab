@@ -10,12 +10,16 @@ import {
     MAX_CHATS_OVERALL,
     MAX_CHATS_FROM_SINGLE_PLAYER,
     MIN_MS_BETWEEN_MSGS,
+    ENABLE_FILTER,
 } from "../types/types";
 import { PartyStatus, GameStatus, SocketEvent } from "../types/enums";
 import { getServerGameLibrary } from "../config";
 import { v4 as uuidv4 } from "uuid";
 import { CronJob } from "cron";
 import { getUnixTime } from "date-fns";
+
+import Filter from "bad-words";
+const filter = new Filter();
 
 const SERVER_GAME_LIST: Array<ServerGame> = getServerGameLibrary().gameList;
 const PARTY_EXPIRATION_SEC = 60;
@@ -390,7 +394,7 @@ export const addChatMessage = (
     party.chat.push({
         playerId: player.id,
         playerName: player.name,
-        message,
+        message: ENABLE_FILTER ? filter.clean(message) : message,
         date: Date.now().valueOf(),
     });
 
