@@ -3,7 +3,7 @@ import PrimaryButton from "../common/PrimaryButton";
 import ButtonGroup from "../common/ButtonGroup";
 import { Spacer } from "@geist-ui/react";
 import GameSelector from "../library/GameSelector";
-import { Player, ClientGameLibrary, ClientParty } from "../../types/types";
+import { ClientGameLibrary, ClientParty, Player } from "../../types/types";
 import React, { useState } from "react";
 import PartyStatus from "./PartyStatus";
 import GameDetail from "../detail/GameDetail";
@@ -12,20 +12,18 @@ import { Countdown } from "../find/Countdown";
 import { ChatBox } from "../chat/ChatBox";
 
 const PartyScreen = ({
-    playerList,
+    partyState,
     gameLibrary,
+    thisPlayer,
     onSelectGame,
-    selectedGameId,
     onStartGame,
     resetName,
-    meId,
-    isHost,
     onInOutParty,
-    isPublic,
-    publicEndDate,
-    partyState,
     onSendChat,
 }: PartyScreenProps): JSX.Element => {
+    const { playerList, selectedGameId, isPublic, publicEndDate } = partyState;
+    const { id: meId, isHost } = thisPlayer;
+
     const selectedGame = gameLibrary.gameList.find(
         ({ id }) => id === selectedGameId
     );
@@ -136,18 +134,13 @@ const PartyScreen = ({
 };
 
 type PartyScreenProps = {
-    playerList: Array<Player>;
+    partyState: ClientParty;
     gameLibrary: ClientGameLibrary;
+    thisPlayer: Player;
     onSelectGame: (gameId: string) => void;
-    selectedGameId: string;
     onStartGame: () => void;
     resetName: () => void;
-    meId: number;
-    isHost: boolean;
     onInOutParty: (outOfParty: boolean) => void;
-    isPublic: boolean;
-    publicEndDate: number;
-    partyState: ClientParty;
     onSendChat: (message: string) => void;
 };
 

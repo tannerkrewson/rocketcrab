@@ -41,15 +41,8 @@ export const Code = ({
         isReconnect,
     });
 
-    const {
-        status,
-        me,
-        playerList,
-        selectedGameId,
-        gameState,
-        isPublic,
-        publicEndDate,
-    } = partyState || {};
+    const { status, me, playerList, selectedGameId, gameState } =
+        partyState || {};
 
     const [myLastValidName, setMyLastValidName] = useState("");
     useEffect(() => {
@@ -103,17 +96,12 @@ export const Code = ({
             ) : (
                 <PartyScreen
                     partyState={partyState}
-                    playerList={playerList}
+                    thisPlayer={me}
                     gameLibrary={gameLibrary}
                     onSelectGame={onSelectGame}
-                    selectedGameId={selectedGameId}
                     onStartGame={onStartGame}
                     resetName={() => onNameEntry("")}
-                    meId={me?.id}
-                    isHost={me?.isHost}
                     onInOutParty={onInOutParty}
-                    isPublic={isPublic}
-                    publicEndDate={publicEndDate}
                     onSendChat={onSendChat}
                 />
             )}
