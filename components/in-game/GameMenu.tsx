@@ -4,21 +4,19 @@ import { MenuButton } from "../../types/types";
 
 const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => (
     <div className="game-menu">
-        {menuButtons.map(
-            ({ label, hostOnly, onClick }) =>
-                (!hostOnly || (isHost && hostOnly)) && (
-                    <>
-                        <PrimaryButton
-                            size="small"
-                            type={hostOnly ? "error" : "secondary"}
-                            onClick={onClick}
-                        >
-                            {label}
-                        </PrimaryButton>
-                        <Spacer y={0.5} />
-                    </>
-                )
-        )}
+        {menuButtons.map(({ label, hostOnly, onClick }) => (
+            <>
+                <PrimaryButton
+                    size="small"
+                    type={hostOnly ? "error" : "secondary"}
+                    disabled={!isHost && hostOnly}
+                    onClick={onClick}
+                >
+                    {label}
+                </PrimaryButton>
+                <Spacer y={0.5} />
+            </>
+        ))}
         <style jsx>{`
             .game-menu {
                 position: fixed;

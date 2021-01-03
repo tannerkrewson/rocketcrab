@@ -13,6 +13,7 @@ import PlayerList from "../party/PlayerList";
 import GameFrame from "../in-game/GameFrame";
 import Connecting from "./Connecting";
 import { ChatBox } from "../chat/ChatBox";
+import Swal from "sweetalert2";
 
 const GameLayout = ({
     partyState,
@@ -39,17 +40,11 @@ const GameLayout = ({
     // https://stackoverflow.com/a/48830513
     const [frameRefresh, setFrameRefresh] = useState(0);
 
+    const hostName = playerList.find(({ isHost }) => isHost).name;
+
     const menuButtons: Array<MenuButton> = [
         {
-            label: "Reload my game",
-            hostOnly: false,
-            onClick: useCallback(() => {
-                setShowMenu(false);
-                setFrameRefresh(frameRefresh + 1);
-            }, [frameRefresh]),
-        },
-        {
-            label: "View chat",
+            label: "Chat",
             hostOnly: false,
             onClick: useCallback(() => {
                 setShowMenu(false);
@@ -57,7 +52,7 @@ const GameLayout = ({
             }, []),
         },
         {
-            label: "View players",
+            label: "Players",
             hostOnly: false,
             onClick: useCallback(() => {
                 setShowMenu(false);
@@ -73,19 +68,66 @@ const GameLayout = ({
             }, []),
         },
         {
+            label: "Reload my game",
+            hostOnly: false,
+            onClick: useCallback(() => {
+                Swal.fire({
+                    title: "Are your sure?",
+                    text:
+                        "If reloading doesn't fix your issue, tell your party host, " +
+                        hostName +
+                        ", to try the Reload All button.",
+                    showCancelButton: true,
+                    confirmButtonText: `Reload my game`,
+                    icon: "warning",
+                }).then(({ isConfirmed }) => {
+                    if (isConfirmed) {
+                        setShowMenu(false);
+                        setFrameRefresh(frameRefresh + 1);
+                    }
+                });
+            }, [frameRefresh]),
+        },
+        {
             label: "Reload all",
             hostOnly: true,
             onClick: useCallback(() => {
-                setShowMenu(false);
-                onStartGame();
+                Swal.fire({
+                    title: "Are your sure?",
+                    text:
+                        "Your current session in " +
+                        thisGame.name +
+                        " will be lost!",
+                    showCancelButton: true,
+                    confirmButtonText: `Reload All`,
+                    icon: "warning",
+                }).then(({ isConfirmed }) => {
+                    if (isConfirmed) {
+                        setShowMenu(false);
+                        onStartGame();
+                    }
+                });
             }, [onStartGame]),
         },
         {
             label: "Exit to party",
             hostOnly: true,
             onClick: useCallback(() => {
-                setShowMenu(false);
-                onExitGame();
+                Swal.fire({
+                    title: "Are your sure?",
+                    text:
+                        "Your current session in " +
+                        thisGame.name +
+                        " will be lost!",
+                    showCancelButton: true,
+                    confirmButtonText: "Exit to party",
+                    icon: "warning",
+                }).then(({ isConfirmed }) => {
+                    if (isConfirmed) {
+                        setShowMenu(false);
+                        onExitGame();
+                    }
+                });
             }, [onExitGame]),
         },
     ];

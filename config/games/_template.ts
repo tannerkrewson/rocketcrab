@@ -62,6 +62,7 @@ const game: ServerGame = {
     // you can add a min and/or max players if you would like disable the "Start Game" button
     // if the number of players in the rocketcrab party is not within range. this can be different
     // than the "players" property.
+    // THIS IS CURRENTLY NOT IMPLEMENTED
     minPlayers: 1, // optional. if you do use it, make this 1 or more
     maxPlayers: 6, // optional. if you do use it, make this 1 or more
 
