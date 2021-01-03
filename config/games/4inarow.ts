@@ -8,7 +8,8 @@ const game: ServerGame = {
     basedOn: {
         game: "Connect Four",
     },
-    description: "Play a quick game of 4 in a Row with a friend, in seconds",
+    description:
+        "A quick, easy board game in which two players compete to get four pieces in a line.",
     displayUrlText: "4inarow.onrender.com",
     displayUrlHref: "https://4inarow.onrender.com",
     category: ["easy"],
@@ -16,6 +17,9 @@ const game: ServerGame = {
     familyFriendly: true,
     minPlayers: 2,
     maxPlayers: 2,
+
+    guideId: "4inarow",
+    pictures: ["https://i.imgur.com/1Hhs3iQ.png"],
 
     getJoinGameUrl: async () => {
         const newGameUrl = "https://board-game-server.onrender.com/";
