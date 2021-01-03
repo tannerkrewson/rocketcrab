@@ -1,25 +1,40 @@
 import { Input, useInput } from "@geist-ui/react";
-import React, { useState } from "react";
-import { ChatMessage, MAX_CHAT_MSG_LEN } from "../../types/types";
+import React, { useEffect, useState } from "react";
+import {
+    ChatMessage,
+    MAX_CHAT_MSG_LEN,
+    MIN_MS_BETWEEN_MSGS,
+    Player,
+} from "../../types/types";
+import { isChatMsgValid } from "../../utils/utils";
 import PrimaryButton from "../common/PrimaryButton";
 import SkinnyCard from "../common/SkinnyCard";
 
 export const ChatBox = ({
     chat,
     onSendChat,
+    thisPlayer,
 }: {
     chat: Array<ChatMessage>;
     onSendChat: (message: string) => void;
+    thisPlayer: Player;
 }): JSX.Element => {
     const { state: msgToSend, bindings, reset } = useInput("");
     const [showChat, setShowChat] = useState(true);
+    const [sendDisabled, setSendDisabled] = useSendButton(
+        msgToSend,
+        thisPlayer,
+        chat
+    );
 
     const handleConfirm = (e?) => {
         if (e) e.preventDefault();
-        if (msgToSend.length < 1 || msgToSend.length > MAX_CHAT_MSG_LEN) return;
+        if (!isChatMsgValid(msgToSend, thisPlayer, chat)) return;
 
         onSendChat(msgToSend);
         reset();
+
+        setTimeout(setSendDisabled, MIN_MS_BETWEEN_MSGS);
     };
 
     const onEnter = (e) => {
@@ -27,6 +42,9 @@ export const ChatBox = ({
 
         handleConfirm();
     };
+
+    useEffect(setSendDisabled, [msgToSend]);
+
     return (
         <SkinnyCard>
             <div className="input-container">
@@ -57,7 +75,11 @@ export const ChatBox = ({
                             width="100%"
                         />
                         <div className="send-container">
-                            <PrimaryButton size="small" onClick={handleConfirm}>
+                            <PrimaryButton
+                                size="small"
+                                onClick={handleConfirm}
+                                disabled={sendDisabled}
+                            >
                                 Send
                             </PrimaryButton>
                         </div>
@@ -80,4 +102,17 @@ export const ChatBox = ({
             `}</style>
         </SkinnyCard>
     );
+};
+
+const useSendButton = (
+    msgToSend: string,
+    thisPlayer: Player,
+    chat: Array<ChatMessage>
+): [boolean, () => void] => {
+    const [sendDisabled, setSendDisabled] = useState(true);
+
+    return [
+        sendDisabled,
+        () => setSendDisabled(!isChatMsgValid(msgToSend, thisPlayer, chat)),
+    ];
 };

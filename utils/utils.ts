@@ -1,4 +1,11 @@
-import { LibraryState, PromiseWebSocket } from "../types/types";
+import {
+    ChatMessage,
+    LibraryState,
+    MAX_CHAT_MSG_LEN,
+    MIN_MS_BETWEEN_MSGS,
+    Player,
+    PromiseWebSocket,
+} from "../types/types";
 import WebSocket from "ws";
 import { useInput } from "@geist-ui/react";
 import { useState } from "react";
@@ -54,4 +61,32 @@ export const useLibraryState = (): LibraryState => {
         setSearch,
         searchBindings,
     };
+};
+
+export const isChatMsgValid = (
+    message: string,
+    player: Player,
+    chat: Array<ChatMessage>
+): boolean => {
+    if (
+        typeof message !== "string" ||
+        message.length > MAX_CHAT_MSG_LEN ||
+        message.length < 1
+    ) {
+        return false;
+    }
+
+    const now = Date.now().valueOf();
+
+    const indexOfLatestMsgFromThisPlayer = chat
+        .map(({ playerId }) => playerId === player.id)
+        .lastIndexOf(true);
+
+    if (indexOfLatestMsgFromThisPlayer === -1) return true;
+
+    const latestMsgFromThisPlayer = chat[indexOfLatestMsgFromThisPlayer];
+
+    const timeBetweenLastMsgAndNow = now - latestMsgFromThisPlayer.date;
+
+    return timeBetweenLastMsgAndNow >= MIN_MS_BETWEEN_MSGS;
 };

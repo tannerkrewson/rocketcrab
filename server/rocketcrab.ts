@@ -6,10 +6,8 @@ import {
     ClientParty,
     FinderState,
     FINDER_ACTIVE_MS,
-    MAX_CHAT_MSG_LEN,
     MAX_CHATS_OVERALL,
     MAX_CHATS_FROM_SINGLE_PLAYER,
-    MIN_MS_BETWEEN_MSGS,
     ENABLE_FILTER,
 } from "../types/types";
 import { PartyStatus, GameStatus, SocketEvent } from "../types/enums";
@@ -19,6 +17,7 @@ import { CronJob } from "cron";
 import { getUnixTime } from "date-fns";
 
 import Filter from "bad-words";
+import { isChatMsgValid } from "../utils/utils";
 const filter = new Filter();
 
 const SERVER_GAME_LIST: Array<ServerGame> = getServerGameLibrary().gameList;
@@ -389,7 +388,7 @@ export const addChatMessage = (
     player: Player,
     party: Party
 ): boolean => {
-    if (!isChatMsgValid(message, player, party)) return false;
+    if (!isChatMsgValid(message, player, party.chat)) return false;
 
     party.chat.push({
         playerId: player.id,
@@ -401,30 +400,6 @@ export const addChatMessage = (
     purgeOverflowMsgs(player, party);
 
     return true;
-};
-
-const isChatMsgValid = (
-    message: string,
-    player: Player,
-    party: Party
-): boolean => {
-    if (typeof message !== "string" || message.length > MAX_CHAT_MSG_LEN) {
-        return false;
-    }
-
-    const now = Date.now().valueOf();
-
-    const indexOfLatestMsgFromThisPlayer = party.chat
-        .map(({ playerId }) => playerId === player.id)
-        .lastIndexOf(true);
-
-    if (indexOfLatestMsgFromThisPlayer === -1) return true;
-
-    const latestMsgFromThisPlayer = party.chat[indexOfLatestMsgFromThisPlayer];
-
-    const timeBetweenLastMsgAndNow = now - latestMsgFromThisPlayer.date;
-
-    return timeBetweenLastMsgAndNow >= MIN_MS_BETWEEN_MSGS;
 };
 
 const purgeOverflowMsgs = (player: Player, party: Party): void => {
