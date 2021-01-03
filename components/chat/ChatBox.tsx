@@ -1,4 +1,4 @@
-import { Input, useInput } from "@geist-ui/react";
+import { Badge, Input, Spacer, useInput } from "@geist-ui/react";
 import React, { useEffect, useState } from "react";
 import {
     ChatMessage,
@@ -29,6 +29,7 @@ export const ChatBox = ({
         thisPlayer,
         chat
     );
+    const [newMsgCount, setNewMsgCount] = useState(0);
 
     const handleConfirm = (e?) => {
         if (e) e.preventDefault();
@@ -48,30 +49,44 @@ export const ChatBox = ({
 
     useEffect(setSendDisabled, [msgToSend]);
 
+    useEffect(() => {
+        if (showChat) return;
+        setNewMsgCount(newMsgCount + 1);
+    }, [chat]);
+
     return (
         <SkinnyCard>
-            <div className="input-container">
-                <h4>Chat</h4>
+            <div className="flex-center-row">
+                <h4 className="flex-center-row" style={{ margin: 0 }}>
+                    <span style={{ marginRight: ".25em" }}>Chat</span>
+                    {newMsgCount > 0 && !showChat && (
+                        <Badge type="error">{newMsgCount}</Badge>
+                    )}
+                </h4>
                 <PrimaryButton
                     size="mini"
-                    onClick={() => setShowChat(!showChat)}
+                    onClick={() => {
+                        setShowChat(!showChat);
+                        setNewMsgCount(0);
+                    }}
                 >
                     {showChat ? "▲ Hide" : "▼ Show"}
                 </PrimaryButton>
             </div>
             {showChat && (
                 <>
+                    <Spacer y={0.5} />
                     <div className="msg-container">
                         {chat.map(({ playerId, playerName, message, date }) => (
                             <div key={date}>
                                 <b>{playerName}: </b>
                                 {ENABLE_FILTER && playerId !== thisPlayer.id
-                                    ? filter.clean(message)
+                                    ? filterClean(message)
                                     : message}
                             </div>
                         ))}
                     </div>
-                    <div className="input-container">
+                    <div className="flex-center-row">
                         <Input
                             {...bindings}
                             autoFocus
@@ -93,12 +108,12 @@ export const ChatBox = ({
             )}
 
             <style jsx>{`
-                .input-container {
+                .flex-center-row {
                     display: flex;
                     justify-content: space-between;
+                    align-items: center;
                 }
                 .send-container {
-                    margin-top: 0.1em;
                     margin-left: 0.5em;
                 }
                 .msg-container {
@@ -120,4 +135,14 @@ const useSendButton = (
         sendDisabled,
         () => setSendDisabled(!isChatMsgValid(msgToSend, thisPlayer, chat)),
     ];
+};
+
+// https://github.com/web-mech/badwords/issues/93
+const filterClean = (message: string): string => {
+    try {
+        return filter.clean(message);
+        // eslint-disable-next-line no-empty
+    } catch (e) {}
+
+    return message;
 };
