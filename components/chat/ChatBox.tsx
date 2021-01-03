@@ -1,5 +1,5 @@
 import { Badge, Input, Spacer, useInput } from "@geist-ui/react";
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
     ChatMessage,
     ENABLE_FILTER,
@@ -31,6 +31,7 @@ export const ChatBox = ({
         chat
     );
     const [newMsgCount, setNewMsgCount] = useState(0);
+    const messagesEndRef = useRef(null);
 
     const handleConfirm = (e?) => {
         if (e) e.preventDefault();
@@ -51,7 +52,10 @@ export const ChatBox = ({
     useEffect(setSendDisabled, [msgToSend]);
 
     useEffect(() => {
-        if (showChat) return;
+        if (showChat) {
+            messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
+            return;
+        }
         setNewMsgCount(newMsgCount + 1);
     }, [chat]);
 
@@ -88,11 +92,11 @@ export const ChatBox = ({
                                     : message}
                             </div>
                         ))}
+                        <div ref={messagesEndRef} />
                     </div>
                     <div className="flex-center-row">
                         <Input
                             {...bindings}
-                            autoFocus
                             onKeyDown={onEnter}
                             maxLength={MAX_CHAT_MSG_LEN}
                             width="100%"
@@ -121,6 +125,8 @@ export const ChatBox = ({
                 }
                 .msg-container {
                     text-align: left;
+                    height: 10em;
+                    overflow: auto;
                 }
             `}</style>
         </>
