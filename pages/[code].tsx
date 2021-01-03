@@ -41,8 +41,7 @@ export const Code = ({
         isReconnect,
     });
 
-    const { status, me, playerList, selectedGameId, gameState } =
-        partyState || {};
+    const { status, me } = partyState || {};
 
     const [myLastValidName, setMyLastValidName] = useState("");
     useEffect(() => {
@@ -67,14 +66,12 @@ export const Code = ({
     if (showGame) {
         return (
             <GameLayout
-                path={code as string}
-                gameState={gameState}
-                selectedGameId={selectedGameId}
+                partyState={partyState}
                 onExitGame={onExitGame}
                 onStartGame={onStartGame}
                 onHostGameLoaded={onHostGameLoaded}
+                onSendChat={onSendChat}
                 gameLibrary={gameLibrary}
-                playerList={playerList}
                 thisPlayer={me}
                 reconnecting={showReconnecting}
             />

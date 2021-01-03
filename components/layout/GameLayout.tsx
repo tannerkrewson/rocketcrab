@@ -2,39 +2,39 @@ import { Spacer } from "@geist-ui/react";
 import PrimaryButton from "../common/PrimaryButton";
 import { useCallback, useState } from "react";
 import {
-    GameState,
     ClientGameLibrary,
     Player,
     MenuButton,
+    ClientParty,
 } from "../../types/types";
 import GameMenu from "../in-game/GameMenu";
 import GameSelector from "../library/GameSelector";
 import PlayerList from "../party/PlayerList";
 import GameFrame from "../in-game/GameFrame";
 import Connecting from "./Connecting";
+import { ChatBox } from "../chat/ChatBox";
 
 const GameLayout = ({
-    gameState,
-    path,
-    selectedGameId,
+    partyState,
     onExitGame,
     onStartGame,
     onHostGameLoaded,
+    onSendChat,
     gameLibrary,
-    playerList,
     thisPlayer,
     reconnecting,
 }: GameLayoutProps): JSX.Element => {
+    const { code, gameState, selectedGameId, playerList, chat } = partyState;
+    const { isHost } = thisPlayer;
     const thisGame = gameLibrary.gameList.find(
         ({ id }) => id == selectedGameId
     );
-
-    const { isHost } = thisPlayer;
 
     const [statusCollapsed, setStatusCollapsed] = useState(false);
     const [showMenu, setShowMenu] = useState(false);
     const [showGameLibrary, setShowGameLibrary] = useState(false);
     const [showPlayerList, setShowPlayerList] = useState(false);
+    const [showChat, setShowChat] = useState(false);
 
     // https://stackoverflow.com/a/48830513
     const [frameRefresh, setFrameRefresh] = useState(0);
@@ -47,6 +47,14 @@ const GameLayout = ({
                 setShowMenu(false);
                 setFrameRefresh(frameRefresh + 1);
             }, [frameRefresh]),
+        },
+        {
+            label: "View chat",
+            hostOnly: false,
+            onClick: useCallback(() => {
+                setShowMenu(false);
+                setShowChat(true);
+            }, []),
         },
         {
             label: "View players",
@@ -93,13 +101,14 @@ const GameLayout = ({
                         setShowMenu(false);
                         setShowGameLibrary(false);
                         setShowPlayerList(false);
+                        setShowChat(false);
                     }}
                 >
                     🚀🦀
                 </h4>
                 {!statusCollapsed && (
                     <>
-                        <div className="url">rocketcrab.com/{path}</div>
+                        <div className="url">rocketcrab.com/{code}</div>
                         <PrimaryButton
                             onClick={() => {
                                 setShowMenu(!showMenu);
@@ -147,6 +156,19 @@ const GameLayout = ({
                     <PlayerList playerList={playerList} isPublic={false} />
                     <Spacer y={0.5} />
                     <PrimaryButton onClick={() => setShowPlayerList(false)}>
+                        Close
+                    </PrimaryButton>
+                </div>
+            )}
+            {showChat && (
+                <div className="component-frame">
+                    <ChatBox
+                        chat={chat}
+                        thisPlayer={thisPlayer}
+                        onSendChat={onSendChat}
+                    />
+                    <Spacer y={0.5} />
+                    <PrimaryButton onClick={() => setShowChat(false)}>
                         Close
                     </PrimaryButton>
                 </div>
@@ -213,14 +235,12 @@ const GameLayout = ({
 };
 
 type GameLayoutProps = {
-    gameState: GameState;
-    selectedGameId: string;
-    path: string;
+    partyState: ClientParty;
     onExitGame: () => void;
     onStartGame: () => void;
     onHostGameLoaded: () => void;
+    onSendChat: (message: string) => void;
     gameLibrary: ClientGameLibrary;
-    playerList: Array<Player>;
     thisPlayer: Player;
     reconnecting: boolean;
 };
