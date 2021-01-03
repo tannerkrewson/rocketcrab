@@ -15,13 +15,16 @@ const GameSelector = ({
     isHost,
 }: GameSelectorProps): JSX.Element => {
     const [viewingGameId, setViewingGameId] = useState("");
+    const viewingGame = gameLibrary.gameList.find(
+        ({ id }) => id === viewingGameId
+    );
 
     const onBackToSearch = useCallback(() => {
         setViewingGameId("");
     }, [setViewingGameId]);
 
     const onSelectGameButton = useCallback(() => {
-        onSelectGame(viewingGameId);
+        onSelectGame(viewingGameId, viewingGame.name);
         onDone();
     }, [onSelectGame, viewingGameId, onDone]);
 
@@ -41,9 +44,7 @@ const GameSelector = ({
             {viewingGameId && (
                 <>
                     <GameDetail
-                        game={gameLibrary.gameList.find(
-                            ({ id }) => id === viewingGameId
-                        )}
+                        game={viewingGame}
                         allCategories={gameLibrary.categories}
                         showOnlyHostMessage={!isHost}
                     />
@@ -68,7 +69,7 @@ const GameSelector = ({
 
 type GameSelectorProps = {
     gameLibrary: ClientGameLibrary;
-    onSelectGame: (gameId: string) => void;
+    onSelectGame: (gameId: string, gameName?: string) => void;
     onDone: () => void;
     backToLabel: string;
     isHost: boolean;

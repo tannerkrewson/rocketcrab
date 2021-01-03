@@ -77,7 +77,7 @@ export const useRocketcrabClientSocket = ({
         };
     }, [code, partyState, isReconnect]);
 
-    const onNameEntry = useCallback((enteredName) => {
+    const onNameEntry = useCallback((enteredName: string) => {
         socket.emit(SocketEvent.NAME, enteredName);
     }, []);
 
@@ -85,17 +85,20 @@ export const useRocketcrabClientSocket = ({
         socket.emit(SocketEvent.GAME_SELECT, gameId);
     }, []);
 
-    const onStartGame = useCallback(() => {
-        socket.emit(SocketEvent.GAME_START);
+    const onStartGame = useCallback(
+        (gameId?: string) => {
+            socket.emit(SocketEvent.GAME_START, gameId);
 
-        const db = new RocketcrabDexie();
-        db.addGame(selectedGameId);
+            const db = new RocketcrabDexie();
+            db.addGame(selectedGameId);
 
-        if (me?.isHost) {
-            logEvent("party-numberOfPlayers", playerList.length.toString());
-            logEvent("party-game", selectedGameId);
-        }
-    }, [playerList, selectedGameId]);
+            if (me?.isHost) {
+                logEvent("party-numberOfPlayers", playerList.length.toString());
+                logEvent("party-game", selectedGameId);
+            }
+        },
+        [playerList, selectedGameId]
+    );
 
     const onExitGame = useCallback(() => {
         socket.emit(SocketEvent.GAME_EXIT);
@@ -159,7 +162,7 @@ type UseRocketcrabClientSocketReturn = {
     partyState: ClientParty;
     onNameEntry: (enteredName: string) => void;
     onSelectGame: (gameId: string) => void;
-    onStartGame: () => void;
+    onStartGame: (gameId?: string) => void;
     onExitGame: () => void;
     onHostGameLoaded: () => void;
     showReconnecting: boolean;

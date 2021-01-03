@@ -83,8 +83,12 @@ const attachPartyListenersToPlayer = (
         sendStateToAll(party, rocketcrab, { enableFinderCheck: true });
     });
 
-    socket.on(SocketEvent.GAME_START, () => {
+    socket.on(SocketEvent.GAME_START, (gameId) => {
         if (!player.isHost) return;
+
+        if (gameId) {
+            setGame(gameId, party);
+        }
 
         startGame(party, rocketcrab);
         // startGame does its own sendStateToAlls

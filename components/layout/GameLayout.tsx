@@ -16,6 +16,7 @@ import { ChatBox } from "../chat/ChatBox";
 import Swal from "sweetalert2";
 import { ToastAction } from "@geist-ui/react/dist/use-toasts/use-toast";
 import ButtonGroup from "../common/ButtonGroup";
+import { logEvent } from "../../utils/analytics";
 
 const GameLayout = ({
     partyState,
@@ -261,8 +262,26 @@ const GameLayout = ({
                     <GameSelector
                         gameLibrary={gameLibrary}
                         onDone={hideAllWindows}
-                        // eslint-disable-next-line @typescript-eslint/no-empty-function
-                        onSelectGame={() => {}}
+                        onSelectGame={(gameId: string, gameName: string) => {
+                            if (!isHost) return;
+
+                            Swal.fire({
+                                title: "Switch to " + gameName + "?",
+                                text:
+                                    "Your current session in " +
+                                    thisGame.name +
+                                    " will be lost!",
+                                showCancelButton: true,
+                                confirmButtonText: "Exit to party",
+                                icon: "warning",
+                            }).then(({ isConfirmed }) => {
+                                if (isConfirmed) {
+                                    setShowMenu(false);
+                                    onStartGame(gameId);
+                                    logEvent("party-inGameSwitch");
+                                }
+                            });
+                        }}
                         backToLabel="game"
                         isHost={isHost}
                     />
@@ -368,7 +387,7 @@ const GameLayout = ({
 type GameLayoutProps = {
     partyState: ClientParty;
     onExitGame: () => void;
-    onStartGame: () => void;
+    onStartGame: (gameId?: string) => void;
     onHostGameLoaded: () => void;
     onSendChat: (message: string) => void;
     gameLibrary: ClientGameLibrary;

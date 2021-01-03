@@ -88,7 +88,7 @@ const PartyScreen = ({
                 </PrimaryButton>
                 <PrimaryButton
                     disabled={!selectedGameId || !isHost}
-                    onClick={onStartGame}
+                    onClick={() => onStartGame()}
                     size="large"
                     type="error"
                 >
