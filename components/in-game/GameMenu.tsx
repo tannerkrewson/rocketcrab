@@ -1,21 +1,19 @@
 import PrimaryButton from "../common/PrimaryButton";
-import { Spacer } from "@geist-ui/react";
 import { MenuButton } from "../../types/types";
 
 const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => (
     <div className="game-menu">
         {menuButtons.map(({ label, hostOnly, onClick }) => (
-            <>
-                <PrimaryButton
-                    size="small"
-                    type={hostOnly ? "error" : "secondary"}
-                    disabled={!isHost && hostOnly}
-                    onClick={onClick}
-                >
-                    {label}
-                </PrimaryButton>
-                <Spacer y={0.5} />
-            </>
+            <PrimaryButton
+                size="small"
+                type={hostOnly ? "error" : "secondary"}
+                disabled={!isHost && hostOnly}
+                onClick={onClick}
+                key={label}
+                style={{ marginBottom: ".5em" }}
+            >
+                {label}
+            </PrimaryButton>
         ))}
         <style jsx>{`
             .game-menu {
