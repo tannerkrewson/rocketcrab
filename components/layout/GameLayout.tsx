@@ -90,6 +90,12 @@ const GameLayout = ({
         },
     ];
 
+    const hideAllWindows = useCallback(() => {
+        setShowGameLibrary(false);
+        setShowPlayerList(false);
+        setShowChat(false);
+    }, [setShowGameLibrary, setShowPlayerList, setShowChat]);
+
     const statusClass = "status " + (statusCollapsed ? "status-collapsed" : "");
     return (
         <div className="layout">
@@ -99,9 +105,7 @@ const GameLayout = ({
                     onClick={() => {
                         setStatusCollapsed(!statusCollapsed);
                         setShowMenu(false);
-                        setShowGameLibrary(false);
-                        setShowPlayerList(false);
-                        setShowChat(false);
+                        hideAllWindows();
                     }}
                 >
                     🚀🦀
@@ -112,8 +116,7 @@ const GameLayout = ({
                         <PrimaryButton
                             onClick={() => {
                                 setShowMenu(!showMenu);
-                                setShowGameLibrary(false);
-                                setShowPlayerList(false);
+                                hideAllWindows();
                             }}
                             size="small"
                         >
@@ -141,7 +144,7 @@ const GameLayout = ({
                 <div className="component-frame">
                     <GameSelector
                         gameLibrary={gameLibrary}
-                        onDone={() => setShowGameLibrary(false)}
+                        onDone={hideAllWindows}
                         // eslint-disable-next-line @typescript-eslint/no-empty-function
                         onSelectGame={() => {}}
                         backToLabel="game"
@@ -155,7 +158,7 @@ const GameLayout = ({
                     <Spacer y={0.5} />
                     <PlayerList playerList={playerList} isPublic={false} />
                     <Spacer y={0.5} />
-                    <PrimaryButton onClick={() => setShowPlayerList(false)}>
+                    <PrimaryButton onClick={hideAllWindows}>
                         Close
                     </PrimaryButton>
                 </div>
@@ -166,9 +169,10 @@ const GameLayout = ({
                         chat={chat}
                         thisPlayer={thisPlayer}
                         onSendChat={onSendChat}
+                        disableHide={true}
                     />
                     <Spacer y={0.5} />
-                    <PrimaryButton onClick={() => setShowChat(false)}>
+                    <PrimaryButton onClick={hideAllWindows}>
                         Close
                     </PrimaryButton>
                 </div>

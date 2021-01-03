@@ -99,11 +99,13 @@ const PartyScreen = ({
             {(isPublic || isOrWasPublic) && (
                 <>
                     <Spacer y={0.5} />
-                    <ChatBox
-                        chat={partyState.chat}
-                        onSendChat={onSendChat}
-                        thisPlayer={thisPlayer}
-                    />
+                    <SkinnyCard>
+                        <ChatBox
+                            chat={partyState.chat}
+                            onSendChat={onSendChat}
+                            thisPlayer={thisPlayer}
+                        />
+                    </SkinnyCard>
                 </>
             )}
             <PlayerList

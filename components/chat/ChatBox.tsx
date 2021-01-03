@@ -9,7 +9,6 @@ import {
 } from "../../types/types";
 import { isChatMsgValid } from "../../utils/utils";
 import PrimaryButton from "../common/PrimaryButton";
-import SkinnyCard from "../common/SkinnyCard";
 import Filter from "bad-words";
 const filter = new Filter();
 
@@ -17,10 +16,12 @@ export const ChatBox = ({
     chat,
     onSendChat,
     thisPlayer,
+    disableHide = false,
 }: {
     chat: Array<ChatMessage>;
     onSendChat: (message: string) => void;
     thisPlayer: Player;
+    disableHide?: boolean;
 }): JSX.Element => {
     const { state: msgToSend, bindings, reset } = useInput("");
     const [showChat, setShowChat] = useState(true);
@@ -55,7 +56,7 @@ export const ChatBox = ({
     }, [chat]);
 
     return (
-        <SkinnyCard>
+        <>
             <div className="flex-center-row">
                 <h4 className="flex-center-row" style={{ margin: 0 }}>
                     <span style={{ marginRight: ".25em" }}>Chat</span>
@@ -63,15 +64,17 @@ export const ChatBox = ({
                         <Badge type="error">{newMsgCount}</Badge>
                     )}
                 </h4>
-                <PrimaryButton
-                    size="mini"
-                    onClick={() => {
-                        setShowChat(!showChat);
-                        setNewMsgCount(0);
-                    }}
-                >
-                    {showChat ? "▲ Hide" : "▼ Show"}
-                </PrimaryButton>
+                {!disableHide && (
+                    <PrimaryButton
+                        size="mini"
+                        onClick={() => {
+                            setShowChat(!showChat);
+                            setNewMsgCount(0);
+                        }}
+                    >
+                        {showChat ? "▲ Hide" : "▼ Show"}
+                    </PrimaryButton>
+                )}
             </div>
             {showChat && (
                 <>
@@ -120,7 +123,7 @@ export const ChatBox = ({
                     text-align: left;
                 }
             `}</style>
-        </SkinnyCard>
+        </>
     );
 };
 
