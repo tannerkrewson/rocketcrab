@@ -3,12 +3,13 @@ import PrimaryButton from "../common/PrimaryButton";
 import ButtonGroup from "../common/ButtonGroup";
 import { Spacer } from "@geist-ui/react";
 import GameSelector from "../library/GameSelector";
-import { Player, ClientGameLibrary } from "../../types/types";
+import { Player, ClientGameLibrary, ClientParty } from "../../types/types";
 import React, { useState } from "react";
 import PartyStatus from "./PartyStatus";
 import GameDetail from "../detail/GameDetail";
 import SkinnyCard from "../common/SkinnyCard";
 import { Countdown } from "../find/Countdown";
+import { ChatBox } from "../chat/ChatBox";
 
 const PartyScreen = ({
     playerList,
@@ -22,6 +23,7 @@ const PartyScreen = ({
     onInOutParty,
     isPublic,
     publicEndDate,
+    partyState,
 }: PartyScreenProps): JSX.Element => {
     const selectedGame = gameLibrary.gameList.find(
         ({ id }) => id === selectedGameId
@@ -67,6 +69,8 @@ const PartyScreen = ({
         );
     }
 
+    const isOrWasPublic = !!publicEndDate;
+
     return (
         <div style={{ textAlign: "center" }}>
             <Spacer y={1.25} />
@@ -93,13 +97,19 @@ const PartyScreen = ({
                 </PrimaryButton>
             </ButtonGroup>
             <Spacer y={2} />
+            {isOrWasPublic && (
+                <>
+                    <Spacer y={0.5} />
+                    <ChatBox chat={partyState.chat} />
+                </>
+            )}
             <PlayerList
                 playerList={playerList}
                 onEditName={resetName}
                 meId={meId}
                 isPublic={isPublic}
             />
-            {publicEndDate && (
+            {isOrWasPublic && (
                 <>
                     <Spacer y={0.5} />
 
@@ -136,6 +146,7 @@ type PartyScreenProps = {
     onInOutParty: (outOfParty: boolean) => void;
     isPublic: boolean;
     publicEndDate: number;
+    partyState: ClientParty;
 };
 
 export default PartyScreen;

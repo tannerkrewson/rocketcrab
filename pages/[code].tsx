@@ -101,6 +101,7 @@ export const Code = ({
                 />
             ) : (
                 <PartyScreen
+                    partyState={partyState}
                     playerList={playerList}
                     gameLibrary={gameLibrary}
                     onSelectGame={onSelectGame}

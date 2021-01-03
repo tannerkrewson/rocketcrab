@@ -96,6 +96,19 @@ export const newParty = ({
         nextPlayerId: 0,
         idealHostId: 0,
         isPublic,
+        chat: [
+            {
+                playerName: "Tanny-Banany",
+                message:
+                    "Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat.",
+                date: Date.now().valueOf(),
+            },
+            {
+                playerName: "Jessica",
+                message: "Lorem ipsum dolor sit amet",
+                date: Date.now().valueOf() + 10000,
+            },
+        ],
     };
 
     if (isPublic) {

@@ -40,6 +40,7 @@ export type ClientParty = {
     idealHostId: number;
     isPublic: boolean;
     publicEndDate?: number;
+    chat: Array<ChatMessage>;
 };
 
 export type Player = {
@@ -134,6 +135,12 @@ export type LibraryState = {
     search: string;
     setSearch: Dispatch<SetStateAction<string>>;
     searchBindings: SearchBindingsType;
+};
+
+export type ChatMessage = {
+    playerName: string;
+    message: string;
+    date: number;
 };
 
 type SearchBindingsType = {
