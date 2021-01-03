@@ -2,6 +2,7 @@ import { Input, useInput } from "@geist-ui/react";
 import React, { useEffect, useState } from "react";
 import {
     ChatMessage,
+    ENABLE_FILTER,
     MAX_CHAT_MSG_LEN,
     MIN_MS_BETWEEN_MSGS,
     Player,
@@ -9,6 +10,8 @@ import {
 import { isChatMsgValid } from "../../utils/utils";
 import PrimaryButton from "../common/PrimaryButton";
 import SkinnyCard from "../common/SkinnyCard";
+import Filter from "bad-words";
+const filter = new Filter();
 
 export const ChatBox = ({
     chat,
@@ -59,10 +62,12 @@ export const ChatBox = ({
             {showChat && (
                 <>
                     <div className="msg-container">
-                        {chat.map(({ playerName, message, date }) => (
+                        {chat.map(({ playerId, playerName, message, date }) => (
                             <div key={date}>
                                 <b>{playerName}: </b>
-                                {message}
+                                {ENABLE_FILTER && playerId !== thisPlayer.id
+                                    ? filter.clean(message)
+                                    : message}
                             </div>
                         ))}
                     </div>

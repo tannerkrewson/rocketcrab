@@ -8,17 +8,13 @@ import {
     FINDER_ACTIVE_MS,
     MAX_CHATS_OVERALL,
     MAX_CHATS_FROM_SINGLE_PLAYER,
-    ENABLE_FILTER,
 } from "../types/types";
 import { PartyStatus, GameStatus, SocketEvent } from "../types/enums";
 import { getServerGameLibrary } from "../config";
 import { v4 as uuidv4 } from "uuid";
 import { CronJob } from "cron";
 import { getUnixTime } from "date-fns";
-
-import Filter from "bad-words";
 import { isChatMsgValid } from "../utils/utils";
-const filter = new Filter();
 
 const SERVER_GAME_LIST: Array<ServerGame> = getServerGameLibrary().gameList;
 const PARTY_EXPIRATION_SEC = 60;
@@ -393,7 +389,7 @@ export const addChatMessage = (
     party.chat.push({
         playerId: player.id,
         playerName: player.name,
-        message: ENABLE_FILTER ? filter.clean(message) : message,
+        message,
         date: Date.now().valueOf(),
     });
 
