@@ -293,9 +293,11 @@ const GameLayout = ({
             )}
             {showPlayerList && (
                 <div className="component-frame">
-                    <div>🚀🦀 Players:</div>
-                    <Spacer y={0.5} />
-                    <PlayerList playerList={playerList} isPublic={false} />
+                    <PlayerList
+                        playerList={playerList}
+                        disableHideShow={true}
+                        startHidden={false}
+                    />
                     <Spacer y={0.5} />
                     <PrimaryButton onClick={hideAllWindows}>
                         Close

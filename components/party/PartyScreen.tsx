@@ -1,7 +1,7 @@
 import PlayerList from "./PlayerList";
 import PrimaryButton from "../common/PrimaryButton";
 import ButtonGroup from "../common/ButtonGroup";
-import { Spacer } from "@geist-ui/react";
+import { Grid, Spacer } from "@geist-ui/react";
 import GameSelector from "../library/GameSelector";
 import { ClientGameLibrary, ClientParty, Player } from "../../types/types";
 import React, { useState } from "react";
@@ -95,9 +95,7 @@ const PartyScreen = ({
                     Start Game
                 </PrimaryButton>
             </ButtonGroup>
-            <Spacer y={2} />
-
-            <Spacer y={0.5} />
+            <Spacer y={1.5} />
             <SkinnyCard>
                 <ChatBox
                     chat={partyState.chat}
@@ -106,13 +104,40 @@ const PartyScreen = ({
                     startHidden={!isPublic}
                 />
             </SkinnyCard>
+            <SkinnyCard>
+                <PlayerList
+                    playerList={playerList}
+                    onEditName={resetName}
+                    meId={meId}
+                    startHidden={false}
+                    disableHideShow={false}
+                />
+            </SkinnyCard>
 
-            <PlayerList
-                playerList={playerList}
-                onEditName={resetName}
-                meId={meId}
-                isPublic={isPublic}
-            />
+            {playerList.length === 1 && (
+                <Grid xs={24}>
+                    <Spacer y={1} />
+                    <SkinnyCard>
+                        When
+                        {isPublic ? " others join, " : " your friends join, "}
+                        they&apos;ll appear right next to your name!
+                        <br />
+                        {!isPublic && (
+                            <>
+                                <Spacer y={0.6} />
+                                You have friends... right? 😆 If not,
+                                that&apos;s okay, we&apos;ve got you covered:
+                                <Spacer y={0.5} />
+                                <PrimaryButton href="/find" size="medium">
+                                    Find Players
+                                </PrimaryButton>
+                                <Spacer y={0.5} />
+                            </>
+                        )}
+                    </SkinnyCard>
+                </Grid>
+            )}
+
             {isOrWasPublic && (
                 <>
                     <Spacer y={0.5} />
