@@ -17,6 +17,7 @@ import Swal from "sweetalert2";
 import { ToastAction } from "@geist-ui/react/dist/use-toasts/use-toast";
 import ButtonGroup from "../common/ButtonGroup";
 import { logEvent } from "../../utils/analytics";
+import { filterClean } from "../../utils/utils";
 
 const GameLayout = ({
     partyState,
@@ -96,7 +97,10 @@ const GameLayout = ({
         // don't show toasts for your own messages
         if (playerId === thisPlayer.id) return;
 
-        setToast({ text: "🚀🦀 " + playerName + ": " + message, actions });
+        setToast({
+            text: "🚀🦀 " + playerName + ": " + filterClean(message),
+            actions,
+        });
         setLastShownToastDate(date);
     }, [chat]);
 

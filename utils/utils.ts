@@ -9,6 +9,8 @@ import {
 import WebSocket from "ws";
 import { useInput } from "@geist-ui/react";
 import { useState } from "react";
+import Filter from "bad-words";
+const filter = new Filter();
 
 export const postJson = (url = "", data = {}): Promise<any> =>
     fetch(url, {
@@ -89,4 +91,14 @@ export const isChatMsgValid = (
     const timeBetweenLastMsgAndNow = now - latestMsgFromThisPlayer.date;
 
     return timeBetweenLastMsgAndNow >= MIN_MS_BETWEEN_MSGS;
+};
+
+// https://github.com/web-mech/badwords/issues/93
+export const filterClean = (message: string): string => {
+    try {
+        return filter.clean(message);
+        // eslint-disable-next-line no-empty
+    } catch (e) {}
+
+    return message;
 };

@@ -7,10 +7,8 @@ import {
     MIN_MS_BETWEEN_MSGS,
     Player,
 } from "../../types/types";
-import { isChatMsgValid } from "../../utils/utils";
+import { filterClean, isChatMsgValid } from "../../utils/utils";
 import PrimaryButton from "../common/PrimaryButton";
-import Filter from "bad-words";
-const filter = new Filter();
 
 export const ChatBox = ({
     chat,
@@ -144,14 +142,4 @@ const useSendButton = (
         sendDisabled,
         () => setSendDisabled(!isChatMsgValid(msgToSend, thisPlayer, chat)),
     ];
-};
-
-// https://github.com/web-mech/badwords/issues/93
-const filterClean = (message: string): string => {
-    try {
-        return filter.clean(message);
-        // eslint-disable-next-line no-empty
-    } catch (e) {}
-
-    return message;
 };
