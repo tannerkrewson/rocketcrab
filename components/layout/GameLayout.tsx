@@ -308,7 +308,7 @@ const GameLayout = ({
                         chat={chat}
                         thisPlayer={thisPlayer}
                         onSendChat={onSendChat}
-                        disableHide={true}
+                        disableHideShow={true}
                     />
                     <Spacer y={0.5} />
                     <ButtonGroup>

@@ -96,18 +96,17 @@ const PartyScreen = ({
                 </PrimaryButton>
             </ButtonGroup>
             <Spacer y={2} />
-            {(isPublic || isOrWasPublic) && (
-                <>
-                    <Spacer y={0.5} />
-                    <SkinnyCard>
-                        <ChatBox
-                            chat={partyState.chat}
-                            onSendChat={onSendChat}
-                            thisPlayer={thisPlayer}
-                        />
-                    </SkinnyCard>
-                </>
-            )}
+
+            <Spacer y={0.5} />
+            <SkinnyCard>
+                <ChatBox
+                    chat={partyState.chat}
+                    onSendChat={onSendChat}
+                    thisPlayer={thisPlayer}
+                    startHidden={!isPublic}
+                />
+            </SkinnyCard>
+
             <PlayerList
                 playerList={playerList}
                 onEditName={resetName}
