@@ -26,6 +26,8 @@ import {
     FINDER_ACTIVE_MS,
     MAX_CHAT_MSG_LEN,
     MIN_MS_BETWEEN_MSGS,
+    MAX_CHATS_FROM_SINGLE_PLAYER,
+    MAX_CHATS_OVERALL,
 } from "../../types/types";
 import { PartyStatus, GameStatus, SocketEvent } from "../../types/enums";
 
@@ -549,7 +551,7 @@ describe("server/rocketcrab.ts", () => {
         expect(mockParty.chat.length).toBe(0);
     });
 
-    const addChatMessageTimed = (offset, otherId = 0) => {
+    const testAddChatMessageTimed = (offset, otherId = 0) => {
         const dateOfLastMsg =
             Date.now().valueOf() - MIN_MS_BETWEEN_MSGS + offset;
         const mockPlayer = generateMockPlayer({ id: 0 });
@@ -569,14 +571,16 @@ describe("server/rocketcrab.ts", () => {
     };
 
     it("addChatMessage doesn't add msg if another msg by the same user was sent too recently", () => {
-        const { result, mockParty } = addChatMessageTimed(1000);
+        const { result, mockParty } = testAddChatMessageTimed(1000);
 
         expect(result).toBe(false);
         expect(mockParty.chat.length).toBe(1);
     });
 
     it("addChatMessage works if a users last msg was not too recent", () => {
-        const { result, mockParty, dateOfLastMsg } = addChatMessageTimed(-1000);
+        const { result, mockParty, dateOfLastMsg } = testAddChatMessageTimed(
+            -1000
+        );
 
         expect(result).toBe(true);
         expect(mockParty.chat.length).toBe(2);
@@ -585,13 +589,84 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("addChatMessage works if recent msg was not by same user", () => {
-        const { result, mockParty } = addChatMessageTimed(1000, 123);
+        const { result, mockParty } = testAddChatMessageTimed(1000, 123);
 
         expect(result).toBe(true);
         expect(mockParty.chat.length).toBe(2);
         expect(mockParty.chat[1].message).toBe("Hello again");
         expect(mockParty.chat[0].playerId).toBe(123);
         expect(mockParty.chat[1].playerId).toBe(0);
+    });
+
+    const testAddChatMessagePurge = (
+        originalNumberOfMessages,
+        varyId = false
+    ) => {
+        const mockPlayer = generateMockPlayer({ id: 0 });
+
+        const now = Date.now().valueOf();
+        const mockChat = [];
+
+        for (let i = 0; i < originalNumberOfMessages; i++) {
+            mockChat.push({
+                playerId: varyId ? i : mockPlayer.id,
+                playerName: mockPlayer.name,
+                message: "msg-" + i,
+                date:
+                    now -
+                    (originalNumberOfMessages - i) * 1000 -
+                    MIN_MS_BETWEEN_MSGS -
+                    1000,
+            });
+        }
+        const mockParty = generateMockParty({
+            chat: mockChat,
+        });
+
+        expect(mockParty.chat.length).toBe(originalNumberOfMessages);
+        expect(mockParty.chat[0].message).toBe("msg-" + 0);
+
+        const result = addChatMessage("Hello again", mockPlayer, mockParty);
+
+        return { result, mockParty };
+    };
+
+    it("addChatMessage purges old msgs from same player", () => {
+        const { result, mockParty } = testAddChatMessagePurge(
+            MAX_CHATS_FROM_SINGLE_PLAYER
+        );
+
+        expect(result).toBe(true);
+        expect(mockParty.chat.length).toBe(MAX_CHATS_FROM_SINGLE_PLAYER);
+        expect(mockParty.chat[0].message).toBe("msg-" + 1);
+        expect(mockParty.chat[1].message).toBe("msg-" + 2);
+        expect(mockParty.chat[2].message).toBe("Hello again");
+    });
+
+    it("addChatMessage doesn't purge if under MAX_CHATS_FROM_SINGLE_PLAYER", () => {
+        const { result, mockParty } = testAddChatMessagePurge(
+            MAX_CHATS_FROM_SINGLE_PLAYER - 1
+        );
+
+        expect(result).toBe(true);
+        expect(mockParty.chat.length).toBe(MAX_CHATS_FROM_SINGLE_PLAYER);
+        expect(mockParty.chat[0].message).toBe("msg-" + 0);
+        expect(mockParty.chat[1].message).toBe("msg-" + 1);
+        expect(mockParty.chat[2].message).toBe("Hello again");
+    });
+
+    it("addChatMessage purges if over MAX_CHATS_OVERALL", () => {
+        const { result, mockParty } = testAddChatMessagePurge(
+            MAX_CHATS_OVERALL,
+            true
+        );
+
+        expect(result).toBe(true);
+        expect(mockParty.chat.length).toBe(MAX_CHATS_OVERALL);
+        expect(mockParty.chat[0].message).toBe("msg-" + 1);
+        expect(mockParty.chat[MAX_CHATS_OVERALL - 1].message).toBe(
+            "Hello again"
+        );
     });
 
     it("reconnectToParty uses matching existing party", () => {
