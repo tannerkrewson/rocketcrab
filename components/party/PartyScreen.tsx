@@ -71,6 +71,34 @@ const PartyScreen = ({
 
     const isOrWasPublic = !!publicEndDate;
 
+    const rChatBox = (
+        <SkinnyCard>
+            <ChatBox
+                chat={partyState.chat}
+                onSendChat={onSendChat}
+                thisPlayer={thisPlayer}
+                startHidden={!isPublic}
+            />
+        </SkinnyCard>
+    );
+
+    const rPlayerList = (
+        <SkinnyCard>
+            <PlayerList
+                playerList={playerList}
+                onEditName={resetName}
+                meId={meId}
+                startHidden={false}
+                disableHideShow={false}
+                onKick={onKick}
+            />
+        </SkinnyCard>
+    );
+
+    const orderedCards = isOrWasPublic
+        ? [rChatBox, rPlayerList]
+        : [rPlayerList, rChatBox];
+
     return (
         <div style={{ textAlign: "center" }}>
             <Spacer y={1.25} />
@@ -97,25 +125,7 @@ const PartyScreen = ({
                 </PrimaryButton>
             </ButtonGroup>
             <Spacer y={1.5} />
-            <SkinnyCard>
-                <ChatBox
-                    chat={partyState.chat}
-                    onSendChat={onSendChat}
-                    thisPlayer={thisPlayer}
-                    startHidden={!isPublic}
-                />
-            </SkinnyCard>
-            <SkinnyCard>
-                <PlayerList
-                    playerList={playerList}
-                    onEditName={resetName}
-                    meId={meId}
-                    startHidden={false}
-                    disableHideShow={false}
-                    onKick={onKick}
-                />
-            </SkinnyCard>
-
+            {orderedCards}
             {playerList.length === 1 && (
                 <Grid xs={24}>
                     <Spacer y={1} />
