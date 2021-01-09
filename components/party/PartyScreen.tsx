@@ -21,6 +21,8 @@ const PartyScreen = ({
     onInOutParty,
     onSendChat,
     onKick,
+    unreadMsgCount,
+    clearUnreadMsgCount,
 }: PartyScreenProps): JSX.Element => {
     const { playerList, selectedGameId, isPublic, publicEndDate } = partyState;
     const { id: meId, isHost } = thisPlayer;
@@ -78,6 +80,8 @@ const PartyScreen = ({
                 onSendChat={onSendChat}
                 thisPlayer={thisPlayer}
                 startHidden={!isPublic}
+                unreadMsgCount={unreadMsgCount}
+                clearUnreadMsgCount={clearUnreadMsgCount}
             />
         </SkinnyCard>
     );
@@ -179,6 +183,8 @@ type PartyScreenProps = {
     partyState: ClientParty;
     gameLibrary: ClientGameLibrary;
     thisPlayer: Player;
+    unreadMsgCount: number;
+    clearUnreadMsgCount: () => void;
     onSelectGame: (gameId: string) => void;
     onStartGame: () => void;
     resetName: () => void;

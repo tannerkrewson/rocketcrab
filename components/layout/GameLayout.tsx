@@ -1,11 +1,12 @@
-import { Spacer, useToasts } from "@geist-ui/react";
+import { Badge, Spacer, useToasts } from "@geist-ui/react";
 import PrimaryButton from "../common/PrimaryButton";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
     ClientGameLibrary,
     Player,
     MenuButton,
     ClientParty,
+    ChatMessage,
 } from "../../types/types";
 import GameMenu from "../in-game/GameMenu";
 import GameSelector from "../library/GameSelector";
@@ -30,6 +31,9 @@ const GameLayout = ({
     thisPlayer,
     reconnecting,
     onKick,
+    unreadMsgCount,
+    clearUnreadMsgCount,
+    newestMsg,
 }: GameLayoutProps): JSX.Element => {
     const { code, gameState, selectedGameId, playerList, chat } = partyState;
     const { isHost } = thisPlayer;
@@ -79,9 +83,9 @@ const GameLayout = ({
     );
 
     useEffect(() => {
-        if (chat.length === 0) return;
+        if (!newestMsg) return;
 
-        const { playerId, playerName, message, date } = chat[chat.length - 1];
+        const { playerId, playerName, message, date } = newestMsg;
 
         const lastMessageCameInOverOneSecondAgo =
             differenceInMilliseconds(Date.now(), date) > 1000;
@@ -92,13 +96,6 @@ const GameLayout = ({
             setLastShownToastDate(date);
             return;
         }
-
-        // don't show a toast if it has already been shown
-        // (this has to be done because every partyState update triggers a
-        // "change" to `chat`, even if it hasn't actually changed, causing msgs
-        // to be toasted multiple times)
-        if (lastShownToastDate === date) return;
-        setLastShownToastDate(date);
 
         // don't show toasts if they were muted by the user
         if (!enableToasts) return;
@@ -113,8 +110,7 @@ const GameLayout = ({
             text: "🚀🦀 " + playerName + ": " + filterClean(message),
             actions,
         });
-        setLastShownToastDate(date);
-    }, [chat]);
+    }, [newestMsg]);
 
     const hostName = playerList.find(({ isHost }) => isHost).name;
 
@@ -126,6 +122,7 @@ const GameLayout = ({
                 setShowMenu(false);
                 setShowChat(true);
             }, []),
+            badgeCount: unreadMsgCount,
         },
         {
             label: "Players",
@@ -208,6 +205,11 @@ const GameLayout = ({
         },
     ];
 
+    const combinedMenuBadgeCount = menuButtons.reduce(
+        (prev, curr) => prev + (curr.badgeCount ?? 0),
+        0
+    );
+
     const promptMute = () => {
         Swal.fire({
             title: "Are your sure?",
@@ -246,15 +248,24 @@ const GameLayout = ({
                 {!statusCollapsed && (
                     <>
                         <div className="url">rocketcrab.com/{code}</div>
-                        <PrimaryButton
-                            onClick={() => {
-                                setShowMenu(!showMenu);
-                                hideAllWindows();
-                            }}
-                            size="small"
-                        >
-                            {showMenu ? "▲" : "▼"} Menu
-                        </PrimaryButton>
+                        <div>
+                            <Badge.Anchor placement="bottomLeft">
+                                {!showMenu && combinedMenuBadgeCount > 0 && (
+                                    <Badge type="error" size="mini">
+                                        {combinedMenuBadgeCount}
+                                    </Badge>
+                                )}
+                                <PrimaryButton
+                                    onClick={() => {
+                                        setShowMenu(!showMenu);
+                                        hideAllWindows();
+                                    }}
+                                    size="small"
+                                >
+                                    {showMenu ? "▲" : "▼"} Menu
+                                </PrimaryButton>
+                            </Badge.Anchor>
+                        </div>
 
                         {showMenu && (
                             <GameMenu
@@ -326,6 +337,8 @@ const GameLayout = ({
                         thisPlayer={thisPlayer}
                         onSendChat={onSendChat}
                         disableHideShow={true}
+                        unreadMsgCount={unreadMsgCount}
+                        clearUnreadMsgCount={clearUnreadMsgCount}
                     />
                     <Spacer y={0.5} />
                     <ButtonGroup>
@@ -415,6 +428,9 @@ type GameLayoutProps = {
     thisPlayer: Player;
     reconnecting: boolean;
     onKick: (id: number, name: string) => void;
+    unreadMsgCount: number;
+    newestMsg: ChatMessage;
+    clearUnreadMsgCount: () => void;
 };
 
 export default GameLayout;

@@ -12,6 +12,7 @@ import { getClientGameLibrary } from "../config";
 import { parseCookies } from "nookies";
 
 import { useRocketcrabClientSocket } from "../utils/useRocketcrabClientSocket";
+import { useChat } from "../utils/useChat";
 
 const CLIENT_GAME_LIBRARY = getClientGameLibrary();
 
@@ -42,7 +43,12 @@ export const Code = ({
         isReconnect,
     });
 
-    const { status, me } = partyState || {};
+    const { status, me, chat } = partyState || {};
+
+    const { unreadMsgCount, clearUnreadMsgCount, newestMsg } = useChat(
+        chat,
+        me
+    );
 
     const [myLastValidName, setMyLastValidName] = useState("");
     useEffect(() => {
@@ -76,6 +82,9 @@ export const Code = ({
                 thisPlayer={me}
                 reconnecting={showReconnecting}
                 onKick={onKick}
+                unreadMsgCount={unreadMsgCount}
+                newestMsg={newestMsg}
+                clearUnreadMsgCount={clearUnreadMsgCount}
             />
         );
     }
@@ -103,6 +112,8 @@ export const Code = ({
                     onInOutParty={onInOutParty}
                     onSendChat={onSendChat}
                     onKick={onKick}
+                    unreadMsgCount={unreadMsgCount}
+                    clearUnreadMsgCount={clearUnreadMsgCount}
                 />
             )}
         </PageLayout>

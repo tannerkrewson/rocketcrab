@@ -133,6 +133,7 @@ export type MenuButton = {
     label: string;
     hostOnly: boolean;
     onClick: () => void;
+    badgeCount?: number;
 };
 
 export type LibraryState = {

@@ -1,9 +1,11 @@
 import PrimaryButton from "../common/PrimaryButton";
 import { MenuButton } from "../../types/types";
+import React from "react";
+import { Badge } from "@geist-ui/react";
 
 const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => (
     <div className="game-menu">
-        {menuButtons.map(({ label, hostOnly, onClick }) => (
+        {menuButtons.map(({ label, hostOnly, onClick, badgeCount }) => (
             <PrimaryButton
                 size="small"
                 type={hostOnly ? "error" : "secondary"}
@@ -13,6 +15,14 @@ const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => (
                 style={{ marginBottom: ".5em" }}
             >
                 {label}
+                {badgeCount > 0 && (
+                    <>
+                        &nbsp;
+                        <Badge type="error" size="mini">
+                            {badgeCount}
+                        </Badge>
+                    </>
+                )}
             </PrimaryButton>
         ))}
         <style jsx>{`

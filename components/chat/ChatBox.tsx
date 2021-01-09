@@ -1,5 +1,5 @@
 import { Input, Spacer, useInput } from "@geist-ui/react";
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useEffect, useRef, useState } from "react";
 import {
     ChatMessage,
     ENABLE_FILTER,
@@ -17,12 +17,16 @@ export const ChatBox = ({
     thisPlayer,
     disableHideShow = false,
     startHidden = false,
+    unreadMsgCount,
+    clearUnreadMsgCount,
 }: {
     chat: Array<ChatMessage>;
     onSendChat: (message: string) => void;
     thisPlayer: Player;
     disableHideShow?: boolean;
     startHidden?: boolean;
+    unreadMsgCount: number;
+    clearUnreadMsgCount: () => void;
 }): JSX.Element => {
     const { state: msgToSend, bindings, reset } = useInput("");
     const [isChatShowing, setIsChatShowing] = useState(!startHidden);
@@ -31,7 +35,6 @@ export const ChatBox = ({
         thisPlayer,
         chat
     );
-    const { newMsgCount, clearNewMsgCount } = useNewMsgCount(chat);
     const messagesEndRef = useRef(null);
 
     const handleConfirm = (e?) => {
@@ -59,16 +62,19 @@ export const ChatBox = ({
         }
     }, [chat]);
 
+    useEffect(() => {
+        if (isChatShowing) {
+            clearUnreadMsgCount();
+        }
+    }, [unreadMsgCount, isChatShowing]);
+
     return (
         <CollapseBox
             title="Chat"
             startHidden={startHidden}
             disableHideShow={disableHideShow}
-            badgeCount={newMsgCount}
-            onCollapse={(currentCollapse) => {
-                clearNewMsgCount();
-                setIsChatShowing(!currentCollapse);
-            }}
+            badgeCount={unreadMsgCount}
+            onCollapse={(currentCollapse) => setIsChatShowing(!currentCollapse)}
             badgeType="error" // red
         >
             <Spacer y={0.5} />
@@ -130,31 +136,4 @@ const useSendButton = (
         sendDisabled,
         () => setSendDisabled(!isChatMsgValid(msgToSend, thisPlayer, chat)),
     ];
-};
-
-const useNewMsgCount = (chat: Array<ChatMessage>) => {
-    const [newMsgCount, setNewMsgCount] = useState(0);
-    const [lastMsgDate, setLastMsgDate] = useState(0);
-
-    useEffect(() => {
-        const latestLastMsg = chat[chat.length - 1];
-        if (!latestLastMsg) return;
-
-        // if we are initializing, show the count of all unread msgs
-        if (!lastMsgDate) {
-            setNewMsgCount(chat.length);
-            setLastMsgDate(latestLastMsg.date);
-            return;
-        }
-
-        if (lastMsgDate !== latestLastMsg.date) {
-            setNewMsgCount(newMsgCount + 1);
-            setLastMsgDate(latestLastMsg.date);
-        }
-    }, [chat]);
-
-    return {
-        newMsgCount,
-        clearNewMsgCount: useCallback(() => setNewMsgCount(0), []),
-    };
 };
