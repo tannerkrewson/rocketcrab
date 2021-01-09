@@ -44,8 +44,8 @@ const onJoinParty = (socket: SocketIO.Socket, rocketcrab: RocketCrab) => ({
         ? reconnectToParty(lastPartyState, rocketcrab)
         : getPartyByCode(code, partyList);
 
-    const isPlayerBanned = party.bannedIPs.find(
-        (ip) => socket.handshake.address === ip
+    const isPlayerBanned = party?.bannedIPs?.find(
+        (ip) => socket?.handshake?.address === ip
     );
 
     if (party && !isPlayerBanned) {
