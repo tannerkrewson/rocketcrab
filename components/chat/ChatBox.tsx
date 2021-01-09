@@ -1,5 +1,5 @@
 import { Input, Spacer, useInput } from "@geist-ui/react";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
     ChatMessage,
     ENABLE_FILTER,
@@ -31,7 +31,7 @@ export const ChatBox = ({
         thisPlayer,
         chat
     );
-    const [newMsgCount, setNewMsgCount] = useState(0);
+    const { newMsgCount, clearNewMsgCount } = useNewMsgCount(chat);
     const messagesEndRef = useRef(null);
 
     const handleConfirm = (e?) => {
@@ -57,7 +57,6 @@ export const ChatBox = ({
             messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
             return;
         }
-        setNewMsgCount(newMsgCount + 1);
     }, [chat]);
 
     return (
@@ -67,7 +66,7 @@ export const ChatBox = ({
             disableHideShow={disableHideShow}
             badgeCount={newMsgCount}
             onCollapse={(currentCollapse) => {
-                setNewMsgCount(0);
+                clearNewMsgCount();
                 setIsChatShowing(!currentCollapse);
             }}
         >
@@ -130,4 +129,31 @@ const useSendButton = (
         sendDisabled,
         () => setSendDisabled(!isChatMsgValid(msgToSend, thisPlayer, chat)),
     ];
+};
+
+const useNewMsgCount = (chat: Array<ChatMessage>) => {
+    const [newMsgCount, setNewMsgCount] = useState(0);
+    const [lastMsgDate, setLastMsgDate] = useState(0);
+
+    useEffect(() => {
+        const latestLastMsg = chat[chat.length - 1];
+        if (!latestLastMsg) return;
+
+        // if we are initializing, show the count of all unread msgs
+        if (!lastMsgDate) {
+            setNewMsgCount(chat.length);
+            setLastMsgDate(latestLastMsg.date);
+            return;
+        }
+
+        if (lastMsgDate !== latestLastMsg.date) {
+            setNewMsgCount(newMsgCount + 1);
+            setLastMsgDate(latestLastMsg.date);
+        }
+    }, [chat]);
+
+    return {
+        newMsgCount,
+        clearNewMsgCount: useCallback(() => setNewMsgCount(0), []),
+    };
 };

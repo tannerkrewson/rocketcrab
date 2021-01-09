@@ -18,6 +18,7 @@ import { ToastAction } from "@geist-ui/react/dist/use-toasts/use-toast";
 import ButtonGroup from "../common/ButtonGroup";
 import { logEvent } from "../../utils/analytics";
 import { filterClean } from "../../utils/utils";
+import { differenceInMilliseconds } from "date-fns";
 
 const GameLayout = ({
     partyState,
@@ -47,7 +48,7 @@ const GameLayout = ({
 
     const [enableToasts, setEnableToasts] = useState(true);
     const [, setToast] = useToasts();
-    const [lastShownToastDate, setLastShownToastDate] = useState(-1);
+    const [lastShownToastDate, setLastShownToastDate] = useState(0);
 
     const actions = useMemo(
         (): ToastAction[] => [
@@ -81,6 +82,16 @@ const GameLayout = ({
         if (chat.length === 0) return;
 
         const { playerId, playerName, message, date } = chat[chat.length - 1];
+
+        const lastMessageCameInOverOneSecondAgo =
+            differenceInMilliseconds(Date.now(), date) > 1000;
+
+        // don't show a toast for an old message that happens to be the latest
+        // when we are initializing
+        if (!lastShownToastDate && lastMessageCameInOverOneSecondAgo) {
+            setLastShownToastDate(date);
+            return;
+        }
 
         // don't show a toast if it has already been shown
         // (this has to be done because every partyState update triggers a
