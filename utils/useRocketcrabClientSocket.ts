@@ -114,6 +114,45 @@ export const useRocketcrabClientSocket = ({
         socket.emit(SocketEvent.CHAT_MESSAGE, message);
     }, []);
 
+    const onKick = useCallback((playerId, name) => {
+        Swal.fire({
+            title: `Kick ${name}?`,
+            showCancelButton: true,
+            confirmButtonText: `Kick player`,
+            icon: "warning",
+        }).then(({ isConfirmed }) => {
+            if (isConfirmed) {
+                Swal.fire({
+                    title: `Ban ${name} as well?`,
+                    text:
+                        "This may prevent anyone else on the same network as this player from joining as well. If you want to let them join again, you'll have to make a new party.",
+                    showCancelButton: true,
+                    confirmButtonText: `Kick & ban player`,
+                    cancelButtonText: "Just kick",
+                    icon: "warning",
+                }).then(({ isConfirmed }) => {
+                    if (isConfirmed) {
+                        socket.emit(SocketEvent.KICK_PLAYER, {
+                            playerId,
+                            isBan: true,
+                        });
+                        Swal.fire(
+                            "Kicked & banned!",
+                            "Good riddance!",
+                            "success"
+                        );
+                    } else {
+                        socket.emit(SocketEvent.KICK_PLAYER, {
+                            playerId,
+                            isBan: false,
+                        });
+                        Swal.fire("Kicked!", "Bye bye!", "success");
+                    }
+                });
+            }
+        });
+    }, []);
+
     return {
         partyState,
         onNameEntry,
@@ -123,6 +162,7 @@ export const useRocketcrabClientSocket = ({
         onHostGameLoaded,
         showReconnecting,
         onSendChat,
+        onKick,
     };
 };
 
@@ -167,4 +207,5 @@ type UseRocketcrabClientSocketReturn = {
     onHostGameLoaded: () => void;
     showReconnecting: boolean;
     onSendChat: (message: string) => void;
+    onKick: (id: number, name: string) => void;
 };

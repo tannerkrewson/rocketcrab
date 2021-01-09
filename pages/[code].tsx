@@ -34,6 +34,7 @@ export const Code = ({
         onHostGameLoaded,
         showReconnecting,
         onSendChat,
+        onKick,
     } = useRocketcrabClientSocket({
         code,
         router,
@@ -74,6 +75,7 @@ export const Code = ({
                 gameLibrary={gameLibrary}
                 thisPlayer={me}
                 reconnecting={showReconnecting}
+                onKick={onKick}
             />
         );
     }
@@ -100,6 +102,7 @@ export const Code = ({
                     resetName={() => onNameEntry("")}
                     onInOutParty={onInOutParty}
                     onSendChat={onSendChat}
+                    onKick={onKick}
                 />
             )}
         </PageLayout>

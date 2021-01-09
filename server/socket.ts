@@ -12,6 +12,7 @@ import {
     getFinderState,
     sendFinderStateToAll,
     addChatMessage,
+    kickPlayer,
 } from "./rocketcrab";
 import type {
     JoinPartyResponse,
@@ -43,7 +44,11 @@ const onJoinParty = (socket: SocketIO.Socket, rocketcrab: RocketCrab) => ({
         ? reconnectToParty(lastPartyState, rocketcrab)
         : getPartyByCode(code, partyList);
 
-    if (party) {
+    const isPlayerBanned = party.bannedIPs.find(
+        (ip) => socket.handshake.address === ip
+    );
+
+    if (party && !isPlayerBanned) {
         const { id, name } = lastPartyState?.me || {};
         const player = addPlayer(name, socket, party, id);
 
@@ -106,6 +111,13 @@ const attachPartyListenersToPlayer = (
         if (isMessageValid) {
             sendStateToAll(party, rocketcrab, { enableFinderCheck: false });
         }
+    });
+
+    socket.on(SocketEvent.KICK_PLAYER, async ({ playerId, isBan }) => {
+        if (!player.isHost) return;
+
+        kickPlayer(playerId, isBan, party);
+        sendStateToAll(party, rocketcrab, { enableFinderCheck: true });
     });
 };
 

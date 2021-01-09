@@ -735,6 +735,7 @@ const generateMockParty = ({
     idealHostId = 0,
     isPublic = false,
     chat = [],
+    bannedIPs = [],
 }: Partial<Party>): Party => ({
     status,
     playerList,
@@ -746,6 +747,7 @@ const generateMockParty = ({
     idealHostId,
     isPublic,
     chat,
+    bannedIPs,
 });
 
 const generateMockPlayer = ({

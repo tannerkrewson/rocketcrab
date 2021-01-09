@@ -20,6 +20,7 @@ const PartyScreen = ({
     resetName,
     onInOutParty,
     onSendChat,
+    onKick,
 }: PartyScreenProps): JSX.Element => {
     const { playerList, selectedGameId, isPublic, publicEndDate } = partyState;
     const { id: meId, isHost } = thisPlayer;
@@ -111,6 +112,7 @@ const PartyScreen = ({
                     meId={meId}
                     startHidden={false}
                     disableHideShow={false}
+                    onKick={onKick}
                 />
             </SkinnyCard>
 
@@ -172,6 +174,7 @@ type PartyScreenProps = {
     resetName: () => void;
     onInOutParty: (outOfParty: boolean) => void;
     onSendChat: (message: string) => void;
+    onKick: (id: number, name: string) => void;
 };
 
 export default PartyScreen;

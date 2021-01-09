@@ -28,6 +28,7 @@ const GameLayout = ({
     gameLibrary,
     thisPlayer,
     reconnecting,
+    onKick,
 }: GameLayoutProps): JSX.Element => {
     const { code, gameState, selectedGameId, playerList, chat } = partyState;
     const { isHost } = thisPlayer;
@@ -297,6 +298,9 @@ const GameLayout = ({
                         playerList={playerList}
                         disableHideShow={true}
                         startHidden={false}
+                        onKick={onKick}
+                        disableEditName={true}
+                        meId={thisPlayer.id}
                     />
                     <Spacer y={0.5} />
                     <PrimaryButton onClick={hideAllWindows}>
@@ -399,6 +403,7 @@ type GameLayoutProps = {
     gameLibrary: ClientGameLibrary;
     thisPlayer: Player;
     reconnecting: boolean;
+    onKick: (id: number, name: string) => void;
 };
 
 export default GameLayout;

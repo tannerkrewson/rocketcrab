@@ -10,31 +10,45 @@ const PlayerList = ({
     meId,
     startHidden,
     disableHideShow,
-}: PlayerListProps): JSX.Element => (
-    <CollapseBox
-        title="Players"
-        startHidden={startHidden}
-        disableHideShow={disableHideShow}
-        badgeCount={0}
-    >
-        <Spacer y={0.5} />
-        <Grid.Container gap={1}>
-            {playerList.map(({ id, name, isHost }) => (
-                <Grid xs={12} key={id}>
-                    <NameBox
-                        name={name}
-                        label={[
-                            ...(meId === id ? ["You"] : []),
-                            ...(isHost ? ["Host"] : []),
-                        ]}
-                        color={isHost ? "#e00" : undefined}
-                        onEditName={meId === id ? onEditName : undefined}
-                    />
-                </Grid>
-            ))}
-        </Grid.Container>
-    </CollapseBox>
-);
+    onKick,
+    disableEditName = false,
+}: PlayerListProps): JSX.Element => {
+    const meIsHost = playerList.find(({ id }) => meId === id)?.isHost;
+    const isMe = (id) => meId === id;
+
+    return (
+        <CollapseBox
+            title="Players"
+            startHidden={startHidden}
+            disableHideShow={disableHideShow}
+            badgeCount={0}
+        >
+            <Spacer y={0.5} />
+            <Grid.Container gap={1}>
+                {playerList.map(({ id, name, isHost }) => (
+                    <Grid xs={12} key={id}>
+                        <NameBox
+                            name={name}
+                            label={[
+                                ...(isMe(id) ? ["You"] : []),
+                                ...(isHost ? ["Host"] : []),
+                            ]}
+                            color={isHost && "#e00"}
+                            onEditName={
+                                !disableEditName && isMe(id) && onEditName
+                            }
+                            onKick={
+                                meIsHost &&
+                                !isMe(id) &&
+                                (() => onKick(id, name))
+                            }
+                        />
+                    </Grid>
+                ))}
+            </Grid.Container>
+        </CollapseBox>
+    );
+};
 
 type PlayerListProps = {
     playerList: Array<Player>;
@@ -42,6 +56,8 @@ type PlayerListProps = {
     meId?: number;
     startHidden: boolean;
     disableHideShow: boolean;
+    onKick: (id: number, name: string) => void;
+    disableEditName?: boolean;
 };
 
 export default PlayerList;

@@ -100,6 +100,7 @@ export const newParty = ({
         idealHostId: 0,
         isPublic,
         chat: [],
+        bannedIPs: [],
     };
 
     if (isPublic) {
@@ -396,6 +397,22 @@ export const addChatMessage = (
     purgeOverflowMsgs(player, party);
 
     return true;
+};
+
+export const kickPlayer = (
+    playerId: number,
+    isBan: boolean,
+    party: Party
+): void => {
+    const playerToKick = party.playerList.find(({ id }) => id === playerId);
+
+    if (!playerToKick) return;
+
+    if (isBan) {
+        party.bannedIPs.push(playerToKick.socket.handshake.address);
+    }
+
+    removePlayer(playerToKick, party);
 };
 
 const purgeOverflowMsgs = (player: Player, party: Party): void => {

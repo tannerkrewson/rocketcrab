@@ -46,6 +46,7 @@ export type ClientParty = {
     isPublic: boolean;
     publicEndDate?: number;
     chat: Array<ChatMessage>;
+    bannedIPs: Array<string>;
 };
 
 export type Player = {
