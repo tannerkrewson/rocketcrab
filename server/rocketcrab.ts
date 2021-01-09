@@ -297,7 +297,7 @@ export const setGame = (gameId: string, party: Party): void => {
 
 export const startGame = async (
     party: Party,
-    rocketcrab?: RocketCrab
+    rocketcrab: RocketCrab
 ): Promise<void> => {
     // TODO: check if ready
     const { gameState, selectedGameId, playerList } = party;
@@ -435,7 +435,7 @@ const findGameById = (gameId: string): ServerGame =>
 const disconnectAllPlayers = (playerList: Array<Player>): void =>
     playerList.forEach(({ socket }) => socket.disconnect(true));
 
-const getJsonParty = ({ playerList, ...party }: Party) => ({
+export const getJsonParty = ({ playerList, ...party }: Party): ClientParty => ({
     playerList: playerList.map(({ id, name, isHost }) => ({
         id,
         name,
