@@ -21,7 +21,9 @@ const PlayerList = ({
             title="Players"
             startHidden={startHidden}
             disableHideShow={disableHideShow}
-            badgeCount={0}
+            badgeCount={playerList.length}
+            badgeType="secondary"
+            onlyShowBadgeWhenCollapsed={false}
         >
             <Spacer y={0.5} />
             <Grid.Container gap={1}>

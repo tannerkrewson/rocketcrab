@@ -8,6 +8,8 @@ export const CollapseBox = ({
     startHidden = false,
     disableHideShow = false,
     badgeCount = 0,
+    badgeType,
+    onlyShowBadgeWhenCollapsed = true,
     onCollapse,
 }: {
     title: string;
@@ -15,6 +17,8 @@ export const CollapseBox = ({
     startHidden: boolean;
     disableHideShow: boolean;
     badgeCount: number;
+    badgeType?: "default" | "secondary" | "success" | "warning" | "error";
+    onlyShowBadgeWhenCollapsed?: boolean;
     onCollapse?: (currentCollapse: boolean) => void;
 }): JSX.Element => {
     const [collapse, setCollapse] = useState(startHidden);
@@ -23,9 +27,10 @@ export const CollapseBox = ({
             <div className="flex-center-row">
                 <h4 className="flex-center-row" style={{ margin: 0 }}>
                     <span style={{ marginRight: ".25em" }}>{title}</span>
-                    {badgeCount > 0 && collapse && (
-                        <Badge type="error">{badgeCount}</Badge>
-                    )}
+                    {badgeCount > 0 &&
+                        (collapse || !onlyShowBadgeWhenCollapsed) && (
+                            <Badge type={badgeType}>{badgeCount}</Badge>
+                        )}
                 </h4>
                 {!disableHideShow && (
                     <PrimaryButton

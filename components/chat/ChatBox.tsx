@@ -69,6 +69,7 @@ export const ChatBox = ({
                 clearNewMsgCount();
                 setIsChatShowing(!currentCollapse);
             }}
+            badgeType="error" // red
         >
             <Spacer y={0.5} />
             <div className="msg-container">
