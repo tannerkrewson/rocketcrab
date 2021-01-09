@@ -39,10 +39,9 @@ export const useRocketcrabClientSocket = ({
         });
 
         socket.on(SocketEvent.DISCONNECT, (reason) => {
-            // if the disconnection was initiated by the server
+            // if the disconnection was initiated by the server, we were kicked
             if (reason === "io server disconnect") {
-                // reconnect manually
-                socket.connect();
+                router.push("/");
             }
             // else the socket will automatically try to reconnect
 
