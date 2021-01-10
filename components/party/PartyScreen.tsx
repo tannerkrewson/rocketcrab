@@ -1,7 +1,7 @@
 import PlayerList from "./PlayerList";
 import PrimaryButton from "../common/PrimaryButton";
 import ButtonGroup from "../common/ButtonGroup";
-import { Grid, Spacer } from "@geist-ui/react";
+import { Spacer } from "@geist-ui/react";
 import GameSelector from "../library/GameSelector";
 import { ClientGameLibrary, ClientParty, Player } from "../../types/types";
 import React, { useState } from "react";
@@ -10,6 +10,7 @@ import GameDetail from "../detail/GameDetail";
 import SkinnyCard from "../common/SkinnyCard";
 import { Countdown } from "../find/Countdown";
 import { ChatBox } from "../chat/ChatBox";
+import AddAppButton from "../layout/AddAppButton";
 
 const PartyScreen = ({
     partyState,
@@ -130,28 +131,39 @@ const PartyScreen = ({
             </ButtonGroup>
             <Spacer y={1.5} />
             {orderedCards}
-            {playerList.length === 1 && (
-                <Grid xs={24}>
+            {!isPublic && !isHost && (
+                <>
                     <Spacer y={1} />
                     <SkinnyCard>
-                        When
-                        {isPublic ? " others join, " : " your friends join, "}
-                        they&apos;ll appear right next to your name!
-                        <br />
-                        {!isPublic && (
-                            <>
-                                <Spacer y={0.6} />
-                                You have friends... right? 😆 If not,
-                                that&apos;s okay, we&apos;ve got you covered:
-                                <Spacer y={0.5} />
-                                <PrimaryButton href="/find" size="medium">
-                                    Find Players
-                                </PrimaryButton>
-                                <Spacer y={0.5} />
-                            </>
-                        )}
+                        <div>
+                            {host.name} is a great host, so don&apos;t
+                            <div style={{ display: "inline-block" }}>
+                                tell them I said this... 🤫{" "}
+                            </div>
+                        </div>
+                        <Spacer y={0.5} />
+                        <div>
+                            I think you&apos;d be even better! 😊 Just go to{" "}
+                            <span
+                                style={{
+                                    fontFamily: '"Inconsolata", monospace',
+                                    fontWeight: "bold",
+                                    fontSize: "1.05em",
+                                }}
+                            >
+                                rocketcrab.com{"  "}
+                            </span>
+                            anytime to host <i>your</i> friends and family! Or,
+                            even better:
+                        </div>
+                        <Spacer y={0.5} />
+                        <ButtonGroup>
+                            <AddAppButton />
+                        </ButtonGroup>
+                        <Spacer y={0.5} />
+                        No App Store download required! 😮
                     </SkinnyCard>
-                </Grid>
+                </>
             )}
 
             {isOrWasPublic && (
