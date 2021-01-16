@@ -106,13 +106,17 @@ export const Find = ({
                         </div>
                     )}
                     {finderActiveDates?.lastStart && (
-                        <Countdown
-                            start={
-                                finderActiveDates.lastStart + FINDER_ACTIVE_MS
-                            }
-                        >
-                            Public parties will close
-                        </Countdown>
+                        <>
+                            <Spacer y={0.5} />
+                            <Countdown
+                                start={
+                                    finderActiveDates.lastStart +
+                                    FINDER_ACTIVE_MS
+                                }
+                            >
+                                Public parties will close
+                            </Countdown>
+                        </>
                     )}
                     <Spacer y={1.1} />
                 </>
@@ -133,7 +137,7 @@ export const Find = ({
                                 waiting on this page.
                             </div>
                         )}
-
+                        <Spacer y={0.5} />
                         <Countdown start={finderActiveDates.nextStart}>
                             Public parties will open next
                         </Countdown>

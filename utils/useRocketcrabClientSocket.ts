@@ -159,6 +159,10 @@ export const useRocketcrabClientSocket = ({
         });
     }, []);
 
+    const onSetIsPublic = useCallback((proposedIsPublic) => {
+        socket.emit(SocketEvent.SET_IS_PUBLIC, proposedIsPublic);
+    }, []);
+
     return {
         partyState,
         onNameEntry,
@@ -169,6 +173,7 @@ export const useRocketcrabClientSocket = ({
         showReconnecting,
         onSendChat,
         onKick,
+        onSetIsPublic,
     };
 };
 
@@ -214,4 +219,5 @@ type UseRocketcrabClientSocketReturn = {
     showReconnecting: boolean;
     onSendChat: (message: string) => void;
     onKick: (id: number, name: string) => void;
+    onSetIsPublic: (isPublic: boolean) => void;
 };

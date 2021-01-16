@@ -113,11 +113,19 @@ const attachPartyListenersToPlayer = (
         }
     });
 
-    socket.on(SocketEvent.KICK_PLAYER, async ({ playerId, isBan }) => {
+    socket.on(SocketEvent.KICK_PLAYER, ({ playerId, isBan }) => {
         if (!player.isHost) return;
 
         kickPlayer(playerId, isBan, party);
         sendStateToAll(party, rocketcrab, { enableFinderCheck: true });
+    });
+
+    socket.on(SocketEvent.SET_IS_PUBLIC, (proposedIsPublic) => {
+        if (player.isHost && rocketcrab.isFinderActive) {
+            party.isPublic = !!proposedIsPublic;
+        }
+
+        sendStateToAll(party, rocketcrab, { forceFinderUpdate: true });
     });
 };
 

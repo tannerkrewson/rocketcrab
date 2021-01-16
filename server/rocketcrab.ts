@@ -59,6 +59,8 @@ export const initCron = (rocketcrab: RocketCrab): void => {
                 // ensure that a long-lived party is not shown on a subsequent
                 // activation of the finder
                 rocketcrab.partyList.forEach((party) => {
+                    if (!party.isPublic) return;
+
                     party.isPublic = false;
                     sendStateToAll(party, rocketcrab, {
                         enableFinderCheck: false,
@@ -99,6 +101,7 @@ export const newParty = ({
         nextPlayerId: 0,
         idealHostId: 0,
         isPublic,
+        createdAsPublic: isPublic,
         chat: [],
         bannedIPs: [],
     };
@@ -214,9 +217,14 @@ export const sendStateToAll = (
         forceFinderUpdate,
     }: { enableFinderCheck?: boolean; forceFinderUpdate?: boolean } = {}
 ): void => {
-    party.playerList.forEach(({ socket, ...player }) =>
-        socket.emit(SocketEvent.UPDATE, { me: player, ...getJsonParty(party) })
-    );
+    party.playerList.forEach(({ socket, ...player }) => {
+        const clientParty: ClientParty = {
+            me: player,
+            ...getJsonParty(party),
+            isFinderActive: rocketcrab.isFinderActive,
+        };
+        socket.emit(SocketEvent.UPDATE, clientParty);
+    });
 
     if (
         (enableFinderCheck && shouldSendFinderStateUpdate(party, rocketcrab)) ||

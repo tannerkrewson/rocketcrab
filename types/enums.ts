@@ -27,4 +27,5 @@ export enum SocketEvent {
     FINDER_UPDATE = "FINDER_UPDATE",
     CHAT_MESSAGE = "CHAT_MESSAGE",
     KICK_PLAYER = "KICK_PLAYER",
+    SET_IS_PUBLIC = "SET_IS_PUBLIC",
 }

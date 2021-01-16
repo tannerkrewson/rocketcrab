@@ -30,20 +30,25 @@ export type FinderActiveDates = {
     nextWeekOfStarts: number[];
 };
 
-export type Party = ClientParty & {
+export type Party = CommonParty & {
     nextPlayerId: number;
 };
 
-export type ClientParty = {
+export type ClientParty = CommonParty & {
+    me?: Player;
+    isFinderActive?: boolean;
+};
+
+type CommonParty = {
     status: PartyStatus;
     playerList: Array<Player>;
     code: string;
     uuid: string;
-    me?: Player;
     selectedGameId: string;
     gameState: GameState;
     idealHostId: number;
     isPublic: boolean;
+    createdAsPublic: boolean;
     publicEndDate?: number;
     chat: Array<ChatMessage>;
     bannedIPs: Array<string>;

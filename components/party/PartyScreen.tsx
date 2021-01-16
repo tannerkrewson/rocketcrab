@@ -4,7 +4,7 @@ import ButtonGroup from "../common/ButtonGroup";
 import { Spacer } from "@geist-ui/react";
 import GameSelector from "../library/GameSelector";
 import { ClientGameLibrary, ClientParty, Player } from "../../types/types";
-import React, { useCallback, useState } from "react";
+import React, { useCallback, useEffect, useState } from "react";
 import PartyStatus from "./PartyStatus";
 import GameDetail from "../detail/GameDetail";
 import SkinnyCard from "../common/SkinnyCard";
@@ -13,6 +13,7 @@ import { ChatBox } from "../chat/ChatBox";
 import AddAppButton from "../layout/AddAppButton";
 import Swal from "sweetalert2";
 import { useRouter } from "next/router";
+import { isFuture } from "date-fns";
 
 const PartyScreen = ({
     partyState,
@@ -24,12 +25,20 @@ const PartyScreen = ({
     onInOutParty,
     onSendChat,
     onKick,
+    onSetIsPublic,
     unreadMsgCount,
     clearUnreadMsgCount,
 }: PartyScreenProps): JSX.Element => {
     const router = useRouter();
 
-    const { playerList, selectedGameId, isPublic, publicEndDate } = partyState;
+    const {
+        playerList,
+        selectedGameId,
+        isPublic,
+        publicEndDate,
+        isFinderActive,
+        createdAsPublic,
+    } = partyState;
     const { id: meId, isHost } = thisPlayer;
 
     const selectedGame = gameLibrary.gameList.find(
@@ -50,7 +59,15 @@ const PartyScreen = ({
         setGameInfoVisible(visibility);
     };
 
-    const leaveText = isPublic ? "Back to Public Parties" : "Leave Party";
+    const [awaitingChangeToIsPublic, setAwaitingChangeToIsPublic] = useState(
+        false
+    );
+
+    useEffect(() => setAwaitingChangeToIsPublic(false), [isPublic]);
+
+    const leaveText = createdAsPublic
+        ? "Back to Public Parties"
+        : "Leave Party";
 
     const promptLeave = useCallback(() => {
         Swal.fire({
@@ -60,7 +77,7 @@ const PartyScreen = ({
             icon: "warning",
         }).then(({ isConfirmed }) => {
             if (isConfirmed) {
-                router.push(isPublic ? "/find" : "/");
+                router.push(createdAsPublic ? "/find" : "/");
             }
         });
     }, [isPublic]);
@@ -91,8 +108,6 @@ const PartyScreen = ({
         );
     }
 
-    const isOrWasPublic = !!publicEndDate;
-
     const rChatBox = (
         <SkinnyCard>
             <ChatBox
@@ -119,7 +134,7 @@ const PartyScreen = ({
         </SkinnyCard>
     );
 
-    const orderedCards = isOrWasPublic
+    const orderedCards = createdAsPublic
         ? [rChatBox, rPlayerList]
         : [rPlayerList, rChatBox];
 
@@ -155,7 +170,7 @@ const PartyScreen = ({
                     <Spacer y={1} />
                     <SkinnyCard>
                         <div>
-                            {host.name} is a great host, so don&apos;t
+                            {host.name} is a great host, so don&apos;t{" "}
                             <div style={{ display: "inline-block" }}>
                                 tell them I said this... 🤫{" "}
                             </div>
@@ -185,18 +200,39 @@ const PartyScreen = ({
                 </>
             )}
 
-            {isOrWasPublic && (
+            {createdAsPublic && (
                 <>
                     <Spacer y={0.5} />
-
                     <SkinnyCard>
-                        {isPublic
-                            ? "This is a public party! Anyone in the 🌏 can join without the code! But, they can't join if you haven't selected a game, and they can't join after you've started a game."
-                            : "This public party is now closed. Have fun! 😀"}
-                        {isPublic && (
+                        <div>
+                            {isPublic
+                                ? "This is a public party! Anyone in the 🌏 can join without the code! But, they can't join if you haven't selected a game, and they can't join after you've started a game."
+                                : "This public party is now closed. Have fun! 😀"}
+                        </div>
+                        {isFuture(publicEndDate) && (
                             <Countdown start={publicEndDate}>
                                 Public parties will close
                             </Countdown>
+                        )}
+                        {selectedGame && isFinderActive && (
+                            <>
+                                <Spacer y={0.5} />
+                                <PrimaryButton
+                                    onClick={() => {
+                                        if (!isHost || awaitingChangeToIsPublic)
+                                            return;
+                                        onSetIsPublic(!isPublic);
+                                        setAwaitingChangeToIsPublic(true);
+                                    }}
+                                    loading={awaitingChangeToIsPublic}
+                                    disabled={!isHost}
+                                >
+                                    {isPublic
+                                        ? "Close to new players"
+                                        : "Open to public"}
+                                </PrimaryButton>
+                                <Spacer y={0.5} />
+                            </>
                         )}
                     </SkinnyCard>
                 </>
@@ -222,6 +258,7 @@ type PartyScreenProps = {
     onInOutParty: (outOfParty: boolean) => void;
     onSendChat: (message: string) => void;
     onKick: (id: number, name: string) => void;
+    onSetIsPublic: (isPublic: boolean) => void;
 };
 
 export default PartyScreen;

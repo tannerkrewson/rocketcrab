@@ -248,7 +248,10 @@ describe("server/rocketcrab.ts", () => {
                 isHost: false,
             },
         ];
-        const jsonParty = generateMockParty({ playerList: jsonPlayerList });
+        const jsonParty = {
+            ...generateMockParty({ playerList: jsonPlayerList }),
+            isFinderActive: mocketCrab.isFinderActive,
+        };
 
         expect(emits[0]).toBeCalledWith(SocketEvent.UPDATE, {
             ...jsonParty,
@@ -736,6 +739,7 @@ const generateMockParty = ({
     isPublic = false,
     chat = [],
     bannedIPs = [],
+    createdAsPublic = false,
 }: Partial<Party>): Party => ({
     status,
     playerList,
@@ -748,6 +752,7 @@ const generateMockParty = ({
     isPublic,
     chat,
     bannedIPs,
+    createdAsPublic,
 });
 
 const generateMockPlayer = ({
