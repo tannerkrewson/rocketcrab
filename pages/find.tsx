@@ -18,6 +18,7 @@ import { Spacer } from "@geist-ui/react";
 import Swal from "sweetalert2";
 import { FindTime } from "../components/find/FindTime";
 import { Countdown } from "../components/find/Countdown";
+import GameDetail from "../components/detail/GameDetail";
 
 const socket = io();
 const CLIENT_GAME_LIBRARY = getClientGameLibrary();
@@ -29,6 +30,7 @@ export const Find = ({
     const [newLoading, setNewLoading] = useState(false);
     const [showReconnecting, setShowReconnecting] = useState(false);
     const [finderState, setFinderState] = useState<FinderState | undefined>();
+    const [gameInfoVisible, setGameInfoVisible] = useState("");
 
     const { isActive, publicPartyList, finderActiveDates, subscriberCount } =
         finderState ?? {};
@@ -80,6 +82,25 @@ export const Find = ({
         };
     }, []);
 
+    if (gameInfoVisible) {
+        const selectedGame = gameLibrary.gameList.find(
+            ({ id }) => id === gameInfoVisible
+        );
+        return (
+            <PageLayout reconnecting={showReconnecting} deemphasize={true}>
+                <div style={{ textAlign: "center" }}>
+                    <GameDetail
+                        game={selectedGame}
+                        allCategories={gameLibrary.categories}
+                    />
+                    <PrimaryButton onClick={() => setGameInfoVisible("")}>
+                        Back to Public Parties
+                    </PrimaryButton>
+                </div>
+            </PageLayout>
+        );
+    }
+
     const scs = subscriberCount === 1;
 
     return (
@@ -92,6 +113,7 @@ export const Find = ({
                             key={party.code}
                             party={party}
                             gameLibrary={gameLibrary}
+                            onWhatIs={setGameInfoVisible}
                         />
                     ))}
                     {!finderState?.publicPartyList?.length &&

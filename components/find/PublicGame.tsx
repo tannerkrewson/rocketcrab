@@ -1,14 +1,18 @@
 import React from "react";
+import { QuestionCircle } from "@geist-ui/react-icons";
 import { ClientGameLibrary, ClientParty } from "../../types/types";
 import PrimaryButton from "../common/PrimaryButton";
 import SkinnyCard from "../common/SkinnyCard";
+import { Spacer } from "@geist-ui/react";
 
 const PublicGame = ({
     party,
     gameLibrary,
+    onWhatIs,
 }: {
     party: ClientParty;
     gameLibrary: ClientGameLibrary;
+    onWhatIs: (gameId: string) => void;
 }): JSX.Element => {
     const { code, playerList, selectedGameId } = party;
     const selectedGame = gameLibrary.gameList.find(
@@ -22,7 +26,21 @@ const PublicGame = ({
                     <div>
                         {host.name}
                         &apos;s game{" "}
-                        {selectedGame ? "of " + selectedGame.name : ""}
+                        {selectedGame ? (
+                            <span>
+                                of{" "}
+                                <a
+                                    onClick={() => onWhatIs(selectedGameId)}
+                                    className="game-info"
+                                >
+                                    {selectedGame.name}
+                                    <Spacer inline x={0.15} />
+                                    <QuestionCircle size={18} />
+                                </a>
+                            </span>
+                        ) : (
+                            ""
+                        )}
                     </div>
                     <div>
                         {playerList.length} player
@@ -34,6 +52,10 @@ const PublicGame = ({
             <style jsx>{`
                 .public-game {
                     display: flex;
+                    justify-content: space-between;
+                }
+                .game-info {
+                    display: inline-flex;
                     justify-content: space-between;
                 }
             `}</style>

@@ -165,7 +165,7 @@ const PartyScreen = ({
             </ButtonGroup>
             <Spacer y={1.5} />
             {orderedCards}
-            {!isPublic && !isHost && (
+            {!createdAsPublic && !isHost && (
                 <>
                     <Spacer y={1} />
                     <SkinnyCard>
@@ -210,9 +210,12 @@ const PartyScreen = ({
                                 : "This public party is now closed. Have fun! 😀"}
                         </div>
                         {isFuture(publicEndDate) && (
-                            <Countdown start={publicEndDate}>
-                                Public parties will close
-                            </Countdown>
+                            <>
+                                <Spacer y={0.5} />
+                                <Countdown start={publicEndDate}>
+                                    Public parties will close
+                                </Countdown>
+                            </>
                         )}
                         {selectedGame && isFinderActive && (
                             <>
