@@ -54,6 +54,11 @@ const GameLayout = ({
     const [, setToast] = useToasts();
     const [lastShownToastDate, setLastShownToastDate] = useState(0);
 
+    const igLogEvent = useCallback(
+        (event) => logEvent("inGame-" + event, isHost ? "isHost" : "notHost"),
+        [isHost]
+    );
+
     const actions = useMemo(
         (): ToastAction[] => [
             {
@@ -71,6 +76,7 @@ const GameLayout = ({
                     cancel();
                     setShowMenu(false);
                     setShowChat(true);
+                    igLogEvent("toastChatReply");
                 },
             },
             {
@@ -110,6 +116,8 @@ const GameLayout = ({
             text: "🚀🦀 " + playerName + ": " + filterClean(message),
             actions,
         });
+
+        igLogEvent("toastMsg");
     }, [newestMsg]);
 
     const hostName = playerList.find(({ isHost }) => isHost).name;
@@ -121,6 +129,7 @@ const GameLayout = ({
             onClick: useCallback(() => {
                 setShowMenu(false);
                 setShowChat(true);
+                igLogEvent("showChat");
             }, []),
             badgeCount: unreadMsgCount,
         },
@@ -130,6 +139,7 @@ const GameLayout = ({
             onClick: useCallback(() => {
                 setShowMenu(false);
                 setShowPlayerList(true);
+                igLogEvent("showPlayers");
             }, []),
         },
         {
@@ -138,6 +148,7 @@ const GameLayout = ({
             onClick: useCallback(() => {
                 setShowMenu(false);
                 setShowGameLibrary(true);
+                igLogEvent("browseGames");
             }, []),
         },
         {
@@ -157,6 +168,7 @@ const GameLayout = ({
                     if (isConfirmed) {
                         setShowMenu(false);
                         setFrameRefresh(frameRefresh + 1);
+                        igLogEvent("reloadMe");
                     }
                 });
             }, [frameRefresh]),
@@ -178,6 +190,7 @@ const GameLayout = ({
                     if (isConfirmed) {
                         setShowMenu(false);
                         onStartGame();
+                        igLogEvent("reloadAll");
                     }
                 });
             }, [onStartGame]),
@@ -199,6 +212,7 @@ const GameLayout = ({
                     if (isConfirmed) {
                         setShowMenu(false);
                         onExitGame();
+                        igLogEvent("exitToParty");
                     }
                 });
             }, [onExitGame]),
@@ -221,6 +235,7 @@ const GameLayout = ({
         }).then(({ isConfirmed }) => {
             if (isConfirmed) {
                 setEnableToasts(false);
+                igLogEvent("muteChat");
             }
         });
     };
@@ -241,6 +256,7 @@ const GameLayout = ({
                         setStatusCollapsed(!statusCollapsed);
                         setShowMenu(false);
                         hideAllWindows();
+                        igLogEvent("clickLogo");
                     }}
                 >
                     🚀🦀
@@ -259,6 +275,7 @@ const GameLayout = ({
                                     onClick={() => {
                                         setShowMenu(!showMenu);
                                         hideAllWindows();
+                                        igLogEvent("clickMenu");
                                     }}
                                     size="small"
                                 >
@@ -305,7 +322,7 @@ const GameLayout = ({
                                 if (isConfirmed) {
                                     setShowMenu(false);
                                     onStartGame(gameId);
-                                    logEvent("party-inGameSwitch");
+                                    igLogEvent("switchGame");
                                 }
                             });
                         }}

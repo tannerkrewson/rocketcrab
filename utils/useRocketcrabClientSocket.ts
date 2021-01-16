@@ -44,7 +44,7 @@ export const useRocketcrabClientSocket = ({
                 router.push("/");
             }
             // else the socket will automatically try to reconnect
-
+            logEvent("common-reconnecting");
             setShowReconnecting(true);
         });
 
@@ -94,6 +94,10 @@ export const useRocketcrabClientSocket = ({
             if (me?.isHost) {
                 logEvent("party-numberOfPlayers", playerList.length.toString());
                 logEvent("party-game", selectedGameId);
+                logEvent(
+                    "party-isPublic",
+                    (!!partyState.publicEndDate).toString()
+                );
             }
         },
         [playerList, selectedGameId]
@@ -111,6 +115,7 @@ export const useRocketcrabClientSocket = ({
 
     const onSendChat = useCallback((message) => {
         socket.emit(SocketEvent.CHAT_MESSAGE, message);
+        logEvent("common-sendChat");
     }, []);
 
     const onKick = useCallback((playerId, name) => {
@@ -140,12 +145,14 @@ export const useRocketcrabClientSocket = ({
                             "Good riddance!",
                             "success"
                         );
+                        logEvent("common-ban");
                     } else {
                         socket.emit(SocketEvent.KICK_PLAYER, {
                             playerId,
                             isBan: false,
                         });
                         Swal.fire("Kicked!", "Bye bye!", "success");
+                        logEvent("common-kick");
                     }
                 });
             }
