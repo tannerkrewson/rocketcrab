@@ -35,7 +35,12 @@ export const useRocketcrabClientSocket = ({
         });
         socket.on(SocketEvent.INVALID_NAME, () => {
             if (code === "ffff") return;
-            Swal.fire("Try again", "Name already in use", "error");
+            Swal.fire({
+                title: "Try again",
+                text: "Name already in use",
+                icon: "error",
+                heightAuto: false,
+            });
         });
 
         socket.on(SocketEvent.DISCONNECT, (reason) => {
@@ -124,6 +129,7 @@ export const useRocketcrabClientSocket = ({
             showCancelButton: true,
             confirmButtonText: `Kick player`,
             icon: "warning",
+            heightAuto: false,
         }).then(({ isConfirmed }) => {
             if (isConfirmed) {
                 Swal.fire({
@@ -134,24 +140,31 @@ export const useRocketcrabClientSocket = ({
                     confirmButtonText: `Kick & ban player`,
                     cancelButtonText: "Just kick",
                     icon: "warning",
+                    heightAuto: false,
                 }).then(({ isConfirmed }) => {
                     if (isConfirmed) {
                         socket.emit(SocketEvent.KICK_PLAYER, {
                             playerId,
                             isBan: true,
                         });
-                        Swal.fire(
-                            "Kicked & banned!",
-                            "Good riddance!",
-                            "success"
-                        );
+                        Swal.fire({
+                            title: "Kicked & banned!",
+                            text: "Good riddance!",
+                            icon: "success",
+                            heightAuto: false,
+                        });
                         logEvent("common-ban");
                     } else {
                         socket.emit(SocketEvent.KICK_PLAYER, {
                             playerId,
                             isBan: false,
                         });
-                        Swal.fire("Kicked!", "Bye bye!", "success");
+                        Swal.fire({
+                            title: "Kicked!",
+                            text: "Bye bye!",
+                            icon: "success",
+                            heightAuto: false,
+                        });
                         logEvent("common-kick");
                     }
                 });

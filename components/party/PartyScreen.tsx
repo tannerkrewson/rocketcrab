@@ -75,6 +75,7 @@ const PartyScreen = ({
             showCancelButton: true,
             confirmButtonText: leaveText,
             icon: "warning",
+            heightAuto: false,
         }).then(({ isConfirmed }) => {
             if (isConfirmed) {
                 router.push(createdAsPublic ? "/find" : "/");

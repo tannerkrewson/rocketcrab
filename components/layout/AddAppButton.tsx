@@ -57,11 +57,13 @@ const AddAppButton = () => {
             // Wait for the user to respond to the prompt
             deferredPrompt.userChoice.then(() => setIsLoading(false));
         } else {
-            Swal.fire(
-                "Hmm...",
-                "Failed to add rocketcrab as an app on this device. Try again, or try on your phone!",
-                "error"
-            );
+            Swal.fire({
+                title: "Hmm...",
+                text:
+                    "Failed to add rocketcrab as an app on this device. Try again, or try on your phone!",
+                icon: "error",
+                heightAuto: false,
+            });
             setIsLoading(false);
         }
     };

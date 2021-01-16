@@ -41,11 +41,13 @@ export const Find = ({
 
         const result = await postJson("/api/new-public").catch(() => {
             setNewLoading(false);
-            Swal.fire(
-                "Try again",
-                "The server is not allowing public parties to be created right now... maybe you were just a smidge too early? 😊",
-                "error"
-            );
+            Swal.fire({
+                title: "Try again",
+                text:
+                    "The server is not allowing public parties to be created right now... maybe you were just a smidge too early? 😊",
+                icon: "error",
+                heightAuto: false,
+            });
         });
 
         if (result) {

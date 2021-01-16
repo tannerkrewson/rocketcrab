@@ -164,6 +164,7 @@ const GameLayout = ({
                     showCancelButton: true,
                     confirmButtonText: `Reload my game`,
                     icon: "warning",
+                    heightAuto: false,
                 }).then(({ isConfirmed }) => {
                     if (isConfirmed) {
                         setShowMenu(false);
@@ -186,6 +187,7 @@ const GameLayout = ({
                     showCancelButton: true,
                     confirmButtonText: `Reload All`,
                     icon: "warning",
+                    heightAuto: false,
                 }).then(({ isConfirmed }) => {
                     if (isConfirmed) {
                         setShowMenu(false);
@@ -208,6 +210,7 @@ const GameLayout = ({
                     showCancelButton: true,
                     confirmButtonText: "Exit to party",
                     icon: "warning",
+                    heightAuto: false,
                 }).then(({ isConfirmed }) => {
                     if (isConfirmed) {
                         setShowMenu(false);
@@ -232,6 +235,7 @@ const GameLayout = ({
             showCancelButton: true,
             confirmButtonText: "Mute chat",
             icon: "question",
+            heightAuto: false,
         }).then(({ isConfirmed }) => {
             if (isConfirmed) {
                 setEnableToasts(false);
@@ -318,6 +322,7 @@ const GameLayout = ({
                                 showCancelButton: true,
                                 confirmButtonText: "Exit to party",
                                 icon: "warning",
+                                heightAuto: false,
                             }).then(({ isConfirmed }) => {
                                 if (isConfirmed) {
                                     setShowMenu(false);
