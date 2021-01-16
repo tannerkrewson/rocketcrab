@@ -36,6 +36,7 @@ export const ChatBox = ({
         chat
     );
     const messagesEndRef = useRef(null);
+    const checkSendTimeoutRef = useRef(null);
 
     const handleConfirm = (e?) => {
         if (e) e.preventDefault();
@@ -44,7 +45,10 @@ export const ChatBox = ({
         onSendChat(msgToSend);
         reset();
 
-        setTimeout(setSendDisabled, MIN_MS_BETWEEN_MSGS);
+        checkSendTimeoutRef.current = setTimeout(
+            setSendDisabled,
+            MIN_MS_BETWEEN_MSGS
+        );
     };
 
     const onEnter = (e) => {
@@ -67,6 +71,9 @@ export const ChatBox = ({
             clearUnreadMsgCount();
         }
     }, [unreadMsgCount, isChatShowing]);
+
+    // remove timeout when chat is closed
+    useEffect(() => () => clearTimeout(checkSendTimeoutRef.current), []);
 
     return (
         <CollapseBox

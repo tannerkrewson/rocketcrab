@@ -110,7 +110,7 @@ const PartyScreen = ({
     }
 
     const rChatBox = (
-        <SkinnyCard>
+        <SkinnyCard key="ChatBox">
             <ChatBox
                 chat={partyState.chat}
                 onSendChat={onSendChat}
@@ -123,7 +123,7 @@ const PartyScreen = ({
     );
 
     const rPlayerList = (
-        <SkinnyCard>
+        <SkinnyCard key="PlayerList">
             <PlayerList
                 playerList={playerList}
                 onEditName={resetName}
