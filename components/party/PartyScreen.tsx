@@ -4,13 +4,15 @@ import ButtonGroup from "../common/ButtonGroup";
 import { Spacer } from "@geist-ui/react";
 import GameSelector from "../library/GameSelector";
 import { ClientGameLibrary, ClientParty, Player } from "../../types/types";
-import React, { useState } from "react";
+import React, { useCallback, useState } from "react";
 import PartyStatus from "./PartyStatus";
 import GameDetail from "../detail/GameDetail";
 import SkinnyCard from "../common/SkinnyCard";
 import { Countdown } from "../find/Countdown";
 import { ChatBox } from "../chat/ChatBox";
 import AddAppButton from "../layout/AddAppButton";
+import Swal from "sweetalert2";
+import { useRouter } from "next/router";
 
 const PartyScreen = ({
     partyState,
@@ -25,6 +27,8 @@ const PartyScreen = ({
     unreadMsgCount,
     clearUnreadMsgCount,
 }: PartyScreenProps): JSX.Element => {
+    const router = useRouter();
+
     const { playerList, selectedGameId, isPublic, publicEndDate } = partyState;
     const { id: meId, isHost } = thisPlayer;
 
@@ -45,6 +49,21 @@ const PartyScreen = ({
         onInOutParty(visibility);
         setGameInfoVisible(visibility);
     };
+
+    const leaveText = isPublic ? "Back to Public Parties" : "Leave Party";
+
+    const promptLeave = useCallback(() => {
+        Swal.fire({
+            title: "Are your sure?",
+            showCancelButton: true,
+            confirmButtonText: leaveText,
+            icon: "warning",
+        }).then(({ isConfirmed }) => {
+            if (isConfirmed) {
+                router.push(isPublic ? "/find" : "/");
+            }
+        });
+    }, [isPublic]);
 
     if (gameSelectorVisible) {
         return (
@@ -184,8 +203,8 @@ const PartyScreen = ({
             )}
 
             <Spacer y={1} />
-            <PrimaryButton href="/" size="small">
-                Leave Party
+            <PrimaryButton onClick={promptLeave} size="small">
+                {leaveText}
             </PrimaryButton>
         </div>
     );

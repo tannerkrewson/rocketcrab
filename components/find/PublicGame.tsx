@@ -1,4 +1,3 @@
-import { useRouter } from "next/router";
 import React from "react";
 import { ClientGameLibrary, ClientParty } from "../../types/types";
 import PrimaryButton from "../common/PrimaryButton";
@@ -12,7 +11,6 @@ const PublicGame = ({
     gameLibrary: ClientGameLibrary;
 }): JSX.Element => {
     const { code, playerList, selectedGameId } = party;
-    const router = useRouter();
     const selectedGame = gameLibrary.gameList.find(
         ({ id }) => id === selectedGameId
     );
@@ -31,11 +29,7 @@ const PublicGame = ({
                         {playerList.length !== 1 ? "s" : ""}
                     </div>
                 </div>
-                <PrimaryButton
-                    onClick={() => router.push("/[code]", "/" + code)}
-                >
-                    Join
-                </PrimaryButton>
+                <PrimaryButton href={"/" + code}>Join</PrimaryButton>
             </div>
             <style jsx>{`
                 .public-game {
