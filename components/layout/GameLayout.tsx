@@ -266,7 +266,7 @@ const GameLayout = ({
     return (
         <div className="layout">
             <div className={statusClass}>
-                <h4
+                <div
                     className="logo"
                     onClick={() => {
                         setStatusCollapsed(!statusCollapsed);
@@ -275,8 +275,9 @@ const GameLayout = ({
                         igLogEvent("clickLogo");
                     }}
                 >
-                    🚀🦀
-                </h4>
+                    <img src="/rocket.svg" className="rocket" />
+                    <img src="/crab.svg" className="crab" />
+                </div>
                 {!statusCollapsed && (
                     <>
                         <div className="url">rocketcrab.com/{code}</div>
@@ -431,12 +432,28 @@ const GameLayout = ({
                 .status-collapsed {
                     position: fixed;
                     width: fit-content;
-                    border-right: 1px solid #ddd;
+                    border: none;
+                    border-radius: 8px;
+                    top: 0.5em;
+                    left: 0.5em;
+                    backdrop-filter: blur(5px);
+                    background-color: rgba(255, 255, 255, 0.2);
                 }
                 .logo {
                     margin: 0;
                     user-select: none;
                     cursor: pointer;
+                    line-height: 2.8em;
+                }
+                .rocket {
+                    height: 1.5em;
+                    margin-left: 0.1em;
+                    filter: drop-shadow(0 0 6px cyan);
+                }
+                .crab {
+                    height: 1.5em;
+                    margin-left: 0.25em;
+                    filter: drop-shadow(0 0 6px #ff0000d9);
                 }
                 .url {
                     font-size: 1.2em;
