@@ -333,7 +333,7 @@ const GameLayout = ({
                                     thisGame.name +
                                     " will be lost!",
                                 showCancelButton: true,
-                                confirmButtonText: "Exit to party",
+                                confirmButtonText: "Switch!",
                                 icon: "warning",
                                 heightAuto: false,
                             }).then(({ isConfirmed }) => {
