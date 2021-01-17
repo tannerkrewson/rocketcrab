@@ -14,6 +14,7 @@ import AddAppButton from "../layout/AddAppButton";
 import Swal from "sweetalert2";
 import { useRouter } from "next/router";
 import { isFuture } from "date-fns";
+import { useIsAlreadyPWA } from "../../utils/useIsAlreadyPWA";
 
 const PartyScreen = ({
     partyState,
@@ -45,6 +46,8 @@ const PartyScreen = ({
         ({ id }) => id === selectedGameId
     );
     const host = playerList.find(({ isHost }) => isHost);
+
+    const isAlreadyPWA = useIsAlreadyPWA();
 
     const [gameSelectorVisible, setGameSelectorVisible] = useState(false);
     const [gameInfoVisible, setGameInfoVisible] = useState(false);
@@ -166,7 +169,7 @@ const PartyScreen = ({
             </ButtonGroup>
             <Spacer y={1.5} />
             {orderedCards}
-            {!createdAsPublic && !isHost && (
+            {!isAlreadyPWA && !createdAsPublic && !isHost && (
                 <>
                     <Spacer y={1} />
                     <SkinnyCard>

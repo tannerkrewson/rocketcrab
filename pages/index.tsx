@@ -7,10 +7,12 @@ import AddAppButton from "../components/layout/AddAppButton";
 import PageLayout from "../components/layout/PageLayout";
 import { postJson } from "../utils/utils";
 import { Spacer } from "@geist-ui/react";
+import { useIsAlreadyPWA } from "../utils/useIsAlreadyPWA";
 
 export const Home = (): JSX.Element => {
     const router = useRouter();
     const [newLoading, setNewLoading] = useState(false);
+    const isAlreadyPWA = useIsAlreadyPWA();
 
     const onClickNew = async (e) => {
         e.preventDefault();
@@ -46,8 +48,12 @@ export const Home = (): JSX.Element => {
             </ButtonGroup>
             <Spacer y={1.2} />
             <div className="btn-col">
-                <AddAppButton />
-                <Spacer y={0.5} />
+                {!isAlreadyPWA && (
+                    <>
+                        <AddAppButton />
+                        <Spacer y={0.5} />
+                    </>
+                )}
                 <PrimaryButton
                     type="default"
                     url="https://discord.gg/MvYRVCP"

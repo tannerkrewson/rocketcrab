@@ -29,21 +29,13 @@ if (typeof window !== "undefined") {
     });
 }
 
-const AddAppButton = () => {
-    const [isAlreadyPWA, setIsAlreadyPWA] = useState(false);
+const AddAppButton = (): JSX.Element => {
     const [isLoading, setIsLoading] = useState(false);
     const [isiOS, setIsiOS] = useState(false);
 
     const [showiOS, setShowiOS] = useState(false);
 
     useEffect(() => {
-        // https://stackoverflow.com/a/52695341
-        setIsAlreadyPWA(
-            window.matchMedia("(display-mode: standalone)").matches ||
-                window.navigator.standalone ||
-                document.referrer.includes("android-app://")
-        );
-
         setIsiOS(
             /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
         );
@@ -51,7 +43,7 @@ const AddAppButton = () => {
 
     const handleAddApp = () => {
         setIsLoading(true);
-        logEvent("home-clickAddApp", true);
+        logEvent("home-clickAddApp");
         if (isiOS) {
             setShowiOS(true);
             logEvent("home-addApp-iOS");
@@ -80,17 +72,16 @@ const AddAppButton = () => {
 
     return (
         <>
-            {!isAlreadyPWA && (
-                <PrimaryButton
-                    className="btn-small btn-vertical"
-                    onClick={handleAddApp}
-                    disabled={isLoading}
-                    manualWidth
-                    type="default"
-                >
-                    {isLoading ? "Loading..." : "Add 🚀🦀 App"}
-                </PrimaryButton>
-            )}
+            <PrimaryButton
+                onClick={handleAddApp}
+                disabled={isLoading}
+                manualWidth
+                type="default"
+                loading={isLoading}
+            >
+                Add 🚀🦀 App
+            </PrimaryButton>
+
             {showiOS && (
                 <PWAPrompt
                     debug={true}

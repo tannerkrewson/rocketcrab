@@ -111,7 +111,7 @@ exports[`pages/index.tsx matches snapshot 1`] = `
           class="jsx-4074410339 btn-col"
         >
           <button
-            class="jsx-3131001525 btn btn-small btn-vertical"
+            class="jsx-3131001525 btn "
             style="width: 100%;"
             type="button"
           >
