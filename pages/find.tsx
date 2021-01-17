@@ -144,7 +144,7 @@ export const Find = ({
                         subscriberCountMsg="waiting on this page."
                         showCountdown={!!finderActiveDates?.nextStart}
                         countdownStart={finderActiveDates?.nextStart}
-                        countdownMsg="Public parties will close"
+                        countdownMsg="Public parties will open next"
                         findTimeDates={finderActiveDates?.nextWeekOfStarts}
                     />
                 </div>

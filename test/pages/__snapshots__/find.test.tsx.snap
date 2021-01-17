@@ -43,6 +43,19 @@ exports[`pages/find.tsx matches snapshot 1`] = `
           Public Parties (beta)
         </div>
         <div
+          class="jsx-58839709"
+          style="text-align: center;"
+        >
+          <div
+            class="jsx-58839709"
+          >
+            To make sure there are enough players, public games open roughly every four hours from Thursday to Saturday.
+          </div>
+          <span
+            class="jsx-870436695 "
+          />
+        </div>
+        <div
           class="jsx-1938348541 item justify jsx-1720607024 "
         >
           <div
