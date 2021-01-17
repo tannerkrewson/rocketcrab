@@ -12,7 +12,7 @@ const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => (
                 disabled={!isHost && hostOnly}
                 onClick={onClick}
                 key={label}
-                style={{ marginBottom: ".5em" }}
+                style={{ marginBottom: ".7em" }}
             >
                 {label}
                 {badgeCount > 0 && (
@@ -34,6 +34,7 @@ const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => (
                 right: 0;
                 top: 3em;
                 padding: 1em;
+                padding-bottom: 0.6em;
                 background: white;
                 display: flex;
                 flex-direction: column;

@@ -20,6 +20,7 @@ import ButtonGroup from "../common/ButtonGroup";
 import { logEvent } from "../../utils/analytics";
 import { filterClean } from "../../utils/utils";
 import { differenceInMilliseconds } from "date-fns";
+import GameDetail from "../detail/GameDetail";
 
 const GameLayout = ({
     partyState,
@@ -46,6 +47,7 @@ const GameLayout = ({
     const [showGameLibrary, setShowGameLibrary] = useState(false);
     const [showPlayerList, setShowPlayerList] = useState(false);
     const [showChat, setShowChat] = useState(false);
+    const [showGameInfo, setShowGameInfo] = useState(false);
 
     // https://stackoverflow.com/a/48830513
     const [frameRefresh, setFrameRefresh] = useState(0);
@@ -140,6 +142,15 @@ const GameLayout = ({
                 setShowMenu(false);
                 setShowPlayerList(true);
                 igLogEvent("showPlayers");
+            }, []),
+        },
+        {
+            label: "About this game",
+            hostOnly: false,
+            onClick: useCallback(() => {
+                setShowMenu(false);
+                setShowGameInfo(true);
+                igLogEvent("gameInfo");
             }, []),
         },
         {
@@ -248,6 +259,7 @@ const GameLayout = ({
         setShowGameLibrary(false);
         setShowPlayerList(false);
         setShowChat(false);
+        setShowGameInfo(false);
     }, [setShowGameLibrary, setShowPlayerList, setShowChat]);
 
     const statusClass = "status " + (statusCollapsed ? "status-collapsed" : "");
@@ -377,6 +389,18 @@ const GameLayout = ({
                             {enableToasts ? "Mute" : "Unmute"}
                         </PrimaryButton>
                     </ButtonGroup>
+                </div>
+            )}
+            {showGameInfo && (
+                <div className="component-frame">
+                    <GameDetail
+                        game={thisGame}
+                        allCategories={gameLibrary.categories}
+                    />
+                    <Spacer y={0.5} />
+                    <PrimaryButton onClick={hideAllWindows}>
+                        Close
+                    </PrimaryButton>
                 </div>
             )}
             <style jsx>{`
