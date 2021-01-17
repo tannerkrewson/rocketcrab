@@ -12,6 +12,7 @@ export enum GameStatus {
 }
 
 export enum SocketEvent {
+    CONNECT = "connect",
     DISCONNECT = "disconnect",
     RECONNECT = "reconnect",
     GAME_EXIT = "GAME_EXIT",

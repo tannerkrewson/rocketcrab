@@ -17,6 +17,7 @@ export const useRocketcrabClientSocket = ({
     isReconnect,
 }: UseRocketcrabClientSocketProps): UseRocketcrabClientSocketReturn => {
     const [partyState, setPartyState] = useState<ClientParty | undefined>();
+    const [socketConnected, setSocketConnected] = useState(socket?.connected);
     const [showReconnecting, setShowReconnecting] = useState(false);
 
     const { me, playerList, selectedGameId } = partyState || {};
@@ -24,6 +25,8 @@ export const useRocketcrabClientSocket = ({
     // only ran with initial value due to the []
     useEffect(() => {
         socket.open();
+
+        socket.on(SocketEvent.CONNECT, () => setSocketConnected(true));
 
         socket.on(SocketEvent.UPDATE, (newPartyState: ClientParty) => {
             setPartyState(newPartyState);
@@ -55,11 +58,14 @@ export const useRocketcrabClientSocket = ({
 
         return () => {
             socket.close();
+            setSocketConnected(false);
             setPartyState(undefined);
         };
     }, []);
 
     useEffect(() => {
+        if (!socketConnected) return;
+
         // "code" will be undefined during Automatic Static Optimization
         if (code && !partyState) {
             joinParty(code, cookiePartyState, isReconnect);
@@ -79,7 +85,7 @@ export const useRocketcrabClientSocket = ({
             socket.io.off(SocketEvent.RECONNECT);
             socket.off(SocketEvent.INVALID_PARTY);
         };
-    }, [code, partyState, isReconnect]);
+    }, [code, partyState, isReconnect, socketConnected]);
 
     const onNameEntry = useCallback((enteredName: string) => {
         socket.emit(SocketEvent.NAME, enteredName);
