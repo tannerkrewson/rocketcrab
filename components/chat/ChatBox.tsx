@@ -37,6 +37,7 @@ export const ChatBox = ({
     );
     const messagesEndRef = useRef(null);
     const checkSendTimeoutRef = useRef(null);
+    const [isFirstRender, setIsFirstRender] = useState(true);
 
     const handleConfirm = (e?) => {
         if (e) e.preventDefault();
@@ -60,11 +61,14 @@ export const ChatBox = ({
     useEffect(setSendDisabled, [msgToSend]);
 
     useEffect(() => {
-        if (isChatShowing && messagesEndRef.current) {
+        if (!isFirstRender && isChatShowing && messagesEndRef.current) {
             messagesEndRef.current.scrollIntoView({ behavior: "smooth" });
             return;
         }
-    }, [chat]);
+        setIsFirstRender(false);
+        // the isFirstRender check prevents the page from scrolling to the chat
+        // box when first entering the party screen, after selecting a game, etc.
+    }, [chat.length]);
 
     useEffect(() => {
         if (isChatShowing) {
