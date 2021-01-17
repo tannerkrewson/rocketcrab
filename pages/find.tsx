@@ -14,11 +14,9 @@ import {
 import { GetServerSideProps } from "next";
 import { getClientGameLibrary } from "../config";
 import PublicGame from "../components/find/PublicGame";
-import { Spacer } from "@geist-ui/react";
 import Swal from "sweetalert2";
-import { FindTime } from "../components/find/FindTime";
-import { Countdown } from "../components/find/Countdown";
 import GameDetail from "../components/detail/GameDetail";
+import { FinderInfoCard } from "../components/find/FinderInfoCard";
 
 const socket = io();
 const CLIENT_GAME_LIBRARY = getClientGameLibrary();
@@ -103,74 +101,53 @@ export const Find = ({
         );
     }
 
-    const scs = subscriberCount === 1;
-
     return (
         <PageLayout reconnecting={showReconnecting}>
             <div className="description">Public Parties (beta)</div>
             {isActive ? (
                 <>
-                    {publicPartyList?.map((party) => (
-                        <PublicGame
-                            key={party.code}
-                            party={party}
-                            gameLibrary={gameLibrary}
-                            onWhatIs={setGameInfoVisible}
-                        />
-                    ))}
-                    {!finderState?.publicPartyList?.length &&
-                        "No public parties found. 😞 You should make one! 🥰 "}
-                    {subscriberCount > 0 && (
+                    {publicPartyList?.length ? (
+                        publicPartyList?.map((party) => (
+                            <PublicGame
+                                key={party.code}
+                                party={party}
+                                gameLibrary={gameLibrary}
+                                onWhatIs={setGameInfoVisible}
+                            />
+                        ))
+                    ) : (
                         <div style={{ textAlign: "center" }}>
-                            <Spacer y={1} />
-                            There {scs ? "is " : "are "}
-                            {subscriberCount} other
-                            {scs ? " person " : " people "}
-                            here still looking for a party to choose!
+                            No public parties found. 😞{" "}
+                            <div style={{ display: "inline-block" }}>
+                                You should make one! 🥰
+                            </div>
                         </div>
                     )}
-                    {finderActiveDates?.lastStart && (
-                        <>
-                            <Spacer y={0.5} />
-                            <Countdown
-                                start={
-                                    finderActiveDates.lastStart +
-                                    FINDER_ACTIVE_MS
-                                }
-                            >
-                                Public parties will close
-                            </Countdown>
-                        </>
-                    )}
-                    <Spacer y={1.1} />
+                    <FinderInfoCard
+                        subscriberCount={subscriberCount}
+                        subscriberCountMsg="here still looking for a party to choose!"
+                        showCountdown={!!finderActiveDates?.lastStart}
+                        countdownStart={
+                            finderActiveDates.lastStart + FINDER_ACTIVE_MS
+                        }
+                        countdownMsg="Public parties will close"
+                    />
                 </>
             ) : (
-                finderActiveDates && (
-                    <div style={{ textAlign: "center" }}>
-                        <div>
-                            To make sure there are enough players, public games
-                            open roughly every four hours from Thursday to
-                            Saturday.
-                        </div>
-                        {subscriberCount > 0 && (
-                            <div>
-                                <Spacer y={1} />
-                                There {scs ? "is " : "are "}
-                                {subscriberCount} other
-                                {scs ? " person " : " people "}
-                                waiting on this page.
-                            </div>
-                        )}
-                        <Spacer y={0.5} />
-                        <Countdown start={finderActiveDates.nextStart}>
-                            Public parties will open next
-                        </Countdown>
-
-                        <FindTime dates={finderActiveDates.nextWeekOfStarts} />
-
-                        <Spacer y={1.1} />
+                <div style={{ textAlign: "center" }}>
+                    <div>
+                        To make sure there are enough players, public games open
+                        roughly every four hours from Thursday to Saturday.
                     </div>
-                )
+                    <FinderInfoCard
+                        subscriberCount={subscriberCount}
+                        subscriberCountMsg="waiting on this page."
+                        showCountdown={!!finderActiveDates?.nextStart}
+                        countdownStart={finderActiveDates?.nextStart}
+                        countdownMsg="Public parties will close"
+                        findTimeDates={finderActiveDates?.nextWeekOfStarts}
+                    />
+                </div>
             )}
 
             <ButtonGroup>
