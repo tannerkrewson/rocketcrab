@@ -38,7 +38,7 @@ const game: ServerGame = {
         "https://i.imgur.com/gAYGUUC.jpg",
         "https://i.imgur.com/8VMpYns.jpg",
     ],
-    getJoinGameUrl: async () => {
+    connectToGame: async () => {
         const newUrl = "https://spyfall.tannerkrewson.com/new";
         const { gameCode } = await postJson(newUrl);
         return {

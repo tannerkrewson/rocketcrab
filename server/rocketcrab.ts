@@ -325,7 +325,7 @@ export const startGame = async (
     });
 
     try {
-        gameState.joinGameURL = await game.getJoinGameUrl();
+        gameState.joinGameURL = await game.connectToGame();
     } catch (e) {
         console.error(e);
 

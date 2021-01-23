@@ -20,7 +20,7 @@ const game: ServerGame = {
         "https://i.imgur.com/690VrZJ.jpg",
         "https://i.imgur.com/X4BZKmA.jpg",
     ],
-    getJoinGameUrl: async () => {
+    connectToGame: async () => {
         return {
             playerURL:
                 "https://www.qwiqwit.com/autojoin/" +

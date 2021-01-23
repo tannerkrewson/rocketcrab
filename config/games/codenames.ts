@@ -20,7 +20,7 @@ const game: ServerGame = {
         "https://i.imgur.com/fFKfyEN.jpg",
     ],
 
-    getJoinGameUrl: async () => {
+    connectToGame: async () => {
         const {
             game: { name },
             player: { credential },

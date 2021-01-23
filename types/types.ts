@@ -90,7 +90,7 @@ export type BasedOn = {
 };
 
 export type ServerGame = ClientGame & {
-    getJoinGameUrl: () => Promise<JoinGameURL>;
+    connectToGame: () => Promise<JoinGameURL>;
 };
 
 export type JoinGameURL = {

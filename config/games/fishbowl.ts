@@ -25,7 +25,7 @@ const game: ServerGame = {
     category: ["easy"],
     players: "4+",
     familyFriendly: true,
-    getJoinGameUrl: async () => {
+    connectToGame: async () => {
         const newGameUrl = "https://fishbowl-graphql.onrender.com/v1/graphql";
         const {
             data: {

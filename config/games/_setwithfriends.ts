@@ -21,7 +21,7 @@ const game: ServerGame = {
 
     familyFriendly: true,
 
-    getJoinGameUrl: async () => {
+    connectToGame: async () => {
         const roomName =
             "rocketcrab-" + Math.random().toString(36).substring(8);
 

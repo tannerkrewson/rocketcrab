@@ -30,7 +30,7 @@ const game: ServerGame = {
         "https://i.imgur.com/hMeiX8k.jpg",
         "https://i.imgur.com/plGWABz.jpg",
     ],
-    getJoinGameUrl: async () => {
+    connectToGame: async () => {
         const id = randomBytes(8).toString("hex");
         return {
             playerURL: "https://just1.herokuapp.com/room/rocketcrab-" + id,

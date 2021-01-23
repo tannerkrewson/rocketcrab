@@ -30,7 +30,7 @@ const game: ServerGame = {
     familyFriendly: true,
     minPlayers: 1,
     maxPlayers: Infinity,
-    getJoinGameUrl: async () => {
+    connectToGame: async () => {
         const newUrl = "https://drawphone.tannerkrewson.com/new";
         const { gameCode } = await postJson(newUrl);
         return {

@@ -25,7 +25,7 @@ const game: ServerGame = {
         "https://i.imgur.com/cuGMgKv.jpg",
         "https://i.imgur.com/u36UW03.jpg",
     ],
-    getJoinGameUrl: async () => {
+    connectToGame: async () => {
         const id = randomBytes(8).toString("hex");
         return {
             playerURL: "https://longwave.web.app/rocketcrab-" + id,

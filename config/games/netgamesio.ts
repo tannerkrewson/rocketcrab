@@ -29,7 +29,7 @@ const gameTemplate = (
     pictures,
     ...(guideUrl ? { guideUrl } : {}),
     ...(guideId ? { guideId } : {}),
-    getJoinGameUrl: async () => {
+    connectToGame: async () => {
         const newGame = await fetch(
             "https://netgames.io/games/" + urlId + "/new"
         );

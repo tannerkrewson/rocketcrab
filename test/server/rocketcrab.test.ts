@@ -38,7 +38,7 @@ jest.mock("../../config", () => ({
                 {
                     id: "jd-foogame",
                     name: "FooGame",
-                    getJoinGameUrl: async () => ({
+                    connectToGame: async () => ({
                         playerURL: "foogame.com",
                     }),
                 } as ServerGame,
@@ -46,7 +46,7 @@ jest.mock("../../config", () => ({
                 ({
                     id: "brokengame",
                     name: "BrokenGame",
-                    getJoinGameUrl: async () => {
+                    connectToGame: async () => {
                         throw Error;
                     },
                 } as unknown) as ServerGame,
@@ -433,7 +433,7 @@ describe("server/rocketcrab.ts", () => {
         expect(mockParty.status).toBe(PartyStatus.ingame);
         expect(mockParty.gameState.status).toBe(GameStatus.waitingforhost);
 
-        // TODO: test call to getJoinGameUrl
+        // TODO: test call to connectToGame
     });
 
     it("startGame fails if game doesn't exist", async () => {

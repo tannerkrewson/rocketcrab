@@ -69,7 +69,7 @@ const game: ServerGame = {
     // see https://github.com/tannerkrewson/rocketcrab#step-2-creating-a-config-file
     // note that this will be running on the rocketcrab server, and will run once per party, not per player.
     // this function will be ran in a try catch, so no need to worry about crashing the server! 😆
-    getJoinGameUrl: async () => {
+    connectToGame: async () => {
         // this is an example of one way it could be done. you could put any code here to do what you need to do!
         // check other config files for more exmaples.
 

@@ -32,7 +32,7 @@ const SERVER_GAME_LIST: Array<ServerGame> = fs
 const getClientGameList = (): Array<ClientGame> =>
     SERVER_GAME_LIST.map(
         // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        ({ getJoinGameUrl, ...clientGame }): ClientGame => clientGame
+        ({ connectToGame, ...clientGame }): ClientGame => clientGame
     );
 
 export const getServerGameLibrary = (): ServerGameLibrary => ({

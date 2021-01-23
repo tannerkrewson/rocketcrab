@@ -11,7 +11,7 @@ const game: ServerGame = {
     category: ["trivia", "medium"],
     players: "1+",
     familyFriendly: true,
-    getJoinGameUrl: async () => {
+    connectToGame: async () => {
         const id = randomBytes(8).toString("hex");
         return {
             playerURL: "https://protobowl.com/rocketcrab-" + id,

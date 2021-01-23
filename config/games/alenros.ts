@@ -2,7 +2,7 @@ import { ServerGame } from "../../types/types";
 import { randomBytes } from "crypto";
 import { newPromiseWebSocket } from "../../utils/utils";
 
-const getJoinGameUrl = (wsUrl, baseUrl) => async () => {
+const connectToGame = (wsUrl, baseUrl) => async () => {
     const ws = newPromiseWebSocket(wsUrl);
 
     // random 5-digit number
@@ -81,7 +81,7 @@ const game: Array<ServerGame> = [
             "https://i.imgur.com/Zn9oupF.jpg",
             "https://i.imgur.com/R0kbS1H.jpg",
         ],
-        getJoinGameUrl: getJoinGameUrl(
+        connectToGame: connectToGame(
             "wss://fake-artist.herokuapp.com/sockjs/rocketcrab/rocketcrab/websocket",
             "https://fake-artist.herokuapp.com/"
         ),
@@ -110,7 +110,7 @@ const game: Array<ServerGame> = [
             "https://i.imgur.com/MasoMRt.jpg",
             "https://i.imgur.com/3PBQodp.jpg",
         ],
-        getJoinGameUrl: getJoinGameUrl(
+        connectToGame: connectToGame(
             "wss://insider-online.herokuapp.com/sockjs/rocketcrab/rocketcrab/websocket",
             "https://insider-online.herokuapp.com/"
         ),

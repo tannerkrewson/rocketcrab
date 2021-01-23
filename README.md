@@ -36,7 +36,7 @@ That's it! Many existing games already offer these, and can work with rocketcrab
 
 ### Creating a config file
 
-The config files, as mentioned above, should be fairly self explanatory. Along with the [config template](https://github.com/tannerkrewson/rocketcrab/blob/master/config/games/_template.ts), check out the config files of other games to see how they implement rocketcrab. The most important part, which will be explained here, is the `getJoinGameUrl` function. This function:
+The config files, as mentioned above, should be fairly self explanatory. Along with the [config template](https://github.com/tannerkrewson/rocketcrab/blob/master/config/games/_template.ts), check out the config files of other games to see how they implement rocketcrab. The most important part, which will be explained here, is the `connectToGame` function. This function:
 
 -   is `async`, which will allow you to use `await` to make `GET` or `POST` requests.
 -   needs to return an object with these properties:
@@ -45,15 +45,15 @@ The config files, as mentioned above, should be fairly self explanatory. Along w
     -   `customQueryParams` (optional) a record of query params in addition to or to replace the automatic query params. See the [config template](https://github.com/tannerkrewson/rocketcrab/blob/master/config/games/_template.ts) for more info.
     -   `afterQueryParams` (optional) string that will be appended to the `playerURL` after automatic and custom query params are applied.
 
-Here are three examples of different `getJoinGameUrl` functions:
+Here are three examples of different `connectToGame` functions:
 
--   For [Drawphone](https://github.com/tannerkrewson/rocketcrab/blob/a3f796af7f6b70100b1dcf9ab141d73fea41e049/config/games/drawphone.ts#L18-L25), a new game can be generated with a `POST` request to the `/new`, which will return a game code. In it's `getJoinGameUrl` function, the `/new` endpoint is called, and the resulting game code is returned in the `code` property, which will add the code as a query param called `code` to the `playerURL` that is opened in each player's `iframe`.
--   For [Spyfall](https://github.com/tannerkrewson/rocketcrab/blob/a3f796af7f6b70100b1dcf9ab141d73fea41e049/config/games/spyfall.ts#L18-L24), a new game can be generated in the exact same way as Drawphone. But, game links are required to take the format `spyfall.tannerkrewson.com/abcd`, and not `drawphone.tannerkrewson.com/?code=abcd` like the above example. So, instead of returning the game code from `getJoinGameUrl` in the `code` property, the game code is directly appended to the `playerURL` before it is returned from `getJoinGameUrl`.
--   For [Just One](https://github.com/tannerkrewson/rocketcrab/blob/a3f796af7f6b70100b1dcf9ab141d73fea41e049/config/games/justone.ts#L14-L19), we can pick our own game code! So, instead of calling to some endpoint to get a game code like Drawphone and Spyfall, the `getJoinGameUrl` function can itself generate a code, and we cross our fingers and hope it's unique! 😂 The resulting `playerURL` will look something like this: `https://just1.herokuapp.com/room/rocketcrab-d5b30ccdd25855e5`.
+-   For [Drawphone](https://github.com/tannerkrewson/rocketcrab/blob/a3f796af7f6b70100b1dcf9ab141d73fea41e049/config/games/drawphone.ts#L18-L25), a new game can be generated with a `POST` request to the `/new`, which will return a game code. In it's `connectToGame` function, the `/new` endpoint is called, and the resulting game code is returned in the `code` property, which will add the code as a query param called `code` to the `playerURL` that is opened in each player's `iframe`.
+-   For [Spyfall](https://github.com/tannerkrewson/rocketcrab/blob/a3f796af7f6b70100b1dcf9ab141d73fea41e049/config/games/spyfall.ts#L18-L24), a new game can be generated in the exact same way as Drawphone. But, game links are required to take the format `spyfall.tannerkrewson.com/abcd`, and not `drawphone.tannerkrewson.com/?code=abcd` like the above example. So, instead of returning the game code from `connectToGame` in the `code` property, the game code is directly appended to the `playerURL` before it is returned from `connectToGame`.
+-   For [Just One](https://github.com/tannerkrewson/rocketcrab/blob/a3f796af7f6b70100b1dcf9ab141d73fea41e049/config/games/justone.ts#L14-L19), we can pick our own game code! So, instead of calling to some endpoint to get a game code like Drawphone and Spyfall, the `connectToGame` function can itself generate a code, and we cross our fingers and hope it's unique! 😂 The resulting `playerURL` will look something like this: `https://just1.herokuapp.com/room/rocketcrab-d5b30ccdd25855e5`.
 
 ### The automatic query params
 
-The `playerURL` returned from `getJoinGameUrl` is automatically appended with 3 query params. The resulting `playerURL` that is opened in every player's `iframe` will look something like this:
+The `playerURL` returned from `connectToGame` is automatically appended with 3 query params. The resulting `playerURL` that is opened in every player's `iframe` will look something like this:
 
 ```
 https://yourgame.com/?rocketcrab=true&name=Mary&ishost=true

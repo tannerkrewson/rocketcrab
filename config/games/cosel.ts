@@ -33,7 +33,7 @@ const game: ServerGame = {
         "https://i.imgur.com/EEHgiYM.jpg",
     ],
 
-    getJoinGameUrl: async () => {
+    connectToGame: async () => {
         const res = await fetch("https://warhol.cosel.io/api/games", {
             method: "POST",
             headers: { sessionId: Math.random().toString(36).substring(7) },

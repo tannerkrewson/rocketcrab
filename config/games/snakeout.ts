@@ -34,7 +34,7 @@ const game: ServerGame = {
         "https://i.imgur.com/w568hdf.jpg",
         "https://i.imgur.com/00tlDOB.jpg",
     ],
-    getJoinGameUrl: async () => {
+    connectToGame: async () => {
         const newUrl = "https://snakeout.tannerkrewson.com/new";
         const { gameCode } = await postJson(newUrl);
         return {
