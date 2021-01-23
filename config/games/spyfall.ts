@@ -42,7 +42,7 @@ const game: ServerGame = {
         const newUrl = "https://spyfall.tannerkrewson.com/new";
         const { gameCode } = await postJson(newUrl);
         return {
-            playerURL: "https://spyfall.tannerkrewson.com/" + gameCode,
+            player: { url: "https://spyfall.tannerkrewson.com/" + gameCode },
         };
     },
 };

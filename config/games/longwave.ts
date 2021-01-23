@@ -28,7 +28,7 @@ const game: ServerGame = {
     connectToGame: async () => {
         const id = randomBytes(8).toString("hex");
         return {
-            playerURL: "https://longwave.web.app/rocketcrab-" + id,
+            player: { url: "https://longwave.web.app/rocketcrab-" + id },
         };
     },
 };

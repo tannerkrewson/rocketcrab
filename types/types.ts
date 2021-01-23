@@ -90,12 +90,16 @@ export type BasedOn = {
 };
 
 export type ServerGame = ClientGame & {
-    connectToGame: () => Promise<JoinGameURL>;
+    connectToGame: () => Promise<ConnectedGame>;
 };
 
-export type JoinGameURL = {
-    playerURL: string;
-    hostURL?: string;
+export type ConnectedGame = {
+    player: ConnectedGameURL;
+    host?: Partial<ConnectedGameURL>; // this just makes the url optional for host
+};
+
+export type ConnectedGameURL = {
+    url: string;
     customQueryParams?: Record<string, string>;
     afterQueryParams?: string;
 };
@@ -120,7 +124,7 @@ export type ServerGameLibrary = {
 export type GameState = {
     status: GameStatus;
     error?: string;
-    joinGameURL?: JoinGameURL;
+    connectedGame?: ConnectedGame;
 };
 
 export type JoinPartyResponse = {

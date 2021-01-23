@@ -22,9 +22,11 @@ const game: ServerGame = {
     ],
     connectToGame: async () => {
         return {
-            playerURL:
-                "https://www.qwiqwit.com/autojoin/" +
-                randomBytes(8).toString("hex"),
+            player: {
+                url:
+                    "https://www.qwiqwit.com/autojoin/" +
+                    randomBytes(8).toString("hex"),
+            },
         };
     },
 };

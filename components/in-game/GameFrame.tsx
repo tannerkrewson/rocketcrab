@@ -1,6 +1,7 @@
 import { GameStatus } from "../../types/enums";
 import { Loading } from "@geist-ui/react";
 import { ClientGame, GameState, Player } from "../../types/types";
+import { useConnectedGame } from "../../utils/useConnectedGame";
 
 const GameFrame = ({
     gameState,
@@ -9,54 +10,18 @@ const GameFrame = ({
     thisPlayer,
     frameRefreshCount,
 }: GameFrameProps): JSX.Element => {
-    const {
-        status,
-        joinGameURL: {
-            playerURL,
-            hostURL,
-            customQueryParams,
-            afterQueryParams,
-        },
-    } = gameState;
+    const { status, connectedGame } = gameState;
 
-    const { renameParams } = thisGame;
-    const { name, isHost } = thisPlayer;
+    const { isHost } = thisPlayer;
 
-    const paramKeys = {
-        rocketcrab: "rocketcrab",
-        name: "name",
-        ishost: "ishost",
-        ...renameParams,
-    };
-
-    const defaultParams = {
-        rocketcrab: "true",
-        name,
-        ishost: isHost.toString(),
-    };
-
-    const params = {
-        ...Object.keys(paramKeys).reduce(
-            (acc, name) => ({
-                ...acc,
-                [paramKeys[name]]: defaultParams[name],
-            }),
-            {}
-        ),
-        ...customQueryParams,
-    };
-
-    const appendToUrl =
-        "?" + new URLSearchParams(params).toString() + (afterQueryParams ?? "");
+    const gameUrl = useConnectedGame(connectedGame, thisGame, thisPlayer);
 
     const showLoading = status === GameStatus.loading;
     const showError = status === GameStatus.error;
     const showWaitingForHost = !isHost && status === GameStatus.waitingforhost;
-    const showGameFrame = !isHost && status === GameStatus.inprogress;
-    const showHostGameFrame =
-        isHost &&
-        (status === GameStatus.inprogress ||
-            status === GameStatus.waitingforhost);
+    const showGameFrame =
+        (isHost && status === GameStatus.waitingforhost) ||
+        status === GameStatus.inprogress;
 
     return (
         <>
@@ -123,16 +88,9 @@ const GameFrame = ({
             {showGameFrame && (
                 <iframe
                     className="frame"
-                    src={playerURL + appendToUrl}
+                    src={gameUrl}
                     key={frameRefreshCount}
-                ></iframe>
-            )}
-            {showHostGameFrame && (
-                <iframe
-                    className="frame"
-                    src={hostURL + appendToUrl}
-                    key={frameRefreshCount}
-                    onLoad={onHostGameLoaded}
+                    onLoad={isHost ? onHostGameLoaded : undefined}
                 ></iframe>
             )}
             <style jsx>{`

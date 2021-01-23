@@ -38,9 +38,11 @@ const game: ServerGame = {
         const newUrl = "https://snakeout.tannerkrewson.com/new";
         const { gameCode } = await postJson(newUrl);
         return {
-            playerURL: "https://snakeout.tannerkrewson.com/",
-            customQueryParams: {
-                code: gameCode,
+            player: {
+                url: "https://snakeout.tannerkrewson.com/",
+                customQueryParams: {
+                    code: gameCode,
+                },
             },
         };
     },

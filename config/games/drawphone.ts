@@ -34,9 +34,11 @@ const game: ServerGame = {
         const newUrl = "https://drawphone.tannerkrewson.com/new";
         const { gameCode } = await postJson(newUrl);
         return {
-            playerURL: "https://drawphone.tannerkrewson.com/",
-            customQueryParams: {
-                code: gameCode,
+            player: {
+                url: "https://drawphone.tannerkrewson.com/",
+                customQueryParams: {
+                    code: gameCode,
+                },
             },
         };
     },

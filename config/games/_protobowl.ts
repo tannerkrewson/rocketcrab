@@ -14,7 +14,7 @@ const game: ServerGame = {
     connectToGame: async () => {
         const id = randomBytes(8).toString("hex");
         return {
-            playerURL: "https://protobowl.com/rocketcrab-" + id,
+            player: { url: "https://protobowl.com/rocketcrab-" + id },
         };
     },
 };

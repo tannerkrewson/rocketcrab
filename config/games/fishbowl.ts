@@ -36,7 +36,9 @@ const game: ServerGame = {
             variables: null,
         });
         return {
-            playerURL: "https://fishbowl-game.com/game/" + join_code + "/lobby",
+            player: {
+                url: "https://fishbowl-game.com/game/" + join_code + "/lobby",
+            },
         };
     },
     renameParams: {

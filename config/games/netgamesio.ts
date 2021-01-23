@@ -34,7 +34,7 @@ const gameTemplate = (
             "https://netgames.io/games/" + urlId + "/new"
         );
         return {
-            playerURL: newGame.url,
+            player: { url: newGame.url },
         };
     },
 });

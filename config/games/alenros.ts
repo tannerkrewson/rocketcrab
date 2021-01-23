@@ -42,7 +42,7 @@ const connectToGame = (wsUrl, baseUrl) => async () => {
     ws.close();
 
     return {
-        playerURL: baseUrl + accessCode,
+        player: { url: baseUrl + accessCode },
     };
 };
 

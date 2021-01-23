@@ -96,7 +96,6 @@ export const newParty = ({
         selectedGameId: "",
         gameState: {
             status: GameStatus.loading,
-            joinGameURL: { playerURL: "", hostURL: "" },
         },
         nextPlayerId: 0,
         idealHostId: 0,
@@ -325,7 +324,7 @@ export const startGame = async (
     });
 
     try {
-        gameState.joinGameURL = await game.connectToGame();
+        gameState.connectedGame = await game.connectToGame();
     } catch (e) {
         console.error(e);
 
@@ -336,12 +335,6 @@ export const startGame = async (
     }
 
     gameState.status = GameStatus.waitingforhost;
-
-    // if config does not provide a specific url for the host,
-    // just use the same one for the host as other players
-    if (!gameState.joinGameURL.hostURL) {
-        gameState.joinGameURL.hostURL = gameState.joinGameURL.playerURL;
-    }
 
     const host = getHost(playerList);
 
@@ -368,7 +361,8 @@ export const exitGame = (party: Party): void => {
 
     const { gameState } = party;
     gameState.status = GameStatus.loading;
-    gameState.joinGameURL = { playerURL: "", hostURL: "" };
+    delete gameState.connectedGame;
+    delete gameState.error;
 };
 
 export const getFinderState = ({

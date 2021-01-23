@@ -78,41 +78,65 @@ const game: ServerGame = {
         const jsonRes = await res.json();
 
         return {
-            playerURL: "https://coolgameonline.com/room/" + jsonRes.code, // required
-            hostURL:
-                "https://coolgameonline.com/room/" + jsonRes.code + "/host", // optional. if not used, rocketcrab host will use playerURL
+            player: {
+                url: "https://coolgameonline.com/room/" + jsonRes.code, // required
+
+                /*
+                    if you want to add (or replace!) the automatic query params 
+                    (see the readme for a list of these), use customQueryParams!
+                    
+                    with the below customQueryParams, playerURL would look 
+                    something like:
+                    https://coolgameonline.com/room/abcd/?rocketcrab=haha&name=Mary&ishost=false&foo=bar&baz=qux
+
+                    Note: Prefer to use the renameParams (detailed below) over 
+                    customQueryParams if possible.
+                */
+                customQueryParams: {
+                    foo: "bar",
+                    baz: "qux",
+                    rocketcrab: "haha", // this is an example of replacing an automatic query param
+                }, // optional
+
+                /*
+                    query params will be appended to playerURL and hostURL 
+                    automatically. a string provided to afterQueryParams will be 
+                    appended after that!
+
+                    with the below afterQueryParams, playerURL would look something 
+                    like:
+                    https://coolgameonline.com/room/abcd/?rocketcrab=true&name=Mary&ishost=false#foo
+                */
+                afterQueryParams: "#foo", // optional
+
+                /*
+                    NOTE: feel free to use both customQueryParams and afterQueryParams
+                    together! afterQueryParams will be appended after the automatic
+                    and custom query params.
+                */
+            }, // required
 
             /*
-                query params will be appended to playerURL and hostURL 
-                automatically. a string provided to afterQueryParams will be 
-                appended after that!
-
-                with the below afterQueryParams, playerURL would look something 
-                like:
-                https://coolgameonline.com/room/abcd/?rocketcrab=true&name=Mary&ishost=false#foo
-            */
-            afterQueryParams: "#foo", // optional
-
-            /*
-                if you want to add (or replace!) the automatic query params 
-                (see the readme for a list of these), use customQueryParams!
+                If you want the host player to use a different url, 
+                customQueryParams, and/or afterQueryParams, include this host 
+                property!
                 
-                with the below customQueryParams, playerURL would look 
-                something like:
-                https://coolgameonline.com/room/abcd/?rocketcrab=haha&name=Mary&ishost=false&foo=bar&baz=qux
+                This property itself and everything in it is optional.
 
-                Note: Prefer to use the renameParams (detailed below) over 
-                customQueryParams if possible.
+                If this host property or anything it contains is not included, 
+                rocketcrab will use whatever was set in the above player 
+                property for the host.
+                
+                If you want the host player to NOT have something that was 
+                included in the player property, you will need to include it in 
+                the host property and set it as blank or otherwise.
             */
-            customQueryParams: {
-                foo: "bar",
-                baz: "qux",
-                rocketcrab: "haha", // this is an example of replacing an automatic query param
+            host: {
+                url:
+                    "https://coolgameonline.com/room/" + jsonRes.code + "/host", // optional. if not used, rocketcrab host will use playerURL
+                customQueryParams: {}, // optional. see player property for details.
+                afterQueryParams: "", // optional. see player property for details.
             }, // optional
-
-            // feel free to use both customQueryParams and afterQueryParams
-            // together! afterQueryParams will be appended after the automatic
-            // and custom query params.
         };
     }, // required
 

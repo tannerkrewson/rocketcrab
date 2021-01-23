@@ -41,7 +41,7 @@ const game: ServerGame = {
         const jsonRes = await res.json();
 
         return {
-            playerURL: "https://cosel.io/game/" + jsonRes.game.hash,
+            player: { url: "https://cosel.io/game/" + jsonRes.game.hash },
         };
     },
 };

@@ -39,7 +39,7 @@ jest.mock("../../config", () => ({
                     id: "jd-foogame",
                     name: "FooGame",
                     connectToGame: async () => ({
-                        playerURL: "foogame.com",
+                        player: { url: "foogame.com" },
                     }),
                 } as ServerGame,
                 { id: "lk-coolgame", name: "CoolGame" } as ServerGame,
@@ -474,9 +474,10 @@ describe("server/rocketcrab.ts", () => {
             selectedGameId: "FooGame",
             gameState: {
                 status: GameStatus.inprogress,
-                joinGameURL: {
-                    playerURL: "test.com",
-                    hostURL: "host.com",
+                error: "ahhhhh",
+                connectedGame: {
+                    player: { url: "test.com" },
+                    host: {},
                 },
             },
         });
@@ -485,8 +486,8 @@ describe("server/rocketcrab.ts", () => {
 
         expect(mockParty.status).toBe(PartyStatus.party);
         expect(mockParty.gameState.status).toBe(GameStatus.loading);
-        expect(mockParty.gameState.joinGameURL.playerURL).toBe("");
-        expect(mockParty.gameState.joinGameURL.hostURL).toBe("");
+        expect(mockParty.gameState.error).toBeUndefined();
+        expect(mockParty.gameState.connectedGame).toBeUndefined();
     });
 
     it("getFinderState works", () => {

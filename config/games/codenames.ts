@@ -37,7 +37,7 @@ const game: ServerGame = {
         }, 10 * 1000);
 
         return {
-            playerURL: "https://codenames.game/room/" + name,
+            player: { url: "https://codenames.game/room/" + name },
         };
     },
 

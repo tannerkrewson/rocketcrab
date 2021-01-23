@@ -33,7 +33,9 @@ const game: ServerGame = {
     connectToGame: async () => {
         const id = randomBytes(8).toString("hex");
         return {
-            playerURL: "https://just1.herokuapp.com/room/rocketcrab-" + id,
+            player: {
+                url: "https://just1.herokuapp.com/room/rocketcrab-" + id,
+            },
         };
     },
 };

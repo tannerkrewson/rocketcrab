@@ -59,7 +59,7 @@ const game: ServerGame = {
         );
 
         return {
-            playerURL: "https://setwithfriends.com/room/" + roomName,
+            player: { url: "https://setwithfriends.com/room/" + roomName },
         };
     },
 };
