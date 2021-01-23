@@ -96,7 +96,7 @@ export type ServerGame = ClientGame & {
 export type JoinGameURL = {
     playerURL: string;
     hostURL?: string;
-    code?: string;
+    customQueryParams?: Record<string, string>;
     afterQueryParams?: string;
 };
 

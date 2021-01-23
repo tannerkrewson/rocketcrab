@@ -11,7 +11,12 @@ const GameFrame = ({
 }: GameFrameProps): JSX.Element => {
     const {
         status,
-        joinGameURL: { playerURL, hostURL, code, afterQueryParams },
+        joinGameURL: {
+            playerURL,
+            hostURL,
+            customQueryParams,
+            afterQueryParams,
+        },
     } = gameState;
 
     const { renameParams } = thisGame;
@@ -21,7 +26,6 @@ const GameFrame = ({
         rocketcrab: "rocketcrab",
         name: "name",
         ishost: "ishost",
-        ...(code ? { code: "code" } : {}),
         ...renameParams,
     };
 
@@ -29,16 +33,18 @@ const GameFrame = ({
         rocketcrab: "true",
         name,
         ishost: isHost.toString(),
-        ...(code ? { code } : {}),
     };
 
-    const params = Object.keys(paramKeys).reduce(
-        (acc, name) => ({
-            ...acc,
-            [paramKeys[name]]: defaultParams[name],
-        }),
-        {}
-    );
+    const params = {
+        ...Object.keys(paramKeys).reduce(
+            (acc, name) => ({
+                ...acc,
+                [paramKeys[name]]: defaultParams[name],
+            }),
+            {}
+        ),
+        ...customQueryParams,
+    };
 
     const appendToUrl =
         "?" + new URLSearchParams(params).toString() + (afterQueryParams ?? "");

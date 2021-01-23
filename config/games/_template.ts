@@ -81,29 +81,62 @@ const game: ServerGame = {
             playerURL: "https://coolgameonline.com/room/" + jsonRes.code, // required
             hostURL:
                 "https://coolgameonline.com/room/" + jsonRes.code + "/host", // optional. if not used, rocketcrab host will use playerURL
-            code: jsonRes, // optional. will be appended to playerURL and hostURL as a query param. so like ?code=abcd
-            afterQueryParams: "#foo", // optional. query params will be appended to playerURL and hostURL automatically. this string will be appended after that!
-            // ^ with this afterQueryParams, playerURL would look like: https://coolgameonline.com/room/abcd/?rocketcrab=true&name=Mary&ishost=true&code=abcd#foo
+
+            /*
+                query params will be appended to playerURL and hostURL 
+                automatically. a string provided to afterQueryParams will be 
+                appended after that!
+
+                with the below afterQueryParams, playerURL would look something 
+                like:
+                https://coolgameonline.com/room/abcd/?rocketcrab=true&name=Mary&ishost=false#foo
+            */
+            afterQueryParams: "#foo", // optional
+
+            /*
+                if you want to add (or replace!) the automatic query params 
+                (see the readme for a list of these), use customQueryParams!
+                
+                with the below customQueryParams, playerURL would look 
+                something like:
+                https://coolgameonline.com/room/abcd/?rocketcrab=haha&name=Mary&ishost=false&foo=bar&baz=qux
+
+                Note: Prefer to use the renameParams (detailed below) over 
+                customQueryParams if possible.
+            */
+            customQueryParams: {
+                foo: "bar",
+                baz: "qux",
+                rocketcrab: "haha", // this is an example of replacing an automatic query param
+            }, // optional
+
+            // feel free to use both customQueryParams and afterQueryParams
+            // together! afterQueryParams will be appended after the automatic
+            // and custom query params.
         };
     }, // required
 
     /*
-       By default, rocketcrab will automatically apply some params to playerURL like so:
+       By default, rocketcrab will automatically apply some params to playerURL 
+       like so:
 
-       https://yourgame.com/?rocketcrab=true&name=Mary&ishost=true&code=abcd
+       https://yourgame.com/?rocketcrab=true&name=Mary&ishost=true
 
-       If you need those values to have different key names, use renameParams. For example,
-       the below renameParams will make the above URL look like this instead:
+       If you need those values to have different key names, use renameParams.
+       For example, the below renameParams will make the above URL look like 
+       this instead:
 
-       https://yourgame.com/?boosterfish=true&nickname=Mary&admin=true&gamecode=abcd
+       https://yourgame.com/?boosterfish=true&nickname=Mary&admin=true
 
        You don't need to include all of them; just the ones you need.
+
+       If you want to replace the values of these properties and not just the
+       names, use customQueryParams.
     */
     renameParams: {
         rocketcrab: "boosterfish",
         name: "nickname",
         ishost: "admin",
-        code: "gamecode",
     }, // optional
 };
 

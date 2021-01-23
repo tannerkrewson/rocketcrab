@@ -42,7 +42,8 @@ The config files, as mentioned above, should be fairly self explanatory. Along w
 -   needs to return an object with these properties:
     -   `playerURL` (required) string of the url that should be opened in every player's `iframe`.
     -   `hostURL` (optional) string of a url to be opened only in the "host" player's `iframe`. If not provided, the `playerURL` will be used.
-    -   `code` (optional) the code to be added to the `playerURL` as `code` (see the next section for further explanation)
+    -   `customQueryParams` (optional) a record of query params in addition to or to replace the automatic query params. See the [config template](https://github.com/tannerkrewson/rocketcrab/blob/master/config/games/_template.ts) for more info.
+    -   `afterQueryParams` (optional) string that will be appended to the `playerURL` after automatic and custom query params are applied.
 
 Here are three examples of different `getJoinGameUrl` functions:
 
@@ -52,10 +53,10 @@ Here are three examples of different `getJoinGameUrl` functions:
 
 ### The automatic query params
 
-The `playerURL` returned from `getJoinGameUrl` is automatically appended with 3 or 4 query params. Four if a `code` is returned `getJoinGameUrl`, four if not. The resulting `playerURL` that is opened in every player's `iframe` will look something like this:
+The `playerURL` returned from `getJoinGameUrl` is automatically appended with 3 query params. The resulting `playerURL` that is opened in every player's `iframe` will look something like this:
 
 ```
-https://yourgame.com/?rocketcrab=true&name=Mary&ishost=true&code=abcd
+https://yourgame.com/?rocketcrab=true&name=Mary&ishost=true
 ```
 
 -   `rocketcrab` will always be true, well, if you're using rocketcrab, that is! 😂 You can use this to put your game into a "rocketcrab" mode. Here are some ideas for how this could be helpful:
@@ -65,7 +66,7 @@ https://yourgame.com/?rocketcrab=true&name=Mary&ishost=true&code=abcd
 -   `ishost` is `true` for the one player that is the host of the rocketcrab party, and `false` for all other players. A few caveats:
     -   I included this in case some one needed it, but implementing this in your game could allow any player that knows about it to make themselves host, especially outside of rocketcrab, so I don't recommend it.
     -   In Drawphone, for example, the first player who joins a party is made the host. So, rocketcrab will load the host's `iframe` first, and will wait a few seconds before opening the `iframe` of the rest of the players. This is not a guaranteed solution, as the `iframe` API does not allow rocketcrab to know when its page has loaded.
--   `code` is the same `string` that is returned from `getJoinGameUrl`'s `code` property. If that `code` property is not provided, this query param will not be included.
+-   There used to be an automatic `code` parameter for the game code. This was removed in favor of using a custom query param, detailed further in the template.
 
 ### 🚀🦀 for your existing players
 
