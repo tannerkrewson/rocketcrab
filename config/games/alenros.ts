@@ -102,8 +102,7 @@ const game: Array<ServerGame> = [
         category: ["medium"],
         players: "4-8",
         familyFriendly: true,
-        guideUrl:
-            "https://www.ultraboardgames.com/a-fake-artist-goes-to-new-york/game-rules.php",
+        guideUrl: "https://www.ultraboardgames.com/insider/game-rules.php",
         pictures: [
             "https://i.imgur.com/i3rYxXt.jpg",
             "https://i.imgur.com/yy0ZpvT.jpg",
