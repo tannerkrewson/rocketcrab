@@ -11,7 +11,7 @@ const GameFrame = ({
 }: GameFrameProps): JSX.Element => {
     const {
         status,
-        joinGameURL: { playerURL, hostURL, code },
+        joinGameURL: { playerURL, hostURL, code, afterQueryParams },
     } = gameState;
 
     const { renameParams } = thisGame;
@@ -40,7 +40,8 @@ const GameFrame = ({
         {}
     );
 
-    const appendToUrl = "?" + new URLSearchParams(params).toString();
+    const appendToUrl =
+        "?" + new URLSearchParams(params).toString() + (afterQueryParams ?? "");
 
     const showLoading = status === GameStatus.loading;
     const showError = status === GameStatus.error;

@@ -97,6 +97,7 @@ export type JoinGameURL = {
     playerURL: string;
     hostURL?: string;
     code?: string;
+    afterQueryParams?: string;
 };
 
 export type GameCategory = {

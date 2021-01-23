@@ -82,6 +82,8 @@ const game: ServerGame = {
             hostURL:
                 "https://coolgameonline.com/room/" + jsonRes.code + "/host", // optional. if not used, rocketcrab host will use playerURL
             code: jsonRes, // optional. will be appended to playerURL and hostURL as a query param. so like ?code=abcd
+            afterQueryParams: "#foo", // optional. query params will be appended to playerURL and hostURL automatically. this string will be appended after that!
+            // ^ with this afterQueryParams, playerURL would look like: https://coolgameonline.com/room/abcd/?rocketcrab=true&name=Mary&ishost=true&code=abcd#foo
         };
     }, // required
 
