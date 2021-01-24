@@ -5,18 +5,7 @@ const GameInfo = ({ game }: GameInfoProps): JSX.Element => (
     <SkinnyCard>
         {game.basedOn && (
             <div className="info">
-                {game.basedOn.bggId ? (
-                    <a
-                        href={`https://boardgamegeek.com/boardgame/${game.basedOn.bggId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                    >
-                        <span className="emoji">🎲</span>
-                    </a>
-                ) : (
-                    <span className="emoji">🎲</span>
-                )}
-                Based on{" "}
+                <span className="emoji">🎲</span> Based on{" "}
                 {game.basedOn.link ? (
                     <a
                         href={game.basedOn.link}
@@ -62,6 +51,18 @@ const GameInfo = ({ game }: GameInfoProps): JSX.Element => (
                     rel="noopener noreferrer"
                 >
                     {game.donationUrlText}
+                </a>
+            </div>
+        )}
+        {game.basedOn.bggId && (
+            <div className="info">
+                <span className="emoji">📙</span> More information on{" "}
+                <a
+                    href={`https://boardgamegeek.com/boardgame/${game.basedOn.bggId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    BoardGameGeek
                 </a>
             </div>
         )}
