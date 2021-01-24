@@ -45,10 +45,10 @@ const games: Array<ServerGame> = [
         description:
             "The Loyal Servants of Arthur are on a quest for the Holy Grail. However, the evil Minions of Mordred are amidst the good, and they wish to destroy their prize. They are well hidden, and are colluding in secret. Merlin knows where the Evil ones lie, but cannot reveal his knowledge for he will die if they learn his identity. Can the quest succeed despite the treachery afoot?",
         basedOn: {
-            game: "Avalon",
+            game: "The Resistance: Avalon",
             author: "Don Eskridge",
             link:
-                "https://www.amazon.com/Resistance-Avalon-Social-Deduction-Game/dp/B009SAAV0C",
+                "https://indieboardsandcards.com/index.php/our-games/the-resistance-avalon/",
         },
         category: ["netgamesio", "medium"],
         players: "5-10",
@@ -184,8 +184,7 @@ const games: Array<ServerGame> = [
         basedOn: {
             game: "Decrypto",
             author: "Thomas Dagenais-Lespérance",
-            link:
-                "https://www.amazon.com/IELLO-IEL00072-Decrypto-Board-Game/dp/B0765KL7B8",
+            link: "https://iellousa.com/products/decrypto",
         },
         category: ["netgamesio", "hard"],
         players: "4+",
