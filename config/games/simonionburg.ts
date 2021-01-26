@@ -6,7 +6,7 @@ const game: ServerGame = {
 	name: "Simonionburg",
 	author: "Simon Weisse",
 	basedOn: {
-		game: "Quacks of Quedlinburg and Dominion (losely)",
+		game: "Quacks of Quedlinburg and Dominion (loosely)",
 		author: "Wolfgang Warsch (Quacks), Donald X. Vaccarino (Dominion)",
 		link: "https://boardgamegeek.com/boardgame/244521/quacks-quedlinburg", // https://dominion.games/ for a second game link /shrug
 	},
