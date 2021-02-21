@@ -29,11 +29,24 @@ const SERVER_GAME_LIST: Array<ServerGame> = fs
         return { ...game, guide };
     });
 
-const getClientGameList = (): Array<ClientGame> =>
-    SERVER_GAME_LIST.map(
-        // eslint-disable-next-line @typescript-eslint/no-unused-vars
-        ({ connectToGame, ...clientGame }): ClientGame => clientGame
-    );
+const CLIENT_GAME_LIST: Array<ClientGame> = SERVER_GAME_LIST.map(
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    ({ connectToGame, ...clientGame }): ClientGame => clientGame
+);
+
+/*
+    On rocketcrab.com, show all games.
+    On kids.rocketcrab.com, show only kid games.
+*/
+const getClientGameList = ({
+    kidsOnly,
+}: {
+    kidsOnly: boolean;
+}): Array<ClientGame> =>
+    CLIENT_GAME_LIST.filter(({ familyFriendly }) => {
+        if (kidsOnly && !familyFriendly) return false;
+        return true;
+    });
 
 export const getServerGameLibrary = (): ServerGameLibrary => ({
     categories,
@@ -42,5 +55,7 @@ export const getServerGameLibrary = (): ServerGameLibrary => ({
 
 export const getClientGameLibrary = (): ClientGameLibrary => ({
     categories,
-    gameList: getClientGameList(),
+    gameList: getClientGameList({
+        kidsOnly: false,
+    }),
 });
