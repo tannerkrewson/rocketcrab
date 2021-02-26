@@ -176,7 +176,7 @@ export const Find = ({
     );
 };
 
-export const getServerSideProps: GetServerSideProps = async () => ({
+export const getStaticProps: GetServerSideProps = async () => ({
     props: {
         gameLibrary: CLIENT_GAME_LIBRARY,
     },

@@ -40,12 +40,10 @@ type LibraryProps = {
     gameLibrary: ClientGameLibrary;
 };
 
-export const getServerSideProps: GetServerSideProps = async (): Promise<any> => {
-    return {
-        props: {
-            gameLibrary: CLIENT_GAME_LIBRARY,
-        },
-    };
-};
+export const getStaticProps: GetServerSideProps = async () => ({
+    props: {
+        gameLibrary: CLIENT_GAME_LIBRARY,
+    },
+});
 
 export default Library;
