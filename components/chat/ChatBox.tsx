@@ -4,7 +4,6 @@ import {
     ChatMessage,
     ENABLE_FILTER,
     MAX_CHAT_MSG_LEN,
-    MIN_MS_BETWEEN_MSGS,
     Player,
 } from "../../types/types";
 import { filterClean, isChatMsgValid } from "../../utils/utils";
@@ -30,13 +29,8 @@ export const ChatBox = ({
 }): JSX.Element => {
     const { state: msgToSend, bindings, reset } = useInput("");
     const [isChatShowing, setIsChatShowing] = useState(!startHidden);
-    const [sendDisabled, setSendDisabled] = useSendButton(
-        msgToSend,
-        thisPlayer,
-        chat
-    );
+
     const messagesEndRef = useRef(null);
-    const checkSendTimeoutRef = useRef(null);
     const [isFirstRender, setIsFirstRender] = useState(true);
 
     const handleConfirm = (e?) => {
@@ -45,11 +39,6 @@ export const ChatBox = ({
 
         onSendChat(msgToSend);
         reset();
-
-        checkSendTimeoutRef.current = setTimeout(
-            setSendDisabled,
-            MIN_MS_BETWEEN_MSGS
-        );
     };
 
     const onEnter = (e) => {
@@ -57,8 +46,6 @@ export const ChatBox = ({
 
         handleConfirm();
     };
-
-    useEffect(setSendDisabled, [msgToSend]);
 
     useEffect(() => {
         if (!isFirstRender && isChatShowing && messagesEndRef.current) {
@@ -75,9 +62,6 @@ export const ChatBox = ({
             clearUnreadMsgCount();
         }
     }, [unreadMsgCount, isChatShowing]);
-
-    // remove timeout when chat is closed
-    useEffect(() => () => clearTimeout(checkSendTimeoutRef.current), []);
 
     return (
         <CollapseBox
@@ -108,11 +92,7 @@ export const ChatBox = ({
                     width="100%"
                 />
                 <div className="send-container">
-                    <PrimaryButton
-                        size="small"
-                        onClick={handleConfirm}
-                        disabled={sendDisabled}
-                    >
+                    <PrimaryButton size="small" onClick={handleConfirm}>
                         Send
                     </PrimaryButton>
                 </div>
@@ -134,17 +114,4 @@ export const ChatBox = ({
             `}</style>
         </CollapseBox>
     );
-};
-
-const useSendButton = (
-    msgToSend: string,
-    thisPlayer: Player,
-    chat: Array<ChatMessage>
-): [boolean, () => void] => {
-    const [sendDisabled, setSendDisabled] = useState(true);
-
-    return [
-        sendDisabled,
-        () => setSendDisabled(!isChatMsgValid(msgToSend, thisPlayer, chat)),
-    ];
 };
