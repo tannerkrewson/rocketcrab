@@ -8,8 +8,7 @@ const game: ServerGame = {
     basedOn: {
         game: "Just One",
         author: "Ludovic Roudy & Bruno Sautter",
-        link:
-            "https://www.amazon.com/Repos-JOUS01-Just-One-dp-B07W3PJTL2/dp/B07W3PJTL2/",
+        link: "https://justone-the-game.com/?lang=en",
     },
     description: `Just One is a cooperative party game in which you play 
         together to discover as many mystery words as possible. Find the best 
