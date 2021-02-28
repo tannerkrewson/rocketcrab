@@ -30,6 +30,12 @@
         "backgroundColor": "BurlyWood"
     },
     {
+        "id": "writing",
+        "name": "✍️ Writing",
+        "color": "black",
+        "backgroundColor": "Turquoise"
+    },
+    {
         "id": "netgamesio",
         "name": "💎 netgames.io",
         "color": "white",
