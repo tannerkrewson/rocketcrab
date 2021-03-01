@@ -52,7 +52,7 @@ const games: Array<ServerGame> = [
             in the story, so writing with ambiguity allows for more
             interesting stories.`,
         basedOn: {
-            game: "Consequences",
+            game: "Consequences, FoldingStory",
             link: "https://en.wikipedia.org/wiki/Consequences_(game)",
         },
         category: ["writing", "easy"],
