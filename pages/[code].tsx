@@ -13,8 +13,9 @@ import { parseCookies } from "nookies";
 
 import { useRocketcrabClientSocket } from "../utils/useRocketcrabClientSocket";
 import { useChat } from "../utils/useChat";
+import { RocketcrabMode } from "../types/enums";
 
-const CLIENT_GAME_LIBRARY = getClientGameLibrary();
+const CLIENT_GAME_LIBRARY = getClientGameLibrary(RocketcrabMode.MAIN);
 
 export const Code = ({
     gameLibrary = { gameList: [], categories: [] },
@@ -125,7 +126,7 @@ export const Code = ({
 export const getServerSideProps: GetServerSideProps = async (
     ctx: GetServerSidePropsContext
 ): Promise<any> => {
-    const code = ctx?.query?.code;
+    const code = ctx.query?.code;
 
     let lastPartyState: ClientParty = { me: {} } as ClientParty;
     let isReconnect = false;

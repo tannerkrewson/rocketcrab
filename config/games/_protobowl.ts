@@ -1,4 +1,5 @@
 import { ServerGame } from "../../types/types";
+import { RocketcrabMode } from "../../types/enums";
 import { randomBytes } from "crypto";
 
 const game: ServerGame = {
@@ -10,7 +11,7 @@ const game: ServerGame = {
     displayUrlHref: "https://protobowl.com/",
     category: ["trivia", "medium"],
     players: "1+",
-    familyFriendly: true,
+    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
     connectToGame: async () => {
         const id = randomBytes(8).toString("hex");
         return {

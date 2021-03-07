@@ -1,5 +1,6 @@
 import { ServerGame } from "../../types/types";
 import { postJson } from "../../utils/utils";
+import { RocketcrabMode } from "../../types/enums";
 
 const game: ServerGame = {
     id: "drawphone",
@@ -27,7 +28,7 @@ const game: ServerGame = {
     ],
     category: ["drawing", "easy"],
     players: "1+",
-    familyFriendly: true,
+    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
     minPlayers: 1,
     maxPlayers: Infinity,
     connectToGame: async () => {

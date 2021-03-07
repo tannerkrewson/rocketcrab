@@ -1,5 +1,6 @@
 import { ServerGame } from "../../types/types";
 import { postJson } from "../../utils/utils";
+import { RocketcrabMode } from "../../types/enums";
 
 const game: ServerGame = {
     id: "tk-spyfall",
@@ -31,7 +32,7 @@ const game: ServerGame = {
     guideId: "spyfall",
     category: ["medium"],
     players: "4+",
-    familyFriendly: true,
+    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
     minPlayers: 1,
     maxPlayers: Infinity,
     pictures: [

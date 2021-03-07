@@ -1,5 +1,6 @@
 import { ServerGame } from "../../types/types";
 import { randomBytes } from "crypto";
+import { RocketcrabMode } from "../../types/enums";
 
 const game: ServerGame = {
     id: "qwiqwit",
@@ -13,7 +14,7 @@ const game: ServerGame = {
     donationUrlHref: "https://www.buymeacoffee.com/qwiqwit",
     category: ["easy"],
     players: "3-25",
-    familyFriendly: true,
+    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
     pictures: [
         "https://i.imgur.com/5mX4zf7.jpg",
         "https://i.imgur.com/cPZFcYr.jpg",

@@ -1,4 +1,5 @@
 import { ServerGame } from "../../types/types";
+import { RocketcrabMode } from "../../types/enums";
 
 const game: ServerGame = {
     id: "setwithfriends",
@@ -19,7 +20,7 @@ const game: ServerGame = {
 
     category: ["easy"],
 
-    familyFriendly: true,
+    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
 
     connectToGame: async () => {
         const roomName =

@@ -1,5 +1,6 @@
 import { ServerGame } from "../../types/types";
 import { randomBytes } from "crypto";
+import { RocketcrabMode } from "../../types/enums";
 
 const game: ServerGame = {
     id: "justone",
@@ -20,7 +21,7 @@ const game: ServerGame = {
     displayUrlHref: "https://just1.herokuapp.com/",
     category: ["easy"],
     players: "1+",
-    familyFriendly: true,
+    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
     guideId: "justone",
     pictures: [
         "https://i.imgur.com/KX3Sjsi.jpg",

@@ -1,4 +1,5 @@
 import { ServerGame } from "../../types/types";
+import { RocketcrabMode } from "../../types/enums";
 
 const game: ServerGame = {
     id: "cosel",
@@ -21,7 +22,7 @@ const game: ServerGame = {
 
     players: "4+",
 
-    familyFriendly: true,
+    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
 
     guideUrl: "https://cosel.io/how-to-play",
 

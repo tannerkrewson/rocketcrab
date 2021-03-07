@@ -1,4 +1,4 @@
-import { PartyStatus, GameStatus } from "./enums";
+import { PartyStatus, GameStatus, RocketcrabMode } from "./enums";
 import WebSocket from "ws";
 import { Dispatch, SetStateAction } from "react";
 import { BindingsChangeTarget } from "@geist-ui/react/dist/input/use-input";
@@ -77,7 +77,7 @@ export type ClientGame = {
     pictures?: Array<string>;
     category?: Array<string>;
     players?: string;
-    familyFriendly: boolean;
+    showOn: Array<RocketcrabMode>;
     minPlayers?: number;
     maxPlayers?: number;
     renameParams?: Record<string, string>;

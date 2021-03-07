@@ -6,8 +6,9 @@ import PageLayout from "../components/layout/PageLayout";
 import { getClientGameLibrary } from "../config";
 import { ClientGameLibrary } from "../types/types";
 import { useLibraryState } from "../utils/utils";
+import { RocketcrabMode } from "../types/enums";
 
-const CLIENT_GAME_LIBRARY = getClientGameLibrary();
+const CLIENT_GAME_LIBRARY = getClientGameLibrary(RocketcrabMode.MAIN);
 
 export const Library = ({ gameLibrary }: LibraryProps): JSX.Element => {
     const router = useRouter();

@@ -1,4 +1,5 @@
 import { ServerGame } from "../../types/types";
+import { RocketcrabMode } from "../../types/enums";
 
 const gameTemplate = (
     urlId: string,
@@ -8,7 +9,7 @@ const gameTemplate = (
         basedOn,
         category,
         players,
-        familyFriendly,
+        showOn,
         guideUrl,
         guideId,
         pictures,
@@ -25,7 +26,7 @@ const gameTemplate = (
     donationUrlHref: "https://www.buymeacoffee.com/lukegt",
     category,
     players,
-    familyFriendly,
+    showOn,
     pictures,
     ...(guideUrl ? { guideUrl } : {}),
     ...(guideId ? { guideId } : {}),
@@ -52,7 +53,7 @@ const games: Array<ServerGame> = [
         },
         category: ["netgamesio", "medium"],
         players: "5-10",
-        familyFriendly: true,
+        showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
         guideUrl: "https://www.ultraboardgames.com/avalon/game-rules.php",
         pictures: [
             "https://i.imgur.com/v8oxIRT.jpg",
@@ -74,7 +75,7 @@ const games: Array<ServerGame> = [
         },
         category: ["netgamesio", "medium"],
         players: "2-4",
-        familyFriendly: true,
+        showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
         pictures: [
             "https://i.imgur.com/AST27jv.jpg",
             "https://i.imgur.com/h1eLGMu.jpg",
@@ -95,7 +96,7 @@ const games: Array<ServerGame> = [
         },
         category: ["netgamesio", "medium"],
         players: "3+",
-        familyFriendly: true,
+        showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
         guide: "spyfall",
         pictures: [
             "https://i.imgur.com/yW8IO3b.jpg",
@@ -117,7 +118,7 @@ const games: Array<ServerGame> = [
         },
         category: ["netgamesio", "hard"],
         players: "5-10",
-        familyFriendly: true,
+        showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
         guideUrl:
             "https://www.ultraboardgames.com/secret-hitler/game-rules.php",
         pictures: [
@@ -140,7 +141,7 @@ const games: Array<ServerGame> = [
         },
         category: ["netgamesio", "medium"],
         players: "4+",
-        familyFriendly: true,
+        showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
         guideId: "codenames",
         pictures: [
             "https://i.imgur.com/fnrZNkH.jpg",
@@ -164,7 +165,7 @@ const games: Array<ServerGame> = [
         },
         category: ["netgamesio", "medium"],
         players: "3-18",
-        familyFriendly: true,
+        showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
         guideUrl:
             "https://www.ultraboardgames.com/one-night-ultimate-werewolf/game-rules.php",
         pictures: [
@@ -188,7 +189,7 @@ const games: Array<ServerGame> = [
         },
         category: ["netgamesio", "hard"],
         players: "4+",
-        familyFriendly: true,
+        showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
         guideUrl: "https://www.ultraboardgames.com/enigma/game-rules.php",
         pictures: [
             "https://i.imgur.com/QYstRgP.jpg",

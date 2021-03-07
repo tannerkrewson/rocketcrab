@@ -1,5 +1,6 @@
 import { ServerGame } from "../../types/types";
 import { randomBytes } from "crypto";
+import { RocketcrabMode } from "../../types/enums";
 
 const game: ServerGame = {
     id: "longwave",
@@ -16,7 +17,7 @@ const game: ServerGame = {
     displayUrlHref: "https://longwave.web.app/",
     category: ["easy"],
     players: "2-12+",
-    familyFriendly: true,
+    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
     guideUrl: "https://www.ultraboardgames.com/wavelength/game-rules.php",
     pictures: [
         "https://i.imgur.com/yDx8aln.jpg",

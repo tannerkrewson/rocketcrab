@@ -6,6 +6,7 @@ import {
     ServerGameLibrary,
     ClientGameLibrary,
 } from "../types/types";
+import { RocketcrabMode } from "../types/enums";
 
 import categories from "./categories.json";
 
@@ -34,28 +35,16 @@ const CLIENT_GAME_LIST: Array<ClientGame> = SERVER_GAME_LIST.map(
     ({ connectToGame, ...clientGame }): ClientGame => clientGame
 );
 
-/*
-    On rocketcrab.com, show all games.
-    On kids.rocketcrab.com, show only kid games.
-*/
-const getClientGameList = ({
-    kidsOnly,
-}: {
-    kidsOnly: boolean;
-}): Array<ClientGame> =>
-    CLIENT_GAME_LIST.filter(({ familyFriendly }) => {
-        if (kidsOnly && !familyFriendly) return false;
-        return true;
-    });
-
 export const getServerGameLibrary = (): ServerGameLibrary => ({
     categories,
     gameList: SERVER_GAME_LIST,
 });
 
-export const getClientGameLibrary = (): ClientGameLibrary => ({
+export const getClientGameLibrary = (
+    mode: RocketcrabMode
+): ClientGameLibrary => ({
     categories,
-    gameList: getClientGameList({
-        kidsOnly: false,
-    }),
+    gameList: CLIENT_GAME_LIST.filter(
+        ({ showOn }) => mode === RocketcrabMode.ALL || showOn?.includes(mode)
+    ),
 });

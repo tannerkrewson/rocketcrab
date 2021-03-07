@@ -1,5 +1,6 @@
 import { ServerGame } from "../../types/types";
 import { postJson } from "../../utils/utils";
+import { RocketcrabMode } from "../../types/enums";
 
 const game: ServerGame = {
     id: "snakeout",
@@ -24,7 +25,7 @@ const game: ServerGame = {
     donationUrlHref: "https://www.buymeacoffee.com/tannerkrewson",
     category: ["medium"],
     players: "5-10",
-    familyFriendly: true,
+    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
     guideUrl: "https://snakeout.tannerkrewson.com/how-to-play",
     pictures: [
         "https://i.imgur.com/Doo5X0p.jpg",

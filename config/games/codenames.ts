@@ -1,5 +1,6 @@
 import { ServerGame } from "../../types/types";
 import { postJson } from "../../utils/utils";
+import { RocketcrabMode } from "../../types/enums";
 
 const game: ServerGame = {
     id: "codenames",
@@ -11,7 +12,7 @@ const game: ServerGame = {
     displayUrlHref: "https://codenames.game/",
     category: ["medium"],
     players: "2-8+",
-    familyFriendly: true,
+    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
     guideId: "codenames",
     pictures: [
         "https://i.imgur.com/Hiu7cAm.jpg",

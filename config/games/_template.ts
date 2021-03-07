@@ -1,4 +1,5 @@
 import { ServerGame } from "../../types/types";
+import { RocketcrabMode } from "../../types/enums";
 
 // PLEASE REMOVE ALL COMMENTS AFTER COPYING THIS TEMPLATE
 // (you can add your own comments tho if you like :D )
@@ -56,8 +57,10 @@ const game: ServerGame = {
     // this is just for show. make this the recommended number of players or something
     players: "4-9", // optional
 
-    // if there is explicit content in the game that can't be turned off, set this as false
-    familyFriendly: true, // required
+    // if there is explicit content in the game that can't be turned off,
+    // remove the KIDS enum from the array. this will prevent the game from
+    // being shown on kids.rocketcrab.com
+    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS], // required
 
     // you can add a min and/or max players if you would like disable the "Start Game" button
     // if the number of players in the rocketcrab party is not within range. this can be different

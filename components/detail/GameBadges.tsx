@@ -1,4 +1,5 @@
 import { Badge } from "@geist-ui/react";
+import { RocketcrabMode } from "../../types/enums";
 import { ClientGame, GameCategory } from "../../types/types";
 import SkinnyCard from "../common/SkinnyCard";
 
@@ -20,7 +21,9 @@ const GameBadges = ({ game, allCategories }: GameBadgesProps): JSX.Element => (
         })}
         <SpaceBadge>{game.players} players</SpaceBadge>
         <SpaceBadge>
-            {game.familyFriendly ? "Family friendly" : "Adults only"}
+            {game.showOn.includes(RocketcrabMode.KIDS)
+                ? "Family friendly"
+                : "Adults only"}
         </SpaceBadge>
     </SkinnyCard>
 );

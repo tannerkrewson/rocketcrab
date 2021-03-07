@@ -6,8 +6,9 @@ import PrimaryButton from "../../components/common/PrimaryButton";
 import ButtonGroup from "../../components/common/ButtonGroup";
 import PageLayout from "../../components/layout/PageLayout";
 import { getClientGameLibrary } from "../../config";
+import { RocketcrabMode } from "../../types/enums";
 
-const CLIENT_GAME_LIBRARY = getClientGameLibrary();
+const CLIENT_GAME_LIBRARY = getClientGameLibrary(RocketcrabMode.MAIN);
 
 export const GamePage = ({
     game,

@@ -5,7 +5,7 @@ import React, { useEffect, useState } from "react";
 import { postJson } from "../utils/utils";
 import { useRouter } from "next/router";
 import { io } from "socket.io-client";
-import { SocketEvent } from "../types/enums";
+import { RocketcrabMode, SocketEvent } from "../types/enums";
 import {
     ClientGameLibrary,
     FinderState,
@@ -19,7 +19,7 @@ import GameDetail from "../components/detail/GameDetail";
 import { FinderInfoCard } from "../components/find/FinderInfoCard";
 
 const socket = io();
-const CLIENT_GAME_LIBRARY = getClientGameLibrary();
+const CLIENT_GAME_LIBRARY = getClientGameLibrary(RocketcrabMode.MAIN);
 
 export const Find = ({
     gameLibrary = { gameList: [], categories: [] },

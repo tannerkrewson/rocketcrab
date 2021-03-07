@@ -30,3 +30,9 @@ export enum SocketEvent {
     KICK_PLAYER = "KICK_PLAYER",
     SET_IS_PUBLIC = "SET_IS_PUBLIC",
 }
+
+export enum RocketcrabMode {
+    MAIN, // will be shown on rocketcrab.com
+    KIDS, // will be shown on kids.rocketcrab.com
+    ALL, //  do not use. for testing only.
+}

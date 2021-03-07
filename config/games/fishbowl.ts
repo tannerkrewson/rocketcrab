@@ -1,5 +1,6 @@
 import { ServerGame } from "../../types/types";
 import { postJson } from "../../utils/utils";
+import { RocketcrabMode } from "../../types/enums";
 
 const game: ServerGame = {
     id: "fishbowl",
@@ -24,7 +25,7 @@ const game: ServerGame = {
     ],
     category: ["easy"],
     players: "4+",
-    familyFriendly: true,
+    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
     connectToGame: async () => {
         const newGameUrl = "https://fishbowl-graphql.onrender.com/v1/graphql";
         const {
