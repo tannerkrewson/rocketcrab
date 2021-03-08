@@ -32,7 +32,7 @@ export enum SocketEvent {
 }
 
 export enum RocketcrabMode {
-    MAIN, // will be shown on rocketcrab.com
-    KIDS, // will be shown on kids.rocketcrab.com
-    ALL, //  do not use. for testing only.
+    MAIN = "MAIN", // will be shown on rocketcrab.com
+    KIDS = "KIDS", // will be shown on kids.rocketcrab.com
+    ALL = "ALL", //  do not use. for testing only.
 }

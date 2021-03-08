@@ -4,7 +4,7 @@ import { Code } from "../../pages/[code]";
 import { ClientGameLibrary } from "../../types/types";
 
 jest.mock("next/router", () => ({
-    useRouter: () => ({ query: "ijkl" }),
+    useRouter: () => ({ query: "ijkl", locale: "MAIN" }),
 }));
 
 jest.mock("socket.io-client", () => ({

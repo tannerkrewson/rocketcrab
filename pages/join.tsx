@@ -5,8 +5,10 @@ import PrimaryButton from "../components/common/PrimaryButton";
 import ButtonGroup from "../components/common/ButtonGroup";
 import PageLayout from "../components/layout/PageLayout";
 import { useState } from "react";
+import { GetServerSideProps } from "next";
+import { RocketcrabMode } from "../types/enums";
 
-export const Join = (): JSX.Element => {
+export const Join = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
     const router = useRouter();
     const { invalid } = router.query;
 
@@ -30,7 +32,12 @@ export const Join = (): JSX.Element => {
     };
 
     return (
-        <PageLayout path={code} disablePhonetic={true} center={true}>
+        <PageLayout
+            path={code}
+            disablePhonetic={true}
+            center={true}
+            mode={mode}
+        >
             <div className="description">Join Party</div>
             <div className="input-container">
                 <Input
@@ -96,5 +103,11 @@ const useCodeInput = (initialCode) => {
         },
     };
 };
+
+export const getStaticProps: GetServerSideProps = async ({ locale }) => ({
+    props: {
+        mode: locale as RocketcrabMode,
+    },
+});
 
 export default Join;

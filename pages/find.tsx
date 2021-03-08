@@ -12,17 +12,17 @@ import {
     FINDER_ACTIVE_MS,
 } from "../types/types";
 import { GetServerSideProps } from "next";
-import { getClientGameLibrary } from "../config";
 import PublicGame from "../components/find/PublicGame";
 import Swal from "sweetalert2";
 import GameDetail from "../components/detail/GameDetail";
 import { FinderInfoCard } from "../components/find/FinderInfoCard";
+import { GAME_LIBRARY } from "../config";
 
 const socket = io();
-const CLIENT_GAME_LIBRARY = getClientGameLibrary(RocketcrabMode.MAIN);
 
 export const Find = ({
     gameLibrary = { gameList: [], categories: [] },
+    mode,
 }: FindProps): JSX.Element => {
     const router = useRouter();
     const [newLoading, setNewLoading] = useState(false);
@@ -87,7 +87,11 @@ export const Find = ({
             ({ id }) => id === gameInfoVisible
         );
         return (
-            <PageLayout reconnecting={showReconnecting} deemphasize={true}>
+            <PageLayout
+                reconnecting={showReconnecting}
+                deemphasize={true}
+                mode={mode}
+            >
                 <div style={{ textAlign: "center" }}>
                     <GameDetail
                         game={selectedGame}
@@ -102,7 +106,7 @@ export const Find = ({
     }
 
     return (
-        <PageLayout reconnecting={showReconnecting}>
+        <PageLayout reconnecting={showReconnecting} mode={mode}>
             <div className="description">Public Parties (beta)</div>
             {isActive ? (
                 <>
@@ -176,14 +180,16 @@ export const Find = ({
     );
 };
 
-export const getStaticProps: GetServerSideProps = async () => ({
+export const getStaticProps: GetServerSideProps = async ({ locale }) => ({
     props: {
-        gameLibrary: CLIENT_GAME_LIBRARY,
+        gameLibrary: GAME_LIBRARY[locale],
+        mode: locale as RocketcrabMode,
     },
 });
 
 type FindProps = {
     gameLibrary: ClientGameLibrary;
+    mode: RocketcrabMode;
 };
 
 export default Find;

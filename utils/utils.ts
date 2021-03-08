@@ -10,6 +10,8 @@ import WebSocket from "ws";
 import { useInput } from "@geist-ui/react";
 import { useState } from "react";
 import Filter from "bad-words";
+import { RocketcrabMode } from "../types/enums";
+
 const filter = new Filter();
 
 export const postJson = (url = "", data = {}): Promise<any> =>
@@ -101,4 +103,9 @@ export const filterClean = (message: string): string => {
     } catch (e) {}
 
     return message;
+};
+
+export const MODE_MAP = {
+    [RocketcrabMode.MAIN]: "rocketcrab.com",
+    [RocketcrabMode.KIDS]: "kids.rocketcrab.com",
 };

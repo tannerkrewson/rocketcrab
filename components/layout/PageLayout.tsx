@@ -1,4 +1,5 @@
 import { Loading } from "@geist-ui/react";
+import { RocketcrabMode } from "../../types/enums";
 import Connecting from "./Connecting";
 import Footer from "./Footer";
 import MainTitle from "./MainTitle";
@@ -11,11 +12,13 @@ const PageLayout = ({
     deemphasize,
     center,
     reconnecting,
+    mode,
 }: PageLayoutParams): JSX.Element => (
     <div className="container">
         <main>
             <div className="main-content">
                 <MainTitle
+                    mode={mode}
                     path={path}
                     disablePhonetic={disablePhonetic}
                     deemphasize={deemphasize}
@@ -89,6 +92,7 @@ type PageLayoutParams = {
     deemphasize?: boolean;
     center?: boolean;
     reconnecting?: boolean;
+    mode: RocketcrabMode;
 };
 
 export default PageLayout;

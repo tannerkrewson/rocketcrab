@@ -8,8 +8,10 @@ import PageLayout from "../components/layout/PageLayout";
 import { postJson } from "../utils/utils";
 import { Spacer } from "@geist-ui/react";
 import { useIsAlreadyPWA } from "../utils/useIsAlreadyPWA";
+import { RocketcrabMode } from "../types/enums";
+import { GetServerSideProps } from "next";
 
-export const Home = (): JSX.Element => {
+export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
     const router = useRouter();
     const [newLoading, setNewLoading] = useState(false);
     const isAlreadyPWA = useIsAlreadyPWA();
@@ -24,7 +26,7 @@ export const Home = (): JSX.Element => {
     };
 
     return (
-        <PageLayout center={true}>
+        <PageLayout center={true} mode={mode}>
             <div className="description">party games for phones</div>
 
             <ButtonGroup>
@@ -100,5 +102,11 @@ export const Home = (): JSX.Element => {
         </PageLayout>
     );
 };
+
+export const getStaticProps: GetServerSideProps = async ({ locale }) => ({
+    props: {
+        mode: locale as RocketcrabMode,
+    },
+});
 
 export default Home;

@@ -1,13 +1,16 @@
 import converter from "phonetic-alphabet-converter";
 import { Tooltip } from "@geist-ui/react";
 import { useCallback, useState } from "react";
+import { RocketcrabMode } from "../../types/enums";
+import { MODE_MAP } from "../../utils/utils";
 
 const MainTitle = ({
     path = "",
     disablePhonetic,
     deemphasize,
+    mode,
 }: MainTitleProps): JSX.Element => {
-    const host = "rocketcrab.com";
+    const host = MODE_MAP[mode];
     const title = host + (path ? "/" + path : "");
 
     const titleClasses = "title" + (deemphasize ? " deemphasize" : "");
@@ -16,7 +19,7 @@ const MainTitle = ({
 
     const linkCopyClick = useCallback(() => {
         setCopiedTooltip(true);
-        navigator.clipboard.writeText("https://rocketcrab.com/" + path);
+        navigator.clipboard.writeText(`https://${host}/${path}`);
 
         setTimeout(() => setCopiedTooltip(false), 1000);
     }, [path]);
@@ -105,6 +108,7 @@ type MainTitleProps = {
     path?: string;
     disablePhonetic?: boolean;
     deemphasize?: boolean;
+    mode: RocketcrabMode;
 };
 
 export default MainTitle;

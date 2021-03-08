@@ -48,3 +48,8 @@ export const getClientGameLibrary = (
         ({ showOn }) => mode === RocketcrabMode.ALL || showOn?.includes(mode)
     ),
 });
+
+export const GAME_LIBRARY = {
+    [RocketcrabMode.MAIN]: getClientGameLibrary(RocketcrabMode.MAIN),
+    [RocketcrabMode.KIDS]: getClientGameLibrary(RocketcrabMode.KIDS),
+};

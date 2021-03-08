@@ -3,14 +3,12 @@ import { useRouter } from "next/router";
 import React, { useCallback } from "react";
 import GameLibrary from "../components/library/GameLibrary";
 import PageLayout from "../components/layout/PageLayout";
-import { getClientGameLibrary } from "../config";
 import { ClientGameLibrary } from "../types/types";
-import { useLibraryState } from "../utils/utils";
+import { MODE_MAP, useLibraryState } from "../utils/utils";
 import { RocketcrabMode } from "../types/enums";
+import { GAME_LIBRARY } from "../config";
 
-const CLIENT_GAME_LIBRARY = getClientGameLibrary(RocketcrabMode.MAIN);
-
-export const Library = ({ gameLibrary }: LibraryProps): JSX.Element => {
+export const Library = ({ gameLibrary, mode }: LibraryProps): JSX.Element => {
     const router = useRouter();
 
     const onDone = useCallback(() => router.back(), [router]);
@@ -25,10 +23,10 @@ export const Library = ({ gameLibrary }: LibraryProps): JSX.Element => {
     const libraryState = useLibraryState();
 
     return (
-        <PageLayout>
+        <PageLayout mode={mode}>
             <GameLibrary
                 gameLibrary={gameLibrary}
-                backToLabel="rocketcrab.com"
+                backToLabel={MODE_MAP[mode]}
                 onDone={onDone}
                 setViewingGameId={onViewGame}
                 libraryState={libraryState}
@@ -39,11 +37,13 @@ export const Library = ({ gameLibrary }: LibraryProps): JSX.Element => {
 
 type LibraryProps = {
     gameLibrary: ClientGameLibrary;
+    mode: RocketcrabMode;
 };
 
-export const getStaticProps: GetServerSideProps = async () => ({
+export const getStaticProps: GetServerSideProps = async ({ locale }) => ({
     props: {
-        gameLibrary: CLIENT_GAME_LIBRARY,
+        gameLibrary: GAME_LIBRARY[locale as RocketcrabMode],
+        mode: locale as RocketcrabMode,
     },
 });
 

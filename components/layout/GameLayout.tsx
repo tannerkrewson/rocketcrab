@@ -18,9 +18,10 @@ import Swal from "sweetalert2";
 import { ToastAction } from "@geist-ui/react/dist/use-toasts/use-toast";
 import ButtonGroup from "../common/ButtonGroup";
 import { logEvent } from "../../utils/analytics";
-import { filterClean } from "../../utils/utils";
+import { filterClean, MODE_MAP } from "../../utils/utils";
 import { differenceInMilliseconds } from "date-fns";
 import GameDetail from "../detail/GameDetail";
+import { RocketcrabMode } from "../../types/enums";
 
 const GameLayout = ({
     partyState,
@@ -35,7 +36,9 @@ const GameLayout = ({
     unreadMsgCount,
     clearUnreadMsgCount,
     newestMsg,
+    mode,
 }: GameLayoutProps): JSX.Element => {
+    const host = MODE_MAP[mode];
     const { code, gameState, selectedGameId, playerList, chat } = partyState;
     const { isHost } = thisPlayer;
     const thisGame = gameLibrary.gameList.find(
@@ -280,7 +283,9 @@ const GameLayout = ({
                 </div>
                 {!statusCollapsed && (
                     <>
-                        <div className="url">rocketcrab.com/{code}</div>
+                        <div className="url">
+                            {host}/{code}
+                        </div>
                         <div>
                             <Badge.Anchor placement="bottomLeft">
                                 {!showMenu && combinedMenuBadgeCount > 0 && (
@@ -494,6 +499,7 @@ type GameLayoutProps = {
     unreadMsgCount: number;
     newestMsg: ChatMessage;
     clearUnreadMsgCount: () => void;
+    mode: RocketcrabMode;
 };
 
 export default GameLayout;

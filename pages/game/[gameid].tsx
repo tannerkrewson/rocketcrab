@@ -5,20 +5,19 @@ import GameDetail from "../../components/detail/GameDetail";
 import PrimaryButton from "../../components/common/PrimaryButton";
 import ButtonGroup from "../../components/common/ButtonGroup";
 import PageLayout from "../../components/layout/PageLayout";
-import { getClientGameLibrary } from "../../config";
 import { RocketcrabMode } from "../../types/enums";
-
-const CLIENT_GAME_LIBRARY = getClientGameLibrary(RocketcrabMode.MAIN);
+import { GAME_LIBRARY } from "../../config";
 
 export const GamePage = ({
     game,
     allCategories,
+    mode,
 }: InferGetStaticPropsType<typeof getStaticProps>): JSX.Element => {
     const router = useRouter();
     const onBack = useCallback(() => router.back(), [router]);
 
     return (
-        <PageLayout>
+        <PageLayout mode={mode}>
             <GameDetail game={game} allCategories={allCategories} />
             <ButtonGroup>
                 <PrimaryButton onClick={onBack}>
@@ -32,24 +31,42 @@ export const GamePage = ({
     );
 };
 
-export const getStaticProps: GetStaticProps = async (ctx) => {
-    const { gameid } = ctx.params;
-    const { gameList, categories } = CLIENT_GAME_LIBRARY;
+export const getStaticProps: GetStaticProps = async ({ params, locale }) => {
+    const { gameid } = params;
+    const mode = locale as RocketcrabMode;
+    const { gameList, categories } = GAME_LIBRARY[mode];
+    const game = gameList.find(({ id }) => id === gameid);
+
+    if (!game.showOn.includes(mode)) {
+        return {
+            notFound: true,
+        };
+    }
 
     return {
         props: {
-            game: gameList.find(({ id }) => id === gameid),
+            game,
             allCategories: categories,
+            mode,
         },
     };
 };
 
 export const getStaticPaths: GetStaticPaths = async () => {
-    const { gameList } = CLIENT_GAME_LIBRARY;
     return {
-        paths: gameList.map(({ id }) => ({ params: { gameid: id } })),
+        paths: getAllPaths(),
         fallback: false,
     };
 };
+
+const getAllPaths = () =>
+    [RocketcrabMode.MAIN, RocketcrabMode.KIDS]
+        .map((mode) =>
+            GAME_LIBRARY[mode].gameList.map(({ id }) => ({
+                params: { gameid: id },
+                locale: mode,
+            }))
+        )
+        .flat();
 
 export default GamePage;

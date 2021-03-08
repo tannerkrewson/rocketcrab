@@ -8,14 +8,12 @@ import NameEntry from "../components/party/NameEntry";
 import GameLayout from "../components/layout/GameLayout";
 
 import { ClientGameLibrary, ClientParty } from "../types/types";
-import { getClientGameLibrary } from "../config";
 import { parseCookies } from "nookies";
 
 import { useRocketcrabClientSocket } from "../utils/useRocketcrabClientSocket";
 import { useChat } from "../utils/useChat";
 import { RocketcrabMode } from "../types/enums";
-
-const CLIENT_GAME_LIBRARY = getClientGameLibrary(RocketcrabMode.MAIN);
+import { GAME_LIBRARY } from "../config";
 
 export const Code = ({
     gameLibrary = { gameList: [], categories: [] },
@@ -23,6 +21,7 @@ export const Code = ({
     isReconnect,
 }: CodeProps): JSX.Element => {
     const router = useRouter();
+    const mode = router.locale as RocketcrabMode;
     const code = router?.query?.code as string;
 
     const previousName = lastPartyState?.me?.name;
@@ -87,6 +86,7 @@ export const Code = ({
                 unreadMsgCount={unreadMsgCount}
                 newestMsg={newestMsg}
                 clearUnreadMsgCount={clearUnreadMsgCount}
+                mode={mode}
             />
         );
     }
@@ -97,6 +97,7 @@ export const Code = ({
             loading={showLoading}
             deemphasize={deemphasize}
             reconnecting={showReconnecting}
+            mode={mode}
         >
             {showNameEntry ? (
                 <NameEntry
@@ -127,6 +128,7 @@ export const getServerSideProps: GetServerSideProps = async (
     ctx: GetServerSidePropsContext
 ): Promise<any> => {
     const code = ctx.query?.code;
+    const mode = ctx.locale as RocketcrabMode;
 
     let lastPartyState: ClientParty = { me: {} } as ClientParty;
     let isReconnect = false;
@@ -145,7 +147,7 @@ export const getServerSideProps: GetServerSideProps = async (
 
     return {
         props: {
-            gameLibrary: CLIENT_GAME_LIBRARY,
+            gameLibrary: GAME_LIBRARY[mode],
             ...(lastPartyState ? { lastPartyState } : {}),
             isReconnect,
         },
