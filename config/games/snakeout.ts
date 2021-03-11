@@ -25,7 +25,7 @@ const game: ServerGame = {
     donationUrlHref: "https://www.buymeacoffee.com/tannerkrewson",
     category: ["medium"],
     players: "5-10",
-    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
+    showOn: [RocketcrabMode.MAIN],
     guideUrl: "https://snakeout.tannerkrewson.com/how-to-play",
     pictures: [
         "https://i.imgur.com/Doo5X0p.jpg",

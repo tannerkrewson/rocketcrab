@@ -2,7 +2,20 @@ import { ServerGame } from "../../types/types";
 import { postJson } from "../../utils/utils";
 import { RocketcrabMode } from "../../types/enums";
 
-const game: ServerGame = {
+const toConnectToGame = (url) => async () => {
+    const newUrl = url + "new";
+    const { gameCode } = await postJson(newUrl);
+    return {
+        player: {
+            url,
+            customQueryParams: {
+                code: gameCode,
+            },
+        },
+    };
+};
+
+const drawphone: ServerGame = {
     id: "drawphone",
     name: "Drawphone",
     author: "Tanner Krewson",
@@ -28,21 +41,22 @@ const game: ServerGame = {
     ],
     category: ["drawing", "easy"],
     players: "1+",
-    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
+    showOn: [RocketcrabMode.MAIN],
     minPlayers: 1,
     maxPlayers: Infinity,
-    connectToGame: async () => {
-        const newUrl = "https://drawphone.tannerkrewson.com/new";
-        const { gameCode } = await postJson(newUrl);
-        return {
-            player: {
-                url: "https://drawphone.tannerkrewson.com/",
-                customQueryParams: {
-                    code: gameCode,
-                },
-            },
-        };
-    },
+    connectToGame: toConnectToGame("https://drawphone.tannerkrewson.com/"),
 };
 
-export default game;
+export default [
+    drawphone,
+    {
+        ...drawphone,
+        id: "drawphone-kids",
+        name: "Drawphone for Kids",
+        description:
+            drawphone.description +
+            "\n\nNOTE: Age-restricted word packs are removed from Drawphone for Kids. Players can still draw and guess unrestricted.",
+        showOn: [RocketcrabMode.KIDS],
+        connectToGame: toConnectToGame("https://dpk.tannerkrewson.com/"),
+    },
+];

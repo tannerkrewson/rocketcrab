@@ -73,7 +73,7 @@ const game: Array<ServerGame> = [
         displayUrlHref: "https://fake-artist.herokuapp.com/",
         category: ["medium", "drawing"],
         players: "4-10",
-        showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
+        showOn: [RocketcrabMode.MAIN],
         guideUrl:
             "https://www.ultraboardgames.com/a-fake-artist-goes-to-new-york/game-rules.php",
         pictures: [
@@ -102,7 +102,7 @@ const game: Array<ServerGame> = [
         displayUrlHref: "https://insider-online.herokuapp.com/",
         category: ["medium"],
         players: "4-8",
-        showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
+        showOn: [RocketcrabMode.MAIN],
         guideUrl: "https://www.ultraboardgames.com/insider/game-rules.php",
         pictures: [
             "https://i.imgur.com/i3rYxXt.jpg",

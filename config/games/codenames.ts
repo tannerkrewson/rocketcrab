@@ -12,7 +12,7 @@ const game: ServerGame = {
     displayUrlHref: "https://codenames.game/",
     category: ["medium"],
     players: "2-8+",
-    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
+    showOn: [RocketcrabMode.MAIN],
     guideId: "codenames",
     pictures: [
         "https://i.imgur.com/Hiu7cAm.jpg",

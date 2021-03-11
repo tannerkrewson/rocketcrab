@@ -53,7 +53,7 @@ const games: Array<ServerGame> = [
         },
         category: ["netgamesio", "medium"],
         players: "5-10",
-        showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
+        showOn: [RocketcrabMode.MAIN],
         guideUrl: "https://www.ultraboardgames.com/avalon/game-rules.php",
         pictures: [
             "https://i.imgur.com/v8oxIRT.jpg",
@@ -75,7 +75,7 @@ const games: Array<ServerGame> = [
         },
         category: ["netgamesio", "medium"],
         players: "2-4",
-        showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
+        showOn: [RocketcrabMode.MAIN],
         pictures: [
             "https://i.imgur.com/AST27jv.jpg",
             "https://i.imgur.com/h1eLGMu.jpg",
@@ -96,7 +96,7 @@ const games: Array<ServerGame> = [
         },
         category: ["netgamesio", "medium"],
         players: "3+",
-        showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
+        showOn: [RocketcrabMode.MAIN],
         guide: "spyfall",
         pictures: [
             "https://i.imgur.com/yW8IO3b.jpg",
@@ -118,7 +118,7 @@ const games: Array<ServerGame> = [
         },
         category: ["netgamesio", "hard"],
         players: "5-10",
-        showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
+        showOn: [RocketcrabMode.MAIN],
         guideUrl:
             "https://www.ultraboardgames.com/secret-hitler/game-rules.php",
         pictures: [
@@ -141,7 +141,7 @@ const games: Array<ServerGame> = [
         },
         category: ["netgamesio", "medium"],
         players: "4+",
-        showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
+        showOn: [RocketcrabMode.MAIN],
         guideId: "codenames",
         pictures: [
             "https://i.imgur.com/fnrZNkH.jpg",
@@ -165,7 +165,7 @@ const games: Array<ServerGame> = [
         },
         category: ["netgamesio", "medium"],
         players: "3-18",
-        showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
+        showOn: [RocketcrabMode.MAIN],
         guideUrl:
             "https://www.ultraboardgames.com/one-night-ultimate-werewolf/game-rules.php",
         pictures: [
@@ -189,7 +189,7 @@ const games: Array<ServerGame> = [
         },
         category: ["netgamesio", "hard"],
         players: "4+",
-        showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
+        showOn: [RocketcrabMode.MAIN],
         guideUrl: "https://www.ultraboardgames.com/enigma/game-rules.php",
         pictures: [
             "https://i.imgur.com/QYstRgP.jpg",

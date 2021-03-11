@@ -21,7 +21,7 @@ const game: ServerGame = {
     displayUrlHref: "https://just1.herokuapp.com/",
     category: ["easy"],
     players: "1+",
-    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
+    showOn: [RocketcrabMode.MAIN],
     guideId: "justone",
     pictures: [
         "https://i.imgur.com/KX3Sjsi.jpg",

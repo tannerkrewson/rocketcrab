@@ -5,10 +5,12 @@ import {
     ClientGame,
     ServerGameLibrary,
     ClientGameLibrary,
+    GameCategory,
 } from "../types/types";
 import { RocketcrabMode } from "../types/enums";
 
-import categories from "./categories.json";
+import CATEGORIES_RAW from "./categories.json";
+const CATEGORIES: Array<GameCategory> = CATEGORIES_RAW;
 
 const SERVER_GAME_LIST: Array<ServerGame> = fs
     .readdirSync(path.join(process.cwd(), "config", "games"))
@@ -36,18 +38,29 @@ const CLIENT_GAME_LIST: Array<ClientGame> = SERVER_GAME_LIST.map(
 );
 
 export const getServerGameLibrary = (): ServerGameLibrary => ({
-    categories,
+    categories: CATEGORIES,
     gameList: SERVER_GAME_LIST,
 });
 
 export const getClientGameLibrary = (
     mode: RocketcrabMode
-): ClientGameLibrary => ({
-    categories,
-    gameList: CLIENT_GAME_LIST.filter(
+): ClientGameLibrary => {
+    const gameList = CLIENT_GAME_LIST.filter(
         ({ showOn }) => mode === RocketcrabMode.ALL || showOn?.includes(mode)
-    ),
-});
+    );
+
+    const categoriesOfThisGameList = gameList
+        .map(({ category }) => category)
+        .flat();
+    const categories = CATEGORIES.filter(({ id }) =>
+        categoriesOfThisGameList.find((categoryId) => id === categoryId)
+    );
+
+    return {
+        categories,
+        gameList,
+    };
+};
 
 export const GAME_LIBRARY = {
     [RocketcrabMode.MAIN]: getClientGameLibrary(RocketcrabMode.MAIN),

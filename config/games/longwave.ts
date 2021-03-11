@@ -17,7 +17,7 @@ const game: ServerGame = {
     displayUrlHref: "https://longwave.web.app/",
     category: ["easy"],
     players: "2-12+",
-    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
+    showOn: [RocketcrabMode.MAIN],
     guideUrl: "https://www.ultraboardgames.com/wavelength/game-rules.php",
     pictures: [
         "https://i.imgur.com/yDx8aln.jpg",

@@ -14,7 +14,7 @@ const game: ServerGame = {
     donationUrlHref: "https://www.buymeacoffee.com/qwiqwit",
     category: ["easy"],
     players: "3-25",
-    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
+    showOn: [RocketcrabMode.MAIN],
     pictures: [
         "https://i.imgur.com/5mX4zf7.jpg",
         "https://i.imgur.com/cPZFcYr.jpg",

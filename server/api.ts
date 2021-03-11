@@ -23,7 +23,7 @@ export default (server: Application, rocketcrab: RocketCrab): void => {
         (mode) => `/${mode}/*`
     );
 
-    // redirect http://rocketcrab.com/MAIN/transfer/drawphone
+    // redirect https://rocketcrab.com/MAIN/transfer/drawphone
     //       to https://rocketcrab.com/transfer/drawphone
     // workaround because Next.js puts those MAIN and KIDS into
     // the Links

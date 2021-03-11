@@ -32,7 +32,7 @@ const game: ServerGame = {
     guideId: "spyfall",
     category: ["medium"],
     players: "4+",
-    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
+    showOn: [RocketcrabMode.MAIN],
     minPlayers: 1,
     maxPlayers: Infinity,
     pictures: [

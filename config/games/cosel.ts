@@ -22,7 +22,7 @@ const game: ServerGame = {
 
     players: "4+",
 
-    showOn: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
+    showOn: [RocketcrabMode.MAIN],
 
     guideUrl: "https://cosel.io/how-to-play",
 
