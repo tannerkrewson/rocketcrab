@@ -1,6 +1,7 @@
 import { newParty, setGame } from "./rocketcrab";
 import { RocketCrab } from "../types/types";
 import { Application, Request, Response } from "express";
+import { RocketcrabMode } from "../types/enums";
 
 export default (server: Application, rocketcrab: RocketCrab): void => {
     const { partyList } = rocketcrab;
@@ -17,6 +18,21 @@ export default (server: Application, rocketcrab: RocketCrab): void => {
         const { code } = newParty({ rocketcrab, isPublic });
         res.json({ code });
     };
+
+    const localeRedirects = [RocketcrabMode.MAIN, RocketcrabMode.KIDS].map(
+        (mode) => `/${mode}/*`
+    );
+
+    // redirect http://rocketcrab.com/MAIN/transfer/drawphone
+    //       to https://rocketcrab.com/transfer/drawphone
+    // workaround because Next.js puts those MAIN and KIDS into
+    // the Links
+    server.all(localeRedirects, (req, res) => {
+        const newPath = req.originalUrl.split("/");
+        newPath.splice(1, 1); // removes second item from array
+        res.redirect(newPath.join("/"));
+    });
+
     server.post("/api/new", newPartyHandler(false));
     server.post("/api/new-public", newPartyHandler(true));
 

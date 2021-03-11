@@ -9,6 +9,7 @@ describe("server/api.ts", () => {
         app = ({
             post: jest.fn(),
             get: jest.fn(),
+            all: jest.fn(),
         } as unknown) as Application;
 
         rocketcrab = ({
@@ -139,5 +140,17 @@ describe("server/api.ts", () => {
         handler(req, res);
 
         expect(rocketcrab.partyList[0].selectedGameId).toBe("");
+    });
+
+    it("locale transfers work", () => {
+        expect(app.all.mock.calls[0][0]).toEqual(["/MAIN/*", "/KIDS/*"]);
+        const handler = app.all.mock.calls[0][1];
+        const res = { redirect: jest.fn() };
+        handler({ originalUrl: "/MAIN/a/b/c" }, res);
+        handler({ originalUrl: "/KIDS/d/e/f" }, res);
+
+        expect(res.redirect.mock.calls.length).toBe(2);
+        expect(res.redirect.mock.calls[0][0]).toBe("/a/b/c");
+        expect(res.redirect.mock.calls[1][0]).toBe("/d/e/f");
     });
 });
