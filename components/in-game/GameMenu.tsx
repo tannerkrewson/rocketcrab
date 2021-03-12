@@ -5,26 +5,28 @@ import { Badge } from "@geist-ui/react";
 
 const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => (
     <div className="game-menu">
-        {menuButtons.map(({ label, hostOnly, onClick, badgeCount }) => (
-            <PrimaryButton
-                size="small"
-                type={hostOnly ? "error" : "secondary"}
-                disabled={!isHost && hostOnly}
-                onClick={onClick}
-                key={label}
-                style={{ marginBottom: ".7em" }}
-            >
-                {label}
-                {badgeCount > 0 && (
-                    <>
-                        &nbsp;
-                        <Badge type="error" size="mini">
-                            {badgeCount}
-                        </Badge>
-                    </>
-                )}
-            </PrimaryButton>
-        ))}
+        {menuButtons
+            .filter(({ hide }) => !hide)
+            .map(({ label, hostOnly, onClick, badgeCount }) => (
+                <PrimaryButton
+                    size="small"
+                    type={hostOnly ? "error" : "secondary"}
+                    disabled={!isHost && hostOnly}
+                    onClick={onClick}
+                    key={label}
+                    style={{ marginBottom: ".7em" }}
+                >
+                    {label}
+                    {badgeCount > 0 && (
+                        <>
+                            &nbsp;
+                            <Badge type="error" size="mini">
+                                {badgeCount}
+                            </Badge>
+                        </>
+                    )}
+                </PrimaryButton>
+            ))}
         <style jsx>{`
             .game-menu {
                 position: fixed;

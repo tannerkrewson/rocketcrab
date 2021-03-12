@@ -15,6 +15,7 @@ import Swal from "sweetalert2";
 import { useRouter } from "next/router";
 import { isFuture } from "date-fns";
 import { useIsAlreadyPWA } from "../../utils/useIsAlreadyPWA";
+import { RocketcrabMode } from "../../types/enums";
 
 const PartyScreen = ({
     partyState,
@@ -31,6 +32,7 @@ const PartyScreen = ({
     clearUnreadMsgCount,
 }: PartyScreenProps): JSX.Element => {
     const router = useRouter();
+    const isKidsMode = router.locale === RocketcrabMode.KIDS;
 
     const {
         playerList,
@@ -112,7 +114,7 @@ const PartyScreen = ({
         );
     }
 
-    const rChatBox = (
+    const rChatBox = !isKidsMode && (
         <SkinnyCard key="ChatBox">
             <ChatBox
                 chat={partyState.chat}
@@ -169,7 +171,7 @@ const PartyScreen = ({
             </ButtonGroup>
             <Spacer y={1.5} />
             {orderedCards}
-            {!isAlreadyPWA && !createdAsPublic && !isHost && (
+            {!isAlreadyPWA && !createdAsPublic && !isHost && !isKidsMode && (
                 <>
                     <Spacer y={1} />
                     <SkinnyCard>
@@ -204,7 +206,7 @@ const PartyScreen = ({
                 </>
             )}
 
-            {createdAsPublic && (
+            {createdAsPublic && !isKidsMode && (
                 <>
                     <Spacer y={0.5} />
                     <SkinnyCard>

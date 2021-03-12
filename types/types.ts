@@ -144,6 +144,7 @@ export type MenuButton = {
     hostOnly: boolean;
     onClick: () => void;
     badgeCount?: number;
+    hide?: boolean;
 };
 
 export type LibraryState = {

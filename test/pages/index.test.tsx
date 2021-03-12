@@ -17,6 +17,10 @@ Object.defineProperty(window, "matchMedia", {
     })),
 });
 
+jest.mock("next/router", () => ({
+    useRouter: () => ({ locale: "MAIN" }),
+}));
+
 describe("pages/index.tsx", () => {
     it("matches snapshot", () => {
         const { asFragment } = render(<Home mode={RocketcrabMode.MAIN} />, {});

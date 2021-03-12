@@ -13,6 +13,7 @@ import { GetServerSideProps } from "next";
 
 export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
     const router = useRouter();
+    const isKidsMode = router.locale === RocketcrabMode.KIDS;
     const [newLoading, setNewLoading] = useState(false);
     const isAlreadyPWA = useIsAlreadyPWA();
 
@@ -27,7 +28,11 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
 
     return (
         <PageLayout center={true} mode={mode}>
-            <div className="description">party games for phones</div>
+            <div className="description">
+                {isKidsMode
+                    ? "play in class or with family!"
+                    : "party games for phones"}
+            </div>
 
             <ButtonGroup>
                 <PrimaryButton href="/join" size="large">
@@ -42,40 +47,48 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                     Start Party
                 </PrimaryButton>
             </ButtonGroup>
-            <Spacer y={0.7} />
-            <ButtonGroup>
-                <PrimaryButton href="/find" size="large">
-                    Find Players
-                </PrimaryButton>
-            </ButtonGroup>
+            {!isKidsMode && (
+                <>
+                    <Spacer y={0.7} />
+                    <ButtonGroup>
+                        <PrimaryButton href="/find" size="large">
+                            Find Players
+                        </PrimaryButton>
+                    </ButtonGroup>
+                </>
+            )}
             <Spacer y={1.2} />
             <div className="btn-col">
-                {!isAlreadyPWA && (
+                {!isAlreadyPWA && !isKidsMode && (
                     <>
                         <AddAppButton />
                         <Spacer y={0.5} />
                     </>
                 )}
-                <PrimaryButton
-                    type="default"
-                    url="https://discord.gg/MvYRVCP"
-                    manualWidth
-                >
-                    <img
-                        src="/Discord-Logo-Color.svg"
-                        className="discord-logo"
-                    />
-                    Join our Discord
-                </PrimaryButton>
-                <Spacer y={0.5} />
-                <PrimaryButton
-                    type="default"
-                    url="https://github.com/tannerkrewson/rocketcrab/#-for-developers"
-                    manualWidth
-                >
-                    Add your game
-                </PrimaryButton>
-                <Spacer y={0.5} />
+                {!isKidsMode && (
+                    <>
+                        <PrimaryButton
+                            type="default"
+                            url="https://discord.gg/MvYRVCP"
+                            manualWidth
+                        >
+                            <img
+                                src="/Discord-Logo-Color.svg"
+                                className="discord-logo"
+                            />
+                            Join our Discord
+                        </PrimaryButton>
+                        <Spacer y={0.5} />
+                        <PrimaryButton
+                            type="default"
+                            url="https://github.com/tannerkrewson/rocketcrab/#-for-developers"
+                            manualWidth
+                        >
+                            Add your game
+                        </PrimaryButton>
+                        <Spacer y={0.5} />
+                    </>
+                )}
                 <PrimaryButton type="default" href="/library" manualWidth>
                     Browse Games
                 </PrimaryButton>

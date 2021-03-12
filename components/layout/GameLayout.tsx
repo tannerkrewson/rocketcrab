@@ -22,6 +22,7 @@ import { filterClean, MODE_MAP } from "../../utils/utils";
 import { differenceInMilliseconds } from "date-fns";
 import GameDetail from "../detail/GameDetail";
 import { RocketcrabMode } from "../../types/enums";
+import { useRouter } from "next/router";
 
 const GameLayout = ({
     partyState,
@@ -38,6 +39,9 @@ const GameLayout = ({
     newestMsg,
     mode,
 }: GameLayoutProps): JSX.Element => {
+    const router = useRouter();
+    const isKidsMode = router.locale === RocketcrabMode.KIDS;
+
     const host = MODE_MAP[mode];
     const { code, gameState, selectedGameId, playerList, chat } = partyState;
     const { isHost } = thisPlayer;
@@ -55,7 +59,7 @@ const GameLayout = ({
     // https://stackoverflow.com/a/48830513
     const [frameRefresh, setFrameRefresh] = useState(0);
 
-    const [enableToasts, setEnableToasts] = useState(true);
+    const [enableToasts, setEnableToasts] = useState(!isKidsMode);
     const [, setToast] = useToasts();
     const [lastShownToastDate, setLastShownToastDate] = useState(0);
 
@@ -137,6 +141,7 @@ const GameLayout = ({
                 igLogEvent("showChat");
             }, []),
             badgeCount: unreadMsgCount,
+            hide: isKidsMode,
         },
         {
             label: "Players",
