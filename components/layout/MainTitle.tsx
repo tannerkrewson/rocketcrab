@@ -1,6 +1,7 @@
 import converter from "phonetic-alphabet-converter";
 import { Tooltip } from "@geist-ui/react";
 import { useCallback, useState } from "react";
+import { Textfit } from "react-textfit";
 import { RocketcrabMode } from "../../types/enums";
 import { MODE_MAP } from "../../utils/utils";
 
@@ -30,17 +31,19 @@ const MainTitle = ({
                 <img src="/rocket.svg" className="rocket" />
                 <img src="/crab.svg" className="crab" />
             </div>
-            <Tooltip
-                text={"Copied!"}
-                visible={copiedTooltip}
-                trigger="click"
-                type="dark"
-                offset={-4}
-            >
-                <h2 className="party-url" onClick={linkCopyClick}>
-                    {title}
-                </h2>
-            </Tooltip>
+            <Textfit mode="single">
+                <Tooltip
+                    text={"Copied!"}
+                    visible={copiedTooltip}
+                    trigger="click"
+                    type="dark"
+                    offset={-4}
+                >
+                    <h2 className="party-url" onClick={linkCopyClick}>
+                        {title}
+                    </h2>
+                </Tooltip>
+            </Textfit>
 
             {path && !disablePhonetic && (
                 <div className="phonetic">({converter(path).join(" ")})</div>

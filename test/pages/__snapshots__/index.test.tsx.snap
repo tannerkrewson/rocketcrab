@@ -27,14 +27,20 @@ exports[`pages/index.tsx matches snapshot 1`] = `
               src="/crab.svg"
             />
           </div>
-          <div
-            class="jsx-418573366 tooltip "
-          >
-            <h2
-              class="jsx-1758552329 party-url"
+          <div>
+            <div
+              style="display: inline-block; white-space: nowrap;"
             >
-              rocketcrab.com
-            </h2>
+              <div
+                class="jsx-418573366 tooltip "
+              >
+                <h2
+                  class="jsx-1758552329 party-url"
+                >
+                  rocketcrab.com
+                </h2>
+              </div>
+            </div>
           </div>
         </div>
         <div
