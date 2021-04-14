@@ -9,7 +9,12 @@ import {
     MAX_CHATS_OVERALL,
     MAX_CHATS_FROM_SINGLE_PLAYER,
 } from "../types/types";
-import { PartyStatus, GameStatus, SocketEvent } from "../types/enums";
+import {
+    PartyStatus,
+    GameStatus,
+    SocketEvent,
+    RocketcrabMode,
+} from "../types/enums";
 import { getServerGameLibrary } from "../config";
 import { v4 as uuidv4 } from "uuid";
 import { CronJob } from "cron";
@@ -82,11 +87,13 @@ export const newParty = ({
     forceGameCode,
     forceUuid,
     isPublic = false,
+    mode = RocketcrabMode.MAIN,
 }: {
     rocketcrab: RocketCrab;
     forceGameCode?: string;
     forceUuid?: string;
     isPublic?: boolean;
+    mode?: RocketcrabMode;
 }): Party => {
     const newParty: Party = {
         status: PartyStatus.party,
@@ -103,6 +110,7 @@ export const newParty = ({
         createdAsPublic: isPublic,
         chat: [],
         bannedIPs: [],
+        mode,
     };
 
     if (isPublic) {

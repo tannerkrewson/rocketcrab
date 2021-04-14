@@ -1,6 +1,7 @@
 import api from "../../server/api";
 import { Application } from "express";
 import { RocketCrab } from "../../types/types";
+import { RocketcrabMode } from "../../types/enums";
 
 describe("server/api.ts", () => {
     let app;
@@ -19,15 +20,25 @@ describe("server/api.ts", () => {
         api(app, rocketcrab);
     });
 
-    it("/api/new works", () => {
+    it("/api/new works for regular mode", () => {
         expect(app.post.mock.calls[0][0]).toEqual("/api/new");
         const handler = app.post.mock.calls[0][1];
         const res = { json: jest.fn() };
         handler(undefined, res);
 
-        expect(rocketcrab.partyList[0].code).toEqual(
-            res.json.mock.calls[0][0].code
-        );
+        const actualParty = rocketcrab.partyList[0];
+        expect(actualParty.code).toEqual(res.json.mock.calls[0][0].code);
+        expect(actualParty.mode).toEqual(RocketcrabMode.MAIN);
+    });
+
+    it("/api/new works for kids mode", () => {
+        const handler = app.post.mock.calls[0][1];
+        const res = { json: jest.fn() };
+        handler({ hostname: "kids.rocketcrab.com" }, res);
+
+        const actualParty = rocketcrab.partyList[0];
+        expect(actualParty.code).toEqual(res.json.mock.calls[0][0].code);
+        expect(actualParty.mode).toEqual(RocketcrabMode.KIDS);
     });
 
     it("/transfer create party", () => {

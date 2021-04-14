@@ -6,6 +6,11 @@ import { RocketcrabMode } from "../types/enums";
 export default (server: Application, rocketcrab: RocketCrab): void => {
     const { partyList } = rocketcrab;
 
+    const getMode = (req: Request) =>
+        req?.hostname?.startsWith("kids.")
+            ? RocketcrabMode.KIDS
+            : RocketcrabMode.MAIN;
+
     const newPartyHandler = (isPublic: boolean) => (
         req: Request,
         res: Response
@@ -15,7 +20,7 @@ export default (server: Application, rocketcrab: RocketCrab): void => {
             return;
         }
 
-        const { code } = newParty({ rocketcrab, isPublic });
+        const { code } = newParty({ rocketcrab, isPublic, mode: getMode(req) });
         res.json({ code });
     };
 
@@ -50,9 +55,13 @@ export default (server: Application, rocketcrab: RocketCrab): void => {
         if (givenUuid) {
             party =
                 partyList.find(({ uuid }) => uuid === givenUuid) ||
-                newParty({ rocketcrab, forceUuid: givenUuid as string });
+                newParty({
+                    rocketcrab,
+                    forceUuid: givenUuid as string,
+                    mode: getMode(req),
+                });
         } else {
-            party = newParty({ rocketcrab });
+            party = newParty({ rocketcrab, mode: getMode(req) });
         }
 
         if (gameid && !party.selectedGame) {

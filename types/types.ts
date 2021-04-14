@@ -52,6 +52,7 @@ type CommonParty = {
     publicEndDate?: number;
     chat: Array<ChatMessage>;
     bannedIPs: Array<string>;
+    mode: RocketcrabMode;
 };
 
 export type Player = {
