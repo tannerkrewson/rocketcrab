@@ -2,14 +2,12 @@ import { newParty, setGame } from "./rocketcrab";
 import { RocketCrab } from "../types/types";
 import { Application, Request, Response } from "express";
 import { RocketcrabMode } from "../types/enums";
+import { getModeFromHost } from "../utils/utils";
 
 export default (server: Application, rocketcrab: RocketCrab): void => {
     const { partyList } = rocketcrab;
 
-    const getMode = (req: Request) =>
-        req?.hostname?.startsWith("kids.")
-            ? RocketcrabMode.KIDS
-            : RocketcrabMode.MAIN;
+    const getMode = (req: Request) => getModeFromHost(req?.hostname);
 
     const newPartyHandler = (isPublic: boolean) => (
         req: Request,

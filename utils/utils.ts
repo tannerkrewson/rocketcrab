@@ -109,3 +109,6 @@ export const MODE_MAP = {
     [RocketcrabMode.MAIN]: "rocketcrab.com",
     [RocketcrabMode.KIDS]: "kids.rocketcrab.com",
 };
+
+export const getModeFromHost = (hostname: string): RocketcrabMode =>
+    hostname?.startsWith("kids.") ? RocketcrabMode.KIDS : RocketcrabMode.MAIN;
