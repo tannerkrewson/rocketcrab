@@ -22,6 +22,7 @@ import type {
 } from "../types/types";
 import type { Server } from "socket.io";
 import { SocketEvent } from "../types/enums";
+import { getModeFromHost } from "../utils/utils";
 
 export default (io: Server, rocketcrab: RocketCrab): void => {
     io.on("connection", (socket) => {
@@ -48,7 +49,10 @@ const onJoinParty = (socket: SocketIO.Socket, rocketcrab: RocketCrab) => ({
         (ip) => socket?.handshake?.address === ip
     );
 
-    if (party && !isPlayerBanned) {
+    const userMode = getModeFromHost(socket?.handshake?.headers?.host);
+    const modesMatch = userMode === party?.mode;
+
+    if (party && !isPlayerBanned && modesMatch) {
         const { id, name } = lastPartyState?.me || {};
         const player = addPlayer(name, socket, party, id);
 
