@@ -109,6 +109,7 @@ export const useRocketcrabClientSocket = ({
                     "party-isPublic",
                     (!!partyState.publicEndDate).toString()
                 );
+                logEvent("party-mode", partyState.mode);
             }
         },
         [playerList, selectedGameId]
