@@ -29,7 +29,12 @@ import {
     MAX_CHATS_FROM_SINGLE_PLAYER,
     MAX_CHATS_OVERALL,
 } from "../../types/types";
-import { PartyStatus, GameStatus, SocketEvent } from "../../types/enums";
+import {
+    PartyStatus,
+    GameStatus,
+    SocketEvent,
+    RocketcrabMode,
+} from "../../types/enums";
 
 jest.mock("../../config", () => ({
     getServerGameLibrary: jest.fn(
@@ -685,7 +690,10 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("reconnectToParty creates identical party", () => {
-        const partyToRecreate = generateMockParty({ nextPlayerId: 0 });
+        const partyToRecreate = generateMockParty({
+            nextPlayerId: 0,
+            mode: RocketcrabMode.KIDS,
+        });
         const rocketcrab = generateMocketCrab({});
         const actualParty = reconnectToParty(partyToRecreate, rocketcrab);
 
@@ -741,6 +749,7 @@ const generateMockParty = ({
     chat = [],
     bannedIPs = [],
     createdAsPublic = false,
+    mode = RocketcrabMode.MAIN,
 }: Partial<Party>): Party => ({
     status,
     playerList,
@@ -754,6 +763,7 @@ const generateMockParty = ({
     chat,
     bannedIPs,
     createdAsPublic,
+    mode,
 });
 
 const generateMockPlayer = ({

@@ -143,7 +143,7 @@ export const reconnectToParty = (
 
     if (!lastPartyState || !lastPartyState.uuid) return;
 
-    const { code, uuid, status, selectedGameId, gameState, idealHostId } =
+    const { code, uuid, status, selectedGameId, gameState, idealHostId, mode } =
         lastPartyState || {};
 
     const partyAlreadyExists = getPartyByUuid(uuid, partyList);
@@ -164,6 +164,9 @@ export const reconnectToParty = (
         party.status = status;
     }
 
+    if ([RocketcrabMode.MAIN, RocketcrabMode.KIDS].includes(mode)) {
+        party.mode = mode;
+    }
     if (findGameById(selectedGameId)) {
         party.selectedGameId = selectedGameId;
     }
