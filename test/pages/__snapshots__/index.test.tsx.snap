@@ -132,6 +132,29 @@ exports[`pages/index.tsx matches snapshot 1`] = `
           />
           <a
             class="link"
+            href="https://kids.rocketcrab.com/"
+            rel="noopener noreferrer"
+            style="line-height: 0;"
+            target="_blank"
+          >
+            <button
+              class="jsx-3131001525 btn "
+              style="width: 100%;"
+              type="button"
+              url="https://kids.rocketcrab.com/"
+            >
+              <div
+                class="text"
+              >
+                🧒 Try Kids Mode
+              </div>
+            </button>
+          </a>
+          <span
+            class="jsx-3462447556 "
+          />
+          <a
+            class="link"
             href="https://discord.gg/MvYRVCP"
             rel="noopener noreferrer"
             style="line-height: 0;"

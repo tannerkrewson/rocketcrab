@@ -69,6 +69,14 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                     <>
                         <PrimaryButton
                             type="default"
+                            url="https://kids.rocketcrab.com/"
+                            manualWidth
+                        >
+                            🧒 Try Kids Mode
+                        </PrimaryButton>
+                        <Spacer y={0.5} />
+                        <PrimaryButton
+                            type="default"
                             url="https://discord.gg/MvYRVCP"
                             manualWidth
                         >
