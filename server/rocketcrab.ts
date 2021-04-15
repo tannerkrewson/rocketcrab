@@ -52,7 +52,7 @@ export const initCron = (rocketcrab: RocketCrab): void => {
     };
 
     const activateFinderJob = new CronJob(
-        "0 0/4 * * 4-6", // https://crontab.guru/#0_0/2_*_*_4-6
+        "0 13 * * 6", // https://crontab.guru/#0_13_*_*_6
         () => {
             setDates();
             rocketcrab.isFinderActive = true;

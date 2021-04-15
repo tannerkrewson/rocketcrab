@@ -180,12 +180,19 @@ export const Find = ({
     );
 };
 
-export const getStaticProps: GetServerSideProps = async ({ locale }) => ({
-    props: {
-        gameLibrary: GAME_LIBRARY[locale],
-        mode: locale as RocketcrabMode,
-    },
-});
+export const getStaticProps: GetServerSideProps = async ({ locale }) => {
+    if (locale === RocketcrabMode.KIDS) {
+        return {
+            notFound: true,
+        };
+    }
+    return {
+        props: {
+            gameLibrary: GAME_LIBRARY[locale],
+            mode: locale as RocketcrabMode,
+        },
+    };
+};
 
 type FindProps = {
     gameLibrary: ClientGameLibrary;
