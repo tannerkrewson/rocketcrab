@@ -6,6 +6,7 @@ import { AppPropsType } from "next/dist/next-server/lib/utils";
 import { initGA, logPageView } from "../utils/analytics";
 import { useState, useEffect } from "react";
 import Router from "next/router";
+import withDarkMode, { useDarkMode } from "next-dark-mode";
 
 import "swiper/swiper-bundle.css";
 import "react-toggle/style.css";
@@ -30,8 +31,11 @@ const MyApp = ({ Component, pageProps }: AppPropsType): JSX.Element => {
             Router.events.off("routeChangeComplete", loadingStop);
         };
     }, []);
+
+    const { darkModeActive } = useDarkMode();
+
     return (
-        <GeistProvider>
+        <GeistProvider themeType={darkModeActive ? "dark" : "light"}>
             <CssBaseline />
             <Body>
                 <Component {...pageProps} />
@@ -40,4 +44,4 @@ const MyApp = ({ Component, pageProps }: AppPropsType): JSX.Element => {
     );
 };
 
-export default MyApp;
+export default withDarkMode(MyApp);

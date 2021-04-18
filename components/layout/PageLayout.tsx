@@ -95,7 +95,7 @@ const PageLayout = ({
             .react-toggle:not(.react-toggle--checked) .react-toggle-track,
             .react-toggle:hover:not(.react-toggle--disabled)
                 .react-toggle-track {
-                background-color: black;
+                background-color: #5f6a78;
             }
 
             .react-toggle--checked .react-toggle-track,
