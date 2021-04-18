@@ -20,7 +20,7 @@ import type {
     Party,
     RocketCrab,
 } from "../types/types";
-import type { Server } from "socket.io";
+import type { Server, Socket } from "socket.io";
 import { SocketEvent } from "../types/enums";
 import { getModeFromHost } from "../utils/utils";
 
@@ -34,7 +34,7 @@ export default (io: Server, rocketcrab: RocketCrab): void => {
     });
 };
 
-const onJoinParty = (socket: SocketIO.Socket, rocketcrab: RocketCrab) => ({
+const onJoinParty = (socket: Socket, rocketcrab: RocketCrab) => ({
     code,
     lastPartyState,
     reconnecting,
@@ -133,10 +133,7 @@ const attachPartyListenersToPlayer = (
     });
 };
 
-const onFinderSubscribe = (
-    socket: SocketIO.Socket,
-    rocketcrab: RocketCrab
-) => () => {
+const onFinderSubscribe = (socket: Socket, rocketcrab: RocketCrab) => () => {
     socket.emit(SocketEvent.FINDER_UPDATE, getFinderState(rocketcrab));
 
     rocketcrab.finderSubscribers.push(socket);

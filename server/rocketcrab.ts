@@ -19,6 +19,7 @@ import { getServerGameLibrary } from "../config";
 import { v4 as uuidv4 } from "uuid";
 import { CronJob } from "cron";
 import { getUnixTime } from "date-fns";
+import type { Socket } from "socket.io";
 import { isChatMsgValid } from "../utils/utils";
 
 const SERVER_GAME_LIST: Array<ServerGame> = getServerGameLibrary().gameList;
@@ -179,7 +180,7 @@ export const reconnectToParty = (
 
 export const addPlayer = (
     name: string,
-    socket: SocketIO.Socket,
+    socket: Socket,
     party: Party,
     previousId?: number
 ): Player => {

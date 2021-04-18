@@ -1,3 +1,4 @@
+import type { Socket } from "socket.io";
 import {
     initRocketCrab,
     newParty,
@@ -161,12 +162,12 @@ describe("server/rocketcrab.ts", () => {
         const mockParty: Party = generateMockParty({ nextPlayerId: 0 });
         const { playerList } = mockParty;
 
-        const mockSocket0 = {} as SocketIO.Socket;
+        const mockSocket0 = {} as Socket;
         const mockPlayer0 = addPlayer("foo", mockSocket0, mockParty);
 
         expect(playerList.length).toBe(1);
 
-        const mockSocket1 = {} as SocketIO.Socket;
+        const mockSocket1 = {} as Socket;
         const mockPlayer1 = addPlayer("bar", mockSocket1, mockParty);
 
         expect(playerList.length).toBe(2);
@@ -193,7 +194,7 @@ describe("server/rocketcrab.ts", () => {
             nextPlayerId: 2,
         });
 
-        const mockSocket = {} as SocketIO.Socket;
+        const mockSocket = {} as Socket;
         addPlayer("bar", mockSocket, mockParty, 0);
 
         expect(playerList[1].id).toBe(0);
@@ -203,7 +204,7 @@ describe("server/rocketcrab.ts", () => {
         const playerList = [generateMockPlayer({ id: 0, isHost: true })];
         const mockParty: Party = generateMockParty({ playerList });
 
-        const mockSocket = {} as SocketIO.Socket;
+        const mockSocket = {} as Socket;
         addPlayer("bar", mockSocket, mockParty, 0);
 
         expect(playerList[0].id).toBe(0);
@@ -215,7 +216,7 @@ describe("server/rocketcrab.ts", () => {
             nextPlayerId: 0,
         });
 
-        const mockSocket = {} as SocketIO.Socket;
+        const mockSocket = {} as Socket;
         addPlayer("foo", mockSocket, mockParty, 100);
 
         const { playerList } = mockParty;
@@ -229,7 +230,7 @@ describe("server/rocketcrab.ts", () => {
         const mockParty: Party = generateMockParty({
             playerList: generateMockPlayerList(3, (player, i) => ({
                 ...player,
-                socket: { emit: emits[i] } as Partial<SocketIO.Socket>,
+                socket: { emit: emits[i] } as Partial<Socket>,
             })),
         });
         const mocketCrab = generateMocketCrab({});
@@ -278,7 +279,7 @@ describe("server/rocketcrab.ts", () => {
         const generateMocket = (i: number) =>
             (({
                 emit: emits[i],
-            } as Partial<SocketIO.Socket>) as SocketIO.Socket);
+            } as Partial<Socket>) as Socket);
 
         const mockParty: Party = generateMockParty({
             status: PartyStatus.party,
@@ -306,7 +307,7 @@ describe("server/rocketcrab.ts", () => {
         const generateMocket = (i: number) =>
             (({
                 emit: emits[i],
-            } as Partial<SocketIO.Socket>) as SocketIO.Socket);
+            } as Partial<Socket>) as Socket);
 
         const mockParty: Party = generateMockParty({
             status: PartyStatus.ingame,
@@ -325,7 +326,7 @@ describe("server/rocketcrab.ts", () => {
     it("removePlayer works", () => {
         const disconnect = jest.fn();
         const mockPlayer = generateMockPlayer({
-            socket: ({ disconnect } as unknown) as SocketIO.Socket,
+            socket: ({ disconnect } as unknown) as Socket,
         });
 
         const playerList = [mockPlayer];
@@ -346,7 +347,7 @@ describe("server/rocketcrab.ts", () => {
                 ...player,
                 socket: {
                     disconnect: jest.fn(),
-                } as Partial<SocketIO.Socket>,
+                } as Partial<Socket>,
             })),
         });
 
@@ -404,7 +405,7 @@ describe("server/rocketcrab.ts", () => {
         const mockPlayerList = generateMockPlayerList(4, (player, i) => ({
             ...player,
             name: i === 0 ? "" : player.name,
-            socket: { emit: jest.fn() } as Partial<SocketIO.Socket>,
+            socket: { emit: jest.fn() } as Partial<Socket>,
         }));
 
         setName("name1", mockPlayerList[0], mockPlayerList);
@@ -427,7 +428,7 @@ describe("server/rocketcrab.ts", () => {
                 socket: ({
                     emit: jest.fn(),
                     once: jest.fn(),
-                } as unknown) as SocketIO.Socket,
+                } as unknown) as Socket,
             })),
         });
 
@@ -769,7 +770,7 @@ const generateMockParty = ({
 const generateMockPlayer = ({
     id = 0,
     name = "foo",
-    socket = {} as SocketIO.Socket,
+    socket = {} as Socket,
     isHost = false,
 }: Partial<Player> = {}): Player => ({
     id,

@@ -62,6 +62,12 @@ const PageLayout = ({
             .height-expander {
                 flex-grow: 1;
             }
+
+            .theme-toggle {
+                position: fixed;
+                bottom: 1em;
+                right: 1em;
+            }
         `}</style>
 
         <style jsx global>{`

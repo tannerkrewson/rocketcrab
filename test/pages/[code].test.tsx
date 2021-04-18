@@ -1,4 +1,5 @@
 import React from "react";
+import type { Socket } from "socket.io";
 import { render } from "../testUtils";
 import { Code } from "../../pages/[code]";
 import { ClientGameLibrary } from "../../types/types";
@@ -18,7 +19,7 @@ jest.mock("socket.io-client", () => ({
                 on: jest.fn(),
                 off: jest.fn(),
             },
-        } as unknown) as SocketIO.Socket),
+        } as unknown) as Socket),
 }));
 
 describe("pages/[code].tsx", () => {

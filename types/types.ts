@@ -1,6 +1,7 @@
 import { PartyStatus, GameStatus, RocketcrabMode } from "./enums";
 import WebSocket from "ws";
 import { Dispatch, SetStateAction } from "react";
+import type { Socket } from "socket.io";
 import { BindingsChangeTarget } from "@geist-ui/react/dist/input/use-input";
 
 export const FINDER_ACTIVE_MS = 10 * 60 * 1000; // 10 minutes
@@ -13,7 +14,7 @@ export const ENABLE_FILTER = true;
 export type RocketCrab = {
     partyList: Array<Party>;
     isFinderActive: boolean;
-    finderSubscribers: Array<SocketIO.Socket>;
+    finderSubscribers: Array<Socket>;
     finderActiveDates?: FinderActiveDates;
 };
 
@@ -58,7 +59,7 @@ type CommonParty = {
 export type Player = {
     id: number;
     name: string;
-    socket?: SocketIO.Socket;
+    socket?: Socket;
     isHost: boolean;
 };
 
