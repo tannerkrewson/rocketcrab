@@ -8,6 +8,7 @@ import { useState, useEffect } from "react";
 import Router from "next/router";
 
 import "swiper/swiper-bundle.css";
+import "react-toggle/style.css";
 
 const MyApp = ({ Component, pageProps }: AppPropsType): JSX.Element => {
     const [, setLoading] = useState(false);

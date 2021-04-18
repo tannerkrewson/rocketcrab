@@ -53,6 +53,7 @@
         "react-markdown": "^5.0.3",
         "react-spinners-kit": "^1.9.1",
         "react-textfit": "^1.1.1",
+        "react-toggle": "^4.1.2",
         "socket.io": "^4.0.1",
         "socket.io-client": "^4.0.1",
         "sweetalert2": "^10.16.2",

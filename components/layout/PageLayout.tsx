@@ -85,6 +85,28 @@ const PageLayout = ({
             .fslightbox-toolbar-button:first-child {
                 display: none;
             }
+
+            .react-toggle--focus .react-toggle-thumb,
+            .react-toggle:active:not(.react-toggle--disabled)
+                .react-toggle-thumb {
+                box-shadow: none;
+            }
+
+            .react-toggle:not(.react-toggle--checked) .react-toggle-track,
+            .react-toggle:hover:not(.react-toggle--disabled)
+                .react-toggle-track {
+                background-color: black;
+            }
+
+            .react-toggle--checked .react-toggle-track,
+            .react-toggle--checked:hover:not(.react-toggle--disabled)
+                .react-toggle-track {
+                background-color: #03a5fc;
+            }
+
+            .react-toggle--checked .react-toggle-thumb {
+                border-color: transparent;
+            }
         `}</style>
         {reconnecting && <Connecting />}
     </div>
