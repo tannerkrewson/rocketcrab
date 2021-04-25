@@ -1,5 +1,11 @@
 [
     {
+        "id": "new",
+        "name": "✨ New games",
+        "color": "white",
+        "backgroundColor": "#7928ca"
+    },
+    {
         "id": "recent",
         "name": "⏱️ Recently played",
         "color": "white",
