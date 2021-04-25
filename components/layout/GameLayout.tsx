@@ -1,4 +1,4 @@
-import { Badge, Spacer, useToasts } from "@geist-ui/react";
+import { Badge, Spacer, useTheme, useToasts } from "@geist-ui/react";
 import PrimaryButton from "../common/PrimaryButton";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -67,6 +67,10 @@ const GameLayout = ({
         (event) => logEvent("inGame-" + event, isHost ? "isHost" : "notHost"),
         [isHost]
     );
+
+    const {
+        palette: { accents_1, accents_2 },
+    } = useTheme();
 
     const actions = useMemo(
         (): ToastAction[] => [
@@ -421,13 +425,14 @@ const GameLayout = ({
                     height: 100%;
                 }
                 .status {
-                    border-bottom: 1px solid #ddd;
+                    border-bottom: 1px solid ${accents_2};
                     display: flex;
                     justify-content: space-between;
                     align-content: center;
                     padding: 0.5em;
                     height: 2em;
                     z-index: 1;
+                    background-color: ${accents_1};
                 }
                 @media only screen and (max-width: 385px) {
                     .status {
