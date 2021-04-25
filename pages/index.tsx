@@ -47,16 +47,6 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                     Start Party
                 </PrimaryButton>
             </ButtonGroup>
-            {!isKidsMode && (
-                <>
-                    <Spacer y={0.7} />
-                    <ButtonGroup>
-                        <PrimaryButton href="/find" size="large">
-                            Find Players
-                        </PrimaryButton>
-                    </ButtonGroup>
-                </>
-            )}
             <Spacer y={1.2} />
             <div className="btn-col">
                 {!isAlreadyPWA && !isKidsMode && (
