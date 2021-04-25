@@ -21,7 +21,9 @@ rocketcrab is a lobby service and launcher for mobile web party games.
 
 Rocketcrab makes it easy for players to discover your game, and easily switch to and from your game without having to manually open a different website and enter a new game code. It accomplishs this by putting your game's page into an `iframe`, which allows any of your cookies, local storage, analytics, and advertising to continue working, while disallowing rocketcrab from manipulating your site. Integrating your game with rocketcrab should be a simple process, but please let me know by opening an issue or joining our Discord if there is any way it could be better!
 
-Games are added to rocketcrab via config files located [here](https://github.com/tannerkrewson/rocketcrab/tree/master/config/games). By looking at the config files of other games, you might be able to understand how other games implement rocketcrab, and how you might integrate rocketcrab into your game. Here's what you need to know:
+The name Rocketcrab is the first thing I could think of that sounded cool, had an available `.com` domain, and could be represented by two emojis. It also does not have an ambigious spelling when spoken out loud (there's only one way to spell "rocket" and "crab"), which is important when trying to get your whole group to go to the site to play games!
+
+Games are added to rocketcrab via config files located [here](https://github.com/tannerkrewson/rocketcrab/tree/dev/config/games). By looking at the config files of other games, you might be able to understand how other games implement rocketcrab, and how you might integrate rocketcrab into your game. Here's what you need to know:
 
 ### Ensuring compatability
 
@@ -36,24 +38,28 @@ That's it! Many existing games already offer these, and can work with rocketcrab
 
 ### Creating a config file
 
-The config files, as mentioned above, should be fairly self explanatory. Along with the [config template](https://github.com/tannerkrewson/rocketcrab/blob/master/config/games/_template.ts), check out the config files of other games to see how they implement rocketcrab. The most important part, which will be explained here, is the `connectToGame` function. This function:
+The config files, as mentioned above, should be fairly self explanatory. Along with the [config template](https://github.com/tannerkrewson/rocketcrab/blob/dev/config/games/_template.ts), check out the config files of other games to see how they implement rocketcrab. The most important part, which will be explained here, is the `connectToGame` function. This function:
 
 -   is `async`, which will allow you to use `await` to make `GET` or `POST` requests.
 -   needs to return an object with these properties:
-    -   `playerURL` (required) string of the url that should be opened in every player's `iframe`.
-    -   `hostURL` (optional) string of a url to be opened only in the "host" player's `iframe`. If not provided, the `playerURL` will be used.
-    -   `customQueryParams` (optional) a record of query params in addition to or to replace the automatic query params. See the [config template](https://github.com/tannerkrewson/rocketcrab/blob/master/config/games/_template.ts) for more info.
-    -   `afterQueryParams` (optional) string that will be appended to the `playerURL` after automatic and custom query params are applied.
+    -   `player` (required) an object with these properties:
+        -   `url` (required) string of the url that should be opened in every player's `iframe`.
+            -   `customQueryParams` (optional) a record of query params in addition to or to replace the automatic query params.
+            -   `afterQueryParams` (optional) string that will be appended to the `player.url` after automatic and custom query params are applied.
+    -   `host` (optional) an object with these properties:
+        -   `url` (optional) string of a url to be opened only in the "host" player's `iframe`. If not provided, the `url` from the `player` object will be used.
+            -   `customQueryParams` (optional) same as `player` object, but only applied to the host.
+            -   `afterQueryParams` (optional) same as `player` object, but only applied to the host.
+    -   These properties are explained more in depth in the [config template](https://github.com/tannerkrewson/rocketcrab/blob/dev/config/games/_template.ts).
 
-Here are three examples of different `connectToGame` functions:
+Here are two examples of different `connectToGame` functions:
 
--   For [Drawphone](https://github.com/tannerkrewson/rocketcrab/blob/a3f796af7f6b70100b1dcf9ab141d73fea41e049/config/games/drawphone.ts#L18-L25), a new game can be generated with a `POST` request to the `/new`, which will return a game code. In it's `connectToGame` function, the `/new` endpoint is called, and the resulting game code is returned in the `code` property, which will add the code as a query param called `code` to the `playerURL` that is opened in each player's `iframe`.
--   For [Spyfall](https://github.com/tannerkrewson/rocketcrab/blob/a3f796af7f6b70100b1dcf9ab141d73fea41e049/config/games/spyfall.ts#L18-L24), a new game can be generated in the exact same way as Drawphone. But, game links are required to take the format `spyfall.tannerkrewson.com/abcd`, and not `drawphone.tannerkrewson.com/?code=abcd` like the above example. So, instead of returning the game code from `connectToGame` in the `code` property, the game code is directly appended to the `playerURL` before it is returned from `connectToGame`.
--   For [Just One](https://github.com/tannerkrewson/rocketcrab/blob/a3f796af7f6b70100b1dcf9ab141d73fea41e049/config/games/justone.ts#L14-L19), we can pick our own game code! So, instead of calling to some endpoint to get a game code like Drawphone and Spyfall, the `connectToGame` function can itself generate a code, and we cross our fingers and hope it's unique! 😂 The resulting `playerURL` will look something like this: `https://just1.herokuapp.com/room/rocketcrab-d5b30ccdd25855e5`.
+-   For [Spyfall](https://github.com/tannerkrewson/rocketcrab/blob/ba2a9f05d9d85af440b603436f6280bc92c0087e/config/games/spyfall.ts#L42-L48), game links are required to take the format `spyfall.tannerkrewson.com/abcd`. So, instead of returning the game code from `connectToGame` in the `code` property, the game code is directly appended to the `player.url` before it is returned from `connectToGame`.
+-   For [Just One](https://github.com/tannerkrewson/rocketcrab/blob/ba2a9f05d9d85af440b603436f6280bc92c0087e/config/games/justone.ts#L33-L40), we can pick our own game code! So, instead of calling to some endpoint to get a game code like Drawphone and Spyfall, the `connectToGame` function can itself generate a code, and we cross our fingers and hope it's unique! 😂 The resulting `player.url` will look something like this: `https://just1.herokuapp.com/room/rocketcrab-d5b30ccdd25855e5`.
 
 ### The automatic query params
 
-The `playerURL` returned from `connectToGame` is automatically appended with 3 query params. The resulting `playerURL` that is opened in every player's `iframe` will look something like this:
+The `player.url` returned from `connectToGame` is automatically appended with 3 query params. The resulting `player.url` that is opened in every player's `iframe` will look something like this:
 
 ```
 https://yourgame.com/?rocketcrab=true&name=Mary&ishost=true
