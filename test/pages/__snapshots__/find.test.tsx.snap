@@ -3,13 +3,13 @@
 exports[`pages/find.tsx matches snapshot 1`] = `
 <DocumentFragment>
   <div
-    class="jsx-911348231 container"
+    class="jsx-1187451143 container"
   >
     <main
-      class="jsx-911348231"
+      class="jsx-1187451143"
     >
       <div
-        class="jsx-911348231 main-content"
+        class="jsx-1187451143 main-content"
       >
         <div
           class="jsx-1758552329 title"
@@ -88,7 +88,7 @@ exports[`pages/find.tsx matches snapshot 1`] = `
         </div>
       </div>
       <div
-        class="jsx-911348231 height-expander"
+        class="jsx-1187451143 height-expander"
       />
     </main>
     <footer

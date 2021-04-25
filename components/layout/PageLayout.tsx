@@ -50,8 +50,7 @@ const PageLayout = ({
 
             .main-content {
                 min-height: 20rem;
-                width: min(24em, 100vw);
-                padding: 0 0.5em;
+                width: min(24em, 95vw);
             }
 
             a {
