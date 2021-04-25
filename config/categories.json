@@ -1,9 +1,9 @@
 [
     {
         "id": "recent",
-        "name": "✨ Recently played",
+        "name": "⏱️ Recently played",
         "color": "white",
-        "backgroundColor": "darkgrey"
+        "backgroundColor": "#999"
     },
     {
         "id": "easy",

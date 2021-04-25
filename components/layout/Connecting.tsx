@@ -24,6 +24,7 @@ const Connecting = (): JSX.Element => {
                     padding: 0.3em;
                     box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.12);
                     cursor: pointer;
+                    color: black;
                 }
                 .icon-container {
                     width: 2em;
