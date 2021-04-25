@@ -27,7 +27,7 @@ const GameGuide = ({ guide, guideUrl }: GameGuideProps): JSX.Element => (
                 `}</style>
             </>
         )}
-        {guide && <ReactMarkdown source={guide} />}
+        {guide && <ReactMarkdown>{guide}</ReactMarkdown>}
     </>
 );
 

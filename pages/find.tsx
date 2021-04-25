@@ -65,7 +65,10 @@ export const Find = ({
             setShowReconnecting(false);
         });
 
-        socket.on(SocketEvent.DISCONNECT, (reason) => {
+        // TODO: https://github.com/socketio/socket.io/issues/3885
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
+        socket.on(SocketEvent.DISCONNECT, (reason: string) => {
             // if the disconnection was initiated by the server
             if (reason === "io server disconnect") {
                 // reconnect manually

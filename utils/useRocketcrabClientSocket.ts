@@ -26,6 +26,9 @@ export const useRocketcrabClientSocket = ({
     useEffect(() => {
         socket.open();
 
+        // TODO: https://github.com/socketio/socket.io/issues/3885
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
         socket.on(SocketEvent.CONNECT, () => setSocketConnected(true));
 
         socket.on(SocketEvent.UPDATE, (newPartyState: ClientParty) => {
@@ -46,6 +49,9 @@ export const useRocketcrabClientSocket = ({
             });
         });
 
+        // TODO: https://github.com/socketio/socket.io/issues/3885
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
         socket.on(SocketEvent.DISCONNECT, (reason) => {
             // if the disconnection was initiated by the server, we were kicked
             if (reason === "io server disconnect") {
@@ -71,6 +77,9 @@ export const useRocketcrabClientSocket = ({
             joinParty(code, cookiePartyState, isReconnect);
         }
 
+        // TODO: https://github.com/socketio/socket.io/issues/3885
+        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
+        // @ts-ignore
         socket.io.on(SocketEvent.RECONNECT, () => {
             joinParty(code, partyState || cookiePartyState, true);
             setShowReconnecting(false);

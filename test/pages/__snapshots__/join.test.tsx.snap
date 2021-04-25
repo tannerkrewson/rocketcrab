@@ -3,13 +3,13 @@
 exports[`pages/join.tsx matches snapshot 1`] = `
 <DocumentFragment>
   <div
-    class="jsx-1855009027 container"
+    class="jsx-1108310075 container"
   >
     <main
-      class="jsx-1855009027"
+      class="jsx-1108310075"
     >
       <div
-        class="jsx-1855009027 main-content"
+        class="jsx-1108310075 main-content"
       >
         <div
           class="jsx-1758552329 title"
@@ -104,10 +104,10 @@ exports[`pages/join.tsx matches snapshot 1`] = `
           wxyz does not exist 😞
         </div>
         <div
-          class="jsx-1938348541 item justify jsx-1720607024 "
+          class="jsx-4094718877 item justify jsx-1720607024 "
         >
           <div
-            class="jsx-974242038 item  jsx-4216129763 "
+            class="jsx-2819926550 item  jsx-4216129763 "
           >
             <div>
               <button
@@ -125,7 +125,7 @@ exports[`pages/join.tsx matches snapshot 1`] = `
             </div>
           </div>
           <div
-            class="jsx-974242038 item  jsx-4216129763 "
+            class="jsx-2819926550 item  jsx-4216129763 "
           >
             <button
               class="jsx-512623370 btn "
@@ -144,29 +144,78 @@ exports[`pages/join.tsx matches snapshot 1`] = `
       </div>
     </main>
     <footer
-      class="jsx-3128977650"
+      class="jsx-2797266980"
       style="margin-top: 1em;"
     >
-      rocketcrab by 
-      <a
-        class="jsx-3128977650"
-        href="https://www.tannerkrewson.com/"
-        rel="noopener noreferrer"
-        target="_blank"
-      >
-        Tanner Krewson
-      </a>
-      <br
-        class="jsx-3128977650"
+      <div
+        class="jsx-2797266980 side"
       />
-      <a
-        class="jsx-3128977650"
-        href="https://github.com/tannerkrewson/rocketcrab"
-        rel="noopener noreferrer"
-        target="_blank"
+      <div
+        class="jsx-2797266980 tag"
       >
-        View on GitHub
-      </a>
+        rocketcrab by 
+        <a
+          class="jsx-2797266980"
+          href="https://www.tannerkrewson.com/"
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          Tanner Krewson
+        </a>
+        <br
+          class="jsx-2797266980"
+        />
+        <a
+          class="jsx-2797266980"
+          href="https://github.com/tannerkrewson/rocketcrab"
+          rel="noopener noreferrer"
+          target="_blank"
+        >
+          View on GitHub
+        </a>
+      </div>
+      <div
+        class="jsx-2797266980 side"
+      >
+        <div
+          class="jsx-2797266980 theme-toggle"
+        >
+          <div
+            class="react-toggle react-toggle--checked"
+          >
+            <div
+              class="react-toggle-track"
+            >
+              <div
+                class="react-toggle-track-check"
+              >
+                <span
+                  class="jsx-2797266980 sun-moon"
+                >
+                  ☀️
+                </span>
+              </div>
+              <div
+                class="react-toggle-track-x"
+              >
+                <span
+                  class="jsx-2797266980 sun-moon"
+                >
+                  🌙
+                </span>
+              </div>
+            </div>
+            <div
+              class="react-toggle-thumb"
+            />
+            <input
+              checked=""
+              class="react-toggle-screenreader-only"
+              type="checkbox"
+            />
+          </div>
+        </div>
+      </div>
     </footer>
   </div>
 </DocumentFragment>

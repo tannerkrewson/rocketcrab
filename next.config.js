@@ -1,5 +1,5 @@
 const withPWA = require("next-pwa");
-const { RocketcrabMode } = require("./types/enums");
+const { RocketcrabMode } = require("./dist/types/enums");
 
 const IS_DEV = process.env.NODE_ENV === "development";
 const DOMAIN = IS_DEV ? "localhost" : "rocketcrab.com";
