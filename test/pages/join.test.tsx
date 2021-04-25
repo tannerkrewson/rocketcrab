@@ -4,7 +4,7 @@ import { Join } from "../../pages/join";
 import { RocketcrabMode } from "../../types/enums";
 
 jest.mock("next/router", () => ({
-    useRouter: () => ({ query: { invalid: "wxyz" } }),
+    useRouter: () => ({ query: { invalid: "wxyz" }, locale: "MAIN" }),
 }));
 
 describe("pages/join.tsx", () => {

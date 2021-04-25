@@ -148,7 +148,6 @@ exports[`pages/library.tsx matches snapshot 1`] = `
       >
         rocketcrab by 
         <a
-          class="jsx-3899203255"
           href="https://www.tannerkrewson.com/"
           rel="noopener noreferrer"
           target="_blank"

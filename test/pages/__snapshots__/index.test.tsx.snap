@@ -86,31 +86,6 @@ exports[`pages/index.tsx matches snapshot 1`] = `
           </div>
         </div>
         <span
-          class="jsx-3791690804 "
-        />
-        <div
-          class="jsx-4094718877 item justify jsx-1720607024 "
-        >
-          <div
-            class="jsx-2819926550 item  jsx-4216129763 "
-          >
-            <div>
-              <button
-                class="jsx-2230649419 btn "
-                href="/find"
-                style="width: auto;"
-                type="button"
-              >
-                <div
-                  class="text"
-                >
-                  Find Players
-                </div>
-              </button>
-            </div>
-          </div>
-        </div>
-        <span
           class="jsx-2523868958 "
         />
         <div
@@ -235,7 +210,6 @@ exports[`pages/index.tsx matches snapshot 1`] = `
       >
         rocketcrab by 
         <a
-          class="jsx-3899203255"
           href="https://www.tannerkrewson.com/"
           rel="noopener noreferrer"
           target="_blank"

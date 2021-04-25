@@ -1,26 +1,41 @@
+import { useRouter } from "next/router";
+import { RocketcrabMode } from "../../types/enums";
 import { ThemeToggle } from "../common/ThemeToggle";
 
 const Footer = (): JSX.Element => {
+    const router = useRouter();
+    const isKidsMode = router.locale === RocketcrabMode.KIDS;
+
+    const NameWrapper = ({ children }) =>
+        !isKidsMode ? (
+            <a
+                href="https://www.tannerkrewson.com/"
+                target="_blank"
+                rel="noopener noreferrer"
+            >
+                {children}
+            </a>
+        ) : (
+            <>{children}</>
+        );
+
     return (
         <footer style={{ marginTop: "1em" }}>
             <div className="side" />
             <div className="tag">
-                rocketcrab by{" "}
-                <a
-                    href="https://www.tannerkrewson.com/"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    Tanner Krewson
-                </a>
-                <br />
-                <a
-                    href="https://github.com/tannerkrewson/rocketcrab"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                >
-                    View on GitHub
-                </a>
+                rocketcrab by <NameWrapper>Tanner Krewson</NameWrapper>
+                {!isKidsMode && (
+                    <>
+                        <br />
+                        <a
+                            href="https://github.com/tannerkrewson/rocketcrab"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            View on GitHub
+                        </a>
+                    </>
+                )}
             </div>
             <div className="side">
                 <div className="theme-toggle">
