@@ -52,8 +52,10 @@ export const getClientGameLibrary = (
     const categoriesOfThisGameList = gameList
         .map(({ category }) => category)
         .flat();
-    const categories = CATEGORIES.filter(({ id }) =>
-        categoriesOfThisGameList.find((categoryId) => id === categoryId)
+    const categories = CATEGORIES.filter(
+        ({ id }) =>
+            categoriesOfThisGameList.find((categoryId) => id === categoryId) ||
+            id === "recent" // always include the recent category
     );
 
     return {
