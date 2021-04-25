@@ -1,12 +1,6 @@
-import { useDarkMode } from "next-dark-mode";
-import Toggle from "react-toggle";
+import { ThemeToggle } from "../common/ThemeToggle";
 
 const Footer = (): JSX.Element => {
-    const {
-        darkModeActive,
-        switchToDarkMode, // function - toggles the dark mode on
-        switchToLightMode, // function - toggles the light mode on
-    } = useDarkMode();
     return (
         <footer style={{ marginTop: "1em" }}>
             <div className="side" />
@@ -30,18 +24,7 @@ const Footer = (): JSX.Element => {
             </div>
             <div className="side">
                 <div className="theme-toggle">
-                    <Toggle
-                        checked={!darkModeActive}
-                        icons={{
-                            checked: <span className="sun-moon">☀️</span>,
-                            unchecked: <span className="sun-moon">🌙</span>,
-                        }}
-                        onChange={({ target }) =>
-                            target.checked
-                                ? switchToLightMode()
-                                : switchToDarkMode()
-                        }
-                    />
+                    <ThemeToggle />
                 </div>
             </div>
             <style jsx>{`
@@ -71,11 +54,6 @@ const Footer = (): JSX.Element => {
                     position: absolute;
                     right: 0.9em;
                     bottom: 1.3em;
-                }
-
-                .sun-moon {
-                    margin-left: -4px;
-                    line-height: 0.7em;
                 }
             `}</style>
         </footer>

@@ -2,6 +2,7 @@ import PrimaryButton from "../common/PrimaryButton";
 import { MenuButton } from "../../types/types";
 import React from "react";
 import { Badge, useTheme } from "@geist-ui/react";
+import { ThemeToggle } from "../common/ThemeToggle";
 
 const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => {
     const {
@@ -32,6 +33,10 @@ const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => {
                         )}
                     </PrimaryButton>
                 ))}
+            <div className="theme-toggle-container">
+                <ThemeToggle />
+            </div>
+
             <style jsx>{`
                 .game-menu {
                     position: fixed;
@@ -45,6 +50,11 @@ const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => {
                     background: ${accents_1};
                     display: flex;
                     flex-direction: column;
+                }
+                .theme-toggle-container {
+                    margin: 0.5em 0;
+                    display: flex;
+                    justify-content: center;
                 }
             `}</style>
         </div>
