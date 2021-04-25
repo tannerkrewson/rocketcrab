@@ -484,8 +484,8 @@ const GameLayout = ({
                     position: absolute;
                     top: 3em;
                     right: 0;
-                    background: white;
-                    border: 1px solid #ddd;
+                    background: ${accents_1};
+                    border: 1px solid ${accents_2};
                     width: min(24em, 100vw - 3em);
                     margin: 0.5em;
                     box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
