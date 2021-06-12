@@ -54,6 +54,18 @@ const GameInfo = ({ game }: GameInfoProps): JSX.Element => (
                 </a>
             </div>
         )}
+        {game.basedOn.bggId && (
+            <div className="info">
+                <span className="emoji">📙</span> More information on{" "}
+                <a
+                    href={`https://boardgamegeek.com/boardgame/${game.basedOn.bggId}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                >
+                    BoardGameGeek
+                </a>
+            </div>
+        )}
         <style jsx>{`
             .info {
                 line-height: 0.85em;

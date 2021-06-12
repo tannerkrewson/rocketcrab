@@ -10,6 +10,7 @@ const game: ServerGame = {
         game: "Wavelength",
         author: "Wolfgang Warsch, Alex Hague, & Justin Vickers",
         link: "https://www.wavelength.zone/",
+        bggId: 262543,
     },
     description:
         "Wavelength is a social guessing game where two teams compete to read each other's minds. It’s a thrilling experience of TALKING and THINKING and HIGH FIVING that anyone can play—but it also has some of that deep word game sorcery, like Codenames, where your decisions feel tense, strategic, meaningful. ",

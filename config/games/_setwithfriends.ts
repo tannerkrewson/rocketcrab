@@ -9,8 +9,8 @@ const game: ServerGame = {
     basedOn: {
         game: "Set",
         author: "Marsha Falco",
-
         link: "https://www.playmonster.com/product/set/",
+        bggId: 1198,
     },
 
     description: "Find the triplets!",

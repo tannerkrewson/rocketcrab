@@ -57,6 +57,7 @@ const game: Array<ServerGame> = [
             author: "Oink Games",
             link:
                 "https://oinkgames.com/en/games/analog/a-fake-artist-goes-to-new-york/",
+            bggId: 135779,
         },
         description: `Please note: you will need a way for all players to draw 
             together; it is not provided by the game.
@@ -95,6 +96,7 @@ const game: Array<ServerGame> = [
             game: "Insider",
             author: "Oink Games",
             link: "https://oinkgames.com/en/games/analog/insider/",
+            bggId: 206051,
         },
         description:
             '"Insider" combines two fun components: finding out what the secret word is and revealing the Insider. The Insider knows the secret word and tries to hide their identity while carefully manipulating the other players to the right answer.',

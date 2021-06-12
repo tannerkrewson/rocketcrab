@@ -10,6 +10,7 @@ const game: ServerGame = {
         game: "Just One",
         author: "Ludovic Roudy & Bruno Sautter",
         link: "https://justone-the-game.com/?lang=en",
+        bggId: 254640,
     },
     description: `Just One is a cooperative party game in which you play 
         together to discover as many mystery words as possible. Find the best 
