@@ -42,6 +42,7 @@ export const Code = ({
         router,
         cookiePartyState: lastPartyState,
         isReconnect,
+        gameLibrary,
     });
 
     const { status, me, chat } = partyState || {};

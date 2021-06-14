@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import Swal from "sweetalert2";
-import { ClientParty } from "../types/types";
+import { ClientGameLibrary, ClientParty } from "../types/types";
 import { logEvent } from "./analytics";
 import { io } from "socket.io-client";
 import { RocketcrabDexie } from "./dexie";
@@ -15,12 +15,17 @@ export const useRocketcrabClientSocket = ({
     router,
     cookiePartyState,
     isReconnect,
+    gameLibrary,
 }: UseRocketcrabClientSocketProps): UseRocketcrabClientSocketReturn => {
     const [partyState, setPartyState] = useState<ClientParty | undefined>();
     const [socketConnected, setSocketConnected] = useState(socket?.connected);
     const [showReconnecting, setShowReconnecting] = useState(false);
 
     const { me, playerList, selectedGameId } = partyState || {};
+
+    const selectedGame = gameLibrary?.gameList?.find(
+        ({ id }) => id === selectedGameId
+    );
 
     // only ran with initial value due to the []
     useEffect(() => {
@@ -106,6 +111,35 @@ export const useRocketcrabClientSocket = ({
 
     const onStartGame = useCallback(
         (gameId?: string) => {
+            const { minPlayers, maxPlayers, name } = selectedGame;
+
+            if (minPlayers && playerList.length < minPlayers) {
+                const morePlayers = minPlayers - playerList.length;
+                Swal.fire({
+                    title: "Not enough players!",
+                    text: `${name} requires at least ${minPlayers} player${
+                        minPlayers === 1 ? "" : "s"
+                    }. You need ${morePlayers} more player${
+                        morePlayers === 1 ? "" : "s"
+                    }.`,
+                    icon: "error",
+                    heightAuto: false,
+                });
+                return;
+            }
+            if (maxPlayers && playerList.length > maxPlayers) {
+                const lessPlayers = playerList.length - minPlayers;
+                Swal.fire({
+                    title: "Too many players!",
+                    text: `${name} has a maximum of ${minPlayers} player${
+                        minPlayers === 1 ? "" : "s"
+                    }. You have ${lessPlayers} too many players.`,
+                    icon: "error",
+                    heightAuto: false,
+                });
+                return;
+            }
+
             socket.emit(SocketEvent.GAME_START, gameId);
 
             const db = new RocketcrabDexie();
@@ -236,6 +270,7 @@ type UseRocketcrabClientSocketProps = {
     router: NextRouter;
     cookiePartyState?: ClientParty;
     isReconnect: boolean;
+    gameLibrary: ClientGameLibrary;
 };
 
 type UseRocketcrabClientSocketReturn = {

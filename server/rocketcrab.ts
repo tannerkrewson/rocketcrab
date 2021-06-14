@@ -319,14 +319,16 @@ export const startGame = async (
     party: Party,
     rocketcrab: RocketCrab
 ): Promise<void> => {
-    // TODO: check if ready
     const { gameState, selectedGameId, playerList } = party;
 
     const willSendFinderUpdate = shouldSendFinderStateUpdate(party, rocketcrab);
     party.status === PartyStatus.party && party.isPublic;
 
     const game: ServerGame = findGameById(selectedGameId);
+
     if (!game) return;
+    if (game.minPlayers && playerList.length < game.minPlayers) return;
+    if (game.maxPlayers && playerList.length > game.maxPlayers) return;
 
     party.status = PartyStatus.ingame;
     gameState.status = GameStatus.loading;
