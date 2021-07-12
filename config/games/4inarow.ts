@@ -7,6 +7,8 @@ const game: ServerGame = {
     author: "fravic",
     basedOn: {
         game: "Connect Four",
+        link: "https://en.wikipedia.org/wiki/Connect_Four",
+        bggId: 2719,
     },
     description:
         "A quick, easy board game in which two players compete to get four pieces in a line.",
