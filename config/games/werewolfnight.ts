@@ -5,6 +5,12 @@ const game: ServerGame = {
     id: "werewolfnight",
     name: "werewolf-night.com",
     author: "Duc Ngo Viet",
+    basedOn: {
+        game: "Mafia",
+        author: "Dimitry Davidoff",
+        link: "https://en.wikipedia.org/wiki/Mafia_(party_game)",
+        bggId: 925,
+    },
     description: `Werewolf-night is an interactive deduction game for
     two teams: the villagers and the werewolves.
     While the villagers do not know who the werewolves are, the werewolves try to remain undiscovered
