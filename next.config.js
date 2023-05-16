@@ -24,4 +24,8 @@ module.exports = withPWA({
             },
         ],
     },
+    webpack: (config) => {
+        config.experiments = { ...config.experiments, topLevelAwait: true };
+        return config;
+    },
 });

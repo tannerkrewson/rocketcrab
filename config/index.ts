@@ -12,18 +12,24 @@ import { RocketcrabMode } from "../types/enums";
 import CATEGORIES_RAW from "./categories.json";
 const CATEGORIES: Array<GameCategory> = CATEGORIES_RAW;
 
-const SERVER_GAME_LIST: Array<ServerGame> = fs
-    .readdirSync(path.join(process.cwd(), "config", "games"))
-    .filter((file) => !file.startsWith("_") && file.endsWith(".ts"))
-    .reduce((games, file) => {
-        const name = file.substr(0, file.indexOf("."));
-        const exported = require("./games/" + name).default;
-        const newGames = Array.isArray(exported) ? exported : [exported];
+const SERVER_GAME_LIST: Array<ServerGame> = (
+    await Promise.all(
+        fs
+            .readdirSync(path.join(process.cwd(), "config", "games"))
+            .filter((file) => !file.startsWith("_") && file.endsWith(".ts"))
+            .map((file) => {
+                const name = file.substring(0, file.indexOf("."));
+                return require("./games/" + name);
+            })
+    )
+)
+    .reduce((games, exported) => {
+        const newGames = Array.isArray(exported.default)
+            ? exported.default
+            : [exported.default];
         return [...games, ...newGames];
     }, [])
     .map((game) => {
-        console.log(game);
-
         if (!game.guideId) return game;
 
         const guide = fs.readFileSync(
