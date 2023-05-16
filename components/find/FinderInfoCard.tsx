@@ -21,10 +21,10 @@ export const FinderInfoCard = ({
 }): JSX.Element => {
     const showSubscriberCount = subscriberCount > 0;
     const scs = subscriberCount === 1;
-    if (!showSubscriberCount && !showCountdown) return <Spacer y={1} />;
+    if (!showSubscriberCount && !showCountdown) return <Spacer h={1} />;
     return (
         <>
-            <Spacer y={1} />
+            <Spacer h={1} />
             <SkinnyCard>
                 {showSubscriberCount && (
                     <div style={{ textAlign: "center" }}>
@@ -34,14 +34,14 @@ export const FinderInfoCard = ({
                         {subscriberCountMsg}
                     </div>
                 )}
-                {showSubscriberCount && showCountdown && <Spacer y={0.8} />}
+                {showSubscriberCount && showCountdown && <Spacer h={0.8} />}
                 {showCountdown && (
                     <Countdown start={countdownStart}>{countdownMsg}</Countdown>
                 )}
-                {showCountdown && findTimeDates && <Spacer y={0.2} />}
+                {showCountdown && findTimeDates && <Spacer h={0.2} />}
                 {findTimeDates && <FindTime dates={findTimeDates} />}
             </SkinnyCard>
-            <Spacer y={1} />
+            <Spacer h={1} />
         </>
     );
 };

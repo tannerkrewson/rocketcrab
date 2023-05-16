@@ -23,7 +23,7 @@ const GameGroup = ({
         ) : (
             <div>{errorMessage}</div>
         )}
-        <Spacer y={1} />
+        <Spacer h={1} />
         <ButtonGroup>
             <PrimaryButton onClick={onBack}>
                 ↩️ Back to categories

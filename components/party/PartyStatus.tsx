@@ -31,7 +31,7 @@ const PartyStatus = ({
                                 ? "As the host, you have to start the game!"
                                 : "Waiting for " + hostName + " to start..."}
                         </div>
-                        <Spacer y={1} />
+                        <Spacer h={1} />
                         <ButtonGroup>
                             <PrimaryButton
                                 onClick={onShowGameInfo}

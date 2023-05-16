@@ -253,8 +253,7 @@ const GameLayout = ({
     const promptMute = () => {
         Swal.fire({
             title: "Are your sure?",
-            text:
-                "New chat messages won't appear over your game, but you can still see them in the menu!",
+            text: "New chat messages won't appear over your game, but you can still see them in the menu!",
             showCancelButton: true,
             confirmButtonText: "Mute chat",
             icon: "question",
@@ -298,7 +297,7 @@ const GameLayout = ({
                         <div>
                             <Badge.Anchor placement="bottomLeft">
                                 {!showMenu && combinedMenuBadgeCount > 0 && (
-                                    <Badge type="error" size="mini">
+                                    <Badge type="error">
                                         {combinedMenuBadgeCount}
                                     </Badge>
                                 )}
@@ -373,7 +372,7 @@ const GameLayout = ({
                         disableEditName={true}
                         meId={thisPlayer.id}
                     />
-                    <Spacer y={0.5} />
+                    <Spacer h={0.5} />
                     <PrimaryButton onClick={hideAllWindows}>
                         Close
                     </PrimaryButton>
@@ -389,7 +388,7 @@ const GameLayout = ({
                         unreadMsgCount={unreadMsgCount}
                         clearUnreadMsgCount={clearUnreadMsgCount}
                     />
-                    <Spacer y={0.5} />
+                    <Spacer h={0.5} />
                     <ButtonGroup>
                         <PrimaryButton onClick={hideAllWindows}>
                             Close
@@ -412,7 +411,7 @@ const GameLayout = ({
                         game={thisGame}
                         allCategories={gameLibrary.categories}
                     />
-                    <Spacer y={0.5} />
+                    <Spacer h={0.5} />
                     <PrimaryButton onClick={hideAllWindows}>
                         Close
                     </PrimaryButton>

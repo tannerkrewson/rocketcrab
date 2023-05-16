@@ -48,7 +48,7 @@ const GameSelector = ({
                         allCategories={gameLibrary.categories}
                         showOnlyHostMessage={!isHost}
                     />
-                    <Spacer y={1} />
+                    <Spacer h={1} />
                     <ButtonGroup>
                         <PrimaryButton onClick={onBackToSearch}>
                             ↩️ Back to search
