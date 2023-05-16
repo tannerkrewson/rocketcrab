@@ -34,7 +34,7 @@ const PublicGame = ({
                                     className="game-info"
                                 >
                                     {selectedGame.name}
-                                    <Spacer inline x={0.15} />
+                                    <Spacer inline w={0.15} />
                                     <QuestionCircle size={18} />
                                 </a>
                             </span>

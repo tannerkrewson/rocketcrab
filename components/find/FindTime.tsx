@@ -4,7 +4,7 @@ import React from "react";
 
 export const FindTime = ({ dates }: { dates: number[] }): JSX.Element => (
     <div style={{ fontSize: ".85em", padding: "0 2em" }}>
-        <Spacer y={0.5} />
+        <Spacer h={0.5} />
         {Object.entries(
             dates
                 .map((date) =>
@@ -37,7 +37,7 @@ export const FindTime = ({ dates }: { dates: number[] }): JSX.Element => (
                         </Grid>
                     ))}
                 </Grid.Container>
-                <Spacer y={0.7} />
+                <Spacer h={0.7} />
             </div>
         ))}
         ...and so on.

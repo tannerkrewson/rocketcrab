@@ -42,10 +42,9 @@ export const Join = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
             <div className="input-container">
                 <Input
                     placeholder="ex. abcd"
-                    size="large"
+                    scale={4 / 3}
                     width="8rem"
                     clearable={!joinLoading}
-                    type="text"
                     maxLength={4}
                     autoFocus
                     onKeyDown={onKey}

@@ -2,7 +2,7 @@ import { PartyStatus, GameStatus, RocketcrabMode } from "./enums";
 import WebSocket from "ws";
 import { Dispatch, SetStateAction } from "react";
 import type { Socket } from "socket.io";
-import { BindingsChangeTarget } from "@geist-ui/react/dist/input/use-input";
+import { BindingsChangeTarget } from "@geist-ui/react/dist/use-input";
 
 export const FINDER_ACTIVE_MS = 10 * 60 * 1000; // 10 minutes
 export const MAX_CHAT_MSG_LEN = 100;

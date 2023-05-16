@@ -30,15 +30,15 @@ export const newPromiseWebSocket = (url: string): PromiseWebSocket => {
 
     ws.onMessage = () =>
         new Promise((resolve) =>
-            ws.on("message", (msg) => resolve(msg as string))
+            ws.on("message", (msg) => resolve(msg as unknown as string))
         );
 
     ws.untilMessage = (msgChecker) =>
         new Promise((resolve, reject) =>
             ws.on("message", (msg) => {
                 try {
-                    if (msgChecker(msg as string)) {
-                        resolve(msg as string);
+                    if (msgChecker(msg as unknown as string)) {
+                        resolve(msg as unknown as string);
                     }
                 } catch (error) {
                     ws.close();

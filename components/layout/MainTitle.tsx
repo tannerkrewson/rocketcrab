@@ -1,7 +1,7 @@
 import converter from "phonetic-alphabet-converter";
 import { Tooltip } from "@geist-ui/react";
 import { useCallback, useState } from "react";
-import { Textfit } from "react-textfit";
+import { Textfit } from "@aw-web-design/react-textfit";
 import { RocketcrabMode } from "../../types/enums";
 import { MODE_MAP } from "../../utils/utils";
 

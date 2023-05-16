@@ -47,12 +47,12 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                     Start Party
                 </PrimaryButton>
             </ButtonGroup>
-            <Spacer y={1.2} />
+            <Spacer h={1.2} />
             <div className="btn-col">
                 {!isAlreadyPWA && !isKidsMode && (
                     <>
                         <AddAppButton />
-                        <Spacer y={0.5} />
+                        <Spacer h={0.5} />
                     </>
                 )}
                 {!isKidsMode && (
@@ -64,7 +64,7 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                         >
                             🧒 Try Kids Mode
                         </PrimaryButton>
-                        <Spacer y={0.5} />
+                        <Spacer h={0.5} />
                         <PrimaryButton
                             type="default"
                             url="https://discord.gg/MvYRVCP"
@@ -76,7 +76,7 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                             />
                             Join our Discord
                         </PrimaryButton>
-                        <Spacer y={0.5} />
+                        <Spacer h={0.5} />
                         <PrimaryButton
                             type="default"
                             url="https://github.com/tannerkrewson/rocketcrab/#-for-developers"
@@ -84,14 +84,14 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                         >
                             Add your game
                         </PrimaryButton>
-                        <Spacer y={0.5} />
+                        <Spacer h={0.5} />
                     </>
                 )}
                 <PrimaryButton type="default" href="/library" manualWidth>
                     Browse Games
                 </PrimaryButton>
             </div>
-            <Spacer y={0.5} />
+            <Spacer h={0.5} />
             <style jsx>{`
                 .description {
                     text-align: center;
