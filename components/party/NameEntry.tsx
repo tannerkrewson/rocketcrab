@@ -40,7 +40,6 @@ const NameEntry = ({
             <div className="description">Enter your name:</div>
             <div className="input-container">
                 <Input
-                    type="text"
                     id="player-name"
                     placeholder="Use your real name!"
                     value={name}
@@ -48,7 +47,7 @@ const NameEntry = ({
                     autoFocus
                     onKeyDown={onEnter}
                     maxLength={24}
-                    size="large"
+                    scale={4 / 3}
                     clearable
                 />
             </div>

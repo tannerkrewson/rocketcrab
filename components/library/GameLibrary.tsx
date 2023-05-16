@@ -29,9 +29,9 @@ const GameLibrary = ({
 
     return (
         <div style={{ textAlign: "center", justifyContent: "center" }}>
-            <Spacer y={2} />
+            <Spacer h={2} />
             <h4>{categoryName}Games</h4>
-            <Spacer y={1} />
+            <Spacer h={1} />
             {!selectedCategory && <SearchBox {...searchBindings} />}
             {!selectedCategory && !search && (
                 <CategoryGroup
@@ -80,7 +80,7 @@ const SearchBox = (props) => (
             clearable
             {...props}
         />
-        <Spacer y={1} />
+        <Spacer h={1} />
     </>
 );
 

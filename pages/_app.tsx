@@ -2,7 +2,7 @@ import { GeistProvider, CssBaseline } from "@geist-ui/react";
 import Body from "../components/layout/Body";
 import "fontsource-inconsolata";
 import "fontsource-mukta";
-import { AppPropsType } from "next/dist/next-server/lib/utils";
+import { AppPropsType } from "next/dist/shared/lib/utils";
 import { initGA, logPageView } from "../utils/analytics";
 import { useState, useEffect } from "react";
 import Router from "next/router";

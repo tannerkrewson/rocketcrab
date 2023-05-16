@@ -25,7 +25,7 @@ const PlayerList = ({
             badgeType="secondary"
             onlyShowBadgeWhenCollapsed={false}
         >
-            <Spacer y={0.5} />
+            <Spacer h={0.5} />
             <Grid.Container gap={1}>
                 {playerList.map(({ id, name, isHost }) => (
                     <Grid xs={12} key={id}>

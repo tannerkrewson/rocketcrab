@@ -5,9 +5,8 @@ const IS_DEV = process.env.NODE_ENV === "development";
 const DOMAIN = IS_DEV ? "localhost" : "rocketcrab.com";
 
 module.exports = withPWA({
-    pwa: {
-        dest: "public",
-    },
+    dest: "public",
+})({
     i18n: {
         locales: [RocketcrabMode.MAIN, RocketcrabMode.KIDS],
         defaultLocale: RocketcrabMode.MAIN,

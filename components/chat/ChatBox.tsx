@@ -72,7 +72,7 @@ export const ChatBox = ({
             onCollapse={(currentCollapse) => setIsChatShowing(!currentCollapse)}
             badgeType="error" // red
         >
-            <Spacer y={0.5} />
+            <Spacer h={0.5} />
             <div className="msg-container">
                 {chat.map(({ playerId, playerName, message, date }) => (
                     <div key={date}>

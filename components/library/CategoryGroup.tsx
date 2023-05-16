@@ -22,7 +22,7 @@ const CategoryGroup = ({
                 />
             ))}
         </Grid.Container>
-        <Spacer y={1} />
+        <Spacer h={1} />
         <ButtonGroup>
             <PrimaryButton onClick={onDone} size="medium">
                 ↩️ Back to {backToLabel}

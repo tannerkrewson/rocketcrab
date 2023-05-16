@@ -22,6 +22,8 @@ const SERVER_GAME_LIST: Array<ServerGame> = fs
         return [...games, ...newGames];
     }, [])
     .map((game) => {
+        console.log(game);
+
         if (!game.guideId) return game;
 
         const guide = fs.readFileSync(
