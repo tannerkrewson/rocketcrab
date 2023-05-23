@@ -96,5 +96,8 @@
     "bugs": {
         "url": "https://github.com/tannerkrewson/rocketcrab/issues"
     },
-    "homepage": "https://rocketcrab.com/"
+    "homepage": "https://rocketcrab.com/",
+    "engines": {
+        "node": "16.x"
+    }
 }
