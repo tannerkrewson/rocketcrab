@@ -38,7 +38,7 @@
         "cross-env": "^7.0.3",
         "date-fns": "^2.21.1",
         "dexie": "^3.0.3",
-        "express": "^4.17.1",
+        "express": "^4.17.3",
         "fontsource-inconsolata": "^3.0.5",
         "fontsource-mukta": "^3.0.5",
         "fslightbox-react": "^1.6.2",
