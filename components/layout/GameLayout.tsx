@@ -179,7 +179,7 @@ const GameLayout = ({
             hostOnly: false,
             onClick: useCallback(() => {
                 Swal.fire({
-                    title: "Are your sure?",
+                    title: "Are you sure?",
                     text:
                         "If reloading doesn't fix your issue, tell your party host, " +
                         hostName +
@@ -202,7 +202,7 @@ const GameLayout = ({
             hostOnly: true,
             onClick: useCallback(() => {
                 Swal.fire({
-                    title: "Are your sure?",
+                    title: "Are you sure?",
                     text:
                         "Your current session in " +
                         thisGame.name +
@@ -225,7 +225,7 @@ const GameLayout = ({
             hostOnly: true,
             onClick: useCallback(() => {
                 Swal.fire({
-                    title: "Are your sure?",
+                    title: "Are you sure?",
                     text:
                         "Your current session in " +
                         thisGame.name +
@@ -252,7 +252,7 @@ const GameLayout = ({
 
     const promptMute = () => {
         Swal.fire({
-            title: "Are your sure?",
+            title: "Are you sure?",
             text:
                 "New chat messages won't appear over your game, but you can still see them in the menu!",
             showCancelButton: true,

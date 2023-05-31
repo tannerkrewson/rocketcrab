@@ -76,7 +76,7 @@ const PartyScreen = ({
 
     const promptLeave = useCallback(() => {
         Swal.fire({
-            title: "Are your sure?",
+            title: "Are you sure?",
             showCancelButton: true,
             confirmButtonText: leaveText,
             icon: "warning",
