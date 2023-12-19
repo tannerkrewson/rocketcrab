@@ -1,5 +1,5 @@
 import { ClientGame, GameCategory } from "../../types/types";
-import { Description, Tabs } from "@geist-ui/react";
+import { Description, Tabs } from "@geist-ui/core";
 
 import GameInfo from "./GameInfo";
 import GameDescription from "./GameDescription";

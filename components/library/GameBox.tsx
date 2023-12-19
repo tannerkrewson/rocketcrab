@@ -1,5 +1,5 @@
 import { ClientGame } from "../../types/types";
-import { Description, Grid, useTheme } from "@geist-ui/react";
+import { Description, Grid, useTheme } from "@geist-ui/core";
 
 const GameBox = ({ game, onClick, count = 0 }: GameBoxProps): JSX.Element => {
     const {

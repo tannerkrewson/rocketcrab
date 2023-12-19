@@ -1,5 +1,5 @@
 import { GameStatus } from "../../types/enums";
-import { Loading } from "@geist-ui/react";
+import { Loading } from "@geist-ui/core";
 import { ClientGame, GameState, Player } from "../../types/types";
 import { useConnectedGame } from "../../utils/useConnectedGame";
 

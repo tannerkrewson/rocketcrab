@@ -1,4 +1,4 @@
-import { Loading } from "@geist-ui/react";
+import { Loading } from "@geist-ui/core";
 import { RocketcrabMode } from "../../types/enums";
 import Connecting from "./Connecting";
 import Footer from "./Footer";

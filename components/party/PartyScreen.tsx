@@ -1,7 +1,7 @@
 import PlayerList from "./PlayerList";
 import PrimaryButton from "../common/PrimaryButton";
 import ButtonGroup from "../common/ButtonGroup";
-import { Spacer } from "@geist-ui/react";
+import { Spacer } from "@geist-ui/core";
 import GameSelector from "../library/GameSelector";
 import { ClientGameLibrary, ClientParty, Player } from "../../types/types";
 import React, { useCallback, useEffect, useState } from "react";

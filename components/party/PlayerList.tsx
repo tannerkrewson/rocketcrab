@@ -1,5 +1,5 @@
 import NameBox from "./NameBox";
-import { Grid, Spacer } from "@geist-ui/react";
+import { Grid, Spacer } from "@geist-ui/core";
 import { Player } from "../../types/types";
 import React from "react";
 import { CollapseBox } from "../common/CollapseBox";

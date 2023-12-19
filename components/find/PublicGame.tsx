@@ -3,7 +3,7 @@ import { QuestionCircle } from "@geist-ui/react-icons";
 import { ClientGameLibrary, ClientParty } from "../../types/types";
 import PrimaryButton from "../common/PrimaryButton";
 import SkinnyCard from "../common/SkinnyCard";
-import { Spacer } from "@geist-ui/react";
+import { Spacer } from "@geist-ui/core";
 
 const PublicGame = ({
     party,

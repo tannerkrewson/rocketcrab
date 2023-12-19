@@ -1,4 +1,4 @@
-import { Loading, Card } from "@geist-ui/react";
+import { Loading, Card } from "@geist-ui/core";
 
 const NameBox = ({
     name,

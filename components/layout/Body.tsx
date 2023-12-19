@@ -1,4 +1,4 @@
-import { useTheme } from "@geist-ui/react";
+import { useTheme } from "@geist-ui/core";
 import Head from "next/head";
 
 const Body = ({ children }: BodyProps): JSX.Element => {

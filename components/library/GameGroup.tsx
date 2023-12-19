@@ -1,4 +1,4 @@
-import { Grid, Spacer } from "@geist-ui/react";
+import { Grid, Spacer } from "@geist-ui/core";
 import PrimaryButton from "../common/PrimaryButton";
 import ButtonGroup from "../common/ButtonGroup";
 import GameBox from "./GameBox";

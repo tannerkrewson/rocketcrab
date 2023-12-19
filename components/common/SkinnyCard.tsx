@@ -1,4 +1,4 @@
-import { Card, useTheme } from "@geist-ui/react";
+import { Card, useTheme } from "@geist-ui/core";
 
 const SkinnyCard = ({ children }: SkinnyCardProps): JSX.Element => {
     const {

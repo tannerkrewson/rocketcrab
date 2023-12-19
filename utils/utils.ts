@@ -7,7 +7,7 @@ import {
     PromiseWebSocket,
 } from "../types/types";
 import WebSocket from "ws";
-import { useInput } from "@geist-ui/react";
+import { useInput } from "@geist-ui/core";
 import { useState } from "react";
 import Filter from "bad-words";
 import { RocketcrabMode } from "../types/enums";

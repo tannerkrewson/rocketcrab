@@ -1,4 +1,4 @@
-import { Card, Spacer, useTheme } from "@geist-ui/react";
+import { Card, Spacer, useTheme } from "@geist-ui/core";
 
 import { JellyfishSpinner } from "react-spinners-kit";
 import { ClientGame, Player } from "../../types/types";
