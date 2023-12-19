@@ -1,4 +1,4 @@
-import { Spacer } from "@geist-ui/react";
+import { Spacer } from "@geist-ui/core";
 import { useCallback, useState } from "react";
 import { ClientGameLibrary } from "../../types/types";
 import PrimaryButton from "../common/PrimaryButton";

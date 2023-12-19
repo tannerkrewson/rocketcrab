@@ -1,4 +1,4 @@
-import { Spacer } from "@geist-ui/react";
+import { Spacer } from "@geist-ui/core";
 import React from "react";
 import SkinnyCard from "../common/SkinnyCard";
 import { Countdown } from "./Countdown";

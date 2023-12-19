@@ -6,7 +6,7 @@ import ButtonGroup from "../components/common/ButtonGroup";
 import AddAppButton from "../components/layout/AddAppButton";
 import PageLayout from "../components/layout/PageLayout";
 import { postJson } from "../utils/utils";
-import { Spacer } from "@geist-ui/react";
+import { Spacer } from "@geist-ui/core";
 import { useIsAlreadyPWA } from "../utils/useIsAlreadyPWA";
 import { RocketcrabMode } from "../types/enums";
 import { GetServerSideProps } from "next";

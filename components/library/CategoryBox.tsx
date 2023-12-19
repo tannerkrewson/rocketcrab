@@ -1,5 +1,5 @@
 import { GameCategory } from "../../types/types";
-import { Grid } from "@geist-ui/react";
+import { Grid } from "@geist-ui/core";
 const CategoryBox = ({
     category: { id, name, color, backgroundColor },
     onClick,

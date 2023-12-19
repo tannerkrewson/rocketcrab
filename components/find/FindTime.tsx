@@ -1,4 +1,4 @@
-import { Grid, Spacer } from "@geist-ui/react";
+import { Grid, Spacer } from "@geist-ui/core";
 import { formatRelative, differenceInCalendarDays, format } from "date-fns";
 import React from "react";
 

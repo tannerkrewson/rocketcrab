@@ -1,7 +1,7 @@
 import PrimaryButton from "../common/PrimaryButton";
 import { MenuButton } from "../../types/types";
 import React from "react";
-import { Badge, useTheme } from "@geist-ui/react";
+import { Badge, useTheme } from "@geist-ui/core";
 import { ThemeToggle } from "../common/ThemeToggle";
 
 const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => {

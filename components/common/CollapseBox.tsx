@@ -1,4 +1,4 @@
-import { Badge } from "@geist-ui/react";
+import { Badge } from "@geist-ui/core";
 import React, { useState } from "react";
 import PrimaryButton from "./PrimaryButton";
 

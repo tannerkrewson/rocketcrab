@@ -1,4 +1,4 @@
-import { Input, Spacer, useInput } from "@geist-ui/react";
+import { Input, Spacer, useInput } from "@geist-ui/core";
 import React, { useEffect, useRef, useState } from "react";
 import {
     ChatMessage,

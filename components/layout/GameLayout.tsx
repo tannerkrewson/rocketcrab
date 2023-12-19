@@ -1,4 +1,4 @@
-import { Badge, Spacer, useTheme, useToasts } from "@geist-ui/react";
+import { Badge, Spacer, useTheme, useToasts } from "@geist-ui/core";
 import PrimaryButton from "../common/PrimaryButton";
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
@@ -15,7 +15,7 @@ import GameFrame from "../in-game/GameFrame";
 import Connecting from "./Connecting";
 import { ChatBox } from "../chat/ChatBox";
 import Swal from "sweetalert2";
-import { ToastAction } from "@geist-ui/react/dist/use-toasts/use-toast";
+import { ToastAction } from "@geist-ui/core/dist/use-toasts/use-toast";
 import ButtonGroup from "../common/ButtonGroup";
 import { logEvent } from "../../utils/analytics";
 import { filterClean, MODE_MAP } from "../../utils/utils";
@@ -60,7 +60,7 @@ const GameLayout = ({
     const [frameRefresh, setFrameRefresh] = useState(0);
 
     const [enableToasts, setEnableToasts] = useState(!isKidsMode);
-    const [, setToast] = useToasts();
+    const { setToast } = useToasts();
     const [lastShownToastDate, setLastShownToastDate] = useState(0);
 
     const igLogEvent = useCallback(

@@ -1,5 +1,5 @@
 import CategoryGroup from "./CategoryGroup";
-import { Input, Spacer } from "@geist-ui/react";
+import { Input, Spacer } from "@geist-ui/core";
 import FilteredGameGroup from "./FilteredGameGroup";
 import RecentGameGroup from "./RecentGameGroup";
 import { ClientGameLibrary, LibraryState } from "../../types/types";

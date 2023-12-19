@@ -1,4 +1,4 @@
-import { GeistProvider, CssBaseline } from "@geist-ui/react";
+import { GeistProvider, CssBaseline } from "@geist-ui/core";
 import Body from "../components/layout/Body";
 import "fontsource-inconsolata";
 import "fontsource-mukta";
