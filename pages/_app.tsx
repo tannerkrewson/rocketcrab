@@ -6,12 +6,13 @@ import { AppPropsType } from "next/dist/shared/lib/utils";
 import { initGA, logPageView } from "../utils/analytics";
 import { useState, useEffect } from "react";
 import Router from "next/router";
+import dynamic from "next/dynamic";
 import withDarkMode, { useDarkMode } from "next-dark-mode";
 
 import "swiper/swiper-bundle.css";
 import "react-toggle/style.css";
 
-const MyApp = ({ Component, pageProps }: AppPropsType): JSX.Element => {
+const App = ({ Component, pageProps }: AppPropsType): JSX.Element => {
     const [, setLoading] = useState(false);
     useEffect(() => {
         initGA();
@@ -43,5 +44,6 @@ const MyApp = ({ Component, pageProps }: AppPropsType): JSX.Element => {
         </GeistProvider>
     );
 };
-
-export default withDarkMode(MyApp);
+export default dynamic(() => Promise.resolve(withDarkMode(App)), {
+    ssr: false,
+});
