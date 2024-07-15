@@ -60,7 +60,7 @@
         "sweetalert2": "^11.7.5",
         "swiper": "^9.3.2",
         "uuid": "^9.0.0",
-        "ws": "^8.13.0"
+        "ws": "^7.5.10"
     },
     "devDependencies": {
         "@testing-library/react": "^14.0.0",

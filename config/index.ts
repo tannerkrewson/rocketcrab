@@ -17,12 +17,25 @@ const SERVER_GAME_LIST: Array<ServerGame> = fs
     .filter((file) => !file.startsWith("_") && file.endsWith(".ts"))
     .reduce((games, file) => {
         const name = file.substr(0, file.indexOf("."));
-        const exported = require("./games/" + name).default;
+
+        const required = require("./games/" + name);
+
+        // this was triggered when upgrading ws from v7 to v8
+        if (typeof required?.then === "function") {
+            console.warn(
+                "\n",
+                file,
+                "returned a Promise when imported. It is likely importing something fishy."
+            );
+
+            process.exit(1);
+        }
+
+        const exported = required.default;
         const newGames = Array.isArray(exported) ? exported : [exported];
         return [...games, ...newGames];
     }, [])
     .map((game) => {
-
         if (!game.guideId) return game;
 
         const guide = fs.readFileSync(
