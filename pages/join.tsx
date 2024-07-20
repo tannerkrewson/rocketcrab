@@ -41,6 +41,9 @@ export const Join = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
             <div className="description">Join Party</div>
             <div className="input-container">
                 <Input
+                    crossOrigin={undefined}
+                    onPointerEnterCapture={undefined}
+                    onPointerLeaveCapture={undefined}
                     placeholder="ex. abcd"
                     scale={4 / 3}
                     width="8rem"

@@ -86,6 +86,9 @@ export const ChatBox = ({
             </div>
             <div className="flex-center-row">
                 <Input
+                    crossOrigin={undefined}
+                    onPointerEnterCapture={undefined}
+                    onPointerLeaveCapture={undefined}
                     {...bindings}
                     onKeyDown={onEnter}
                     maxLength={MAX_CHAT_MSG_LEN}

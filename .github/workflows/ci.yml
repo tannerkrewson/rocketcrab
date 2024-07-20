@@ -14,7 +14,6 @@ jobs:
               with:
                   node-version: 20
             - run: npm i
-            - run: npm run type-check
             - run: npm run build
             - run: npm run lint
             - run: npm test

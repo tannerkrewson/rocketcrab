@@ -49,6 +49,9 @@ const NameEntry = ({
                     maxLength={24}
                     scale={4 / 3}
                     clearable
+                    crossOrigin={undefined}
+                    onPointerEnterCapture={undefined}
+                    onPointerLeaveCapture={undefined}
                 />
             </div>
 
