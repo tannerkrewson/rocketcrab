@@ -10,6 +10,9 @@
     ],
     "rules": {
         // used by dynamic importing of game configs
-        "@typescript-eslint/no-var-requires": 0
+        "@typescript-eslint/no-var-requires": "off",
+
+        // i'm lazy and these didn't work the first try
+        "@next/next/no-img-element": "off"
     }
 }

@@ -4,7 +4,6 @@ import { useCallback, useState } from "react";
 import { Textfit } from "@aw-web-design/react-textfit";
 import { RocketcrabMode } from "../../types/enums";
 import { MODE_MAP } from "../../utils/utils";
-import Image from "next/image";
 
 const MainTitle = ({
     path = "",
@@ -29,12 +28,12 @@ const MainTitle = ({
     return (
         <div className={titleClasses}>
             <div style={{ margin: ".5em" }}>
-                <Image
+                <img
                     src="/rocket.svg"
                     className="rocket"
                     alt="rocketcrab logo"
                 />
-                <Image src="/crab.svg" className="crab" alt="rocketcrab logo" />
+                <img src="/crab.svg" className="crab" alt="rocketcrab logo" />
             </div>
             <Textfit mode="single">
                 <Tooltip

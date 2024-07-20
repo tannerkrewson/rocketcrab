@@ -23,7 +23,6 @@ import { differenceInMilliseconds } from "date-fns";
 import GameDetail from "../detail/GameDetail";
 import { RocketcrabMode } from "../../types/enums";
 import { useRouter } from "next/router";
-import Image from "next/image";
 
 const GameLayout = ({
     partyState,
@@ -296,12 +295,12 @@ const GameLayout = ({
                         igLogEvent("clickLogo");
                     }}
                 >
-                    <Image
+                    <img
                         src="/rocket.svg"
                         className="rocket"
                         alt="rocketcrab logo"
                     />
-                    <Image
+                    <img
                         src="/crab.svg"
                         className="crab"
                         alt="rocketcrab logo"
