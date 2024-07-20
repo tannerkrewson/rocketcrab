@@ -16,12 +16,8 @@
         "test": "jest",
         "test:watch": "jest --watch",
         "test:all": "run-s lint type-check test",
-        "test:coverage": "jest --coverage"
-    },
-    "husky": {
-        "hooks": {
-            "pre-commit": "run-s lint:staged type-check test"
-        }
+        "test:coverage": "jest --coverage",
+        "prepare": "husky"
     },
     "lint-staged": {
         "*.@(js|ts|tsx|json|md)": [
