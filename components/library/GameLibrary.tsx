@@ -20,7 +20,7 @@ const GameLibrary = ({
     } = libraryState;
 
     const fullCategory = gameLibrary?.categories?.find(
-        ({ id }) => id === selectedCategory
+        ({ id }) => id === selectedCategory,
     );
 
     const categoryName = fullCategory ? fullCategory.name + " " : "";

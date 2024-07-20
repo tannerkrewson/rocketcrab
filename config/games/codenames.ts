@@ -33,7 +33,7 @@ const game: ServerGame = {
         setTimeout(async () => {
             await postJson(
                 "https://lobby.codenames.game/game/" + name + "/leave",
-                { credentials: credential } // why did they have to add an "s" 😭😆
+                { credentials: credential }, // why did they have to add an "s" 😭😆
             );
         }, 10 * 1000);
 

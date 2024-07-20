@@ -23,6 +23,7 @@ import { differenceInMilliseconds } from "date-fns";
 import GameDetail from "../detail/GameDetail";
 import { RocketcrabMode } from "../../types/enums";
 import { useRouter } from "next/router";
+import Image from "next/image";
 
 const GameLayout = ({
     partyState,
@@ -46,7 +47,7 @@ const GameLayout = ({
     const { code, gameState, selectedGameId, playerList, chat } = partyState;
     const { isHost } = thisPlayer;
     const thisGame = gameLibrary.gameList.find(
-        ({ id }) => id == selectedGameId
+        ({ id }) => id == selectedGameId,
     );
 
     const [statusCollapsed, setStatusCollapsed] = useState(false);
@@ -65,12 +66,28 @@ const GameLayout = ({
 
     const igLogEvent = useCallback(
         (event) => logEvent("inGame-" + event, isHost ? "isHost" : "notHost"),
-        [isHost]
+        [isHost],
     );
 
     const {
         palette: { accents_1, accents_2 },
     } = useTheme();
+
+    const promptMute = useCallback(() => {
+        Swal.fire({
+            title: "Are your sure?",
+            text: "New chat messages won't appear over your game, but you can still see them in the menu!",
+            showCancelButton: true,
+            confirmButtonText: "Mute chat",
+            icon: "question",
+            heightAuto: false,
+        }).then(({ isConfirmed }) => {
+            if (isConfirmed) {
+                setEnableToasts(false);
+                igLogEvent("muteChat");
+            }
+        });
+    }, [igLogEvent]);
 
     const actions = useMemo(
         (): ToastAction[] => [
@@ -98,7 +115,7 @@ const GameLayout = ({
                 handler: (event, cancel) => cancel(),
             },
         ],
-        []
+        [igLogEvent, promptMute],
     );
 
     useEffect(() => {
@@ -131,7 +148,16 @@ const GameLayout = ({
         });
 
         igLogEvent("toastMsg");
-    }, [newestMsg]);
+    }, [
+        actions,
+        enableToasts,
+        igLogEvent,
+        lastShownToastDate,
+        newestMsg,
+        setToast,
+        showChat,
+        thisPlayer.id,
+    ]);
 
     const hostName = playerList.find(({ isHost }) => isHost).name;
 
@@ -143,7 +169,7 @@ const GameLayout = ({
                 setShowMenu(false);
                 setShowChat(true);
                 igLogEvent("showChat");
-            }, []),
+            }, [igLogEvent]),
             badgeCount: unreadMsgCount,
             hide: isKidsMode,
         },
@@ -154,7 +180,7 @@ const GameLayout = ({
                 setShowMenu(false);
                 setShowPlayerList(true);
                 igLogEvent("showPlayers");
-            }, []),
+            }, [igLogEvent]),
         },
         {
             label: "About this game",
@@ -163,7 +189,7 @@ const GameLayout = ({
                 setShowMenu(false);
                 setShowGameInfo(true);
                 igLogEvent("gameInfo");
-            }, []),
+            }, [igLogEvent]),
         },
         {
             label: "Browse games",
@@ -172,7 +198,7 @@ const GameLayout = ({
                 setShowMenu(false);
                 setShowGameLibrary(true);
                 igLogEvent("browseGames");
-            }, []),
+            }, [igLogEvent]),
         },
         {
             label: "Reload my game",
@@ -195,7 +221,7 @@ const GameLayout = ({
                         igLogEvent("reloadMe");
                     }
                 });
-            }, [frameRefresh]),
+            }, [frameRefresh, hostName, igLogEvent]),
         },
         {
             label: "Reload all",
@@ -218,7 +244,7 @@ const GameLayout = ({
                         igLogEvent("reloadAll");
                     }
                 });
-            }, [onStartGame]),
+            }, [igLogEvent, onStartGame, thisGame.name]),
         },
         {
             label: "Exit to party",
@@ -241,30 +267,14 @@ const GameLayout = ({
                         igLogEvent("exitToParty");
                     }
                 });
-            }, [onExitGame]),
+            }, [igLogEvent, onExitGame, thisGame.name]),
         },
     ];
 
     const combinedMenuBadgeCount = menuButtons.reduce(
         (prev, curr) => prev + (curr.badgeCount ?? 0),
-        0
+        0,
     );
-
-    const promptMute = () => {
-        Swal.fire({
-            title: "Are your sure?",
-            text: "New chat messages won't appear over your game, but you can still see them in the menu!",
-            showCancelButton: true,
-            confirmButtonText: "Mute chat",
-            icon: "question",
-            heightAuto: false,
-        }).then(({ isConfirmed }) => {
-            if (isConfirmed) {
-                setEnableToasts(false);
-                igLogEvent("muteChat");
-            }
-        });
-    };
 
     const hideAllWindows = useCallback(() => {
         setShowGameLibrary(false);
@@ -286,8 +296,16 @@ const GameLayout = ({
                         igLogEvent("clickLogo");
                     }}
                 >
-                    <img src="/rocket.svg" className="rocket" />
-                    <img src="/crab.svg" className="crab" />
+                    <Image
+                        src="/rocket.svg"
+                        className="rocket"
+                        alt="rocketcrab logo"
+                    />
+                    <Image
+                        src="/crab.svg"
+                        className="crab"
+                        alt="rocketcrab logo"
+                    />
                 </div>
                 {!statusCollapsed && (
                     <>

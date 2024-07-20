@@ -29,8 +29,10 @@ const GameBox = ({ game, onClick, count = 0 }: GameBoxProps): JSX.Element => {
                     background-color: ${background};
                     border: 1px solid ${accents_2};
                     border-radius: 5px;
-                    transition: background-color 200ms ease 0ms,
-                        box-shadow 200ms ease 0ms, border 200ms ease 0ms,
+                    transition:
+                        background-color 200ms ease 0ms,
+                        box-shadow 200ms ease 0ms,
+                        border 200ms ease 0ms,
                         color 200ms ease 0ms;
 
                     animation-name: fadein;

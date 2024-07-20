@@ -15,7 +15,7 @@ export const FindTime = ({ dates }: { dates: number[] }): JSX.Element => (
                         .replaceAll(":00", "")
                         .replaceAll(" AM", "am")
                         .replaceAll(" PM", "pm")
-                        .split(" at ")
+                        .split(" at "),
                 )
                 // convert [ [day, time], [day, time], ... ]
                 // to { day: [time, time, ...], day: [time, time, ...]}
@@ -24,8 +24,8 @@ export const FindTime = ({ dates }: { dates: number[] }): JSX.Element => (
                         ...prev,
                         [day]: [...(prev[day] || []), time],
                     }),
-                    {}
-                )
+                    {},
+                ),
         ).map(([day, times]: [string, string[]], i) => (
             <div key={i}>
                 {i === 0 && "and "}

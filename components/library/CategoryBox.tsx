@@ -23,7 +23,9 @@ const CategoryBox = ({
                 color: ${color};
                 background-color: ${backgroundColor};
                 box-shadow: ${backgroundColor} 0px 1px 8px 0px;
-                transition: transform 200ms ease 0ms, box-shadow 200ms ease 0ms;
+                transition:
+                    transform 200ms ease 0ms,
+                    box-shadow 200ms ease 0ms;
 
                 animation-name: fadein;
                 animation-duration: 0.25s;

@@ -12,11 +12,11 @@ const connectToGame = (wsUrl, baseUrl) => async () => {
     await ws.onOpen();
 
     ws.send(
-        '["{\\"msg\\":\\"connect\\",\\"version\\":\\"1\\",\\"support\\":[\\"1\\",\\"pre2\\",\\"pre1\\"]}"]'
+        '["{\\"msg\\":\\"connect\\",\\"version\\":\\"1\\",\\"support\\":[\\"1\\",\\"pre2\\",\\"pre1\\"]}"]',
     );
 
     await ws.untilMessage((msg) =>
-        msg.startsWith('a["{\\"msg\\":\\"connected\\",')
+        msg.startsWith('a["{\\"msg\\":\\"connected\\",'),
     );
 
     const createGamePayload = JSON.stringify({
@@ -55,8 +55,7 @@ const game: Array<ServerGame> = [
         basedOn: {
             game: "A Fake Artist Goes To New York",
             author: "Oink Games",
-            link:
-                "https://oinkgames.com/en/games/analog/a-fake-artist-goes-to-new-york/",
+            link: "https://oinkgames.com/en/games/analog/a-fake-artist-goes-to-new-york/",
             bggId: 135779,
         },
         description: `Please note: you will need a way for all players to draw 
@@ -85,7 +84,7 @@ const game: Array<ServerGame> = [
         ],
         connectToGame: connectToGame(
             "wss://fake-artist.herokuapp.com/sockjs/rocketcrab/rocketcrab/websocket",
-            "https://fake-artist.herokuapp.com/"
+            "https://fake-artist.herokuapp.com/",
         ),
     },
     {
@@ -115,7 +114,7 @@ const game: Array<ServerGame> = [
         ],
         connectToGame: connectToGame(
             "wss://insider-online.herokuapp.com/sockjs/rocketcrab/rocketcrab/websocket",
-            "https://insider-online.herokuapp.com/"
+            "https://insider-online.herokuapp.com/",
         ),
     },
 ];

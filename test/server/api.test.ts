@@ -7,15 +7,15 @@ describe("server/api.ts", () => {
     let app;
     let rocketcrab: RocketCrab;
     beforeEach(() => {
-        app = ({
+        app = {
             post: jest.fn(),
             get: jest.fn(),
             all: jest.fn(),
-        } as unknown) as Application;
+        } as unknown as Application;
 
-        rocketcrab = ({
+        rocketcrab = {
             partyList: [],
-        } as Partial<RocketCrab>) as RocketCrab;
+        } as Partial<RocketCrab> as RocketCrab;
 
         api(app, rocketcrab);
     });
@@ -61,7 +61,7 @@ describe("server/api.ts", () => {
 
         expect(rocketcrab.partyList[0].uuid).toEqual(req.params.uuid);
         expect(rocketcrab.partyList[0].selectedGameId).toEqual(
-            req.params.gameid
+            req.params.gameid,
         );
         expect(res.cookie.mock.calls[0][1]).toEqual(req.query.name);
     });
@@ -82,7 +82,7 @@ describe("server/api.ts", () => {
                     name: "John",
                 },
             },
-            res
+            res,
         );
         handler(
             {
@@ -94,7 +94,7 @@ describe("server/api.ts", () => {
                     name: "Jack",
                 },
             },
-            res
+            res,
         );
 
         expect(rocketcrab.partyList.length).toEqual(1);
@@ -133,7 +133,7 @@ describe("server/api.ts", () => {
         handler(req, res);
 
         expect(rocketcrab.partyList[0].selectedGameId).toEqual(
-            req.params.gameid
+            req.params.gameid,
         );
     });
 

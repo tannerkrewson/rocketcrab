@@ -13,7 +13,7 @@ const gameTemplate = (
         guideUrl,
         guideId,
         pictures,
-    }: Partial<ServerGame>
+    }: Partial<ServerGame>,
 ): ServerGame => ({
     id: "netgamesio-" + urlId,
     name: name,
@@ -32,7 +32,7 @@ const gameTemplate = (
     ...(guideId ? { guideId } : {}),
     connectToGame: async () => {
         const newGame = await fetch(
-            "https://netgames.io/games/" + urlId + "/new"
+            "https://netgames.io/games/" + urlId + "/new",
         );
         return {
             player: { url: newGame.url },
@@ -48,8 +48,7 @@ const games: Array<ServerGame> = [
         basedOn: {
             game: "The Resistance: Avalon",
             author: "Don Eskridge",
-            link:
-                "https://indieboardsandcards.com/index.php/our-games/the-resistance-avalon/",
+            link: "https://indieboardsandcards.com/index.php/our-games/the-resistance-avalon/",
             bggId: 128882,
         },
         category: ["netgamesio", "medium"],
@@ -165,8 +164,7 @@ const games: Array<ServerGame> = [
         basedOn: {
             game: "One Night Ultimate Werewolf",
             author: "Bezier Games",
-            link:
-                "https://beziergames.com/collections/all-uw-titles/products/one-night-ultimate-werewolf",
+            link: "https://beziergames.com/collections/all-uw-titles/products/one-night-ultimate-werewolf",
             bggId: 147949,
         },
         category: ["netgamesio", "medium"],

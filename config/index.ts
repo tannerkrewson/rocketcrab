@@ -25,7 +25,7 @@ const SERVER_GAME_LIST: Array<ServerGame> = fs
             console.warn(
                 "\n",
                 file,
-                "returned a Promise when imported. It is likely importing something fishy."
+                "returned a Promise when imported. It is likely importing something fishy.",
             );
 
             process.exit(1);
@@ -40,7 +40,7 @@ const SERVER_GAME_LIST: Array<ServerGame> = fs
 
         const guide = fs.readFileSync(
             path.join(process.cwd(), "config", "guides", game.guideId + ".md"),
-            "utf8"
+            "utf8",
         );
 
         return { ...game, guide };
@@ -48,7 +48,7 @@ const SERVER_GAME_LIST: Array<ServerGame> = fs
 
 const CLIENT_GAME_LIST: Array<ClientGame> = SERVER_GAME_LIST.map(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    ({ connectToGame, ...clientGame }): ClientGame => clientGame
+    ({ connectToGame, ...clientGame }): ClientGame => clientGame,
 );
 
 export const getServerGameLibrary = (): ServerGameLibrary => ({
@@ -57,10 +57,10 @@ export const getServerGameLibrary = (): ServerGameLibrary => ({
 });
 
 export const getClientGameLibrary = (
-    mode: RocketcrabMode
+    mode: RocketcrabMode,
 ): ClientGameLibrary => {
     const gameList = CLIENT_GAME_LIST.filter(
-        ({ showOn }) => mode === RocketcrabMode.ALL || showOn?.includes(mode)
+        ({ showOn }) => mode === RocketcrabMode.ALL || showOn?.includes(mode),
     );
 
     const categoriesOfThisGameList = gameList
@@ -69,7 +69,7 @@ export const getClientGameLibrary = (
     const categories = CATEGORIES.filter(
         ({ id }) =>
             categoriesOfThisGameList.find((categoryId) => id === categoryId) ||
-            id === "recent" // always include the recent category
+            id === "recent", // always include the recent category
     );
 
     return {

@@ -55,13 +55,13 @@ export const ChatBox = ({
         setIsFirstRender(false);
         // the isFirstRender check prevents the page from scrolling to the chat
         // box when first entering the party screen, after selecting a game, etc.
-    }, [chat.length]);
+    }, [chat.length, isChatShowing, isFirstRender]);
 
     useEffect(() => {
         if (isChatShowing) {
             clearUnreadMsgCount();
         }
-    }, [unreadMsgCount, isChatShowing]);
+    }, [unreadMsgCount, isChatShowing, clearUnreadMsgCount]);
 
     return (
         <CollapseBox

@@ -10,7 +10,7 @@ jest.mock("next/router", () => ({
 
 jest.mock("socket.io-client", () => ({
     io: () =>
-        (({
+        ({
             open: jest.fn(),
             on: jest.fn(),
             off: jest.fn(),
@@ -19,14 +19,14 @@ jest.mock("socket.io-client", () => ({
                 on: jest.fn(),
                 off: jest.fn(),
             },
-        } as unknown) as Socket),
+        }) as unknown as Socket,
 }));
 
 describe("pages/[code].tsx", () => {
     it("matches snapshot", () => {
         const { asFragment } = render(
-            <Code gameLibrary={{} as ClientGameLibrary} />,
-            {}
+            <Code gameLibrary={{} as ClientGameLibrary} isReconnect={false} />,
+            {},
         );
         expect(asFragment()).toMatchSnapshot();
     });

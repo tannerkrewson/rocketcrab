@@ -4,6 +4,7 @@ import { useCallback, useState } from "react";
 import { Textfit } from "@aw-web-design/react-textfit";
 import { RocketcrabMode } from "../../types/enums";
 import { MODE_MAP } from "../../utils/utils";
+import Image from "next/image";
 
 const MainTitle = ({
     path = "",
@@ -23,13 +24,17 @@ const MainTitle = ({
         navigator.clipboard.writeText(`https://${host}/${path}`);
 
         setTimeout(() => setCopiedTooltip(false), 1000);
-    }, [path]);
+    }, [host, path]);
 
     return (
         <div className={titleClasses}>
             <div style={{ margin: ".5em" }}>
-                <img src="/rocket.svg" className="rocket" />
-                <img src="/crab.svg" className="crab" />
+                <Image
+                    src="/rocket.svg"
+                    className="rocket"
+                    alt="rocketcrab logo"
+                />
+                <Image src="/crab.svg" className="crab" alt="rocketcrab logo" />
             </div>
             <Textfit mode="single">
                 <Tooltip

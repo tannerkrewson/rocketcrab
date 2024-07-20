@@ -45,7 +45,7 @@ const PartyScreen = ({
     const { id: meId, isHost } = thisPlayer;
 
     const selectedGame = gameLibrary.gameList.find(
-        ({ id }) => id === selectedGameId
+        ({ id }) => id === selectedGameId,
     );
     const host = playerList.find(({ isHost }) => isHost);
 
@@ -85,7 +85,7 @@ const PartyScreen = ({
                 router.push(createdAsPublic ? "/find" : "/");
             }
         });
-    }, [isPublic]);
+    }, [createdAsPublic, leaveText, router]);
 
     if (gameSelectorVisible) {
         return (

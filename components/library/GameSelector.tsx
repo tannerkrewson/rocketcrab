@@ -16,7 +16,7 @@ const GameSelector = ({
 }: GameSelectorProps): JSX.Element => {
     const [viewingGameId, setViewingGameId] = useState("");
     const viewingGame = gameLibrary.gameList.find(
-        ({ id }) => id === viewingGameId
+        ({ id }) => id === viewingGameId,
     );
 
     const onBackToSearch = useCallback(() => {
@@ -26,7 +26,7 @@ const GameSelector = ({
     const onSelectGameButton = useCallback(() => {
         onSelectGame(viewingGameId, viewingGame.name);
         onDone();
-    }, [onSelectGame, viewingGameId, onDone]);
+    }, [onSelectGame, viewingGameId, viewingGame.name, onDone]);
 
     const libraryState = useLibraryState();
 

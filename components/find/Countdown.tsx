@@ -24,7 +24,7 @@ export const Countdown = ({
                     intervalToDuration({
                         start,
                         end,
-                    })
+                    }),
                 )}
             </div>
         </div>

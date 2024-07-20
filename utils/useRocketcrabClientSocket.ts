@@ -24,7 +24,7 @@ export const useRocketcrabClientSocket = ({
     const { me, playerList, selectedGameId } = partyState || {};
 
     const selectedGame = gameLibrary?.gameList?.find(
-        ({ id }) => id === selectedGameId
+        ({ id }) => id === selectedGameId,
     );
 
     // only ran with initial value due to the []
@@ -72,7 +72,7 @@ export const useRocketcrabClientSocket = ({
             setSocketConnected(false);
             setPartyState(undefined);
         };
-    }, []);
+    }, [code, router]);
 
     useEffect(() => {
         if (!socketConnected) return;
@@ -99,7 +99,14 @@ export const useRocketcrabClientSocket = ({
             socket.io.off(SocketEvent.RECONNECT);
             socket.off(SocketEvent.INVALID_PARTY);
         };
-    }, [code, partyState, isReconnect, socketConnected]);
+    }, [
+        code,
+        partyState,
+        isReconnect,
+        socketConnected,
+        cookiePartyState,
+        router,
+    ]);
 
     const onNameEntry = useCallback((enteredName: string) => {
         socket.emit(SocketEvent.NAME, enteredName);
@@ -150,12 +157,19 @@ export const useRocketcrabClientSocket = ({
                 logEvent("party-game", selectedGameId);
                 logEvent(
                     "party-isPublic",
-                    (!!partyState.publicEndDate).toString()
+                    (!!partyState.publicEndDate).toString(),
                 );
                 logEvent("party-mode", partyState.mode);
             }
         },
-        [playerList, selectedGameId]
+        [
+            me?.isHost,
+            partyState.mode,
+            partyState.publicEndDate,
+            playerList.length,
+            selectedGame,
+            selectedGameId,
+        ],
     );
 
     const onExitGame = useCallback(() => {
@@ -165,7 +179,7 @@ export const useRocketcrabClientSocket = ({
     // give the host a little extra time (TODO probably remove)
     const onHostGameLoaded = useCallback(
         () => setTimeout(() => socket.emit(SocketEvent.HOST_GAME_LOADED), 2000),
-        []
+        [],
     );
 
     const onSendChat = useCallback((message) => {
@@ -184,8 +198,7 @@ export const useRocketcrabClientSocket = ({
             if (isConfirmed) {
                 Swal.fire({
                     title: `Ban ${name} as well?`,
-                    text:
-                        "This may prevent anyone else on the same network as this player from joining as well. If you want to let them join again, you'll have to make a new party.",
+                    text: "This may prevent anyone else on the same network as this player from joining as well. If you want to let them join again, you'll have to make a new party.",
                     showCancelButton: true,
                     confirmButtonText: `Kick & ban player`,
                     cancelButtonText: "Just kick",
@@ -243,7 +256,7 @@ export const useRocketcrabClientSocket = ({
 const joinParty = (
     code: string,
     partyState: ClientParty,
-    reconnecting: boolean
+    reconnecting: boolean,
 ) => {
     // if dev game, pick random name and submit
     if (code === "ffff") {
@@ -260,7 +273,7 @@ const joinParty = (
     });
 };
 
-const setCookie = (key: string, value: any) =>
+const setCookie = (key: string, value: string) =>
     setNookie(null, key, value, {
         maxAge: 2147483647,
     });

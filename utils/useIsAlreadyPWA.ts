@@ -10,7 +10,7 @@ export const useIsAlreadyPWA = (): boolean => {
         setIsAlreadyPWA(
             window.matchMedia("(display-mode: standalone)").matches ||
                 window.navigator.standalone ||
-                document.referrer.includes("android-app://")
+                document.referrer.includes("android-app://"),
         );
     }, []);
 

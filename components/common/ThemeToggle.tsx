@@ -2,11 +2,8 @@ import { useDarkMode } from "next-dark-mode";
 import Toggle from "react-toggle";
 
 export const ThemeToggle = (): JSX.Element => {
-    const {
-        darkModeActive,
-        switchToDarkMode,
-        switchToLightMode,
-    } = useDarkMode();
+    const { darkModeActive, switchToDarkMode, switchToLightMode } =
+        useDarkMode();
     return (
         <>
             <Toggle

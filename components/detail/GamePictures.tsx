@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
 import FsLightbox from "fslightbox-react";
 import SkinnyCard from "../common/SkinnyCard";
+import Image from "next/image";
 
 const GamePictures = ({ pictures }: GamePicturesProps): JSX.Element => {
     const [lightboxState, setLightboxState] = useState({
@@ -17,8 +18,9 @@ const GamePictures = ({ pictures }: GamePicturesProps): JSX.Element => {
                 <Swiper spaceBetween={16} slidesPerView={2.5}>
                     {pictures.map((picture, i) => (
                         <SwiperSlide key={picture}>
-                            <img
+                            <Image
                                 src={picture}
+                                alt="Game picture"
                                 style={{
                                     boxShadow:
                                         "2px 2px 6px rgba(0, 0, 0, 0.12)",

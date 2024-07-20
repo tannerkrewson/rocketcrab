@@ -84,7 +84,7 @@ const NameEntry = ({
 };
 
 type NameEntryProps = {
-    onNameEntry: (name: string) => any;
+    onNameEntry: (name: string) => void;
     previousName: string;
 };
 

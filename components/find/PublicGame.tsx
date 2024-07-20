@@ -16,7 +16,7 @@ const PublicGame = ({
 }): JSX.Element => {
     const { code, playerList, selectedGameId } = party;
     const selectedGame = gameLibrary.gameList.find(
-        ({ id }) => id === selectedGameId
+        ({ id }) => id === selectedGameId,
     );
     const host = playerList.find((p) => p.isHost);
     return (

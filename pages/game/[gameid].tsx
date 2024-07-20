@@ -65,7 +65,7 @@ const getAllPaths = () =>
             GAME_LIBRARY[mode].gameList.map(({ id }) => ({
                 params: { gameid: id },
                 locale: mode,
-            }))
+            })),
         )
         .flat();
 

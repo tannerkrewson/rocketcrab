@@ -37,7 +37,7 @@ const AddAppButton = (): JSX.Element => {
 
     useEffect(() => {
         setIsiOS(
-            /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
+            /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
         );
     }, []);
 
@@ -59,8 +59,7 @@ const AddAppButton = (): JSX.Element => {
         } else {
             Swal.fire({
                 title: "Hmm...",
-                text:
-                    "Failed to add rocketcrab as an app on this device. Try refreshing the page!",
+                text: "Failed to add rocketcrab as an app on this device. Try refreshing the page!",
                 icon: "error",
                 heightAuto: false,
             });

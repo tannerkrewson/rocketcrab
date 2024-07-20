@@ -31,6 +31,10 @@ const PrimaryButton = (props: PrimaryButtonProps): JSX.Element => {
 
 const ButtonWrapper = ({ manualWidth, ...props }: PrimaryButtonProps) => (
     <Button
+        placeholder={undefined}
+        onPointerEnterCapture={undefined}
+        onPointerLeaveCapture={undefined}
+        {...props}
         type="secondary"
         ghost
         shadow
@@ -38,14 +42,13 @@ const ButtonWrapper = ({ manualWidth, ...props }: PrimaryButtonProps) => (
         style={{
             width: manualWidth ? "100%" : "auto",
         }}
-        {...(props as any)}
     />
 );
 
 type PrimaryButtonProps = {
     size?: string;
     href?: string;
-    onClick?: (e: any) => void;
+    onClick?: React.MouseEventHandler<HTMLButtonElement>;
     disabled?: boolean;
     as?: string;
     children?: React.ReactNode;

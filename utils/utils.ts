@@ -14,6 +14,7 @@ import { RocketcrabMode } from "../types/enums";
 
 const filter = new Filter();
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const postJson = (url = "", data = {}): Promise<any> =>
     fetch(url, {
         method: "POST",
@@ -30,7 +31,7 @@ export const newPromiseWebSocket = (url: string): PromiseWebSocket => {
 
     ws.onMessage = () =>
         new Promise((resolve) =>
-            ws.on("message", (msg) => resolve(msg as unknown as string))
+            ws.on("message", (msg) => resolve(msg as unknown as string)),
         );
 
     ws.untilMessage = (msgChecker) =>
@@ -44,7 +45,7 @@ export const newPromiseWebSocket = (url: string): PromiseWebSocket => {
                     ws.close();
                     reject(error);
                 }
-            })
+            }),
         );
 
     return ws;
@@ -70,7 +71,7 @@ export const useLibraryState = (): LibraryState => {
 export const isChatMsgValid = (
     message: string,
     player: Player,
-    chat: Array<ChatMessage>
+    chat: Array<ChatMessage>,
 ): boolean => {
     if (
         typeof message !== "string" ||

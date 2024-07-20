@@ -49,16 +49,16 @@ jest.mock("../../config", () => ({
                     }),
                 } as ServerGame,
                 { id: "lk-coolgame", name: "CoolGame" } as ServerGame,
-                ({
+                {
                     id: "brokengame",
                     name: "BrokenGame",
                     connectToGame: async () => {
                         throw Error;
                     },
-                } as unknown) as ServerGame,
+                } as unknown as ServerGame,
             ],
             categories: [],
-        })
+        }),
     ),
     getClientGameLibrary: jest.fn(() => ({
         gameList: [{ name: "FooGame" }, { name: "CoolGame" }],
@@ -277,9 +277,9 @@ describe("server/rocketcrab.ts", () => {
         const emits = [jest.fn(), jest.fn(), jest.fn()];
 
         const generateMocket = (i: number) =>
-            (({
+            ({
                 emit: emits[i],
-            } as Partial<Socket>) as Socket);
+            }) as Partial<Socket> as Socket;
 
         const mockParty: Party = generateMockParty({
             status: PartyStatus.party,
@@ -305,9 +305,9 @@ describe("server/rocketcrab.ts", () => {
         const emits = [jest.fn()];
 
         const generateMocket = (i: number) =>
-            (({
+            ({
                 emit: emits[i],
-            } as Partial<Socket>) as Socket);
+            }) as Partial<Socket> as Socket;
 
         const mockParty: Party = generateMockParty({
             status: PartyStatus.ingame,
@@ -326,7 +326,7 @@ describe("server/rocketcrab.ts", () => {
     it("removePlayer works", () => {
         const disconnect = jest.fn();
         const mockPlayer = generateMockPlayer({
-            socket: ({ disconnect } as unknown) as Socket,
+            socket: { disconnect } as unknown as Socket,
         });
 
         const playerList = [mockPlayer];
@@ -412,7 +412,7 @@ describe("server/rocketcrab.ts", () => {
 
         expect(mockPlayerList[0].name).toBe("");
         expect(mockPlayerList[0].socket.emit).toBeCalledWith(
-            SocketEvent.INVALID_NAME
+            SocketEvent.INVALID_NAME,
         );
     });
 
@@ -425,10 +425,10 @@ describe("server/rocketcrab.ts", () => {
             },
             playerList: generateMockPlayerList(1, (player) => ({
                 ...player,
-                socket: ({
+                socket: {
                     emit: jest.fn(),
                     once: jest.fn(),
-                } as unknown) as Socket,
+                } as unknown as Socket,
             })),
         });
 
@@ -530,7 +530,7 @@ describe("server/rocketcrab.ts", () => {
         expect(publicPartyList.length).toBe(1);
         expect(publicPartyList[0].code).toBe("dddd");
         expect(publicPartyList[0]).toStrictEqual(
-            getJsonParty(mockPartyList[3])
+            getJsonParty(mockPartyList[3]),
         );
     });
 
@@ -554,7 +554,7 @@ describe("server/rocketcrab.ts", () => {
         const result = addChatMessage(
             "a" + "a".repeat(MAX_CHAT_MSG_LEN),
             mockPlayer,
-            mockParty
+            mockParty,
         );
 
         expect(result).toBe(false);
@@ -588,9 +588,8 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("addChatMessage works if a users last msg was not too recent", () => {
-        const { result, mockParty, dateOfLastMsg } = testAddChatMessageTimed(
-            -1000
-        );
+        const { result, mockParty, dateOfLastMsg } =
+            testAddChatMessageTimed(-1000);
 
         expect(result).toBe(true);
         expect(mockParty.chat.length).toBe(2);
@@ -610,7 +609,7 @@ describe("server/rocketcrab.ts", () => {
 
     const testAddChatMessagePurge = (
         originalNumberOfMessages,
-        varyId = false
+        varyId = false,
     ) => {
         const mockPlayer = generateMockPlayer({ id: 0 });
 
@@ -643,7 +642,7 @@ describe("server/rocketcrab.ts", () => {
 
     it("addChatMessage purges old msgs from same player", () => {
         const { result, mockParty } = testAddChatMessagePurge(
-            MAX_CHATS_FROM_SINGLE_PLAYER
+            MAX_CHATS_FROM_SINGLE_PLAYER,
         );
 
         expect(result).toBe(true);
@@ -655,7 +654,7 @@ describe("server/rocketcrab.ts", () => {
 
     it("addChatMessage doesn't purge if under MAX_CHATS_FROM_SINGLE_PLAYER", () => {
         const { result, mockParty } = testAddChatMessagePurge(
-            MAX_CHATS_FROM_SINGLE_PLAYER - 1
+            MAX_CHATS_FROM_SINGLE_PLAYER - 1,
         );
 
         expect(result).toBe(true);
@@ -668,14 +667,14 @@ describe("server/rocketcrab.ts", () => {
     it("addChatMessage purges if over MAX_CHATS_OVERALL", () => {
         const { result, mockParty } = testAddChatMessagePurge(
             MAX_CHATS_OVERALL,
-            true
+            true,
         );
 
         expect(result).toBe(true);
         expect(mockParty.chat.length).toBe(MAX_CHATS_OVERALL);
         expect(mockParty.chat[0].message).toBe("msg-" + 1);
         expect(mockParty.chat[MAX_CHATS_OVERALL - 1].message).toBe(
-            "Hello again"
+            "Hello again",
         );
     });
 
@@ -781,7 +780,7 @@ const generateMockPlayer = ({
 
 const generateMockPlayerList = (
     numPlayers,
-    modifyPlayer?: (Player, number) => Player
+    modifyPlayer?: (Player, number) => Player,
 ): Array<Player> => {
     const playerList: Array<Player> = [];
     for (let i = 0; i < numPlayers; i++) {

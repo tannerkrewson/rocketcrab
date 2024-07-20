@@ -50,7 +50,7 @@ const PartyStatus = ({
                                 onlyOnePlayer,
                                 isHost,
                                 hostName,
-                                isPublic
+                                isPublic,
                             )}
                         </div>
                     </div>
@@ -79,7 +79,7 @@ const getPreSelectedGameStatus = (
     onlyOnePlayer: boolean,
     isHost: boolean,
     hostName: string,
-    isPublic: boolean
+    isPublic: boolean,
 ) => {
     if (isPublic) {
         return "You must select a game before others can join!";
@@ -88,8 +88,8 @@ const getPreSelectedGameStatus = (
     return onlyOnePlayer
         ? "⬆️ Give this link to your friends! ⬆️ \n (You can tap it to copy!)"
         : isHost
-        ? "As the host, you must select the game!"
-        : `Waiting for ${hostName} to select a game...`;
+          ? "As the host, you must select the game!"
+          : `Waiting for ${hostName} to select a game...`;
 };
 
 type PartyStatusProps = {

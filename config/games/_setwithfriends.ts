@@ -37,7 +37,7 @@ const game: ServerGame = {
                     "content-type": "application/json",
                     referer: "https://setwithfriends.com/",
                 },
-            }
+            },
         );
 
         const { idToken } = await auth.json();
@@ -56,7 +56,7 @@ const game: ServerGame = {
                     authorization: "Bearer " + idToken,
                     "content-type": "application/json",
                 },
-            }
+            },
         );
 
         return {

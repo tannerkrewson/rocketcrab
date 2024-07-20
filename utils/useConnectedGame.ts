@@ -3,7 +3,7 @@ import { ClientGame, ConnectedGame, Player } from "../types/types";
 export const useConnectedGame = (
     connectedGame: ConnectedGame,
     { renameParams }: ClientGame,
-    { isHost, name }: Player
+    { isHost, name }: Player,
 ): string => {
     if (!connectedGame?.player) return "";
 
@@ -30,7 +30,7 @@ export const useConnectedGame = (
                 ...acc,
                 [paramKeys[name]]: defaultParams[name],
             }),
-            {}
+            {},
         ),
         ...customQueryParams,
     };

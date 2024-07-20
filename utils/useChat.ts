@@ -3,7 +3,7 @@ import { ChatMessage, Player } from "../types/types";
 
 export const useChat = (
     chat: Array<ChatMessage>,
-    me: Player
+    me: Player,
 ): {
     unreadMsgCount: number;
     clearUnreadMsgCount: () => void;
@@ -11,7 +11,7 @@ export const useChat = (
 } => {
     const [unreadMsgCount, setUnreadMsgCount] = useState(chat?.length ?? 0);
     const [previousLastMsg, setPreviousLastMsg] = useState(
-        chat?.length && chat[chat.length - 1]
+        chat?.length && chat[chat.length - 1],
     );
 
     useEffect(() => {
@@ -27,7 +27,7 @@ export const useChat = (
             setUnreadMsgCount(unreadMsgCount + 1);
             setPreviousLastMsg(nextLastMsg);
         }
-    }, [chat]);
+    }, [chat, me.id, previousLastMsg, unreadMsgCount]);
 
     return {
         unreadMsgCount,

@@ -41,8 +41,7 @@ export const Find = ({
             setNewLoading(false);
             Swal.fire({
                 title: "Try again",
-                text:
-                    "The server is not allowing public parties to be created right now... maybe you were just a smidge too early? 😊",
+                text: "The server is not allowing public parties to be created right now... maybe you were just a smidge too early? 😊",
                 icon: "error",
                 heightAuto: false,
             });
@@ -87,7 +86,7 @@ export const Find = ({
 
     if (gameInfoVisible) {
         const selectedGame = gameLibrary.gameList.find(
-            ({ id }) => id === gameInfoVisible
+            ({ id }) => id === gameInfoVisible,
         );
         return (
             <PageLayout
