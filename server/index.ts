@@ -29,7 +29,7 @@ const nextHandler = nextApp.getRequestHandler();
     attachSocketHandlers(io, rocketCrab);
     initCron(rocketCrab);
 
-    app.get("*", (nextHandler as unknown) as RequestHandler);
+    app.use((req, res) => nextHandler(req, res));
 
     await http.listen(port);
 
