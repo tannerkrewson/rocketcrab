@@ -66,14 +66,6 @@ const GameFrame = ({
                             , or try again later. If the problem continues, let
                             us know on{" "}
                             <a
-                                href="https://discord.gg/MvYRVCP"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                            >
-                                Discord
-                            </a>{" "}
-                            or{" "}
-                            <a
                                 href="https://github.com/tannerkrewson/rocketcrab/issues"
                                 target="_blank"
                                 rel="noopener noreferrer"

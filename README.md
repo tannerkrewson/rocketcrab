@@ -6,8 +6,6 @@
 
 rocketcrab is a lobby service and launcher for mobile web party games.
 
-[Join the Rocketcrab Discord!](https://discord.gg/MvYRVCP)
-
 ## 🚀🦀 for developers
 
 ### Add your game to rocketcrab, tl;dr:
@@ -19,7 +17,7 @@ rocketcrab is a lobby service and launcher for mobile web party games.
 
 ### What's a "rocket crab"???
 
-Rocketcrab makes it easy for players to discover your game, and easily switch to and from your game without having to manually open a different website and enter a new game code. It accomplishs this by putting your game's page into an `iframe`, which allows any of your cookies, local storage, analytics, and advertising to continue working, while disallowing rocketcrab from manipulating your site. Integrating your game with rocketcrab should be a simple process, but please let me know by opening an issue or joining our Discord if there is any way it could be better!
+Rocketcrab makes it easy for players to discover your game, and easily switch to and from your game without having to manually open a different website and enter a new game code. It accomplishs this by putting your game's page into an `iframe`, which allows any of your cookies, local storage, analytics, and advertising to continue working, while disallowing rocketcrab from manipulating your site. Integrating your game with rocketcrab should be a simple process, but please let me know by opening an issue if there is any way it could be better!
 
 The name Rocketcrab is the first thing I could think of that sounded cool, had an available `.com` domain, and could be represented by two emojis. It also does not have an ambigious spelling when spoken out loud (there's only one way to spell "rocket" and "crab"), which is important when trying to get your whole group to go to the site to play games!
 

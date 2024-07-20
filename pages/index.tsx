@@ -67,18 +67,6 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                         <Spacer h={0.5} />
                         <PrimaryButton
                             type="default"
-                            url="https://discord.gg/MvYRVCP"
-                            manualWidth
-                        >
-                            <img
-                                src="/Discord-Logo-Color.svg"
-                                className="discord-logo"
-                            />
-                            Join our Discord
-                        </PrimaryButton>
-                        <Spacer h={0.5} />
-                        <PrimaryButton
-                            type="default"
                             url="https://github.com/tannerkrewson/rocketcrab/#-for-developers"
                             manualWidth
                         >
@@ -96,12 +84,6 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                 .description {
                     text-align: center;
                     margin-bottom: 2em;
-                }
-                .discord-logo {
-                    width: 1.7em;
-                    margin-left: -0.35em;
-                    margin-right: 0.3em;
-                    margin-bottom: -0.1em;
                 }
                 .btn-col {
                     display: flex;
