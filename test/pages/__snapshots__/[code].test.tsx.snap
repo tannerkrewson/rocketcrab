@@ -19,10 +19,12 @@ exports[`pages/[code].tsx matches snapshot 1`] = `
             style="margin: .5em;"
           >
             <img
+              alt="rocketcrab logo"
               class="jsx-1758552329 rocket"
               src="/rocket.svg"
             />
             <img
+              alt="rocketcrab logo"
               class="jsx-1758552329 crab"
               src="/crab.svg"
             />
@@ -32,7 +34,7 @@ exports[`pages/[code].tsx matches snapshot 1`] = `
               style="display: inline-block; white-space: nowrap;"
             >
               <div
-                class="jsx-418573366 tooltip "
+                class="jsx-418573366 tooltip"
               >
                 <h2
                   class="jsx-1758552329 party-url"
@@ -52,17 +54,17 @@ exports[`pages/[code].tsx matches snapshot 1`] = `
           class="jsx-2322376654 input-container"
         >
           <div
-            class="jsx-2152825435 with-label"
+            class="jsx-2946092383 with-label"
           >
             <div
-              class="jsx-2152825435 input-container "
+              class="jsx-2946092383 input-container"
             >
               <div
-                class="jsx-2152825435 input-wrapper hover  "
+                class="jsx-2946092383 input-wrapper hover"
               >
                 <input
                   autocomplete="off"
-                  class="jsx-2152825435  "
+                  class="jsx-2946092383 "
                   id="player-name"
                   maxlength="24"
                   placeholder="Use your real name!"
@@ -70,10 +72,10 @@ exports[`pages/[code].tsx matches snapshot 1`] = `
                   value=""
                 />
                 <div
-                  class="jsx-1724197483 clear-icon "
+                  class="jsx-100723902 clear-icon"
                 >
                   <svg
-                    class="jsx-1724197483"
+                    class="jsx-100723902"
                     fill="none"
                     shape-rendering="geometricPrecision"
                     stroke="currentColor"
@@ -83,11 +85,11 @@ exports[`pages/[code].tsx matches snapshot 1`] = `
                     viewBox="0 0 24 24"
                   >
                     <path
-                      class="jsx-1724197483"
+                      class="jsx-100723902"
                       d="M18 6L6 18"
                     />
                     <path
-                      class="jsx-1724197483"
+                      class="jsx-100723902"
                       d="M6 6l12 12"
                     />
                   </svg>
@@ -97,13 +99,13 @@ exports[`pages/[code].tsx matches snapshot 1`] = `
           </div>
         </div>
         <div
-          class="jsx-4094718877 item justify jsx-1720607024 "
+          class="jsx-2262539868 item justify jsx-3384369884"
         >
           <div
-            class="jsx-2819926550 item  jsx-4216129763 "
+            class="jsx-3633143255 item jsx-3484918754"
           >
             <button
-              class="jsx-2230649419 btn "
+              class="jsx-3631069826 btn"
               style="width: auto;"
               type="button"
             >
@@ -115,10 +117,10 @@ exports[`pages/[code].tsx matches snapshot 1`] = `
             </button>
           </div>
           <div
-            class="jsx-2819926550 item  jsx-4216129763 "
+            class="jsx-3633143255 item jsx-3484918754"
           >
             <button
-              class="jsx-512623370 btn "
+              class="jsx-2410941923 btn"
               disabled=""
               style="width: auto;"
               type="button"

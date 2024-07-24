@@ -27,7 +27,7 @@ export const useChat = (
             setUnreadMsgCount(unreadMsgCount + 1);
             setPreviousLastMsg(nextLastMsg);
         }
-    }, [chat, me.id, previousLastMsg, unreadMsgCount]);
+    }, [chat, me, previousLastMsg, unreadMsgCount]);
 
     return {
         unreadMsgCount,

@@ -162,14 +162,7 @@ export const useRocketcrabClientSocket = ({
                 logEvent("party-mode", partyState.mode);
             }
         },
-        [
-            me?.isHost,
-            partyState.mode,
-            partyState.publicEndDate,
-            playerList.length,
-            selectedGame,
-            selectedGameId,
-        ],
+        [me?.isHost, partyState, playerList, selectedGame, selectedGameId],
     );
 
     const onExitGame = useCallback(() => {
