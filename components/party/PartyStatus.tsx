@@ -1,4 +1,4 @@
-import { Card, Spacer, useTheme } from "@geist-ui/core";
+import { Card, CardBody, Spacer } from "@nextui-org/react";
 
 import { JellyfishSpinner } from "react-spinners-kit";
 import { ClientGame, Player } from "../../types/types";
@@ -13,15 +13,9 @@ const PartyStatus = ({
     onlyOnePlayer,
     isPublic,
 }: PartyStatusProps): JSX.Element => {
-    const {
-        palette: { accents_1 },
-    } = useTheme();
-
     return (
         <Card>
-            <Card.Content
-                style={{ padding: "1em", backgroundColor: accents_1 }}
-            >
+            <CardBody>
                 {selectedGame ? (
                     <>
                         <div>Ready to play:</div>
@@ -31,7 +25,7 @@ const PartyStatus = ({
                                 ? "As the host, you have to start the game!"
                                 : "Waiting for " + hostName + " to start..."}
                         </div>
-                        <Spacer h={1} />
+                        <Spacer y={1} />
                         <ButtonGroup>
                             <PrimaryButton
                                 onClick={onShowGameInfo}
@@ -70,7 +64,7 @@ const PartyStatus = ({
                         display: flex;
                     }
                 `}</style>
-            </Card.Content>
+            </CardBody>
         </Card>
     );
 };

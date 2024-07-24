@@ -1,10 +1,6 @@
-import { useTheme } from "@geist-ui/core";
 import Head from "next/head";
 
-const Body = ({ children }: BodyProps): JSX.Element => {
-    const {
-        palette: { accents_2, accents_5, accents_7, foreground, success },
-    } = useTheme();
+const Body = ({ children, themeType }: BodyProps): JSX.Element => {
     return (
         <>
             <Head>
@@ -41,7 +37,7 @@ const Body = ({ children }: BodyProps): JSX.Element => {
                 <meta name="theme-color" content="#ffffff" />
                 <meta name="description" content="party games for phones" />
             </Head>
-            {children}
+            <main className={themeType}>{children}</main>
             <style jsx global>{`
                 html,
                 body,
@@ -59,29 +55,6 @@ const Body = ({ children }: BodyProps): JSX.Element => {
                     text-transform: none;
                 }
 
-                /* fixes a weird geist bug where the dashes of unordered list move when you scroll */
-                .container ul li:before {
-                    margin-right: 0.5em;
-                    position: initial;
-                    content: "•";
-                }
-
-                /* "Copied!" tooltip animation */
-                #geist-ui-tooltip .tooltip-content.transition-enter {
-                    opacity: 0;
-                }
-                #geist-ui-tooltip .tooltip-content.transition-enter-active {
-                    transition: opacity 0.2s ease-out;
-                    opacity: 1;
-                }
-                #geist-ui-tooltip .tooltip-content.transition-leave {
-                    opacity: 1;
-                }
-                #geist-ui-tooltip .tooltip-content.transition-leave-active {
-                    transition: opacity 0.2s ease-out;
-                    opacity: 0;
-                }
-
                 .card.card.card,
                 .card.card.card:hover {
                     box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
@@ -92,22 +65,6 @@ const Body = ({ children }: BodyProps): JSX.Element => {
                     padding: 0 1.1em;
                     min-width: initial;
                 }
-
-                .swal2-popup {
-                    background: ${accents_2};
-                }
-                .swal2-title {
-                    color: ${foreground};
-                }
-                .swal2-styled.swal2-confirm {
-                    background: ${success};
-                }
-                .swal2-styled.swal2-cancel {
-                    background: ${accents_5};
-                }
-                .swal2-content {
-                    color: ${accents_7};
-                }
             `}</style>
         </>
     );
@@ -115,6 +72,7 @@ const Body = ({ children }: BodyProps): JSX.Element => {
 
 type BodyProps = {
     children: React.ReactNode;
+    themeType: string;
 };
 
 export default Body;

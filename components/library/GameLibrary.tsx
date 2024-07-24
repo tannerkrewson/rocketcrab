@@ -1,5 +1,5 @@
 import CategoryGroup from "./CategoryGroup";
-import { Input, Spacer } from "@geist-ui/core";
+import { Input, Spacer } from "@nextui-org/react";
 import FilteredGameGroup from "./FilteredGameGroup";
 import RecentGameGroup from "./RecentGameGroup";
 import { ClientGameLibrary, LibraryState } from "../../types/types";
@@ -11,13 +11,8 @@ const GameLibrary = ({
     setViewingGameId,
     libraryState,
 }: GameLibraryProps): JSX.Element => {
-    const {
-        selectedCategory,
-        setSelectedCategory,
-        search,
-        setSearch,
-        searchBindings,
-    } = libraryState;
+    const { selectedCategory, setSelectedCategory, search, setSearch } =
+        libraryState;
 
     const fullCategory = gameLibrary?.categories?.find(
         ({ id }) => id === selectedCategory,
@@ -29,10 +24,12 @@ const GameLibrary = ({
 
     return (
         <div style={{ textAlign: "center", justifyContent: "center" }}>
-            <Spacer h={2} />
+            <Spacer y={2} />
             <h4>{categoryName}Games</h4>
-            <Spacer h={1} />
-            {!selectedCategory && <SearchBox {...searchBindings} />}
+            <Spacer y={1} />
+            {!selectedCategory && (
+                <SearchBox search={search} onSearchChange={setSearch} />
+            )}
             {!selectedCategory && !search && (
                 <CategoryGroup
                     categories={gameLibrary.categories}
@@ -71,16 +68,15 @@ const GameLibrary = ({
     );
 };
 
-const SearchBox = (props) => (
+const SearchBox = ({ search, onSearchChange }) => (
     <>
         <Input
-            icon="🔎"
             placeholder="Search"
             width="100%"
-            clearable
-            {...props}
+            value={search}
+            onValueChange={onSearchChange}
         />
-        <Spacer h={1} />
+        <Spacer y={1} />
     </>
 );
 

@@ -1,5 +1,5 @@
 import converter from "phonetic-alphabet-converter";
-import { Tooltip } from "@geist-ui/core";
+import { Tooltip } from "@nextui-org/react";
 import { useCallback, useState } from "react";
 import { Textfit } from "@aw-web-design/react-textfit";
 import { RocketcrabMode } from "../../types/enums";

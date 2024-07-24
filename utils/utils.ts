@@ -7,7 +7,6 @@ import {
     PromiseWebSocket,
 } from "../types/types";
 import WebSocket from "ws";
-import { useInput } from "@geist-ui/core";
 import { useState } from "react";
 import Filter from "bad-words";
 import { RocketcrabMode } from "../types/enums";
@@ -53,18 +52,13 @@ export const newPromiseWebSocket = (url: string): PromiseWebSocket => {
 
 export const useLibraryState = (): LibraryState => {
     const [selectedCategory, setSelectedCategory] = useState("");
-    const {
-        state: search,
-        setState: setSearch,
-        bindings: searchBindings,
-    } = useInput("");
+    const [search, setSearch] = useState("");
 
     return {
         selectedCategory,
         setSelectedCategory,
         search,
         setSearch,
-        searchBindings,
     };
 };
 

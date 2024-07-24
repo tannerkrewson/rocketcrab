@@ -1,4 +1,3 @@
-// import { Button } from "@geist-ui/core";
 import { Button } from "@nextui-org/react";
 import Link from "next/link";
 
@@ -32,11 +31,7 @@ const PrimaryButton = (props: PrimaryButtonProps): JSX.Element => {
 
 const ButtonWrapper = ({ manualWidth, ...props }: PrimaryButtonProps) => (
     <Button
-        placeholder={undefined}
-        onPointerEnterCapture={undefined}
-        onPointerLeaveCapture={undefined}
-        // @ts-expect-error this error makes no sense
-        type="secondary"
+        color="default"
         style={{
             width: manualWidth ? "100%" : "auto",
         }}

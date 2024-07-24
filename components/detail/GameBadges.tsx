@@ -1,4 +1,4 @@
-import { Badge } from "@geist-ui/core";
+import { Badge } from "@nextui-org/react";
 import { RocketcrabMode } from "../../types/enums";
 import { ClientGame, GameCategory } from "../../types/types";
 import SkinnyCard from "../common/SkinnyCard";

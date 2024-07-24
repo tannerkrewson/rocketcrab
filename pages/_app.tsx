@@ -1,4 +1,3 @@
-import { GeistProvider, CssBaseline } from "@geist-ui/core";
 import Body from "../components/layout/Body";
 import "fontsource-inconsolata";
 import "fontsource-mukta";
@@ -44,14 +43,10 @@ const App = ({ Component, pageProps }: AppPropsType): JSX.Element => {
     return (
         <ModalContext.Provider value={setModalState}>
             <NextUIProvider>
-                <GeistProvider themeType={darkModeActive ? "dark" : "light"}>
-                    <CssBaseline />
-
-                    <Body>
-                        <Component {...pageProps} />
-                    </Body>
-                    <Modal state={modalState} />
-                </GeistProvider>
+                <Body themeType={darkModeActive ? "dark" : ""}>
+                    <Component {...pageProps} />
+                </Body>
+                <Modal state={modalState} />
             </NextUIProvider>
         </ModalContext.Provider>
     );

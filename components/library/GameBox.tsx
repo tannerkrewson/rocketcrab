@@ -1,20 +1,11 @@
 import { ClientGame } from "../../types/types";
-import { Description, Grid, useTheme } from "@geist-ui/core";
 
 const GameBox = ({ game, onClick, count = 0 }: GameBoxProps): JSX.Element => {
-    const {
-        palette: { background, accents_2 },
-    } = useTheme();
-
     return (
-        <Grid xs={24}>
+        <>
             <button onClick={() => onClick(game.id)} className="game-box">
                 <b>{game.name}</b>
-                <Description
-                    style={{ width: "fit-content" }}
-                    title={"by " + game.author}
-                    className="remove-text-transform"
-                />
+                <div>{"by " + game.author}</div>
                 <span className="back-emoji">➡️</span>
             </button>
             <style jsx>{`
@@ -26,8 +17,6 @@ const GameBox = ({ game, onClick, count = 0 }: GameBoxProps): JSX.Element => {
                     position: relative;
                     cursor: pointer;
                     margin-bottom: 0.3em;
-                    background-color: ${background};
-                    border: 1px solid ${accents_2};
                     border-radius: 5px;
                     transition:
                         background-color 200ms ease 0ms,
@@ -67,7 +56,7 @@ const GameBox = ({ game, onClick, count = 0 }: GameBoxProps): JSX.Element => {
                     top: 1.2em;
                 }
             `}</style>
-        </Grid>
+        </>
     );
 };
 

@@ -1,11 +1,10 @@
 import { GameCategory } from "../../types/types";
-import { Grid } from "@geist-ui/core";
 const CategoryBox = ({
     category: { id, name, color, backgroundColor },
     onClick,
     count,
 }: CategoryBoxProps): JSX.Element => (
-    <Grid xs={12} key={id}>
+    <>
         <button onClick={() => onClick(id)} className="category-box">
             {name}
         </button>
@@ -50,7 +49,7 @@ const CategoryBox = ({
                 }
             }
         `}</style>
-    </Grid>
+    </>
 );
 
 export type CategoryBoxProps = {

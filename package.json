@@ -26,8 +26,6 @@
     },
     "dependencies": {
         "@aw-web-design/react-textfit": "4.1.135",
-        "@geist-ui/core": "^2.3.8",
-        "@geist-ui/react-icons": "^1.0.1",
         "@nextui-org/react": "^2.4.6",
         "bad-words": "^3.0.4",
         "body-parser": "^1.20.2",
@@ -48,6 +46,7 @@
         "react": "^18.3.1",
         "react-dom": "^18.3.1",
         "react-ga": "^3.3.1",
+        "react-hot-toast": "^2.4.1",
         "react-ios-pwa-prompt": "^1.8.4",
         "react-markdown": "^6.0.3",
         "react-spinners-kit": "^1.9.1",

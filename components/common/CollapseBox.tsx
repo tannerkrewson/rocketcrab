@@ -1,4 +1,4 @@
-import { Badge } from "@geist-ui/core";
+import { Badge } from "@nextui-org/react";
 import React, { useState } from "react";
 import PrimaryButton from "./PrimaryButton";
 
