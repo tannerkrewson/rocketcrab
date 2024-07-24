@@ -36,13 +36,13 @@ const ButtonWrapper = ({ manualWidth, ...props }: PrimaryButtonProps) => (
         onPointerLeaveCapture={undefined}
         // @ts-expect-error this error makes no sense
         type="secondary"
+        style={{
+            width: manualWidth ? "100%" : "auto",
+        }}
         {...props}
         ghost
         shadow
         auto={!manualWidth}
-        style={{
-            width: manualWidth ? "100%" : "auto",
-        }}
     />
 );
 

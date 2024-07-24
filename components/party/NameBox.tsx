@@ -12,6 +12,7 @@ const NameBox = ({
             border: "1pt solid " + (color || "#ddd"),
             borderRadius: "0",
             boxShadow: "none",
+            width: "100%",
         }}
     >
         <Card.Body style={{ padding: ".5em", position: "relative" }}>

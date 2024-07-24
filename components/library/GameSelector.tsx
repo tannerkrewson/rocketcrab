@@ -26,7 +26,7 @@ const GameSelector = ({
     const onSelectGameButton = useCallback(() => {
         onSelectGame(viewingGameId, viewingGame.name);
         onDone();
-    }, [onSelectGame, viewingGameId, viewingGame.name, onDone]);
+    }, [onSelectGame, viewingGameId, viewingGame, onDone]);
 
     const libraryState = useLibraryState();
 
