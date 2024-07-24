@@ -1,7 +1,7 @@
 import PrimaryButton from "../components/common/PrimaryButton";
 import ButtonGroup from "../components/common/ButtonGroup";
 import PageLayout from "../components/layout/PageLayout";
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { postJson } from "../utils/utils";
 import { useRouter } from "next/router";
 import { io } from "socket.io-client";
@@ -13,10 +13,10 @@ import {
 } from "../types/types";
 import { GetServerSideProps } from "next";
 import PublicGame from "../components/find/PublicGame";
-import Swal from "sweetalert2";
 import GameDetail from "../components/detail/GameDetail";
 import { FinderInfoCard } from "../components/find/FinderInfoCard";
 import { GAME_LIBRARY } from "../config";
+import { ModalContext } from "./_app";
 
 const socket = io();
 
@@ -29,6 +29,7 @@ export const Find = ({
     const [showReconnecting, setShowReconnecting] = useState(false);
     const [finderState, setFinderState] = useState<FinderState | undefined>();
     const [gameInfoVisible, setGameInfoVisible] = useState("");
+    const fireModal = useContext(ModalContext);
 
     const { isActive, publicPartyList, finderActiveDates, subscriberCount } =
         finderState ?? {};
@@ -39,11 +40,10 @@ export const Find = ({
 
         const result = await postJson("/api/new-public").catch(() => {
             setNewLoading(false);
-            Swal.fire({
+            fireModal({
                 title: "Try again",
                 text: "The server is not allowing public parties to be created right now... maybe you were just a smidge too early? 😊",
                 icon: "error",
-                heightAuto: false,
             });
         });
 
