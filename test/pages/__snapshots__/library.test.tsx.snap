@@ -19,10 +19,12 @@ exports[`pages/library.tsx matches snapshot 1`] = `
             style="margin: .5em;"
           >
             <img
+              alt="rocketcrab logo"
               class="jsx-1758552329 rocket"
               src="/rocket.svg"
             />
             <img
+              alt="rocketcrab logo"
               class="jsx-1758552329 crab"
               src="/crab.svg"
             />
@@ -32,7 +34,7 @@ exports[`pages/library.tsx matches snapshot 1`] = `
               style="display: inline-block; white-space: nowrap;"
             >
               <div
-                class="jsx-418573366 tooltip "
+                class="jsx-418573366 tooltip"
               >
                 <h2
                   class="jsx-1758552329 party-url"
@@ -47,40 +49,40 @@ exports[`pages/library.tsx matches snapshot 1`] = `
           style="text-align: center; justify-content: center;"
         >
           <span
-            class="jsx-3499487811 "
+            class="jsx-1361813001 "
           />
           <h4>
             Games
           </h4>
           <span
-            class="jsx-870436695 "
+            class="jsx-3613949930 "
           />
           <div
-            class="jsx-984614781 with-label"
+            class="jsx-556863166 with-label"
           >
             <div
-              class="jsx-984614781 input-container "
+              class="jsx-556863166 input-container"
             >
               <div
-                class="jsx-984614781 input-wrapper   "
+                class="jsx-556863166 input-wrapper"
               >
                 <span
-                  class="jsx-2794596122 input-icon"
+                  class="jsx-2464681384 input-icon"
                 >
                   🔎
                 </span>
                 <input
                   autocomplete="off"
-                  class="jsx-984614781  left-icon"
+                  class="jsx-556863166 left-icon"
                   placeholder="Search"
                   type="text"
                   value=""
                 />
                 <div
-                  class="jsx-1717893035 clear-icon "
+                  class="jsx-100723902 clear-icon"
                 >
                   <svg
-                    class="jsx-1717893035"
+                    class="jsx-100723902"
                     fill="none"
                     shape-rendering="geometricPrecision"
                     stroke="currentColor"
@@ -90,11 +92,11 @@ exports[`pages/library.tsx matches snapshot 1`] = `
                     viewBox="0 0 24 24"
                   >
                     <path
-                      class="jsx-1717893035"
+                      class="jsx-100723902"
                       d="M18 6L6 18"
                     />
                     <path
-                      class="jsx-1717893035"
+                      class="jsx-100723902"
                       d="M6 6l12 12"
                     />
                   </svg>
@@ -103,22 +105,22 @@ exports[`pages/library.tsx matches snapshot 1`] = `
             </div>
           </div>
           <span
-            class="jsx-870436695 "
+            class="jsx-3613949930 "
           />
           <div
-            class="jsx-2819926550 item  jsx-1720607024 "
+            class="jsx-3633143255 item jsx-3384369884"
           />
           <span
-            class="jsx-870436695 "
+            class="jsx-3613949930 "
           />
           <div
-            class="jsx-4094718877 item justify jsx-1720607024 "
+            class="jsx-2262539868 item justify jsx-3384369884"
           >
             <div
-              class="jsx-2819926550 item  jsx-4216129763 "
+              class="jsx-3633143255 item jsx-3484918754"
             >
               <button
-                class="jsx-1244829081 btn "
+                class="jsx-3631069826 btn"
                 style="width: auto;"
                 type="button"
               >

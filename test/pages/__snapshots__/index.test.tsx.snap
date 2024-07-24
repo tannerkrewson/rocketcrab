@@ -19,10 +19,12 @@ exports[`pages/index.tsx matches snapshot 1`] = `
             style="margin: .5em;"
           >
             <img
+              alt="rocketcrab logo"
               class="jsx-1758552329 rocket"
               src="/rocket.svg"
             />
             <img
+              alt="rocketcrab logo"
               class="jsx-1758552329 crab"
               src="/crab.svg"
             />
@@ -32,7 +34,7 @@ exports[`pages/index.tsx matches snapshot 1`] = `
               style="display: inline-block; white-space: nowrap;"
             >
               <div
-                class="jsx-418573366 tooltip "
+                class="jsx-418573366 tooltip"
               >
                 <h2
                   class="jsx-1758552329 party-url"
@@ -44,36 +46,40 @@ exports[`pages/index.tsx matches snapshot 1`] = `
           </div>
         </div>
         <div
-          class="jsx-4074410339 description"
+          class="jsx-890958437 description"
         >
           party games for phones
         </div>
         <div
-          class="jsx-4094718877 item justify jsx-1720607024 "
+          class="jsx-2262539868 item justify jsx-3384369884"
         >
           <div
-            class="jsx-2819926550 item  jsx-4216129763 "
+            class="jsx-3633143255 item jsx-3484918754"
           >
-            <div>
-              <button
-                class="jsx-2230649419 btn "
-                href="/join"
-                style="width: auto;"
-                type="button"
-              >
-                <div
-                  class="text"
+            <a
+              href="/join"
+            >
+              <div>
+                <button
+                  class="jsx-3631069826 btn"
+                  href="/join"
+                  style="width: auto;"
+                  type="button"
                 >
-                   Join Party 
-                </div>
-              </button>
-            </div>
+                  <div
+                    class="text"
+                  >
+                     Join Party 
+                  </div>
+                </button>
+              </div>
+            </a>
           </div>
           <div
-            class="jsx-2819926550 item  jsx-4216129763 "
+            class="jsx-3633143255 item jsx-3484918754"
           >
             <button
-              class="jsx-2230649419 btn "
+              class="jsx-3631069826 btn"
               style="width: auto;"
               type="button"
             >
@@ -86,13 +92,13 @@ exports[`pages/index.tsx matches snapshot 1`] = `
           </div>
         </div>
         <span
-          class="jsx-2523868958 "
+          class="jsx-1807881398 "
         />
         <div
-          class="jsx-4074410339 btn-col"
+          class="jsx-890958437 btn-col"
         >
           <button
-            class="jsx-3131001525 btn "
+            class="jsx-999325230 btn"
             style="width: 100%;"
             type="button"
           >
@@ -103,7 +109,7 @@ exports[`pages/index.tsx matches snapshot 1`] = `
             </div>
           </button>
           <span
-            class="jsx-3462447556 "
+            class="jsx-2817929712 "
           />
           <a
             class="link"
@@ -113,7 +119,7 @@ exports[`pages/index.tsx matches snapshot 1`] = `
             target="_blank"
           >
             <button
-              class="jsx-3131001525 btn "
+              class="jsx-999325230 btn"
               style="width: 100%;"
               type="button"
               url="https://kids.rocketcrab.com/"
@@ -126,7 +132,7 @@ exports[`pages/index.tsx matches snapshot 1`] = `
             </button>
           </a>
           <span
-            class="jsx-3462447556 "
+            class="jsx-2817929712 "
           />
           <a
             class="link"
@@ -136,7 +142,7 @@ exports[`pages/index.tsx matches snapshot 1`] = `
             target="_blank"
           >
             <button
-              class="jsx-3131001525 btn "
+              class="jsx-999325230 btn"
               style="width: 100%;"
               type="button"
               url="https://github.com/tannerkrewson/rocketcrab/#-for-developers"
@@ -149,25 +155,29 @@ exports[`pages/index.tsx matches snapshot 1`] = `
             </button>
           </a>
           <span
-            class="jsx-3462447556 "
+            class="jsx-2817929712 "
           />
-          <div>
-            <button
-              class="jsx-3131001525 btn "
-              href="/library"
-              style="width: 100%;"
-              type="button"
-            >
-              <div
-                class="text"
+          <a
+            href="/library"
+          >
+            <div>
+              <button
+                class="jsx-999325230 btn"
+                href="/library"
+                style="width: 100%;"
+                type="button"
               >
-                Browse Games
-              </div>
-            </button>
-          </div>
+                <div
+                  class="text"
+                >
+                  Browse Games
+                </div>
+              </button>
+            </div>
+          </a>
         </div>
         <span
-          class="jsx-3462447556 "
+          class="jsx-2817929712 "
         />
       </div>
     </main>
