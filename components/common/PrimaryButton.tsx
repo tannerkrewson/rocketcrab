@@ -34,8 +34,9 @@ const ButtonWrapper = ({ manualWidth, ...props }: PrimaryButtonProps) => (
         placeholder={undefined}
         onPointerEnterCapture={undefined}
         onPointerLeaveCapture={undefined}
-        {...props}
+        // @ts-expect-error this error makes no sense
         type="secondary"
+        {...props}
         ghost
         shadow
         auto={!manualWidth}
