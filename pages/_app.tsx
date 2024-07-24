@@ -10,7 +10,6 @@ import withDarkMode, { useDarkMode } from "next-dark-mode";
 import { NextUIProvider } from "@nextui-org/react";
 
 import "swiper/swiper-bundle.css";
-import "react-toggle/style.css";
 import "../styles/global.css";
 import Modal from "../components/common/Modal";
 import classNames from "classnames";
