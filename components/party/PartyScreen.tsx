@@ -1,7 +1,7 @@
 import PlayerList from "./PlayerList";
 import PrimaryButton from "../common/PrimaryButton";
 import ButtonGroup from "../common/ButtonGroup";
-import { Spacer } from "@geist-ui/core";
+import { Spacer } from "@nextui-org/react";
 import GameSelector from "../library/GameSelector";
 import { ClientGameLibrary, ClientParty, Player } from "../../types/types";
 import React, { useCallback, useContext, useEffect, useState } from "react";
@@ -148,7 +148,7 @@ const PartyScreen = ({
 
     return (
         <div style={{ textAlign: "center" }}>
-            <Spacer h={1.25} />
+            <Spacer y={1.25} />
             <PartyStatus
                 selectedGame={selectedGame}
                 host={host}
@@ -157,7 +157,7 @@ const PartyScreen = ({
                 onlyOnePlayer={playerList.length === 1}
                 isPublic={isPublic}
             />
-            <Spacer h={1} />
+            <Spacer y={1} />
             <ButtonGroup>
                 <PrimaryButton onClick={showGameSelector(true)} size="large">
                     Browse Games
@@ -171,11 +171,11 @@ const PartyScreen = ({
                     Start Game
                 </PrimaryButton>
             </ButtonGroup>
-            <Spacer h={1.5} />
+            <Spacer y={1.5} />
             {orderedCards}
             {!isAlreadyPWA && !createdAsPublic && !isHost && !isKidsMode && (
                 <>
-                    <Spacer h={1} />
+                    <Spacer y={1} />
                     <SkinnyCard>
                         <div>
                             {host.name} is a great host, so don&apos;t{" "}
@@ -183,7 +183,7 @@ const PartyScreen = ({
                                 tell them I said this... 🤫{" "}
                             </div>
                         </div>
-                        <Spacer h={0.5} />
+                        <Spacer y={0.5} />
                         <div>
                             I think you&apos;d be even better! 😊 Just go to{" "}
                             <span
@@ -198,11 +198,11 @@ const PartyScreen = ({
                             anytime to host <i>your</i> friends and family! Or,
                             even better:
                         </div>
-                        <Spacer h={0.5} />
+                        <Spacer y={0.5} />
                         <ButtonGroup>
                             <AddAppButton />
                         </ButtonGroup>
-                        <Spacer h={0.5} />
+                        <Spacer y={0.5} />
                         No App Store download required! 😮
                     </SkinnyCard>
                 </>
@@ -210,7 +210,7 @@ const PartyScreen = ({
 
             {createdAsPublic && !isKidsMode && (
                 <>
-                    <Spacer h={0.5} />
+                    <Spacer y={0.5} />
                     <SkinnyCard>
                         <div>
                             {isPublic
@@ -219,7 +219,7 @@ const PartyScreen = ({
                         </div>
                         {isFuture(publicEndDate) && (
                             <>
-                                <Spacer h={0.5} />
+                                <Spacer y={0.5} />
                                 <Countdown start={publicEndDate}>
                                     Public parties will close
                                 </Countdown>
@@ -227,7 +227,7 @@ const PartyScreen = ({
                         )}
                         {selectedGame && isFinderActive && (
                             <>
-                                <Spacer h={0.5} />
+                                <Spacer y={0.5} />
                                 <PrimaryButton
                                     onClick={() => {
                                         if (!isHost || awaitingChangeToIsPublic)
@@ -242,14 +242,14 @@ const PartyScreen = ({
                                         ? "Close to new players"
                                         : "Open to public"}
                                 </PrimaryButton>
-                                <Spacer h={0.5} />
+                                <Spacer y={0.5} />
                             </>
                         )}
                     </SkinnyCard>
                 </>
             )}
 
-            <Spacer h={1} />
+            <Spacer y={1} />
             <PrimaryButton onClick={promptLeave} size="small">
                 {leaveText}
             </PrimaryButton>

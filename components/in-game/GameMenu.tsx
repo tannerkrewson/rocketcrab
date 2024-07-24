@@ -1,14 +1,10 @@
 import PrimaryButton from "../common/PrimaryButton";
 import { MenuButton } from "../../types/types";
 import React from "react";
-import { Badge, useTheme } from "@geist-ui/core";
+import { Badge } from "@nextui-org/react";
 import { ThemeToggle } from "../common/ThemeToggle";
 
 const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => {
-    const {
-        palette: { accents_1, accents_2 },
-    } = useTheme();
-
     return (
         <div className="game-menu">
             {menuButtons
@@ -39,13 +35,10 @@ const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => {
                 .game-menu {
                     position: fixed;
                     width: fit-content;
-                    border-left: 1px solid ${accents_2};
-                    border-bottom: 1px solid ${accents_2};
                     right: 0;
                     top: 3em;
                     padding: 1em;
                     padding-bottom: 0.6em;
-                    background: ${accents_1};
                     display: flex;
                     flex-direction: column;
                 }

@@ -1,4 +1,4 @@
-import { Loading } from "@geist-ui/core";
+import { Spinner } from "@nextui-org/react";
 import { RocketcrabMode } from "../../types/enums";
 import Connecting from "./Connecting";
 import Footer from "./Footer";
@@ -24,7 +24,7 @@ const PageLayout = ({
                     deemphasize={deemphasize}
                 />
 
-                {loading ? <Loading /> : children}
+                {loading ? <Spinner /> : children}
             </div>
             {!center && <div className="height-expander"></div>}
         </main>

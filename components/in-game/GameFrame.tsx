@@ -1,5 +1,5 @@
 import { GameStatus } from "../../types/enums";
-import { Loading } from "@geist-ui/core";
+import { Spinner } from "@nextui-org/react";
 import { ClientGame, GameState, Player } from "../../types/types";
 import { useConnectedGame } from "../../utils/useConnectedGame";
 
@@ -27,13 +27,14 @@ const GameFrame = ({
         <>
             {(showLoading || showWaitingForHost) && (
                 <div className="frame">
-                    <Loading type={showWaitingForHost ? "error" : "default"}>
-                        {showWaitingForHost ? (
-                            <span>Waiting for host</span>
-                        ) : (
-                            <span>Loading game</span>
-                        )}
-                    </Loading>
+                    <Spinner
+                        color={showWaitingForHost ? "danger" : "default"}
+                        label={
+                            showWaitingForHost
+                                ? "Waiting for host"
+                                : "Loading game"
+                        }
+                    />
                 </div>
             )}
             {showError && (

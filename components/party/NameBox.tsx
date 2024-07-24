@@ -1,4 +1,4 @@
-import { Loading, Card } from "@geist-ui/core";
+import { Spinner, Card, CardBody } from "@nextui-org/react";
 
 const NameBox = ({
     name,
@@ -15,8 +15,8 @@ const NameBox = ({
             width: "100%",
         }}
     >
-        <Card.Body style={{ padding: ".5em", position: "relative" }}>
-            {name ? name : <Loading />}
+        <CardBody style={{ padding: ".5em", position: "relative" }}>
+            {name ? name : <Spinner />}
             {onEditName && (
                 <div onClick={onEditName} className="emoji-button">
                     ✏️
@@ -45,7 +45,7 @@ const NameBox = ({
                     font-style: italic;
                 }
             `}</style>
-        </Card.Body>
+        </CardBody>
     </Card>
 );
 

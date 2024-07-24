@@ -1,4 +1,4 @@
-import { Spacer } from "@geist-ui/core";
+import { Spacer } from "@nextui-org/react";
 import { useCallback, useState } from "react";
 import { ClientGameLibrary } from "../../types/types";
 import PrimaryButton from "../common/PrimaryButton";
@@ -48,7 +48,7 @@ const GameSelector = ({
                         allCategories={gameLibrary.categories}
                         showOnlyHostMessage={!isHost}
                     />
-                    <Spacer h={1} />
+                    <Spacer y={1} />
                     <ButtonGroup>
                         <PrimaryButton onClick={onBackToSearch}>
                             ↩️ Back to search

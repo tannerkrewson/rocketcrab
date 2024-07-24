@@ -1,4 +1,4 @@
-import { Input, Spacer, useInput } from "@geist-ui/core";
+import { Input, Spacer } from "@nextui-org/react";
 import React, { useEffect, useRef, useState } from "react";
 import {
     ChatMessage,
@@ -27,7 +27,7 @@ export const ChatBox = ({
     unreadMsgCount: number;
     clearUnreadMsgCount: () => void;
 }): JSX.Element => {
-    const { state: msgToSend, bindings, reset } = useInput("");
+    const [msgToSend, setMsgToSend] = useState("");
     const [isChatShowing, setIsChatShowing] = useState(!startHidden);
 
     const messagesEndRef = useRef(null);
@@ -38,7 +38,7 @@ export const ChatBox = ({
         if (!isChatMsgValid(msgToSend, thisPlayer, chat)) return;
 
         onSendChat(msgToSend);
-        reset();
+        setMsgToSend("");
     };
 
     const onEnter = (e) => {
@@ -72,7 +72,7 @@ export const ChatBox = ({
             onCollapse={(currentCollapse) => setIsChatShowing(!currentCollapse)}
             badgeType="error" // red
         >
-            <Spacer h={0.5} />
+            <Spacer y={0.5} />
             <div className="msg-container">
                 {chat.map(({ playerId, playerName, message, date }) => (
                     <div key={date}>
@@ -86,13 +86,11 @@ export const ChatBox = ({
             </div>
             <div className="flex-center-row">
                 <Input
-                    crossOrigin={undefined}
-                    onPointerEnterCapture={undefined}
-                    onPointerLeaveCapture={undefined}
-                    {...bindings}
                     onKeyDown={onEnter}
                     maxLength={MAX_CHAT_MSG_LEN}
                     width="100%"
+                    value={msgToSend}
+                    onValueChange={setMsgToSend}
                 />
                 <div className="send-container">
                     <PrimaryButton size="small" onClick={handleConfirm}>

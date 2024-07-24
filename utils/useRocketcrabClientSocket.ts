@@ -223,7 +223,7 @@ export const useRocketcrabClientSocket = ({
                     });
                 }
             },
-        }).then();
+        });
     }, []);
 
     const onSetIsPublic = useCallback((proposedIsPublic) => {

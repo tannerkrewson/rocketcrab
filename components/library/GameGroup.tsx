@@ -1,4 +1,4 @@
-import { Grid, Spacer } from "@geist-ui/core";
+import { Spacer } from "@nextui-org/react";
 import PrimaryButton from "../common/PrimaryButton";
 import ButtonGroup from "../common/ButtonGroup";
 import GameBox from "./GameBox";
@@ -10,7 +10,7 @@ const GameGroup = ({
     onSelectGame,
     errorMessage,
 }: GameGroupProps): JSX.Element => (
-    <Grid.Container gap={1}>
+    <>
         {games && games.length ? (
             games.map((game, i) => (
                 <GameBox
@@ -23,13 +23,13 @@ const GameGroup = ({
         ) : (
             <div>{errorMessage}</div>
         )}
-        <Spacer h={1} />
+        <Spacer y={1} />
         <ButtonGroup>
             <PrimaryButton onClick={onBack}>
                 ↩️ Back to categories
             </PrimaryButton>
         </ButtonGroup>
-    </Grid.Container>
+    </>
 );
 
 type GameGroupProps = {

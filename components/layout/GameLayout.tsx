@@ -1,12 +1,7 @@
-import { Badge, Spacer, useTheme, useToasts } from "@geist-ui/core";
+import { Badge, Spacer } from "@nextui-org/react";
+import toast, { Toaster } from "react-hot-toast";
 import PrimaryButton from "../common/PrimaryButton";
-import React, {
-    useCallback,
-    useContext,
-    useEffect,
-    useMemo,
-    useState,
-} from "react";
+import React, { useCallback, useContext, useEffect, useState } from "react";
 import {
     ClientGameLibrary,
     Player,
@@ -20,7 +15,6 @@ import PlayerList from "../party/PlayerList";
 import GameFrame from "../in-game/GameFrame";
 import Connecting from "./Connecting";
 import { ChatBox } from "../chat/ChatBox";
-import { ToastAction } from "@geist-ui/core/dist/use-toasts/use-toast";
 import ButtonGroup from "../common/ButtonGroup";
 import { logEvent } from "../../utils/analytics";
 import { filterClean, MODE_MAP } from "../../utils/utils";
@@ -66,17 +60,12 @@ const GameLayout = ({
     const [frameRefresh, setFrameRefresh] = useState(0);
 
     const [enableToasts, setEnableToasts] = useState(!isKidsMode);
-    const { setToast } = useToasts();
     const [lastShownToastDate, setLastShownToastDate] = useState(0);
 
     const igLogEvent = useCallback(
         (event) => logEvent("inGame-" + event, isHost ? "isHost" : "notHost"),
         [isHost],
     );
-
-    const {
-        palette: { accents_1, accents_2 },
-    } = useTheme();
 
     const fireModal = useContext(ModalContext);
 
@@ -96,35 +85,6 @@ const GameLayout = ({
             },
         });
     }, [fireModal, igLogEvent]);
-
-    const actions = useMemo(
-        (): ToastAction[] => [
-            {
-                name: "Mute",
-                passive: true,
-                handler: (event, cancel) => {
-                    cancel();
-                    promptMute();
-                },
-            },
-            {
-                name: "Reply",
-                passive: true,
-                handler: (event, cancel) => {
-                    cancel();
-                    setShowMenu(false);
-                    setShowChat(true);
-                    igLogEvent("toastChatReply");
-                },
-            },
-            {
-                name: "Dismiss",
-                passive: true,
-                handler: (event, cancel) => cancel(),
-            },
-        ],
-        [igLogEvent, promptMute],
-    );
 
     useEffect(() => {
         if (!newestMsg) return;
@@ -150,19 +110,42 @@ const GameLayout = ({
         // don't show toasts for your own messages
         if (playerId === thisPlayer.id) return;
 
-        setToast({
-            text: "🚀🦀 " + playerName + ": " + filterClean(message),
-            actions,
-        });
+        toast(
+            <>
+                <span>
+                    {"🚀🦀 " + playerName + ": " + filterClean(message)}
+                </span>
+                <PrimaryButton
+                    onClick={() => {
+                        toast.dismiss();
+                        promptMute();
+                    }}
+                >
+                    Mute
+                </PrimaryButton>
+                <PrimaryButton
+                    onClick={() => {
+                        toast.dismiss();
+                        setShowMenu(false);
+                        setShowChat(true);
+                        igLogEvent("toastChatReply");
+                    }}
+                >
+                    Reply
+                </PrimaryButton>
+                <PrimaryButton onClick={() => toast.dismiss()}>
+                    Dismiss
+                </PrimaryButton>
+            </>,
+        );
 
         igLogEvent("toastMsg");
     }, [
-        actions,
         enableToasts,
         igLogEvent,
         lastShownToastDate,
         newestMsg,
-        setToast,
+        promptMute,
         showChat,
         thisPlayer.id,
     ]);
@@ -297,6 +280,7 @@ const GameLayout = ({
     const statusClass = "status " + (statusCollapsed ? "status-collapsed" : "");
     return (
         <div className="layout">
+            <Toaster />
             <div className={statusClass}>
                 <div
                     className="logo"
@@ -324,12 +308,14 @@ const GameLayout = ({
                             {host}/{code}
                         </div>
                         <div>
-                            <Badge.Anchor placement="bottomLeft">
-                                {!showMenu && combinedMenuBadgeCount > 0 && (
-                                    <Badge type="error">
-                                        {combinedMenuBadgeCount}
-                                    </Badge>
-                                )}
+                            <Badge
+                                color="danger"
+                                isInvisible={
+                                    showMenu || combinedMenuBadgeCount === 0
+                                }
+                                content={combinedMenuBadgeCount}
+                                placement="bottom-left"
+                            >
                                 <PrimaryButton
                                     onClick={() => {
                                         setShowMenu(!showMenu);
@@ -340,7 +326,7 @@ const GameLayout = ({
                                 >
                                     {showMenu ? "▲" : "▼"} Menu
                                 </PrimaryButton>
-                            </Badge.Anchor>
+                            </Badge>
                         </div>
 
                         {showMenu && (
@@ -402,7 +388,7 @@ const GameLayout = ({
                         disableEditName={true}
                         meId={thisPlayer.id}
                     />
-                    <Spacer h={0.5} />
+                    <Spacer y={0.5} />
                     <PrimaryButton onClick={hideAllWindows}>
                         Close
                     </PrimaryButton>
@@ -418,7 +404,7 @@ const GameLayout = ({
                         unreadMsgCount={unreadMsgCount}
                         clearUnreadMsgCount={clearUnreadMsgCount}
                     />
-                    <Spacer h={0.5} />
+                    <Spacer y={0.5} />
                     <ButtonGroup>
                         <PrimaryButton onClick={hideAllWindows}>
                             Close
@@ -441,7 +427,7 @@ const GameLayout = ({
                         game={thisGame}
                         allCategories={gameLibrary.categories}
                     />
-                    <Spacer h={0.5} />
+                    <Spacer y={0.5} />
                     <PrimaryButton onClick={hideAllWindows}>
                         Close
                     </PrimaryButton>
@@ -454,14 +440,12 @@ const GameLayout = ({
                     height: 100%;
                 }
                 .status {
-                    border-bottom: 1px solid ${accents_2};
                     display: flex;
                     justify-content: space-between;
                     align-content: center;
                     padding: 0.5em;
                     height: 2em;
                     z-index: 1;
-                    background-color: ${accents_1};
                 }
                 @media only screen and (max-width: 385px) {
                     .status {
@@ -513,8 +497,6 @@ const GameLayout = ({
                     position: absolute;
                     top: 3em;
                     right: 0;
-                    background: ${accents_1};
-                    border: 1px solid ${accents_2};
                     width: min(24em, 100vw - 3em);
                     margin: 0.5em;
                     box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);

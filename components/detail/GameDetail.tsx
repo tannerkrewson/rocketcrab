@@ -1,5 +1,5 @@
 import { ClientGame, GameCategory } from "../../types/types";
-import { Description, Tabs } from "@geist-ui/core";
+import { Tabs, Tab } from "@nextui-org/react";
 
 import GameInfo from "./GameInfo";
 import GameDescription from "./GameDescription";
@@ -16,24 +16,20 @@ const GameDetail = ({
         <div style={{ fontSize: "1.75em", fontWeight: "bold" }}>
             {game.name}
         </div>
-        <Tabs initialValue="1">
-            <Tabs.Item label="Info" value="1">
+        <Tabs>
+            <Tab title="Info">
                 <GameInfo game={game} />
                 <GamePictures pictures={game.pictures} />
                 <GameBadges game={game} allCategories={allCategories} />
                 <GameDescription description={game.description} />
                 {showOnlyHostMessage && (
-                    <Description
-                        style={{ margin: "0 auto", width: "fit-content" }}
-                        title="Only the host can select a game."
-                        className="remove-text-transform"
-                    />
+                    <div>Only the host can select a game.</div>
                 )}
-            </Tabs.Item>
+            </Tab>
             {(game.guide || game.guideUrl) && (
-                <Tabs.Item label="Guide" value="2">
+                <Tab title="Guide">
                     <GameGuide guide={game.guide} guideUrl={game.guideUrl} />
-                </Tabs.Item>
+                </Tab>
             )}
         </Tabs>
     </div>

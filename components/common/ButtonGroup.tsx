@@ -1,13 +1,11 @@
-import { Grid } from "@geist-ui/core";
-
 const ButtonGroup = ({ children }: ButtonGroupProps): JSX.Element => {
     const buttons = Array.isArray(children) ? children : [children];
     return (
-        <Grid.Container gap={1} justify="center">
-            {buttons.map((button, index) => (
-                <Grid key={index}>{button}</Grid>
+        <>
+            {buttons.map((button) => (
+                <>{button}</>
             ))}
-        </Grid.Container>
+        </>
     );
 };
 

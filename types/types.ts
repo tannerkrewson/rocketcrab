@@ -2,7 +2,6 @@ import { PartyStatus, GameStatus, RocketcrabMode } from "./enums";
 import WebSocket from "ws";
 import { Dispatch, SetStateAction } from "react";
 import type { Socket } from "socket.io";
-import { BindingsChangeTarget } from "@geist-ui/core/dist/use-input";
 
 export const FINDER_ACTIVE_MS = 10 * 60 * 1000; // 10 minutes
 export const MAX_CHAT_MSG_LEN = 100;
@@ -155,7 +154,6 @@ export type LibraryState = {
     setSelectedCategory: Dispatch<SetStateAction<string>>;
     search: string;
     setSearch: Dispatch<SetStateAction<string>>;
-    searchBindings: SearchBindingsType;
 };
 
 export type ChatMessage = {
@@ -163,9 +161,4 @@ export type ChatMessage = {
     playerName: string;
     message: string;
     date: number;
-};
-
-type SearchBindingsType = {
-    value: string;
-    onChange: (event: BindingsChangeTarget) => void;
 };
