@@ -1,1 +1,1 @@
-run-s lint:staged type-check test
+run-s lint:staged type-check

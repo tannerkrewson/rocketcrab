@@ -4,7 +4,7 @@ import "fontsource-inconsolata";
 import "fontsource-mukta";
 import { AppPropsType } from "next/dist/shared/lib/utils";
 import { initGA, logPageView } from "../utils/analytics";
-import { useState, useEffect } from "react";
+import { useState, useEffect, createContext } from "react";
 import Router from "next/router";
 import dynamic from "next/dynamic";
 import withDarkMode, { useDarkMode } from "next-dark-mode";
@@ -13,9 +13,13 @@ import { NextUIProvider } from "@nextui-org/react";
 import "swiper/swiper-bundle.css";
 import "react-toggle/style.css";
 import "../styles/global.css";
+import Modal from "../components/common/Modal";
+
+export const ModalContext = createContext(null);
 
 const App = ({ Component, pageProps }: AppPropsType): JSX.Element => {
     const [, setLoading] = useState(false);
+    const [modalState, setModalState] = useState({});
     useEffect(() => {
         initGA();
         logPageView();
@@ -38,15 +42,18 @@ const App = ({ Component, pageProps }: AppPropsType): JSX.Element => {
     const { darkModeActive } = useDarkMode();
 
     return (
-        <NextUIProvider>
-            <GeistProvider themeType={darkModeActive ? "dark" : "light"}>
-                <CssBaseline />
+        <ModalContext.Provider value={setModalState}>
+            <NextUIProvider>
+                <GeistProvider themeType={darkModeActive ? "dark" : "light"}>
+                    <CssBaseline />
 
-                <Body>
-                    <Component {...pageProps} />
-                </Body>
-            </GeistProvider>
-        </NextUIProvider>
+                    <Body>
+                        <Component {...pageProps} />
+                    </Body>
+                    <Modal state={modalState} />
+                </GeistProvider>
+            </NextUIProvider>
+        </ModalContext.Provider>
     );
 };
 export default dynamic(() => Promise.resolve(withDarkMode(App)), {

@@ -1,5 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
-import Swal from "sweetalert2";
+import { useCallback, useContext, useEffect, useState } from "react";
 import { ClientGameLibrary, ClientParty } from "../types/types";
 import { logEvent } from "./analytics";
 import { io } from "socket.io-client";
@@ -7,6 +6,7 @@ import { RocketcrabDexie } from "./dexie";
 import { setCookie as setNookie } from "nookies";
 import { NextRouter } from "next/router";
 import { SocketEvent } from "../types/enums";
+import { ModalContext } from "../pages/_app";
 
 const socket = io();
 
@@ -20,6 +20,7 @@ export const useRocketcrabClientSocket = ({
     const [partyState, setPartyState] = useState<ClientParty | undefined>();
     const [socketConnected, setSocketConnected] = useState(socket?.connected);
     const [showReconnecting, setShowReconnecting] = useState(false);
+    const fireModal = useContext(ModalContext);
 
     const { me, playerList, selectedGameId } = partyState || {};
 
@@ -46,11 +47,10 @@ export const useRocketcrabClientSocket = ({
         });
         socket.on(SocketEvent.INVALID_NAME, () => {
             if (code === "ffff") return;
-            Swal.fire({
+            fireModal({
                 title: "Try again",
                 text: "Name already in use",
                 icon: "error",
-                heightAuto: false,
             });
         });
 
@@ -122,7 +122,7 @@ export const useRocketcrabClientSocket = ({
 
             if (minPlayers && playerList.length < minPlayers) {
                 const morePlayers = minPlayers - playerList.length;
-                Swal.fire({
+                fireModal({
                     title: "Not enough players!",
                     text: `${name} requires at least ${minPlayers} player${
                         minPlayers === 1 ? "" : "s"
@@ -130,19 +130,17 @@ export const useRocketcrabClientSocket = ({
                         morePlayers === 1 ? "" : "s"
                     }.`,
                     icon: "error",
-                    heightAuto: false,
                 });
                 return;
             }
             if (maxPlayers && playerList.length > maxPlayers) {
                 const lessPlayers = playerList.length - minPlayers;
-                Swal.fire({
+                fireModal({
                     title: "Too many players!",
                     text: `${name} has a maximum of ${minPlayers} player${
                         minPlayers === 1 ? "" : "s"
                     }. You have ${lessPlayers} too many players.`,
                     icon: "error",
-                    heightAuto: false,
                 });
                 return;
             }
@@ -181,51 +179,51 @@ export const useRocketcrabClientSocket = ({
     }, []);
 
     const onKick = useCallback((playerId, name) => {
-        Swal.fire({
+        fireModal({
             title: `Kick ${name}?`,
             showCancelButton: true,
             confirmButtonText: `Kick player`,
             icon: "warning",
-            heightAuto: false,
-        }).then(({ isConfirmed }) => {
-            if (isConfirmed) {
-                Swal.fire({
-                    title: `Ban ${name} as well?`,
-                    text: "This may prevent anyone else on the same network as this player from joining as well. If you want to let them join again, you'll have to make a new party.",
-                    showCancelButton: true,
-                    confirmButtonText: `Kick & ban player`,
-                    cancelButtonText: "Just kick",
-                    icon: "warning",
-                    heightAuto: false,
-                }).then(({ isConfirmed }) => {
-                    if (isConfirmed) {
-                        socket.emit(SocketEvent.KICK_PLAYER, {
-                            playerId,
-                            isBan: true,
-                        });
-                        Swal.fire({
-                            title: "Kicked & banned!",
-                            text: "Good riddance!",
-                            icon: "success",
-                            heightAuto: false,
-                        });
-                        logEvent("common-ban");
-                    } else {
-                        socket.emit(SocketEvent.KICK_PLAYER, {
-                            playerId,
-                            isBan: false,
-                        });
-                        Swal.fire({
-                            title: "Kicked!",
-                            text: "Bye bye!",
-                            icon: "success",
-                            heightAuto: false,
-                        });
-                        logEvent("common-kick");
-                    }
-                });
-            }
-        });
+
+            onClose: ({ isConfirmed }) => {
+                if (isConfirmed) {
+                    fireModal({
+                        title: `Ban ${name} as well?`,
+                        text: "This may prevent anyone else on the same network as this player from joining as well. If you want to let them join again, you'll have to make a new party.",
+                        showCancelButton: true,
+                        confirmButtonText: `Kick & ban player`,
+                        cancelButtonText: "Just kick",
+                        icon: "warning",
+
+                        onClose: ({ isConfirmed }) => {
+                            if (isConfirmed) {
+                                socket.emit(SocketEvent.KICK_PLAYER, {
+                                    playerId,
+                                    isBan: true,
+                                });
+                                fireModal({
+                                    title: "Kicked & banned!",
+                                    text: "Good riddance!",
+                                    icon: "success",
+                                });
+                                logEvent("common-ban");
+                            } else {
+                                socket.emit(SocketEvent.KICK_PLAYER, {
+                                    playerId,
+                                    isBan: false,
+                                });
+                                fireModal({
+                                    title: "Kicked!",
+                                    text: "Bye bye!",
+                                    icon: "success",
+                                });
+                                logEvent("common-kick");
+                            }
+                        },
+                    });
+                }
+            },
+        }).then();
     }, []);
 
     const onSetIsPublic = useCallback((proposedIsPublic) => {

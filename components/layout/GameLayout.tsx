@@ -1,6 +1,12 @@
 import { Badge, Spacer, useTheme, useToasts } from "@geist-ui/core";
 import PrimaryButton from "../common/PrimaryButton";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, {
+    useCallback,
+    useContext,
+    useEffect,
+    useMemo,
+    useState,
+} from "react";
 import {
     ClientGameLibrary,
     Player,
@@ -14,7 +20,6 @@ import PlayerList from "../party/PlayerList";
 import GameFrame from "../in-game/GameFrame";
 import Connecting from "./Connecting";
 import { ChatBox } from "../chat/ChatBox";
-import Swal from "sweetalert2";
 import { ToastAction } from "@geist-ui/core/dist/use-toasts/use-toast";
 import ButtonGroup from "../common/ButtonGroup";
 import { logEvent } from "../../utils/analytics";
@@ -23,6 +28,7 @@ import { differenceInMilliseconds } from "date-fns";
 import GameDetail from "../detail/GameDetail";
 import { RocketcrabMode } from "../../types/enums";
 import { useRouter } from "next/router";
+import { ModalContext } from "../../pages/_app";
 
 const GameLayout = ({
     partyState,
@@ -72,21 +78,24 @@ const GameLayout = ({
         palette: { accents_1, accents_2 },
     } = useTheme();
 
+    const fireModal = useContext(ModalContext);
+
     const promptMute = useCallback(() => {
-        Swal.fire({
+        fireModal({
             title: "Are your sure?",
             text: "New chat messages won't appear over your game, but you can still see them in the menu!",
             showCancelButton: true,
             confirmButtonText: "Mute chat",
             icon: "question",
-            heightAuto: false,
-        }).then(({ isConfirmed }) => {
-            if (isConfirmed) {
-                setEnableToasts(false);
-                igLogEvent("muteChat");
-            }
+
+            onClose: ({ isConfirmed }) => {
+                if (isConfirmed) {
+                    setEnableToasts(false);
+                    igLogEvent("muteChat");
+                }
+            },
         });
-    }, [igLogEvent]);
+    }, [fireModal, igLogEvent]);
 
     const actions = useMemo(
         (): ToastAction[] => [
@@ -203,7 +212,7 @@ const GameLayout = ({
             label: "Reload my game",
             hostOnly: false,
             onClick: useCallback(() => {
-                Swal.fire({
+                fireModal({
                     title: "Are your sure?",
                     text:
                         "If reloading doesn't fix your issue, tell your party host, " +
@@ -212,21 +221,22 @@ const GameLayout = ({
                     showCancelButton: true,
                     confirmButtonText: `Reload my game`,
                     icon: "warning",
-                    heightAuto: false,
-                }).then(({ isConfirmed }) => {
-                    if (isConfirmed) {
-                        setShowMenu(false);
-                        setFrameRefresh(frameRefresh + 1);
-                        igLogEvent("reloadMe");
-                    }
+
+                    onClose: ({ isConfirmed }) => {
+                        if (isConfirmed) {
+                            setShowMenu(false);
+                            setFrameRefresh(frameRefresh + 1);
+                            igLogEvent("reloadMe");
+                        }
+                    },
                 });
-            }, [frameRefresh, hostName, igLogEvent]),
+            }, [fireModal, frameRefresh, hostName, igLogEvent]),
         },
         {
             label: "Reload all",
             hostOnly: true,
             onClick: useCallback(() => {
-                Swal.fire({
+                fireModal({
                     title: "Are your sure?",
                     text:
                         "Your current session in " +
@@ -235,21 +245,22 @@ const GameLayout = ({
                     showCancelButton: true,
                     confirmButtonText: `Reload All`,
                     icon: "warning",
-                    heightAuto: false,
-                }).then(({ isConfirmed }) => {
-                    if (isConfirmed) {
-                        setShowMenu(false);
-                        onStartGame();
-                        igLogEvent("reloadAll");
-                    }
+
+                    onClose: ({ isConfirmed }) => {
+                        if (isConfirmed) {
+                            setShowMenu(false);
+                            onStartGame();
+                            igLogEvent("reloadAll");
+                        }
+                    },
                 });
-            }, [igLogEvent, onStartGame, thisGame.name]),
+            }, [fireModal, igLogEvent, onStartGame, thisGame.name]),
         },
         {
             label: "Exit to party",
             hostOnly: true,
             onClick: useCallback(() => {
-                Swal.fire({
+                fireModal({
                     title: "Are your sure?",
                     text:
                         "Your current session in " +
@@ -258,15 +269,16 @@ const GameLayout = ({
                     showCancelButton: true,
                     confirmButtonText: "Exit to party",
                     icon: "warning",
-                    heightAuto: false,
-                }).then(({ isConfirmed }) => {
-                    if (isConfirmed) {
-                        setShowMenu(false);
-                        onExitGame();
-                        igLogEvent("exitToParty");
-                    }
+
+                    onClose: ({ isConfirmed }) => {
+                        if (isConfirmed) {
+                            setShowMenu(false);
+                            onExitGame();
+                            igLogEvent("exitToParty");
+                        }
+                    },
                 });
-            }, [igLogEvent, onExitGame, thisGame.name]),
+            }, [fireModal, igLogEvent, onExitGame, thisGame.name]),
         },
     ];
 
@@ -356,7 +368,7 @@ const GameLayout = ({
                         onSelectGame={(gameId: string, gameName: string) => {
                             if (!isHost) return;
 
-                            Swal.fire({
+                            fireModal({
                                 title: "Switch to " + gameName + "?",
                                 text:
                                     "Your current session in " +
@@ -365,13 +377,14 @@ const GameLayout = ({
                                 showCancelButton: true,
                                 confirmButtonText: "Switch!",
                                 icon: "warning",
-                                heightAuto: false,
-                            }).then(({ isConfirmed }) => {
-                                if (isConfirmed) {
-                                    setShowMenu(false);
-                                    onStartGame(gameId);
-                                    igLogEvent("switchGame");
-                                }
+
+                                onClose: ({ isConfirmed }) => {
+                                    if (isConfirmed) {
+                                        setShowMenu(false);
+                                        onStartGame(gameId);
+                                        igLogEvent("switchGame");
+                                    }
+                                },
                             });
                         }}
                         backToLabel="game"

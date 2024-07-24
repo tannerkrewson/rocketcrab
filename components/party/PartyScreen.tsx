@@ -4,18 +4,18 @@ import ButtonGroup from "../common/ButtonGroup";
 import { Spacer } from "@geist-ui/core";
 import GameSelector from "../library/GameSelector";
 import { ClientGameLibrary, ClientParty, Player } from "../../types/types";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useContext, useEffect, useState } from "react";
 import PartyStatus from "./PartyStatus";
 import GameDetail from "../detail/GameDetail";
 import SkinnyCard from "../common/SkinnyCard";
 import { Countdown } from "../find/Countdown";
 import { ChatBox } from "../chat/ChatBox";
 import AddAppButton from "../layout/AddAppButton";
-import Swal from "sweetalert2";
 import { useRouter } from "next/router";
 import { isFuture } from "date-fns";
 import { useIsAlreadyPWA } from "../../utils/useIsAlreadyPWA";
 import { RocketcrabMode } from "../../types/enums";
+import { ModalContext } from "../../pages/_app";
 
 const PartyScreen = ({
     partyState,
@@ -73,19 +73,22 @@ const PartyScreen = ({
         ? "Back to Public Parties"
         : "Leave Party";
 
+    const fireModal = useContext(ModalContext);
+
     const promptLeave = useCallback(() => {
-        Swal.fire({
+        fireModal({
             title: "Are your sure?",
             showCancelButton: true,
             confirmButtonText: leaveText,
             icon: "warning",
-            heightAuto: false,
-        }).then(({ isConfirmed }) => {
-            if (isConfirmed) {
-                router.push(createdAsPublic ? "/find" : "/");
-            }
+
+            onClose: ({ isConfirmed }) => {
+                if (isConfirmed) {
+                    router.push(createdAsPublic ? "/find" : "/");
+                }
+            },
         });
-    }, [createdAsPublic, leaveText, router]);
+    }, [createdAsPublic, fireModal, leaveText, router]);
 
     if (gameSelectorVisible) {
         return (

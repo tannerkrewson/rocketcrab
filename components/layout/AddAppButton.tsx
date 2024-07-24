@@ -5,10 +5,10 @@
 // copied from https://github.com/tannerkrewson/spyfall/blob/dev/components/AddAppButton.js
 
 import dynamic from "next/dynamic";
-import { useState, useEffect } from "react";
-import Swal from "sweetalert2";
+import { useState, useEffect, useContext } from "react";
 import PrimaryButton from "../common/PrimaryButton";
 import { logEvent } from "../../utils/analytics";
+import { ModalContext } from "../../pages/_app";
 
 // https://github.com/chrisdancee/react-ios-pwa-prompt/issues/32#issuecomment-586762839
 const PWAPrompt = dynamic(() => import("react-ios-pwa-prompt"), {
@@ -41,6 +41,8 @@ const AddAppButton = (): JSX.Element => {
         );
     }, []);
 
+    const fireModal = useContext(ModalContext);
+
     const handleAddApp = () => {
         setIsLoading(true);
         logEvent("home-clickAddApp");
@@ -57,11 +59,10 @@ const AddAppButton = (): JSX.Element => {
 
             logEvent("home-addApp-native");
         } else {
-            Swal.fire({
+            fireModal({
                 title: "Hmm...",
                 text: "Failed to add rocketcrab as an app on this device. Try refreshing the page!",
                 icon: "error",
-                heightAuto: false,
             });
             setIsLoading(false);
 
