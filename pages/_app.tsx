@@ -8,9 +8,11 @@ import { useState, useEffect } from "react";
 import Router from "next/router";
 import dynamic from "next/dynamic";
 import withDarkMode, { useDarkMode } from "next-dark-mode";
+import { NextUIProvider } from "@nextui-org/react";
 
 import "swiper/swiper-bundle.css";
 import "react-toggle/style.css";
+import "../styles/global.css";
 
 const App = ({ Component, pageProps }: AppPropsType): JSX.Element => {
     const [, setLoading] = useState(false);
@@ -36,12 +38,15 @@ const App = ({ Component, pageProps }: AppPropsType): JSX.Element => {
     const { darkModeActive } = useDarkMode();
 
     return (
-        <GeistProvider themeType={darkModeActive ? "dark" : "light"}>
-            <CssBaseline />
-            <Body>
-                <Component {...pageProps} />
-            </Body>
-        </GeistProvider>
+        <NextUIProvider>
+            <GeistProvider themeType={darkModeActive ? "dark" : "light"}>
+                <CssBaseline />
+
+                <Body>
+                    <Component {...pageProps} />
+                </Body>
+            </GeistProvider>
+        </NextUIProvider>
     );
 };
 export default dynamic(() => Promise.resolve(withDarkMode(App)), {
