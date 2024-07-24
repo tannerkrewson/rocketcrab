@@ -72,7 +72,7 @@ export const useRocketcrabClientSocket = ({
             setSocketConnected(false);
             setPartyState(undefined);
         };
-    }, [code, router]);
+    }, [code, fireModal, router]);
 
     useEffect(() => {
         if (!socketConnected) return;
@@ -160,7 +160,14 @@ export const useRocketcrabClientSocket = ({
                 logEvent("party-mode", partyState.mode);
             }
         },
-        [me?.isHost, partyState, playerList, selectedGame, selectedGameId],
+        [
+            fireModal,
+            me?.isHost,
+            partyState,
+            playerList,
+            selectedGame,
+            selectedGameId,
+        ],
     );
 
     const onExitGame = useCallback(() => {
@@ -178,53 +185,56 @@ export const useRocketcrabClientSocket = ({
         logEvent("common-sendChat");
     }, []);
 
-    const onKick = useCallback((playerId, name) => {
-        fireModal({
-            title: `Kick ${name}?`,
-            showCancelButton: true,
-            confirmButtonText: `Kick player`,
-            icon: "warning",
+    const onKick = useCallback(
+        (playerId, name) => {
+            fireModal({
+                title: `Kick ${name}?`,
+                showCancelButton: true,
+                confirmButtonText: `Kick player`,
+                icon: "warning",
 
-            onClose: ({ isConfirmed }) => {
-                if (isConfirmed) {
-                    fireModal({
-                        title: `Ban ${name} as well?`,
-                        text: "This may prevent anyone else on the same network as this player from joining as well. If you want to let them join again, you'll have to make a new party.",
-                        showCancelButton: true,
-                        confirmButtonText: `Kick & ban player`,
-                        cancelButtonText: "Just kick",
-                        icon: "warning",
+                onClose: ({ isConfirmed }) => {
+                    if (isConfirmed) {
+                        fireModal({
+                            title: `Ban ${name} as well?`,
+                            text: "This may prevent anyone else on the same network as this player from joining as well. If you want to let them join again, you'll have to make a new party.",
+                            showCancelButton: true,
+                            confirmButtonText: `Kick & ban player`,
+                            cancelButtonText: "Just kick",
+                            icon: "warning",
 
-                        onClose: ({ isConfirmed }) => {
-                            if (isConfirmed) {
-                                socket.emit(SocketEvent.KICK_PLAYER, {
-                                    playerId,
-                                    isBan: true,
-                                });
-                                fireModal({
-                                    title: "Kicked & banned!",
-                                    text: "Good riddance!",
-                                    icon: "success",
-                                });
-                                logEvent("common-ban");
-                            } else {
-                                socket.emit(SocketEvent.KICK_PLAYER, {
-                                    playerId,
-                                    isBan: false,
-                                });
-                                fireModal({
-                                    title: "Kicked!",
-                                    text: "Bye bye!",
-                                    icon: "success",
-                                });
-                                logEvent("common-kick");
-                            }
-                        },
-                    });
-                }
-            },
-        });
-    }, []);
+                            onClose: ({ isConfirmed }) => {
+                                if (isConfirmed) {
+                                    socket.emit(SocketEvent.KICK_PLAYER, {
+                                        playerId,
+                                        isBan: true,
+                                    });
+                                    fireModal({
+                                        title: "Kicked & banned!",
+                                        text: "Good riddance!",
+                                        icon: "success",
+                                    });
+                                    logEvent("common-ban");
+                                } else {
+                                    socket.emit(SocketEvent.KICK_PLAYER, {
+                                        playerId,
+                                        isBan: false,
+                                    });
+                                    fireModal({
+                                        title: "Kicked!",
+                                        text: "Bye bye!",
+                                        icon: "success",
+                                    });
+                                    logEvent("common-kick");
+                                }
+                            },
+                        });
+                    }
+                },
+            });
+        },
+        [fireModal],
+    );
 
     const onSetIsPublic = useCallback((proposedIsPublic) => {
         socket.emit(SocketEvent.SET_IS_PUBLIC, proposedIsPublic);

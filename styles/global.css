@@ -1,3 +1,8 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* hide the fullscreen button on the screenshot viewer */
+.fslightbox-toolbar-button:first-child {
+    display: none;
+}

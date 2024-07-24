@@ -1,6 +1,6 @@
 import Head from "next/head";
 
-const Body = ({ children, themeType }: BodyProps): JSX.Element => {
+const Body = ({ children }: BodyProps): JSX.Element => {
     return (
         <>
             <Head>
@@ -37,7 +37,7 @@ const Body = ({ children, themeType }: BodyProps): JSX.Element => {
                 <meta name="theme-color" content="#ffffff" />
                 <meta name="description" content="party games for phones" />
             </Head>
-            <main className={themeType}>{children}</main>
+            {children}
             <style jsx global>{`
                 html,
                 body,
@@ -72,7 +72,6 @@ const Body = ({ children, themeType }: BodyProps): JSX.Element => {
 
 type BodyProps = {
     children: React.ReactNode;
-    themeType: string;
 };
 
 export default Body;

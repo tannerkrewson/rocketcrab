@@ -27,7 +27,7 @@ const MainTitle = ({
 
     return (
         <div className={titleClasses}>
-            <div style={{ margin: ".5em" }}>
+            <div className="flex justify-center items-center">
                 <img
                     src="/rocket.svg"
                     className="rocket"
@@ -58,7 +58,6 @@ const MainTitle = ({
                     .title {
                         transition: all 0.1s ease-out;
                         text-align: center;
-                        margin: 2em 0 0 0;
                     }
                     .deemphasize {
                         margin-top: -0.25em;
@@ -67,9 +66,6 @@ const MainTitle = ({
                         filter: saturate(50%) opacity(50%) blur(1px);
                     }
 
-                    .logo {
-                        margin: 0.5em;
-                    }
                     .rocket {
                         height: 2.6em;
                         margin-right: 0.7em;

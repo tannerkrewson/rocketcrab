@@ -13,6 +13,7 @@ import "swiper/swiper-bundle.css";
 import "react-toggle/style.css";
 import "../styles/global.css";
 import Modal from "../components/common/Modal";
+import classNames from "classnames";
 
 export const ModalContext = createContext(null);
 
@@ -43,10 +44,19 @@ const App = ({ Component, pageProps }: AppPropsType): JSX.Element => {
     return (
         <ModalContext.Provider value={setModalState}>
             <NextUIProvider>
-                <Body themeType={darkModeActive ? "dark" : ""}>
-                    <Component {...pageProps} />
+                <Body>
+                    <main
+                        className={classNames(
+                            darkModeActive ? "dark" : "",
+                            "text-foreground",
+                            "bg-background",
+                            "min-h-screen",
+                        )}
+                    >
+                        <Component {...pageProps} />
+                        <Modal state={modalState} />
+                    </main>
                 </Body>
-                <Modal state={modalState} />
             </NextUIProvider>
         </ModalContext.Provider>
     );

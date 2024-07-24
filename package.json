@@ -29,6 +29,7 @@
         "@nextui-org/react": "^2.4.6",
         "bad-words": "^3.0.4",
         "body-parser": "^1.20.2",
+        "classnames": "^2.5.1",
         "cron": "^3.1.7",
         "cross-env": "^7.0.3",
         "date-fns": "^3.6.0",
