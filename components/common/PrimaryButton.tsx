@@ -1,4 +1,5 @@
-import { Button } from "@geist-ui/core";
+// import { Button } from "@geist-ui/core";
+import { Button } from "@nextui-org/react";
 import Link from "next/link";
 
 const PrimaryButton = (props: PrimaryButtonProps): JSX.Element => {
