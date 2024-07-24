@@ -2,7 +2,6 @@ import React, { useState } from "react";
 import { useRouter } from "next/router";
 
 import PrimaryButton from "../components/common/PrimaryButton";
-import ButtonGroup from "../components/common/ButtonGroup";
 import AddAppButton from "../components/layout/AddAppButton";
 import PageLayout from "../components/layout/PageLayout";
 import { postJson } from "../utils/utils";
@@ -34,7 +33,7 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                     : "party games for phones"}
             </div>
 
-            <ButtonGroup>
+            <div className="flex justify-center space-x-2">
                 <PrimaryButton href="/join" size="large">
                     &nbsp;Join Party&nbsp;
                 </PrimaryButton>
@@ -46,13 +45,12 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                 >
                     Start Party
                 </PrimaryButton>
-            </ButtonGroup>
-            <Spacer y={1} />
-            <div className="btn-col">
+            </div>
+            <Spacer y={8} />
+            <div className="btn-col space-y-2">
                 {!isAlreadyPWA && !isKidsMode && (
                     <>
                         <AddAppButton />
-                        <Spacer y={0.5} />
                     </>
                 )}
                 {!isKidsMode && (
@@ -64,7 +62,6 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                         >
                             🧒 Try Kids Mode
                         </PrimaryButton>
-                        <Spacer y={0.5} />
                         <PrimaryButton
                             type="default"
                             url="https://github.com/tannerkrewson/rocketcrab/#-for-developers"
@@ -72,7 +69,6 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                         >
                             Add your game
                         </PrimaryButton>
-                        <Spacer y={0.5} />
                     </>
                 )}
                 <PrimaryButton type="default" href="/library" manualWidth>

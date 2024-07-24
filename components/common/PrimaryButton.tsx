@@ -31,13 +31,13 @@ const PrimaryButton = (props: PrimaryButtonProps): JSX.Element => {
 
 const ButtonWrapper = ({ manualWidth, ...props }: PrimaryButtonProps) => (
     <Button
-        color="default"
+        color="primary"
         style={{
             width: manualWidth ? "100%" : "auto",
         }}
         {...props}
         ghost
-        shadow
+        variant="shadow"
         auto={!manualWidth}
     />
 );
