@@ -40,7 +40,7 @@ export const CollapseBox = ({
                 </h4>
                 {!disableHideShow && (
                     <PrimaryButton
-                        size="mini"
+                        size="sm"
                         onClick={() => {
                             const toggledCollapse = !collapse;
                             setCollapse(toggledCollapse);

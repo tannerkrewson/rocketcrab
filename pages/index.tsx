@@ -34,14 +34,14 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
             </div>
 
             <div className="flex justify-center space-x-2">
-                <PrimaryButton href="/join" size="large">
+                <PrimaryButton href="/join" size="lg">
                     &nbsp;Join Party&nbsp;
                 </PrimaryButton>
 
                 <PrimaryButton
                     onClick={onClickNew}
                     loading={newLoading}
-                    size="large"
+                    size="lg"
                 >
                     Start Party
                 </PrimaryButton>
@@ -56,14 +56,12 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                 {!isKidsMode && (
                     <>
                         <PrimaryButton
-                            type="default"
                             url="https://kids.rocketcrab.com/"
                             manualWidth
                         >
                             🧒 Try Kids Mode
                         </PrimaryButton>
                         <PrimaryButton
-                            type="default"
                             url="https://github.com/tannerkrewson/rocketcrab/#-for-developers"
                             manualWidth
                         >
@@ -71,7 +69,7 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                         </PrimaryButton>
                     </>
                 )}
-                <PrimaryButton type="default" href="/library" manualWidth>
+                <PrimaryButton href="/library" manualWidth>
                     Browse Games
                 </PrimaryButton>
             </div>

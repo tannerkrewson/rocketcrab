@@ -154,7 +154,7 @@ export const Find = ({
             )}
 
             <ButtonGroup>
-                <PrimaryButton href="/" size="large">
+                <PrimaryButton href="/" size="lg">
                     Back
                 </PrimaryButton>
 
@@ -162,7 +162,7 @@ export const Find = ({
                     <PrimaryButton
                         onClick={onClickNew}
                         loading={newLoading}
-                        size="large"
+                        size="lg"
                     >
                         Start Public Party
                     </PrimaryButton>

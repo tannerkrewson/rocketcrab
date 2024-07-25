@@ -159,14 +159,14 @@ const PartyScreen = ({
             />
             <Spacer y={1} />
             <div className="flex justify-center space-x-2">
-                <PrimaryButton onClick={showGameSelector(true)} size="large">
+                <PrimaryButton onClick={showGameSelector(true)} size="lg">
                     Browse Games
                 </PrimaryButton>
                 <PrimaryButton
                     disabled={!selectedGameId || !isHost}
                     onClick={() => onStartGame()}
-                    size="large"
-                    type="error"
+                    size="lg"
+                    color="danger"
                 >
                     Start Game
                 </PrimaryButton>
@@ -251,7 +251,7 @@ const PartyScreen = ({
 
             <Spacer y={1} />
             <div className="flex justify-center space-x-2">
-                <PrimaryButton onClick={promptLeave} size="small">
+                <PrimaryButton onClick={promptLeave} size="sm">
                     {leaveText}
                 </PrimaryButton>
             </div>

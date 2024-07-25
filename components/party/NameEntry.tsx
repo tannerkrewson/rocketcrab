@@ -49,14 +49,14 @@ const NameEntry = ({
             />
 
             <div className="flex mt-4 justify-center space-x-2">
-                <PrimaryButton onClick={handleBack} size="large">
+                <PrimaryButton onClick={handleBack} size="lg">
                     Back
                 </PrimaryButton>
 
                 <PrimaryButton
                     onClick={handleConfirm}
                     disabled={name.length < 1}
-                    size="large"
+                    size="lg"
                 >
                     Confirm
                 </PrimaryButton>
