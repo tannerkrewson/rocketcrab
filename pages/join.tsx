@@ -55,13 +55,13 @@ export const Join = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                 {...bindings}
             />
             <div className="flex mt-4 justify-center space-x-2">
-                <PrimaryButton href="/" size="large">
+                <PrimaryButton href="/" size="lg">
                     Back
                 </PrimaryButton>
 
                 <PrimaryButton
                     onClick={onJoin}
-                    size="large"
+                    size="lg"
                     disabled={code.length !== 4}
                     loading={joinLoading}
                 >

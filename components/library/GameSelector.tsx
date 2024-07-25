@@ -55,7 +55,7 @@ const GameSelector = ({
                         <PrimaryButton
                             disabled={!isHost}
                             onClick={onSelectGameButton}
-                            type="error"
+                            color="danger"
                         >
                             Select game
                         </PrimaryButton>

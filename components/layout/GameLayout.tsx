@@ -322,7 +322,7 @@ const GameLayout = ({
                                         hideAllWindows();
                                         igLogEvent("clickMenu");
                                     }}
-                                    size="small"
+                                    size="sm"
                                 >
                                     {showMenu ? "▲" : "▼"} Menu
                                 </PrimaryButton>

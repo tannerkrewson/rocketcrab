@@ -27,10 +27,7 @@ const PartyStatus = ({
                         </div>
                         <Spacer y={1} />
                         <ButtonGroup>
-                            <PrimaryButton
-                                onClick={onShowGameInfo}
-                                size="small"
-                            >
+                            <PrimaryButton onClick={onShowGameInfo} size="sm">
                                 What is {selectedGame.name}?
                             </PrimaryButton>
                         </ButtonGroup>

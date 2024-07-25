@@ -22,7 +22,7 @@ const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => {
                         {badgeCount > 0 && (
                             <>
                                 &nbsp;
-                                <Badge type="error">{badgeCount}</Badge>
+                                <Badge color="danger">{badgeCount}</Badge>
                             </>
                         )}
                     </PrimaryButton>

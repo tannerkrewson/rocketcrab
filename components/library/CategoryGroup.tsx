@@ -3,7 +3,6 @@ import { GameCategory } from "../../types/types";
 import { Spacer } from "@nextui-org/react";
 
 import PrimaryButton from "../common/PrimaryButton";
-import ButtonGroup from "../common/ButtonGroup";
 
 const CategoryGroup = ({
     categories,
@@ -23,7 +22,7 @@ const CategoryGroup = ({
             ))}
         </div>
         <Spacer y={1} />
-        <PrimaryButton onClick={onDone} size="medium">
+        <PrimaryButton onClick={onDone} size="md">
             ↩️ Back to {backToLabel}
         </PrimaryButton>
     </>
