@@ -11,8 +11,8 @@ const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => {
                 .filter(({ hide }) => !hide)
                 .map(({ label, hostOnly, onClick, badgeCount }) => (
                     <PrimaryButton
-                        size="small"
-                        type={hostOnly ? "error" : "secondary"}
+                        size="sm"
+                        color={hostOnly ? "danger" : "default"}
                         disabled={!isHost && hostOnly}
                         onClick={onClick}
                         key={label}
