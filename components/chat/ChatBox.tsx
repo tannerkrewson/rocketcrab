@@ -93,7 +93,7 @@ export const ChatBox = ({
                     onValueChange={setMsgToSend}
                 />
                 <div className="send-container">
-                    <PrimaryButton size="small" onClick={handleConfirm}>
+                    <PrimaryButton size="sm" onClick={handleConfirm}>
                         Send
                     </PrimaryButton>
                 </div>

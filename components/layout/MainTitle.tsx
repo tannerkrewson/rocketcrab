@@ -1,5 +1,10 @@
 import converter from "phonetic-alphabet-converter";
-import { Tooltip } from "@nextui-org/react";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+    Tooltip,
+} from "@nextui-org/react";
 import { useCallback, useState } from "react";
 import { Textfit } from "@aw-web-design/react-textfit";
 import { RocketcrabMode } from "../../types/enums";
@@ -36,17 +41,19 @@ const MainTitle = ({
                 <img src="/crab.svg" className="crab" alt="rocketcrab logo" />
             </div>
             <Textfit mode="single">
-                <Tooltip
-                    text={"Copied!"}
-                    visible={copiedTooltip}
-                    trigger="click"
-                    type="dark"
-                    offset={-4}
+                <Popover
+                    isOpen={copiedTooltip}
+                    onOpenChange={(open) => setCopiedTooltip(open)}
                 >
-                    <h2 className="party-url" onClick={linkCopyClick}>
-                        {title}
-                    </h2>
-                </Tooltip>
+                    <PopoverTrigger>
+                        <h2 className="party-url" onClick={linkCopyClick}>
+                            {title}
+                        </h2>
+                    </PopoverTrigger>
+                    <PopoverContent>
+                        <div className="text-medium">Copied!</div>
+                    </PopoverContent>
+                </Popover>
             </Textfit>
 
             {path && !disablePhonetic && (

@@ -30,7 +30,7 @@ export const FindTime = ({ dates }: { dates: number[] }): JSX.Element => (
             <div key={i}>
                 {i === 0 && "and "}
                 {day} at <>{times}</>
-                <Spacer y={0.7} />
+                <Spacer y={1} />
             </div>
         ))}
         ...and so on.

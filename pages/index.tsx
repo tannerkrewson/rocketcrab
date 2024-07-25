@@ -26,7 +26,7 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
     };
 
     return (
-        <PageLayout center={true} mode={mode}>
+        <PageLayout mode={mode}>
             <div className="description">
                 {isKidsMode
                     ? "play in class or with family!"

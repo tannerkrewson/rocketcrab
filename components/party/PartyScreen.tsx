@@ -148,7 +148,7 @@ const PartyScreen = ({
 
     return (
         <div className="flex flex-col justify-center space-y-4">
-            <Spacer y={1.25} />
+            <Spacer y={2} />
             <PartyStatus
                 selectedGame={selectedGame}
                 host={host}

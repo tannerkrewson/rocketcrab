@@ -34,11 +34,11 @@ export const FinderInfoCard = ({
                         {subscriberCountMsg}
                     </div>
                 )}
-                {showSubscriberCount && showCountdown && <Spacer y={0.8} />}
+                {showSubscriberCount && showCountdown && <Spacer y={1} />}
                 {showCountdown && (
                     <Countdown start={countdownStart}>{countdownMsg}</Countdown>
                 )}
-                {showCountdown && findTimeDates && <Spacer y={0.2} />}
+                {showCountdown && findTimeDates && <Spacer y={0.5} />}
                 {findTimeDates && <FindTime dates={findTimeDates} />}
             </SkinnyCard>
             <Spacer y={1} />
