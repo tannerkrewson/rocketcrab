@@ -38,34 +38,6 @@ const Body = ({ children }: BodyProps): JSX.Element => {
                 <meta name="description" content="party games for phones" />
             </Head>
             {children}
-            <style jsx global>{`
-                html,
-                body,
-                #__next {
-                    height: 100%;
-                }
-                * {
-                    letter-spacing: normal !important;
-                    font-family: "Mukta", sans-serif;
-                }
-
-                /* remove text-transform from "Description" element and buttons */
-                dl.remove-text-transform dt,
-                .btn .text {
-                    text-transform: none;
-                }
-
-                .card.card.card,
-                .card.card.card:hover {
-                    box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
-                    border-color: rgba(223, 225, 229, 0);
-                }
-
-                .btn-col .btn.btn {
-                    padding: 0 1.1em;
-                    min-width: initial;
-                }
-            `}</style>
         </>
     );
 };

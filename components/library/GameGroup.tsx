@@ -1,6 +1,5 @@
 import { Spacer } from "@nextui-org/react";
 import PrimaryButton from "../common/PrimaryButton";
-import ButtonGroup from "../common/ButtonGroup";
 import GameBox from "./GameBox";
 import { ClientGame } from "../../types/types";
 
@@ -11,24 +10,17 @@ const GameGroup = ({
     errorMessage,
 }: GameGroupProps): JSX.Element => (
     <>
-        {games && games.length ? (
-            games.map((game, i) => (
-                <GameBox
-                    key={game.id}
-                    count={i}
-                    game={game}
-                    onClick={onSelectGame}
-                />
-            ))
-        ) : (
-            <div>{errorMessage}</div>
-        )}
-        <Spacer y={1} />
-        <ButtonGroup>
-            <PrimaryButton onClick={onBack}>
-                ↩️ Back to categories
-            </PrimaryButton>
-        </ButtonGroup>
+        <div className="my-4 gap-2 grid grid-cols-1">
+            {games && games.length ? (
+                games.map((game) => (
+                    <GameBox key={game.id} game={game} onClick={onSelectGame} />
+                ))
+            ) : (
+                <div>{errorMessage}</div>
+            )}
+        </div>
+        <Spacer y={6} />
+        <PrimaryButton onClick={onBack}>↩️ Back to categories</PrimaryButton>
     </>
 );
 

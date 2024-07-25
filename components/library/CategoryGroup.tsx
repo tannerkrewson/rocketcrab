@@ -11,24 +11,22 @@ const CategoryGroup = ({
     onDone,
     backToLabel,
 }: CategoryGroupProps): JSX.Element => (
-    <div className="mt-4 mx-2 grid gap-3 grid-cols-2">
-        {categories?.map((category, i) => (
-            <div className="">
+    <>
+        <div className="my-8 mx-2 grid gap-3 grid-cols-2">
+            {categories?.map((category, i) => (
                 <CategoryBox
                     key={category.id}
                     category={category}
                     onClick={onSelectCategory}
                     count={i}
                 />
-            </div>
-        ))}
+            ))}
+        </div>
         <Spacer y={1} />
-        <ButtonGroup>
-            <PrimaryButton onClick={onDone} size="medium">
-                ↩️ Back to {backToLabel}
-            </PrimaryButton>
-        </ButtonGroup>
-    </div>
+        <PrimaryButton onClick={onDone} size="medium">
+            ↩️ Back to {backToLabel}
+        </PrimaryButton>
+    </>
 );
 
 type CategoryGroupProps = {

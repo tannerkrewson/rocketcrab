@@ -3,7 +3,6 @@ import { useCallback, useState } from "react";
 import { ClientGameLibrary } from "../../types/types";
 import PrimaryButton from "../common/PrimaryButton";
 import GameDetail from "../detail/GameDetail";
-import ButtonGroup from "../common/ButtonGroup";
 import GameLibrary from "./GameLibrary";
 import { useLibraryState } from "../../utils/utils";
 
@@ -49,7 +48,7 @@ const GameSelector = ({
                         showOnlyHostMessage={!isHost}
                     />
                     <Spacer y={1} />
-                    <ButtonGroup>
+                    <div className="flex justify-center space-x-2">
                         <PrimaryButton onClick={onBackToSearch}>
                             ↩️ Back to search
                         </PrimaryButton>
@@ -60,7 +59,7 @@ const GameSelector = ({
                         >
                             Select game
                         </PrimaryButton>
-                    </ButtonGroup>
+                    </div>
                 </>
             )}
         </>

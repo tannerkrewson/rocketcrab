@@ -12,19 +12,21 @@ const GameDetail = ({
     allCategories,
     showOnlyHostMessage,
 }: GameDetailProps): JSX.Element => (
-    <div style={{ textAlign: "left" }}>
+    <div className="text-center">
         <div style={{ fontSize: "1.75em", fontWeight: "bold" }}>
             {game.name}
         </div>
         <Tabs>
             <Tab title="Info">
-                <GameInfo game={game} />
-                <GamePictures pictures={game.pictures} />
-                <GameBadges game={game} allCategories={allCategories} />
-                <GameDescription description={game.description} />
-                {showOnlyHostMessage && (
-                    <div>Only the host can select a game.</div>
-                )}
+                <div className="space-y-3">
+                    <GameInfo game={game} />
+                    <GamePictures pictures={game.pictures} />
+                    <GameBadges game={game} allCategories={allCategories} />
+                    <GameDescription description={game.description} />
+                    {showOnlyHostMessage && (
+                        <div>Only the host can select a game.</div>
+                    )}
+                </div>
             </Tab>
             {(game.guide || game.guideUrl) && (
                 <Tab title="Guide">

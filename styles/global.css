@@ -6,3 +6,8 @@
 .fslightbox-toolbar-button:first-child {
     display: none;
 }
+
+* {
+    letter-spacing: normal !important;
+    font-family: "Mukta", sans-serif;
+}

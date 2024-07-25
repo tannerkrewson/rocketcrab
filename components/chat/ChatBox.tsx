@@ -70,7 +70,7 @@ export const ChatBox = ({
             disableHideShow={disableHideShow}
             badgeCount={unreadMsgCount}
             onCollapse={(currentCollapse) => setIsChatShowing(!currentCollapse)}
-            badgeType="error" // red
+            badgeType="danger" // red
         >
             <Spacer y={0.5} />
             <div className="msg-container">
