@@ -13,7 +13,7 @@ const PageLayout = ({
     reconnecting,
     mode,
 }: PageLayoutParams): JSX.Element => (
-    <div className="max-w-lg mx-auto px-4 pt-32">
+    <div className="max-w-md mx-auto px-4 pt-32">
         <MainTitle
             mode={mode}
             path={path}

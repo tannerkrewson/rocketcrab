@@ -14,11 +14,14 @@ export const Join = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
 
     const [joinLoading, setJoinLoading] = useState(false);
     const { code, bindings } = useCodeInput("");
+    const [hasStartedTyping, setHasStartedTyping] = useState(false);
 
     const onKey = (e) => {
         // if they entered anything but a letter
         if (/[^A-Za-z]/g.test(e.key)) {
             e.preventDefault();
+        } else {
+            setHasStartedTyping(true);
         }
 
         if (e.key === "Enter") {
@@ -38,31 +41,20 @@ export const Join = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
             center={true}
             mode={mode}
         >
-            <div className="description">Join Party</div>
-            <div className="input-container">
-                <Input
-                    crossOrigin={undefined}
-                    onPointerEnterCapture={undefined}
-                    onPointerLeaveCapture={undefined}
-                    placeholder="ex. abcd"
-                    scale={4 / 3}
-                    width="8rem"
-                    clearable={!joinLoading}
-                    maxLength={4}
-                    autoFocus
-                    onKeyDown={onKey}
-                    autoCorrect="off"
-                    autoCapitalize="none"
-                    disabled={joinLoading}
-                    {...bindings}
-                />
-            </div>
-            {invalid && (
-                <div className="description" style={{ color: "red" }}>
-                    {invalid} does not exist 😞
-                </div>
-            )}
-            <ButtonGroup>
+            <Input
+                label="Join Party"
+                placeholder="ex. abcd"
+                maxLength={4}
+                autoFocus
+                onKeyDown={onKey}
+                autoCorrect="off"
+                autoCapitalize="none"
+                disabled={joinLoading}
+                errorMessage={`${invalid} does not exist 😞`}
+                isInvalid={invalid && !hasStartedTyping}
+                {...bindings}
+            />
+            <div className="flex mt-4 justify-center space-x-2">
                 <PrimaryButton href="/" size="large">
                     Back
                 </PrimaryButton>
@@ -75,7 +67,7 @@ export const Join = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                 >
                     Join
                 </PrimaryButton>
-            </ButtonGroup>
+            </div>
             <style jsx>{`
                 .description {
                     text-align: center;

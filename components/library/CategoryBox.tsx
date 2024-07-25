@@ -5,14 +5,13 @@ const CategoryBox = ({
     count,
 }: CategoryBoxProps): JSX.Element => (
     <>
-        <button onClick={() => onClick(id)} className="category-box">
+        <button onClick={() => onClick(id)} className="category-box rounded-lg">
             {name}
         </button>
         <style jsx>{`
             .category-box {
                 overflow: hidden;
                 border: none;
-                border-radius: 5px;
                 width: 100%;
                 min-height: 3.5em;
                 padding: 0px;

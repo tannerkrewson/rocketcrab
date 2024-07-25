@@ -22,23 +22,27 @@ const PlayerList = ({
             startHidden={startHidden}
             disableHideShow={disableHideShow}
             badgeCount={playerList.length}
-            badgeType="secondary"
+            badgeType="default"
             onlyShowBadgeWhenCollapsed={false}
         >
             <Spacer y={0.5} />
-            {playerList.map(({ id, name, isHost }, index) => (
-                <NameBox
-                    key={index}
-                    name={name}
-                    label={[
-                        ...(isMe(id) ? ["You"] : []),
-                        ...(isHost ? ["Host"] : []),
-                    ]}
-                    color={isHost && "#e00"}
-                    onEditName={!disableEditName && isMe(id) && onEditName}
-                    onKick={meIsHost && !isMe(id) && (() => onKick(id, name))}
-                />
-            ))}
+            <div className="mt-4 mx-2 grid gap-3 grid-cols-2">
+                {playerList.map(({ id, name, isHost }, index) => (
+                    <NameBox
+                        key={index}
+                        name={name}
+                        label={[
+                            ...(isMe(id) ? ["You"] : []),
+                            ...(isHost ? ["Host"] : []),
+                        ]}
+                        color={isHost && "#e00"}
+                        onEditName={!disableEditName && isMe(id) && onEditName}
+                        onKick={
+                            meIsHost && !isMe(id) && (() => onKick(id, name))
+                        }
+                    />
+                ))}
+            </div>
         </CollapseBox>
     );
 };

@@ -147,7 +147,7 @@ const PartyScreen = ({
         : [rPlayerList, rChatBox];
 
     return (
-        <div style={{ textAlign: "center" }}>
+        <div className="flex flex-col justify-center space-y-4">
             <Spacer y={1.25} />
             <PartyStatus
                 selectedGame={selectedGame}
@@ -158,7 +158,7 @@ const PartyScreen = ({
                 isPublic={isPublic}
             />
             <Spacer y={1} />
-            <ButtonGroup>
+            <div className="flex justify-center space-x-2">
                 <PrimaryButton onClick={showGameSelector(true)} size="large">
                     Browse Games
                 </PrimaryButton>
@@ -170,7 +170,7 @@ const PartyScreen = ({
                 >
                     Start Game
                 </PrimaryButton>
-            </ButtonGroup>
+            </div>
             <Spacer y={1.5} />
             {orderedCards}
             {!isAlreadyPWA && !createdAsPublic && !isHost && !isKidsMode && (
@@ -250,9 +250,11 @@ const PartyScreen = ({
             )}
 
             <Spacer y={1} />
-            <PrimaryButton onClick={promptLeave} size="small">
-                {leaveText}
-            </PrimaryButton>
+            <div className="flex justify-center space-x-2">
+                <PrimaryButton onClick={promptLeave} size="small">
+                    {leaveText}
+                </PrimaryButton>
+            </div>
         </div>
     );
 };

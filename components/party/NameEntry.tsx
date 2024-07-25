@@ -37,25 +37,18 @@ const NameEntry = ({
 
     return (
         <>
-            <div className="description">Enter your name:</div>
-            <div className="input-container">
-                <Input
-                    id="player-name"
-                    placeholder="Use your real name!"
-                    value={name}
-                    onChange={handleNameChange}
-                    autoFocus
-                    onKeyDown={onEnter}
-                    maxLength={24}
-                    scale={4 / 3}
-                    clearable
-                    crossOrigin={undefined}
-                    onPointerEnterCapture={undefined}
-                    onPointerLeaveCapture={undefined}
-                />
-            </div>
+            <Input
+                id="player-name"
+                label="Enter your name:"
+                placeholder="Use your real name!"
+                value={name}
+                onChange={handleNameChange}
+                autoFocus
+                onKeyDown={onEnter}
+                maxLength={24}
+            />
 
-            <ButtonGroup>
+            <div className="flex mt-4 justify-center space-x-2">
                 <PrimaryButton onClick={handleBack} size="large">
                     Back
                 </PrimaryButton>
@@ -67,18 +60,7 @@ const NameEntry = ({
                 >
                     Confirm
                 </PrimaryButton>
-            </ButtonGroup>
-
-            <style jsx>{`
-                .description {
-                    text-align: center;
-                    margin-bottom: 1em;
-                }
-                .input-container {
-                    margin-bottom: 2em;
-                    text-align: center;
-                }
-            `}</style>
+            </div>
         </>
     );
 };
