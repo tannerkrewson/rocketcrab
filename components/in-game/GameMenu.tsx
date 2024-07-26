@@ -6,7 +6,7 @@ import { ThemeToggle } from "../common/ThemeToggle";
 
 const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => {
     return (
-        <div className="game-menu">
+        <div className="fixed right-0 top-12 p-4 flex flex-col gap-2 bg-background shadow-md">
             {menuButtons
                 .filter(({ hide }) => !hide)
                 .map(({ label, hostOnly, onClick, badgeCount }) => (
@@ -27,27 +27,9 @@ const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => {
                         )}
                     </PrimaryButton>
                 ))}
-            <div className="theme-toggle-container">
+            <div className="flex justify-center">
                 <ThemeToggle />
             </div>
-
-            <style jsx>{`
-                .game-menu {
-                    position: fixed;
-                    width: fit-content;
-                    right: 0;
-                    top: 3em;
-                    padding: 1em;
-                    padding-bottom: 0.6em;
-                    display: flex;
-                    flex-direction: column;
-                }
-                .theme-toggle-container {
-                    margin: 0.5em 0;
-                    display: flex;
-                    justify-content: center;
-                }
-            `}</style>
         </div>
     );
 };
