@@ -24,9 +24,9 @@ const GameFrame = ({
         status === GameStatus.inprogress;
 
     return (
-        <>
+        <div className="grow">
             {(showLoading || showWaitingForHost) && (
-                <div className="frame">
+                <div className="flex h-full items-center justify-center">
                     <Spinner
                         color={showWaitingForHost ? "danger" : "default"}
                         label={
@@ -38,61 +38,45 @@ const GameFrame = ({
                 </div>
             )}
             {showError && (
-                <div className="frame">
-                    <div
+                <div className="h-full w-full flex items-center justify-center flex-col">
+                    <h4>{gameState.error}</h4>
+                    <p
                         style={{
-                            display: "flex",
-                            alignItems: "center",
-                            justifyContent: "center",
-                            height: "100%",
-                            flexDirection: "column",
+                            color: "grey",
+                            margin: "1em",
+                            textAlign: "center",
                         }}
                     >
-                        <h4>{gameState.error}</h4>
-                        <p
-                            style={{
-                                color: "grey",
-                                margin: "1em",
-                                textAlign: "center",
-                            }}
+                        {thisGame.name} may be down. 😭 You can check{" "}
+                        <a
+                            href={thisGame.displayUrlHref}
+                            target="_blank"
+                            rel="noopener noreferrer"
                         >
-                            {thisGame.name} may be down. 😭 You can check{" "}
-                            <a
-                                href={thisGame.displayUrlHref}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                            >
-                                {thisGame.displayUrlText}
-                            </a>
-                            , or try again later. If the problem continues, let
-                            us know on{" "}
-                            <a
-                                href="https://github.com/tannerkrewson/rocketcrab/issues"
-                                target="_blank"
-                                rel="noopener noreferrer"
-                            >
-                                GitHub
-                            </a>
-                            . 😃
-                        </p>
-                    </div>
+                            {thisGame.displayUrlText}
+                        </a>
+                        , or try again later. If the problem continues, let us
+                        know on{" "}
+                        <a
+                            href="https://github.com/tannerkrewson/rocketcrab/issues"
+                            target="_blank"
+                            rel="noopener noreferrer"
+                        >
+                            GitHub
+                        </a>
+                        . 😃
+                    </p>
                 </div>
             )}
             {showGameFrame && (
                 <iframe
-                    className="frame"
+                    className="h-full w-full"
                     src={gameUrl}
                     key={frameRefreshCount}
                     onLoad={isHost ? onHostGameLoaded : undefined}
                 ></iframe>
             )}
-            <style jsx>{`
-                .frame {
-                    flex: 1 1 auto;
-                    border: 0;
-                }
-            `}</style>
-        </>
+        </div>
     );
 };
 

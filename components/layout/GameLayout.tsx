@@ -23,6 +23,7 @@ import GameDetail from "../detail/GameDetail";
 import { RocketcrabMode } from "../../types/enums";
 import { useRouter } from "next/router";
 import { ModalContext } from "../../pages/_app";
+import classNames from "classnames";
 
 const GameLayout = ({
     partyState,
@@ -276,14 +277,17 @@ const GameLayout = ({
         setShowChat(false);
         setShowGameInfo(false);
     }, [setShowGameLibrary, setShowPlayerList, setShowChat]);
-
-    const statusClass = "status " + (statusCollapsed ? "status-collapsed" : "");
     return (
-        <div className="layout">
+        <div className="flex flex-col h-screen">
             <Toaster />
-            <div className={statusClass}>
+            <div
+                className={classNames({
+                    "flex flex-row justify-between shadow-sm z-10": true,
+                    "status-collapsed": statusCollapsed,
+                })}
+            >
                 <div
-                    className="logo"
+                    className="logo flex flex-row p-2 items-center"
                     onClick={() => {
                         setStatusCollapsed(!statusCollapsed);
                         setShowMenu(false);
@@ -304,10 +308,10 @@ const GameLayout = ({
                 </div>
                 {!statusCollapsed && (
                     <>
-                        <div className="url">
+                        <div className="url p-2">
                             {host}/{code}
                         </div>
-                        <div>
+                        <div className="p-2">
                             <Badge
                                 color="danger"
                                 isInvisible={
@@ -347,7 +351,7 @@ const GameLayout = ({
                 frameRefreshCount={frameRefresh}
             />
             {showGameLibrary && (
-                <div className="component-frame">
+                <div className="component-frame bg-background">
                     <GameSelector
                         gameLibrary={gameLibrary}
                         onDone={hideAllWindows}
@@ -379,7 +383,7 @@ const GameLayout = ({
                 </div>
             )}
             {showPlayerList && (
-                <div className="component-frame">
+                <div className="component-frame bg-background">
                     <PlayerList
                         playerList={playerList}
                         disableHideShow={true}
@@ -395,7 +399,7 @@ const GameLayout = ({
                 </div>
             )}
             {showChat && (
-                <div className="component-frame">
+                <div className="component-frame bg-background">
                     <ChatBox
                         chat={chat}
                         thisPlayer={thisPlayer}
@@ -422,7 +426,7 @@ const GameLayout = ({
                 </div>
             )}
             {showGameInfo && (
-                <div className="component-frame">
+                <div className="component-frame bg-background">
                     <GameDetail
                         game={thisGame}
                         allCategories={gameLibrary.categories}
@@ -434,44 +438,19 @@ const GameLayout = ({
                 </div>
             )}
             <style jsx>{`
-                .layout {
-                    display: flex;
-                    flex-flow: column;
-                    height: 100%;
-                }
-                .status {
-                    display: flex;
-                    justify-content: space-between;
-                    align-content: center;
-                    padding: 0.5em;
-                    height: 2em;
-                    z-index: 1;
-                }
-                @media only screen and (max-width: 385px) {
-                    .status {
-                        font-size: 0.9em;
-                        margin-bottom: 0em;
-                    }
-                    .logo {
-                        line-height: 2em;
-                        font-size: 1em;
-                    }
-                }
                 .status-collapsed {
                     position: fixed;
-                    width: fit-content;
-                    border: none;
                     border-radius: 8px;
                     top: 0.5em;
                     left: 0.5em;
                     backdrop-filter: blur(5px);
                     background-color: rgba(255, 255, 255, 0.2);
+                    height: fit-content;
                 }
                 .logo {
                     margin: 0;
                     user-select: none;
                     cursor: pointer;
-                    line-height: 2.8em;
                 }
                 .rocket {
                     height: 1.5em;
@@ -485,9 +464,6 @@ const GameLayout = ({
                 }
                 .url {
                     font-size: 1.2em;
-                    line-height: 1em;
-                    height: 1em;
-                    margin: auto 0;
                     font-weight: bold;
                     font-family: "Inconsolata", monospace;
                 }
