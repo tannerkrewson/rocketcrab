@@ -3,7 +3,6 @@ import { Card, CardBody, Spacer } from "@nextui-org/react";
 import { JellyfishSpinner } from "react-spinners-kit";
 import { ClientGame, Player } from "../../types/types";
 import PrimaryButton from "../common/PrimaryButton";
-import ButtonGroup from "../common/ButtonGroup";
 
 const PartyStatus = ({
     selectedGame,
@@ -17,21 +16,27 @@ const PartyStatus = ({
         <Card>
             <CardBody>
                 {selectedGame ? (
-                    <>
-                        <div>Ready to play:</div>
-                        <h3 className="game-name">{selectedGame.name}</h3>
+                    <div className="text-center">
                         <div>
+                            {isHost
+                                ? "You've selected:"
+                                : hostName + " has selected:"}
+                        </div>
+
+                        <div className="text-2xl my-1 font-bold">
+                            {selectedGame.name}
+                        </div>
+
+                        <div className="my-2">
                             {isHost
                                 ? "As the host, you have to start the game!"
                                 : "Waiting for " + hostName + " to start..."}
                         </div>
                         <Spacer y={1} />
-                        <ButtonGroup>
-                            <PrimaryButton onClick={onShowGameInfo} size="sm">
-                                What is {selectedGame.name}?
-                            </PrimaryButton>
-                        </ButtonGroup>
-                    </>
+                        <PrimaryButton onClick={onShowGameInfo} size="sm">
+                            What is {selectedGame.name}?
+                        </PrimaryButton>
+                    </div>
                 ) : (
                     <div className="status-container">
                         <JellyfishSpinner size={4} sizeUnit="em" color="Grey" />
@@ -47,10 +52,6 @@ const PartyStatus = ({
                     </div>
                 )}
                 <style jsx>{`
-                    .game-name {
-                        margin-top: 0.2em;
-                        line-height: 1.2em;
-                    }
                     .status-note {
                         flex: 1;
                         display: flex;
