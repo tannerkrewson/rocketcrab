@@ -46,9 +46,12 @@ const MainTitle = ({
                     onOpenChange={(open) => setCopiedTooltip(open)}
                 >
                     <PopoverTrigger>
-                        <h2 className="party-url" onClick={linkCopyClick}>
+                        <div
+                            className="party-url font-bold"
+                            onClick={linkCopyClick}
+                        >
                             {title}
-                        </h2>
+                        </div>
                     </PopoverTrigger>
                     <PopoverContent>
                         <div className="text-medium">Copied!</div>
