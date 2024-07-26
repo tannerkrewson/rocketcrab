@@ -13,19 +13,22 @@ const PageLayout = ({
     reconnecting,
     mode,
 }: PageLayoutParams): JSX.Element => (
-    <div className="max-w-md mx-auto px-4 pt-32">
-        <MainTitle
-            mode={mode}
-            path={path}
-            disablePhonetic={disablePhonetic}
-            deemphasize={deemphasize}
-        />
+    <div className="flex min-h-screen items-center flex-col">
+        <div className="flex flex-col justify-center flex-1 max-w-md px-2 w-full">
+            <MainTitle
+                mode={mode}
+                path={path}
+                disablePhonetic={disablePhonetic}
+                deemphasize={deemphasize}
+            />
 
-        {loading ? <Spinner /> : children}
+            {loading ? <Spinner /> : children}
 
-        <Footer />
-
-        {reconnecting && <Connecting />}
+            {reconnecting && <Connecting />}
+        </div>
+        <div className="w-full">
+            <Footer />
+        </div>
     </div>
 );
 
