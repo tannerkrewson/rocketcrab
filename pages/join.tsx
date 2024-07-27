@@ -37,6 +37,7 @@ export const Join = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
     return (
         <PageLayout path={code} disablePhonetic={true} mode={mode}>
             <Input
+                size="lg"
                 label="Join Party"
                 placeholder="ex. abcd"
                 maxLength={4}

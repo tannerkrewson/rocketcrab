@@ -86,6 +86,7 @@ export const ChatBox = ({
             </div>
             <div className="flex-center-row">
                 <Input
+                    size="lg"
                     onKeyDown={onEnter}
                     maxLength={MAX_CHAT_MSG_LEN}
                     width="100%"
