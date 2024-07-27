@@ -147,7 +147,6 @@ const PartyScreen = ({
 
     return (
         <div className="flex flex-col justify-center space-y-4">
-            <Spacer y={2} />
             <PartyStatus
                 selectedGame={selectedGame}
                 host={host}
@@ -176,26 +175,32 @@ const PartyScreen = ({
                 <>
                     <Spacer y={1} />
                     <SkinnyCard>
-                        <div>
-                            {host.name} is a great host, so don&apos;t{" "}
-                            <div style={{ display: "inline-block" }}>
-                                tell them I said this... 🤫{" "}
+                        <div className="text-center p-1">
+                            <div>
+                                {host.name} is a great host, so don&apos;t{" "}
+                                <div style={{ display: "inline-block" }}>
+                                    tell them I said this... 🤫{" "}
+                                </div>
                             </div>
-                        </div>
-                        <Spacer y={0.5} />
-                        <div>
-                            I think you&apos;d be even better! 😊 Just go to{" "}
-                            <span
-                                style={{
-                                    fontFamily: '"Inconsolata", monospace',
-                                    fontWeight: "bold",
-                                    fontSize: "1.05em",
-                                }}
-                            >
-                                rocketcrab.com{"  "}
-                            </span>
-                            anytime to host <i>your</i> friends and family! Or,
-                            even better:
+                            <div>I think you&apos;d be even better! 😊 </div>
+                            <div>
+                                Just go to{" "}
+                                <span
+                                    style={{
+                                        fontFamily: '"Inconsolata", monospace',
+                                        fontWeight: "bold",
+                                        fontSize: "1.05em",
+                                    }}
+                                >
+                                    rocketcrab.com{" "}
+                                </span>
+                                anytime to host <i>your</i> friends and family!
+                                Or, even better:
+                            </div>
+                            <div className="flex flex-col items-center py-3">
+                                <AddAppButton />
+                            </div>
+                            No App Store download required! 😮
                         </div>
                     </SkinnyCard>
                 </>

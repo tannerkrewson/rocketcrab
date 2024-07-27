@@ -75,7 +75,6 @@ const AddAppButton = (): JSX.Element => {
             <PrimaryButton
                 onClick={handleAddApp}
                 disabled={isLoading}
-                manualWidth
                 loading={isLoading}
             >
                 Add 🚀🦀 App
