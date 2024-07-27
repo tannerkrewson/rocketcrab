@@ -71,6 +71,7 @@ const GameLibrary = ({
 const SearchBox = ({ search, onSearchChange }) => (
     <>
         <Input
+            size="lg"
             placeholder="Search"
             width="100%"
             value={search}

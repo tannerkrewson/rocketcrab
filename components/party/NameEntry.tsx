@@ -38,6 +38,7 @@ const NameEntry = ({
     return (
         <>
             <Input
+                size="lg"
                 id="player-name"
                 label="Enter your name:"
                 placeholder="Use your real name!"
