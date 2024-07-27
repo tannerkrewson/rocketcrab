@@ -41,64 +41,68 @@ exports[`pages/join.tsx matches snapshot 1`] = `
         </div>
       </div>
       <div
-        class="group flex flex-col data-[hidden=true]:hidden w-full"
-        data-filled="true"
-        data-filled-within="true"
-        data-focus="true"
-        data-focus-visible="true"
-        data-focus-within="true"
-        data-has-elements="true"
-        data-has-helper="true"
-        data-has-label="true"
-        data-invalid="true"
-        data-slot="base"
+        class="jsx-2322376654 flex justify-center"
       >
         <div
-          class="relative w-full inline-flex tap-highlight-transparent shadow-sm px-3 bg-default-100 data-[hover=true]:bg-default-200 group-data-[focus=true]:bg-default-100 min-h-12 rounded-large flex-col items-start justify-center transition-background motion-reduce:transition-none !duration-150 outline-none group-data-[focus-visible=true]:z-10 group-data-[focus-visible=true]:ring-2 group-data-[focus-visible=true]:ring-focus group-data-[focus-visible=true]:ring-offset-2 group-data-[focus-visible=true]:ring-offset-background !bg-danger-50 data-[hover=true]:!bg-danger-100 group-data-[focus=true]:!bg-danger-50 h-16 py-2.5 gap-0"
+          class="group flex flex-col data-[hidden=true]:hidden w-32"
+          data-filled="true"
+          data-filled-within="true"
           data-focus="true"
           data-focus-visible="true"
-          data-slot="input-wrapper"
-          style="cursor: text;"
+          data-focus-within="true"
+          data-has-elements="true"
+          data-has-helper="true"
+          data-has-label="true"
+          data-invalid="true"
+          data-slot="base"
         >
-          <label
-            class="absolute z-10 pointer-events-none origin-top-left rtl:origin-top-right subpixel-antialiased block text-foreground-500 cursor-text !text-danger will-change-auto !duration-200 !ease-out motion-reduce:transition-none transition-[transform,color,left,opacity] group-data-[filled-within=true]:text-default-600 group-data-[filled-within=true]:pointer-events-auto group-data-[filled-within=true]:scale-85 text-medium group-data-[filled-within=true]:-translate-y-[calc(50%_+_theme(fontSize.small)/2_-_8px)] pe-2 max-w-full text-ellipsis overflow-hidden"
-            data-slot="label"
-            for="react-aria-:r1:"
-            id="react-aria-:r2:"
-          >
-            Join Party
-          </label>
           <div
-            class="inline-flex w-full items-center h-full box-border group-data-[has-label=true]:items-end pb-0.5"
-            data-slot="inner-wrapper"
+            class="relative w-full inline-flex tap-highlight-transparent shadow-sm px-3 bg-default-100 data-[hover=true]:bg-default-200 group-data-[focus=true]:bg-default-100 min-h-12 rounded-large flex-col items-start justify-center transition-background motion-reduce:transition-none !duration-150 outline-none group-data-[focus-visible=true]:z-10 group-data-[focus-visible=true]:ring-2 group-data-[focus-visible=true]:ring-focus group-data-[focus-visible=true]:ring-offset-2 group-data-[focus-visible=true]:ring-offset-background !bg-danger-50 data-[hover=true]:!bg-danger-100 group-data-[focus=true]:!bg-danger-50 py-2.5 gap-0 h-auto"
+            data-focus="true"
+            data-focus-visible="true"
+            data-slot="input-wrapper"
+            style="cursor: text;"
           >
-            <input
-              aria-describedby="react-aria-:r5:"
-              aria-invalid="true"
-              aria-label="Join Party"
-              aria-labelledby="react-aria-:r1: react-aria-:r2:"
-              autocapitalize="none"
-              class="w-full font-normal bg-transparent !outline-none placeholder:text-foreground-500 focus-visible:outline-none data-[has-start-content=true]:ps-1.5 data-[has-end-content=true]:pe-1.5 file:cursor-pointer file:bg-transparent file:border-0 autofill:bg-transparent bg-clip-text text-medium !placeholder:text-danger !text-danger group-data-[has-value=true]:text-default-foreground"
-              data-filled-within="true"
-              data-slot="input"
-              id="react-aria-:r1:"
-              maxlength="4"
-              placeholder="ex. abcd"
-              type="text"
-              value=""
-            />
+            <label
+              class="z-10 pointer-events-none origin-top-left rtl:origin-top-right subpixel-antialiased block text-foreground-500 cursor-text !text-danger will-change-auto !duration-200 !ease-out motion-reduce:transition-none transition-[transform,color,left,opacity] group-data-[filled-within=true]:text-default-600 group-data-[filled-within=true]:pointer-events-auto group-data-[filled-within=true]:scale-85 text-medium group-data-[filled-within=true]:-translate-y-[calc(50%_+_theme(fontSize.small)/2_-_8px)] pe-2 max-w-full text-ellipsis overflow-hidden static pt-1 pb-1"
+              data-slot="label"
+              for="react-aria-:r1:"
+              id="react-aria-:r2:"
+            >
+              Join Party
+            </label>
+            <div
+              class="inline-flex w-full items-center h-full box-border group-data-[has-label=true]:items-end pb-0.5"
+              data-slot="inner-wrapper"
+            >
+              <input
+                aria-describedby="react-aria-:r5:"
+                aria-invalid="true"
+                aria-label="Join Party"
+                aria-labelledby="react-aria-:r1: react-aria-:r2:"
+                autocapitalize="none"
+                class="w-full font-normal bg-transparent !outline-none placeholder:text-foreground-500 focus-visible:outline-none data-[has-start-content=true]:ps-1.5 data-[has-end-content=true]:pe-1.5 file:cursor-pointer file:bg-transparent file:border-0 autofill:bg-transparent bg-clip-text !placeholder:text-danger !text-danger group-data-[has-value=true]:text-default-foreground font-mono text-3xl text-center"
+                data-filled-within="true"
+                data-slot="input"
+                id="react-aria-:r1:"
+                maxlength="4"
+                placeholder="abcd"
+                type="text"
+                value=""
+              />
+            </div>
           </div>
-        </div>
-        <div
-          class="hidden group-data-[has-helper=true]:flex p-1 relative flex-col gap-1.5"
-          data-slot="helper-wrapper"
-        >
           <div
-            class="text-tiny text-danger"
-            data-slot="error-message"
-            id="react-aria-:r5:"
+            class="hidden group-data-[has-helper=true]:flex p-1 relative flex-col gap-1.5"
+            data-slot="helper-wrapper"
           >
-            wxyz does not exist 😞
+            <div
+              class="text-tiny text-danger"
+              data-slot="error-message"
+              id="react-aria-:r5:"
+            >
+              wxyz does not exist 😞
+            </div>
           </div>
         </div>
       </div>

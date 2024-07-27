@@ -35,20 +35,29 @@ export const Join = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
 
     return (
         <PageLayout path={code} disablePhonetic={true} mode={mode}>
-            <Input
-                size="lg"
-                label="Join Party"
-                placeholder="ex. abcd"
-                maxLength={4}
-                autoFocus
-                onKeyDown={onKey}
-                autoCorrect="off"
-                autoCapitalize="none"
-                disabled={joinLoading}
-                errorMessage={`${invalid} does not exist 😞`}
-                isInvalid={invalid && !hasStartedTyping}
-                {...bindings}
-            />
+            <div className="flex justify-center">
+                <Input
+                    className="w-32"
+                    classNames={{
+                        label: "static pt-1 pb-1",
+                        input: "font-mono text-3xl text-center",
+                        inputWrapper: "h-auto",
+                    }}
+                    size="lg"
+                    label="Join Party"
+                    placeholder="abcd"
+                    maxLength={4}
+                    autoFocus
+                    onKeyDown={onKey}
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    disabled={joinLoading}
+                    errorMessage={`${invalid} does not exist 😞`}
+                    isInvalid={invalid && !hasStartedTyping}
+                    {...bindings}
+                />
+            </div>
+
             <div className="flex mt-4 justify-center space-x-2">
                 <PrimaryButton href="/" size="lg">
                     Back
