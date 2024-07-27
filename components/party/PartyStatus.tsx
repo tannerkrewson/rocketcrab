@@ -41,13 +41,17 @@ const PartyStatus = ({
                     <div className="status-container">
                         <JellyfishSpinner size={4} sizeUnit="em" color="Grey" />
 
-                        <div className="status-note">
+                        <div className="status-note flex-col">
                             {getPreSelectedGameStatus(
                                 onlyOnePlayer,
                                 isHost,
                                 hostName,
                                 isPublic,
-                            )}
+                            )
+                                .split("\n")
+                                .map((text, i) => (
+                                    <div key={i}>{text}</div>
+                                ))}
                         </div>
                     </div>
                 )}
