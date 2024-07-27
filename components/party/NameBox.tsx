@@ -1,13 +1,20 @@
 import { Spinner, Card, CardBody } from "@nextui-org/react";
+import classNames from "classnames";
 
 const NameBox = ({
     name,
-    color,
+    isHost,
     label = [],
     onEditName,
     onKick,
 }: NameBoxProps): JSX.Element => (
-    <Card radius="sm" shadow="sm">
+    <Card
+        radius="sm"
+        shadow="sm"
+        className={classNames({
+            "border-1 border-rose-400": isHost,
+        })}
+    >
         <CardBody className="text-center">
             {name ? name : <Spinner />}
             {onEditName && (
@@ -44,7 +51,7 @@ const NameBox = ({
 
 type NameBoxProps = {
     name?: string;
-    color?: string;
+    isHost?: boolean;
     label?: string[];
     onEditName?: () => void;
     onKick?: () => void;

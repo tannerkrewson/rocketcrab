@@ -35,7 +35,7 @@ const PlayerList = ({
                             ...(isMe(id) ? ["You"] : []),
                             ...(isHost ? ["Host"] : []),
                         ]}
-                        color={isHost && "#e00"}
+                        isHost={isHost}
                         onEditName={!disableEditName && isMe(id) && onEditName}
                         onKick={
                             meIsHost && !isMe(id) && (() => onKick(id, name))
