@@ -13,7 +13,7 @@ const PageLayout = ({
     reconnecting,
     mode,
 }: PageLayoutParams): JSX.Element => (
-    <div className="flex min-h-screen items-center flex-col">
+    <div className="flex min-h-svh items-center flex-col">
         <div className="flex flex-col justify-center flex-1 max-w-md px-2 w-full">
             <MainTitle
                 mode={mode}

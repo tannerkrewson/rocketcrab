@@ -277,7 +277,7 @@ const GameLayout = ({
         setShowGameInfo(false);
     }, [setShowGameLibrary, setShowPlayerList, setShowChat]);
     return (
-        <div className="flex flex-col h-screen">
+        <div className="flex flex-col h-svh">
             <Toaster />
             <div
                 className={classNames({

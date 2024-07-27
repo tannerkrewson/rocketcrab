@@ -49,7 +49,6 @@ const App = ({ Component, pageProps }: AppPropsType): JSX.Element => {
                             darkModeActive ? "dark" : "",
                             "text-foreground",
                             "bg-background",
-                            "min-h-screen",
                         )}
                     >
                         <Component {...pageProps} />
