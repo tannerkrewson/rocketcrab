@@ -80,16 +80,15 @@ const AddAppButton = (): JSX.Element => {
                 Add 🚀🦀 App
             </PrimaryButton>
 
-            {showiOS && (
-                <PWAPrompt
-                    debug={true}
-                    permanentlyHideOnDismiss={false}
-                    onClose={() => {
-                        setShowiOS(false);
-                        setIsLoading(false);
-                    }}
-                />
-            )}
+            <PWAPrompt
+                appIconPath="/apple-touch-icon.png"
+                isShown={showiOS}
+                permanentlyHideOnDismiss={false}
+                onClose={() => {
+                    setShowiOS(false);
+                    setIsLoading(false);
+                }}
+            />
         </>
     );
 };

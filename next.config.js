@@ -24,4 +24,5 @@ module.exports = withPWA({
             },
         ],
     },
+    transpilePackages: ["swiper"],
 });

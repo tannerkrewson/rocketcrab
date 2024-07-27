@@ -3,6 +3,8 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import FsLightbox from "fslightbox-react";
 import SkinnyCard from "../common/SkinnyCard";
 
+import "swiper/css";
+
 const GamePictures = ({ pictures }: GamePicturesProps): JSX.Element => {
     const [lightboxState, setLightboxState] = useState({
         toggler: false,
