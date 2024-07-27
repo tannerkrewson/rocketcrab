@@ -146,6 +146,7 @@ exports[`pages/join.tsx matches snapshot 1`] = `
         >
           rocketcrab by 
           <a
+            class="underline text-green-500 decoration-dotted"
             href="https://www.tannerkrewson.com/"
             rel="noopener noreferrer"
             target="_blank"
@@ -156,7 +157,7 @@ exports[`pages/join.tsx matches snapshot 1`] = `
             class="jsx-3899203255"
           />
           <a
-            class="jsx-3899203255"
+            class="jsx-3899203255 underline text-green-500 decoration-dotted"
             href="https://github.com/tannerkrewson/rocketcrab"
             rel="noopener noreferrer"
             target="_blank"

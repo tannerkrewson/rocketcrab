@@ -9,6 +9,7 @@ const Footer = (): JSX.Element => {
     const NameWrapper = ({ children }) =>
         !isKidsMode ? (
             <a
+                className="underline text-green-500 decoration-dotted"
                 href="https://www.tannerkrewson.com/"
                 target="_blank"
                 rel="noopener noreferrer"
@@ -28,6 +29,7 @@ const Footer = (): JSX.Element => {
                     <>
                         <br />
                         <a
+                            className="underline text-green-500 decoration-dotted"
                             href="https://github.com/tannerkrewson/rocketcrab"
                             target="_blank"
                             rel="noopener noreferrer"
