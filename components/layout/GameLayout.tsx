@@ -15,7 +15,6 @@ import PlayerList from "../party/PlayerList";
 import GameFrame from "../in-game/GameFrame";
 import Connecting from "./Connecting";
 import { ChatBox } from "../chat/ChatBox";
-import ButtonGroup from "../common/ButtonGroup";
 import { logEvent } from "../../utils/analytics";
 import { filterClean, MODE_MAP } from "../../utils/utils";
 import { differenceInMilliseconds } from "date-fns";
@@ -409,7 +408,7 @@ const GameLayout = ({
                         clearUnreadMsgCount={clearUnreadMsgCount}
                     />
                     <Spacer y={0.5} />
-                    <ButtonGroup>
+                    <div className="flex mt-4 justify-center space-x-2">
                         <PrimaryButton onClick={hideAllWindows}>
                             Close
                         </PrimaryButton>
@@ -422,7 +421,7 @@ const GameLayout = ({
                         >
                             {enableToasts ? "Mute" : "Unmute"}
                         </PrimaryButton>
-                    </ButtonGroup>
+                    </div>
                 </div>
             )}
             {showGameInfo && (

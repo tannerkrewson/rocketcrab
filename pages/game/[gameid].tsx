@@ -3,7 +3,6 @@ import { useRouter } from "next/router";
 import { useCallback } from "react";
 import GameDetail from "../../components/detail/GameDetail";
 import PrimaryButton from "../../components/common/PrimaryButton";
-import ButtonGroup from "../../components/common/ButtonGroup";
 import PageLayout from "../../components/layout/PageLayout";
 import { RocketcrabMode } from "../../types/enums";
 import { GAME_LIBRARY } from "../../config";
@@ -19,14 +18,14 @@ export const GamePage = ({
     return (
         <PageLayout mode={mode}>
             <GameDetail game={game} allCategories={allCategories} />
-            <ButtonGroup>
+            <div className="flex justify-center space-x-2">
                 <PrimaryButton onClick={onBack}>
                     ↩️ Back to search
                 </PrimaryButton>
                 <PrimaryButton href={`/transfer/${game.id}/`}>
                     Start Party
                 </PrimaryButton>
-            </ButtonGroup>
+            </div>
         </PageLayout>
     );
 };
