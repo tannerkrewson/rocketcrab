@@ -1,5 +1,4 @@
 import PrimaryButton from "../components/common/PrimaryButton";
-import ButtonGroup from "../components/common/ButtonGroup";
 import PageLayout from "../components/layout/PageLayout";
 import React, { useContext, useEffect, useState } from "react";
 import { postJson } from "../utils/utils";
@@ -153,7 +152,7 @@ export const Find = ({
                 </div>
             )}
 
-            <ButtonGroup>
+            <div className="flex mt-4 justify-center space-x-2">
                 <PrimaryButton href="/" size="lg">
                     Back
                 </PrimaryButton>
@@ -167,7 +166,7 @@ export const Find = ({
                         Start Public Party
                     </PrimaryButton>
                 )}
-            </ButtonGroup>
+            </div>
             <style jsx>{`
                 .description {
                     font-size: 1.1em;

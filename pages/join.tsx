@@ -2,7 +2,6 @@ import { useRouter } from "next/router";
 import { Input } from "@nextui-org/react";
 
 import PrimaryButton from "../components/common/PrimaryButton";
-import ButtonGroup from "../components/common/ButtonGroup";
 import PageLayout from "../components/layout/PageLayout";
 import { useState } from "react";
 import { GetServerSideProps } from "next";

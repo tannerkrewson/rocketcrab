@@ -1,6 +1,5 @@
 import PlayerList from "./PlayerList";
 import PrimaryButton from "../common/PrimaryButton";
-import ButtonGroup from "../common/ButtonGroup";
 import { Spacer } from "@nextui-org/react";
 import GameSelector from "../library/GameSelector";
 import { ClientGameLibrary, ClientParty, Player } from "../../types/types";
@@ -198,12 +197,6 @@ const PartyScreen = ({
                             anytime to host <i>your</i> friends and family! Or,
                             even better:
                         </div>
-                        <Spacer y={0.5} />
-                        <ButtonGroup>
-                            <AddAppButton />
-                        </ButtonGroup>
-                        <Spacer y={0.5} />
-                        No App Store download required! 😮
                     </SkinnyCard>
                 </>
             )}
