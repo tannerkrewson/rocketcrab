@@ -9,6 +9,7 @@ import { useCallback, useState } from "react";
 import { Textfit } from "@aw-web-design/react-textfit";
 import { RocketcrabMode } from "../../types/enums";
 import { MODE_MAP } from "../../utils/utils";
+import classNames from "classnames";
 
 const MainTitle = ({
     path = "",
@@ -18,8 +19,6 @@ const MainTitle = ({
 }: MainTitleProps): JSX.Element => {
     const host = MODE_MAP[mode];
     const title = host + (path ? "/" + path : "");
-
-    const titleClasses = "title" + (deemphasize ? " deemphasize" : "");
 
     const [copiedTooltip, setCopiedTooltip] = useState(false);
 
@@ -31,7 +30,12 @@ const MainTitle = ({
     }, [host, path]);
 
     return (
-        <div className={titleClasses}>
+        <div
+            className={classNames({
+                "title mt-3": true,
+                deemphasize,
+            })}
+        >
             <div className="flex justify-center items-center">
                 <img
                     src="/rocket.svg"
@@ -47,7 +51,7 @@ const MainTitle = ({
                 >
                     <PopoverTrigger>
                         <div
-                            className="party-url font-bold"
+                            className="party-url font-bold my-2"
                             onClick={linkCopyClick}
                         >
                             {title}
