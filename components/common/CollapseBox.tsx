@@ -1,4 +1,4 @@
-import { Chip, Spacer } from "@nextui-org/react";
+import { Chip } from "@nextui-org/react";
 import React, { useState } from "react";
 import PrimaryButton from "./PrimaryButton";
 

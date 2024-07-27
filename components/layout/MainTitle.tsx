@@ -1,10 +1,5 @@
 import converter from "phonetic-alphabet-converter";
-import {
-    Popover,
-    PopoverContent,
-    PopoverTrigger,
-    Tooltip,
-} from "@nextui-org/react";
+import { Popover, PopoverContent, PopoverTrigger } from "@nextui-org/react";
 import { useCallback, useState } from "react";
 import { Textfit } from "@aw-web-design/react-textfit";
 import { RocketcrabMode } from "../../types/enums";
