@@ -3,225 +3,211 @@
 exports[`pages/join.tsx matches snapshot 1`] = `
 <DocumentFragment>
   <div
-    class="jsx-1187451143 container"
+    class="flex min-h-svh items-center flex-col"
   >
-    <main
-      class="jsx-1187451143"
+    <div
+      class="flex flex-col justify-center flex-1 max-w-md px-2 w-full"
     >
       <div
-        class="jsx-1187451143 main-content"
+        class="jsx-4268528184 title mt-3"
       >
         <div
-          class="jsx-1758552329 title"
+          class="jsx-4268528184 flex justify-center items-center"
         >
-          <div
-            class="jsx-1758552329"
-            style="margin: .5em;"
-          >
-            <img
-              alt="rocketcrab logo"
-              class="jsx-1758552329 rocket"
-              src="/rocket.svg"
-            />
-            <img
-              alt="rocketcrab logo"
-              class="jsx-1758552329 crab"
-              src="/crab.svg"
-            />
-          </div>
-          <div>
-            <div
-              style="display: inline-block; white-space: nowrap;"
-            >
-              <div
-                class="jsx-418573366 tooltip"
-              >
-                <h2
-                  class="jsx-1758552329 party-url"
-                >
-                  rocketcrab.com
-                </h2>
-              </div>
-            </div>
-          </div>
+          <img
+            alt="rocketcrab logo"
+            class="jsx-4268528184 rocket"
+            src="/rocket.svg"
+          />
+          <img
+            alt="rocketcrab logo"
+            class="jsx-4268528184 crab"
+            src="/crab.svg"
+          />
         </div>
-        <div
-          class="jsx-2322376654 description"
-        >
-          Join Party
-        </div>
-        <div
-          class="jsx-2322376654 input-container"
-        >
+        <div>
           <div
-            class="jsx-3754444383 with-label"
+            style="display: inline-block; white-space: nowrap;"
           >
             <div
-              class="jsx-3754444383 input-container"
-            >
-              <div
-                class="jsx-3754444383 input-wrapper hover"
-              >
-                <input
-                  autocapitalize="none"
-                  autocomplete="off"
-                  autocorrect="off"
-                  class="jsx-3754444383 "
-                  maxlength="4"
-                  placeholder="ex. abcd"
-                  type="text"
-                  value=""
-                />
-                <div
-                  class="jsx-100723902 clear-icon"
-                >
-                  <svg
-                    class="jsx-100723902"
-                    fill="none"
-                    shape-rendering="geometricPrecision"
-                    stroke="currentColor"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="1.5"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      class="jsx-100723902"
-                      d="M18 6L6 18"
-                    />
-                    <path
-                      class="jsx-100723902"
-                      d="M6 6l12 12"
-                    />
-                  </svg>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-        <div
-          class="jsx-2322376654 description"
-          style="color: red;"
-        >
-          wxyz does not exist 😞
-        </div>
-        <div
-          class="jsx-2262539868 item justify jsx-3384369884"
-        >
-          <div
-            class="jsx-3633143255 item jsx-3484918754"
-          >
-            <a
-              href="/"
-            >
-              <div>
-                <button
-                  class="jsx-3631069826 btn"
-                  href="/"
-                  style="width: auto;"
-                  type="button"
-                >
-                  <div
-                    class="text"
-                  >
-                    Back
-                  </div>
-                </button>
-              </div>
-            </a>
-          </div>
-          <div
-            class="jsx-3633143255 item jsx-3484918754"
-          >
-            <button
-              class="jsx-2410941923 btn"
-              disabled=""
-              style="width: auto;"
+              aria-expanded="false"
+              class="z-10 aria-expanded:scale-[0.97] aria-expanded:opacity-70 subpixel-antialiased jsx-4268528184 party-url font-bold my-2"
+              data-slot="trigger"
               type="button"
             >
-              <div
-                class="text"
-              >
-                Join
-              </div>
-            </button>
+              rocketcrab.com
+            </div>
           </div>
         </div>
       </div>
-    </main>
-    <footer
-      class="jsx-3899203255"
-      style="margin-top: 1em;"
-    >
       <div
-        class="jsx-3899203255 side"
-      />
-      <div
-        class="jsx-3899203255 tag"
-      >
-        rocketcrab by 
-        <a
-          href="https://www.tannerkrewson.com/"
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          Tanner Krewson
-        </a>
-        <br
-          class="jsx-3899203255"
-        />
-        <a
-          class="jsx-3899203255"
-          href="https://github.com/tannerkrewson/rocketcrab"
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          View on GitHub
-        </a>
-      </div>
-      <div
-        class="jsx-3899203255 side"
+        class="group flex flex-col data-[hidden=true]:hidden w-full"
+        data-filled="true"
+        data-filled-within="true"
+        data-focus="true"
+        data-focus-visible="true"
+        data-focus-within="true"
+        data-has-elements="true"
+        data-has-helper="true"
+        data-has-label="true"
+        data-invalid="true"
+        data-slot="base"
       >
         <div
-          class="jsx-3899203255 theme-toggle"
+          class="relative w-full inline-flex tap-highlight-transparent shadow-sm px-3 bg-default-100 data-[hover=true]:bg-default-200 group-data-[focus=true]:bg-default-100 min-h-12 rounded-large flex-col items-start justify-center transition-background motion-reduce:transition-none !duration-150 outline-none group-data-[focus-visible=true]:z-10 group-data-[focus-visible=true]:ring-2 group-data-[focus-visible=true]:ring-focus group-data-[focus-visible=true]:ring-offset-2 group-data-[focus-visible=true]:ring-offset-background !bg-danger-50 data-[hover=true]:!bg-danger-100 group-data-[focus=true]:!bg-danger-50 h-16 py-2.5 gap-0"
+          data-focus="true"
+          data-focus-visible="true"
+          data-slot="input-wrapper"
+          style="cursor: text;"
+        >
+          <label
+            class="absolute z-10 pointer-events-none origin-top-left rtl:origin-top-right subpixel-antialiased block text-foreground-500 cursor-text !text-danger will-change-auto !duration-200 !ease-out motion-reduce:transition-none transition-[transform,color,left,opacity] group-data-[filled-within=true]:text-default-600 group-data-[filled-within=true]:pointer-events-auto group-data-[filled-within=true]:scale-85 text-medium group-data-[filled-within=true]:-translate-y-[calc(50%_+_theme(fontSize.small)/2_-_8px)] pe-2 max-w-full text-ellipsis overflow-hidden"
+            data-slot="label"
+            for="react-aria-:r1:"
+            id="react-aria-:r2:"
+          >
+            Join Party
+          </label>
+          <div
+            class="inline-flex w-full items-center h-full box-border group-data-[has-label=true]:items-end pb-0.5"
+            data-slot="inner-wrapper"
+          >
+            <input
+              aria-describedby="react-aria-:r5:"
+              aria-invalid="true"
+              aria-label="Join Party"
+              aria-labelledby="react-aria-:r1: react-aria-:r2:"
+              autocapitalize="none"
+              class="w-full font-normal bg-transparent !outline-none placeholder:text-foreground-500 focus-visible:outline-none data-[has-start-content=true]:ps-1.5 data-[has-end-content=true]:pe-1.5 file:cursor-pointer file:bg-transparent file:border-0 autofill:bg-transparent bg-clip-text text-medium !placeholder:text-danger !text-danger group-data-[has-value=true]:text-default-foreground"
+              data-filled-within="true"
+              data-slot="input"
+              id="react-aria-:r1:"
+              maxlength="4"
+              placeholder="ex. abcd"
+              type="text"
+              value=""
+            />
+          </div>
+        </div>
+        <div
+          class="hidden group-data-[has-helper=true]:flex p-1 relative flex-col gap-1.5"
+          data-slot="helper-wrapper"
         >
           <div
-            class="react-toggle react-toggle--checked"
+            class="text-tiny text-danger"
+            data-slot="error-message"
+            id="react-aria-:r5:"
           >
-            <div
-              class="react-toggle-track"
+            wxyz does not exist 😞
+          </div>
+        </div>
+      </div>
+      <div
+        class="jsx-2322376654 flex mt-4 justify-center space-x-2"
+      >
+        <a
+          href="/"
+        >
+          <div>
+            <button
+              class="z-0 group relative inline-flex items-center justify-center box-border appearance-none select-none whitespace-nowrap font-normal subpixel-antialiased overflow-hidden tap-highlight-transparent data-[pressed=true]:scale-[0.97] outline-none data-[focus-visible=true]:z-10 data-[focus-visible=true]:outline-2 data-[focus-visible=true]:outline-focus data-[focus-visible=true]:outline-offset-2 border-medium px-6 min-w-24 h-12 text-medium gap-3 rounded-large [&>svg]:max-w-[theme(spacing.8)] transition-transform-colors-opacity motion-reduce:transition-none border-default bg-default-100 text-default-foreground data-[hover=true]:opacity-hover"
+              type="button"
             >
-              <div
-                class="react-toggle-track-check"
+              Back
+            </button>
+          </div>
+        </a>
+        <button
+          class="z-0 group relative inline-flex items-center justify-center box-border appearance-none select-none whitespace-nowrap font-normal subpixel-antialiased overflow-hidden tap-highlight-transparent data-[pressed=true]:scale-[0.97] outline-none data-[focus-visible=true]:z-10 data-[focus-visible=true]:outline-2 data-[focus-visible=true]:outline-focus data-[focus-visible=true]:outline-offset-2 border-medium px-6 min-w-24 h-12 text-medium gap-3 rounded-large opacity-disabled pointer-events-none [&>svg]:max-w-[theme(spacing.8)] transition-transform-colors-opacity motion-reduce:transition-none border-default bg-default-100 text-default-foreground data-[hover=true]:opacity-hover"
+          data-disabled="true"
+          disabled=""
+          type="button"
+        >
+          Join
+        </button>
+      </div>
+    </div>
+    <div
+      class="w-full"
+    >
+      <footer
+        class="jsx-3899203255"
+        style="margin-top: 1em;"
+      >
+        <div
+          class="jsx-3899203255 side"
+        />
+        <div
+          class="jsx-3899203255 tag"
+        >
+          rocketcrab by 
+          <a
+            href="https://www.tannerkrewson.com/"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            Tanner Krewson
+          </a>
+          <br
+            class="jsx-3899203255"
+          />
+          <a
+            class="jsx-3899203255"
+            href="https://github.com/tannerkrewson/rocketcrab"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            View on GitHub
+          </a>
+        </div>
+        <div
+          class="jsx-3899203255 side"
+        >
+          <div
+            class="jsx-3899203255 theme-toggle"
+          >
+            <label
+              class="group relative max-w-fit inline-flex items-center justify-start cursor-pointer touch-none tap-highlight-transparent"
+              data-selected="true"
+            >
+              <span
+                style="border: 0px; clip-path: inset(50%); height: 1px; margin: -1px; overflow: hidden; padding: 0px; position: absolute; width: 1px; white-space: nowrap;"
+              >
+                <input
+                  aria-labelledby=":r6:"
+                  checked=""
+                  role="switch"
+                  type="checkbox"
+                  value=""
+                />
+              </span>
+              <span
+                aria-hidden="true"
+                class="px-1 relative inline-flex items-center justify-start flex-shrink-0 overflow-hidden bg-default-200 rounded-full outline-none group-data-[focus-visible=true]:z-10 group-data-[focus-visible=true]:ring-2 group-data-[focus-visible=true]:ring-focus group-data-[focus-visible=true]:ring-offset-2 group-data-[focus-visible=true]:ring-offset-background group-data-[selected=true]:bg-primary group-data-[selected=true]:text-primary-foreground w-12 h-7 mr-2 rtl:ml-2 rtl:mr-[unset] transition-background"
               >
                 <span
-                  class="jsx-791876786 sun-moon"
+                  class="z-0 absolute left-1.5 rtl:right-1.5 rtl:left-[unset] text-current text-small opacity-0 scale-50 transition-transform-opacity group-data-[selected=true]:scale-100 group-data-[selected=true]:opacity-100"
+                  height="1em"
+                  width="1em"
                 >
                   ☀️
                 </span>
-              </div>
-              <div
-                class="react-toggle-track-x"
-              >
                 <span
-                  class="jsx-791876786 sun-moon"
+                  class="z-10 flex items-center justify-center bg-white shadow-small rounded-full origin-right w-5 h-5 text-small group-data-[selected=true]:ml-5 rtl:group-data-[selected=true]:ml-0 rtl:group-data-[selected=true]:mr-5 transition-all group-data-[pressed=true]:w-6 group-data-[selected]:group-data-[pressed]:ml-4"
+                />
+                <span
+                  class="z-0 absolute right-1.5 rtl:left-1.5 rtl:right-[unset] text-default-600 text-small opacity-100 transition-transform-opacity group-data-[selected=true]:translate-x-3 group-data-[selected=true]:opacity-0"
+                  height="1em"
+                  width="1em"
                 >
                   🌙
                 </span>
-              </div>
-            </div>
-            <div
-              class="react-toggle-thumb"
-            />
-            <input
-              checked=""
-              class="react-toggle-screenreader-only"
-              type="checkbox"
-            />
+              </span>
+            </label>
           </div>
         </div>
-      </div>
-    </footer>
+      </footer>
+    </div>
   </div>
 </DocumentFragment>
 `;
