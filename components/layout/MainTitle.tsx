@@ -1,10 +1,9 @@
 import converter from "phonetic-alphabet-converter";
-import { Popover, PopoverContent, PopoverTrigger } from "@nextui-org/react";
-import { useCallback, useState } from "react";
 import { Textfit } from "@aw-web-design/react-textfit";
 import { RocketcrabMode } from "../../types/enums";
 import { MODE_MAP } from "../../utils/utils";
 import classNames from "classnames";
+import ClickToCopy from "../common/ClickToCopy";
 
 const MainTitle = ({
     path = "",
@@ -14,15 +13,6 @@ const MainTitle = ({
 }: MainTitleProps): JSX.Element => {
     const host = MODE_MAP[mode];
     const title = host + (path ? "/" + path : "");
-
-    const [copiedTooltip, setCopiedTooltip] = useState(false);
-
-    const linkCopyClick = useCallback(() => {
-        setCopiedTooltip(true);
-        navigator.clipboard.writeText(`https://${host}/${path}`);
-
-        setTimeout(() => setCopiedTooltip(false), 1000);
-    }, [host, path]);
 
     return (
         <div
@@ -40,22 +30,9 @@ const MainTitle = ({
                 <img src="/crab.svg" className="crab" alt="rocketcrab logo" />
             </div>
             <Textfit mode="single">
-                <Popover
-                    isOpen={copiedTooltip}
-                    onOpenChange={(open) => setCopiedTooltip(open)}
-                >
-                    <PopoverTrigger>
-                        <div
-                            className="party-url font-bold my-2"
-                            onClick={linkCopyClick}
-                        >
-                            {title}
-                        </div>
-                    </PopoverTrigger>
-                    <PopoverContent>
-                        <div className="text-medium">Copied!</div>
-                    </PopoverContent>
-                </Popover>
+                <ClickToCopy>
+                    <div className="party-url font-bold my-2">{title}</div>
+                </ClickToCopy>
             </Textfit>
 
             {path && !disablePhonetic && (

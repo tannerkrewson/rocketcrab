@@ -9,6 +9,7 @@ import {
     useDisclosure,
 } from "@nextui-org/react";
 import { ModalContext } from "../../pages/_app";
+import QRCode from "react-qr-code";
 
 const Modal = ({ state }) => {
     const { isOpen, onOpen, onOpenChange } = useDisclosure();
@@ -34,7 +35,15 @@ const Modal = ({ state }) => {
                         <ModalHeader className="flex flex-col gap-1">
                             {state.title}
                         </ModalHeader>
-                        <ModalBody>{state.text}</ModalBody>
+                        <ModalBody>
+                            {state.qr ? (
+                                <div className="flex justify-center">
+                                    <QRCode value={state.qr}></QRCode>
+                                </div>
+                            ) : (
+                                state.text
+                            )}
+                        </ModalBody>
                         <ModalFooter>
                             {state.showCancelButton && (
                                 <Button

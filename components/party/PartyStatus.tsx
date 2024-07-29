@@ -82,7 +82,7 @@ const getPreSelectedGameStatus = (
     }
 
     return onlyOnePlayer
-        ? "⬆️ Give this link to your friends! ⬆️ \n (You can tap it to copy!)"
+        ? "Welcome to Rocketcrab!"
         : isHost
           ? "As the host, you must select the game!"
           : `Waiting for ${hostName} to select a game...`;

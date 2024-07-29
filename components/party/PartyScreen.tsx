@@ -15,6 +15,7 @@ import { isFuture } from "date-fns";
 import { useIsAlreadyPWA } from "../../utils/useIsAlreadyPWA";
 import { RocketcrabMode } from "../../types/enums";
 import { ModalContext } from "../../pages/_app";
+import ShareButtons from "./ShareButtons";
 
 const PartyScreen = ({
     partyState,
@@ -147,6 +148,7 @@ const PartyScreen = ({
 
     return (
         <div className="flex flex-col justify-center space-y-4">
+            <ShareButtons />
             <PartyStatus
                 selectedGame={selectedGame}
                 host={host}
