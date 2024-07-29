@@ -43,6 +43,9 @@ const game: ServerGame = {
     connectToGame: async () => {
         const newUrl = "https://spyfall.tannerkrewson.com/new";
         const { gameCode } = await postJson(newUrl);
+
+        if (!gameCode) throw "Failed to create Spyfall game";
+
         return {
             player: { url: "https://spyfall.tannerkrewson.com/" + gameCode },
         };
