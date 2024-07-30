@@ -54,6 +54,7 @@ export const Join = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                     disabled={joinLoading}
                     errorMessage={`${invalid} does not exist 😞`}
                     isInvalid={invalid && !hasStartedTyping}
+                    spellCheck="false"
                     {...bindings}
                 />
             </div>
