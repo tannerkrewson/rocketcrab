@@ -1,5 +1,4 @@
 import { Badge, Spacer } from "@nextui-org/react";
-import toast, { Toaster } from "react-hot-toast";
 import PrimaryButton from "../common/PrimaryButton";
 import React, { useCallback, useContext, useEffect, useState } from "react";
 import {
@@ -23,6 +22,10 @@ import { RocketcrabMode } from "../../types/enums";
 import { useRouter } from "next/router";
 import { ModalContext } from "../../pages/_app";
 import classNames from "classnames";
+import { ToastContainer, toast } from "react-toastify";
+
+import "react-toastify/dist/ReactToastify.css";
+import { useDarkMode } from "next-dark-mode";
 
 const GameLayout = ({
     partyState,
@@ -61,6 +64,8 @@ const GameLayout = ({
 
     const [enableToasts, setEnableToasts] = useState(!isKidsMode);
     const [lastShownToastDate, setLastShownToastDate] = useState(0);
+
+    const { darkModeActive } = useDarkMode();
 
     const igLogEvent = useCallback(
         (event) => logEvent("inGame-" + event, isHost ? "isHost" : "notHost"),
@@ -112,31 +117,16 @@ const GameLayout = ({
 
         toast(
             <>
-                <span>
-                    {"🚀🦀 " + playerName + ": " + filterClean(message)}
-                </span>
-                <PrimaryButton
-                    onClick={() => {
-                        toast.dismiss();
-                        promptMute();
-                    }}
-                >
-                    Mute
-                </PrimaryButton>
-                <PrimaryButton
-                    onClick={() => {
-                        toast.dismiss();
-                        setShowMenu(false);
-                        setShowChat(true);
-                        igLogEvent("toastChatReply");
-                    }}
-                >
-                    Reply
-                </PrimaryButton>
-                <PrimaryButton onClick={() => toast.dismiss()}>
-                    Dismiss
-                </PrimaryButton>
+                <b>{playerName}</b>: {filterClean(message)}
             </>,
+            {
+                closeOnClick: true,
+                onClick: () => {
+                    setShowMenu(false);
+                    setShowChat(true);
+                    igLogEvent("toastChatReply");
+                },
+            },
         );
 
         igLogEvent("toastMsg");
@@ -278,7 +268,11 @@ const GameLayout = ({
     }, [setShowGameLibrary, setShowPlayerList, setShowChat]);
     return (
         <div className="flex flex-col h-svh">
-            <Toaster />
+            <ToastContainer
+                stacked
+                hideProgressBar
+                theme={darkModeActive ? "dark" : "light"}
+            />
             <div
                 className={classNames({
                     "flex flex-row justify-between shadow-sm z-10": true,
