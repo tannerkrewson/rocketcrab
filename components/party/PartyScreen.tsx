@@ -166,7 +166,8 @@ const PartyScreen = ({
                     disabled={!selectedGameId || !isHost}
                     onClick={() => onStartGame()}
                     size="lg"
-                    color="danger"
+                    color={!selectedGameId || !isHost ? "default" : "success"}
+                    variant="shadow"
                 >
                     Start Game
                 </PrimaryButton>

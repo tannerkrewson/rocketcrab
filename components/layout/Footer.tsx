@@ -9,10 +9,13 @@ const Footer = (): JSX.Element => {
     const NameWrapper = ({ children }) =>
         !isKidsMode ? (
             <a
-                className="underline text-green-500 decoration-dotted"
+                className="underline decoration-dotted"
                 href="https://www.tannerkrewson.com/"
                 target="_blank"
                 rel="noopener noreferrer"
+                style={{
+                    color: "rgb(23, 201, 100)",
+                }}
             >
                 {children}
             </a>
@@ -29,7 +32,7 @@ const Footer = (): JSX.Element => {
                     <>
                         <br />
                         <a
-                            className="underline text-green-500 decoration-dotted"
+                            className="underline green decoration-dotted"
                             href="https://github.com/tannerkrewson/rocketcrab"
                             target="_blank"
                             rel="noopener noreferrer"
@@ -61,6 +64,10 @@ const Footer = (): JSX.Element => {
                     font-size: 12px;
                     text-align: center;
                     margin-bottom: 2em;
+                }
+
+                .green {
+                    color: rgb(23, 201, 100);
                 }
 
                 a:hover {
