@@ -11,7 +11,6 @@ import { NextUIProvider } from "@nextui-org/react";
 
 import "../styles/global.css";
 import Modal from "../components/common/Modal";
-import classNames from "classnames";
 
 export const ModalContext = createContext(null);
 
@@ -39,17 +38,21 @@ const App = ({ Component, pageProps }: AppPropsType): JSX.Element => {
 
     const { darkModeActive } = useDarkMode();
 
+    useEffect(() => {
+        if (darkModeActive) {
+            document
+                .querySelector("body")
+                .classList.add("dark", "text-foreground", "bg-background");
+        } else {
+            document.querySelector("body").classList.remove("dark");
+        }
+    }, [darkModeActive]);
+
     return (
         <ModalContext.Provider value={setModalState}>
             <NextUIProvider>
                 <Body>
-                    <main
-                        className={classNames(
-                            darkModeActive ? "dark" : "",
-                            "text-foreground",
-                            "bg-background",
-                        )}
-                    >
+                    <main>
                         <Component {...pageProps} />
                         <Modal state={modalState} />
                     </main>
