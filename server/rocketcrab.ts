@@ -7,7 +7,6 @@ import {
     FinderState,
     FINDER_ACTIVE_MS,
     MAX_CHATS_OVERALL,
-    MAX_CHATS_FROM_SINGLE_PLAYER,
 } from "../types/types";
 import {
     PartyStatus,
@@ -410,7 +409,7 @@ export const addChatMessage = (
         date: Date.now().valueOf(),
     });
 
-    purgeOverflowMsgs(player, party);
+    purgeOverflowMsgs(party);
 
     return true;
 };
@@ -431,26 +430,7 @@ export const kickPlayer = (
     removePlayer(playerToKick, party);
 };
 
-const purgeOverflowMsgs = (player: Player, party: Party): void => {
-    const numberOfMsgsFromThisPlayer = party.chat.reduce(
-        (prev, cur) => prev + (cur.playerId === player.id ? 1 : 0),
-        0,
-    );
-
-    let numberOfMsgsToRemove =
-        numberOfMsgsFromThisPlayer - MAX_CHATS_FROM_SINGLE_PLAYER;
-
-    if (numberOfMsgsToRemove > 0) {
-        // removes from the beginning, which will be the oldest msgs
-        party.chat = party.chat.filter(({ playerId }) => {
-            if (playerId === player.id && numberOfMsgsToRemove > 0) {
-                numberOfMsgsToRemove--;
-                return false;
-            }
-            return true;
-        });
-    }
-
+const purgeOverflowMsgs = (party: Party): void => {
     // remove overflow from the beginning (oldest)
     if (party.chat.length > MAX_CHATS_OVERALL) {
         party.chat.splice(0, party.chat.length - MAX_CHATS_OVERALL);

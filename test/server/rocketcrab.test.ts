@@ -27,7 +27,6 @@ import {
     FINDER_ACTIVE_MS,
     MAX_CHAT_MSG_LEN,
     MIN_MS_BETWEEN_MSGS,
-    MAX_CHATS_FROM_SINGLE_PLAYER,
     MAX_CHATS_OVERALL,
 } from "../../types/types";
 import {
@@ -639,30 +638,6 @@ describe("server/rocketcrab.ts", () => {
 
         return { result, mockParty };
     };
-
-    it("addChatMessage purges old msgs from same player", () => {
-        const { result, mockParty } = testAddChatMessagePurge(
-            MAX_CHATS_FROM_SINGLE_PLAYER,
-        );
-
-        expect(result).toBe(true);
-        expect(mockParty.chat.length).toBe(MAX_CHATS_FROM_SINGLE_PLAYER);
-        expect(mockParty.chat[0].message).toBe("msg-" + 1);
-        expect(mockParty.chat[1].message).toBe("msg-" + 2);
-        expect(mockParty.chat[2].message).toBe("Hello again");
-    });
-
-    it("addChatMessage doesn't purge if under MAX_CHATS_FROM_SINGLE_PLAYER", () => {
-        const { result, mockParty } = testAddChatMessagePurge(
-            MAX_CHATS_FROM_SINGLE_PLAYER - 1,
-        );
-
-        expect(result).toBe(true);
-        expect(mockParty.chat.length).toBe(MAX_CHATS_FROM_SINGLE_PLAYER);
-        expect(mockParty.chat[0].message).toBe("msg-" + 0);
-        expect(mockParty.chat[1].message).toBe("msg-" + 1);
-        expect(mockParty.chat[2].message).toBe("Hello again");
-    });
 
     it("addChatMessage purges if over MAX_CHATS_OVERALL", () => {
         const { result, mockParty } = testAddChatMessagePurge(
