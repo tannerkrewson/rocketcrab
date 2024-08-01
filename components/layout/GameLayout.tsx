@@ -130,13 +130,15 @@ const GameLayout = ({
         );
 
         igLogEvent("toastMsg");
+
+        // don't include showChat because it changing shouldn't
+        // cause a toast to appear
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [
         enableToasts,
         igLogEvent,
         lastShownToastDate,
         newestMsg,
-        promptMute,
-        showChat,
         thisPlayer.id,
     ]);
 
