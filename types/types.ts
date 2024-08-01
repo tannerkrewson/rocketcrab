@@ -6,7 +6,7 @@ import type { Socket } from "socket.io";
 export const FINDER_ACTIVE_MS = 10 * 60 * 1000; // 10 minutes
 export const MAX_CHAT_MSG_LEN = 100;
 export const MAX_CHATS_OVERALL = 20;
-export const MIN_MS_BETWEEN_MSGS = 5 * 1000; // 5 seconds
+export const MIN_MS_BETWEEN_MSGS = 1 * 1000; // 1 second
 export const ENABLE_FILTER = true;
 
 export type RocketCrab = {
