@@ -4,6 +4,7 @@ import {
     ChatMessage,
     ENABLE_FILTER,
     MAX_CHAT_MSG_LEN,
+    MIN_MS_BETWEEN_MSGS,
     Player,
 } from "../../types/types";
 import { filterClean, isChatMsgValid } from "../../utils/utils";
@@ -29,6 +30,7 @@ export const ChatBox = ({
 }): JSX.Element => {
     const [msgToSend, setMsgToSend] = useState("");
     const [isChatShowing, setIsChatShowing] = useState(!startHidden);
+    const [isChatSendDisabled, setIsChatSendDisabled] = useState(false);
 
     const messagesEndRef = useRef(null);
     const [isFirstRender, setIsFirstRender] = useState(true);
@@ -39,6 +41,9 @@ export const ChatBox = ({
 
         onSendChat(msgToSend);
         setMsgToSend("");
+        setIsChatSendDisabled(true);
+
+        setTimeout(() => setIsChatSendDisabled(false), MIN_MS_BETWEEN_MSGS);
     };
 
     const onEnter = (e) => {
@@ -94,7 +99,11 @@ export const ChatBox = ({
                     onValueChange={setMsgToSend}
                 />
                 <div className="send-container">
-                    <PrimaryButton size="sm" onClick={handleConfirm}>
+                    <PrimaryButton
+                        size="sm"
+                        onClick={handleConfirm}
+                        disabled={isChatSendDisabled}
+                    >
                         Send
                     </PrimaryButton>
                 </div>
