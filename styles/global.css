@@ -11,3 +11,13 @@
     letter-spacing: normal !important;
     font-family: "Mukta", sans-serif;
 }
+
+a {
+    color: rgb(23, 201, 100);
+    text-decoration: underline;
+    text-decoration-style: dotted;
+}
+
+a:hover {
+    text-decoration: underline;
+}
