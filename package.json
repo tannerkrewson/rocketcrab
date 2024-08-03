@@ -34,6 +34,7 @@
         "cross-env": "^7.0.3",
         "date-fns": "^3.6.0",
         "dexie": "^4.0.8",
+        "emoji-picker-react": "^4.11.1",
         "express": "^4.19.2",
         "fontsource-inconsolata": "^3.0.5",
         "fontsource-mukta": "^3.0.5",

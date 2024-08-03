@@ -26,6 +26,7 @@ import { ToastContainer, toast } from "react-toastify";
 
 import "react-toastify/dist/ReactToastify.css";
 import { useDarkMode } from "next-dark-mode";
+import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
 
 const GameLayout = ({
     partyState,
@@ -58,6 +59,7 @@ const GameLayout = ({
     const [showPlayerList, setShowPlayerList] = useState(false);
     const [showChat, setShowChat] = useState(false);
     const [showGameInfo, setShowGameInfo] = useState(false);
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
 
     // https://stackoverflow.com/a/48830513
     const [frameRefresh, setFrameRefresh] = useState(0);
@@ -259,6 +261,7 @@ const GameLayout = ({
         setShowPlayerList(false);
         setShowChat(false);
         setShowGameInfo(false);
+        setShowEmojiPicker(false);
     }, [setShowGameLibrary, setShowPlayerList, setShowChat]);
     return (
         <div className="flex flex-col h-svh">
@@ -299,6 +302,16 @@ const GameLayout = ({
                             {host}/{code}
                         </div>
                         <div className="p-2">
+                            <PrimaryButton
+                                onClick={() => {
+                                    setShowMenu(false);
+                                    setShowEmojiPicker(!showEmojiPicker);
+                                    igLogEvent("openEmojiPicker");
+                                }}
+                                size="sm"
+                            >
+                                😀
+                            </PrimaryButton>
                             <Badge
                                 color="danger"
                                 isInvisible={
@@ -419,6 +432,22 @@ const GameLayout = ({
                         allCategories={gameLibrary.categories}
                     />
                     <Spacer y={0.5} />
+                    <PrimaryButton onClick={hideAllWindows}>
+                        Close
+                    </PrimaryButton>
+                </div>
+            )}
+            {showEmojiPicker && (
+                <div className="component-frame bg-background">
+                    <EmojiPicker
+                        reactionsDefaultOpen={true}
+                        emojiStyle={"native" as EmojiStyle}
+                        theme={(darkModeActive ? "dark" : "light") as Theme}
+                        onEmojiClick={({ emoji }) => {
+                            onSendChat(emoji);
+                            hideAllWindows();
+                        }}
+                    />
                     <PrimaryButton onClick={hideAllWindows}>
                         Close
                     </PrimaryButton>
