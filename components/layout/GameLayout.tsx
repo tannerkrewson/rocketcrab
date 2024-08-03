@@ -1,4 +1,4 @@
-import { Badge, Button, Spacer } from "@nextui-org/react";
+import { Button, Spacer } from "@nextui-org/react";
 import PrimaryButton from "../common/PrimaryButton";
 import React, { useCallback, useContext, useEffect, useState } from "react";
 import {
@@ -164,6 +164,7 @@ const GameLayout = ({
                 setShowPlayerList(true);
                 igLogEvent("showPlayers");
             }, [igLogEvent]),
+            badgeCount: partyState?.playerList?.length,
         },
         {
             label: "About this game",
@@ -257,11 +258,6 @@ const GameLayout = ({
         },
     ];
 
-    const combinedMenuBadgeCount = menuButtons.reduce(
-        (prev, curr) => prev + (curr.badgeCount ?? 0),
-        0,
-    );
-
     const hideAllWindows = useCallback(() => {
         setShowGameLibrary(false);
         setShowPlayerList(false);
@@ -308,25 +304,16 @@ const GameLayout = ({
                             {host}/{code}
                         </div>
                         <div className="p-2">
-                            <Badge
-                                color="danger"
-                                isInvisible={
-                                    showMenu || combinedMenuBadgeCount === 0
-                                }
-                                content={combinedMenuBadgeCount}
-                                placement="bottom-left"
+                            <PrimaryButton
+                                onClick={() => {
+                                    setShowMenu(!showMenu);
+                                    hideAllWindows();
+                                    igLogEvent("clickMenu");
+                                }}
+                                size="sm"
                             >
-                                <PrimaryButton
-                                    onClick={() => {
-                                        setShowMenu(!showMenu);
-                                        hideAllWindows();
-                                        igLogEvent("clickMenu");
-                                    }}
-                                    size="sm"
-                                >
-                                    {showMenu ? "▲" : "▼"} Menu
-                                </PrimaryButton>
-                            </Badge>
+                                {showMenu ? "▲" : "▼"} Menu
+                            </PrimaryButton>
                         </div>
 
                         {showMenu && (

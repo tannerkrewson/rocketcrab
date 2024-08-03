@@ -1,7 +1,7 @@
 import PrimaryButton from "../common/PrimaryButton";
 import { MenuButton } from "../../types/types";
 import React from "react";
-import { Badge } from "@nextui-org/react";
+import { Chip } from "@nextui-org/react";
 import { ThemeToggle } from "../common/ThemeToggle";
 
 const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => {
@@ -20,10 +20,9 @@ const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => {
                     >
                         {label}
                         {badgeCount > 0 && (
-                            <>
-                                &nbsp;
-                                <Badge color="danger">{badgeCount}</Badge>
-                            </>
+                            <Chip size="sm" color="default">
+                                {badgeCount}
+                            </Chip>
                         )}
                     </PrimaryButton>
                 ))}
