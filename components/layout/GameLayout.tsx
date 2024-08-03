@@ -1,4 +1,4 @@
-import { Badge, Spacer } from "@nextui-org/react";
+import { Badge, Button, Spacer } from "@nextui-org/react";
 import PrimaryButton from "../common/PrimaryButton";
 import React, { useCallback, useContext, useEffect, useState } from "react";
 import {
@@ -116,12 +116,17 @@ const GameLayout = ({
 
         toast(
             <>
-                {partyState?.playerList?.length > 2 && (
-                    <>
-                        <b>{playerName}</b>:{" "}
-                    </>
-                )}
-                {filterClean(message)}
+                <div className="flex items-center space-x-1">
+                    <div>{playerName}: </div>
+
+                    <div
+                        className={classNames({
+                            "text-4xl": message.length < 3,
+                        })}
+                    >
+                        {filterClean(message)}
+                    </div>
+                </div>
             </>,
             {
                 closeOnClick: true,
@@ -302,16 +307,6 @@ const GameLayout = ({
                             {host}/{code}
                         </div>
                         <div className="p-2">
-                            <PrimaryButton
-                                onClick={() => {
-                                    setShowMenu(false);
-                                    setShowEmojiPicker(!showEmojiPicker);
-                                    igLogEvent("openEmojiPicker");
-                                }}
-                                size="sm"
-                            >
-                                😀
-                            </PrimaryButton>
                             <Badge
                                 color="danger"
                                 isInvisible={
@@ -342,6 +337,32 @@ const GameLayout = ({
                     </>
                 )}
             </div>
+            <Button
+                radius="full"
+                size="lg"
+                isIconOnly
+                variant="faded"
+                onClick={() => {
+                    setShowMenu(false);
+                    setShowEmojiPicker(!showEmojiPicker);
+                    igLogEvent("openEmojiPicker");
+                }}
+                className="fixed bottom-2 right-2"
+            >
+                {showEmojiPicker ? (
+                    <img
+                        src={`/close-${darkModeActive ? "dark" : "light"}.svg`}
+                        alt="Close reaction button"
+                        className="w-6"
+                    />
+                ) : (
+                    <img
+                        src={`/smile-${darkModeActive ? "dark" : "light"}.svg`}
+                        alt="Reaction button"
+                        className="w-8"
+                    />
+                )}
+            </Button>
             <GameFrame
                 gameState={gameState}
                 selectedGameId={selectedGameId}
@@ -438,19 +459,17 @@ const GameLayout = ({
                 </div>
             )}
             {showEmojiPicker && (
-                <div className="component-frame bg-background">
+                <div className="fixed bottom-2 left-2">
                     <EmojiPicker
                         reactionsDefaultOpen={true}
                         emojiStyle={"native" as EmojiStyle}
                         theme={(darkModeActive ? "dark" : "light") as Theme}
+                        autoFocusSearch={false}
                         onEmojiClick={({ emoji }) => {
                             onSendChat(emoji);
                             hideAllWindows();
                         }}
                     />
-                    <PrimaryButton onClick={hideAllWindows}>
-                        Close
-                    </PrimaryButton>
                 </div>
             )}
             <style jsx>{`
