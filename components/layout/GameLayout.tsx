@@ -114,7 +114,12 @@ const GameLayout = ({
 
         toast(
             <>
-                <b>{playerName}</b>: {filterClean(message)}
+                {partyState?.playerList?.length > 2 && (
+                    <>
+                        <b>{playerName}</b>:{" "}
+                    </>
+                )}
+                {filterClean(message)}
             </>,
             {
                 closeOnClick: true,
