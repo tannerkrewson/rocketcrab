@@ -63,7 +63,6 @@ const GameLayout = ({
     const [frameRefresh, setFrameRefresh] = useState(0);
 
     const [enableToasts, setEnableToasts] = useState(!isKidsMode);
-    const [lastShownToastDate, setLastShownToastDate] = useState(0);
 
     const { darkModeActive } = useDarkMode();
 
@@ -96,13 +95,11 @@ const GameLayout = ({
 
         const { playerId, playerName, message, date } = newestMsg;
 
-        const lastMessageCameInOverOneSecondAgo =
-            differenceInMilliseconds(Date.now(), date) > 1000;
+        // is latest message over 3 seconds old
+        const isLatestMessageOld =
+            differenceInMilliseconds(Date.now(), date) > 3000;
 
-        // don't show a toast for an old message that happens to be the latest
-        // when we are initializing
-        if (!lastShownToastDate && lastMessageCameInOverOneSecondAgo) {
-            setLastShownToastDate(date);
+        if (isLatestMessageOld) {
             return;
         }
 
@@ -130,17 +127,7 @@ const GameLayout = ({
         );
 
         igLogEvent("toastMsg");
-
-        // don't include showChat because it changing shouldn't
-        // cause a toast to appear
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [
-        enableToasts,
-        igLogEvent,
-        lastShownToastDate,
-        newestMsg,
-        thisPlayer.id,
-    ]);
+    }, [enableToasts, igLogEvent, newestMsg, showChat, thisPlayer.id]);
 
     const hostName = playerList.find(({ isHost }) => isHost).name;
 
