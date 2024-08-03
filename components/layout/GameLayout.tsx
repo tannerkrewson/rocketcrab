@@ -60,6 +60,7 @@ const GameLayout = ({
     const [showChat, setShowChat] = useState(false);
     const [showGameInfo, setShowGameInfo] = useState(false);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [showEmojiButton, setShowEmojiButton] = useState(true);
 
     // https://stackoverflow.com/a/48830513
     const [frameRefresh, setFrameRefresh] = useState(0);
@@ -97,9 +98,9 @@ const GameLayout = ({
 
         const { playerId, playerName, message, date } = newestMsg;
 
-        // is latest message over 3 seconds old
+        // is latest message over 2 seconds old
         const isLatestMessageOld =
-            differenceInMilliseconds(Date.now(), date) > 3000;
+            differenceInMilliseconds(Date.now(), date) > 2000;
 
         if (isLatestMessageOld) {
             return;
@@ -337,32 +338,34 @@ const GameLayout = ({
                     </>
                 )}
             </div>
-            <Button
-                radius="full"
-                size="lg"
-                isIconOnly
-                variant="faded"
-                onClick={() => {
-                    setShowMenu(false);
-                    setShowEmojiPicker(!showEmojiPicker);
-                    igLogEvent("openEmojiPicker");
-                }}
-                className="fixed bottom-2 right-2"
-            >
-                {showEmojiPicker ? (
-                    <img
-                        src={`/close-${darkModeActive ? "dark" : "light"}.svg`}
-                        alt="Close reaction button"
-                        className="w-6"
-                    />
-                ) : (
-                    <img
-                        src={`/smile-${darkModeActive ? "dark" : "light"}.svg`}
-                        alt="Reaction button"
-                        className="w-8"
-                    />
-                )}
-            </Button>
+            {showEmojiButton && (
+                <Button
+                    radius="full"
+                    size="lg"
+                    isIconOnly
+                    variant="faded"
+                    onClick={() => {
+                        setShowMenu(false);
+                        setShowEmojiPicker(!showEmojiPicker);
+                        igLogEvent("openEmojiPicker");
+                    }}
+                    className="fixed bottom-2 right-2"
+                >
+                    {showEmojiPicker ? (
+                        <img
+                            src={`/close-${darkModeActive ? "dark" : "light"}.svg`}
+                            alt="Close reaction button"
+                            className="w-6"
+                        />
+                    ) : (
+                        <img
+                            src={`/smile-${darkModeActive ? "dark" : "light"}.svg`}
+                            alt="Reaction button"
+                            className="w-8"
+                        />
+                    )}
+                </Button>
+            )}
             <GameFrame
                 gameState={gameState}
                 selectedGameId={selectedGameId}
@@ -431,9 +434,13 @@ const GameLayout = ({
                     />
                     <Spacer y={0.5} />
                     <div className="flex mt-4 justify-center space-x-2">
-                        <PrimaryButton onClick={hideAllWindows}>
-                            Close
-                        </PrimaryButton>
+                        <PrimaryButton
+                            onClick={() => setShowEmojiButton(!showEmojiButton)}
+                        >
+                            {showEmojiButton
+                                ? "Hide 🙂 Button"
+                                : "Show 🙂 Button"}
+                        </PrimaryButton>{" "}
                         <PrimaryButton
                             onClick={
                                 enableToasts
@@ -442,6 +449,9 @@ const GameLayout = ({
                             }
                         >
                             {enableToasts ? "Mute" : "Unmute"}
+                        </PrimaryButton>{" "}
+                        <PrimaryButton onClick={hideAllWindows}>
+                            Close
                         </PrimaryButton>
                     </div>
                 </div>
