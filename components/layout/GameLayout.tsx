@@ -435,13 +435,15 @@ const GameLayout = ({
                     <Spacer y={0.5} />
                     <div className="flex mt-4 justify-center space-x-2">
                         <PrimaryButton
+                            size="sm"
                             onClick={() => setShowEmojiButton(!showEmojiButton)}
                         >
                             {showEmojiButton
                                 ? "Hide 🙂 Button"
                                 : "Show 🙂 Button"}
-                        </PrimaryButton>{" "}
+                        </PrimaryButton>
                         <PrimaryButton
+                            size="sm"
                             onClick={
                                 enableToasts
                                     ? promptMute
@@ -449,8 +451,8 @@ const GameLayout = ({
                             }
                         >
                             {enableToasts ? "Mute" : "Unmute"}
-                        </PrimaryButton>{" "}
-                        <PrimaryButton onClick={hideAllWindows}>
+                        </PrimaryButton>
+                        <PrimaryButton size="sm" onClick={hideAllWindows}>
                             Close
                         </PrimaryButton>
                     </div>

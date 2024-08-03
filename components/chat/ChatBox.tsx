@@ -100,9 +100,8 @@ export const ChatBox = ({
                 />
                 <div className="send-container">
                     <PrimaryButton
-                        size="sm"
                         onClick={handleConfirm}
-                        disabled={isChatSendDisabled}
+                        disabled={isChatSendDisabled || !msgToSend.length}
                     >
                         Send
                     </PrimaryButton>
