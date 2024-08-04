@@ -75,12 +75,6 @@ exports[`pages/index.tsx matches snapshot 1`] = `
       <div
         class="jsx-890958437 btn-col space-y-2"
       >
-        <button
-          class="z-0 group relative inline-flex items-center justify-center box-border appearance-none select-none whitespace-nowrap font-normal subpixel-antialiased overflow-hidden tap-highlight-transparent data-[pressed=true]:scale-[0.97] outline-none data-[focus-visible=true]:z-10 data-[focus-visible=true]:outline-2 data-[focus-visible=true]:outline-focus data-[focus-visible=true]:outline-offset-2 border-medium px-4 min-w-20 h-10 text-small gap-2 rounded-medium [&>svg]:max-w-[theme(spacing.8)] transition-transform-colors-opacity motion-reduce:transition-none border-default bg-default-100 text-default-foreground data-[hover=true]:opacity-hover"
-          type="button"
-        >
-          Add 🚀🦀 App
-        </button>
         <a
           class="link"
           href="https://kids.rocketcrab.com/"
@@ -132,18 +126,17 @@ exports[`pages/index.tsx matches snapshot 1`] = `
       class="w-full"
     >
       <footer
-        class="jsx-3899203255"
+        class="jsx-890225678"
         style="margin-top: 1em;"
       >
         <div
-          class="jsx-3899203255 side"
+          class="jsx-890225678 side"
         />
         <div
-          class="jsx-3899203255 tag"
+          class="jsx-890225678 tag"
         >
           rocketcrab by 
           <a
-            class="underline text-green-500 decoration-dotted"
             href="https://www.tannerkrewson.com/"
             rel="noopener noreferrer"
             target="_blank"
@@ -151,10 +144,10 @@ exports[`pages/index.tsx matches snapshot 1`] = `
             Tanner Krewson
           </a>
           <br
-            class="jsx-3899203255"
+            class="jsx-890225678"
           />
           <a
-            class="jsx-3899203255 underline text-green-500 decoration-dotted"
+            class="jsx-890225678"
             href="https://github.com/tannerkrewson/rocketcrab"
             rel="noopener noreferrer"
             target="_blank"
@@ -163,10 +156,10 @@ exports[`pages/index.tsx matches snapshot 1`] = `
           </a>
         </div>
         <div
-          class="jsx-3899203255 side"
+          class="jsx-890225678 side"
         >
           <div
-            class="jsx-3899203255 theme-toggle"
+            class="jsx-890225678 theme-toggle"
           >
             <label
               class="group relative max-w-fit inline-flex items-center justify-start cursor-pointer touch-none tap-highlight-transparent"

@@ -1,11 +1,11 @@
 module.exports = {
     roots: ["<rootDir>"],
-    moduleFileExtensions: ["js", "ts", "tsx", "json"],
     testPathIgnorePatterns: ["<rootDir>[/\\\\](node_modules|.next)[/\\\\]"],
     testEnvironment: "jsdom",
-    transformIgnorePatterns: ["[/\\\\]node_modules[/\\\\].+\\.(ts|tsx)$"],
+    transformIgnorePatterns: ["/node_modules/(?!(swiper))"],
     transform: {
-        "^.+\\.(ts|tsx)$": "babel-jest",
+        "^.+\\.(ts|tsx|js|jsx|mjs)$": "babel-jest",
+        "^.+\\.(css)$": "<rootDir>/test/fileTransform.js",
     },
     watchPlugins: [
         "jest-watch-typeahead/filename",
