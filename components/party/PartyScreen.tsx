@@ -98,6 +98,9 @@ const PartyScreen = ({
                 onDone={showGameSelector(false)}
                 backToLabel="party"
                 isHost={isHost}
+                onSuggestGame={(gameName) => {
+                    onSendChat(`I want to play ${gameName}!`);
+                }}
             />
         );
     }

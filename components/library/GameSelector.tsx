@@ -10,6 +10,7 @@ const GameSelector = ({
     gameLibrary,
     onSelectGame,
     onDone,
+    onSuggestGame,
     backToLabel,
     isHost,
 }: GameSelectorProps): JSX.Element => {
@@ -23,9 +24,21 @@ const GameSelector = ({
     }, [setViewingGameId]);
 
     const onSelectGameButton = useCallback(() => {
-        onSelectGame(viewingGameId, viewingGame.name);
+        if (isHost) {
+            onSelectGame(viewingGameId, viewingGame.name);
+        } else {
+            onSuggestGame(viewingGame.name);
+        }
+
         onDone();
-    }, [onSelectGame, viewingGameId, viewingGame, onDone]);
+    }, [
+        isHost,
+        onDone,
+        onSelectGame,
+        viewingGameId,
+        viewingGame,
+        onSuggestGame,
+    ]);
 
     const libraryState = useLibraryState();
 
@@ -53,11 +66,10 @@ const GameSelector = ({
                             ↩️ Back to search
                         </PrimaryButton>
                         <PrimaryButton
-                            disabled={!isHost}
                             onClick={onSelectGameButton}
-                            color="danger"
+                            color={isHost ? "danger" : "default"}
                         >
-                            Select game
+                            {isHost ? "Select" : "Suggest"} game
                         </PrimaryButton>
                     </div>
                 </>
@@ -70,6 +82,7 @@ type GameSelectorProps = {
     gameLibrary: ClientGameLibrary;
     onSelectGame: (gameId: string, gameName?: string) => void;
     onDone: () => void;
+    onSuggestGame?: (gameName: string) => void;
     backToLabel: string;
     isHost: boolean;
 };

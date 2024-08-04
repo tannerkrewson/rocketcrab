@@ -388,6 +388,9 @@ const GameLayout = ({
                                 },
                             });
                         }}
+                        onSuggestGame={(gameName) => {
+                            onSendChat(`I want to play ${gameName}!`);
+                        }}
                         backToLabel="game"
                         isHost={isHost}
                     />
