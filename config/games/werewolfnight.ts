@@ -1,3 +1,4 @@
+import { RocketcrabMode } from "../../types/enums";
 import { ServerGame } from "../../types/types";
 import { postJson } from "../../utils/utils";
 
@@ -29,7 +30,7 @@ const game: ServerGame = {
     ],
     category: ["hard"],
     players: "5-16",
-    familyFriendly: true,
+    showOn: [RocketcrabMode.MAIN],
     minPlayers: 5,
     maxPlayers: 16,
     connectToGame: async () => {

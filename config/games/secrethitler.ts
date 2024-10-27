@@ -1,3 +1,4 @@
+import { RocketcrabMode } from "../../types/enums";
 import { ServerGame } from "../../types/types";
 import { postJson } from "../../utils/utils";
 
@@ -25,11 +26,12 @@ const game: ServerGame = {
     ],
     category: ["hard"],
     players: "5-10",
-    familyFriendly: false,
+    showOn: [RocketcrabMode.MAIN],
     minPlayers: 5,
     maxPlayers: 10,
     connectToGame: async () => {
-        const newUrl = "https://inspiring-hugle-c583a0.netlify.app/.netlify/functions/secretHitler";
+        const newUrl =
+            "https://inspiring-hugle-c583a0.netlify.app/.netlify/functions/secretHitler";
         const { gameCode } = await postJson(newUrl);
         return {
             player: {

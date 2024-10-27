@@ -1,3 +1,4 @@
+import { RocketcrabMode } from "../../types/enums";
 import { ServerGame } from "../../types/types";
 import { postJson } from "../../utils/utils";
 
@@ -10,9 +11,9 @@ const gameTemplate = (
         category,
         players,
         minPlayers,
-        familyFriendly,
+        showOn,
         pictures,
-    }: Partial<ServerGame>
+    }: Partial<ServerGame>,
 ): ServerGame => ({
     id: "ooc-" + game,
     name: name,
@@ -25,7 +26,7 @@ const gameTemplate = (
     maxPlayers: 255,
     category,
     players,
-    familyFriendly,
+    showOn,
     pictures,
     connectToGame: async () => {
         const origin = "https://outofcontext.party"; // "http://localhost:8080"; // (dev)
@@ -58,7 +59,7 @@ const games: Array<ServerGame> = [
         category: ["writing", "easy"],
         minPlayers: 2,
         players: "2+",
-        familyFriendly: true,
+        showOn: [RocketcrabMode.MAIN],
         pictures: [
             "https://i.imgur.com/d3qNPi4.jpg",
             "https://i.imgur.com/yd8klf4.jpg",
@@ -79,7 +80,7 @@ const games: Array<ServerGame> = [
         category: ["writing", "medium"],
         minPlayers: 4,
         players: "4+",
-        familyFriendly: true,
+        showOn: [RocketcrabMode.MAIN],
         pictures: [
             "https://i.imgur.com/n4QYeLp.jpg",
             "https://i.imgur.com/IQ6DAhF.jpg",
@@ -101,7 +102,7 @@ const games: Array<ServerGame> = [
         category: ["writing", "medium"],
         minPlayers: 2,
         players: "2+",
-        familyFriendly: true,
+        showOn: [RocketcrabMode.MAIN],
         pictures: [
             "https://i.imgur.com/IAC751C.jpg",
             "https://i.imgur.com/BvdwE7v.jpg",
