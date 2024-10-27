@@ -1,9 +1,8 @@
 import CategoryBox from "./CategoryBox";
 import { GameCategory } from "../../types/types";
-import { Grid, Spacer } from "@geist-ui/react";
+import { Spacer } from "@nextui-org/react";
 
 import PrimaryButton from "../common/PrimaryButton";
-import ButtonGroup from "../common/ButtonGroup";
 
 const CategoryGroup = ({
     categories,
@@ -12,7 +11,7 @@ const CategoryGroup = ({
     backToLabel,
 }: CategoryGroupProps): JSX.Element => (
     <>
-        <Grid.Container gap={1}>
+        <div className="my-8 mx-2 grid gap-3 grid-cols-2">
             {categories?.map((category, i) => (
                 <CategoryBox
                     key={category.id}
@@ -21,13 +20,11 @@ const CategoryGroup = ({
                     count={i}
                 />
             ))}
-        </Grid.Container>
+        </div>
         <Spacer y={1} />
-        <ButtonGroup>
-            <PrimaryButton onClick={onDone} size="medium">
-                ↩️ Back to {backToLabel}
-            </PrimaryButton>
-        </ButtonGroup>
+        <PrimaryButton onClick={onDone} size="md">
+            ↩️ Back to {backToLabel}
+        </PrimaryButton>
     </>
 );
 

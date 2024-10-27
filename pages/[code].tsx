@@ -49,7 +49,7 @@ export const Code = ({
 
     const { unreadMsgCount, clearUnreadMsgCount, newestMsg } = useChat(
         chat,
-        me
+        me,
     );
 
     const [myLastValidName, setMyLastValidName] = useState("");
@@ -64,7 +64,7 @@ export const Code = ({
     const [deemphasize, setDeemphasize] = useState(false);
     const onInOutParty = useCallback(
         (outOfParty) => setDeemphasize(outOfParty),
-        [setDeemphasize]
+        [setDeemphasize],
     );
 
     const showLoading = status === "loading";
@@ -125,9 +125,7 @@ export const Code = ({
     );
 };
 
-export const getServerSideProps: GetServerSideProps = async (
-    ctx: GetServerSidePropsContext
-): Promise<any> => {
+export const getServerSideProps = (async (ctx: GetServerSidePropsContext) => {
     const code = ctx.query?.code;
     const mode = ctx.locale as RocketcrabMode;
 
@@ -136,7 +134,7 @@ export const getServerSideProps: GetServerSideProps = async (
 
     try {
         lastPartyState = JSON.parse(
-            parseCookies(ctx).lastPartyState
+            parseCookies(ctx).lastPartyState,
         ) as ClientParty;
 
         isReconnect = lastPartyState.code === code;
@@ -153,7 +151,7 @@ export const getServerSideProps: GetServerSideProps = async (
             isReconnect,
         },
     };
-};
+}) satisfies GetServerSideProps<CodeProps>;
 
 type CodeProps = {
     gameLibrary: ClientGameLibrary;

@@ -61,10 +61,6 @@ const Footer = (): JSX.Element => {
                     margin-bottom: 2em;
                 }
 
-                a:hover {
-                    text-decoration: underline;
-                }
-
                 .theme-toggle {
                     position: absolute;
                     right: 0.9em;

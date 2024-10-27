@@ -1,9 +1,9 @@
 import converter from "phonetic-alphabet-converter";
-import { Tooltip } from "@geist-ui/react";
-import { useCallback, useState } from "react";
-import { Textfit } from "react-textfit";
+import { Textfit } from "@aw-web-design/react-textfit";
 import { RocketcrabMode } from "../../types/enums";
 import { MODE_MAP } from "../../utils/utils";
+import classNames from "classnames";
+import ClickToCopy from "../common/ClickToCopy";
 
 const MainTitle = ({
     path = "",
@@ -14,35 +14,25 @@ const MainTitle = ({
     const host = MODE_MAP[mode];
     const title = host + (path ? "/" + path : "");
 
-    const titleClasses = "title" + (deemphasize ? " deemphasize" : "");
-
-    const [copiedTooltip, setCopiedTooltip] = useState(false);
-
-    const linkCopyClick = useCallback(() => {
-        setCopiedTooltip(true);
-        navigator.clipboard.writeText(`https://${host}/${path}`);
-
-        setTimeout(() => setCopiedTooltip(false), 1000);
-    }, [path]);
-
     return (
-        <div className={titleClasses}>
-            <div style={{ margin: ".5em" }}>
-                <img src="/rocket.svg" className="rocket" />
-                <img src="/crab.svg" className="crab" />
+        <div
+            className={classNames({
+                "title mt-3": true,
+                deemphasize,
+            })}
+        >
+            <div className="flex justify-center items-center">
+                <img
+                    src="/rocket.svg"
+                    className="rocket"
+                    alt="rocketcrab logo"
+                />
+                <img src="/crab.svg" className="crab" alt="rocketcrab logo" />
             </div>
             <Textfit mode="single">
-                <Tooltip
-                    text={"Copied!"}
-                    visible={copiedTooltip}
-                    trigger="click"
-                    type="dark"
-                    offset={-4}
-                >
-                    <h2 className="party-url" onClick={linkCopyClick}>
-                        {title}
-                    </h2>
-                </Tooltip>
+                <ClickToCopy>
+                    <div className="party-url font-bold my-2">{title}</div>
+                </ClickToCopy>
             </Textfit>
 
             {path && !disablePhonetic && (
@@ -54,7 +44,6 @@ const MainTitle = ({
                     .title {
                         transition: all 0.1s ease-out;
                         text-align: center;
-                        margin: 2em 0 0 0;
                     }
                     .deemphasize {
                         margin-top: -0.25em;
@@ -63,9 +52,6 @@ const MainTitle = ({
                         filter: saturate(50%) opacity(50%) blur(1px);
                     }
 
-                    .logo {
-                        margin: 0.5em;
-                    }
                     .rocket {
                         height: 2.6em;
                         margin-right: 0.7em;

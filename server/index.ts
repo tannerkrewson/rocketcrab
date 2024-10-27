@@ -1,5 +1,5 @@
 import next from "next";
-import express, { RequestHandler } from "express";
+import express from "express";
 import { json } from "body-parser";
 import { createServer } from "http";
 import { Server } from "socket.io";
@@ -29,7 +29,7 @@ const nextHandler = nextApp.getRequestHandler();
     attachSocketHandlers(io, rocketCrab);
     initCron(rocketCrab);
 
-    app.get("*", (nextHandler as unknown) as RequestHandler);
+    app.use((req, res) => nextHandler(req, res));
 
     await http.listen(port);
 

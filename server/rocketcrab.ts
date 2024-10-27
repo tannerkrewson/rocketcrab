@@ -7,7 +7,6 @@ import {
     FinderState,
     FINDER_ACTIVE_MS,
     MAX_CHATS_OVERALL,
-    MAX_CHATS_FROM_SINGLE_PLAYER,
 } from "../types/types";
 import {
     PartyStatus,
@@ -77,7 +76,7 @@ export const initCron = (rocketcrab: RocketCrab): void => {
         },
         null,
         true,
-        "America/Chicago"
+        "America/Chicago",
     );
 
     setDates();
@@ -122,7 +121,7 @@ export const newParty = ({
 
     setTimeout(
         () => deletePartyIfEmpty(newParty, partyList),
-        PARTY_EXPIRATION_SEC * 1000
+        PARTY_EXPIRATION_SEC * 1000,
     );
 
     return newParty;
@@ -130,7 +129,7 @@ export const newParty = ({
 
 export const getPartyByCode = (
     newCode: string,
-    partyList: Array<Party>
+    partyList: Array<Party>,
 ): Party => partyList.find(({ code }) => code === newCode);
 
 export const getPartyByUuid = (newUuid: string, partyList: Party[]): Party =>
@@ -138,7 +137,7 @@ export const getPartyByUuid = (newUuid: string, partyList: Party[]): Party =>
 
 export const reconnectToParty = (
     lastPartyState: ClientParty,
-    rocketcrab: RocketCrab
+    rocketcrab: RocketCrab,
 ): Party => {
     const { partyList } = rocketcrab;
 
@@ -182,7 +181,7 @@ export const addPlayer = (
     name: string,
     socket: Socket,
     party: Party,
-    previousId?: number
+    previousId?: number,
 ): Player => {
     const { playerList } = party;
 
@@ -226,7 +225,7 @@ export const sendStateToAll = (
     {
         enableFinderCheck,
         forceFinderUpdate,
-    }: { enableFinderCheck?: boolean; forceFinderUpdate?: boolean } = {}
+    }: { enableFinderCheck?: boolean; forceFinderUpdate?: boolean } = {},
 ): void => {
     party.playerList.forEach(({ socket, ...player }) => {
         const clientParty: ClientParty = {
@@ -247,13 +246,13 @@ export const sendStateToAll = (
 
 export const sendFinderStateToAll = (rocketcrab: RocketCrab): void => {
     rocketcrab.finderSubscribers.forEach((socket) =>
-        socket.emit(SocketEvent.FINDER_UPDATE, getFinderState(rocketcrab))
+        socket.emit(SocketEvent.FINDER_UPDATE, getFinderState(rocketcrab)),
     );
 };
 
 export const shouldSendFinderStateUpdate = (
     { status, isPublic }: Party,
-    { isFinderActive }: RocketCrab
+    { isFinderActive }: RocketCrab,
 ): boolean => {
     const thisPartyIsShownOnFinder = status === PartyStatus.party && isPublic;
 
@@ -277,7 +276,7 @@ export const removePlayer = (player: Player, party: Party): void => {
 
 export const deletePartyIfEmpty = (
     party: Party,
-    partyList: Array<Party>
+    partyList: Array<Party>,
 ): void => {
     const { playerList, code } = party;
 
@@ -293,7 +292,7 @@ export const deletePartyIfEmpty = (
 export const setName = (
     name: string,
     playerToName: Player,
-    playerList: Array<Player>
+    playerList: Array<Player>,
 ): void => {
     const validLength = typeof name === "string" && name.length <= 24;
 
@@ -317,7 +316,7 @@ export const setGame = (gameId: string, party: Party): void => {
 
 export const startGame = async (
     party: Party,
-    rocketcrab: RocketCrab
+    rocketcrab: RocketCrab,
 ): Promise<void> => {
     const { gameState, selectedGameId, playerList } = party;
 
@@ -389,7 +388,7 @@ export const getFinderState = ({
     publicPartyList: partyList
         .filter(
             ({ isPublic, status, selectedGameId }) =>
-                isPublic && status === PartyStatus.party && selectedGameId
+                isPublic && status === PartyStatus.party && selectedGameId,
         )
         .map((party) => getJsonParty(party)),
     finderActiveDates,
@@ -399,7 +398,7 @@ export const getFinderState = ({
 export const addChatMessage = (
     message: string,
     player: Player,
-    party: Party
+    party: Party,
 ): boolean => {
     if (!isChatMsgValid(message, player, party.chat)) return false;
 
@@ -410,7 +409,7 @@ export const addChatMessage = (
         date: Date.now().valueOf(),
     });
 
-    purgeOverflowMsgs(player, party);
+    purgeOverflowMsgs(party);
 
     return true;
 };
@@ -418,7 +417,7 @@ export const addChatMessage = (
 export const kickPlayer = (
     playerId: number,
     isBan: boolean,
-    party: Party
+    party: Party,
 ): void => {
     const playerToKick = party.playerList.find(({ id }) => id === playerId);
 
@@ -431,26 +430,7 @@ export const kickPlayer = (
     removePlayer(playerToKick, party);
 };
 
-const purgeOverflowMsgs = (player: Player, party: Party): void => {
-    const numberOfMsgsFromThisPlayer = party.chat.reduce(
-        (prev, cur) => prev + (cur.playerId === player.id ? 1 : 0),
-        0
-    );
-
-    let numberOfMsgsToRemove =
-        numberOfMsgsFromThisPlayer - MAX_CHATS_FROM_SINGLE_PLAYER;
-
-    if (numberOfMsgsToRemove > 0) {
-        // removes from the beginning, which will be the oldest msgs
-        party.chat = party.chat.filter(({ playerId }) => {
-            if (playerId === player.id && numberOfMsgsToRemove > 0) {
-                numberOfMsgsToRemove--;
-                return false;
-            }
-            return true;
-        });
-    }
-
+const purgeOverflowMsgs = (party: Party): void => {
     // remove overflow from the beginning (oldest)
     if (party.chat.length > MAX_CHATS_OVERALL) {
         party.chat.splice(0, party.chat.length - MAX_CHATS_OVERALL);
@@ -459,7 +439,7 @@ const purgeOverflowMsgs = (player: Player, party: Party): void => {
 
 const findPlayerByName = (
     nameToFind: string,
-    playerList: Array<Player>
+    playerList: Array<Player>,
 ): Player => playerList.find(({ name }) => name === nameToFind);
 
 const findGameById = (gameId: string): ServerGame =>
@@ -497,7 +477,7 @@ const getRandomFourLetters = (): string => {
     return code;
 };
 
-const deleteFromArray = (item: any, array: Array<any>): void => {
+const deleteFromArray = (item: unknown, array: Array<unknown>): void => {
     const index = array.indexOf(item);
     if (index > -1) {
         array.splice(index, 1);

@@ -1,5 +1,5 @@
 import NameBox from "./NameBox";
-import { Grid, Spacer } from "@geist-ui/react";
+import { Spacer } from "@nextui-org/react";
 import { Player } from "../../types/types";
 import React from "react";
 import { CollapseBox } from "../common/CollapseBox";
@@ -22,32 +22,27 @@ const PlayerList = ({
             startHidden={startHidden}
             disableHideShow={disableHideShow}
             badgeCount={playerList.length}
-            badgeType="secondary"
+            badgeType="default"
             onlyShowBadgeWhenCollapsed={false}
         >
             <Spacer y={0.5} />
-            <Grid.Container gap={1}>
-                {playerList.map(({ id, name, isHost }) => (
-                    <Grid xs={12} key={id}>
-                        <NameBox
-                            name={name}
-                            label={[
-                                ...(isMe(id) ? ["You"] : []),
-                                ...(isHost ? ["Host"] : []),
-                            ]}
-                            color={isHost && "#e00"}
-                            onEditName={
-                                !disableEditName && isMe(id) && onEditName
-                            }
-                            onKick={
-                                meIsHost &&
-                                !isMe(id) &&
-                                (() => onKick(id, name))
-                            }
-                        />
-                    </Grid>
+            <div className="mt-4 mx-2 grid gap-3 grid-cols-2">
+                {playerList.map(({ id, name, isHost }, index) => (
+                    <NameBox
+                        key={index}
+                        name={name}
+                        label={[
+                            ...(isMe(id) ? ["You"] : []),
+                            ...(isHost ? ["Host"] : []),
+                        ]}
+                        isHost={isHost}
+                        onEditName={!disableEditName && isMe(id) && onEditName}
+                        onKick={
+                            meIsHost && !isMe(id) && (() => onKick(id, name))
+                        }
+                    />
                 ))}
-            </Grid.Container>
+            </div>
         </CollapseBox>
     );
 };

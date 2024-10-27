@@ -15,7 +15,7 @@ describe("pages/library.tsx", () => {
                 gameLibrary={{} as ClientGameLibrary}
                 mode={RocketcrabMode.MAIN}
             />,
-            {}
+            {},
         );
         expect(asFragment()).toMatchSnapshot();
     });

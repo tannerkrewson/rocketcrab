@@ -1,10 +1,11 @@
-import { Button } from "@geist-ui/react";
+import { Button } from "@nextui-org/react";
 import Link from "next/link";
 
 const PrimaryButton = (props: PrimaryButtonProps): JSX.Element => {
     if (props.href) {
         return (
-            <Link href={props.href} as={props.as}>
+            // TODO: remove locale when sending to prod
+            <Link href={props.href} locale={false}>
                 <div>
                     <ButtonWrapper {...props} />
                 </div>
@@ -29,28 +30,42 @@ const PrimaryButton = (props: PrimaryButtonProps): JSX.Element => {
     }
 };
 
-const ButtonWrapper = ({ manualWidth, ...props }: PrimaryButtonProps) => (
+const ButtonWrapper = (props: PrimaryButtonProps) => (
     <Button
-        type="secondary"
-        ghost
-        shadow
-        auto={!manualWidth}
-        style={{
-            width: manualWidth ? "100%" : "auto",
-        }}
-        {...(props as any)}
-    />
+        size={props.size}
+        onClick={props.onClick}
+        isDisabled={props.disabled}
+        isLoading={props.loading}
+        variant={props.variant || "faded"}
+        color={props.color}
+        fullWidth={props.manualWidth}
+    >
+        {props.children}
+    </Button>
 );
 
 type PrimaryButtonProps = {
-    size?: string;
+    size?: "sm" | "md" | "lg";
     href?: string;
-    onClick?: (e: any) => void;
+    onClick?: React.MouseEventHandler<HTMLButtonElement>;
     disabled?: boolean;
-    as?: string;
     children?: React.ReactNode;
     loading?: boolean;
-    type?: string;
+    variant?:
+        | "faded"
+        | "solid"
+        | "bordered"
+        | "light"
+        | "flat"
+        | "shadow"
+        | "ghost";
+    color?:
+        | "warning"
+        | "default"
+        | "primary"
+        | "secondary"
+        | "success"
+        | "danger";
     url?: string;
     manualWidth?: boolean;
     style?: Record<string, string>;

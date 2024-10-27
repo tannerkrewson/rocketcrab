@@ -4,26 +4,28 @@ import { Application, Request, Response } from "express";
 import { RocketcrabMode } from "../types/enums";
 import { getModeFromHost } from "../utils/utils";
 
-export default (server: Application, rocketcrab: RocketCrab): void => {
+const api = (server: Application, rocketcrab: RocketCrab): void => {
     const { partyList } = rocketcrab;
 
     const getMode = (req: Request) => getModeFromHost(req?.hostname);
 
-    const newPartyHandler = (isPublic: boolean) => (
-        req: Request,
-        res: Response
-    ) => {
-        if (isPublic && !rocketcrab.isFinderActive) {
-            res.status(400).end();
-            return;
-        }
+    const newPartyHandler =
+        (isPublic: boolean) => (req: Request, res: Response) => {
+            if (isPublic && !rocketcrab.isFinderActive) {
+                res.status(400).end();
+                return;
+            }
 
-        const { code } = newParty({ rocketcrab, isPublic, mode: getMode(req) });
-        res.json({ code });
-    };
+            const { code } = newParty({
+                rocketcrab,
+                isPublic,
+                mode: getMode(req),
+            });
+            res.json({ code });
+        };
 
     const localeRedirects = [RocketcrabMode.MAIN, RocketcrabMode.KIDS].map(
-        (mode) => `/${mode}/*`
+        (mode) => `/${mode}/*`,
     );
 
     // redirect https://rocketcrab.com/MAIN/transfer/drawphone
@@ -84,8 +86,10 @@ export default (server: Application, rocketcrab: RocketCrab): void => {
                     gameStatus: gameState.status,
                     selectedGameId,
                     numberOfPlayers: playerList.length,
-                })
-            )
+                }),
+            ),
         );
     });
 };
+
+export default api;

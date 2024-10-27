@@ -17,7 +17,7 @@ export const Library = ({ gameLibrary, mode }: LibraryProps): JSX.Element => {
         (gameId) => {
             router.push("/game/[gameid]", "/game/" + gameId);
         },
-        [router]
+        [router],
     );
 
     const libraryState = useLibraryState();

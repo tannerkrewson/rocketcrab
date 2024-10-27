@@ -1,21 +1,22 @@
-import { Loading, Card } from "@geist-ui/react";
+import { Spinner, Card, CardBody } from "@nextui-org/react";
+import classNames from "classnames";
 
 const NameBox = ({
     name,
-    color,
+    isHost,
     label = [],
     onEditName,
     onKick,
 }: NameBoxProps): JSX.Element => (
     <Card
-        style={{
-            border: "1pt solid " + (color || "#ddd"),
-            borderRadius: "0",
-            boxShadow: "none",
-        }}
+        radius="sm"
+        shadow="sm"
+        className={classNames({
+            "border-1 border-rose-400": isHost,
+        })}
     >
-        <Card.Body style={{ padding: ".5em", position: "relative" }}>
-            {name ? name : <Loading />}
+        <CardBody className="text-center">
+            {name ? name : <Spinner />}
             {onEditName && (
                 <div onClick={onEditName} className="emoji-button">
                     ✏️
@@ -38,19 +39,19 @@ const NameBox = ({
                     position: absolute;
                     text-align: right;
                     right: 0.3em;
-                    bottom: 0;
+                    bottom: 0.1em;
                     color: Grey;
                     font-size: 0.8em;
                     font-style: italic;
                 }
             `}</style>
-        </Card.Body>
+        </CardBody>
     </Card>
 );
 
 type NameBoxProps = {
     name?: string;
-    color?: string;
+    isHost?: boolean;
     label?: string[];
     onEditName?: () => void;
     onKick?: () => void;

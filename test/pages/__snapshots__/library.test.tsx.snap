@@ -3,212 +3,194 @@
 exports[`pages/library.tsx matches snapshot 1`] = `
 <DocumentFragment>
   <div
-    class="jsx-1187451143 container"
+    class="flex min-h-svh items-center flex-col"
   >
-    <main
-      class="jsx-1187451143"
+    <div
+      class="flex flex-col justify-center flex-1 max-w-md px-2 w-full"
     >
       <div
-        class="jsx-1187451143 main-content"
+        class="jsx-4268528184 title mt-3"
       >
         <div
-          class="jsx-1758552329 title"
+          class="jsx-4268528184 flex justify-center items-center"
         >
+          <img
+            alt="rocketcrab logo"
+            class="jsx-4268528184 rocket"
+            src="/rocket.svg"
+          />
+          <img
+            alt="rocketcrab logo"
+            class="jsx-4268528184 crab"
+            src="/crab.svg"
+          />
+        </div>
+        <div>
           <div
-            class="jsx-1758552329"
-            style="margin: .5em;"
+            style="display: inline-block; white-space: nowrap;"
           >
-            <img
-              class="jsx-1758552329 rocket"
-              src="/rocket.svg"
-            />
-            <img
-              class="jsx-1758552329 crab"
-              src="/crab.svg"
-            />
-          </div>
-          <div>
             <div
-              style="display: inline-block; white-space: nowrap;"
+              aria-expanded="false"
+              class="z-10 aria-expanded:scale-[0.97] aria-expanded:opacity-70 subpixel-antialiased jsx-4268528184 party-url font-bold my-2"
+              data-slot="trigger"
+              type="button"
             >
-              <div
-                class="jsx-418573366 tooltip "
-              >
-                <h2
-                  class="jsx-1758552329 party-url"
-                >
-                  rocketcrab.com
-                </h2>
-              </div>
+              rocketcrab.com
             </div>
           </div>
         </div>
+      </div>
+      <div
+        style="text-align: center; justify-content: center;"
+      >
+        <span
+          aria-hidden="true"
+          class="w-px h-px block"
+          style="margin-left: 0.25rem; margin-top: 0.5rem;"
+        />
+        <h4>
+          Games
+        </h4>
+        <span
+          aria-hidden="true"
+          class="w-px h-px block"
+          style="margin-left: 0.25rem; margin-top: 0.25rem;"
+        />
         <div
-          style="text-align: center; justify-content: center;"
+          class="group flex flex-col data-[hidden=true]:hidden w-full group relative justify-end data-[has-label=true]:mt-[calc(theme(fontSize.small)_+_12px)]"
+          data-filled="true"
+          data-filled-within="true"
+          data-slot="base"
         >
-          <span
-            class="jsx-3499487811 "
-          />
-          <h4>
-            Games
-          </h4>
-          <span
-            class="jsx-870436695 "
-          />
           <div
-            class="jsx-984614781 with-label"
+            class="h-full flex flex-col"
+            data-slot="main-wrapper"
           >
             <div
-              class="jsx-984614781 input-container "
+              class="relative w-full inline-flex tap-highlight-transparent flex-row items-center shadow-sm px-3 gap-3 bg-default-100 data-[hover=true]:bg-default-200 group-data-[focus=true]:bg-default-100 h-12 min-h-12 rounded-large transition-background motion-reduce:transition-none !duration-150 outline-none group-data-[focus-visible=true]:z-10 group-data-[focus-visible=true]:ring-2 group-data-[focus-visible=true]:ring-focus group-data-[focus-visible=true]:ring-offset-2 group-data-[focus-visible=true]:ring-offset-background"
+              data-slot="input-wrapper"
+              style="cursor: text;"
             >
               <div
-                class="jsx-984614781 input-wrapper   "
+                class="inline-flex w-full items-center h-full box-border"
+                data-slot="inner-wrapper"
               >
-                <span
-                  class="jsx-2794596122 input-icon"
-                >
-                  🔎
-                </span>
                 <input
-                  autocomplete="off"
-                  class="jsx-984614781  left-icon"
+                  aria-label="Search"
+                  class="w-full font-normal bg-transparent !outline-none placeholder:text-foreground-500 focus-visible:outline-none data-[has-start-content=true]:ps-1.5 data-[has-end-content=true]:pe-1.5 file:cursor-pointer file:bg-transparent file:border-0 autofill:bg-transparent bg-clip-text text-medium group-data-[has-value=true]:text-default-foreground"
+                  data-slot="input"
+                  id="react-aria-:r1:"
                   placeholder="Search"
                   type="text"
                   value=""
+                  width="100%"
                 />
-                <div
-                  class="jsx-1717893035 clear-icon "
-                >
-                  <svg
-                    class="jsx-1717893035"
-                    fill="none"
-                    shape-rendering="geometricPrecision"
-                    stroke="currentColor"
-                    stroke-linecap="round"
-                    stroke-linejoin="round"
-                    stroke-width="1.5"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      class="jsx-1717893035"
-                      d="M18 6L6 18"
-                    />
-                    <path
-                      class="jsx-1717893035"
-                      d="M6 6l12 12"
-                    />
-                  </svg>
-                </div>
               </div>
             </div>
           </div>
-          <span
-            class="jsx-870436695 "
-          />
-          <div
-            class="jsx-2819926550 item  jsx-1720607024 "
-          />
-          <span
-            class="jsx-870436695 "
-          />
-          <div
-            class="jsx-4094718877 item justify jsx-1720607024 "
-          >
-            <div
-              class="jsx-2819926550 item  jsx-4216129763 "
-            >
-              <button
-                class="jsx-1244829081 btn "
-                style="width: auto;"
-                type="button"
-              >
-                <div
-                  class="text"
-                >
-                  ↩️ Back to rocketcrab.com
-                </div>
-              </button>
-            </div>
-          </div>
         </div>
-      </div>
-      <div
-        class="jsx-1187451143 height-expander"
-      />
-    </main>
-    <footer
-      class="jsx-3899203255"
-      style="margin-top: 1em;"
-    >
-      <div
-        class="jsx-3899203255 side"
-      />
-      <div
-        class="jsx-3899203255 tag"
-      >
-        rocketcrab by 
-        <a
-          href="https://www.tannerkrewson.com/"
-          rel="noopener noreferrer"
-          target="_blank"
-        >
-          Tanner Krewson
-        </a>
-        <br
-          class="jsx-3899203255"
+        <span
+          aria-hidden="true"
+          class="w-px h-px block"
+          style="margin-left: 0.25rem; margin-top: 0.25rem;"
         />
-        <a
-          class="jsx-3899203255"
-          href="https://github.com/tannerkrewson/rocketcrab"
-          rel="noopener noreferrer"
-          target="_blank"
+        <div
+          class="my-8 mx-2 grid gap-3 grid-cols-2"
+        />
+        <span
+          aria-hidden="true"
+          class="w-px h-px block"
+          style="margin-left: 0.25rem; margin-top: 0.25rem;"
+        />
+        <button
+          class="z-0 group relative inline-flex items-center justify-center box-border appearance-none select-none whitespace-nowrap font-normal subpixel-antialiased overflow-hidden tap-highlight-transparent data-[pressed=true]:scale-[0.97] outline-none data-[focus-visible=true]:z-10 data-[focus-visible=true]:outline-2 data-[focus-visible=true]:outline-focus data-[focus-visible=true]:outline-offset-2 border-medium px-4 min-w-20 h-10 text-small gap-2 rounded-medium [&>svg]:max-w-[theme(spacing.8)] transition-transform-colors-opacity motion-reduce:transition-none border-default bg-default-100 text-default-foreground data-[hover=true]:opacity-hover"
+          type="button"
         >
-          View on GitHub
-        </a>
+          ↩️ Back to rocketcrab.com
+        </button>
       </div>
-      <div
-        class="jsx-3899203255 side"
+    </div>
+    <div
+      class="w-full"
+    >
+      <footer
+        class="jsx-890225678"
+        style="margin-top: 1em;"
       >
         <div
-          class="jsx-3899203255 theme-toggle"
+          class="jsx-890225678 side"
+        />
+        <div
+          class="jsx-890225678 tag"
+        >
+          rocketcrab by 
+          <a
+            href="https://www.tannerkrewson.com/"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            Tanner Krewson
+          </a>
+          <br
+            class="jsx-890225678"
+          />
+          <a
+            class="jsx-890225678"
+            href="https://github.com/tannerkrewson/rocketcrab"
+            rel="noopener noreferrer"
+            target="_blank"
+          >
+            View on GitHub
+          </a>
+        </div>
+        <div
+          class="jsx-890225678 side"
         >
           <div
-            class="react-toggle react-toggle--checked"
+            class="jsx-890225678 theme-toggle"
           >
-            <div
-              class="react-toggle-track"
+            <label
+              class="group relative max-w-fit inline-flex items-center justify-start cursor-pointer touch-none tap-highlight-transparent"
+              data-selected="true"
             >
-              <div
-                class="react-toggle-track-check"
+              <span
+                style="border: 0px; clip-path: inset(50%); height: 1px; margin: -1px; overflow: hidden; padding: 0px; position: absolute; width: 1px; white-space: nowrap;"
+              >
+                <input
+                  aria-labelledby=":r6:"
+                  checked=""
+                  role="switch"
+                  type="checkbox"
+                  value=""
+                />
+              </span>
+              <span
+                aria-hidden="true"
+                class="px-1 relative inline-flex items-center justify-start flex-shrink-0 overflow-hidden bg-default-200 rounded-full outline-none group-data-[focus-visible=true]:z-10 group-data-[focus-visible=true]:ring-2 group-data-[focus-visible=true]:ring-focus group-data-[focus-visible=true]:ring-offset-2 group-data-[focus-visible=true]:ring-offset-background group-data-[selected=true]:bg-primary group-data-[selected=true]:text-primary-foreground w-12 h-7 mr-2 rtl:ml-2 rtl:mr-[unset] transition-background"
               >
                 <span
-                  class="jsx-791876786 sun-moon"
+                  class="z-0 absolute left-1.5 rtl:right-1.5 rtl:left-[unset] text-current text-small opacity-0 scale-50 transition-transform-opacity group-data-[selected=true]:scale-100 group-data-[selected=true]:opacity-100"
+                  height="1em"
+                  width="1em"
                 >
                   ☀️
                 </span>
-              </div>
-              <div
-                class="react-toggle-track-x"
-              >
                 <span
-                  class="jsx-791876786 sun-moon"
+                  class="z-10 flex items-center justify-center bg-white shadow-small rounded-full origin-right w-5 h-5 text-small group-data-[selected=true]:ml-5 rtl:group-data-[selected=true]:ml-0 rtl:group-data-[selected=true]:mr-5 transition-all group-data-[pressed=true]:w-6 group-data-[selected]:group-data-[pressed]:ml-4"
+                />
+                <span
+                  class="z-0 absolute right-1.5 rtl:left-1.5 rtl:right-[unset] text-default-600 text-small opacity-100 transition-transform-opacity group-data-[selected=true]:translate-x-3 group-data-[selected=true]:opacity-0"
+                  height="1em"
+                  width="1em"
                 >
                   🌙
                 </span>
-              </div>
-            </div>
-            <div
-              class="react-toggle-thumb"
-            />
-            <input
-              checked=""
-              class="react-toggle-screenreader-only"
-              type="checkbox"
-            />
+              </span>
+            </label>
           </div>
         </div>
-      </div>
-    </footer>
+      </footer>
+    </div>
   </div>
 </DocumentFragment>
 `;

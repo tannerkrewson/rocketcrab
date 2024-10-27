@@ -1,7 +1,6 @@
 import PrimaryButton from "../components/common/PrimaryButton";
-import ButtonGroup from "../components/common/ButtonGroup";
 import PageLayout from "../components/layout/PageLayout";
-import React, { useEffect, useState } from "react";
+import React, { useContext, useEffect, useState } from "react";
 import { postJson } from "../utils/utils";
 import { useRouter } from "next/router";
 import { io } from "socket.io-client";
@@ -13,10 +12,10 @@ import {
 } from "../types/types";
 import { GetServerSideProps } from "next";
 import PublicGame from "../components/find/PublicGame";
-import Swal from "sweetalert2";
 import GameDetail from "../components/detail/GameDetail";
 import { FinderInfoCard } from "../components/find/FinderInfoCard";
 import { GAME_LIBRARY } from "../config";
+import { ModalContext } from "./_app";
 
 const socket = io();
 
@@ -29,6 +28,7 @@ export const Find = ({
     const [showReconnecting, setShowReconnecting] = useState(false);
     const [finderState, setFinderState] = useState<FinderState | undefined>();
     const [gameInfoVisible, setGameInfoVisible] = useState("");
+    const fireModal = useContext(ModalContext);
 
     const { isActive, publicPartyList, finderActiveDates, subscriberCount } =
         finderState ?? {};
@@ -39,12 +39,10 @@ export const Find = ({
 
         const result = await postJson("/api/new-public").catch(() => {
             setNewLoading(false);
-            Swal.fire({
+            fireModal({
                 title: "Try again",
-                text:
-                    "The server is not allowing public parties to be created right now... maybe you were just a smidge too early? 😊",
+                text: "The server is not allowing public parties to be created right now... maybe you were just a smidge too early? 😊",
                 icon: "error",
-                heightAuto: false,
             });
         });
 
@@ -65,9 +63,6 @@ export const Find = ({
             setShowReconnecting(false);
         });
 
-        // TODO: https://github.com/socketio/socket.io/issues/3885
-        // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-        // @ts-ignore
         socket.on(SocketEvent.DISCONNECT, (reason: string) => {
             // if the disconnection was initiated by the server
             if (reason === "io server disconnect") {
@@ -87,7 +82,7 @@ export const Find = ({
 
     if (gameInfoVisible) {
         const selectedGame = gameLibrary.gameList.find(
-            ({ id }) => id === gameInfoVisible
+            ({ id }) => id === gameInfoVisible,
         );
         return (
             <PageLayout
@@ -157,8 +152,8 @@ export const Find = ({
                 </div>
             )}
 
-            <ButtonGroup>
-                <PrimaryButton href="/" size="large">
+            <div className="flex mt-4 justify-center space-x-2">
+                <PrimaryButton href="/" size="lg">
                     Back
                 </PrimaryButton>
 
@@ -166,12 +161,12 @@ export const Find = ({
                     <PrimaryButton
                         onClick={onClickNew}
                         loading={newLoading}
-                        size="large"
+                        size="lg"
                     >
                         Start Public Party
                     </PrimaryButton>
                 )}
-            </ButtonGroup>
+            </div>
             <style jsx>{`
                 .description {
                     font-size: 1.1em;

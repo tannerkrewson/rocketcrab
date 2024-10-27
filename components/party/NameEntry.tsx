@@ -1,8 +1,7 @@
 import React, { useState } from "react";
 import Router from "next/router";
-import { Input } from "@geist-ui/react";
+import { Input } from "@nextui-org/react";
 import PrimaryButton from "../common/PrimaryButton";
-import ButtonGroup from "../common/ButtonGroup";
 
 const NameEntry = ({
     onNameEntry,
@@ -37,52 +36,37 @@ const NameEntry = ({
 
     return (
         <>
-            <div className="description">Enter your name:</div>
-            <div className="input-container">
-                <Input
-                    type="text"
-                    id="player-name"
-                    placeholder="Use your real name!"
-                    value={name}
-                    onChange={handleNameChange}
-                    autoFocus
-                    onKeyDown={onEnter}
-                    maxLength={24}
-                    size="large"
-                    clearable
-                />
-            </div>
+            <Input
+                size="lg"
+                id="player-name"
+                label="Enter your name:"
+                placeholder="Use your real name!"
+                value={name}
+                onChange={handleNameChange}
+                autoFocus
+                onKeyDown={onEnter}
+                maxLength={24}
+            />
 
-            <ButtonGroup>
-                <PrimaryButton onClick={handleBack} size="large">
+            <div className="flex mt-4 justify-center space-x-2">
+                <PrimaryButton onClick={handleBack} size="lg">
                     Back
                 </PrimaryButton>
 
                 <PrimaryButton
                     onClick={handleConfirm}
                     disabled={name.length < 1}
-                    size="large"
+                    size="lg"
                 >
                     Confirm
                 </PrimaryButton>
-            </ButtonGroup>
-
-            <style jsx>{`
-                .description {
-                    text-align: center;
-                    margin-bottom: 1em;
-                }
-                .input-container {
-                    margin-bottom: 2em;
-                    text-align: center;
-                }
-            `}</style>
+            </div>
         </>
     );
 };
 
 type NameEntryProps = {
-    onNameEntry: (name: string) => any;
+    onNameEntry: (name: string) => void;
     previousName: string;
 };
 

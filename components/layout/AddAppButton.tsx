@@ -5,10 +5,10 @@
 // copied from https://github.com/tannerkrewson/spyfall/blob/dev/components/AddAppButton.js
 
 import dynamic from "next/dynamic";
-import { useState, useEffect } from "react";
-import Swal from "sweetalert2";
+import { useState, useEffect, useContext } from "react";
 import PrimaryButton from "../common/PrimaryButton";
 import { logEvent } from "../../utils/analytics";
+import { ModalContext } from "../../pages/_app";
 
 // https://github.com/chrisdancee/react-ios-pwa-prompt/issues/32#issuecomment-586762839
 const PWAPrompt = dynamic(() => import("react-ios-pwa-prompt"), {
@@ -37,9 +37,11 @@ const AddAppButton = (): JSX.Element => {
 
     useEffect(() => {
         setIsiOS(
-            /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream
+            /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
         );
     }, []);
+
+    const fireModal = useContext(ModalContext);
 
     const handleAddApp = () => {
         setIsLoading(true);
@@ -57,12 +59,10 @@ const AddAppButton = (): JSX.Element => {
 
             logEvent("home-addApp-native");
         } else {
-            Swal.fire({
+            fireModal({
                 title: "Hmm...",
-                text:
-                    "Failed to add rocketcrab as an app on this device. Try refreshing the page!",
+                text: "Failed to add rocketcrab as an app on this device. Try refreshing the page!",
                 icon: "error",
-                heightAuto: false,
             });
             setIsLoading(false);
 
@@ -75,23 +75,20 @@ const AddAppButton = (): JSX.Element => {
             <PrimaryButton
                 onClick={handleAddApp}
                 disabled={isLoading}
-                manualWidth
-                type="default"
                 loading={isLoading}
             >
                 Add 🚀🦀 App
             </PrimaryButton>
 
-            {showiOS && (
-                <PWAPrompt
-                    debug={true}
-                    permanentlyHideOnDismiss={false}
-                    onClose={() => {
-                        setShowiOS(false);
-                        setIsLoading(false);
-                    }}
-                />
-            )}
+            <PWAPrompt
+                appIconPath="/apple-touch-icon.png"
+                isShown={showiOS}
+                permanentlyHideOnDismiss={false}
+                onClose={() => {
+                    setShowiOS(false);
+                    setIsLoading(false);
+                }}
+            />
         </>
     );
 };

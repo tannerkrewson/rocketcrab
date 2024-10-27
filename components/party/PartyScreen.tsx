@@ -1,21 +1,21 @@
 import PlayerList from "./PlayerList";
 import PrimaryButton from "../common/PrimaryButton";
-import ButtonGroup from "../common/ButtonGroup";
-import { Spacer } from "@geist-ui/react";
+import { Spacer } from "@nextui-org/react";
 import GameSelector from "../library/GameSelector";
 import { ClientGameLibrary, ClientParty, Player } from "../../types/types";
-import React, { useCallback, useEffect, useState } from "react";
+import React, { useCallback, useContext, useEffect, useState } from "react";
 import PartyStatus from "./PartyStatus";
 import GameDetail from "../detail/GameDetail";
 import SkinnyCard from "../common/SkinnyCard";
 import { Countdown } from "../find/Countdown";
 import { ChatBox } from "../chat/ChatBox";
 import AddAppButton from "../layout/AddAppButton";
-import Swal from "sweetalert2";
 import { useRouter } from "next/router";
 import { isFuture } from "date-fns";
 import { useIsAlreadyPWA } from "../../utils/useIsAlreadyPWA";
 import { RocketcrabMode } from "../../types/enums";
+import { ModalContext } from "../../pages/_app";
+import ShareButtons from "./ShareButtons";
 
 const PartyScreen = ({
     partyState,
@@ -45,7 +45,7 @@ const PartyScreen = ({
     const { id: meId, isHost } = thisPlayer;
 
     const selectedGame = gameLibrary.gameList.find(
-        ({ id }) => id === selectedGameId
+        ({ id }) => id === selectedGameId,
     );
     const host = playerList.find(({ isHost }) => isHost);
 
@@ -64,9 +64,8 @@ const PartyScreen = ({
         setGameInfoVisible(visibility);
     };
 
-    const [awaitingChangeToIsPublic, setAwaitingChangeToIsPublic] = useState(
-        false
-    );
+    const [awaitingChangeToIsPublic, setAwaitingChangeToIsPublic] =
+        useState(false);
 
     useEffect(() => setAwaitingChangeToIsPublic(false), [isPublic]);
 
@@ -74,19 +73,22 @@ const PartyScreen = ({
         ? "Back to Public Parties"
         : "Leave Party";
 
+    const fireModal = useContext(ModalContext);
+
     const promptLeave = useCallback(() => {
-        Swal.fire({
+        fireModal({
             title: "Are you sure?",
             showCancelButton: true,
             confirmButtonText: leaveText,
             icon: "warning",
-            heightAuto: false,
-        }).then(({ isConfirmed }) => {
-            if (isConfirmed) {
-                router.push(createdAsPublic ? "/find" : "/");
-            }
+
+            onClose: ({ isConfirmed }) => {
+                if (isConfirmed) {
+                    router.push(createdAsPublic ? "/find" : "/");
+                }
+            },
         });
-    }, [isPublic]);
+    }, [createdAsPublic, fireModal, leaveText, router]);
 
     if (gameSelectorVisible) {
         return (
@@ -96,6 +98,9 @@ const PartyScreen = ({
                 onDone={showGameSelector(false)}
                 backToLabel="party"
                 isHost={isHost}
+                onSuggestGame={(gameName) => {
+                    onSendChat(`I want to play ${gameName}!`);
+                }}
             />
         );
     }
@@ -145,8 +150,8 @@ const PartyScreen = ({
         : [rPlayerList, rChatBox];
 
     return (
-        <div style={{ textAlign: "center" }}>
-            <Spacer y={1.25} />
+        <div className="flex flex-col justify-center space-y-4">
+            <ShareButtons />
             <PartyStatus
                 selectedGame={selectedGame}
                 host={host}
@@ -156,52 +161,53 @@ const PartyScreen = ({
                 isPublic={isPublic}
             />
             <Spacer y={1} />
-            <ButtonGroup>
-                <PrimaryButton onClick={showGameSelector(true)} size="large">
+            <div className="flex justify-center space-x-2">
+                <PrimaryButton onClick={showGameSelector(true)} size="lg">
                     Browse Games
                 </PrimaryButton>
                 <PrimaryButton
                     disabled={!selectedGameId || !isHost}
                     onClick={() => onStartGame()}
-                    size="large"
-                    type="error"
+                    size="lg"
+                    color={!selectedGameId || !isHost ? "default" : "success"}
+                    variant="shadow"
                 >
                     Start Game
                 </PrimaryButton>
-            </ButtonGroup>
+            </div>
             <Spacer y={1.5} />
             {orderedCards}
             {!isAlreadyPWA && !createdAsPublic && !isHost && !isKidsMode && (
                 <>
                     <Spacer y={1} />
                     <SkinnyCard>
-                        <div>
-                            {host.name} is a great host, so don&apos;t{" "}
-                            <div style={{ display: "inline-block" }}>
-                                tell them I said this... 🤫{" "}
+                        <div className="text-center p-1">
+                            <div>
+                                {host.name} is a great host, so don&apos;t{" "}
+                                <div style={{ display: "inline-block" }}>
+                                    tell them I said this... 🤫{" "}
+                                </div>
                             </div>
+                            <div>I think you&apos;d be even better! 😊 </div>
+                            <div>
+                                Just go to{" "}
+                                <span
+                                    style={{
+                                        fontFamily: '"Inconsolata", monospace',
+                                        fontWeight: "bold",
+                                        fontSize: "1.05em",
+                                    }}
+                                >
+                                    rocketcrab.com{" "}
+                                </span>
+                                anytime to host <i>your</i> friends and family!
+                                Or, even better:
+                            </div>
+                            <div className="flex flex-col items-center py-3">
+                                <AddAppButton />
+                            </div>
+                            No App Store download required! 😮
                         </div>
-                        <Spacer y={0.5} />
-                        <div>
-                            I think you&apos;d be even better! 😊 Just go to{" "}
-                            <span
-                                style={{
-                                    fontFamily: '"Inconsolata", monospace',
-                                    fontWeight: "bold",
-                                    fontSize: "1.05em",
-                                }}
-                            >
-                                rocketcrab.com{"  "}
-                            </span>
-                            anytime to host <i>your</i> friends and family! Or,
-                            even better:
-                        </div>
-                        <Spacer y={0.5} />
-                        <ButtonGroup>
-                            <AddAppButton />
-                        </ButtonGroup>
-                        <Spacer y={0.5} />
-                        No App Store download required! 😮
                     </SkinnyCard>
                 </>
             )}
@@ -248,9 +254,11 @@ const PartyScreen = ({
             )}
 
             <Spacer y={1} />
-            <PrimaryButton onClick={promptLeave} size="small">
-                {leaveText}
-            </PrimaryButton>
+            <div className="flex justify-center space-x-2">
+                <PrimaryButton onClick={promptLeave} size="sm">
+                    {leaveText}
+                </PrimaryButton>
+            </div>
         </div>
     );
 };

@@ -24,49 +24,37 @@ import type { Server, Socket } from "socket.io";
 import { SocketEvent } from "../types/enums";
 import { getModeFromHost } from "../utils/utils";
 
-export default (io: Server, rocketcrab: RocketCrab): void => {
-    io.on("connection", (socket) => {
-        socket.on(SocketEvent.JOIN_PARTY, onJoinParty(socket, rocketcrab));
-        socket.on(
-            SocketEvent.FINDER_SUBSCRIBE,
-            onFinderSubscribe(socket, rocketcrab)
+const onJoinParty =
+    (socket: Socket, rocketcrab: RocketCrab) =>
+    ({ code, lastPartyState, reconnecting }: JoinPartyResponse) => {
+        const { partyList } = rocketcrab;
+
+        const party = reconnecting
+            ? reconnectToParty(lastPartyState, rocketcrab)
+            : getPartyByCode(code, partyList);
+
+        const isPlayerBanned = party?.bannedIPs?.find(
+            (ip) => socket?.handshake?.address === ip,
         );
-    });
-};
 
-const onJoinParty = (socket: Socket, rocketcrab: RocketCrab) => ({
-    code,
-    lastPartyState,
-    reconnecting,
-}: JoinPartyResponse) => {
-    const { partyList } = rocketcrab;
+        const userMode = getModeFromHost(socket?.handshake?.headers?.host);
+        const modesMatch = userMode === party?.mode;
 
-    const party = reconnecting
-        ? reconnectToParty(lastPartyState, rocketcrab)
-        : getPartyByCode(code, partyList);
+        if (party && !isPlayerBanned && modesMatch) {
+            const { id, name } = lastPartyState?.me || {};
+            const player = addPlayer(name, socket, party, id);
 
-    const isPlayerBanned = party?.bannedIPs?.find(
-        (ip) => socket?.handshake?.address === ip
-    );
-
-    const userMode = getModeFromHost(socket?.handshake?.headers?.host);
-    const modesMatch = userMode === party?.mode;
-
-    if (party && !isPlayerBanned && modesMatch) {
-        const { id, name } = lastPartyState?.me || {};
-        const player = addPlayer(name, socket, party, id);
-
-        attachPartyListenersToPlayer(player, party, rocketcrab);
-        sendStateToAll(party, rocketcrab, { enableFinderCheck: true });
-    } else {
-        socket.emit(SocketEvent.INVALID_PARTY, { code });
-    }
-};
+            attachPartyListenersToPlayer(player, party, rocketcrab);
+            sendStateToAll(party, rocketcrab, { enableFinderCheck: true });
+        } else {
+            socket.emit(SocketEvent.INVALID_PARTY, { code });
+        }
+    };
 
 const attachPartyListenersToPlayer = (
     player: Player,
     party: Party,
-    rocketcrab: RocketCrab
+    rocketcrab: RocketCrab,
 ) => {
     const { partyList } = rocketcrab;
     const { socket } = player;
@@ -140,7 +128,7 @@ const onFinderSubscribe = (socket: Socket, rocketcrab: RocketCrab) => () => {
 
     socket.on(SocketEvent.DISCONNECT, () => {
         rocketcrab.finderSubscribers = rocketcrab.finderSubscribers.filter(
-            (s) => s !== socket
+            (s) => s !== socket,
         );
         onFinderSubscriberUpdate(rocketcrab);
     });
@@ -156,3 +144,15 @@ const onFinderSubscriberUpdate = (rocketcrab: RocketCrab) => {
         sendFinderStateToAll(rocketcrab);
     }
 };
+
+const s = (io: Server, rocketcrab: RocketCrab): void => {
+    io.on("connection", (socket) => {
+        socket.on(SocketEvent.JOIN_PARTY, onJoinParty(socket, rocketcrab));
+        socket.on(
+            SocketEvent.FINDER_SUBSCRIBE,
+            onFinderSubscribe(socket, rocketcrab),
+        );
+    });
+};
+
+export default s;

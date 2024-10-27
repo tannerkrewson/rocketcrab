@@ -1,18 +1,9 @@
-import { Card, useTheme } from "@geist-ui/react";
+import { Card, CardBody } from "@nextui-org/react";
 
 const SkinnyCard = ({ children }: SkinnyCardProps): JSX.Element => {
-    const {
-        palette: { accents_1 },
-    } = useTheme();
-
     return (
-        <Card
-            style={{
-                marginBottom: "12pt",
-                backgroundColor: accents_1,
-            }}
-        >
-            <Card.Body style={{ padding: "8pt" }}>{children}</Card.Body>
+        <Card>
+            <CardBody style={{ padding: "8pt" }}>{children}</CardBody>
         </Card>
     );
 };

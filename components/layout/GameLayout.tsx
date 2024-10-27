@@ -1,6 +1,6 @@
-import { Badge, Spacer, useTheme, useToasts } from "@geist-ui/react";
+import { Button, Spacer } from "@nextui-org/react";
 import PrimaryButton from "../common/PrimaryButton";
-import React, { useCallback, useEffect, useMemo, useState } from "react";
+import React, { useCallback, useContext, useEffect, useState } from "react";
 import {
     ClientGameLibrary,
     Player,
@@ -14,15 +14,19 @@ import PlayerList from "../party/PlayerList";
 import GameFrame from "../in-game/GameFrame";
 import Connecting from "./Connecting";
 import { ChatBox } from "../chat/ChatBox";
-import Swal from "sweetalert2";
-import { ToastAction } from "@geist-ui/react/dist/use-toasts/use-toast";
-import ButtonGroup from "../common/ButtonGroup";
 import { logEvent } from "../../utils/analytics";
 import { filterClean, MODE_MAP } from "../../utils/utils";
 import { differenceInMilliseconds } from "date-fns";
 import GameDetail from "../detail/GameDetail";
 import { RocketcrabMode } from "../../types/enums";
 import { useRouter } from "next/router";
+import { ModalContext } from "../../pages/_app";
+import classNames from "classnames";
+import { ToastContainer, toast } from "react-toastify";
+
+import "react-toastify/dist/ReactToastify.css";
+import { useDarkMode } from "next-dark-mode";
+import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
 
 const GameLayout = ({
     partyState,
@@ -46,7 +50,7 @@ const GameLayout = ({
     const { code, gameState, selectedGameId, playerList, chat } = partyState;
     const { isHost } = thisPlayer;
     const thisGame = gameLibrary.gameList.find(
-        ({ id }) => id == selectedGameId
+        ({ id }) => id == selectedGameId,
     );
 
     const [statusCollapsed, setStatusCollapsed] = useState(false);
@@ -55,64 +59,50 @@ const GameLayout = ({
     const [showPlayerList, setShowPlayerList] = useState(false);
     const [showChat, setShowChat] = useState(false);
     const [showGameInfo, setShowGameInfo] = useState(false);
+    const [showEmojiPicker, setShowEmojiPicker] = useState(false);
+    const [showEmojiButton, setShowEmojiButton] = useState(true);
 
     // https://stackoverflow.com/a/48830513
     const [frameRefresh, setFrameRefresh] = useState(0);
 
     const [enableToasts, setEnableToasts] = useState(!isKidsMode);
-    const [, setToast] = useToasts();
-    const [lastShownToastDate, setLastShownToastDate] = useState(0);
+
+    const { darkModeActive } = useDarkMode();
 
     const igLogEvent = useCallback(
         (event) => logEvent("inGame-" + event, isHost ? "isHost" : "notHost"),
-        [isHost]
+        [isHost],
     );
 
-    const {
-        palette: { accents_1, accents_2 },
-    } = useTheme();
+    const fireModal = useContext(ModalContext);
 
-    const actions = useMemo(
-        (): ToastAction[] => [
-            {
-                name: "Mute",
-                passive: true,
-                handler: (event, cancel) => {
-                    cancel();
-                    promptMute();
-                },
+    const promptMute = useCallback(() => {
+        fireModal({
+            title: "Are you sure?",
+            text: "New chat messages won't appear over your game, but you can still see them in the menu!",
+            showCancelButton: true,
+            confirmButtonText: "Mute chat",
+            icon: "question",
+
+            onClose: ({ isConfirmed }) => {
+                if (isConfirmed) {
+                    setEnableToasts(false);
+                    igLogEvent("muteChat");
+                }
             },
-            {
-                name: "Reply",
-                passive: true,
-                handler: (event, cancel) => {
-                    cancel();
-                    setShowMenu(false);
-                    setShowChat(true);
-                    igLogEvent("toastChatReply");
-                },
-            },
-            {
-                name: "Dismiss",
-                passive: true,
-                handler: (event, cancel) => cancel(),
-            },
-        ],
-        []
-    );
+        });
+    }, [fireModal, igLogEvent]);
 
     useEffect(() => {
         if (!newestMsg) return;
 
         const { playerId, playerName, message, date } = newestMsg;
 
-        const lastMessageCameInOverOneSecondAgo =
-            differenceInMilliseconds(Date.now(), date) > 1000;
+        // is latest message over 2 seconds old
+        const isLatestMessageOld =
+            differenceInMilliseconds(Date.now(), date) > 2000;
 
-        // don't show a toast for an old message that happens to be the latest
-        // when we are initializing
-        if (!lastShownToastDate && lastMessageCameInOverOneSecondAgo) {
-            setLastShownToastDate(date);
+        if (isLatestMessageOld) {
             return;
         }
 
@@ -125,13 +115,32 @@ const GameLayout = ({
         // don't show toasts for your own messages
         if (playerId === thisPlayer.id) return;
 
-        setToast({
-            text: "🚀🦀 " + playerName + ": " + filterClean(message),
-            actions,
-        });
+        toast(
+            <>
+                <div className="flex items-center space-x-1">
+                    <div>{playerName}: </div>
+
+                    <div
+                        className={classNames({
+                            "text-4xl": message.length < 3,
+                        })}
+                    >
+                        {filterClean(message)}
+                    </div>
+                </div>
+            </>,
+            {
+                closeOnClick: true,
+                onClick: () => {
+                    setShowMenu(false);
+                    setShowChat(true);
+                    igLogEvent("toastChatReply");
+                },
+            },
+        );
 
         igLogEvent("toastMsg");
-    }, [newestMsg]);
+    }, [enableToasts, igLogEvent, newestMsg, showChat, thisPlayer.id]);
 
     const hostName = playerList.find(({ isHost }) => isHost).name;
 
@@ -143,7 +152,7 @@ const GameLayout = ({
                 setShowMenu(false);
                 setShowChat(true);
                 igLogEvent("showChat");
-            }, []),
+            }, [igLogEvent]),
             badgeCount: unreadMsgCount,
             hide: isKidsMode,
         },
@@ -154,7 +163,8 @@ const GameLayout = ({
                 setShowMenu(false);
                 setShowPlayerList(true);
                 igLogEvent("showPlayers");
-            }, []),
+            }, [igLogEvent]),
+            badgeCount: partyState?.playerList?.length,
         },
         {
             label: "About this game",
@@ -163,7 +173,7 @@ const GameLayout = ({
                 setShowMenu(false);
                 setShowGameInfo(true);
                 igLogEvent("gameInfo");
-            }, []),
+            }, [igLogEvent]),
         },
         {
             label: "Browse games",
@@ -172,13 +182,13 @@ const GameLayout = ({
                 setShowMenu(false);
                 setShowGameLibrary(true);
                 igLogEvent("browseGames");
-            }, []),
+            }, [igLogEvent]),
         },
         {
             label: "Reload my game",
             hostOnly: false,
             onClick: useCallback(() => {
-                Swal.fire({
+                fireModal({
                     title: "Are you sure?",
                     text:
                         "If reloading doesn't fix your issue, tell your party host, " +
@@ -187,21 +197,22 @@ const GameLayout = ({
                     showCancelButton: true,
                     confirmButtonText: `Reload my game`,
                     icon: "warning",
-                    heightAuto: false,
-                }).then(({ isConfirmed }) => {
-                    if (isConfirmed) {
-                        setShowMenu(false);
-                        setFrameRefresh(frameRefresh + 1);
-                        igLogEvent("reloadMe");
-                    }
+
+                    onClose: ({ isConfirmed }) => {
+                        if (isConfirmed) {
+                            setShowMenu(false);
+                            setFrameRefresh(frameRefresh + 1);
+                            igLogEvent("reloadMe");
+                        }
+                    },
                 });
-            }, [frameRefresh]),
+            }, [fireModal, frameRefresh, hostName, igLogEvent]),
         },
         {
             label: "Reload all",
             hostOnly: true,
             onClick: useCallback(() => {
-                Swal.fire({
+                fireModal({
                     title: "Are you sure?",
                     text:
                         "Your current session in " +
@@ -210,21 +221,22 @@ const GameLayout = ({
                     showCancelButton: true,
                     confirmButtonText: `Reload All`,
                     icon: "warning",
-                    heightAuto: false,
-                }).then(({ isConfirmed }) => {
-                    if (isConfirmed) {
-                        setShowMenu(false);
-                        onStartGame();
-                        igLogEvent("reloadAll");
-                    }
+
+                    onClose: ({ isConfirmed }) => {
+                        if (isConfirmed) {
+                            setShowMenu(false);
+                            onStartGame();
+                            igLogEvent("reloadAll");
+                        }
+                    },
                 });
-            }, [onStartGame]),
+            }, [fireModal, igLogEvent, onStartGame, thisGame.name]),
         },
         {
             label: "Exit to party",
             hostOnly: true,
             onClick: useCallback(() => {
-                Swal.fire({
+                fireModal({
                     title: "Are you sure?",
                     text:
                         "Your current session in " +
@@ -233,53 +245,40 @@ const GameLayout = ({
                     showCancelButton: true,
                     confirmButtonText: "Exit to party",
                     icon: "warning",
-                    heightAuto: false,
-                }).then(({ isConfirmed }) => {
-                    if (isConfirmed) {
-                        setShowMenu(false);
-                        onExitGame();
-                        igLogEvent("exitToParty");
-                    }
+
+                    onClose: ({ isConfirmed }) => {
+                        if (isConfirmed) {
+                            setShowMenu(false);
+                            onExitGame();
+                            igLogEvent("exitToParty");
+                        }
+                    },
                 });
-            }, [onExitGame]),
+            }, [fireModal, igLogEvent, onExitGame, thisGame.name]),
         },
     ];
-
-    const combinedMenuBadgeCount = menuButtons.reduce(
-        (prev, curr) => prev + (curr.badgeCount ?? 0),
-        0
-    );
-
-    const promptMute = () => {
-        Swal.fire({
-            title: "Are you sure?",
-            text:
-                "New chat messages won't appear over your game, but you can still see them in the menu!",
-            showCancelButton: true,
-            confirmButtonText: "Mute chat",
-            icon: "question",
-            heightAuto: false,
-        }).then(({ isConfirmed }) => {
-            if (isConfirmed) {
-                setEnableToasts(false);
-                igLogEvent("muteChat");
-            }
-        });
-    };
-
     const hideAllWindows = useCallback(() => {
         setShowGameLibrary(false);
         setShowPlayerList(false);
         setShowChat(false);
         setShowGameInfo(false);
+        setShowEmojiPicker(false);
     }, [setShowGameLibrary, setShowPlayerList, setShowChat]);
-
-    const statusClass = "status " + (statusCollapsed ? "status-collapsed" : "");
     return (
-        <div className="layout">
-            <div className={statusClass}>
+        <div className="flex flex-col h-svh">
+            <ToastContainer
+                stacked
+                hideProgressBar
+                theme={darkModeActive ? "dark" : "light"}
+            />
+            <div
+                className={classNames({
+                    "flex flex-row justify-between shadow-sm z-10": true,
+                    "status-collapsed": statusCollapsed,
+                })}
+            >
                 <div
-                    className="logo"
+                    className="logo flex flex-row p-2 items-center"
                     onClick={() => {
                         setStatusCollapsed(!statusCollapsed);
                         setShowMenu(false);
@@ -287,32 +286,33 @@ const GameLayout = ({
                         igLogEvent("clickLogo");
                     }}
                 >
-                    <img src="/rocket.svg" className="rocket" />
-                    <img src="/crab.svg" className="crab" />
+                    <img
+                        src="/rocket.svg"
+                        className="rocket"
+                        alt="rocketcrab logo"
+                    />
+                    <img
+                        src="/crab.svg"
+                        className="crab"
+                        alt="rocketcrab logo"
+                    />
                 </div>
                 {!statusCollapsed && (
                     <>
-                        <div className="url">
+                        <div className="url p-2">
                             {host}/{code}
                         </div>
-                        <div>
-                            <Badge.Anchor placement="bottomLeft">
-                                {!showMenu && combinedMenuBadgeCount > 0 && (
-                                    <Badge type="error" size="mini">
-                                        {combinedMenuBadgeCount}
-                                    </Badge>
-                                )}
-                                <PrimaryButton
-                                    onClick={() => {
-                                        setShowMenu(!showMenu);
-                                        hideAllWindows();
-                                        igLogEvent("clickMenu");
-                                    }}
-                                    size="small"
-                                >
-                                    {showMenu ? "▲" : "▼"} Menu
-                                </PrimaryButton>
-                            </Badge.Anchor>
+                        <div className="p-2">
+                            <PrimaryButton
+                                onClick={() => {
+                                    setShowMenu(!showMenu);
+                                    hideAllWindows();
+                                    igLogEvent("clickMenu");
+                                }}
+                                size="sm"
+                            >
+                                {showMenu ? "▲" : "▼"} Menu
+                            </PrimaryButton>
                         </div>
 
                         {showMenu && (
@@ -324,6 +324,34 @@ const GameLayout = ({
                     </>
                 )}
             </div>
+            {showEmojiButton && (
+                <Button
+                    radius="full"
+                    size="lg"
+                    isIconOnly
+                    variant="faded"
+                    onClick={() => {
+                        setShowMenu(false);
+                        setShowEmojiPicker(!showEmojiPicker);
+                        igLogEvent("openEmojiPicker");
+                    }}
+                    className="fixed bottom-2 right-2"
+                >
+                    {showEmojiPicker ? (
+                        <img
+                            src={`/close-${darkModeActive ? "dark" : "light"}.svg`}
+                            alt="Close reaction button"
+                            className="w-6"
+                        />
+                    ) : (
+                        <img
+                            src={`/smile-${darkModeActive ? "dark" : "light"}.svg`}
+                            alt="Reaction button"
+                            className="w-8"
+                        />
+                    )}
+                </Button>
+            )}
             <GameFrame
                 gameState={gameState}
                 selectedGameId={selectedGameId}
@@ -333,14 +361,14 @@ const GameLayout = ({
                 frameRefreshCount={frameRefresh}
             />
             {showGameLibrary && (
-                <div className="component-frame">
+                <div className="component-frame bg-background">
                     <GameSelector
                         gameLibrary={gameLibrary}
                         onDone={hideAllWindows}
                         onSelectGame={(gameId: string, gameName: string) => {
                             if (!isHost) return;
 
-                            Swal.fire({
+                            fireModal({
                                 title: "Switch to " + gameName + "?",
                                 text:
                                     "Your current session in " +
@@ -349,14 +377,18 @@ const GameLayout = ({
                                 showCancelButton: true,
                                 confirmButtonText: "Switch!",
                                 icon: "warning",
-                                heightAuto: false,
-                            }).then(({ isConfirmed }) => {
-                                if (isConfirmed) {
-                                    setShowMenu(false);
-                                    onStartGame(gameId);
-                                    igLogEvent("switchGame");
-                                }
+
+                                onClose: ({ isConfirmed }) => {
+                                    if (isConfirmed) {
+                                        setShowMenu(false);
+                                        onStartGame(gameId);
+                                        igLogEvent("switchGame");
+                                    }
+                                },
                             });
+                        }}
+                        onSuggestGame={(gameName) => {
+                            onSendChat(`I want to play ${gameName}!`);
                         }}
                         backToLabel="game"
                         isHost={isHost}
@@ -364,7 +396,7 @@ const GameLayout = ({
                 </div>
             )}
             {showPlayerList && (
-                <div className="component-frame">
+                <div className="component-frame bg-background">
                     <PlayerList
                         playerList={playerList}
                         disableHideShow={true}
@@ -380,7 +412,7 @@ const GameLayout = ({
                 </div>
             )}
             {showChat && (
-                <div className="component-frame">
+                <div className="component-frame bg-background">
                     <ChatBox
                         chat={chat}
                         thisPlayer={thisPlayer}
@@ -390,11 +422,17 @@ const GameLayout = ({
                         clearUnreadMsgCount={clearUnreadMsgCount}
                     />
                     <Spacer y={0.5} />
-                    <ButtonGroup>
-                        <PrimaryButton onClick={hideAllWindows}>
-                            Close
+                    <div className="flex mt-4 justify-center space-x-2">
+                        <PrimaryButton
+                            size="sm"
+                            onClick={() => setShowEmojiButton(!showEmojiButton)}
+                        >
+                            {showEmojiButton
+                                ? "Hide 🙂 Button"
+                                : "Show 🙂 Button"}
                         </PrimaryButton>
                         <PrimaryButton
+                            size="sm"
                             onClick={
                                 enableToasts
                                     ? promptMute
@@ -403,11 +441,14 @@ const GameLayout = ({
                         >
                             {enableToasts ? "Mute" : "Unmute"}
                         </PrimaryButton>
-                    </ButtonGroup>
+                        <PrimaryButton size="sm" onClick={hideAllWindows}>
+                            Close
+                        </PrimaryButton>
+                    </div>
                 </div>
             )}
             {showGameInfo && (
-                <div className="component-frame">
+                <div className="component-frame bg-background">
                     <GameDetail
                         game={thisGame}
                         allCategories={gameLibrary.categories}
@@ -418,47 +459,34 @@ const GameLayout = ({
                     </PrimaryButton>
                 </div>
             )}
+            {showEmojiPicker && (
+                <div className="fixed bottom-2 left-2">
+                    <EmojiPicker
+                        reactionsDefaultOpen={true}
+                        emojiStyle={"native" as EmojiStyle}
+                        theme={(darkModeActive ? "dark" : "light") as Theme}
+                        autoFocusSearch={false}
+                        onEmojiClick={({ emoji }) => {
+                            onSendChat(emoji);
+                            hideAllWindows();
+                        }}
+                    />
+                </div>
+            )}
             <style jsx>{`
-                .layout {
-                    display: flex;
-                    flex-flow: column;
-                    height: 100%;
-                }
-                .status {
-                    border-bottom: 1px solid ${accents_2};
-                    display: flex;
-                    justify-content: space-between;
-                    align-content: center;
-                    padding: 0.5em;
-                    height: 2em;
-                    z-index: 1;
-                    background-color: ${accents_1};
-                }
-                @media only screen and (max-width: 385px) {
-                    .status {
-                        font-size: 0.9em;
-                        margin-bottom: 0em;
-                    }
-                    .logo {
-                        line-height: 2em;
-                        font-size: 1em;
-                    }
-                }
                 .status-collapsed {
                     position: fixed;
-                    width: fit-content;
-                    border: none;
                     border-radius: 8px;
                     top: 0.5em;
                     left: 0.5em;
                     backdrop-filter: blur(5px);
                     background-color: rgba(255, 255, 255, 0.2);
+                    height: fit-content;
                 }
                 .logo {
                     margin: 0;
                     user-select: none;
                     cursor: pointer;
-                    line-height: 2.8em;
                 }
                 .rocket {
                     height: 1.5em;
@@ -472,9 +500,6 @@ const GameLayout = ({
                 }
                 .url {
                     font-size: 1.2em;
-                    line-height: 1em;
-                    height: 1em;
-                    margin: auto 0;
                     font-weight: bold;
                     font-family: "Inconsolata", monospace;
                 }
@@ -484,8 +509,6 @@ const GameLayout = ({
                     position: absolute;
                     top: 3em;
                     right: 0;
-                    background: ${accents_1};
-                    border: 1px solid ${accents_2};
                     width: min(24em, 100vw - 3em);
                     margin: 0.5em;
                     box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);

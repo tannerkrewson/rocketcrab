@@ -47,7 +47,7 @@ const drawphone: ServerGame = {
     connectToGame: toConnectToGame("https://drawphone.tannerkrewson.com/"),
 };
 
-export default [
+const games = [
     drawphone,
     {
         ...drawphone,
@@ -60,3 +60,5 @@ export default [
         connectToGame: toConnectToGame("https://dpk.tannerkrewson.com/"),
     },
 ];
+
+export default games;

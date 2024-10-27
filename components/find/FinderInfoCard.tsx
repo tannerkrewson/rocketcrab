@@ -1,4 +1,4 @@
-import { Spacer } from "@geist-ui/react";
+import { Spacer } from "@nextui-org/react";
 import React from "react";
 import SkinnyCard from "../common/SkinnyCard";
 import { Countdown } from "./Countdown";
@@ -34,11 +34,11 @@ export const FinderInfoCard = ({
                         {subscriberCountMsg}
                     </div>
                 )}
-                {showSubscriberCount && showCountdown && <Spacer y={0.8} />}
+                {showSubscriberCount && showCountdown && <Spacer y={1} />}
                 {showCountdown && (
                     <Countdown start={countdownStart}>{countdownMsg}</Countdown>
                 )}
-                {showCountdown && findTimeDates && <Spacer y={0.2} />}
+                {showCountdown && findTimeDates && <Spacer y={0.5} />}
                 {findTimeDates && <FindTime dates={findTimeDates} />}
             </SkinnyCard>
             <Spacer y={1} />

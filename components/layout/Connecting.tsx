@@ -1,4 +1,4 @@
-import { Loading } from "@geist-ui/react";
+import { Spinner } from "@nextui-org/react";
 import { useState } from "react";
 
 const Connecting = (): JSX.Element => {
@@ -9,7 +9,7 @@ const Connecting = (): JSX.Element => {
             onClick={() => setCollapseText(!collapseText)}
         >
             <span className="icon-container">
-                <Loading />
+                <Spinner size="sm" color="default" />
             </span>
             {!collapseText && <span>🚀🦀 Reconnecting...</span>}
             <style jsx>{`

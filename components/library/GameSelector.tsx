@@ -1,9 +1,8 @@
-import { Spacer } from "@geist-ui/react";
+import { Spacer } from "@nextui-org/react";
 import { useCallback, useState } from "react";
 import { ClientGameLibrary } from "../../types/types";
 import PrimaryButton from "../common/PrimaryButton";
 import GameDetail from "../detail/GameDetail";
-import ButtonGroup from "../common/ButtonGroup";
 import GameLibrary from "./GameLibrary";
 import { useLibraryState } from "../../utils/utils";
 
@@ -11,12 +10,13 @@ const GameSelector = ({
     gameLibrary,
     onSelectGame,
     onDone,
+    onSuggestGame,
     backToLabel,
     isHost,
 }: GameSelectorProps): JSX.Element => {
     const [viewingGameId, setViewingGameId] = useState("");
     const viewingGame = gameLibrary.gameList.find(
-        ({ id }) => id === viewingGameId
+        ({ id }) => id === viewingGameId,
     );
 
     const onBackToSearch = useCallback(() => {
@@ -24,9 +24,21 @@ const GameSelector = ({
     }, [setViewingGameId]);
 
     const onSelectGameButton = useCallback(() => {
-        onSelectGame(viewingGameId, viewingGame.name);
+        if (isHost) {
+            onSelectGame(viewingGameId, viewingGame.name);
+        } else {
+            onSuggestGame(viewingGame.name);
+        }
+
         onDone();
-    }, [onSelectGame, viewingGameId, onDone]);
+    }, [
+        isHost,
+        onDone,
+        onSelectGame,
+        viewingGameId,
+        viewingGame,
+        onSuggestGame,
+    ]);
 
     const libraryState = useLibraryState();
 
@@ -49,18 +61,17 @@ const GameSelector = ({
                         showOnlyHostMessage={!isHost}
                     />
                     <Spacer y={1} />
-                    <ButtonGroup>
+                    <div className="flex justify-center space-x-2">
                         <PrimaryButton onClick={onBackToSearch}>
                             ↩️ Back to search
                         </PrimaryButton>
                         <PrimaryButton
-                            disabled={!isHost}
                             onClick={onSelectGameButton}
-                            type="error"
+                            color={isHost ? "danger" : "default"}
                         >
-                            Select game
+                            {isHost ? "Select" : "Suggest"} game
                         </PrimaryButton>
-                    </ButtonGroup>
+                    </div>
                 </>
             )}
         </>
@@ -71,6 +82,7 @@ type GameSelectorProps = {
     gameLibrary: ClientGameLibrary;
     onSelectGame: (gameId: string, gameName?: string) => void;
     onDone: () => void;
+    onSuggestGame?: (gameName: string) => void;
     backToLabel: string;
     isHost: boolean;
 };

@@ -1,18 +1,22 @@
-import { GeistProvider, CssBaseline } from "@geist-ui/react";
 import Body from "../components/layout/Body";
-import "fontsource-inconsolata";
-import "fontsource-mukta";
-import { AppPropsType } from "next/dist/next-server/lib/utils";
+import "fontsource-inconsolata/index.css";
+import "fontsource-mukta/index.css";
+import { AppPropsType } from "next/dist/shared/lib/utils";
 import { initGA, logPageView } from "../utils/analytics";
-import { useState, useEffect } from "react";
+import { useState, useEffect, createContext } from "react";
 import Router from "next/router";
+import dynamic from "next/dynamic";
 import withDarkMode, { useDarkMode } from "next-dark-mode";
+import { NextUIProvider } from "@nextui-org/react";
 
-import "swiper/swiper-bundle.css";
-import "react-toggle/style.css";
+import "../styles/global.css";
+import Modal from "../components/common/Modal";
 
-const MyApp = ({ Component, pageProps }: AppPropsType): JSX.Element => {
+export const ModalContext = createContext(null);
+
+const App = ({ Component, pageProps }: AppPropsType): JSX.Element => {
     const [, setLoading] = useState(false);
+    const [modalState, setModalState] = useState({});
     useEffect(() => {
         initGA();
         logPageView();
@@ -34,14 +38,29 @@ const MyApp = ({ Component, pageProps }: AppPropsType): JSX.Element => {
 
     const { darkModeActive } = useDarkMode();
 
+    useEffect(() => {
+        if (darkModeActive) {
+            document
+                .querySelector("body")
+                .classList.add("dark", "text-foreground", "bg-background");
+        } else {
+            document.querySelector("body").classList.remove("dark");
+        }
+    }, [darkModeActive]);
+
     return (
-        <GeistProvider themeType={darkModeActive ? "dark" : "light"}>
-            <CssBaseline />
-            <Body>
-                <Component {...pageProps} />
-            </Body>
-        </GeistProvider>
+        <ModalContext.Provider value={setModalState}>
+            <NextUIProvider>
+                <Body>
+                    <main>
+                        <Component {...pageProps} />
+                        <Modal state={modalState} />
+                    </main>
+                </Body>
+            </NextUIProvider>
+        </ModalContext.Provider>
     );
 };
-
-export default withDarkMode(MyApp);
+export default dynamic(() => Promise.resolve(withDarkMode(App)), {
+    ssr: false,
+});

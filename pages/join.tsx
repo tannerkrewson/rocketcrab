@@ -1,8 +1,7 @@
 import { useRouter } from "next/router";
-import { Input } from "@geist-ui/react";
+import { Input } from "@nextui-org/react";
 
 import PrimaryButton from "../components/common/PrimaryButton";
-import ButtonGroup from "../components/common/ButtonGroup";
 import PageLayout from "../components/layout/PageLayout";
 import { useState } from "react";
 import { GetServerSideProps } from "next";
@@ -14,11 +13,14 @@ export const Join = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
 
     const [joinLoading, setJoinLoading] = useState(false);
     const { code, bindings } = useCodeInput("");
+    const [hasStartedTyping, setHasStartedTyping] = useState(false);
 
     const onKey = (e) => {
         // if they entered anything but a letter
         if (/[^A-Za-z]/g.test(e.key)) {
             e.preventDefault();
+        } else {
+            setHasStartedTyping(true);
         }
 
         if (e.key === "Enter") {
@@ -32,48 +34,45 @@ export const Join = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
     };
 
     return (
-        <PageLayout
-            path={code}
-            disablePhonetic={true}
-            center={true}
-            mode={mode}
-        >
-            <div className="description">Join Party</div>
-            <div className="input-container">
+        <PageLayout path={code} disablePhonetic={true} mode={mode}>
+            <div className="flex justify-center">
                 <Input
-                    placeholder="ex. abcd"
-                    size="large"
-                    width="8rem"
-                    clearable={!joinLoading}
-                    type="text"
+                    className="w-32"
+                    classNames={{
+                        label: "static pt-1 pb-1",
+                        input: "font-mono text-3xl text-center",
+                        inputWrapper: "h-auto",
+                    }}
+                    size="lg"
+                    label="Join Party"
+                    placeholder="abcd"
                     maxLength={4}
                     autoFocus
                     onKeyDown={onKey}
                     autoCorrect="off"
                     autoCapitalize="none"
                     disabled={joinLoading}
+                    errorMessage={`${invalid} does not exist 😞`}
+                    isInvalid={invalid && !hasStartedTyping}
+                    spellCheck="false"
                     {...bindings}
                 />
             </div>
-            {invalid && (
-                <div className="description" style={{ color: "red" }}>
-                    {invalid} does not exist 😞
-                </div>
-            )}
-            <ButtonGroup>
-                <PrimaryButton href="/" size="large">
+
+            <div className="flex mt-4 justify-center space-x-2">
+                <PrimaryButton href="/" size="lg">
                     Back
                 </PrimaryButton>
 
                 <PrimaryButton
                     onClick={onJoin}
-                    size="large"
+                    size="lg"
                     disabled={code.length !== 4}
                     loading={joinLoading}
                 >
                     Join
                 </PrimaryButton>
-            </ButtonGroup>
+            </div>
             <style jsx>{`
                 .description {
                     text-align: center;

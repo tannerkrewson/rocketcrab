@@ -3,6 +3,8 @@ import { Swiper, SwiperSlide } from "swiper/react";
 import FsLightbox from "fslightbox-react";
 import SkinnyCard from "../common/SkinnyCard";
 
+import "swiper/css";
+
 const GamePictures = ({ pictures }: GamePicturesProps): JSX.Element => {
     const [lightboxState, setLightboxState] = useState({
         toggler: false,
@@ -14,27 +16,30 @@ const GamePictures = ({ pictures }: GamePicturesProps): JSX.Element => {
     return (
         pictures?.length && (
             <SkinnyCard>
-                <Swiper spaceBetween={16} slidesPerView={2.5}>
-                    {pictures.map((picture, i) => (
-                        <SwiperSlide key={picture}>
-                            <img
-                                src={picture}
-                                style={{
-                                    boxShadow:
-                                        "2px 2px 6px rgba(0, 0, 0, 0.12)",
-                                    borderRadius: "5px",
-                                    border: "1px solid #eaeaea",
-                                }}
-                                onClick={() =>
-                                    setLightboxState({
-                                        toggler: !lightboxState.toggler,
-                                        sourceIndex: i,
-                                    })
-                                }
-                            />
-                        </SwiperSlide>
-                    ))}
-                </Swiper>
+                <div>
+                    <Swiper spaceBetween={16} slidesPerView={2.5}>
+                        {pictures.map((picture, i) => (
+                            <SwiperSlide key={picture}>
+                                <img
+                                    src={picture}
+                                    alt="Game picture"
+                                    style={{
+                                        boxShadow:
+                                            "2px 2px 6px rgba(0, 0, 0, 0.12)",
+                                        borderRadius: "5px",
+                                        border: "1px solid #eaeaea",
+                                    }}
+                                    onClick={() =>
+                                        setLightboxState({
+                                            toggler: !lightboxState.toggler,
+                                            sourceIndex: i,
+                                        })
+                                    }
+                                />
+                            </SwiperSlide>
+                        ))}
+                    </Swiper>
+                </div>
                 <FsLightbox
                     toggler={lightboxState.toggler}
                     sources={pictures}

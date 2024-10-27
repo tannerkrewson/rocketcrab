@@ -54,7 +54,7 @@ const GameInfo = ({ game }: GameInfoProps): JSX.Element => (
                 </a>
             </div>
         )}
-        {game.basedOn.bggId && (
+        {game.basedOn?.bggId && (
             <div className="info">
                 <span className="emoji">📙</span> More information on{" "}
                 <a

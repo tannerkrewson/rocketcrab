@@ -1,9 +1,7 @@
 import React from "react";
-import { QuestionCircle } from "@geist-ui/react-icons";
 import { ClientGameLibrary, ClientParty } from "../../types/types";
 import PrimaryButton from "../common/PrimaryButton";
 import SkinnyCard from "../common/SkinnyCard";
-import { Spacer } from "@geist-ui/react";
 
 const PublicGame = ({
     party,
@@ -16,7 +14,7 @@ const PublicGame = ({
 }): JSX.Element => {
     const { code, playerList, selectedGameId } = party;
     const selectedGame = gameLibrary.gameList.find(
-        ({ id }) => id === selectedGameId
+        ({ id }) => id === selectedGameId,
     );
     const host = playerList.find((p) => p.isHost);
     return (
@@ -33,9 +31,7 @@ const PublicGame = ({
                                     onClick={() => onWhatIs(selectedGameId)}
                                     className="game-info"
                                 >
-                                    {selectedGame.name}
-                                    <Spacer inline x={0.15} />
-                                    <QuestionCircle size={18} />
+                                    {selectedGame.name} ❓
                                 </a>
                             </span>
                         ) : (

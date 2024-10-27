@@ -1,9 +1,10 @@
-import { Input, Spacer, useInput } from "@geist-ui/react";
+import { Input, Spacer } from "@nextui-org/react";
 import React, { useEffect, useRef, useState } from "react";
 import {
     ChatMessage,
     ENABLE_FILTER,
     MAX_CHAT_MSG_LEN,
+    MIN_MS_BETWEEN_MSGS,
     Player,
 } from "../../types/types";
 import { filterClean, isChatMsgValid } from "../../utils/utils";
@@ -27,8 +28,9 @@ export const ChatBox = ({
     unreadMsgCount: number;
     clearUnreadMsgCount: () => void;
 }): JSX.Element => {
-    const { state: msgToSend, bindings, reset } = useInput("");
+    const [msgToSend, setMsgToSend] = useState("");
     const [isChatShowing, setIsChatShowing] = useState(!startHidden);
+    const [isChatSendDisabled, setIsChatSendDisabled] = useState(false);
 
     const messagesEndRef = useRef(null);
     const [isFirstRender, setIsFirstRender] = useState(true);
@@ -38,7 +40,10 @@ export const ChatBox = ({
         if (!isChatMsgValid(msgToSend, thisPlayer, chat)) return;
 
         onSendChat(msgToSend);
-        reset();
+        setMsgToSend("");
+        setIsChatSendDisabled(true);
+
+        setTimeout(() => setIsChatSendDisabled(false), MIN_MS_BETWEEN_MSGS);
     };
 
     const onEnter = (e) => {
@@ -55,13 +60,13 @@ export const ChatBox = ({
         setIsFirstRender(false);
         // the isFirstRender check prevents the page from scrolling to the chat
         // box when first entering the party screen, after selecting a game, etc.
-    }, [chat.length]);
+    }, [chat.length, isChatShowing, isFirstRender]);
 
     useEffect(() => {
         if (isChatShowing) {
             clearUnreadMsgCount();
         }
-    }, [unreadMsgCount, isChatShowing]);
+    }, [unreadMsgCount, isChatShowing, clearUnreadMsgCount]);
 
     return (
         <CollapseBox
@@ -70,7 +75,7 @@ export const ChatBox = ({
             disableHideShow={disableHideShow}
             badgeCount={unreadMsgCount}
             onCollapse={(currentCollapse) => setIsChatShowing(!currentCollapse)}
-            badgeType="error" // red
+            badgeType="danger" // red
         >
             <Spacer y={0.5} />
             <div className="msg-container">
@@ -86,13 +91,18 @@ export const ChatBox = ({
             </div>
             <div className="flex-center-row">
                 <Input
-                    {...bindings}
+                    size="lg"
                     onKeyDown={onEnter}
                     maxLength={MAX_CHAT_MSG_LEN}
                     width="100%"
+                    value={msgToSend}
+                    onValueChange={setMsgToSend}
                 />
                 <div className="send-container">
-                    <PrimaryButton size="small" onClick={handleConfirm}>
+                    <PrimaryButton
+                        onClick={handleConfirm}
+                        disabled={isChatSendDisabled || !msgToSend.length}
+                    >
                         Send
                     </PrimaryButton>
                 </div>

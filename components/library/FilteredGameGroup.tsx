@@ -11,12 +11,12 @@ const FilteredGameGroup = ({
     const games = gameList
         .filter(
             ({ category }) =>
-                !categoryFilter || category.includes(categoryFilter)
+                !categoryFilter || category.includes(categoryFilter),
         )
         .filter(({ name, author }) =>
             (name + author)
                 .toLowerCase()
-                .includes(nameFilter.toLowerCase().trim())
+                .includes(nameFilter.toLowerCase().trim()),
         );
 
     return (

@@ -1,4 +1,4 @@
-import { Loading } from "@geist-ui/react";
+import { Spinner } from "@nextui-org/react";
 import { RocketcrabMode } from "../../types/enums";
 import Connecting from "./Connecting";
 import Footer from "./Footer";
@@ -10,82 +10,25 @@ const PageLayout = ({
     loading,
     disablePhonetic,
     deemphasize,
-    center,
     reconnecting,
     mode,
 }: PageLayoutParams): JSX.Element => (
-    <div className="container">
-        <main>
-            <div className="main-content">
-                <MainTitle
-                    mode={mode}
-                    path={path}
-                    disablePhonetic={disablePhonetic}
-                    deemphasize={deemphasize}
-                />
+    <div className="flex min-h-svh items-center flex-col">
+        <div className="flex flex-col justify-center flex-1 max-w-md px-2 w-full">
+            <MainTitle
+                mode={mode}
+                path={path}
+                disablePhonetic={disablePhonetic}
+                deemphasize={deemphasize}
+            />
 
-                {loading ? <Loading /> : children}
-            </div>
-            {!center && <div className="height-expander"></div>}
-        </main>
+            {loading ? <Spinner /> : children}
 
-        <Footer />
-
-        <style jsx>{`
-            .container {
-                min-height: 100%;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-            }
-
-            main {
-                flex: 1;
-                display: flex;
-                flex-direction: column;
-                justify-content: center;
-                align-items: center;
-            }
-
-            .main-content {
-                min-height: 20rem;
-                width: min(24em, 95vw);
-            }
-
-            a {
-                color: inherit;
-                text-decoration: none;
-            }
-
-            .height-expander {
-                flex-grow: 1;
-            }
-
-            .theme-toggle {
-                position: fixed;
-                bottom: 1em;
-                right: 1em;
-            }
-        `}</style>
-
-        <style jsx global>{`
-            html,
-            body {
-                padding: 0;
-                margin: 0;
-            }
-
-            * {
-                box-sizing: border-box;
-            }
-
-            /* hide the fullscreen button */
-            .fslightbox-toolbar-button:first-child {
-                display: none;
-            }
-        `}</style>
-        {reconnecting && <Connecting />}
+            {reconnecting && <Connecting />}
+        </div>
+        <div className="w-full">
+            <Footer />
+        </div>
     </div>
 );
 
@@ -95,7 +38,6 @@ type PageLayoutParams = {
     loading?: boolean;
     disablePhonetic?: boolean;
     deemphasize?: boolean;
-    center?: boolean;
     reconnecting?: boolean;
     mode: RocketcrabMode;
 };

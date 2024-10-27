@@ -15,15 +15,15 @@ describe("server/socket.ts", () => {
             join: jest.fn(),
             handshake: { headers: {} },
         };
-        io = ({
+        io = {
             on: (event, handler) => {
                 handler(socket);
             },
-        } as unknown) as Server;
+        } as unknown as Server;
 
-        rocketcrab = ({
+        rocketcrab = {
             partyList: [],
-        } as Partial<RocketCrab>) as RocketCrab;
+        } as Partial<RocketCrab> as RocketCrab;
 
         api(io, rocketcrab);
     });

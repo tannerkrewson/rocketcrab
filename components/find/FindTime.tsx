@@ -1,4 +1,4 @@
-import { Grid, Spacer } from "@geist-ui/react";
+import { Spacer } from "@nextui-org/react";
 import { formatRelative, differenceInCalendarDays, format } from "date-fns";
 import React from "react";
 
@@ -15,7 +15,7 @@ export const FindTime = ({ dates }: { dates: number[] }): JSX.Element => (
                         .replaceAll(":00", "")
                         .replaceAll(" AM", "am")
                         .replaceAll(" PM", "pm")
-                        .split(" at ")
+                        .split(" at "),
                 )
                 // convert [ [day, time], [day, time], ... ]
                 // to { day: [time, time, ...], day: [time, time, ...]}
@@ -24,20 +24,13 @@ export const FindTime = ({ dates }: { dates: number[] }): JSX.Element => (
                         ...prev,
                         [day]: [...(prev[day] || []), time],
                     }),
-                    {}
-                )
+                    {},
+                ),
         ).map(([day, times]: [string, string[]], i) => (
             <div key={i}>
                 {i === 0 && "and "}
-                {day} at{" "}
-                <Grid.Container gap={0.4} justify="center">
-                    {times.map((time) => (
-                        <Grid xs={4} key={time}>
-                            {time}
-                        </Grid>
-                    ))}
-                </Grid.Container>
-                <Spacer y={0.7} />
+                {day} at <>{times}</>
+                <Spacer y={1} />
             </div>
         ))}
         ...and so on.

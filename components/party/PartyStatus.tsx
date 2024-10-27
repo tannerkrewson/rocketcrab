@@ -1,9 +1,8 @@
-import { Card, Spacer, useTheme } from "@geist-ui/react";
+import { Card, CardBody, Spacer } from "@nextui-org/react";
 
 import { JellyfishSpinner } from "react-spinners-kit";
 import { ClientGame, Player } from "../../types/types";
 import PrimaryButton from "../common/PrimaryButton";
-import ButtonGroup from "../common/ButtonGroup";
 
 const PartyStatus = ({
     selectedGame,
@@ -13,53 +12,50 @@ const PartyStatus = ({
     onlyOnePlayer,
     isPublic,
 }: PartyStatusProps): JSX.Element => {
-    const {
-        palette: { accents_1 },
-    } = useTheme();
-
     return (
         <Card>
-            <Card.Content
-                style={{ padding: "1em", backgroundColor: accents_1 }}
-            >
+            <CardBody>
                 {selectedGame ? (
-                    <>
-                        <div>Ready to play:</div>
-                        <h3 className="game-name">{selectedGame.name}</h3>
+                    <div className="text-center">
                         <div>
+                            {isHost
+                                ? "You've selected:"
+                                : hostName + " has selected:"}
+                        </div>
+
+                        <div className="text-2xl my-1 font-bold">
+                            {selectedGame.name}
+                        </div>
+
+                        <div className="my-2">
                             {isHost
                                 ? "As the host, you have to start the game!"
                                 : "Waiting for " + hostName + " to start..."}
                         </div>
                         <Spacer y={1} />
-                        <ButtonGroup>
-                            <PrimaryButton
-                                onClick={onShowGameInfo}
-                                size="small"
-                            >
-                                What is {selectedGame.name}?
-                            </PrimaryButton>
-                        </ButtonGroup>
-                    </>
+                        <PrimaryButton onClick={onShowGameInfo} size="sm">
+                            What is {selectedGame.name}?
+                        </PrimaryButton>
+                    </div>
                 ) : (
                     <div className="status-container">
                         <JellyfishSpinner size={4} sizeUnit="em" color="Grey" />
 
-                        <div className="status-note">
+                        <div className="status-note flex-col">
                             {getPreSelectedGameStatus(
                                 onlyOnePlayer,
                                 isHost,
                                 hostName,
-                                isPublic
-                            )}
+                                isPublic,
+                            )
+                                .split("\n")
+                                .map((text, i) => (
+                                    <div key={i}>{text}</div>
+                                ))}
                         </div>
                     </div>
                 )}
                 <style jsx>{`
-                    .game-name {
-                        margin-top: 0.2em;
-                        line-height: 1.2em;
-                    }
                     .status-note {
                         flex: 1;
                         display: flex;
@@ -70,7 +66,7 @@ const PartyStatus = ({
                         display: flex;
                     }
                 `}</style>
-            </Card.Content>
+            </CardBody>
         </Card>
     );
 };
@@ -79,17 +75,17 @@ const getPreSelectedGameStatus = (
     onlyOnePlayer: boolean,
     isHost: boolean,
     hostName: string,
-    isPublic: boolean
+    isPublic: boolean,
 ) => {
     if (isPublic) {
         return "You must select a game before others can join!";
     }
 
     return onlyOnePlayer
-        ? "⬆️ Give this link to your friends! ⬆️ \n (You can tap it to copy!)"
+        ? "Welcome to Rocketcrab!"
         : isHost
-        ? "As the host, you must select the game!"
-        : `Waiting for ${hostName} to select a game...`;
+          ? "As the host, you must select the game!"
+          : `Waiting for ${hostName} to select a game...`;
 };
 
 type PartyStatusProps = {

@@ -1,4 +1,4 @@
-import { Badge } from "@geist-ui/react";
+import { Chip } from "@nextui-org/react";
 import React, { useState } from "react";
 import PrimaryButton from "./PrimaryButton";
 
@@ -17,7 +17,13 @@ export const CollapseBox = ({
     startHidden: boolean;
     disableHideShow: boolean;
     badgeCount: number;
-    badgeType?: "default" | "secondary" | "success" | "warning" | "error";
+    badgeType?:
+        | "default"
+        | "secondary"
+        | "success"
+        | "warning"
+        | "primary"
+        | "danger";
     onlyShowBadgeWhenCollapsed?: boolean;
     onCollapse?: (currentCollapse: boolean) => void;
 }): JSX.Element => {
@@ -29,12 +35,12 @@ export const CollapseBox = ({
                     <span style={{ marginRight: ".25em" }}>{title}</span>
                     {badgeCount > 0 &&
                         (collapse || !onlyShowBadgeWhenCollapsed) && (
-                            <Badge type={badgeType}>{badgeCount}</Badge>
+                            <Chip color={badgeType}>{badgeCount}</Chip>
                         )}
                 </h4>
                 {!disableHideShow && (
                     <PrimaryButton
-                        size="mini"
+                        size="sm"
                         onClick={() => {
                             const toggledCollapse = !collapse;
                             setCollapse(toggledCollapse);

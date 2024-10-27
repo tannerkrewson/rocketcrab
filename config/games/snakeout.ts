@@ -9,8 +9,7 @@ const game: ServerGame = {
     basedOn: {
         game: "The Resistance",
         author: "Don Eskridge",
-        link:
-            "https://indieboardsandcards.com/index.php/our-games/the-resistance/",
+        link: "https://indieboardsandcards.com/index.php/our-games/the-resistance/",
         bggId: 41114,
     },
     description: `Out the snake, or be outed as a snake! 🐍

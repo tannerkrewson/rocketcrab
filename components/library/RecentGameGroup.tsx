@@ -21,12 +21,12 @@ const RecentGameGroup = ({
 
             setGames(
                 gameList.filter(({ id }) =>
-                    sortedRecentGames.find(({ gameId }) => id === gameId)
-                )
+                    sortedRecentGames.find(({ gameId }) => id === gameId),
+                ),
             );
         };
         getRecentGames();
-    }, []);
+    }, [gameList]);
 
     return (
         <GameGroup

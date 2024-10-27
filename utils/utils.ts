@@ -7,13 +7,13 @@ import {
     PromiseWebSocket,
 } from "../types/types";
 import WebSocket from "ws";
-import { useInput } from "@geist-ui/react";
 import { useState } from "react";
 import Filter from "bad-words";
 import { RocketcrabMode } from "../types/enums";
 
 const filter = new Filter();
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const postJson = (url = "", data = {}): Promise<any> =>
     fetch(url, {
         method: "POST",
@@ -30,21 +30,21 @@ export const newPromiseWebSocket = (url: string): PromiseWebSocket => {
 
     ws.onMessage = () =>
         new Promise((resolve) =>
-            ws.on("message", (msg) => resolve(msg as string))
+            ws.on("message", (msg) => resolve(msg as unknown as string)),
         );
 
     ws.untilMessage = (msgChecker) =>
         new Promise((resolve, reject) =>
             ws.on("message", (msg) => {
                 try {
-                    if (msgChecker(msg as string)) {
-                        resolve(msg as string);
+                    if (msgChecker(msg as unknown as string)) {
+                        resolve(msg as unknown as string);
                     }
                 } catch (error) {
                     ws.close();
                     reject(error);
                 }
-            })
+            }),
         );
 
     return ws;
@@ -52,25 +52,20 @@ export const newPromiseWebSocket = (url: string): PromiseWebSocket => {
 
 export const useLibraryState = (): LibraryState => {
     const [selectedCategory, setSelectedCategory] = useState("");
-    const {
-        state: search,
-        setState: setSearch,
-        bindings: searchBindings,
-    } = useInput("");
+    const [search, setSearch] = useState("");
 
     return {
         selectedCategory,
         setSelectedCategory,
         search,
         setSearch,
-        searchBindings,
     };
 };
 
 export const isChatMsgValid = (
     message: string,
     player: Player,
-    chat: Array<ChatMessage>
+    chat: Array<ChatMessage>,
 ): boolean => {
     if (
         typeof message !== "string" ||
