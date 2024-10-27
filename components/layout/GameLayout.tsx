@@ -78,7 +78,7 @@ const GameLayout = ({
 
     const promptMute = useCallback(() => {
         fireModal({
-            title: "Are your sure?",
+            title: "Are you sure?",
             text: "New chat messages won't appear over your game, but you can still see them in the menu!",
             showCancelButton: true,
             confirmButtonText: "Mute chat",
@@ -189,7 +189,7 @@ const GameLayout = ({
             hostOnly: false,
             onClick: useCallback(() => {
                 fireModal({
-                    title: "Are your sure?",
+                    title: "Are you sure?",
                     text:
                         "If reloading doesn't fix your issue, tell your party host, " +
                         hostName +
@@ -213,7 +213,7 @@ const GameLayout = ({
             hostOnly: true,
             onClick: useCallback(() => {
                 fireModal({
-                    title: "Are your sure?",
+                    title: "Are you sure?",
                     text:
                         "Your current session in " +
                         thisGame.name +
@@ -237,7 +237,7 @@ const GameLayout = ({
             hostOnly: true,
             onClick: useCallback(() => {
                 fireModal({
-                    title: "Are your sure?",
+                    title: "Are you sure?",
                     text:
                         "Your current session in " +
                         thisGame.name +
@@ -257,7 +257,6 @@ const GameLayout = ({
             }, [fireModal, igLogEvent, onExitGame, thisGame.name]),
         },
     ];
-
     const hideAllWindows = useCallback(() => {
         setShowGameLibrary(false);
         setShowPlayerList(false);
