@@ -29,9 +29,11 @@ const onJoinParty =
     ({ code, lastPartyState, reconnecting }: JoinPartyResponse) => {
         const { partyList } = rocketcrab;
 
-        const party = reconnecting
-            ? reconnectToParty(lastPartyState, rocketcrab)
-            : getPartyByCode(code, partyList);
+        let party = getPartyByCode(code, partyList);
+
+        if (!party && reconnecting) {
+            party = reconnectToParty(lastPartyState, rocketcrab);
+        }
 
         const isPlayerBanned = party?.bannedIPs?.find(
             (ip) => socket?.handshake?.address === ip,
