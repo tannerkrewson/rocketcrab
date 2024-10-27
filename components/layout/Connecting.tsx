@@ -9,7 +9,7 @@ const Connecting = (): JSX.Element => {
             onClick={() => setCollapseText(!collapseText)}
         >
             <span className="icon-container">
-                <Spinner size="sm" color="default" />
+                <Spinner size="sm" color="danger" />
             </span>
             {!collapseText && <span>🚀🦀 Reconnecting...</span>}
             <style jsx>{`
