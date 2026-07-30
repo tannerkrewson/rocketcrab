@@ -19,8 +19,9 @@ const api = (server: Application, rocketcrab: RocketCrab): void => {
             res.json({ code });
         };
 
-    const localeRedirects = [RocketcrabMode.MAIN, RocketcrabMode.KIDS].map(
-        (mode) => `/${mode}/*`,
+    // Express 5 uses path-to-regexp v8 — wildcard `*` is now `{*splat}`
+    const localeRedirects = [RocketcrabMode.MAIN, RocketcrabMode.KIDS].flatMap(
+        (mode) => [`/${mode}`, `/${mode}/{*splat}`],
     );
 
     // redirect https://rocketcrab.com/MAIN/transfer/drawphone
@@ -36,7 +37,8 @@ const api = (server: Application, rocketcrab: RocketCrab): void => {
     server.post("/api/new", newPartyHandler(false));
     server.post("/api/new-public", newPartyHandler(true));
 
-    server.get("/transfer/:gameid/:uuid?", (req: Request, res: Response) => {
+    // Express 5 with path-to-regexp v8: optional params use {/param} syntax
+    server.get("/transfer/:gameid{/:uuid}", (req: Request, res: Response) => {
         const { uuid: givenUuid, gameid } = req.params;
         const { name } = req.query;
 

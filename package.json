@@ -19,7 +19,6 @@
         "test:coverage": "NODE_OPTIONS='--experimental-strip-types --experimental-require-module' vitest run --coverage",
         "prepare": "husky"
     },
-
     "dependencies": {
         "@aw-web-design/react-textfit": "4.1.135",
         "@nextui-org/react": "^2.4.6",
@@ -27,13 +26,12 @@
         "@tanstack/react-router": "1.170.18",
         "@tanstack/react-start": "1.168.33",
         "bad-words": "^3.0.4",
-        "body-parser": "^1.20.2",
         "classnames": "^2.5.1",
         "cross-env": "^7.0.3",
         "date-fns": "^3.6.0",
         "dexie": "^4.0.8",
         "emoji-picker-react": "^4.11.1",
-        "express": "^4.19.2",
+        "express": "^5.2.1",
         "fontsource-inconsolata": "^3.0.5",
         "fontsource-mukta": "^3.0.5",
         "framer-motion": "^11.3.19",
@@ -59,7 +57,6 @@
     },
     "devDependencies": {
         "@testing-library/react": "^16.0.0",
-        "@types/express": "^4.17.21",
         "@types/node": "^22.15.3",
         "@types/react": "^18.3.3",
         "@types/supertest": "^7.2.1",
