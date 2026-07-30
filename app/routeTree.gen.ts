@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as LibraryRouteImport } from './routes/library'
+import { Route as GameGameidRouteImport } from './routes/game.$gameid'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +29,44 @@ const LibraryRoute = LibraryRouteImport.update({
   path: '/library',
   getParentRoute: () => rootRouteImport,
 } as any)
+const GameGameidRoute = GameGameidRouteImport.update({
+  id: '/game/$gameid',
+  path: '/game/$gameid',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
+  '/game/$gameid': typeof GameGameidRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
+  '/game/$gameid': typeof GameGameidRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
+  '/game/$gameid': typeof GameGameidRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/join' | '/library'
+  fullPaths: '/' | '/join' | '/library' | '/game/$gameid'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/join' | '/library'
-  id: '__root__' | '/' | '/join' | '/library'
+  to: '/' | '/join' | '/library' | '/game/$gameid'
+  id: '__root__' | '/' | '/join' | '/library' | '/game/$gameid'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   JoinRoute: typeof JoinRoute
   LibraryRoute: typeof LibraryRoute
+  GameGameidRoute: typeof GameGameidRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +92,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LibraryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/game/$gameid': {
+      id: '/game/$gameid'
+      path: '/game/$gameid'
+      fullPath: '/game/$gameid'
+      preLoaderRoute: typeof GameGameidRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +106,7 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   JoinRoute: JoinRoute,
   LibraryRoute: LibraryRoute,
+  GameGameidRoute: GameGameidRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
