@@ -112,7 +112,8 @@ describe("server/architecture", () => {
                 description: "Party statistics",
                 queryParams: [],
                 body: null,
-                response: "Array<{ partyStatus, gameStatus, selectedGameId, numberOfPlayers }>",
+                response:
+                    "Array<{ partyStatus, gameStatus, selectedGameId, numberOfPlayers }>",
                 status: 200,
             },
             {
@@ -127,7 +128,8 @@ describe("server/architecture", () => {
             {
                 method: "ALL",
                 path: "/MAIN/*, /KIDS/*",
-                description: "Locale prefix stripping (workaround for Next.js locale routing)",
+                description:
+                    "Locale prefix stripping (workaround for Next.js locale routing)",
                 queryParams: [],
                 body: null,
                 response: "302 redirect to stripped path",

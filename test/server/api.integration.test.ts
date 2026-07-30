@@ -35,7 +35,10 @@ import attachAPIHandlers from "../../server/api";
 import { RocketcrabMode } from "../../types/enums";
 
 /** Create a fresh Express app with API routes attached */
-const createTestApp = (): { app: Application; rocketcrab: ReturnType<typeof initRocketCrab> } => {
+const createTestApp = (): {
+    app: Application;
+    rocketcrab: ReturnType<typeof initRocketCrab>;
+} => {
     const app = express();
     app.use(express.json());
     const rocketcrab = initRocketCrab(false); // no dev party
@@ -139,9 +142,7 @@ describe("API integration — /api/stats", () => {
 describe("API integration — /transfer/:gameid/:uuid?", () => {
     it("creates a party and redirects to it", async () => {
         const { app, rocketcrab } = createTestApp();
-        const res = await request(app)
-            .get("/transfer/drawphone")
-            .expect(302);
+        const res = await request(app).get("/transfer/drawphone").expect(302);
 
         expect(res.headers.location).toMatch(/^\/[a-z]{4}$/);
         expect(rocketcrab.partyList.length).toBe(1);
@@ -156,7 +157,9 @@ describe("API integration — /transfer/:gameid/:uuid?", () => {
         // supertest combines cookies via set-cookie header
         const cookies = res.headers["set-cookie"];
         expect(cookies).toBeDefined();
-        const joinCookie = Array.isArray(cookies) ? cookies.join("; ") : cookies;
+        const joinCookie = Array.isArray(cookies)
+            ? cookies.join("; ")
+            : cookies;
         expect(joinCookie).toContain("previousName=Alice");
     });
 
@@ -165,16 +168,12 @@ describe("API integration — /transfer/:gameid/:uuid?", () => {
         const uuid = "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee";
 
         // First call creates the party
-        await request(app)
-            .get(`/transfer/drawphone/${uuid}`)
-            .expect(302);
+        await request(app).get(`/transfer/drawphone/${uuid}`).expect(302);
 
         expect(rocketcrab.partyList.length).toBe(1);
 
         // Second call with same UUID reuses it
-        await request(app)
-            .get(`/transfer/drawphone/${uuid}`)
-            .expect(302);
+        await request(app).get(`/transfer/drawphone/${uuid}`).expect(302);
 
         expect(rocketcrab.partyList.length).toBe(1);
     });
@@ -195,9 +194,7 @@ describe("API integration — /transfer/:gameid/:uuid?", () => {
 
     it("rejects UUIDs shorter than 10 characters", async () => {
         const { app } = createTestApp();
-        await request(app)
-            .get("/transfer/drawphone/short")
-            .expect(400);
+        await request(app).get("/transfer/drawphone/short").expect(400);
     });
 
     it("sets the game when a valid game ID is provided", async () => {
@@ -223,13 +220,9 @@ describe("API integration — /transfer/:gameid/:uuid?", () => {
     it("works without a UUID (creates new party)", async () => {
         const { app, rocketcrab } = createTestApp();
 
-        await request(app)
-            .get("/transfer/drawphone")
-            .expect(302);
+        await request(app).get("/transfer/drawphone").expect(302);
 
-        await request(app)
-            .get("/transfer/drawphone")
-            .expect(302);
+        await request(app).get("/transfer/drawphone").expect(302);
 
         expect(rocketcrab.partyList.length).toBe(2);
     });
@@ -256,9 +249,7 @@ describe("Locale redirects", () => {
 
     it("preserves multi-segment paths after stripping prefix", async () => {
         const { app } = createTestApp();
-        const res = await request(app)
-            .get("/MAIN/a/b/c")
-            .expect(302);
+        const res = await request(app).get("/MAIN/a/b/c").expect(302);
 
         expect(res.headers.location).toBe("/a/b/c");
     });

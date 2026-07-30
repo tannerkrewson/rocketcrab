@@ -6,19 +6,13 @@
  */
 
 import { describe, expect, it } from "vitest";
-import {
-    getModeFromHost,
-    isKidsMode,
-    MODE_MAP,
-} from "../../utils/mode";
+import { getModeFromHost, isKidsMode, MODE_MAP } from "../../utils/mode";
 import { RocketcrabMode } from "../../types/enums";
 
 describe("utils/mode", () => {
     describe("getModeFromHost", () => {
         it("returns MAIN for rocketcrab.com", () => {
-            expect(getModeFromHost("rocketcrab.com")).toBe(
-                RocketcrabMode.MAIN,
-            );
+            expect(getModeFromHost("rocketcrab.com")).toBe(RocketcrabMode.MAIN);
         });
 
         it("returns KIDS for kids.rocketcrab.com", () => {
@@ -54,9 +48,7 @@ describe("utils/mode", () => {
             expect(getModeFromHost("kids.staging.local")).toBe(
                 RocketcrabMode.KIDS,
             );
-            expect(getModeFromHost("kids.127.0.0.1")).toBe(
-                RocketcrabMode.KIDS,
-            );
+            expect(getModeFromHost("kids.127.0.0.1")).toBe(RocketcrabMode.KIDS);
         });
 
         it("returns MAIN for subdomains not starting with kids.", () => {

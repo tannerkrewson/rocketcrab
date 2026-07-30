@@ -102,4 +102,3 @@ export const filterClean = (message: string): string => {
 // Mode resolution — see utils/mode.ts for the canonical implementation
 export { MODE_MAP, getModeFromHost, isKidsMode } from "./mode";
 // Mode context (JSX) available from ./ModeContext
-
