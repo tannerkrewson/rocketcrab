@@ -13,10 +13,10 @@
         "format:check": "oxfmt --check",
         "lint": "eslint .",
         "lint:staged": "lint-staged",
-        "test": "vitest run",
-        "test:watch": "vitest",
+        "test": "NODE_OPTIONS='--experimental-strip-types --experimental-require-module' vitest run",
+        "test:watch": "NODE_OPTIONS='--experimental-strip-types --experimental-require-module' vitest",
         "test:all": "run-s lint type-check test",
-        "test:coverage": "vitest run --coverage",
+        "test:coverage": "NODE_OPTIONS='--experimental-strip-types --experimental-require-module' vitest run --coverage",
         "prepare": "husky"
     },
     "lint-staged": {
@@ -98,7 +98,7 @@
     },
     "homepage": "https://rocketcrab.com/",
     "engines": {
-        "node": "20.x",
+        "node": "24.x",
         "npm": "10.x"
     }
 }
