@@ -274,7 +274,8 @@ const GameLayout = ({
             <div
                 className={classNames({
                     "flex flex-row justify-between shadow-sm z-10": true,
-                    "fixed rounded-lg top-2 left-2 backdrop-blur-sm bg-white/20 h-fit": statusCollapsed,
+                    "fixed rounded-lg top-2 left-2 backdrop-blur-sm bg-white/20 h-fit":
+                        statusCollapsed,
                 })}
             >
                 <div

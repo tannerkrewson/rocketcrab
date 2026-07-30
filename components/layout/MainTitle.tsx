@@ -18,7 +18,8 @@ const MainTitle = ({
         <div
             className={classNames({
                 "text-center transition-all duration-100 ease-out": true,
-                "-mt-1 -mb-8 scale-75 saturate-50 opacity-50 blur-sm": deemphasize,
+                "-mt-1 -mb-8 scale-75 saturate-50 opacity-50 blur-sm":
+                    deemphasize,
             })}
         >
             <div className="flex justify-center items-center">
