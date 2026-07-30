@@ -1,6 +1,6 @@
 import { Button, Card } from "@heroui/react";
 import { useContext } from "react";
-import { ModalContext } from "../../pages/_app";
+import { ModalContext } from "../../utils/ModalContext";
 import ClickToCopy from "../common/ClickToCopy";
 
 const ShareButtons = () => {

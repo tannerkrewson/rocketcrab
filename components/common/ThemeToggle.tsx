@@ -1,19 +1,14 @@
 import { Switch } from "@heroui/react";
-import { useDarkMode } from "next-dark-mode";
+import { useTheme } from "../../utils/theme";
 
 export const ThemeToggle = (): JSX.Element => {
-    const { darkModeActive, switchToDarkMode, switchToLightMode } =
-        useDarkMode();
+    const { isDark, setTheme } = useTheme();
     return (
-        <>
-            <Switch
-                isSelected={!darkModeActive}
-                startContent={<span className="sun-moon">☀️</span>}
-                endContent={<span className="sun-moon">🌙</span>}
-                onValueChange={(checked) =>
-                    checked ? switchToLightMode() : switchToDarkMode()
-                }
-            />
-        </>
+        <Switch
+            defaultSelected={!isDark}
+            onValueChange={(checked) => setTheme(checked ? "light" : "dark")}
+        >
+            <span>{isDark ? "🌙" : "☀️"}</span>
+        </Switch>
     );
 };

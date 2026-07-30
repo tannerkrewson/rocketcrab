@@ -3,10 +3,10 @@ import { ClientGameLibrary, ClientParty } from "../types/types.ts";
 import { logEvent } from "./analytics.ts";
 import { io } from "socket.io-client";
 import { RocketcrabDexie } from "./dexie.ts";
-import { setCookie as setNookie } from "nookies";
+import { setCookie as setBrowserCookie } from "./cookies.ts";
 import { NextRouter } from "next/router";
 import { SocketEvent } from "../types/enums.ts";
-import { ModalContext } from "../pages/_app.ts";
+import { ModalContext } from "../utils/ModalContext";
 
 const socket = io();
 
@@ -266,7 +266,7 @@ const joinParty = (
 };
 
 const setCookie = (key: string, value: string) =>
-    setNookie(null, key, value, {
+    setBrowserCookie(key, value, {
         maxAge: 2147483647,
     });
 

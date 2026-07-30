@@ -20,12 +20,12 @@ import { differenceInMilliseconds } from "date-fns";
 import GameDetail from "../detail/GameDetail";
 import { RocketcrabMode } from "../../types/enums";
 import { useRouter } from "next/router";
-import { ModalContext } from "../../pages/_app";
+import { ModalContext } from "../../utils/ModalContext";
 import classNames from "classnames";
 import { ToastContainer, toast } from "react-toastify";
 
 import "react-toastify/dist/ReactToastify.css";
-import { useDarkMode } from "next-dark-mode";
+import { useTheme } from "../../utils/theme";
 import EmojiPicker, { EmojiStyle, Theme } from "emoji-picker-react";
 
 const GameLayout = ({
@@ -67,7 +67,7 @@ const GameLayout = ({
 
     const [enableToasts, setEnableToasts] = useState(!isKidsMode);
 
-    const { darkModeActive } = useDarkMode();
+    const { isDark: darkModeActive } = useTheme();
 
     const igLogEvent = useCallback(
         (event) => logEvent("inGame-" + event, isHost ? "isHost" : "notHost"),
@@ -326,10 +326,9 @@ const GameLayout = ({
             </div>
             {showEmojiButton && (
                 <Button
-                    radius="full"
                     size="lg"
                     isIconOnly
-                    variant="faded"
+                    variant="secondary"
                     onClick={() => {
                         setShowMenu(false);
                         setShowEmojiPicker(!showEmojiPicker);

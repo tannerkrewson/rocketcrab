@@ -28,7 +28,7 @@ const GameFrame = ({
             {(showLoading || showWaitingForHost) && (
                 <div className="flex h-full items-center justify-center">
                     <Spinner
-                        color={showWaitingForHost ? "danger" : "default"}
+                        color={showWaitingForHost ? "danger" : "current"}
                         label={
                             showWaitingForHost
                                 ? "Waiting for host"

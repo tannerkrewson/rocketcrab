@@ -43,7 +43,6 @@ export const Join = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                         input: "font-mono text-3xl text-center",
                         inputWrapper: "h-auto",
                     }}
-                    size="lg"
                     label="Join Party"
                     placeholder="abcd"
                     maxLength={4}

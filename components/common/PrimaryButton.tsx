@@ -32,12 +32,11 @@ const PrimaryButton = (props: PrimaryButtonProps): JSX.Element => {
 
 const ButtonWrapper = (props: PrimaryButtonProps) => (
     <Button
-        size={props.size}
+        size={props.size as any}
         onClick={props.onClick}
         isDisabled={props.disabled}
-        isLoading={props.loading}
-        variant={props.variant || "faded"}
-        color={props.color}
+        {...(props.loading ? { isDisabled: true } : {})}
+        variant={(props.variant as any) || "secondary"}
         fullWidth={props.manualWidth}
     >
         {props.children}
@@ -51,21 +50,8 @@ type PrimaryButtonProps = {
     disabled?: boolean;
     children?: React.ReactNode;
     loading?: boolean;
-    variant?:
-        | "faded"
-        | "solid"
-        | "bordered"
-        | "light"
-        | "flat"
-        | "shadow"
-        | "ghost";
-    color?:
-        | "warning"
-        | "default"
-        | "primary"
-        | "secondary"
-        | "success"
-        | "danger";
+    variant?: string;
+    color?: string;
     url?: string;
     manualWidth?: boolean;
     style?: Record<string, string>;

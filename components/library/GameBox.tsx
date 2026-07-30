@@ -3,7 +3,11 @@ import { ClientGame } from "../../types/types";
 
 const GameBox = ({ game, onClick }: GameBoxProps): JSX.Element => {
     return (
-        <Card onPress={() => onClick(game.id)} isPressable>
+        <Card
+            isHoverable
+            onClick={() => onClick(game.id)}
+            className="cursor-pointer"
+        >
             <div className="text-left mx-4 my-4">
                 <b>{game.name}</b>
                 <div className="text-gray-400">{"by " + game.author}</div>

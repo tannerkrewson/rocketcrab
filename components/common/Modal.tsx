@@ -1,6 +1,6 @@
 import React, { useContext, useEffect } from "react";
 import { Modal, Button, useOverlayState } from "@heroui/react";
-import { ModalContext } from "../../pages/_app";
+import { ModalContext } from "../../utils/ModalContext";
 import QRCode from "react-qr-code";
 
 const ModalComponent = ({ state }) => {
@@ -34,8 +34,7 @@ const ModalComponent = ({ state }) => {
                     <Modal.Footer>
                         {state.showCancelButton && (
                             <Button
-                                color="danger"
-                                variant="light"
+                                variant="danger"
                                 onPress={() => {
                                     overlayState.close();
                                     setModalState?.({});
@@ -53,7 +52,6 @@ const ModalComponent = ({ state }) => {
                             </Button>
                         )}
                         <Button
-                            color="primary"
                             onPress={() => {
                                 overlayState.close();
                                 setModalState?.({});

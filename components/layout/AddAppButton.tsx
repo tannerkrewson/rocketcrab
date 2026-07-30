@@ -8,7 +8,7 @@ import dynamic from "next/dynamic";
 import { useState, useEffect, useContext } from "react";
 import PrimaryButton from "../common/PrimaryButton";
 import { logEvent } from "../../utils/analytics";
-import { ModalContext } from "../../pages/_app";
+import { ModalContext } from "../../utils/ModalContext";
 
 // https://github.com/chrisdancee/react-ios-pwa-prompt/issues/32#issuecomment-586762839
 const PWAPrompt = dynamic(() => import("react-ios-pwa-prompt"), {

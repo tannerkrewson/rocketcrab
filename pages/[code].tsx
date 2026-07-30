@@ -8,7 +8,7 @@ import NameEntry from "../components/party/NameEntry";
 import GameLayout from "../components/layout/GameLayout";
 
 import { ClientGameLibrary, ClientParty } from "../types/types";
-import { parseCookies } from "nookies";
+import { getCookie } from "../utils/cookies";
 
 import { useRocketcrabClientSocket } from "../utils/useRocketcrabClientSocket";
 import { useChat } from "../utils/useChat";
@@ -131,9 +131,9 @@ export const getServerSideProps = (async (ctx: GetServerSidePropsContext) => {
     let isReconnect = false;
 
     try {
-        lastPartyState = JSON.parse(
-            parseCookies(ctx).lastPartyState,
-        ) as ClientParty;
+        const cookieString = ctx.req?.headers?.cookie || "";
+        const raw = getCookie("lastPartyState", cookieString);
+        lastPartyState = JSON.parse(raw!) as ClientParty;
 
         isReconnect = lastPartyState.code === code;
         if (!isReconnect) {

@@ -13,6 +13,12 @@ import "@fontsource/mukta";
 import { ModeProvider } from "../../utils/ModeContext";
 import { getModeFromHost } from "../../utils/mode";
 
+// --- Theme ---
+import { ThemeProvider, ThemeScript } from "../../utils/theme";
+
+// --- Modal ---
+import { ModalProvider } from "../../utils/ModalContext";
+
 /**
  * Root error boundary — catches rendering errors anywhere in the route tree.
  */
@@ -70,6 +76,8 @@ export const Route = createRootRoute({
 });
 
 function RootComponent() {
+    const [mounted, setMounted] = React.useState(false);
+    React.useEffect(() => setMounted(true), []);
     /**
      * Resolve the mode from the current hostname.
      * During SSR, the TanStack Start request context provides the hostname.
@@ -86,9 +94,15 @@ function RootComponent() {
 
     return (
         <ModeProvider mode={mode}>
-            <div id="app-root">
-                <Outlet />
-            </div>
+            <ThemeProvider>
+                {/* Inline script to set theme class before hydration */}
+                {!mounted && <ThemeScript />}
+                <ModalProvider>
+                    <div id="app-root">
+                        <Outlet />
+                    </div>
+                </ModalProvider>
+            </ThemeProvider>
         </ModeProvider>
     );
 }

@@ -9,13 +9,11 @@ const NameBox = ({
     onKick,
 }: NameBoxProps): JSX.Element => (
     <Card
-        radius="sm"
-        shadow="sm"
-        className={classNames({
+        className={classNames("rounded-sm shadow-sm", {
             "border-1 border-rose-400": isHost,
         })}
     >
-        <Card.Content className="text-center">
+        <div className="text-center p-3">
             {name ? name : <Spinner />}
             {onEditName && (
                 <div onClick={onEditName} className="emoji-button">
@@ -45,7 +43,7 @@ const NameBox = ({
                     font-style: italic;
                 }
             `}</style>
-        </Card.Content>
+        </div>
     </Card>
 );
 

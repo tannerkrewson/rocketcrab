@@ -17,13 +17,7 @@ export const CollapseBox = ({
     startHidden: boolean;
     disableHideShow: boolean;
     badgeCount: number;
-    badgeType?:
-        | "default"
-        | "secondary"
-        | "success"
-        | "warning"
-        | "primary"
-        | "danger";
+    badgeType?: string;
     onlyShowBadgeWhenCollapsed?: boolean;
     onCollapse?: (currentCollapse: boolean) => void;
 }): JSX.Element => {
@@ -35,7 +29,7 @@ export const CollapseBox = ({
                     <span style={{ marginRight: ".25em" }}>{title}</span>
                     {badgeCount > 0 &&
                         (collapse || !onlyShowBadgeWhenCollapsed) && (
-                            <Chip color={badgeType}>{badgeCount}</Chip>
+                            <Chip color={badgeType as any}>{badgeCount}</Chip>
                         )}
                 </h4>
                 {!disableHideShow && (

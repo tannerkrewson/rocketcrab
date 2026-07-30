@@ -14,7 +14,7 @@ import { useRouter } from "next/router";
 import { isFuture } from "date-fns";
 import { useIsAlreadyPWA } from "../../utils/useIsAlreadyPWA";
 import { RocketcrabMode } from "../../types/enums";
-import { ModalContext } from "../../pages/_app";
+import { ModalContext } from "../../utils/ModalContext";
 import ShareButtons from "./ShareButtons";
 
 const PartyScreen = ({
