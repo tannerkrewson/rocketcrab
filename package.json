@@ -24,7 +24,7 @@
         "*.@(ts|tsx)": [
             "oxlint --fix"
         ],
-        "*.json": [
+        "package.json": [
             "oxfmt"
         ]
     },
