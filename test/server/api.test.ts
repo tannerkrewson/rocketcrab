@@ -153,6 +153,25 @@ describe("server/api.ts", () => {
         expect(rocketcrab.partyList[0].selectedGameId).toBe("");
     });
 
+    it("/api/stats returns party statistics", () => {
+        const statsHandler = app.get.mock.calls[1][1];
+        const res = { json: jest.fn() };
+
+        const handler = app.post.mock.calls[0][1];
+        handler(undefined, { json: jest.fn() });
+        handler(undefined, { json: jest.fn() });
+
+        statsHandler(undefined, res);
+
+        const stats = res.json.mock.calls[0][0];
+        expect(Array.isArray(stats)).toBe(true);
+        expect(stats.length).toBe(2);
+        expect(stats[0]).toHaveProperty("partyStatus");
+        expect(stats[0]).toHaveProperty("gameStatus");
+        expect(stats[0]).toHaveProperty("selectedGameId");
+        expect(stats[0]).toHaveProperty("numberOfPlayers");
+    });
+
     it("locale transfers work", () => {
         expect(app.all.mock.calls[0][0]).toEqual(["/MAIN/*", "/KIDS/*"]);
         const handler = app.all.mock.calls[0][1];

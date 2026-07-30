@@ -44,7 +44,9 @@ describe("server/architecture", () => {
             get: vi.fn(),
             all: vi.fn(),
         } as unknown as Application;
-        const rocketcrab = { partyList: [] } as Partial<RocketCrab> as RocketCrab;
+        const rocketcrab = {
+            partyList: [],
+        } as Partial<RocketCrab> as RocketCrab;
 
         api(app, rocketcrab);
 
@@ -71,7 +73,9 @@ describe("server/architecture", () => {
                 handler(socket);
             },
         } as unknown as Server;
-        const rocketcrab = { partyList: [] } as Partial<RocketCrab> as RocketCrab;
+        const rocketcrab = {
+            partyList: [],
+        } as Partial<RocketCrab> as RocketCrab;
 
         socketApi(io, rocketcrab);
 
