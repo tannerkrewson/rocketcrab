@@ -22,7 +22,8 @@
         "test",
         "app",
         "app.config.ts",
-        "vite.config.ts"
+        "vite.config.ts",
+        "server/with-tanstack.ts"
     ],
     "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "**/*.js"]
 }

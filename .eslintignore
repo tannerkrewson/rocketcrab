@@ -4,3 +4,4 @@
 **/public/workbox-*
 .oxfmtrc.json
 app/
+app/routeTree.gen.ts
