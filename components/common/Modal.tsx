@@ -1,91 +1,77 @@
 import React, { useContext, useEffect } from "react";
-import {
-    Modal as NextModal,
-    ModalContent,
-    ModalHeader,
-    ModalBody,
-    ModalFooter,
-    Button,
-    useDisclosure,
-} from "@nextui-org/react";
+import { Modal, Button, useOverlayState } from "@heroui/react";
 import { ModalContext } from "../../pages/_app";
 import QRCode from "react-qr-code";
 
-const Modal = ({ state }) => {
-    const { isOpen, onOpen, onOpenChange } = useDisclosure();
+const ModalComponent = ({ state }) => {
+    const overlayState = useOverlayState();
 
     const setModalState = useContext(ModalContext);
 
     useEffect(() => {
         if (state.title) {
-            onOpen();
+            overlayState.open();
         }
-    }, [onOpen, state]);
+    }, [overlayState, state]);
 
     return (
-        <NextModal
-            isOpen={isOpen}
-            onOpenChange={onOpenChange}
-            isDismissable={false}
-            hideCloseButton={true}
-        >
-            <ModalContent>
-                {(onClose) => (
-                    <>
-                        <ModalHeader className="flex flex-col gap-1">
-                            {state.title}
-                        </ModalHeader>
-                        <ModalBody>
-                            {state.qr ? (
-                                <div className="flex justify-center">
-                                    <QRCode value={state.qr}></QRCode>
-                                </div>
-                            ) : (
-                                state.text
-                            )}
-                        </ModalBody>
-                        <ModalFooter>
-                            {state.showCancelButton && (
-                                <Button
-                                    color="danger"
-                                    variant="light"
-                                    onPress={() => {
-                                        onClose();
-                                        setModalState?.({});
-
-                                        if (state.onClose) {
-                                            state.onClose({
-                                                isConfirmed: false,
-                                            });
-                                        }
-                                    }}
-                                >
-                                    {state.cancelButtonText
-                                        ? state.cancelButtonText
-                                        : "Cancel"}
-                                </Button>
-                            )}
+        <Modal state={overlayState}>
+            <Modal.Backdrop />
+            <Modal.Container>
+                <Modal.Dialog>
+                    <Modal.Header className="flex flex-col gap-1">
+                        {state.title}
+                    </Modal.Header>
+                    <Modal.Body>
+                        {state.qr ? (
+                            <div className="flex justify-center">
+                                <QRCode value={state.qr} />
+                            </div>
+                        ) : (
+                            state.text
+                        )}
+                    </Modal.Body>
+                    <Modal.Footer>
+                        {state.showCancelButton && (
                             <Button
-                                color="primary"
+                                color="danger"
+                                variant="light"
                                 onPress={() => {
-                                    onClose();
+                                    overlayState.close();
                                     setModalState?.({});
 
                                     if (state.onClose) {
-                                        state.onClose({ isConfirmed: true });
+                                        state.onClose({
+                                            isConfirmed: false,
+                                        });
                                     }
                                 }}
                             >
-                                {state.confirmButtonText
-                                    ? state.confirmButtonText
-                                    : "OK"}
+                                {state.cancelButtonText
+                                    ? state.cancelButtonText
+                                    : "Cancel"}
                             </Button>
-                        </ModalFooter>
-                    </>
-                )}
-            </ModalContent>
-        </NextModal>
+                        )}
+                        <Button
+                            color="primary"
+                            onPress={() => {
+                                overlayState.close();
+                                setModalState?.({});
+
+                                if (state.onClose) {
+                                    state.onClose({ isConfirmed: true });
+                                }
+                            }}
+                        >
+                            {state.confirmButtonText
+                                ? state.confirmButtonText
+                                : "OK"}
+                        </Button>
+                    </Modal.Footer>
+                </Modal.Dialog>
+            </Modal.Container>
+        </Modal>
     );
 };
 
-export default Modal;
+export default ModalComponent;

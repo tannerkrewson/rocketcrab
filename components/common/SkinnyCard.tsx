@@ -1,9 +1,9 @@
-import { Card, CardBody } from "@nextui-org/react";
+import { Card } from "@heroui/react";
 
 const SkinnyCard = ({ children }: SkinnyCardProps): JSX.Element => {
     return (
         <Card>
-            <CardBody style={{ padding: "8pt" }}>{children}</CardBody>
+            <Card.Content style={{ padding: "8pt" }}>{children}</Card.Content>
         </Card>
     );
 };

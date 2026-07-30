@@ -1,4 +1,4 @@
-import { Button } from "@nextui-org/react";
+import { Button } from "@heroui/react";
 import Link from "next/link";
 
 const PrimaryButton = (props: PrimaryButtonProps): JSX.Element => {

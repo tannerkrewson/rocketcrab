@@ -1,4 +1,4 @@
-import { Input, Spacer } from "@nextui-org/react";
+import { Input } from "@heroui/react";
 import React, { useEffect, useRef, useState } from "react";
 import {
     ChatMessage,
@@ -77,7 +77,7 @@ export const ChatBox = ({
             onCollapse={(currentCollapse) => setIsChatShowing(!currentCollapse)}
             badgeType="danger" // red
         >
-            <Spacer y={0.5} />
+            <div className="h-2"></div>
             <div className="msg-container">
                 {chat.map(({ playerId, playerName, message, date }) => (
                     <div key={date}>

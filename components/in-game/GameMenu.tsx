@@ -1,7 +1,7 @@
 import PrimaryButton from "../common/PrimaryButton";
 import { MenuButton } from "../../types/types";
 import React from "react";
-import { Chip } from "@nextui-org/react";
+import { Chip } from "@heroui/react";
 import { ThemeToggle } from "../common/ThemeToggle";
 
 const GameMenu = ({ isHost, menuButtons }: GameMenuProps): JSX.Element => {

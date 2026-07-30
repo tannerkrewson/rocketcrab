@@ -1,4 +1,4 @@
-import { Spinner } from "@nextui-org/react";
+import { Spinner } from "@heroui/react";
 import { RocketcrabMode } from "../../types/enums";
 import Connecting from "./Connecting";
 import Footer from "./Footer";

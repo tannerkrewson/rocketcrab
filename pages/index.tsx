@@ -5,7 +5,7 @@ import PrimaryButton from "../components/common/PrimaryButton";
 import AddAppButton from "../components/layout/AddAppButton";
 import PageLayout from "../components/layout/PageLayout";
 import { postJson } from "../utils/utils";
-import { Spacer } from "@nextui-org/react";
+
 import { useIsAlreadyPWA } from "../utils/useIsAlreadyPWA";
 import { RocketcrabMode } from "../types/enums";
 import { GetServerSideProps } from "next";
@@ -46,7 +46,7 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                     Start Party
                 </PrimaryButton>
             </div>
-            <Spacer y={8} />
+            <div className="h-32"></div>
             <div className="btn-col space-y-2">
                 {!isAlreadyPWA && !isKidsMode && (
                     <>
@@ -73,7 +73,7 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                     Browse Games
                 </PrimaryButton>
             </div>
-            <Spacer y={0.5} />
+            <div className="h-2"></div>
             <style jsx>{`
                 .description {
                     text-align: center;

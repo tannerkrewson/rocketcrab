@@ -1,4 +1,4 @@
-import { Button, Spacer } from "@nextui-org/react";
+import { Button } from "@heroui/react";
 import PrimaryButton from "../common/PrimaryButton";
 import React, { useCallback, useContext, useEffect, useState } from "react";
 import {
@@ -405,7 +405,7 @@ const GameLayout = ({
                         disableEditName={true}
                         meId={thisPlayer.id}
                     />
-                    <Spacer y={0.5} />
+                    <div className="h-2"></div>
                     <PrimaryButton onClick={hideAllWindows}>
                         Close
                     </PrimaryButton>
@@ -421,7 +421,7 @@ const GameLayout = ({
                         unreadMsgCount={unreadMsgCount}
                         clearUnreadMsgCount={clearUnreadMsgCount}
                     />
-                    <Spacer y={0.5} />
+                    <div className="h-2"></div>
                     <div className="flex mt-4 justify-center space-x-2">
                         <PrimaryButton
                             size="sm"
@@ -453,7 +453,7 @@ const GameLayout = ({
                         game={thisGame}
                         allCategories={gameLibrary.categories}
                     />
-                    <Spacer y={0.5} />
+                    <div className="h-2"></div>
                     <PrimaryButton onClick={hideAllWindows}>
                         Close
                     </PrimaryButton>

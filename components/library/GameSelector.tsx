@@ -1,4 +1,3 @@
-import { Spacer } from "@nextui-org/react";
 import { useCallback, useState } from "react";
 import { ClientGameLibrary } from "../../types/types";
 import PrimaryButton from "../common/PrimaryButton";
@@ -60,7 +59,7 @@ const GameSelector = ({
                         allCategories={gameLibrary.categories}
                         showOnlyHostMessage={!isHost}
                     />
-                    <Spacer y={1} />
+                    <div className="h-4"></div>
                     <div className="flex justify-center space-x-2">
                         <PrimaryButton onClick={onBackToSearch}>
                             ↩️ Back to search

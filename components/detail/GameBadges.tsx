@@ -1,4 +1,4 @@
-import { Chip } from "@nextui-org/react";
+import { Chip } from "@heroui/react";
 import { RocketcrabMode } from "../../types/enums";
 import { ClientGame, GameCategory } from "../../types/types";
 import SkinnyCard from "../common/SkinnyCard";

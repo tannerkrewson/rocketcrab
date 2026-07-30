@@ -7,8 +7,6 @@ import { useState, useEffect, createContext } from "react";
 import Router from "next/router";
 import dynamic from "next/dynamic";
 import withDarkMode, { useDarkMode } from "next-dark-mode";
-import { NextUIProvider } from "@nextui-org/react";
-
 import "../styles/global.css";
 import Modal from "../components/common/Modal";
 
@@ -50,14 +48,12 @@ const App = ({ Component, pageProps }: AppPropsType): JSX.Element => {
 
     return (
         <ModalContext.Provider value={setModalState}>
-            <NextUIProvider>
-                <Body>
-                    <main>
-                        <Component {...pageProps} />
-                        <Modal state={modalState} />
-                    </main>
-                </Body>
-            </NextUIProvider>
+            <Body>
+                <main>
+                    <Component {...pageProps} />
+                    <Modal state={modalState} />
+                </main>
+            </Body>
         </ModalContext.Provider>
     );
 };

@@ -1,4 +1,4 @@
-import { Button, Card, CardBody } from "@nextui-org/react";
+import { Button, Card } from "@heroui/react";
 import { useContext } from "react";
 import { ModalContext } from "../../pages/_app";
 import ClickToCopy from "../common/ClickToCopy";
@@ -9,7 +9,7 @@ const ShareButtons = () => {
 
     return (
         <Card>
-            <CardBody className="text-center">
+            <Card.Content className="text-center">
                 <div className="mb-2">Get your friends to join!</div>
                 <div className="flex flex-row gap-2 justify-center">
                     {canShare && (
@@ -42,7 +42,7 @@ const ShareButtons = () => {
                         QR Code
                     </Button>
                 </div>
-            </CardBody>
+            </Card.Content>
         </Card>
     );
 };

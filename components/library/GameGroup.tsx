@@ -1,4 +1,3 @@
-import { Spacer } from "@nextui-org/react";
 import PrimaryButton from "../common/PrimaryButton";
 import GameBox from "./GameBox";
 import { ClientGame } from "../../types/types";
@@ -19,7 +18,7 @@ const GameGroup = ({
                 <div>{errorMessage}</div>
             )}
         </div>
-        <Spacer y={6} />
+        <div className="h-24"></div>
         <PrimaryButton onClick={onBack}>↩️ Back to categories</PrimaryButton>
     </>
 );

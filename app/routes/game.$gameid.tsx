@@ -1,5 +1,9 @@
 import React from "react";
-import { createFileRoute, useParams, useNavigate } from "@tanstack/react-router";
+import {
+    createFileRoute,
+    useParams,
+    useNavigate,
+} from "@tanstack/react-router";
 import { useMode } from "../../utils/ModeContext";
 import { GAME_LIBRARY } from "../../config";
 import { ClientGame, ClientGameLibrary } from "../../types/types";
@@ -14,7 +18,10 @@ export const Route = createFileRoute("/game/$gameid")({
         <PageLayout mode={"MAIN" as RocketcrabMode}>
             <div className="text-center py-12">
                 <h1 className="text-2xl font-bold mb-4">Game Not Found</h1>
-                <p className="mb-4">The game you're looking for doesn't exist or isn't available in this mode.</p>
+                <p className="mb-4">
+                    The game you're looking for doesn't exist or isn't available
+                    in this mode.
+                </p>
                 <PrimaryButton href="/library">Browse Games</PrimaryButton>
             </div>
         </PageLayout>
@@ -53,10 +60,7 @@ function GameDetailComponent() {
 
     return (
         <PageLayout mode={mode}>
-            <GameDetail
-                game={game}
-                allCategories={gameLibrary.categories}
-            />
+            <GameDetail game={game} allCategories={gameLibrary.categories} />
             <div className="flex justify-center space-x-2">
                 <PrimaryButton onClick={onBack}>
                     ↩️ Back to search

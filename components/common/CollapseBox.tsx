@@ -1,4 +1,4 @@
-import { Chip } from "@nextui-org/react";
+import { Chip } from "@heroui/react";
 import React, { useState } from "react";
 import PrimaryButton from "./PrimaryButton";
 

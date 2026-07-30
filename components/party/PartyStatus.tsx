@@ -1,4 +1,4 @@
-import { Card, CardBody, Spacer } from "@nextui-org/react";
+import { Card } from "@heroui/react";
 
 import { JellyfishSpinner } from "react-spinners-kit";
 import { ClientGame, Player } from "../../types/types";
@@ -14,7 +14,7 @@ const PartyStatus = ({
 }: PartyStatusProps): JSX.Element => {
     return (
         <Card>
-            <CardBody>
+            <Card.Content>
                 {selectedGame ? (
                     <div className="text-center">
                         <div>
@@ -32,7 +32,7 @@ const PartyStatus = ({
                                 ? "As the host, you have to start the game!"
                                 : "Waiting for " + hostName + " to start..."}
                         </div>
-                        <Spacer y={1} />
+                        <div className="h-4"></div>
                         <PrimaryButton onClick={onShowGameInfo} size="sm">
                             What is {selectedGame.name}?
                         </PrimaryButton>
@@ -66,7 +66,7 @@ const PartyStatus = ({
                         display: flex;
                     }
                 `}</style>
-            </CardBody>
+            </Card.Content>
         </Card>
     );
 };

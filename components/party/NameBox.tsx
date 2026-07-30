@@ -1,4 +1,4 @@
-import { Spinner, Card, CardBody } from "@nextui-org/react";
+import { Spinner, Card } from "@heroui/react";
 import classNames from "classnames";
 
 const NameBox = ({
@@ -15,7 +15,7 @@ const NameBox = ({
             "border-1 border-rose-400": isHost,
         })}
     >
-        <CardBody className="text-center">
+        <Card.Content className="text-center">
             {name ? name : <Spinner />}
             {onEditName && (
                 <div onClick={onEditName} className="emoji-button">
@@ -45,7 +45,7 @@ const NameBox = ({
                     font-style: italic;
                 }
             `}</style>
-        </CardBody>
+        </Card.Content>
     </Card>
 );
 

@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Input } from "@nextui-org/react";
+import { Input } from "@heroui/react";
 
 import PrimaryButton from "../../components/common/PrimaryButton";
 import PageLayout from "../../components/layout/PageLayout";

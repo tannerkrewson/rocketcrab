@@ -1,4 +1,4 @@
-import { Card } from "@nextui-org/react";
+import { Card } from "@heroui/react";
 import { ClientGame } from "../../types/types";
 
 const GameBox = ({ game, onClick }: GameBoxProps): JSX.Element => {

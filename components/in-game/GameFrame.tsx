@@ -1,5 +1,5 @@
 import { GameStatus } from "../../types/enums";
-import { Spinner } from "@nextui-org/react";
+import { Spinner } from "@heroui/react";
 import { ClientGame, GameState, Player } from "../../types/types";
 import { useConnectedGame } from "../../utils/useConnectedGame";
 

@@ -1,27 +1,21 @@
-import { Popover, PopoverContent, PopoverTrigger } from "@nextui-org/react";
-import { cloneElement, useCallback, useState } from "react";
+import { Popover } from "@heroui/react";
+import { cloneElement, useCallback } from "react";
 
 const ClickToCopy = ({ children }) => {
-    const [copiedTooltip, setCopiedTooltip] = useState(false);
-
     const linkCopyClick = useCallback(() => {
-        setCopiedTooltip(true);
         navigator.clipboard.writeText(window.location.href);
-
-        setTimeout(() => setCopiedTooltip(false), 1000);
     }, []);
 
     return (
-        <Popover
-            isOpen={copiedTooltip}
-            onOpenChange={(open) => setCopiedTooltip(open)}
-        >
-            <PopoverTrigger>
+        <Popover>
+            <Popover.Trigger>
                 {cloneElement(children, { onClick: linkCopyClick })}
-            </PopoverTrigger>
-            <PopoverContent>
-                <div className="text-medium">Copied!</div>
-            </PopoverContent>
+            </Popover.Trigger>
+            <Popover.Dialog>
+                <Popover.Content>
+                    <div className="text-medium">Copied!</div>
+                </Popover.Content>
+            </Popover.Dialog>
         </Popover>
     );
 };

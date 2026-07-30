@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import Router from "next/router";
-import { Input } from "@nextui-org/react";
+import { Input } from "@heroui/react";
 import PrimaryButton from "../common/PrimaryButton";
 
 const NameEntry = ({

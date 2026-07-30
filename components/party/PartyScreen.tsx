@@ -1,6 +1,6 @@
 import PlayerList from "./PlayerList";
 import PrimaryButton from "../common/PrimaryButton";
-import { Spacer } from "@nextui-org/react";
+
 import GameSelector from "../library/GameSelector";
 import { ClientGameLibrary, ClientParty, Player } from "../../types/types";
 import React, { useCallback, useContext, useState } from "react";
@@ -153,7 +153,7 @@ const PartyScreen = ({
                 onlyOnePlayer={playerList.length === 1}
                 isPublic={isPublic}
             />
-            <Spacer y={1} />
+            <div className="h-4"></div>
             <div className="flex justify-center space-x-2">
                 <PrimaryButton onClick={showGameSelector(true)} size="lg">
                     Browse Games
@@ -168,11 +168,11 @@ const PartyScreen = ({
                     Start Game
                 </PrimaryButton>
             </div>
-            <Spacer y={1.5} />
+            <div className="h-6"></div>
             {orderedCards}
             {!isAlreadyPWA && !createdAsPublic && !isHost && !isKidsMode && (
                 <>
-                    <Spacer y={1} />
+                    <div className="h-4"></div>
                     <SkinnyCard>
                         <div className="text-center p-1">
                             <div>
@@ -207,7 +207,7 @@ const PartyScreen = ({
 
             {createdAsPublic && !isKidsMode && (
                 <>
-                    <Spacer y={0.5} />
+                    <div className="h-2"></div>
                     <SkinnyCard>
                         <div>
                             {isPublic
@@ -216,7 +216,7 @@ const PartyScreen = ({
                         </div>
                         {isFuture(publicEndDate) && (
                             <>
-                                <Spacer y={0.5} />
+                                <div className="h-2"></div>
                                 <Countdown start={publicEndDate}>
                                     Public parties will close
                                 </Countdown>
@@ -226,7 +226,7 @@ const PartyScreen = ({
                 </>
             )}
 
-            <Spacer y={1} />
+            <div className="h-4"></div>
             <div className="flex justify-center space-x-2">
                 <PrimaryButton onClick={promptLeave} size="sm">
                     {leaveText}

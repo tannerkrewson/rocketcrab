@@ -1,4 +1,4 @@
-import { Switch } from "@nextui-org/react";
+import { Switch } from "@heroui/react";
 import { useDarkMode } from "next-dark-mode";
 
 export const ThemeToggle = (): JSX.Element => {

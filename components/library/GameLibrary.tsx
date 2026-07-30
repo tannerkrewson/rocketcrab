@@ -1,5 +1,5 @@
 import CategoryGroup from "./CategoryGroup";
-import { Input, Spacer } from "@nextui-org/react";
+import { Input } from "@heroui/react";
 import FilteredGameGroup from "./FilteredGameGroup";
 import RecentGameGroup from "./RecentGameGroup";
 import { ClientGameLibrary, LibraryState } from "../../types/types";
@@ -24,9 +24,9 @@ const GameLibrary = ({
 
     return (
         <div style={{ textAlign: "center", justifyContent: "center" }}>
-            <Spacer y={2} />
+            <div className="h-8"></div>
             <h4>{categoryName}Games</h4>
-            <Spacer y={1} />
+            <div className="h-4"></div>
             {!selectedCategory && (
                 <SearchBox search={search} onSearchChange={setSearch} />
             )}
@@ -77,7 +77,7 @@ const SearchBox = ({ search, onSearchChange }) => (
             value={search}
             onValueChange={onSearchChange}
         />
-        <Spacer y={1} />
+        <div className="h-4"></div>
     </>
 );
 

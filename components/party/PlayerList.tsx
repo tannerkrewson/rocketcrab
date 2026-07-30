@@ -1,5 +1,5 @@
 import NameBox from "./NameBox";
-import { Spacer } from "@nextui-org/react";
+
 import { Player } from "../../types/types";
 import React from "react";
 import { CollapseBox } from "../common/CollapseBox";
@@ -25,7 +25,7 @@ const PlayerList = ({
             badgeType="default"
             onlyShowBadgeWhenCollapsed={false}
         >
-            <Spacer y={0.5} />
+            <div className="h-2"></div>
             <div className="mt-4 mx-2 grid gap-3 grid-cols-2">
                 {playerList.map(({ id, name, isHost }, index) => (
                     <NameBox
