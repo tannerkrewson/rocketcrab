@@ -139,8 +139,7 @@ export const getServerSideProps = (async (ctx: GetServerSidePropsContext) => {
         if (!isReconnect) {
             lastPartyState.me.id = null;
         }
-        // eslint-disable-next-line no-empty
-    } catch (error) {}
+    } catch {}
 
     return {
         props: {

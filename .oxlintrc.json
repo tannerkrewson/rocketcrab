@@ -1,0 +1,22 @@
+{
+  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": [
+    "typescript",
+    "react",
+    "vitest",
+    "oxc"
+  ],
+  "categories": {
+    "correctness": "error",
+    "suspicious": "warn",
+    "perf": "warn"
+  },
+  "rules": {
+    "react/react-in-jsx-scope": "off",
+    "vitest/require-mock-type-parameters": "off",
+    "vitest/expect-expect": "off"
+  },
+  "env": {
+    "builtin": true
+  }
+}

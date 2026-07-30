@@ -93,8 +93,7 @@ export const isChatMsgValid = (
 export const filterClean = (message: string): string => {
     try {
         return filter.clean(message);
-        // eslint-disable-next-line no-empty
-    } catch (e) {}
+    } catch {}
 
     return message;
 };
