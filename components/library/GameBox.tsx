@@ -1,20 +1,18 @@
-import { Card } from "@heroui/react";
 import { ClientGame } from "../../types/types";
 
 const GameBox = ({ game, onClick }: GameBoxProps): JSX.Element => {
     return (
-        <Card
-            isHoverable
+        <div
             onClick={() => onClick(game.id)}
-            className="cursor-pointer"
+            className="cursor-pointer rounded-lg border p-4 hover:shadow-md transition-shadow relative"
         >
-            <div className="text-left mx-4 my-4">
+            <div className="text-left">
                 <b>{game.name}</b>
                 <div className="text-gray-400">{"by " + game.author}</div>
             </div>
 
-            <span className="absolute bottom-7 right-4">➡️</span>
-        </Card>
+            <span className="absolute bottom-4 right-4">➡️</span>
+        </div>
     );
 };
 

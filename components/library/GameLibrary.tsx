@@ -1,5 +1,4 @@
 import CategoryGroup from "./CategoryGroup";
-import { Input } from "@heroui/react";
 import FilteredGameGroup from "./FilteredGameGroup";
 import RecentGameGroup from "./RecentGameGroup";
 import { ClientGameLibrary, LibraryState } from "../../types/types";
@@ -70,11 +69,11 @@ const GameLibrary = ({
 
 const SearchBox = ({ search, onSearchChange }) => (
     <>
-        <Input
+        <input
             placeholder="Search"
-            width="100%"
+            className="w-full border rounded-lg px-3 py-2"
             value={search}
-            onValueChange={onSearchChange}
+            onChange={(e) => onSearchChange(e.target.value)}
         />
         <div className="h-4"></div>
     </>

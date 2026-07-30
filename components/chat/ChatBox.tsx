@@ -1,4 +1,3 @@
-import { Input } from "@heroui/react";
 import React, { useEffect, useRef, useState } from "react";
 import {
     ChatMessage,
@@ -90,13 +89,12 @@ export const ChatBox = ({
                 <div ref={messagesEndRef} />
             </div>
             <div className="flex-center-row">
-                <Input
-                    className="h-12"
+                <input
+                    className="h-12 w-full border rounded-lg px-3"
                     onKeyDown={onEnter}
                     maxLength={MAX_CHAT_MSG_LEN}
-                    width="100%"
                     value={msgToSend}
-                    onValueChange={setMsgToSend}
+                    onChange={(e) => setMsgToSend(e.target.value)}
                 />
                 <div className="send-container">
                     <PrimaryButton

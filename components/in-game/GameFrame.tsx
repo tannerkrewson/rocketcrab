@@ -27,14 +27,16 @@ const GameFrame = ({
         <div className="grow">
             {(showLoading || showWaitingForHost) && (
                 <div className="flex h-full items-center justify-center">
-                    <Spinner
-                        color={showWaitingForHost ? "danger" : "current"}
-                        label={
-                            showWaitingForHost
+                    <div className="flex flex-col items-center gap-2">
+                        <Spinner
+                            color={showWaitingForHost ? "danger" : "current"}
+                        />
+                        <span className="text-sm text-gray-500">
+                            {showWaitingForHost
                                 ? "Waiting for host"
-                                : "Loading game"
-                        }
-                    />
+                                : "Loading game"}
+                        </span>
+                    </div>
                 </div>
             )}
             {showError && (

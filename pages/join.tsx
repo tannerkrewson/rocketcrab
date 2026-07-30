@@ -1,5 +1,4 @@
 import { useRouter } from "next/router";
-import { Input } from "@heroui/react";
 
 import PrimaryButton from "../components/common/PrimaryButton";
 import PageLayout from "../components/layout/PageLayout";
@@ -36,26 +35,26 @@ export const Join = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
     return (
         <PageLayout path={code} disablePhonetic={true} mode={mode}>
             <div className="flex justify-center">
-                <Input
-                    className="w-32"
-                    classNames={{
-                        label: "static pt-1 pb-1",
-                        input: "font-mono text-3xl text-center",
-                        inputWrapper: "h-auto",
-                    }}
-                    label="Join Party"
-                    placeholder="abcd"
-                    maxLength={4}
-                    autoFocus
-                    onKeyDown={onKey}
-                    autoCorrect="off"
-                    autoCapitalize="none"
-                    disabled={joinLoading}
-                    errorMessage={`${invalid} does not exist 😞`}
-                    isInvalid={invalid && !hasStartedTyping}
-                    spellCheck="false"
-                    {...bindings}
-                />
+                <div className="flex flex-col items-center gap-2">
+                    <label className="text-sm font-medium">Join Party</label>
+                    <input
+                        placeholder="abcd"
+                        maxLength={4}
+                        disabled={joinLoading}
+                        autoFocus
+                        onKeyDown={onKey}
+                        autoCorrect="off"
+                        autoCapitalize="none"
+                        spellCheck={false}
+                        className="w-32 font-mono text-3xl text-center border rounded-lg px-3 py-2"
+                        {...bindings}
+                    />
+                    {invalid && !hasStartedTyping && (
+                        <p className="text-sm text-red-500">
+                            {invalid} does not exist 😞
+                        </p>
+                    )}
+                </div>
             </div>
 
             <div className="flex mt-4 justify-center space-x-2">

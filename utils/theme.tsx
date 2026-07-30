@@ -132,14 +132,11 @@ export function ThemeProvider({
         return () => mq.removeEventListener("change", handler);
     }, []);
 
-    const resolvedTheme = useMemo<"light" | "dark">(
-        () => {
-            if (mode === "dark") return "dark";
-            if (mode === "light") return "light";
-            return systemDark ? "dark" : "light";
-        },
-        [mode, systemDark],
-    );
+    const resolvedTheme = useMemo<"light" | "dark">(() => {
+        if (mode === "dark") return "dark";
+        if (mode === "light") return "light";
+        return systemDark ? "dark" : "light";
+    }, [mode, systemDark]);
 
     // Apply the dark class whenever the resolved theme changes
     useEffect(() => {

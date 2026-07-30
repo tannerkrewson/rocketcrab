@@ -1,6 +1,6 @@
 import React, { useState } from "react";
 import Router from "next/router";
-import { Input } from "@heroui/react";
+
 import PrimaryButton from "../common/PrimaryButton";
 
 const NameEntry = ({
@@ -36,16 +36,21 @@ const NameEntry = ({
 
     return (
         <>
-            <Input
-                id="player-name"
-                label="Enter your name:"
-                placeholder="Use your real name!"
-                value={name}
-                onChange={handleNameChange}
-                autoFocus
-                onKeyDown={onEnter}
-                maxLength={24}
-            />
+            <div className="flex flex-col gap-1">
+                <label htmlFor="player-name" className="text-sm font-medium">
+                    Enter your name:
+                </label>
+                <input
+                    id="player-name"
+                    placeholder="Use your real name!"
+                    value={name}
+                    onChange={handleNameChange}
+                    autoFocus
+                    onKeyDown={onEnter}
+                    maxLength={24}
+                    className="border rounded-lg px-3 py-2"
+                />
+            </div>
 
             <div className="flex mt-4 justify-center space-x-2">
                 <PrimaryButton onClick={handleBack} size="lg">

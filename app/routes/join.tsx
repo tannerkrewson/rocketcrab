@@ -1,6 +1,5 @@
 import React, { useState } from "react";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { TextField } from "@heroui/react";
 
 import PrimaryButton from "../../components/common/PrimaryButton";
 import PageLayout from "../../components/layout/PageLayout";
@@ -50,23 +49,25 @@ function JoinComponent() {
 
     return (
         <PageLayout path={code} disablePhonetic={true} mode={mode}>
-            <div className="flex justify-center">
-                <TextField
-                    label="Join Party"
+            <div className="flex flex-col items-center gap-2">
+                <label className="text-sm font-medium">Join Party</label>
+                <input
                     placeholder="abcd"
                     maxLength={4}
-                    isDisabled={joinLoading}
-                    errorMessage={`${invalid} does not exist 😞`}
-                    isInvalid={Boolean(invalid) && !hasStartedTyping}
+                    disabled={joinLoading}
+                    autoFocus
+                    onKeyDown={onKey}
+                    autoCorrect="off"
+                    autoCapitalize="none"
+                    spellCheck={false}
+                    className="w-32 font-mono text-3xl text-center border rounded-lg px-3 py-2"
                     {...bindings}
-                    className="w-48"
-                >
-                    <TextField.Input
-                        className="font-mono text-3xl text-center"
-                        autoFocus
-                        onKeyDown={onKey}
-                    />
-                </TextField>
+                />
+                {Boolean(invalid) && !hasStartedTyping && (
+                    <p className="text-sm text-red-500">
+                        {invalid} does not exist 😞
+                    </p>
+                )}
             </div>
 
             <div className="flex mt-4 justify-center space-x-2">
