@@ -27,7 +27,7 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
 
     return (
         <PageLayout mode={mode}>
-            <div className="description">
+            <div className="text-center mb-8">
                 {isKidsMode
                     ? "play in class or with family!"
                     : "party games for phones"}
@@ -47,7 +47,7 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                 </PrimaryButton>
             </div>
             <div className="h-32"></div>
-            <div className="btn-col space-y-2">
+            <div className="flex flex-col w-fit mx-auto space-y-2">
                 {!isAlreadyPWA && !isKidsMode && (
                     <>
                         <AddAppButton />
@@ -74,18 +74,6 @@ export const Home = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                 </PrimaryButton>
             </div>
             <div className="h-2"></div>
-            <style jsx>{`
-                .description {
-                    text-align: center;
-                    margin-bottom: 2em;
-                }
-                .btn-col {
-                    display: flex;
-                    flex-direction: column;
-                    width: fit-content;
-                    margin: 0 auto;
-                }
-            `}</style>
         </PageLayout>
     );
 };

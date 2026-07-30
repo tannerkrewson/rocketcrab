@@ -93,8 +93,15 @@ async function main() {
         const tsrModule = await import(TSR_SERVER_ENTRY);
         const tsrHandler = tsrModule.default;
 
-        // Serve static client assets
+        // Serve static client assets (hashed filenames from Vite build)
         app.use("/assets", express.static(join(TSR_CLIENT_DIR, "assets")));
+
+        // Serve PWA-specific root-level files (service worker, manifest, icons)
+        app.use("/sw.js", express.static(join(TSR_CLIENT_DIR, "sw.js")));
+        app.use(
+            "/manifest.webmanifest",
+            express.static(join(TSR_CLIENT_DIR, "manifest.webmanifest")),
+        );
 
         // TanStack Start catch-all for non-API routes
         app.use(async (req, res, next) => {

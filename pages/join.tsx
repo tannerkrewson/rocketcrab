@@ -71,16 +71,6 @@ export const Join = ({ mode }: { mode: RocketcrabMode }): JSX.Element => {
                     Join
                 </PrimaryButton>
             </div>
-            <style jsx>{`
-                .description {
-                    text-align: center;
-                    margin-bottom: 1em;
-                }
-                .input-container {
-                    margin-bottom: 2em;
-                    text-align: center;
-                }
-            `}</style>
         </PageLayout>
     );
 };

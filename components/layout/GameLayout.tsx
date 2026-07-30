@@ -472,47 +472,7 @@ const GameLayout = ({
                     />
                 </div>
             )}
-            <style jsx>{`
-                .status-collapsed {
-                    position: fixed;
-                    border-radius: 8px;
-                    top: 0.5em;
-                    left: 0.5em;
-                    backdrop-filter: blur(5px);
-                    background-color: rgba(255, 255, 255, 0.2);
-                    height: fit-content;
-                }
-                .logo {
-                    margin: 0;
-                    user-select: none;
-                    cursor: pointer;
-                }
-                .rocket {
-                    height: 1.5em;
-                    margin-left: 0.1em;
-                    filter: drop-shadow(0 0 6px cyan);
-                }
-                .crab {
-                    height: 1.5em;
-                    margin-left: 0.25em;
-                    filter: drop-shadow(0 0 6px #ff0000d9);
-                }
-                .url {
-                    font-size: 1.2em;
-                    font-weight: bold;
-                    font-family: "Inconsolata", monospace;
-                }
-                .component-frame {
-                    padding: 1em;
-                    text-align: center;
-                    position: absolute;
-                    top: 3em;
-                    right: 0;
-                    width: min(24em, 100vw - 3em);
-                    margin: 0.5em;
-                    box-shadow: 0 1px 6px rgba(32, 33, 36, 0.28);
-                }
-            `}</style>
+
             {reconnecting && <Connecting />}
         </div>
     );

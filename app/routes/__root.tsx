@@ -19,6 +19,9 @@ import { ThemeProvider, ThemeScript } from "../../utils/theme";
 // --- Modal ---
 import { ModalProvider } from "../../utils/ModalContext";
 
+// --- Analytics ---
+import { AppAnalytics } from "../../utils/AnalyticsTracker";
+
 /**
  * Root error boundary — catches rendering errors anywhere in the route tree.
  */
@@ -98,6 +101,10 @@ function RootComponent() {
                 {/* Inline script to set theme class before hydration */}
                 {!mounted && <ThemeScript />}
                 <ModalProvider>
+                    <AppAnalytics />
+                    {/* PWA manifest link — enables browser install prompt */}
+                    <link rel="manifest" href="/manifest.webmanifest" />
+                    <meta name="theme-color" content="#ffffff" />
                     <div id="app-root">
                         <Outlet />
                     </div>

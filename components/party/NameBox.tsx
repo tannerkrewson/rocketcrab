@@ -16,33 +16,24 @@ const NameBox = ({
         <div className="text-center p-3">
             {name ? name : <Spinner />}
             {onEditName && (
-                <div onClick={onEditName} className="emoji-button">
+                <div
+                    onClick={onEditName}
+                    className="absolute left-2 bottom-2 cursor-pointer"
+                >
                     ✏️
                 </div>
             )}
             {onKick && (
-                <div onClick={onKick} className="emoji-button">
+                <div
+                    onClick={onKick}
+                    className="absolute left-2 bottom-2 cursor-pointer"
+                >
                     ❌
                 </div>
             )}
-            <div className="labels">{label.join(", ")}</div>
-            <style jsx>{`
-                .emoji-button {
-                    cursor: pointer;
-                    position: absolute;
-                    left: 0.5em;
-                    bottom: 0.5em;
-                }
-                .labels {
-                    position: absolute;
-                    text-align: right;
-                    right: 0.3em;
-                    bottom: 0.1em;
-                    color: Grey;
-                    font-size: 0.8em;
-                    font-style: italic;
-                }
-            `}</style>
+            <div className="absolute text-right right-1 bottom-0.5 text-gray-400 text-xs italic">
+                {label.join(", ")}
+            </div>
         </div>
     </Card>
 );

@@ -10,6 +10,7 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CodeRouteImport } from './routes/$code'
 import { Route as FindRouteImport } from './routes/find'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as LibraryRouteImport } from './routes/library'
@@ -18,6 +19,11 @@ import { Route as GameGameidRouteImport } from './routes/game.$gameid'
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CodeRoute = CodeRouteImport.update({
+  id: '/$code',
+  path: '/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FindRoute = FindRouteImport.update({
@@ -43,6 +49,7 @@ const GameGameidRoute = GameGameidRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/$code': typeof CodeRoute
   '/find': typeof FindRoute
   '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
@@ -50,6 +57,7 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/$code': typeof CodeRoute
   '/find': typeof FindRoute
   '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
@@ -58,6 +66,7 @@ export interface FileRoutesByTo {
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/$code': typeof CodeRoute
   '/find': typeof FindRoute
   '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
@@ -65,14 +74,22 @@ export interface FileRoutesById {
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/find' | '/join' | '/library' | '/game/$gameid'
+  fullPaths: '/' | '/$code' | '/find' | '/join' | '/library' | '/game/$gameid'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/find' | '/join' | '/library' | '/game/$gameid'
-  id: '__root__' | '/' | '/find' | '/join' | '/library' | '/game/$gameid'
+  to: '/' | '/$code' | '/find' | '/join' | '/library' | '/game/$gameid'
+  id:
+    | '__root__'
+    | '/'
+    | '/$code'
+    | '/find'
+    | '/join'
+    | '/library'
+    | '/game/$gameid'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CodeRoute: typeof CodeRoute
   FindRoute: typeof FindRoute
   JoinRoute: typeof JoinRoute
   LibraryRoute: typeof LibraryRoute
@@ -86,6 +103,13 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/$code': {
+      id: '/$code'
+      path: '/$code'
+      fullPath: '/$code'
+      preLoaderRoute: typeof CodeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/find': {
@@ -121,6 +145,7 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CodeRoute: CodeRoute,
   FindRoute: FindRoute,
   JoinRoute: JoinRoute,
   LibraryRoute: LibraryRoute,

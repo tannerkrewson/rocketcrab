@@ -38,10 +38,10 @@ const PartyStatus = ({
                         </PrimaryButton>
                     </div>
                 ) : (
-                    <div className="status-container">
+                    <div className="flex">
                         <JellyfishSpinner size={4} sizeUnit="em" color="Grey" />
 
-                        <div className="status-note flex-col">
+                        <div className="flex-1 flex items-center justify-center flex-col">
                             {getPreSelectedGameStatus(
                                 onlyOnePlayer,
                                 isHost,
@@ -55,17 +55,6 @@ const PartyStatus = ({
                         </div>
                     </div>
                 )}
-                <style jsx>{`
-                    .status-note {
-                        flex: 1;
-                        display: flex;
-                        align-items: center;
-                        justify-content: center;
-                    }
-                    .status-container {
-                        display: flex;
-                    }
-                `}</style>
             </Card.Content>
         </Card>
     );

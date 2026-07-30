@@ -4,8 +4,9 @@ import SkinnyCard from "../common/SkinnyCard";
 const GameInfo = ({ game }: GameInfoProps): JSX.Element => (
     <SkinnyCard>
         {game.basedOn && (
-            <div className="info">
-                <span className="emoji">🎲</span> Based on{" "}
+            <div className="py-1 leading-none">
+                <span className="w-5 text-xs text-center inline-block">🎲</span>{" "}
+                Based on{" "}
                 {game.basedOn.link ? (
                     <a
                         href={game.basedOn.link}
@@ -20,20 +21,26 @@ const GameInfo = ({ game }: GameInfoProps): JSX.Element => (
                 {game.basedOn.author && <span> by {game.basedOn.author}</span>}
             </div>
         )}
-        <div className="info">
-            <span className="emoji">🧍</span>{" "}
+        <div className="py-1 leading-none">
+            <span className="w-5 text-xs text-center inline-block">🧍</span>{" "}
             {game.basedOn ? (
                 <span>
-                    Adapted for <span className="emoji">🚀</span>
-                    <span className="emoji">🦀</span> by
+                    Adapted for{" "}
+                    <span className="w-5 text-xs text-center inline-block">
+                        🚀
+                    </span>
+                    <span className="w-5 text-xs text-center inline-block">
+                        🦀
+                    </span>{" "}
+                    by
                 </span>
             ) : (
                 "by "
             )}{" "}
             {game.author}
         </div>
-        <div className="info">
-            <span className="emoji">🔗</span>{" "}
+        <div className="py-1 leading-none">
+            <span className="w-5 text-xs text-center inline-block">🔗</span>{" "}
             <a
                 href={game.displayUrlHref}
                 target="_blank"
@@ -43,8 +50,8 @@ const GameInfo = ({ game }: GameInfoProps): JSX.Element => (
             </a>
         </div>
         {game.donationUrlHref && game.donationUrlText && (
-            <div className="info">
-                <span className="emoji">💲</span>{" "}
+            <div className="py-1 leading-none">
+                <span className="w-5 text-xs text-center inline-block">💲</span>{" "}
                 <a
                     href={game.donationUrlHref}
                     target="_blank"
@@ -55,8 +62,9 @@ const GameInfo = ({ game }: GameInfoProps): JSX.Element => (
             </div>
         )}
         {game.basedOn?.bggId && (
-            <div className="info">
-                <span className="emoji">📙</span> More information on{" "}
+            <div className="py-1 leading-none">
+                <span className="w-5 text-xs text-center inline-block">📙</span>{" "}
+                More information on{" "}
                 <a
                     href={`https://boardgamegeek.com/boardgame/${game.basedOn.bggId}`}
                     target="_blank"
@@ -66,21 +74,6 @@ const GameInfo = ({ game }: GameInfoProps): JSX.Element => (
                 </a>
             </div>
         )}
-        <style jsx>{`
-            .info {
-                line-height: 0.85em;
-                padding: 0.4em 0;
-            }
-            .emoji {
-                width: 1.5em;
-                font-size: 0.8em;
-                display: inline-block;
-                text-align: center;
-            }
-            p {
-                margin: 0;
-            }
-        `}</style>
     </SkinnyCard>
 );
 

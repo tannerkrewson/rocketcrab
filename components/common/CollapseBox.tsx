@@ -24,8 +24,8 @@ export const CollapseBox = ({
     const [collapse, setCollapse] = useState(startHidden);
     return (
         <>
-            <div className="flex-center-row">
-                <h4 className="flex-center-row" style={{ margin: 0 }}>
+            <div className="flex justify-between items-center">
+                <h4 className="flex items-center" style={{ margin: 0 }}>
                     <span style={{ marginRight: ".25em" }}>{title}</span>
                     {badgeCount > 0 &&
                         (collapse || !onlyShowBadgeWhenCollapsed) && (
@@ -46,14 +46,6 @@ export const CollapseBox = ({
                 )}
             </div>
             {!collapse && children}
-
-            <style jsx>{`
-                .flex-center-row {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-            `}</style>
         </>
     );
 };

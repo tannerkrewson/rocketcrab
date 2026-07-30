@@ -20,9 +20,9 @@ const Footer = (): JSX.Element => {
         );
 
     return (
-        <footer style={{ marginTop: "1em" }}>
-            <div className="side" />
-            <div className="tag">
+        <footer className="flex justify-center w-full mt-4">
+            <div className="flex-1 ml-auto relative" />
+            <div className="text-xs text-center mb-8">
                 rocketcrab by <NameWrapper>Tanner Krewson</NameWrapper>
                 {!isKidsMode && (
                     <>
@@ -37,36 +37,11 @@ const Footer = (): JSX.Element => {
                     </>
                 )}
             </div>
-            <div className="side">
-                <div className="theme-toggle">
+            <div className="flex-1 ml-auto relative">
+                <div className="absolute right-3 bottom-5">
                     <ThemeToggle />
                 </div>
             </div>
-            <style jsx>{`
-                footer {
-                    justify-content: center;
-                    width: 100%;
-                    display: flex;
-                }
-
-                .side {
-                    flex: 1;
-                    margin-left: auto;
-                    position: relative;
-                }
-
-                .tag {
-                    font-size: 12px;
-                    text-align: center;
-                    margin-bottom: 2em;
-                }
-
-                .theme-toggle {
-                    position: absolute;
-                    right: 0.9em;
-                    bottom: 1.3em;
-                }
-            `}</style>
         </footer>
     );
 };

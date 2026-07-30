@@ -5,31 +5,13 @@ const Connecting = (): JSX.Element => {
     const [collapseText, setCollapseText] = useState(false);
     return (
         <div
-            className="loading-popup"
+            className="flex flex-row absolute bottom-4 left-4 rounded-full bg-rose-200 p-1 shadow-md cursor-pointer text-black"
             onClick={() => setCollapseText(!collapseText)}
         >
-            <span className="icon-container">
+            <span className="w-8">
                 <Spinner size="sm" color="danger" />
             </span>
             {!collapseText && <span>🚀🦀 Reconnecting...</span>}
-            <style jsx>{`
-                .loading-popup {
-                    display: flex;
-                    flex-direction: row;
-                    position: absolute;
-                    bottom: 1em;
-                    left: 1em;
-                    border-radius: 1em;
-                    background: #fad3cf;
-                    padding: 0.3em;
-                    box-shadow: 2px 2px 6px rgba(0, 0, 0, 0.12);
-                    cursor: pointer;
-                    color: black;
-                }
-                .icon-container {
-                    width: 2em;
-                }
-            `}</style>
         </div>
     );
 };

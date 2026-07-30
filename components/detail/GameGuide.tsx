@@ -14,17 +14,15 @@ const GameGuide = ({ guide, guideUrl }: GameGuideProps): JSX.Element => (
                         {guideUrl}
                     </a>
                 </div>
-                <iframe src={guideUrl} />
-                <style jsx>{`
-                    iframe {
-                        width: 100vw;
-                        height: 75vh;
-                        position: relative;
-
-                        /* i really should have left a comment on this one, huh? */
-                        left: calc((100vw - min(24em, 100vw)) / -2 - 0.5em);
-                    }
-                `}</style>
+                <iframe
+                    src={guideUrl}
+                    style={{
+                        width: "100vw",
+                        height: "75vh",
+                        position: "relative",
+                        left: `calc((100vw - min(24em, 100vw)) / -2 - 0.5em)`,
+                    }}
+                />
             </>
         )}
         {guide && <ReactMarkdown>{guide}</ReactMarkdown>}

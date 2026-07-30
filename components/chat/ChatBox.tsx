@@ -77,7 +77,7 @@ export const ChatBox = ({
             badgeType="danger" // red
         >
             <div className="h-2"></div>
-            <div className="msg-container">
+            <div className="text-left h-40 overflow-auto">
                 {chat.map(({ playerId, playerName, message, date }) => (
                     <div key={date}>
                         <b>{playerName}: </b>
@@ -88,7 +88,7 @@ export const ChatBox = ({
                 ))}
                 <div ref={messagesEndRef} />
             </div>
-            <div className="flex-center-row">
+            <div className="flex justify-between items-center">
                 <input
                     className="h-12 w-full border rounded-lg px-3"
                     onKeyDown={onEnter}
@@ -96,7 +96,7 @@ export const ChatBox = ({
                     value={msgToSend}
                     onChange={(e) => setMsgToSend(e.target.value)}
                 />
-                <div className="send-container">
+                <div className="ml-2">
                     <PrimaryButton
                         onClick={handleConfirm}
                         disabled={isChatSendDisabled || !msgToSend.length}
@@ -105,21 +105,6 @@ export const ChatBox = ({
                     </PrimaryButton>
                 </div>
             </div>
-            <style jsx>{`
-                .flex-center-row {
-                    display: flex;
-                    justify-content: space-between;
-                    align-items: center;
-                }
-                .send-container {
-                    margin-left: 0.5em;
-                }
-                .msg-container {
-                    text-align: left;
-                    height: 10em;
-                    overflow: auto;
-                }
-            `}</style>
         </CollapseBox>
     );
 };
