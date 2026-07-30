@@ -25,6 +25,8 @@
     },
     "dependencies": {
         "@aw-web-design/react-textfit": "4.1.135",
+        "@fontsource/inconsolata": "^5.3.0",
+        "@fontsource/mukta": "^5.3.0",
         "@nextui-org/react": "^2.4.6",
         "@rsbuild/core": "2.1.9",
         "@tanstack/react-router": "1.170.18",
@@ -36,8 +38,6 @@
         "dexie": "^4.4.4",
         "emoji-picker-react": "^4.19.1",
         "express": "^5.2.1",
-        "fontsource-inconsolata": "^3.0.5",
-        "fontsource-mukta": "^3.0.5",
         "fslightbox-react": "^1.7.6",
         "next": "^14.2.5",
         "next-dark-mode": "^3.0.0",

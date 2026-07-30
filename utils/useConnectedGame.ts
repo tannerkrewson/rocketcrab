@@ -1,4 +1,4 @@
-import { ClientGame, ConnectedGame, Player } from "../types/types";
+import { ClientGame, ConnectedGame, Player } from "../types/types.ts";
 
 export const useConnectedGame = (
     connectedGame: ConnectedGame,

@@ -6,8 +6,8 @@ import {
     ServerGameLibrary,
     ClientGameLibrary,
     GameCategory,
-} from "../types/types";
-import { RocketcrabMode } from "../types/enums";
+} from "../types/types.ts";
+import { RocketcrabMode } from "../types/enums.ts";
 
 import CATEGORIES_RAW from "./categories.json";
 const CATEGORIES: Array<GameCategory> = CATEGORIES_RAW;

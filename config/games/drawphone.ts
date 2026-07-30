@@ -1,6 +1,6 @@
-import { ServerGame } from "../../types/types";
-import { postJson } from "../../utils/utils";
-import { RocketcrabMode } from "../../types/enums";
+import { ServerGame } from "../../types/types.ts";
+import { postJson } from "../../utils/utils.ts";
+import { RocketcrabMode } from "../../types/enums.ts";
 
 const toConnectToGame = (url) => async () => {
     const newUrl = url + "new";

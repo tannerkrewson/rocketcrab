@@ -5,7 +5,7 @@ import {
     MIN_MS_BETWEEN_MSGS,
     Player,
     PromiseWebSocket,
-} from "../types/types";
+} from "../types/types.ts";
 import WebSocket from "ws";
 import { useState } from "react";
 import Filter from "bad-words";
@@ -99,5 +99,5 @@ export const filterClean = (message: string): string => {
 };
 
 // Mode resolution — see utils/mode.ts for the canonical implementation
-export { MODE_MAP, getModeFromHost, isKidsMode } from "./mode";
+export { MODE_MAP, getModeFromHost, isKidsMode } from "./mode.ts";
 // Mode context (JSX) available from ./ModeContext

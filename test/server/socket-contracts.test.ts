@@ -35,10 +35,7 @@ vi.mock("../../config", () => ({
 
 import { newParty } from "../../server/rocketcrab";
 import attachSocketHandlers from "../../server/socket";
-import {
-    SocketEvent,
-    PartyStatus,
-} from "../../types/enums";
+import { SocketEvent, PartyStatus } from "../../types/enums";
 import type { RocketCrab, Party } from "../../types/types";
 
 // ---------------------------------------------------------------------------
@@ -612,7 +609,7 @@ describe("SET_IS_PUBLIC event contract", () => {
         hostSocket.emit.mockClear();
         const hostSetPublic = getHandler(hostSocket, SocketEvent.SET_IS_PUBLIC);
         hostSetPublic(true);
-        expect(party.isPublic).toBe(true);
+        expect(_party.isPublic).toBe(true);
         expect(hostSocket.emit).toHaveBeenCalledWith(
             SocketEvent.UPDATE,
             expect.any(Object),

@@ -1,12 +1,12 @@
 import { useCallback, useContext, useEffect, useState } from "react";
-import { ClientGameLibrary, ClientParty } from "../types/types";
-import { logEvent } from "./analytics";
+import { ClientGameLibrary, ClientParty } from "../types/types.ts";
+import { logEvent } from "./analytics.ts";
 import { io } from "socket.io-client";
-import { RocketcrabDexie } from "./dexie";
+import { RocketcrabDexie } from "./dexie.ts";
 import { setCookie as setNookie } from "nookies";
 import { NextRouter } from "next/router";
-import { SocketEvent } from "../types/enums";
-import { ModalContext } from "../pages/_app";
+import { SocketEvent } from "../types/enums.ts";
+import { ModalContext } from "../pages/_app.ts";
 
 const socket = io();
 

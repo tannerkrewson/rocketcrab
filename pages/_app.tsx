@@ -1,6 +1,6 @@
 import Body from "../components/layout/Body";
-import "fontsource-inconsolata/index.css";
-import "fontsource-mukta/index.css";
+import "@fontsource/inconsolata";
+import "@fontsource/mukta";
 import { AppPropsType } from "next/dist/shared/lib/utils";
 import { initGA, logPageView } from "../utils/analytics";
 import { useState, useEffect, createContext } from "react";

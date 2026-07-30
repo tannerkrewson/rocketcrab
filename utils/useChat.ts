@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { ChatMessage, Player } from "../types/types";
+import { ChatMessage, Player } from "../types/types.ts";
 
 export const useChat = (
     chat: Array<ChatMessage>,

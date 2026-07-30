@@ -1,4 +1,4 @@
-import { PartyStatus, GameStatus, RocketcrabMode } from "./enums";
+import { PartyStatus, GameStatus, RocketcrabMode } from "./enums.ts";
 import WebSocket from "ws";
 import { Dispatch, SetStateAction } from "react";
 import type { Socket } from "socket.io";

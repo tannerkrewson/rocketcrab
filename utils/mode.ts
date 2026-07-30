@@ -17,7 +17,7 @@
  * your hosts file: 127.0.0.1  kids.localhost
  */
 
-import { RocketcrabMode } from "../types/enums";
+import { RocketcrabMode } from "../types/enums.ts";
 
 /**
  * Maps each RocketcrabMode to its canonical hostname.

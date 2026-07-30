@@ -1,6 +1,6 @@
-import { ServerGame } from "../../types/types";
+import { ServerGame } from "../../types/types.ts";
 import { randomBytes } from "crypto";
-import { RocketcrabMode } from "../../types/enums";
+import { RocketcrabMode } from "../../types/enums.ts";
 
 const game: ServerGame = {
     id: "qwiqwit",

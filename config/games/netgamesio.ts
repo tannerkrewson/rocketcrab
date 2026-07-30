@@ -1,5 +1,5 @@
-import { ServerGame } from "../../types/types";
-import { RocketcrabMode } from "../../types/enums";
+import { ServerGame } from "../../types/types.ts";
+import { RocketcrabMode } from "../../types/enums.ts";
 
 const gameTemplate = (
     urlId: string,

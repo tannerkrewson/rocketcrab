@@ -5,8 +5,8 @@ import type { ErrorComponentProps } from "@tanstack/react-router";
 // --- Global Styles ---
 import "../../styles/global.css";
 // --- Fonts ---
-import "fontsource-inconsolata/index.css";
-import "fontsource-mukta/index.css";
+import "@fontsource/inconsolata";
+import "@fontsource/mukta";
 
 // --- Mode Context ---
 import { ModeProvider } from "../../utils/ModeContext";

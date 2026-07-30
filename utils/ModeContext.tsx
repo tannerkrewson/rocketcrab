@@ -19,7 +19,7 @@
  */
 
 import React, { createContext, useContext } from "react";
-import { RocketcrabMode } from "../types/enums";
+import { RocketcrabMode } from "../types/enums.ts";
 
 const ModeContext = createContext<RocketcrabMode>(RocketcrabMode.MAIN);
 
