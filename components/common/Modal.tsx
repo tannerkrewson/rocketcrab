@@ -51,7 +51,7 @@ const Modal = ({ state }) => {
                                     variant="light"
                                     onPress={() => {
                                         onClose();
-                                        setModalState({});
+                                        setModalState?.({});
 
                                         if (state.onClose) {
                                             state.onClose({
@@ -69,7 +69,7 @@ const Modal = ({ state }) => {
                                 color="primary"
                                 onPress={() => {
                                     onClose();
-                                    setModalState({});
+                                    setModalState?.({});
 
                                     if (state.onClose) {
                                         state.onClose({ isConfirmed: true });

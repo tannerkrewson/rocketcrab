@@ -60,7 +60,8 @@ describe("server/api.ts", () => {
     });
 
     it("/transfer create party", () => {
-        expect(app.get.mock.calls[0][0]).toEqual("/transfer/:gameid/:uuid?");
+        // Express 5 with path-to-regexp v8: optional params use {/param} syntax
+        expect(app.get.mock.calls[0][0]).toEqual("/transfer/:gameid{/:uuid}");
         const handler = app.get.mock.calls[0][1];
         const req = {
             params: {
@@ -172,7 +173,13 @@ describe("server/api.ts", () => {
     });
 
     it("locale transfers work", () => {
-        expect(app.all.mock.calls[0][0]).toEqual(["/MAIN/*", "/KIDS/*"]);
+        // Express 5 with path-to-regexp v8: wildcards use {*splat}
+        const patterns = app.all.mock.calls[0][0];
+        expect(patterns).toContain("/MAIN");
+        expect(patterns).toContain("/MAIN/{*splat}");
+        expect(patterns).toContain("/KIDS");
+        expect(patterns).toContain("/KIDS/{*splat}");
+
         const handler = app.all.mock.calls[0][1];
         const res = { redirect: vi.fn() };
         handler({ originalUrl: "/MAIN/a/b/c" }, res);

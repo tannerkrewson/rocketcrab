@@ -9,11 +9,6 @@ export const Route = createFileRoute("/")({
             message: "TanStack Start is working! 🚀",
         };
     },
-    meta: () => [
-        {
-            title: "Rocketcrab",
-        },
-    ],
 });
 
 function IndexComponent() {

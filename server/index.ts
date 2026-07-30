@@ -1,6 +1,5 @@
 import next from "next";
 import express from "express";
-import { json } from "body-parser";
 import { createServer } from "http";
 import { Server } from "socket.io";
 
@@ -18,7 +17,7 @@ const nextHandler = nextApp.getRequestHandler();
     await nextApp.prepare();
 
     const app: express.Application = express();
-    app.use(json());
+    app.use(express.json());
 
     const http = createServer(app);
     const io: Server = new Server(http);

@@ -55,7 +55,8 @@ describe("server/architecture", () => {
         expect(postRoutes).toContain("/api/new-public");
 
         const getRoutes = app.get.mock.calls.map((c: string[]) => c[0]);
-        expect(getRoutes).toContain("/transfer/:gameid/:uuid?");
+        // Express 5 with path-to-regexp v8: optional params use {/param} syntax
+        expect(getRoutes).toContain("/transfer/:gameid{/:uuid}");
 
         const allRoutes = app.all.mock.calls.map((c: string[]) => c[0]);
         expect(allRoutes.length).toBeGreaterThan(0);

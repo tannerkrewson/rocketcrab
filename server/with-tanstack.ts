@@ -16,7 +16,6 @@
  *   5. Single `node server/with-tanstack.ts` start command
  */
 import express from "express";
-import { json } from "body-parser";
 import { createServer } from "http";
 import { Server } from "socket.io";
 import { fileURLToPath } from "node:url";
@@ -35,7 +34,7 @@ const TSR_CLIENT_DIR = join(__dirname, "../dist/client");
 
 async function main() {
     const app = express();
-    app.use(json());
+    app.use(express.json());
 
     const http = createServer(app);
     const io = new Server(http);
