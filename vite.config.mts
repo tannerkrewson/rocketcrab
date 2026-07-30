@@ -11,6 +11,9 @@ export default defineConfig({
         }),
         VitePWA({
             registerType: "autoUpdate",
+            strategies: "injectManifest",
+            srcDir: "app",
+            filename: "sw.ts",
             includeAssets: [
                 "favicon.ico",
                 "apple-touch-icon.png",
@@ -68,29 +71,11 @@ export default defineConfig({
                     },
                 ],
             },
-            workbox: {
+            injectManifest: {
                 globPatterns: [
                     "**/*.{js,css,html,woff2,png,svg,ico,webmanifest}",
                 ],
-                navigateFallback: "/",
-                navigateFallbackDenylist: [
-                    /^\/api\//,
-                    /^\/transfer\//,
-                    /^\/socket\.io\//,
-                ],
-                runtimeCaching: [
-                    {
-                        urlPattern: /^https?:\/\/.*/i,
-                        handler: "NetworkFirst",
-                        options: {
-                            cacheName: "external-resources",
-                            expiration: {
-                                maxEntries: 50,
-                                maxAgeSeconds: 60 * 60 * 24,
-                            },
-                        },
-                    },
-                ],
+                maximumFileSizeToCacheInBytes: 4 * 1024 * 1024,
             },
         }),
     ],

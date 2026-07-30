@@ -17,78 +17,40 @@ const MainTitle = ({
     return (
         <div
             className={classNames({
-                "title mt-3": true,
-                deemphasize,
+                "text-center transition-all duration-100 ease-out": true,
+                "-mt-1 -mb-8 scale-75 saturate-50 opacity-50 blur-sm": deemphasize,
             })}
         >
             <div className="flex justify-center items-center">
                 <img
                     src="/rocket.svg"
-                    className="rocket"
+                    className="h-10 mr-3"
+                    style={{ filter: "drop-shadow(0 0 6px cyan)" }}
                     alt="rocketcrab logo"
                 />
-                <img src="/crab.svg" className="crab" alt="rocketcrab logo" />
+                <img
+                    src="/crab.svg"
+                    className="h-10"
+                    style={{ filter: "drop-shadow(0 0 6px #ff0000d9)" }}
+                    alt="rocketcrab logo"
+                />
             </div>
             <Textfit mode="single">
                 <ClickToCopy>
-                    <div className="party-url font-bold my-2">{title}</div>
+                    <div
+                        className="font-bold my-2 cursor-pointer select-none font-mono text-[1.7em] transition-transform duration-200 ease-out active:scale-90 sm:text-[2.4em]"
+                        style={{ fontFamily: '"Inconsolata", monospace' }}
+                    >
+                        {title}
+                    </div>
                 </ClickToCopy>
             </Textfit>
 
             {path && !disablePhonetic && (
-                <div className="phonetic">({converter(path).join(" ")})</div>
+                <div className="-mt-2 mb-6 text-sm italic">
+                    ({converter(path).join(" ")})
+                </div>
             )}
-
-            <style jsx>
-                {`
-                    .title {
-                        transition: all 0.1s ease-out;
-                        text-align: center;
-                    }
-                    .deemphasize {
-                        margin-top: -0.25em;
-                        margin-bottom: -2em;
-                        transform: scale(0.75);
-                        filter: saturate(50%) opacity(50%) blur(1px);
-                    }
-
-                    .rocket {
-                        height: 2.6em;
-                        margin-right: 0.7em;
-                        filter: drop-shadow(0 0 6px cyan);
-                    }
-                    .crab {
-                        height: 2.6em;
-                        filter: drop-shadow(0 0 6px #ff0000d9);
-                    }
-
-                    .party-url {
-                        font-size: 1.7em;
-                        cursor: pointer;
-                        transform: scale(1);
-                        transition: transform 0.2s ease-out;
-                        user-select: none;
-                        font-family: "Inconsolata", monospace;
-                    }
-
-                    .party-url:active {
-                        transform: scale(0.9);
-                    }
-
-                    @media only screen and (min-width: 385px) {
-                        .party-url {
-                            font-size: 2.4em;
-                        }
-                    }
-
-                    .phonetic {
-                        margin-top: -0.6em;
-                        margin-bottom: 1.5em;
-                        font-size: 0.9em;
-                        font-style: italic;
-                    }
-                `}
-            </style>
         </div>
     );
 };

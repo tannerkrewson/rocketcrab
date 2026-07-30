@@ -274,11 +274,11 @@ const GameLayout = ({
             <div
                 className={classNames({
                     "flex flex-row justify-between shadow-sm z-10": true,
-                    "status-collapsed": statusCollapsed,
+                    "fixed rounded-lg top-2 left-2 backdrop-blur-sm bg-white/20 h-fit": statusCollapsed,
                 })}
             >
                 <div
-                    className="logo flex flex-row p-2 items-center"
+                    className="m-0 select-none cursor-pointer flex flex-row p-2 items-center"
                     onClick={() => {
                         setStatusCollapsed(!statusCollapsed);
                         setShowMenu(false);
@@ -288,18 +288,20 @@ const GameLayout = ({
                 >
                     <img
                         src="/rocket.svg"
-                        className="rocket"
+                        className="h-6 ml-0.5"
+                        style={{ filter: "drop-shadow(0 0 6px cyan)" }}
                         alt="rocketcrab logo"
                     />
                     <img
                         src="/crab.svg"
-                        className="crab"
+                        className="h-6 ml-1"
+                        style={{ filter: "drop-shadow(0 0 6px #ff0000d9)" }}
                         alt="rocketcrab logo"
                     />
                 </div>
                 {!statusCollapsed && (
                     <>
-                        <div className="url p-2">
+                        <div className="text-lg font-bold font-mono p-2">
                             {host}/{code}
                         </div>
                         <div className="p-2">
@@ -360,7 +362,7 @@ const GameLayout = ({
                 frameRefreshCount={frameRefresh}
             />
             {showGameLibrary && (
-                <div className="component-frame bg-background">
+                <div className="p-4 text-center absolute top-12 right-0 w-[min(24em,calc(100vw-3em))] m-2 shadow-[0_1px_6px_rgba(32,33,36,0.28)] bg-background">
                     <GameSelector
                         gameLibrary={gameLibrary}
                         onDone={hideAllWindows}
@@ -395,7 +397,7 @@ const GameLayout = ({
                 </div>
             )}
             {showPlayerList && (
-                <div className="component-frame bg-background">
+                <div className="p-4 text-center absolute top-12 right-0 w-[min(24em,calc(100vw-3em))] m-2 shadow-[0_1px_6px_rgba(32,33,36,0.28)] bg-background">
                     <PlayerList
                         playerList={playerList}
                         disableHideShow={true}
@@ -411,7 +413,7 @@ const GameLayout = ({
                 </div>
             )}
             {showChat && (
-                <div className="component-frame bg-background">
+                <div className="p-4 text-center absolute top-12 right-0 w-[min(24em,calc(100vw-3em))] m-2 shadow-[0_1px_6px_rgba(32,33,36,0.28)] bg-background">
                     <ChatBox
                         chat={chat}
                         thisPlayer={thisPlayer}
@@ -447,7 +449,7 @@ const GameLayout = ({
                 </div>
             )}
             {showGameInfo && (
-                <div className="component-frame bg-background">
+                <div className="p-4 text-center absolute top-12 right-0 w-[min(24em,calc(100vw-3em))] m-2 shadow-[0_1px_6px_rgba(32,33,36,0.28)] bg-background">
                     <GameDetail
                         game={thisGame}
                         allCategories={gameLibrary.categories}
