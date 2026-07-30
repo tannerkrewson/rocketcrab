@@ -20,7 +20,7 @@
         "prepare": "husky"
     },
     "lint-staged": {
-        "*.@(js|ts|tsx|json|md)": [
+        "*.@(js|ts|tsx|json)": [
             "npm run lint"
         ]
     },
