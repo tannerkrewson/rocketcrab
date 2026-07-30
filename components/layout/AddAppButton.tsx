@@ -1,19 +1,10 @@
-/* eslint-disable @typescript-eslint/explicit-module-boundary-types */
-/* eslint-disable-next-line @typescript-eslint/ban-ts-comment */
-// @ts-nocheck
-
-// copied from https://github.com/tannerkrewson/spyfall/blob/dev/components/AddAppButton.js
-
-import dynamic from "next/dynamic";
-import { useState, useEffect, useContext } from "react";
+import { lazy, Suspense, useState, useEffect, useContext } from "react";
 import PrimaryButton from "../common/PrimaryButton";
 import { logEvent } from "../../utils/analytics";
 import { ModalContext } from "../../utils/ModalContext";
 
 // https://github.com/chrisdancee/react-ios-pwa-prompt/issues/32#issuecomment-586762839
-const PWAPrompt = dynamic(() => import("react-ios-pwa-prompt"), {
-    ssr: false,
-});
+const PWAPrompt = lazy(() => import("react-ios-pwa-prompt"));
 
 // https://web.dev/customize-install/#beforeinstallprompt
 let deferredPrompt;
@@ -37,7 +28,8 @@ const AddAppButton = (): JSX.Element => {
 
     useEffect(() => {
         setIsiOS(
-            /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream,
+            /iPad|iPhone|iPod/.test(navigator.userAgent) &&
+                !("MSStream" in window),
         );
     }, []);
 
@@ -80,15 +72,16 @@ const AddAppButton = (): JSX.Element => {
                 Add 🚀🦀 App
             </PrimaryButton>
 
-            <PWAPrompt
-                appIconPath="/apple-touch-icon.png"
-                isShown={showiOS}
-                permanentlyHideOnDismiss={false}
-                onClose={() => {
-                    setShowiOS(false);
-                    setIsLoading(false);
-                }}
-            />
+            <Suspense fallback={null}>
+                <PWAPrompt
+                    appIconPath="/apple-touch-icon.png"
+                    isShown={showiOS}
+                    onClose={() => {
+                        setShowiOS(false);
+                        setIsLoading(false);
+                    }}
+                />
+            </Suspense>
         </>
     );
 };

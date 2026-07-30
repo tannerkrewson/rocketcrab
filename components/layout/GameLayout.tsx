@@ -19,7 +19,6 @@ import { filterClean, MODE_MAP } from "../../utils/utils";
 import { differenceInMilliseconds } from "date-fns";
 import GameDetail from "../detail/GameDetail";
 import { RocketcrabMode } from "../../types/enums";
-import { useRouter } from "next/router";
 import { ModalContext } from "../../utils/ModalContext";
 import classNames from "classnames";
 import { ToastContainer, toast } from "react-toastify";
@@ -43,8 +42,7 @@ const GameLayout = ({
     newestMsg,
     mode,
 }: GameLayoutProps): JSX.Element => {
-    const router = useRouter();
-    const isKidsMode = router.locale === RocketcrabMode.KIDS;
+    const isKidsMode = mode === RocketcrabMode.KIDS;
 
     const host = MODE_MAP[mode];
     const { code, gameState, selectedGameId, playerList, chat } = partyState;

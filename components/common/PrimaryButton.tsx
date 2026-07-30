@@ -1,11 +1,10 @@
 import { Button } from "@heroui/react";
-import Link from "next/link";
+import { Link } from "@tanstack/react-router";
 
 const PrimaryButton = (props: PrimaryButtonProps): JSX.Element => {
     if (props.href) {
         return (
-            // TODO: remove locale when sending to prod
-            <Link href={props.href} locale={false}>
+            <Link to={props.href}>
                 <div>
                     <ButtonWrapper {...props} />
                 </div>

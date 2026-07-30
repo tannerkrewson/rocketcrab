@@ -1,10 +1,10 @@
-import { useRouter } from "next/router";
+import { useMode } from "../../utils/ModeContext";
 import { RocketcrabMode } from "../../types/enums";
 import { ThemeToggle } from "../common/ThemeToggle";
 
 const Footer = (): JSX.Element => {
-    const router = useRouter();
-    const isKidsMode = router.locale === RocketcrabMode.KIDS;
+    const mode = useMode();
+    const isKidsMode = mode === RocketcrabMode.KIDS;
 
     const NameWrapper = ({ children }) =>
         !isKidsMode ? (

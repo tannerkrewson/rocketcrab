@@ -10,11 +10,12 @@ import SkinnyCard from "../common/SkinnyCard";
 import { Countdown } from "../find/Countdown";
 import { ChatBox } from "../chat/ChatBox";
 import AddAppButton from "../layout/AddAppButton";
-import { useRouter } from "next/router";
+import { useNavigate } from "@tanstack/react-router";
 import { isFuture } from "date-fns";
 import { useIsAlreadyPWA } from "../../utils/useIsAlreadyPWA";
 import { RocketcrabMode } from "../../types/enums";
 import { ModalContext } from "../../utils/ModalContext";
+import { useMode } from "../../utils/ModeContext";
 import ShareButtons from "./ShareButtons";
 
 const PartyScreen = ({
@@ -30,8 +31,9 @@ const PartyScreen = ({
     unreadMsgCount,
     clearUnreadMsgCount,
 }: PartyScreenProps): JSX.Element => {
-    const router = useRouter();
-    const isKidsMode = router.locale === RocketcrabMode.KIDS;
+    const navigate = useNavigate();
+    const mode = useMode();
+    const isKidsMode = mode === RocketcrabMode.KIDS;
 
     const {
         playerList,
@@ -77,11 +79,11 @@ const PartyScreen = ({
 
             onClose: ({ isConfirmed }) => {
                 if (isConfirmed) {
-                    router.push("/");
+                    navigate({ to: "/" });
                 }
             },
         });
-    }, [fireModal, leaveText, router]);
+    }, [fireModal, leaveText, navigate]);
 
     if (gameSelectorVisible) {
         return (

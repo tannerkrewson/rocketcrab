@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import Router from "next/router";
+import { useNavigate } from "@tanstack/react-router";
 
 import PrimaryButton from "../common/PrimaryButton";
 
@@ -7,6 +7,7 @@ const NameEntry = ({
     onNameEntry,
     previousName,
 }: NameEntryProps): JSX.Element => {
+    const navigate = useNavigate();
     const [name, setName] = useState("");
 
     const handleNameChange = ({ target: { value } }) => setName(value);
@@ -24,7 +25,7 @@ const NameEntry = ({
         if (previousName) {
             onNameEntry(previousName);
         } else {
-            Router.push("/");
+            navigate({ to: "/" });
         }
     };
 
