@@ -73,11 +73,11 @@ async function main() {
 
                 const headers = new Headers();
                 for (const [key, value] of Object.entries(req.headers)) {
-                    if (value) {
+                    if (value != null) {
                         if (Array.isArray(value)) {
                             value.forEach((v) => headers.append(key, v));
                         } else {
-                            headers.set(key, value);
+                            headers.set(key, String(value));
                         }
                     }
                 }

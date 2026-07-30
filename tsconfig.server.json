@@ -8,6 +8,9 @@
         "isolatedModules": false,
         "noEmit": false
     },
+    "exclude": [
+        "server/with-tanstack.ts"
+    ],
     "include": [
         "server/**/*.ts",
         "config/**/*.ts",
