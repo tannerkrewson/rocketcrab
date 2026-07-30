@@ -9,7 +9,6 @@ import {
 import WebSocket from "ws";
 import { useState } from "react";
 import Filter from "bad-words";
-import { RocketcrabMode } from "../types/enums";
 
 const filter = new Filter();
 
@@ -100,10 +99,7 @@ export const filterClean = (message: string): string => {
     return message;
 };
 
-export const MODE_MAP = {
-    [RocketcrabMode.MAIN]: "rocketcrab.com",
-    [RocketcrabMode.KIDS]: "kids.rocketcrab.com",
-};
+// Mode resolution — see utils/mode.ts for the canonical implementation
+export { MODE_MAP, getModeFromHost, isKidsMode } from "./mode";
+// Mode context (JSX) available from ./ModeContext
 
-export const getModeFromHost = (hostname: string): RocketcrabMode =>
-    hostname?.startsWith("kids.") ? RocketcrabMode.KIDS : RocketcrabMode.MAIN;

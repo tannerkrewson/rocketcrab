@@ -15,6 +15,6 @@
         "jsx": "preserve",
         "incremental": true
     },
-    "exclude": ["node_modules", ".next", "out", "test"],
+    "exclude": ["node_modules", ".next", "out", "test", "app", "app.config.ts", "vite.config.ts"],
     "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", "**/*.js"]
 }
