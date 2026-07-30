@@ -8,7 +8,6 @@
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
 
-
 // Mock dependencies
 vi.mock("../../utils/ModeContext", () => ({
     useMode: () => "MAIN",
