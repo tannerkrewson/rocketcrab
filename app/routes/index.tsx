@@ -1,54 +1,92 @@
-import React from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import React, { useState } from "react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+
+import PrimaryButton from "../../components/common/PrimaryButton";
+import AddAppButton from "../../components/layout/AddAppButton";
+import PageLayout from "../../components/layout/PageLayout";
+import { postJson } from "../../utils/utils";
 import { useMode } from "../../utils/ModeContext";
 import { isKidsMode } from "../../utils/mode";
+import { useIsAlreadyPWA } from "../../utils/useIsAlreadyPWA";
 
 export const Route = createFileRoute("/")({
-    component: IndexComponent,
-    loader: () => {
-        return {
-            title: "Rocketcrab",
-        };
-    },
+    component: HomeComponent,
 });
 
-function IndexComponent() {
-    const data = Route.useLoaderData();
+function HomeComponent() {
+    const navigate = useNavigate();
     const mode = useMode();
     const kids = isKidsMode(mode);
+    const [newLoading, setNewLoading] = useState(false);
+    const isAlreadyPWA = useIsAlreadyPWA();
+
+    const onClickNew = async (e: React.MouseEvent) => {
+        e.preventDefault();
+        setNewLoading(true);
+
+        try {
+            const { code } = await postJson("/api/new");
+            navigate({ to: `/${code}` });
+        } catch {
+            setNewLoading(false);
+        }
+    };
 
     return (
-        <div style={{ textAlign: "center", padding: "2em" }}>
-            <h1>{data.title}</h1>
-            <p>
+        <PageLayout mode={mode}>
+            <div className="text-center mb-8">
                 {kids
                     ? "play in class or with family!"
                     : "party games for phones"}
-            </p>
+            </div>
 
-            <div style={{ marginTop: "2em" }}>
-                <Link to="/join">
-                    <button
-                        style={{ margin: "0.5em", padding: "0.75em 1.5em" }}
-                    >
-                        Join Party
-                    </button>
-                </Link>
-                <button
-                    style={{ margin: "0.5em", padding: "0.75em 1.5em" }}
-                    id="start-party-btn"
+            <div className="flex justify-center space-x-2">
+                <PrimaryButton
+                    onClick={() => navigate({ to: "/join" })}
+                    size="lg"
+                >
+                    &nbsp;Join Party&nbsp;
+                </PrimaryButton>
+
+                <PrimaryButton
+                    onClick={onClickNew}
+                    loading={newLoading}
+                    size="lg"
                 >
                     Start Party
-                </button>
+                </PrimaryButton>
             </div>
-
-            <div style={{ marginTop: "2em" }}>
-                <Link to="/library">Browse Games</Link>
+            <div className="mt-8" />
+            <div className="flex flex-col items-center space-y-2 w-fit mx-auto">
+                {!isAlreadyPWA && !kids && (
+                    <>
+                        <AddAppButton />
+                    </>
+                )}
+                {!kids && (
+                    <>
+                        <PrimaryButton
+                            url="https://kids.rocketcrab.com/"
+                            manualWidth
+                        >
+                            🧒 Try Kids Mode
+                        </PrimaryButton>
+                        <PrimaryButton
+                            url="https://github.com/tannerkrewson/rocketcrab/#-for-developers"
+                            manualWidth
+                        >
+                            Add your game
+                        </PrimaryButton>
+                    </>
+                )}
+                <PrimaryButton
+                    onClick={() => navigate({ to: "/library" })}
+                    manualWidth
+                >
+                    Browse Games
+                </PrimaryButton>
             </div>
-
-            <div style={{ marginTop: "1em" }}>
-                <a href="/api/stats">API Stats</a>
-            </div>
-        </div>
+            <div className="mb-2" />
+        </PageLayout>
     );
 }
