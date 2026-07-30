@@ -27,7 +27,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const port = process.env.PORT || 3000;
 const dev = process.env.NODE_ENV !== "production";
 
-const TSR_SERVER_ENTRY = join(__dirname, "../dist/server/server.mjs");
+const TSR_SERVER_ENTRY = join(__dirname, "../dist/server/server.js");
 const TSR_CLIENT_DIR = join(__dirname, "../dist/client");
 
 /**

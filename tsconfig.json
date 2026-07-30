@@ -21,20 +21,6 @@
         },
         "types": ["vite/client"]
     },
-    "exclude": [
-        "node_modules",
-        ".next",
-        "out",
-        "test",
-        "dist",
-        "app.config.ts"
-    ],
-    "include": [
-        "next-env.d.ts",
-        "**/*.ts",
-        "**/*.tsx",
-        "**/*.js",
-        "app/**/*.ts",
-        "app/**/*.tsx"
-    ]
+    "exclude": ["node_modules", "test", "dist", "app.config.ts"],
+    "include": ["**/*.ts", "**/*.tsx", "**/*.js", "app/**/*.ts", "app/**/*.tsx"]
 }

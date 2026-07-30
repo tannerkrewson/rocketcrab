@@ -1,5 +1,9 @@
 import fs from "fs";
 import path from "path";
+import { createRequire } from "node:module";
+
+const require = createRequire(import.meta.url);
+
 import {
     ServerGame,
     ClientGame,
