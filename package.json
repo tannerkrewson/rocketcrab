@@ -4,9 +4,11 @@
     "license": "MIT",
     "type": "module",
     "scripts": {
-        "dev": "cross-env NODE_ENV=development nodemon",
+        "dev:app": "vite",
+        "dev:server": "cross-env NODE_ENV=development tsx server/with-tanstack.ts",
         "build": "vite build",
-        "start": "cross-env NODE_ENV=production node --experimental-strip-types server/with-tanstack.ts",
+        "build:server": "tsc --project tsconfig.server.json",
+        "start": "cross-env NODE_ENV=production node dist/server/with-tanstack.js",
         "type-check": "tsc --pretty --noEmit",
         "format": "oxfmt",
         "format:check": "oxfmt --check",
@@ -19,8 +21,11 @@
         "prepare": "husky"
     },
     "lint-staged": {
-        "*.@(js|ts|tsx|json)": [
+        "*.@(ts|tsx)": [
             "oxlint --fix"
+        ],
+        "*.json": [
+            "oxfmt"
         ]
     },
     "dependencies": {
@@ -38,7 +43,7 @@
         "dexie": "^4.4.4",
         "emoji-picker-react": "^4.19.1",
         "express": "^5.2.1",
-        "fslightbox-react": "^1.7.6",
+        "fslightbox-react": "^1.8.0",
         "next": "^14.2.5",
         "next-dark-mode": "^3.0.0",
         "next-pwa": "^5.6.0",
@@ -48,10 +53,10 @@
         "react-dom": "^18.3.1",
         "react-ga4": "^2.1.0",
         "react-ios-pwa-prompt": "^2.0.6",
-        "react-markdown": "^6.0.3",
+        "react-markdown": "^10.1.0",
         "react-qr-code": "^2.2.0",
         "react-spinners-kit": "^1.9.1",
-        "react-toastify": "^10.0.5",
+        "react-toastify": "^10.0.6",
         "socket.io": "^4.8.3",
         "socket.io-client": "^4.8.3",
         "swiper": "^11.2.10",
@@ -65,7 +70,7 @@
         "@types/supertest": "^7.2.1",
         "@types/webpack-env": "^1.18.8",
         "@types/ws": "^8.5.11",
-        "autoprefixer": "^10.4.19",
+        "autoprefixer": "^10.5.4",
         "husky": "^9.1.7",
         "jsdom": "^30.0.1",
         "lint-staged": "^15.5.2",
@@ -77,6 +82,7 @@
         "supertest": "^7.2.2",
         "tailwindcss": "^3.4.7",
         "ts-node": "^10.9.2",
+        "tsx": "^4.23.1",
         "typescript": "^5.9.3",
         "vitest": "^4.1.10"
     },

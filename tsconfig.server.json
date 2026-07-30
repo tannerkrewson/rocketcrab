@@ -1,19 +1,14 @@
 {
     "extends": "./tsconfig.json",
     "compilerOptions": {
-        "module": "commonjs",
-        "moduleResolution": "node",
+        "module": "esnext",
+        "moduleResolution": "bundler",
         "outDir": "dist",
-        "target": "es2017",
+        "target": "es2022",
         "isolatedModules": false,
         "noEmit": false,
-        "allowImportingTsExtensions": false
+        "allowImportingTsExtensions": false,
+        "declaration": false
     },
-    "exclude": ["server/with-tanstack.ts"],
-    "include": [
-        "server/**/*.ts",
-        "config/**/*.ts",
-        "types/**/*.ts",
-        "utils/**/*.ts"
-    ]
+    "include": ["server/**/*.ts"]
 }
