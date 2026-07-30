@@ -1,4 +1,4 @@
-import converter from "phonetic-alphabet-converter";
+import { NATO_PHONETIC_ALPHABET } from "phonetic-alphabet-converter";
 import { Textfit } from "@aw-web-design/react-textfit";
 import { RocketcrabMode } from "../../types/enums";
 import { MODE_MAP } from "../../utils/utils";
@@ -49,7 +49,14 @@ const MainTitle = ({
 
             {path && !disablePhonetic && (
                 <div className="-mt-2 mb-6 text-sm italic">
-                    ({converter(path).join(" ")})
+                    (
+                    {path
+                        .toLowerCase()
+                        .split("")
+                        .map((letter) => NATO_PHONETIC_ALPHABET[letter])
+                        .filter(Boolean)
+                        .join(" ")}
+                    )
                 </div>
             )}
         </div>

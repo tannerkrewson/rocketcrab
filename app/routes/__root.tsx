@@ -1,5 +1,11 @@
 import React from "react";
-import { Outlet, createRootRoute, Link } from "@tanstack/react-router";
+import {
+    Outlet,
+    HeadContent,
+    Scripts,
+    createRootRoute,
+    Link,
+} from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
 import "@heroui/react/styles";
 
@@ -96,20 +102,28 @@ function RootComponent() {
     const mode = getModeFromHost(hostname);
 
     return (
-        <ModeProvider mode={mode}>
-            <ThemeProvider>
-                {/* Inline script to set theme class before hydration */}
-                {!mounted && <ThemeScript />}
-                <ModalProvider>
-                    <AppAnalytics />
-                    {/* PWA manifest link — enables browser install prompt */}
-                    <link rel="manifest" href="/manifest.webmanifest" />
-                    <meta name="theme-color" content="#ffffff" />
-                    <div id="app-root">
-                        <Outlet />
-                    </div>
-                </ModalProvider>
-            </ThemeProvider>
-        </ModeProvider>
+        <html>
+            <head>
+                <HeadContent />
+                {/* PWA manifest link — enables browser install prompt */}
+                <link rel="manifest" href="/manifest.webmanifest" />
+                <meta name="theme-color" content="#ffffff" />
+            </head>
+            <body>
+                <ModeProvider mode={mode}>
+                    <ThemeProvider>
+                        {/* Inline script to set theme class before hydration */}
+                        {!mounted && <ThemeScript />}
+                        <ModalProvider>
+                            <AppAnalytics />
+                            <div id="app-root">
+                                <Outlet />
+                            </div>
+                        </ModalProvider>
+                    </ThemeProvider>
+                </ModeProvider>
+                <Scripts />
+            </body>
+        </html>
     );
 }

@@ -5,7 +5,7 @@ import {
     useNavigate,
 } from "@tanstack/react-router";
 import { useMode } from "../../utils/ModeContext";
-import { GAME_LIBRARY } from "../../config";
+import { getGameLibraries } from "../../config/gameLibrary";
 import { ClientGame, ClientGameLibrary } from "../../types/types";
 import { RocketcrabMode } from "../../types/enums";
 import GameDetail from "../../components/detail/GameDetail";
@@ -13,6 +13,7 @@ import PrimaryButton from "../../components/common/PrimaryButton";
 import PageLayout from "../../components/layout/PageLayout";
 
 export const Route = createFileRoute("/game/$gameid")({
+    loader: () => getGameLibraries(),
     component: GameDetailComponent,
     notFoundComponent: () => (
         <PageLayout mode={"MAIN" as RocketcrabMode}>
@@ -32,10 +33,10 @@ function GameDetailComponent() {
     const { gameid } = useParams({ from: "/game/$gameid" });
     const mode = useMode();
     const navigate = useNavigate();
+    const libraries = Route.useLoaderData();
 
     const gameLibrary: ClientGameLibrary =
-        GAME_LIBRARY[mode as RocketcrabMode] ||
-        GAME_LIBRARY[RocketcrabMode.MAIN];
+        libraries[mode as RocketcrabMode] || libraries[RocketcrabMode.MAIN];
 
     const game: ClientGame | undefined = gameLibrary.gameList.find(
         ({ id }) => id === gameid,

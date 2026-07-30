@@ -3,22 +3,23 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMode } from "../../utils/ModeContext";
 import { MODE_MAP } from "../../utils/mode";
 import { useLibraryState } from "../../utils/utils";
-import { GAME_LIBRARY } from "../../config";
+import { getGameLibraries } from "../../config/gameLibrary";
 import { ClientGameLibrary } from "../../types/types";
 import { RocketcrabMode } from "../../types/enums";
 import GameLibrary from "../../components/library/GameLibrary";
 
 export const Route = createFileRoute("/library")({
+    loader: () => getGameLibraries(),
     component: LibraryComponent,
 });
 
 function LibraryComponent() {
     const mode = useMode();
     const navigate = useNavigate();
+    const libraries = Route.useLoaderData();
 
     const gameLibrary: ClientGameLibrary =
-        GAME_LIBRARY[mode as RocketcrabMode] ||
-        GAME_LIBRARY[RocketcrabMode.MAIN];
+        libraries[mode as RocketcrabMode] || libraries[RocketcrabMode.MAIN];
 
     const onDone = useCallback(() => {
         navigate({ to: "/" });

@@ -1,4 +1,9 @@
-import ReactGA from "react-ga4";
+import { ReactGAImplementation } from "react-ga4";
+
+// Use the named implementation export instead of the default export. The
+// package's CommonJS/ESM interop shape can make the default export an object
+// containing the GA4 instance when bundled by Vite/Rolldown.
+const ReactGA = new ReactGAImplementation();
 
 export const initGA = (): void => {
     ReactGA.initialize("G-V569CH5H2D");

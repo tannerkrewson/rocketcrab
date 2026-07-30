@@ -11,8 +11,7 @@
  *   npm start
  *
  * Development:
- *   Terminal 1: npx vite (port 3001 — TanStack Start HMR)
- *   Terminal 2: NODE_ENV=development node --experimental-strip-types server/with-tanstack.ts (port 3000)
+ *   npm run dev (port 3000, with Vite HMR on port 3001)
  */
 import express from "express";
 import { createServer } from "http";
@@ -70,7 +69,7 @@ function createViteDevProxy(vitePort: number) {
                 (err as Error).message,
             );
             res.status(502).send(
-                "Vite dev server not available. Run `npx vite` in another terminal.",
+                "Vite dev server not available. Run `npm run dev` in another terminal.",
             );
         }
     };

@@ -4,6 +4,7 @@
     "license": "MIT",
     "type": "module",
     "scripts": {
+        "dev": "run-p dev:app dev:server",
         "dev:app": "vite",
         "dev:server": "cross-env NODE_ENV=development tsx server/with-tanstack.ts",
         "build": "vite build",
@@ -69,6 +70,7 @@
         "@types/supertest": "^7.2.1",
         "@types/webpack-env": "^1.18.8",
         "@types/ws": "^8.5.11",
+        "@vitejs/plugin-react": "^6.0.5",
         "husky": "^9.1.7",
         "jsdom": "^30.0.1",
         "lint-staged": "^15.5.2",

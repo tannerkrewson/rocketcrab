@@ -1,8 +1,17 @@
 import fs from "fs";
 import path from "path";
-import { createRequire } from "node:module";
 
-const require = createRequire(import.meta.url);
+import drawphone from "./games/drawphone.ts";
+import fishbowl from "./games/fishbowl.ts";
+import justone from "./games/justone.ts";
+import longwave from "./games/longwave.ts";
+import netgamesio from "./games/netgamesio.ts";
+import outofcontextparty from "./games/outofcontextparty.ts";
+import qwiqwit from "./games/qwiqwit.ts";
+import secrethitler from "./games/secrethitler.ts";
+import snakeout from "./games/snakeout.ts";
+import spyfall from "./games/spyfall.ts";
+import werewolfnight from "./games/werewolfnight.ts";
 
 import {
     ServerGame,
@@ -16,39 +25,32 @@ import { RocketcrabMode } from "../types/enums.ts";
 import CATEGORIES_RAW from "./categories.json";
 const CATEGORIES: Array<GameCategory> = CATEGORIES_RAW;
 
-const SERVER_GAME_LIST: Array<ServerGame> = fs
-    .readdirSync(path.join(process.cwd(), "config", "games"))
-    .filter((file) => !file.startsWith("_") && file.endsWith(".ts"))
-    .reduce((games, file) => {
-        const name = file.substr(0, file.indexOf("."));
+const CONFIGURED_GAME_MODULES = [
+    drawphone,
+    fishbowl,
+    justone,
+    longwave,
+    netgamesio,
+    outofcontextparty,
+    qwiqwit,
+    secrethitler,
+    snakeout,
+    spyfall,
+    werewolfnight,
+];
 
-        const required = require("./games/" + name);
+const SERVER_GAME_LIST: Array<ServerGame> = CONFIGURED_GAME_MODULES.flatMap(
+    (games) => (Array.isArray(games) ? games : [games]),
+).map((game) => {
+    if (!game.guideId) return game;
 
-        // this was triggered when upgrading ws from v7 to v8
-        if (typeof required?.then === "function") {
-            console.warn(
-                "\n",
-                file,
-                "returned a Promise when imported. It is likely importing something fishy.",
-            );
+    const guide = fs.readFileSync(
+        path.join(process.cwd(), "config", "guides", game.guideId + ".md"),
+        "utf8",
+    );
 
-            process.exit(1);
-        }
-
-        const exported = required.default;
-        const newGames = Array.isArray(exported) ? exported : [exported];
-        return [...games, ...newGames];
-    }, [])
-    .map((game) => {
-        if (!game.guideId) return game;
-
-        const guide = fs.readFileSync(
-            path.join(process.cwd(), "config", "guides", game.guideId + ".md"),
-            "utf8",
-        );
-
-        return { ...game, guide };
-    });
+    return { ...game, guide };
+});
 
 const CLIENT_GAME_LIST: Array<ClientGame> = SERVER_GAME_LIST.map(
     // eslint-disable-next-line @typescript-eslint/no-unused-vars

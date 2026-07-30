@@ -11,13 +11,13 @@ import NameEntry from "../../components/party/NameEntry";
 import GameLayout from "../../components/layout/GameLayout";
 
 import { ClientGameLibrary, ClientParty } from "../../types/types";
-import { GAME_LIBRARY } from "../../config";
+import { getGameLibraries } from "../../config/gameLibrary";
 
 import { useRocketcrabClientSocket } from "../../utils/useRocketcrabClientSocketTanStack";
 import { useChat } from "../../utils/useChat";
 import { useMode } from "../../utils/ModeContext";
 import { getCookie } from "../../utils/cookies";
-import type { RocketcrabMode } from "../../types/enums";
+import { RocketcrabMode } from "../../types/enums";
 
 /**
  * Party route — handles party code URLs (/:code).
@@ -27,6 +27,7 @@ import type { RocketcrabMode } from "../../types/enums";
  * SSR cannot read it consistently.
  */
 export const Route = createFileRoute("/$code")({
+    loader: () => getGameLibraries(),
     component: PartyRouteComponent,
 });
 
@@ -34,10 +35,11 @@ function PartyRouteComponent() {
     const { code } = useParams({ from: "/$code" });
     const navigate = useNavigate();
     const mode = useMode();
+    const libraries = Route.useLoaderData();
 
     // Resolve the mode-appropriate game library
     const gameLibrary: ClientGameLibrary =
-        GAME_LIBRARY[mode as RocketcrabMode] || GAME_LIBRARY.MAIN;
+        libraries[mode as RocketcrabMode] || libraries[RocketcrabMode.MAIN];
 
     // Read the lastPartyState cookie on mount (client-side only)
     const [lastPartyState, setLastPartyState] = useState<
