@@ -5,17 +5,17 @@ import {
     ServerGame,
     ClientParty,
     MAX_CHATS_OVERALL,
-} from "../types/types";
+} from "../types/types.ts";
 import {
     PartyStatus,
     GameStatus,
     SocketEvent,
     RocketcrabMode,
-} from "../types/enums";
-import { getServerGameLibrary } from "../config";
+} from "../types/enums.ts";
+import { getServerGameLibrary } from "../config/index.ts";
 import { v4 as uuidv4 } from "uuid";
 import type { Socket } from "socket.io";
-import { isChatMsgValid } from "../utils/utils";
+import { isChatMsgValid } from "../utils/utils.ts";
 
 const SERVER_GAME_LIST: Array<ServerGame> = getServerGameLibrary().gameList;
 const PARTY_EXPIRATION_SEC = 60;

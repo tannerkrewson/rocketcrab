@@ -1,8 +1,8 @@
-import { newParty, setGame } from "./rocketcrab";
-import { RocketCrab } from "../types/types";
+import { newParty, setGame } from "./rocketcrab.ts";
+import { RocketCrab } from "../types/types.ts";
 import { Application, Request, Response } from "express";
-import { RocketcrabMode } from "../types/enums";
-import { getModeFromHost } from "../utils/utils";
+import { RocketcrabMode } from "../types/enums.ts";
+import { getModeFromHost } from "../utils/utils.ts";
 
 const api = (server: Application, rocketcrab: RocketCrab): void => {
     const { partyList } = rocketcrab;

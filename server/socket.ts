@@ -11,16 +11,16 @@ import {
     reconnectToParty,
     addChatMessage,
     kickPlayer,
-} from "./rocketcrab";
+} from "./rocketcrab.ts";
 import type {
     JoinPartyResponse,
     Player,
     Party,
     RocketCrab,
-} from "../types/types";
+} from "../types/types.ts";
 import type { Server, Socket } from "socket.io";
-import { SocketEvent } from "../types/enums";
-import { getModeFromHost } from "../utils/utils";
+import { SocketEvent } from "../types/enums.ts";
+import { getModeFromHost } from "../utils/utils.ts";
 
 const onJoinParty =
     (socket: Socket, rocketcrab: RocketCrab) =>

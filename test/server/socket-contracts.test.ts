@@ -9,7 +9,7 @@
  */
 
 import { describe, expect, it, vi } from "vitest";
-import type { Server, Socket } from "socket.io";
+import type { Server } from "socket.io";
 
 // ---------------------------------------------------------------------------
 // Mock config before any module imports
@@ -38,19 +38,12 @@ import attachSocketHandlers from "../../server/socket";
 import {
     SocketEvent,
     PartyStatus,
-    GameStatus,
-    RocketcrabMode,
 } from "../../types/enums";
-import type { RocketCrab, ClientParty, Party } from "../../types/types";
+import type { RocketCrab, Party } from "../../types/types";
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-type MockSocketEvent = {
-    event: string;
-    handler: (...args: unknown[]) => void;
-};
 
 type MockSocket = {
     on: ReturnType<typeof vi.fn>;
@@ -75,15 +68,6 @@ function createMockSocket(host?: string): MockSocket {
     };
 }
 
-function createMockIo(onConnection: (socket: MockSocket) => void): unknown {
-    return {
-        on: vi.fn((event: string, handler: (socket: MockSocket) => void) => {
-            expect(event).toBe("connection");
-            onConnection(handler);
-        }),
-    } as unknown as Server;
-}
-
 /** Extract the handler registered for a specific event on a mock socket */
 function getHandler(
     socket: MockSocket,
@@ -92,15 +76,6 @@ function getHandler(
     const call = socket.on.mock.calls.find(([ev]: [string]) => ev === event);
     if (!call) throw new Error(`Handler for ${event} not registered`);
     return call[1];
-}
-
-function makeMinimalParty(overrides: Partial<Party> = {}): Party {
-    const party = newParty({
-        rocketcrab: { partyList: [] },
-        forceGameCode: "test",
-        mode: RocketcrabMode.MAIN,
-    });
-    return { ...party, ...overrides };
 }
 
 // ---------------------------------------------------------------------------
@@ -184,7 +159,7 @@ describe("server/socket.ts handler registration", () => {
 describe("Party lifecycle via socket events", () => {
     it("JOIN_PARTY with valid code triggers UPDATE and adds party listeners", () => {
         const rocketcrab: RocketCrab = { partyList: [] };
-        const party = newParty({
+        const _party = newParty({
             rocketcrab,
             forceGameCode: "abcd",
         });
@@ -256,11 +231,11 @@ describe("Party lifecycle via socket events", () => {
 
     it("JOIN_PARTY with banned IP emits INVALID_PARTY", () => {
         const rocketcrab: RocketCrab = { partyList: [] };
-        const party = newParty({
+        const _party = newParty({
             rocketcrab,
             forceGameCode: "banned",
         }) as Party;
-        party.bannedIPs = ["127.0.0.1"];
+        _party.bannedIPs = ["127.0.0.1"];
 
         const mockSocket = createMockSocket();
 
@@ -293,7 +268,7 @@ describe("Party lifecycle via socket events", () => {
 
     it("NAME event updates player name and triggers UPDATE", () => {
         const rocketcrab: RocketCrab = { partyList: [] };
-        const party = newParty({
+        const _party = newParty({
             rocketcrab,
             forceGameCode: "name1",
         });
@@ -331,7 +306,7 @@ describe("Party lifecycle via socket events", () => {
 
     it("GAME_SELECT event (host-only) updates selected game", () => {
         const rocketcrab: RocketCrab = { partyList: [] };
-        const party = newParty({
+        const _party = newParty({
             rocketcrab,
             forceGameCode: "game1",
         });
@@ -368,7 +343,7 @@ describe("Party lifecycle via socket events", () => {
 
     it("CHAT_MESSAGE event adds message and triggers UPDATE", () => {
         const rocketcrab: RocketCrab = { partyList: [] };
-        const party = newParty({
+        const _party = newParty({
             rocketcrab,
             forceGameCode: "chat1",
         });
@@ -484,7 +459,7 @@ describe("Game lifecycle via socket events", () => {
         attachSocketHandlers(io, rocketcrab);
         connectionHandler!(mockSocket);
 
-        const party = newParty({
+        const _party = newParty({
             rocketcrab,
             forceGameCode: "exit1",
         });
@@ -510,7 +485,7 @@ describe("Game lifecycle via socket events", () => {
         const rocketcrab: RocketCrab = { partyList: [] };
         const hostSocket = createMockSocket();
         const targetSocket = createMockSocket();
-        const party = newParty({
+        const _party = newParty({
             rocketcrab,
             forceGameCode: "kick1",
         });
@@ -582,8 +557,8 @@ describe("Socket disconnect behavior", () => {
         const joinHandler = getHandler(mockSocket, SocketEvent.JOIN_PARTY);
         joinHandler({ code: "disc1", lastPartyState: {}, reconnecting: false });
 
-        const party = rocketcrab.partyList[0];
-        expect(party.playerList.length).toBe(1);
+        const _party = rocketcrab.partyList[0];
+        expect(_party.playerList.length).toBe(1);
 
         mockSocket.emit.mockClear();
 
@@ -595,7 +570,7 @@ describe("Socket disconnect behavior", () => {
         disconnectHandler();
 
         // Should have removed the player from party
-        expect(party.playerList.length).toBe(0);
+        expect(_party.playerList.length).toBe(0);
     });
 });
 
@@ -608,7 +583,7 @@ describe("SET_IS_PUBLIC event contract", () => {
         const rocketcrab: RocketCrab = { partyList: [] };
         const hostSocket = createMockSocket();
 
-        const party = newParty({
+        const _party = newParty({
             rocketcrab,
             forceGameCode: "pub1",
         });

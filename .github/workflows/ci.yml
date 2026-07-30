@@ -6,14 +6,21 @@ on:
             - prod
 
 jobs:
-    build:
+    quality:
         runs-on: ubuntu-latest
         steps:
             - uses: actions/checkout@v4
             - uses: actions/setup-node@v4
               with:
-                  node-version: 24
+                  node-version: "24.x"
             - run: npm ci
-            - run: npm run build
-            - run: npm run lint
-            - run: npm test
+            - name: Format check
+              run: npm run format:check
+            - name: Lint
+              run: npm run lint
+            - name: Type check
+              run: npm run type-check
+            - name: Test
+              run: npm test
+            - name: Build
+              run: npm run build

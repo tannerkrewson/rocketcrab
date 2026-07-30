@@ -6,11 +6,10 @@
         "outDir": "dist",
         "target": "es2017",
         "isolatedModules": false,
-        "noEmit": false
+        "noEmit": false,
+        "allowImportingTsExtensions": false
     },
-    "exclude": [
-        "server/with-tanstack.ts"
-    ],
+    "exclude": ["server/with-tanstack.ts"],
     "include": [
         "server/**/*.ts",
         "config/**/*.ts",
