@@ -14,6 +14,8 @@ import {
     getPartyByUuid,
     reconnectToParty,
     addChatMessage,
+    kickPlayer,
+    getJsonParty,
 } from "../../server/rocketcrab";
 import {
     Party,
@@ -567,6 +569,100 @@ describe("server/rocketcrab.ts", () => {
         const actualParty = reconnectToParty(partyToRecreate, rocketcrab);
 
         expect(actualParty.code).not.toBe("abcd");
+    });
+
+    it("kickPlayer removes player without ban", () => {
+        const disconnect = vi.fn();
+        const mockPlayer = generateMockPlayer({
+            id: 5,
+            socket: { disconnect } as unknown as Socket,
+        });
+        const mockParty: Party = generateMockParty({
+            playerList: [mockPlayer],
+            bannedIPs: [],
+        });
+
+        kickPlayer(5, false, mockParty);
+
+        expect(mockParty.playerList.length).toBe(0);
+        expect(mockParty.bannedIPs.length).toBe(0);
+    });
+
+    it("kickPlayer removes player with ban and records IP", () => {
+        const disconnect = vi.fn();
+        const mockPlayer = generateMockPlayer({
+            id: 5,
+            socket: {
+                disconnect,
+                handshake: { address: "192.168.1.1" },
+            } as unknown as Socket,
+        });
+        const mockParty: Party = generateMockParty({
+            playerList: [mockPlayer],
+            bannedIPs: [],
+        });
+
+        kickPlayer(5, true, mockParty);
+
+        expect(mockParty.playerList.length).toBe(0);
+        expect(mockParty.bannedIPs).toContain("192.168.1.1");
+    });
+
+    it("kickPlayer does nothing for non-existent player", () => {
+        const mockParty: Party = generateMockParty({});
+
+        kickPlayer(999, false, mockParty);
+
+        expect(mockParty.playerList.length).toBe(0);
+    });
+
+    it("setHost picks lowest id when ideal host is removed", () => {
+        const player10 = generateMockPlayer({ id: 10, isHost: true });
+        const player5 = generateMockPlayer({ id: 5, isHost: false });
+        const player8 = generateMockPlayer({ id: 8, isHost: false });
+
+        const mockParty = generateMockParty({
+            idealHostId: 10,
+            playerList: [player10, player5, player8],
+        });
+
+        removePlayer(player10, mockParty);
+
+        const host = mockParty.playerList.find((p) => p.isHost);
+        expect(host).toBeDefined();
+        expect(host.id).toBe(5);
+    });
+
+    it("getJsonParty strips socket from playerList", () => {
+        const mockParty = generateMockParty({
+            playerList: generateMockPlayerList(2),
+        });
+
+        const jsonParty = getJsonParty(mockParty);
+
+        expect(jsonParty.playerList[0]).not.toHaveProperty("socket");
+        expect(jsonParty.playerList[0]).toHaveProperty("id");
+        expect(jsonParty.playerList[0]).toHaveProperty("name");
+        expect(jsonParty.playerList[0]).toHaveProperty("isHost");
+    });
+
+    it("newParty generates unique codes", () => {
+        const rocketcrab = generateMocketCrab({});
+        const codes = new Set<string>();
+
+        for (let i = 0; i < 10; i++) {
+            const { code } = newParty({ rocketcrab });
+            expect(codes.has(code)).toBe(false);
+            codes.add(code);
+        }
+
+        expect(codes.size).toBe(10);
+    });
+
+    it("initRocketCrab creates dev party when isDevMode is true", () => {
+        const crab = initRocketCrab(true);
+        expect(crab.partyList.length).toBe(1);
+        expect(crab.partyList[0].code).toBe("ffff");
     });
 
     it("reconnectToParty returns undefined if no lastPartyState given", () => {
