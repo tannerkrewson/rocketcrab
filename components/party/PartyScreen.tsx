@@ -3,7 +3,7 @@ import PrimaryButton from "../common/PrimaryButton";
 import { Spacer } from "@nextui-org/react";
 import GameSelector from "../library/GameSelector";
 import { ClientGameLibrary, ClientParty, Player } from "../../types/types";
-import React, { useCallback, useContext, useEffect, useState } from "react";
+import React, { useCallback, useContext, useState } from "react";
 import PartyStatus from "./PartyStatus";
 import GameDetail from "../detail/GameDetail";
 import SkinnyCard from "../common/SkinnyCard";
@@ -27,7 +27,6 @@ const PartyScreen = ({
     onInOutParty,
     onSendChat,
     onKick,
-    onSetIsPublic,
     unreadMsgCount,
     clearUnreadMsgCount,
 }: PartyScreenProps): JSX.Element => {
@@ -39,7 +38,6 @@ const PartyScreen = ({
         selectedGameId,
         isPublic,
         publicEndDate,
-        isFinderActive,
         createdAsPublic,
     } = partyState;
     const { id: meId, isHost } = thisPlayer;
@@ -64,11 +62,6 @@ const PartyScreen = ({
         setGameInfoVisible(visibility);
     };
 
-    const [awaitingChangeToIsPublic, setAwaitingChangeToIsPublic] =
-        useState(false);
-
-    useEffect(() => setAwaitingChangeToIsPublic(false), [isPublic]);
-
     const leaveText = createdAsPublic
         ? "Back to Public Parties"
         : "Leave Party";
@@ -84,11 +77,11 @@ const PartyScreen = ({
 
             onClose: ({ isConfirmed }) => {
                 if (isConfirmed) {
-                    router.push(createdAsPublic ? "/find" : "/");
+                    router.push("/");
                 }
             },
         });
-    }, [createdAsPublic, fireModal, leaveText, router]);
+    }, [fireModal, leaveText, router]);
 
     if (gameSelectorVisible) {
         return (
@@ -229,26 +222,6 @@ const PartyScreen = ({
                                 </Countdown>
                             </>
                         )}
-                        {selectedGame && isFinderActive && (
-                            <>
-                                <Spacer y={0.5} />
-                                <PrimaryButton
-                                    onClick={() => {
-                                        if (!isHost || awaitingChangeToIsPublic)
-                                            return;
-                                        onSetIsPublic(!isPublic);
-                                        setAwaitingChangeToIsPublic(true);
-                                    }}
-                                    loading={awaitingChangeToIsPublic}
-                                    disabled={!isHost}
-                                >
-                                    {isPublic
-                                        ? "Close to new players"
-                                        : "Open to public"}
-                                </PrimaryButton>
-                                <Spacer y={0.5} />
-                            </>
-                        )}
                     </SkinnyCard>
                 </>
             )}
@@ -275,7 +248,6 @@ type PartyScreenProps = {
     onInOutParty: (outOfParty: boolean) => void;
     onSendChat: (message: string) => void;
     onKick: (id: number, name: string) => void;
-    onSetIsPublic: (isPublic: boolean) => void;
 };
 
 export default PartyScreen;

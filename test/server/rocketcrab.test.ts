@@ -13,8 +13,6 @@ import {
     getPartyByCode,
     getPartyByUuid,
     reconnectToParty,
-    getFinderState,
-    getJsonParty,
     addChatMessage,
 } from "../../server/rocketcrab";
 import {
@@ -24,7 +22,6 @@ import {
     ServerGameLibrary,
     ServerGame,
     RocketCrab,
-    FINDER_ACTIVE_MS,
     MAX_CHAT_MSG_LEN,
     MIN_MS_BETWEEN_MSGS,
     MAX_CHATS_OVERALL,
@@ -69,8 +66,6 @@ describe("server/rocketcrab.ts", () => {
     it("initRocketCrab works", () => {
         expect(initRocketCrab()).toStrictEqual({
             partyList: [],
-            isFinderActive: false,
-            finderSubscribers: [],
         });
     });
 
@@ -98,25 +93,6 @@ describe("server/rocketcrab.ts", () => {
         expect(partyList[0].code).toBe("abcd");
         expect(partyList[0].uuid).toBe("cool-uuid");
         expect(partyList[0].playerList.length).toBe(0);
-    });
-
-    it("newParty works isPublic", () => {
-        const rocketcrab = generateMocketCrab({
-            finderActiveDates: {
-                lastStart: 100,
-                nextStart: 200,
-                nextWeekOfStarts: [],
-            },
-        });
-        const { partyList } = rocketcrab;
-
-        newParty({
-            rocketcrab,
-            isPublic: true,
-        });
-
-        expect(partyList.length).toBe(1);
-        expect(partyList[0].publicEndDate).toBe(100 + FINDER_ACTIVE_MS);
     });
 
     it("getPartyByCode finds existing party", () => {
@@ -232,9 +208,8 @@ describe("server/rocketcrab.ts", () => {
                 socket: { emit: emits[i] } as Partial<Socket>,
             })),
         });
-        const mocketCrab = generateMocketCrab({});
 
-        sendStateToAll(mockParty, mocketCrab);
+        sendStateToAll(mockParty);
 
         const jsonPlayerList = [
             {
@@ -255,7 +230,6 @@ describe("server/rocketcrab.ts", () => {
         ];
         const jsonParty = {
             ...generateMockParty({ playerList: jsonPlayerList }),
-            isFinderActive: mocketCrab.isFinderActive,
         };
 
         expect(emits[0]).toBeCalledWith(SocketEvent.UPDATE, {
@@ -270,56 +244,6 @@ describe("server/rocketcrab.ts", () => {
             ...jsonParty,
             me: jsonPlayerList[2],
         });
-    });
-
-    it("sendStateToAll sends a finder update if enabled", () => {
-        const emits = [jest.fn(), jest.fn(), jest.fn()];
-
-        const generateMocket = (i: number) =>
-            ({
-                emit: emits[i],
-            }) as Partial<Socket> as Socket;
-
-        const mockParty: Party = generateMockParty({
-            status: PartyStatus.party,
-            isPublic: true,
-        });
-        const mocketCrab = generateMocketCrab({
-            isFinderActive: true,
-            finderSubscribers: [
-                generateMocket(0),
-                generateMocket(1),
-                generateMocket(2),
-            ],
-        });
-
-        sendStateToAll(mockParty, mocketCrab, { enableFinderCheck: true });
-
-        expect(emits[0]).toBeCalled();
-        expect(emits[1]).toBeCalled();
-        expect(emits[2]).toBeCalled();
-    });
-
-    it("sendStateToAll sends a finder update if forced", () => {
-        const emits = [jest.fn()];
-
-        const generateMocket = (i: number) =>
-            ({
-                emit: emits[i],
-            }) as Partial<Socket> as Socket;
-
-        const mockParty: Party = generateMockParty({
-            status: PartyStatus.ingame,
-            isPublic: false,
-        });
-        const mocketCrab = generateMocketCrab({
-            isFinderActive: true,
-            finderSubscribers: [generateMocket(0)],
-        });
-
-        sendStateToAll(mockParty, mocketCrab, { forceFinderUpdate: true });
-
-        expect(emits[0]).toBeCalled();
     });
 
     it("removePlayer works", () => {
@@ -431,9 +355,7 @@ describe("server/rocketcrab.ts", () => {
             })),
         });
 
-        const mocketCrab = generateMocketCrab({});
-
-        await startGame(mockParty, mocketCrab);
+        await startGame(mockParty);
 
         expect(mockParty.status).toBe(PartyStatus.ingame);
         expect(mockParty.gameState.status).toBe(GameStatus.waitingforhost);
@@ -449,9 +371,7 @@ describe("server/rocketcrab.ts", () => {
                 status: undefined,
             },
         });
-        const mocketCrab = generateMocketCrab({});
-
-        await startGame(mockParty, mocketCrab);
+        await startGame(mockParty);
 
         expect(mockParty.status).toBe(PartyStatus.party);
         expect(mockParty.gameState.status).toBeUndefined();
@@ -465,9 +385,7 @@ describe("server/rocketcrab.ts", () => {
                 status: undefined,
             },
         });
-        const mocketCrab = generateMocketCrab({});
-
-        await startGame(mockParty, mocketCrab);
+        await startGame(mockParty);
 
         expect(mockParty.status).toBe(PartyStatus.ingame);
         expect(mockParty.gameState.status).toBe(GameStatus.error);
@@ -493,44 +411,6 @@ describe("server/rocketcrab.ts", () => {
         expect(mockParty.gameState.status).toBe(GameStatus.loading);
         expect(mockParty.gameState.error).toBeUndefined();
         expect(mockParty.gameState.connectedGame).toBeUndefined();
-    });
-
-    it("getFinderState works", () => {
-        const mockPartyList = [
-            generateMockParty({
-                code: "aaaa",
-                isPublic: false,
-                status: PartyStatus.party,
-                selectedGameId: "jd-foogame",
-            }),
-            generateMockParty({
-                code: "bbbb",
-                isPublic: true,
-                status: PartyStatus.ingame,
-                selectedGameId: "jd-foogame",
-            }),
-            generateMockParty({
-                code: "cccc",
-                isPublic: true,
-                status: PartyStatus.party,
-                selectedGameId: "",
-            }),
-            generateMockParty({
-                code: "dddd",
-                isPublic: true,
-                status: PartyStatus.party,
-                selectedGameId: "jd-foogame",
-            }),
-        ];
-        const mocketCrab = generateMocketCrab({ partyList: mockPartyList });
-
-        const { publicPartyList } = getFinderState(mocketCrab);
-
-        expect(publicPartyList.length).toBe(1);
-        expect(publicPartyList[0].code).toBe("dddd");
-        expect(publicPartyList[0]).toStrictEqual(
-            getJsonParty(mockPartyList[3]),
-        );
     });
 
     it("addChatMessage works", () => {
@@ -701,14 +581,8 @@ describe("server/rocketcrab.ts", () => {
 
 const generateMocketCrab = ({
     partyList = [],
-    isFinderActive = false,
-    finderSubscribers = [],
-    finderActiveDates,
 }: Partial<RocketCrab>): RocketCrab => ({
     partyList,
-    isFinderActive,
-    finderSubscribers,
-    finderActiveDates,
 });
 
 const generateMockParty = ({

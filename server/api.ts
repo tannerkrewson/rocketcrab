@@ -11,11 +11,6 @@ const api = (server: Application, rocketcrab: RocketCrab): void => {
 
     const newPartyHandler =
         (isPublic: boolean) => (req: Request, res: Response) => {
-            if (isPublic && !rocketcrab.isFinderActive) {
-                res.status(400).end();
-                return;
-            }
-
             const { code } = newParty({
                 rocketcrab,
                 isPublic,

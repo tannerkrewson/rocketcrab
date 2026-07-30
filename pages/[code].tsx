@@ -36,7 +36,6 @@ export const Code = ({
         showReconnecting,
         onSendChat,
         onKick,
-        onSetIsPublic,
     } = useRocketcrabClientSocket({
         code,
         router,
@@ -118,7 +117,6 @@ export const Code = ({
                     onKick={onKick}
                     unreadMsgCount={unreadMsgCount}
                     clearUnreadMsgCount={clearUnreadMsgCount}
-                    onSetIsPublic={onSetIsPublic}
                 />
             )}
         </PageLayout>

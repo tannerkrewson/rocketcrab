@@ -4,8 +4,6 @@ import {
     Player,
     ServerGame,
     ClientParty,
-    FinderState,
-    FINDER_ACTIVE_MS,
     MAX_CHATS_OVERALL,
 } from "../types/types";
 import {
@@ -16,8 +14,6 @@ import {
 } from "../types/enums";
 import { getServerGameLibrary } from "../config";
 import { v4 as uuidv4 } from "uuid";
-import { CronJob } from "cron";
-import { getUnixTime } from "date-fns";
 import type { Socket } from "socket.io";
 import { isChatMsgValid } from "../utils/utils";
 
@@ -29,8 +25,6 @@ export const initRocketCrab = (isDevMode?: boolean): RocketCrab => {
 
     const rocketcrab = {
         partyList,
-        isFinderActive: false,
-        finderSubscribers: [],
     };
 
     if (isDevMode) newParty({ rocketcrab, forceGameCode: "ffff" });
@@ -38,52 +32,8 @@ export const initRocketCrab = (isDevMode?: boolean): RocketCrab => {
     return rocketcrab;
 };
 
-export const initCron = (rocketcrab: RocketCrab): void => {
-    const setDates = () => {
-        rocketcrab.finderActiveDates = {
-            lastStart: getUnixTime(activateFinderJob.lastDate()) * 1000,
-            nextStart: activateFinderJob.nextDate().valueOf(),
-            nextWeekOfStarts: activateFinderJob
-                .nextDates(24)
-                // eslint-disable-next-line @typescript-eslint/ban-ts-comment
-                // @ts-ignore
-                .map((momentDate) => momentDate.valueOf()),
-        };
-    };
-
-    const activateFinderJob = new CronJob(
-        "0 13 * * 6", // https://crontab.guru/#0_13_*_*_6
-        () => {
-            setDates();
-            rocketcrab.isFinderActive = true;
-            sendFinderStateToAll(rocketcrab);
-
-            setTimeout(() => {
-                rocketcrab.isFinderActive = false;
-
-                // ensure that a long-lived party is not shown on a subsequent
-                // activation of the finder
-                rocketcrab.partyList.forEach((party) => {
-                    if (!party.isPublic) return;
-
-                    party.isPublic = false;
-                    sendStateToAll(party, rocketcrab, {
-                        enableFinderCheck: false,
-                    });
-                });
-                sendFinderStateToAll(rocketcrab);
-            }, FINDER_ACTIVE_MS);
-        },
-        null,
-        true,
-        "America/Chicago",
-    );
-
-    setDates();
-};
-
 export const newParty = ({
-    rocketcrab: { partyList, finderActiveDates },
+    rocketcrab: { partyList },
     forceGameCode,
     forceUuid,
     isPublic = false,
@@ -112,10 +62,6 @@ export const newParty = ({
         bannedIPs: [],
         mode,
     };
-
-    if (isPublic) {
-        newParty.publicEndDate = finderActiveDates.lastStart + FINDER_ACTIVE_MS;
-    }
 
     partyList.push(newParty);
 
@@ -219,44 +165,14 @@ export const addPlayer = (
     return player;
 };
 
-export const sendStateToAll = (
-    party: Party,
-    rocketcrab: RocketCrab,
-    {
-        enableFinderCheck,
-        forceFinderUpdate,
-    }: { enableFinderCheck?: boolean; forceFinderUpdate?: boolean } = {},
-): void => {
+export const sendStateToAll = (party: Party): void => {
     party.playerList.forEach(({ socket, ...player }) => {
         const clientParty: ClientParty = {
             me: player,
             ...getJsonParty(party),
-            isFinderActive: rocketcrab.isFinderActive,
         };
         socket.emit(SocketEvent.UPDATE, clientParty);
     });
-
-    if (
-        (enableFinderCheck && shouldSendFinderStateUpdate(party, rocketcrab)) ||
-        forceFinderUpdate
-    ) {
-        sendFinderStateToAll(rocketcrab);
-    }
-};
-
-export const sendFinderStateToAll = (rocketcrab: RocketCrab): void => {
-    rocketcrab.finderSubscribers.forEach((socket) =>
-        socket.emit(SocketEvent.FINDER_UPDATE, getFinderState(rocketcrab)),
-    );
-};
-
-export const shouldSendFinderStateUpdate = (
-    { status, isPublic }: Party,
-    { isFinderActive }: RocketCrab,
-): boolean => {
-    const thisPartyIsShownOnFinder = status === PartyStatus.party && isPublic;
-
-    return isFinderActive && thisPartyIsShownOnFinder;
 };
 
 export const removePlayer = (player: Player, party: Party): void => {
@@ -314,14 +230,8 @@ export const setGame = (gameId: string, party: Party): void => {
     }
 };
 
-export const startGame = async (
-    party: Party,
-    rocketcrab: RocketCrab,
-): Promise<void> => {
+export const startGame = async (party: Party): Promise<void> => {
     const { gameState, selectedGameId, playerList } = party;
-
-    const willSendFinderUpdate = shouldSendFinderStateUpdate(party, rocketcrab);
-    party.status === PartyStatus.party && party.isPublic;
 
     const game: ServerGame = findGameById(selectedGameId);
 
@@ -332,9 +242,7 @@ export const startGame = async (
     party.status = PartyStatus.ingame;
     gameState.status = GameStatus.loading;
 
-    sendStateToAll(party, rocketcrab, {
-        forceFinderUpdate: willSendFinderUpdate,
-    });
+    sendStateToAll(party);
 
     try {
         gameState.connectedGame = await game.connectToGame();
@@ -343,7 +251,7 @@ export const startGame = async (
 
         gameState.status = GameStatus.error;
         gameState.error = "❌ Can't connect to " + game.name;
-        sendStateToAll(party, rocketcrab);
+        sendStateToAll(party);
         return;
     }
 
@@ -353,7 +261,7 @@ export const startGame = async (
 
     const onHostGameLoaded = () => {
         gameState.status = GameStatus.inprogress;
-        sendStateToAll(party, rocketcrab);
+        sendStateToAll(party);
     };
 
     // if, for some unknown reason, the host doesn't send this event, we'll
@@ -366,7 +274,7 @@ export const startGame = async (
         onHostGameLoaded();
     });
 
-    sendStateToAll(party, rocketcrab);
+    sendStateToAll(party);
 };
 
 export const exitGame = (party: Party): void => {
@@ -377,23 +285,6 @@ export const exitGame = (party: Party): void => {
     delete gameState.connectedGame;
     delete gameState.error;
 };
-
-export const getFinderState = ({
-    isFinderActive,
-    partyList,
-    finderActiveDates,
-    finderSubscribers,
-}: RocketCrab): FinderState => ({
-    isActive: isFinderActive,
-    publicPartyList: partyList
-        .filter(
-            ({ isPublic, status, selectedGameId }) =>
-                isPublic && status === PartyStatus.party && selectedGameId,
-        )
-        .map((party) => getJsonParty(party)),
-    finderActiveDates,
-    subscriberCount: finderSubscribers.length - 1, // not counting the person it's being sent to
-});
 
 export const addChatMessage = (
     message: string,

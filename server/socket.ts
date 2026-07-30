@@ -9,8 +9,6 @@ import {
     exitGame,
     getPartyByCode,
     reconnectToParty,
-    getFinderState,
-    sendFinderStateToAll,
     addChatMessage,
     kickPlayer,
 } from "./rocketcrab";
@@ -47,7 +45,7 @@ const onJoinParty =
             const player = addPlayer(name, socket, party, id);
 
             attachPartyListenersToPlayer(player, party, rocketcrab);
-            sendStateToAll(party, rocketcrab, { enableFinderCheck: true });
+            sendStateToAll(party);
         } else {
             socket.emit(SocketEvent.INVALID_PARTY, { code });
         }
@@ -67,19 +65,19 @@ const attachPartyListenersToPlayer = (
     socket.on(SocketEvent.DISCONNECT, () => {
         removePlayer(player, party);
         deletePartyIfEmpty(party, partyList);
-        sendStateToAll(party, rocketcrab, { enableFinderCheck: true });
+        sendStateToAll(party);
     });
 
     socket.on(SocketEvent.NAME, (name) => {
         setName(name, player, playerList);
-        sendStateToAll(party, rocketcrab, { enableFinderCheck: player.isHost });
+        sendStateToAll(party);
     });
 
     socket.on(SocketEvent.GAME_SELECT, (gameId) => {
         if (!player.isHost) return;
 
         setGame(gameId, party);
-        sendStateToAll(party, rocketcrab, { enableFinderCheck: true });
+        sendStateToAll(party);
     });
 
     socket.on(SocketEvent.GAME_START, (gameId) => {
@@ -89,7 +87,7 @@ const attachPartyListenersToPlayer = (
             setGame(gameId, party);
         }
 
-        startGame(party, rocketcrab);
+        startGame(party);
         // startGame does its own sendStateToAlls
     });
 
@@ -97,13 +95,13 @@ const attachPartyListenersToPlayer = (
         if (!player.isHost) return;
 
         exitGame(party);
-        sendStateToAll(party, rocketcrab, { enableFinderCheck: true });
+        sendStateToAll(party);
     });
 
     socket.on(SocketEvent.CHAT_MESSAGE, (message) => {
         const isMessageValid = addChatMessage(message, player, party);
         if (isMessageValid) {
-            sendStateToAll(party, rocketcrab, { enableFinderCheck: false });
+            sendStateToAll(party);
         }
     });
 
@@ -111,49 +109,21 @@ const attachPartyListenersToPlayer = (
         if (!player.isHost) return;
 
         kickPlayer(playerId, isBan, party);
-        sendStateToAll(party, rocketcrab, { enableFinderCheck: true });
+        sendStateToAll(party);
     });
 
     socket.on(SocketEvent.SET_IS_PUBLIC, (proposedIsPublic) => {
-        if (player.isHost && rocketcrab.isFinderActive) {
+        if (player.isHost) {
             party.isPublic = !!proposedIsPublic;
         }
 
-        sendStateToAll(party, rocketcrab, { forceFinderUpdate: true });
+        sendStateToAll(party);
     });
-};
-
-const onFinderSubscribe = (socket: Socket, rocketcrab: RocketCrab) => () => {
-    socket.emit(SocketEvent.FINDER_UPDATE, getFinderState(rocketcrab));
-
-    rocketcrab.finderSubscribers.push(socket);
-
-    socket.on(SocketEvent.DISCONNECT, () => {
-        rocketcrab.finderSubscribers = rocketcrab.finderSubscribers.filter(
-            (s) => s !== socket,
-        );
-        onFinderSubscriberUpdate(rocketcrab);
-    });
-
-    onFinderSubscriberUpdate(rocketcrab);
-};
-
-const onFinderSubscriberUpdate = (rocketcrab: RocketCrab) => {
-    // this is to update the subscriber count. only do this when then finder is
-    // not active, because when it is, there are many other events happening
-    // that will also send the subscriber count.
-    if (!rocketcrab.isFinderActive) {
-        sendFinderStateToAll(rocketcrab);
-    }
 };
 
 const s = (io: Server, rocketcrab: RocketCrab): void => {
     io.on("connection", (socket) => {
         socket.on(SocketEvent.JOIN_PARTY, onJoinParty(socket, rocketcrab));
-        socket.on(
-            SocketEvent.FINDER_SUBSCRIBE,
-            onFinderSubscribe(socket, rocketcrab),
-        );
     });
 };
 
