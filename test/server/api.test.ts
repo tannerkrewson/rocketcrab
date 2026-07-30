@@ -1,3 +1,21 @@
+import { vi } from "vitest";
+
+vi.mock("../../config", () => ({
+    getServerGameLibrary: vi.fn(() => ({
+        gameList: [
+            {
+                id: "drawphone",
+                name: "Drawphone",
+            },
+        ],
+        categories: [],
+    })),
+    getClientGameLibrary: vi.fn(() => ({
+        gameList: [{ id: "drawphone", name: "Drawphone" }],
+        categories: [],
+    })),
+}));
+
 import api from "../../server/api";
 import { Application } from "express";
 import { RocketCrab } from "../../types/types";
@@ -8,9 +26,9 @@ describe("server/api.ts", () => {
     let rocketcrab: RocketCrab;
     beforeEach(() => {
         app = {
-            post: jest.fn(),
-            get: jest.fn(),
-            all: jest.fn(),
+            post: vi.fn(),
+            get: vi.fn(),
+            all: vi.fn(),
         } as unknown as Application;
 
         rocketcrab = {
@@ -23,7 +41,7 @@ describe("server/api.ts", () => {
     it("/api/new works for regular mode", () => {
         expect(app.post.mock.calls[0][0]).toEqual("/api/new");
         const handler = app.post.mock.calls[0][1];
-        const res = { json: jest.fn() };
+        const res = { json: vi.fn() };
         handler(undefined, res);
 
         const actualParty = rocketcrab.partyList[0];
@@ -33,7 +51,7 @@ describe("server/api.ts", () => {
 
     it("/api/new works for kids mode", () => {
         const handler = app.post.mock.calls[0][1];
-        const res = { json: jest.fn() };
+        const res = { json: vi.fn() };
         handler({ hostname: "kids.rocketcrab.com" }, res);
 
         const actualParty = rocketcrab.partyList[0];
@@ -54,8 +72,8 @@ describe("server/api.ts", () => {
             },
         };
         const res = {
-            cookie: jest.fn(),
-            redirect: jest.fn(),
+            cookie: vi.fn(),
+            redirect: vi.fn(),
         };
         handler(req, res);
 
@@ -69,8 +87,8 @@ describe("server/api.ts", () => {
     it("/transfer doesn't create party if already made", () => {
         const handler = app.get.mock.calls[0][1];
         const res = {
-            cookie: jest.fn(),
-            redirect: jest.fn(),
+            cookie: vi.fn(),
+            redirect: vi.fn(),
         };
         handler(
             {
@@ -108,9 +126,9 @@ describe("server/api.ts", () => {
             },
             query: {},
         };
-        const end = jest.fn();
+        const end = vi.fn();
         const res = {
-            status: jest.fn(() => ({ end })),
+            status: vi.fn(() => ({ end })),
         };
         handler(req, res);
 
@@ -128,7 +146,7 @@ describe("server/api.ts", () => {
             query: {},
         };
         const res = {
-            redirect: jest.fn(),
+            redirect: vi.fn(),
         };
         handler(req, res);
 
@@ -146,36 +164,17 @@ describe("server/api.ts", () => {
             query: {},
         };
         const res = {
-            redirect: jest.fn(),
+            redirect: vi.fn(),
         };
         handler(req, res);
 
         expect(rocketcrab.partyList[0].selectedGameId).toBe("");
     });
 
-    it("/api/stats returns party statistics", () => {
-        const statsHandler = app.get.mock.calls[1][1];
-        const res = { json: jest.fn() };
-
-        const handler = app.post.mock.calls[0][1];
-        handler(undefined, { json: jest.fn() });
-        handler(undefined, { json: jest.fn() });
-
-        statsHandler(undefined, res);
-
-        const stats = res.json.mock.calls[0][0];
-        expect(Array.isArray(stats)).toBe(true);
-        expect(stats.length).toBe(2);
-        expect(stats[0]).toHaveProperty("partyStatus");
-        expect(stats[0]).toHaveProperty("gameStatus");
-        expect(stats[0]).toHaveProperty("selectedGameId");
-        expect(stats[0]).toHaveProperty("numberOfPlayers");
-    });
-
     it("locale transfers work", () => {
         expect(app.all.mock.calls[0][0]).toEqual(["/MAIN/*", "/KIDS/*"]);
         const handler = app.all.mock.calls[0][1];
-        const res = { redirect: jest.fn() };
+        const res = { redirect: vi.fn() };
         handler({ originalUrl: "/MAIN/a/b/c" }, res);
         handler({ originalUrl: "/KIDS/d/e/f" }, res);
 

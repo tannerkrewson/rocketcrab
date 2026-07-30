@@ -69,9 +69,9 @@ describe("server/architecture", () => {
             handshake: { headers: {} },
         };
         const io = {
-            on: (event: string, handler: (s: typeof socket) => void) => {
+            on: vi.fn((event: string, handler: (s: typeof socket) => void) => {
                 handler(socket);
-            },
+            }),
         } as unknown as Server;
         const rocketcrab = {
             partyList: [],

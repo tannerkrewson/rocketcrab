@@ -35,8 +35,8 @@ import {
     RocketcrabMode,
 } from "../../types/enums";
 
-jest.mock("../../config", () => ({
-    getServerGameLibrary: jest.fn(
+vi.mock("../../config", () => ({
+    getServerGameLibrary: vi.fn(
         (): ServerGameLibrary => ({
             gameList: [
                 {
@@ -58,7 +58,7 @@ jest.mock("../../config", () => ({
             categories: [],
         }),
     ),
-    getClientGameLibrary: jest.fn(() => ({
+    getClientGameLibrary: vi.fn(() => ({
         gameList: [{ name: "FooGame" }, { name: "CoolGame" }],
         categories: [],
     })),
@@ -203,7 +203,7 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("sendStateToAll works", () => {
-        const emits = [jest.fn(), jest.fn(), jest.fn()];
+        const emits = [vi.fn(), vi.fn(), vi.fn()];
         const mockParty: Party = generateMockParty({
             playerList: generateMockPlayerList(3, (player, i) => ({
                 ...player,
@@ -249,7 +249,7 @@ describe("server/rocketcrab.ts", () => {
     });
 
     it("removePlayer works", () => {
-        const disconnect = jest.fn();
+        const disconnect = vi.fn();
         const mockPlayer = generateMockPlayer({
             socket: { disconnect } as unknown as Socket,
         });
@@ -271,7 +271,7 @@ describe("server/rocketcrab.ts", () => {
             playerList: generateMockPlayerList(2, (player) => ({
                 ...player,
                 socket: {
-                    disconnect: jest.fn(),
+                    disconnect: vi.fn(),
                 } as Partial<Socket>,
             })),
         });
@@ -330,7 +330,7 @@ describe("server/rocketcrab.ts", () => {
         const mockPlayerList = generateMockPlayerList(4, (player, i) => ({
             ...player,
             name: i === 0 ? "" : player.name,
-            socket: { emit: jest.fn() } as Partial<Socket>,
+            socket: { emit: vi.fn() } as Partial<Socket>,
         }));
 
         setName("name1", mockPlayerList[0], mockPlayerList);
@@ -351,8 +351,8 @@ describe("server/rocketcrab.ts", () => {
             playerList: generateMockPlayerList(1, (player) => ({
                 ...player,
                 socket: {
-                    emit: jest.fn(),
-                    once: jest.fn(),
+                    emit: vi.fn(),
+                    once: vi.fn(),
                 } as unknown as Socket,
             })),
         });
