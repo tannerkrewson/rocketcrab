@@ -8,7 +8,13 @@ export default defineConfig({
         environment: "jsdom",
         globals: true,
         include: ["test/**/*.test.ts", "test/**/*.test.tsx"],
-        exclude: ["node_modules", ".next", "test/pages/**", "test/config/**"],
+        exclude: [
+            "node_modules",
+            ".next",
+            "test/pages/**",
+            "test/config/**",
+            "test/browser/**",
+        ],
         css: true,
         server: {
             deps: {

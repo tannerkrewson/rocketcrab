@@ -1,0 +1,288 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mock Party Game</title>
+<style>
+  body { font-family: system-ui, -apple-system, sans-serif; margin: 0; padding: 14px; background: #f0f2f7; color: #222; }
+  .card { background: #fff; border-radius: 10px; padding: 14px; margin: 10px 0; box-shadow: 0 1px 3px rgba(0,0,0,.15); }
+  h1 { font-size: 16px; margin: 0 0 6px; }
+  .meta { font-size: 13px; color: #555; line-height: 1.6; }
+  .meta b { color: #222; }
+  input { width: 100%; padding: 10px; border: 1px solid #c9ced9; border-radius: 8px; font-size: 15px; box-sizing: border-box; }
+  button { margin-top: 10px; padding: 10px 16px; border: 0; border-radius: 8px; background: #3d6de0; color: #fff; font-size: 15px; cursor: pointer; }
+  button:disabled { background: #a9b9e2; cursor: default; }
+  .opt { display: block; width: 100%; text-align: left; margin-top: 8px; background: #eef2fb; color: #222; border: 1px solid #c9d3ea; }
+  .opt b { color: #3d6de0; }
+  li { margin: 4px 0; }
+  .winner { font-size: 20px; font-weight: bold; color: #b8860b; }
+  .waiting { color: #888; font-style: italic; }
+</style>
+</head>
+<body data-testid="mock-game">
+  <div class="card">
+    <h1>Mock Party Game</h1>
+    <div class="meta">
+      <div data-testid="room">Room: <b id="room-code"></b></div>
+      <div data-testid="me">Playing as <b id="me-name"></b><span id="me-host"></span></div>
+      <div data-testid="phase">Phase: <b id="phase-name">lobby</b></div>
+      <div data-testid="player-count" id="player-count">0</div>
+    </div>
+  </div>
+  <div id="area" class="card"></div>
+<script>
+(function () {
+  "use strict";
+
+  var params = new URLSearchParams(window.location.search);
+  var ME = {
+    name: params.get("name") || "anonymous",
+    isHost: params.get("ishost") === "true",
+    rocketcrab: params.get("rocketcrab") === "true",
+  };
+  var room = (window.location.pathname.split("/").pop() || "room");
+  var SYNC_URL = "https://just1.herokuapp.com/__sync__";
+
+  document.getElementById("room-code").textContent = room;
+  document.getElementById("me-name").textContent = ME.name;
+  document.getElementById("me-host").textContent = ME.isHost ? " (host)" : "";
+
+  var state = {
+    started: false,
+    players: [ME],
+    prompts: {},
+    answers: {},
+    votes: {},
+    phase: "lobby",
+  };
+  var lastJson = "";
+  var dirty = false;
+
+  function sync(extra) {
+    var payload = {
+      room: room,
+      state: {
+        started: state.started,
+        players: [ME],
+        prompts: state.prompts,
+        answers: state.answers,
+        votes: state.votes,
+      },
+    };
+    if (extra) Object.assign(payload, extra);
+    return fetch(SYNC_URL, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify(payload),
+    })
+      .then(function (res) { return res.json(); })
+      .then(function (json) {
+        var s = JSON.stringify(json);
+        if (s !== lastJson) {
+          lastJson = s;
+          state = json;
+          render();
+        }
+      })
+      .catch(function () {});
+  }
+
+  // Announce ourselves, then poll for everyone else's updates.
+  sync();
+  setInterval(function () { sync(); }, 400);
+
+  function others() {
+    return state.players.map(function (p) { return p.name; }).filter(function (n) { return n !== ME.name; });
+  }
+  function myPromptSubmitted() { return !!state.prompts[ME.name]; }
+  function promptOf(owner) { return state.prompts[owner]; }
+  function answeredCount() {
+    return others().filter(function (o) { return (state.answers[o] || {})[ME.name]; }).length;
+  }
+  function votedCount() {
+    return others().filter(function (o) { return (state.votes[o] || {})[ME.name]; }).length;
+  }
+  function nextUnanswered() {
+    return others().find(function (o) {
+      return !!(state.prompts[o]) && !(state.answers[o] || {})[ME.name];
+    });
+  }
+  function nextUnvoted() {
+    return others().find(function (o) {
+      return !!(state.prompts[o]) && !(state.votes[o] || {})[ME.name];
+    });
+  }
+
+  function render() {
+    document.getElementById("player-count").textContent = String(state.players.length);
+    document.getElementById("phase-name").textContent = state.phase;
+    var area = document.getElementById("area");
+    area.innerHTML = "";
+    if (state.phase === "lobby") renderLobby(area);
+    else if (state.phase === "prompts") renderPrompts(area);
+    else if (state.phase === "answers") renderAnswers(area);
+    else if (state.phase === "votes") renderVotes(area);
+    else if (state.phase === "results") renderResults(area);
+  }
+
+  function renderLobby(area) {
+    var html = "<div>Players in this party:</div><ul data-testid=\"player-list\">";
+    state.players.forEach(function (p) {
+      html += "<li data-testid=\"player\">" + esc(p.name) +
+        (p.name === ME.name ? " (you)" : "") + "</li>";
+    });
+    html += "</ul>";
+    html += "<button data-testid=\"start-game\" id=\"start-game\">Start the game</button>";
+    area.innerHTML = html;
+    document.getElementById("start-game").onclick = function () {
+      state.started = true;
+      sync();
+    };
+  }
+
+  function renderPrompts(area) {
+    if (!myPromptSubmitted()) {
+      area.innerHTML =
+        "<label for=\"prompt-input\">Write a prompt:</label>" +
+        "<input id=\"prompt-input\" data-testid=\"prompt-input\" placeholder=\"e.g. Best pizza topping?\">" +
+        "<button data-testid=\"submit-prompt\" id=\"submit-prompt\">Submit prompt</button>";
+      document.getElementById("submit-prompt").onclick = submitPrompt;
+      document.getElementById("prompt-input").addEventListener("keydown", function (e) {
+        if (e.key === "Enter") submitPrompt();
+      });
+    } else {
+      var done = state.players.filter(function (p) { return !!state.prompts[p.name]; }).length;
+      area.innerHTML =
+        "<div>Your prompt: <b>" + esc(state.prompts[ME.name]) + "</b></div>" +
+        "<div data-testid=\"prompts-count\">" + done + "/" + state.players.length +
+        " prompts submitted</div>" +
+        (done < state.players.length
+          ? "<div class=\"waiting\">Waiting for " + (state.players.length - done) +
+            " more player(s) to write a prompt...</div>"
+          : "");
+    }
+  }
+  function submitPrompt() {
+    var input = document.getElementById("prompt-input");
+    var text = (input && input.value || "").trim();
+    if (!text) return;
+    state.prompts[ME.name] = text;
+    sync();
+  }
+
+  function renderAnswers(area) {
+    var owner = nextUnanswered();
+    if (!owner) {
+      area.innerHTML = "<div>All answers in. Waiting for everyone...</div>" +
+        "<div data-testid=\"answers-count\">" + answeredCount() + "/" + others().length + "</div>";
+      return;
+    }
+    area.innerHTML =
+      "<div data-testid=\"answer-prompt\">Prompt from <b>" + esc(owner) +
+      "</b>: \"" + esc(promptOf(owner)) + "\"</div>" +
+      "<label for=\"answer-input\">Your answer:</label>" +
+      "<input id=\"answer-input\" data-testid=\"answer-input\" placeholder=\"Write your answer\">" +
+      "<button data-testid=\"submit-answer\" id=\"submit-answer\">Submit answer</button>" +
+      "<div data-testid=\"answers-count\">" + answeredCount() + "/" + others().length + " answered</div>";
+    document.getElementById("submit-answer").onclick = submitAnswer;
+    document.getElementById("answer-input").addEventListener("keydown", function (e) {
+      if (e.key === "Enter") submitAnswer();
+    });
+  }
+  function submitAnswer() {
+    var owner = nextUnanswered();
+    var input = document.getElementById("answer-input");
+    var text = (input && input.value || "").trim();
+    if (!owner || !text) return;
+    state.answers[owner] = state.answers[owner] || {};
+    state.answers[owner][ME.name] = text;
+    sync();
+  }
+
+  function renderVotes(area) {
+    var owner = nextUnvoted();
+    if (!owner) {
+      area.innerHTML = "<div>All votes in. Waiting for everyone...</div>" +
+        "<div data-testid=\"votes-count\">" + votedCount() + "/" + others().length + "</div>";
+      return;
+    }
+    var html =
+      "<div data-testid=\"vote-prompt\">Prompt from <b>" + esc(owner) +
+      "</b>: \"" + esc(promptOf(owner)) + "\"</div>" +
+      "<div>Vote for your favorite answer:</div>";
+    Object.keys(state.answers[owner] || {}).forEach(function (answerer) {
+      if (answerer === ME.name) return;
+      html += "<button class=\"opt\" data-testid=\"vote-option\" data-answerer=\"" +
+        escAttr(answerer) + "\"><b>" + esc(answerer) + "</b>: " +
+        esc((state.answers[owner] || {})[answerer]) + "</button>";
+    });
+    html += "<div data-testid=\"votes-count\">" + votedCount() + "/" + others().length + " voted</div>";
+    area.innerHTML = html;
+    Array.prototype.forEach.call(area.querySelectorAll("[data-testid=vote-option]"), function (btn) {
+      btn.onclick = function () { submitVote(btn.getAttribute("data-answerer")); };
+    });
+  }
+  function submitVote(answerer) {
+    var owner = nextUnvoted();
+    if (!owner || answerer === ME.name) return;
+    state.votes[owner] = state.votes[owner] || {};
+    state.votes[owner][ME.name] = answerer;
+    sync();
+  }
+
+  function scores() {
+    var s = {};
+    state.players.forEach(function (p) { s[p.name] = 0; });
+    Object.keys(state.votes).forEach(function (owner) {
+      Object.keys(state.votes[owner]).forEach(function (voter) {
+        var target = state.votes[owner][voter];
+        if (s[target] !== undefined) s[target] += 1;
+      });
+    });
+    return s;
+  }
+  function promptWinner(owner) {
+    var votes = state.votes[owner] || {};
+    var best = null;
+    var bestCount = 0;
+    state.players.forEach(function (p) {
+      var answerer = p.name;
+      if (answerer === owner) return;
+      var count = Object.keys(votes).filter(function (v) { return votes[v] === answerer; }).length;
+      if (count > bestCount) { bestCount = count; best = answerer; }
+    });
+    return best;
+  }
+  function renderResults(area) {
+    var s = scores();
+    var ranked = state.players.map(function (p) { return p.name; })
+      .slice().sort(function (a, b) { return s[b] - s[a]; });
+    var winner = ranked.length ? ranked[0] : null;
+    var html = "<div class=\"winner\" data-testid=\"winner\">🏆 " + esc(winner) + " wins!</div>";
+    html += "<h3 style=\"margin:10px 0 4px\">Leaderboard</h3><ol data-testid=\"leaderboard\">";
+    ranked.forEach(function (name) {
+      html += "<li data-testid=\"leaderboard-row\" data-player=\"" + escAttr(name) + "\">" +
+        esc(name) + " — " + s[name] + " vote" + (s[name] === 1 ? "" : "s") + "</li>";
+    });
+    html += "</ol><h3 style=\"margin:10px 0 4px\">Prompt winners</h3><ul>";
+    state.players.forEach(function (p) {
+      html += "<li data-testid=\"prompt-winner\">\"" + esc(promptOf(p.name)) + "\" → " +
+        esc(promptWinner(p.name) || "no winner") + "</li>";
+    });
+    html += "</ul>";
+    area.innerHTML = html;
+  }
+
+  function esc(s) {
+    return String(s).replace(/[&<>"']/g, function (c) {
+      return { "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c];
+    });
+  }
+  function escAttr(s) { return esc(s).replace(/"/g, "&quot;"); }
+
+  render();
+})();
+</script>
+</body>
+</html>

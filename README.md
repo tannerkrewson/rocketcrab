@@ -89,6 +89,26 @@ If your game already has a player base, our goal is to make rocketcrab just as e
 
 For an example of both of these buttons in action, check out [snakeout.tannerkrewson.com](https://snakeout.tannerkrewson.com/). [Here's](https://github.com/tannerkrewson/snakeout/commit/6845cbb199b7269abcc7d7829c63c5c6ac2179f9) what the code looked like for them.
 
+## 🚀🦀 Testing
+
+Unit/integration tests (jsdom) run with `npm test`.
+
+End-to-end user-flow tests run in real Chromium via Vitest Browser Mode
+(`@vitest/browser` + Playwright provider) against the real app server
+(`server/with-tanstack.ts`), which `globalSetup` builds and starts for you:
+
+```bash
+npm run test:browser        # run once
+npm run test:browser:watch  # watch mode
+```
+
+The browser suite lives in `test/browser/` and covers the fundamental flows:
+creating/joining a party by its 4-letter code, entering a username, lobby sync
+(players, host, chat, kick, leave), and a full embedded-game round (prompts →
+answers → votes → winner/leaderboard). The embedded game host is intercepted
+and served a local mock game fixture (`test/browser/mock-game.html`) so the
+whole round runs offline and deterministically.
+
 ## 🚀🦀 Behind the scenes
 
 This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) using the [`with-typescript-eslint-jest`](https://github.com/vercel/next.js/tree/v9.4.4/examples/with-typescript-eslint-jest) template, which includes:
