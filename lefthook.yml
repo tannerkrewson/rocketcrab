@@ -1,0 +1,13 @@
+pre-commit:
+  parallel: true
+  commands:
+    lint:
+      glob: "*.{ts,tsx}"
+      run: npx oxlint --fix {staged_files}
+      stage_fixed: true
+    format:
+      glob: "package.json"
+      run: npx oxfmt {staged_files}
+      stage_fixed: true
+    type-check:
+      run: npm run type-check
