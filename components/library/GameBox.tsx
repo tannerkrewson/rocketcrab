@@ -1,18 +1,19 @@
+import { Card, CardBody } from "@heroui/react";
 import { ClientGame } from "../../types/types";
 
 const GameBox = ({ game, onClick }: GameBoxProps): JSX.Element => {
     return (
-        <div
-            onClick={() => onClick(game.id)}
-            className="cursor-pointer rounded-lg border p-4 hover:shadow-md transition-shadow relative"
+        <Card
+            isPressable
+            onPress={() => onClick(game.id)}
+            className="relative"
         >
-            <div className="text-left">
+            <CardBody className="text-left p-4">
                 <b>{game.name}</b>
-                <div className="text-gray-400">{"by " + game.author}</div>
-            </div>
-
-            <span className="absolute bottom-4 right-4">➡️</span>
-        </div>
+                <div className="text-default-500">{"by " + game.author}</div>
+                <span className="absolute bottom-4 right-4">➡️</span>
+            </CardBody>
+        </Card>
     );
 };
 
