@@ -41,7 +41,12 @@ const PartyStatus = ({
                     </div>
                 ) : (
                     <div className="flex">
-                        <JellyfishSpinner size={4} sizeUnit="em" color="Grey" />
+                        <JellyfishSpinner
+                            loading={true}
+                            size={4}
+                            sizeUnit="em"
+                            color="Grey"
+                        />
 
                         <div className="flex-1 flex items-center justify-center flex-col">
                             {getPreSelectedGameStatus(
