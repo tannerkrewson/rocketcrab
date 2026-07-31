@@ -1,9 +1,20 @@
 import { useState } from "react";
 import { Swiper, SwiperSlide } from "swiper/react";
-import FsLightbox from "fslightbox-react";
+import fslightboxModule from "fslightbox-react";
+import type { ComponentType } from "react";
 import SkinnyCard from "../common/SkinnyCard";
 
 import "swiper/css";
+
+// fslightbox-react is CommonJS and Vite exposes its component one level
+// deeper during SSR than it does in the browser bundle.
+const FsLightbox =
+    ((fslightboxModule as { default?: ComponentType })?.default ??
+        fslightboxModule) as ComponentType<{
+        toggler: boolean;
+        sources: string[];
+        sourceIndex: number;
+    }>;
 
 const GamePictures = ({ pictures }: GamePicturesProps): JSX.Element => {
     const [lightboxState, setLightboxState] = useState({
