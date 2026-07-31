@@ -1,4 +1,4 @@
-import { Card } from "@heroui/react";
+import { Card, CardBody } from "@heroui/react";
 
 import { JellyfishSpinner } from "react-spinners-kit";
 import { ClientGame, Player } from "../../types/types";
@@ -14,7 +14,7 @@ const PartyStatus = ({
 }: PartyStatusProps): JSX.Element => {
     return (
         <Card>
-            <Card.Content>
+            <CardBody>
                 {selectedGame ? (
                     <div className="text-center">
                         <div>
@@ -55,7 +55,7 @@ const PartyStatus = ({
                         </div>
                     </div>
                 )}
-            </Card.Content>
+            </CardBody>
         </Card>
     );
 };

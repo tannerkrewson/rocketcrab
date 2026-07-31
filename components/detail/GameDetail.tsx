@@ -1,5 +1,5 @@
 import { ClientGame, GameCategory } from "../../types/types";
-import { Tabs } from "@heroui/react";
+import { Tab, Tabs } from "@heroui/react";
 
 import GameInfo from "./GameInfo";
 import GameDescription from "./GameDescription";
@@ -17,13 +17,7 @@ const GameDetail = ({
             {game.name}
         </div>
         <Tabs>
-            <Tabs.List>
-                <Tabs.Tab id="info">Info</Tabs.Tab>
-                {(game.guide || game.guideUrl) && (
-                    <Tabs.Tab id="guide">Guide</Tabs.Tab>
-                )}
-            </Tabs.List>
-            <Tabs.Panel id="info">
+            <Tab key="info" title="Info">
                 <div className="space-y-3">
                     <GameInfo game={game} />
                     <GamePictures pictures={game.pictures} />
@@ -33,11 +27,11 @@ const GameDetail = ({
                         <div>Only the host can select a game.</div>
                     )}
                 </div>
-            </Tabs.Panel>
+            </Tab>
             {(game.guide || game.guideUrl) && (
-                <Tabs.Panel id="guide">
+                <Tab key="guide" title="Guide">
                     <GameGuide guide={game.guide} guideUrl={game.guideUrl} />
-                </Tabs.Panel>
+                </Tab>
             )}
         </Tabs>
     </div>

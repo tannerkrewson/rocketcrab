@@ -7,7 +7,6 @@ import {
     Link,
 } from "@tanstack/react-router";
 import type { ErrorComponentProps } from "@tanstack/react-router";
-import "@heroui/react/styles";
 
 // --- Global Styles ---
 import "../../styles/global.css";

@@ -1,74 +1,61 @@
 import React, { useContext, useEffect } from "react";
-import { Modal, Button, useOverlayState } from "@heroui/react";
+import {
+    Modal as HeroModal,
+    ModalContent,
+    ModalHeader,
+    ModalBody,
+    ModalFooter,
+    Button,
+    useDisclosure,
+} from "@heroui/react";
 import { ModalContext } from "../../utils/ModalContext";
 import QRCode from "react-qr-code";
 
 const ModalComponent = ({ state }) => {
-    const overlayState = useOverlayState();
-
+    const { isOpen, onOpen, onOpenChange } = useDisclosure();
     const setModalState = useContext(ModalContext);
 
     useEffect(() => {
-        if (state.title) {
-            overlayState.open();
-        }
-    }, [overlayState, state]);
+        if (state.title) onOpen();
+    }, [onOpen, state.title]);
+
+    const close = (isConfirmed: boolean) => {
+        setModalState?.({});
+        state.onClose?.({ isConfirmed });
+    };
 
     return (
-        <Modal state={overlayState}>
-            <Modal.Backdrop />
-            <Modal.Container>
-                <Modal.Dialog>
-                    <Modal.Header className="flex flex-col gap-1">
-                        {state.title}
-                    </Modal.Header>
-                    <Modal.Body>
-                        {state.qr ? (
-                            <div className="flex justify-center">
-                                <QRCode value={state.qr} />
-                            </div>
-                        ) : (
-                            state.text
-                        )}
-                    </Modal.Body>
-                    <Modal.Footer>
-                        {state.showCancelButton && (
-                            <Button
-                                variant="danger"
-                                onPress={() => {
-                                    overlayState.close();
-                                    setModalState?.({});
-
-                                    if (state.onClose) {
-                                        state.onClose({
-                                            isConfirmed: false,
-                                        });
-                                    }
-                                }}
-                            >
-                                {state.cancelButtonText
-                                    ? state.cancelButtonText
-                                    : "Cancel"}
-                            </Button>
-                        )}
-                        <Button
-                            onPress={() => {
-                                overlayState.close();
-                                setModalState?.({});
-
-                                if (state.onClose) {
-                                    state.onClose({ isConfirmed: true });
-                                }
-                            }}
-                        >
-                            {state.confirmButtonText
-                                ? state.confirmButtonText
-                                : "OK"}
+        <HeroModal
+            isOpen={isOpen}
+            onOpenChange={onOpenChange}
+            isDismissable={false}
+            hideCloseButton
+        >
+            <ModalContent>
+                <ModalHeader className="flex flex-col gap-1">
+                    {state.title}
+                </ModalHeader>
+                <ModalBody>
+                    {state.qr ? (
+                        <div className="flex justify-center">
+                            <QRCode value={state.qr} />
+                        </div>
+                    ) : (
+                        state.text
+                    )}
+                </ModalBody>
+                <ModalFooter>
+                    {state.showCancelButton && (
+                        <Button color="danger" onPress={() => close(false)}>
+                            {state.cancelButtonText || "Cancel"}
                         </Button>
-                    </Modal.Footer>
-                </Modal.Dialog>
-            </Modal.Container>
-        </Modal>
+                    )}
+                    <Button color="primary" onPress={() => close(true)}>
+                        {state.confirmButtonText || "OK"}
+                    </Button>
+                </ModalFooter>
+            </ModalContent>
+        </HeroModal>
     );
 };
 

@@ -35,7 +35,7 @@ const ButtonWrapper = (props: PrimaryButtonProps) => (
         onClick={props.onClick}
         isDisabled={props.disabled}
         {...(props.loading ? { isDisabled: true } : {})}
-        variant={(props.variant as any) || "secondary"}
+        variant={(props.variant as any) || "solid"}
         fullWidth={props.manualWidth}
     >
         {props.children}

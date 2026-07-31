@@ -329,7 +329,7 @@ const GameLayout = ({
                 <Button
                     size="lg"
                     isIconOnly
-                    variant="secondary"
+                    variant="solid"
                     onClick={() => {
                         setShowMenu(false);
                         setShowEmojiPicker(!showEmojiPicker);
