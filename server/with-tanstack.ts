@@ -61,8 +61,11 @@ function createViteDevProxy(vitePort: number) {
                 res.setHeader(key, value);
             });
 
-            const text = await proxyRes.text();
-            res.send(text);
+            // Preserve the upstream response bytes. Using `text()` here
+            // corrupts fonts, images, and other binary Vite assets while
+            // proxying them through Express.
+            const body = Buffer.from(await proxyRes.arrayBuffer());
+            res.send(body);
         } catch (err) {
             console.warn(
                 `[Vite proxy] Failed to proxy to ${url}:`,
