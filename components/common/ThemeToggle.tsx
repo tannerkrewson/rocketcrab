@@ -6,8 +6,8 @@ export const ThemeToggle = (): JSX.Element => {
     return (
         <label className="flex items-center gap-2 cursor-pointer">
             <Switch
-                defaultSelected={!isDark}
-                onChange={(checked: unknown) =>
+                isSelected={!isDark}
+                onValueChange={(checked) =>
                     setTheme(checked ? "light" : "dark")
                 }
             />

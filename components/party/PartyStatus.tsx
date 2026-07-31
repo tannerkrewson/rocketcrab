@@ -1,6 +1,8 @@
 import { Card, CardBody } from "@heroui/react";
 
-import { JellyfishSpinner } from "react-spinners-kit";
+import spinners from "react-spinners-kit";
+
+const { JellyfishSpinner } = spinners;
 import { ClientGame, Player } from "../../types/types";
 import PrimaryButton from "../common/PrimaryButton";
 
