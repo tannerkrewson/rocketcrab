@@ -1,3 +1,4 @@
+@config "../tailwind.config.cjs";
 @import "tailwindcss";
 
 /* hide the fullscreen button on the screenshot viewer */
