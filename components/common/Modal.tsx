@@ -12,7 +12,7 @@ import { ModalContext } from "../../utils/ModalContext";
 import QRCode from "react-qr-code";
 
 const ModalComponent = ({ state }) => {
-    const { isOpen, onOpen, onOpenChange } = useDisclosure();
+    const { isOpen, onOpen, onClose, onOpenChange } = useDisclosure();
     const setModalState = useContext(ModalContext);
 
     useEffect(() => {
@@ -20,6 +20,7 @@ const ModalComponent = ({ state }) => {
     }, [onOpen, state.title]);
 
     const close = (isConfirmed: boolean) => {
+        onClose();
         setModalState?.({});
         state.onClose?.({ isConfirmed });
     };
