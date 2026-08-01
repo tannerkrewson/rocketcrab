@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>spike: runtime origin B</title>
+    <style>
+      body {
+        margin: 0;
+        font-family: system-ui, sans-serif;
+        display: flex;
+        flex-direction: column;
+        height: 100vh;
+      }
+      #bar {
+        padding: 4px 10px;
+        background: #312e81;
+        color: #c7d2fe;
+        font-size: 12px;
+      }
+      #game-container {
+        flex: 1;
+        position: relative;
+        min-height: 0;
+      }
+      #game-container iframe {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        border: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="bar">runtime origin — waiting for host bootstrap</div>
+    <div id="game-container"></div>
+    <script type="module" src="/main.ts"></script>
+  </body>
+</html>

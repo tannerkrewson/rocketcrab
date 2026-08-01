@@ -57,10 +57,13 @@ Key properties:
    protocol schemas and engines; a single workspace keeps one lockfile, one
    version, and coordinated releases.
 4. **Opaque sandbox for ordinary games plus an opt-in privileged runtime.**
-   Kept open — this is exactly the decision gate owned by **F4**. If physical
-   Mobile Safari or security testing makes the single shared privileged
-   runtime untenable, F4 may select a two-tier model. Until then, one
-   privileged runtime origin is the default.
+   Evaluated by **F4** (2026-08-01 spike) and **rejected for v1**: the spike
+   showed the single separate-origin privileged runtime provides the required
+   isolation with ordinary web capabilities intact (ESM, fetch, canvas,
+   WebGL, audio, media), while a second tier would add a runtime path,
+   schemas, and complexity without fixing the shared-origin caveat (B5). F4
+   recorded the decision in ADR-0008; it stands unless the physical-device
+   pass contradicts it.
 
 ## Tradeoffs
 

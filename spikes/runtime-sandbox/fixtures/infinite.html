@@ -1,0 +1,18 @@
+<!doctype html>
+<html lang="en">
+  <body>
+    <script>
+      // The game loads and registers normally first, then wedges the shared
+      // renderer after a delay. This makes the containment/recovery behavior
+      // observable and deterministic for the automated test, and is also the
+      // fixture a human can paste for the physical pass.
+      window.__infiniteStarted = true;
+      setTimeout(() => {
+        let x = 0;
+        while (true) {
+          x += 1;
+        }
+      }, 4000);
+    </script>
+  </body>
+</html>
