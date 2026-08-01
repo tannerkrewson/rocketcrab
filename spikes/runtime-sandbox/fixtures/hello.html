@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>spike: hello capabilities</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 16px;
+      }
+      canvas,
+      img {
+        border: 1px solid #ccc;
+        margin: 4px;
+        display: block;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>hello (capability probe)</h1>
+    <script>
+      window.__inlineClassic = true;
+    </script>
+    <canvas id="c" width="120" height="60"></canvas>
+    <canvas id="gl" width="120" height="60"></canvas>
+    <img id="img" alt="remote image" />
+    <input type="file" id="file" />
+    <button id="clickme" type="button">tap for audio / fullscreen / pointer lock</button>
+    <script type="module">
+      const results = {};
+      const done = () => {
+        window.__results = { ...results };
+      };
+      const report = (k, v) => {
+        results[k] = v;
+        done();
+      };
+
+      // ---- synchronous setup (runs before any await) ----
+      window.__moduleReady = false;
+      const canvas = document.getElementById("c");
+      const glCanvas = document.getElementById("gl");
+      const img = document.getElementById("img");
+      const file = document.getElementById("file");
+      const clickme = document.getElementById("clickme");
+
+      // Web Audio: create the context eagerly; resume on a user gesture.
+      try {
+        const AC = window.AudioContext || window.webkitAudioContext;
+        const actx = new AC();
+        window.__audioCtx = actx;
+        results.audioInitialState = actx.state;
+        clickme.addEventListener("click", () => {
+          actx
+            .resume()
+            .then(() => report("audioAfterGesture", actx.state))
+            .catch((e) => report("audioAfterGesture", "error:" + String(e)));
+        });
+      } catch (e) {
+        report("audioSetup", false);
+      }
+
+      // Clipboard needs user activation inside the sandboxed frame.
+      clickme.addEventListener("click", async () => {
+        try {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            await navigator.clipboard.writeText("nova-clipboard-spike");
+            report("clipboardWrite", true);
+          } else {
+            report("clipboardWrite", "unsupported");
+          }
+        } catch (e) {
+          report("clipboardWrite", false);
+          report("clipboardError", String(e));
+        }
+      });
+
+      clickme.addEventListener("click", async () => {
+        try {
+          await canvas.requestFullscreen();
+          report("fullscreen", document.fullscreenElement === canvas);
+        } catch (e) {
+          report("fullscreen", false);
+        }
+        try {
+          await canvas.requestPointerLock();
+          report("pointerLock", document.pointerLockElement === canvas);
+        } catch (e) {
+          report("pointerLock", false);
+        }
+      });
+
+      file.addEventListener("change", () => {
+        const f = file.files && file.files[0];
+        if (!f) {
+          report("fileInput", false);
+          return;
+        }
+        const reader = new FileReader();
+        reader.onload = () =>
+          report("fileInput", String(reader.result).includes("HELLO-FROM-SPIKE"));
+        reader.readAsText(f);
+      });
+
+      window.__orientationSeen = null;
+      window.addEventListener("deviceorientation", (e) => {
+        window.__orientationSeen = { alpha: e.alpha, beta: e.beta, gamma: e.gamma };
+      });
+
+      window.__visibilityChanges = 0;
+      document.addEventListener("visibilitychange", () => {
+        window.__visibilityChanges += 1;
+      });
+
+      // ---- async probes ----
+      report("inlineModule", true);
+
+      try {
+        const { v4 } = await import("https://cdn.jsdelivr.net/npm/uuid@9.0.1/+esm");
+        report("esmJsdelivr", typeof v4 === "function" && typeof v4() === "string");
+      } catch (e) {
+        report("esmJsdelivr", false);
+        report("esmJsdelivrError", String(e));
+      }
+
+      try {
+        const r = await fetch("https://cdn.jsdelivr.net/npm/uuid@9.0.1/package.json");
+        const j = await r.json();
+        report("fetchRemote", r.ok && typeof j.name === "string");
+      } catch (e) {
+        report("fetchRemote", false);
+        report("fetchError", String(e));
+      }
+
+      report(
+        "remoteImage",
+        await new Promise((resolve) => {
+          img.onload = () => resolve(true);
+          img.onerror = () => resolve(false);
+          img.src = "https://placehold.co/120x60/png?text=ok";
+        }),
+      );
+
+      try {
+        const ctx = canvas.getContext("2d");
+        ctx.fillStyle = "#ff6600";
+        ctx.fillRect(0, 0, 120, 60);
+        const px = ctx.getImageData(60, 30, 1, 1).data;
+        report("canvas2d", px[0] === 255 && px[1] === 102);
+      } catch (e) {
+        report("canvas2d", false);
+      }
+
+      try {
+        const gl = glCanvas.getContext("webgl") || glCanvas.getContext("experimental-webgl");
+        report("webgl", Boolean(gl && gl.getParameter(gl.VERSION)));
+        if (!gl) report("webglError", "no context returned");
+      } catch (e) {
+        report("webgl", false);
+        report("webglError", String(e));
+      }
+
+      try {
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          await navigator.clipboard.writeText("nova-clipboard-spike");
+          report("clipboardWrite", true);
+        } else {
+          report("clipboardWrite", "unsupported");
+        }
+      } catch (e) {
+        report("clipboardWrite", false);
+      }
+
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+        report("media", {
+          video: stream.getVideoTracks().length > 0,
+          audio: stream.getAudioTracks().length > 0,
+        });
+        stream.getTracks().forEach((t) => t.stop());
+      } catch (e) {
+        report("media", false);
+        report("mediaError", String(e));
+        report("mediaDevices", typeof navigator.mediaDevices?.getUserMedia === "function");
+      }
+
+      window.__moduleReady = true;
+      done();
+    </script>
+  </body>
+</html>
