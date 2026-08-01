@@ -1,0 +1,21 @@
+version: 2
+updates:
+  # Dependency-update bot: Dependabot (chosen over Renovate because it is
+  # native to GitHub, needs no extra service, and is sufficient for a
+  # weekly npm update cadence on this project).
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 5
+    versioning-strategy: "increase"
+    groups:
+      dev-dependencies:
+        dependency-type: "development"
+        update-types: ["minor", "patch"]
+
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    open-pull-requests-limit: 3
