@@ -1,6 +1,6 @@
 # ADR-0008: Shared runtime-origin limitations
 
-- **Status:** Accepted (runtime model detail **Pending** F4)
+- **Status:** Accepted (runtime model decision **recorded** 2026-08-01; physical confirmation PENDING)
 - **Date:** 2026-08-01
 - **Owner:** Rocketcrab Nova planning (Phase 1)
 - **Related:** ADR-0001 (origins), F4 (sandbox spike), M2 (deployment),
@@ -43,6 +43,20 @@ and document this limitation."
   preferred unless physical Mobile Safari or security testing makes that
   untenable. This ADR assumes the single privileged runtime until F4 records
   otherwise.
+
+## F4 record (2026-08-01)
+
+F4's spike (`spikes/runtime-sandbox/`, findings in `docs/testing/
+runtime-sandbox-findings.md`) **confirmed the single separate-origin
+privileged runtime for all games** and rejected the two-tier model for v1:
+capabilities (ESM, fetch, canvas, WebGL, audio, media, WS) work from the
+sandboxed game frame on the runtime origin, isolation from the Nova app holds,
+and a second tier would add complexity without fixing the shared-origin caveat
+below. The shared-origin limitations documented in this ADR remain in force
+and are accepted for v1 (runtime origin stays secret-free); the deferred
+per-game subdomain escape hatch still exists if B5 ever becomes unacceptable.
+Physical-device confirmation (Mobile Safari) is still required before F4
+closes.
 
 ## Alternatives considered
 

@@ -1,6 +1,6 @@
 # ADR-0012: Mobile Safari support policy
 
-- **Status:** Accepted (capability matrix **Pending** F4)
+- **Status:** Accepted (physical-device capability matrix **Pending** F4 pass)
 - **Date:** 2026-08-01
 - **Owner:** Rocketcrab Nova planning (Phase 1)
 - **Related:** F4 (sandbox spike), M1 (hardening), B6 (suspension),
@@ -41,7 +41,12 @@ instability, and strict audio/user-gesture rules.
   chrome; respect safe-area insets; audio requires a user gesture and startup
   instructions must be clear (M1).
 - **Pending F4:** the concrete capability matrix and the selected runtime
-  model (ADR-0008) are recorded by F4 before F6/U3/A3/M1 unblock.
+  model (ADR-0008) are recorded by F4 before F6/U3/A3/M1 unblock. F4 has
+  published the automated desktop capability matrix (`docs/testing/
+runtime-sandbox-capability-matrix.md`) and recommended the single
+  privileged runtime model (ADR-0008); the **physical iPhone** column of the
+  matrix is still PENDING and must be filled in by the F4 physical-device
+  pass.
 
 ## Alternatives considered
 
