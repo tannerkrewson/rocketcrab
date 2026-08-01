@@ -1,14 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { ClipboardPenLine } from "lucide-react";
+import { PagePlaceholder } from "../components/ui/PagePlaceholder";
 
 export const Route = createFileRoute("/create")({
-  component: CreatePlaceholder,
+  component: CreatePage,
 });
 
-function CreatePlaceholder() {
+function CreatePage() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 p-6">
-      <h2 className="text-3xl font-bold">Create a game</h2>
-      <p className="text-base-content/70">The AI prompt workflow lands here (see issue U4).</p>
-    </main>
+    <PagePlaceholder
+      title="Create a game"
+      description="Copy one master prompt, let an AI chatbot interview you, then paste the finished HTML game right here."
+      icon={<ClipboardPenLine />}
+    >
+      <p className="text-sm font-semibold text-base-content/50">
+        The full prompt workflow lands here (issue U4).
+      </p>
+    </PagePlaceholder>
   );
 }

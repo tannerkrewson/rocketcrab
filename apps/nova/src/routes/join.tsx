@@ -1,14 +1,21 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { KeyRound } from "lucide-react";
+import { PagePlaceholder } from "../components/ui/PagePlaceholder";
 
 export const Route = createFileRoute("/join")({
-  component: JoinPlaceholder,
+  component: JoinPage,
 });
 
-function JoinPlaceholder() {
+function JoinPage() {
   return (
-    <main className="mx-auto flex min-h-screen max-w-md flex-col items-center justify-center gap-4 p-6">
-      <h2 className="text-3xl font-bold">Join a party</h2>
-      <p className="text-base-content/70">Four-letter code entry lands here (see issue P2/P4).</p>
-    </main>
+    <PagePlaceholder
+      title="Join a party"
+      description="Got a four-letter code from a friend? Type it here and jump into their game."
+      icon={<KeyRound />}
+    >
+      <p className="text-sm font-semibold text-base-content/50">
+        Four-letter code entry lands here (issues P2 / P4).
+      </p>
+    </PagePlaceholder>
   );
 }
