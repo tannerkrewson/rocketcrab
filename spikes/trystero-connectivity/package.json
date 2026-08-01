@@ -1,0 +1,14 @@
+{
+  "name": "@rocketcrab/trystero-connectivity-spike",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Temporary F5 spike: validate backendless Trystero connectivity (Nostr strategy) with same-machine multi-page simulation plus a manual cross-device UI. Not part of the npm workspace; relies on root-hoisted devDependencies (vite, @playwright/test) and the root-hoisted trystero dependency.",
+  "type": "module",
+  "scripts": {
+    "dev": "node ../../node_modules/vite/bin/vite.js --port 5199 --strictPort",
+    "dev:host": "node ../../node_modules/vite/bin/vite.js --port 5199 --strictPort --host 0.0.0.0",
+    "build": "node ../../node_modules/vite/bin/vite.js build",
+    "preview": "node ../../node_modules/vite/bin/vite.js preview --port 5199 --strictPort",
+    "test:e2e": "node ../../node_modules/@playwright/test/cli.js test"
+  }
+}
