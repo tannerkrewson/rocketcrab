@@ -75,16 +75,31 @@ setup required for production runtime isolation is documented in
 
 ### Root scripts
 
-| Script                                    | Purpose                                                          |
-| ----------------------------------------- | ---------------------------------------------------------------- |
-| `npm run dev`                             | Run all apps in watch mode (parallel via concurrently)           |
-| `npm run build`                           | Build all apps and packages                                      |
-| `npm run format` / `npm run format:check` | Write / verify Oxfmt formatting                                  |
-| `npm run lint`                            | Oxlint over the workspace                                        |
-| `npm run typecheck`                       | `tsc --noEmit` across all apps and packages                      |
-| `npm test` / `npm run test:watch`         | Vitest unit tests (run / watch)                                  |
-| `npm run test:e2e`                        | Playwright end-to-end tests (run `npx playwright install` first) |
-| `npm run check`                           | Format check + lint + typecheck + tests + build                  |
+| Script                                    | Purpose                                                                    |
+| ----------------------------------------- | -------------------------------------------------------------------------- |
+| `npm run dev`                             | Run all apps in watch mode (parallel via concurrently)                     |
+| `npm run build`                           | Build all apps and packages                                                |
+| `npm run format` / `npm run format:check` | Write / verify Oxfmt formatting                                            |
+| `npm run lint`                            | Oxlint over the workspace                                                  |
+| `npm run typecheck`                       | `tsc --noEmit` across all apps and packages                                |
+| `npm test` / `npm run test:watch`         | Vitest unit tests (run / watch)                                            |
+| `npm run test:e2e`                        | Playwright end-to-end tests (run `npx playwright install` first)           |
+| `npm run bundle:size`                     | Print built bundle sizes; warn when the Nova main bundle exceeds the limit |
+| `npm run check`                           | Format check + lint + typecheck + tests + build                            |
+
+## CI and quality gates
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the same checks as `npm run
+check` from a clean checkout using `npm ci` (the committed lockfile), then
+uploads the Nova and Runtime bundles as separate artifacts and runs Playwright
+smoke tests (`e2e/`). Generated files (TanStack Router `routeTree.gen.ts`) are
+excluded from formatting and lint via `.oxfmtrc.json` / `.oxlintrc.json`.
+
+Dependency updates are handled by Dependabot (`.github/dependabot.yml`).
+
+The `bundle:size` script reports built asset sizes; the Nova main JS bundle has
+a documented warning threshold of 400 kB (configurable via
+`NOVA_BUNDLE_LIMIT_KB`). The threshold is a warning, not a CI gate.
 
 ## Testing
 
