@@ -1,0 +1,25 @@
+{
+  "name": "@rocketcrab/core",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "immer": "11.1.15",
+    "nanoid": "6.0.0",
+    "trystero": "0.25.3"
+  },
+  "devDependencies": {
+    "fast-check": "4.9.0",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}

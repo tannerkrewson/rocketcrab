@@ -1,27 +1,27 @@
 # dependencies
-node_modules
+node_modules/
 
-# next.js
-.next
-.env*.local
+# builds
+dist/
+*.tsbuildinfo
 
-# next-pwa
-public/sw*
-public/workbox-*
-
-# express
-dist
+# env
+.env
+.env.*
+!.env.example
 
 # testing
-coverage
+coverage/
+playwright-report/
+test-results/
 
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-
-# misc
+# editor / os
 .DS_Store
+.vscode/
+.idea/
 
-# typescript
-*.tsbuildinfo
+# agent tooling
+.pi-subagents/
+
+# local beads database (also excluded via .git/info/exclude)
+.beads/
