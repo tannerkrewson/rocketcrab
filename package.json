@@ -31,5 +31,8 @@
   "engines": {
     "node": ">=20"
   },
-  "packageManager": "npm@11.16.0"
+  "packageManager": "npm@11.16.0",
+  "allowScripts": {
+    "lefthook@2.1.10": true
+  }
 }
