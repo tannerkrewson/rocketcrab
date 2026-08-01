@@ -3,10 +3,10 @@ pre-commit:
   commands:
     format-check:
       glob: "*.{js,jsx,ts,tsx,json,css,html,md,yml,yaml}"
-      run: npm exec oxfmt --check {staged_files}
+      run: npm exec -- oxfmt --check {staged_files}
     lint:
       glob: "*.{js,jsx,ts,tsx}"
-      run: npm exec oxlint {staged_files}
+      run: npm exec -- oxlint {staged_files}
 
 pre-push:
   parallel: true
