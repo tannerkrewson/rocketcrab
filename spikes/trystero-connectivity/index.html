@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Trystero Connectivity Spike (F5)</title>
+    <style>
+      :root {
+        --bg: #12121f;
+        --panel: #1c1c2e;
+        --text: #e8e8f0;
+        --muted: #9a9ab0;
+        --accent: #7c6cf0;
+        --good: #4ade80;
+        --bad: #f87171;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      body {
+        margin: 0;
+        font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+        background: var(--bg);
+        color: var(--text);
+        font-size: 14px;
+      }
+      header {
+        padding: 12px 16px;
+        border-bottom: 1px solid #2a2a40;
+      }
+      h1 {
+        margin: 0;
+        font-size: 16px;
+      }
+      main {
+        display: grid;
+        grid-template-columns: 320px 1fr;
+        gap: 16px;
+        padding: 16px;
+      }
+      @media (max-width: 800px) {
+        main {
+          grid-template-columns: 1fr;
+        }
+      }
+      section {
+        background: var(--panel);
+        border-radius: 8px;
+        padding: 12px;
+      }
+      h2 {
+        margin: 0 0 10px;
+        font-size: 13px;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--muted);
+      }
+      label {
+        display: block;
+        margin: 8px 0 4px;
+        color: var(--muted);
+        font-size: 12px;
+      }
+      input,
+      select {
+        width: 100%;
+        padding: 6px 8px;
+        background: #10101d;
+        border: 1px solid #33334d;
+        border-radius: 4px;
+        color: var(--text);
+      }
+      button {
+        margin-top: 8px;
+        padding: 8px 10px;
+        background: var(--accent);
+        border: none;
+        border-radius: 4px;
+        color: #fff;
+        cursor: pointer;
+        font-weight: 600;
+      }
+      button.secondary {
+        background: #33334d;
+      }
+      button:disabled {
+        opacity: 0.5;
+        cursor: not-allowed;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+      }
+      .row button {
+        flex: 1;
+      }
+      .status {
+        margin-top: 10px;
+        font-size: 12px;
+        line-height: 1.6;
+      }
+      .status .good {
+        color: var(--good);
+      }
+      .status .bad {
+        color: var(--bad);
+      }
+      #log {
+        height: 320px;
+        overflow-y: auto;
+        background: #10101d;
+        border-radius: 4px;
+        padding: 8px;
+        font-size: 12px;
+        line-height: 1.5;
+        white-space: pre-wrap;
+      }
+      #peers {
+        margin-top: 8px;
+      }
+    </style>
+  </head>
+  <body>
+    <header><h1>Trystero Connectivity Spike — Rocketcrab Nova F5</h1></header>
+    <main>
+      <section>
+        <h2>Room</h2>
+        <label for="appId">appId</label>
+        <input id="appId" value="rocketcrab-f5-spike" />
+        <label for="room">Room code</label>
+        <input id="room" placeholder="e.g. ABCD" />
+        <label for="password">Password (optional)</label>
+        <input id="password" placeholder="leave empty for none" />
+        <label for="admission">Admission (creator only)</label>
+        <select id="admission">
+          <option value="all">Allow everyone</option>
+          <option value="none">Reject everyone</option>
+        </select>
+        <div class="row">
+          <button id="createBtn">Create Room</button>
+          <button id="joinBtn" class="secondary">Join Room</button>
+        </div>
+        <div class="row">
+          <button id="leaveBtn" disabled>Leave</button>
+          <button id="dropRelayBtn" class="secondary" disabled>Drop 1st relay</button>
+        </div>
+        <div class="row">
+          <button id="sendStructBtn" disabled>Send struct</button>
+          <button id="sendBinBtn" disabled>Send 1 MB bin</button>
+          <button id="sendLargeBtn" disabled>Send 5 MB</button>
+        </div>
+        <div class="row">
+          <button id="pingBtn" disabled>Ping first peer</button>
+        </div>
+        <div class="status" id="status">Not in a room.</div>
+        <div id="peers"></div>
+      </section>
+      <section>
+        <h2>Log</h2>
+        <div id="log"></div>
+      </section>
+    </main>
+    <script type="module" src="./src/driver.ts"></script>
+  </body>
+</html>
