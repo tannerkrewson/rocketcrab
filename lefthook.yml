@@ -3,19 +3,19 @@ pre-commit:
   commands:
     format-check:
       glob: "*.{js,jsx,ts,tsx,json,css,html,md,yml,yaml}"
-      run: pnpm exec oxfmt --check {staged_files}
+      run: npm exec oxfmt --check {staged_files}
     lint:
       glob: "*.{js,jsx,ts,tsx}"
-      run: pnpm exec oxlint {staged_files}
+      run: npm exec oxlint {staged_files}
 
 pre-push:
   parallel: true
   commands:
     lint:
-      run: pnpm lint
+      run: npm run lint
     typecheck:
-      run: pnpm typecheck
+      run: npm run typecheck
     test:
-      run: pnpm test
+      run: npm run test
     build:
-      run: pnpm build
+      run: npm run build

@@ -50,24 +50,23 @@ install tools, understand code, deploy a website, or create a repository.
 │   ├── api/
 │   └── testing/
 ├── package.json
-├── pnpm-workspace.yaml
 ├── lefthook.yml
 ├── .oxlintrc.json
 └── .oxfmtrc.json
 ```
 
-Packages are consumed as TypeScript source by the apps (via the pnpm workspace
+Packages are consumed as TypeScript source by the apps (via the npm workspace
 protocol); Vite handles transpilation at build time. A package's `build` script
 type-checks its source; apps produce real static bundles with `vite build`.
 
 ## Getting started
 
-Requires Node.js >= 20 and pnpm (see `packageManager`).
+Requires Node.js >= 20 and npm (see `packageManager`).
 
 ```sh
-pnpm install     # installs workspace, installs lefthook hooks
-pnpm dev         # starts all apps in parallel
-pnpm check       # format check + lint + typecheck + tests + build
+npm install     # installs workspace, installs lefthook hooks
+npm run dev     # starts all apps in parallel
+npm run check   # format check + lint + typecheck + tests + build
 ```
 
 Local development serves both origins over HTTP by default; the two-origin HTTPS
@@ -76,22 +75,22 @@ setup required for production runtime isolation is documented in
 
 ### Root scripts
 
-| Script                              | Purpose                                                                |
-| ----------------------------------- | ---------------------------------------------------------------------- |
-| `pnpm dev`                          | Run all apps in watch mode                                             |
-| `pnpm build`                        | Build all apps and packages                                            |
-| `pnpm format` / `pnpm format:check` | Write / verify Oxfmt formatting                                        |
-| `pnpm lint`                         | Oxlint over the workspace                                              |
-| `pnpm typecheck`                    | `tsc --noEmit` across all apps and packages                            |
-| `pnpm test` / `pnpm test:watch`     | Vitest unit tests (run / watch)                                        |
-| `pnpm test:e2e`                     | Playwright end-to-end tests (run `pnpm exec playwright install` first) |
-| `pnpm check`                        | Format check + lint + typecheck + tests + build                        |
+| Script                                    | Purpose                                                          |
+| ----------------------------------------- | ---------------------------------------------------------------- |
+| `npm run dev`                             | Run all apps in watch mode (parallel via concurrently)           |
+| `npm run build`                           | Build all apps and packages                                      |
+| `npm run format` / `npm run format:check` | Write / verify Oxfmt formatting                                  |
+| `npm run lint`                            | Oxlint over the workspace                                        |
+| `npm run typecheck`                       | `tsc --noEmit` across all apps and packages                      |
+| `npm test` / `npm run test:watch`         | Vitest unit tests (run / watch)                                  |
+| `npm run test:e2e`                        | Playwright end-to-end tests (run `npx playwright install` first) |
+| `npm run check`                           | Format check + lint + typecheck + tests + build                  |
 
 ## Testing
 
-- **Unit tests**: Vitest, one config per app/package, run via `pnpm test`.
-- **End-to-end**: Playwright (`pnpm test:e2e`). Install browsers once with
-  `pnpm exec playwright install`.
+- **Unit tests**: Vitest, one config per app/package, run via `npm test`.
+- **End-to-end**: Playwright (`npm run test:e2e`). Install browsers once with
+  `npx playwright install`.
 
 ## Security posture (summary)
 

@@ -2,22 +2,27 @@
   "name": "rocketcrab-nova",
   "version": "0.0.0",
   "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
   "type": "module",
   "scripts": {
-    "dev": "pnpm -r --parallel --stream dev",
-    "build": "pnpm -r build",
+    "dev": "concurrently -k -n nova,runtime -c blue,magenta \"npm run dev --workspace @rocketcrab/nova\" \"npm run dev --workspace @rocketcrab/runtime\"",
+    "build": "npm run build --workspaces --if-present",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
     "lint": "oxlint .",
-    "typecheck": "pnpm -r typecheck",
-    "test": "pnpm -r test",
-    "test:watch": "pnpm -r --parallel test:watch",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present",
+    "test:watch": "concurrently -k -n nova,runtime -c blue,magenta \"npm run test:watch --workspace @rocketcrab/nova\" \"npm run test:watch --workspace @rocketcrab/runtime\"",
     "test:e2e": "playwright test",
-    "check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
     "prepare": "lefthook install"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",
+    "concurrently": "10.0.4",
     "lefthook": "2.1.10",
     "oxfmt": "0.61.0",
     "oxlint": "1.76.0",
@@ -26,5 +31,5 @@
   "engines": {
     "node": ">=20"
   },
-  "packageManager": "pnpm@11.18.0"
+  "packageManager": "npm@11.16.0"
 }
