@@ -1,121 +1,108 @@
-<p align="center">
-  <img width="360" src="public/rocketcrab-logo-text.svg">
-</p>
+# Rocketcrab Nova
 
-### Play now at [rocketcrab.com](https://rocketcrab.com/)
+Rocketcrab Nova is a static, mobile-first web application for creating, testing,
+saving, and playing user-generated multiplayer browser games.
 
-rocketcrab is a lobby service and launcher for mobile web party games.
+A user copies one master prompt into their preferred AI chat service, is
+interviewed by that chatbot about the game they want, receives one complete HTML
+document in one code block, pastes it into Nova, tests several simulated players
+on one page, saves the game in their browser, creates a party with a four-letter
+code, and plays through a Nova-managed peer-to-peer session.
 
-## 🚀🦀 for developers
+Nova does not generate games itself, and it does not require game creators to
+install tools, understand code, deploy a website, or create a repository.
 
-### Add your game to rocketcrab, tl;dr:
+## Architecture at a glance
 
-1. Make sure your game has mobile support, and does not require a login or registration
-2. Add an API to your game that create a new room/lobby when called
-3. Copy `config/games/_template.ts` and fill it out for your game
-4. ...that's pretty much it. Submit a PR!!! If you'd like more detail, keep reading!
+- **Fully static application.** No Nova application backend. Production is
+  static assets at two HTTPS origins:
+  - `https://nova.example` — the Nova application.
+  - `https://runtime.nova.example` — an intentionally isolated execution origin
+    for pasted game HTML.
+- **One self-contained HTML document per game.** Generated games are ordinary
+  HTML that may use remote scripts, ESM imports, assets, HTTP requests, and
+  browser APIs. Nova does not proxy or rewrite them.
+- **Browser-local storage only.** Saved games live in IndexedDB on Nova's main
+  origin. No accounts, no cloud sync, no public catalog.
+- **Trystero for all real peer-to-peer transport.** A transport-neutral interface
+  (`InMemoryTransport` for the local test arena, `TrysteroTransport` for real
+  parties) keeps the game-facing API identical everywhere.
+- **Three game modes.** `state` (Nova-owned canonical state, actions, authority,
+  migration), `simulation` (ordered inputs, shared clock, authoritative
+  snapshots), and `raw` (named data channels for specialized games).
 
-### What's a "rocket crab"???
+## Workspace layout
 
-Rocketcrab makes it easy for players to discover your game, and easily switch to and from your game without having to manually open a different website and enter a new game code. It accomplishs this by putting your game's page into an `iframe`, which allows any of your cookies, local storage, analytics, and advertising to continue working, while disallowing rocketcrab from manipulating your site. Integrating your game with rocketcrab should be a simple process, but please let me know by opening an issue if there is any way it could be better!
-
-The name Rocketcrab is the first thing I could think of that sounded cool, had an available `.com` domain, and could be represented by two emojis. It also does not have an ambigious spelling when spoken out loud (there's only one way to spell "rocket" and "crab"), which is important when trying to get your whole group to go to the site to play games!
-
-Games are added to rocketcrab via config files located [here](https://github.com/tannerkrewson/rocketcrab/tree/dev/config/games). By looking at the config files of other games, you might be able to understand how other games implement rocketcrab, and how you might integrate rocketcrab into your game. Here's what you need to know:
-
-### Ensuring compatability
-
-Rocketcrab works by opening your game in an `iframe` on all of the players' devices. At minimum, for your game to work with rocketcrab, there must be:
-
--   A way for rocketcrab to generate a new party via either:
-    -   an API that rocketcrab can hit (eg. `https://yourgame.com/api/creategame`, which returns the generated game code, like `abcd`)
-    -   generating a random id that your game will accept as a valid room code
--   A way to construct a link to join a game using that game code (eg. `https://yourgame.com/abcd` will be opened on every player's browser, resulting in them all being in the same game together)
-
-That's it! Many existing games already offer these, and can work with rocketcrab without any changes! But, to make the experience of playing your game with rocketcrab even better, you may need to make a few minor changes, explained in the "The automatic query params" section below.
-
-### Creating a config file
-
-The config files, as mentioned above, should be fairly self explanatory. Along with the [config template](https://github.com/tannerkrewson/rocketcrab/blob/dev/config/games/_template.ts), check out the config files of other games to see how they implement rocketcrab. The most important part, which will be explained here, is the `connectToGame` function. This function:
-
--   is `async`, which will allow you to use `await` to make `GET` or `POST` requests.
--   needs to return an object with these properties:
-    -   `player` (required) an object with these properties:
-        -   `url` (required) string of the url that should be opened in every player's `iframe`.
-            -   `customQueryParams` (optional) a record of query params in addition to or to replace the automatic query params.
-            -   `afterQueryParams` (optional) string that will be appended to the `player.url` after automatic and custom query params are applied.
-    -   `host` (optional) an object with these properties:
-        -   `url` (optional) string of a url to be opened only in the "host" player's `iframe`. If not provided, the `url` from the `player` object will be used.
-            -   `customQueryParams` (optional) same as `player` object, but only applied to the host.
-            -   `afterQueryParams` (optional) same as `player` object, but only applied to the host.
-    -   These properties are explained more in depth in the [config template](https://github.com/tannerkrewson/rocketcrab/blob/dev/config/games/_template.ts).
-
-Here are two examples of different `connectToGame` functions:
-
--   For [Spyfall](https://github.com/tannerkrewson/rocketcrab/blob/ba2a9f05d9d85af440b603436f6280bc92c0087e/config/games/spyfall.ts#L42-L48), game links are required to take the format `spyfall.tannerkrewson.com/abcd`. So, instead of returning the game code from `connectToGame` in the `code` property, the game code is directly appended to the `player.url` before it is returned from `connectToGame`.
--   For [Just One](https://github.com/tannerkrewson/rocketcrab/blob/ba2a9f05d9d85af440b603436f6280bc92c0087e/config/games/justone.ts#L33-L40), we can pick our own game code! So, instead of calling to some endpoint to get a game code like Drawphone and Spyfall, the `connectToGame` function can itself generate a code, and we cross our fingers and hope it's unique! 😂 The resulting `player.url` will look something like this: `https://just1.herokuapp.com/room/rocketcrab-d5b30ccdd25855e5`.
-
-### The automatic query params
-
-The `player.url` returned from `connectToGame` is automatically appended with 3 query params. The resulting `player.url` that is opened in every player's `iframe` will look something like this:
-
-```
-https://yourgame.com/?rocketcrab=true&name=Mary&ishost=true
+```text
+/
+├── apps/
+│   ├── nova/                 # Main React SPA
+│   └── runtime/              # Static isolated iframe runner
+├── packages/
+│   ├── protocol/             # Zod schemas and shared protocol types
+│   ├── core/                 # Party, authority, state and simulation engines
+│   ├── nova-api/             # Game-facing runtime implementation and types
+│   └── testing/              # In-memory transport and reusable fixtures
+├── examples/
+│   └── games/                # Complete single-HTML sample games
+├── docs/
+│   ├── architecture/
+│   ├── api/
+│   └── testing/
+├── package.json
+├── pnpm-workspace.yaml
+├── lefthook.yml
+├── .oxlintrc.json
+└── .oxfmtrc.json
 ```
 
--   `rocketcrab` will always be true, well, if you're using rocketcrab, that is! 😂 You can use this to put your game into a "rocketcrab" mode. Here are some ideas for how this could be helpful:
-    -   Rocketcrab itself has it's own game code system, so if your game prominentely displays its own game code, your players may be confused. If `rocketcrab=true`, you should hide any UI in your game that shows the game code!
-    -   You should also hide any "Play on 🚀🦀" buttons (see the next section), because if `rocketcrab=true`, they're already playing with on rocketcrab! 😂
--   `name` is a string of the name that each player has entered into rocketcrab. Use this instead of asking for your players' names a second time!
--   `ishost` is `true` for the one player that is the host of the rocketcrab party, and `false` for all other players. A few caveats:
-    -   I included this in case some one needed it, but implementing this in your game could allow any player that knows about it to make themselves host, especially outside of rocketcrab, so I don't recommend it.
-    -   In Drawphone, for example, the first player who joins a party is made the host. So, rocketcrab will load the host's `iframe` first, and will wait a few seconds before opening the `iframe` of the rest of the players. This is not a guaranteed solution, as the `iframe` API does not allow rocketcrab to know when its page has loaded.
--   There used to be an automatic `code` parameter for the game code. This was removed in favor of using a custom query param, detailed further in the template.
+Packages are consumed as TypeScript source by the apps (via the pnpm workspace
+protocol); Vite handles transpilation at build time. A package's `build` script
+type-checks its source; apps produce real static bundles with `vite build`.
 
-### 🚀🦀 for your existing players
+## Getting started
 
-If your game already has a player base, our goal is to make rocketcrab just as easy, if not easier, to use than how they already play. Rocketcrab is also a great way for your players to discover new games, which helps developers with no players yet find players for their games! So, we will want to make the process of discovering and jumping into a rocketcrab party from your game's existing lobby as painless as possible! Here's two features of rocketcrab to help:
+Requires Node.js >= 20 and pnpm (see `packageManager`).
 
--   Place a button on the homepage of your game that links to `https://rocketcrab.com/transfer/[your game's id here]/`.
-    -   This will place the user in a new rocketcrab party with your game already selected!
-    -   Your game's ID is the `id` that is set for your game in its config file. For example, Drawphone's [is `drawphone`](https://github.com/tannerkrewson/rocketcrab/blob/00c36ef3b133d01f74969c14d5271461853325fb/config/games/drawphone.ts#L5), so the link would look like `https://rocketcrab.com/transfer/drawphone/`.
--   Place a button in the party of your game that, when clicked by one player, will transfer all players to `https://rocketcrab.com/transfer/[your game's id here]/[insert a uuid here]`.
-    -   The first time this link is followed, it will create a new rocketcrab party. Any subsequent time it is followed, it will place users into the same rocketcrab party that was created with the same `uuid`.
-    -   Again, for the most seamless experience, when any player clicks the button, your game should automatically redirect all players in the lobby to this link right away.
-    -   The uuid should be unique to each lobby in your game, but the same for each player in the lobby.
-    -   To generate the uuid, [this uuid package](https://github.com/uuidjs/uuid) would be best, but any very long random string will do.
-    -   An example of a link for Drawphone: `https://rocketcrab.com/transfer/drawphone/9b1deb4d-3b7d-4bad-9bdd-2b0d7b3dcb6d/`
-    -   Make sure you hide this button if the players are using you game through rocketcrab, or else they could do [this](https://i.imgur.com/MXanVTG.jpg)!
-
-For an example of both of these buttons in action, check out [snakeout.tannerkrewson.com](https://snakeout.tannerkrewson.com/). [Here's](https://github.com/tannerkrewson/snakeout/commit/6845cbb199b7269abcc7d7829c63c5c6ac2179f9) what the code looked like for them.
-
-## 🚀🦀 Behind the scenes
-
-This is a [Next.js](https://nextjs.org/) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app) using the [`with-typescript-eslint-jest`](https://github.com/vercel/next.js/tree/v9.4.4/examples/with-typescript-eslint-jest) template, which includes:
-
--   [Typescript](https://www.typescriptlang.org/)
--   Linting with [ESLint](https://eslint.org/)
--   Formatting with [Prettier](https://prettier.io/)
--   Linting, typechecking and formatting on by default using [`husky`](https://github.com/typicode/husky) for commit hooks
--   Testing with [Jest](https://jestjs.io/) and [`react-testing-library`](https://testing-library.com/docs/react-testing-library/intro)
-
-### Getting Started
-
-First, run the development server:
-
-```bash
-npm run dev
+```sh
+pnpm install     # installs workspace, installs lefthook hooks
+pnpm dev         # starts all apps in parallel
+pnpm check       # format check + lint + typecheck + tests + build
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Local development serves both origins over HTTP by default; the two-origin HTTPS
+setup required for production runtime isolation is documented in
+`docs/architecture/` (see M2 — Configure production static deployment).
 
-You can start editing the page by modifying `pages/index.js`. The page auto-updates as you edit the file.
+### Root scripts
 
-### Learn More
+| Script                              | Purpose                                                                |
+| ----------------------------------- | ---------------------------------------------------------------------- |
+| `pnpm dev`                          | Run all apps in watch mode                                             |
+| `pnpm build`                        | Build all apps and packages                                            |
+| `pnpm format` / `pnpm format:check` | Write / verify Oxfmt formatting                                        |
+| `pnpm lint`                         | Oxlint over the workspace                                              |
+| `pnpm typecheck`                    | `tsc --noEmit` across all apps and packages                            |
+| `pnpm test` / `pnpm test:watch`     | Vitest unit tests (run / watch)                                        |
+| `pnpm test:e2e`                     | Playwright end-to-end tests (run `pnpm exec playwright install` first) |
+| `pnpm check`                        | Format check + lint + typecheck + tests + build                        |
 
-To learn more about Next.js, take a look at the following resources:
+## Testing
 
--   [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
--   [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+- **Unit tests**: Vitest, one config per app/package, run via `pnpm test`.
+- **End-to-end**: Playwright (`pnpm test:e2e`). Install browsers once with
+  `pnpm exec playwright install`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js/) - your feedback and contributions are welcome!
+## Security posture (summary)
+
+Generated game HTML is untrusted and runs only in an iframe on the separate
+runtime origin. The runtime has no Nova credentials, no access to main-origin
+storage or DOM, and no service-worker authority over the application. All
+cross-origin and peer messages are validated against versioned Zod schemas.
+See `docs/architecture/` for the full threat model and ADRs.
+
+## Current non-goals
+
+No public game publishing or discovery, no accounts, no cloud sync, no
+moderation system, no server-side game execution, no Nova-hosted AI generation,
+no custom cartridge language, no Nova proxy for CDN imports or assets.
