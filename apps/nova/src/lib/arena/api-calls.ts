@@ -8,6 +8,7 @@
  * Shapes mirror the runtime schemas by contract; drift is pinned by tests.
  */
 import { z } from "zod";
+import { stateResponseSchema } from "@rocketcrab/protocol";
 
 export const arenaApiCallSchemas = {
   ready: z.object({}).strict(),
@@ -18,6 +19,7 @@ export const arenaApiCallSchemas = {
         payload: z.unknown().optional(),
         baseRevision: z.number().int().nonnegative().optional(),
       }),
+      actionId: z.string().min(1).max(64),
     })
     .strict(),
   "raw.createChannel": z
@@ -51,6 +53,13 @@ export const arenaApiCallSchemas = {
         payload: z.unknown().optional(),
         tick: z.number().int().nonnegative().optional(),
       }),
+    })
+    .strict(),
+  // S2: the authority frame's answer to a stateRequest host event.
+  stateResponse: z
+    .object({
+      requestId: z.string().min(1).max(64),
+      result: stateResponseSchema,
     })
     .strict(),
 } as const;

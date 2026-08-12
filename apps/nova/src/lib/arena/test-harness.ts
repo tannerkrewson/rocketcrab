@@ -5,6 +5,7 @@
  * real iframes or channels.
  */
 import { expect, vi } from "vitest";
+import type { GameApiEvent } from "@rocketcrab/protocol";
 import type { ChannelPort } from "../runtime-host";
 import type { ArenaSeams } from "./engine";
 import type { ArenaRunOutcome } from "./types";
@@ -155,5 +156,29 @@ export async function runToStart(
   for (let index = 0; index < count; index += 1) {
     deliver(channels[baseline + index]!.port1, registrationMessage(`Game ${index + 1}`));
     deliver(channels[baseline + index]!.port1, apiCallMessage("ready", {}));
+  }
+}
+
+/**
+ * S2: answer every pending `stateRequest` apiEvent the host pushed into a
+ * fake frame with a minimal stateResponse, so the state engine can start
+ * and apply actions. Call in a waitFor loop while the run settles.
+ */
+export function answerStateRequests(channels: FakeChannel[], count: number, baseline = 0): void {
+  for (let index = 0; index < count; index += 1) {
+    const port = channels[baseline + index]!.port1;
+    const requests = port.sent
+      .filter((message) => (message as { type?: string }).type === "game.apiEvent")
+      .map((message) => (message as { event: GameApiEvent }).event)
+      .filter((event) => event.kind === "stateRequest");
+    for (const event of requests) {
+      deliver(
+        port,
+        apiCallMessage("stateResponse", {
+          requestId: event.requestId,
+          result: { kind: "state", ok: true, state: {}, views: {} },
+        }),
+      );
+    }
   }
 }
