@@ -1,7 +1,7 @@
 /**
  * Generator → editor draft source handoff (A4).
  *
- * The /create generator's paste target stores pasted game HTML as an
+ * The /build generator's paste target stores pasted game HTML as an
  * unsaved draft in sessionStorage before navigating to the editor; the
  * /editor route picks it up and seeds the blank editor ("a paste target
  * that can create a new local draft immediately"). "Continue to editor"
@@ -25,7 +25,7 @@ export function newDraftGameId(): string {
 
 /**
  * Store a new draft source and return the entry. Read-only consumers use
- * {@link readDraftSource}; the /create flow always stores a fresh entry
+ * {@link readDraftSource}; the /build flow always stores a fresh entry
  * before navigating, so the editor can never pick up an older draft.
  */
 export function storeDraftSource(source: string): DraftSourceEntry {

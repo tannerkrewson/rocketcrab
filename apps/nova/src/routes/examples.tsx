@@ -57,7 +57,7 @@ const exampleGames: ExampleGame[] = [
 /**
  * Complete example games (examples/games/): each one opens in the editor as
  * a new local draft so users can run, inspect, and modify a real game for
- * each mode (state, simulation, raw) — the same handoff the /create paste
+ * each mode (state, simulation, raw) — the same handoff the /build paste
  * target uses.
  */
 export function ExamplesPage() {

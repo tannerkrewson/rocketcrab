@@ -8,7 +8,7 @@ export const Route = createFileRoute("/editor")({
 
 /**
  * The blank game editor (A4): the paste target for the master-prompt flow.
- * When the /create generator handed off a draft source (sessionStorage),
+ * When the /build generator handed off a draft source (sessionStorage),
  * this route seeds the editor with it; otherwise the editor starts empty.
  * The component is keyed by the draft id so a new paste always remounts the
  * editor with the new source instead of keeping stale state.

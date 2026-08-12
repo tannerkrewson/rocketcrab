@@ -28,5 +28,5 @@ test-results/
 .pi/
 
 # local beads database (also excluded via .git/info/exclude)
-.beads/
+.beads
 node_modules

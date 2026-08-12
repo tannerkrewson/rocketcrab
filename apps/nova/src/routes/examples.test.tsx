@@ -10,7 +10,7 @@ import { routeTree } from "../routeTree.gen";
 /**
  * Examples page tests (A4): the /examples route lists one complete game per
  * mode and "Open in the editor" turns an example source into a new local
- * draft (lazy ?raw import + the same handoff the /create paste target uses).
+ * draft (lazy ?raw import + the same handoff the /build paste target uses).
  */
 
 function renderExamples() {
