@@ -26,8 +26,26 @@ nova.ready();
 `;
 
 /** A lobby-style state-mode game: players, start, and an action. */
-export const STATE_MODE_EXAMPLE = `// State-mode example: a lobby plus a "draw card" action.
-nova.defineGame({ title: "Draw One", mode: "state", version: "1.0.0" });
+export const STATE_MODE_EXAMPLE = `// State-mode example: a shared deck; every player draws their own card.
+// Nova owns state, action ordering, and per-player views — the game only
+// describes the rules (no networking code).
+nova.defineGame({
+  title: "Draw One",
+  mode: "state",
+  version: "1.0.0",
+  createInitialState: function (context) {
+    return { deck: ["ace", "king", "queen", "jack"], hands: {} };
+  },
+  actions: {
+    drawCard: function (draft, context) {
+      if (draft.hands[context.actor.id]) return; // already drew
+      draft.hands[context.actor.id] = draft.deck.pop();
+    }
+  },
+  selectView: function (state, viewer) {
+    return { hand: state.hands[viewer.id], cardsLeft: state.deck.length };
+  }
+});
 
 nova.onPlayerJoin(function (player) {
   nova.log(player.name + " joined (" + nova.players.length + " players)");
@@ -39,12 +57,18 @@ nova.onPlayerLeave(function (player) {
 
 nova.onStart(function () {
   nova.log("Game started with " + nova.players.length + " players.");
-  // Actions are plain data; Nova owns ordering and application (S2).
-  nova.dispatch({ type: "drawCard", payload: { deck: "main" } });
 });
 
+// React to your own view: draw a card while you have no hand yet.
 nova.state.onChange(function (state) {
   nova.log("State changed:", state);
+  if (!state.hand) {
+    // If two players raced on the same revision, Nova rejects the stale
+    // one — the next view retries automatically. No networking code.
+    nova.dispatch({ type: "drawCard" }).catch(function (error) {
+      nova.log("Draw rejected:", error.code);
+    });
+  }
 });
 
 nova.ready();

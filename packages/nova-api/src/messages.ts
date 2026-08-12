@@ -8,14 +8,18 @@
  */
 import {
   PROTOCOL_VERSION,
+  actionAcknowledgementMessageSchema,
   actionDispatchMessageSchema,
   assertPeerMessage,
+  authorityAnnouncementMessageSchema,
   gameEndMessageSchema,
   gameReadyMessageSchema,
   gameStartMessageSchema,
   playerIdentityMessageSchema,
   rawChannelMetadataMessageSchema,
   simulationInputMessageSchema,
+  stateSnapshotMessageSchema,
+  stateViewMessageSchema,
   type GameEndReason,
   type PeerMessage,
 } from "@rocketcrab/protocol";
@@ -82,6 +86,7 @@ export function buildActionDispatchMessage(
     baseRevision: number;
     actionType: string;
     payload: unknown;
+    expiresAtMs?: number;
   },
 ): PeerMessage {
   return assertPeerMessage(
@@ -93,6 +98,111 @@ export function buildActionDispatchMessage(
       baseRevision: input.baseRevision,
       actionType: input.actionType,
       payload: input.payload,
+      ...(input.expiresAtMs !== undefined ? { expiresAtMs: input.expiresAtMs } : {}),
+    }),
+  );
+}
+
+/** Build and validate an `action.ack` message (S2 action protocol). */
+export function buildActionAckMessage(
+  base: PeerMessageBase,
+  input: {
+    seq: number;
+    actionId: string;
+    status: "accepted" | "rejected" | "superseded";
+    revision?: number;
+    errorCode?: string;
+    errorMessage?: string;
+  },
+): PeerMessage {
+  return assertPeerMessage(
+    actionAcknowledgementMessageSchema.parse({
+      ...envelope(base),
+      seq: input.seq,
+      type: "action.ack",
+      actionId: input.actionId,
+      status: input.status,
+      ...(input.revision !== undefined ? { revision: input.revision } : {}),
+      ...(input.errorCode !== undefined ? { errorCode: input.errorCode } : {}),
+      ...(input.errorMessage !== undefined ? { errorMessage: input.errorMessage } : {}),
+    }),
+  );
+}
+
+/** Build and validate a `state.snapshot` message (S2 state mode). */
+export function buildStateSnapshotMessage(
+  base: PeerMessageBase,
+  input: {
+    seq: number;
+    revision: number;
+    stateHash?: string;
+    term: number;
+    authorityMemberId: string;
+    processedActionIds: readonly string[];
+    state: unknown;
+  },
+): PeerMessage {
+  return assertPeerMessage(
+    stateSnapshotMessageSchema.parse({
+      ...envelope(base),
+      seq: input.seq,
+      type: "state.snapshot",
+      revision: input.revision,
+      ...(input.stateHash !== undefined ? { stateHash: input.stateHash } : {}),
+      term: input.term,
+      authorityMemberId: input.authorityMemberId,
+      processedActionIds: input.processedActionIds,
+      state: input.state,
+    }),
+  );
+}
+
+/** Build and validate a `state.view` message (S2 per-player views). */
+export function buildStateViewMessage(
+  base: PeerMessageBase,
+  input: {
+    seq: number;
+    revision: number;
+    stateHash?: string;
+    forMemberId: string;
+    view: unknown;
+  },
+): PeerMessage {
+  return assertPeerMessage(
+    stateViewMessageSchema.parse({
+      ...envelope(base),
+      seq: input.seq,
+      type: "state.view",
+      revision: input.revision,
+      ...(input.stateHash !== undefined ? { stateHash: input.stateHash } : {}),
+      forMemberId: input.forMemberId,
+      view: input.view,
+    }),
+  );
+}
+
+/** Build and validate an `authority.announce` message (S2/S3). */
+export function buildAuthorityAnnounceMessage(
+  base: PeerMessageBase,
+  input: {
+    seq: number;
+    term: number;
+    authorityMemberId: string;
+    stateRevision: number;
+    stateHash?: string;
+    eligibleMemberIds: readonly string[];
+  },
+): PeerMessage {
+  return assertPeerMessage(
+    authorityAnnouncementMessageSchema.parse({
+      ...envelope(base),
+      seq: input.seq,
+      type: "authority.announce",
+      term: input.term,
+      authorityMemberId: input.authorityMemberId,
+      stateRevision: input.stateRevision,
+      ...(input.stateHash !== undefined ? { stateHash: input.stateHash } : {}),
+      eligibleMemberIds: input.eligibleMemberIds,
     }),
   );
 }
