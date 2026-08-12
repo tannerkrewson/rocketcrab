@@ -35,6 +35,25 @@ export const actionPayloadWarnBytes = Math.floor(actionPayloadBytes * LIMIT_WARN
 export const actionRatePerSecond = 20;
 export const actionWarnRatePerSecond = Math.floor(actionRatePerSecond * LIMIT_WARN_FRACTION);
 
+/**
+ * Hard cap on one raw-channel message payload (ADR-0006 raw mode). Raw mode
+ * is the escape hatch for fast continuous protocols, so the cap sits well
+ * above the action cap; payloads above `messageBytesBeforeChunking` travel
+ * as chunked transfers with progress on both sides. Binary payloads are
+ * measured by byte length, structured payloads by UTF-8 serialized size.
+ */
+export const rawMessageBytes = 1024 * 1024; // 1 MiB
+/** Warn threshold: senders degrade gracefully (rate-limit, compress) at 80%. */
+export const rawMessageWarnBytes = Math.floor(rawMessageBytes * LIMIT_WARN_FRACTION);
+
+/**
+ * Maximum raw-channel messages sent per second per player (all channels).
+ * The window is the same 10 s sliding window state mode uses for action
+ * rates, so diagnostics are comparable across modes.
+ */
+export const rawRatePerSecond = 120;
+export const rawWarnRatePerSecond = Math.floor(rawRatePerSecond * LIMIT_WARN_FRACTION);
+
 /** Maximum runtime log messages per second per runtime frame. */
 export const runtimeLogRatePerSecond = 50;
 export const runtimeLogWarnRatePerSecond = Math.floor(
@@ -72,6 +91,10 @@ export const LIMITS = {
   actionPayloadWarnBytes,
   actionRatePerSecond,
   actionWarnRatePerSecond,
+  rawMessageBytes,
+  rawMessageWarnBytes,
+  rawRatePerSecond,
+  rawWarnRatePerSecond,
   runtimeLogRatePerSecond,
   runtimeLogWarnRatePerSecond,
   errorReportRatePerSecond,
