@@ -631,6 +631,31 @@ describe("greeter migration (ADR-0004)", () => {
     // party membership and from game authority).
     expect(sorted(creator.members)).toEqual(["creator", "joiner"]);
   });
+
+  it("steps the reconnected ex-greeter down so the room never has two advertisers", async () => {
+    const world = makeWorld();
+    const creator = await makeCreator(world);
+    const joiner = await makeJoiner(world);
+    expect(creator.amGreeter).toBe(true);
+
+    // The greeter's PRIVATE connection drops (mobile suspension); the
+    // remaining member elects itself and takes over the rendezvous.
+    await creator.privateTransport.suspend();
+    await settle(world);
+    expect(joiner.amGreeter).toBe(true);
+    expect(joiner.greeterMemberId).toBe("joiner");
+
+    // The original greeter resumes: the new greeter re-announces on the
+    // reconnect, and the ex-greeter steps down instead of double-advertising.
+    await creator.privateTransport.resume();
+    await settle(world);
+    expect(creator.amGreeter).toBe(false);
+    expect(creator.greeterMemberId).toBe("joiner");
+    expect(creator.rendezvousTransport).toBeNull();
+    expect(membersOf(world, rendezvousRoomName("AAAA"))).toEqual(["joiner"]);
+    // Both stay in the party.
+    expect(sorted(creator.members)).toEqual(["creator", "joiner"]);
+  });
 });
 
 describe("invite links (ADR-0011)", () => {
