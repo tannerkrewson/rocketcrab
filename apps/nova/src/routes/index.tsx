@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Gamepad2, PlusCircle, Users } from "lucide-react";
+import { Gamepad2 } from "lucide-react";
 import { buttonStyles } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -8,82 +8,50 @@ export const Route = createFileRoute("/")({
   component: HomeComponent,
 });
 
-interface HomeAction {
-  to: "/build" | "/join" | "/library" | "/party";
-  label: string;
-  description: string;
-  icon: typeof PlusCircle;
-  variant: "primary" | "secondary" | "outline";
-}
-
-const actions: HomeAction[] = [
-  {
-    to: "/build",
-    label: "Build a game",
-    description: "Copy the AI prompt, chat with a bot, paste the result.",
-    icon: PlusCircle,
-    variant: "primary",
-  },
-  {
-    to: "/party",
-    label: "Start a party",
-    description: "Open a lobby now; pick a game before you play (classic flow).",
-    icon: Users,
-    variant: "secondary",
-  },
-  {
-    to: "/join",
-    label: "Join a party",
-    description: "Enter a four-letter code from a friend.",
-    icon: Users,
-    variant: "outline",
-  },
-  {
-    to: "/library",
-    label: "My games",
-    description: "Your saved games, ready to test and play.",
-    icon: Gamepad2,
-    variant: "outline",
-  },
-];
-
+/**
+ * Home screen, conformed to classic rocketcrab's layout (7.20): tagline
+ * centered at the top, Join/Start party primary buttons side by side, a
+ * column of secondary actions below, and Nova's "Recent games" at the bottom.
+ */
 function HomeComponent() {
   return (
-    <div className="flex flex-col gap-8">
-      <section className="flex flex-col items-center gap-3 py-6 text-center">
+    <div className="flex flex-col gap-10">
+      <section className="flex flex-col items-center gap-2 pt-6 text-center">
         <p className="text-5xl" aria-hidden="true">
           🦀🚀
         </p>
         <h1 className="text-4xl font-black tracking-tight text-base-content sm:text-5xl">
           Rocketcrab <span className="text-primary">Nova</span>
         </h1>
-        <p className="max-w-md text-lg text-base-content/70">
-          Build, test, save, and play your own multiplayer browser games — no hosting, no accounts,
-          no code setup.
-        </p>
+        <p className="text-lg text-base-content/70">party games for phones</p>
       </section>
 
-      <section aria-label="Main actions" className="flex flex-col gap-4">
-        {actions.map((action) => {
-          const Icon = action.icon;
-          return (
-            <Link
-              key={action.to}
-              to={action.to}
-              className={buttonStyles(
-                action.variant,
-                "lg",
-                "flex items-center gap-4 px-6 py-5 text-left",
-              )}
-            >
-              <Icon className="h-7 w-7 shrink-0" aria-hidden="true" />
-              <span className="flex flex-col">
-                <span className="text-lg font-black">{action.label}</span>
-                <span className="text-sm font-medium opacity-80">{action.description}</span>
-              </span>
-            </Link>
-          );
-        })}
+      <section aria-label="Start or join a party" className="flex justify-center gap-3">
+        <Link
+          to="/party"
+          search={{ gameId: undefined, mode: undefined, title: undefined }}
+          className={buttonStyles("primary", "lg", "flex-1 px-4 sm:flex-none sm:px-10")}
+        >
+          Start party
+        </Link>
+        <Link
+          to="/join"
+          className={buttonStyles("primary", "lg", "flex-1 px-4 sm:flex-none sm:px-10")}
+        >
+          Join party
+        </Link>
+      </section>
+
+      <section aria-label="More" className="mx-auto flex w-full max-w-xs flex-col gap-2">
+        <Link to="/build" className={buttonStyles("outline", "lg", "w-full")}>
+          Build a game
+        </Link>
+        <Link to="/library" className={buttonStyles("outline", "lg", "w-full")}>
+          My games
+        </Link>
+        <Link to="/about" className={buttonStyles("outline", "lg", "w-full")}>
+          About
+        </Link>
       </section>
 
       <section aria-labelledby="recent-games-heading">
