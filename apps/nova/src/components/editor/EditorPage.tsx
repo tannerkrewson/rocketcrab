@@ -1,7 +1,15 @@
 import { PROTOCOL_VERSION, type GameMode } from "@rocketcrab/protocol";
 import type { SavedGame } from "@rocketcrab/core";
 import { Link, useBlocker, useNavigate } from "@tanstack/react-router";
-import { ClipboardPaste, CopyPlus, Eraser, FlaskConical, Play, Save } from "lucide-react";
+import {
+  ClipboardPaste,
+  CopyPlus,
+  Eraser,
+  FlaskConical,
+  PartyPopper,
+  Play,
+  Save,
+} from "lucide-react";
 import {
   useCallback,
   useContext,
@@ -29,6 +37,7 @@ import { useRuntimeSession } from "../../lib/editor/runtime-session";
 import { formatBytes, validateSource } from "../../lib/editor/validation";
 import { readFromClipboard, writeToClipboard } from "../../lib/editor/clipboard";
 import { storeArenaSource } from "../../lib/arena/draft-source";
+import { storePartySource } from "../../lib/party/source-handoff";
 import { CodeEditor } from "./CodeEditor";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import { PreviewPanel } from "./PreviewPanel";
@@ -310,6 +319,30 @@ export function EditorPage({ game }: { game?: SavedGame }) {
     }
   }, [game, navigate, source]);
 
+  /**
+   * Play with friends (P4): create a REAL party from the CURRENT editor
+   * source (saved or not). The source is handed to the party route via
+   * sessionStorage; unsaved changes are never written to the saved game.
+   */
+  const handlePlayWithFriends = useCallback(() => {
+    const errors = validateSource(source).filter((issue) => issue.severity === "error");
+    if (errors.length > 0) {
+      toast.error("Fix the validation errors before starting a party.");
+      return;
+    }
+    const id = game?.id ?? draftGameId();
+    storePartySource({ gameId: id, source });
+    void navigate({
+      to: "/party",
+      search: {
+        gameId: id,
+        mode: game?.mode ?? "state",
+        title: title.trim() || registration?.title || DEFAULT_GAME_TITLE,
+      },
+      ignoreBlocker: true,
+    });
+  }, [game, navigate, registration, source, title]);
+
   const handleSave = useCallback(async () => {
     if (savingRef.current) return;
     savingRef.current = true;
@@ -486,6 +519,14 @@ export function EditorPage({ game }: { game?: SavedGame }) {
         <FlaskConical className="h-4 w-4" aria-hidden="true" />
         Test multiplayer
       </Button>
+      <Button
+        variant="primary"
+        onClick={handlePlayWithFriends}
+        title="Create a real party from this source and play it with friends"
+      >
+        <PartyPopper className="h-4 w-4" aria-hidden="true" />
+        Play with friends
+      </Button>
     </>
   );
 
@@ -648,6 +689,15 @@ export function EditorPage({ game }: { game?: SavedGame }) {
           >
             <FlaskConical className="h-4 w-4" aria-hidden="true" />
             Test
+          </Button>
+          <Button
+            variant="primary"
+            size="md"
+            onClick={handlePlayWithFriends}
+            title="Create a real party from this source and play it with friends"
+          >
+            <PartyPopper className="h-4 w-4" aria-hidden="true" />
+            Party
           </Button>
         </div>
       </div>

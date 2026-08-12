@@ -234,14 +234,27 @@ export class NovaSession implements NovaClientBackend {
    */
   async join(): Promise<void> {
     this.assertAlive();
-    this.transportUnsubscribers.push(
-      this.transport.on("connection:state", (state) => this.handleConnectionState(state)),
-      this.transport.on("peer:joined", (peer) => this.handlePeerJoined(peer)),
-      this.transport.on("peer:left", (peer) => this.handlePeerLeft(peer)),
-      this.transport.on("peer:reconnected", () => this.handleReconnected()),
-      this.transport.on("message:received", (message) => this.handleMessage(message)),
-    );
+    this.wireTransport();
     await this.transport.join({ room: this.room, sessionId: this.sessionId });
+  }
+
+  /**
+   * Attach to an ALREADY-JOINED transport (P4 party lobby). The party layer
+   * joins the private room inside `createParty`/`joinPartyByCode`, so this
+   * session never calls `transport.join()`; it wires the same listeners
+   * {@link NovaSession.join} would, seeds the connection status from the
+   * transport's current state, and replays the current peers so the session
+   * observes the party state it missed while the transport was being
+   * established (player lists, identity exchange, readiness).
+   */
+  async attach(): Promise<void> {
+    this.assertAlive();
+    this.wireTransport();
+    this.status = mapConnectionState(this.transport.connectionState);
+    this.emit({ type: "connection", status: this.status });
+    for (const peer of this.transport.peers) {
+      this.handlePeerJoined(peer);
+    }
   }
 
   /** Leave the party cleanly; pending outgoing messages are discarded. */
@@ -443,6 +456,16 @@ export class NovaSession implements NovaClientBackend {
   // Transport event handling
   // ------------------------------------------------------------------
 
+  private wireTransport(): void {
+    this.transportUnsubscribers.push(
+      this.transport.on("connection:state", (state) => this.handleConnectionState(state)),
+      this.transport.on("peer:joined", (peer) => this.handlePeerJoined(peer)),
+      this.transport.on("peer:left", (peer) => this.handlePeerLeft(peer)),
+      this.transport.on("peer:reconnected", () => this.handleReconnected()),
+      this.transport.on("message:received", (message) => this.handleMessage(message)),
+    );
+  }
+
   private handleConnectionState(state: TransportConnectionState): void {
     this.status = mapConnectionState(state);
     if (state === "connected") {
@@ -522,6 +545,14 @@ export class NovaSession implements NovaClientBackend {
         const player = this.playersMap.get(peerMessage.senderMemberId);
         if (player !== undefined) {
           player.name = peerMessage.displayName;
+        }
+        // A peer that introduces itself may have attached its session after
+        // our readiness announcement was sent (P4 late-attach race): re-send
+        // our ready state so no member is left thinking we are not ready.
+        if (this.readySent) {
+          void this.sendProtocol((base) => buildGameReadyMessage(base), {
+            targetMemberId: peerMessage.senderMemberId,
+          }).catch((error: unknown) => this.emitError(error));
         }
         break;
       }

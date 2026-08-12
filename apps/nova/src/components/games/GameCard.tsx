@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Copy, FlaskConical, Pencil, Trash2 } from "lucide-react";
+import { Copy, FlaskConical, PartyPopper, Pencil, Trash2 } from "lucide-react";
 import type { SavedGame } from "@rocketcrab/core";
 import { Button, buttonStyles } from "../ui/Button";
 import { Card } from "../ui/Card";
@@ -65,6 +65,15 @@ export function GameCard({ game, onDuplicate, onDelete, busy = false }: GameCard
           >
             <FlaskConical className="h-4 w-4" aria-hidden="true" />
             Test
+          </Link>
+          <Link
+            to="/party"
+            search={{ gameId: game.id, mode: game.mode ?? "state", title: game.title }}
+            className={buttonStyles("primary", "md")}
+            title="Create a party from this game and play it with friends"
+          >
+            <PartyPopper className="h-4 w-4" aria-hidden="true" />
+            Play
           </Link>
           <Button variant="ghost" onClick={onDuplicate} disabled={busy}>
             <Copy className="h-4 w-4" aria-hidden="true" />
