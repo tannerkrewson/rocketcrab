@@ -927,20 +927,6 @@ export class ArenaEngine {
       const session = runtime.session;
       const status = session?.connectionStatus ?? "none";
       const report = session?.getStateModeDiagnostics().authorityMemberId ?? null;
-      const diag = session?.getStateModeDiagnostics();
-      // eslint-disable-next-line no-console
-      console.log(
-        "[s4-probe] player",
-        runtime.spec.id,
-        "status",
-        status,
-        "authority",
-        report,
-        "term",
-        diag?.term,
-        "election",
-        diag?.electionInProgress,
-      );
       if (session === null || status !== "connected") continue;
       if (report === null || report === undefined) continue;
       const player = players.find((p) => p.memberId === report);
