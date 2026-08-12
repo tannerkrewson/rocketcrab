@@ -22,6 +22,10 @@ function runExample(
   source: string,
   memberId: string,
   displayName: string,
+  options: {
+    mode?: "state" | "simulation" | "raw";
+    simulation?: { tickMs?: number; snapshotIntervalMs?: number };
+  } = {},
 ): NovaSession {
   const transport = harness.createTransport({ memberId, displayName });
   const session = createNovaSession({
@@ -29,7 +33,8 @@ function runExample(
     room: "arena",
     sessionId: SESSION,
     player: { memberId, displayName },
-    game: { gameId: "game-example", mode: "state", title: "Example Game" },
+    game: { gameId: "game-example", mode: options.mode ?? "state", title: "Example Game" },
+    simulation: options.simulation,
   });
   // Syntax + behavior: execute the documented source against the real API.
   new Function("nova", source)(session.client);
@@ -138,24 +143,55 @@ describe("documented examples", () => {
     }
   });
 
-  it("simulation-mode example routes inputs between players", async () => {
+  it("simulation-mode example routes inputs, advances ticks, and restores snapshots", async () => {
     const harness = createInMemoryHarness();
-    const a = runExample(harness, SIMULATION_MODE_EXAMPLE, "member-a", "Ada");
-    const b = runExample(harness, SIMULATION_MODE_EXAMPLE, "member-b", "Ben");
-    const entries = logs();
-    try {
-      await a.join();
-      await b.join();
-      await flush(harness);
-      a.start();
-      b.start();
-      await flush(harness);
-      const messages = entries.map((args) => args.join(" ")).join("\n");
-      expect(messages).toContain("Ada moved: move"); // B received A's input
-      expect(messages).toContain("Ben moved: move"); // A received B's input
-    } finally {
-      vi.restoreAllMocks();
-    }
+    // Fast deterministic cadence (real timers; the clock is fake-timer free).
+    const timings = {
+      mode: "simulation" as const,
+      simulation: { tickMs: 20, snapshotIntervalMs: 60 },
+    };
+    const a = runExample(harness, SIMULATION_MODE_EXAMPLE, "member-a", "Ada", timings);
+    const b = runExample(harness, SIMULATION_MODE_EXAMPLE, "member-b", "Ben", timings);
+    await a.join();
+    await b.join();
+    await flush(harness);
+    a.start();
+    b.start();
+    // Poll with real time + drain: the in-memory hub only delivers on
+    // drain() and the simulation clock is driven by real timers.
+    const waitFor = async (condition: () => boolean, label: string): Promise<void> => {
+      const deadline = Date.now() + 5_000;
+      while (!condition()) {
+        if (Date.now() > deadline) throw new Error(`waitFor ${label} timed out`);
+        await flush(harness);
+        await new Promise((resolve) => setTimeout(resolve, 10));
+      }
+    };
+    // Inputs crossed the transport in both directions (the example sends
+    // once per player at start).
+    await waitFor(
+      () =>
+        b.getSimulationDiagnostics().inputsReceived >= 1 &&
+        a.getSimulationDiagnostics().inputsReceived >= 1,
+      "inputs",
+    );
+    // The Nova-provided clock advances every frame's local simulation.
+    await waitFor(
+      () => a.getSimulationDiagnostics().tick >= 2 && b.getSimulationDiagnostics().tick >= 2,
+      "ticks",
+    );
+    // The authority produces authoritative snapshots (the example's
+    // serializeState callback) and every shell replicates them. The
+    // authority itself never receives its own broadcasts (no loopback),
+    // so its retained snapshot is asserted through `authorityTick`.
+    await waitFor(
+      () =>
+        b.getSimulationDiagnostics().snapshotsReceived >= 1 &&
+        a.getSimulationDiagnostics().authorityTick !== null,
+      "snapshots",
+    );
+    expect(a.getSimulationDiagnostics().authorityMemberId).toBe("member-a");
+    expect(b.getSimulationDiagnostics().authorityMemberId).toBe("member-a");
   });
 
   it("raw-mode example exchanges chat messages between players", async () => {

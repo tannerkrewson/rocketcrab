@@ -385,9 +385,9 @@ describe("createNovaClient lifecycle", () => {
         sender: { id: "member-b", name: "Ben" },
       },
     });
-    emit({ type: "simulationSnapshot", snapshot: { tick: 5 } });
+    emit({ type: "simulationSnapshot", snapshot: { tick: 5, state: { x: 1 } } });
     expect(inputs).toHaveLength(1);
-    expect(snapshots).toEqual([{ tick: 5 }]);
+    expect(snapshots).toEqual([{ tick: 5, state: { x: 1 } }]);
     unsubscribe();
     emit({
       type: "simulationInput",
