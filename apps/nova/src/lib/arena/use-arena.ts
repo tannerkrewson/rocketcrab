@@ -26,6 +26,10 @@ export function useArena(options: UseArenaOptions) {
   optionsRef.current = options;
 
   const containerRefs = useRef(new Map<string, HTMLDivElement>());
+  // Stable per-player ref callbacks: the identity of the function passed to
+  // a container div never changes, so React never detaches/reattaches the
+  // binding on re-render (and the engine's getContainer is deterministic).
+  const refCallbacks = useRef(new Map<string, (element: HTMLDivElement | null) => void>());
   const engineRef = useRef<ArenaEngine | null>(null);
   const [state, setState] = useState<ArenaState | null>(null);
 
@@ -59,18 +63,22 @@ export function useArena(options: UseArenaOptions) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [getContainer]);
 
-  /** Bind (or unbind) a player's frame container div. */
-  const bindContainer = useCallback(
-    (playerId: string) => (element: HTMLDivElement | null) => {
-      if (element !== null) {
-        containerRefs.current.set(playerId, element);
-      } else {
-        containerRefs.current.delete(playerId);
-      }
-      void engineRef.current?.loadPending();
-    },
-    [],
-  );
+  /** Bind (or unbind) a player's frame container div (stable per player). */
+  const bindContainer = useCallback((playerId: string) => {
+    let callback = refCallbacks.current.get(playerId);
+    if (callback === undefined) {
+      callback = (element) => {
+        if (element !== null) {
+          containerRefs.current.set(playerId, element);
+        } else {
+          containerRefs.current.delete(playerId);
+        }
+        void engineRef.current?.loadPending();
+      };
+      refCallbacks.current.set(playerId, callback);
+    }
+    return callback;
+  }, []);
 
   /** Stable control surface (all no-ops until the engine mounts). */
   const actions = useMemo(
@@ -87,7 +95,6 @@ export function useArena(options: UseArenaOptions) {
       setDropMessages: (enabled: boolean) => engineRef.current?.setDropMessages(enabled),
       clearLogs: () => engineRef.current?.clearLogs(),
       restartAll: () => engineRef.current?.restartAll(),
-      replaceSource: (source: string) => engineRef.current?.replaceSource(source),
       stop: () => engineRef.current?.stop(),
     }),
     [],

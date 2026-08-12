@@ -17,22 +17,31 @@ import {
   Activity,
   AlertTriangle,
   ArrowRight,
+  Bug,
   Droplets,
   FlaskConical,
   Gauge,
+  GripHorizontal,
   PartyPopper,
   Pause,
+  Pencil,
   Play,
   Plus,
-  RefreshCw,
   RotateCcw,
   Trash2,
   Wifi,
   WifiOff,
   X,
 } from "lucide-react";
-import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
-import { toast } from "sonner";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useState,
+  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
+} from "react";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { EmptyState } from "../ui/EmptyState";
@@ -57,6 +66,18 @@ function formatTime(timestamp: number): string {
 
 function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString(undefined, { dateStyle: "medium" });
+}
+
+/** Game-frame heights: a sane default (~45vh) with hard clamps. */
+function defaultFrameHeightPx(): number {
+  return clampFrameHeight(
+    Math.round((typeof window === "undefined" ? 800 : window.innerHeight) * 0.45),
+  );
+}
+
+function clampFrameHeight(value: number): number {
+  const max = typeof window === "undefined" ? 1200 : Math.round(window.innerHeight * 0.8);
+  return Math.min(Math.max(value, 160), max);
 }
 
 function connectionBadge(player: ArenaPlayer): ReactNode {
@@ -153,8 +174,8 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
 
   const [activePlayerId, setActivePlayerId] = useState("player-1");
   const [newPlayerName, setNewPlayerName] = useState("");
-  const [replaceDialog, setReplaceDialog] = useState(false);
-  const [replacementSource, setReplacementSource] = useState(source);
+  const [debugOpen, setDebugOpen] = useState(false);
+  const [frameHeightPx, setFrameHeightPx] = useState(defaultFrameHeightPx);
   const [renameTarget, setRenameTarget] = useState<ArenaPlayer | null>(null);
 
   // Keep the mobile tab on an existing player when players are removed.
@@ -170,16 +191,33 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
     setNewPlayerName("");
   }, [actions, newPlayerName]);
 
-  const handleReplaceSource = useCallback(() => {
-    const next = replacementSource.trim();
-    if (next.length === 0) {
-      toast.error("The source can't be empty.");
-      return;
-    }
-    actions.replaceSource(next);
-    setReplaceDialog(false);
-    toast.success("Source replaced — all players restarted.");
-  }, [actions, replacementSource]);
+  /** Shared vertical drag: resize every game frame (7.13). */
+  const handleFrameResize = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const handle = event.currentTarget;
+      const startY = event.clientY;
+      const startHeight = frameHeightPx;
+      try {
+        handle.setPointerCapture(event.pointerId);
+      } catch {
+        // Pointer capture unavailable (some test environments); the window
+        // listeners below still track the drag.
+      }
+      const onMove = (moveEvent: PointerEvent) => {
+        setFrameHeightPx(clampFrameHeight(startHeight + (moveEvent.clientY - startY)));
+      };
+      const onEnd = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onEnd);
+        window.removeEventListener("pointercancel", onEnd);
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onEnd);
+      window.addEventListener("pointercancel", onEnd);
+    },
+    [frameHeightPx],
+  );
 
   const handleRename = useCallback(() => {
     if (renameTarget === null) return;
@@ -206,99 +244,127 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
   const summary = state.summary;
   const authority = state.authorityPlayerId;
 
-  const toolbar = (
-    <div className="flex flex-wrap items-center gap-2">
-      <div className="flex items-center gap-2">
-        <input
-          type="text"
-          value={newPlayerName}
-          onChange={(event) => setNewPlayerName(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === "Enter") handleAddPlayer();
-          }}
-          placeholder="Player name"
-          aria-label="New player name"
-          maxLength={32}
-          className="input input-bordered input-sm w-36"
-        />
+  /** Shared simulation toolbar. Rendered once for desktop and once inside
+   *  the phone controls panel; `idPrefix` keeps the latency slider ids
+   *  unique across the two instances. */
+  const toolbar = (idPrefix: string) => {
+    const latencyId = `arena-latency-${idPrefix}`;
+    return (
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex items-center gap-2">
+          <input
+            type="text"
+            value={newPlayerName}
+            onChange={(event) => setNewPlayerName(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter") handleAddPlayer();
+            }}
+            placeholder="Player name"
+            aria-label="New player name"
+            maxLength={32}
+            className="input input-bordered input-sm w-36"
+          />
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={handleAddPlayer}
+            title="Add a simulated player"
+          >
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            Add player
+          </Button>
+        </div>
         <Button
-          variant="secondary"
+          variant={debugOpen ? "accent" : "outline"}
           size="md"
-          onClick={handleAddPlayer}
-          title="Add a simulated player"
+          onClick={() => setDebugOpen((open) => !open)}
+          aria-expanded={debugOpen}
+          title="Show or hide network simulation controls and diagnostics"
         >
-          <Plus className="h-4 w-4" aria-hidden="true" />
-          Add player
+          <Bug className="h-4 w-4" aria-hidden="true" />
+          {debugOpen ? "Debug on" : "Debug"}
+        </Button>
+        {debugOpen ? (
+          <>
+            <div className="flex items-center gap-2">
+              <Gauge className="h-4 w-4 text-base-content/60" aria-hidden="true" />
+              <label htmlFor={latencyId} className="text-xs font-semibold text-base-content/60">
+                Latency {state.latencyMs}ms
+              </label>
+              <input
+                id={latencyId}
+                type="range"
+                min={0}
+                max={1000}
+                step={25}
+                value={state.latencyMs}
+                onChange={(event) => actions.setLatency(Number(event.target.value))}
+                className="range range-xs w-32"
+                aria-label="Artificial latency"
+              />
+              <Button
+                variant={state.dropMessages ? "accent" : "outline"}
+                size="md"
+                onClick={() => actions.setDropMessages(!state.dropMessages)}
+                title="Toggle simulated message drops on unreliable channels"
+              >
+                <Droplets className="h-4 w-4" aria-hidden="true" />
+                {state.dropMessages ? "Dropping" : "Drop messages"}
+              </Button>
+            </div>
+            <Button
+              variant="danger"
+              size="md"
+              onClick={() => void actions.triggerAuthorityLoss()}
+              disabled={authority === null}
+              title={`Force the current authority player (${state.players.find((player) => player.id === authority)?.name ?? ""}) to lose its connection`}
+            >
+              <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+              Authority loss
+            </Button>
+          </>
+        ) : null}
+        <Button
+          variant="ghost"
+          size="md"
+          onClick={actions.clearLogs}
+          title="Clear every player's logs"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+          Clear logs
+        </Button>
+        {game !== undefined ? (
+          <Link
+            to="/games/$gameId/edit"
+            params={{ gameId: game.id }}
+            className="btn btn-outline btn-md font-bold"
+            title="Return to this game's editor"
+          >
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+            Back to editor
+          </Link>
+        ) : (
+          <Link
+            to="/editor"
+            className="btn btn-outline btn-md font-bold"
+            title="Return to the editor"
+          >
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+            Back to editor
+          </Link>
+        )}
+        <Button
+          variant="outline"
+          size="md"
+          onClick={actions.restartAll}
+          title="Restart every simulated player"
+        >
+          <RotateCcw className="h-4 w-4" aria-hidden="true" />
+          Restart all
         </Button>
       </div>
-      <div className="flex items-center gap-2">
-        <Gauge className="h-4 w-4 text-base-content/60" aria-hidden="true" />
-        <label htmlFor="arena-latency" className="text-xs font-semibold text-base-content/60">
-          Latency {state.latencyMs}ms
-        </label>
-        <input
-          id="arena-latency"
-          type="range"
-          min={0}
-          max={1000}
-          step={25}
-          value={state.latencyMs}
-          onChange={(event) => actions.setLatency(Number(event.target.value))}
-          className="range range-xs w-32"
-          aria-label="Artificial latency"
-        />
-        <Button
-          variant={state.dropMessages ? "accent" : "outline"}
-          size="md"
-          onClick={() => actions.setDropMessages(!state.dropMessages)}
-          title="Toggle simulated message drops on unreliable channels"
-        >
-          <Droplets className="h-4 w-4" aria-hidden="true" />
-          {state.dropMessages ? "Dropping" : "Drop messages"}
-        </Button>
-      </div>
-      <Button
-        variant="danger"
-        size="md"
-        onClick={() => void actions.triggerAuthorityLoss()}
-        disabled={authority === null}
-        title={`Force the current authority player (${state.players.find((player) => player.id === authority)?.name ?? ""}) to lose its connection`}
-      >
-        <AlertTriangle className="h-4 w-4" aria-hidden="true" />
-        Authority loss
-      </Button>
-      <Button
-        variant="ghost"
-        size="md"
-        onClick={actions.clearLogs}
-        title="Clear every player's logs"
-      >
-        <X className="h-4 w-4" aria-hidden="true" />
-        Clear logs
-      </Button>
-      <Button
-        variant="outline"
-        size="md"
-        onClick={() => {
-          setReplacementSource(source);
-          setReplaceDialog(true);
-        }}
-        title="Replace the source and restart every player"
-      >
-        <RefreshCw className="h-4 w-4" aria-hidden="true" />
-        Replace source
-      </Button>
-      <Button
-        variant="outline"
-        size="md"
-        onClick={actions.restartAll}
-        title="Restart every simulated player"
-      >
-        <RotateCcw className="h-4 w-4" aria-hidden="true" />
-        Restart all
-      </Button>
-    </div>
-  );
+    );
+  };
 
   const summaryBar = (
     <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-base-content/70">
@@ -311,7 +377,7 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
       {summary.failed > 0 ? (
         <span className="badge badge-error badge-sm">{summary.failed} failed</span>
       ) : null}
-      {state.stateDiagnostics !== null ? (
+      {debugOpen && state.stateDiagnostics !== null ? (
         <span className="badge badge-ghost badge-sm font-mono" title="State-mode diagnostics">
           state rev {state.stateDiagnostics.revision} · {state.stateDiagnostics.stateSizeBytes} B ·{" "}
           {state.stateDiagnostics.actionRatePerSecond.toFixed(1)} act/s
@@ -427,10 +493,20 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
         ) : null}
       </div>
       <div
-        className="h-52 overflow-hidden rounded-box border border-base-300 bg-black"
+        className="overflow-hidden rounded-md border border-base-300 bg-black"
+        style={{ height: `${frameHeightPx}px` }}
         data-testid={`arena-frame-${player.id}`}
       >
         <div ref={bindContainer(player.id)} className="h-full w-full" />
+      </div>
+      <div
+        role="separator"
+        aria-label={`Resize ${player.name}'s game frame`}
+        className="flex h-3 cursor-ns-resize select-none items-center justify-center rounded-md border border-base-300 bg-base-200 text-base-content/40"
+        onPointerDown={handleFrameResize}
+        title="Drag to resize"
+      >
+        <GripHorizontal className="h-3 w-3" aria-hidden="true" />
       </div>
       <div
         className="max-h-32 min-h-16 overflow-y-auto rounded-box border border-base-300 bg-base-200 p-2 font-mono text-[11px] leading-relaxed"
@@ -494,18 +570,15 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
 
       {summaryBar}
 
-      {/* Desktop: shared toolbar above a responsive grid of player frames. */}
+      {/* Desktop: shared toolbar above the player grid. */}
       <div className="hidden flex-col gap-3 md:flex" data-testid="arena-desktop">
         <div className="flex flex-wrap items-center gap-2 rounded-box border-2 border-base-300 bg-base-100 p-3">
-          {toolbar}
-        </div>
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-          {state.players.map(playerCard)}
+          {toolbar("desktop")}
         </div>
       </div>
 
-      {/* Phone: one player frame at a time; shared controls in a
-          collapsible panel so they never cover the game. */}
+      {/* Phone: player tabs + shared controls in a collapsible panel so
+          they never cover the game. */}
       <div className="flex flex-col gap-3 md:hidden" data-testid="arena-mobile">
         <div
           role="tablist"
@@ -527,39 +600,29 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
         </div>
         <details className="collapse collapse-arrow border-2 border-base-300 bg-base-100">
           <summary className="collapse-title text-sm font-bold">Simulation controls</summary>
-          <div className="collapse-content">{toolbar}</div>
+          <div className="collapse-content">{toolbar("mobile")}</div>
         </details>
-        {/* Every frame stays mounted so switching tabs never reloads it. */}
+      </div>
+
+      {/* The one and only set of player frames. Phones show the active
+          player and hide the rest with CSS (`max-md:hidden`), so every
+          frame stays mounted and switching tabs never reloads it; desktop
+          shows them all in a responsive grid. A single rendering per player
+          also keeps each frame bound to exactly one visible container. */}
+      <div
+        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
+        data-testid="arena-grid"
+      >
         {state.players.map((player) => (
-          <div key={player.id} className={activePlayerId === player.id ? "" : "hidden"}>
+          <div
+            key={player.id}
+            className={activePlayerId === player.id ? "" : "max-md:hidden"}
+            data-testid={`arena-card-${player.id}`}
+          >
             {playerCard(player)}
           </div>
         ))}
       </div>
-
-      <Dialog open={replaceDialog} onClose={() => setReplaceDialog(false)} title="Replace source">
-        <div className="flex flex-col gap-3">
-          <p className="text-sm text-base-content/70">
-            Replacing the source destroys every current runtime frame and restarts all players with
-            the new source. Unsaved editor changes are not affected.
-          </p>
-          <textarea
-            value={replacementSource}
-            onChange={(event) => setReplacementSource(event.target.value)}
-            aria-label="Replacement game source"
-            spellCheck={false}
-            className="textarea textarea-bordered h-64 w-full font-mono text-xs"
-          />
-          <div className="flex justify-end gap-2">
-            <Button variant="ghost" onClick={() => setReplaceDialog(false)}>
-              Cancel
-            </Button>
-            <Button variant="danger" onClick={handleReplaceSource}>
-              Replace and restart all
-            </Button>
-          </div>
-        </div>
-      </Dialog>
 
       <Dialog
         open={renameTarget !== null}
