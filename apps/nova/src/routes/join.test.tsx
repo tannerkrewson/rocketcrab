@@ -45,6 +45,10 @@ const { stubEngine } = vi.hoisted(() => ({
     onState: vi.fn(() => () => undefined),
     isActive: vi.fn(() => false),
     setContainer: vi.fn(),
+    setDisplayName: vi.fn(),
+    selectGame: vi.fn(async () => undefined),
+    retrySetup: vi.fn(),
+    dismissError: vi.fn(),
     createParty: vi.fn(async () => undefined),
     joinByCode: vi.fn(async () => undefined),
     joinByInvite: vi.fn(async () => undefined),
@@ -91,11 +95,14 @@ describe("/join", () => {
     expect(screen.getByLabelText("Four-letter party code")).toBeInTheDocument();
   });
 
-  it("submits the normalized code to the engine", async () => {
+  it("submits the normalized code and the player name to the engine", async () => {
     renderJoin();
+    const nameInput = await screen.findByLabelText("Your player name");
+    fireEvent.change(nameInput, { target: { value: "Ada" } });
     const input = await screen.findByLabelText("Four-letter party code");
     fireEvent.change(input, { target: { value: " abcd " } });
     fireEvent.click(screen.getByRole("button", { name: /join party/i }));
+    await waitFor(() => expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada"));
     await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("ABCD"));
   });
 

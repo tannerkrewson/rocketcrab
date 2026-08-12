@@ -483,6 +483,90 @@ describe("party engine — readiness and start gating", () => {
     expect(b.engine.getState().lastError).toMatch(/rejected/i);
     expect(a.engine.getState().members).toHaveLength(1);
   });
+
+  it("creates a party without a game; the lobby blocks start until one is picked (7.6)", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const promise = a.engine.createParty(); // no game preselected
+    for (let i = 0; i < 8; i += 1) {
+      await flush();
+      world.clock.advance(1_000);
+    }
+    await settle(world);
+    await promise;
+
+    let state = a.engine.getState();
+    expect(state.phase).toBe("lobby");
+    expect(state.role).toBe("creator");
+    expect(state.game).toBeNull();
+    expect(state.canStart).toBe(false);
+    expect(state.canForceStart).toBe(false);
+    expect(state.startBlockedReason).toMatch(/pick a game/i);
+
+    // Picking a game from the lobby registers + announces the source.
+    await a.engine.selectGame({
+      gameId: GAME.gameId,
+      title: GAME.title,
+      mode: GAME.mode,
+      source: GAME.source,
+    });
+    await settle(world);
+    state = a.engine.getState();
+    expect(state.game).toEqual({ gameId: GAME.gameId, title: GAME.title, mode: GAME.mode });
+    expect(a.harness.frames).toHaveLength(1); // the lobby preview frame booted
+
+    await a.engine.leaveParty();
+    await settle(world);
+    expect(world.hub.roomNames().every((room) => world.hub.membersOf(room).length === 0)).toBe(
+      true,
+    );
+  });
+
+  it("a join for a nonexistent code fails fast and can be retried from the error phase (7.10)", async () => {
+    const world = makeWorld();
+    const b = makePlayer(world, "b", { earlyMissTimeoutMs: 1_000 });
+
+    const join = b.engine.joinByCode("ZZZZ");
+    await flush();
+    world.clock.advance(1_000); // the early-miss window closes: no peer at all
+    await settle(world);
+    await join;
+
+    const failed = b.engine.getState();
+    expect(failed.phase).toBe("error");
+    expect(failed.lastError).toMatch(/no party is advertising/i);
+
+    // The old code threw "already active" when retrying from the error
+    // phase; a retry must now start clean and reach the same clear error.
+    const retry = b.engine.joinByCode("ZZZZ");
+    await flush();
+    world.clock.advance(1_000);
+    await settle(world);
+    await retry;
+    expect(b.engine.getState().phase).toBe("error");
+    expect(b.engine.getState().lastError).toMatch(/no party is advertising/i);
+
+    // Dismissing the error returns to the idle entry UI without a toast.
+    b.engine.dismissError();
+    expect(b.engine.getState().phase).toBe("idle");
+  });
+
+  it("setDisplayName updates the local display name (7.5)", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    await runCreate(a, world);
+
+    a.engine.setDisplayName("Grace");
+    expect(a.engine.getState().displayName).toBe("Grace");
+    expect(a.engine.getState().members.find((m) => m.isSelf)?.displayName).toBe("Grace");
+
+    await a.engine.leaveParty();
+    await settle(world);
+    // The saved name survives a page reload: a fresh engine on the same
+    // localStorage picks it up through the identity module (tested in
+    // identity.test.ts); here we only verify the engine persists it.
+    expect(window.localStorage.getItem("nova:player:name:v1")).toBe("Grace");
+  });
 });
 
 describe("party engine — roles, reconnect, and cleanup", () => {

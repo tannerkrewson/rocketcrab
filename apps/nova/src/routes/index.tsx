@@ -9,7 +9,7 @@ export const Route = createFileRoute("/")({
 });
 
 interface HomeAction {
-  to: "/create" | "/join" | "/library";
+  to: "/create" | "/join" | "/library" | "/party";
   label: string;
   description: string;
   icon: typeof PlusCircle;
@@ -25,11 +25,18 @@ const actions: HomeAction[] = [
     variant: "primary",
   },
   {
+    to: "/party",
+    label: "Start a party",
+    description: "Open a lobby now; pick a game before you play (classic flow).",
+    icon: Users,
+    variant: "secondary",
+  },
+  {
     to: "/join",
     label: "Join a party",
     description: "Enter a four-letter code from a friend.",
     icon: Users,
-    variant: "secondary",
+    variant: "outline",
   },
   {
     to: "/library",

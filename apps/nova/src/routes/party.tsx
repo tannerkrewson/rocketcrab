@@ -7,9 +7,11 @@ import { PartyResumeBanner } from "../components/party/PartyResumeBanner";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
 import { LoadingState } from "../components/ui/LoadingState";
-import { buttonStyles } from "../components/ui/Button";
+import { Button, buttonStyles } from "../components/ui/Button";
+import { Card } from "../components/ui/Card";
 import { usePartyEngine } from "../lib/party/use-party";
 import { takePartySource } from "../lib/party/source-handoff";
+import { getSavedPlayerName } from "../lib/party/identity";
 import { gameRepository } from "../lib/games/instance";
 
 export const Route = createFileRoute("/party")({
@@ -44,6 +46,8 @@ function PartyPage() {
   const startedRef = useRef(false);
   const [attempt, setAttempt] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // 7.5: the player's name is asked before they enter a lobby (start flow).
+  const [name, setName] = useState(() => getSavedPlayerName() ?? "");
 
   useEffect(() => {
     if (startedRef.current || engine.isActive()) {
@@ -82,6 +86,16 @@ function PartyPage() {
     setAttempt((value) => value + 1);
   };
 
+  // 7.6: start a party with NO game preselected — the host lands in the
+  // lobby and picks a game from there (classic parity). The name is applied
+  // to the engine identity first (7.5).
+  const handleStartParty = () => {
+    if (name.trim().length > 0) {
+      engine.setDisplayName(name);
+    }
+    void engine.createParty();
+  };
+
   if (engine.isActive()) {
     // A party is being created, joining, in the lobby, playing, or
     // reconnecting — render the full experience.
@@ -103,17 +117,44 @@ function PartyPage() {
       <EmptyState
         icon={<PartyPopper />}
         title="No party here yet"
-        description="Start a party from a game in your library (or the editor), or join a friend's party with their four-letter code."
+        description="Start a party now and pick a game from the lobby, start from a game in your library, or join a friend's party with their four-letter code."
         action={
-          <div className="flex flex-wrap justify-center gap-2">
-            <Link to="/library" className={buttonStyles("secondary")}>
-              <Gamepad2 className="h-5 w-5" aria-hidden="true" />
-              Pick a game
-            </Link>
-            <Link to="/join" className={buttonStyles("primary")}>
-              <Users className="h-5 w-5" aria-hidden="true" />
-              Join a party
-            </Link>
+          <div className="flex w-full max-w-sm flex-col items-stretch gap-3">
+            <Card>
+              <div className="flex flex-col gap-2">
+                <label htmlFor="party-name" className="text-sm font-bold">
+                  Your name
+                </label>
+                <input
+                  id="party-name"
+                  type="text"
+                  value={name}
+                  onChange={(event) => setName(event.target.value)}
+                  placeholder="Your name"
+                  maxLength={24}
+                  autoComplete="nickname"
+                  aria-label="Your player name"
+                  className="input input-bordered w-full"
+                />
+                <Button variant="primary" size="lg" onClick={handleStartParty}>
+                  <PartyPopper className="h-5 w-5" aria-hidden="true" />
+                  Start a party
+                </Button>
+                <p className="text-center text-xs text-base-content/60">
+                  Your party starts in the lobby; pick a game there before anyone starts playing.
+                </p>
+              </div>
+            </Card>
+            <div className="flex flex-wrap justify-center gap-2">
+              <Link to="/library" className={buttonStyles("secondary")}>
+                <Gamepad2 className="h-5 w-5" aria-hidden="true" />
+                Start with a game
+              </Link>
+              <Link to="/join" className={buttonStyles("ghost")}>
+                <Users className="h-5 w-5" aria-hidden="true" />
+                Join a party
+              </Link>
+            </div>
           </div>
         }
       />

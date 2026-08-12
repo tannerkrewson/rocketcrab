@@ -3,9 +3,11 @@ import {
   Check,
   Copy,
   Crown,
+  Gamepad2,
   Loader2,
   LogOut,
   PartyPopper,
+  Pencil,
   Play,
   ShieldQuestion,
   Users,
@@ -15,7 +17,11 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState, PartyMemberView } from "../../lib/party/engine";
+import { useSavedGames } from "../../lib/games/queries";
 import { Button, buttonStyles } from "../ui/Button";
+import { Dialog } from "../ui/Dialog";
+import { ErrorPanel } from "../ui/ErrorPanel";
+import { LoadingState } from "../ui/LoadingState";
 import { PartyInviteQr } from "./PartyInviteQr";
 import { PartyDiagnosticsPanel } from "./PartyDiagnostics";
 
@@ -26,6 +32,10 @@ export interface PartyLobbyProps {
   onStart: (force: boolean) => void;
   onLeave: () => void;
   onRefreshDiagnostics: () => void;
+  /** Pick a saved game for a party that was started without one (7.6). */
+  onPickGame: (gameId: string) => void;
+  /** Apply an edited player name (7.5). */
+  onEditName: (name: string) => void;
 }
 
 function connectionBadge(member: PartyMemberView) {
@@ -86,9 +96,14 @@ export function PartyLobby({
   onStart,
   onLeave,
   onRefreshDiagnostics,
+  onPickGame,
+  onEditName,
 }: PartyLobbyProps) {
   const [forceDialog, setForceDialog] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [editingName, setEditingName] = useState(false);
+  const [nameDraft, setNameDraft] = useState(state.displayName);
 
   const copyInvite = async () => {
     if (state.inviteUrl === null) return;
@@ -130,6 +145,77 @@ export function PartyLobby({
           {state.connectionState}
         </span>
       </header>
+
+      {/* Player name, editable (7.5 — classic parity: the name is asked
+          before the lobby and can be changed at any time). */}
+      <section className="flex flex-wrap items-center gap-2 text-sm font-semibold text-base-content/70">
+        <span>
+          You are playing as{" "}
+          <span className="font-black text-base-content">{state.displayName}</span>
+        </span>
+        {editingName ? null : (
+          <button
+            type="button"
+            className="btn btn-ghost btn-xs"
+            onClick={() => {
+              setNameDraft(state.displayName);
+              setEditingName(true);
+            }}
+          >
+            <Pencil className="h-3 w-3" aria-hidden="true" />
+            Edit name
+          </button>
+        )}
+      </section>
+      {editingName ? (
+        <form
+          className="flex flex-wrap items-center gap-2"
+          onSubmit={(event) => {
+            event.preventDefault();
+            const trimmed = nameDraft.trim();
+            if (trimmed.length > 0) {
+              onEditName(trimmed);
+            }
+            setEditingName(false);
+          }}
+        >
+          <input
+            type="text"
+            value={nameDraft}
+            onChange={(event) => setNameDraft(event.target.value)}
+            maxLength={24}
+            aria-label="Your player name"
+            className="input input-bordered input-sm min-w-40 flex-1"
+          />
+          <Button variant="primary" size="md" type="submit">
+            Save
+          </Button>
+          <Button variant="ghost" size="md" onClick={() => setEditingName(false)}>
+            Cancel
+          </Button>
+        </form>
+      ) : null}
+
+      {/* No game selected yet (7.6): the host picks one from saved games;
+          joiners wait. */}
+      {state.game === null ? (
+        <section
+          className="flex flex-wrap items-center gap-3 rounded-box border-2 border-dashed border-base-300 bg-base-100 p-4"
+          aria-label="No game selected"
+        >
+          <p className="min-w-0 flex-1 text-sm font-semibold text-base-content/70">
+            {state.role === "creator"
+              ? "No game yet — pick one from your saved games to start playing."
+              : "Waiting for the host to pick a game…"}
+          </p>
+          {state.role === "creator" ? (
+            <Button variant="primary" size="md" onClick={() => setPickerOpen(true)}>
+              <Gamepad2 className="h-4 w-4" aria-hidden="true" />
+              Pick a game
+            </Button>
+          ) : null}
+        </section>
+      ) : null}
 
       {state.endedReason !== null ? (
         <div className="rounded-box border-2 border-accent bg-accent/10 p-3 text-sm font-semibold">
@@ -377,6 +463,61 @@ export function PartyLobby({
           </div>
         </div>
       ) : null}
+
+      {pickerOpen ? (
+        <Dialog open onClose={() => setPickerOpen(false)} title="Pick a game">
+          <GamePicker
+            onPick={(gameId) => {
+              setPickerOpen(false);
+              onPickGame(gameId);
+            }}
+          />
+        </Dialog>
+      ) : null}
     </div>
+  );
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Something went wrong.";
+}
+
+/** Saved-game list for the lobby's pick-a-game dialog (7.6). */
+function GamePicker({ onPick }: { onPick: (gameId: string) => void }) {
+  const gamesQuery = useSavedGames();
+  if (gamesQuery.isLoading) {
+    return <LoadingState label="Loading your games…" />;
+  }
+  if (gamesQuery.isError) {
+    return <ErrorPanel title="Couldn't load your games" message={errorMessage(gamesQuery.error)} />;
+  }
+  const games = gamesQuery.data ?? [];
+  if (games.length === 0) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-4 text-center">
+        <p className="text-sm text-base-content/70">
+          No saved games yet — create one in the editor first.
+        </p>
+        <Link to="/create" className={buttonStyles("primary", "md")}>
+          Create a game
+        </Link>
+      </div>
+    );
+  }
+  return (
+    <ul className="flex max-h-96 flex-col gap-2 overflow-y-auto" aria-label="Saved games">
+      {games.map((game) => (
+        <li key={game.id}>
+          <button
+            type="button"
+            onClick={() => onPick(game.id)}
+            className="flex w-full items-center justify-between gap-2 rounded-box border border-base-300 bg-base-200 px-3 py-2 text-left hover:border-primary"
+          >
+            <span className="min-w-0 flex-1 truncate font-bold">{game.title}</span>
+            <span className="badge badge-ghost badge-sm">{game.mode ?? "state"}</span>
+          </button>
+        </li>
+      ))}
+    </ul>
   );
 }

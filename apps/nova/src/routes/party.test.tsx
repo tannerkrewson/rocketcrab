@@ -49,6 +49,10 @@ const { stubEngine } = vi.hoisted(() => ({
     onState: vi.fn(() => () => undefined),
     isActive: vi.fn(() => false),
     setContainer: vi.fn(),
+    setDisplayName: vi.fn(),
+    selectGame: vi.fn(async () => undefined),
+    retrySetup: vi.fn(),
+    dismissError: vi.fn(),
     createParty: vi.fn(async () => undefined),
     joinByCode: vi.fn(async () => undefined),
     joinByInvite: vi.fn(async () => undefined),
@@ -93,6 +97,16 @@ describe("/party", () => {
     renderParty("/party");
     expect(await screen.findByText("No party here yet")).toBeInTheDocument();
     expect(stubEngine.createParty).not.toHaveBeenCalled();
+  });
+
+  it("starts a party without a game, applying the entered name first (7.5/7.6)", async () => {
+    renderParty("/party");
+    await screen.findByText("No party here yet");
+    const nameInput = await screen.findByLabelText("Your player name");
+    fireEvent.change(nameInput, { target: { value: "Ada" } });
+    fireEvent.click(screen.getByRole("button", { name: /start a party/i }));
+    await waitFor(() => expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada"));
+    await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledWith());
   });
 
   it("creates a party from a saved game", async () => {

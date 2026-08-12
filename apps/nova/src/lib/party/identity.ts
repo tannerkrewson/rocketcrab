@@ -11,6 +11,8 @@
 
 const MEMBER_PREFIX = "member-";
 const IDENTITY_KEY = "nova:party:identity:v1";
+/** The player-chosen name, stored separately so it survives identity resets. */
+const PLAYER_NAME_KEY = "nova:player:name:v1";
 
 function randomHex(length: number): string {
   const bytes = new Uint8Array(Math.ceil(length / 2));
@@ -57,7 +59,9 @@ function readStoredIdentity(): PartyIdentity | null {
 
 /**
  * This page's party identity, generated once per browser and reused across
- * page loads so reconnects/rejoins keep the same memberId (ADR-0007).
+ * page loads so reconnects/rejoins keep the same memberId (ADR-0007). The
+ * display name prefers the player's saved name (7.5); a fresh browser gets
+ * a short generated name until the player sets one.
  */
 export function localPartyIdentity(): PartyIdentity {
   if (cachedIdentity === null) {
@@ -67,9 +71,10 @@ export function localPartyIdentity(): PartyIdentity {
     return cachedIdentity;
   }
   const memberId = generateMemberId();
+  const savedName = getSavedPlayerName();
   const identity: PartyIdentity = {
     memberId,
-    displayName: `Player ${memberId.slice(-4).toUpperCase()}`,
+    displayName: savedName ?? `Player ${memberId.slice(-4).toUpperCase()}`,
   };
   cachedIdentity = identity;
   try {
@@ -80,11 +85,60 @@ export function localPartyIdentity(): PartyIdentity {
   return identity;
 }
 
-/** Test-only reset so each test starts with a fresh identity. */
+/** The player's saved display name, or null when never set (7.5). */
+export function getSavedPlayerName(): string | null {
+  try {
+    const raw = window.localStorage.getItem(PLAYER_NAME_KEY);
+    if (raw === null) {
+      return null;
+    }
+    const trimmed = raw.trim();
+    return trimmed.length === 0 ? null : trimmed;
+  } catch {
+    return null;
+  }
+}
+
+/** Persist the player's chosen display name (7.5). */
+export function setSavedPlayerName(name: string): void {
+  const trimmed = name.trim();
+  if (trimmed.length === 0) {
+    return;
+  }
+  try {
+    window.localStorage.setItem(PLAYER_NAME_KEY, trimmed);
+  } catch {
+    // Storage unavailable — the name just won't survive this page.
+  }
+}
+
+/**
+ * Apply a display-name change: persist it and update the cached identity so
+ * the current page (and future loads) use the new name immediately.
+ */
+export function updatePartyDisplayName(name: string): PartyIdentity | null {
+  const trimmed = name.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+  setSavedPlayerName(trimmed);
+  const identity = localPartyIdentity();
+  const updated: PartyIdentity = { memberId: identity.memberId, displayName: trimmed };
+  cachedIdentity = updated;
+  try {
+    window.localStorage.setItem(IDENTITY_KEY, JSON.stringify(updated));
+  } catch {
+    // Storage unavailable — identity lives for this page.
+  }
+  return updated;
+}
+
+/** Test-only reset so each test starts with a fresh identity (and name). */
 export function resetPartyIdentityForTests(): void {
   cachedIdentity = null;
   try {
     window.localStorage.removeItem(IDENTITY_KEY);
+    window.localStorage.removeItem(PLAYER_NAME_KEY);
   } catch {
     // Storage unavailable — nothing to reset.
   }
