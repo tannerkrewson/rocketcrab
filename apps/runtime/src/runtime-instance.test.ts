@@ -251,6 +251,34 @@ describe("RuntimeInstance registration", () => {
     expect((errors[0] as { message: string }).message).toContain("failed validation");
   });
 
+  it("rejects a malformed apiVersion declaration instead of forwarding it", () => {
+    const { port } = setup();
+    hook().report("defineGame", { options: { apiVersion: "2" } });
+    expect(runtimeMessage(port, "game.registration")).toBeUndefined();
+    const errors = port.sent.filter((m) => (m as { type: string }).type === "runtime.error");
+    expect(errors.length).toBeGreaterThan(0);
+    expect((errors[0] as { message: string }).message).toContain("failed validation");
+  });
+
+  it("reports an unsupported Nova API version and still registers the game", () => {
+    const { port } = setup();
+    hook().report("defineGame", { options: { apiVersion: 99 } });
+    const error = runtimeMessage(port, "runtime.error");
+    expect(error?.category).toBe("unsupported");
+    expect(error?.message).toContain("Unsupported Nova API version 99");
+    // The game still runs (observational diagnostic, like invalid_html).
+    const registration = runtimeMessage(port, "game.registration");
+    expect(registration?.title).toBe("Untitled game");
+  });
+
+  it("accepts the current Nova API version without an unsupported report", () => {
+    const { port } = setup();
+    hook().report("defineGame", { options: { apiVersion: 1 } });
+    const errors = port.sent.filter((m) => (m as { type: string }).type === "runtime.error");
+    expect(errors.some((m) => (m as { category: string }).category === "unsupported")).toBe(false);
+    expect(runtimeMessage(port, "game.registration")?.title).toBe("Untitled game");
+  });
+
   it("ignores a second defineGame call", () => {
     const { port } = setup();
     hook().report("defineGame", { options: { title: "First" } });

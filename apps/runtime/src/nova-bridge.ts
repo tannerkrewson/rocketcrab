@@ -21,11 +21,26 @@
 import { PROTOCOL_VERSION, gameModeSchema, titleSchema, type GameMode } from "@rocketcrab/protocol";
 import { z } from "zod";
 
-/** What the runtime accepts from `nova.defineGame` (S1 will widen this). */
+/**
+ * Nova API versions this build can execute (U4 validation category
+ * `unsupported`). The game-facing `window.nova` bridge currently ships the
+ * protocol version (the bridge sets `window.nova.version`); if the Nova API
+ * ever diverges from the protocol version, S1 formalizes its own constant in
+ * `@rocketcrab/nova-api`.
+ */
+export const SUPPORTED_NOVA_API_VERSIONS: readonly number[] = [PROTOCOL_VERSION];
+
+/**
+ * What the runtime accepts from `nova.defineGame` (S1 will widen this).
+ * `apiVersion` declares the Nova API version the game was built against;
+ * the runtime reports an `unsupported` error when it is not one this build
+ * can execute (U4 validation category), without refusing to run.
+ */
 export const gameDeclarationSchema = z.object({
   title: titleSchema.optional(),
   gameMode: gameModeSchema.optional(),
   gameVersion: z.string().min(1).max(32).optional(),
+  apiVersion: z.number().int().nonnegative().max(1024).optional(),
 });
 export type GameDeclaration = z.infer<typeof gameDeclarationSchema>;
 
