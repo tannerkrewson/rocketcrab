@@ -21,8 +21,19 @@ function themeBlock(name: string): string {
 }
 
 describe("styles.css theme setup", () => {
-  it("keeps only the custom themes enabled", () => {
-    expect(styles).toContain("themes: false");
+  it("keeps the Nova themes as the default and system-dark", () => {
+    expect(styles).not.toContain("themes: false");
+    // No builtin theme carries --default/--prefersdark flags, so the Nova
+    // themes below stay the :root default and the prefers-dark variant.
+    expect(styles).not.toContain("light --default");
+    expect(styles).not.toContain("dark --prefersdark");
+  });
+
+  it("enables all default daisyUI themes for the theme selector (7.3)", () => {
+    // daisyUI 5.7.9's theme list: first entries, a sample, and the last.
+    expect(styles).toContain("light, dark, cupcake");
+    expect(styles).toContain("dracula");
+    expect(styles).toContain("silk;");
   });
 
   it("defines the pure-white light theme as the default", () => {

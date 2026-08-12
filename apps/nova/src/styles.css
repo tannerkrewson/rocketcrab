@@ -1,6 +1,14 @@
 @import "tailwindcss";
 @plugin 'daisyui' {
-  themes: false;
+  /* All 35 default daisyUI themes, selectable via [data-theme=...] by the
+   * theme picker (rocketcrab-9fv.7.3). None carry --default/--prefersdark
+   * flags, so they never override the Nova themes below: the app still
+   * defaults to "nova" (pure white) and follows the OS in dark mode. */
+  themes:
+    light, dark, cupcake, bumblebee, emerald, corporate, synthwave, retro, cyberpunk, valentine,
+    halloween, garden, forest, aqua, lofi, pastel, fantasy, wireframe, black, luxury, dracula, cmyk,
+    autumn, business, acid, lemonade, night, coffee, winter, dim, nord, sunset, caramellatte, abyss,
+    silk;
 }
 
 /*
@@ -15,7 +23,7 @@
  *    daisyUI emits it under @media (prefers-color-scheme: dark) for
  *    :root:not([data-theme]), so it follows the OS preference whenever no
  *    explicit data-theme override is set — and both themes stay reachable
- *    via [data-theme="nova"|"nova-dark"] for the future theme selector
+ *    via [data-theme="nova"|"nova-dark"] for the theme selector
  *    (rocketcrab-9fv.7.3).
  */
 @plugin "daisyui/theme" {
