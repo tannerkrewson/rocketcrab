@@ -26,8 +26,11 @@
 import {
   PROTOCOL_VERSION,
   assertRuntimeMessage,
+  gameApiEventMessageSchema,
   parseRuntimeMessage,
   runtimeBootstrapMessageSchema,
+  type GameApiCallMessage,
+  type GameApiEvent,
   type GameLifecycleEventMessage,
   type GameMetadataMessage,
   type GameMode,
@@ -53,6 +56,7 @@ export type RuntimeHostEvent =
   | { type: "error"; message: RuntimeErrorMessage }
   | { type: "console"; message: RuntimeConsoleMessage }
   | { type: "lifecycle"; message: GameLifecycleEventMessage }
+  | { type: "apiCall"; message: GameApiCallMessage }
   | { type: "unresponsive" }
   | { type: "responsive" }
   | { type: "port-closed" }
@@ -284,6 +288,32 @@ export class RuntimeHostClient {
     };
   }
 
+  /**
+   * Push one session event into the runtime frame (U6 session router): the
+   * host-side NovaSession emits events (player joins, connection changes,
+   * start/end, raw messages, simulation inputs, errors) and this bridge
+   * forwards them over the instance channel as a validated `game.apiEvent`
+   * message; the runtime delivers them to the game frame's `window.nova`
+   * handlers. No-op when the runtime is not running.
+   */
+  pushApiEvent(event: GameApiEvent): void {
+    if (!this.port || this.runtimeInstanceId === null) {
+      return;
+    }
+    const message = assertRuntimeMessage(
+      gameApiEventMessageSchema.parse({
+        version: PROTOCOL_VERSION,
+        runtimeInstanceId: this.runtimeInstanceId,
+        ...(this.sessionId !== undefined ? { sessionId: this.sessionId } : {}),
+        messageId: newMessageId(),
+        sentAt: Date.now(),
+        type: "game.apiEvent",
+        event,
+      }),
+    );
+    this.send(message);
+  }
+
   /** Remove the frame and all listeners without sending further messages. */
   dispose(): void {
     this.stopHeartbeat();
@@ -372,6 +402,9 @@ export class RuntimeHostClient {
         break;
       case "game.lifecycle":
         this.emit({ type: "lifecycle", message });
+        break;
+      case "game.apiCall":
+        this.emit({ type: "apiCall", message });
         break;
       default:
         // The runtime never sends bootstrap/ping/reload/end back; ignore.

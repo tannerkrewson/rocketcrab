@@ -1,7 +1,7 @@
 import { PROTOCOL_VERSION, type GameMode } from "@rocketcrab/protocol";
 import type { SavedGame } from "@rocketcrab/core";
 import { Link, useBlocker, useNavigate } from "@tanstack/react-router";
-import { ClipboardPaste, CopyPlus, Eraser, Play, Save } from "lucide-react";
+import { ClipboardPaste, CopyPlus, Eraser, FlaskConical, Play, Save } from "lucide-react";
 import {
   useCallback,
   useContext,
@@ -28,6 +28,7 @@ import {
 import { useRuntimeSession } from "../../lib/editor/runtime-session";
 import { formatBytes, validateSource } from "../../lib/editor/validation";
 import { readFromClipboard, writeToClipboard } from "../../lib/editor/clipboard";
+import { storeArenaSource } from "../../lib/arena/draft-source";
 import { CodeEditor } from "./CodeEditor";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import { PreviewPanel } from "./PreviewPanel";
@@ -284,6 +285,31 @@ export function EditorPage({ game }: { game?: SavedGame }) {
     }
   }, []);
 
+  /**
+   * Test multiplayer (U6): hand the CURRENT editor source (saved or not) to
+   * the test arena via sessionStorage and open it. The arena tests exactly
+   * what the creator sees in the editor; unsaved changes are not written to
+   * the saved game.
+   */
+  const handleTestMultiplayer = useCallback(() => {
+    const errors = validateSource(source).filter((issue) => issue.severity === "error");
+    if (errors.length > 0) {
+      toast.error("Fix the validation errors before testing multiplayer.");
+      return;
+    }
+    const id = game?.id ?? draftGameId();
+    storeArenaSource({ gameId: id, source });
+    if (game !== undefined) {
+      void navigate({
+        to: "/games/$gameId/test",
+        params: { gameId: game.id },
+        ignoreBlocker: true,
+      });
+    } else {
+      void navigate({ to: "/test", ignoreBlocker: true });
+    }
+  }, [game, navigate, source]);
+
   const handleSave = useCallback(async () => {
     if (savingRef.current) return;
     savingRef.current = true;
@@ -452,6 +478,14 @@ export function EditorPage({ game }: { game?: SavedGame }) {
         <Play className="h-4 w-4" aria-hidden="true" />
         {runStatus === "running" ? "Re-run" : "Run"}
       </Button>
+      <Button
+        variant="secondary"
+        onClick={handleTestMultiplayer}
+        title="Run this source with several simulated players in the test arena"
+      >
+        <FlaskConical className="h-4 w-4" aria-hidden="true" />
+        Test multiplayer
+      </Button>
     </>
   );
 
@@ -605,6 +639,15 @@ export function EditorPage({ game }: { game?: SavedGame }) {
           >
             <Play className="h-4 w-4" aria-hidden="true" />
             Run
+          </Button>
+          <Button
+            variant="secondary"
+            size="md"
+            onClick={handleTestMultiplayer}
+            title="Run this source with several simulated players in the test arena"
+          >
+            <FlaskConical className="h-4 w-4" aria-hidden="true" />
+            Test
           </Button>
         </div>
       </div>

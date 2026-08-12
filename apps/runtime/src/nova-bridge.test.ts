@@ -65,6 +65,38 @@ describe("NOVA_BRIDGE_SCRIPT", () => {
       expect(NOVA_BRIDGE_SCRIPT).toContain(`report('${method}'`);
     }
   });
+
+  it("receives host-pushed session events and keeps session state (U6 router)", () => {
+    // The host session router pushes game.apiEvent payloads into the frame
+    // through the same-origin hook; the bridge dispatches each kind to the
+    // matching handler lists and updates the stateful reads.
+    expect(NOVA_BRIDGE_SCRIPT).toContain(
+      "window.__novaGameBridge = { version: 1, receive: receive }",
+    );
+    expect(NOVA_BRIDGE_SCRIPT).toContain("function receive(kind, payload)");
+    for (const kind of [
+      "'playerJoined'",
+      "'playerLeft'",
+      "'connection'",
+      "'start'",
+      "'end'",
+      "'state'",
+      "'rawMessage'",
+      "'simulationInput'",
+      "'simulationSnapshot'",
+      "'error'",
+    ]) {
+      expect(NOVA_BRIDGE_SCRIPT).toContain(`case ${kind}:`);
+    }
+    // Session state is now stateful (mirrors createNovaClient getters).
+    expect(NOVA_BRIDGE_SCRIPT).toContain("get player()");
+    expect(NOVA_BRIDGE_SCRIPT).toContain("get players()");
+    expect(NOVA_BRIDGE_SCRIPT).toContain("get connectionStatus()");
+    expect(NOVA_BRIDGE_SCRIPT).toContain("var selfPlayer = null;");
+    expect(NOVA_BRIDGE_SCRIPT).toContain("var connectionStatus = 'disconnected';");
+    // The bootstrap player identity is injected before the bridge runs.
+    expect(NOVA_BRIDGE_SCRIPT).toContain("window.__novaBootstrap");
+  });
 });
 
 describe("gameDeclarationSchema", () => {

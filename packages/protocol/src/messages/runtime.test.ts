@@ -4,6 +4,8 @@ import { htmlSourceBytes } from "../limits";
 import {
   RUNTIME_MESSAGE_TYPES,
   endGameRequestMessageSchema,
+  gameApiCallMessageSchema,
+  gameApiEventMessageSchema,
   gameLifecycleEventMessageSchema,
   gameMetadataMessageSchema,
   gameRegistrationMessageSchema,
@@ -42,6 +44,8 @@ describe("runtime message schemas", () => {
       runtimePongMessageSchema,
       runtimeReloadMessageSchema,
       runtimeConsoleMessageSchema,
+      gameApiCallMessageSchema,
+      gameApiEventMessageSchema,
     ];
     expect(schemas).toHaveLength(RUNTIME_MESSAGE_TYPES.length);
     for (const schema of schemas) {
@@ -99,6 +103,19 @@ describe("runtime message schemas", () => {
       runtimeConsoleMessageSchema.parse(
         baseRuntime({ type: "runtime.console", level: "warn", message: "flaky", dropped: 3 }),
       ),
+      gameApiCallMessageSchema.parse(
+        baseRuntime({
+          type: "game.apiCall",
+          method: "dispatch",
+          payload: { action: { type: "playCard", payload: { card: 1 } } },
+        }),
+      ),
+      gameApiEventMessageSchema.parse(
+        baseRuntime({
+          type: "game.apiEvent",
+          event: { kind: "playerJoined", player: { id: "member-2", name: "Blair" } },
+        }),
+      ),
     ];
     expect(validExamples).toHaveLength(RUNTIME_MESSAGE_TYPES.length);
   });
@@ -116,6 +133,8 @@ describe("runtime message schemas", () => {
       baseRuntime({ type: "runtime.pong", status: "extra" }),
       baseRuntime({ type: "runtime.reload", source: "<html></html>" }),
       baseRuntime({ type: "runtime.console", level: "trace", message: "x" }),
+      baseRuntime({ type: "game.apiCall", method: "teleport", payload: {} }),
+      baseRuntime({ type: "game.apiEvent", event: { kind: "teleport" } }),
     ];
     expect(invalidExamples).toHaveLength(RUNTIME_MESSAGE_TYPES.length);
     for (const example of invalidExamples) {
@@ -140,6 +159,73 @@ describe("runtime message schemas", () => {
     if (!result.ok) {
       expect(result.error.code).toBe("invalid_message");
     }
+  });
+
+  it("validates game.apiCall payloads and methods at the boundary", () => {
+    // Valid forwarded calls parse (the runtime validated them already).
+    const ready = parseRuntimeMessage(
+      baseRuntime({ type: "game.apiCall", method: "ready", payload: {} }),
+    );
+    expect(ready.ok).toBe(true);
+    const rawSend = parseRuntimeMessage(
+      baseRuntime({
+        type: "game.apiCall",
+        method: "raw.send",
+        payload: { name: "chat", payload: { text: "hi" } },
+      }),
+    );
+    expect(rawSend.ok).toBe(true);
+
+    // Unknown methods and malformed envelopes fail.
+    const unknownMethod = parseRuntimeMessage(
+      baseRuntime({ type: "game.apiCall", method: "launchMissiles", payload: {} }),
+    );
+    expect(unknownMethod.ok).toBe(false);
+    const noPayload = parseRuntimeMessage(baseRuntime({ type: "game.apiCall", method: "ready" }));
+    expect(noPayload.ok).toBe(false);
+  });
+
+  it("validates every game.apiEvent kind", () => {
+    const events = [
+      { kind: "identity", player: { id: "member-1", name: "Alex" } },
+      { kind: "connection", status: "reconnecting" },
+      { kind: "start" },
+      { kind: "end", reason: "user_exit" },
+      { kind: "state", state: { tick: 1 } },
+      {
+        kind: "rawMessage",
+        channel: "chat",
+        message: { from: { id: "member-2", name: "Blair" }, payload: "hi", binary: false },
+      },
+      {
+        kind: "simulationInput",
+        input: {
+          type: "move",
+          payload: { dx: 1 },
+          tick: 3,
+          sender: { id: "member-2", name: "Blair" },
+        },
+      },
+      { kind: "simulationSnapshot", snapshot: { t: 1 } },
+      {
+        kind: "error",
+        code: "not_started",
+        message: "nova.dispatch() is only available after start",
+      },
+    ];
+    for (const event of events) {
+      const result = parseRuntimeMessage(baseRuntime({ type: "game.apiEvent", event }));
+      expect(result.ok, JSON.stringify(event)).toBe(true);
+    }
+    // Unknown kinds and missing required fields fail.
+    const bad = parseRuntimeMessage(
+      baseRuntime({ type: "game.apiEvent", event: { kind: "rawMessage", channel: "x" } }),
+    );
+    expect(bad.ok).toBe(false);
+    const badStatus = parseRuntimeMessage(
+      baseRuntime({ type: "game.apiEvent", event: { kind: "connection", status: "flaky" } }),
+    );
+    expect(badStatus.ok).toBe(false);
   });
 
   it("rejects unknown runtime message types with a useful error", () => {

@@ -19,6 +19,7 @@
 import {
   PROTOCOL_VERSION,
   parseRuntimeMessage,
+  type GameApiEventMessage,
   type GameLifecycleEventMessage,
   type GameMode,
   type RuntimeBootstrapMessage,
@@ -27,6 +28,7 @@ import {
 } from "@rocketcrab/protocol";
 import { classifyHtmlSource } from "./html-source";
 import {
+  buildApiCallMessage,
   buildConsoleMessage,
   buildErrorMessage,
   buildLifecycleMessage,
@@ -235,7 +237,15 @@ export class RuntimeInstance {
   }
 
   private injectedSource(html: string): string {
-    return `<script>\n${NOVA_BRIDGE_SCRIPT}\n</script>\n${html}`;
+    // The validated bootstrap player identity is injected before the bridge
+    // script so `window.nova.player` is correct from the first game tick
+    // (same-origin forwarding of data the host already validated; the game
+    // frame never sees the host origin).
+    const identity = JSON.stringify({
+      memberId: this.bootstrap.player.memberId,
+      displayName: this.bootstrap.player.displayName,
+    });
+    return `<script>window.__novaBootstrap = { player: ${identity} };</script>\n<script>\n${NOVA_BRIDGE_SCRIPT}\n</script>\n${html}`;
   }
 
   private armRegistrationTimer(): void {
@@ -274,6 +284,9 @@ export class RuntimeInstance {
         break;
       case "game.end":
         this.destroy(parsed.value.reason);
+        break;
+      case "game.apiEvent":
+        this.handleApiEvent(parsed.value.event);
         break;
       default:
         this.sendError(
@@ -374,11 +387,11 @@ export class RuntimeInstance {
   }
 
   /**
-   * A forwarded Nova API call (S1): validate the payload, then surface it
-   * clearly. No host-side session router exists before the arena/party
-   * milestones (U6/P1/S2), so a validated call cannot be performed yet and
-   * is reported as `unsupported` — never silently dropped. The session
-   * router milestones replace this branch with real forwarding.
+   * A forwarded Nova API call: validate the payload (never trust game
+   * input), then forward it to the host session router (U6/P1) as a
+   * `game.apiCall` message. The host routes the call into this game's
+   * NovaSession over the transport; host-pushed events come back as
+   * `game.apiEvent`. Never dropped silently.
    */
   private handleApiCall(method: NovaApiCallMethod, payload: unknown): void {
     const parsed = novaApiCallSchemas[method].safeParse(payload);
@@ -386,10 +399,26 @@ export class RuntimeInstance {
       this.sendError("runtime", `nova.${method}() call failed validation; ignored.`);
       return;
     }
-    this.sendError(
-      "unsupported",
-      `nova.${method}() is not available in this build yet: the host has not connected this game to a party session.`,
-    );
+    this.send(buildApiCallMessage(this.runtimeInstanceId, method, parsed.data, this.sessionId));
+  }
+
+  /**
+   * A host-pushed session event (`game.apiEvent`): deliver it into the game
+   * frame through the same-origin bridge hook. Events only flow after the
+   * game registered (the host joins the session on registration), so the
+   * bridge is installed by the time the first event arrives; a missing
+   * frame (torn down between messages) drops the event safely.
+   */
+  private handleApiEvent(event: GameApiEventMessage["event"]): void {
+    const bridge = this.frame?.window as
+      | (Window & { __novaGameBridge?: { receive?: (kind: string, payload: unknown) => void } })
+      | null
+      | undefined;
+    try {
+      bridge?.__novaGameBridge?.receive?.(event.kind, event);
+    } catch {
+      // Game-originated handler exceptions never break the runtime loop.
+    }
   }
 
   private handleGameError(payload: unknown): void {

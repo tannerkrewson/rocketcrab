@@ -429,29 +429,36 @@ describe("RuntimeInstance protocol boundary", () => {
     );
   });
 
-  it("validates and surfaces forwarded Nova API calls as unsupported (S1)", () => {
-    // Error reports are rate-limited (F6: 5/s); refill the bucket between
-    // batches with fake timers so all six methods are exercised.
-    vi.useFakeTimers();
+  it("forwards validated Nova API calls to the host session router (U6)", () => {
     const { port } = setup();
     hook().report("ready", {});
     hook().report("dispatch", { action: { type: "playCard", payload: { c: 1 } } });
     hook().report("raw.createChannel", { spec: { name: "chat" } });
-    hook().report("raw.send", { name: "chat", payload: "hi" });
+    hook().report("raw.send", { name: "chat", payload: "hi", options: { to: "member-2" } });
     hook().report("simulation.register", {});
-    vi.advanceTimersByTime(1100);
-    hook().report("simulation.sendInput", { input: { type: "move" } });
-    const unsupported = port.sent.filter(
-      (m) =>
-        (m as { type: string }).type === "runtime.error" &&
-        (m as { category?: string }).category === "unsupported",
+    hook().report("simulation.sendInput", { input: { type: "move", tick: 3 } });
+    const calls = port.sent.filter((m) => (m as { type: string }).type === "game.apiCall");
+    expect(calls).toHaveLength(6);
+    const byMethod = new Map(calls.map((m) => [(m as { method: string }).method, m]));
+    expect([...byMethod.keys()].sort()).toEqual([
+      "dispatch",
+      "raw.createChannel",
+      "raw.send",
+      "ready",
+      "simulation.register",
+      "simulation.sendInput",
+    ]);
+    // The validated payload is forwarded verbatim and the envelope carries
+    // the runtime instance id and session id.
+    expect((byMethod.get("dispatch") as { payload: unknown }).payload).toEqual({
+      action: { type: "playCard", payload: { c: 1 } },
+    });
+    expect((byMethod.get("ready") as { runtimeInstanceId: string }).runtimeInstanceId).toBe(
+      "runtime-1",
     );
-    expect(unsupported).toHaveLength(6);
-    const messages = unsupported.map((m) => String((m as { message?: string }).message)).join("\n");
-    expect(messages).toContain("nova.ready() is not available");
-    expect(messages).toContain("nova.dispatch() is not available");
-    expect(messages).toContain("nova.raw.createChannel() is not available");
-    expect(messages).toContain("nova.simulation.sendInput() is not available");
+    expect(port.sent).not.toContain(
+      expect.objectContaining({ type: "runtime.error", category: "unsupported" }),
+    );
   });
 
   it("rejects malformed forwarded Nova API calls without forwarding them", () => {
@@ -465,6 +472,88 @@ describe("RuntimeInstance protocol boundary", () => {
     expect(errors[0]?.category).toBe("runtime");
     expect(String(errors[0]?.message)).toContain("nova.dispatch() call failed validation");
     expect(String(errors[1]?.message)).toContain("nova.raw.send() call failed validation");
+  });
+
+  it("injects the validated bootstrap player identity into the frame", () => {
+    const { frameHost } = setup({
+      bootstrap: bootstrapMessage({ player: { memberId: "member-7", displayName: "Robin" } }),
+    });
+    const frame = frameHost.frames[0]!;
+    expect(frame.source).toContain("window.__novaBootstrap");
+    expect(frame.source).toContain('"memberId":"member-7"');
+    expect(frame.source).toContain('"displayName":"Robin"');
+    // The bridge script still runs before the game HTML.
+    expect(frame.source.indexOf("window.__novaBootstrap")).toBeLessThan(
+      frame.source.indexOf("defineGame"),
+    );
+    expect(frame.source.indexOf("defineGame")).toBeLessThan(
+      frame.source.indexOf("<!doctype html>"),
+    );
+  });
+
+  it("delivers host-pushed session events into the game frame", () => {
+    const { instance, port, frameHost } = setup();
+    const frame = frameHost.frames[0]!;
+    receiveOnPort(port, {
+      version: 1,
+      runtimeInstanceId: "runtime-1",
+      sessionId: "session-1",
+      messageId: "message-api-event",
+      sentAt: 1_700_000_000_010,
+      type: "game.apiEvent",
+      event: { kind: "playerJoined", player: { id: "member-2", name: "Blair" } },
+    });
+    receiveOnPort(port, {
+      version: 1,
+      runtimeInstanceId: "runtime-1",
+      sessionId: "session-1",
+      messageId: "message-api-event-2",
+      sentAt: 1_700_000_000_011,
+      type: "game.apiEvent",
+      event: { kind: "connection", status: "connected" },
+    });
+    expect(frame.received).toEqual([
+      {
+        kind: "playerJoined",
+        payload: { kind: "playerJoined", player: { id: "member-2", name: "Blair" } },
+      },
+      { kind: "connection", payload: { kind: "connection", status: "connected" } },
+    ]);
+    expect(instance.isDestroyed()).toBe(false);
+    // Events are never echoed back to the host.
+    expect(messageTypes(port)).not.toContain("game.apiEvent");
+  });
+
+  it("drops apiEvents safely when the frame is already torn down", () => {
+    const { instance, port, frameHost } = setup();
+    instance.destroy("user_exit");
+    expect(frameHost.frames[0]?.destroyed).toBe(true);
+    expect(() =>
+      receiveOnPort(port, {
+        version: 1,
+        runtimeInstanceId: "runtime-1",
+        sessionId: "session-1",
+        messageId: "message-api-event",
+        sentAt: 1_700_000_000_010,
+        type: "game.apiEvent",
+        event: { kind: "start" },
+      }),
+    ).not.toThrow();
+  });
+
+  it("rejects malformed apiEvent messages with a security error", () => {
+    const { port } = setup();
+    receiveOnPort(port, {
+      version: 1,
+      runtimeInstanceId: "runtime-1",
+      sessionId: "session-1",
+      messageId: "message-bad",
+      sentAt: 1_700_000_000_010,
+      type: "game.apiEvent",
+      event: { kind: "teleport" },
+    });
+    const error = lastRuntimeMessage(port, "runtime.error");
+    expect(error?.category).toBe("security");
   });
 
   it("rejects defineGame declarations targeting unknown API versions", () => {
