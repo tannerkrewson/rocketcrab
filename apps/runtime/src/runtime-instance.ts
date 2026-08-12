@@ -328,6 +328,7 @@ export class RuntimeInstance {
       case "raw.send":
       case "simulation.register":
       case "simulation.sendInput":
+      case "stateResponse":
         this.handleApiCall(kind, payload);
         break;
       case "error":

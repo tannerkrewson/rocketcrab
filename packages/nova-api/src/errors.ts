@@ -39,6 +39,32 @@ export const NOVA_ERROR_CODES = {
   invalid_message: "invalid_message",
   /** The host cannot perform the requested operation in this build. */
   unsupported: "unsupported",
+  /** A dispatched action was based on an outdated state revision (S2). */
+  stale_revision: "stale_revision",
+  /** A dispatched action was not applied before its deadline (S2). */
+  timed_out: "timed_out",
+  /** The action type has no registered handler (S2). */
+  unknown_action: "unknown_action",
+  /** The action payload exceeded the size limit (S2). */
+  payload_too_large: "payload_too_large",
+  /** Applying the action produced an oversized canonical state (S2). */
+  state_too_large: "state_too_large",
+  /** An action handler produced a non-plain-data state (S2). */
+  invalid_state: "invalid_state",
+  /** No authority is active, so the action cannot be applied (S2; S3). */
+  no_authority: "no_authority",
+  /** The game ended before the action could be applied (S2). */
+  game_ended: "game_ended",
+  /** An action handler threw (S2). */
+  handler_error: "handler_error",
+  /** A player's view could not be computed (S2). */
+  view_error: "view_error",
+  /** The initial state could not be created (S2). */
+  initial_state_error: "initial_state_error",
+  /** The authority runtime did not answer in time (S2). */
+  execution_timeout: "execution_timeout",
+  /** The authority runtime failed while executing (S2). */
+  execution_failed: "execution_failed",
 } as const;
 
 export type NovaErrorCode = (typeof NOVA_ERROR_CODES)[keyof typeof NOVA_ERROR_CODES];
