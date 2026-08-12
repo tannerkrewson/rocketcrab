@@ -158,10 +158,36 @@ standard Chromium works — Helium is not a valid control browser.
   internet endpoints); the WebRTC data path does not: the carrier-NAT phone
   gathers only host candidates (no STUN configured), so ICE never completes.
   Same-Wi-Fi passes connect via host candidates only.
-- **S4 — two phones, different networks: PENDING** (needs a second
-  phone/tablet).
+- **S4 — two phones, different networks: EXCLUDED** (only one iPhone
+  available); S3 already establishes the cross-network TURN verdict, and P0
+  `rocketcrab-23s` will re-run phone-to-phone with TURN configured.
 - **S5–S9 — pending** (3-peer partial, leave/rejoin, 5 MiB transfer,
   backgrounding, airplane-mode failure reporting).
+
+- **S1 — two separate desktop devices (desktop + Mac): PASS**, joined
+  quickly, low ping.
+- **S5 — four peers (2 desktop tabs + Mac + iPhone): PASS**, all joined
+  quickly, pings < 10 ms.
+- **S6 — leave/rejoin: desktop/Mac fine; phone rejoin FAILS** with
+  "could not connect to peer … after exchanging SDP; configure TURN
+  servers" — **on the same Wi-Fi**, where host candidates should suffice.
+  This is a rejoin/session bug, not the S3 NAT case (see F11).
+- **S7 — 5 MiB transfer iPhone→Mac: PASS**, 1120 ms (≈4.5 MiB/s — faster
+  than the 1278 ms loopback baseline).
+- **S8 — backgrounding: FAIL.** After ~20 s at Home the iPhone dropped; on
+  return it was not in a room and rejoin did not work (same error pattern as
+  S6); logs showed only "peer left". Mobile-suspension finding for M1.
+- **S9 — airplane-mode failure reporting: pending.**
+
+- **F11 — Phone rejoin after Leave()/backgrounding fails on same Wi-Fi
+  (new finding).** The phone's rejoin after Leave() or after iOS background
+  suspension fails with "configure TURN servers" even on the same Wi-Fi,
+  where host candidates should connect. Likely mechanisms: stale peer
+  handles / offer-pool churn on the other side (matches the automated F4
+  finding that rejected peers are not cleaned up and keep re-offering) plus
+  iOS WebRTC suspension during backgrounding. P1/P2 must fail-fast rejoin
+  and dispose stale handles; M1 mobile-suspension material. Distinct from
+  the cross-network TURN verdict (S3, P0 `rocketcrab-23s`).
 
 **TURN verdict (provisional, per S3):** ordinary cross-network / phone
 connectivity is **unreliable without TURN**. Created P0 discovered issue
