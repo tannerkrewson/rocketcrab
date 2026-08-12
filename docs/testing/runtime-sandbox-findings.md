@@ -5,10 +5,10 @@ iPhone + Mobile Safari) — results in the section below.
 
 ## What was built
 
-A temporary two-origin HTTPS spike at `spikes/runtime-sandbox/` (not part of
-the npm workspace): a host app (origin A, `:5273`), a runtime app (origin B,
-`:5274`), and an unrelated third origin (C, `:5275`) used to prove wrong-origin
-rejection. The host embeds the runtime in a cross-origin iframe, bootstraps it
+A temporary two-origin HTTPS spike (since industrialised into `apps/runtime`
+and removed in release cleanup): a host app (origin A, `:5273`), a runtime
+app (origin B, `:5274`), and an unrelated third origin (C, `:5275`) used to
+prove wrong-origin rejection. The host embeds the runtime in a cross-origin iframe, bootstraps it
 with an **exact-origin `postMessage`** that transfers a dedicated
 **`MessageChannel`**, and sends game HTML over that channel. The runtime
 executes each game inside a same-origin sandboxed iframe

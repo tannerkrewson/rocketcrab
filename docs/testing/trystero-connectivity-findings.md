@@ -7,8 +7,10 @@ cross-device human pass (desktop + Mac + iPhone). TURN verdict:
 backgrounding bug (F11) handed to P1/P2/M1.
 
 Beads issue: `rocketcrab-9fv.1.5`. Trystero **0.25.3**, **Nostr** strategy (default).
-Automated runs: `spikes/trystero-connectivity` Playwright suite, 11 scenarios,
-multiple pages in one headless Chromium instance on one machine.
+Automated runs: the spike's Playwright suite, 11 scenarios, multiple pages in
+one headless Chromium instance on one machine (spike removed in release
+cleanup — the P1 harness now lives in `packages/trystero-transport`, e2e in
+`e2e-trystero/`).
 
 ## 1. Scope and method
 

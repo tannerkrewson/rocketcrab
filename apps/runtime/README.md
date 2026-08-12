@@ -4,8 +4,7 @@ The runtime-origin application (U3). It executes untrusted game HTML on a
 separate origin from the Nova shell (ADR-0001) inside a same-origin sandboxed
 game frame, and talks to the shell over a versioned protocol
 (`@rocketcrab/protocol`, runtime plane). This is the industrialised shape of
-the F4 spike (`spikes/runtime-sandbox/`, findings in
-`docs/testing/runtime-sandbox-findings.md`).
+the F4 spike (findings in `docs/testing/runtime-sandbox-findings.md`).
 
 ## The trust boundary
 

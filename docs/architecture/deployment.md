@@ -170,8 +170,8 @@ npm run dev:https
 # devices open https://192.168.1.10:5173 (accept the cert warning)
 ```
 
-(`scripts/gen-certs.mjs` generalises the F4 spike tooling;
-`spikes/runtime-sandbox/scripts/gen-certs.mjs` remains for the spike.)
+(`scripts/gen-certs.mjs` generalises the F4 spike tooling; the spike's own
+copy was removed in release cleanup.)
 
 ## 8. Deployment, verification, rollback
 

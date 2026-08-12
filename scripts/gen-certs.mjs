@@ -1,8 +1,8 @@
 // Generates throwaway self-signed certs for local HTTPS development of both
 // origins (M2, `npm run dev:https`). The certs are gitignored — local
 // tooling only, never production. Idempotent: skips when certs already
-// exist. Generalised from the F4 spike's
-// `spikes/runtime-sandbox/scripts/gen-certs.mjs`.
+// exist. Generalised from the F4 spike's dev-cert generator
+// (spike removed in release cleanup).
 //
 // Usage:
 //   node scripts/gen-certs.mjs                # localhost only
