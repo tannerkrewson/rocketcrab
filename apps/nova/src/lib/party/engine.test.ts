@@ -1114,3 +1114,123 @@ describe("party engine — rename announcements (7.25)", () => {
     await settle(world);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Classic games in parties, kick, and reload (7.7.4, 7.29)
+// ---------------------------------------------------------------------------
+
+describe("party engine — classic games, kick, and reload (7.7.4, 7.29)", () => {
+  it("shares a classic room: the host creates it once, the joiner builds the same room", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+
+    // Host starts a party with no game (7.6) and picks a classic game; the
+    // room is created in the host's browser (protobowl needs no fetch).
+    const promise = a.engine.createParty();
+    for (let i = 0; i < 8; i += 1) {
+      await flush();
+      world.clock.advance(1_000);
+    }
+    await settle(world);
+    await promise;
+    const code = a.engine.getState().code as string;
+
+    await a.engine.selectClassicGame("protobowl");
+    await settle(world);
+    const aState = a.engine.getState();
+    expect(aState.phase).toBe("lobby");
+    expect(aState.classicGame?.gameId).toBe("protobowl");
+    expect(aState.classicGame?.connectResult.player.url).toContain("https://protobowl.com/");
+    expect(aState.game?.title).toBe("Protobowl");
+    // Classic games bypass the source-transfer/ready gates (7.7.4).
+    expect(aState.canStart).toBe(true);
+
+    // Joiner joins, asks for the room, and receives the shared spec.
+    const { join: joinPromise, settled } = startJoin(b, world, code);
+    await settled;
+    const pending = a.engine.getState().pendingJoinRequests;
+    a.engine.respondToJoinRequest(pending[0]?.memberId ?? "", true);
+    await settle(world);
+    await joinPromise;
+    await settle(world);
+
+    const bState = b.engine.getState();
+    expect(bState.phase).toBe("lobby");
+    expect(bState.classicGame?.gameId).toBe("protobowl");
+    expect(bState.classicGame?.connectResult.player.url).toBe(
+      aState.classicGame?.connectResult.player.url,
+    );
+    expect(bState.canStart).toBe(true);
+
+    // Starting flips BOTH phones to playing without a Nova source transfer.
+    a.engine.startGame();
+    await settle(world);
+    expect(a.engine.getState().phase).toBe("playing");
+    expect(b.engine.getState().phase).toBe("playing");
+
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+    await settle(world);
+  });
+
+  it("kicks a member: the kicked member sees a removed state and can dismiss it", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    const code = await runCreate(a, world);
+    await registerLocalGame(a, world);
+    const { join: joinPromise, settled } = startJoin(b, world, code);
+    await settled;
+    const pending = a.engine.getState().pendingJoinRequests;
+    a.engine.respondToJoinRequest(pending[0]?.memberId ?? "", true);
+    await settle(world);
+    await joinPromise;
+    await settle(world);
+    expect(b.engine.getState().phase).toBe("lobby");
+
+    a.engine.kickMember(b.memberId);
+    await settle(world);
+    await flush();
+    await settle(world);
+
+    // The kicked member sees the removed screen after the teardown settles.
+    const bState = b.engine.getState();
+    expect(bState.removedReason).toBe("The host removed you from the party.");
+    expect(bState.phase).toBe("removed");
+    // The host still has a live lobby.
+    expect(a.engine.getState().phase).toBe("lobby");
+
+    b.engine.dismissRemoved();
+    expect(b.engine.getState().phase).toBe("idle");
+    expect(b.engine.getState().removedReason).toBeNull();
+  });
+
+  it("reloads: local reload reaches the runtime; reload all reaches peers", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    const code = await runCreate(a, world);
+    await registerLocalGame(a, world);
+    const { join: joinPromise, settled } = startJoin(b, world, code);
+    await settled;
+    const pending = a.engine.getState().pendingJoinRequests;
+    a.engine.respondToJoinRequest(pending[0]?.memberId ?? "", true);
+    await settle(world);
+    await joinPromise;
+    await registerLocalGame(b, world);
+    await settle(world);
+
+    // Reload my game: the local runtime receives runtime.reload.
+    a.engine.reloadMyGame();
+    const sentA = a.harness.port1.sent as Array<{ type: string }>;
+    expect(sentA.some((message) => message.type === "runtime.reload")).toBe(true);
+
+    // Reload all: the peer's runtime receives runtime.reload too.
+    b.harness.port1.sent.length = 0;
+    a.engine.reloadAllGames();
+    await settle(world);
+    const sentB = b.harness.port1.sent as Array<{ type: string }>;
+    expect(sentB.some((message) => message.type === "runtime.reload")).toBe(true);
+  });
+});
