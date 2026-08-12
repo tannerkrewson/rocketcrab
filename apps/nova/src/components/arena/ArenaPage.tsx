@@ -31,15 +31,7 @@ import {
   WifiOff,
   X,
 } from "lucide-react";
-import {
-  createContext,
-  useCallback,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
@@ -48,7 +40,7 @@ import { useRecordTestResults } from "../../lib/games/queries";
 import { useArena } from "../../lib/arena/use-arena";
 import { runtimeOriginForMainOrigin } from "../../lib/runtime-origin";
 import type { ChannelPort } from "../../lib/runtime-host";
-import type { ArenaPlayer, ArenaState } from "../../lib/arena/types";
+import type { ArenaPlayer } from "../../lib/arena/types";
 
 /** Test seams forwarded to RuntimeHostClient (no-op in production). */
 export interface ArenaRuntimeSeams {
@@ -58,23 +50,6 @@ export interface ArenaRuntimeSeams {
 }
 
 export const ArenaRuntimeSeamsContext = createContext<ArenaRuntimeSeams>({});
-
-/** Viewport breakpoint matching the md: grid (desktop arena layout). */
-function useIsDesktop(): boolean {
-  const [isDesktop, setIsDesktop] = useState(() =>
-    typeof window.matchMedia === "function"
-      ? window.matchMedia("(min-width: 768px)").matches
-      : true,
-  );
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") return;
-    const mediaQuery = window.matchMedia("(min-width: 768px)");
-    const onChange = (event: MediaQueryListEvent) => setIsDesktop(event.matches);
-    mediaQuery.addEventListener("change", onChange);
-    return () => mediaQuery.removeEventListener("change", onChange);
-  }, []);
-  return isDesktop;
-}
 
 function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString(undefined, { timeStyle: "short" });
@@ -149,7 +124,7 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
   const gameMode = game?.mode ?? "state";
 
   const onRunSucceeded = useCallback(
-    (outcome: { runId: number; source: string }) => {
+    (_outcome: { runId: number; source: string }) => {
       if (game === undefined) return;
       // Persist the last successful test time (U2 recordTestResults). Only a
       // clean full run (every player registered + started, no fatal errors)

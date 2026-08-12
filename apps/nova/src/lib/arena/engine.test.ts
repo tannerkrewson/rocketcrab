@@ -10,7 +10,7 @@
 import type { GameApiEvent } from "@rocketcrab/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArenaEngine, type ArenaEngineOptions, type ArenaPlayerSpec } from "./engine";
-import type { ArenaRunOutcome, ArenaState } from "./types";
+import type { ArenaState } from "./types";
 import {
   apiCallMessage,
   createHarness,
@@ -22,7 +22,6 @@ import {
   runtimeErrorMessage,
   runToStart,
   type ArenaHarness,
-  type FakeChannel,
 } from "./test-harness";
 
 const SOURCE =

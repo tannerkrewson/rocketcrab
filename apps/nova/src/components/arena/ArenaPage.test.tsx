@@ -25,7 +25,7 @@ import {
   runToStart,
   type ArenaHarness,
 } from "../../lib/arena/test-harness";
-import { ArenaPage, ArenaRuntimeSeamsContext } from "./ArenaPage";
+import { ArenaRuntimeSeamsContext } from "./ArenaPage";
 
 const SOURCE =
   "<!doctype html><html><head><title>Rocket Rumble</title></head><body><p>rockets</p></body></html>";
@@ -229,7 +229,6 @@ describe("ArenaPage — draft mode and source handoff", () => {
     storeArenaSource({ gameId: "draft-abc", source: SOURCE });
     const harness = createHarness();
     renderRoute(["/test"], harness);
-    const desktop = await desktopLayout();
     await runToStart(harness.channels, 2);
     await waitFor(() => expect(screen.getByText("Test passed")).toBeInTheDocument());
     // No party launch for drafts (nothing saved to launch).
