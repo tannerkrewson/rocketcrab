@@ -4,9 +4,19 @@
 }
 
 /*
- * Nova theme — playful rocket/crab identity.
+ * Nova themes — playful rocket/crab identity on classic pure white/black.
  * Semantic tokens via daisyUI color variables; bright but coherent,
  * high contrast, chunky rounded shapes.
+ *
+ * Theme strategy (selector-ready, per rocketcrab-9fv.7.2):
+ *  - "nova" (light): the default theme, pure white surfaces. Applied at
+ *    :where(:root), so it is the fallback everywhere.
+ *  - "nova-dark": the system-dark variant (prefersdark), deep blacks.
+ *    daisyUI emits it under @media (prefers-color-scheme: dark) for
+ *    :root:not([data-theme]), so it follows the OS preference whenever no
+ *    explicit data-theme override is set — and both themes stay reachable
+ *    via [data-theme="nova"|"nova-dark"] for the future theme selector
+ *    (rocketcrab-9fv.7.3).
  */
 @plugin "daisyui/theme" {
   name: "nova";
@@ -14,10 +24,10 @@
   prefersdark: false;
   color-scheme: light;
 
-  --color-base-100: oklch(98.5% 0.012 90);
-  --color-base-200: oklch(96% 0.015 90);
-  --color-base-300: oklch(92% 0.02 90);
-  --color-base-content: oklch(24% 0.02 262);
+  --color-base-100: oklch(100% 0 0);
+  --color-base-200: oklch(96.5% 0 0);
+  --color-base-300: oklch(91% 0 0);
+  --color-base-content: oklch(20% 0 0);
 
   --color-primary: oklch(62% 0.21 22);
   --color-primary-content: oklch(99% 0 0);
@@ -30,17 +40,41 @@
 
   --color-neutral: oklch(28% 0.02 262);
   --color-neutral-content: oklch(96% 0.01 90);
+}
+
+@plugin "daisyui/theme" {
+  name: "nova-dark";
+  default: false;
+  prefersdark: true;
+  color-scheme: dark;
+
+  --color-base-100: oklch(19% 0 0);
+  --color-base-200: oklch(14% 0 0);
+  --color-base-300: oklch(10% 0 0);
+  --color-base-content: oklch(97% 0 0);
+
+  --color-primary: oklch(65% 0.21 25);
+  --color-primary-content: oklch(99% 0 0);
+
+  --color-secondary: oklch(60% 0.17 250);
+  --color-secondary-content: oklch(99% 0 0);
+
+  --color-accent: oklch(86% 0.17 88);
+  --color-accent-content: oklch(28% 0.05 80);
+
+  --color-neutral: oklch(35% 0.02 262);
+  --color-neutral-content: oklch(97% 0.01 90);
 
   --color-info: oklch(72% 0.11 225);
   --color-info-content: oklch(98% 0 0);
 
-  --color-success: oklch(70% 0.15 150);
+  --color-success: oklch(72% 0.15 150);
   --color-success-content: oklch(98% 0 0);
 
-  --color-warning: oklch(82% 0.16 85);
+  --color-warning: oklch(84% 0.16 85);
   --color-warning-content: oklch(28% 0.05 60);
 
-  --color-error: oklch(63% 0.2 25);
+  --color-error: oklch(65% 0.2 25);
   --color-error-content: oklch(99% 0 0);
 
   --radius-selector: 0.5rem;
