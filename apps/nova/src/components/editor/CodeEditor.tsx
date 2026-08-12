@@ -18,6 +18,13 @@ export function CodeEditor({ value, onChange, ariaLabel }: CodeEditorProps) {
     <CodeMirror
       value={value}
       height="100%"
+      // The wrapper div @uiw/react-codemirror renders (`.cm-theme-*`) has no
+      // height of its own, so `.cm-editor`'s height:100% collapses to auto
+      // and the editor grows to full content height — clipped by the
+      // overflow-hidden panel with no way to scroll (U4 scroll bug). Give the
+      // wrapper the full height of its fixed-height parent so the internal
+      // `.cm-scroller` actually scrolls.
+      className="h-full"
       extensions={[html(), EditorView.contentAttributes.of({ "aria-label": ariaLabel })]}
       onChange={(next) => onChange(next)}
       basicSetup={{ lineNumbers: true, foldGutter: true, autocompletion: true }}
