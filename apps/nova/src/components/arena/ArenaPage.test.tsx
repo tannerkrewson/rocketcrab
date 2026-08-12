@@ -205,19 +205,33 @@ describe("ArenaPage — desktop grid", () => {
 });
 
 describe("ArenaPage — phone layout", () => {
-  it("switches between players with tabs while every frame stays mounted", async () => {
+  it("switches among four simulated players with tabs, all frames mounted", async () => {
     const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
     const harness = createHarness();
     renderRoute([`/games/${game.id}/test`], harness);
+    const desktop = await desktopLayout();
     await runToStart(harness.channels, 2);
+    // Add two more players (four total, per the U6 mobile acceptance).
+    for (const name of ["Player 3", "Player 4"]) {
+      await userEvent.type(desktop.getByLabelText("New player name"), name);
+      await userEvent.click(desktop.getByRole("button", { name: /Add player/ }));
+      await vi.waitFor(() => expect(harness.channels.length).toBeGreaterThanOrEqual(3));
+      const index = harness.channels.length - 1;
+      deliver(harness.channels[index]!.port1, readyMessage());
+      deliver(harness.channels[index]!.port1, registrationMessage(name));
+      deliver(harness.channels[index]!.port1, apiCallMessage("ready", {}));
+    }
 
     const mobile = within(await screen.findByTestId("arena-mobile"));
     const tabs = within(mobile.getByRole("tablist", { name: "Simulated players" }));
+    for (const name of ["Player 1", "Player 2", "Player 3", "Player 4"]) {
+      expect(tabs.getByRole("tab", { name })).toBeInTheDocument();
+    }
     expect(tabs.getByRole("tab", { name: "Player 1" })).toHaveAttribute("aria-selected", "true");
-    await userEvent.click(tabs.getByRole("tab", { name: "Player 2" }));
-    expect(tabs.getByRole("tab", { name: "Player 2" })).toHaveAttribute("aria-selected", "true");
-    // Both player cards are mounted (frames never reload on tab switch).
-    expect(mobile.getAllByTestId(/arena-frame-/)).toHaveLength(2);
+    await userEvent.click(tabs.getByRole("tab", { name: "Player 4" }));
+    expect(tabs.getByRole("tab", { name: "Player 4" })).toHaveAttribute("aria-selected", "true");
+    // Every frame stays mounted: switching tabs never reloads a frame.
+    expect(mobile.getAllByTestId(/arena-frame-/)).toHaveLength(4);
     // The shared controls live in a collapsible panel (doesn't cover the game).
     expect(mobile.getByText("Simulation controls")).toBeInTheDocument();
     expect(mobile.getByRole("button", { name: /Add player/ })).toBeInTheDocument();
