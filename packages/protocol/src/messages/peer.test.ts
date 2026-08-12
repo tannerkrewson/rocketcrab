@@ -15,7 +15,9 @@ import {
   gameStartMessageSchema,
   gameEndMessageSchema,
   joinRequestMessageSchema,
+  partyGreeterMessageSchema,
   partyIdentityMessageSchema,
+  partySessionMessageSchema,
   peerCapabilitiesMessageSchema,
   peerMessagesSchema,
   playerIdentityMessageSchema,
@@ -43,6 +45,8 @@ describe("peer message schemas", () => {
   it("defines every peer message family with a Zod schema", () => {
     const schemas = [
       partyIdentityMessageSchema,
+      partySessionMessageSchema,
+      partyGreeterMessageSchema,
       playerIdentityMessageSchema,
       joinRequestMessageSchema,
       admissionResponseMessageSchema,
@@ -78,6 +82,19 @@ describe("peer message schemas", () => {
           type: "party.identity",
           partyCode: "ABCD",
           memberCount: 2,
+        }),
+      ),
+      partySessionMessageSchema.parse(
+        basePeer({
+          type: "party.session",
+          partyCode: "ABCD",
+          secret: "A".repeat(43),
+        }),
+      ),
+      partyGreeterMessageSchema.parse(
+        basePeer({
+          type: "party.greeter",
+          greeterMemberId: "member-2",
         }),
       ),
       playerIdentityMessageSchema.parse(
@@ -252,6 +269,8 @@ describe("peer message schemas", () => {
     const invalidExamples: unknown[] = [
       // Wrong payload types, missing required fields, and bad values.
       basePeer({ type: "party.identity", partyCode: "ABC", memberCount: 0 }),
+      basePeer({ type: "party.session", partyCode: "ABCD", secret: "nope" }),
+      basePeer({ type: "party.greeter", greeterMemberId: "" }),
       basePeer({ type: "player.identity", authorityEligible: "yes" }),
       basePeer({ type: "join.request", partyCode: "ABCD" }),
       basePeer({ type: "join.admission", partyCode: "ABCD", decision: "maybe" }),

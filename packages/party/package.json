@@ -1,0 +1,24 @@
+{
+  "name": "@rocketcrab/party",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "tsc --noEmit",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@rocketcrab/core": "0.0.0",
+    "@rocketcrab/protocol": "0.0.0"
+  },
+  "devDependencies": {
+    "@rocketcrab/testing": "0.0.0",
+    "typescript": "7.0.2",
+    "vitest": "4.1.10"
+  }
+}

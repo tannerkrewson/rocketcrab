@@ -44,6 +44,19 @@ export const partyCodeSchema = z
   .string()
   .regex(/^[A-Z]{4}$/, "Party code must be exactly four uppercase letters A-Z.");
 
+/**
+ * The 32-byte party session secret as unpadded base64url (43 characters;
+ * ADR-0011). Generated with Web Crypto (CSPRNG), carried in invite-link
+ * fragments and post-admission party control messages only — never in
+ * game runtime messages or the game DOM.
+ */
+export const sessionSecretSchema = z
+  .string()
+  .regex(
+    /^[A-Za-z0-9_-]{43}$/,
+    "Session secret must be 32 random bytes encoded as unpadded base64url.",
+  );
+
 /** Epoch-millisecond timestamp. */
 export const timestampSchema = z.number().int().nonnegative();
 
@@ -71,6 +84,7 @@ export type SessionId = z.infer<typeof sessionIdSchema>;
 export type GameId = z.infer<typeof gameIdSchema>;
 export type RuntimeInstanceId = z.infer<typeof runtimeInstanceIdSchema>;
 export type PartyCode = z.infer<typeof partyCodeSchema>;
+export type SessionSecret = z.infer<typeof sessionSecretSchema>;
 export type Timestamp = z.infer<typeof timestampSchema>;
 export type MonotonicSequence = z.infer<typeof monotonicSequenceSchema>;
 export type DisplayName = z.infer<typeof displayNameSchema>;
