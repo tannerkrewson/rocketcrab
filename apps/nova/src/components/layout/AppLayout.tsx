@@ -2,6 +2,7 @@ import { Link, Outlet } from "@tanstack/react-router";
 import { Home, Info, Library, PlusCircle, Rocket, Users } from "lucide-react";
 import type { ComponentType } from "react";
 import { cn } from "../../lib/cn";
+import { ThemeSelector } from "./ThemeSelector";
 
 interface NavItem {
   to: "/" | "/build" | "/library" | "/join" | "/about";
@@ -55,7 +56,9 @@ export function AppLayout() {
               </Link>
             ))}
           </nav>
-          <div className="navbar-end hidden md:flex" />
+          <div className="navbar-end flex gap-2">
+            <ThemeSelector />
+          </div>
         </div>
       </header>
 
