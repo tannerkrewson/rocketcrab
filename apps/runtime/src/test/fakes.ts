@@ -35,6 +35,8 @@ export interface FakeFrameRecord {
   allowTokens: readonly string[];
   window: Window | null;
   destroyed: boolean;
+  /** Recorded host-pushed session events (kind + payload). */
+  received: Array<{ kind: string; payload: unknown }>;
 }
 
 export interface FakeFrameHost {
@@ -52,7 +54,17 @@ export function createFakeFrameFactory(): FakeFrameHost {
         allowTokens: [...allowTokens],
         window: null,
         destroyed: false,
+        received: [],
       };
+      // The runtime delivers host-pushed events through the same-origin
+      // bridge hook; the double records them for assertions.
+      const bridge = {
+        receive: (kind: string, payload: unknown) => {
+          record.received.push({ kind, payload });
+        },
+      };
+      const windowLike = { __novaGameBridge: bridge } as unknown as Window;
+      record.window = windowLike;
       frames.push(record);
       return {
         window: record.window,
