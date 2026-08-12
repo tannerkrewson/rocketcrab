@@ -12,7 +12,7 @@
       window.__malicious = {};
       try {
         window.__malicious.topDom =
-          window.top.document.getElementById("bar") !== null ? "read" : "missing";
+          window.top.document.getElementById("game-container") !== null ? "read" : "missing";
       } catch (e) {
         window.__malicious.topDom = "blocked:" + e.name;
       }
