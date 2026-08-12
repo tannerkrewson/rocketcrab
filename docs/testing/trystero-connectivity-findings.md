@@ -1,6 +1,9 @@
 # F5 Findings — Backendless Trystero Connectivity (Rocketcrab Nova)
 
-Status: **DRAFT — automated same-machine results complete; cross-device results pending the human pass.**
+Status: **DRAFT — automated same-machine results complete; cross-device human
+pass IN PROGRESS (2026-08-01)**. TURN verdict so far: **cross-network
+connectivity requires TURN** (S3 FAIL) — P0 TURN issue `rocketcrab-23s`
+created, blocking release.
 
 Beads issue: `rocketcrab-9fv.1.5`. Trystero **0.25.3**, **Nostr** strategy (default).
 Automated runs: `spikes/trystero-connectivity` Playwright suite, 11 scenarios,
@@ -135,3 +138,33 @@ issue's blocking conditions **P1 and all real-party functionality remain blocked
 **If phone-to-phone connectivity proves unreliable without TURN, the human pass
 must spawn a P0 discovered issue for temporary TURN credentials blocking production
 release. Do not silently replace Trystero.**
+
+## 7. Human-pass results so far (2026-08-01)
+
+Environment: stock Chrome desktop control + iPhone (Mobile Safari); harness
+served over **HTTPS** (`https://192.168.1.10:5199`, trusted spike certs — see
+F9); relays pinned to `GOOD_RELAYS` (see F10). Note: the user's embedded
+"Helium" Chromium could not do WebRTC at all (0 peers even same-machine);
+standard Chromium works — Helium is not a valid control browser.
+
+- **S1 — two desktop tabs (loopback): PASS**, ping 0 ms.
+- **S2 — desktop + iPhone, same Wi-Fi: PASS**, ping 4–6 ms, discovery ≈ 25 s
+  (consistent with F3). One transient "could not connect to peer … after
+  exchanging SDP; configure TURN servers" error was traced to a leftover tab
+  in the room; a clean re-run connected.
+- **S3 — desktop Wi-Fi + iPhone cellular: FAIL without TURN.** Repeated
+  "could not connect to peer … after exchanging SDP; configure TURN servers"
+  errors (3+ over ~90 s). Discovery works over cellular (Nostr relays are
+  internet endpoints); the WebRTC data path does not: the carrier-NAT phone
+  gathers only host candidates (no STUN configured), so ICE never completes.
+  Same-Wi-Fi passes connect via host candidates only.
+- **S4 — two phones, different networks: PENDING** (needs a second
+  phone/tablet).
+- **S5–S9 — pending** (3-peer partial, leave/rejoin, 5 MiB transfer,
+  backgrounding, airplane-mode failure reporting).
+
+**TURN verdict (provisional, per S3):** ordinary cross-network / phone
+connectivity is **unreliable without TURN**. Created P0 discovered issue
+`rocketcrab-23s` (temporary TURN credentials) **blocking production release**
+(blocks M4 `rocketcrab-9fv.6.4`) per the F5 blocking conditions. Do not
+silently replace Trystero.
