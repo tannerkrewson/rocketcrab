@@ -91,6 +91,15 @@ export const DEFAULT_COLLISION_RETRIES = 4;
 export const DEFAULT_ADVERT_INTERVAL_MS = 5_000;
 /** Default joiner advert discovery window (Trystero discovery ≈ 20 s; F3). */
 export const DEFAULT_DISCOVERY_TIMEOUT_MS = 20_000;
+/**
+ * Fail-fast window for a joiner whose rendezvous room shows no peers at
+ * all. A party that exists has its greeter sitting in the rendezvous room,
+ * so "no peer has appeared" is a strong "no party here" signal — fail
+ * clearly instead of waiting out the full discovery window (user issue
+ * rocketcrab-9fv.7.10). A party that exists but is slow to be discovered
+ * can simply be retried.
+ */
+export const DEFAULT_EARLY_MISS_TIMEOUT_MS = 7_000;
 /** Extra wait after the first advert for a possible second (collision). */
 export const DEFAULT_ADVERT_SETTLE_MS = 1_500;
 
@@ -745,6 +754,14 @@ export interface JoinByCodeOptions {
   readonly selectParty?: (adverts: readonly PartyAdvert[]) => PartyAdvert | Promise<PartyAdvert>;
   /** Overall advert discovery window (default 20 s; F5 F3). */
   readonly discoveryTimeoutMs?: number;
+  /**
+   * Fail-fast window when the rendezvous room shows no peers at all
+   * (default {@link DEFAULT_EARLY_MISS_TIMEOUT_MS}). An existing party's
+   * greeter sits in the rendezvous room, so a completely empty room is
+   * treated as "no party" and the join fails early instead of spinning for
+   * the whole discovery window. Skip the early check by passing 0.
+   */
+  readonly earlyMissTimeoutMs?: number;
   /** Admission exchange timeout (default LIMITS.handshakeTimeoutMs). */
   readonly admissionTimeoutMs?: number;
   /** Policy used if this joiner later becomes greeter after migration. */
@@ -879,20 +896,37 @@ export async function joinPartyByCode(options: JoinByCodeOptions): Promise<Party
     memberId: options.memberId,
     displayName: options.displayName,
   });
+  // Track whether ANY peer ever appears in the rendezvous room. The peer
+  // listener must attach before join() resolves: transports report existing
+  // room members (the greeter) as peer:joined during the join itself, so an
+  // empty room can be told apart from a live party before discovery starts.
+  let rendezvousPeerSeen = false;
+  const onRendezvousPeer = (): void => {
+    rendezvousPeerSeen = true;
+  };
+  rendezvous.on("peer:joined", onRendezvousPeer);
   try {
     await rendezvous.join({ room: rendezvousRoomName(code), sessionId: rendezvousSessionId(code) });
     const adverts = await discoverAdverts({
       rendezvous,
       code,
       timeoutMs: options.discoveryTimeoutMs ?? DEFAULT_DISCOVERY_TIMEOUT_MS,
+      earlyMissTimeoutMs: options.earlyMissTimeoutMs ?? DEFAULT_EARLY_MISS_TIMEOUT_MS,
+      peerSeen: () => rendezvousPeerSeen,
       schedule,
     });
     if (adverts.length === 0) {
-      throw new PartyError("not_found", `No party is advertising code ${code}.`);
+      throw new PartyError(
+        "not_found",
+        `No party is advertising code ${code}. Double-check the code with your friend and that they are waiting in their lobby.`,
+      );
     }
     const first = adverts[0];
     if (first === undefined) {
-      throw new PartyError("not_found", `No party is advertising code ${code}.`);
+      throw new PartyError(
+        "not_found",
+        `No party is advertising code ${code}. Double-check the code with your friend and that they are waiting in their lobby.`,
+      );
     }
     const advert =
       adverts.length === 1 ? first : await resolveCollision(adverts, options.selectParty);
@@ -1026,13 +1060,18 @@ async function discoverAdverts(input: {
   rendezvous: NovaTransport;
   code: PartyCode;
   timeoutMs: number;
+  /** Optional fail-fast: reject when no peer has appeared by this time. */
+  earlyMissTimeoutMs?: number;
+  /** Current "has the rendezvous room shown any peer" signal. */
+  peerSeen?: () => boolean;
   schedule: Scheduler;
 }): Promise<readonly PartyAdvert[]> {
-  return new Promise<readonly PartyAdvert[]>((resolve) => {
+  return new Promise<readonly PartyAdvert[]>((resolve, reject) => {
     let settled = false;
     let unsubscribe: () => void = () => undefined;
     let cancel: () => void = () => undefined;
     let settleCancel: () => void = () => undefined;
+    let cancelEarlyMiss: () => void = () => undefined;
     const adverts = new Map<MemberId, PartyAdvert>();
     const finish = (): void => {
       if (settled) {
@@ -1042,8 +1081,39 @@ async function discoverAdverts(input: {
       unsubscribe();
       cancel();
       settleCancel();
+      cancelEarlyMiss();
       resolve([...adverts.values()]);
     };
+    const fail = (error: unknown): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      unsubscribe();
+      cancel();
+      settleCancel();
+      cancelEarlyMiss();
+      reject(error);
+    };
+    if (
+      input.earlyMissTimeoutMs !== undefined &&
+      input.earlyMissTimeoutMs > 0 &&
+      input.peerSeen !== undefined
+    ) {
+      cancelEarlyMiss = input.schedule(() => {
+        // No peer has appeared in the rendezvous room at all: the party
+        // almost certainly does not exist, so fail fast with a clear error
+        // instead of waiting out the whole discovery window (7.10).
+        if (!input.peerSeen?.()) {
+          fail(
+            new PartyError(
+              "not_found",
+              `No party is advertising code ${input.code}. Double-check the code with your friend and that they are waiting in their lobby.`,
+            ),
+          );
+        }
+      }, input.earlyMissTimeoutMs);
+    }
     unsubscribe = input.rendezvous.on("message:received", (message) => {
       if (message.channel !== PARTY_CONTROL_CHANNEL) {
         return;

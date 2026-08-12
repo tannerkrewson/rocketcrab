@@ -47,6 +47,7 @@ import { Dialog } from "../ui/Dialog";
 import { EmptyState } from "../ui/EmptyState";
 import { useRecordTestResults } from "../../lib/games/queries";
 import { useArena } from "../../lib/arena/use-arena";
+import { getSavedPlayerName } from "../../lib/party/identity";
 import { runtimeOriginForMainOrigin } from "../../lib/runtime-origin";
 import type { ChannelPort } from "../../lib/runtime-host";
 import type { ArenaPlayer } from "../../lib/arena/types";
@@ -165,7 +166,9 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
     gameTitle: game?.title,
     runtimeOrigin: runtimeOriginForMainOrigin(window.location.origin),
     initialPlayers: [
-      { id: "player-1", name: "Player 1", memberId: "member-1" },
+      // 7.5: the first arena player defaults to the player's saved name so
+      // the test arena feels like "you" right away.
+      { id: "player-1", name: getSavedPlayerName() ?? "Player 1", memberId: "member-1" },
       { id: "player-2", name: "Player 2", memberId: "member-2" },
     ],
     seams,

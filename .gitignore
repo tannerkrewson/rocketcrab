@@ -24,6 +24,7 @@ test-results/
 .idea/
 
 # agent tooling
+.pi/
 .pi-subagents/
 .pi/
 

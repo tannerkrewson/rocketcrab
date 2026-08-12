@@ -1,13 +1,19 @@
 import { Loader2, PartyPopper } from "lucide-react";
 import { toast } from "sonner";
+import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
 import { cn } from "../../lib/cn";
 import { usePartyEngine } from "../../lib/party/use-party";
 import type { PartyEngineState } from "../../lib/party/engine";
+import { gameRepository } from "../../lib/games/instance";
 import { Button } from "../ui/Button";
 import { ErrorPanel } from "../ui/ErrorPanel";
 import { PartyLobby } from "./PartyLobby";
 import { PartyPlayShell } from "./PartyPlayShell";
 import { PartyReconnectScreen } from "./PartyReconnectScreen";
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : "Something went wrong.";
+}
 
 /**
  * The party experience (P4): one component that owns the party engine's
@@ -19,9 +25,41 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
   const { state, engine, bindContainer } = usePartyEngine();
 
   const handleLeave = async () => {
+    // 7.10: only toast when there was actually a party to leave; the error
+    // phase has nothing to tear down and must not claim the user "left".
+    const wasInParty =
+      state.phase === "lobby" ||
+      state.phase === "starting" ||
+      state.phase === "playing" ||
+      state.phase === "reconnecting";
     await engine.leaveParty();
-    toast.success("You left the party.");
+    if (wasInParty) {
+      toast.success("You left the party.");
+    }
     onLeft?.();
+  };
+
+  // 7.6: the lobby's pick-a-game dialog loads the saved game and hands it
+  // to the engine, which registers/announces it for the whole party.
+  const handlePickGame = async (gameId: string) => {
+    try {
+      const game = await gameRepository.read(gameId);
+      await engine.selectGame({
+        gameId: game.id,
+        title: game.title,
+        mode: game.mode ?? "state",
+        source: game.html,
+        apiVersion: PROTOCOL_VERSION,
+      });
+    } catch (error) {
+      toast.error(`Couldn't load that game: ${errorMessage(error)}`);
+    }
+  };
+
+  // 7.5: apply the edited name to the engine identity (persisted there).
+  const handleEditName = (name: string) => {
+    engine.setDisplayName(name);
+    toast.success("Name updated.");
   };
 
   // The frame container: the same DOM node for the whole party. The lobby
@@ -64,7 +102,7 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
           </div>
         </div>
       ) : null}
-      {renderPhase(state, engine, handleLeave)}
+      {renderPhase(state, engine, handleLeave, handlePickGame, handleEditName, onLeft)}
     </div>
   );
 }
@@ -73,6 +111,9 @@ function renderPhase(
   state: PartyEngineState,
   engine: ReturnType<typeof usePartyEngine>["engine"],
   handleLeave: () => Promise<void>,
+  handlePickGame: (gameId: string) => Promise<void>,
+  handleEditName: (name: string) => void,
+  onLeft?: () => void,
 ) {
   switch (state.phase) {
     case "creating":
@@ -83,7 +124,7 @@ function renderPhase(
           <p className="font-black">{state.phaseDetail ?? "Working…"}</p>
           <p className="text-sm text-base-content/70">
             {state.phase === "joining"
-              ? "The greeter needs to approve your request before you can join."
+              ? "Searching the network for the party — this can take a few seconds. If it never appears, double-check the code with your friend."
               : "Your party is being set up — it takes a few seconds."}
           </p>
           <Button variant="ghost" size="md" onClick={() => void handleLeave()}>
@@ -101,6 +142,8 @@ function renderPhase(
           onStart={(force) => engine.startGame(force)}
           onLeave={() => void handleLeave()}
           onRefreshDiagnostics={() => void engine.refreshDiagnostics()}
+          onPickGame={(gameId) => void handlePickGame(gameId)}
+          onEditName={handleEditName}
         />
       );
     case "playing":
@@ -121,10 +164,19 @@ function renderPhase(
           <ErrorPanel
             title="The party couldn't be set up"
             message={state.lastError ?? "Something went wrong."}
-            onRetry={() => void handleLeave()}
+            // 7.10: retry re-runs the failed setup; it must NOT call leave
+            // (that toasted "you left the party" over the navbar and left
+            // a blank page).
+            onRetry={() => engine.retrySetup()}
           />
           <div className="flex justify-center">
-            <Button variant="ghost" onClick={() => void handleLeave()}>
+            <Button
+              variant="ghost"
+              onClick={() => {
+                engine.dismissError();
+                onLeft?.();
+              }}
+            >
               <PartyPopper className="h-4 w-4" aria-hidden="true" />
               Back
             </Button>

@@ -4,6 +4,7 @@ import { JoinScreen } from "../components/party/JoinScreen";
 import { PartyExperience } from "../components/party/PartyExperience";
 import { PartyResumeBanner } from "../components/party/PartyResumeBanner";
 import { partyEngine } from "../lib/party/engine";
+import { getSavedPlayerName } from "../lib/party/identity";
 import { importInviteFromLocation } from "../lib/party/invite-import";
 
 export const Route = createFileRoute("/join")({
@@ -15,9 +16,13 @@ export const Route = createFileRoute("/join")({
  * Invite secrets arrive in the URL fragment (ADR-0011); the fragment is
  * parsed and imported into session memory BEFORE the party route renders,
  * then stripped from the URL so the secret does not linger in history.
+ * The code/name state lives HERE (not in JoinScreen) so it survives the
+ * joining → error transition: "Try again" keeps the typed code (7.10).
  */
 function JoinPage() {
   const [joinError, setJoinError] = useState<string | null>(null);
+  const [code, setCode] = useState("");
+  const [name, setName] = useState(() => getSavedPlayerName() ?? "");
 
   // Import the invite fragment (if any) once per page load.
   useEffect(() => {
@@ -33,9 +38,17 @@ function JoinPage() {
 
   const state = partyEngine.getState();
 
-  const handleJoin = (code: string) => {
+  const handleJoin = (submittedCode: string, submittedName: string) => {
     setJoinError(null);
-    void partyEngine.joinByCode(code).then(() => {
+    if (submittedCode.length === 0) {
+      return;
+    }
+    // 7.5: the player's name is asked on the join screen and applied to the
+    // engine identity before the join so it is announced to peers.
+    if (submittedName.trim().length > 0) {
+      partyEngine.setDisplayName(submittedName);
+    }
+    void partyEngine.joinByCode(submittedCode).then(() => {
       const latest = partyEngine.getState();
       if (latest.phase === "error" && latest.lastError !== null) {
         setJoinError(latest.lastError);
@@ -55,6 +68,10 @@ function JoinPage() {
         <JoinScreen
           error={joinError ?? (state.phase === "error" ? state.lastError : null)}
           joining={false}
+          code={code}
+          onCodeChange={setCode}
+          name={name}
+          onNameChange={setName}
           onSubmit={handleJoin}
         />
       </div>

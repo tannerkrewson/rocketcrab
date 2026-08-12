@@ -8,6 +8,7 @@ import {
 } from "@tanstack/react-router";
 import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { describe, expect, it, vi } from "vitest";
 import type { PartyEngineState } from "../../lib/party/engine";
@@ -79,6 +80,7 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
 
 async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobbyProps> = {}) {
   cleanup(); // isolate: some tests render the lobby twice
+  const queryClient = new QueryClient();
   const lobby = (props: PartyLobbyProps) => (
     <PartyLobby
       {...props}
@@ -87,6 +89,8 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
       onStart={handlers.onStart ?? props.onStart}
       onLeave={handlers.onLeave ?? props.onLeave}
       onRefreshDiagnostics={handlers.onRefreshDiagnostics ?? props.onRefreshDiagnostics}
+      onPickGame={handlers.onPickGame ?? props.onPickGame}
+      onEditName={handlers.onEditName ?? props.onEditName}
     />
   );
   // PartyLobby renders router Links; give it a real router context.
@@ -106,7 +110,9 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
     routeTree,
     history: createMemoryHistory({ initialEntries: ["/"] }),
   });
-  const wrapper = ({ children }: { children: ReactNode }) => <>{children}</>;
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
   const result = render(<RouterProvider router={router} />, { wrapper });
   await result.findByTestId("party-code");
   return result;
@@ -250,6 +256,44 @@ describe("PartyLobby", () => {
     await renderLobby(makeState(), { onLeave });
     await userEvent.click(screen.getByRole("button", { name: /leave party/i }));
     expect(onLeave).toHaveBeenCalled();
+  });
+
+  it("prompts the creator to pick a game when the party has none (7.6)", async () => {
+    const state = makeState({
+      game: null,
+      canStart: false,
+      canForceStart: false,
+      startBlockedReason: "Pick a game before starting the party.",
+    });
+    const onPickGame = vi.fn();
+    await renderLobby(state, { onPickGame });
+    expect(screen.getByText(/no game yet/i)).toBeInTheDocument();
+    const pickButton = screen.getByRole("button", { name: /pick a game/i });
+    expect(pickButton).toBeInTheDocument();
+    await userEvent.click(pickButton);
+    // The picker dialog opens (empty library in tests).
+    expect(await screen.findByRole("dialog", { name: "Pick a game" })).toBeInTheDocument();
+    expect(await screen.findByText(/no saved games yet/i)).toBeInTheDocument();
+    expect(onPickGame).not.toHaveBeenCalled();
+  });
+
+  it("tells joiners to wait when the party has no game (7.6)", async () => {
+    const state = makeState({ role: "joiner", game: null });
+    await renderLobby(state);
+    expect(screen.getByText(/waiting for the host to pick a game/i)).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /pick a game/i })).not.toBeInTheDocument();
+  });
+
+  it("edits the player name from the lobby (7.5)", async () => {
+    const onEditName = vi.fn();
+    await renderLobby(makeState(), { onEditName });
+    expect(screen.getByText(/you are playing as/i)).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /edit name/i }));
+    const input = screen.getByLabelText("Your player name");
+    await userEvent.clear(input);
+    await userEvent.type(input, "Grace");
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    expect(onEditName).toHaveBeenCalledWith("Grace");
   });
 
   it("shows the ended-game banner and disables start after a game ends", async () => {
