@@ -67,6 +67,12 @@ export const NOVA_ERROR_CODES = {
   execution_timeout: "execution_timeout",
   /** The authority runtime failed while executing (S2). */
   execution_failed: "execution_failed",
+  /**
+   * Media transport is not available in this build: tracks/streams cannot
+   * cross the runtime frame boundary yet (A3 experimental surface; see
+   * `docs/testing/media-bridging-findings.md`).
+   */
+  media_unsupported: "media_unsupported",
 } as const;
 
 export type NovaErrorCode = (typeof NOVA_ERROR_CODES)[keyof typeof NOVA_ERROR_CODES];
