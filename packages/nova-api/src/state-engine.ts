@@ -306,6 +306,7 @@ export class NovaStateEngine {
   private graceTimer: ReturnType<typeof setTimeout> | null = null;
   private heartbeatTimer: ReturnType<typeof setInterval> | null = null;
   private restoreTimer: ReturnType<typeof setTimeout> | null = null;
+  private winnerWaitTimer: ReturnType<typeof setTimeout> | null = null;
   /** revision -> (stateHash -> reporting member ids) for reconciliation. */
   private readonly revisionVotes = new Map<number, Map<string, Set<string>>>();
   private readonly history = new Map<string, ProcessedActionRecord>();
@@ -664,8 +665,14 @@ export class NovaStateEngine {
       adoptedAuthority = true;
     }
     // Same term from a different authority: the announcement reconciliation
-    // decides the authority; the state is still reconciled below.
-    this.recordObservation(message.authorityMemberId, message.revision, message.stateHash);
+    // decides the authority; the state is still reconciled below. The state
+    // report is attributed to the transport sender (pushes come from the
+    // shell holding the state), falling back to the envelope's authority.
+    this.recordObservation(
+      message.senderMemberId ?? message.authorityMemberId,
+      message.revision,
+      message.stateHash,
+    );
     if (message.revision < this.revision) {
       if (adoptedAuthority) {
         this.maybePushTo(message.authorityMemberId, message.revision, message.stateHash);
@@ -918,6 +925,7 @@ export class NovaStateEngine {
     this.clearGraceTimer();
     this.clearRestoreTimer();
     this.clearElectionTimer();
+    this.clearWinnerWaitTimer();
     this.stopHeartbeats();
     this.restoreDone = true;
     this.restoreBackup = null;
@@ -951,8 +959,13 @@ export class NovaStateEngine {
     if (winner === null) return;
     if (winner === this.selfMemberId) {
       this.becomeAuthority(term);
+      return;
     }
-    // Otherwise the winner announces and handleAnnounce adopts it.
+    // The winner announces on its own schedule. If it never materializes
+    // (it may have missed our campaigns — e.g. it was reconnecting while we
+    // campaigned, or a silent partition hid it), re-elect at the next term
+    // so the party cannot stall forever waiting for an announcement.
+    this.armWinnerWaitTimer();
   }
 
   /** Become the elected authority for `term`: announce, then restore. */
@@ -1038,6 +1051,7 @@ export class NovaStateEngine {
     this.clearGraceTimer();
     this.clearRestoreTimer();
     this.clearElectionTimer();
+    this.clearWinnerWaitTimer();
     this.election = null;
     this.restoreDone = true;
     this.restoreBackup = null;
@@ -1071,6 +1085,25 @@ export class NovaStateEngine {
     if (this.election !== null) return; // already campaigning
     if (this.authorityMemberId === this.selfMemberId) return;
     this.startElection();
+  }
+
+  /**
+   * Wait for an elected winner's announcement; re-elect when it never
+   * materializes (the winner may have missed the campaigns while it was
+   * reconnecting, or a partition hid it — ADR-0007: no stalled party).
+   */
+  private armWinnerWaitTimer(): void {
+    this.clearWinnerWaitTimer();
+    if (this.disposed || !this.started || this.ended) return;
+    this.winnerWaitTimer = setTimeout(() => {
+      this.winnerWaitTimer = null;
+      if (this.disposed || !this.started || this.ended) return;
+      if (!this.host.selfConnected()) return;
+      if (this.election !== null) return; // a new campaign is underway
+      if (this.authorityMemberId === null) {
+        this.startElection(); // the winner never announced: elect again
+      }
+    }, this.gracePeriodMs);
   }
 
   private startHeartbeats(): void {
@@ -1322,7 +1355,7 @@ export class NovaStateEngine {
       );
       return true;
     }
-    if (!(await this.commit(result.state, result.views))) {
+    if (!(await this.commit(result.state, result.views, item.actionId))) {
       this.settleRejected(item, "invalid_state", "The action result failed validation.");
       return true;
     }
@@ -1334,15 +1367,37 @@ export class NovaStateEngine {
     return true;
   }
 
-  /** Commit a new canonical state: revision, hash, snapshot, views. */
-  private async commit(state: unknown, views: Record<string, unknown>): Promise<boolean> {
+  /**
+   * Commit a new canonical state: revision, hash, snapshot, views. The
+   * committed action (when given) is recorded in the history BEFORE the
+   * snapshot is published, so the replicated `processedActionIds` are
+   * complete and a re-sent action is deduplicated after migration (ADR-0007:
+   * no action commits twice).
+   */
+  private async commit(
+    state: unknown,
+    views: Record<string, unknown>,
+    actionId?: string,
+  ): Promise<boolean> {
+    if (this.disposed) return false;
+    if (this.authorityMemberId !== this.selfMemberId || !this.restoreDone) return false;
+    // Hash BEFORE mutating revision/canonical: a catch-up snapshot read
+    // mid-commit must never observe the new revision with the old hash
+    // (ADR-0007: state envelopes carry consistent revision + hash).
+    const stateHash = await stateHashOf(state);
     if (this.disposed) return false;
     if (this.authorityMemberId !== this.selfMemberId || !this.restoreDone) return false;
     this.revision += 1;
     this.canonical = state;
-    this.stateHash = await stateHashOf(state);
-    if (this.disposed) return false;
-    if (this.authorityMemberId !== this.selfMemberId || !this.restoreDone) return false;
+    this.stateHash = stateHash;
+    if (actionId !== undefined) {
+      this.remember(actionId, {
+        actionId,
+        status: "accepted",
+        revision: this.revision,
+        processedAt: this.now(),
+      });
+    }
     this.lastCommitAt = this.now();
     this.stats.applied += 1;
     this.noteProcessed();
@@ -1576,11 +1631,19 @@ export class NovaStateEngine {
     }
   }
 
+  private clearWinnerWaitTimer(): void {
+    if (this.winnerWaitTimer !== null) {
+      clearTimeout(this.winnerWaitTimer);
+      this.winnerWaitTimer = null;
+    }
+  }
+
   private clearTimers(): void {
     this.clearGraceTimer();
     this.clearHeartbeatTimer();
     this.clearRestoreTimer();
     this.clearElectionTimer();
+    this.clearWinnerWaitTimer();
   }
 }
 
