@@ -1,5 +1,9 @@
 // Host application (origin A) for the F4 runtime-sandbox spike.
 //
+// NOTE: the fixtures are embedded at build time via Vite `?raw` imports
+// instead of being fetched — the host dev server does not serve
+// /fixtures/* (Vite's SPA fallback would return index.html for those URLs).
+//
 // Responsibilities (spike scope; U3/F6 formalize the real protocol):
 // - embed the runtime iframe on a DIFFERENT origin (port 5274)
 // - bootstrap over postMessage with an exact-origin targetOrigin, handing a
@@ -29,6 +33,7 @@ const emergencyStopBtn = document.getElementById("emergency-stop") as HTMLButton
 const reloadBtn = document.getElementById("reload") as HTMLButtonElement;
 const restartBtn = document.getElementById("restart") as HTMLButtonElement;
 const loadHelloBtn = document.getElementById("load-hello") as HTMLButtonElement;
+const loadInfiniteBtn = document.getElementById("load-infinite") as HTMLButtonElement;
 const loadMaliciousBtn = document.getElementById("load-malicious") as HTMLButtonElement;
 
 let port: MessagePort | null = null;
@@ -146,21 +151,11 @@ async function restart(): Promise<void> {
   await init();
 }
 
-const DEMO_HELLO = `<!doctype html>
-<html lang="en">
-<body>
-<h1>demo game</h1>
-<canvas id="c" width="120" height="60"></canvas>
-<p id="out">inline script ran: <b id="mark">checking…</b></p>
-<script>
-  document.getElementById('mark').textContent = 'yes'
-  const ctx = document.getElementById('c').getContext('2d')
-  ctx.fillStyle = '#ff6600'
-  ctx.fillRect(0, 0, 120, 60)
-  window.__demo = { inline: true, canvas: true }
-</script>
-</body>
-</html>`;
+// Full capability probe (rows 1-11 of the physical-device checklist) and
+// the CPU-exhaustion fixture (row 15), embedded so the phone UI can load
+// them (iPhone Safari has no JS console).
+import helloProbeHtml from "../fixtures/hello.html?raw";
+import infiniteHtml from "../fixtures/infinite.html?raw";
 
 const DEMO_MALICIOUS = `<!doctype html>
 <html lang="en">
@@ -215,7 +210,16 @@ emergencyStopBtn.addEventListener("click", () => {
 });
 reloadBtn.addEventListener("click", () => hostApi.reload());
 restartBtn.addEventListener("click", () => void hostApi.restart());
-loadHelloBtn.addEventListener("click", () => hostApi.load(DEMO_HELLO));
+loadHelloBtn.addEventListener("click", () => {
+  hostApi.load(helloProbeHtml);
+  log("loaded hello.html capability probe");
+});
+// Physical-device pass needs the CPU-exhaustion fixture loadable from the
+// phone UI (no JS console on iPhone Safari).
+loadInfiniteBtn.addEventListener("click", () => {
+  hostApi.load(infiniteHtml);
+  log("loaded infinite.html (wedges after ~4s)");
+});
 loadMaliciousBtn.addEventListener("click", () => hostApi.load(DEMO_MALICIOUS));
 
 log(`runtime origin: ${RUNTIME_ORIGIN}`);

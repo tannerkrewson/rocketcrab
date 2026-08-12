@@ -14,6 +14,37 @@
         margin: 4px;
         display: block;
       }
+      /* Physical-device pass: on-screen results so silent probes are
+         observable on a phone (no JS console in iPhone Safari). */
+      #probe-panel {
+        position: fixed;
+        top: 8px;
+        right: 8px;
+        z-index: 9999;
+        max-width: 78vw;
+        max-height: 62vh;
+        overflow: auto;
+        background: rgba(17, 24, 39, 0.85);
+        color: #e2e8f0;
+        font:
+          11px/1.5 ui-monospace,
+          SFMono-Regular,
+          Menlo,
+          monospace;
+        padding: 6px 10px;
+        border-radius: 8px;
+        pointer-events: none;
+        white-space: pre;
+      }
+      #probe-panel .ok {
+        color: #4ade80;
+      }
+      #probe-panel .bad {
+        color: #f87171;
+      }
+      #probe-panel .info {
+        color: #93c5fd;
+      }
     </style>
   </head>
   <body>
@@ -26,10 +57,28 @@
     <img id="img" alt="remote image" />
     <input type="file" id="file" />
     <button id="clickme" type="button">tap for audio / fullscreen / pointer lock</button>
+    <div id="probe-panel"></div>
     <script type="module">
       const results = {};
+      function renderPanel() {
+        const panel = document.getElementById("probe-panel");
+        if (!panel) return;
+        const lines = Object.entries(window.__results).map(([k, v]) => {
+          const bad =
+            v === false || v === null || (typeof v === "string" && /^(error|denied)/.test(v));
+          const ok =
+            !bad && (v === true || (v && typeof v === "object" && Object.keys(v).length > 0));
+          const mark = bad ? "✗" : ok ? "✓" : "·";
+          const cls = bad ? "bad" : ok ? "ok" : "info";
+          return `<span class="${cls}">${mark}</span> ${k}: ${JSON.stringify(v)}`;
+        });
+        panel.innerHTML =
+          (lines.length ? lines.join("\n") : "waiting for probes…") +
+          `\n<span class="info">updated ${new Date().toLocaleTimeString()}</span>`;
+      }
       const done = () => {
         window.__results = { ...results };
+        renderPanel();
       };
       const report = (k, v) => {
         results[k] = v;
@@ -53,7 +102,23 @@
         clickme.addEventListener("click", () => {
           actx
             .resume()
-            .then(() => report("audioAfterGesture", actx.state))
+            .then(() => {
+              report("audioAfterGesture", actx.state);
+              // Audible proof for the physical-device pass: short tone.
+              try {
+                const osc = actx.createOscillator();
+                const gain = actx.createGain();
+                osc.type = "sine";
+                osc.frequency.value = 880;
+                gain.gain.setValueAtTime(0.15, actx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.001, actx.currentTime + 0.6);
+                osc.connect(gain).connect(actx.destination);
+                osc.start();
+                osc.stop(actx.currentTime + 0.65);
+              } catch (e) {
+                report("audioBeep", "error:" + String(e));
+              }
+            })
             .catch((e) => report("audioAfterGesture", "error:" + String(e)));
         });
       } catch (e) {
@@ -105,6 +170,31 @@
       window.__orientationSeen = null;
       window.addEventListener("deviceorientation", (e) => {
         window.__orientationSeen = { alpha: e.alpha, beta: e.beta, gamma: e.gamma };
+        report("orientation", window.__orientationSeen);
+      });
+      // iOS 13+ requires a user-gesture permission request before
+      // deviceorientation events fire. Physical-device pass needs this
+      // tappable from the phone (no JS console); whether the prompt works
+      // from inside the sandboxed runtime iframe is itself a finding.
+      const orientBtn = document.createElement("button");
+      orientBtn.type = "button";
+      orientBtn.textContent = "tap to request orientation permission";
+      clickme.insertAdjacentElement("afterend", orientBtn);
+      orientBtn.addEventListener("click", async () => {
+        try {
+          const DE = window.DeviceOrientationEvent;
+          if (DE && typeof DE.requestPermission === "function") {
+            const perm = await DE.requestPermission();
+            report("orientationPermission", perm);
+            report("orientation", `permission ${perm} — rotate the phone`);
+          } else {
+            report("orientationPermission", "no-request-api");
+            report("orientation", window.__orientationSeen ?? "no events yet — rotate the phone");
+          }
+        } catch (e) {
+          report("orientationPermission", "error:" + String(e));
+          report("orientation", "error:" + String(e));
+        }
       });
 
       window.__visibilityChanges = 0;
@@ -130,6 +220,32 @@
       } catch (e) {
         report("fetchRemote", false);
         report("fetchError", String(e));
+      }
+
+      // WebSocket probe: local wss echo on the same host, port 5276 (origin
+      // port swap, same pattern as the runtime origin).
+      try {
+        const wsUrl = location.origin.replace(/:\d+$/, ":5276").replace(/^http/, "wss");
+        const ws = new WebSocket(wsUrl);
+        const wsT0 = performance.now();
+        ws.addEventListener("open", () => ws.send("nova-ws-spike"));
+        ws.addEventListener("message", (ev) => {
+          const ok = ev.data === "nova-ws-spike";
+          report("wsEcho", ok);
+          if (ok) report("wsLatencyMs", Math.round(performance.now() - wsT0));
+          ws.close();
+        });
+        ws.addEventListener("error", () => {
+          report("wsEcho", false);
+          report("wsError", "open/error — is the :5276 echo server running?");
+        });
+        // fail-safe so the probe never hangs the panel
+        setTimeout(() => {
+          if (ws.readyState !== WebSocket.CLOSED) ws.close();
+        }, 8000);
+      } catch (e) {
+        report("wsEcho", false);
+        report("wsError", String(e));
       }
 
       report(

@@ -1,7 +1,7 @@
 # F4 runtime sandbox — spike findings and runtime-model recommendation
 
-Status: committed 2026-08-01. Physical-device confirmation **pending**
-(see `physical-device-checklist-f4.md`).
+Status: committed 2026-08-01; physical-device pass **completed** (2026-08-01,
+iPhone + Mobile Safari) — results in the section below.
 
 ## What was built
 
@@ -66,6 +66,45 @@ browsers isolate cross-origin frames into separate processes (Chrome desktop,
 Safari WebContent process groups); that claim must be verified on the
 physical-device pass. This is Blocker Register B6 / M1 material.
 
+## Physical-device results (2026-08-01, iPhone + Mobile Safari)
+
+Human pass run per `physical-device-checklist-f4.md` against the LAN
+(`https://192.168.1.10:5273/5274/5275`, locally-trusted self-signed certs).
+Host UI was extended for the pass: an on-screen probe panel in the hello
+game, a "Load infinite game" button, an orientation-permission button, an
+audible audio beep, and a WebSocket probe — so every probe is observable on
+a phone with no JS console.
+
+- **Capabilities pass on device.** Inline + module scripts, jsDelivr ESM,
+  remote fetch, remote image, Canvas 2D, WebGL (hardware), Web Audio after a
+  user gesture (audible beep), file input (content-checked), clipboard
+  write, camera + microphone (real capture, prompt allowed), soft reload,
+  Emergency-stop destruction, and page backgrounding/resume all verified on
+  the iPhone. Runtime origin secrets remain empty (DevTools check).
+- **Fullscreen and pointer lock: unsupported on iPhone Safari** (expected
+  platform limitation, not a spike defect). Desktop control confirms both
+  work there.
+- **Device orientation/motion: denied without a prompt.** From inside the
+  sandboxed game frame, `DeviceOrientationEvent.requestPermission()` returns
+  `denied` and iOS never surfaces the motion-permission prompt. WebKit does
+  not present the prompt for a cross-origin sandboxed iframe in this setup.
+  Finding: orientation/motion needs a host-origin permission flow (request +
+  delegation) or must be documented unsupported for games — A3/M1 material.
+- **CPU exhaustion: FAIL on physical iPhone, matching the headless caveat.**
+  An infinite-loop game freezes the entire Safari tab: pinch-zoom still
+  works but every control (including Emergency stop) is unresponsive and
+  page reload is very slow. Cross-origin iframes do **not** get a separate
+  process on iOS Safari in this configuration, so the "shell stays
+  responsive while the game spins" property does **not** hold on the primary
+  target device. Neither the privileged nor an opaque-sandbox runtime avoids
+  same-tab wedging on iOS (the game still executes in the tab), so this does
+  not flip the runtime-model recommendation; mitigation belongs in M1/U3
+  (document the limitation, reload-based recovery, WebWorker execution for
+  non-DOM games). Decisive input for Blocker Register B1/B6.
+- **WebSocket:** local wss echo probe added to the hello game; exercise by
+  re-loading the hello game (echo server runs on `:5276` with the spike
+  certs).
+
 ## Decision gate — recommended runtime model
 
 **Recommendation: a single separate-origin privileged runtime for all games**
@@ -81,11 +120,15 @@ physical-device pass. This is Blocker Register B6 / M1 material.
 - The shared-origin caveat (B5) is documented and accepted for v1; unique
   runtime subdomains remain the deferred escape hatch if that changes.
 
-**What would change the recommendation:** physical Mobile Safari testing shows
-(a) the privileged model fails a required capability in a way an opaque
-sandbox would not, or (b) the shared-runtime-origin permission/storage
-behavior (B5) proves unacceptable for v1 — then revisit (unique subdomains or
-a two-tier model) before release.
+**What would change the recommendation:** physical Mobile Safari testing
+showed no capability failure that an opaque sandbox would avoid. Every
+required capability held on device except platform limitations (fullscreen
+and pointer lock unsupported by iOS Safari; motion permission denied for the
+sandboxed frame) and the CPU-exhaustion tab-wedge, which affects any in-tab
+execution model on iOS and is a M1/U3 mitigation concern, not a model
+differentiator. B5 (shared runtime origin) remains the open design
+constraint; revisit (unique subdomains or a two-tier model) only if B5 proves
+unacceptable for v1.
 
 ## Notes for downstream issues
 
