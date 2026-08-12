@@ -68,6 +68,20 @@ interface RoomOptions {
 }
 
 const APP_ID = "rocketcrab-f5-spike";
+
+// Verified-reachable public Nostr relays (probed 2026-08-01 from the dev
+// machine's network). Trystero's `defaultRelayUrls` are a mix of dead/flaky
+// community relays — e.g. strfry.openhoofd.nl fails TLS — which breaks
+// signaling for the physical-device pass. Pin working relays instead.
+const GOOD_RELAYS = [
+  "wss://relay.damus.io",
+  "wss://nos.lol",
+  "wss://relay.primal.net",
+  "wss://nostr.mom",
+  "wss://relay.snort.social",
+  "wss://offchain.pub",
+  "wss://relay.nostr.info",
+];
 const LARGE_SIZE = 5 * 1024 * 1024; // 5 MiB default
 
 // FNV-1a 32-bit over a string, deterministic for integrity comparison.
@@ -252,8 +266,8 @@ function enterRoom(options: RoomOptions): string {
   if (options.password) config.password = options.password;
   if (options.relays) {
     config.relayConfig = { urls: options.relays, redundancy: options.redundancy ?? 5 };
-  } else if (options.redundancy) {
-    config.relayConfig = { redundancy: options.redundancy };
+  } else {
+    config.relayConfig = { urls: GOOD_RELAYS, redundancy: options.redundancy ?? 5 };
   }
   const callbacks: Parameters<typeof joinRoom>[2] = {
     onJoinError: (details) => {
