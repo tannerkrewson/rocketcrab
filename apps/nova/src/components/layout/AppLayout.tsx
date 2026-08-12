@@ -5,7 +5,7 @@ import { cn } from "../../lib/cn";
 import { ThemeSelector } from "./ThemeSelector";
 
 interface NavItem {
-  to: "/" | "/build" | "/library" | "/join" | "/about";
+  to: "/" | "/build" | "/browse" | "/join" | "/about";
   label: string;
   icon: ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
   exact?: boolean;
@@ -14,7 +14,7 @@ interface NavItem {
 const navItems: NavItem[] = [
   { to: "/", label: "Home", icon: Home, exact: true },
   { to: "/build", label: "Build", icon: PlusCircle },
-  { to: "/library", label: "Games", icon: Library },
+  { to: "/browse", label: "Games", icon: Library },
   { to: "/join", label: "Join", icon: Users },
   { to: "/about", label: "About", icon: Info },
 ];
