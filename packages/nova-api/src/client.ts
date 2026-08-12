@@ -90,7 +90,13 @@ export type NovaSessionEvent =
       rejectedCount: number;
       actionRatePerSecond: number;
     }
-  | { type: "actionRejected"; actionId: string; code: string; message: string };
+  | { type: "actionRejected"; actionId: string; code: string; message: string }
+  | {
+      /** S3: the authority changed (election/migration). Host-side only. */
+      type: "authorityChanged";
+      authorityMemberId: string | null;
+      term: number;
+    };
 
 /**
  * The backend a client is projected over: the in-process session engine or
@@ -291,6 +297,7 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
       }
       case "stateCommitted":
       case "actionRejected":
+      case "authorityChanged":
         break; // host-side diagnostics; games observe acks and errors
     }
   });
