@@ -9,76 +9,21 @@
  */
 import type { GameApiEvent } from "@rocketcrab/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import type { ChannelPort } from "../runtime-host";
-import { ArenaEngine, type ArenaEngineOptions, type ArenaSeams } from "./engine";
-import type { ArenaPlayerSpec, ArenaRunOutcome, ArenaState } from "./types";
-
-interface FakePort extends ChannelPort {
-  sent: unknown[];
-  closed: boolean;
-}
-
-function createFakePort(): FakePort {
-  const port: FakePort = {
-    sent: [],
-    closed: false,
-    onmessage: null,
-    onmessageerror: null,
-    postMessage(message: unknown): void {
-      port.sent.push(message);
-    },
-    close(): void {
-      port.closed = true;
-    },
-  };
-  return port;
-}
-
-function deliver(port: FakePort, message: unknown): void {
-  port.onmessage?.({ data: message } as MessageEvent);
-}
-
-interface FakeChannel {
-  port1: FakePort;
-  port2: FakePort;
-}
-
-interface ArenaHarness {
-  seams: ArenaSeams;
-  channels: FakeChannel[];
-  frames: HTMLIFrameElement[];
-  windowMessages: Array<{ data: unknown }>;
-  containers: Map<string, HTMLDivElement>;
-  outcomes: ArenaRunOutcome[];
-}
-
-function createHarness(): ArenaHarness {
-  const channels: FakeChannel[] = [];
-  const frames: HTMLIFrameElement[] = [];
-  const windowMessages: ArenaHarness["windowMessages"] = [];
-  const containers = new Map<string, HTMLDivElement>();
-  return {
-    seams: {
-      createChannel() {
-        const port1 = createFakePort();
-        const port2 = createFakePort();
-        channels.push({ port1, port2 });
-        return { port1, port2 };
-      },
-      async waitForFrameLoad(iframe) {
-        frames.push(iframe);
-        iframe.contentWindow?.addEventListener("message", (event: MessageEvent) => {
-          windowMessages.push({ data: event.data });
-        });
-      },
-    },
-    channels,
-    frames,
-    windowMessages,
-    containers,
-    outcomes: [],
-  };
-}
+import { ArenaEngine, type ArenaEngineOptions, type ArenaPlayerSpec } from "./engine";
+import type { ArenaRunOutcome, ArenaState } from "./types";
+import {
+  apiCallMessage,
+  createHarness,
+  deliver,
+  mountContainer,
+  readyAll,
+  registrationMessage,
+  readyMessage,
+  runtimeErrorMessage,
+  runToStart,
+  type ArenaHarness,
+  type FakeChannel,
+} from "./test-harness";
 
 const SOURCE =
   "<!doctype html><html><head><title>Rocket Rumble</title></head><body><p>rockets</p></body></html>";
@@ -115,59 +60,8 @@ function createEngine(
 
 function mountContainers(harness: ArenaHarness, count: number): void {
   for (let index = 0; index < count; index += 1) {
-    const div = document.createElement("div");
-    div.setAttribute("data-player", `player-${index + 1}`);
-    document.body.appendChild(div);
-    harness.containers.set(`player-${index + 1}`, div);
+    mountContainer(harness, `player-${index + 1}`);
   }
-}
-
-function readyMessage(): Record<string, unknown> {
-  return {
-    version: 1,
-    runtimeInstanceId: "runtime-1",
-    messageId: "message-ready",
-    sentAt: 1_700_000_000_000,
-    type: "runtime.ready",
-    status: "ready",
-  };
-}
-
-function registrationMessage(title: string, gameMode = "state"): Record<string, unknown> {
-  return {
-    version: 1,
-    runtimeInstanceId: "runtime-1",
-    messageId: "message-reg",
-    sentAt: 1_700_000_000_001,
-    type: "game.registration",
-    gameId: "game-1",
-    title,
-    gameMode,
-  };
-}
-
-function apiCallMessage(method: string, payload: unknown): Record<string, unknown> {
-  return {
-    version: 1,
-    runtimeInstanceId: "runtime-1",
-    messageId: `message-${method}`,
-    sentAt: 1_700_000_000_002,
-    type: "game.apiCall",
-    method,
-    payload,
-  };
-}
-
-function runtimeErrorMessage(category: string, message: string): Record<string, unknown> {
-  return {
-    version: 1,
-    runtimeInstanceId: "runtime-1",
-    messageId: "message-error",
-    sentAt: 1_700_000_000_003,
-    type: "runtime.error",
-    category,
-    message,
-  };
 }
 
 /** apiEvent messages pushed to one player's client (in order). */
@@ -179,38 +73,14 @@ function apiEventsOf(harness: ArenaHarness, playerIndex: number): GameApiEvent[]
   );
 }
 
-/** Ready every player's runtime frame in load order (baseline = existing channels). */
-async function readyAll(
+/** Run two+ players to start through the fake host, then wait for start. */
+async function runToStartWithEngine(
   engine: ArenaEngine,
   harness: ArenaHarness,
   count: number,
   baseline = 0,
 ): Promise<void> {
-  for (let index = 0; index < count; index += 1) {
-    await vi.waitFor(() => expect(harness.channels.length).toBe(baseline + index + 1));
-    deliver(harness.channels[baseline + index]!.port1, readyMessage());
-  }
-  await vi.waitFor(() =>
-    expect(engine.getSnapshot().players.every((player) => player.runState === "running")).toBe(
-      true,
-    ),
-  );
-}
-
-/** Full happy path: register + ready every player and wait for game start. */
-async function runToStart(
-  engine: ArenaEngine,
-  harness: ArenaHarness,
-  count: number,
-  baseline = 0,
-): Promise<void> {
-  await readyAll(engine, harness, count, baseline);
-  for (let index = 0; index < count; index += 1) {
-    deliver(harness.channels[baseline + index]!.port1, registrationMessage(`Game ${index + 1}`));
-  }
-  for (let index = 0; index < count; index += 1) {
-    deliver(harness.channels[baseline + index]!.port1, apiCallMessage("ready", {}));
-  }
+  await runToStart(harness.channels, count, baseline);
   await vi.waitFor(() => {
     const snapshot = engine.getSnapshot();
     expect(snapshot.players.every((player) => player.runState === "started")).toBe(true);
@@ -231,7 +101,7 @@ describe("ArenaEngine — happy path", () => {
     mountContainers(harness, 2);
     const engine = createEngine(harness);
     engine.start();
-    await runToStart(engine, harness, 2);
+    await runToStartWithEngine(engine, harness, 2);
 
     const snapshot = engine.getSnapshot();
     expect(snapshot.players).toHaveLength(2);
@@ -275,7 +145,7 @@ describe("ArenaEngine — happy path", () => {
     mountContainers(harness, 6);
     const engine = createEngine(harness, { initialPlayers: playerSpecs(6) });
     engine.start();
-    await runToStart(engine, harness, 6);
+    await runToStartWithEngine(engine, harness, 6);
 
     const snapshot = engine.getSnapshot();
     expect(snapshot.players).toHaveLength(6);
@@ -297,7 +167,7 @@ describe("ArenaEngine — happy path", () => {
     mountContainers(harness, 2);
     const engine = createEngine(harness);
     engine.start();
-    await runToStart(engine, harness, 2);
+    await runToStartWithEngine(engine, harness, 2);
 
     // Player 1 declares a raw channel and broadcasts on it.
     deliver(
@@ -333,7 +203,7 @@ describe("ArenaEngine — network controls", () => {
     mountContainers(harness, 2);
     const engine = createEngine(harness);
     engine.start();
-    await runToStart(engine, harness, 2);
+    await runToStartWithEngine(engine, harness, 2);
     return { harness, engine };
   }
 
@@ -427,7 +297,7 @@ describe("ArenaEngine — player management", () => {
     mountContainers(harness, 2);
     const engine = createEngine(harness);
     engine.start();
-    await runToStart(engine, harness, 2);
+    await runToStartWithEngine(engine, harness, 2);
 
     // Add a third player: it loads once its container is mounted.
     engine.addPlayer("Zoe");
@@ -470,7 +340,7 @@ describe("ArenaEngine — player management", () => {
     mountContainers(harness, 2);
     const engine = createEngine(harness);
     engine.start();
-    await runToStart(engine, harness, 2);
+    await runToStartWithEngine(engine, harness, 2);
 
     deliver(
       harness.channels[1]!.port1,
@@ -494,7 +364,7 @@ describe("ArenaEngine — player management", () => {
     mountContainers(harness, 2);
     const engine = createEngine(harness);
     engine.start();
-    await readyAll(engine, harness, 2);
+    await readyAll(harness.channels, 2);
     deliver(harness.channels[0]!.port1, registrationMessage("Game 1"));
     deliver(
       harness.channels[0]!.port1,
@@ -520,14 +390,14 @@ describe("ArenaEngine — restart and source replacement", () => {
     mountContainers(harness, 2);
     const engine = createEngine(harness);
     engine.start();
-    await runToStart(engine, harness, 2);
+    await runToStartWithEngine(engine, harness, 2);
 
     const firstFrames = [...harness.frames];
     const firstChannels = harness.channels.length;
     engine.restartAll();
     expect(harness.outcomes).toHaveLength(1); // first run succeeded before the restart
 
-    await runToStart(engine, harness, 2, firstChannels);
+    await runToStartWithEngine(engine, harness, 2, firstChannels);
     // Fresh channels + bootstraps: every old runtime was destroyed.
     expect(harness.channels.length).toBe(firstChannels + 2);
     expect(harness.frames.length).toBe(firstFrames.length + 2);
@@ -545,13 +415,13 @@ describe("ArenaEngine — restart and source replacement", () => {
     mountContainers(harness, 2);
     const engine = createEngine(harness);
     engine.start();
-    await runToStart(engine, harness, 2);
+    await runToStartWithEngine(engine, harness, 2);
 
     const firstFrames = [...harness.frames];
     const bootstrapsBefore = harness.windowMessages.length;
     const channelsBefore = harness.channels.length;
     engine.replaceSource(REPLACED_SOURCE);
-    await runToStart(engine, harness, 2, channelsBefore);
+    await runToStartWithEngine(engine, harness, 2, channelsBefore);
 
     const bootstraps = harness.windowMessages
       .map((message) => message.data as Record<string, unknown>)
@@ -570,9 +440,8 @@ describe("ArenaEngine — per-player state", () => {
   it("tracks connection state changes in the player snapshot", async () => {
     const harness = createHarness();
     mountContainers(harness, 2);
-    const engine = createEngine(harness);
     const states: ArenaState[] = [];
-    const spyEngine = new ArenaEngine({
+    const engine = new ArenaEngine({
       source: SOURCE,
       gameId: "game-1",
       gameMode: "state",
@@ -583,13 +452,12 @@ describe("ArenaEngine — per-player state", () => {
       onState: (state) => states.push(state),
       onRunSucceeded: (outcome) => harness.outcomes.push(outcome),
     });
-    spyEngine.start();
-    await runToStart(spyEngine, harness, 2);
+    engine.start();
+    await runToStartWithEngine(engine, harness, 2);
     expect(states.length).toBeGreaterThan(0);
     // The last snapshot reflects the settled run.
     const last = states.at(-1)!;
     expect(last.players[0]?.connectionState).toBe("connected");
-    expect(engine.getSnapshot().status).toBe("starting");
     engine.stop();
   });
 
@@ -598,7 +466,7 @@ describe("ArenaEngine — per-player state", () => {
     mountContainers(harness, 2);
     const engine = createEngine(harness);
     engine.start();
-    await runToStart(engine, harness, 2);
+    await runToStartWithEngine(engine, harness, 2);
     engine.stop();
     expect(document.querySelectorAll("iframe")).toHaveLength(0);
     expect(engine.getSnapshot().status).toBe("stopped");
