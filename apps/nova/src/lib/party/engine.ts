@@ -44,6 +44,8 @@ import { RuntimeHostClient, type ChannelPort, type RuntimeHostEvent } from "../r
 import { arenaApiCallSchemas } from "../arena/api-calls";
 import { runtimeOriginForMainOrigin } from "../runtime-origin";
 import { localPartyIdentity } from "./identity";
+import { browserLifecycleSource, type PartyLifecycleSource } from "./lifecycle";
+import { clearPartyRecovery, savePartyRecovery } from "./party-recovery";
 import { createTrysteroPartyTransportFactory } from "./transport-factory";
 
 /** Runtime-bridge test seams (no-op in production; mirror U6's arena). */
@@ -124,6 +126,8 @@ export interface PartyEngineState {
   readonly phase: PartyPhase;
   /** Human-readable progress for the creating/joining phases. */
   readonly phaseDetail: string | null;
+  /** Reconnect attempts since the last connected state (reconnect UX). */
+  readonly reconnectAttempts: number;
   readonly role: "creator" | "joiner" | null;
   readonly code: PartyCode | null;
   readonly memberId: MemberId;
@@ -156,6 +160,8 @@ export interface PartyEngineConfig {
   identity?: { memberId: string; displayName: string };
   /** Party-layer scheduler (deterministic tests). */
   schedule?: Scheduler;
+  /** Page-lifecycle events (default: real browser events; tests inject). */
+  lifecycle?: PartyLifecycleSource;
   /** Party-layer secret derivation (deterministic tests). */
   derive?: PartySecretDerivation;
   /** Forwarded to the party layer (tests/UX tuning). */
@@ -227,6 +233,21 @@ interface PartyEngineDefaults {
   advertIntervalMs: number;
 }
 
+/** How long the resume health probe waits for one peer's ping (M1). */
+const PARTY_HEALTH_PROBE_TIMEOUT_MS = 2_000;
+/** First auto-reconnect retry delay after a failed attempt (M1). */
+const RECONNECT_RETRY_BASE_MS = 5_000;
+/** Auto-reconnect retry backoff cap (M1). */
+const RECONNECT_RETRY_CAP_MS = 30_000;
+
+/** Injectable scheduler for engine-owned timers (defaults to setTimeout). */
+function defaultScheduler(callback: () => void, delayMs: number): () => void {
+  const id = setTimeout(callback, delayMs);
+  return () => {
+    clearTimeout(id);
+  };
+}
+
 /** A stable member identity (ADR-0007); defaults to the page identity. */
 interface PartyMemberIdentity {
   readonly memberId: string;
@@ -237,8 +258,11 @@ export class PartyEngine {
   private readonly defaults: PartyEngineDefaults;
   private readonly identity: PartyMemberIdentity;
   private readonly schedule?: Scheduler;
+  private readonly scheduleFn: Scheduler;
   private readonly derive?: PartySecretDerivation;
   private readonly diagnosticsProvider?: () => unknown;
+  private readonly lifecycle: PartyLifecycleSource;
+  private readonly lifecycleUnsubscribers: Array<() => void> = [];
 
   private readonly listeners = new Set<(state: PartyEngineState) => void>();
   private party: PartySession | null = null;
@@ -269,6 +293,12 @@ export class PartyEngine {
   private phaseDetail: string | null = null;
   private connectionState: TransportConnectionState = "idle";
 
+  // M1 lifecycle bookkeeping (ADR-0012/B6).
+  private pageWasHidden = false;
+  private offline = false;
+  private reconnectAttempts = 0;
+  private reconnectRetryTimer: (() => void) | null = null;
+
   constructor(config: PartyEngineConfig = {}) {
     this.defaults = {
       transportFactory: config.transportFactory ?? createTrysteroPartyTransportFactory(),
@@ -282,8 +312,11 @@ export class PartyEngine {
     };
     this.identity = config.identity ?? localPartyIdentity();
     this.schedule = config.schedule;
+    this.scheduleFn = config.schedule ?? defaultScheduler;
     this.derive = config.derive;
     this.diagnosticsProvider = config.diagnostics;
+    this.lifecycle = config.lifecycle ?? browserLifecycleSource();
+    this.subscribeLifecycle();
   }
 
   // ------------------------------------------------------------------
@@ -333,6 +366,7 @@ export class PartyEngine {
     return {
       phase: this.phase,
       phaseDetail: this.phaseDetail,
+      reconnectAttempts: this.reconnectAttempts,
       role: party?.role ?? null,
       code: party?.code ?? null,
       memberId: identity.memberId,
@@ -422,6 +456,7 @@ export class PartyEngine {
       this.game = { gameId: input.gameId, title: input.title, mode: input.mode };
       this.phase = "lobby";
       this.phaseDetail = null;
+      this.saveRecovery();
       this.emit();
       // The host holds the verified source from the start; register and
       // announce it, then boot the local runtime frame.
@@ -455,6 +490,7 @@ export class PartyEngine {
       await this.establish(party);
       this.phase = "lobby";
       this.phaseDetail = null;
+      this.saveRecovery();
       this.emit();
       void this.coordinator
         ?.refresh()
@@ -489,6 +525,7 @@ export class PartyEngine {
       await this.establish(party);
       this.phase = "lobby";
       this.phaseDetail = null;
+      this.saveRecovery();
       this.emit();
       void this.coordinator
         ?.refresh()
@@ -605,35 +642,51 @@ export class PartyEngine {
     this.lastError = null;
     this.phase = "idle";
     this.phaseDetail = null;
+    this.reconnectAttempts = 0;
+    this.offline = false;
+    this.pageWasHidden = false;
+    this.cancelReconnectRetry();
+    clearPartyRecovery();
     this.leaving = false;
     this.emit();
   }
 
-  /** Reconnect after the party connection dropped (reconnect screen). */
+  /**
+   * Reconnect after the party connection dropped (reconnect screen, M1).
+   * Also handles the F11 case: a backgrounded phone whose WebRTC link iOS
+   * killed silently — the transport still reports "connected", so the
+   * engine forces a fresh connection (suspend + resume) to rejoin cleanly
+   * instead of sitting on a stale handle.
+   */
   async reconnect(): Promise<void> {
     const transport = this.party?.privateTransport;
-    if (transport === undefined) {
+    if (transport === undefined || this.leaving) {
       return;
     }
-    this.phaseDetail = "Reconnecting…";
+    this.reconnectAttempts += 1;
+    this.phase = "reconnecting";
+    this.phaseDetail = `Reconnecting… (attempt ${this.reconnectAttempts})`;
     this.emit();
     try {
+      if (transport.connectionState === "connected") {
+        // A link that looks alive but whose peers stopped answering (the
+        // backgrounded-phone case): force a fresh connection id (F11).
+        await transport.suspend();
+      }
       if (transport.connectionState === "suspended") {
         await transport.resume();
       } else if (transport.connectionState === "disconnected") {
         await transport.reconnect();
       } else {
-        this.addNotice("info", "The party connection is already up.");
-        this.phase = this.session?.isStarted() === true ? "playing" : "lobby";
-        this.phaseDetail = null;
-        this.emit();
+        // Mid-join (joining): the connection:state handler settles the phase.
         return;
       }
       // The transport "connection:state" handler settles the phase.
     } catch (error) {
       this.addNotice("error", `Reconnect failed: ${errorMessage(error)}`);
-      this.phaseDetail = "Reconnect failed — try again.";
+      this.phaseDetail = `Reconnect failed (attempt ${this.reconnectAttempts}) — will retry automatically.`;
       this.emit();
+      this.scheduleReconnectRetry();
     }
   }
 
@@ -652,6 +705,225 @@ export class PartyEngine {
       }
     }
     this.emit();
+  }
+
+  // ------------------------------------------------------------------
+  // M1 lifecycle handling (ADR-0012/B6)
+  // ------------------------------------------------------------------
+
+  /** Subscribe to the page-lifecycle events (once per engine). */
+  private subscribeLifecycle(): void {
+    this.lifecycleUnsubscribers.push(
+      this.lifecycle.onVisibilityChange((hidden) => {
+        if (hidden) {
+          this.handlePageHidden();
+        } else {
+          this.handlePageResumed();
+        }
+      }),
+      this.lifecycle.onPageHide(() => this.handlePageHidden()),
+      this.lifecycle.onPageShow(() => this.handlePageResumed()),
+      this.lifecycle.onOnline(() => this.handleOnline()),
+      this.lifecycle.onOffline(() => this.handleOffline()),
+    );
+  }
+
+  /** The page went to the background (Mobile Safari suspends it). */
+  private handlePageHidden(): void {
+    this.pageWasHidden = true;
+    // Timers are unreliable while hidden (B6): cancel any pending retry so
+    // a reconnect burst never fires on resume; the resume probe re-decides.
+    this.cancelReconnectRetry();
+  }
+
+  /**
+   * The page came back (foreground / pageshow): re-sync the runtime frame
+   * and verify the party connection is actually alive. A backgrounded
+   * phone's WebRTC can die without the transport noticing (F11); the
+   * health probe detects that and rejoins with a fresh connection.
+   */
+  private handlePageResumed(): void {
+    this.pageWasHidden = false;
+    if (this.leaving) {
+      return;
+    }
+    if (!this.isInPartyPhase(this.phase)) {
+      return;
+    }
+    this.recoverRuntimeAfterResume();
+    void this.checkPartyConnectionAfterResume();
+  }
+
+  /** The browser reports the network went away (`offline`). */
+  private handleOffline(): void {
+    if (this.leaving || !this.isInPartyPhase(this.phase)) {
+      return;
+    }
+    this.offline = true;
+    if (this.phase === "reconnecting") {
+      this.scheduleReconnectRetry();
+    } else {
+      this.enterReconnecting("You're offline. Nova will reconnect when the network returns.");
+    }
+  }
+
+  /** The network came back (`online`): retry immediately. */
+  private handleOnline(): void {
+    this.offline = false;
+    if (this.leaving || this.phase !== "reconnecting") {
+      return;
+    }
+    this.addNotice("info", "You're back online — reconnecting.");
+    void this.reconnect();
+  }
+
+  /** True for phases where the party connection matters. */
+  private isInPartyPhase(phase: PartyPhase): boolean {
+    return (
+      phase === "lobby" || phase === "starting" || phase === "playing" || phase === "reconnecting"
+    );
+  }
+
+  /**
+   * After a background/foreground cycle the runtime frame may have been
+   * suspended or killed by the OS; reload it when it is gone or wedged.
+   */
+  private recoverRuntimeAfterResume(): void {
+    const runtime = this.runtime;
+    if (runtime === null || this.leaving) {
+      return;
+    }
+    const diagnostic = runtime.diagnose();
+    if (diagnostic.ready && !diagnostic.unresponsive) {
+      return;
+    }
+    this.addNotice(
+      "warn",
+      "Your game's runtime was suspended while the page was away — reloading it.",
+    );
+    this.emit();
+    void runtime.restart().catch((error: unknown) => {
+      this.addNotice("error", `The game could not be reloaded: ${errorMessage(error)}`);
+      this.emit();
+    });
+  }
+
+  /**
+   * Verify the party connection after a resume. Transports that report
+   * suspended/disconnected already entered the reconnect flow via their
+   * connection:state handler; transports that still report connected but
+   * whose peers stopped answering (F11 — iOS killed the WebRTC link while
+   * backgrounded) get a fresh connection.
+   */
+  private async checkPartyConnectionAfterResume(): Promise<void> {
+    const transport = this.party?.privateTransport;
+    if (transport === undefined || this.leaving) {
+      return;
+    }
+    if (transport.connectionState === "suspended" || transport.connectionState === "disconnected") {
+      this.enterReconnecting(
+        "Your connection was suspended while the page was in the background. Reconnecting…",
+      );
+      void this.reconnect();
+      return;
+    }
+    if (transport.connectionState !== "connected") {
+      return; // joining: the state handler settles it
+    }
+    const peers = transport.peers;
+    if (peers.length === 0) {
+      return; // solo member: nothing to probe
+    }
+    const ping = (
+      transport as unknown as { ping?: (connectionId: string) => Promise<number | null> }
+    ).ping;
+    if (typeof ping !== "function") {
+      return; // transports without pings report connection state honestly
+    }
+    const answers = await Promise.all(
+      peers.map((peer) => this.probePeer(ping, transport, peer.connectionId)),
+    );
+    if (answers.some((alive) => alive)) {
+      return; // at least one peer answers: the connection is healthy
+    }
+    this.addNotice(
+      "warn",
+      "Your phone's connection went quiet in the background — reconnecting with a fresh connection.",
+    );
+    this.enterReconnecting("Your connection went quiet in the background. Reconnecting…");
+    void this.reconnect();
+  }
+
+  /** Ping one peer with a hard timeout; true = the peer answered. */
+  private probePeer(
+    ping: (connectionId: string) => Promise<number | null>,
+    transport: unknown,
+    connectionId: string,
+  ): Promise<boolean> {
+    return new Promise<boolean>((resolve) => {
+      let settled = false;
+      const finish = (alive: boolean): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cancel();
+        resolve(alive);
+      };
+      const cancel = this.scheduleFn(() => finish(false), PARTY_HEALTH_PROBE_TIMEOUT_MS);
+      void Promise.resolve(ping.call(transport, connectionId))
+        .then((pingMs) => finish(pingMs !== null))
+        .catch(() => finish(false));
+    });
+  }
+
+  /** Auto-retry the reconnect with backoff (cancelled on success/leave). */
+  private scheduleReconnectRetry(): void {
+    if (this.leaving) {
+      return;
+    }
+    this.cancelReconnectRetry();
+    const delayMs = Math.min(
+      RECONNECT_RETRY_CAP_MS,
+      RECONNECT_RETRY_BASE_MS * 2 ** Math.max(0, this.reconnectAttempts - 1),
+    );
+    this.reconnectRetryTimer = this.scheduleFn(() => {
+      this.reconnectRetryTimer = null;
+      if (this.leaving || this.phase !== "reconnecting") {
+        return;
+      }
+      this.addNotice("info", "Retrying the connection automatically…");
+      void this.reconnect();
+    }, delayMs);
+  }
+
+  private cancelReconnectRetry(): void {
+    if (this.reconnectRetryTimer !== null) {
+      this.reconnectRetryTimer();
+      this.reconnectRetryTimer = null;
+    }
+  }
+
+  /**
+   * Persist local recovery information (M1): code, invite secret, identity,
+   * and the game — enough for a one-tap rejoin after a page reload.
+   */
+  private saveRecovery(): void {
+    const party = this.party;
+    if (party === null) {
+      return;
+    }
+    savePartyRecovery({
+      role: party.role,
+      code: party.code,
+      secret: party.secret,
+      memberId: this.identity.memberId,
+      displayName: this.identity.displayName,
+      game:
+        this.game === null
+          ? null
+          : { gameId: this.game.gameId, title: this.game.title, mode: this.game.mode },
+    });
   }
 
   // ------------------------------------------------------------------
@@ -818,8 +1090,14 @@ export class PartyEngine {
         this.emit();
         break;
       case "port-closed":
-        this.addNotice("warn", "Your game's runtime channel closed.");
+        this.addNotice("warn", "Your game's runtime channel closed — reloading it.");
         this.emit();
+        if (this.runtime !== null && !this.leaving) {
+          void this.runtime.restart().catch((error: unknown) => {
+            this.addNotice("error", `The game could not be reloaded: ${errorMessage(error)}`);
+            this.emit();
+          });
+        }
         break;
       case "ready":
       case "metadata":
@@ -966,9 +1244,19 @@ export class PartyEngine {
       return;
     }
     if (state === "connected") {
+      this.reconnectAttempts = 0;
+      this.offline = false;
+      this.cancelReconnectRetry();
       this.phase = this.session?.isStarted() === true ? "playing" : "lobby";
       this.phaseDetail = null;
       this.emit();
+      // Re-announce the game after a rejoin so this member's coordinator
+      // has current metadata and can request any missing source (M1).
+      void this.coordinator
+        ?.refresh()
+        .catch((error: unknown) =>
+          this.addNotice("warn", `Could not ask the party for the game: ${errorMessage(error)}`),
+        );
     }
   }
 
@@ -979,6 +1267,7 @@ export class PartyEngine {
     this.phase = "reconnecting";
     this.phaseDetail = detail;
     this.emit();
+    this.scheduleReconnectRetry();
   }
 
   private handleCoordinatorEvent(event: GameSourceTransferEvent): void {
@@ -991,6 +1280,7 @@ export class PartyEngine {
             mode: event.metadata.mode ?? "state",
           };
         }
+        this.saveRecovery();
         this.emit();
         break;
       }

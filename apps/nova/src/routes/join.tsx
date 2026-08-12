@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { JoinScreen } from "../components/party/JoinScreen";
 import { PartyExperience } from "../components/party/PartyExperience";
+import { PartyResumeBanner } from "../components/party/PartyResumeBanner";
 import { partyEngine } from "../lib/party/engine";
 import { importInviteFromLocation } from "../lib/party/invite-import";
 
@@ -45,13 +46,18 @@ function JoinPage() {
   if (state.phase === "idle" || state.phase === "error") {
     // Idle: show the code form (with any join error inline). Error: the
     // join failed (rejected, not found, timeout) — show the form again so
-    // the player can try another code or an invite link.
+    // the player can try another code or an invite link. A saved recovery
+    // record (page reload while in a party, M1) offers a one-tap rejoin
+    // above the form.
     return (
-      <JoinScreen
-        error={joinError ?? (state.phase === "error" ? state.lastError : null)}
-        joining={false}
-        onSubmit={handleJoin}
-      />
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4">
+        <PartyResumeBanner engine={partyEngine} />
+        <JoinScreen
+          error={joinError ?? (state.phase === "error" ? state.lastError : null)}
+          joining={false}
+          onSubmit={handleJoin}
+        />
+      </div>
     );
   }
   return <PartyExperience />;
