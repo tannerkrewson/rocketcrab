@@ -1,21 +1,16 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { ClipboardPenLine } from "lucide-react";
-import { PagePlaceholder } from "../components/ui/PagePlaceholder";
+import { EditorPage } from "../components/editor/EditorPage";
 
 export const Route = createFileRoute("/create")({
   component: CreatePage,
 });
 
+/**
+ * The create flow (U4): paste one complete HTML game (from the master-prompt
+ * interview), run it in the live preview, fix it, then save it to the
+ * library. The editor starts in "new game" mode — nothing is persisted
+ * until the user saves.
+ */
 function CreatePage() {
-  return (
-    <PagePlaceholder
-      title="Create a game"
-      description="Copy one master prompt, let an AI chatbot interview you, then paste the finished HTML game right here."
-      icon={<ClipboardPenLine />}
-    >
-      <p className="text-sm font-semibold text-base-content/50">
-        The full prompt workflow lands here (issue U4).
-      </p>
-    </PagePlaceholder>
-  );
+  return <EditorPage />;
 }
