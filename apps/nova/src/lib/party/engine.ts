@@ -894,7 +894,11 @@ export class PartyEngine {
       case "simulation.sendInput": {
         const parsed = arenaApiCallSchemas["simulation.sendInput"].safeParse(payload);
         if (parsed.success) {
-          session.sendSimulationInput(parsed.data.input);
+          try {
+            session.sendSimulationInput(parsed.data.input);
+          } catch (error) {
+            this.addNotice("error", `nova.simulation.sendInput() failed: ${errorMessage(error)}`);
+          }
         }
         break;
       }

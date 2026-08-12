@@ -432,7 +432,18 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
         "nova.simulation.sendInput options failed validation.",
       );
       assertStructuredCloneSafe(input.payload, "nova.simulation.sendInput payload");
-      backend.sendSimulationInput(input);
+      // Runtime rejections (rate limit, not connected) arrive via
+      // `nova.onError` so games observe them uniformly in the arena, over
+      // party transports, and in-process (S1: every API failure is a
+      // stable NovaError).
+      Promise.resolve()
+        .then(() => backend.sendSimulationInput(input))
+        .catch((error: unknown) => {
+          callSafely(
+            errorHandlers,
+            error instanceof NovaError ? error : new NovaError("invalid_options", String(error)),
+          );
+        });
     },
     onAuthorityChange(handler) {
       return addHandler(simulationAuthorityChangeHandlers, handler);

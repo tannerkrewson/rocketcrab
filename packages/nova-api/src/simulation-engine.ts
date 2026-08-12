@@ -383,11 +383,13 @@ export class NovaSimulationEngine {
     if (message.sentAt !== undefined && message.sentAt > 0 && this.started) {
       const authorityTickNow = message.tick + (receivedAt - message.sentAt) / this.tickMs;
       const drift = this.tick - authorityTickNow;
-      this.driftTicks = Math.round(drift);
       if (Math.abs(drift) >= 2) {
         // Resync the local clock to the authority (the game restores from
         // the snapshot and continues from the authoritative clock).
         this.tick = Math.max(0, Math.round(authorityTickNow));
+        this.driftTicks = 0; // the clock was realigned
+      } else {
+        this.driftTicks = Math.round(drift);
       }
     }
     return retained;
@@ -496,7 +498,19 @@ export class NovaSimulationEngine {
    */
   private async produceSnapshot(): Promise<void> {
     if (this.disposed || this.ended || !this.isAuthority || !this.restored) return;
-    const result = await this.executor.serializeState();
+    let result: Awaited<ReturnType<NovaSimulationExecutor["serializeState"]>>;
+    try {
+      result = await this.executor.serializeState();
+    } catch (error) {
+      // An executor must never take the engine down (frame crashes, game
+      // handler throws): surface a stable error and keep the cadence going.
+      this.host.emit({
+        type: "error",
+        code: "snapshot_error",
+        message: error instanceof Error ? error.message.slice(0, 256) : String(error),
+      });
+      return;
+    }
     if (this.disposed || this.ended || !this.isAuthority || !this.restored) return;
     if (!result.ok) {
       this.host.emit({ type: "error", code: result.code, message: result.message });
