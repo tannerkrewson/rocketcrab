@@ -43,7 +43,7 @@ import { createNovaSession } from "@rocketcrab/nova-api";
 import { RuntimeHostClient, type ChannelPort, type RuntimeHostEvent } from "../runtime-host";
 import { arenaApiCallSchemas } from "../arena/api-calls";
 import { runtimeOriginForMainOrigin } from "../runtime-origin";
-import { localPartyIdentity } from "./identity";
+import { localPartyIdentity, updatePartyDisplayName } from "./identity";
 import { browserLifecycleSource, type PartyLifecycleSource } from "./lifecycle";
 import { clearPartyRecovery, savePartyRecovery } from "./party-recovery";
 import { createTrysteroPartyTransportFactory } from "./transport-factory";
@@ -168,6 +168,8 @@ export interface PartyEngineConfig {
   collisionListenMs?: number;
   collisionRetries?: number;
   discoveryTimeoutMs?: number;
+  /** Fail-fast "no party here" window for code joins (default 7 s; 7.10). */
+  earlyMissTimeoutMs?: number;
   admissionTimeoutMs?: number;
   advertIntervalMs?: number;
   /** Adapter diagnostics (Trystero getDiagnostics); duck-typed when present. */
@@ -229,6 +231,7 @@ interface PartyEngineDefaults {
   collisionListenMs: number;
   collisionRetries: number;
   discoveryTimeoutMs: number;
+  earlyMissTimeoutMs: number;
   admissionTimeoutMs: number;
   advertIntervalMs: number;
 }
@@ -248,15 +251,21 @@ function defaultScheduler(callback: () => void, delayMs: number): () => void {
   };
 }
 
+/** The last setup attempt, so the error screen can retry it (7.10). */
+type LastSetup =
+  | { kind: "create"; input: PartySourceSpec | undefined }
+  | { kind: "join-code"; code: string }
+  | { kind: "join-invite"; input: { secret: string; code?: string } };
+
 /** A stable member identity (ADR-0007); defaults to the page identity. */
 interface PartyMemberIdentity {
   readonly memberId: string;
-  readonly displayName: string;
+  displayName: string;
 }
 
 export class PartyEngine {
   private readonly defaults: PartyEngineDefaults;
-  private readonly identity: PartyMemberIdentity;
+  private identity: PartyMemberIdentity;
   private readonly schedule?: Scheduler;
   private readonly scheduleFn: Scheduler;
   private readonly derive?: PartySecretDerivation;
@@ -287,6 +296,7 @@ export class PartyEngine {
   private leaving = false;
   private notices: PartyNotice[] = [];
   private lastError: string | null = null;
+  private lastSetup: LastSetup | null = null;
   private lastDiagnostics: unknown = null;
 
   private phase: PartyPhase = "idle";
@@ -309,6 +319,7 @@ export class PartyEngine {
       collisionListenMs: config.collisionListenMs ?? 2_000,
       collisionRetries: config.collisionRetries ?? 4,
       discoveryTimeoutMs: config.discoveryTimeoutMs ?? 20_000,
+      earlyMissTimeoutMs: config.earlyMissTimeoutMs ?? 7_000,
       admissionTimeoutMs: config.admissionTimeoutMs ?? 30_000,
       advertIntervalMs: config.advertIntervalMs ?? 5_000,
     };
@@ -345,6 +356,8 @@ export class PartyEngine {
     let startBlockedReason: string | null = null;
     if (!inLobby) {
       startBlockedReason = "The party is not in the lobby yet.";
+    } else if (this.game === null) {
+      startBlockedReason = "Pick a game before starting the party.";
     } else if (ended) {
       startBlockedReason = "The game ended; leave the party to play again.";
     } else if (anyFailed) {
@@ -384,8 +397,9 @@ export class PartyEngine {
       authorityMemberId: this.computeAuthorityMemberId(members),
       inviteUrl: this.buildInviteUrl(),
       connectionState: this.connectionState,
-      canStart: inLobby && !ended && !anyFailed && allVerified && allReady,
-      canForceStart: inLobby && !ended && !anyFailed && allVerified && !allReady,
+      canStart: inLobby && this.game !== null && !ended && !anyFailed && allVerified && allReady,
+      canForceStart:
+        inLobby && this.game !== null && !ended && !anyFailed && allVerified && !allReady,
       startBlockedReason,
       endedReason: this.endedReason,
       diagnostics: this.buildDiagnostics(),
@@ -433,9 +447,16 @@ export class PartyEngine {
    * Create a party from a game source (saved game or current editor
    * source). Resolves when the party is live and the lobby is ready.
    */
-  async createParty(input: PartySourceSpec): Promise<void> {
-    this.assertIdle();
+  /**
+   * Create a party. With a game ({@link PartySourceSpec}) the host registers
+   * and announces it immediately (the classic start-from-editor flow);
+   * without one the host lands in the lobby with no game selected and can
+   * pick one later via {@link selectGame} (7.6 — classic start-a-party flow).
+   */
+  async createParty(input?: PartySourceSpec): Promise<void> {
+    this.prepareSetup();
     const identity = this.identity;
+    this.lastSetup = { kind: "create", input };
     this.phase = "creating";
     this.phaseDetail = "Generating your room code…";
     this.lastError = null;
@@ -446,7 +467,7 @@ export class PartyEngine {
         displayName: identity.displayName,
         transportFactory: this.defaults.transportFactory,
         partyName: "Nova party",
-        gameTitle: input.title,
+        gameTitle: input?.title ?? "Nova party",
         onJoinRequest: (request) => this.queueApproval(request),
         collisionListenMs: this.defaults.collisionListenMs,
         collisionRetries: this.defaults.collisionRetries,
@@ -454,15 +475,25 @@ export class PartyEngine {
         ...(this.schedule !== undefined ? { schedule: this.schedule } : {}),
         ...(this.derive !== undefined ? { derive: this.derive } : {}),
       });
+      // The user cancelled while the room was being created: drop the
+      // session instead of resurrecting a party behind their back.
+      if (this.leaving) {
+        await party.leave().catch(() => undefined);
+        return;
+      }
       await this.establish(party);
-      this.game = { gameId: input.gameId, title: input.title, mode: input.mode };
+      this.game =
+        input === undefined ? null : { gameId: input.gameId, title: input.title, mode: input.mode };
       this.phase = "lobby";
       this.phaseDetail = null;
+      this.lastSetup = null;
       this.saveRecovery();
       this.emit();
       // The host holds the verified source from the start; register and
       // announce it, then boot the local runtime frame.
-      this.registerSource(input);
+      if (input !== undefined) {
+        this.registerSource(input);
+      }
     } catch (error) {
       this.failSetup(error);
     }
@@ -470,8 +501,9 @@ export class PartyEngine {
 
   /** Join a party by its four-letter code. */
   async joinByCode(code: string): Promise<void> {
-    this.assertIdle();
+    this.prepareSetup();
     const identity = this.identity;
+    this.lastSetup = { kind: "join-code", code };
     this.phase = "joining";
     this.phaseDetail = `Joining party ${code.toUpperCase()}…`;
     this.lastError = null;
@@ -484,14 +516,22 @@ export class PartyEngine {
         transportFactory: this.defaults.transportFactory,
         onJoinRequest: (request) => this.queueApproval(request),
         discoveryTimeoutMs: this.defaults.discoveryTimeoutMs,
+        earlyMissTimeoutMs: this.defaults.earlyMissTimeoutMs,
         admissionTimeoutMs: this.defaults.admissionTimeoutMs,
         advertIntervalMs: this.defaults.advertIntervalMs,
         ...(this.schedule !== undefined ? { schedule: this.schedule } : {}),
         ...(this.derive !== undefined ? { derive: this.derive } : {}),
       });
+      // The user cancelled while joining: drop the session instead of
+      // resurrecting a party behind their back.
+      if (this.leaving) {
+        await party.leave().catch(() => undefined);
+        return;
+      }
       await this.establish(party);
       this.phase = "lobby";
       this.phaseDetail = null;
+      this.lastSetup = null;
       this.saveRecovery();
       this.emit();
       void this.coordinator
@@ -506,8 +546,9 @@ export class PartyEngine {
 
   /** Join a party from an invite-link secret (ADR-0011). */
   async joinByInvite(input: { secret: string; code?: string }): Promise<void> {
-    this.assertIdle();
+    this.prepareSetup();
     const identity = this.identity;
+    this.lastSetup = { kind: "join-invite", input };
     this.phase = "joining";
     this.phaseDetail = "Joining the party from your invite…";
     this.lastError = null;
@@ -524,9 +565,16 @@ export class PartyEngine {
         ...(this.schedule !== undefined ? { schedule: this.schedule } : {}),
         ...(this.derive !== undefined ? { derive: this.derive } : {}),
       });
+      // The user cancelled while joining: drop the session instead of
+      // resurrecting a party behind their back.
+      if (this.leaving) {
+        await party.leave().catch(() => undefined);
+        return;
+      }
       await this.establish(party);
       this.phase = "lobby";
       this.phaseDetail = null;
+      this.lastSetup = null;
       this.saveRecovery();
       this.emit();
       void this.coordinator
@@ -537,6 +585,70 @@ export class PartyEngine {
     } catch (error) {
       this.failSetup(error);
     }
+  }
+
+  /**
+   * Pick a game for a party that was started without one (7.6). The caller
+   * loads the saved game from the repository and passes the source here;
+   * the host then registers/announces it and boots the local frame.
+   */
+  async selectGame(input: PartySourceSpec): Promise<void> {
+    if (this.phase !== "lobby" || this.party === null) {
+      return;
+    }
+    this.game = { gameId: input.gameId, title: input.title, mode: input.mode };
+    this.emit();
+    this.registerSource(input);
+  }
+
+  /**
+   * Update this player's display name (7.5): persists it for next time and
+   * applies it locally immediately. Peers see the new name on their next
+   * handshake/rejoin (the transport bakes names into the handshake).
+   */
+  setDisplayName(name: string): void {
+    const trimmed = name.trim();
+    if (trimmed.length === 0) {
+      return;
+    }
+    updatePartyDisplayName(trimmed);
+    this.identity = { ...this.identity, displayName: trimmed };
+    this.emit();
+  }
+
+  /**
+   * Re-run the last setup attempt (create / join-by-code / join-by-invite)
+   * after a failure. Used by the error screen's retry (7.10) — the previous
+   * flow called leave instead, which toasted "you left the party" over the
+   * navbar and left a blank page.
+   */
+  retrySetup(): void {
+    const last = this.lastSetup;
+    if (last === null || this.party !== null) {
+      return;
+    }
+    if (last.kind === "create") {
+      void this.createParty(last.input);
+    } else if (last.kind === "join-code") {
+      void this.joinByCode(last.code);
+    } else {
+      void this.joinByInvite(last.input);
+    }
+  }
+
+  /**
+   * Clear a failed setup and return to the entry UI. Unlike leave, this
+   * never toasts or tears down anything (there is nothing to tear down).
+   */
+  dismissError(): void {
+    if (this.phase !== "error") {
+      return;
+    }
+    this.lastError = null;
+    this.phase = "idle";
+    this.phaseDetail = null;
+    this.notices = [];
+    this.emit();
   }
 
   // ------------------------------------------------------------------
@@ -642,6 +754,7 @@ export class PartyEngine {
     this.endedReason = null;
     this.notices = [];
     this.lastError = null;
+    this.lastSetup = null;
     this.phase = "idle";
     this.phaseDetail = null;
     this.gameStarted = false;
@@ -1677,13 +1790,21 @@ export class PartyEngine {
     this.notices = [...this.notices, makeNotice(level, message)].slice(-MAX_NOTICES);
   }
 
-  private assertIdle(): void {
-    if (this.isActive()) {
+  private prepareSetup(): void {
+    // A live party blocks a second setup; a leftover error phase (failed
+    // join/create) does NOT — a retry must be able to start cleanly (7.10).
+    if (this.party !== null || this.session !== null) {
       throw new PartyError(
         "invalid_state",
         "A party is already active on this page; leave it before starting another.",
       );
     }
+    this.leaving = false;
+    this.lastError = null;
+    this.phase = "idle";
+    this.phaseDetail = null;
+    this.notices = [];
+    this.emit();
   }
 
   private emit(): void {

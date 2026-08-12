@@ -246,6 +246,35 @@ describe("creation + joining by four letters (ADR-0004)", () => {
       }),
     ).rejects.toMatchObject({ code: "invalid_code" });
   });
+
+  it("fails fast with not_found when no peer ever appears in the rendezvous room (7.10)", async () => {
+    const world = makeWorld();
+    const promise = joinPartyByCode({
+      code: "ZZZZ",
+      memberId: "joiner",
+      transportFactory: world.factory,
+      schedule: world.clock.schedule,
+      discoveryTimeoutMs: 20_000,
+      earlyMissTimeoutMs: 1_000,
+    });
+    // Attach the rejection expectation BEFORE the timer fires so the early
+    // fail is observed (and not reported as an unhandled rejection).
+    const expectation = expect(promise).rejects.toMatchObject({
+      code: "not_found",
+      message: expect.stringMatching(/no party is advertising/i),
+    });
+    await flush(); // attach the discovery + peer listeners
+    world.clock.advance(1_000); // the early-miss window closes: no peers
+    await settle(world);
+    await expectation;
+  });
+
+  it("does NOT fail fast when a peer (the greeter) is present before the early window (7.10)", async () => {
+    const world = makeWorld();
+    await makeCreator(world); // greeter sits in the rendezvous room for AAAA
+    const joiner = await makeJoiner(world);
+    expect(joiner.code).toBe("AAAA");
+  });
 });
 
 describe("admission (ADR-0004 steps 8-9)", () => {
