@@ -49,3 +49,12 @@ export function takePartySource(gameId: string): string | null {
     return null;
   }
 }
+
+/** Test-only reset so each test imports a fresh handoff. */
+export function resetPartySourceForTests(): void {
+  try {
+    sessionStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // sessionStorage unavailable (private mode): nothing to reset.
+  }
+}

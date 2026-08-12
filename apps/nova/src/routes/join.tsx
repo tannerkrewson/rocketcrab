@@ -1,16 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { parseInviteFragment } from "@rocketcrab/party";
 import { JoinScreen } from "../components/party/JoinScreen";
 import { PartyExperience } from "../components/party/PartyExperience";
 import { partyEngine } from "../lib/party/engine";
+import { importInviteFromLocation } from "../lib/party/invite-import";
 
 export const Route = createFileRoute("/join")({
   component: JoinPage,
 });
-
-/** Module-level guard so StrictMode's double effect run never joins twice. */
-let inviteHandled = false;
 
 /**
  * The join route (P2/P4): four-letter code entry, plus invite-link joining.
@@ -23,22 +20,13 @@ function JoinPage() {
 
   // Import the invite fragment (if any) once per page load.
   useEffect(() => {
-    if (inviteHandled) {
-      return;
-    }
-    inviteHandled = true;
-    const data = parseInviteFragment(window.location.hash);
-    if (data !== null && data.secret !== undefined) {
-      // The secret lives in engine/PartySession memory from here on; remove
-      // the fragment from the address bar and history.
-      history.replaceState(null, "", window.location.pathname + window.location.search);
-      void partyEngine.joinByInvite({
-        secret: data.secret,
-        ...(data.code !== undefined ? { code: data.code } : {}),
-      });
-    } else if (window.location.hash.length > 0) {
-      // A fragment with no valid invite data: drop it (ADR-0011 hygiene).
-      history.replaceState(null, "", window.location.pathname + window.location.search);
+    const invite = importInviteFromLocation({
+      hash: window.location.hash,
+      pathname: window.location.pathname,
+      search: window.location.search,
+    });
+    if (invite !== null) {
+      void partyEngine.joinByInvite(invite);
     }
   }, []);
 
