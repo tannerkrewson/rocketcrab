@@ -20,6 +20,10 @@ npm run test:e2e:trystero
      structured message, a 256 KiB binary payload, and a 1 MiB large string
      with progress events on both sides, ping each other, then leave.
   2. Relay diagnostics + connection quality are observable after joining.
+  3. P3: two pages run the game-source coordinator (packages/party) over the
+     real transport — the host registers a multi-chunk game source, the
+     admitted joiner requests and receives it byte-identical, and the
+     SHA-256 digest + byte count verify before launch.
 
 ## Resiliency
 

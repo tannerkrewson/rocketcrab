@@ -6,6 +6,7 @@
 // end-to-end test of the P1 adapter over real Nostr relays + WebRTC.
 import { TrysteroTransport } from "@rocketcrab/trystero-transport";
 import type { TrysteroTransportDiagnostics } from "@rocketcrab/trystero-transport";
+import { GameSourceCoordinator } from "@rocketcrab/party";
 
 interface HarnessState {
   ready: boolean;
@@ -25,6 +26,15 @@ interface HarnessState {
   progress: Array<{ dir: string; fraction: number; channel: string }>;
   pings: number[];
   errors: string[];
+  /** P3 game-source transfer state (host announcement / joiner receipt). */
+  source: {
+    gameId: string | null;
+    sourceSha256: string | null;
+    sourceSizeBytes: number | null;
+    received: boolean;
+    receivedLength: number | null;
+    events: string[];
+  };
 }
 
 interface JoinOptions {
@@ -80,9 +90,18 @@ const state: HarnessState = {
   progress: [],
   pings: [],
   errors: [],
+  source: {
+    gameId: null,
+    sourceSha256: null,
+    sourceSizeBytes: null,
+    received: false,
+    receivedLength: null,
+    events: [],
+  },
 };
 
 let transport: TrysteroTransport | null = null;
+let sourceCoordinator: GameSourceCoordinator | null = null;
 
 /** Resolve the join: "joined" or an error category string. */
 async function enterRoom(options: JoinOptions): Promise<string> {
@@ -158,6 +177,16 @@ function snapshotRelays(current: TrysteroTransport): HarnessState["relays"] {
 }
 
 async function leaveRoom(): Promise<void> {
+  sourceCoordinator?.dispose();
+  sourceCoordinator = null;
+  state.source = {
+    gameId: null,
+    sourceSha256: null,
+    sourceSizeBytes: null,
+    received: false,
+    receivedLength: null,
+    events: [],
+  };
   if (transport !== null) {
     await transport.leave();
     transport = null;
@@ -217,6 +246,51 @@ async function pingFirst(): Promise<number | null> {
   return ms;
 }
 
+// ---------------------------------------------------------------------------
+// P3: peer-to-peer game source transfer over the established party transport
+// ---------------------------------------------------------------------------
+
+/** Host role: register the game source and announce it to the party. */
+async function sourceHostStart(gameId: string, source: string): Promise<void> {
+  const current = requireTransport();
+  sourceCoordinator?.dispose();
+  sourceCoordinator = new GameSourceCoordinator({
+    transport: current,
+    onEvent: (event) => {
+      state.source.events.push(event.type);
+    },
+  });
+  const metadata = await sourceCoordinator.setSource({ gameId, title: "E2E Game", source });
+  state.source.gameId = metadata.gameId;
+  state.source.sourceSha256 = metadata.sourceSha256;
+  state.source.sourceSizeBytes = metadata.sourceSizeBytes;
+}
+
+/** Joiner role: attach the coordinator and wait for the verified source. */
+async function sourceJoinerStart(): Promise<void> {
+  const current = requireTransport();
+  sourceCoordinator?.dispose();
+  sourceCoordinator = new GameSourceCoordinator({
+    transport: current,
+    onEvent: (event) => {
+      state.source.events.push(event.type);
+      if (event.type === "received") {
+        state.source.gameId = event.gameId;
+        state.source.sourceSha256 = event.sourceSha256;
+        state.source.received = true;
+        state.source.receivedLength = event.source.length;
+        state.source.sourceSizeBytes = new TextEncoder().encode(event.source).byteLength;
+      }
+    },
+  });
+  // The coordinator may have missed the host's announcement; ask for it.
+  await sourceCoordinator.refresh();
+}
+
+function getSourceState(): HarnessState["source"] {
+  return state.source;
+}
+
 function getDiagnostics(): TrysteroTransportDiagnostics | null {
   return transport?.getDiagnostics() ?? null;
 }
@@ -234,6 +308,9 @@ declare global {
       ping: () => Promise<number | null>;
       getState: () => HarnessState;
       getDiagnostics: () => TrysteroTransportDiagnostics | null;
+      sourceHostStart: (gameId: string, source: string) => Promise<void>;
+      sourceJoinerStart: () => Promise<void>;
+      getSourceState: () => HarnessState["source"];
       randomRoom: () => string;
     };
   }
@@ -250,6 +327,9 @@ window.__harness = {
   ping: pingFirst,
   getState: () => state,
   getDiagnostics,
+  sourceHostStart,
+  sourceJoinerStart: () => sourceJoinerStart(),
+  getSourceState,
   randomRoom,
 };
 
