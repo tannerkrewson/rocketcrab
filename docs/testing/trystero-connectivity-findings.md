@@ -1,9 +1,10 @@
 # F5 Findings — Backendless Trystero Connectivity (Rocketcrab Nova)
 
-Status: **DRAFT — automated same-machine results complete; cross-device human
-pass IN PROGRESS (2026-08-01)**. TURN verdict so far: **cross-network
-connectivity requires TURN** (S3 FAIL) — P0 TURN issue `rocketcrab-23s`
-created, blocking release.
+Status: **COMPLETE (2026-08-01)** — automated same-machine results +
+cross-device human pass (desktop + Mac + iPhone). TURN verdict:
+**cross-network connectivity requires TURN** (S3 FAIL) — P0 TURN issue
+`rocketcrab-23s` created, blocking release. Same-Wi-Fi phone rejoin/
+backgrounding bug (F11) handed to P1/P2/M1.
 
 Beads issue: `rocketcrab-9fv.1.5`. Trystero **0.25.3**, **Nostr** strategy (default).
 Automated runs: `spikes/trystero-connectivity` Playwright suite, 11 scenarios,
@@ -177,7 +178,13 @@ standard Chromium works — Helium is not a valid control browser.
 - **S8 — backgrounding: FAIL.** After ~20 s at Home the iPhone dropped; on
   return it was not in a room and rejoin did not work (same error pattern as
   S6); logs showed only "peer left". Mobile-suspension finding for M1.
-- **S9 — airplane-mode failure reporting: pending.**
+- **S9 — airplane-mode failure reporting: CONFIRMED WEAK on device.**
+  In airplane mode, Join reported "entered room … as …" with **no errors** —
+  user-visible success while nothing was happening (the F5 finding: no
+  structured join error for relay failure; only socket `readyState` +
+  console). P1/P2 must surface relay state and impose their own
+  discovery/join timeout. Recovery observation inconclusive: on restoring
+  connectivity iOS reloaded the page and cleared the log.
 
 - **F11 — Phone rejoin after Leave()/backgrounding fails on same Wi-Fi
   (new finding).** The phone's rejoin after Leave() or after iOS background
