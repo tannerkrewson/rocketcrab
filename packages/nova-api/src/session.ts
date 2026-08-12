@@ -1514,10 +1514,10 @@ export class NovaSession implements NovaClientBackend {
         // Flush buffered dispatches toward the new authority and re-send
         // in-flight ones (deduplication makes the re-sends exactly-once).
         this.flushDispatchBuffer();
-        // A1: authority changes notify the simulation loop (restore after
-        // migration / follower snapshot pushes).
-        this.simulationEngine.onAuthorityChanged(event.authorityMemberId, event.term);
         if (this.game.mode === "simulation") {
+          // A1: authority changes notify the simulation loop (restore after
+          // migration / follower snapshot pushes).
+          this.simulationEngine.onAuthorityChanged(event.authorityMemberId, event.term);
           // Games never learn which player is authoritative (engineering
           // rule 1): the game-facing event carries the monotonic term only,
           // so frames know to treat the next snapshot as the restore point.
