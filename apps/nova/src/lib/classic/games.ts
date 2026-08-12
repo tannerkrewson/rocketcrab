@@ -128,6 +128,8 @@ const drawphone: ClassicGame = {
   id: "drawphone",
   name: "Drawphone",
   frameOrigins: origins("https://drawphone.tannerkrewson.com/", "https://dpk.tannerkrewson.com"),
+  // Verified CORS-blocked: /new returns 200 with no Access-Control-Allow-Origin (7.7.3).
+  connectStatus: "blocked",
   connectToGame: drawphoneConnect("https://drawphone.tannerkrewson.com/"),
 };
 
@@ -139,6 +141,7 @@ const drawphoneKids: ClassicGame = {
     drawphoneBase.description +
     "\n\nNOTE: Age-restricted word packs are removed from Drawphone for Kids. Players can still draw and guess unrestricted.",
   frameOrigins: origins("https://drawphone.tannerkrewson.com/", "https://dpk.tannerkrewson.com"),
+  connectStatus: "blocked",
   connectToGame: drawphoneConnect("https://dpk.tannerkrewson.com/"),
 };
 
@@ -287,6 +290,9 @@ function netgamesioGame(
     ...(guideUrl ? { guideUrl } : {}),
     ...(pictures ? { pictures } : {}),
     frameOrigins: origins("https://netgames.io/"),
+    // netgames.io /new 302-redirects with no Access-Control-Allow-Origin, so
+    // the room-creation fetch is CORS-blocked from the browser (7.7.3).
+    connectStatus: "blocked",
     connectToGame: async () => {
       const res = await fetch(`https://netgames.io/games/${urlId}/new`);
       if (!res.ok) {
@@ -491,6 +497,8 @@ function outOfContextGame(
     players,
     ...(pictures ? { pictures } : {}),
     frameOrigins: origins(origin + "/"),
+    // outofcontext.party/api/v1/rocketcrab returns 403 with no CORS headers (7.7.3).
+    connectStatus: "blocked",
     connectToGame: async () => {
       const { code } = await postJson<{ code?: string }>(`${origin}/api/v1/rocketcrab`, {
         game,
@@ -628,6 +636,8 @@ const secrethitlerDuc: ClassicGame = {
   minPlayers: 5,
   maxPlayers: 10,
   frameOrigins: origins("https://secret-hitler.com/"),
+  // netlify function returns 200 with no CORS headers (7.7.3).
+  connectStatus: "blocked",
   connectToGame: async () => {
     const newUrl = "https://inspiring-hugle-c583a0.netlify.app/.netlify/functions/secretHitler";
     const { gameCode } = await postJson<{ gameCode?: string }>(newUrl);
@@ -677,6 +687,8 @@ const snakeout: ClassicGame = {
   category: ["medium"],
   players: "5-10",
   frameOrigins: origins("https://snakeout.tannerkrewson.com/"),
+  // snakeout.tannerkrewson.com/new returns 200 with no CORS headers (7.7.3).
+  connectStatus: "blocked",
   connectToGame: async () => {
     const newUrl = "https://snakeout.tannerkrewson.com/new";
     const { gameCode } = await postJson<{ gameCode?: string }>(newUrl);
@@ -728,6 +740,8 @@ const tkSpyfall: ClassicGame = {
   maxPlayers: Number.POSITIVE_INFINITY,
   pictures: ["https://i.imgur.com/gAYGUUC.jpg", "https://i.imgur.com/8VMpYns.jpg"],
   frameOrigins: origins("https://spyfall.tannerkrewson.com/"),
+  // spyfall.tannerkrewson.com/new returns 200 with no CORS headers (7.7.3).
+  connectStatus: "blocked",
   connectToGame: async () => {
     const newUrl = "https://spyfall.tannerkrewson.com/new";
     const { gameCode } = await postJson<{ gameCode?: string }>(newUrl);
@@ -768,6 +782,8 @@ const werewolfnight: ClassicGame = {
   minPlayers: 5,
   maxPlayers: 16,
   frameOrigins: origins("https://werewolf-night.com/"),
+  // werewolf.uber.space/newRoom returns 200 with no CORS headers (7.7.3).
+  connectStatus: "blocked",
   connectToGame: async () => {
     const newUrl = "https://werewolf.uber.space/newRoom";
     const { gameCode } = await postJson<{ gameCode?: string }>(newUrl);
