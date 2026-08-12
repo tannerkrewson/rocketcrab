@@ -23,6 +23,7 @@ import {
   peerCapabilitiesMessageSchema,
   peerMessagesSchema,
   playerIdentityMessageSchema,
+  rawChannelCloseMessageSchema,
   rawChannelMetadataMessageSchema,
   simulationInputMessageSchema,
   simulationSnapshotMessageSchema,
@@ -67,6 +68,7 @@ describe("peer message schemas", () => {
       gameStartMessageSchema,
       gameEndMessageSchema,
       rawChannelMetadataMessageSchema,
+      rawChannelCloseMessageSchema,
       gameSourceMetadataMessageSchema,
       gameSourceTransferMessageSchema,
       transferAcknowledgementMessageSchema,
@@ -238,6 +240,12 @@ describe("peer message schemas", () => {
           broadcast: true,
         }),
       ),
+      rawChannelCloseMessageSchema.parse(
+        basePeer({
+          type: "raw.close",
+          channelName: "chat",
+        }),
+      ),
       gameSourceMetadataMessageSchema.parse(
         basePeer({
           type: "game.source.metadata",
@@ -336,6 +344,10 @@ describe("peer message schemas", () => {
         ordering: "ordered",
         binaryPayloads: false,
         broadcast: true,
+      }),
+      basePeer({
+        type: "raw.close",
+        channelName: "x".repeat(65),
       }),
       basePeer({
         type: "game.source.metadata",

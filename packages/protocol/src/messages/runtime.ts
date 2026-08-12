@@ -34,6 +34,7 @@ export const NOVA_API_CALL_METHODS = [
   "ready",
   "dispatch",
   "raw.createChannel",
+  "raw.close",
   "raw.send",
   "simulation.register",
   "simulation.sendInput",

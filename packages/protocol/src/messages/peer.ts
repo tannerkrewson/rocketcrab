@@ -312,7 +312,9 @@ export type GameEndMessage = z.infer<typeof gameEndMessageSchema>;
 /**
  * Raw channel metadata: declares a named raw-mode channel and its delivery
  * guarantees (ADR-0006 raw mode: named channels, reliable/unreliable,
- * ordered/unordered, binary, broadcast/targeted).
+ * ordered/unordered, binary, broadcast/targeted). Peers joining mid-game
+ * receive the declarations of every open channel (targeted re-announcement
+ * on join), so channel lifecycle survives peer joins.
  */
 export const rawChannelMetadataMessageSchema = z.object({
   ...peerEnvelopeFields,
@@ -324,6 +326,20 @@ export const rawChannelMetadataMessageSchema = z.object({
   broadcast: z.boolean(),
 });
 export type RawChannelMetadataMessage = z.infer<typeof rawChannelMetadataMessageSchema>;
+
+/**
+ * Raw channel close: the declaring player closed one of its raw channels
+ * (A2 channel lifecycle). Receivers drop the channel declaration: local
+ * sends on it fail with `unknown_channel` unless the receiver declared the
+ * channel itself (each player owns its own declarations). The channel name
+ * may be re-opened later with a fresh `raw.channel` declaration.
+ */
+export const rawChannelCloseMessageSchema = z.object({
+  ...peerEnvelopeFields,
+  type: z.literal("raw.close"),
+  channelName: channelNameSchema,
+});
+export type RawChannelCloseMessage = z.infer<typeof rawChannelCloseMessageSchema>;
 
 /**
  * Game source metadata: the pre-transfer descriptor for a peer-to-peer game
@@ -440,6 +456,7 @@ export const peerMessagesSchema = z.discriminatedUnion("type", [
   gameStartMessageSchema,
   gameEndMessageSchema,
   rawChannelMetadataMessageSchema,
+  rawChannelCloseMessageSchema,
   gameSourceMetadataMessageSchema,
   gameSourceTransferMessageSchema,
   transferAcknowledgementMessageSchema,
