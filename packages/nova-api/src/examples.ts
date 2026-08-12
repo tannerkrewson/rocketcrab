@@ -74,13 +74,37 @@ nova.state.onChange(function (state) {
 nova.ready();
 `;
 
-/** A simulation-mode game: register input handlers and send inputs. */
-export const SIMULATION_MODE_EXAMPLE = `// Simulation-mode example: continuous player inputs.
+/** A simulation-mode game: register handlers and send inputs. */
+export const SIMULATION_MODE_EXAMPLE = `// Simulation-mode example: a continuous paddle game. Nova owns the input
+// order, the tick clock, authority selection, and authoritative snapshots;
+// the game owns the rules and its own local simulation copy.
 nova.defineGame({ title: "Pong-ish", mode: "simulation" });
+
+var pos = { x: 0, y: 0 };
+var inputs = [];
 
 nova.simulation.register({
   onInput: function (input) {
-    nova.log(input.sender.name + " moved: " + input.type);
+    inputs.push(input); // { type, payload, sender } — apply during the next tick
+  },
+  onTick: function (tick) {
+    // Advance one fixed step (the Nova-provided time step).
+    while (inputs.length > 0) {
+      var input = inputs.shift();
+      if (input.type === "move") {
+        pos.x += input.payload.dx;
+        pos.y += input.payload.dy;
+      }
+    }
+  },
+  onSnapshot: function (snapshot) {
+    // Authoritative correction (or restore after migration): drop local
+    // prediction and adopt the authoritative state.
+    pos = snapshot.state.pos;
+  },
+  serializeState: function () {
+    // Authority side: the snapshot Nova replicates to every player.
+    return { pos: { x: pos.x, y: pos.y } };
   }
 });
 

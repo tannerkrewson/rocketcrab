@@ -58,6 +58,7 @@ import type {
   NovaSimulationHandle,
   NovaSimulationHandlers,
   NovaSimulationInput,
+  NovaSimulationSnapshot,
   NovaStateHandle,
   NovaStateHandlers,
   NovaMediaHandle,
@@ -77,7 +78,15 @@ export type NovaSessionEvent =
   | { type: "state"; state: unknown }
   | { type: "rawMessage"; channel: string; message: NovaRawMessage }
   | { type: "simulationInput"; input: NovaSimulationInput & { sender: NovaPlayer } }
-  | { type: "simulationSnapshot"; snapshot: unknown }
+  | { type: "simulationSnapshot"; snapshot: NovaSimulationSnapshot }
+  /** The local simulation clock advanced one time step (A1). */
+  | { type: "simulationTick"; tick: number }
+  /**
+   * The game's authority changed (A1). Games never learn which player is
+   * authoritative — the event carries the monotonic term only, and the
+   * next snapshot is the restore point.
+   */
+  | { type: "simulationAuthorityChange"; term: number }
   | { type: "error"; error: NovaError }
   | { type: "actionReceived"; action: NovaAction }
   | { type: "actionAck"; ack: NovaActionAck }
@@ -129,7 +138,7 @@ export interface NovaClientBackend {
   /** Send a payload on a raw channel. */
   sendRaw(name: string, payload: unknown, options?: NovaRawSendOptions): void;
   /** Signal that the game registered simulation handlers. */
-  registerSimulation(): void;
+  registerSimulation(handlers?: NovaSimulationHandlers): void;
   /** Send one simulation input to the party. */
   sendSimulationInput(input: NovaSimulationInput): void;
   /** Subscribe to inbound events. Returns an unsubscribe function. */
@@ -200,6 +209,8 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
   const stateHandlers = new Set<Handler<unknown>>();
   const rawHandlers = new Map<string, Set<Handler<NovaRawMessage>>>();
   let simulationHandlers: NovaSimulationHandlers | null = null;
+  let simulationTick = 0;
+  const simulationAuthorityChangeHandlers = new Set<Handler<void>>();
 
   const unsubscribeEvents = backend.onEvent((event) => {
     switch (event.type) {
@@ -270,6 +281,17 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
         if (simulationHandlers?.onSnapshot !== undefined) {
           callSafely(new Set([simulationHandlers.onSnapshot]), event.snapshot);
         }
+        break;
+      case "simulationTick":
+        simulationTick = event.tick;
+        if (simulationHandlers?.onTick !== undefined) {
+          callSafely(new Set([simulationHandlers.onTick]), event.tick);
+        }
+        break;
+      case "simulationAuthorityChange":
+        // Games never learn which player is authoritative: a bare
+        // notification (the next snapshot is the restore point).
+        callSafely(simulationAuthorityChangeHandlers);
         break;
       case "error":
         callSafely(errorHandlers, event.error);
@@ -381,17 +403,21 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
     register(handlers) {
       const onInput = handlers.onInput;
       const onSnapshot = handlers.onSnapshot;
+      const onTick = handlers.onTick;
+      const serializeState = handlers.serializeState;
       if (
         (onInput !== undefined && typeof onInput !== "function") ||
-        (onSnapshot !== undefined && typeof onSnapshot !== "function")
+        (onSnapshot !== undefined && typeof onSnapshot !== "function") ||
+        (onTick !== undefined && typeof onTick !== "function") ||
+        (serializeState !== undefined && typeof serializeState !== "function")
       ) {
         throw new NovaError(
           "invalid_options",
-          "nova.simulation.register expects onInput/onSnapshot functions.",
+          "nova.simulation.register expects onInput/onSnapshot/onTick/serializeState functions.",
         );
       }
       simulationHandlers = handlers;
-      backend.registerSimulation();
+      backend.registerSimulation(handlers);
       return () => {
         if (simulationHandlers === handlers) {
           simulationHandlers = null;
@@ -406,7 +432,24 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
         "nova.simulation.sendInput options failed validation.",
       );
       assertStructuredCloneSafe(input.payload, "nova.simulation.sendInput payload");
-      backend.sendSimulationInput(input);
+      // Runtime rejections (rate limit, not connected) arrive via
+      // `nova.onError` so games observe them uniformly in the arena, over
+      // party transports, and in-process (S1: every API failure is a
+      // stable NovaError).
+      Promise.resolve()
+        .then(() => backend.sendSimulationInput(input))
+        .catch((error: unknown) => {
+          callSafely(
+            errorHandlers,
+            error instanceof NovaError ? error : new NovaError("invalid_options", String(error)),
+          );
+        });
+    },
+    onAuthorityChange(handler) {
+      return addHandler(simulationAuthorityChangeHandlers, handler);
+    },
+    getTick() {
+      return simulationTick;
     },
   };
 
@@ -570,6 +613,7 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
       stateHandlers.clear();
       rawHandlers.clear();
       simulationHandlers = null;
+      simulationAuthorityChangeHandlers.clear();
       renderHandler = null;
       for (const entry of pendingDispatches.values()) {
         clearTimeout(entry.timer);

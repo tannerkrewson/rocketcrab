@@ -182,3 +182,32 @@ export function answerStateRequests(channels: FakeChannel[], count: number, base
     }
   }
 }
+
+/**
+ * A1: answer every pending `simulationRequest` apiEvent the host pushed
+ * into a fake frame with a serialized simulation state, so the simulation
+ * engine can produce authoritative snapshots. Call in a waitFor loop while
+ * the run settles.
+ */
+export function answerSimulationRequests(
+  channels: FakeChannel[],
+  count: number,
+  baseline = 0,
+): void {
+  for (let index = 0; index < count; index += 1) {
+    const port = channels[baseline + index]!.port1;
+    const requests = port.sent
+      .filter((message) => (message as { type?: string }).type === "game.apiEvent")
+      .map((message) => (message as { event: GameApiEvent }).event)
+      .filter((event) => event.kind === "simulationRequest");
+    for (const event of requests) {
+      deliver(
+        port,
+        apiCallMessage("simulationResponse", {
+          requestId: event.requestId,
+          result: { kind: "state", ok: true, state: { puck: { x: 1, y: 2 } } },
+        }),
+      );
+    }
+  }
+}

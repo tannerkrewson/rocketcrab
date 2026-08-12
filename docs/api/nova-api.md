@@ -251,28 +251,125 @@ const current = nova.state.get();
 
 ## 9. Simulation mode (`mode: "simulation"`)
 
-For faster continuous games. The game registers input handlers and sends
-ordered inputs.
+For faster continuous games (arcade, low-frequency 2D movement, shared
+pucks). The game owns the simulation rules and runs a local simulation copy
+on every frame; Nova owns everything else — ordered input delivery, the
+shared simulation clock, authority selection, periodic authoritative
+snapshots, restore after migration, input/snapshot rate bounds, and
+latency/drift reporting (ADR-0006). **No networking code, ever.**
 
 ```js
-nova.defineGame({ title: "Pong-ish", mode: "simulation" });
+nova.defineGame({ title: "Nova Drift", mode: "simulation" });
+
+// Your local simulation state (each frame has its own copy).
+var puck = { x: 0, y: 0 };
+var queued = [];
 
 nova.simulation.register({
-  onInput: (input) => {
-    // input: { type, payload?, tick?, sender: { id, name } }
-    applyInput(input);
+  // Every player's input, including your own, in Nova-assigned per-sender
+  // order: { type, payload?, tick?, sender: { id, name } }. Queue it and
+  // apply it during the next onTick step (local prediction).
+  onInput: function (input) {
+    queued.push(input);
   },
-  onSnapshot: (snapshot) => restore(snapshot), // authoritative snapshots (later milestone)
+  // Advance one fixed step (the Nova-provided time step, e.g. 100 ms).
+  onTick: function (tick) {
+    while (queued.length > 0) apply(queued.shift());
+    puck.x += 1; // …your simulation rules…
+  },
+  // An authoritative snapshot arrived: restore from it. This is the
+  // correction path, the late-join path, AND the post-migration restore.
+  onSnapshot: function (snapshot) {
+    puck = snapshot.state.puck; // snapshot: { tick, state, stateHash? }
+  },
+  // Authority side: Nova asks the current authority's frame to serialize
+  // its state at the snapshot cadence and replicates it to every player.
+  serializeState: function () {
+    return { puck: puck };
+  },
 });
 
-nova.onStart(() => {
+// Optional: know when the game's authority migrated (term only — Nova
+// never reveals which player is authoritative). Treat the next snapshot as
+// the authoritative restore point and drop stale local prediction.
+nova.simulation.onAuthorityChange(function () {
+  resetPrediction();
+});
+
+nova.onStart(function () {
+  // Send an input (arrow keys, taps, …). Only available after start.
   nova.simulation.sendInput({ type: "move", payload: { dx: 1, dy: 0 } });
 });
+
+// Interpolation hook: your current local tick (0 before the clock starts).
+var tick = nova.simulation.getTick();
 ```
 
-- Register handlers during setup, before the game starts.
-- The simulation clock and snapshot protocol arrive with the simulation
-  milestone (A1); S1 already routes inputs end-to-end.
+### Who owns what
+
+- **Nova owns**: the ordered input sequence (per-sender, via the ordered
+  channel), the simulation tick clock, authority selection (the S3
+  election machinery — identical to state mode), input broadcast, the
+  snapshot cadence, snapshot replication, restore after authority
+  migration, input/snapshot rate bounds, and latency/drift diagnostics.
+- **The game owns**: the simulation rules, rendering, optional
+  interpolation (use `getTick()` and snapshot ticks), optional local
+  prediction (apply inputs before the next authoritative correction), and
+  state serialization via its `serializeState` callback.
+
+### The simulation clock and snapshots
+
+- Every frame runs its own **local clock** at the configured tick interval
+  (default 100 ms = 10 Hz; Nova bounds 16..500 ms). Each tick fires
+  `onTick(tick)`; advance your simulation by exactly one fixed step.
+- Inputs arrive through `onInput` as they are sent (per-sender order is
+  guaranteed; your own input is looped back locally). Apply them during the
+  next tick for local prediction.
+- The **authority** produces authoritative snapshots at the configured
+  cadence (default 1 s; Nova bounds 50..10 000 ms): it calls the game's
+  `serializeState()` on the authority frame, verifies the size bound
+  (512 KiB), hashes it, and broadcasts `{ tick, state, stateHash? }` to
+  every player. Every frame's `onSnapshot` fires; restore from it.
+- Snapshots are **replicated** to every shell (like canonical state in
+  state mode). When the authority migrates (its tab closes, it loses
+  connection), the new authority restores the most recent valid snapshot
+  (hash-checked) and re-broadcasts it — every frame restores and the game
+  continues. Games observe the migration only as an
+  `onAuthorityChange` notification and the following snapshot.
+
+### Rate bounds and diagnostics
+
+- Inputs are bounded per player: 60 inputs/second over a 10-second window
+  (F6 parity). Over-limit sends are rejected with a stable `rate_limited`
+  error delivered through `nova.onError`.
+- Snapshot frequency is bounded by Nova (50 ms..10 s, configurable by the
+  host within those limits) and each snapshot is capped at 512 KiB.
+- `nova.simulation.getTick()` exposes the local clock; host/arena
+  diagnostics expose the tick, snapshot age, input latency, high-latency
+  flag, and clock drift (simulated latency is visible in the arena).
+
+### When to choose simulation vs. state mode
+
+- **State mode** — turn-based, card, board, trivia, drawing, voting, word,
+  and social games: Nova owns the canonical state, action ordering,
+  deduplication, per-player views, and rejection. Choose it by default.
+- **Simulation mode** — continuous games where a shared simulation is
+  updated by every player at a fixed rate (arcade, 2D movement, shared
+  physics-ish). Choose it when the game's core loop advances continuously
+  and a per-player view of a canonical state feels wrong.
+- **Raw mode** — specialized protocols that need lower-level channels; no
+  synchronization, migration, or cheating resistance (ADR-0006).
+
+### Initial limitations
+
+- No generic rollback netcode: local prediction may diverge between
+  corrections; snapshots re-converge the copies.
+- No promise of deterministic third-party physics engines (each frame runs
+  its own copy; nondeterminism shows as drift, corrected by snapshots).
+- No built-in collision or 3D engine.
+- No guarantee that very high-frequency competitive games feel acceptable
+  over arbitrary mobile connections (each frame renders its own local copy;
+  input latency and drift are reported, not eliminated).
 
 ---
 
@@ -480,12 +577,16 @@ on raw channels.
   arrive with S3. Until then the authority is the lowest connected member at
   game start and stays fixed for the game; if it leaves, dispatches fail
   with `no_authority` and every shell keeps the last committed state.
-- No simulation clock or snapshots yet (A1).
+- Simulation mode shipped with A1: the tick clock, ordered inputs, snapshot
+  production/replication, restore after migration, rate bounds, and
+  latency/drift diagnostics (see section 9). Rollback netcode and
+  deterministic third-party physics are explicit non-goals.
 - Raw-mode guarantees are separate from state-mode guarantees (A2).
 - Since the U6 arena session router landed, the runtime forwards validated
   calls to the host (`game.apiCall`) and the host routes them into the
   player's session over the transport; session events return as
   `game.apiEvent`. State-mode execution runs through the same channel: the
   authority's frame answers `stateRequest` events with `stateResponse`
-  calls, so the same game code works in the arena and over party
-  transports.
+  calls. Simulation snapshots run through the same channel: the authority's
+  frame answers `simulationRequest` events with `simulationResponse` calls,
+  so the same game code works in the arena and over party transports.

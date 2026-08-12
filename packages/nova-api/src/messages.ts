@@ -21,6 +21,7 @@ import {
   rawChannelCloseMessageSchema,
   rawChannelMetadataMessageSchema,
   simulationInputMessageSchema,
+  simulationSnapshotMessageSchema,
   stateSnapshotMessageSchema,
   stateViewMessageSchema,
   type GameEndReason,
@@ -314,6 +315,32 @@ export function buildSimulationInputMessage(
       inputType: input.inputType,
       payload: input.payload,
       ...(input.targetTick !== undefined ? { targetTick: input.targetTick } : {}),
+    }),
+  );
+}
+
+/** Build and validate a `simulation.snapshot` message (A1). */
+export function buildSimulationSnapshotMessage(
+  base: PeerMessageBase,
+  input: {
+    seq: number;
+    tick: number;
+    stateHash?: string;
+    term: number;
+    authorityMemberId: string;
+    state: unknown;
+  },
+): PeerMessage {
+  return assertPeerMessage(
+    simulationSnapshotMessageSchema.parse({
+      ...envelope(base),
+      seq: input.seq,
+      type: "simulation.snapshot",
+      tick: input.tick,
+      term: input.term,
+      authorityMemberId: input.authorityMemberId,
+      ...(input.stateHash !== undefined ? { stateHash: input.stateHash } : {}),
+      state: input.state,
     }),
   );
 }
