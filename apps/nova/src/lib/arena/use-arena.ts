@@ -5,7 +5,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GameMode } from "@rocketcrab/protocol";
-import { ArenaEngine, type ArenaEngineOptions, type ArenaSeams } from "./engine";
+import { ArenaEngine, type ArenaSeams } from "./engine";
 import type { ArenaRunOutcome, ArenaState } from "./types";
 import type { InMemoryHubOptions } from "@rocketcrab/testing";
 
