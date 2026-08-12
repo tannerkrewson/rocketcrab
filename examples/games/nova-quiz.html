@@ -1,0 +1,1260 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Nova Quiz</title>
+    <style>
+      /* Nova Quiz — a complete state-mode example game (S4 vertical slice).
+         Mobile-first: one column, big touch targets, system fonts. Nova owns
+         state, ordering, authority, migration, and per-player views; this
+         document only describes the rules and renders the player's view. */
+      :root {
+        --bg: #0f1220;
+        --card: #1a1f35;
+        --card-2: #232945;
+        --ink: #f2f4ff;
+        --muted: #98a0c0;
+        --accent: #7c6cff;
+        --accent-ink: #ffffff;
+        --good: #2dd4a7;
+        --bad: #ff6b81;
+        --warn: #ffc857;
+        --line: #2e3657;
+        --radius: 16px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+      #quiz-app {
+        width: 100%;
+        max-width: 480px;
+        padding: max(12px, env(safe-area-inset-top)) 14px max(20px, env(safe-area-inset-bottom));
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      header.top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      header.top h1 {
+        font-size: 17px;
+        margin: 0;
+        letter-spacing: 0.02em;
+      }
+      .chip {
+        border-radius: 999px;
+        padding: 3px 10px;
+        font-size: 12px;
+        font-weight: 700;
+        border: 1px solid var(--line);
+        color: var(--muted);
+        background: var(--card);
+        white-space: nowrap;
+      }
+      .chip.live {
+        color: var(--good);
+        border-color: var(--good);
+      }
+      .chip.warn {
+        color: var(--warn);
+        border-color: var(--warn);
+      }
+      .chip.bad {
+        color: var(--bad);
+        border-color: var(--bad);
+      }
+      .chip.accent {
+        color: var(--accent);
+        border-color: var(--accent);
+      }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        padding: 16px;
+      }
+      .card h2 {
+        font-size: 15px;
+        margin: 0 0 6px;
+        color: var(--muted);
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+      }
+      .card .question {
+        font-size: 21px;
+        line-height: 1.35;
+        font-weight: 700;
+        margin: 0;
+      }
+      .card .category {
+        display: inline-block;
+        margin-top: 8px;
+        font-size: 12px;
+        font-weight: 700;
+        color: var(--accent);
+        background: rgba(124, 108, 255, 0.14);
+        border-radius: 999px;
+        padding: 3px 10px;
+      }
+      .quizmaster-line {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      .timer {
+        margin-left: auto;
+        font-variant-numeric: tabular-nums;
+        font-weight: 800;
+        color: var(--ink);
+      }
+      .timer.low {
+        color: var(--warn);
+      }
+      .options {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 10px;
+      }
+      .option {
+        border: 1px solid var(--line);
+        background: var(--card-2);
+        color: var(--ink);
+        border-radius: 14px;
+        min-height: 56px;
+        padding: 8px 12px;
+        font-size: 15px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        cursor: pointer;
+        text-align: left;
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+      }
+      .option:active {
+        transform: translateY(1px);
+      }
+      .option .letter {
+        flex: none;
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        background: rgba(255, 255, 255, 0.08);
+        font-size: 13px;
+        font-weight: 800;
+      }
+      .option.picked {
+        border-color: var(--accent);
+        background: rgba(124, 108, 255, 0.18);
+      }
+      .option.correct {
+        border-color: var(--good);
+        background: rgba(45, 212, 167, 0.16);
+      }
+      .option.wrong {
+        border-color: var(--bad);
+        background: rgba(255, 107, 129, 0.12);
+      }
+      .option.dim {
+        opacity: 0.55;
+      }
+      .option:disabled {
+        cursor: default;
+      }
+      .note {
+        font-size: 13px;
+        color: var(--muted);
+        margin: 4px 0 0;
+      }
+      .note.good {
+        color: var(--good);
+      }
+      .btn {
+        border: none;
+        border-radius: 14px;
+        min-height: 52px;
+        padding: 12px 18px;
+        font-size: 16px;
+        font-weight: 800;
+        cursor: pointer;
+        color: var(--accent-ink);
+        background: var(--accent);
+        touch-action: manipulation;
+        -webkit-tap-highlight-color: transparent;
+        width: 100%;
+      }
+      .btn:active {
+        transform: translateY(1px);
+      }
+      .btn.secondary {
+        background: var(--card-2);
+        color: var(--ink);
+        border: 1px solid var(--line);
+      }
+      .btn:disabled {
+        opacity: 0.55;
+        cursor: default;
+      }
+      .answers-list {
+        list-style: none;
+        margin: 8px 0 0;
+        padding: 0;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 14px;
+      }
+      .answers-list li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 8px 10px;
+        background: var(--card-2);
+        border-radius: 10px;
+      }
+      .answers-list .mark {
+        font-weight: 800;
+      }
+      .mark.good {
+        color: var(--good);
+      }
+      .mark.bad {
+        color: var(--bad);
+      }
+      .scores {
+        margin: 8px 0 0;
+        padding: 0;
+        list-style: none;
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+        font-size: 14px;
+      }
+      .scores li {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .scores .pos {
+        width: 22px;
+        color: var(--muted);
+        font-weight: 700;
+      }
+      .scores .pts {
+        margin-left: auto;
+        font-weight: 800;
+        font-variant-numeric: tabular-nums;
+      }
+      .scores li.me {
+        color: var(--accent);
+      }
+      .banner {
+        border-radius: 12px;
+        padding: 10px 14px;
+        font-size: 13px;
+        font-weight: 600;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .banner.spectator {
+        background: rgba(124, 108, 255, 0.14);
+        color: var(--accent);
+        border: 1px solid var(--accent);
+      }
+      .banner.conn {
+        background: rgba(255, 200, 87, 0.12);
+        color: var(--warn);
+        border: 1px solid var(--warn);
+      }
+      .banner.done {
+        background: rgba(45, 212, 167, 0.12);
+        color: var(--good);
+        border: 1px solid var(--good);
+      }
+      .standings {
+        text-align: center;
+        margin: 4px 0 10px;
+      }
+      .standings .trophy {
+        font-size: 44px;
+        line-height: 1;
+      }
+      .standings .winner {
+        font-size: 20px;
+        font-weight: 900;
+        margin: 6px 0 2px;
+      }
+      .muted {
+        color: var(--muted);
+      }
+      .waiting {
+        text-align: center;
+        color: var(--muted);
+        padding: 48px 0;
+        font-size: 15px;
+      }
+      .hidden {
+        display: none !important;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="quiz-app">
+      <div class="waiting" id="quiz-waiting">Setting up Nova Quiz…</div>
+    </div>
+
+    <script type="module">
+      /* Nova Quiz (S4 vertical-slice example game)
+       *
+       * A round-based trivia face-off in state mode. Nova owns state, action
+       * ordering, per-player views, reconnects, late-join catch-up, and
+       * authority migration (ADR-0006/0007) — this file contains no
+       * networking, no authority logic, and no direct Trystero usage.
+       *
+       * How it plays:
+       *  - Every round, one player is the quizmaster (rotating); the others
+       *    answer a 4-option question from the built-in bank.
+       *  - The quizmaster reveals answers early; otherwise the answer window
+       *    closes automatically (any frame's timer can trigger the reveal,
+       *    so a backgrounded phone can never stall the game).
+       *  - The roster reconciles with the connected players at the start of
+       *    every round: a player who joins mid-game spectates the current
+       *    question and plays from the next round; a player who reconnects
+       *    is back in. The game runs roster.length rounds.
+       *  - Views are private: before the reveal, a player sees only their
+       *    own answer, and nobody (not even the authority) sees the correct
+       *    answer.
+       *
+       * Test seam: globalThis.__novaQuizConfig ({ answerMs, resultsMs,
+       * rounds }) overrides the default timing so automated tests run fast.
+       * Nothing sets it in a real browser, so real games use the defaults.
+       */
+      (function () {
+        "use strict";
+
+        // ------------------------------------------------------------------
+        // Configuration and question bank (module scope, never in state).
+        // ------------------------------------------------------------------
+
+        var config = (typeof globalThis !== "undefined" && globalThis.__novaQuizConfig) || {};
+        var ANSWER_MS = typeof config.answerMs === "number" ? config.answerMs : 30000;
+        var RESULTS_MS = typeof config.resultsMs === "number" ? config.resultsMs : 8000;
+        var ROUNDS_OVERRIDE = typeof config.rounds === "number" ? config.rounds : 0;
+        var JOIN_WAIT_MS = typeof config.joinWaitMs === "number" ? config.joinWaitMs : 15000;
+        var MIN_PLAYERS = typeof config.minPlayers === "number" ? config.minPlayers : 3;
+        var BEGIN_READY_DELAY_MS = 400;
+
+        var LETTERS = ["A", "B", "C", "D"];
+
+        var QUESTIONS = [
+          {
+            category: "Space",
+            q: "Which planet has the most moons?",
+            options: ["Jupiter", "Saturn", "Mars", "Earth"],
+            answer: 0,
+          },
+          {
+            category: "Geography",
+            q: "What is the capital of Canada?",
+            options: ["Toronto", "Vancouver", "Ottawa", "Montreal"],
+            answer: 2,
+          },
+          {
+            category: "Science",
+            q: "What is the chemical symbol for gold?",
+            options: ["Go", "Gd", "Au", "Ag"],
+            answer: 2,
+          },
+          {
+            category: "History",
+            q: "Who was the first person to walk on the Moon?",
+            options: ["Buzz Aldrin", "Neil Armstrong", "Yuri Gagarin", "John Glenn"],
+            answer: 1,
+          },
+          {
+            category: "Sports",
+            q: "How many players are on a soccer team on the field?",
+            options: ["9", "10", "11", "12"],
+            answer: 2,
+          },
+          {
+            category: "Movies",
+            q: 'Which 1997 film features the line "I\'m the king of the world!"?',
+            options: ["Titanic", "The Fifth Element", "Good Will Hunting", "As Good as It Gets"],
+            answer: 0,
+          },
+          {
+            category: "Music",
+            q: 'Which band released the album "Abbey Road"?',
+            options: ["The Rolling Stones", "Pink Floyd", "The Beatles", "Queen"],
+            answer: 2,
+          },
+          {
+            category: "Food",
+            q: "What is the main ingredient in hummus?",
+            options: ["Lentils", "Chickpeas", "Black beans", "Tahini"],
+            answer: 1,
+          },
+          {
+            category: "Nature",
+            q: "What is the largest living animal on Earth?",
+            options: ["African elephant", "Blue whale", "Giraffe", "Colossal squid"],
+            answer: 1,
+          },
+          {
+            category: "Technology",
+            q: 'What does "HTTP" stand for?',
+            options: [
+              "HyperText Transfer Protocol",
+              "High-Tech Transfer Process",
+              "Hyperlink Text Transport Protocol",
+              "Host Transfer Technology Protocol",
+            ],
+            answer: 0,
+          },
+          {
+            category: "Art",
+            q: "Who painted the Mona Lisa?",
+            options: ["Michelangelo", "Raphael", "Leonardo da Vinci", "Donatello"],
+            answer: 2,
+          },
+          {
+            category: "Literature",
+            q: 'Who wrote "Pride and Prejudice"?',
+            options: ["Charlotte Brontë", "Jane Austen", "Emily Brontë", "Mary Shelley"],
+            answer: 1,
+          },
+          { category: "Math", q: "What is 7 × 8?", options: ["54", "56", "58", "64"], answer: 1 },
+          {
+            category: "Weather",
+            q: "What is the strongest category of hurricane?",
+            options: ["Category 3", "Category 4", "Category 5", "Category 6"],
+            answer: 2,
+          },
+          {
+            category: "Animals",
+            q: "How many hearts does an octopus have?",
+            options: ["One", "Two", "Three", "Four"],
+            answer: 2,
+          },
+          {
+            category: "Games",
+            q: "In chess, which piece can only move diagonally?",
+            options: ["Rook", "Knight", "Queen", "Bishop"],
+            answer: 3,
+          },
+          {
+            category: "Language",
+            q: "Which language has the most native speakers?",
+            options: ["English", "Spanish", "Mandarin", "Hindi"],
+            answer: 2,
+          },
+          {
+            category: "Ocean",
+            q: "What is the deepest point in the world's oceans?",
+            options: ["Mariana Trench", "Java Trench", "Puerto Rico Trench", "Tonga Trench"],
+            answer: 0,
+          },
+          {
+            category: "Inventions",
+            q: "Who is credited with inventing the telephone?",
+            options: [
+              "Thomas Edison",
+              "Alexander Graham Bell",
+              "Nikola Tesla",
+              "Guglielmo Marconi",
+            ],
+            answer: 1,
+          },
+          {
+            category: "Human Body",
+            q: "What is the largest organ of the human body?",
+            options: ["Liver", "Brain", "Skin", "Lungs"],
+            answer: 2,
+          },
+          {
+            category: "Space",
+            q: "What galaxy is Earth in?",
+            options: ["Andromeda", "Milky Way", "Whirlpool", "Sombrero"],
+            answer: 1,
+          },
+          {
+            category: "Famous Quotes",
+            q: '"The only thing we have to fear is fear itself" — who said it?',
+            options: [
+              "Abraham Lincoln",
+              "Winston Churchill",
+              "Franklin D. Roosevelt",
+              "Martin Luther King Jr.",
+            ],
+            answer: 2,
+          },
+        ];
+
+        function questionFor(round) {
+          return QUESTIONS[(round - 1) % QUESTIONS.length];
+        }
+
+        // ------------------------------------------------------------------
+        // Game declaration: rules only. Handlers run on the current
+        // authority's runtime; Nova owns ordering and migration.
+        // ------------------------------------------------------------------
+
+        nova.defineGame({
+          title: "Nova Quiz",
+          mode: "state",
+          version: "1.0.0",
+
+          createInitialState: function (context) {
+            var roster = context.players.map(function (p) {
+              return { id: p.id, name: p.name };
+            });
+            var scores = {};
+            roster.forEach(function (p) {
+              scores[p.id] = 0;
+            });
+            return {
+              // "waiting" (player join window) | "question" | "revealed" |
+              // "finished". The game begins when at least MIN_PLAYERS are
+              // connected, or after the join window closes — so a small
+              // party is never stuck.
+              phase: "waiting",
+              waitStartedAt: context.now,
+              joinWaitMs: JOIN_WAIT_MS,
+              minPlayers: MIN_PLAYERS,
+              round: 0,
+              roundsTotal: ROUNDS_OVERRIDE > 0 ? ROUNDS_OVERRIDE : roster.length,
+              roster: roster,
+              scores: scores,
+              answers: {}, // memberId -> { choice, name } (private until reveal)
+              correctChoice: null, // null until the reveal (private for everyone)
+              roundStartedAt: 0,
+              revealedAt: null,
+              answerMs: ANSWER_MS,
+              resultsMs: RESULTS_MS,
+              winnerId: null,
+            };
+          },
+
+          actions: {
+            // Start the game: the first question goes live once enough
+            // players are connected (or the join window closes).
+            begin: function (draft, context) {
+              if (draft.phase !== "waiting") return;
+              var enough =
+                context.players.length >= draft.minPlayers ||
+                context.now >= draft.waitStartedAt + draft.joinWaitMs;
+              if (!enough) return;
+              var roster = context.players.map(function (p) {
+                return { id: p.id, name: p.name };
+              });
+              draft.phase = "question";
+              draft.round = 1;
+              draft.roundsTotal = ROUNDS_OVERRIDE > 0 ? ROUNDS_OVERRIDE : roster.length;
+              draft.roster = roster;
+              draft.roundStartedAt = context.now;
+              roster.forEach(function (p) {
+                if (!draft.scores[p.id]) draft.scores[p.id] = 0;
+              });
+            },
+
+            // Lock in an answer. Ignored when the round is not open, for the
+            // quizmaster, after the deadline (the authority's clock is
+            // authoritative), or for players outside the roster.
+            answer: function (draft, context, payload) {
+              if (draft.phase !== "question") return;
+              if (draft.answers[context.actor.id]) return;
+              if (isQuizmaster(draft, context.actor.id)) return;
+              if (!inRoster(draft, context.actor.id)) return;
+              if (context.now > draft.roundStartedAt + draft.answerMs) return;
+              var choice = payload && payload.choice;
+              if (typeof choice !== "number" || choice < 0 || choice > 3) return;
+              if (Math.floor(choice) !== choice) return;
+              draft.answers[context.actor.id] = {
+                choice: choice,
+                name: context.actor.name,
+              };
+            },
+
+            // Reveal the correct answer and score the round. Anyone may
+            // reveal once the answer window has closed; before that only the
+            // quizmaster can. Idempotent: a second reveal is a no-op.
+            reveal: function (draft, context, payload) {
+              if (draft.phase !== "question") return;
+              var deadline = draft.roundStartedAt + draft.answerMs;
+              var actor = context.actor;
+              if (!isQuizmaster(draft, actor.id) && context.now < deadline) return;
+              var correct = questionFor(draft.round);
+              draft.correctChoice = correct.answer;
+              draft.phase = "revealed";
+              draft.revealedAt = context.now;
+              Object.keys(draft.answers).forEach(function (memberId) {
+                if (draft.answers[memberId].choice === correct.answer) {
+                  draft.scores[memberId] = (draft.scores[memberId] || 0) + 1;
+                }
+              });
+            },
+
+            // Advance to the next round (or finish). Quizmaster-only before
+            // the results window closes; any frame's timer may advance after
+            // it. Reconciles the roster with the connected players so late
+            // joiners play from the next round and reconnects are honored.
+            nextRound: function (draft, context, payload) {
+              if (draft.phase !== "revealed") return;
+              var actor = context.actor;
+              if (
+                !isQuizmaster(draft, actor.id) &&
+                context.now < draft.revealedAt + draft.resultsMs
+              ) {
+                return;
+              }
+              var next = draft.round + 1;
+              var roster = context.players.map(function (p) {
+                return { id: p.id, name: p.name };
+              });
+              var roundsTotal = ROUNDS_OVERRIDE > 0 ? ROUNDS_OVERRIDE : roster.length;
+              if (next > roundsTotal) {
+                draft.phase = "finished";
+                draft.winnerId = winnerOf(draft, roster);
+                return;
+              }
+              draft.round = next;
+              draft.roundsTotal = roundsTotal;
+              draft.roster = roster;
+              draft.answers = {};
+              draft.correctChoice = null;
+              draft.phase = "question";
+              draft.roundStartedAt = context.now;
+              draft.revealedAt = null;
+              // Players who joined late (or rejoined) enter with 0 points.
+              roster.forEach(function (p) {
+                if (!draft.scores[p.id]) draft.scores[p.id] = 0;
+              });
+            },
+          },
+
+          // Per-player view: only the viewer's own answer before the reveal,
+          // and no correct answer for anyone (including the authority) until
+          // the reveal. Spectators (joined mid-question) see everything
+          // public and cannot answer.
+          selectView: function (state, viewer) {
+            // The join window: everyone sees the same waiting card.
+            if (state.phase === "waiting") {
+              return {
+                phase: "waiting",
+                round: 0,
+                roundsTotal: 0,
+                roster: state.roster,
+                quizmasterId: null,
+                question: { text: "", options: [], category: "" },
+                correctChoice: null,
+                revealed: false,
+                myAnswer: null,
+                answers: {},
+                revealedAnswers: [],
+                scores: [],
+                answeredCount: 0,
+                deadline: 0,
+                revealedAt: null,
+                resultsMs: state.resultsMs,
+                isQuizmaster: false,
+                spectator: false,
+                winnerId: null,
+                waiting: true,
+                readyToBegin: state.roster.length >= state.minPlayers,
+                beginAt: state.waitStartedAt + state.joinWaitMs,
+              };
+            }
+            var inRosterFlag = inRoster(state, viewer.id);
+            var own = state.answers[viewer.id] || null;
+            var answersView = {};
+            if (own) {
+              answersView[viewer.id] = { choice: own.choice, name: own.name };
+            }
+            var revealed = state.phase === "revealed" || state.phase === "finished";
+            var publicAnswers = [];
+            if (revealed) {
+              publicAnswers = Object.keys(state.answers).map(function (memberId) {
+                return {
+                  memberId: memberId,
+                  name: state.answers[memberId].name,
+                  choice: state.answers[memberId].choice,
+                };
+              });
+            }
+            var rosterScores = state.roster.map(function (p) {
+              return { id: p.id, name: p.name, score: state.scores[p.id] || 0 };
+            });
+            rosterScores.sort(function (a, b) {
+              if (b.score !== a.score) return b.score - a.score;
+              return rosterIndex(state, a.id) - rosterIndex(state, b.id);
+            });
+            var q = questionFor(state.round);
+            return {
+              phase: state.phase,
+              round: state.round,
+              roundsTotal: state.roundsTotal,
+              roster: state.roster,
+              quizmasterId: quizmasterId(state),
+              question: { text: q.q, options: q.options, category: q.category },
+              correctChoice: revealed ? state.correctChoice : null,
+              revealed: revealed,
+              myAnswer: own ? own.choice : null,
+              answers: answersView, // private: only the viewer's own answer
+              revealedAnswers: revealed ? publicAnswers : [],
+              scores: rosterScores,
+              answeredCount: Object.keys(state.answers).length,
+              deadline: state.roundStartedAt + state.answerMs,
+              revealedAt: state.revealedAt,
+              resultsMs: state.resultsMs,
+              isQuizmaster: inRosterFlag && quizmasterId(state) === viewer.id,
+              spectator: !inRosterFlag,
+              winnerId: state.winnerId,
+            };
+          },
+        });
+
+        // ------------------------------------------------------------------
+        // Rules helpers (module scope; used by handlers and selectView).
+        // ------------------------------------------------------------------
+
+        function inRoster(state, memberId) {
+          return state.roster.some(function (p) {
+            return p.id === memberId;
+          });
+        }
+
+        function rosterIndex(state, memberId) {
+          for (var i = 0; i < state.roster.length; i += 1) {
+            if (state.roster[i].id === memberId) return i;
+          }
+          return state.roster.length;
+        }
+
+        function quizmasterId(state) {
+          if (state.roster.length === 0) return null;
+          return state.roster[(state.round - 1) % state.roster.length].id;
+        }
+
+        function isQuizmaster(state, memberId) {
+          return quizmasterId(state) === memberId;
+        }
+
+        function winnerOf(state, roster) {
+          var best = null;
+          roster.forEach(function (p) {
+            var score = state.scores[p.id] || 0;
+            if (best === null || score > best.score) {
+              best = { id: p.id, name: p.name, score: score };
+            }
+          });
+          return best ? best.id : null;
+        }
+
+        // ------------------------------------------------------------------
+        // Frame-side driving: auto-advance timers with idempotent dispatches.
+        // Every frame runs the same safety net; racing dispatches are
+        // deduplicated by Nova (one applies, the rest are no-ops or
+        // stale_revision — retried only while the phase is unchanged).
+        // ------------------------------------------------------------------
+
+        var latestView = null;
+        var scheduleKey = "";
+        var timerId = null;
+        var revealAttempts = 0;
+        var nextAttempts = 0;
+
+        // nova.dispatch can throw synchronously once the game ended; the
+        // frame-side driving code never lets a late timer crash the game.
+        function safeDispatch(action) {
+          try {
+            return nova.dispatch(action);
+          } catch (error) {
+            nova.log("dispatch skipped:", error && error.code ? error.code : String(error));
+            return Promise.resolve();
+          }
+        }
+
+        function viewKey(view) {
+          if (view.phase === "waiting") {
+            return "waiting:" + view.beginAt + ":" + (view.readyToBegin ? "go" : "wait");
+          }
+          return (
+            view.phase + ":" + view.round + ":" + (view.roundStartedAt || view.revealedAt || "x")
+          );
+        }
+
+        function scheduleFrom(view) {
+          var key = viewKey(view);
+          if (key === scheduleKey) return;
+          scheduleKey = key;
+          revealAttempts = 0;
+          nextAttempts = 0;
+          clearTimeout(timerId);
+          timerId = null;
+          var delay = null;
+          if (view.phase === "waiting") {
+            // Enough players are here (or the join window is closing): begin.
+            delay = view.readyToBegin
+              ? BEGIN_READY_DELAY_MS
+              : Math.max(0, view.beginAt - Date.now());
+          } else if (view.phase === "question") {
+            delay = Math.max(0, view.deadline - Date.now());
+          } else if (view.phase === "revealed") {
+            delay = Math.max(0, view.revealedAt + view.resultsMs - Date.now());
+          }
+          if (delay === null) return;
+          timerId = setTimeout(function () {
+            timerId = null;
+            if (view.phase === "waiting") {
+              safeDispatch({ type: "begin" }).catch(function () {
+                /* the join window view will refresh and reschedule */
+              });
+            } else if (view.phase === "question") {
+              revealAttempts += 1;
+              safeDispatch({ type: "reveal" }).catch(function (error) {
+                if (revealAttempts === 1) {
+                  // A race with another player's reveal: Nova rejected this
+                  // stale action; the retry (or the winner's commit) settles it.
+                  nova.log("Reveal raced another player (", error.code, ") — retrying.");
+                }
+                if (revealAttempts <= 5 && latestView && latestView.phase === "question") {
+                  retry(150);
+                  return;
+                }
+                nova.log("Reveal could not be applied:", error.code, error.message);
+              });
+            } else if (view.phase === "revealed") {
+              nextAttempts += 1;
+              safeDispatch({ type: "nextRound" }).catch(function (error) {
+                if (nextAttempts === 1) {
+                  nova.log("Next round raced another player (", error.code, ") — retrying.");
+                }
+                if (nextAttempts <= 5 && latestView && latestView.phase === "revealed") {
+                  retry(150);
+                  return;
+                }
+                nova.log("Next round could not be started:", error.code, error.message);
+              });
+            }
+          }, delay);
+        }
+
+        function retry(afterMs) {
+          clearTimeout(timerId);
+          timerId = setTimeout(function () {
+            timerId = null;
+            if (!latestView) return;
+            if (latestView.phase === "question") {
+              safeDispatch({ type: "reveal" }).catch(function () {
+                /* the view will refresh; scheduleFrom reschedules */
+              });
+            } else if (latestView.phase === "revealed") {
+              safeDispatch({ type: "nextRound" }).catch(function () {});
+            }
+          }, afterMs);
+        }
+
+        // ------------------------------------------------------------------
+        // Rendering (progressive enhancement: skipped where there is no DOM,
+        // e.g. the in-process contract tests that run this same script).
+        // ------------------------------------------------------------------
+
+        var root = typeof document !== "undefined" ? document.getElementById("quiz-app") : null;
+
+        function el(tag, attrs, children) {
+          var node = document.createElement(tag);
+          if (attrs) {
+            Object.keys(attrs).forEach(function (key) {
+              node.setAttribute(key, attrs[key]);
+            });
+          }
+          (children || []).forEach(function (child) {
+            node.appendChild(typeof child === "string" ? document.createTextNode(child) : child);
+          });
+          return node;
+        }
+
+        function render(view) {
+          if (!root) return;
+          root.textContent = "";
+          if (!view) {
+            root.appendChild(el("div", { class: "waiting" }, ["Waiting for the game to start…"]));
+            return;
+          }
+          var header = el("header", { class: "top" }, [
+            el("h1", null, ["Nova Quiz"]),
+            connChip(),
+            el("span", { class: "chip", "data-testid": "round-chip" }, [
+              view.phase === "finished"
+                ? "Game over"
+                : view.phase === "waiting"
+                  ? "Waiting for players"
+                  : "Round " + view.round + " of " + view.roundsTotal,
+            ]),
+          ]);
+          root.appendChild(header);
+          if (view.spectator) {
+            root.appendChild(
+              el("div", { class: "banner spectator", "data-testid": "spectator-banner" }, [
+                "👀 You're watching — you join the game from the next round.",
+              ]),
+            );
+          }
+          if (view.phase === "waiting") {
+            renderWaiting(view);
+          } else if (view.phase === "question") {
+            renderQuestion(view);
+          } else if (view.phase === "revealed") {
+            renderRevealed(view);
+          } else {
+            renderFinished(view);
+          }
+        }
+
+        function renderWaiting(view) {
+          var card = el("div", { class: "card" }, [
+            el("h2", null, ["Get ready"]),
+            el("p", { class: "question", "data-testid": "waiting-line" }, [
+              "Waiting for " + view.roster.length + " player(s) to join…",
+            ]),
+            el("p", { class: "note" }, [
+              view.readyToBegin
+                ? "Enough players are here — starting now."
+                : "The game starts when at least 3 players are connected (or the join window closes).",
+            ]),
+          ]);
+          root.appendChild(card);
+          var list = el("ul", { class: "scores", "data-testid": "waiting-list" });
+          view.roster.forEach(function (p) {
+            list.appendChild(
+              el("li", null, [
+                el("span", { class: "pos" }, ["•"]),
+                document.createTextNode(p.name + (p.id === nova.player.id ? " (you)" : "")),
+              ]),
+            );
+          });
+          card.appendChild(list);
+          root.appendChild(
+            el(
+              "button",
+              {
+                type: "button",
+                class: "btn secondary",
+                "data-action": "begin",
+                disabled: "disabled",
+              },
+              ["Waiting…"],
+            ),
+          );
+        }
+
+        function connChip() {
+          var status = nova.connectionStatus;
+          if (status === "connected") {
+            return el("span", { class: "chip live", "data-testid": "conn-chip" }, ["● connected"]);
+          }
+          if (status === "reconnecting") {
+            return el("span", { class: "chip warn", "data-testid": "conn-chip" }, [
+              "⟳ reconnecting",
+            ]);
+          }
+          if (status === "suspended") {
+            return el("span", { class: "chip warn", "data-testid": "conn-chip" }, ["☾ suspended"]);
+          }
+          return el("span", { class: "chip bad", "data-testid": "conn-chip" }, ["✕ " + status]);
+        }
+
+        function quizmasterLine(view) {
+          var qm = view.roster.find(function (p) {
+            return p.id === view.quizmasterId;
+          });
+          var name = qm ? qm.name : "?";
+          return el("div", { class: "quizmaster-line" }, [
+            el("span", null, ["🎤 " + name + " is the quizmaster"]),
+          ]);
+        }
+
+        function timerChip(view) {
+          var ms = 0;
+          var low = false;
+          if (view.phase === "question") {
+            ms = view.deadline - Date.now();
+            low = ms < 6000;
+          } else if (view.phase === "revealed") {
+            ms = view.revealedAt + view.resultsMs - Date.now();
+          }
+          var label = ms <= 0 ? "now" : Math.ceil(ms / 1000) + "s";
+          return el("span", { class: "timer" + (low ? " low" : ""), "data-testid": "timer" }, [
+            label,
+          ]);
+        }
+
+        function renderQuestion(view) {
+          var card = el("div", { class: "card" }, [
+            el("h2", null, ["Question " + view.round]),
+            quizmasterLine(view),
+            timerChip(view),
+            el("p", { class: "question", "data-testid": "question" }, [view.question.text]),
+            el("span", { class: "category" }, [view.question.category]),
+          ]);
+          root.appendChild(card);
+
+          var options = el("div", { class: "options" });
+          var locked = view.myAnswer !== null;
+          view.question.options.forEach(function (text, index) {
+            var cls = "option";
+            if (view.myAnswer === index) cls += " picked";
+            var button = el(
+              "button",
+              { type: "button", class: cls, "data-choice": String(index) },
+              [el("span", { class: "letter" }, [LETTERS[index]]), text],
+            );
+            if (view.isQuizmaster || view.spectator || locked) {
+              button.setAttribute("disabled", "disabled");
+            }
+            options.appendChild(button);
+          });
+          root.appendChild(options);
+
+          if (view.isQuizmaster) {
+            root.appendChild(
+              el("p", { class: "note" }, [
+                "You're the quizmaster — reveal when everyone has answered (" +
+                  view.answeredCount +
+                  "/" +
+                  (view.roster.length - 1) +
+                  " answered).",
+              ]),
+            );
+            root.appendChild(
+              el("button", { type: "button", class: "btn", "data-action": "reveal" }, [
+                "Reveal answers",
+              ]),
+            );
+          } else if (view.myAnswer !== null) {
+            root.appendChild(
+              el("p", { class: "note good", "data-testid": "locked-in" }, [
+                "✓ Answer locked in — waiting for the reveal.",
+              ]),
+            );
+          } else if (!view.spectator) {
+            root.appendChild(
+              el("p", { class: "note" }, ["Pick an answer before the timer runs out."]),
+            );
+          }
+        }
+
+        function renderRevealed(view) {
+          var card = el("div", { class: "card" }, [
+            el("h2", null, ["Answer revealed"]),
+            timerChip(view),
+            el("p", { class: "question" }, [view.question.text]),
+            el("span", { class: "category" }, [view.question.category]),
+          ]);
+          root.appendChild(card);
+
+          var options = el("div", { class: "options" });
+          view.question.options.forEach(function (text, index) {
+            var cls = "option dim";
+            if (index === view.correctChoice) cls = "option correct";
+            else if (view.myAnswer === index) cls = "option wrong";
+            options.appendChild(
+              el("button", { type: "button", class: cls, disabled: "disabled" }, [
+                el("span", { class: "letter" }, [LETTERS[index]]),
+                text + (index === view.correctChoice ? " ✓" : ""),
+              ]),
+            );
+          });
+          root.appendChild(options);
+
+          var list = el("ul", { class: "answers-list", "data-testid": "answers-list" });
+          view.revealedAnswers.forEach(function (entry) {
+            var correct = entry.choice === view.correctChoice;
+            list.appendChild(
+              el("li", null, [
+                el("span", { class: "mark " + (correct ? "good" : "bad") }, [correct ? "✓" : "✗"]),
+                document.createTextNode(
+                  entry.name +
+                    " chose " +
+                    LETTERS[entry.choice] +
+                    (view.myAnswer === entry.memberId ? " (you)" : ""),
+                ),
+              ]),
+            );
+          });
+          if (view.revealedAnswers.length === 0) {
+            list.appendChild(el("li", { class: "muted" }, ["Nobody answered this round."]));
+          }
+          root.appendChild(list);
+
+          root.appendChild(scoresCard(view));
+
+          if (view.isQuizmaster) {
+            root.appendChild(
+              el("button", { type: "button", class: "btn", "data-action": "next" }, ["Next round"]),
+            );
+          } else {
+            root.appendChild(
+              el("p", { class: "note" }, ["Next round starts when the timer runs out."]),
+            );
+          }
+        }
+
+        function scoresCard(view) {
+          var card = el("div", { class: "card" }, [el("h2", null, ["Scores"])]);
+          var list = el("ul", { class: "scores", "data-testid": "scores" });
+          view.scores.forEach(function (entry, index) {
+            var me = entry.id === nova.player.id;
+            list.appendChild(
+              el("li", { class: me ? "me" : "" }, [
+                el("span", { class: "pos" }, [String(index + 1)]),
+                document.createTextNode(entry.name + (me ? " (you)" : "")),
+                el("span", { class: "pts" }, [String(entry.score)]),
+              ]),
+            );
+          });
+          card.appendChild(list);
+          return card;
+        }
+
+        function renderFinished(view) {
+          var card = el("div", { class: "card standings" }, [
+            el("div", { class: "trophy" }, ["🏆"]),
+            el("div", { class: "winner" }, [winnerName(view) + " wins!"]),
+            el("p", { class: "muted" }, ["All " + view.roundsTotal + " rounds are done."]),
+          ]);
+          root.appendChild(card);
+          root.appendChild(scoresCard(view));
+          root.appendChild(
+            el("div", { class: "banner done", "data-testid": "game-over" }, [
+              "Game over — the host returns everyone to the lobby.",
+            ]),
+          );
+        }
+
+        function winnerName(view) {
+          var winner = view.roster.find(function (p) {
+            return p.id === view.winnerId;
+          });
+          return winner ? winner.name : "Nobody";
+        }
+
+        // ------------------------------------------------------------------
+        // Lifecycle wiring.
+        // ------------------------------------------------------------------
+
+        if (root) {
+          // Event delegation: one listener survives every re-render.
+          root.addEventListener("click", function (event) {
+            var target = event.target;
+            var node =
+              target && target.closest
+                ? target.closest("button[data-action], button[data-choice]")
+                : null;
+            if (!node || !latestView) return;
+            if (node.hasAttribute("data-action")) {
+              var action = node.getAttribute("data-action");
+              if (action === "reveal") {
+                safeDispatch({ type: "reveal" }).catch(function (error) {
+                  nova.log("Couldn't reveal yet:", error.code, error.message);
+                });
+              } else if (action === "next") {
+                safeDispatch({ type: "nextRound" }).catch(function (error) {
+                  nova.log("Couldn't advance yet:", error.code, error.message);
+                });
+              }
+            } else if (node.hasAttribute("data-choice")) {
+              safeDispatch({
+                type: "answer",
+                payload: { choice: Number(node.getAttribute("data-choice")) },
+              }).catch(function (error) {
+                nova.log("Answer rejected:", error.code, error.message);
+              });
+            }
+          });
+        }
+
+        nova.state.onChange(function (view) {
+          latestView = view;
+          scheduleFrom(view);
+          render(view);
+        });
+
+        nova.onStart(function () {
+          nova.log("Nova Quiz started with " + nova.players.length + " player(s).");
+          // A player who joined during the join window may have pushed the
+          // party past the minimum: try to begin right away (the handler
+          // validates; a no-op is harmless).
+          if (latestView && latestView.phase === "waiting") {
+            safeDispatch({ type: "begin" }).catch(function () {});
+          }
+        });
+
+        nova.onConnectionChange(function (status) {
+          nova.log("connection:", status);
+          if (root && latestView) {
+            render(latestView); // refresh the status chip
+          }
+        });
+
+        nova.onPlayerJoin(function (player) {
+          nova.log(player.name + " joined the game.");
+          if (latestView && latestView.phase === "waiting") {
+            safeDispatch({ type: "begin" }).catch(function () {});
+          }
+        });
+
+        nova.onPlayerLeave(function (player) {
+          nova.log(player.name + " left the game.");
+        });
+
+        nova.onEnd(function (reason) {
+          nova.log("Nova Quiz ended (" + reason + ").");
+          if (root) {
+            root.textContent = "";
+            root.appendChild(
+              el("div", { class: "card standings" }, [
+                el("div", { class: "trophy" }, ["🏁"]),
+                el("div", { class: "winner" }, ["Game over"]),
+                el("p", { class: "muted" }, ["The game ended (" + reason + ")."]),
+                el("p", { class: "muted" }, ["The host will return everyone to the lobby."]),
+              ]),
+            );
+          }
+        });
+
+        nova.ready();
+      })();
+    </script>
+  </body>
+</html>

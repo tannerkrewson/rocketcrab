@@ -592,6 +592,13 @@ export class ArenaEngine {
       case "error":
         this.logPlayer(id, "error", `Nova error (${event.error.code}): ${event.error.message}`);
         break;
+      case "authorityChanged":
+        this.logPlayer(
+          id,
+          "info",
+          `Authority: ${event.authorityMemberId ?? "none"} (term ${event.term}).`,
+        );
+        break;
       case "stateCommitted":
         // S2 diagnostics: state size + action rate are visible in the logs
         // and the arena state snapshot.
@@ -846,10 +853,30 @@ export class ArenaEngine {
   private computeAuthorityPlayerId(players: readonly ArenaPlayer[]): string | null {
     // The authority is the session the state engine tracks (S3: the current
     // term's elected authority, tracked through elections and migrations).
+    // Only CONNECTED players may hold the seat: a suspended/disconnected
+    // session still reports its stale pre-election belief, which must never
+    // mask the real (connected) authority in the UI.
     for (const runtime of this.players.values()) {
-      const authority = runtime.session?.getStateModeDiagnostics().authorityMemberId;
-      if (authority === null || authority === undefined) continue;
-      const player = players.find((p) => p.memberId === authority);
+      const session = runtime.session;
+      const status = session?.connectionStatus ?? "none";
+      const report = session?.getStateModeDiagnostics().authorityMemberId ?? null;
+      const diag = session?.getStateModeDiagnostics();
+      // eslint-disable-next-line no-console
+      console.log(
+        "[s4-probe] player",
+        runtime.spec.id,
+        "status",
+        status,
+        "authority",
+        report,
+        "term",
+        diag?.term,
+        "election",
+        diag?.electionInProgress,
+      );
+      if (session === null || status !== "connected") continue;
+      if (report === null || report === undefined) continue;
+      const player = players.find((p) => p.memberId === report);
       if (player !== undefined) return player.id;
     }
     return (
@@ -958,6 +985,7 @@ function toApiEvent(event: NovaSessionEvent): GameApiEvent | null {
     case "stateCommitted":
     case "actionRejected":
     case "actionReceived":
+    case "authorityChanged":
       return null;
   }
 }

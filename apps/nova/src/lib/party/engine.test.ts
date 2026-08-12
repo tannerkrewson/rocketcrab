@@ -1,4 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
+// The complete S4 example game document, verbatim (Vite ?raw import).
+import EXAMPLE_GAME_SOURCE from "../../../../../examples/games/nova-quiz.html?raw";
 import { parseInviteFragment, type PartyTransportFactory } from "@rocketcrab/party";
 import { InMemoryTransportHub } from "@rocketcrab/testing";
 import type { ChannelPort } from "../runtime-host";
@@ -531,5 +533,100 @@ describe("party engine — roles, reconnect, and cleanup", () => {
       true,
     );
     expect(a.harness.frames[0]?.isConnected).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// S4: the state-mode vertical-slice example game through the party flow
+// ---------------------------------------------------------------------------
+
+/**
+ * The complete example game document (examples/games/nova-quiz.html) travels
+ * the same P4 path as any saved game: the creator registers it with the
+ * party, the joiner receives the verified source, both frames boot and
+ * register, the game starts, and the emergency teardown returns everyone to
+ * the lobby. The example game rides the party's private transport exactly
+ * like a real saved game (P3 game-source transfer + S1 session).
+ */
+const EXAMPLE_GAME = {
+  gameId: "game_nova_quiz_1",
+  title: "Nova Quiz",
+  mode: "state" as const,
+  source: EXAMPLE_GAME_SOURCE,
+};
+
+describe("the S4 example game over the party flow", () => {
+  it("creates, transfers, starts, and ends with the example game source", async () => {
+    expect(EXAMPLE_GAME.source).toContain("Nova Quiz");
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+
+    // Creator: party is live with the example game as the pending source.
+    const promise = a.engine.createParty({
+      gameId: EXAMPLE_GAME.gameId,
+      title: EXAMPLE_GAME.title,
+      mode: EXAMPLE_GAME.mode,
+      source: EXAMPLE_GAME.source,
+    });
+    for (let i = 0; i < 8; i += 1) {
+      await flush();
+      world.clock.advance(1_000);
+    }
+    await settle(world);
+    await promise;
+    const code = a.engine.getState().code;
+    expect(code).toMatch(/^[A-Z]{4}$/);
+    expect(a.engine.getState().game?.title).toBe("Nova Quiz");
+
+    // The creator's frame boots and registers the example game.
+    await registerLocalGame(a, world);
+    expect(a.engine.getState().members[0]?.ready).toBe(true);
+
+    // Joiner joins by code; the creator approves.
+    const join = b.engine.joinByCode(code as string);
+    const settled = (async () => {
+      await flush();
+      world.clock.advance(5_000);
+      await settle(world);
+      world.clock.advance(2_000);
+      await settle(world);
+    })();
+    await settled;
+    const pending = a.engine.getState().pendingJoinRequests;
+    expect(pending).toHaveLength(1);
+    a.engine.respondToJoinRequest(pending[0]?.memberId ?? "", true);
+    await settle(world);
+    await join;
+
+    // The 40 KB example document transfers byte-identically (P3) and the
+    // joiner's frame boots and registers.
+    await settle(world);
+    expect(memberOf(b.engine.getState(), b.memberId).transferState).toBe("complete");
+    await registerLocalGame(b, world);
+    expect(a.engine.getState().canStart).toBe(true);
+    expect(b.engine.getState().canStart).toBe(true);
+
+    // Start reaches both phones; the game's own declaration ("state" mode,
+    // title) is what the session runs.
+    a.engine.startGame();
+    await settle(world);
+    expect(a.engine.getState().phase).toBe("playing");
+    expect(b.engine.getState().phase).toBe("playing");
+
+    // Emergency teardown: the game ends for everyone and returns to lobby.
+    a.engine.endGame("host_closed");
+    await settle(world);
+    expect(a.engine.getState().phase).toBe("lobby");
+    expect(b.engine.getState().phase).toBe("lobby");
+    expect(a.engine.getState().endedReason).toBe("host_closed");
+
+    // Cleanup leaves every room empty.
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+    await settle(world);
+    expect(world.hub.roomNames().every((room) => world.hub.membersOf(room).length === 0)).toBe(
+      true,
+    );
   });
 });
