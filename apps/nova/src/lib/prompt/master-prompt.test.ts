@@ -1,7 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { NOVA_API_VERSION } from "@rocketcrab/nova-api";
 import { describe, expect, it } from "vitest";
 import { MASTER_PROMPT_VERSION, buildMasterPrompt } from "./master-prompt";
 
@@ -165,12 +164,13 @@ describe("master prompt — acceptance criteria", () => {
     );
   });
 
-  it("is versioned with the template and Nova API versions", () => {
-    expect(normalized).toContain(`template v${MASTER_PROMPT_VERSION}`);
-    expect(normalized).toContain(`Nova API v${NOVA_API_VERSION}`);
-    expect(normalized).toContain(`The Nova API reference (Nova API v${NOVA_API_VERSION})`);
+  it("keeps the template version in code but shows no version badge in the prompt text", () => {
+    // MASTER_PROMPT_VERSION still pins the snapshot checkpoint in code;
+    // the prompt itself carries no "template vX · Nova API vY" badge or
+    // version markers (user request: no version info in the prompt).
     expect(MASTER_PROMPT_VERSION).toBe(1);
-    expect(NOVA_API_VERSION).toBe(1);
+    expect(normalized).not.toContain("template v");
+    expect(normalized).not.toContain("Nova API v");
   });
 
   it("embeds a versioned reference fixture that matches the live docs file (drift guard)", () => {

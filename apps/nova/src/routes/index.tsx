@@ -9,7 +9,7 @@ export const Route = createFileRoute("/")({
 });
 
 interface HomeAction {
-  to: "/create" | "/join" | "/library";
+  to: "/build" | "/join" | "/library";
   label: string;
   description: string;
   icon: typeof PlusCircle;
@@ -18,8 +18,8 @@ interface HomeAction {
 
 const actions: HomeAction[] = [
   {
-    to: "/create",
-    label: "Create a game",
+    to: "/build",
+    label: "Build a game",
     description: "Copy the AI prompt, chat with a bot, paste the result.",
     icon: PlusCircle,
     variant: "primary",
@@ -51,7 +51,7 @@ function HomeComponent() {
           Rocketcrab <span className="text-primary">Nova</span>
         </h1>
         <p className="max-w-md text-lg text-base-content/70">
-          Create, test, save, and play your own multiplayer browser games — no hosting, no accounts,
+          Build, test, save, and play your own multiplayer browser games — no hosting, no accounts,
           no code setup.
         </p>
       </section>
@@ -92,10 +92,10 @@ function HomeComponent() {
           <EmptyState
             icon={<Gamepad2 />}
             title="No games yet"
-            description="Games you create or test will show up here. Start with a game idea and let the AI helper draft it for you."
+            description="Games you build or test will show up here. Start with a game idea and let the AI helper draft it for you."
             action={
-              <Link to="/create" className={buttonStyles("primary")}>
-                Create your first game
+              <Link to="/build" className={buttonStyles("primary")}>
+                Build your first game
               </Link>
             }
           />

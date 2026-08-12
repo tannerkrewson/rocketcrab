@@ -65,8 +65,8 @@ export function LibraryPage() {
             Games are saved right in this browser. Nothing is uploaded.
           </p>
         </div>
-        <Link to="/create" className={buttonStyles("primary", "lg")}>
-          Create a game
+        <Link to="/build" className={buttonStyles("primary", "lg")}>
+          Build a game
         </Link>
       </header>
 
@@ -98,11 +98,11 @@ export function LibraryPage() {
           <EmptyState
             icon={<Gamepad2 />}
             title="No saved games yet"
-            description="Once you create or paste a game it will be listed here for testing, editing, and playing."
+            description="Once you build or paste a game it will be listed here for testing, editing, and playing."
             action={
-              <Link to="/create" className={buttonStyles("primary", "lg")}>
+              <Link to="/build" className={buttonStyles("primary", "lg")}>
                 <PlusCircle className="h-5 w-5" aria-hidden="true" />
-                Create a game
+                Build a game
               </Link>
             }
           />

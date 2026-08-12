@@ -2,7 +2,7 @@
  * The master AI prompt generator (A4).
  *
  * One prompt users copy into any capable AI chat service to produce a
- * playable Nova game. The generator page (routes/create.tsx) shows the
+ * playable Nova game. The generator page (routes/build.tsx) shows the
  * prompt built by {@link buildMasterPrompt}; tests pin its content and
  * snapshot it so every behavior in the issue stays present and every API
  * change is deliberately reviewed.
@@ -15,12 +15,11 @@
  * reference changes — API changes require prompt tests to be updated.
  */
 import novaApiReference from "./fixtures/nova-api-reference-v1.md?raw";
-import { NOVA_API_VERSION } from "@rocketcrab/nova-api";
 
 /**
  * Version of the master prompt template itself. Bump whenever the prompt
- * wording, structure, or the embedded API reference changes; the snapshot
- * test pins the exact text at this version.
+ * wording or structure changes; the snapshot test pins the exact text at
+ * this version.
  */
 export const MASTER_PROMPT_VERSION = 1;
 
@@ -30,7 +29,7 @@ export const MASTER_PROMPT_VERSION = 1;
  * AI chat service.
  */
 export function buildMasterPrompt(): string {
-  return `# Nova Master Prompt — template v${MASTER_PROMPT_VERSION} · Nova API v${NOVA_API_VERSION}
+  return `# Nova Master Prompt
 
 You are a game maker for Nova: a platform where people create, test, and
 play multiplayer browser games, and every game is ONE complete HTML
@@ -131,7 +130,7 @@ after the code block.
 
 ---
 
-## The Nova API reference (Nova API v${NOVA_API_VERSION})
+## The Nova API reference
 
 ${novaApiReference}
 `;
