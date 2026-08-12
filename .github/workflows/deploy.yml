@@ -1,0 +1,142 @@
+# GitHub Pages deploy for one origin (M2 — docs/architecture/deployment.md).
+#
+# The two-origin model (ADR-0001) needs TWO distinct HTTPS origins. GitHub
+# Pages serves ONE site per repo, and all project sites of one account share
+# the `username.github.io` ORIGIN (only the path differs) — so a single
+# repo/account CANNOT host both origins. Run this workflow in the repo whose
+# Pages site is the origin you are deploying:
+#
+#   - `origin: nova`    -> the main app (e.g. custom domain nova.example, or
+#                          a project site on a second account)
+#   - `origin: runtime` -> the runtime origin (e.g. runtime.nova.example, or
+#                          a project site on another account)
+#
+# Nothing publishes automatically: the workflow is manual-only until the user
+# picks a strategy and owns a domain (see deployment.md). The input values
+# are baked into the build:
+#
+#   - `base`            Vite base path of THIS site ("/" for user/org sites
+#                       and custom domains; "/<repo>/" for project sites).
+#   - `runtime_origin`  (nova) the runtime origin, REQUIRED — it is baked
+#                       into the iframe URL and the CSP `frame-src`.
+#   - `runtime_base`    (nova) base path of the runtime site when it is a
+#                       project site (e.g. "/runtime/"); "/" by default.
+#   - `main_origin`     (runtime) the main origin for the exact-origin
+#                       bootstrap check; derived (strip `runtime.` prefix)
+#                       unless the deployment is not on a subdomain.
+name: Deploy to GitHub Pages
+
+on:
+  workflow_dispatch:
+    inputs:
+      origin:
+        description: Origin to build and deploy (one Pages site per repo)
+        required: true
+        type: choice
+        default: nova
+        options:
+          - nova
+          - runtime
+      base:
+        description: >-
+          Vite base path of this site. "/" for user/org sites and custom
+          domains; "/<repo>/" for project sites.
+        required: false
+        type: string
+        default: /
+      runtime_origin:
+        description: >-
+          Runtime origin for the nova build, e.g. https://runtime.nova.example
+          (required for origin=nova; baked into the iframe URL and the CSP
+          frame-src).
+        required: false
+        type: string
+        default: ""
+      runtime_base:
+        description: >-
+          Base path of the runtime site when it is a project site (e.g.
+          /runtime/). Defaults to /.
+        required: false
+        type: string
+        default: /
+      main_origin:
+        description: >-
+          Main origin for the runtime build, e.g. https://nova.example
+          (exact-origin bootstrap check). Leave empty to derive it from the
+          runtime origin (strip the runtime. prefix).
+        required: false
+        type: string
+        default: ""
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+concurrency:
+  group: pages-${{ inputs.origin }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build ${{ inputs.origin }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Nova origin
+        if: inputs.origin == 'nova'
+        run: npm run build --workspace @rocketcrab/nova -- --base "${{ inputs.base }}"
+        env:
+          VITE_RUNTIME_ORIGIN: ${{ inputs.runtime_origin }}
+          VITE_RUNTIME_BASE: ${{ inputs.runtime_base }}
+
+      - name: Build Runtime origin
+        if: inputs.origin == 'runtime'
+        run: npm run build --workspace @rocketcrab/runtime -- --base "${{ inputs.base }}"
+        env:
+          VITE_MAIN_ORIGIN: ${{ inputs.main_origin }}
+
+      # GitHub Pages has no SPA rewrite rules: a deep route returns 404 with
+      # 404.html as the body. Serving a byte-copy of the built index.html
+      # boots the app at the requested path (the router reads
+      # location.pathname; the router basepath comes from Vite's BASE_URL).
+      - name: Add GitHub Pages SPA fallback (nova only)
+        if: inputs.origin == 'nova'
+        run: cp apps/nova/dist/index.html apps/nova/dist/404.html
+
+      - name: Verify static deploy output
+        run: node scripts/verify-static-deploy.mjs --origin "${{ inputs.origin }}" --runtime-origin "${{ inputs.runtime_origin }}"
+
+      - name: Upload Pages artifact (Nova)
+        if: inputs.origin == 'nova'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/nova/dist
+
+      - name: Upload Pages artifact (Runtime)
+        if: inputs.origin == 'runtime'
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: apps/runtime/dist
+
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4

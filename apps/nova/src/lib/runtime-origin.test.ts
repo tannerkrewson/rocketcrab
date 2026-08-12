@@ -1,5 +1,5 @@
-import { describe, expect, it } from "vitest";
-import { runtimeOriginForMainOrigin } from "./runtime-origin";
+import { describe, expect, it, vi } from "vitest";
+import { runtimeBasePath, runtimeOriginForMainOrigin } from "./runtime-origin";
 
 describe("runtimeOriginForMainOrigin", () => {
   it("swaps the dev port to the runtime origin", () => {
@@ -14,5 +14,39 @@ describe("runtimeOriginForMainOrigin", () => {
     expect(runtimeOriginForMainOrigin("https://play.rocketcrab.app")).toBe(
       "https://runtime.play.rocketcrab.app",
     );
+  });
+
+  it("honours the VITE_RUNTIME_ORIGIN build-time pin (M2)", () => {
+    // The derivation cannot express arbitrary origin pairs (two-account or
+    // alternate-host strategies); the deploy workflow pins the origin.
+    vi.stubEnv("VITE_RUNTIME_ORIGIN", "https://sandbox.example.net");
+    try {
+      expect(runtimeOriginForMainOrigin("https://nova.example.com")).toBe(
+        "https://sandbox.example.net",
+      );
+    } finally {
+      vi.unstubAllEnvs();
+    }
+  });
+});
+
+describe("runtimeBasePath", () => {
+  it("defaults to the site root", () => {
+    expect(runtimeBasePath()).toBe("/");
+  });
+
+  it("honours the VITE_RUNTIME_BASE build-time pin (project-site layouts)", () => {
+    vi.stubEnv("VITE_RUNTIME_BASE", "/runtime/");
+    try {
+      expect(runtimeBasePath()).toBe("/runtime/");
+    } finally {
+      vi.unstubAllEnvs();
+    }
+    vi.stubEnv("VITE_RUNTIME_BASE", "runtime");
+    try {
+      expect(runtimeBasePath()).toBe("/runtime/");
+    } finally {
+      vi.unstubAllEnvs();
+    }
   });
 });

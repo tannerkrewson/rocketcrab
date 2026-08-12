@@ -70,22 +70,26 @@ npm run check   # format check + lint + typecheck + tests + build
 ```
 
 Local development serves both origins over HTTP by default; the two-origin HTTPS
-setup required for production runtime isolation is documented in
-`docs/architecture/` (see M2 — Configure production static deployment).
+setup, the GitHub Pages deploy workflow, and the per-origin security policies
+are documented in `docs/architecture/deployment.md` (M2 — Configure production
+static deployment; nothing is published yet).
 
 ### Root scripts
 
-| Script                                    | Purpose                                                                    |
-| ----------------------------------------- | -------------------------------------------------------------------------- |
-| `npm run dev`                             | Run all apps in watch mode (parallel via concurrently)                     |
-| `npm run build`                           | Build all apps and packages                                                |
-| `npm run format` / `npm run format:check` | Write / verify Oxfmt formatting                                            |
-| `npm run lint`                            | Oxlint over the workspace                                                  |
-| `npm run typecheck`                       | `tsc --noEmit` across all apps and packages                                |
-| `npm test` / `npm run test:watch`         | Vitest unit tests (run / watch)                                            |
-| `npm run test:e2e`                        | Playwright end-to-end tests (run `npx playwright install` first)           |
-| `npm run bundle:size`                     | Print built bundle sizes; warn when the Nova main bundle exceeds the limit |
-| `npm run check`                           | Format check + lint + typecheck + tests + build                            |
+| Script                                    | Purpose                                                                     |
+| ----------------------------------------- | --------------------------------------------------------------------------- |
+| `npm run dev`                             | Run all apps in watch mode (parallel via concurrently)                      |
+| `npm run dev:https`                       | Run all apps over local HTTPS (run `npm run gen-certs` first)               |
+| `npm run gen-certs`                       | Generate gitignored self-signed certs for local HTTPS (optional LAN IP arg) |
+| `npm run build`                           | Build all apps and packages                                                 |
+| `npm run format` / `npm run format:check` | Write / verify Oxfmt formatting                                             |
+| `npm run lint`                            | Oxlint over the workspace                                                   |
+| `npm run typecheck`                       | `tsc --noEmit` across all apps and packages                                 |
+| `npm test` / `npm run test:watch`         | Vitest unit tests (run / watch)                                             |
+| `npm run test:e2e`                        | Playwright end-to-end tests (run `npx playwright install` first)            |
+| `npm run bundle:size`                     | Print built bundle sizes; warn when the Nova main bundle exceeds the limit  |
+| `npm run verify:deploy`                   | Verify a built origin's dist against the deployment requirements            |
+| `npm run check`                           | Format check + lint + typecheck + tests + build                             |
 
 ## CI and quality gates
 

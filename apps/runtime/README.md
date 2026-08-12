@@ -107,11 +107,22 @@ explicit, validated, and versioned.
 ## Dev flow
 
 ```sh
-npm run dev            # nova on :5173, runtime on :5174 (distinct origins)
+npm run dev            # nova on :5173, runtime on :5174 (distinct origins, HTTP)
 npm run check          # format, lint, typecheck, test, build (+ bundle purity check)
 npm run test:e2e       # Playwright: runtime handshake, execution, isolation
 ```
 
-No certificate/HTTPS complexity in dev (that was the F4 device-testing-only
-setup). The runtime bundle must never contain Nova database or party secret
+Production is HTTPS-only and the runtime iframe needs a distinct origin, so
+local HTTPS is one command away (M2; `docs/architecture/deployment.md`):
+
+```sh
+npm run gen-certs      # gitignored self-signed certs for localhost
+npm run dev:https      # https://localhost:5173 (nova) + https://localhost:5174 (runtime)
+```
+
+Add a LAN IP for physical-device testing: `node scripts/gen-certs.mjs 192.168.1.10`
+and open `https://192.168.1.10:5173`. The runtime page intentionally ships no
+restrictive CSP (games keep ordinary web capabilities) and sweeps any service
+worker registration on load (ADR-0008; compensating controls in the deployment
+doc). The runtime bundle must never contain Nova database or party secret
 logic — enforced by `scripts/check-runtime-bundle.mjs` after every build.

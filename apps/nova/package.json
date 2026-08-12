@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "dev:https": "vite --mode https",
     "build": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",

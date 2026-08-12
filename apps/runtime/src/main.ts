@@ -23,6 +23,20 @@ import { RuntimeInstance, type FrameFactory } from "./runtime-instance";
 
 const MAIN_ORIGIN = mainOriginForRuntimeOrigin(location.origin);
 
+// Service-worker hygiene (M2; ADR-0008): the runtime origin must not run a
+// service worker — no persistent network control over game traffic. No
+// runtime code registers one and browsers reject registration from the
+// sandboxed game frame, but sweep any leftover registration (e.g. from a
+// misconfigured static host) on page load so the runtime page always starts
+// clean.
+if ("serviceWorker" in navigator) {
+  void navigator.serviceWorker.getRegistrations().then((registrations) => {
+    for (const registration of registrations) {
+      void registration.unregister();
+    }
+  });
+}
+
 const containerEl = document.getElementById("game-container");
 const barEl = document.getElementById("bar");
 if (!containerEl || !barEl) {
