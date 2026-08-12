@@ -228,6 +228,12 @@ export interface NovaStateEngineOptions {
   electionWindowMs?: number;
   /** How long the winner collects state pushes before restoring (S3). */
   restoreWindowMs?: number;
+  /**
+   * SHA-256 state digest (tests inject a deferred implementation to race
+   * authority loss against the commit window deterministically). Defaults
+   * to {@link stateHashOf}.
+   */
+  stateHash?: (value: unknown) => Promise<string>;
 }
 
 interface ActionStats {
@@ -294,6 +300,7 @@ export class NovaStateEngine {
   private readonly gracePeriodMs: number;
   private readonly electionWindowMs: number;
   private readonly restoreWindowMs: number;
+  private readonly stateHashImpl: (value: unknown) => Promise<string>;
 
   private canonical: unknown | null = null;
   private revision = 0;
@@ -337,6 +344,7 @@ export class NovaStateEngine {
     this.gracePeriodMs = options.gracePeriodMs ?? authorityGracePeriodMs;
     this.electionWindowMs = options.electionWindowMs ?? 500;
     this.restoreWindowMs = options.restoreWindowMs ?? 500;
+    this.stateHashImpl = options.stateHash ?? stateHashOf;
   }
 
   /**
@@ -1042,7 +1050,7 @@ export class NovaStateEngine {
     if (this.authorityMemberId !== this.selfMemberId) return; // deposed mid-restore
     this.restoreDone = true;
     if (this.stateHash !== null && this.canonical !== null && this.restoreBackup !== null) {
-      const actual = await stateHashOf(this.canonical);
+      const actual = await this.stateHashImpl(this.canonical);
       if (this.disposed) return;
       if (actual !== this.stateHash) {
         const backup = this.restoreBackup;
@@ -1381,7 +1389,12 @@ export class NovaStateEngine {
       return true;
     }
     if (!(await this.commit(result.state, result.views, item.actionId))) {
-      this.settleRejected(item, "invalid_state", "The action result failed validation.");
+      // The authority changed (or the engine disposed) during the async
+      // state-hash digest: drop the result silently, exactly like the
+      // post-handler check above. The dispatcher re-sends once the new
+      // authority is announced and deduplication applies the action
+      // exactly once (ADR-0007). The action was never invalid, so it must
+      // not be acked as invalid_state (rocketcrab-9fv.7.30).
       return true;
     }
     this.ack(item.senderMemberId, {
@@ -1409,7 +1422,7 @@ export class NovaStateEngine {
     // Hash BEFORE mutating revision/canonical: a catch-up snapshot read
     // mid-commit must never observe the new revision with the old hash
     // (ADR-0007: state envelopes carry consistent revision + hash).
-    const stateHash = await stateHashOf(state);
+    const stateHash = await this.stateHashImpl(state);
     if (this.disposed) return false;
     if (this.authorityMemberId !== this.selfMemberId || !this.restoreDone) return false;
     this.revision += 1;

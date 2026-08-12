@@ -642,7 +642,20 @@ export class NovaSession implements NovaClientBackend {
     }
     const baseRevision = action.baseRevision ?? this.engine.getRevision();
     const authority = this.engine.getAuthorityMemberId();
+    const entry: BufferedDispatch = {
+      actionId,
+      type: action.type,
+      payload: action.payload,
+      baseRevision,
+    };
     if (authority === this.selfPlayer.id) {
+      // Local dispatch on the authority session (no transport round trip).
+      // Track it in-flight so that if the authority steps down mid-commit
+      // (the async state-hash digest can race a peer campaign), the action
+      // is re-sent to the new authority by flushDispatchBuffer and applied
+      // exactly once (deduplication on the new authority; ADR-0007). The
+      // local ack (any status) removes the entry.
+      this.inflightDispatches.set(actionId, entry);
       this.engine.handleLocalAction({
         actionId,
         type: action.type,
@@ -651,12 +664,6 @@ export class NovaSession implements NovaClientBackend {
       });
       return Promise.resolve();
     }
-    const entry: BufferedDispatch = {
-      actionId,
-      type: action.type,
-      payload: action.payload,
-      baseRevision,
-    };
     if (authority === null) {
       // Election in progress (or authority unknown): buffer until the new
       // authority is announced (the client promise resolves on its ack).
