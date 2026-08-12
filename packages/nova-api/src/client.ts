@@ -111,8 +111,10 @@ export interface NovaClientBackend {
   dispatch(action: NovaAction, actionId: string): Promise<void>;
   /** Declare a raw channel to the party. */
   createRawChannel(spec: NovaRawChannelSpec): void;
+  /** Close a raw channel and tell the party. */
+  closeRawChannel(name: string): void;
   /** Send a payload on a raw channel. */
-  sendRaw(name: string, payload: unknown, options: NovaRawSendOptions): void;
+  sendRaw(name: string, payload: unknown, options?: NovaRawSendOptions): void;
   /** Signal that the game registered simulation handlers. */
   registerSimulation(): void;
   /** Send one simulation input to the party. */
@@ -309,6 +311,15 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
       }
       backend.createRawChannel(spec);
     },
+    close(name) {
+      if (ended) throw new NovaError("ended", endedMessage("raw.close"));
+      if (!started) throw new NovaError("not_started", notStartedMessage("raw.close"));
+      assertValid(
+        novaChannelNameSchema.safeParse(name).success,
+        "nova.raw.close: bad channel name.",
+      );
+      backend.closeRawChannel(name);
+    },
     send(name, payload, options = {}) {
       if (ended) throw new NovaError("ended", endedMessage("raw.send"));
       if (!started) throw new NovaError("not_started", notStartedMessage("raw.send"));
@@ -316,10 +327,27 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
         novaChannelNameSchema.safeParse(name).success,
         "nova.raw.send: bad channel name.",
       );
+      if (options.onProgress !== undefined && typeof options.onProgress !== "function") {
+        throw new NovaError(
+          "invalid_options",
+          "nova.raw.send options.onProgress must be a function.",
+        );
+      }
       if (!isBinaryPayload(payload)) {
         assertStructuredCloneSafe(payload, `nova.raw.send payload on channel "${name}"`);
       }
-      backend.sendRaw(name, payload, options);
+      // The session validates channels, limits, and connectivity asynchronously
+      // (transport send); failures are delivered to `nova.onError` handlers so
+      // games observe them uniformly in the arena, over party transports, and
+      // in-process (S1: every API failure is a stable NovaError).
+      Promise.resolve()
+        .then(() => backend.sendRaw(name, payload, options))
+        .catch((error: unknown) => {
+          callSafely(
+            errorHandlers,
+            error instanceof NovaError ? error : new NovaError("invalid_options", String(error)),
+          );
+        });
     },
     onMessage(name, handler) {
       assertValid(

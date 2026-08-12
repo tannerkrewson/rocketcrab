@@ -102,10 +102,21 @@ nova.onStart(function () {
 
   nova.raw.send("chat", { text: "hello everyone" });
   nova.raw.send("positions", new Uint8Array([1, 2, 3]));
+  nova.raw.send("chat", { text: "just for Ada" }, { to: "member-2" });
 });
 
 nova.raw.onMessage("chat", function (message) {
   nova.log(message.from.name + " says: " + message.payload.text);
+});
+
+nova.raw.onMessage("positions", function (message) {
+  // message.payload is a Uint8Array; binary flag is true.
+  nova.log("position bytes: " + message.payload.length);
+});
+
+// Close the chat channel when the game is done with it (A2 lifecycle).
+nova.onEnd(function () {
+  nova.raw.close("chat");
 });
 
 nova.ready();

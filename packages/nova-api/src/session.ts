@@ -27,6 +27,10 @@ import {
   PROTOCOL_VERSION,
   actionTimeoutMs,
   parsePeerMessage,
+  rawMessageBytes,
+  rawRatePerSecond,
+  rawMessageWarnBytes,
+  rawWarnRatePerSecond,
   type GameEndReason,
   type GameMode,
   type PeerMessage,
@@ -49,6 +53,7 @@ import {
   buildGameReadyMessage,
   buildGameStartMessage,
   buildPlayerIdentityMessage,
+  buildRawChannelCloseMessage,
   buildRawChannelMessage,
   buildSimulationInputMessage,
   buildStateSnapshotMessage,
@@ -71,6 +76,8 @@ import type {
   NovaGameDeclaration,
   NovaPlayer,
   NovaRawChannelSpec,
+  NovaRawDiagnostics,
+  NovaRawProgress,
   NovaRawSendOptions,
   NovaSimulationInput,
   NovaStateDiagnostics,
@@ -130,7 +137,33 @@ export interface NovaRawChannelState {
   readonly reliable: boolean;
   readonly ordered: boolean;
   readonly binary: boolean;
+  /** True when THIS session declared the channel; peer declarations are informational. */
+  readonly declaredBySelf: boolean;
 }
+
+/** Sliding-window send rate for the raw rate limit (A2). */
+interface RawRateWindow {
+  /** Send timestamps within the window, in send order. */
+  timestamps: number[];
+  /** Sends rejected by the hard rate limit. */
+  rejections: number;
+}
+
+/** Raw-mode counters (A2 diagnostics). */
+interface RawStats {
+  sent: number;
+  received: number;
+  sentBytes: number;
+  receivedBytes: number;
+  oversizedRejections: number;
+  warned: boolean;
+}
+
+/** Length of the raw rate window (matches the state-mode action window). */
+const RAW_RATE_WINDOW_MS = 10_000;
+
+/** Messages allowed within one window: the per-second rate × window. */
+const RAW_RATE_WINDOW_CAPACITY = Math.floor((rawRatePerSecond * RAW_RATE_WINDOW_MS) / 1000);
 
 function mapConnectionState(state: TransportConnectionState): NovaConnectionStatus {
   switch (state) {
@@ -177,6 +210,15 @@ export class NovaSession implements NovaClientBackend {
   private readonly selfPlayer: PlayerRecord;
   private readonly playersMap = new Map<string, PlayerRecord>();
   private readonly channels = new Map<string, NovaRawChannelState>();
+  private readonly rawStats: RawStats = {
+    sent: 0,
+    received: 0,
+    sentBytes: 0,
+    receivedBytes: 0,
+    oversizedRejections: 0,
+    warned: false,
+  };
+  private readonly rawRate: RawRateWindow = { timestamps: [], rejections: 0 };
   private readonly listeners = new Set<(event: NovaSessionEvent) => void>();
   private readonly transportUnsubscribers: Array<() => void> = [];
   private readonly outbox: OutboxEntry[] = [];
@@ -239,6 +281,23 @@ export class NovaSession implements NovaClientBackend {
   /** State-size and action-rate diagnostics (S2; host/arena visible). */
   getStateModeDiagnostics(): NovaStateDiagnostics {
     return this.engine.getDiagnostics();
+  }
+
+  /** Raw-mode traffic diagnostics (A2; host/arena visible). */
+  getRawDiagnostics(): NovaRawDiagnostics {
+    this.pruneRawRateWindow();
+    return {
+      channelCount: this.channels.size,
+      selfDeclaredChannelCount: this.selfDeclaredChannelCount(),
+      sentCount: this.rawStats.sent,
+      receivedCount: this.rawStats.received,
+      sentBytes: this.rawStats.sentBytes,
+      receivedBytes: this.rawStats.receivedBytes,
+      oversizedRejections: this.rawStats.oversizedRejections,
+      rateLimitRejections: this.rawRate.rejections,
+      ratePerSecond: this.rawRatePerSecond(),
+      warned: this.rawStats.warned,
+    };
   }
 
   /**
@@ -491,6 +550,7 @@ export class NovaSession implements NovaClientBackend {
       reliable: spec.reliable ?? true,
       ordered: spec.ordered ?? true,
       binary: spec.binary ?? false,
+      declaredBySelf: true,
     };
     this.channels.set(spec.name, state);
     void this.sendProtocol((base) =>
@@ -504,7 +564,24 @@ export class NovaSession implements NovaClientBackend {
     ).catch((error: unknown) => this.emitError(error));
   }
 
-  async sendRaw(name: string, payload: unknown, options: NovaRawSendOptions): Promise<void> {
+  /**
+   * Close a raw channel (A2 channel lifecycle): local sends on it fail with
+   * `unknown_channel` afterwards and peers are told the channel closed.
+   * Peers that declared the channel themselves keep their own declaration.
+   * Idempotent: closing an unknown channel is a no-op.
+   */
+  closeRawChannel(name: string): void {
+    this.assertAlive();
+    if (!this.channels.has(name)) {
+      return; // idempotent close (A2 lifecycle rule)
+    }
+    this.channels.delete(name);
+    void this.sendProtocol((base) => buildRawChannelCloseMessage(base, name)).catch(
+      (error: unknown) => this.emitError(error),
+    );
+  }
+
+  async sendRaw(name: string, payload: unknown, options: NovaRawSendOptions = {}): Promise<void> {
     this.assertAlive();
     const channel = this.channels.get(name);
     if (channel === undefined) {
@@ -519,11 +596,54 @@ export class NovaSession implements NovaClientBackend {
         `nova.raw.send failed: not connected to the party (status: ${this.status}).`,
       );
     }
+    // A2 size limit (F6 parity): payloads are measured at the send boundary
+    // (byte length for binary, UTF-8 serialized size for structured data).
+    // Oversized sends are rejected with a clear error so the host can show a
+    // diagnostic; the warn threshold is recorded for the diagnostics view.
+    const sizeBytes = rawPayloadBytes(payload);
+    if (sizeBytes > rawMessageBytes) {
+      this.rawStats.oversizedRejections += 1;
+      throw new NovaError(
+        "payload_too_large",
+        `The raw payload on channel "${name}" is ${sizeBytes} bytes; the hard limit is ${rawMessageBytes} bytes.`,
+      );
+    }
+    if (sizeBytes > rawMessageWarnBytes) {
+      this.rawStats.warned = true;
+    }
+    // A2 rate limit: a sliding 10-second window of sends per player. Bursts
+    // beyond the hard rate are rejected with a clear error (diagnostics).
+    // The per-window cap is the per-second rate × window length, so the
+    // diagnostic `ratePerSecond` stays comparable to state-mode action rates.
+    this.recordRawSend();
+    if (this.rawRate.timestamps.length > RAW_RATE_WINDOW_CAPACITY) {
+      this.rawRate.rejections += 1;
+      throw new NovaError(
+        "rate_limited",
+        `Raw send on channel "${name}" exceeded ${rawRatePerSecond} messages/second; the send was dropped.`,
+      );
+    }
+    if (this.rawRatePerSecond() > rawWarnRatePerSecond) {
+      this.rawStats.warned = true;
+    }
     const targetConnectionId =
       options.to === undefined ? undefined : this.connectionIdOf(options.to);
     if (options.to !== undefined && targetConnectionId === undefined) {
       throw new NovaError("not_connected", `Player "${options.to}" is not connected.`);
     }
+    const onProgress =
+      options.onProgress === undefined
+        ? undefined
+        : (progress: { bytesTransferred: number; totalBytes: number; fraction: number }) => {
+            options.onProgress?.({
+              at: Date.now(),
+              bytesTransferred: progress.bytesTransferred,
+              totalBytes: progress.totalBytes,
+              fraction: progress.fraction,
+            });
+          };
+    this.rawStats.sent += 1;
+    this.rawStats.sentBytes += sizeBytes;
     await this.transport.send({
       channel: name,
       payload,
@@ -531,6 +651,7 @@ export class NovaSession implements NovaClientBackend {
       reliability: (options.reliable ?? channel.reliable) ? "reliable" : "unreliable",
       ordering: (options.ordered ?? channel.ordered) ? "ordered" : "unordered",
       ...(targetConnectionId !== undefined ? { targetConnectionId } : {}),
+      ...(onProgress !== undefined ? { onProgress } : {}),
     });
   }
 
@@ -626,6 +747,26 @@ export class NovaSession implements NovaClientBackend {
       void this.sendProtocol((base) => buildGameReadyMessage(base), {
         targetMemberId: peer.memberId,
       }).catch((error: unknown) => this.emitError(error));
+    }
+    // A2 channel lifecycle: a peer that joins mid-game receives every raw
+    // channel this session has open, so it can subscribe and send on them
+    // without waiting for a fresh declaration. The declarations travel on
+    // the reliable+ordered protocol channel, so the joiner never misses one.
+    for (const [channelName, state] of this.channels) {
+      if (!state.declaredBySelf) {
+        continue;
+      }
+      void this.sendProtocol(
+        (base) =>
+          buildRawChannelMessage(base, {
+            channelName,
+            reliability: state.reliable ? "reliable" : "unreliable",
+            ordering: state.ordered ? "ordered" : "unordered",
+            binaryPayloads: state.binary,
+            broadcast: true,
+          }),
+        { targetMemberId: peer.memberId },
+      ).catch((error: unknown) => this.emitError(error));
     }
     // S2 late join: the authority hands the new shell the current canonical
     // state (migration copy) and computes the new player's selected view.
@@ -831,10 +972,31 @@ export class NovaSession implements NovaClientBackend {
         this.emit({ type: "simulationSnapshot", snapshot: peerMessage.state });
         break;
       case "raw.channel":
-        // Peer channel declarations are recorded implicitly: raw payloads
-        // are routed by channel name on arrival. Nothing further needed in
-        // S1 (guarantees travel with each transport message).
+        // Peer channel declarations are recorded so channel lifecycle works
+        // across the party: the session knows which names are in use, peer
+        // closes remove only peer declarations, and this session re-announces
+        // its own declarations when a peer joins mid-game (A2). Guarantees
+        // also travel with each transport message, so recording is purely
+        // lifecycle bookkeeping.
+        if (!this.channels.has(peerMessage.channelName)) {
+          this.channels.set(peerMessage.channelName, {
+            reliable: peerMessage.reliability === "reliable",
+            ordered: peerMessage.ordering === "ordered",
+            binary: peerMessage.binaryPayloads,
+            declaredBySelf: false,
+          });
+        }
         break;
+      case "raw.close": {
+        // A peer closed its channel: drop the peer's declaration. A channel
+        // this session declared itself stays open (each player owns its own
+        // declarations; closing is per-declaring-player).
+        const existing = this.channels.get(peerMessage.channelName);
+        if (existing !== undefined && !existing.declaredBySelf) {
+          this.channels.delete(peerMessage.channelName);
+        }
+        break;
+      }
       default:
         // peer.capabilities, join.*, party.*, game.source.* and
         // peer.connectionStatus are host/protocol-level traffic that the
@@ -845,6 +1007,8 @@ export class NovaSession implements NovaClientBackend {
   }
 
   private handleRawMessage(message: TransportMessage): void {
+    this.rawStats.received += 1;
+    this.rawStats.receivedBytes += rawPayloadBytes(message.payload);
     this.emit({
       type: "rawMessage",
       channel: message.channel,
@@ -989,6 +1153,36 @@ export class NovaSession implements NovaClientBackend {
     return this.nextSeq;
   }
 
+  /** Record one raw send in the sliding rate window. */
+  private recordRawSend(): void {
+    this.pruneRawRateWindow();
+    this.rawRate.timestamps.push(Date.now());
+  }
+
+  /** Raw sends per second over the current window. */
+  private rawRatePerSecond(): number {
+    return this.rawRate.timestamps.length / (RAW_RATE_WINDOW_MS / 1000);
+  }
+
+  /** Drop send timestamps older than the window. */
+  private pruneRawRateWindow(): void {
+    const cutoff = Date.now() - RAW_RATE_WINDOW_MS;
+    while (this.rawRate.timestamps.length > 0 && (this.rawRate.timestamps[0] ?? 0) < cutoff) {
+      this.rawRate.timestamps.shift();
+    }
+  }
+
+  /** Channels this session declared itself (A2 diagnostics). */
+  private selfDeclaredChannelCount(): number {
+    let count = 0;
+    for (const state of this.channels.values()) {
+      if (state.declaredBySelf) {
+        count += 1;
+      }
+    }
+    return count;
+  }
+
   private base(): PeerMessageBase {
     return {
       sessionId: this.sessionId,
@@ -1071,6 +1265,22 @@ export class NovaSession implements NovaClientBackend {
 
 function toNovaPlayer(player: PlayerRecord): NovaPlayer {
   return { id: player.id, name: player.name };
+}
+
+/**
+ * Size of one raw payload in bytes (A2 size limit): byte length for binary
+ * payloads, UTF-8 serialized size for structured data (the same measurement
+ * the transports use for chunking and progress).
+ */
+export function rawPayloadBytes(payload: unknown): number {
+  if (payload instanceof Uint8Array) {
+    return payload.byteLength;
+  }
+  if (payload instanceof ArrayBuffer) {
+    return payload.byteLength;
+  }
+  const json = JSON.stringify(payload);
+  return new TextEncoder().encode(json ?? "").length;
 }
 
 /** Map a state-engine error code onto the stable NovaError code set. */

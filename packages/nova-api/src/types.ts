@@ -221,6 +221,25 @@ export interface NovaRawSendOptions {
   readonly reliable?: boolean;
   /** Override the channel's ordered setting for this send. */
   readonly ordered?: boolean;
+  /**
+   * Optional sender-side transfer progress for payloads moved in chunks
+   * (payloads above ~64 KiB travel as chunked transfers). Called with the
+   * fraction of the payload the transport has handed off so far. Plain
+   * function: stays in the game's own context, never crosses a boundary.
+   */
+  readonly onProgress?: (progress: NovaRawProgress) => void;
+}
+
+/** One raw transfer-progress observation (A2 transfer observability). */
+export interface NovaRawProgress {
+  /** Epoch-ms timestamp of the observation. */
+  readonly at: number;
+  /** Bytes of the payload handed off so far. */
+  readonly bytesTransferred: number;
+  /** Total payload size in bytes. */
+  readonly totalBytes: number;
+  /** Fraction of the payload transferred, in [0, 1]. */
+  readonly fraction: number;
 }
 
 /** One raw message received on a raw channel. */
@@ -264,9 +283,19 @@ export interface NovaRawHandle {
   /**
    * Declare a raw channel and its delivery guarantees. Call once per
    * channel after the game starts; peers learn the channel from the
-   * declaration. To receive, also subscribe with {@link onMessage}.
+   * declaration (peers joining later receive open channels again). To
+   * receive, also subscribe with {@link onMessage}.
    */
   createChannel(spec: NovaRawChannelSpec): void;
+  /**
+   * Close a raw channel declared with {@link createChannel}. The channel
+   * stops accepting local sends (`unknown_channel` afterwards) and peers
+   * are told the channel closed; a peer that declared the channel itself
+   * keeps its own declaration. The name may be re-opened with a fresh
+   * {@link createChannel}. Idempotent: closing an unknown channel is a
+   * no-op.
+   */
+  close(name: string): void;
   /**
    * Send a payload on a channel created with {@link createChannel}.
    * Broadcasts to every connected player unless `options.to` is set.
@@ -278,6 +307,34 @@ export interface NovaRawHandle {
    * subscription are dropped. Returns an unsubscribe function.
    */
   onMessage(name: string, handler: (message: NovaRawMessage) => void): () => void;
+}
+
+/**
+ * Raw-mode traffic diagnostics (A2; host/arena visible). Counters reflect
+ * this session's raw-channel activity since the last reset; the rate is a
+ * sliding 10-second window like state-mode action rates.
+ */
+export interface NovaRawDiagnostics {
+  /** Channels currently open on this session (self + peer declarations). */
+  readonly channelCount: number;
+  /** Channels this session declared itself. */
+  readonly selfDeclaredChannelCount: number;
+  /** Raw messages sent by this session. */
+  readonly sentCount: number;
+  /** Raw messages received by this session. */
+  readonly receivedCount: number;
+  /** Bytes sent (payload size; chunked transfers count once). */
+  readonly sentBytes: number;
+  /** Bytes received (payload size; chunked transfers count once). */
+  readonly receivedBytes: number;
+  /** Sends rejected because the payload exceeded `rawMessageBytes`. */
+  readonly oversizedRejections: number;
+  /** Sends rejected because the rate exceeded `rawRatePerSecond`. */
+  readonly rateLimitRejections: number;
+  /** Raw messages sent per second over the last 10-second window. */
+  readonly ratePerSecond: number;
+  /** True when the warn thresholds were crossed on any recent send. */
+  readonly warned: boolean;
 }
 
 /** The `nova.simulation` handle (ADR-0006 simulation mode). */

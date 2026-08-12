@@ -628,6 +628,70 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       expect(aReceived[0]?.from).toEqual({ id: "member-b", name: "Ben" });
     });
 
+    it("re-announces open raw channels to a peer joining mid-game (A2)", async () => {
+      const { harness, a, b } = await makePair(harnessFactory);
+      await startBoth({ harness, a, b });
+      a.client.raw.createChannel({ name: "physics", reliable: false, ordered: false });
+      await settle(harness);
+
+      // Carol joins after the channel exists: she learns it from the
+      // targeted re-announcement and can receive without declaring it.
+      const transportC = harness.createTransport({ memberId: "member-c", displayName: "Carol" });
+      const c = createNovaSession({
+        transport: transportC,
+        room: ROOM,
+        sessionId: SESSION,
+        player: { memberId: "member-c", displayName: "Carol" },
+        game: { gameId: "game-1", mode: "raw", title: "Raw Game" },
+      });
+      const cMessages: unknown[] = [];
+      c.client.raw.onMessage("physics", (message) => cMessages.push(message.payload));
+      await c.join();
+      await settle(harness);
+      expect(c.getRawDiagnostics().channelCount).toBe(1);
+
+      a.client.raw.send("physics", { x: 1 });
+      await settle(harness);
+      expect(cMessages).toEqual([{ x: 1 }]);
+    });
+
+    it("propagates raw channel close and keeps per-player declarations (A2)", async () => {
+      const { harness, a, b } = await makePair(harnessFactory);
+      await startBoth({ harness, a, b });
+      a.client.raw.createChannel({ name: "chat" });
+      b.client.raw.createChannel({ name: "chat" });
+      await settle(harness);
+
+      const aErrors: Array<{ code: string }> = [];
+      a.client.onError((error) => aErrors.push({ code: error.code }));
+      a.client.raw.close("chat");
+      await settle(harness);
+      // Ada's own sends fail with a clear error; Ben keeps his declaration.
+      a.client.raw.send("chat", "hi");
+      await settle(harness);
+      await flushMacrotasks();
+      expect(aErrors).toEqual([{ code: "unknown_channel" }]);
+      expect(b.getRawDiagnostics().selfDeclaredChannelCount).toBe(1);
+
+      // Ben's channel still works end to end.
+      const aMessages: unknown[] = [];
+      a.client.raw.onMessage("chat", (message) => aMessages.push(message.payload));
+      b.client.raw.send("chat", { text: "still open" });
+      await settle(harness);
+      expect(aMessages).toEqual([{ text: "still open" }]);
+    });
+
+    it("drops peer declarations when the peer closes the channel (A2)", async () => {
+      const { harness, a, b } = await makePair(harnessFactory);
+      await startBoth({ harness, a, b });
+      a.client.raw.createChannel({ name: "chat" });
+      await settle(harness);
+      expect(b.getRawDiagnostics().channelCount).toBe(1);
+      a.client.raw.close("chat");
+      await settle(harness);
+      expect(b.getRawDiagnostics().channelCount).toBe(0);
+    });
+
     it("routes simulation inputs to registered handlers", async () => {
       const { harness, a, b } = await makePair(harnessFactory);
       await startBoth({ harness, a, b });
