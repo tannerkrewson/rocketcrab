@@ -1000,3 +1000,117 @@ describe("party engine — M1 local recovery record", () => {
     expect(readPartyRecovery()).toBeNull();
   });
 });
+
+describe("party engine — session events reach game frames (7.26)", () => {
+  it("forwards identity/connection/roster/start/end apiEvents to each game frame", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    const apiEventsOf = (player: Player) =>
+      player.harness.port1.sent
+        .filter((message) => (message as { type?: string }).type === "game.apiEvent")
+        .map(
+          (message) =>
+            (message as { event: { kind: string } }).event as { kind: string } & Record<
+              string,
+              unknown
+            >,
+        );
+
+    // Creator: party live, game boots + registers. The session attached
+    // BEFORE the frame existed, so the registration replay must deliver
+    // identity + connection + roster to the frame (7.26).
+    const code = await runCreate(a, world);
+    await registerLocalGame(a, world);
+    await settle(world);
+    const aKinds = apiEventsOf(a).map((event) => event.kind);
+    expect(aKinds).toContain("identity");
+    expect(aKinds).toContain("connection");
+    const aJoined = apiEventsOf(a)
+      .filter((event) => event.kind === "playerJoined")
+      .map((event) => (event.player as { id: string }).id);
+    expect(aJoined).toContain(a.memberId);
+
+    // Joiner: joins, is approved, receives the game, registers.
+    const { join: joinPromise, settled } = startJoin(b, world, code);
+    await settled;
+    const pending = a.engine.getState().pendingJoinRequests;
+    a.engine.respondToJoinRequest(pending[0]?.memberId ?? "", true);
+    await settle(world);
+    await joinPromise;
+    await settle(world);
+    await registerLocalGame(b, world);
+    await settle(world);
+
+    // A's frame saw B join live; B's frame got the full roster replayed.
+    const aJoinedAfter = apiEventsOf(a)
+      .filter((event) => event.kind === "playerJoined")
+      .map((event) => (event.player as { id: string }).id);
+    expect(aJoinedAfter).toContain(b.memberId);
+    const bJoined = apiEventsOf(b)
+      .filter((event) => event.kind === "playerJoined")
+      .map((event) => (event.player as { id: string }).id);
+    expect(bJoined).toContain(a.memberId);
+    expect(bJoined).toContain(b.memberId);
+
+    // Start reaches both frames.
+    a.engine.startGame();
+    await settle(world);
+    expect(apiEventsOf(a).some((event) => event.kind === "start")).toBe(true);
+    expect(apiEventsOf(b).some((event) => event.kind === "start")).toBe(true);
+
+    // End reaches both frames.
+    a.engine.endGame("host_closed");
+    await settle(world);
+    expect(
+      apiEventsOf(a).some(
+        (event) => event.kind === "end" && (event.reason as string | undefined) === "host_closed",
+      ),
+    ).toBe(true);
+    expect(
+      apiEventsOf(b).some(
+        (event) => event.kind === "end" && (event.reason as string | undefined) === "host_closed",
+      ),
+    ).toBe(true);
+
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+    await settle(world);
+  });
+});
+
+describe("party engine — rename announcements (7.25)", () => {
+  it("broadcasts a display-name change; peers' member view updates without a rejoin", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+
+    const code = await runCreate(a, world);
+    await registerLocalGame(a, world);
+    const { join: joinPromise, settled } = startJoin(b, world, code);
+    await settled;
+    const pending = a.engine.getState().pendingJoinRequests;
+    a.engine.respondToJoinRequest(pending[0]?.memberId ?? "", true);
+    await settle(world);
+    await joinPromise;
+    await settle(world);
+    await registerLocalGame(b, world);
+    await settle(world);
+
+    // Baseline: the handshake name is what B sees.
+    expect(memberOf(b.engine.getState(), a.memberId).displayName).toBe("Player a");
+
+    a.engine.setDisplayName("Alpha Renamed");
+    await settle(world);
+
+    // B's member view updates promptly (no rejoin); A's own view is current.
+    expect(memberOf(b.engine.getState(), a.memberId).displayName).toBe("Alpha Renamed");
+    expect(memberOf(a.engine.getState(), a.memberId).displayName).toBe("Alpha Renamed");
+    // Unaffected members keep their names.
+    expect(memberOf(b.engine.getState(), b.memberId).displayName).toBe("Player b");
+
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+    await settle(world);
+  });
+});

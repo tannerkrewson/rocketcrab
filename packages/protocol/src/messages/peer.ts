@@ -87,6 +87,20 @@ export const playerIdentityMessageSchema = z.object({
 });
 export type PlayerIdentityMessage = z.infer<typeof playerIdentityMessageSchema>;
 
+/**
+ * Party rename: a member announces a display-name change to every connected
+ * member on the party control plane (7.25). The join handshake remains the
+ * source of truth for new/reconnecting peers; this message only lets
+ * already-connected members update their view of the renamed member
+ * promptly, without waiting for a rejoin.
+ */
+export const partyRenameMessageSchema = z.object({
+  ...peerEnvelopeFields,
+  type: z.literal("party.rename"),
+  displayName: displayNameSchema,
+});
+export type PartyRenameMessage = z.infer<typeof partyRenameMessageSchema>;
+
 /** Join request: a joiner asks the greeter for admission (ADR-0004). */
 export const joinRequestMessageSchema = z.object({
   ...peerEnvelopeFields,
@@ -439,6 +453,7 @@ export const peerMessagesSchema = z.discriminatedUnion("type", [
   partySessionMessageSchema,
   partyGreeterMessageSchema,
   playerIdentityMessageSchema,
+  partyRenameMessageSchema,
   joinRequestMessageSchema,
   admissionResponseMessageSchema,
   connectionStatusMessageSchema,

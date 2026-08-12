@@ -20,6 +20,7 @@ import {
   buildJoinRequestMessage,
   buildPartyGreeterMessage,
   buildPartyIdentityMessage,
+  buildPartyRenameMessage,
   buildPartySessionMessage,
   looksLikeJoinRequest,
   parsePartyControlMessage,
@@ -156,6 +157,12 @@ export type PartyEvent =
   | { readonly type: "collision"; readonly code: PartyCode }
   | { readonly type: "memberJoined"; readonly memberId: MemberId }
   | { readonly type: "memberLeft"; readonly memberId: MemberId }
+  | {
+      /** A connected member announced a display-name change (7.25). */
+      readonly type: "memberRenamed";
+      readonly memberId: MemberId;
+      readonly displayName: string;
+    }
   | { readonly type: "error"; readonly error: unknown };
 
 /** Structured party-layer failures (join/admission/creation). */
@@ -210,6 +217,8 @@ export class PartySession {
   private rendezvous: NovaTransport | null = null;
   private advertTimer: (() => void) | null = null;
   private disposed = false;
+  /** Display-name overrides announced via `party.rename` (7.25). */
+  private readonly renamedNames = new Map<MemberId, string>();
 
   constructor(config: PartySessionConfig) {
     this.role = config.role;
@@ -260,6 +269,38 @@ export class PartySession {
   /** Admitted party members: self plus every connected private-room peer. */
   get members(): readonly MemberId[] {
     return [this.memberId, ...this.privateTransport.peers.map((peer) => peer.memberId)];
+  }
+
+  /**
+   * A member's current display name: the latest `party.rename` announcement
+   * when one was received, else the join-handshake name, else the member ID.
+   * The handshake stays authoritative for new/reconnecting peers (7.25).
+   */
+  getMemberName(memberId: MemberId): string {
+    const renamed = this.renamedNames.get(memberId);
+    if (renamed !== undefined) {
+      return renamed;
+    }
+    const peer = this.privateTransport.peers.find((candidate) => candidate.memberId === memberId);
+    return peer?.displayName ?? memberId;
+  }
+
+  /**
+   * Broadcast a display-name change to every connected member (7.25). The
+   * local identity updates immediately; peers catch up via this message
+   * instead of waiting for their next handshake/rejoin.
+   */
+  async announceRename(displayName: string): Promise<void> {
+    if (this.disposed) {
+      return;
+    }
+    await this.privateTransport.send({
+      channel: PARTY_CONTROL_CHANNEL,
+      payload: buildPartyRenameMessage(
+        this.baseFor(this.privateTransport, this.material.sessionId),
+        { displayName },
+      ),
+    });
   }
 
   /** The rendezvous transport while this member is greeter, else null. */
@@ -344,6 +385,15 @@ export class PartySession {
     }
     if (parsed.value.type === "party.greeter") {
       this.handleGreeterAnnouncement(parsed.value.greeterMemberId);
+    } else if (parsed.value.type === "party.rename") {
+      // A connected member renamed (7.25): record the override and tell the
+      // shell so the lobby re-renders the member's name promptly.
+      this.renamedNames.set(parsed.value.senderMemberId, parsed.value.displayName);
+      this.emit({
+        type: "memberRenamed",
+        memberId: parsed.value.senderMemberId,
+        displayName: parsed.value.displayName,
+      });
     }
   }
 

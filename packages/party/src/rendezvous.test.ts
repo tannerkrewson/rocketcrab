@@ -792,3 +792,37 @@ describe("listener cleanup (engineering rule 22 / F11)", () => {
     expect(membersOf(world, rendezvousRoomName("AAAA"))).toEqual([]);
   });
 });
+
+describe("rename announcements (7.25)", () => {
+  it("propagates a display-name change to connected members without a rejoin", async () => {
+    const world = makeWorld();
+    const joinerEvents: PartyEvent[] = [];
+    const creator = await makeCreator(world);
+    const joiner = await makeJoiner(world, { onEvent: (e) => joinerEvents.push(e) });
+
+    // Baseline: the joiner sees the creator's handshake name (none provided).
+    expect(joiner.getMemberName("creator")).toBe("creator");
+
+    await creator.announceRename("New Creator Name");
+    await settle(world);
+
+    // The joiner observed the rename promptly and its view updated.
+    expect(
+      joinerEvents.some(
+        (e) =>
+          e.type === "memberRenamed" &&
+          e.memberId === "creator" &&
+          e.displayName === "New Creator Name",
+      ),
+    ).toBe(true);
+    expect(joiner.getMemberName("creator")).toBe("New Creator Name");
+    // Unaffected members keep their handshake names.
+    expect(creator.getMemberName("joiner")).toBe("Joiner");
+
+    // Announcing the same name again still delivers the event (idempotent
+    // view update; the overlay simply holds the same value).
+    await creator.announceRename("New Creator Name");
+    await settle(world);
+    expect(joiner.getMemberName("creator")).toBe("New Creator Name");
+  });
+});
