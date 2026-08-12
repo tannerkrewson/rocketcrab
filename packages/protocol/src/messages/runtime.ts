@@ -9,7 +9,7 @@ import {
   titleSchema,
 } from "../ids";
 import { htmlSourceSchema } from "../limits";
-import { gameModeSchema } from "./shared";
+import { gameEndReasonSchema, gameModeSchema } from "./shared";
 
 /**
  * Runtime-plane messages (host ↔ runtime): messages between the Nova shell
@@ -151,7 +151,7 @@ export type GameLifecycleEventMessage = z.infer<typeof gameLifecycleEventMessage
 export const endGameRequestMessageSchema = z.object({
   ...runtimeEnvelopeFields,
   type: z.literal("game.end"),
-  reason: z.enum(["user_exit", "host_closed", "authority_migrated", "error"]),
+  reason: gameEndReasonSchema,
 });
 export type EndGameRequestMessage = z.infer<typeof endGameRequestMessageSchema>;
 
