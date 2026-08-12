@@ -93,6 +93,67 @@ export const authorityHeartbeatIntervalMs = 1_000;
  */
 export const authorityGracePeriodMs = 5_000;
 
+/**
+ * Default simulation tick interval (A1): the Nova-provided time step at
+ * which a simulation-mode game advances (10 Hz by default; games may pick a
+ * faster or slower cadence within the min/max bounds below).
+ */
+export const simulationTickMs = 100;
+
+/** Fastest allowed simulation tick (~60 Hz); also the snapshot min bound. */
+export const simulationTickMinMs = 16;
+
+/** Slowest allowed simulation tick (2 Hz). */
+export const simulationTickMaxMs = 500;
+
+/**
+ * Default simulation snapshot interval (A1): how often the authority asks
+ * the game to serialize its state and broadcasts an authoritative snapshot
+ * (1 Hz by default, configurable within the bounds below).
+ */
+export const simulationSnapshotIntervalMs = 1_000;
+
+/** Fastest allowed snapshot cadence (20 Hz). */
+export const simulationSnapshotMinIntervalMs = 50;
+
+/** Slowest allowed snapshot cadence (1 per 10 s). */
+export const simulationSnapshotMaxIntervalMs = 10_000;
+
+/**
+ * Maximum simulation inputs sent per second per player (A1 rate bound, F6
+ * parity). Higher than the state-mode action rate because continuous games
+ * need more frequent inputs; bursts beyond the bound are rejected with
+ * `rate_limited`.
+ */
+export const simulationInputRatePerSecond = 60;
+export const simulationInputWarnRatePerSecond = Math.floor(
+  simulationInputRatePerSecond * LIMIT_WARN_FRACTION,
+);
+
+/**
+ * Hard cap on one authoritative simulation snapshot (A1; the same bound as
+ * state-mode canonical snapshots — simulation state is game-defined plain
+ * data serialized by the game's snapshot callback).
+ */
+export const simulationSnapshotBytes = stateSnapshotBytes;
+export const simulationSnapshotWarnBytes = Math.floor(
+  simulationSnapshotBytes * LIMIT_WARN_FRACTION,
+);
+
+/**
+ * Input delivery latency (send → local receive) above which the session
+ * reports `highLatency` in the simulation diagnostics (A1: report high
+ * latency and drift).
+ */
+export const simulationHighLatencyMs = 500;
+
+/**
+ * Maximum number of inputs applied to one simulation step. The authority's
+ * snapshot reflects only inputs that fit the step; the rest wait for the
+ * next step (bounds a pathological burst from starving the snapshot).
+ */
+export const simulationMaxInputsPerTick = 64;
+
 /** The complete limits table, typed. */
 export const LIMITS = {
   htmlSourceBytes,
@@ -117,6 +178,18 @@ export const LIMITS = {
   actionTimeoutMs,
   authorityHeartbeatIntervalMs,
   authorityGracePeriodMs,
+  simulationTickMs,
+  simulationTickMinMs,
+  simulationTickMaxMs,
+  simulationSnapshotIntervalMs,
+  simulationSnapshotMinIntervalMs,
+  simulationSnapshotMaxIntervalMs,
+  simulationInputRatePerSecond,
+  simulationInputWarnRatePerSecond,
+  simulationSnapshotBytes,
+  simulationSnapshotWarnBytes,
+  simulationHighLatencyMs,
+  simulationMaxInputsPerTick,
 } as const;
 
 export type Limits = typeof LIMITS;

@@ -68,6 +68,15 @@ export const NOVA_ERROR_CODES = {
   /** The authority runtime failed while executing (S2). */
   execution_failed: "execution_failed",
   /**
+   * The game did not register a `serializeState` handler, so Nova cannot
+   * produce authoritative simulation snapshots (A1).
+   */
+  no_snapshot_handler: "no_snapshot_handler",
+  /** The game's `serializeState` handler threw (A1). */
+  snapshot_error: "snapshot_error",
+  /** A replicated simulation snapshot failed its hash check (A1). */
+  invalid_snapshot: "invalid_snapshot",
+  /**
    * Media transport is not available in this build: tracks/streams cannot
    * cross the runtime frame boundary yet (A3 experimental surface; see
    * `docs/testing/media-bridging-findings.md`).

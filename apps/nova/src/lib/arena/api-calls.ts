@@ -8,7 +8,7 @@
  * Shapes mirror the runtime schemas by contract; drift is pinned by tests.
  */
 import { z } from "zod";
-import { stateResponseSchema } from "@rocketcrab/protocol";
+import { simulationResponseSchema, stateResponseSchema } from "@rocketcrab/protocol";
 
 export const arenaApiCallSchemas = {
   ready: z.object({}).strict(),
@@ -65,6 +65,14 @@ export const arenaApiCallSchemas = {
     .object({
       requestId: z.string().min(1).max(64),
       result: stateResponseSchema,
+    })
+    .strict(),
+  // A1: the authority frame's answer to a simulationRequest host event
+  // (the game's serializeState callback produced its simulation state).
+  simulationResponse: z
+    .object({
+      requestId: z.string().min(1).max(64),
+      result: simulationResponseSchema,
     })
     .strict(),
 } as const;

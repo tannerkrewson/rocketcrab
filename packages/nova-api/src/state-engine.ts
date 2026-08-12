@@ -206,6 +206,14 @@ export interface NovaStateEngineOptions {
   readonly host: StateEngineHost;
   readonly executor: NovaStateExecutor;
   readonly selfMemberId: string;
+  /**
+   * True when the session runs a simulation-mode game (A1). The election
+   * machinery is mode-agnostic, but simulation mode has no canonical state:
+   * the initial authority announces without creating one, and an elected
+   * authority never reports `no_replicated_state` (the simulation engine
+   * restores the replicated simulation snapshot itself).
+   */
+  simulation?: boolean;
   /** Epoch-ms clock (tests inject a fake). */
   now?: () => number;
   /** How long the authority waits for the executor before rejecting. */
@@ -278,6 +286,7 @@ export class NovaStateEngine {
   private readonly host: StateEngineHost;
   private executor: NovaStateExecutor;
   private readonly selfMemberId: string;
+  private readonly simulation: boolean;
   private readonly now: () => number;
   private readonly executorTimeoutMs: number;
   private readonly historyLimit: number;
@@ -320,6 +329,7 @@ export class NovaStateEngine {
     this.host = options.host;
     this.executor = options.executor;
     this.selfMemberId = options.selfMemberId;
+    this.simulation = options.simulation ?? false;
     this.now = options.now ?? (() => Date.now());
     this.executorTimeoutMs = options.executorTimeoutMs ?? actionTimeoutMs;
     this.historyLimit = options.historyLimit ?? STATE_HISTORY_LIMIT;
@@ -451,6 +461,14 @@ export class NovaStateEngine {
     }
     this.authorityMemberId = this.selfMemberId;
     this.authorityStateRevision = this.revision;
+    if (this.simulation) {
+      // A1: simulation mode has no canonical state. The initial authority
+      // announces and starts heartbeats (the S3 election machinery runs
+      // unchanged); the simulation engine produces its own snapshots.
+      this.announce();
+      this.startHeartbeats();
+      return true;
+    }
     if (this.canonical !== null) {
       this.announce();
       this.startHeartbeats();
@@ -989,6 +1007,13 @@ export class NovaStateEngine {
     this.announce();
     this.startHeartbeats();
     if (this.restoreBackup === null) {
+      if (this.simulation) {
+        // A1: simulation mode has no canonical state to restore; the
+        // simulation engine restores the replicated simulation snapshot on
+        // its own authority-change notification (same restore window).
+        this.restoreDone = true;
+        return;
+      }
       // A shell that missed every snapshot has nothing to restore; it keeps
       // waiting for a peer push and cannot process actions (state error).
       this.restoreDone = true;

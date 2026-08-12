@@ -35,6 +35,9 @@ import { RuntimeHostClient, type ChannelPort, type RuntimeHostEvent } from "../r
 import { arenaApiCallSchemas } from "./api-calls";
 import {
   createFrameStateExecutor,
+  createFrameSimulationExecutor,
+  type FrameSimulationExecutor,
+  type FrameSimulationResponsePayload,
   type FrameStateExecutor,
   type FrameStateResponsePayload,
 } from "./state-executor";
@@ -116,6 +119,7 @@ interface PlayerRuntime {
   transport: InMemoryTransport | null;
   session: NovaSession | null;
   stateExecutor: FrameStateExecutor | null;
+  simulationExecutor: FrameSimulationExecutor | null;
   unsubSession: (() => void) | null;
   runState: ArenaPlayerRunState;
   registered: ArenaRegistration | null;
@@ -368,6 +372,7 @@ export class ArenaEngine {
       runtime.transport = null;
       runtime.session = null;
       runtime.stateExecutor = null;
+      runtime.simulationExecutor = null;
       runtime.unsubSession = null;
       runtime.runState = "pending";
       runtime.registered = null;
@@ -400,6 +405,7 @@ export class ArenaEngine {
       transport: null,
       session: null,
       stateExecutor: null,
+      simulationExecutor: null,
       unsubSession: null,
       runState: "pending",
       registered: null,
@@ -539,6 +545,11 @@ export class ArenaEngine {
     runtime.stateExecutor = createFrameStateExecutor((event) =>
       this.pushApiEvent(runtime.spec.id, event),
     );
+    // A1: simulation snapshots are produced by asking the authority's game
+    // frame to serialize its state (the game's serializeState callback).
+    runtime.simulationExecutor = createFrameSimulationExecutor((event) =>
+      this.pushApiEvent(runtime.spec.id, event),
+    );
     const session = createNovaSession({
       transport,
       room: this.room,
@@ -550,6 +561,7 @@ export class ArenaEngine {
         ...(this.options.gameTitle !== undefined ? { title: this.options.gameTitle } : {}),
       },
       stateExecutor: runtime.stateExecutor,
+      simulationExecutor: runtime.simulationExecutor,
     });
     runtime.session = session;
     runtime.unsubSession = session.onSessionEvent((event) =>
@@ -627,6 +639,8 @@ export class ArenaEngine {
       case "state":
       case "simulationInput":
       case "simulationSnapshot":
+      case "simulationTick":
+      case "simulationAuthorityChange":
       case "actionReceived":
         break; // routed to the frame only
       case "actionAck":
@@ -789,6 +803,21 @@ export class ArenaEngine {
         runtime.stateExecutor?.handleResponse(parsed.data as FrameStateResponsePayload);
         break;
       }
+      case "simulationResponse": {
+        // A1: the authority frame's answer to a simulationRequest; the
+        // frame executor correlates it back to the simulation engine.
+        const parsed = arenaApiCallSchemas.simulationResponse.safeParse(message.payload);
+        if (!parsed.success) {
+          this.logPlayer(
+            runtime.spec.id,
+            "error",
+            "simulationResponse call failed validation at the host; ignored.",
+          );
+          return;
+        }
+        runtime.simulationExecutor?.handleResponse(parsed.data as FrameSimulationResponsePayload);
+        break;
+      }
     }
   }
 
@@ -892,6 +921,8 @@ export class ArenaEngine {
     }
     runtime.stateExecutor?.dispose();
     runtime.stateExecutor = null;
+    runtime.simulationExecutor?.dispose();
+    runtime.simulationExecutor = null;
     runtime.session?.dispose();
     runtime.session = null;
     runtime.transport?.dispose();
@@ -971,6 +1002,10 @@ function toApiEvent(event: NovaSessionEvent): GameApiEvent | null {
       return { kind: "simulationInput", input: event.input };
     case "simulationSnapshot":
       return { kind: "simulationSnapshot", snapshot: event.snapshot };
+    case "simulationTick":
+      return { kind: "simulationTick", tick: event.tick };
+    case "simulationAuthorityChange":
+      return { kind: "simulationAuthorityChange", term: event.term };
     case "error":
       return { kind: "error", code: event.error.code, message: event.error.message };
     case "actionAck":
