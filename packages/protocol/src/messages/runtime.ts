@@ -155,6 +155,60 @@ export const endGameRequestMessageSchema = z.object({
 });
 export type EndGameRequestMessage = z.infer<typeof endGameRequestMessageSchema>;
 
+/**
+ * Runtime heartbeat ping: the host asks the runtime to confirm liveness
+ * (F4 spike heartbeat; threat model T6 — a wedged runtime must be visible
+ * to the shell).
+ */
+export const runtimePingMessageSchema = z
+  .object({
+    ...runtimeEnvelopeFields,
+    type: z.literal("runtime.ping"),
+  })
+  .strict();
+export type RuntimePingMessage = z.infer<typeof runtimePingMessageSchema>;
+
+/** Runtime heartbeat pong: the runtime's liveness reply to `runtime.ping`. */
+export const runtimePongMessageSchema = z
+  .object({
+    ...runtimeEnvelopeFields,
+    type: z.literal("runtime.pong"),
+  })
+  .strict();
+export type RuntimePongMessage = z.infer<typeof runtimePongMessageSchema>;
+
+/**
+ * Reload request: the host asks the runtime to re-run the current game in a
+ * completely fresh frame (F4 soft reload — same source, clean state).
+ */
+export const runtimeReloadMessageSchema = z
+  .object({
+    ...runtimeEnvelopeFields,
+    type: z.literal("runtime.reload"),
+  })
+  .strict();
+export type RuntimeReloadMessage = z.infer<typeof runtimeReloadMessageSchema>;
+
+/**
+ * Console capture: a rate-limited console entry from the game frame
+ * (diagnostics for U4's runtime error panel). Entries are capped by
+ * `runtimeLogRatePerSecond`; the runtime reports how many entries it
+ * dropped since the previous forwarded entry.
+ */
+export const runtimeConsoleMessageSchema = z
+  .object({
+    ...runtimeEnvelopeFields,
+    type: z.literal("runtime.console"),
+    level: z.enum(["debug", "log", "info", "warn", "error"]),
+    message: z.string().min(1).max(1024),
+    /** Serialized, truncated console arguments. */
+    details: z.string().max(4096).optional(),
+    /** Console entries dropped by the runtime rate limiter since this entry. */
+    dropped: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+export type RuntimeConsoleMessage = z.infer<typeof runtimeConsoleMessageSchema>;
+
 /** Every runtime-plane message schema, discriminated by `type`. */
 export const runtimeMessagesSchema = z.discriminatedUnion("type", [
   runtimeBootstrapMessageSchema,
@@ -164,6 +218,10 @@ export const runtimeMessagesSchema = z.discriminatedUnion("type", [
   runtimeErrorMessageSchema,
   gameLifecycleEventMessageSchema,
   endGameRequestMessageSchema,
+  runtimePingMessageSchema,
+  runtimePongMessageSchema,
+  runtimeReloadMessageSchema,
+  runtimeConsoleMessageSchema,
 ]);
 
 /** All runtime-plane message type strings, for useful unknown-type errors. */

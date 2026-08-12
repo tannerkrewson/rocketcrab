@@ -1,0 +1,19 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>remote</title>
+  </head>
+  <body>
+    <script type="module">
+      // Remote dependency probe (ADR-0002 / ADR-0009: no import rewriting;
+      // the game imports straight from a public CDN).
+      try {
+        const mod = await import("https://cdn.jsdelivr.net/npm/uuid@9.0.1/+esm");
+        window.__remoteDep = typeof mod.v4 === "function" ? mod.v4() : "missing-v4";
+      } catch (e) {
+        window.__remoteDep = "error:" + String(e.message || e);
+      }
+    </script>
+  </body>
+</html>

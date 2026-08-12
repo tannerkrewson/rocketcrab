@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>hello</title>
+  </head>
+  <body>
+    <h1>hello</h1>
+    <script>
+      window.__inlineClassic = true;
+      // A fresh frame must reset this counter (reload-created-fresh-frame check).
+      window.__bootCount = (window.__bootCount || 0) + 1;
+    </script>
+    <script type="module">
+      window.__moduleRan = true;
+      window.nova.defineGame({
+        title: "Hello Game",
+        gameMode: "state",
+        gameVersion: "1.0.0",
+      });
+      window.__registered = typeof window.nova.defineGame === "function";
+      window.__novaVersion = window.nova.version;
+    </script>
+  </body>
+</html>

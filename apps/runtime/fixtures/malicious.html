@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>malicious</title>
+  </head>
+  <body>
+    <script>
+      // Isolation probe: the game tries to reach the Nova (host) origin from
+      // the runtime origin. Everything must fail with SecurityError while the
+      // game itself still runs (F4 isolation findings).
+      window.__malicious = {};
+      try {
+        window.__malicious.topDom =
+          window.top.document.getElementById("bar") !== null ? "read" : "missing";
+      } catch (e) {
+        window.__malicious.topDom = "blocked:" + e.name;
+      }
+      try {
+        window.__malicious.topStorage = String(window.top.localStorage.getItem("nova_secret"));
+      } catch (e) {
+        window.__malicious.topStorage = "blocked:" + e.name;
+      }
+      try {
+        window.__malicious.topNav = window.top.location.href = "https://evil.example/";
+      } catch (e) {
+        window.__malicious.topNav = "blocked:" + e.name;
+      }
+      try {
+        window.__malicious.disableStop = (
+          window.top.document.getElementById("emergency-stop") || { remove() {} }
+        ).remove();
+      } catch (e) {
+        window.__malicious.disableStop = "blocked:" + e.name;
+      }
+      // Same-origin with the runtime page is expected and allowed (ADR-0008):
+      window.__malicious.runtimePageDom =
+        typeof window.parent.document.getElementById === "function";
+    </script>
+  </body>
+</html>

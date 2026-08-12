@@ -8,9 +8,13 @@ import {
   gameMetadataMessageSchema,
   gameRegistrationMessageSchema,
   runtimeBootstrapMessageSchema,
+  runtimeConsoleMessageSchema,
   runtimeErrorMessageSchema,
   runtimeMessagesSchema,
+  runtimePingMessageSchema,
+  runtimePongMessageSchema,
   runtimeReadinessMessageSchema,
+  runtimeReloadMessageSchema,
 } from "./runtime";
 
 function baseRuntime(overrides: Record<string, unknown> = {}) {
@@ -34,6 +38,10 @@ describe("runtime message schemas", () => {
       runtimeErrorMessageSchema,
       gameLifecycleEventMessageSchema,
       endGameRequestMessageSchema,
+      runtimePingMessageSchema,
+      runtimePongMessageSchema,
+      runtimeReloadMessageSchema,
+      runtimeConsoleMessageSchema,
     ];
     expect(schemas).toHaveLength(RUNTIME_MESSAGE_TYPES.length);
     for (const schema of schemas) {
@@ -85,6 +93,12 @@ describe("runtime message schemas", () => {
         baseRuntime({ type: "game.lifecycle", event: "created" }),
       ),
       endGameRequestMessageSchema.parse(baseRuntime({ type: "game.end", reason: "user_exit" })),
+      runtimePingMessageSchema.parse(baseRuntime({ type: "runtime.ping" })),
+      runtimePongMessageSchema.parse(baseRuntime({ type: "runtime.pong" })),
+      runtimeReloadMessageSchema.parse(baseRuntime({ type: "runtime.reload" })),
+      runtimeConsoleMessageSchema.parse(
+        baseRuntime({ type: "runtime.console", level: "warn", message: "flaky", dropped: 3 }),
+      ),
     ];
     expect(validExamples).toHaveLength(RUNTIME_MESSAGE_TYPES.length);
   });
@@ -98,6 +112,10 @@ describe("runtime message schemas", () => {
       baseRuntime({ type: "runtime.error", category: "syntax" }),
       baseRuntime({ type: "game.lifecycle", event: "exploded" }),
       baseRuntime({ type: "game.end", reason: "banana" }),
+      baseRuntime({ type: "runtime.ping", status: "extra" }),
+      baseRuntime({ type: "runtime.pong", status: "extra" }),
+      baseRuntime({ type: "runtime.reload", source: "<html></html>" }),
+      baseRuntime({ type: "runtime.console", level: "trace", message: "x" }),
     ];
     expect(invalidExamples).toHaveLength(RUNTIME_MESSAGE_TYPES.length);
     for (const example of invalidExamples) {
