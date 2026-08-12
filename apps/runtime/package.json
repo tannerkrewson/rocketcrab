@@ -12,6 +12,7 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "@rocketcrab/nova-api": "0.0.0",
     "jsdom": "30.0.1",
     "typescript": "7.0.2",
     "vite": "8.2.0",

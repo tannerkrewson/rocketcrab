@@ -50,15 +50,24 @@ allow-pointer-lock allow-fullscreen` and delegates camera/microphone/
   sources fail with `empty_source`; missing `<!doctype`/`<html>` structure is
   reported as `invalid_html` but still runs.
 - **Nova API bootstrap injection**: the bridge defines `window.nova` with
-  `nova.defineGame(options)` inside the game frame, captures window errors,
-  unhandled rejections, and console output, and reports them to the runtime
-  page through a per-instance hook (no extra message listeners — nothing to
-  leak across restarts). Game-declared metadata is schema-validated before
-  it is ever forwarded (`game.registration`); the host-declared `gameId` is
-  never overridable. A declaration may carry the Nova API version the game
-  was built against (`apiVersion`); an unsupported version is reported as
-  a `runtime.error` with category `unsupported` (U4 validation) while the
-  game still runs.
+  the full game-facing API surface (S1: `defineGame`, `ready`, `log`,
+  players, subscriptions, `dispatch`, `state`, `raw`, `simulation`) inside
+  the game frame — the same object shape `createNovaClient` builds in
+  `@rocketcrab/nova-api`. The lifecycle is enforced in the frame too
+  (calls before readiness fail with a clear `NovaError`), and every
+  forwarded call is schema-validated here before it reaches the host.
+  Because no host-side session router exists yet (the arena/party
+  milestones U6/P1 own it), forwarded calls other than `defineGame` are
+  surfaced as a clear `runtime.error` (`unsupported`) instead of being
+  silently dropped; the session router replaces that branch later.
+  The bridge also captures window errors, unhandled rejections, and
+  console output, and reports them to the runtime page through a
+  per-instance hook (no extra message listeners — nothing to leak across
+  restarts). Game-declared metadata is schema-validated before it is
+  ever forwarded (`game.registration`); the host-declared `gameId` is
+  never overridable. `nova.defineGame({ apiVersion })` declares the Nova
+  API version the game targets; an unsupported version fails registration
+  with a clear `unsupported` runtime error (S1 policy — no guessing).
 - **Registration timeout**: if the game does not call `nova.defineGame`
   within 10s, the runtime reports `missing_registration`
   (`runtime.error`).

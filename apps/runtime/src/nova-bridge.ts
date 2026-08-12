@@ -8,9 +8,23 @@
  *   resource load failures) and forwards them to the runtime page;
  * - wraps `console.*` so game output is observable by the host (rate-limited
  *   on the runtime page — see `rate-limiter.ts`);
- * - defines `window.nova` with `nova.defineGame(options)` and forwards the
- *   declaration to the runtime page, which schema-validates it before it is
- *   ever forwarded to the host (never trust game metadata).
+ * - defines `window.nova` with the full game-facing API surface (S1): the
+ *   same object shape `createNovaClient` builds in `@rocketcrab/nova-api`.
+ *   Registration (`nova.defineGame`) and the forwarded calls (`ready`,
+ *   `dispatch`, `raw.*`, `simulation.*`) report to the runtime page, which
+ *   schema-validates them before anything reaches the host (never trust game
+ *   metadata; threat model T10). The lifecycle is enforced in the frame too,
+ *   so calls fail with a clear `NovaError` before readiness (S1 acceptance).
+ *
+ * S1 note: the runtime page validates forwarded calls but cannot route them
+ * to a party session yet — no host-side session router exists before the
+ * arena/party milestones (U6/P1). Validated calls therefore surface as a
+ * clear `runtime.error` (category `unsupported`) instead of being silently
+ * dropped; the session-router milestones replace that branch with real
+ * forwarding. The in-frame lifecycle guarantees that everything reachable in
+ * S1 (registration, logging, subscriptions, reads) behaves exactly like the
+ * arena client; post-start calls cannot occur in S1 because no inbound path
+ * delivers `onStart` to the frame yet.
  *
  * The game frame is same-origin with the runtime page (ADR-0008/B5), so the
  * bridge reports through a per-instance hook on the runtime page rather than
@@ -19,81 +33,257 @@
  * Trystero, and contains no Nova secrets.
  */
 import { PROTOCOL_VERSION, gameModeSchema, titleSchema, type GameMode } from "@rocketcrab/protocol";
+import { NOVA_API_VERSION } from "@rocketcrab/nova-api/version";
 import { z } from "zod";
 
 /**
- * Nova API versions this build can execute (U4 validation category
- * `unsupported`). The game-facing `window.nova` bridge currently ships the
- * protocol version (the bridge sets `window.nova.version`); if the Nova API
- * ever diverges from the protocol version, S1 formalizes its own constant in
- * `@rocketcrab/nova-api`.
+ * Nova API versions this build can execute. The game-facing API version
+ * (NOVA_API_VERSION, @rocketcrab/nova-api) is independent of the protocol
+ * version (S1 policy). Games declare the API version they target via
+ * `nova.defineGame({ apiVersion })`; an unsupported version fails
+ * registration with a clear `unsupported` runtime error.
  */
-export const SUPPORTED_NOVA_API_VERSIONS: readonly number[] = [PROTOCOL_VERSION];
+export const SUPPORTED_NOVA_API_VERSIONS: readonly number[] = [NOVA_API_VERSION];
 
-/**
- * What the runtime accepts from `nova.defineGame` (S1 will widen this).
- * `apiVersion` declares the Nova API version the game was built against;
- * the runtime reports an `unsupported` error when it is not one this build
- * can execute (U4 validation category), without refusing to run.
- */
+/** What the runtime accepts from `nova.defineGame` (protocol keys). */
 export const gameDeclarationSchema = z.object({
   title: titleSchema.optional(),
   gameMode: gameModeSchema.optional(),
   gameVersion: z.string().min(1).max(32).optional(),
-  apiVersion: z.number().int().nonnegative().max(1024).optional(),
+  apiVersion: z.number().int().min(1).optional(),
 });
 export type GameDeclaration = z.infer<typeof gameDeclarationSchema>;
 
-/** JavaScript source injected ahead of the game document (F4 spike shape). */
-export const NOVA_BRIDGE_SCRIPT = [
-  "(function () {",
-  "  if (window.__novaGameBridge) return;",
-  "  function report(kind, payload) {",
-  "    try {",
-  "      var parent = window.parent;",
-  "      if (parent && parent.__novaRuntime && typeof parent.__novaRuntime.report === 'function') {",
-  "        parent.__novaRuntime.report(kind, payload);",
-  "      }",
-  "    } catch (_) {}",
-  "  }",
-  "  window.addEventListener('error', function (e) {",
-  "    var target = e.target;",
-  "    var isResource = target && target !== window && target !== document;",
-  "    report('error', {",
-  "      message: String((e.error && e.error.message) || e.message || 'Script error'),",
-  "      filename: e.filename || '',",
-  "      lineno: e.lineno || 0,",
-  "      colno: e.colno || 0,",
-  "      tag: isResource ? String(target.tagName || '') : ''",
-  "    });",
-  "  }, true);",
-  "  window.addEventListener('unhandledrejection', function (e) {",
-  "    var reason = e.reason;",
-  "    var message = reason && reason.message ? String(reason.message) : String(reason);",
-  "    report('unhandledrejection', { message: message });",
-  "  });",
-  "  var methods = ['debug', 'log', 'info', 'warn', 'error'];",
-  "  for (var i = 0; i < methods.length; i++) {",
-  "    (function (method) {",
-  "      var original = console[method];",
-  "      if (typeof original !== 'function') return;",
-  "      console[method] = function () {",
-  "        var args = Array.prototype.slice.call(arguments);",
-  "        try { original.apply(console, args); } catch (_) {}",
-  "        report('console', { level: method, args: args });",
-  "      };",
-  "    })(methods[i]);",
-  "  }",
-  "  var api = {",
-  `    version: ${PROTOCOL_VERSION},`,
-  "    defineGame: function (options) {",
-  "      report('defineGame', { options: options || null });",
-  "    }",
-  "  };",
-  "  window.nova = api;",
-  "  window.__novaGameBridge = { version: " + String(PROTOCOL_VERSION) + " };",
-  "})();",
-].join("\n");
+/**
+ * Bounded payloads the runtime accepts from forwarded Nova API calls (S1).
+ * Each schema mirrors the `@rocketcrab/nova-api` validation schemas so the
+ * runtime boundary never trusts game-supplied call arguments.
+ */
+export const novaApiCallSchemas = {
+  ready: z.object({}).strict(),
+  dispatch: z
+    .object({
+      action: z.object({
+        type: z.string().min(1).max(64),
+        payload: z.unknown().optional(),
+        baseRevision: z.number().int().nonnegative().optional(),
+      }),
+    })
+    .strict(),
+  "raw.createChannel": z
+    .object({
+      spec: z.object({
+        name: z.string().min(1).max(64),
+        reliable: z.boolean().optional(),
+        ordered: z.boolean().optional(),
+        binary: z.boolean().optional(),
+      }),
+    })
+    .strict(),
+  "raw.send": z
+    .object({
+      name: z.string().min(1).max(64),
+      payload: z.unknown(),
+      options: z
+        .object({
+          to: z.string().min(1).max(64).optional(),
+          reliable: z.boolean().optional(),
+          ordered: z.boolean().optional(),
+        })
+        .optional(),
+    })
+    .strict(),
+  "simulation.register": z.object({}).strict(),
+  "simulation.sendInput": z
+    .object({
+      input: z.object({
+        type: z.string().min(1).max(64),
+        payload: z.unknown().optional(),
+        tick: z.number().int().nonnegative().optional(),
+      }),
+    })
+    .strict(),
+} as const;
+
+export type NovaApiCallMethod = keyof typeof novaApiCallSchemas;
+
+/** Every forwarded Nova API call kind the runtime accepts. */
+export const NOVA_API_CALL_METHODS: readonly string[] = Object.keys(novaApiCallSchemas);
+
+/**
+ * JavaScript source injected ahead of the game document (F4 spike shape).
+ * Kept dependency-free and Trystero-free: it must run in an untrusted frame
+ * with no module loading. The surface mirrors `createNovaClient` from
+ * `@rocketcrab/nova-api` (parity is asserted in `nova-bridge.test.ts`).
+ */
+export const NOVA_BRIDGE_SCRIPT = `(function () {
+  "use strict";
+  if (window.__novaGameBridge) return;
+  function report(kind, payload) {
+    try {
+      var parent = window.parent;
+      if (parent && parent.__novaRuntime && typeof parent.__novaRuntime.report === 'function') {
+        parent.__novaRuntime.report(kind, payload);
+      }
+    } catch (_) {}
+  }
+  window.addEventListener('error', function (e) {
+    var target = e.target;
+    var isResource = target && target !== window && target !== document;
+    report('error', {
+      message: String((e.error && e.error.message) || e.message || 'Script error'),
+      filename: e.filename || '',
+      lineno: e.lineno || 0,
+      colno: e.colno || 0,
+      tag: isResource ? String(target.tagName || '') : ''
+    });
+  }, true);
+  window.addEventListener('unhandledrejection', function (e) {
+    var reason = e.reason;
+    var message = reason && reason.message ? String(reason.message) : String(reason);
+    report('unhandledrejection', { message: message });
+  });
+  var methods = ['debug', 'log', 'info', 'warn', 'error'];
+  for (var i = 0; i < methods.length; i++) {
+    (function (method) {
+      var original = console[method];
+      if (typeof original !== 'function') return;
+      console[method] = function () {
+        var args = Array.prototype.slice.call(arguments);
+        try { original.apply(console, args); } catch (_) {}
+        report('console', { level: method, args: args });
+      };
+    })(methods[i]);
+  }
+
+  // --- Nova API surface (S1). Mirrors createNovaClient in @rocketcrab/nova-api. ---
+  var API_VERSION = ${NOVA_API_VERSION};
+  var registered = false;
+  var readySent = false;
+  var started = false;
+  var ended = false;
+
+  function NovaError(code, message) {
+    this.name = 'NovaError';
+    this.code = code;
+    this.message = message;
+  }
+  function fail(code, message) {
+    throw new NovaError(code, message);
+  }
+  function subscribe(list, fn) {
+    if (typeof fn !== 'function') return function () {};
+    list.push(fn);
+    return function () {
+      var i = list.indexOf(fn);
+      if (i >= 0) list.splice(i, 1);
+    };
+  }
+  function requireStarted(method) {
+    if (ended) fail('ended', 'nova.' + method + '() is not available after the game ended.');
+    if (!started) {
+      fail('not_started', 'nova.' + method + '() is only available after the game starts (see nova.onStart).');
+    }
+  }
+  function gameDeclaration(options) {
+    var out = {};
+    if (options == null) return out;
+    if (typeof options.title === 'string') out.title = options.title;
+    if (typeof options.mode === 'string') out.gameMode = options.mode;
+    if (typeof options.version === 'string') out.gameVersion = options.version;
+    if (typeof options.apiVersion === 'number') out.apiVersion = options.apiVersion;
+    return out;
+  }
+
+  var joinHandlers = [];
+  var leaveHandlers = [];
+  var connectionHandlers = [];
+  var startHandlers = [];
+  var endHandlers = [];
+  var errorHandlers = [];
+  var stateHandlers = [];
+  var rawHandlers = {};
+  var simulationInputHandler = null;
+  var simulationSnapshotHandler = null;
+
+  var stateHandle = {
+    get: function () { return null; },
+    onChange: function (fn) { return subscribe(stateHandlers, fn); }
+  };
+  var rawHandle = {
+    createChannel: function (spec) {
+      requireStarted('raw.createChannel');
+      report('raw.createChannel', { spec: spec });
+    },
+    send: function (name, payload, options) {
+      requireStarted('raw.send');
+      report('raw.send', { name: name, payload: payload, options: options || {} });
+    },
+    onMessage: function (name, fn) {
+      var list = rawHandlers[name];
+      if (list === undefined) {
+        list = [];
+        rawHandlers[name] = list;
+      }
+      return subscribe(list, fn);
+    }
+  };
+  var simulationHandle = {
+    register: function (handlers) {
+      simulationInputHandler = typeof handlers.onInput === 'function' ? handlers.onInput : null;
+      simulationSnapshotHandler = typeof handlers.onSnapshot === 'function' ? handlers.onSnapshot : null;
+      report('simulation.register', {});
+      return function () {
+        simulationInputHandler = null;
+        simulationSnapshotHandler = null;
+      };
+    },
+    sendInput: function (input) {
+      requireStarted('simulation.sendInput');
+      report('simulation.sendInput', { input: input });
+    }
+  };
+
+  var api = {
+    version: API_VERSION,
+    defineGame: function (options) {
+      if (registered) fail('already_registered', 'nova.defineGame() was already called; call it exactly once.');
+      if (options != null && typeof options.apiVersion === 'number' && options.apiVersion !== API_VERSION) {
+        fail('unsupported_api_version', 'nova.defineGame() targets API version ' + options.apiVersion + ', but this build supports version(s) [' + API_VERSION + '].');
+      }
+      registered = true;
+      report('defineGame', { options: gameDeclaration(options) });
+    },
+    ready: function () {
+      if (!registered) fail('not_registered', 'nova.ready() must be called after nova.defineGame().');
+      if (ended) fail('ended', 'nova.ready() is not available after the game ended.');
+      if (started) fail('already_started', 'nova.ready() is not available after the game starts.');
+      if (readySent) fail('already_ready', 'nova.ready() was already called.');
+      readySent = true;
+      report('ready', {});
+    },
+    log: function () { console.log.apply(console, arguments); },
+    player: null,
+    players: [],
+    connectionStatus: 'disconnected',
+    onPlayerJoin: function (fn) { return subscribe(joinHandlers, fn); },
+    onPlayerLeave: function (fn) { return subscribe(leaveHandlers, fn); },
+    onConnectionChange: function (fn) { return subscribe(connectionHandlers, fn); },
+    onStart: function (fn) { return subscribe(startHandlers, fn); },
+    onEnd: function (fn) { return subscribe(endHandlers, fn); },
+    onError: function (fn) { return subscribe(errorHandlers, fn); },
+    dispatch: function (action) {
+      requireStarted('dispatch');
+      report('dispatch', { action: action });
+    },
+    state: stateHandle,
+    raw: rawHandle,
+    simulation: simulationHandle
+  };
+  window.nova = api;
+  window.__novaGameBridge = { version: ${PROTOCOL_VERSION} };
+})();
+`;
 
 const TRUNCATE_SUFFIX = "…";
 

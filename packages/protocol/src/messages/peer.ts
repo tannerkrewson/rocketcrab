@@ -12,7 +12,7 @@ import {
   titleSchema,
 } from "../ids";
 import { messageBytesBeforeChunking } from "../limits";
-import { gameModeSchema } from "./shared";
+import { gameEndReasonSchema, gameModeSchema } from "./shared";
 
 /**
  * Peer-plane messages (party plane): messages between party members over the
@@ -248,6 +248,37 @@ export const simulationSnapshotMessageSchema = z.object({
 export type SimulationSnapshotMessage = z.infer<typeof simulationSnapshotMessageSchema>;
 
 /**
+ * Player ready announcement (S1 ready lifecycle): the sender's game
+ * finished loading and is ready to play. The sender's identity comes from
+ * the peer envelope; the message carries no payload fields.
+ */
+export const gameReadyMessageSchema = z.object({
+  ...peerEnvelopeFields,
+  type: z.literal("game.ready"),
+});
+export type GameReadyMessage = z.infer<typeof gameReadyMessageSchema>;
+
+/**
+ * Game start (S1): announced to every player when the game begins. The
+ * start policy (who decides when to start) is host/arena policy, not game
+ * code — games only observe the start event. Idempotent: a session that is
+ * already started ignores further announcements.
+ */
+export const gameStartMessageSchema = z.object({
+  ...peerEnvelopeFields,
+  type: z.literal("game.start"),
+});
+export type GameStartMessage = z.infer<typeof gameStartMessageSchema>;
+
+/** Game end (S1): announced to every player when the game ends. */
+export const gameEndMessageSchema = z.object({
+  ...peerEnvelopeFields,
+  type: z.literal("game.end"),
+  reason: gameEndReasonSchema,
+});
+export type GameEndMessage = z.infer<typeof gameEndMessageSchema>;
+
+/**
  * Raw channel metadata: declares a named raw-mode channel and its delivery
  * guarantees (ADR-0006 raw mode: named channels, reliable/unreliable,
  * ordered/unordered, binary, broadcast/targeted).
@@ -322,6 +353,9 @@ export const peerMessagesSchema = z.discriminatedUnion("type", [
   authorityElectionMessageSchema,
   simulationInputMessageSchema,
   simulationSnapshotMessageSchema,
+  gameReadyMessageSchema,
+  gameStartMessageSchema,
+  gameEndMessageSchema,
   rawChannelMetadataMessageSchema,
   gameSourceMetadataMessageSchema,
   gameSourceTransferMessageSchema,
