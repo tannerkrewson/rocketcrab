@@ -20,9 +20,11 @@ admission handshakes, latency measurement, media streams, join-error reporting,
 and optional TURN configuration. F5 will validate the backendless premise and
 recommend relay/TURN settings.
 
-The current repository contains Trystero as a dependency of `packages/core`
-(`trystero@0.25.3`), and `packages/core` is defined as the home of the
-transport interface (see `packages/core/src/index.ts`).
+The transport-neutral interface lives in `packages/core`
+(`packages/core/src/transport/`); the real-party adapter lives in its own
+package `@rocketcrab/trystero-transport` (P1), which is the only package that
+may import Trystero (enforced by the root oxlint `no-restricted-imports`
+rule, per ADR-0013). `packages/core` does not depend on Trystero.
 
 ## Decision
 
@@ -68,7 +70,9 @@ transport interface (see `packages/core/src/index.ts`).
 ## Consequences
 
 - P1 acceptance: core Nova code cannot import Trystero outside the adapter
-  package (enforced by package boundary; see ADR-0013 for the npm workspaces
+  package (P1 landed: Trystero is a dependency of
+  `@rocketcrab/trystero-transport` only; enforced by package boundary and an
+  oxlint `no-restricted-imports` rule; see ADR-0013 for the npm workspaces
   note on boundary discipline).
 - S1 acceptance: the same game code works in test and party transports.
 - The test arena (U6) requires no production Trystero code.
