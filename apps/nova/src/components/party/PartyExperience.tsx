@@ -10,6 +10,7 @@ import { ErrorPanel } from "../ui/ErrorPanel";
 import { PartyLobby } from "./PartyLobby";
 import { PartyPlayShell } from "./PartyPlayShell";
 import { PartyReconnectScreen } from "./PartyReconnectScreen";
+import { PartyShellHeader } from "./PartyShellHeader";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
@@ -85,8 +86,21 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
     />
   ) : null;
 
+  // 7.22: the classic shell header (logo + big code + phonetic + invite)
+  // sits above every live party phase. During "playing" the fullscreen
+  // frame (z-40) covers it and the play shell's own top bar takes over.
+  const shellShown = state.phase !== "idle" && state.phase !== "error";
+  const showInviteDetails = state.phase === "lobby" || state.phase === "starting";
+
   return (
     <div className="flex flex-col gap-4">
+      {shellShown ? (
+        <PartyShellHeader
+          code={state.code}
+          inviteUrl={state.inviteUrl}
+          showInviteDetails={showInviteDetails}
+        />
+      ) : null}
       {frameContainer}
       {frameFullscreen ? (
         // The play-shell controls float ABOVE the fullscreen frame; the

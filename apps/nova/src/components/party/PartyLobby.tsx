@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import {
   Check,
-  Copy,
   Crown,
   Gamepad2,
   Loader2,
@@ -14,15 +13,12 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
-import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState, PartyMemberView } from "../../lib/party/engine";
 import { useSavedGames } from "../../lib/games/queries";
 import { Button, buttonStyles } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { ErrorPanel } from "../ui/ErrorPanel";
 import { LoadingState } from "../ui/LoadingState";
-import { PartyInviteQr } from "./PartyInviteQr";
 import { PartyDiagnosticsPanel } from "./PartyDiagnostics";
 
 export interface PartyLobbyProps {
@@ -100,22 +96,9 @@ export function PartyLobby({
   onEditName,
 }: PartyLobbyProps) {
   const [forceDialog, setForceDialog] = useState(false);
-  const [copied, setCopied] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(state.displayName);
-
-  const copyInvite = async () => {
-    if (state.inviteUrl === null) return;
-    const ok = await writeToClipboard(state.inviteUrl);
-    if (ok) {
-      setCopied(true);
-      toast.success("Invite link copied.");
-      window.setTimeout(() => setCopied(false), 2_000);
-    } else {
-      toast.error("Couldn't copy the link — select it below and copy manually.");
-    }
-  };
 
   const greeterName =
     state.members.find((member) => member.memberId === state.greeterMemberId)?.displayName ??
@@ -124,18 +107,34 @@ export function PartyLobby({
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
-      <header className="flex flex-wrap items-center gap-3">
+      {/* Classic-style party status card (7.4): what's selected and whose
+          turn it is to act — the lobby's main heading. */}
+      <header
+        className="flex flex-wrap items-center gap-3 rounded-box border-2 border-base-300 bg-base-100 p-4"
+        aria-label="Party status"
+      >
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-black">Party lobby</h1>
-          <p className="text-sm text-base-content/70">
+          <p className="text-xl font-black">
             {state.game !== null ? (
-              <>
-                Playing <span className="font-bold">“{state.game.title}”</span> ·{" "}
-                {state.role === "creator" ? "you created this party" : "you joined this party"}
-              </>
+              state.role === "creator" ? (
+                <>
+                  You&apos;ve selected: <span className="text-primary">“{state.game.title}”</span>
+                </>
+              ) : (
+                <>“{state.game.title}” has been selected</>
+              )
             ) : (
-              "Waiting for the game…"
+              "Welcome to Rocketcrab!"
             )}
+          </p>
+          <p className="text-sm text-base-content/70">
+            {state.game !== null
+              ? state.role === "creator"
+                ? "As the host, you have to start the game!"
+                : "Waiting for the host to start…"
+              : state.role === "creator"
+                ? "As the host, you must select the game!"
+                : "Waiting for the host to select a game…"}
           </p>
         </div>
         <span
@@ -196,8 +195,8 @@ export function PartyLobby({
         </form>
       ) : null}
 
-      {/* No game selected yet (7.6): the host picks one from saved games;
-          joiners wait. */}
+      {/* No game selected yet (7.6): the host picks one via the action
+          row's Browse games button; joiners wait. */}
       {state.game === null ? (
         <section
           className="flex flex-wrap items-center gap-3 rounded-box border-2 border-dashed border-base-300 bg-base-100 p-4"
@@ -208,12 +207,6 @@ export function PartyLobby({
               ? "No game yet — pick one from your saved games to start playing."
               : "Waiting for the host to pick a game…"}
           </p>
-          {state.role === "creator" ? (
-            <Button variant="primary" size="md" onClick={() => setPickerOpen(true)}>
-              <Gamepad2 className="h-4 w-4" aria-hidden="true" />
-              Pick a game
-            </Button>
-          ) : null}
         </section>
       ) : null}
 
@@ -224,51 +217,8 @@ export function PartyLobby({
         </div>
       ) : null}
 
-      {/* Large four-letter code + QR + invite link. */}
-      <section
-        className="flex flex-col items-center gap-4 rounded-box border-2 border-base-300 bg-base-100 p-5"
-        aria-label="Invite"
-      >
-        <div>
-          <p className="text-center text-xs font-bold uppercase tracking-widest text-base-content/60">
-            Party code
-          </p>
-          <p
-            className="mt-1 text-center font-mono text-6xl font-black tracking-[0.3em] text-primary"
-            data-testid="party-code"
-            aria-label={`Party code ${state.code ?? "—"}`}
-          >
-            {state.code ?? "—"}
-          </p>
-        </div>
-        {state.inviteUrl !== null ? (
-          <div className="flex w-full flex-col items-center gap-3">
-            <PartyInviteQr inviteUrl={state.inviteUrl} size={168} />
-            <div className="flex w-full max-w-md flex-col gap-2">
-              <p className="break-all rounded-box border border-base-300 bg-base-200 p-2 font-mono text-[11px] text-base-content/70">
-                {state.inviteUrl}
-              </p>
-              <Button variant="secondary" onClick={() => void copyInvite()}>
-                {copied ? (
-                  <>
-                    <Check className="h-4 w-4" aria-hidden="true" />
-                    Copied
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-4 w-4" aria-hidden="true" />
-                    Copy invite link
-                  </>
-                )}
-              </Button>
-            </div>
-            <p className="text-center text-xs text-base-content/60">
-              The invite link is the fastest way in; the four-letter code works too (you approve
-              each person).
-            </p>
-          </div>
-        ) : null}
-      </section>
+      {/* The big code + invite (QR, URL, copy) now live in the classic
+          party shell header (7.22) rendered by PartyExperience. */}
 
       {/* Roles: greeter + authority are separate (ADR-0004/0007). */}
       <section className="flex flex-wrap items-center gap-2 text-sm font-semibold text-base-content/70">
@@ -330,50 +280,57 @@ export function PartyLobby({
       ) : null}
 
       {/* Player list with per-player transfer + ready status. */}
-      <section className="flex flex-col gap-2" aria-label="Players">
-        <h2 className="text-sm font-black uppercase tracking-widest text-base-content/60">
+      {/* Classic collapsible Players card (7.4): badge count + per-player
+          rows with transfer/ready state. Open by default. */}
+      <details
+        className="collapse collapse-arrow rounded-box border-2 border-base-300 bg-base-100"
+        open
+      >
+        <summary className="collapse-title flex items-center gap-2 text-sm font-black uppercase tracking-widest text-base-content/60">
           Players ({state.members.length})
-        </h2>
-        <ul className="flex flex-col gap-2">
-          {state.members.map((member) => (
-            <li
-              key={member.memberId}
-              className="flex flex-col gap-2 rounded-box border-2 border-base-300 bg-base-100 p-3"
-              data-testid={`party-member-${member.memberId}`}
-            >
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="font-black">
-                  {member.displayName}
-                  {member.isSelf ? <span className="text-base-content/50"> (you)</span> : null}
-                </span>
-                {member.isGreeter ? (
-                  <span className="badge badge-secondary badge-sm" title="Rendezvous greeter">
-                    Greeter
+        </summary>
+        <div className="collapse-content">
+          <ul className="flex flex-col gap-2">
+            {state.members.map((member) => (
+              <li
+                key={member.memberId}
+                className="flex flex-col gap-2 rounded-box border-2 border-base-300 bg-base-100 p-3"
+                data-testid={`party-member-${member.memberId}`}
+              >
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="font-black">
+                    {member.displayName}
+                    {member.isSelf ? <span className="text-base-content/50"> (you)</span> : null}
                   </span>
-                ) : null}
-                {connectionBadge(member)}
-                {transferBadge(member)}
-                {readyBadge(member)}
-              </div>
-              {member.transferProgress !== null && member.transferState === "transferring" ? (
-                <div className="flex items-center gap-2">
-                  <progress
-                    className="progress progress-info w-full"
-                    value={member.transferProgress}
-                    max={1}
-                    aria-label={`Game transfer progress for ${member.displayName}`}
-                  />
-                  <span className="shrink-0 text-xs font-semibold text-base-content/60">
-                    {member.transferDetail ?? `${Math.round(member.transferProgress * 100)}%`}
-                  </span>
+                  {member.isGreeter ? (
+                    <span className="badge badge-secondary badge-sm" title="Rendezvous greeter">
+                      Greeter
+                    </span>
+                  ) : null}
+                  {connectionBadge(member)}
+                  {transferBadge(member)}
+                  {readyBadge(member)}
                 </div>
-              ) : member.transferDetail !== null ? (
-                <p className="text-xs text-base-content/60">{member.transferDetail}</p>
-              ) : null}
-            </li>
-          ))}
-        </ul>
-      </section>
+                {member.transferProgress !== null && member.transferState === "transferring" ? (
+                  <div className="flex items-center gap-2">
+                    <progress
+                      className="progress progress-info w-full"
+                      value={member.transferProgress}
+                      max={1}
+                      aria-label={`Game transfer progress for ${member.displayName}`}
+                    />
+                    <span className="shrink-0 text-xs font-semibold text-base-content/60">
+                      {member.transferDetail ?? `${Math.round(member.transferProgress * 100)}%`}
+                    </span>
+                  </div>
+                ) : member.transferDetail !== null ? (
+                  <p className="text-xs text-base-content/60">{member.transferDetail}</p>
+                ) : null}
+              </li>
+            ))}
+          </ul>
+        </div>
+      </details>
 
       {/* Notices (a failed peer never freezes the lobby). */}
       {state.notices.length > 0 ? (
@@ -395,8 +352,15 @@ export function PartyLobby({
         </ul>
       ) : null}
 
-      {/* Start / force-start / leave. */}
+      {/* Classic action row (7.4): Browse games (host) + Start game, with
+          force-start and leave alongside. */}
       <section className="flex flex-wrap items-center gap-2">
+        {state.role === "creator" ? (
+          <Button variant="secondary" size="lg" onClick={() => setPickerOpen(true)}>
+            <Gamepad2 className="h-5 w-5" aria-hidden="true" />
+            Browse games
+          </Button>
+        ) : null}
         <Button
           variant="primary"
           size="lg"

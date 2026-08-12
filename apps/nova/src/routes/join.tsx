@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { JoinScreen } from "../components/party/JoinScreen";
 import { PartyExperience } from "../components/party/PartyExperience";
 import { PartyResumeBanner } from "../components/party/PartyResumeBanner";
+import { PartyShellHeader } from "../components/party/PartyShellHeader";
 import { partyEngine } from "../lib/party/engine";
 import { getSavedPlayerName } from "../lib/party/identity";
 import { importInviteFromLocation } from "../lib/party/invite-import";
@@ -64,6 +65,8 @@ function JoinPage() {
     // above the form.
     return (
       <div className="mx-auto flex w-full max-w-md flex-col gap-4">
+        {/* Classic party shell (7.22): logo header above the join form. */}
+        <PartyShellHeader />
         <PartyResumeBanner engine={partyEngine} />
         <JoinScreen
           error={joinError ?? (state.phase === "error" ? state.lastError : null)}
