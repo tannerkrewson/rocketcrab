@@ -52,9 +52,11 @@ describe("/examples", () => {
     renderExamples();
 
     // First card in DOM order is Nova Quiz (state mode).
-    await userEvent.click(
-      (await screen.findAllByRole("button", { name: /^Open in the editor/ }))[0],
-    );
+    const openButtons = await screen.findAllByRole("button", {
+      name: /^Open in the editor/,
+    });
+    expect(openButtons).toHaveLength(3);
+    await userEvent.click(openButtons[0] as HTMLElement);
 
     // The editor route mounts with the example source as an unsaved draft
     // (scope to the desktop layout: jsdom never hides the phone editor).
