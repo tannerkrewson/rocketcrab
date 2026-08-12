@@ -28,6 +28,12 @@ import {
 import { isReservedChannelName } from "./constants";
 import { newActionId } from "./ids";
 import {
+  MEDIA_PUBLISH_INPUT_MESSAGE,
+  isMediaInput,
+  mediaUnsupportedError,
+  probeMediaSupport,
+} from "./media";
+import {
   assertStructuredCloneSafe,
   assertValid,
   isBinaryPayload,
@@ -54,6 +60,7 @@ import type {
   NovaSimulationInput,
   NovaStateHandle,
   NovaStateHandlers,
+  NovaMediaHandle,
 } from "./types";
 
 /**
@@ -396,6 +403,26 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
     },
   };
 
+  // A3 experimental media surface: probe platform capability, and fail
+  // clearly when a game tries to publish (media transport cannot cross the
+  // frame boundary in this build — see docs/testing/media-bridging-findings.md).
+  // Publish never reaches the backend: there is no media transport path yet.
+  const mediaHandle: NovaMediaHandle = {
+    isSupported() {
+      return probeMediaSupport();
+    },
+    publish(trackOrStream) {
+      // Lifecycle gating mirrors every sending call (S1): media needs a
+      // live party connection, which only exists after start.
+      if (ended) throw new NovaError("ended", endedMessage("media.publish"));
+      if (!started) throw new NovaError("not_started", notStartedMessage("media.publish"));
+      if (!isMediaInput(trackOrStream)) {
+        throw new NovaError("invalid_options", MEDIA_PUBLISH_INPUT_MESSAGE);
+      }
+      throw mediaUnsupportedError();
+    },
+  };
+
   const client: NovaClient = {
     version: backend.apiVersion,
     defineGame(options) {
@@ -521,6 +548,9 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
     },
     get simulation() {
       return simulationHandle;
+    },
+    get media() {
+      return mediaHandle;
     },
     dispose() {
       unsubscribeEvents();

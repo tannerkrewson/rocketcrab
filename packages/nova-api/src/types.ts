@@ -356,6 +356,37 @@ export interface NovaSimulationHandle {
 }
 
 /**
+ * The `nova.media` handle (A3) — publishing camera/microphone media to the
+ * party. **Experimental.** The A3 findings (`docs/testing/
+ * media-bridging-findings.md`) evaluate how a game frame that acquires
+ * media could publish it through Nova's party transport; the verdict is
+ * that cross-frame media transport is experimental and unverified on the
+ * supported Mobile Safari versions (Blocker Register B7). In this build
+ * {@link publish} always fails with `media_unsupported` — games must treat
+ * voice/video publishing as unavailable — and {@link isSupported} reports
+ * the platform's raw ability to structured-clone a `MediaStream` so games
+ * and the host can collect device signals.
+ */
+export interface NovaMediaHandle {
+  /**
+   * Platform capability probe: whether this browser realm can
+   * structured-clone a `MediaStream`. `true` does not mean the bridge
+   * works end to end (see the findings doc); `false` means cross-frame
+   * media transfer is certainly unavailable on this platform.
+   */
+  isSupported(): boolean;
+  /**
+   * Publish a camera/microphone track or stream to the party. Acquisition
+   * stays inside the game frame (ordinary browser permission prompts);
+   * only the transport bridge is Nova's. **Experimental:** in this build
+   * the call always throws a `NovaError` with code `media_unsupported`
+   * after lifecycle and input validation, so unsupported combinations fail
+   * clearly instead of silently dropping media.
+   */
+  publish(trackOrStream: MediaStreamTrack | MediaStream): void;
+}
+
+/**
  * The complete game-facing API object (`window.nova`).
  *
  * Lifecycle: call {@link defineGame} once at startup, subscribe to events,
@@ -412,4 +443,6 @@ export interface NovaApi {
   readonly raw: NovaRawHandle;
   /** Simulation inputs (simulation mode). */
   readonly simulation: NovaSimulationHandle;
+  /** Experimental media transport (A3; see {@link NovaMediaHandle}). */
+  readonly media: NovaMediaHandle;
 }
