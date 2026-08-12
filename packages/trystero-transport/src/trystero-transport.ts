@@ -353,8 +353,10 @@ export class TrysteroTransport implements NovaTransport {
       onProgress:
         options.onProgress === undefined
           ? undefined
-          : (percent: number) => {
-              const fraction = Math.max(0, Math.min(1, percent / 100));
+          : (fraction01: number) => {
+              // Trystero reports progress as a fraction in [0, 1] (its docs
+              // call it "a percentage value between 0 and 1").
+              const fraction = Math.max(0, Math.min(1, fraction01));
               options.onProgress?.({
                 direction: "send",
                 messageId,
@@ -563,13 +565,13 @@ export class TrysteroTransport implements NovaTransport {
     this.emit("message:received", message);
   }
 
-  private handleReceiveProgress(percent: number, context: MessageContext): void {
+  private handleReceiveProgress(progress01: number, context: MessageContext): void {
     const envelope = parseWireEnvelope(context.metadata);
     if (envelope === null) {
       return;
     }
     const totalBytes = envelope.totalBytes ?? 0;
-    const fraction = Math.max(0, Math.min(1, percent / 100));
+    const fraction = Math.max(0, Math.min(1, progress01));
     this.emit("transfer:progress", {
       direction: "receive",
       messageId: envelope.messageId,
