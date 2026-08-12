@@ -47,6 +47,14 @@ describe("gameDeclarationSchema", () => {
     expect(gameDeclarationSchema.safeParse({ gameMode: "quantum" }).success).toBe(false);
     expect(gameDeclarationSchema.safeParse({ gameVersion: "" }).success).toBe(false);
   });
+
+  it("accepts and bounds the declared Nova API version", () => {
+    expect(gameDeclarationSchema.safeParse({ apiVersion: 1 }).success).toBe(true);
+    expect(gameDeclarationSchema.safeParse({ apiVersion: 0 }).success).toBe(true);
+    expect(gameDeclarationSchema.safeParse({ apiVersion: -1 }).success).toBe(false);
+    expect(gameDeclarationSchema.safeParse({ apiVersion: 1.5 }).success).toBe(false);
+    expect(gameDeclarationSchema.safeParse({ apiVersion: "1" }).success).toBe(false);
+  });
 });
 
 describe("serializeConsoleArgs", () => {

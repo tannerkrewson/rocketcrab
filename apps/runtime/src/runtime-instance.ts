@@ -36,6 +36,7 @@ import {
 } from "./messages";
 import {
   NOVA_BRIDGE_SCRIPT,
+  SUPPORTED_NOVA_API_VERSIONS,
   gameDeclarationSchema,
   registrationFields,
   serializeConsoleArgs,
@@ -337,6 +338,19 @@ export class RuntimeInstance {
       return;
     }
     const declaration = parsed.data as GameDeclaration;
+    // Unsupported Nova API version is an observable diagnostic (U4 category
+    // `unsupported`): the game declares an API version this build cannot
+    // execute. The game still runs — like `invalid_html`, this is reported,
+    // never used to silently change behavior.
+    if (
+      declaration.apiVersion !== undefined &&
+      !SUPPORTED_NOVA_API_VERSIONS.includes(declaration.apiVersion)
+    ) {
+      this.sendError(
+        "unsupported",
+        `Unsupported Nova API version ${declaration.apiVersion}. Supported versions: [${SUPPORTED_NOVA_API_VERSIONS.join(", ")}].`,
+      );
+    }
     const fields = registrationFields({
       bootstrapGameId: this.gameId,
       bootstrapGameMode: this.gameMode,
