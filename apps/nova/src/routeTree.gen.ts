@@ -11,7 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
-import { Route as CreateRouteImport } from './routes/create'
+import { Route as BuildRouteImport } from './routes/build'
 import { Route as EditorRouteImport } from './routes/editor'
 import { Route as ExamplesRouteImport } from './routes/examples'
 import { Route as JoinRouteImport } from './routes/join'
@@ -32,9 +32,9 @@ const AboutRoute = AboutRouteImport.update({
   path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CreateRoute = CreateRouteImport.update({
-  id: '/create',
-  path: '/create',
+const BuildRoute = BuildRouteImport.update({
+  id: '/build',
+  path: '/build',
   getParentRoute: () => rootRouteImport,
 } as any)
 const EditorRoute = EditorRouteImport.update({
@@ -86,7 +86,7 @@ const GamesGameIdTestRoute = GamesGameIdTestRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
-  '/create': typeof CreateRoute
+  '/build': typeof BuildRoute
   '/editor': typeof EditorRoute
   '/examples': typeof ExamplesRoute
   '/join': typeof JoinRoute
@@ -100,7 +100,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
-  '/create': typeof CreateRoute
+  '/build': typeof BuildRoute
   '/editor': typeof EditorRoute
   '/examples': typeof ExamplesRoute
   '/join': typeof JoinRoute
@@ -115,7 +115,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
-  '/create': typeof CreateRoute
+  '/build': typeof BuildRoute
   '/editor': typeof EditorRoute
   '/examples': typeof ExamplesRoute
   '/join': typeof JoinRoute
@@ -131,7 +131,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/about'
-    | '/create'
+    | '/build'
     | '/editor'
     | '/examples'
     | '/join'
@@ -145,7 +145,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/about'
-    | '/create'
+    | '/build'
     | '/editor'
     | '/examples'
     | '/join'
@@ -159,7 +159,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/about'
-    | '/create'
+    | '/build'
     | '/editor'
     | '/examples'
     | '/join'
@@ -174,7 +174,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
-  CreateRoute: typeof CreateRoute
+  BuildRoute: typeof BuildRoute
   EditorRoute: typeof EditorRoute
   ExamplesRoute: typeof ExamplesRoute
   JoinRoute: typeof JoinRoute
@@ -202,11 +202,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/create': {
-      id: '/create'
-      path: '/create'
-      fullPath: '/create'
-      preLoaderRoute: typeof CreateRouteImport
+    '/build': {
+      id: '/build'
+      path: '/build'
+      fullPath: '/build'
+      preLoaderRoute: typeof BuildRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/editor': {
@@ -278,7 +278,7 @@ declare module '@tanstack/react-router' {
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
-  CreateRoute: CreateRoute,
+  BuildRoute: BuildRoute,
   EditorRoute: EditorRoute,
   ExamplesRoute: ExamplesRoute,
   JoinRoute: JoinRoute,

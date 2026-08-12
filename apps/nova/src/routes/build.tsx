@@ -1,45 +1,20 @@
-import { NOVA_API_VERSION } from "@rocketcrab/nova-api";
 import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import { BookOpen, Check, ClipboardCopy, Code2, ScrollText } from "lucide-react";
+import { Check, ClipboardCopy, Code2, ScrollText } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { writeToClipboard } from "../lib/editor/clipboard";
 import { clearDraftSource, storeDraftSource } from "../lib/editor/draft-handoff";
-import { MASTER_PROMPT_VERSION, buildMasterPrompt } from "../lib/prompt/master-prompt";
+import { buildMasterPrompt } from "../lib/prompt/master-prompt";
 
-export const Route = createFileRoute("/create")({
-  component: CreatePage,
+export const Route = createFileRoute("/build")({
+  component: BuildPage,
 });
 
-/** The API surface summary shown in the expandable "Nova API details" panel. */
-const apiDetails = [
-  {
-    name: "Registration & lifecycle",
-    body: "nova.defineGame(...) once (mode: state | simulation | raw), nova.ready() once, then onStart / onEnd / onConnectionChange / onError.",
-  },
-  {
-    name: "Players",
-    body: "nova.player, nova.players, onPlayerJoin / onPlayerLeave — Nova owns authority and migration, never a host role.",
-  },
-  {
-    name: "State mode (default)",
-    body: "createInitialState, actions (Immer drafts), selectView for per-player views, nova.state.get / onChange, nova.dispatch.",
-  },
-  {
-    name: "Simulation mode",
-    body: "nova.simulation.register, sendInput, getTick, onAuthorityChange, serializeState — Nova owns inputs, the tick clock, and snapshots.",
-  },
-  {
-    name: "Raw mode",
-    body: "nova.raw.createChannel, send, onMessage, close — named channels, transport only, no synchronization guarantees.",
-  },
-  {
-    name: "Media (experimental)",
-    body: "nova.media.isSupported() probes the platform; publish always fails in this build, so never design a game that needs voice/video across players.",
-  },
-];
+/** GitHub link to the Nova API reference docs, branch-free (default branch). */
+const NOVA_API_REFERENCE_URL =
+  "https://github.com/tannerkrewson/rocketcrab/blob/docs/api/nova-api-ai-reference.md";
 
 /**
  * The A4 master-prompt generator page: one copyable prompt that works in
@@ -47,7 +22,7 @@ const apiDetails = [
  * into a new local draft in the editor. This page never interviews the user
  * — the prompt does that inside the chat service.
  */
-export function CreatePage() {
+export function BuildPage() {
   const navigate = useNavigate();
   const prompt = useMemo(() => buildMasterPrompt(), []);
   const [copied, setCopied] = useState(false);
@@ -81,7 +56,7 @@ export function CreatePage() {
   return (
     <div className="flex flex-col gap-6">
       <header className="flex flex-col gap-3">
-        <h1 className="text-3xl font-black">Create a game</h1>
+        <h1 className="text-3xl font-black">Build a game</h1>
         <p className="max-w-2xl text-base-content/70">
           Copy the master prompt below into any AI chat service. The chatbot interviews you about
           rules, players, turns, controls, and style, then writes your game as one complete HTML
@@ -91,14 +66,7 @@ export function CreatePage() {
 
       <section aria-labelledby="master-prompt-heading">
         <Card
-          title={
-            <span id="master-prompt-heading">
-              The master prompt{" "}
-              <span className="badge badge-accent badge-outline font-bold align-middle">
-                template v{MASTER_PROMPT_VERSION} · Nova API v{NOVA_API_VERSION}
-              </span>
-            </span>
-          }
+          title={<span id="master-prompt-heading">The master prompt</span>}
           description="The same prompt works in every AI chat service. It embeds the current Nova API reference so the chatbot writes against the real API."
           actions={
             <Button variant="primary" size="lg" onClick={() => void handleCopyPrompt()}>
@@ -122,41 +90,19 @@ export function CreatePage() {
               {prompt}
             </pre>
           </details>
+          <p className="mt-3 text-sm text-base-content/70">
+            Reading the API reference? It's on GitHub:{" "}
+            <a
+              href={NOVA_API_REFERENCE_URL}
+              target="_blank"
+              rel="noreferrer"
+              className="font-bold text-primary underline underline-offset-2"
+            >
+              Nova API reference
+            </a>
+            .
+          </p>
         </Card>
-      </section>
-
-      <section aria-labelledby="api-details-heading" className="flex flex-col gap-3">
-        <details className="card bg-base-100 shadow-sm">
-          <summary
-            className="cursor-pointer p-4 font-bold text-base-content"
-            id="api-details-heading"
-          >
-            <span className="inline-flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-primary" aria-hidden="true" />
-              What's in the Nova API reference
-            </span>
-          </summary>
-          <div className="flex flex-col gap-3 px-4 pb-4">
-            <p className="text-sm text-base-content/70">
-              The prompt embeds the full Nova API reference (v{NOVA_API_VERSION}) from the versioned
-              template — the same reference the docs ship. Key surfaces:
-            </p>
-            <ul className="flex flex-col gap-2 text-sm">
-              {apiDetails.map((detail) => (
-                <li key={detail.name} className="flex flex-col gap-0.5">
-                  <span className="font-black">{detail.name}</span>
-                  <span className="text-base-content/70">{detail.body}</span>
-                </li>
-              ))}
-            </ul>
-            <p className="text-sm text-base-content/70">
-              The three modes: <b>state</b> (default — turn-based/board/card/trivia games),{" "}
-              <b>simulation</b> (continuous games; the game runs a local simulation copy, Nova owns
-              the clock), and <b>raw</b> (named channels, transport only). Prefer state mode unless
-              the game genuinely needs another mode.
-            </p>
-          </div>
-        </details>
       </section>
 
       <section aria-labelledby="next-steps-heading">
