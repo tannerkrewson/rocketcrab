@@ -981,15 +981,17 @@
         function connChip() {
           var status = nova.connectionStatus;
           if (status === "connected") {
-            return el("span", { class: "chip live" }, ["● connected"]);
+            return el("span", { class: "chip live", "data-testid": "conn-chip" }, ["● connected"]);
           }
           if (status === "reconnecting") {
-            return el("span", { class: "chip warn" }, ["⟳ reconnecting"]);
+            return el("span", { class: "chip warn", "data-testid": "conn-chip" }, [
+              "⟳ reconnecting",
+            ]);
           }
           if (status === "suspended") {
-            return el("span", { class: "chip warn" }, ["☾ suspended"]);
+            return el("span", { class: "chip warn", "data-testid": "conn-chip" }, ["☾ suspended"]);
           }
-          return el("span", { class: "chip bad" }, ["✕ " + status]);
+          return el("span", { class: "chip bad", "data-testid": "conn-chip" }, ["✕ " + status]);
         }
 
         function quizmasterLine(view) {
