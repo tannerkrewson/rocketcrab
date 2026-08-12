@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { PROTOCOL_VERSION, type GameMode } from "@rocketcrab/protocol";
 import { PartyExperience } from "../components/party/PartyExperience";
 import { PartyResumeBanner } from "../components/party/PartyResumeBanner";
+import { PartyShellHeader } from "../components/party/PartyShellHeader";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
 import { LoadingState } from "../components/ui/LoadingState";
@@ -113,6 +114,8 @@ function PartyPage() {
   }
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-4 py-6">
+      {/* Classic party shell (7.22): logo header even before a party exists. */}
+      <PartyShellHeader />
       <PartyResumeBanner engine={engine} />
       <EmptyState
         icon={<PartyPopper />}

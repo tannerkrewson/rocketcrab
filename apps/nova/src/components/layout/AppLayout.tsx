@@ -1,4 +1,4 @@
-import { Link, Outlet } from "@tanstack/react-router";
+import { Link, Outlet, useLocation } from "@tanstack/react-router";
 import { Home, Info, Library, PlusCircle, Rocket, Users } from "lucide-react";
 import type { ComponentType } from "react";
 import { cn } from "../../lib/cn";
@@ -31,58 +31,72 @@ function BrandLink() {
 
 /**
  * App-wide shell: top bar (brand + desktop links), page content, and a
- * thumb-friendly bottom navigation on mobile.
+ * thumb-friendly bottom navigation on mobile. Party routes (/join, /party,
+ * /play) swap the generic chrome for the classic party shell header
+ * (7.22), which those routes render themselves.
  */
 export function AppLayout() {
+  const location = useLocation();
+  const isPartyRoute =
+    location.pathname === "/join" ||
+    location.pathname === "/party" ||
+    location.pathname === "/play";
+
   return (
     <div className="min-h-screen bg-base-200 text-base-content">
-      <header className="sticky top-0 z-40 pt-safe">
-        <div className="navbar mx-auto max-w-5xl rounded-b-box border-2 border-t-0 border-base-300 bg-base-100 px-3 shadow-sm">
-          <div className="navbar-start">
-            <BrandLink />
+      {isPartyRoute ? null : (
+        <header className="sticky top-0 z-40 pt-safe">
+          <div className="navbar mx-auto max-w-5xl rounded-b-box border-2 border-t-0 border-base-300 bg-base-100 px-3 shadow-sm">
+            <div className="navbar-start">
+              <BrandLink />
+            </div>
+            <nav className="navbar-center hidden gap-1 md:flex" aria-label="Primary">
+              {navItems.map((item) => (
+                <Link
+                  key={item.to}
+                  to={item.to}
+                  activeOptions={{ exact: item.exact }}
+                  activeProps={{ className: "btn-primary" }}
+                  inactiveProps={{ className: "btn-ghost" }}
+                  className="btn min-h-11 px-4 text-sm font-bold"
+                >
+                  {item.label}
+                </Link>
+              ))}
+            </nav>
+            <div className="navbar-end hidden md:flex" />
           </div>
-          <nav className="navbar-center hidden gap-1 md:flex" aria-label="Primary">
-            {navItems.map((item) => (
+        </header>
+      )}
+
+      <main
+        className={cn("mx-auto w-full max-w-5xl px-4 pb-28 pt-6 md:pb-12", isPartyRoute && "pb-12")}
+      >
+        <Outlet />
+      </main>
+
+      {isPartyRoute ? null : (
+        <nav
+          className="btm-nav btm-nav-lg z-40 border-t-2 border-base-300 bg-base-100 pb-safe md:hidden"
+          aria-label="Primary mobile"
+        >
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            return (
               <Link
                 key={item.to}
                 to={item.to}
                 activeOptions={{ exact: item.exact }}
-                activeProps={{ className: "btn-primary" }}
-                inactiveProps={{ className: "btn-ghost" }}
-                className="btn min-h-11 px-4 text-sm font-bold"
+                activeProps={{ className: "active text-primary" }}
+                className={cn("flex flex-col items-center gap-0.5 py-1 text-xs font-bold")}
               >
+                <Icon className="h-6 w-6" aria-hidden="true" />
                 {item.label}
               </Link>
-            ))}
-          </nav>
-          <div className="navbar-end hidden md:flex" />
-        </div>
-      </header>
-
-      <main className="mx-auto w-full max-w-5xl px-4 pb-28 pt-6 md:pb-12">
-        <Outlet />
-      </main>
-
-      <nav
-        className="btm-nav btm-nav-lg z-40 border-t-2 border-base-300 bg-base-100 pb-safe md:hidden"
-        aria-label="Primary mobile"
-      >
-        {navItems.map((item) => {
-          const Icon = item.icon;
-          return (
-            <Link
-              key={item.to}
-              to={item.to}
-              activeOptions={{ exact: item.exact }}
-              activeProps={{ className: "active text-primary" }}
-              className={cn("flex flex-col items-center gap-0.5 py-1 text-xs font-bold")}
-            >
-              <Icon className="h-6 w-6" aria-hidden="true" />
-              {item.label}
-            </Link>
-          );
-        })}
-      </nav>
+            );
+          })}
+        </nav>
+      )}
     </div>
   );
 }
