@@ -8,6 +8,7 @@
 import {
   PROTOCOL_VERSION,
   assertRuntimeMessage,
+  gameApiCallMessageSchema,
   gameLifecycleEventMessageSchema,
   gameRegistrationMessageSchema,
   runtimeConsoleMessageSchema,
@@ -16,6 +17,7 @@ import {
   runtimeReadinessMessageSchema,
   type GameLifecycleEventMessage,
   type GameRegistrationMessage,
+  type NovaApiCallMethod,
   type RuntimeConsoleMessage,
   type RuntimeErrorMessage,
 } from "@rocketcrab/protocol";
@@ -151,6 +153,32 @@ export function buildConsoleMessage(
       message,
       ...(options.details !== undefined ? { details: options.details } : {}),
       ...(options.dropped !== undefined ? { dropped: options.dropped } : {}),
+    }),
+  );
+}
+
+/**
+ * Build and validate a `game.apiCall` message: a Nova API call the game
+ * forwarded through the injected bridge, already validated against
+ * `novaApiCallSchemas`. The host session router (U6 arena / P1 party)
+ * routes it into the player's NovaSession over the transport.
+ */
+export function buildApiCallMessage(
+  runtimeInstanceId: string,
+  method: NovaApiCallMethod,
+  payload: unknown,
+  sessionId?: string,
+) {
+  return assertRuntimeMessage(
+    gameApiCallMessageSchema.parse({
+      version: PROTOCOL_VERSION,
+      runtimeInstanceId,
+      ...(sessionId !== undefined ? { sessionId } : {}),
+      messageId: newMessageId(),
+      sentAt: nowSentAt(),
+      type: "game.apiCall",
+      method,
+      payload,
     }),
   );
 }
