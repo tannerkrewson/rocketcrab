@@ -6,24 +6,14 @@
     <meta name="referrer" content="no-referrer" />
     <title>Rocketcrab Nova Runtime</title>
     <style>
-      /* Minimal, secret-free runtime page: a status bar plus the game frame. */
+      /* Minimal, secret-free runtime page: the game frame fills the page. */
       html,
       body {
         margin: 0;
         height: 100%;
       }
-      #bar {
-        font:
-          11px/1.4 ui-monospace,
-          SFMono-Regular,
-          Menlo,
-          monospace;
-        color: #94a3b8;
-        background: #0f172a;
-        padding: 4px 8px;
-      }
       #game-container {
-        height: calc(100% - 24px);
+        height: 100%;
       }
       #game-container iframe {
         border: 0;
@@ -34,7 +24,6 @@
     </style>
   </head>
   <body>
-    <div id="bar">runtime origin — waiting for bootstrap</div>
     <div id="game-container"></div>
     <script type="module" src="/src/main.ts"></script>
   </body>

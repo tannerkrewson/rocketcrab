@@ -25,6 +25,7 @@ test-results/
 
 # agent tooling
 .pi-subagents/
+.pi/
 
 # local beads database (also excluded via .git/info/exclude)
 .beads/
