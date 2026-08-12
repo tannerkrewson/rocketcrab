@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 // The complete S4 example game document, verbatim (Vite ?raw import).
-import EXAMPLE_GAME_SOURCE from "../../../../examples/games/nova-quiz.html?raw";
+import EXAMPLE_GAME_SOURCE from "../../../../../examples/games/nova-quiz.html?raw";
 import { parseInviteFragment, type PartyTransportFactory } from "@rocketcrab/party";
 import { InMemoryTransportHub } from "@rocketcrab/testing";
 import type { ChannelPort } from "../runtime-host";
