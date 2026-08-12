@@ -279,8 +279,9 @@ nova.onStart(() => {
 ## 10. Raw mode (`mode: "raw"`)
 
 For specialized protocols. Nova provides named channels with delivery
-choices and binary support — but no synchronization, migration, or cheating
-resistance (ADR-0006).
+choices, binary support, rate/size limits, transfer progress, and channel
+lifecycle — but no synchronization, migration, or cheating resistance
+(ADR-0006).
 
 ```js
 nova.defineGame({ title: "Chatter", mode: "raw" });
@@ -298,6 +299,11 @@ nova.raw.onMessage("chat", (message) => {
   // message: { from: { id, name }, payload, binary }
   nova.log(message.from.name, "says", message.payload.text);
 });
+
+// Channel lifecycle (A2): close a channel when the game is done with it.
+nova.onEnd(() => {
+  nova.raw.close("chat");
+});
 ```
 
 Rules:
@@ -306,11 +312,64 @@ Rules:
   channel, after start; the declaration tells peers about the channel).
 - **To receive**, subscribe with `onMessage(channel, fn)`; messages on
   channels with no subscription are dropped.
+- **Channel lifecycle** — `close(name)` closes your declaration: local
+  sends on it fail with `unknown_channel` afterwards, and peers are told
+  the channel closed. A peer that declared the channel itself keeps its
+  own declaration (closing is per-declaring-player). Closing an unknown
+  channel is a no-op, and a closed name may be re-opened with a fresh
+  `createChannel`. Peers that join **mid-game** receive every open channel
+  from each player, so they can subscribe and send without a fresh
+  declaration.
 - Channels are just names — each player declares the channels it uses;
   anyone can send on a channel they created to any player (`to: playerId`
   targets one player, otherwise broadcast).
 - Payloads are JSON data or binary (`Uint8Array` / `ArrayBuffer`).
 - The channel name `nova.protocol` is reserved.
+
+### Delivery guarantees and the Trystero mapping (A2)
+
+Every channel declares two delivery choices; defaults are
+`reliable: true, ordered: true`:
+
+| Option     | Meaning over the arena transport (in-memory)                                                       | Over a real party (Trystero)                                                                                                                            |
+| ---------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `reliable` | Reliable channels never drop; unreliable channels may lose messages (simulated link loss).         | All channels are delivered reliably — Trystero's data channel is always reliable (SCTP), so `reliable: false` is accepted but **degrades to reliable**. |
+| `ordered`  | Ordered channels buffer and reorder by delivery stamp; unordered channels may arrive out of order. | All channels are delivered in order — Trystero's data channel is always ordered, so `ordered: false` is accepted but **degrades to ordered**.           |
+| `binary`   | Binary payloads travel on the transport's binary path and bypass protocol validation.              | Same — binary payloads are supported end to end.                                                                                                        |
+
+Games must therefore **never rely on loss or reordering for correctness**
+over a real party: unreliable/unordered options express intent (and are
+truly honored by the test arena), but the Trystero path only provides
+reliable, ordered channels. Use per-send `{ reliable, ordered }` overrides
+in `nova.raw.send` the same way.
+
+### Size, rate, and progress (A2)
+
+- **Size**: one raw payload is bounded by the `rawMessageBytes` hard limit
+  (1 MiB; 80% warn threshold). Oversized sends are rejected with
+  `payload_too_large` and counted in the host diagnostics.
+- **Rate**: sends per player are bounded by `rawRatePerSecond` (120/s over
+  a sliding 10-second window). Bursts beyond it are rejected with
+  `rate_limited` and counted in the host diagnostics. Both thresholds live
+  in `packages/protocol/src/limits.ts` beside the F6 limits.
+- **Progress**: payloads above the chunk threshold travel as chunked
+  transfers. Pass `onProgress({ at, bytesTransferred, totalBytes, fraction })`
+  in `nova.raw.send` options to observe sender-side transfer progress
+  (a plain function — it stays in your context and never crosses a
+  boundary).
+- **Backpressure**: `nova.raw.send` queues into the transport and returns
+  immediately; failures (unknown channel, not connected, over a limit)
+  surface through `nova.onError` with a stable code.
+
+### Raw mode vs. state mode (A2)
+
+State mode gives you canonical state, ordered actions, per-player views,
+late joining, and automatic authority migration — Nova owns correctness.
+Raw mode gives you channels and nothing else: **no synchronization, no
+migration, no cheating resistance**, and delivery guarantees are only as
+strong as the transport behind you (see the Trystero mapping above).
+Prefer state mode unless the game genuinely needs a lower-level protocol;
+the AI reference (A4) follows the same guidance.
 
 ---
 
@@ -331,6 +390,7 @@ Every API failure is a `NovaError` with a stable `code` and a human message:
 | `invalid_payload`         | A payload is not structured-clone-compatible / JSON plain data.          |
 | `unknown_channel`         | A raw send referenced a channel that was not created.                    |
 | `reserved_channel`        | A raw channel used the reserved protocol name.                           |
+| `rate_limited`            | A raw send exceeded the per-second rate limit (A2).                      |
 | `not_connected`           | A targeted send referenced a player who is not connected.                |
 | `invalid_message`         | The host received an invalid protocol message (delivered via `onError`). |
 | `unsupported`             | The operation is not available in this build (reported by the runtime).  |

@@ -17,6 +17,10 @@ import {
   htmlSourceWarnBytes,
   messageBytesBeforeChunking,
   messageWarnBytes,
+  rawMessageBytes,
+  rawMessageWarnBytes,
+  rawRatePerSecond,
+  rawWarnRatePerSecond,
   runtimeLogRatePerSecond,
   runtimeLogWarnRatePerSecond,
   stateSnapshotBytes,
@@ -30,6 +34,8 @@ describe("protocol limits", () => {
     expect(stateSnapshotBytes).toBe(512 * 1024);
     expect(actionPayloadBytes).toBe(16 * 1024);
     expect(actionRatePerSecond).toBe(20);
+    expect(rawMessageBytes).toBe(1024 * 1024);
+    expect(rawRatePerSecond).toBe(120);
     expect(runtimeLogRatePerSecond).toBe(50);
     expect(errorReportRatePerSecond).toBe(5);
     expect(handshakeTimeoutMs).toBe(30_000);
@@ -45,6 +51,8 @@ describe("protocol limits", () => {
     expect(stateSnapshotWarnBytes).toBeLessThan(stateSnapshotBytes);
     expect(actionPayloadWarnBytes).toBeLessThan(actionPayloadBytes);
     expect(actionWarnRatePerSecond).toBeLessThan(actionRatePerSecond);
+    expect(rawMessageWarnBytes).toBeLessThan(rawMessageBytes);
+    expect(rawWarnRatePerSecond).toBeLessThan(rawRatePerSecond);
     expect(runtimeLogWarnRatePerSecond).toBeLessThan(runtimeLogRatePerSecond);
     expect(errorReportWarnRatePerSecond).toBeLessThan(errorReportRatePerSecond);
   });
@@ -53,6 +61,8 @@ describe("protocol limits", () => {
     expect(LIMITS.htmlSourceBytes).toBe(htmlSourceBytes);
     expect(LIMITS.actionTimeoutMs).toBe(actionTimeoutMs);
     expect(LIMITS.errorReportWarnRatePerSecond).toBe(errorReportWarnRatePerSecond);
+    expect(LIMITS.rawMessageBytes).toBe(rawMessageBytes);
+    expect(LIMITS.rawWarnRatePerSecond).toBe(rawWarnRatePerSecond);
   });
 
   it("enforces the HTML source hard limit in the schema", () => {

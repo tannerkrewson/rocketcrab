@@ -725,6 +725,23 @@ export class ArenaEngine {
           });
         break;
       }
+      case "raw.close": {
+        const parsed = arenaApiCallSchemas["raw.close"].safeParse(message.payload);
+        if (!parsed.success) {
+          this.logPlayer(
+            runtime.spec.id,
+            "error",
+            "nova.raw.close() call failed validation at the host; ignored.",
+          );
+          return;
+        }
+        try {
+          session.closeRawChannel(parsed.data.name);
+        } catch (error) {
+          this.sessionError(runtime.spec.id, error);
+        }
+        break;
+      }
       case "simulation.register": {
         if (!arenaApiCallSchemas["simulation.register"].safeParse(message.payload).success) {
           this.logPlayer(

@@ -44,6 +44,9 @@ function makeClient(overrides: Partial<NovaClientBackend> = {}): {
     createRawChannel() {
       calls.push("createRawChannel");
     },
+    closeRawChannel() {
+      calls.push("closeRawChannel");
+    },
     sendRaw() {
       calls.push("sendRaw");
     },
@@ -145,6 +148,9 @@ describe("createNovaClient lifecycle", () => {
     client.raw.createChannel({ name: "chat" });
     client.raw.send("chat", { text: "hi" });
     client.raw.send("chat", new Uint8Array([1]));
+    // raw sends record asynchronously (the backend send is promise-wrapped).
+    await Promise.resolve();
+    await Promise.resolve();
     expect(calls).toEqual([
       "register",
       "ready",
@@ -258,6 +264,41 @@ describe("createNovaClient lifecycle", () => {
     );
     expectNovaError(() => client.raw.createChannel({ name: "nova.protocol" }), "reserved_channel");
     expectNovaError(() => client.raw.createChannel({ name: "x".repeat(65) }), "invalid_options");
+    expectNovaError(() => client.raw.close("x".repeat(65)), "invalid_options");
+    expectNovaError(
+      () => client.raw.send("chat", "hi", { onProgress: 42 as unknown as () => void }),
+      "invalid_options",
+    );
+  });
+
+  it("forwards raw.close to the backend with lifecycle gating (A2)", () => {
+    const { client, calls, emit } = makeClient();
+    expectNovaError(() => client.raw.close("chat"), "not_started");
+    client.defineGame({ title: "T" });
+    client.ready();
+    expectNovaError(() => client.raw.close("chat"), "not_started");
+    emit({ type: "start" });
+    client.raw.close("chat");
+    expect(calls).toContain("closeRawChannel");
+    expectNovaError(() => client.raw.close(""), "invalid_options");
+    emit({ type: "end", reason: "user_exit" });
+    expectNovaError(() => client.raw.close("chat"), "ended");
+  });
+
+  it("delivers async raw send failures to onError (A2)", async () => {
+    const { client, emit } = makeClient({
+      sendRaw() {
+        throw new Error("boom");
+      },
+    });
+    const errors: Array<{ code: string }> = [];
+    client.onError((error) => errors.push({ code: error.code }));
+    client.defineGame({ title: "T" });
+    client.ready();
+    emit({ type: "start" });
+    client.raw.send("chat", "hi");
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(errors).toEqual([{ code: "invalid_options" }]);
   });
 
   it("fails clearly after the game ended", () => {

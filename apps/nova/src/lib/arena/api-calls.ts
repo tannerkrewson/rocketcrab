@@ -32,6 +32,11 @@ export const arenaApiCallSchemas = {
       }),
     })
     .strict(),
+  "raw.close": z
+    .object({
+      name: z.string().min(1).max(64),
+    })
+    .strict(),
   "raw.send": z
     .object({
       name: z.string().min(1).max(64),

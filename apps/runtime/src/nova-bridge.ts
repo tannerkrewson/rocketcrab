@@ -88,6 +88,11 @@ export const novaApiCallSchemas = {
       }),
     })
     .strict(),
+  "raw.close": z
+    .object({
+      name: z.string().min(1).max(64),
+    })
+    .strict(),
   "raw.send": z
     .object({
       name: z.string().min(1).max(64),
@@ -350,6 +355,10 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
     createChannel: function (spec) {
       requireStarted('raw.createChannel');
       report('raw.createChannel', { spec: spec });
+    },
+    close: function (name) {
+      requireStarted('raw.close');
+      report('raw.close', { name: name });
     },
     send: function (name, payload, options) {
       requireStarted('raw.send');

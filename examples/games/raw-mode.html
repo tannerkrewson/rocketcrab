@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Raw-Mode Sample — Chatter</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 2rem;
+        background: #fafafa;
+        color: #1c1c1c;
+      }
+      #log {
+        margin-top: 1rem;
+        padding: 1rem;
+        background: #fff;
+        border: 1px solid #ddd;
+        border-radius: 8px;
+        white-space: pre-wrap;
+        min-height: 8rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Chatter (raw mode sample)</h1>
+    <p>
+      A raw-mode sample game: it exchanges <b>structured</b> chat messages on a reliable ordered
+      channel and <b>binary</b> position samples on a binary channel (A2 acceptance: a raw-mode
+      sample game exchanges structured and binary data).
+    </p>
+    <div id="log">waiting for the game to start…</div>
+    <script type="module">
+      // Raw mode: Nova provides named channels, broadcast and targeted
+      // sends, binary payloads, and channel lifecycle — but NO state
+      // synchronization, migration, or cheating resistance (ADR-0006).
+      nova.defineGame({ title: "Chatter (raw sample)", mode: "raw" });
+
+      function log(line) {
+        const el = document.getElementById("log");
+        el.textContent = el.textContent + "\n" + line;
+        el.scrollTop = el.scrollHeight;
+      }
+
+      // Structured chat channel: reliable + ordered delivery.
+      nova.raw.createChannel({ name: "chat", reliable: true, ordered: true });
+      // Binary positions channel: Uint8Array payloads.
+      nova.raw.createChannel({ name: "positions", binary: true });
+
+      nova.raw.onMessage("chat", (message) => {
+        log(message.from.name + " says: " + message.payload.text);
+      });
+
+      nova.raw.onMessage("positions", (message) => {
+        const bytes = message.payload; // Uint8Array (binary: true)
+        log(
+          message.from.name +
+            " position #" +
+            bytes[0] +
+            " (" +
+            bytes.byteLength +
+            " binary bytes, binary=" +
+            message.binary +
+            ")",
+        );
+      });
+
+      nova.onStart(() => {
+        log("Game started with " + nova.players.length + " player(s).");
+        // Broadcast structured data.
+        nova.raw.send("chat", { text: "hello everyone" });
+        // Targeted send to the first peer, when there is one.
+        const peer = nova.players.find((player) => player.id !== nova.player.id);
+        if (peer !== undefined) {
+          nova.raw.send("chat", { text: "just for you" }, { to: peer.id });
+        }
+        // Broadcast binary data.
+        nova.raw.send("positions", new Uint8Array([1, 2, 3]));
+        // A large payload exercises chunked transfer with progress.
+        const big = new Uint8Array(150 * 1024).fill(9);
+        nova.raw.send("positions", big, {
+          onProgress(progress) {
+            if (progress.fraction === 1) {
+              log("large transfer complete: " + progress.totalBytes + " bytes");
+            }
+          },
+        });
+      });
+
+      nova.onPlayerJoin((player) => log(player.name + " joined."));
+      nova.onPlayerLeave((player) => log(player.name + " left."));
+      nova.onEnd(() => {
+        log("Game ended; closing the chat channel (channel lifecycle).");
+        nova.raw.close("chat");
+      });
+
+      nova.ready();
+    </script>
+  </body>
+</html>

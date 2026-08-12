@@ -296,6 +296,38 @@ describe("ArenaEngine — happy path", () => {
       name: "Player 1",
     });
   });
+
+  it("routes raw channel close between players (A2)", async () => {
+    const harness = createHarness();
+    mountContainers(harness, 2);
+    const engine = createEngine(harness);
+    engine.start();
+    await runToStartWithEngine(engine, harness, 2);
+
+    // Player 1 declares and then closes a raw channel.
+    deliver(
+      harness.channels[0]!.port1,
+      apiCallMessage("raw.createChannel", { spec: { name: "chat" } }),
+    );
+    deliver(harness.channels[0]!.port1, apiCallMessage("raw.close", { name: "chat" }));
+    await vi.waitFor(() => {
+      // After the close, Player 1's session has no channels: a send now
+      // fails and surfaces an error event to Player 1's frame.
+      deliver(
+        harness.channels[0]!.port1,
+        apiCallMessage("raw.send", { name: "chat", payload: "hi" }),
+      );
+      const events = apiEventsOf(harness, 0);
+      expect(
+        events.some(
+          (event) =>
+            event.kind === "error" &&
+            event.code === "unknown_channel" &&
+            String(event.message).includes("raw.send"),
+        ),
+      ).toBe(true);
+    });
+  });
 });
 
 describe("ArenaEngine — network controls", () => {
