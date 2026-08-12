@@ -52,6 +52,16 @@ export function PreviewPanel({ containerRef, status, onStop, stale = false }: Pr
           The preview shows the last Run — edit the code and Run again to see changes.
         </p>
       ) : null}
+      {status === "running" ? (
+        <p
+          className="rounded-box border border-base-300 bg-base-200/60 px-3 py-2 text-xs font-semibold leading-relaxed text-base-content/70"
+          data-testid="preview-no-session-note"
+        >
+          Preview has no party session — multiplayer games show “Connecting” here. Run{" "}
+          <span className="font-bold">Test multiplayer</span> (arena) or{" "}
+          <span className="font-bold">Play with friends</span> (party) to connect real players.
+        </p>
+      ) : null}
       <div
         ref={containerRef}
         className="h-[40vh] min-h-64 overflow-hidden rounded-box border-2 border-base-300 bg-base-100"

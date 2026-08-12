@@ -109,6 +109,16 @@ and reconnects, or sends a stale action (retry from the newest view after a
 \`stale_revision\` rejection). Show the player's own connection status
 visibly.
 
+A game can run in a PREVIEW with no party: \`nova.connectionStatus\` stays
+\`"disconnected"\` and no \`onConnectionChange\`, \`onPlayerJoin\`, or
+\`onStart\` event ever fires. Never wait for those events before rendering:
+always render the game UI immediately (menu, board, or a "waiting for
+players" state) and let a connection enhance it. If you show a
+"Connecting…" indicator, make it a small status chip over a fully working
+screen — never blank the screen behind a connection spinner. Start
+real-time play only when \`onConnectionChange\` reports \`"connected"\`
+(and \`onStart\` has fired in state mode).
+
 ## 7. Never assume a permanent host
 
 Nova owns authority, ordering, and migration invisibly. Never elect or
