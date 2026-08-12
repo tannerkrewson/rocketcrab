@@ -46,8 +46,8 @@ and document this limitation."
 
 ## F4 record (2026-08-01)
 
-F4's spike (`spikes/runtime-sandbox/`, findings in `docs/testing/
-runtime-sandbox-findings.md`) **confirmed the single separate-origin
+F4's spike (findings in `docs/testing/runtime-sandbox-findings.md`)
+**confirmed the single separate-origin
 privileged runtime for all games** and rejected the two-tier model for v1:
 capabilities (ESM, fetch, canvas, WebGL, audio, media, WS) work from the
 sandboxed game frame on the runtime origin, isolation from the Nova app holds,

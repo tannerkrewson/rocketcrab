@@ -22,7 +22,7 @@
   },
   "overrides": [
     {
-      "files": ["packages/trystero-transport/**", "spikes/**"],
+      "files": ["packages/trystero-transport/**"],
       "rules": {
         "no-restricted-imports": "off"
       }
