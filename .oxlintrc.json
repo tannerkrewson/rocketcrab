@@ -1,4 +1,31 @@
 {
   "$schema": "./node_modules/oxlint/configuration_schema.json",
-  "ignorePatterns": ["dist", "node_modules", "**/routeTree.gen.ts"]
+  "ignorePatterns": ["dist", "node_modules", "**/routeTree.gen.ts"],
+  "rules": {
+    "no-restricted-imports": [
+      "error",
+      {
+        "paths": [
+          {
+            "name": "trystero",
+            "message": "Trystero may only be imported by @rocketcrab/trystero-transport (P1 adapter). Games and the core/arena never see Trystero (ADR-0003, engineering rule 1)."
+          }
+        ],
+        "patterns": [
+          {
+            "group": ["@trystero-p2p/*"],
+            "message": "Trystero internals may only be imported by @rocketcrab/trystero-transport (P1 adapter)."
+          }
+        ]
+      }
+    ]
+  },
+  "overrides": [
+    {
+      "files": ["packages/trystero-transport/**", "spikes/**"],
+      "rules": {
+        "no-restricted-imports": "off"
+      }
+    }
+  ]
 }
