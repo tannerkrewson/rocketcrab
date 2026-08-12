@@ -9,11 +9,13 @@
  * {@link LocalGameExecutor} (immer), so the tests cover the same code path
  * the arena uses over either transport.
  */
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { actionPayloadBytes, stateSnapshotBytes } from "@rocketcrab/protocol";
 import {
   NovaStateEngine,
   type AuthorityAnnounceEnvelope,
+  type AuthorityElectionEnvelope,
+  type AuthorityHeartbeatEnvelope,
   type StateEngineEvent,
   type StateEngineHost,
   type StateSnapshotEnvelope,
@@ -33,14 +35,23 @@ class RecordingHost implements StateEngineHost {
   readonly snapshots: Array<{ target?: string; snapshot: StateSnapshotEnvelope }> = [];
   readonly views: Array<{ target: string; view: StateViewEnvelope }> = [];
   readonly announces: AuthorityAnnounceEnvelope[] = [];
+  readonly heartbeats: AuthorityHeartbeatEnvelope[] = [];
+  readonly elections: AuthorityElectionEnvelope[] = [];
   readonly events: StateEngineEvent[] = [];
   connected = new Set<string>(PLAYERS.map((player) => player.id));
+  isSelfConnected = true;
 
   players(): readonly NovaPlayer[] {
     return [...PLAYERS];
   }
   isConnected(memberId: string): boolean {
     return this.connected.has(memberId);
+  }
+  selfConnected(): boolean {
+    return this.isSelfConnected;
+  }
+  eligibleMemberIds(): readonly string[] {
+    return [...this.connected];
   }
   sendAck(targetMemberId: string, ack: NovaActionAck): void {
     this.acks.push({ target: targetMemberId, ack });
@@ -54,10 +65,30 @@ class RecordingHost implements StateEngineHost {
   sendAnnounce(announcement: AuthorityAnnounceEnvelope): void {
     this.announces.push(announcement);
   }
+  sendHeartbeat(heartbeat: AuthorityHeartbeatEnvelope): void {
+    this.heartbeats.push(heartbeat);
+  }
+  sendElection(election: AuthorityElectionEnvelope): void {
+    this.elections.push(election);
+  }
   emit(event: StateEngineEvent): void {
     this.events.push(event);
   }
 }
+
+/** Every engine created in this file (disposed after each test; S3 timers). */
+const createdEngines: NovaStateEngine[] = [];
+
+function track(engine: NovaStateEngine): NovaStateEngine {
+  createdEngines.push(engine);
+  return engine;
+}
+
+afterEach(() => {
+  for (const engine of createdEngines.splice(0)) {
+    engine.dispose();
+  }
+});
 
 /** The test game: a counter that also tracks the acting player. */
 function handlers(overrides: Partial<NovaStateHandlers> = {}): NovaStateHandlers {
@@ -91,16 +122,18 @@ async function makeEngine(
 ): Promise<{ engine: NovaStateEngine; host: RecordingHost; now: () => number }> {
   const host = new RecordingHost();
   const now = options.now ?? (() => 1_700_000_000_000);
-  const engine = new NovaStateEngine({
-    host,
-    executor: options.executor ?? new LocalGameExecutor(handlers()),
-    selfMemberId: "member-a",
-    now,
-    ...(options.historyLimit !== undefined ? { historyLimit: options.historyLimit } : {}),
-    ...(options.executorTimeoutMs !== undefined
-      ? { executorTimeoutMs: options.executorTimeoutMs }
-      : {}),
-  });
+  const engine = track(
+    new NovaStateEngine({
+      host,
+      executor: options.executor ?? new LocalGameExecutor(handlers()),
+      selfMemberId: "member-a",
+      now,
+      ...(options.historyLimit !== undefined ? { historyLimit: options.historyLimit } : {}),
+      ...(options.executorTimeoutMs !== undefined
+        ? { executorTimeoutMs: options.executorTimeoutMs }
+        : {}),
+    }),
+  );
   engine.beginGame();
   const ok = await engine.initializeAsAuthority();
   expect(ok).toBe(true);
@@ -140,13 +173,15 @@ describe("NovaStateEngine authority start", () => {
     expect(diagnostics.appliedCount).toBe(1); // the initial commit
   });
 
-  it("rejects an unstarted game: actions before start are refused", async () => {
+  it("rejects an unstarted game: actions before start are dropped (no authority)", async () => {
     const host = new RecordingHost();
-    const engine = new NovaStateEngine({
-      host,
-      executor: new LocalGameExecutor(handlers()),
-      selfMemberId: "member-a",
-    });
+    const engine = track(
+      new NovaStateEngine({
+        host,
+        executor: new LocalGameExecutor(handlers()),
+        selfMemberId: "member-a",
+      }),
+    );
     engine.handleInboundAction({
       actionId: "action-x",
       seq: 1,
@@ -156,9 +191,10 @@ describe("NovaStateEngine authority start", () => {
       sentAt: 1_700_000_000_000,
       senderMemberId: "member-b",
     });
-    expect(host.acks).toHaveLength(1);
-    expect(host.acks[0]?.ack.status).toBe("rejected");
-    expect(host.acks[0]?.ack.errorCode).toBe("not_started");
+    // S3 routing: only the current authority applies actions; an unstarted
+    // shell (no authority yet) drops dispatches — the sender re-sends once
+    // the authority is announced. The client blocks dispatch pre-start.
+    expect(host.acks).toHaveLength(0);
     expect(host.snapshots).toHaveLength(0);
   });
 });
@@ -468,11 +504,13 @@ describe("NovaStateEngine views and replication", () => {
 
   it("replicates snapshots into follower shells with processed action ids", async () => {
     const host = new RecordingHost();
-    const follower = new NovaStateEngine({
-      host,
-      executor: new LocalGameExecutor(null),
-      selfMemberId: "member-b",
-    });
+    const follower = track(
+      new NovaStateEngine({
+        host,
+        executor: new LocalGameExecutor(null),
+        selfMemberId: "member-b",
+      }),
+    );
     follower.handleSnapshot({
       revision: 7,
       stateHash: "a".repeat(64),
@@ -532,22 +570,47 @@ describe("NovaStateEngine views and replication", () => {
 
   it("tracks the authority and rejects announces from disconnected members", async () => {
     const host = new RecordingHost();
-    const engine = new NovaStateEngine({
-      host,
-      executor: new LocalGameExecutor(null),
-      selfMemberId: "member-b",
-    });
-    engine.handleAnnounce({ authorityMemberId: "member-x", stateRevision: 3 });
+    const engine = track(
+      new NovaStateEngine({
+        host,
+        executor: new LocalGameExecutor(null),
+        selfMemberId: "member-b",
+      }),
+    );
+    engine.handleAnnounce({ term: 1, authorityMemberId: "member-x", stateRevision: 3 });
     expect(engine.getAuthorityMemberId()).toBeNull(); // member-x not connected
-    engine.handleAnnounce({ authorityMemberId: "member-a", stateRevision: 3 });
+    engine.handleAnnounce({ term: 1, authorityMemberId: "member-a", stateRevision: 3 });
     expect(engine.getAuthorityMemberId()).toBe("member-a");
+    expect(engine.getTerm()).toBe(1);
   });
 
-  it("clears the authority when it leaves and keeps the committed state", async () => {
-    const { engine } = await startedEngine();
+  it("starts an election when the authority leaves and keeps the committed state", async () => {
+    const host = new RecordingHost();
+    const engine = track(
+      new NovaStateEngine({
+        host,
+        executor: new LocalGameExecutor(handlers()),
+        selfMemberId: "member-b",
+      }),
+    );
+    engine.beginGame();
+    engine.handleAnnounce({ term: 1, authorityMemberId: "member-a", stateRevision: 1 });
+    engine.handleSnapshot({
+      revision: 1,
+      stateHash: "a".repeat(64),
+      term: 1,
+      authorityMemberId: "member-a",
+      processedActionIds: [],
+      state: { count: 0, lastActor: null },
+    });
     expect(engine.getAuthorityMemberId()).toBe("member-a");
+    host.connected.delete("member-a"); // the transport dropped the authority
     engine.notifyAuthorityLeft();
+    // Suspicion is immediate on a dropped connection: the next term's
+    // election begins, and the last committed state is never corrupted.
     expect(engine.getAuthorityMemberId()).toBeNull();
+    expect(engine.getTerm()).toBe(2);
+    expect(engine.getDiagnostics().electionInProgress).toBe(true);
     expect(engine.getCanonicalState()).toEqual({ count: 0, lastActor: null });
     expect(engine.getDiagnostics().revision).toBe(1);
   });
@@ -556,16 +619,21 @@ describe("NovaStateEngine views and replication", () => {
 describe("NovaStateEngine diagnostics defaults", () => {
   it("reports empty diagnostics before any state", () => {
     const host = new RecordingHost();
-    const engine = new NovaStateEngine({
-      host,
-      executor: new LocalGameExecutor(null),
-      selfMemberId: "member-a",
-    });
+    const engine = track(
+      new NovaStateEngine({
+        host,
+        executor: new LocalGameExecutor(null),
+        selfMemberId: "member-a",
+      }),
+    );
     const diagnostics = engine.getDiagnostics();
     expect(diagnostics.revision).toBe(0);
     expect(diagnostics.stateSizeBytes).toBe(0);
     expect(diagnostics.stateHash).toBeNull();
     expect(diagnostics.authorityMemberId).toBeNull();
+    expect(diagnostics.term).toBe(1);
+    expect(diagnostics.electionInProgress).toBe(false);
+    expect(diagnostics.lastHeartbeatAt).toBeNull();
     expect(diagnostics.appliedCount).toBe(0);
     expect(diagnostics.rejectedCount).toBe(0);
     expect(diagnostics.actionRatePerSecond).toBe(0);
@@ -575,17 +643,19 @@ describe("NovaStateEngine diagnostics defaults", () => {
 describe("NovaStateEngine initial-state failures", () => {
   it("fails the start when createInitialState errors and never commits", async () => {
     const host = new RecordingHost();
-    const engine = new NovaStateEngine({
-      host,
-      executor: new LocalGameExecutor(
-        handlers({
-          createInitialState: () => {
-            throw new Error("bad initial state");
-          },
-        }),
-      ),
-      selfMemberId: "member-a",
-    });
+    const engine = track(
+      new NovaStateEngine({
+        host,
+        executor: new LocalGameExecutor(
+          handlers({
+            createInitialState: () => {
+              throw new Error("bad initial state");
+            },
+          }),
+        ),
+        selfMemberId: "member-a",
+      }),
+    );
     engine.beginGame();
     const ok = await engine.initializeAsAuthority();
     expect(ok).toBe(false);
@@ -608,11 +678,13 @@ async function startedEngineWithDefault(): Promise<{
   host: RecordingHost;
 }> {
   const host = new RecordingHost();
-  const engine = new NovaStateEngine({
-    host,
-    executor: new LocalGameExecutor(null),
-    selfMemberId: "member-a",
-  });
+  const engine = track(
+    new NovaStateEngine({
+      host,
+      executor: new LocalGameExecutor(null),
+      selfMemberId: "member-a",
+    }),
+  );
   engine.beginGame();
   const ok = await engine.initializeAsAuthority();
   expect(ok).toBe(true);

@@ -12,6 +12,8 @@ import {
   actionDispatchMessageSchema,
   assertPeerMessage,
   authorityAnnouncementMessageSchema,
+  authorityElectionMessageSchema,
+  authorityHeartbeatMessageSchema,
   gameEndMessageSchema,
   gameReadyMessageSchema,
   gameStartMessageSchema,
@@ -203,6 +205,56 @@ export function buildAuthorityAnnounceMessage(
       stateRevision: input.stateRevision,
       ...(input.stateHash !== undefined ? { stateHash: input.stateHash } : {}),
       eligibleMemberIds: input.eligibleMemberIds,
+    }),
+  );
+}
+
+/** Build and validate an `authority.heartbeat` message (S3). */
+export function buildAuthorityHeartbeatMessage(
+  base: PeerMessageBase,
+  input: {
+    seq: number;
+    term: number;
+    authorityMemberId: string;
+    stateRevision: number;
+    heartbeatSeq: number;
+  },
+): PeerMessage {
+  return assertPeerMessage(
+    authorityHeartbeatMessageSchema.parse({
+      ...envelope(base),
+      seq: input.seq,
+      type: "authority.heartbeat",
+      term: input.term,
+      authorityMemberId: input.authorityMemberId,
+      stateRevision: input.stateRevision,
+      heartbeatSeq: input.heartbeatSeq,
+    }),
+  );
+}
+
+/** Build and validate an `authority.election` message (S3). */
+export function buildAuthorityElectionMessage(
+  base: PeerMessageBase,
+  input: {
+    seq: number;
+    term: number;
+    candidateMemberId: string;
+    observed: readonly { memberId: string; revision: number; stateHash?: string }[];
+  },
+): PeerMessage {
+  return assertPeerMessage(
+    authorityElectionMessageSchema.parse({
+      ...envelope(base),
+      seq: input.seq,
+      type: "authority.election",
+      term: input.term,
+      candidateMemberId: input.candidateMemberId,
+      observed: input.observed.map((observation) => ({
+        memberId: observation.memberId,
+        revision: observation.revision,
+        ...(observation.stateHash !== undefined ? { stateHash: observation.stateHash } : {}),
+      })),
     }),
   );
 }

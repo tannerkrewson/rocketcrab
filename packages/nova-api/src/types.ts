@@ -173,7 +173,8 @@ export interface NovaActionAck {
 /**
  * State-size and action-rate diagnostics (S2 acceptance: diagnostics are
  * visible to the host and the arena). Values reflect the last committed
- * canonical state.
+ * canonical state. S3 adds the authority election state so the arena can
+ * force and display migration (ADR-0007 acceptance).
  */
 export interface NovaStateDiagnostics {
   /** Current canonical revision (0 before the first snapshot). */
@@ -184,6 +185,12 @@ export interface NovaStateDiagnostics {
   readonly stateHash: string | null;
   /** The current authority's member id, or null when none is known. */
   readonly authorityMemberId: string | null;
+  /** Current authority term (monotonic; ADR-0007 S3). */
+  readonly term: number;
+  /** True while this shell is campaigning (election in progress). */
+  readonly electionInProgress: boolean;
+  /** Epoch ms of the last heartbeat received from the current authority. */
+  readonly lastHeartbeatAt: number | null;
   /** Actions applied so far (committed). */
   readonly appliedCount: number;
   /** Actions rejected/superseded so far. */
