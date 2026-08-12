@@ -25,6 +25,7 @@ import {
   type RuntimeErrorMessage,
   type RuntimeMessage,
 } from "@rocketcrab/protocol";
+import { isSupportedApiVersion } from "@rocketcrab/nova-api/version";
 import { classifyHtmlSource } from "./html-source";
 import {
   buildConsoleMessage,
@@ -37,9 +38,11 @@ import {
 import {
   NOVA_BRIDGE_SCRIPT,
   gameDeclarationSchema,
+  novaApiCallSchemas,
   registrationFields,
   serializeConsoleArgs,
   type GameDeclaration,
+  type NovaApiCallMethod,
 } from "./nova-bridge";
 import { RateLimitedSink, createRuntimeLimiters, type RateLimiter } from "./rate-limiter";
 
@@ -306,6 +309,14 @@ export class RuntimeInstance {
       case "defineGame":
         this.handleDeclaration(payload);
         break;
+      case "ready":
+      case "dispatch":
+      case "raw.createChannel":
+      case "raw.send":
+      case "simulation.register":
+      case "simulation.sendInput":
+        this.handleApiCall(kind, payload);
+        break;
       case "error":
         this.handleGameError(payload);
         break;
@@ -337,6 +348,13 @@ export class RuntimeInstance {
       return;
     }
     const declaration = parsed.data as GameDeclaration;
+    if (declaration.apiVersion !== undefined && !isSupportedApiVersion(declaration.apiVersion)) {
+      this.sendError(
+        "unsupported",
+        `nova.defineGame targets API version ${String(declaration.apiVersion)}, which this build cannot serve; registration ignored.`,
+      );
+      return;
+    }
     const fields = registrationFields({
       bootstrapGameId: this.gameId,
       bootstrapGameMode: this.gameMode,
@@ -347,6 +365,25 @@ export class RuntimeInstance {
     this.clearRegistrationTimer();
     this.send(buildRegistrationMessage(this.runtimeInstanceId, fields, this.sessionId));
     this.send(buildLifecycleMessage(this.runtimeInstanceId, "started", undefined, this.sessionId));
+  }
+
+  /**
+   * A forwarded Nova API call (S1): validate the payload, then surface it
+   * clearly. No host-side session router exists before the arena/party
+   * milestones (U6/P1/S2), so a validated call cannot be performed yet and
+   * is reported as `unsupported` — never silently dropped. The session
+   * router milestones replace this branch with real forwarding.
+   */
+  private handleApiCall(method: NovaApiCallMethod, payload: unknown): void {
+    const parsed = novaApiCallSchemas[method].safeParse(payload);
+    if (!parsed.success) {
+      this.sendError("runtime", `nova.${method}() call failed validation; ignored.`);
+      return;
+    }
+    this.sendError(
+      "unsupported",
+      `nova.${method}() is not available in this build yet: the host has not connected this game to a party session.`,
+    );
   }
 
   private handleGameError(payload: unknown): void {
