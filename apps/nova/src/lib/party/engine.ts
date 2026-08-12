@@ -152,6 +152,8 @@ export interface PartyEngineConfig {
   transportFactory?: PartyTransportFactory;
   runtimeOrigin?: string;
   seams?: PartyRuntimeSeams;
+  /** Player identity override (tests run several engines on one page). */
+  identity?: { memberId: string; displayName: string };
   /** Party-layer scheduler (deterministic tests). */
   schedule?: Scheduler;
   /** Party-layer secret derivation (deterministic tests). */
@@ -225,8 +227,15 @@ interface PartyEngineDefaults {
   advertIntervalMs: number;
 }
 
+/** A stable member identity (ADR-0007); defaults to the page identity. */
+interface PartyMemberIdentity {
+  readonly memberId: string;
+  readonly displayName: string;
+}
+
 export class PartyEngine {
   private readonly defaults: PartyEngineDefaults;
+  private readonly identity: PartyMemberIdentity;
   private readonly schedule?: Scheduler;
   private readonly derive?: PartySecretDerivation;
   private readonly diagnosticsProvider?: () => unknown;
@@ -271,6 +280,7 @@ export class PartyEngine {
       admissionTimeoutMs: config.admissionTimeoutMs ?? 30_000,
       advertIntervalMs: config.advertIntervalMs ?? 5_000,
     };
+    this.identity = config.identity ?? localPartyIdentity();
     this.schedule = config.schedule;
     this.derive = config.derive;
     this.diagnosticsProvider = config.diagnostics;
@@ -283,7 +293,7 @@ export class PartyEngine {
   /** The current state snapshot. */
   getState(): PartyEngineState {
     const party = this.party;
-    const identity = localPartyIdentity();
+    const identity = this.identity;
     const members = this.buildMembers();
     const allReady = members.length > 0 && members.every((member) => member.ready);
     const allVerified =
@@ -389,7 +399,7 @@ export class PartyEngine {
    */
   async createParty(input: PartySourceSpec): Promise<void> {
     this.assertIdle();
-    const identity = localPartyIdentity();
+    const identity = this.identity;
     this.phase = "creating";
     this.phaseDetail = "Generating your room code…";
     this.lastError = null;
@@ -424,7 +434,7 @@ export class PartyEngine {
   /** Join a party by its four-letter code. */
   async joinByCode(code: string): Promise<void> {
     this.assertIdle();
-    const identity = localPartyIdentity();
+    const identity = this.identity;
     this.phase = "joining";
     this.phaseDetail = `Joining party ${code.toUpperCase()}…`;
     this.lastError = null;
@@ -459,7 +469,7 @@ export class PartyEngine {
   /** Join a party from an invite-link secret (ADR-0011). */
   async joinByInvite(input: { secret: string; code?: string }): Promise<void> {
     this.assertIdle();
-    const identity = localPartyIdentity();
+    const identity = this.identity;
     this.phase = "joining";
     this.phaseDetail = "Joining the party from your invite…";
     this.lastError = null;
@@ -667,8 +677,8 @@ export class PartyEngine {
       room: party.material.roomId,
       sessionId: party.material.sessionId,
       player: {
-        memberId: localPartyIdentity().memberId,
-        displayName: localPartyIdentity().displayName,
+        memberId: this.identity.memberId,
+        displayName: this.identity.displayName,
       },
       game: { gameId: "party", mode: "state" },
     });
@@ -695,7 +705,7 @@ export class PartyEngine {
       })
       .then(() => {
         this.selfVerified = true;
-        this.transfers.set(localPartyIdentity().memberId, {
+        this.transfers.set(this.identity.memberId, {
           fraction: 1,
           bytesTransferred: input.source.length,
           totalBytes: input.source.length,
@@ -759,8 +769,8 @@ export class PartyEngine {
         gameMode: source.mode,
         gameSource: source.source,
         player: {
-          memberId: localPartyIdentity().memberId,
-          displayName: localPartyIdentity().displayName,
+          memberId: this.identity.memberId,
+          displayName: this.identity.displayName,
         },
         gameTitle: source.title,
         sessionId: this.party?.material.sessionId,
@@ -906,7 +916,7 @@ export class PartyEngine {
       case "greeter":
         this.addNotice(
           "info",
-          event.greeterMemberId === localPartyIdentity().memberId
+          event.greeterMemberId === this.identity.memberId
             ? "You are now the party greeter (the four-letter code's host)."
             : `${this.displayNameOf(event.greeterMemberId)} is now the party greeter.`,
         );
@@ -994,6 +1004,11 @@ export class PartyEngine {
           fraction: 1,
           detail: "Game received",
         });
+        if (event.direction === "receive") {
+          // The peer who SENT us the game obviously holds a verified source;
+          // mark its row complete so this player's start gate can open.
+          this.markSourceVerified(event.memberId, "Sent you the game");
+        }
         this.addNotice(
           "info",
           event.direction === "send"
@@ -1005,11 +1020,13 @@ export class PartyEngine {
       }
       case "received": {
         this.selfVerified = true;
-        this.recordTransfer(localPartyIdentity().memberId, {
+        this.recordTransfer(this.identity.memberId, {
           state: "complete",
           fraction: 1,
           detail: "Game received",
         });
+        // The sender (the host) holds the verified source too.
+        this.markSourceVerified(event.fromMemberId, "Sent you the game");
         // The joiner can now boot its runtime frame with the verified source.
         this.pendingSource = {
           gameId: event.gameId,
@@ -1023,14 +1040,14 @@ export class PartyEngine {
         break;
       }
       case "verificationFailed": {
-        this.recordTransfer(localPartyIdentity().memberId, {
+        this.recordTransfer(this.identity.memberId, {
           state: "failed",
           fraction: null,
           detail: event.errorMessage,
         });
         this.addNotice(
           "error",
-          `Game verification failed for ${this.displayNameOf(localPartyIdentity().memberId)}: ${event.errorMessage}`,
+          `Game verification failed for ${this.displayNameOf(this.identity.memberId)}: ${event.errorMessage}`,
         );
         this.emit();
         break;
@@ -1050,7 +1067,7 @@ export class PartyEngine {
         break;
       }
       case "incompatible": {
-        this.recordTransfer(localPartyIdentity().memberId, {
+        this.recordTransfer(this.identity.memberId, {
           state: "incompatible",
           fraction: null,
           detail: event.reason,
@@ -1088,7 +1105,7 @@ export class PartyEngine {
    * verification failures).
    */
   private transferTarget(event: GameSourceTransferEvent): MemberId {
-    const self = localPartyIdentity().memberId;
+    const self = this.identity.memberId;
     switch (event.type) {
       case "progress":
         return event.progress.direction === "receive" ? self : event.progress.memberId;
@@ -1111,7 +1128,7 @@ export class PartyEngine {
     // ("Peer <id> could not receive ..."). Joiner side: failures concern
     // this player's own receive transfer.
     const peerMatch = /^Peer (\S+) could not receive/u.exec(error.message);
-    const memberId = peerMatch?.[1] ?? localPartyIdentity().memberId;
+    const memberId = peerMatch?.[1] ?? this.identity.memberId;
     this.recordTransfer(memberId, {
       state: "failed",
       fraction: null,
@@ -1160,7 +1177,7 @@ export class PartyEngine {
 
   private buildMembers(): PartyMemberView[] {
     const party = this.party;
-    const identity = localPartyIdentity();
+    const identity = this.identity;
     const peers = party?.privateTransport.peers ?? [];
     const memberIds = party === null ? [identity.memberId] : party.members;
     const members: PartyMemberView[] = [];
@@ -1211,7 +1228,7 @@ export class PartyEngine {
   }
 
   private displayNameOf(memberId: MemberId): string {
-    const identity = localPartyIdentity();
+    const identity = this.identity;
     if (memberId === identity.memberId) {
       return identity.displayName;
     }
@@ -1227,10 +1244,28 @@ export class PartyEngine {
   }
 
   private isSourceVerified(memberId: MemberId): boolean {
-    if (memberId === localPartyIdentity().memberId) {
+    if (memberId === this.identity.memberId) {
       return this.selfVerified;
     }
     return this.transfers.get(memberId)?.state === "complete";
+  }
+
+  /** Mark a member as holding a verified game source. */
+  private markSourceVerified(memberId: MemberId, detail: string): void {
+    const previous = this.transfers.get(memberId);
+    const existing: TransferState = previous ?? {
+      fraction: 1,
+      bytesTransferred: 0,
+      totalBytes: 0,
+      state: "complete",
+      detail: null,
+    };
+    this.transfers.set(memberId, {
+      ...existing,
+      state: "complete",
+      fraction: 1,
+      detail,
+    });
   }
 
   private recordTransfer(
