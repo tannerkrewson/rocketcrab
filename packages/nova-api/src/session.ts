@@ -572,8 +572,11 @@ export class NovaSession implements NovaClientBackend {
    */
   closeRawChannel(name: string): void {
     this.assertAlive();
-    if (!this.channels.has(name)) {
-      return; // idempotent close (A2 lifecycle rule)
+    const channel = this.channels.get(name);
+    // Only a self declaration can be closed; peer declarations are
+    // informational (idempotent close for unknown/peer-only channels).
+    if (channel === undefined || !channel.declaredBySelf) {
+      return;
     }
     this.channels.delete(name);
     void this.sendProtocol((base) => buildRawChannelCloseMessage(base, name)).catch(
@@ -584,7 +587,10 @@ export class NovaSession implements NovaClientBackend {
   async sendRaw(name: string, payload: unknown, options: NovaRawSendOptions = {}): Promise<void> {
     this.assertAlive();
     const channel = this.channels.get(name);
-    if (channel === undefined) {
+    // Sending requires THIS session's own declaration (S1 rule: create a
+    // channel before sending on it). Peer declarations are lifecycle
+    // bookkeeping only and never authorize sends.
+    if (channel === undefined || !channel.declaredBySelf) {
       throw new NovaError(
         "unknown_channel",
         `No raw channel named "${name}" was created (nova.raw.createChannel first).`,

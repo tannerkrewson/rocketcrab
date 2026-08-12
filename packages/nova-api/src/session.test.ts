@@ -220,6 +220,30 @@ describe("NovaSession raw channels (A2)", () => {
     expect(() => a.client.raw.close("nope")).not.toThrow();
   });
 
+  it("never re-authorizes sends on a closed channel via peer re-announcements", async () => {
+    const { hub, a, b } = await makeRawPair();
+    a.client.raw.createChannel({ name: "chat" });
+    b.client.raw.createChannel({ name: "chat" });
+    await settle(hub);
+    a.client.raw.close("chat");
+    await settle(hub);
+
+    // A reconnects: B re-announces its own "chat" declaration to A (peer
+    // lifecycle mid-channel). The peer declaration must NOT re-authorize A
+    // to send on the channel A closed.
+    await a.transport.reconnect();
+    await settle(hub);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const aErrors: Array<{ code: string }> = [];
+    a.client.onError((error) => aErrors.push({ code: error.code }));
+    a.client.raw.send("chat", "hi");
+    await settle(hub);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(aErrors).toEqual([{ code: "unknown_channel" }]);
+    expect(a.getRawDiagnostics().selfDeclaredChannelCount).toBe(0);
+    expect(a.getRawDiagnostics().channelCount).toBe(1); // peer declaration only
+  });
+
   it("drops a peer-closed channel when this session did not declare it", async () => {
     const { hub, a, b } = await makeRawPair();
     a.client.raw.createChannel({ name: "chat" });

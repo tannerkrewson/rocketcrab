@@ -73,9 +73,11 @@ nova.simulation.sendInput({ type: "move", payload: { dx: 1 } }); // after start
 nova.raw.createChannel({ name: "chat", reliable: true, ordered: true, binary: false });
 nova.raw.send("chat", { text: "hi" }); // broadcast
 nova.raw.send("chat", "hi", { to: "member-2" }); // targeted
+nova.raw.send("chat", bigPayload, { onProgress: (p) => {} }); // chunk progress
 nova.raw.onMessage("chat", (message) => {
   /* { from, payload, binary } */
 });
+nova.raw.close("chat"); // channel lifecycle: local sends then fail
 
 // --- Errors ---
 nova.onError((error) => {
@@ -89,8 +91,11 @@ nova.onError((error) => {
 2. **Call `nova.ready()` once after loading.** The game starts when the host
    says so; you observe it with `onStart`.
 3. **Sending calls only work after start.** `dispatch`, `raw.createChannel`,
-   `raw.send`, and `simulation.sendInput` before `onStart` throw
-   `not_started`; after `onEnd` they throw `ended`.
+   `raw.close`, `raw.send`, and `simulation.sendInput` before `onStart`
+   throw `not_started`; after `onEnd` they throw `ended`. Raw send failures
+   (unknown channel, over the size/rate limits, not connected) arrive via
+   `nova.onError` with a stable `code` (`unknown_channel`,
+   `payload_too_large`, `rate_limited`, `not_connected`).
 4. **Never call methods this version does not have.** They fail loudly.
 5. **Every payload is plain JSON data.** No functions, no cycles, no BigInt,
    no DOM objects. Binary (`Uint8Array`/`ArrayBuffer`) only on raw channels.
