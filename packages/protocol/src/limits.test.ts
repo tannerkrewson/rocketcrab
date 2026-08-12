@@ -7,6 +7,8 @@ import {
   actionRatePerSecond,
   actionTimeoutMs,
   actionWarnRatePerSecond,
+  authorityGracePeriodMs,
+  authorityHeartbeatIntervalMs,
   errorReportRatePerSecond,
   errorReportWarnRatePerSecond,
   handshakeTimeoutMs,
@@ -32,6 +34,8 @@ describe("protocol limits", () => {
     expect(errorReportRatePerSecond).toBe(5);
     expect(handshakeTimeoutMs).toBe(30_000);
     expect(actionTimeoutMs).toBe(10_000);
+    expect(authorityHeartbeatIntervalMs).toBe(1_000);
+    expect(authorityGracePeriodMs).toBe(5_000);
   });
 
   it("keeps warn thresholds below hard limits", () => {

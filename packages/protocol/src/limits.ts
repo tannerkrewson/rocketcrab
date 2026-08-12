@@ -60,6 +60,20 @@ export const handshakeTimeoutMs = 30_000;
  */
 export const actionTimeoutMs = 10_000;
 
+/**
+ * Authority heartbeat interval (ADR-0007 S3). The current authority
+ * broadcasts one heartbeat per interval so followers can detect silent loss;
+ * missing heartbeats begin the grace period.
+ */
+export const authorityHeartbeatIntervalMs = 1_000;
+
+/**
+ * Authority grace period (ADR-0007 S3): how long a follower waits without a
+ * heartbeat (or announcement/snapshot from the authority) before suspecting
+ * the authority and starting an election.
+ */
+export const authorityGracePeriodMs = 5_000;
+
 /** The complete limits table, typed. */
 export const LIMITS = {
   htmlSourceBytes,
@@ -78,6 +92,8 @@ export const LIMITS = {
   errorReportWarnRatePerSecond,
   handshakeTimeoutMs,
   actionTimeoutMs,
+  authorityHeartbeatIntervalMs,
+  authorityGracePeriodMs,
 } as const;
 
 export type Limits = typeof LIMITS;
