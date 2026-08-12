@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { readFileSync } from "node:fs";
-import path from "node:path";
+// The complete S4 example game document, verbatim (Vite ?raw import).
+import EXAMPLE_GAME_SOURCE from "../../../../examples/games/nova-quiz.html?raw";
 import { parseInviteFragment, type PartyTransportFactory } from "@rocketcrab/party";
 import { InMemoryTransportHub } from "@rocketcrab/testing";
 import type { ChannelPort } from "../runtime-host";
@@ -552,9 +552,7 @@ const EXAMPLE_GAME = {
   gameId: "game_nova_quiz_1",
   title: "Nova Quiz",
   mode: "state" as const,
-  // Vitest runs from the workspace root of apps/nova; the example game
-  // lives at the repository root's examples/games directory.
-  source: readFileSync(path.join(process.cwd(), "../../examples/games/nova-quiz.html"), "utf8"),
+  source: EXAMPLE_GAME_SOURCE,
 };
 
 describe("the S4 example game over the party flow", () => {

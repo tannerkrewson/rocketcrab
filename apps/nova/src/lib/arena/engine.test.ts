@@ -404,6 +404,32 @@ describe("ArenaEngine — network controls", () => {
     expect(engine.getSnapshot().summary.success).toBe(true);
   });
 
+  it("the authority badge moves off a suspended player after migration", async () => {
+    const { engine } = await started();
+    expect(engine.getSnapshot().authorityPlayerId).toBe("player-1");
+
+    // Suspend the authority (simulated backgrounded phone, issue step 10):
+    // peers suspect immediately, elect the next-lowest connected member, and
+    // the arena badge follows the session diagnostics.
+    await engine.suspendPlayer("player-1");
+    await vi.waitFor(
+      () => {
+        expect(engine.getSnapshot().authorityPlayerId).toBe("player-2");
+      },
+      { timeout: 10_000, interval: 100 },
+    );
+
+    // Resume: the reconnected player catches up and the game keeps running.
+    await engine.resumePlayer("player-1");
+    await vi.waitFor(
+      () => {
+        expect(engine.getSnapshot().players[0]?.sessionStatus).toBe("connected");
+      },
+      { timeout: 10_000, interval: 100 },
+    );
+    expect(engine.getSnapshot().summary.success).toBe(true);
+  });
+
   it("applies shared latency and drop-message settings", async () => {
     const { engine } = await started();
     engine.setLatency(250);

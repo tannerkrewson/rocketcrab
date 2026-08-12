@@ -16,16 +16,12 @@
  * (`globalThis.__novaQuizConfig`), which nothing sets in a real browser.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { readFileSync } from "node:fs";
-import type { NovaTransport } from "@rocketcrab/core";
-import { InMemoryTransportHub } from "@rocketcrab/testing";
+import { InMemoryTransportHub, type InMemoryTransport } from "@rocketcrab/testing";
+// The single-file example game, verbatim (Vite ?raw import; the tests
+// execute the exact source that runs in the arena and real parties).
+import GAME_SOURCE from "../../../examples/games/nova-quiz.html?raw";
 import { createNovaSession, type NovaSession, type NovaSessionOptions } from "./session";
 import type { NovaAction } from "./types";
-
-const GAME_SOURCE = readFileSync(
-  new URL("../../../examples/games/nova-quiz.html", import.meta.url),
-  "utf8",
-);
 
 /** Extract the game's inline module script (the only part we execute). */
 function extractModuleScript(html: string): string {
@@ -67,7 +63,7 @@ interface QuizView {
 interface World {
   hub: InMemoryTransportHub;
   sessions: NovaSession[];
-  transports: NovaTransport[];
+  transports: InMemoryTransport[];
 }
 
 /** Short election timings for the migration test (deterministic + fast). */

@@ -1312,6 +1312,14 @@ export class NovaSession implements NovaClientBackend {
         // Flush buffered dispatches toward the new authority and re-send
         // in-flight ones (deduplication makes the re-sends exactly-once).
         this.flushDispatchBuffer();
+        // Host-side observability (S3 acceptance: the arena can display the
+        // elected authority and migration as it happens). Games never see
+        // this event; the game-facing client ignores it.
+        this.emit({
+          type: "authorityChanged",
+          authorityMemberId: event.authorityMemberId,
+          term: event.term,
+        });
         break;
       case "electionStarted":
         // Host/arena diagnostics only (visible through getStateModeDiagnostics).
