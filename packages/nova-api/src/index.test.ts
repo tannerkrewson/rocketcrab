@@ -25,6 +25,7 @@ function fakeBackend(): NovaClientBackend {
       return Promise.resolve();
     },
     createRawChannel() {},
+    closeRawChannel() {},
     sendRaw() {},
     registerSimulation() {},
     sendSimulationInput() {},

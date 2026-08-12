@@ -160,6 +160,7 @@ describe("novaApiCallSchemas", () => {
         options: { to: "member-2" },
       }).success,
     ).toBe(true);
+    expect(novaApiCallSchemas["raw.close"].safeParse({ name: "chat" }).success).toBe(true);
     expect(
       novaApiCallSchemas["simulation.sendInput"].safeParse({
         input: { type: "move", tick: 3 },
@@ -181,6 +182,7 @@ describe("novaApiCallSchemas", () => {
       novaApiCallSchemas["raw.createChannel"].safeParse({ spec: { name: "x".repeat(65) } }).success,
     ).toBe(false);
     expect(novaApiCallSchemas["raw.send"].safeParse({ name: "chat" }).success).toBe(false);
+    expect(novaApiCallSchemas["raw.close"].safeParse({ name: "x".repeat(65) }).success).toBe(false);
     expect(
       novaApiCallSchemas["simulation.sendInput"].safeParse({ input: { type: "move", tick: -1 } })
         .success,

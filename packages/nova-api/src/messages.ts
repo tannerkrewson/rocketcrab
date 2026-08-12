@@ -18,6 +18,7 @@ import {
   gameReadyMessageSchema,
   gameStartMessageSchema,
   playerIdentityMessageSchema,
+  rawChannelCloseMessageSchema,
   rawChannelMetadataMessageSchema,
   simulationInputMessageSchema,
   stateSnapshotMessageSchema,
@@ -275,6 +276,20 @@ export function buildRawChannelMessage(
       ...envelope(base),
       type: "raw.channel",
       ...spec,
+    }),
+  );
+}
+
+/** Build and validate a `raw.close` announcement (A2 channel lifecycle). */
+export function buildRawChannelCloseMessage(
+  base: PeerMessageBase,
+  channelName: string,
+): PeerMessage {
+  return assertPeerMessage(
+    rawChannelCloseMessageSchema.parse({
+      ...envelope(base),
+      type: "raw.close",
+      channelName,
     }),
   );
 }

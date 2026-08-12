@@ -438,6 +438,7 @@ describe("RuntimeInstance protocol boundary", () => {
     });
     hook().report("raw.createChannel", { spec: { name: "chat" } });
     hook().report("raw.send", { name: "chat", payload: "hi", options: { to: "member-2" } });
+    hook().report("raw.close", { name: "chat" });
     hook().report("simulation.register", {});
     hook().report("simulation.sendInput", { input: { type: "move", tick: 3 } });
     hook().report("stateResponse", {
@@ -445,10 +446,11 @@ describe("RuntimeInstance protocol boundary", () => {
       result: { kind: "view", ok: true, view: { hand: "ace" } },
     });
     const calls = port.sent.filter((m) => (m as { type: string }).type === "game.apiCall");
-    expect(calls).toHaveLength(7);
+    expect(calls).toHaveLength(8);
     const byMethod = new Map(calls.map((m) => [(m as { method: string }).method, m]));
     expect([...byMethod.keys()].sort()).toEqual([
       "dispatch",
+      "raw.close",
       "raw.createChannel",
       "raw.send",
       "ready",
