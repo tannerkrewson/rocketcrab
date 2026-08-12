@@ -2,7 +2,15 @@ import { PROTOCOL_VERSION, type GameMode } from "@rocketcrab/protocol";
 import type { SavedGame } from "@rocketcrab/core";
 import { Link, useBlocker, useNavigate } from "@tanstack/react-router";
 import { ClipboardPaste, CopyPlus, Eraser, Play, Save } from "lucide-react";
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  createContext,
+} from "react";
 import { toast } from "sonner";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
@@ -17,7 +25,7 @@ import {
   type ConsoleEntry,
   type Diagnostic,
 } from "../../lib/editor/diagnostics";
-import { useRuntimeSession, type RuntimeStatus } from "../../lib/editor/runtime-session";
+import { useRuntimeSession } from "../../lib/editor/runtime-session";
 import { formatBytes, validateSource } from "../../lib/editor/validation";
 import { readFromClipboard, writeToClipboard } from "../../lib/editor/clipboard";
 import { CodeEditor } from "./CodeEditor";
@@ -30,14 +38,14 @@ export const DEFAULT_GAME_TITLE = "Untitled game";
 export const MAX_CONSOLE_ENTRIES = 100;
 export const MAX_DIAGNOSTICS = 50;
 
-export interface EditorPageProps {
-  /** The saved game being edited; undefined on the /create route. */
-  game?: SavedGame;
-  /** Test seams forwarded to RuntimeHostClient (no-op in production). */
+/** Test seams forwarded to RuntimeHostClient (no-op in production). */
+export interface EditorRuntimeSeams {
   createChannel?: () => { port1: ChannelPort; port2: unknown };
   waitForFrameLoad?: (iframe: HTMLIFrameElement) => Promise<void>;
   bootstrapTimeoutMs?: number;
 }
+
+export const EditorRuntimeSeamsContext = createContext<EditorRuntimeSeams>({});
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
@@ -84,19 +92,17 @@ function useIsDesktop(): boolean {
  * always destroys and recreates the runtime frame (no hot-module
  * replacement); unsaved source is never written over the saved version.
  */
-export function EditorPage({
-  game,
-  createChannel,
-  waitForFrameLoad,
-  bootstrapTimeoutMs,
-}: EditorPageProps) {
+export function EditorPage({ game }: { game?: SavedGame }) {
   const navigate = useNavigate();
   const createGame = useCreateGame();
   const updateGame = useUpdateGame();
   const recordTestResults = useRecordTestResults();
+  const seams = useContext(EditorRuntimeSeamsContext);
 
   const savedSource = game?.html ?? "";
-  const savedTitle = game?.title ?? DEFAULT_GAME_TITLE;
+  // New-game mode starts with an empty title; the game's declared title
+  // (nova.defineGame) fills the gap on save when the creator typed nothing.
+  const savedTitle = game?.title ?? "";
 
   const [source, setSource] = useState(savedSource);
   const [title, setTitle] = useState(savedTitle);
@@ -188,9 +194,11 @@ export function EditorPage({
     runtimeOrigin: runtimeOriginForMainOrigin(window.location.origin),
     containerRef: activePreviewRef,
     onEvent: (event) => handleRuntimeEventRef.current(event),
-    ...(createChannel !== undefined ? { createChannel } : {}),
-    ...(waitForFrameLoad !== undefined ? { waitForFrameLoad } : {}),
-    ...(bootstrapTimeoutMs !== undefined ? { bootstrapTimeoutMs } : {}),
+    ...(seams.createChannel !== undefined ? { createChannel: seams.createChannel } : {}),
+    ...(seams.waitForFrameLoad !== undefined ? { waitForFrameLoad: seams.waitForFrameLoad } : {}),
+    ...(seams.bootstrapTimeoutMs !== undefined
+      ? { bootstrapTimeoutMs: seams.bootstrapTimeoutMs }
+      : {}),
   });
 
   const runStatus = session.status;
@@ -279,7 +287,9 @@ export function EditorPage({
     if (savingRef.current) return;
     savingRef.current = true;
     try {
-      const nextTitle = title.trim() || DEFAULT_GAME_TITLE;
+      // The game may declare its own title via nova.defineGame; honor it
+      // when the creator hasn't typed one.
+      const nextTitle = title.trim() || registration?.title || DEFAULT_GAME_TITLE;
       if (game) {
         await updateGame.mutateAsync({
           id: game.id,
@@ -316,7 +326,7 @@ export function EditorPage({
     if (savingRef.current) return;
     savingRef.current = true;
     try {
-      const baseTitle = title.trim() || DEFAULT_GAME_TITLE;
+      const baseTitle = title.trim() || registration?.title || DEFAULT_GAME_TITLE;
       const created = await createGame.mutateAsync({
         title: `${baseTitle} (copy)`,
         html: source,
