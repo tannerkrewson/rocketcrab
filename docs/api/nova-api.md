@@ -568,6 +568,69 @@ on raw channels.
 
 ---
 
+## 14.5 Mobile Safari notes (M1; ADR-0012)
+
+Mobile Safari is a first-class Nova platform, and it is the most
+restrictive browser in scope. Game code that follows these notes behaves
+the same on phones and desktops.
+
+### Audio requires a user gesture
+
+Web Audio contexts start **suspended** on Mobile Safari. Create or resume
+the `AudioContext` inside a tap/click handler — never on page load — and
+the game's first sound happens after the player's first tap:
+
+```js
+var started = false;
+document.addEventListener("pointerdown", function resume() {
+  if (started) return;
+  started = true;
+  if (ctx && ctx.state === "suspended") ctx.resume();
+});
+```
+
+- Show a visible "tap to enable sound" affordance in the first frame;
+  players do not assume audio is on.
+- The silent switch still mutes output on iPhones; the game cannot
+  override it (document it in-game if audio matters).
+- `AudioContext`/`AudioBuffer` and `Web Audio` after a gesture are
+  verified working inside the runtime frame (F4 capability matrix).
+
+### Camera and microphone permissions
+
+- `getUserMedia` inside the game frame triggers the ordinary Safari
+  permission prompt (permission delegation is wired through the runtime
+  frame chain).
+- Permissions are origin-wide: granting for one game grants the runtime
+  origin, so revoke in Settings → Safari if you want to re-test the prompt.
+- The camera/mic permission prompt requires the game frame to be visible;
+  never call `getUserMedia` before the game registered or while the page
+  is backgrounded.
+
+### Lifecycle: your game can be suspended
+
+- When the phone backgrounds, timers, `requestAnimationFrame`, and network
+  connections **stop** (iOS freezes the page; the tab may even be
+  reloaded). Do not assume time advanced while away — derive elapsed time
+  from the state/views Nova delivers, not from local timers.
+- On return (or after a reconnect), the game receives its current state
+  again (state catch-up / snapshot) and continues from where it was. The
+  shell shows a reconnect screen with progress while this happens.
+- Keep the whole game playable touch-only: no hover-only controls, no
+  keyboard-required inputs, buttons ≥ ~44 px. Fullscreen and pointer lock
+  are **unsupported on iPhone Safari** — games must not require them.
+- Device orientation/motion permission is **denied inside the game frame**
+  (F4 finding): do not build tilt-dependent games in this build.
+
+### Where to verify on real phones
+
+The physical-device checklist (`docs/testing/mobile-safari-checklist.md`)
+lists every lifecycle/permission/layout scenario that must be run on
+physical iPhones at release validation (M4). Playwright WebKit in CI is a
+supplement, never a substitute.
+
+---
+
 ## 15. Deliberate non-goals (S1/S2)
 
 - S1 shipped the common surface without mode semantics; S2 shipped the full
