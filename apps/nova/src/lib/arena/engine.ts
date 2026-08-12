@@ -35,6 +35,9 @@ import { RuntimeHostClient, type ChannelPort, type RuntimeHostEvent } from "../r
 import { arenaApiCallSchemas } from "./api-calls";
 import {
   createFrameStateExecutor,
+  createFrameSimulationExecutor,
+  type FrameSimulationExecutor,
+  type FrameSimulationResponsePayload,
   type FrameStateExecutor,
   type FrameStateResponsePayload,
 } from "./state-executor";
@@ -44,6 +47,7 @@ import type {
   ArenaPlayerRunState,
   ArenaRegistration,
   ArenaRunOutcome,
+  ArenaSimulationDiagnostics,
   ArenaState,
   ArenaStateDiagnostics,
   ArenaSummary,
@@ -116,6 +120,7 @@ interface PlayerRuntime {
   transport: InMemoryTransport | null;
   session: NovaSession | null;
   stateExecutor: FrameStateExecutor | null;
+  simulationExecutor: FrameSimulationExecutor | null;
   unsubSession: (() => void) | null;
   runState: ArenaPlayerRunState;
   registered: ArenaRegistration | null;
@@ -178,6 +183,7 @@ export class ArenaEngine {
       dropMessages: this.dropMessages,
       startedAt: this.startedAt,
       stateDiagnostics: this.stateDiagnostics,
+      simulationDiagnostics: this.computeSimulationDiagnostics(players),
       summary,
       sessionId: this.sessionId,
       runId: this.runId,
@@ -368,6 +374,7 @@ export class ArenaEngine {
       runtime.transport = null;
       runtime.session = null;
       runtime.stateExecutor = null;
+      runtime.simulationExecutor = null;
       runtime.unsubSession = null;
       runtime.runState = "pending";
       runtime.registered = null;
@@ -400,6 +407,7 @@ export class ArenaEngine {
       transport: null,
       session: null,
       stateExecutor: null,
+      simulationExecutor: null,
       unsubSession: null,
       runState: "pending",
       registered: null,
@@ -539,6 +547,11 @@ export class ArenaEngine {
     runtime.stateExecutor = createFrameStateExecutor((event) =>
       this.pushApiEvent(runtime.spec.id, event),
     );
+    // A1: simulation snapshots are produced by asking the authority's game
+    // frame to serialize its state (the game's serializeState callback).
+    runtime.simulationExecutor = createFrameSimulationExecutor((event) =>
+      this.pushApiEvent(runtime.spec.id, event),
+    );
     const session = createNovaSession({
       transport,
       room: this.room,
@@ -550,6 +563,7 @@ export class ArenaEngine {
         ...(this.options.gameTitle !== undefined ? { title: this.options.gameTitle } : {}),
       },
       stateExecutor: runtime.stateExecutor,
+      simulationExecutor: runtime.simulationExecutor,
     });
     runtime.session = session;
     runtime.unsubSession = session.onSessionEvent((event) =>
@@ -627,6 +641,8 @@ export class ArenaEngine {
       case "state":
       case "simulationInput":
       case "simulationSnapshot":
+      case "simulationTick":
+      case "simulationAuthorityChange":
       case "actionReceived":
         break; // routed to the frame only
       case "actionAck":
@@ -771,7 +787,13 @@ export class ArenaEngine {
           );
           return;
         }
-        session.sendSimulationInput(parsed.data.input);
+        try {
+          session.sendSimulationInput(parsed.data.input);
+        } catch (error) {
+          // Rate-limit and connectivity rejections surface as Nova errors
+          // (the frame observes them through nova.onError).
+          this.logPlayer(runtime.spec.id, "error", errorMessage(error));
+        }
         break;
       }
       case "stateResponse": {
@@ -787,6 +809,21 @@ export class ArenaEngine {
           return;
         }
         runtime.stateExecutor?.handleResponse(parsed.data as FrameStateResponsePayload);
+        break;
+      }
+      case "simulationResponse": {
+        // A1: the authority frame's answer to a simulationRequest; the
+        // frame executor correlates it back to the simulation engine.
+        const parsed = arenaApiCallSchemas.simulationResponse.safeParse(message.payload);
+        if (!parsed.success) {
+          this.logPlayer(
+            runtime.spec.id,
+            "error",
+            "simulationResponse call failed validation at the host; ignored.",
+          );
+          return;
+        }
+        runtime.simulationExecutor?.handleResponse(parsed.data as FrameSimulationResponsePayload);
         break;
       }
     }
@@ -850,6 +887,36 @@ export class ArenaEngine {
     }
   }
 
+  /**
+   * A1 simulation diagnostics: read live from the current authority's
+   * session (the arena re-reads on every snapshot, so latency and drift
+   * stay visible as the game runs). Null before any connected session.
+   */
+  private computeSimulationDiagnostics(
+    players: readonly ArenaPlayer[],
+  ): ArenaSimulationDiagnostics | null {
+    const authorityId = this.computeAuthorityPlayerId(players);
+    for (const runtime of this.players.values()) {
+      const session = runtime.session;
+      if (authorityId !== null && runtime.spec.id !== authorityId) continue;
+      if (session === null) continue;
+      const diag = session.getSimulationDiagnostics();
+      return {
+        tick: diag.tick,
+        tickMs: diag.tickMs,
+        snapshotIntervalMs: diag.snapshotIntervalMs,
+        authorityTick: diag.authorityTick,
+        snapshotsReceived: diag.snapshotsReceived,
+        inputRatePerSecond: diag.inputRatePerSecond,
+        inputLatencyMs: diag.inputLatencyMs,
+        highLatency: diag.highLatency,
+        driftTicks: diag.driftTicks,
+        term: diag.term,
+      };
+    }
+    return null;
+  }
+
   private computeAuthorityPlayerId(players: readonly ArenaPlayer[]): string | null {
     // The authority is the session the state engine tracks (S3: the current
     // term's elected authority, tracked through elections and migrations).
@@ -892,6 +959,8 @@ export class ArenaEngine {
     }
     runtime.stateExecutor?.dispose();
     runtime.stateExecutor = null;
+    runtime.simulationExecutor?.dispose();
+    runtime.simulationExecutor = null;
     runtime.session?.dispose();
     runtime.session = null;
     runtime.transport?.dispose();
@@ -971,6 +1040,10 @@ function toApiEvent(event: NovaSessionEvent): GameApiEvent | null {
       return { kind: "simulationInput", input: event.input };
     case "simulationSnapshot":
       return { kind: "simulationSnapshot", snapshot: event.snapshot };
+    case "simulationTick":
+      return { kind: "simulationTick", tick: event.tick };
+    case "simulationAuthorityChange":
+      return { kind: "simulationAuthorityChange", term: event.term };
     case "error":
       return { kind: "error", code: event.error.code, message: event.error.message };
     case "actionAck":

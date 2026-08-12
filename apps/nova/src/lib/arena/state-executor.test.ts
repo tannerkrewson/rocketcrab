@@ -6,7 +6,7 @@
 import { describe, expect, it, vi } from "vitest";
 import type { GameApiEvent } from "@rocketcrab/protocol";
 import type { NovaPlayer } from "@rocketcrab/nova-api";
-import { FrameStateExecutor } from "./state-executor";
+import { FrameSimulationExecutor, FrameStateExecutor } from "./state-executor";
 
 const PLAYER_A: NovaPlayer = { id: "member-a", name: "Ada" };
 const PLAYER_B: NovaPlayer = { id: "member-b", name: "Ben" };
@@ -155,6 +155,78 @@ describe("FrameStateExecutor", () => {
     const { executor } = makeHarness();
     const promise = executor.computeView({ state: {}, viewer: PLAYER_A });
     executor.dispose();
+    await expect(promise).resolves.toMatchObject({ ok: false, code: "execution_failed" });
+  });
+});
+
+describe("FrameSimulationExecutor (A1)", () => {
+  function makeSimHarness(timeoutMs = 50): {
+    executor: FrameSimulationExecutor;
+    pushed: GameApiEvent[];
+  } {
+    const pushed: GameApiEvent[] = [];
+    const executor = new FrameSimulationExecutor((event) => pushed.push(event), timeoutMs);
+    return { executor, pushed };
+  }
+
+  function answer(
+    harness: { executor: FrameSimulationExecutor; pushed: GameApiEvent[] },
+    result: unknown,
+    index = harness.pushed.length - 1,
+  ): void {
+    const event = harness.pushed[index];
+    if (event?.kind !== "simulationRequest") {
+      throw new Error("no simulationRequest pushed");
+    }
+    harness.executor.handleResponse({ requestId: event.requestId, result: result as never });
+  }
+
+  it("asks the authority frame to serialize its state and correlates the answer", async () => {
+    const harness = makeSimHarness();
+    const promise = harness.executor.serializeState();
+    expect(harness.pushed).toHaveLength(1);
+    const event = harness.pushed[0];
+    expect(event?.kind).toBe("simulationRequest");
+    if (event?.kind !== "simulationRequest") return;
+    expect(event.requestId).toMatch(/^simulation-/u);
+    answer(harness, { kind: "state", ok: true, state: { puck: { x: 40 } } });
+    await expect(promise).resolves.toEqual({ ok: true, state: { puck: { x: 40 } } });
+  });
+
+  it("forwards stable rejection codes from the frame", async () => {
+    const harness = makeSimHarness();
+    const promise = harness.executor.serializeState();
+    answer(harness, {
+      kind: "error",
+      ok: false,
+      code: "snapshot_error",
+      message: "game exploded",
+    });
+    await expect(promise).resolves.toEqual({
+      ok: false,
+      code: "snapshot_error",
+      message: "game exploded",
+    });
+  });
+
+  it("times out requests the frame never answers", async () => {
+    vi.useFakeTimers();
+    try {
+      const harness = makeSimHarness(50);
+      const promise = harness.executor.serializeState();
+      vi.advanceTimersByTime(51);
+      await expect(promise).resolves.toMatchObject({ ok: false, code: "execution_timeout" });
+      // A late answer after the timeout is dropped (rule 22), not settled.
+      expect(() => answer(harness, { kind: "state", ok: true, state: {} })).not.toThrow();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("settles pending requests as failed when disposed", async () => {
+    const harness = makeSimHarness();
+    const promise = harness.executor.serializeState();
+    harness.executor.dispose();
     await expect(promise).resolves.toMatchObject({ ok: false, code: "execution_failed" });
   });
 });

@@ -40,6 +40,7 @@ import {
   PROTOCOL_VERSION,
   actionTimeoutMs,
   gameModeSchema,
+  simulationResponseSchema,
   stateResponseSchema,
   titleSchema,
   type GameMode,
@@ -127,6 +128,14 @@ export const novaApiCallSchemas = {
     .object({
       requestId: z.string().min(1).max(64),
       result: stateResponseSchema,
+    })
+    .strict(),
+  // A1: the authority frame's answer to a simulationRequest host event
+  // (the game's serializeState callback produced its simulation state).
+  simulationResponse: z
+    .object({
+      requestId: z.string().min(1).max(64),
+      result: simulationResponseSchema,
     })
     .strict(),
 } as const;
@@ -318,6 +327,36 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
       failState(requestId, 'invalid_request', 'Unknown state request kind: ' + String(request.kind));
     }
   }
+  function handleSimulationRequest(requestId) {
+    // A1: the authority's game serializes its simulation state (snapshot
+    // production). The state is game-defined plain data; Nova only carries
+    // and replicates it. Sync and async serializeState are both supported.
+    var state;
+    try {
+      state = simulationSerializeHandler ? simulationSerializeHandler() : undefined;
+    } catch (err) {
+      failSimulation(requestId, 'snapshot_error', err);
+      return;
+    }
+    if (state === undefined) {
+      failSimulation(requestId, 'no_snapshot_handler', 'The game did not register a serializeState handler.');
+      return;
+    }
+    Promise.resolve(state).then(function (resolved) {
+      report('simulationResponse', {
+        requestId: requestId,
+        result: { ok: true, kind: 'state', state: resolved }
+      });
+    }, function (err) {
+      failSimulation(requestId, 'snapshot_error', err);
+    });
+  }
+  function failSimulation(requestId, code, message) {
+    report('simulationResponse', {
+      requestId: requestId,
+      result: { kind: 'error', ok: false, code: code, message: String(message || code).slice(0, 256) }
+    });
+  }
   function subscribe(list, fn) {
     if (typeof fn !== 'function') return function () {};
     list.push(fn);
@@ -352,6 +391,10 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
   var rawHandlers = {};
   var simulationInputHandler = null;
   var simulationSnapshotHandler = null;
+  var simulationTickHandler = null;
+  var simulationSerializeHandler = null;
+  var simulationTickValue = 0;
+  var simulationAuthorityChangeHandlers = [];
 
   var stateHandle = {
     get: function () { return stateValue; },
@@ -383,15 +426,26 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
     register: function (handlers) {
       simulationInputHandler = typeof handlers.onInput === 'function' ? handlers.onInput : null;
       simulationSnapshotHandler = typeof handlers.onSnapshot === 'function' ? handlers.onSnapshot : null;
+      simulationTickHandler = typeof handlers.onTick === 'function' ? handlers.onTick : null;
+      simulationSerializeHandler = typeof handlers.serializeState === 'function' ? handlers.serializeState : null;
       report('simulation.register', {});
       return function () {
         simulationInputHandler = null;
         simulationSnapshotHandler = null;
+        simulationTickHandler = null;
+        simulationSerializeHandler = null;
       };
     },
     sendInput: function (input) {
       requireStarted('simulation.sendInput');
       report('simulation.sendInput', { input: input });
+    },
+    onAuthorityChange: function (fn) {
+      if (typeof fn !== 'function') fail('invalid_options', 'nova.simulation.onAuthorityChange expects a function.');
+      return subscribe(simulationAuthorityChangeHandlers, fn);
+    },
+    getTick: function () {
+      return simulationTickValue;
     }
   };
 
@@ -527,6 +581,20 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
       case 'simulationSnapshot':
         if (simulationSnapshotHandler) {
           try { simulationSnapshotHandler(payload && payload.snapshot); } catch (_) {}
+        }
+        break;
+      case 'simulationTick':
+        simulationTickValue = payload && typeof payload.tick === 'number' ? payload.tick : simulationTickValue;
+        if (simulationTickHandler) {
+          try { simulationTickHandler(simulationTickValue); } catch (_) {}
+        }
+        break;
+      case 'simulationAuthorityChange':
+        callHandlers(simulationAuthorityChangeHandlers);
+        break;
+      case 'simulationRequest':
+        if (payload && payload.requestId) {
+          handleSimulationRequest(payload.requestId);
         }
         break;
       case 'error':

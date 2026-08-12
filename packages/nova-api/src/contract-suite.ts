@@ -23,7 +23,15 @@ import type { NovaTransport } from "@rocketcrab/core";
 import { PROTOCOL_VERSION, assertPeerMessage } from "@rocketcrab/protocol";
 import { createNovaSession, type NovaSession } from "./session";
 import { buildActionDispatchMessage, type PeerMessageBase } from "./messages";
-import type { NovaPlayer, NovaRawMessage, NovaSimulationInput, NovaStateHandlers } from "./types";
+import type { NovaClient } from "./client";
+import type { NovaError } from "./errors";
+import type {
+  NovaPlayer,
+  NovaRawMessage,
+  NovaSimulationInput,
+  NovaSimulationSnapshot,
+  NovaStateHandlers,
+} from "./types";
 
 /** A transport factory plus a deterministic delivery pump (see module docs). */
 export interface NovaTransportHarness {
@@ -137,6 +145,134 @@ function buildInjectedDispatch(
   input: Parameters<typeof buildActionDispatchMessage>[1],
 ) {
   return buildActionDispatchMessage(base, input);
+}
+
+// ---------------------------------------------------------------------------
+// A1 simulation-mode helpers
+// ---------------------------------------------------------------------------
+
+/** Short deterministic simulation timings for the contract tests. */
+const SIM_TIMINGS = { tickMs: 20, snapshotIntervalMs: 60 };
+const SIM_AUTHORITY = {
+  heartbeatIntervalMs: 50,
+  gracePeriodMs: 400,
+  electionWindowMs: 40,
+  restoreWindowMs: 40,
+};
+
+/** The in-process half of a simulation game (per-session state). */
+function registerSimulationGame(client: NovaClient): {
+  client: NovaClient;
+  received: NovaSimulationInput[];
+  advances: number[];
+  corrections: unknown[];
+} {
+  const game = {
+    client,
+    received: [] as NovaSimulationInput[],
+    advances: [] as number[],
+    corrections: [] as unknown[],
+  };
+  const queued: NovaSimulationInput[] = [];
+  let position = { x: 0, y: 0 };
+  client.simulation.register({
+    onInput(input) {
+      game.received.push(input);
+      queued.push(input);
+    },
+    onTick() {
+      // Apply every queued input in Nova-assigned order (fixed step).
+      while (queued.length > 0) {
+        const input = queued.shift();
+        if (input?.type === "move") {
+          const payload = input.payload as { dx?: number; dy?: number };
+          position = {
+            x: position.x + (payload.dx ?? 0),
+            y: position.y + (payload.dy ?? 0),
+          };
+        }
+      }
+      game.advances.push(position.x);
+    },
+    onSnapshot(snapshot) {
+      // Authoritative correction / restore: adopt the replicated state.
+      game.corrections.push(snapshot);
+      const restored = (snapshot as NovaSimulationSnapshot).state as {
+        position: { x: number; y: number };
+      };
+      position = { ...restored.position };
+    },
+    serializeState() {
+      return { position };
+    },
+  });
+  return game;
+}
+
+/** Create a simulation-mode session with the contract timings. */
+function createSimulationSession(
+  harness: NovaTransportHarness,
+  transport: NovaTransport,
+  memberId: string,
+  displayName: string,
+): NovaSession {
+  const session = createNovaSession({
+    transport,
+    room: ROOM,
+    sessionId: SESSION,
+    player: { memberId, displayName },
+    game: { gameId: "game-1", mode: "simulation", title: "Simulation Game" },
+    simulation: SIM_TIMINGS,
+    authority: SIM_AUTHORITY,
+  });
+  session.client.defineGame({ title: "Simulation Game", mode: "simulation" });
+  return session;
+}
+
+interface SimulationPair {
+  harness: NovaTransportHarness;
+  a: NovaSession;
+  b: NovaSession;
+  gameA: ReturnType<typeof registerSimulationGame>;
+  gameB: ReturnType<typeof registerSimulationGame>;
+}
+
+/** Two joined simulation sessions over a fresh harness (started). */
+async function makeSimulationPair(
+  harnessFactory: () => NovaTransportHarness,
+): Promise<SimulationPair> {
+  const harness = harnessFactory();
+  const transportA = harness.createTransport({ memberId: "member-a", displayName: "Ada" });
+  const transportB = harness.createTransport({ memberId: "member-b", displayName: "Ben" });
+  const a = createSimulationSession(harness, transportA, "member-a", "Ada");
+  const b = createSimulationSession(harness, transportB, "member-b", "Ben");
+  const gameA = registerSimulationGame(a.client);
+  const gameB = registerSimulationGame(b.client);
+  await a.join();
+  await b.join();
+  await settle(harness);
+  a.start();
+  b.start();
+  await settle(harness);
+  return { harness, a, b, gameA, gameB };
+}
+
+/**
+ * Poll with real time + drain: the in-memory hub only delivers on drain()
+ * and the simulation clock is driven by real timers.
+ */
+async function waitForSimulation(
+  harness: NovaTransportHarness,
+  condition: () => boolean,
+  what: string,
+  timeoutMs = 5_000,
+): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!condition()) {
+    if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
+    await settle(harness);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
 }
 
 export function runNovaSessionContractTests(harnessFactory: () => NovaTransportHarness): void {
@@ -781,6 +917,165 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       expect(b.getCanonicalState()?.state).toEqual({ shellOnly: true });
       // ...but never reaches the game-facing state handle.
       expect(b.client.state.get()).toEqual({ hand: undefined, deckCount: 3 });
+    });
+
+    // ------------------------------------------------------------------
+    // A1 simulation mode
+    // ------------------------------------------------------------------
+
+    it("advances the simulation clock on every session after start", async () => {
+      const { harness, a, b, gameA, gameB } = await makeSimulationPair(harnessFactory);
+      // The Nova-provided clock advances every frame's local simulation.
+      await waitForSimulation(
+        harness,
+        () => a.getSimulationDiagnostics().tick >= 2 && b.getSimulationDiagnostics().tick >= 2,
+        "ticks",
+      );
+      expect(gameA.advances.length).toBeGreaterThanOrEqual(2);
+      expect(gameB.advances.length).toBeGreaterThanOrEqual(2);
+      expect(a.getSimulationDiagnostics().tickMs).toBe(20);
+    });
+
+    it("routes inputs in Nova-assigned order and reports latency", async () => {
+      const { harness, b, gameB } = await makeSimulationPair(harnessFactory);
+      gameB.client.simulation.sendInput({ type: "move", payload: { dx: 5 } });
+      await waitForSimulation(harness, () => gameB.received.length >= 1, "self input");
+      // Two more moves from Ada: per-sender order is preserved (the ordered
+      // channel + Nova-assigned per-sender seq), so Ben's frame applies
+      // dx 1, dx 1, dx 5 in that order.
+      gameB.client.simulation.sendInput({ type: "move", payload: { dx: 1 } });
+      gameB.client.simulation.sendInput({ type: "move", payload: { dx: 1 } });
+      await waitForSimulation(harness, () => gameB.received.length >= 3, "ordered inputs");
+      const dxs = gameB.received.map((input) => (input.payload as { dx?: number }).dx);
+      expect(dxs.slice(0, 3)).toEqual([5, 1, 1]);
+      const diagnostics = b.getSimulationDiagnostics();
+      expect(diagnostics.inputsReceived).toBeGreaterThanOrEqual(3);
+      expect(diagnostics.inputLatencyMs).not.toBeNull();
+    });
+
+    it("replicates authoritative snapshots to every shell and game frame", async () => {
+      const { harness, a, b, gameB } = await makeSimulationPair(harnessFactory);
+      // The authority (Ada) produces snapshots from its frame's
+      // serializeState; every shell retains them and every game frame
+      // receives them as corrections.
+      await waitForSimulation(
+        harness,
+        () =>
+          b.getSimulationDiagnostics().snapshotsReceived >= 1 &&
+          a.getSimulationDiagnostics().authorityTick !== null,
+        "snapshots",
+      );
+      expect(gameB.corrections.length).toBeGreaterThanOrEqual(1);
+      const first = gameB.corrections[0] as NovaSimulationSnapshot | undefined;
+      expect(first?.tick).toBeGreaterThanOrEqual(1);
+      expect(first?.state).toEqual({ position: expect.any(Object) });
+      expect(b.getSimulationSnapshot()?.state).toEqual({ position: expect.any(Object) });
+      expect(b.getSimulationDiagnostics().authorityMemberId).toBe("member-a");
+      expect(b.getSimulationDiagnostics().authorityTick).toBeGreaterThanOrEqual(1);
+    });
+
+    it("restores a late joiner from the targeted catch-up snapshot", async () => {
+      const harness = harnessFactory();
+      const transportA = harness.createTransport({ memberId: "member-a", displayName: "Ada" });
+      const transportB = harness.createTransport({ memberId: "member-b", displayName: "Ben" });
+      const a = createSimulationSession(harness, transportA, "member-a", "Ada");
+      const b = createSimulationSession(harness, transportB, "member-b", "Ben");
+      registerSimulationGame(a.client);
+      const gameB = registerSimulationGame(b.client);
+      await a.join();
+      await b.join();
+      await settle(harness);
+      a.start();
+      b.start();
+      await waitForSimulation(
+        harness,
+        () => b.getSimulationDiagnostics().snapshotsReceived >= 1,
+        "initial snapshots",
+      );
+
+      // Cara joins after the game started: the authority targets her the
+      // latest snapshot, she restores from it, and her clock starts.
+      const transportC = harness.createTransport({ memberId: "member-c", displayName: "Cara" });
+      const c = createSimulationSession(harness, transportC, "member-c", "Cara");
+      const gameC = registerSimulationGame(c.client);
+      const cStarted: number[] = [];
+      c.client.onStart(() => cStarted.push(1));
+      await c.join();
+      await settle(harness);
+      await waitForSimulation(
+        harness,
+        () => c.getSimulationDiagnostics().authorityTick !== null,
+        "late-join snapshot",
+      );
+      expect(cStarted).toHaveLength(1);
+      expect(gameC.corrections.length).toBeGreaterThanOrEqual(1);
+      expect(c.getSimulationSnapshot()?.tick).toBeGreaterThanOrEqual(1);
+      expect(c.getSimulationDiagnostics().authorityMemberId).toBe("member-a");
+      // Cara can play: her inputs reach Ben's frame.
+      c.client.simulation.sendInput({ type: "move", payload: { dx: 3 } });
+      await waitForSimulation(
+        harness,
+        () => gameB.received.some((input) => (input.payload as { dx?: number }).dx === 3),
+        "late-joiner input",
+      );
+    });
+
+    it("restores a recent snapshot after authority migration and keeps running", async () => {
+      const { harness, a, b } = await makeSimulationPair(harnessFactory);
+      await waitForSimulation(
+        harness,
+        () => b.getSimulationDiagnostics().snapshotsReceived >= 1,
+        "pre-migration snapshots",
+      );
+      const migratedTick = b.getSimulationDiagnostics().authorityTick;
+      expect(migratedTick).toBeGreaterThanOrEqual(1);
+      const authorityChanges: number[] = [];
+      b.client.simulation.onAuthorityChange(() => authorityChanges.push(1));
+
+      // The authority's tab closes: Ben is elected, restores the recent
+      // replicated snapshot, and resumes producing snapshots from HIS
+      // frame's state (the game never learns which player is authoritative).
+      await a.leave();
+      await settle(harness);
+      await waitForSimulation(
+        harness,
+        () =>
+          b.getSimulationDiagnostics().authorityMemberId === "member-b" &&
+          b.getSimulationDiagnostics().term >= 2,
+        "migration",
+      );
+      // The restored snapshot is recent (not the empty pre-game state).
+      expect(b.getSimulationSnapshot()?.tick).toBeGreaterThanOrEqual(1);
+      // The game frame was notified (term only — no identity, rule 1).
+      expect(authorityChanges.length).toBeGreaterThanOrEqual(1);
+      // The new authority continues the snapshot cadence from ITS frame's
+      // state (it produces snapshots; it never receives its own broadcasts,
+      // so the retained authoritative tick advances instead).
+      const tickBefore = b.getSimulationDiagnostics().authorityTick;
+      await waitForSimulation(
+        harness,
+        () => {
+          const tick = b.getSimulationDiagnostics().authorityTick;
+          return tick !== null && tick > (tickBefore ?? 0);
+        },
+        "post-migration snapshots",
+      );
+    });
+
+    it("bounds simulation inputs by the per-second rate and reports errors", async () => {
+      const { harness, a } = await makeSimulationPair(harnessFactory);
+      const errors: Array<{ code: string }> = [];
+      a.client.onError((error: NovaError) => errors.push({ code: error.code }));
+      // 60 inputs/s over a 10 s window: a burst beyond the capacity is
+      // rejected with a clear, stable error (delivered via onError).
+      for (let i = 0; i < 620; i += 1) {
+        a.client.simulation.sendInput({ type: "move", payload: { dx: 0 } });
+      }
+      await flushMacrotasks();
+      await settle(harness);
+      expect(errors.filter((error) => error.code === "rate_limited").length).toBeGreaterThan(0);
+      expect(a.getSimulationDiagnostics().rateLimitRejections).toBeGreaterThan(0);
+      expect(a.getSimulationDiagnostics().inputsSent).toBe(600);
     });
   });
 }

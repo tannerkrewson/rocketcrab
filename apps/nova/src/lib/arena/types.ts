@@ -75,6 +75,33 @@ export interface ArenaStateDiagnostics {
   readonly actionRatePerSecond: number;
 }
 
+/**
+ * A1 simulation diagnostics surfaced in the arena snapshot (the authority's
+ * session read live, so simulated latency and drift stay visible).
+ */
+export interface ArenaSimulationDiagnostics {
+  /** The local simulation tick. */
+  readonly tick: number;
+  /** The configured tick interval in ms (the Nova-provided time step). */
+  readonly tickMs: number;
+  /** The configured snapshot interval in ms. */
+  readonly snapshotIntervalMs: number;
+  /** The last authoritative tick learned from a snapshot, or null. */
+  readonly authorityTick: number | null;
+  /** Snapshots received from the authority. */
+  readonly snapshotsReceived: number;
+  /** Inputs delivered per second over the last 10-second window. */
+  readonly inputRatePerSecond: number;
+  /** Average input delivery latency in ms, or null. */
+  readonly inputLatencyMs: number | null;
+  /** True when input latency crossed the high-latency threshold. */
+  readonly highLatency: boolean;
+  /** Local-clock drift in ticks vs. the authority's snapshot clock. */
+  readonly driftTicks: number;
+  /** Current authority term. */
+  readonly term: number;
+}
+
 /** Snapshot of the whole arena, re-emitted after every change. */
 export interface ArenaState {
   /** Arena-wide lifecycle. */
@@ -90,6 +117,8 @@ export interface ArenaState {
   readonly startedAt: number | null;
   /** S2 state diagnostics (last commit), or null before the first commit. */
   readonly stateDiagnostics: ArenaStateDiagnostics | null;
+  /** A1 simulation diagnostics (the authority's session), or null. */
+  readonly simulationDiagnostics: ArenaSimulationDiagnostics | null;
   readonly summary: ArenaSummary;
   /** The session id labeling every message of this run. */
   readonly sessionId: string;

@@ -187,6 +187,15 @@ describe("runtime message schemas", () => {
       }),
     );
     expect(stateResponse.ok).toBe(true);
+    // A1: the authority frame's simulationResponse answer parses too.
+    const simulationResponse = parseRuntimeMessage(
+      baseRuntime({
+        type: "game.apiCall",
+        method: "simulationResponse",
+        payload: { requestId: "sim-1", result: { kind: "state", ok: true, state: { x: 1 } } },
+      }),
+    );
+    expect(simulationResponse.ok).toBe(true);
     // The protocol boundary treats call payloads as opaque (per-method
     // payload validation happens at the runtime/host boundaries); a
     // structurally bad payload still parses as a game.apiCall envelope.
@@ -229,7 +238,10 @@ describe("runtime message schemas", () => {
           sender: { id: "member-2", name: "Blair" },
         },
       },
-      { kind: "simulationSnapshot", snapshot: { t: 1 } },
+      { kind: "simulationSnapshot", snapshot: { tick: 5, state: { x: 1 } } },
+      { kind: "simulationTick", tick: 7 },
+      { kind: "simulationAuthorityChange", term: 2 },
+      { kind: "simulationRequest", requestId: "sim-1" },
       {
         kind: "error",
         code: "not_started",

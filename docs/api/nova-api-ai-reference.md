@@ -63,11 +63,27 @@ nova.dispatch({ type: "playCard", payload: { card: "ace" } });
 // --- Simulation mode ---
 nova.simulation.register({
   onInput: (input) => {
-    /* { type, payload?, tick?, sender: {id,name} } */
+    /* { type, payload?, tick?, sender: {id,name} } — every player's input,
+       including your own, in Nova-assigned per-sender order */
   },
-  onSnapshot: (snapshot) => {},
+  onTick: (tick) => {
+    /* Advance your local simulation ONE fixed step (the Nova clock). */
+  },
+  onSnapshot: (snapshot) => {
+    /* Authoritative correction / restore: { tick, state, stateHash? }.
+       Drop local prediction and restore from snapshot.state. */
+  },
+  serializeState: () => {
+    /* Authority side: return your current simulation state as plain data
+       (Nova replicates it to every player at the snapshot cadence). */
+  },
 });
 nova.simulation.sendInput({ type: "move", payload: { dx: 1 } }); // after start
+nova.simulation.onAuthorityChange(() => {
+  /* The game's authority migrated (term only). The next snapshot is the
+     authoritative restore point. */
+});
+const tick = nova.simulation.getTick(); // your local clock (interpolation)
 
 // --- Raw mode ---
 nova.raw.createChannel({ name: "chat", reliable: true, ordered: true, binary: false });
@@ -101,7 +117,9 @@ nova.onError((error) => {
    throw `not_started`; after `onEnd` they throw `ended`. Raw send failures
    (unknown channel, over the size/rate limits, not connected) arrive via
    `nova.onError` with a stable `code` (`unknown_channel`,
-   `payload_too_large`, `rate_limited`, `not_connected`).
+   `payload_too_large`, `rate_limited`, `not_connected`). Simulation inputs
+   over the per-second input bound are likewise rejected with
+   `rate_limited` through `nova.onError`.
 4. **Never call methods this version does not have.** They fail loudly.
 5. **Every payload is plain JSON data.** No functions, no cycles, no BigInt,
    no DOM objects. Binary (`Uint8Array`/`ArrayBuffer`) only on raw channels.
@@ -110,6 +128,16 @@ nova.onError((error) => {
    never detect one, and never write networking code. Nova owns ordering,
    authority, and migration invisibly.
 8. **Prefer state mode** unless the game genuinely needs another mode.
+   - **State** (default): turn-based / card / board / trivia / drawing /
+     voting / word / social games. Nova owns the canonical state, action
+     ordering, deduplication, per-player views, and migration.
+   - **Simulation**: continuous games (arcade, 2D movement, shared
+     pucks). The game runs a local simulation copy on every frame; Nova
+     owns ordered inputs, the tick clock, authority, snapshots, restore
+     after migration, and rate bounds. No rollback netcode, no
+     deterministic-physics promise: snapshots correct drift.
+   - **Raw**: specialized protocols needing named channels; Nova provides
+     transport only, no synchronization or migration guarantees.
 9. **State-mode handler functions never leave your context.** `createInitialState`, `actions`, `selectView`, and `render` are functions you pass to `defineGame`; Nova runs them for you. Everything else is plain data.
 10. **Treat state as read-only and dispatch to change it.** Never mutate a value from `nova.state.get()` — return a new state from a handler or mutate the draft Nova gives you.
 11. **Media publishing is experimental and unavailable.** You may capture camera/mic inside your frame with ordinary permission prompts (`navigator.mediaDevices.getUserMedia`), but `nova.media.publish()` always throws `media_unsupported` in this build — never design a game that requires voice/video across players. `nova.media.isSupported()` probes the platform and returns false on unsupported browsers.
@@ -172,8 +200,8 @@ State-mode behavior Nova guarantees:
 - `nova.dispatch` resolves when the action was applied, rejects on
   rejection/timeout. Rejections never corrupt state.
 - **`simulation`** — faster continuous games. Register input handlers and
-  send ordered inputs; Nova owns input ordering and (later) the simulation
-  clock and snapshots.
+  send ordered inputs; Nova owns input ordering, the tick clock, and
+  authoritative snapshots (restore after migration included).
 - **`raw`** — specialized protocols. Named channels with
   reliable/unreliable, ordered/unordered, JSON or binary, broadcast or
   targeted. Nova provides transport only: no synchronization guarantees.
