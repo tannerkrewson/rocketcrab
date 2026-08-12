@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>errors</title>
+  </head>
+  <body>
+    <script>
+      console.log("hello from the game", { code: 42 });
+      setTimeout(function () {
+        throw new Error("game exploded");
+      }, 10);
+      Promise.reject(new Error("rejected promise"));
+    </script>
+  </body>
+</html>
