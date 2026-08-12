@@ -9,6 +9,8 @@
   "type": "module",
   "scripts": {
     "dev": "concurrently -k -n nova,runtime -c blue,magenta \"npm run dev --workspace @rocketcrab/nova\" \"npm run dev --workspace @rocketcrab/runtime\"",
+    "gen-certs": "node scripts/gen-certs.mjs",
+    "dev:https": "concurrently -k -n nova,runtime -c blue,magenta \"npm run dev:https --workspace @rocketcrab/nova\" \"npm run dev:https --workspace @rocketcrab/runtime\"",
     "build": "npm run build --workspaces --if-present",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",
@@ -19,11 +21,13 @@
     "test:e2e": "playwright test",
     "test:e2e:trystero": "playwright test -c e2e-trystero/playwright.config.ts",
     "bundle:size": "node scripts/bundle-size.mjs",
+    "verify:deploy": "node scripts/verify-static-deploy.mjs",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm run test && npm run build",
     "prepare": "lefthook install"
   },
   "devDependencies": {
     "@playwright/test": "1.62.1",
+    "@types/node": "26.2.0",
     "concurrently": "10.0.4",
     "lefthook": "2.1.10",
     "oxfmt": "0.61.0",

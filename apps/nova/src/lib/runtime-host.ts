@@ -40,6 +40,7 @@ import {
   type RuntimeErrorMessage,
   type RuntimeMessage,
 } from "@rocketcrab/protocol";
+import { runtimeBasePath } from "./runtime-origin";
 
 /** Minimal port surface the bridge drives (real MessagePorts satisfy it). */
 export interface ChannelPort {
@@ -192,7 +193,7 @@ export class RuntimeHostClient {
   private ready = false;
   private unresponsive = false;
   private missedPongs = 0;
-  private heartbeatTimer: ReturnType<typeof setInterval> | undefined;
+  private heartbeatTimer: number | undefined;
   private lastGame: LoadGameInput | null = null;
   private lastEvent: RuntimeHostEvent | null = null;
   private readonly recentEvents: RuntimeHostEvent[] = [];
@@ -335,7 +336,9 @@ export class RuntimeHostClient {
     iframe.style.cssText = "width:100%;height:100%;border:0;display:block";
     this.iframe = iframe;
     this.container.appendChild(iframe);
-    iframe.src = `${this.runtimeOrigin}/`;
+    // runtimeBasePath() is "/" by default; project-site runtime layouts
+    // (M2 deployment strategies (b)/(c)) pin it via VITE_RUNTIME_BASE.
+    iframe.src = `${this.runtimeOrigin}${runtimeBasePath()}`;
     try {
       await this.waitForFrameLoad(iframe);
     } catch (error) {
@@ -363,7 +366,7 @@ export class RuntimeHostClient {
   }
 
   private readyResolver: (() => void) | null = null;
-  private readyTimer: ReturnType<typeof setTimeout> | undefined;
+  private readyTimer: number | undefined;
 
   private handleMessage(data: unknown): void {
     const parsed = parseRuntimeMessage(data);

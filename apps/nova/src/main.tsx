@@ -3,12 +3,18 @@ import { RouterProvider, createRouter } from "@tanstack/react-router";
 import { StrictMode } from "react";
 import { createRoot } from "react-dom/client";
 import { Toaster } from "sonner";
+import { normalizeBasePath } from "./lib/basepath";
 import { routeTree } from "./routeTree.gen";
 import "./styles.css";
 
 const queryClient = new QueryClient();
 
-const router = createRouter({ routeTree });
+// Match routes under the deployment base path: "/" normally, "/<repo>/"
+// for GitHub Pages project-site layouts (M2 deployment, normalizeBasePath).
+const router = createRouter({
+  routeTree,
+  basepath: normalizeBasePath(import.meta.env.BASE_URL),
+});
 
 // Register the router instance for type-safe typed routes.
 declare module "@tanstack/react-router" {

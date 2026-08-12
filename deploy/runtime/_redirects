@@ -1,0 +1,6 @@
+# Runtime origin — fallback routing (M2). Netlify / Cloudflare Pages
+# `_redirects` format. GitHub Pages ignores this file (the runtime is a
+# single page served from the site root; no deep routes exist).
+# The runtime page is secret-free and single-purpose: fall any path back to
+# the shell so a stale deep link still boots the runtime.
+/* /index.html 200

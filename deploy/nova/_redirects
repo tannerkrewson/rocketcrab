@@ -1,0 +1,6 @@
+# Nova main origin — SPA fallback routing (M2). Netlify / Cloudflare Pages
+# `_redirects` format. GitHub Pages uses the 404.html copy instead (the
+# deploy workflow adds it; GitHub Pages ignores this file).
+# Rewrite every non-asset request to the app shell so reloading a normal
+# route works (acceptance: "Reloading a normal Nova route works").
+/* /index.html 200

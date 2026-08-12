@@ -1,0 +1,30 @@
+# Runtime origin — intentionally permissive policy (M2; ADR-0008).
+# Netlify / Cloudflare Pages `_headers` format. GitHub Pages IGNORES this
+# file (it cannot send custom headers) — the runtime page then ships with
+# no CSP at all, which is the permissive baseline; the compensating
+# controls are the separate origin, secret-free content, no service
+# workers, no auth cookies, and the strict main-origin policy (see
+# docs/architecture/deployment.md).
+#
+# The CSP below permits ordinary web dependencies for game HTML (inline
+# scripts/modules, HTTPS scripts, HTTPS + WSS connections, remote
+# images/fonts/audio/video/models, blob URLs) while still blocking object
+# embedding and cross-origin framing of the runtime page.
+#
+# Substitute YOUR real origins before use:
+#   - CSP `frame-ancestors` -> your main origin, e.g. https://nova.example
+#     (the ONLY origin allowed to frame the runtime page; leave in place)
+#   - Permissions-Policy `(self)` keeps camera/mic/clipboard delegation to
+#     the game frame working (F4: delegation at every iframe hop).
+# When the site uses a Vite base path (project-site layout), prefix the
+# paths below with that base (e.g. /runtime/assets/*).
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: no-referrer
+  Cross-Origin-Opener-Policy: same-origin
+  Permissions-Policy: camera=(self), microphone=(self), clipboard-read=(self), clipboard-write=(self), fullscreen=(self)
+  Content-Security-Policy: default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors https://nova.example; object-src 'none'; base-uri 'self'
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+/*
+  Cache-Control: public, max-age=0, must-revalidate
