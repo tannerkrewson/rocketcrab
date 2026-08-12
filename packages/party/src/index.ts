@@ -18,6 +18,10 @@
  *   protocol's Zod schemas; threat model T10).
  * - `rendezvous.ts` — creation, joining, admission, collision handling,
  *   greeter migration, and full listener cleanup (engineering rule 22).
+ * - `game-source.ts` — peer-to-peer game source distribution over the
+ *   established private-party transport (P3: metadata, request, binary
+ *   chunk transfer with progress, hash verification, retry, cancellation,
+ *   reconnect re-transfer, and the in-memory session cache).
  *
  * The layer is transport-neutral: it drives the {@link NovaTransport}
  * interface through a {@link PartyTransportFactory}, so the same flows run
@@ -32,3 +36,4 @@ export * from "./secrets";
 export * from "./invite";
 export * from "./messages";
 export * from "./rendezvous";
+export * from "./game-source";

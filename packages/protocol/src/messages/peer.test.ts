@@ -14,6 +14,8 @@ import {
   gameReadyMessageSchema,
   gameStartMessageSchema,
   gameEndMessageSchema,
+  gameSourceCancelMessageSchema,
+  gameSourceRequestMessageSchema,
   joinRequestMessageSchema,
   partyGreeterMessageSchema,
   partyIdentityMessageSchema,
@@ -68,6 +70,8 @@ describe("peer message schemas", () => {
       gameSourceMetadataMessageSchema,
       gameSourceTransferMessageSchema,
       transferAcknowledgementMessageSchema,
+      gameSourceRequestMessageSchema,
+      gameSourceCancelMessageSchema,
     ];
     expect(schemas).toHaveLength(PEER_MESSAGE_TYPES.length);
     for (const schema of schemas) {
@@ -238,6 +242,9 @@ describe("peer message schemas", () => {
         basePeer({
           type: "game.source.metadata",
           gameId: "game-1",
+          title: "Rocket Rumble",
+          apiVersion: 1,
+          mode: "state",
           sourceSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
           sourceSizeBytes: 2048,
           chunkCount: 4,
@@ -259,6 +266,21 @@ describe("peer message schemas", () => {
           gameId: "game-1",
           sourceSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
           status: "received",
+        }),
+      ),
+      gameSourceRequestMessageSchema.parse(
+        basePeer({
+          type: "game.source.request",
+          gameId: "game-1",
+          sourceSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+        }),
+      ),
+      gameSourceCancelMessageSchema.parse(
+        basePeer({
+          type: "game.source.cancel",
+          gameId: "game-1",
+          sourceSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+          reason: "leaving",
         }),
       ),
     ];
@@ -335,6 +357,11 @@ describe("peer message schemas", () => {
         gameId: "game-1",
         sourceSha256: "nope",
         status: "received",
+      }),
+      basePeer({ type: "game.source.request", gameId: "" }),
+      basePeer({
+        type: "game.source.request",
+        sourceSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
       }),
     ];
     expect(invalidExamples).toHaveLength(PEER_MESSAGE_TYPES.length);

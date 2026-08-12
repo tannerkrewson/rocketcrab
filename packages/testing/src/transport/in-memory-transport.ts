@@ -173,6 +173,15 @@ export class InMemoryTransport implements NovaTransport, InMemoryPeer {
   }
 
   notifyReconnected(event: TransportReconnectEvent): void {
+    // A fresh connection id means every per-(sender, channel) ordered stream
+    // and every in-flight chunk transfer from the old connection is stale:
+    // peers restart their delivery sequence for the new connection pairing
+    // (the hub stamps per sender→receiver connection). Without this reset, a
+    // receiver reconnect would drop the first post-reconnect messages as
+    // "stale" because the sender restarted at deliverySeq 1 while this
+    // transport still expected the old stream's next sequence.
+    this.ordered.clear();
+    this.pendingTransfers.clear();
     this.emit("peer:reconnected", event);
   }
 
