@@ -40,7 +40,10 @@ const GAME_SCRIPT = extractModuleScript(GAME_SOURCE);
 
 /** The view shape the game's selectView returns (typed for the tests). */
 interface QuizView {
-  phase: "question" | "revealed" | "finished";
+  phase: "waiting" | "question" | "revealed" | "finished";
+  waiting?: boolean;
+  readyToBegin?: boolean;
+  beginAt?: number;
   round: number;
   roundsTotal: number;
   roster: Array<{ id: string; name: string }>;
@@ -132,7 +135,9 @@ async function playToStart(world: World): Promise<void> {
   for (const session of world.sessions) {
     session.start();
   }
-  await settle(world, 200);
+  // The game begins with a short join window (auto-start once enough players
+  // are connected), then round 1's question goes live.
+  await settle(world, 700);
 }
 
 function viewOf(session: NovaSession): QuizView | null {
@@ -230,7 +235,7 @@ function config(overrides: { answerMs?: number; resultsMs?: number; rounds?: num
 }
 
 beforeEach(() => {
-  config({ answerMs: 600, resultsMs: 400, rounds: 2 });
+  config({ answerMs: 2000, resultsMs: 1200, rounds: 2 });
 });
 
 afterEach(() => {
@@ -265,70 +270,74 @@ describe("the S4 example game document", () => {
 });
 
 describe("four players play full rounds (arena-style)", () => {
-  it("runs the whole game: answers, reveal, scoring, rounds, finish", async () => {
-    const world = makeWorld();
-    for (const player of PLAYERS) {
-      addPlayer(world, player);
-    }
-    await playToStart(world);
+  it(
+    "runs the whole game: answers, reveal, scoring, rounds, finish",
+    { timeout: 25_000 },
+    async () => {
+      const world = makeWorld();
+      for (const player of PLAYERS) {
+        addPlayer(world, player);
+      }
+      await playToStart(world);
 
-    const a = sessionOf(world, "member-a");
-    await waitForView(world, a, (view) => view.phase === "question" && view.round === 1);
+      const a = sessionOf(world, "member-a");
+      await waitForView(world, a, (view) => view.phase === "question" && view.round === 1);
 
-    // Round 1: the first roster member is the quizmaster; the others answer.
-    let view = await waitForView(world, a, (v) => v.phase === "question");
-    expect(view.quizmasterId).toBe("member-a");
-    const answers1 = [
-      { memberId: "member-b", choice: 0 },
-      { memberId: "member-c", choice: 1 },
-      { memberId: "member-d", choice: 2 },
-    ];
-    for (const answer of answers1) {
-      await dispatchSettled(world, sessionOf(world, answer.memberId), {
-        type: "answer",
-        payload: { choice: answer.choice },
-      });
-    }
+      // Round 1: the first roster member is the quizmaster; the others answer.
+      let view = await waitForView(world, a, (v) => v.phase === "question");
+      expect(view.quizmasterId).toBe("member-a");
+      const answers1 = [
+        { memberId: "member-b", choice: 0 },
+        { memberId: "member-c", choice: 1 },
+        { memberId: "member-d", choice: 2 },
+      ];
+      for (const answer of answers1) {
+        await dispatchSettled(world, sessionOf(world, answer.memberId), {
+          type: "answer",
+          payload: { choice: answer.choice },
+        });
+      }
 
-    // The auto-reveal timer closes the round in every frame.
-    view = await waitForView(world, a, (v) => v.phase === "revealed" && v.round === 1);
-    expect(view.correctChoice).toBeTypeOf("number");
-    expect(view.revealedAnswers).toHaveLength(3);
-    for (const answer of answers1) {
-      expect(view.scores.find((entry) => entry.id === answer.memberId)?.score).toBe(
-        expectedScore(view, answer.memberId),
-      );
-    }
+      // The auto-reveal timer closes the round in every frame.
+      view = await waitForView(world, a, (v) => v.phase === "revealed" && v.round === 1);
+      expect(view.correctChoice).toBeTypeOf("number");
+      expect(view.revealedAnswers).toHaveLength(3);
+      for (const answer of answers1) {
+        expect(view.scores.find((entry) => entry.id === answer.memberId)?.score).toBe(
+          expectedScore(view, answer.memberId),
+        );
+      }
 
-    // Round 2 auto-advances; the second roster member is the quizmaster.
-    view = await waitForView(world, a, (v) => v.phase === "question" && v.round === 2);
-    expect(view.quizmasterId).toBe("member-b");
-    const answers2 = [
-      { memberId: "member-a", choice: 3 },
-      { memberId: "member-c", choice: 2 },
-      { memberId: "member-d", choice: 0 },
-    ];
-    for (const answer of answers2) {
-      await dispatchSettled(world, sessionOf(world, answer.memberId), {
-        type: "answer",
-        payload: { choice: answer.choice },
-      });
-    }
-    view = await waitForView(world, a, (v) => v.phase === "revealed" && v.round === 2);
+      // Round 2 auto-advances; the second roster member is the quizmaster.
+      view = await waitForView(world, a, (v) => v.phase === "question" && v.round === 2);
+      expect(view.quizmasterId).toBe("member-b");
+      const answers2 = [
+        { memberId: "member-a", choice: 3 },
+        { memberId: "member-c", choice: 2 },
+        { memberId: "member-d", choice: 0 },
+      ];
+      for (const answer of answers2) {
+        await dispatchSettled(world, sessionOf(world, answer.memberId), {
+          type: "answer",
+          payload: { choice: answer.choice },
+        });
+      }
+      view = await waitForView(world, a, (v) => v.phase === "revealed" && v.round === 2);
 
-    // The game finishes after the last round with a winner.
-    view = await waitForView(world, a, (v) => v.phase === "finished");
-    expect(view.winnerId).not.toBeNull();
-    expect(view.scores[0]?.id).toBe(view.winnerId);
-    // Every frame agrees on the final state.
-    for (const session of world.sessions) {
-      const finalView = await waitForView(world, session, (v) => v.phase === "finished");
-      expect(finalView.roundsTotal).toBe(2);
-      expect(finalView.winnerId).toBe(view.winnerId);
-    }
-  });
+      // The game finishes after the last round with a winner.
+      view = await waitForView(world, a, (v) => v.phase === "finished");
+      expect(view.winnerId).not.toBeNull();
+      expect(view.scores[0]?.id).toBe(view.winnerId);
+      // Every frame agrees on the final state.
+      for (const session of world.sessions) {
+        const finalView = await waitForView(world, session, (v) => v.phase === "finished");
+        expect(finalView.roundsTotal).toBe(2);
+        expect(finalView.winnerId).toBe(view.winnerId);
+      }
+    },
+  );
 
-  it("surfaces action races with stable, actionable error codes", async () => {
+  it("surfaces action races with stable, actionable error codes", { timeout: 15_000 }, async () => {
     const entries: Array<unknown[]> = [];
     vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
       entries.push(args);

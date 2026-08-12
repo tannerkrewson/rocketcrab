@@ -369,6 +369,9 @@
         var ANSWER_MS = typeof config.answerMs === "number" ? config.answerMs : 30000;
         var RESULTS_MS = typeof config.resultsMs === "number" ? config.resultsMs : 8000;
         var ROUNDS_OVERRIDE = typeof config.rounds === "number" ? config.rounds : 0;
+        var JOIN_WAIT_MS = typeof config.joinWaitMs === "number" ? config.joinWaitMs : 15000;
+        var MIN_PLAYERS = typeof config.minPlayers === "number" ? config.minPlayers : 3;
+        var BEGIN_READY_DELAY_MS = 400;
 
         var LETTERS = ["A", "B", "C", "D"];
 
@@ -540,14 +543,21 @@
               scores[p.id] = 0;
             });
             return {
-              phase: "question", // "question" | "revealed" | "finished"
-              round: 1,
+              // "waiting" (player join window) | "question" | "revealed" |
+              // "finished". The game begins when at least MIN_PLAYERS are
+              // connected, or after the join window closes — so a small
+              // party is never stuck.
+              phase: "waiting",
+              waitStartedAt: context.now,
+              joinWaitMs: JOIN_WAIT_MS,
+              minPlayers: MIN_PLAYERS,
+              round: 0,
               roundsTotal: ROUNDS_OVERRIDE > 0 ? ROUNDS_OVERRIDE : roster.length,
               roster: roster,
               scores: scores,
               answers: {}, // memberId -> { choice, name } (private until reveal)
               correctChoice: null, // null until the reveal (private for everyone)
-              roundStartedAt: context.now,
+              roundStartedAt: 0,
               revealedAt: null,
               answerMs: ANSWER_MS,
               resultsMs: RESULTS_MS,
@@ -556,6 +566,27 @@
           },
 
           actions: {
+            // Start the game: the first question goes live once enough
+            // players are connected (or the join window closes).
+            begin: function (draft, context) {
+              if (draft.phase !== "waiting") return;
+              var enough =
+                context.players.length >= draft.minPlayers ||
+                context.now >= draft.waitStartedAt + draft.joinWaitMs;
+              if (!enough) return;
+              var roster = context.players.map(function (p) {
+                return { id: p.id, name: p.name };
+              });
+              draft.phase = "question";
+              draft.round = 1;
+              draft.roundsTotal = ROUNDS_OVERRIDE > 0 ? ROUNDS_OVERRIDE : roster.length;
+              draft.roster = roster;
+              draft.roundStartedAt = context.now;
+              roster.forEach(function (p) {
+                if (!draft.scores[p.id]) draft.scores[p.id] = 0;
+              });
+            },
+
             // Lock in an answer. Ignored when the round is not open, for the
             // quizmaster, after the deadline (the authority's clock is
             // authoritative), or for players outside the roster.
@@ -636,6 +667,33 @@
           // the reveal. Spectators (joined mid-question) see everything
           // public and cannot answer.
           selectView: function (state, viewer) {
+            // The join window: everyone sees the same waiting card.
+            if (state.phase === "waiting") {
+              return {
+                phase: "waiting",
+                round: 0,
+                roundsTotal: 0,
+                roster: state.roster,
+                quizmasterId: null,
+                question: { text: "", options: [], category: "" },
+                correctChoice: null,
+                revealed: false,
+                myAnswer: null,
+                answers: {},
+                revealedAnswers: [],
+                scores: [],
+                answeredCount: 0,
+                deadline: 0,
+                revealedAt: null,
+                resultsMs: state.resultsMs,
+                isQuizmaster: false,
+                spectator: false,
+                winnerId: null,
+                waiting: true,
+                readyToBegin: state.roster.length >= state.minPlayers,
+                beginAt: state.waitStartedAt + state.joinWaitMs,
+              };
+            }
             var inRosterFlag = inRoster(state, viewer.id);
             var own = state.answers[viewer.id] || null;
             var answersView = {};
@@ -747,6 +805,9 @@
         }
 
         function viewKey(view) {
+          if (view.phase === "waiting") {
+            return "waiting:" + view.beginAt + ":" + (view.readyToBegin ? "go" : "wait");
+          }
           return (
             view.phase + ":" + view.round + ":" + (view.roundStartedAt || view.revealedAt || "x")
           );
@@ -761,7 +822,12 @@
           clearTimeout(timerId);
           timerId = null;
           var delay = null;
-          if (view.phase === "question") {
+          if (view.phase === "waiting") {
+            // Enough players are here (or the join window is closing): begin.
+            delay = view.readyToBegin
+              ? BEGIN_READY_DELAY_MS
+              : Math.max(0, view.beginAt - Date.now());
+          } else if (view.phase === "question") {
             delay = Math.max(0, view.deadline - Date.now());
           } else if (view.phase === "revealed") {
             delay = Math.max(0, view.revealedAt + view.resultsMs - Date.now());
@@ -769,7 +835,11 @@
           if (delay === null) return;
           timerId = setTimeout(function () {
             timerId = null;
-            if (view.phase === "question") {
+            if (view.phase === "waiting") {
+              safeDispatch({ type: "begin" }).catch(function () {
+                /* the join window view will refresh and reschedule */
+              });
+            } else if (view.phase === "question") {
               revealAttempts += 1;
               safeDispatch({ type: "reveal" }).catch(function (error) {
                 if (revealAttempts === 1) {
@@ -844,10 +914,12 @@
           var header = el("header", { class: "top" }, [
             el("h1", null, ["Nova Quiz"]),
             connChip(),
-            el("span", { class: "chip" }, [
+            el("span", { class: "chip", "data-testid": "round-chip" }, [
               view.phase === "finished"
                 ? "Game over"
-                : "Round " + view.round + " of " + view.roundsTotal,
+                : view.phase === "waiting"
+                  ? "Waiting for players"
+                  : "Round " + view.round + " of " + view.roundsTotal,
             ]),
           ]);
           root.appendChild(header);
@@ -858,13 +930,52 @@
               ]),
             );
           }
-          if (view.phase === "question") {
+          if (view.phase === "waiting") {
+            renderWaiting(view);
+          } else if (view.phase === "question") {
             renderQuestion(view);
           } else if (view.phase === "revealed") {
             renderRevealed(view);
           } else {
             renderFinished(view);
           }
+        }
+
+        function renderWaiting(view) {
+          var card = el("div", { class: "card" }, [
+            el("h2", null, ["Get ready"]),
+            el("p", { class: "question", "data-testid": "waiting-line" }, [
+              "Waiting for " + view.roster.length + " player(s) to join…",
+            ]),
+            el("p", { class: "note" }, [
+              view.readyToBegin
+                ? "Enough players are here — starting now."
+                : "The game starts when at least 3 players are connected (or the join window closes).",
+            ]),
+          ]);
+          root.appendChild(card);
+          var list = el("ul", { class: "scores", "data-testid": "waiting-list" });
+          view.roster.forEach(function (p) {
+            list.appendChild(
+              el("li", null, [
+                el("span", { class: "pos" }, ["•"]),
+                document.createTextNode(p.name + (p.id === nova.player.id ? " (you)" : "")),
+              ]),
+            );
+          });
+          card.appendChild(list);
+          root.appendChild(
+            el(
+              "button",
+              {
+                type: "button",
+                class: "btn secondary",
+                "data-action": "begin",
+                disabled: "disabled",
+              },
+              ["Waiting…"],
+            ),
+          );
         }
 
         function connChip() {
@@ -1099,6 +1210,12 @@
 
         nova.onStart(function () {
           nova.log("Nova Quiz started with " + nova.players.length + " player(s).");
+          // A player who joined during the join window may have pushed the
+          // party past the minimum: try to begin right away (the handler
+          // validates; a no-op is harmless).
+          if (latestView && latestView.phase === "waiting") {
+            safeDispatch({ type: "begin" }).catch(function () {});
+          }
         });
 
         nova.onConnectionChange(function (status) {
@@ -1110,6 +1227,9 @@
 
         nova.onPlayerJoin(function (player) {
           nova.log(player.name + " joined the game.");
+          if (latestView && latestView.phase === "waiting") {
+            safeDispatch({ type: "begin" }).catch(function () {});
+          }
         });
 
         nova.onPlayerLeave(function (player) {
