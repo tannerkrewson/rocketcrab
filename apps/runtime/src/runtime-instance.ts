@@ -38,9 +38,11 @@ import {
   NOVA_BRIDGE_SCRIPT,
   SUPPORTED_NOVA_API_VERSIONS,
   gameDeclarationSchema,
+  novaApiCallSchemas,
   registrationFields,
   serializeConsoleArgs,
   type GameDeclaration,
+  type NovaApiCallMethod,
 } from "./nova-bridge";
 import { RateLimitedSink, createRuntimeLimiters, type RateLimiter } from "./rate-limiter";
 
@@ -307,6 +309,14 @@ export class RuntimeInstance {
       case "defineGame":
         this.handleDeclaration(payload);
         break;
+      case "ready":
+      case "dispatch":
+      case "raw.createChannel":
+      case "raw.send":
+      case "simulation.register":
+      case "simulation.sendInput":
+        this.handleApiCall(kind, payload);
+        break;
       case "error":
         this.handleGameError(payload);
         break;
@@ -338,18 +348,18 @@ export class RuntimeInstance {
       return;
     }
     const declaration = parsed.data as GameDeclaration;
-    // Unsupported Nova API version is an observable diagnostic (U4 category
-    // `unsupported`): the game declares an API version this build cannot
-    // execute. The game still runs — like `invalid_html`, this is reported,
-    // never used to silently change behavior.
+    // Unsupported Nova API version fails registration with a clear error
+    // (S1 policy: unknown versions fail rather than being guessed at).
+    // The message keeps the U4 diagnostics prefix for the editor panel.
     if (
       declaration.apiVersion !== undefined &&
       !SUPPORTED_NOVA_API_VERSIONS.includes(declaration.apiVersion)
     ) {
       this.sendError(
         "unsupported",
-        `Unsupported Nova API version ${declaration.apiVersion}. Supported versions: [${SUPPORTED_NOVA_API_VERSIONS.join(", ")}].`,
+        `Unsupported Nova API version ${declaration.apiVersion}. Supported versions: [${SUPPORTED_NOVA_API_VERSIONS.join(", ")}]. Registration ignored.`,
       );
+      return;
     }
     const fields = registrationFields({
       bootstrapGameId: this.gameId,
@@ -361,6 +371,25 @@ export class RuntimeInstance {
     this.clearRegistrationTimer();
     this.send(buildRegistrationMessage(this.runtimeInstanceId, fields, this.sessionId));
     this.send(buildLifecycleMessage(this.runtimeInstanceId, "started", undefined, this.sessionId));
+  }
+
+  /**
+   * A forwarded Nova API call (S1): validate the payload, then surface it
+   * clearly. No host-side session router exists before the arena/party
+   * milestones (U6/P1/S2), so a validated call cannot be performed yet and
+   * is reported as `unsupported` — never silently dropped. The session
+   * router milestones replace this branch with real forwarding.
+   */
+  private handleApiCall(method: NovaApiCallMethod, payload: unknown): void {
+    const parsed = novaApiCallSchemas[method].safeParse(payload);
+    if (!parsed.success) {
+      this.sendError("runtime", `nova.${method}() call failed validation; ignored.`);
+      return;
+    }
+    this.sendError(
+      "unsupported",
+      `nova.${method}() is not available in this build yet: the host has not connected this game to a party session.`,
+    );
   }
 
   private handleGameError(payload: unknown): void {

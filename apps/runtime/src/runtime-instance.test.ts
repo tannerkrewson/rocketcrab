@@ -260,15 +260,15 @@ describe("RuntimeInstance registration", () => {
     expect((errors[0] as { message: string }).message).toContain("failed validation");
   });
 
-  it("reports an unsupported Nova API version and still registers the game", () => {
+  it("rejects an unsupported Nova API version without registering (S1 policy)", () => {
     const { port } = setup();
     hook().report("defineGame", { options: { apiVersion: 99 } });
     const error = runtimeMessage(port, "runtime.error");
     expect(error?.category).toBe("unsupported");
     expect(error?.message).toContain("Unsupported Nova API version 99");
-    // The game still runs (observational diagnostic, like invalid_html).
-    const registration = runtimeMessage(port, "game.registration");
-    expect(registration?.title).toBe("Untitled game");
+    // Unknown API versions fail registration with a clear error (S1
+    // acceptance: unknown versions fail rather than being guessed at).
+    expect(runtimeMessage(port, "game.registration")).toBeUndefined();
   });
 
   it("accepts the current Nova API version without an unsupported report", () => {
@@ -427,5 +427,52 @@ describe("RuntimeInstance protocol boundary", () => {
     expect(port.sent.filter((m) => (m as { type: string }).type === "runtime.error")).toHaveLength(
       0,
     );
+  });
+
+  it("validates and surfaces forwarded Nova API calls as unsupported (S1)", () => {
+    // Error reports are rate-limited (F6: 5/s); refill the bucket between
+    // batches with fake timers so all six methods are exercised.
+    vi.useFakeTimers();
+    const { port } = setup();
+    hook().report("ready", {});
+    hook().report("dispatch", { action: { type: "playCard", payload: { c: 1 } } });
+    hook().report("raw.createChannel", { spec: { name: "chat" } });
+    hook().report("raw.send", { name: "chat", payload: "hi" });
+    hook().report("simulation.register", {});
+    vi.advanceTimersByTime(1100);
+    hook().report("simulation.sendInput", { input: { type: "move" } });
+    const unsupported = port.sent.filter(
+      (m) =>
+        (m as { type: string }).type === "runtime.error" &&
+        (m as { category?: string }).category === "unsupported",
+    );
+    expect(unsupported).toHaveLength(6);
+    const messages = unsupported.map((m) => String((m as { message?: string }).message)).join("\n");
+    expect(messages).toContain("nova.ready() is not available");
+    expect(messages).toContain("nova.dispatch() is not available");
+    expect(messages).toContain("nova.raw.createChannel() is not available");
+    expect(messages).toContain("nova.simulation.sendInput() is not available");
+  });
+
+  it("rejects malformed forwarded Nova API calls without forwarding them", () => {
+    const { port } = setup();
+    hook().report("dispatch", { action: { type: "" } });
+    hook().report("raw.send", { name: "chat" });
+    const errors = port.sent.filter(
+      (m) => (m as { type: string }).type === "runtime.error",
+    ) as Array<{ category?: string; message?: string }>;
+    expect(errors).toHaveLength(2);
+    expect(errors[0]?.category).toBe("runtime");
+    expect(String(errors[0]?.message)).toContain("nova.dispatch() call failed validation");
+    expect(String(errors[1]?.message)).toContain("nova.raw.send() call failed validation");
+  });
+
+  it("rejects defineGame declarations targeting unknown API versions", () => {
+    const { port } = setup();
+    hook().report("defineGame", { options: { title: "Future", apiVersion: 99 } });
+    const error = lastRuntimeMessage(port, "runtime.error");
+    expect(error?.category).toBe("unsupported");
+    expect(String(error?.message)).toContain("API version 99");
+    expect(messageTypes(port)).not.toContain("game.registration");
   });
 });

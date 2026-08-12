@@ -63,6 +63,17 @@ renamed, or made optional in any future version of the same message family.
    `src/errors.test.ts`.
 5. Document the change here and in the issue that required it.
 
+### Change log
+
+- **Protocol version 1 additions (S1, Nova API):** added peer-plane lifecycle
+  messages `game.ready`, `game.start`, and `game.end` (the ready lifecycle,
+  game start, and game end concepts of the game-facing Nova API, S1). All
+  three are new message types within version 1 (compatible per the table
+  above); receivers that predate S1 reject them as `unknown_message_type` —
+  a loud, safe failure. `gameEndReasonSchema` in `src/messages/shared.ts` is
+  now shared by the peer `game.end` announcement and the runtime `game.end`
+  teardown request (same values as before, no wire change).
+
 ## Limits
 
 Initial limits live in `src/limits.ts` as typed constants:
