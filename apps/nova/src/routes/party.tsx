@@ -3,6 +3,7 @@ import { Gamepad2, PartyPopper, Users } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { PROTOCOL_VERSION, type GameMode } from "@rocketcrab/protocol";
 import { PartyExperience } from "../components/party/PartyExperience";
+import { PartyResumeBanner } from "../components/party/PartyResumeBanner";
 import { EmptyState } from "../components/ui/EmptyState";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
 import { LoadingState } from "../components/ui/LoadingState";
@@ -97,7 +98,8 @@ function PartyPage() {
     return <LoadingState label="Loading game…" />;
   }
   return (
-    <div className="mx-auto w-full max-w-xl py-6">
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-4 py-6">
+      <PartyResumeBanner engine={engine} />
       <EmptyState
         icon={<PartyPopper />}
         title="No party here yet"
