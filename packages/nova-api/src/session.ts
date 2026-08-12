@@ -45,6 +45,8 @@ import {
   buildActionAckMessage,
   buildActionDispatchMessage,
   buildAuthorityAnnounceMessage,
+  buildAuthorityElectionMessage,
+  buildAuthorityHeartbeatMessage,
   buildGameEndMessage,
   buildGameReadyMessage,
   buildGameStartMessage,
@@ -58,6 +60,8 @@ import {
 import {
   NovaStateEngine,
   type AuthorityAnnounceEnvelope,
+  type AuthorityElectionEnvelope,
+  type AuthorityHeartbeatEnvelope,
   type StateEngineEvent,
   type StateEngineHost,
   type StateSnapshotEnvelope,
@@ -108,6 +112,22 @@ export interface NovaSessionOptions {
    * (contract suite / tests) with the real immer package.
    */
   readonly stateExecutor?: NovaStateExecutor;
+  /**
+   * Authority election timings (S3, ADR-0007). Defaults follow the protocol
+   * limits; tests inject small deterministic values with fake timers.
+   */
+  readonly authority?: {
+    /** Authority heartbeat interval. */
+    readonly heartbeatIntervalMs?: number;
+    /** Missing-heartbeat grace period before suspicion. */
+    readonly gracePeriodMs?: number;
+    /** How long an election collects candidates before finalizing. */
+    readonly electionWindowMs?: number;
+    /** How long the winner collects state pushes before restoring. */
+    readonly restoreWindowMs?: number;
+    /** Epoch-ms clock (tests inject a fake). */
+    readonly now?: () => number;
+  };
 }
 
 /** One connected player as tracked by the session (host-side view). */
@@ -115,6 +135,8 @@ export interface NovaSessionPlayer extends NovaPlayer {
   readonly connectionId: string;
   readonly ready: boolean;
   readonly joinedAt: number;
+  /** Authority eligibility (ADR-0007 member identity; always true for S3). */
+  readonly authorityEligible: boolean;
 }
 
 /** Internal mutable player record (the host-side view is a snapshot). */
@@ -124,6 +146,7 @@ interface PlayerRecord {
   connectionId: string;
   ready: boolean;
   joinedAt: number;
+  authorityEligible: boolean;
 }
 /** Delivery guarantees recorded for one raw channel (S1 raw mode). */
 export interface NovaRawChannelState {
@@ -153,6 +176,14 @@ interface OutboxEntry {
   seq?: number;
 }
 
+/** One action dispatch held or in flight (S3 election buffering). */
+interface BufferedDispatch {
+  readonly actionId: string;
+  readonly type: string;
+  readonly payload: unknown;
+  readonly baseRevision: number;
+}
+
 /** Create a session over a transport and its game-facing client. */
 export function createNovaSession(options: NovaSessionOptions): NovaSession {
   return new NovaSession(options);
@@ -180,6 +211,10 @@ export class NovaSession implements NovaClientBackend {
   private readonly listeners = new Set<(event: NovaSessionEvent) => void>();
   private readonly transportUnsubscribers: Array<() => void> = [];
   private readonly outbox: OutboxEntry[] = [];
+  /** Dispatches held while no authority is known (S3 election buffering). */
+  private readonly dispatchBuffer: BufferedDispatch[] = [];
+  /** Dispatches sent but not yet acked (re-sent when the authority changes). */
+  private readonly inflightDispatches = new Map<string, BufferedDispatch>();
   private nextSeq = 0;
   private readySent = false;
   private started = false;
@@ -201,12 +236,26 @@ export class NovaSession implements NovaClientBackend {
       connectionId: this.transport.selfConnectionId,
       ready: false,
       joinedAt: Date.now(),
+      authorityEligible: true,
     };
     this.client = createNovaClient(this);
     this.engine = new NovaStateEngine({
       host: this.engineHost,
       executor: this.injectedExecutor ?? new LocalGameExecutor(null),
       selfMemberId: memberId,
+      ...(options.authority?.now !== undefined ? { now: options.authority.now } : {}),
+      ...(options.authority?.heartbeatIntervalMs !== undefined
+        ? { heartbeatIntervalMs: options.authority.heartbeatIntervalMs }
+        : {}),
+      ...(options.authority?.gracePeriodMs !== undefined
+        ? { gracePeriodMs: options.authority.gracePeriodMs }
+        : {}),
+      ...(options.authority?.electionWindowMs !== undefined
+        ? { electionWindowMs: options.authority.electionWindowMs }
+        : {}),
+      ...(options.authority?.restoreWindowMs !== undefined
+        ? { restoreWindowMs: options.authority.restoreWindowMs }
+        : {}),
     });
   }
 
@@ -228,6 +277,7 @@ export class NovaSession implements NovaClientBackend {
       connectionId: player.connectionId,
       ready: player.ready,
       joinedAt: player.joinedAt,
+      authorityEligible: player.authorityEligible,
     }));
   }
 
@@ -323,6 +373,8 @@ export class NovaSession implements NovaClientBackend {
   async leave(): Promise<void> {
     this.assertAlive();
     this.outbox.length = 0;
+    this.dispatchBuffer.length = 0;
+    this.inflightDispatches.clear();
     await this.transport.leave();
   }
 
@@ -381,6 +433,8 @@ export class NovaSession implements NovaClientBackend {
     }
     this.transportUnsubscribers.length = 0;
     this.outbox.length = 0;
+    this.dispatchBuffer.length = 0;
+    this.inflightDispatches.clear();
     this.listeners.clear();
     this.client.dispose();
   }
@@ -418,9 +472,13 @@ export class NovaSession implements NovaClientBackend {
   }
 
   /**
-   * Dispatch one action (S2): validate, assign the base revision, and either
-   * apply locally (this session is the fixed initial authority) or send the
-   * action to the authority for sequential application. Resolves once the
+   * Dispatch one action (S2/S3): validate, assign the base revision, and
+   * either apply locally (this session is the current authority), send the
+   * action to the authority, or — when no authority is known (election in
+   * progress) — buffer it until the new authority is announced (ADR-0007:
+   * actions buffer during election). In-flight dispatches are re-sent when
+   * the authority changes so an action whose ack was lost in a migration is
+   * applied exactly once (history + queue deduplication). Resolves once the
    * action is accepted for delivery; the game-facing promise resolves on the
    * authority's ack (see the client).
    */
@@ -438,7 +496,8 @@ export class NovaSession implements NovaClientBackend {
       throw new NovaError("ended", endedMessage("dispatch"));
     }
     const baseRevision = action.baseRevision ?? this.engine.getRevision();
-    if (this.engine.isAuthorityElect()) {
+    const authority = this.engine.getAuthorityMemberId();
+    if (authority === this.selfPlayer.id) {
       this.engine.handleLocalAction({
         actionId,
         type: action.type,
@@ -447,26 +506,21 @@ export class NovaSession implements NovaClientBackend {
       });
       return Promise.resolve();
     }
-    if (this.engine.getAuthorityMemberId() === null) {
-      throw new NovaError(
-        "no_authority",
-        "No authority is currently active; the action was not sent (authority election lands with S3).",
-      );
+    const entry: BufferedDispatch = {
+      actionId,
+      type: action.type,
+      payload: action.payload,
+      baseRevision,
+    };
+    if (authority === null) {
+      // Election in progress (or authority unknown): buffer until the new
+      // authority is announced (the client promise resolves on its ack).
+      this.dispatchBuffer.push(entry);
+      return Promise.resolve();
     }
-    const seq = this.takeSeq();
-    const now = Date.now();
-    return this.sendProtocol(
-      (base) =>
-        buildActionDispatchMessage(base, {
-          seq,
-          actionId,
-          baseRevision,
-          actionType: action.type,
-          payload: action.payload,
-          expiresAtMs: now + actionTimeoutMs,
-        }),
-      { seq },
-    );
+    this.inflightDispatches.set(actionId, entry);
+    this.sendBufferedDispatch(entry);
+    return Promise.resolve();
   }
 
   createRawChannel(spec: NovaRawChannelSpec): void {
@@ -585,15 +639,7 @@ export class NovaSession implements NovaClientBackend {
     this.status = mapConnectionState(state);
     if (state === "connected") {
       this.flushOutbox();
-      // A reconnected/left-then-rejoined authority re-announces so followers
-      // restore the authority after a disconnect window (S2; S3 adds terms).
-      if (
-        this.started &&
-        this.engine.isAuthorityElect() &&
-        this.engine.getCanonicalState() !== null
-      ) {
-        this.engine.announce();
-      }
+      this.engine.onSelfReconnected();
     }
     this.emit({ type: "connection", status: this.status });
   }
@@ -612,6 +658,7 @@ export class NovaSession implements NovaClientBackend {
         connectionId: peer.connectionId,
         ready: false,
         joinedAt: peer.joinedAt,
+        authorityEligible: true,
       });
     }
     const joined = this.playersMap.get(peer.memberId);
@@ -646,7 +693,7 @@ export class NovaSession implements NovaClientBackend {
       {
         revision: snapshot.revision,
         stateHash: snapshot.stateHash,
-        term: 1,
+        term: this.engine.getTerm(),
         authorityMemberId: this.selfPlayer.id,
         processedActionIds: this.engine.processedActionIds(),
         state: this.engine.getCanonicalState(),
@@ -679,13 +726,7 @@ export class NovaSession implements NovaClientBackend {
     this.emit({ type: "connection", status: this.status });
     this.status = "connected";
     this.emit({ type: "connection", status: this.status });
-    if (
-      this.started &&
-      this.engine.isAuthorityElect() &&
-      this.engine.getCanonicalState() !== null
-    ) {
-      this.engine.announce();
-    }
+    this.engine.onSelfReconnected();
   }
 
   private handleMessage(message: TransportMessage): void {
@@ -710,6 +751,7 @@ export class NovaSession implements NovaClientBackend {
         const player = this.playersMap.get(peerMessage.senderMemberId);
         if (player !== undefined) {
           player.name = peerMessage.displayName;
+          player.authorityEligible = peerMessage.authorityEligible;
         }
         // A peer that introduces itself may have attached its session after
         // our readiness announcement was sent (P4 late-attach race): re-send
@@ -749,7 +791,9 @@ export class NovaSession implements NovaClientBackend {
         }
         break;
       case "action.dispatch":
-        // Host-side observability; only the authority applies actions.
+        // Host-side observability; every shell routes the dispatch to its
+        // engine, which applies only when this session is the current
+        // authority (other shells drop it and re-send on authority change).
         this.emit({
           type: "actionReceived",
           action: {
@@ -758,22 +802,21 @@ export class NovaSession implements NovaClientBackend {
             baseRevision: peerMessage.baseRevision,
           },
         });
-        if (this.engine.isAuthorityElect()) {
-          this.engine.handleInboundAction({
-            actionId: peerMessage.actionId,
-            seq: peerMessage.seq,
-            actionType: peerMessage.actionType,
-            payload: peerMessage.payload,
-            baseRevision: peerMessage.baseRevision,
-            sentAt: peerMessage.sentAt,
-            ...(peerMessage.expiresAtMs !== undefined
-              ? { expiresAtMs: peerMessage.expiresAtMs }
-              : {}),
-            senderMemberId: peerMessage.senderMemberId,
-          });
-        }
+        this.engine.handleInboundAction({
+          actionId: peerMessage.actionId,
+          seq: peerMessage.seq,
+          actionType: peerMessage.actionType,
+          payload: peerMessage.payload,
+          baseRevision: peerMessage.baseRevision,
+          sentAt: peerMessage.sentAt,
+          ...(peerMessage.expiresAtMs !== undefined
+            ? { expiresAtMs: peerMessage.expiresAtMs }
+            : {}),
+          senderMemberId: peerMessage.senderMemberId,
+        });
         break;
       case "action.ack":
+        this.noteActionAck(peerMessage.actionId);
         this.emit({
           type: "actionAck",
           ack: {
@@ -797,6 +840,7 @@ export class NovaSession implements NovaClientBackend {
           authorityMemberId: peerMessage.authorityMemberId,
           processedActionIds: peerMessage.processedActionIds,
           state: peerMessage.state,
+          senderMemberId: peerMessage.senderMemberId,
         });
         if (!this.startEmitted) {
           // A late joiner starts from the catch-up snapshot.
@@ -812,8 +856,26 @@ export class NovaSession implements NovaClientBackend {
         break;
       case "authority.announce":
         this.engine.handleAnnounce({
+          term: peerMessage.term,
           authorityMemberId: peerMessage.authorityMemberId,
           stateRevision: peerMessage.stateRevision,
+          ...(peerMessage.stateHash !== undefined ? { stateHash: peerMessage.stateHash } : {}),
+          eligibleMemberIds: peerMessage.eligibleMemberIds,
+        });
+        break;
+      case "authority.heartbeat":
+        this.engine.handleHeartbeat({
+          term: peerMessage.term,
+          authorityMemberId: peerMessage.authorityMemberId,
+          stateRevision: peerMessage.stateRevision,
+          heartbeatSeq: peerMessage.heartbeatSeq,
+        });
+        break;
+      case "authority.election":
+        this.engine.handleElection({
+          term: peerMessage.term,
+          candidateMemberId: peerMessage.candidateMemberId,
+          observed: peerMessage.observed,
         });
         break;
       case "simulation.input":
@@ -860,15 +922,75 @@ export class NovaSession implements NovaClientBackend {
   // Internals
   // ------------------------------------------------------------------
 
+  /** Send one buffered/in-flight dispatch to the current authority. */
+  private sendBufferedDispatch(entry: BufferedDispatch): void {
+    const authority = this.engine.getAuthorityMemberId();
+    if (authority === this.selfPlayer.id) {
+      this.engine.handleLocalAction({
+        actionId: entry.actionId,
+        type: entry.type,
+        payload: entry.payload,
+        baseRevision: entry.baseRevision,
+      });
+      return;
+    }
+    if (authority === null) return; // still electing; keep buffered
+    const seq = this.takeSeq();
+    const now = Date.now();
+    void this.sendProtocol(
+      (base) =>
+        buildActionDispatchMessage(base, {
+          seq,
+          actionId: entry.actionId,
+          baseRevision: entry.baseRevision,
+          actionType: entry.type,
+          payload: entry.payload,
+          expiresAtMs: now + actionTimeoutMs,
+        }),
+      { seq },
+    ).catch((error: unknown) => this.emitError(error));
+  }
+
+  /**
+   * The authority changed (S3): flush buffered dispatches toward the new
+   * authority and re-send in-flight ones whose ack may have been lost in the
+   * migration. Deduplication on the authority side (history + queue) makes
+   * the re-sends exactly-once.
+   */
+  private flushDispatchBuffer(): void {
+    const authority = this.engine.getAuthorityMemberId();
+    if (authority === null) return;
+    const buffered = this.dispatchBuffer.splice(0);
+    for (const entry of buffered) {
+      this.inflightDispatches.set(entry.actionId, entry);
+      this.sendBufferedDispatch(entry);
+    }
+    for (const entry of this.inflightDispatches.values()) {
+      this.sendBufferedDispatch(entry);
+    }
+  }
+
+  /** Drop an in-flight dispatch once its ack arrived (any status). */
+  private noteActionAck(actionId: string): void {
+    this.inflightDispatches.delete(actionId);
+  }
+
   /** The transport-facing half the state engine uses to send and emit. */
   private get engineHost(): StateEngineHost {
     return {
       players: () => this.players,
       isConnected: (memberId) => memberId === this.selfPlayer.id || this.playersMap.has(memberId),
+      selfConnected: () => this.transport.connectionState === "connected",
+      eligibleMemberIds: () =>
+        [this.selfPlayer, ...this.playersMap.values()]
+          .filter((record) => record.authorityEligible)
+          .map((record) => record.id),
       sendAck: (targetMemberId, ack) => this.sendEngineAck(targetMemberId, ack),
       sendSnapshot: (snapshot, targetMemberId) => this.sendEngineSnapshot(snapshot, targetMemberId),
       sendView: (targetMemberId, view) => this.sendEngineView(targetMemberId, view),
       sendAnnounce: (announcement) => this.sendEngineAnnounce(announcement),
+      sendHeartbeat: (heartbeat) => this.sendEngineHeartbeat(heartbeat),
+      sendElection: (election) => this.sendEngineElection(election),
       emit: (event) => this.handleEngineEvent(event),
     };
   }
@@ -876,6 +998,7 @@ export class NovaSession implements NovaClientBackend {
   /** Emit one action ack (targeted; local when the actor is this session). */
   private sendEngineAck(targetMemberId: string, ack: NovaActionAck): void {
     if (targetMemberId === this.selfPlayer.id) {
+      this.noteActionAck(ack.actionId);
       this.emit({ type: "actionAck", ack });
       return;
     }
@@ -955,6 +1078,41 @@ export class NovaSession implements NovaClientBackend {
     ).catch((error: unknown) => this.emitError(error));
   }
 
+  /** Broadcast an authority heartbeat (S3; live-only, never queued). */
+  private sendEngineHeartbeat(heartbeat: AuthorityHeartbeatEnvelope): void {
+    if (this.transport.connectionState !== "connected") return; // soft state
+    const seq = this.takeSeq();
+    void this.deliverProtocol(
+      buildAuthorityHeartbeatMessage(this.base(), {
+        seq,
+        term: heartbeat.term,
+        authorityMemberId: heartbeat.authorityMemberId,
+        stateRevision: heartbeat.stateRevision,
+        heartbeatSeq: heartbeat.heartbeatSeq,
+      }),
+      { seq },
+    ).catch((error: unknown) => this.emitError(error));
+  }
+
+  /** Broadcast an authority election campaign (S3; live-only, never queued). */
+  private sendEngineElection(election: AuthorityElectionEnvelope): void {
+    if (this.transport.connectionState !== "connected") return; // soft state
+    const seq = this.takeSeq();
+    void this.deliverProtocol(
+      buildAuthorityElectionMessage(this.base(), {
+        seq,
+        term: election.term,
+        candidateMemberId: election.candidateMemberId,
+        observed: election.observed.map((observation) => ({
+          memberId: observation.memberId,
+          revision: observation.revision,
+          ...(observation.stateHash !== null ? { stateHash: observation.stateHash } : {}),
+        })),
+      }),
+      { seq },
+    ).catch((error: unknown) => this.emitError(error));
+  }
+
   /** Map state-engine events onto session events (client + host). */
   private handleEngineEvent(event: StateEngineEvent): void {
     switch (event.type) {
@@ -979,6 +1137,14 @@ export class NovaSession implements NovaClientBackend {
         break;
       case "stateError":
         this.emit({ type: "error", error: new NovaError(toErrorCode(event.code), event.message) });
+        break;
+      case "authorityChanged":
+        // Flush buffered dispatches toward the new authority and re-send
+        // in-flight ones (deduplication makes the re-sends exactly-once).
+        this.flushDispatchBuffer();
+        break;
+      case "electionStarted":
+        // Host/arena diagnostics only (visible through getStateModeDiagnostics).
         break;
     }
   }
