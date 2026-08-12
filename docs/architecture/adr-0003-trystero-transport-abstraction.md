@@ -4,7 +4,8 @@
 - **Date:** 2026-08-01
 - **Owner:** Rocketcrab Nova planning (Phase 1)
 - **Related:** U5 (InMemoryTransport), P1 (TrysteroTransport), S1 (Nova API),
-  ADR-0004 (rendezvous), F5 (connectivity spike)
+  ADR-0004 (rendezvous), F5 (connectivity spike), M3 (TURN decision),
+  P0 `rocketcrab-23s` (TURN implementation)
 
 ## Context
 
@@ -77,4 +78,52 @@ rule, per ADR-0013). `packages/core` does not depend on Trystero.
 - S1 acceptance: the same game code works in test and party transports.
 - The test arena (U6) requires no production Trystero code.
 - F5 records relay behavior, discovery/WebRTC timing, throughput, and a TURN
-  recommendation; M3 decides whether TURN infrastructure ships.
+  recommendation; M3 decided whether TURN infrastructure ships (2026-08-12:
+  **it does** — Outcome B, see addendum below).
+
+## M3 addendum: TURN is required for cross-network release (2026-08-12)
+
+- **Status:** Accepted (M3 verdict, Outcome B)
+- **Related:** M3 (`rocketcrab-9fv.6.3`), F5 (`rocketcrab-9fv.1.5`), P0
+  `rocketcrab-23s` (blocks M4/release), Blocker Register B2
+
+### Decision
+
+A fully static release is **not** reliable: **TURN is required** for
+cross-network WebRTC (M3 selects Outcome B). The P0 implementation issue
+`rocketcrab-23s` — a managed TURN service plus one tiny serverless endpoint
+issuing short-lived credentials, with rate limiting, origin checks, and
+abuse controls; **no game code execution, no room-state database, no
+replacement of Trystero** — blocks M4 (`rocketcrab-9fv.6.4`) and production
+release. Nova ships no reusable paid TURN credentials in public JavaScript;
+production enables TURN only after that P0 issue lands (the `turnConfig`
+hook is already wired in `@rocketcrab/trystero-transport`, P1).
+
+### Decision inputs (measured / estimated)
+
+| Input                                       | Value                                                                                                                                                                                                                                                                       | Source                                                              |
+| ------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
+| Cross-network success rate                  | **0% without TURN** (S3: desktop Wi-Fi → iPhone cellular FAILED repeatedly; same-Wi-Fi S1/S2 PASS via host candidates)                                                                                                                                                      | F5 human pass — `docs/testing/trystero-connectivity-findings.md` §7 |
+| Mobile carrier failures                     | Carrier-NAT phone gathers only host candidates (no STUN); ICE never completes; repeated "configure TURN servers" errors                                                                                                                                                     | F5 S3                                                               |
+| Corporate / restricted-network failures     | **NOT device-tested** — assumed likely worse than home Wi-Fi; consistent with Outcome B                                                                                                                                                                                     | assumption (residual risk)                                          |
+| VPN behavior                                | **NOT device-tested** — assumed similar to corporate/restricted networks                                                                                                                                                                                                    | assumption (residual risk)                                          |
+| Trystero join-error classification          | Structured `JoinError` for SDP/ICE failure → adapter maps to `peer_connection_failed` (`packages/trystero-transport/src/errors.ts`); relay failures are not structured (F5) — adapter detects via relay state + join timeouts                                               | F5, P1 transport                                                    |
+| User-facing retry behavior                  | P4 party engine: categorized join errors drive retry UX; reconnect screen + auto-reconnect backoff (`apps/nova/src/lib/party/engine.ts`, `FATAL_CATEGORIES` in errors.ts)                                                                                                   | P4 party engine                                                     |
+| Estimated TURN bandwidth                    | Payloads ≤ 5 MiB per transfer at ~3.9 MiB/s (loopback baseline); a 5 MiB payload to 4 peers ≈ 20 MiB per host; typical action payloads are KB-scale. Free tiers (Metered openrelay 50 GB/mo, free-tier coturn) are ample at party scale; re-measure on the P0 S3/S4 re-test | F5 measured throughput + estimate                                   |
+| Abuse risk of public long-lived credentials | **High** — any visitor could relay arbitrary traffic through a public TURN account (bandwidth burn, IP-abuse exposure). Mitigation: short-lived credentials from the serverless endpoint + rate limiting + origin checks; long-lived credentials only for local dev         | analysis                                                            |
+
+### Residual risks
+
+- Corporate/VPN networks were **not device-tested**; assume worse than home
+  Wi-Fi (consistent with Outcome B). Verify opportunistically during P0's
+  S3/S4 re-test if a corporate/VPN device is available.
+- The credential endpoint is new attack surface; rate limiting, origin
+  checks, and abuse controls are mandatory, not optional.
+- Free-tier provider allowances and stability are unverified until P0
+  evaluates them (free options first — Metered openrelay, free-tier coturn —
+  before any paid account).
+
+### Pointer
+
+P0 implementation issue **`rocketcrab-23s`**, updated 2026-08-12 to the full
+Outcome B shape; blocks M4 (`rocketcrab-9fv.6.4`) and production release.
