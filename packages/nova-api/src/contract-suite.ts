@@ -18,7 +18,7 @@
  * Import as `@rocketcrab/nova-api/contract-suite` (vitest is a
  * devDependency of this package; the suite is test infrastructure).
  */
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { NovaTransport } from "@rocketcrab/core";
 import { PROTOCOL_VERSION, assertPeerMessage } from "@rocketcrab/protocol";
 import { createNovaSession, type NovaSession } from "./session";
@@ -558,16 +558,24 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       expect(committed.at(-1)?.stateSizeBytes).toBeGreaterThan(0);
     });
 
-    it("rejects dispatches when no authority is active", async () => {
+    it("continues after the authority leaves: election, restore, buffered actions (S3)", async () => {
       const harness = harnessFactory();
       const transportA = harness.createTransport({ memberId: "member-a", displayName: "Ada" });
       const transportB = harness.createTransport({ memberId: "member-b", displayName: "Ben" });
+      // Small deterministic timings: the migration completes in ~100 ms.
+      const authority = {
+        heartbeatIntervalMs: 50,
+        gracePeriodMs: 400,
+        electionWindowMs: 40,
+        restoreWindowMs: 40,
+      };
       const a = createNovaSession({
         transport: transportA,
         room: ROOM,
         sessionId: SESSION,
         player: { memberId: "member-a", displayName: "Ada" },
         game: { gameId: "game-1", mode: "state" },
+        authority,
       });
       const b = createNovaSession({
         transport: transportB,
@@ -575,6 +583,7 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
         sessionId: SESSION,
         player: { memberId: "member-b", displayName: "Ben" },
         game: { gameId: "game-1", mode: "state" },
+        authority,
       });
       a.client.defineGame({ title: "Contract Game", mode: "state", ...contractGameHandlers() });
       b.client.defineGame({ title: "Contract Game", mode: "state", ...contractGameHandlers() });
@@ -584,14 +593,30 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       a.start();
       b.start();
       await settle(harness);
-      // The authority leaves; followers reject dispatches with a clear error
-      // and keep the last committed state (S3 owns election/migration).
+      expect(a.getStateModeDiagnostics().authorityMemberId).toBe("member-a");
+
+      // The authority closes its tab: the remaining member suspects
+      // immediately (the connection dropped), elects itself deterministically,
+      // restores the replicated state, and continues the game (ADR-0007).
       await a.leave();
       await settle(harness);
-      await expect(b.client.dispatch({ type: "drawCard" })).rejects.toMatchObject({
-        code: "no_authority",
+      expect(b.getStateModeDiagnostics().authorityMemberId).toBeNull(); // electing
+      expect(b.getStateModeDiagnostics().electionInProgress).toBe(true);
+      // A dispatch during the election buffers and completes after migration.
+      const dispatched = b.client.dispatch({ type: "drawCard" });
+      await vi.waitFor(
+        () => expect(b.getStateModeDiagnostics().authorityMemberId).toBe("member-b"),
+        { timeout: 5_000, interval: 10 },
+      );
+      await expect(dispatched).resolves.toBeUndefined();
+      await settle(harness);
+      expect(b.getStateModeDiagnostics().revision).toBe(2);
+      expect(b.getCanonicalState()?.state).toMatchObject({
+        deck: ["ace", "king"],
+        hands: { "member-b": "queen" },
       });
-      expect(b.getStateModeDiagnostics().revision).toBe(1);
+      // The new term is strictly higher than the old one.
+      expect(b.getStateModeDiagnostics().term).toBeGreaterThanOrEqual(2);
     });
 
     // ------------------------------------------------------------------
