@@ -8,6 +8,11 @@ import {
   partyIdentityMessageSchema,
   partyRenameMessageSchema,
   partySessionMessageSchema,
+  partyClassicRoomMessageSchema,
+  partyClassicRoomRequestMessageSchema,
+  partyKickMessageSchema,
+  partyReloadAllMessageSchema,
+  type ClassicUrlSpecMessage,
   type PartyCode,
   type ParseResult,
   type PeerMessage,
@@ -148,6 +153,61 @@ export function buildPartyRenameMessage(
       ...envelope(base),
       type: "party.rename",
       displayName: input.displayName,
+    }),
+  );
+}
+
+/** Build and validate a `party.classicRoom` announcement (private room, 7.7.4). */
+export function buildPartyClassicRoomMessage(
+  base: PartyControlBase,
+  input: {
+    gameId: string;
+    player: ClassicUrlSpecMessage;
+    host?: Partial<ClassicUrlSpecMessage>;
+  },
+): PeerMessage {
+  return assertPeerMessage(
+    partyClassicRoomMessageSchema.parse({
+      ...envelope(base),
+      type: "party.classicRoom",
+      gameId: input.gameId,
+      player: input.player,
+      ...(input.host !== undefined ? { host: input.host } : {}),
+    }),
+  );
+}
+
+/** Build and validate a `party.classicRoom.request` (private room, 7.7.4). */
+export function buildPartyClassicRoomRequestMessage(base: PartyControlBase): PeerMessage {
+  return assertPeerMessage(
+    partyClassicRoomRequestMessageSchema.parse({
+      ...envelope(base),
+      type: "party.classicRoom.request",
+    }),
+  );
+}
+
+/** Build and validate a `party.kick` (private room, 7.29). */
+export function buildPartyKickMessage(
+  base: PartyControlBase,
+  input: { targetMemberId: string; reason?: string },
+): PeerMessage {
+  return assertPeerMessage(
+    partyKickMessageSchema.parse({
+      ...envelope(base),
+      type: "party.kick",
+      targetMemberId: input.targetMemberId,
+      ...(input.reason !== undefined ? { reason: input.reason } : {}),
+    }),
+  );
+}
+
+/** Build and validate a `party.reloadAll` (private room, 7.29). */
+export function buildPartyReloadAllMessage(base: PartyControlBase): PeerMessage {
+  return assertPeerMessage(
+    partyReloadAllMessageSchema.parse({
+      ...envelope(base),
+      type: "party.reloadAll",
     }),
   );
 }

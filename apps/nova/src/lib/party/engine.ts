@@ -44,6 +44,7 @@ import { RuntimeHostClient, type ChannelPort, type RuntimeHostEvent } from "../r
 import { arenaApiCallSchemas } from "../arena/api-calls";
 import { toApiEvent } from "../arena/api-events";
 import { runtimeOriginForMainOrigin } from "../runtime-origin";
+import { findClassicGame, type ClassicGameConnectResult } from "../classic";
 import { localPartyIdentity, updatePartyDisplayName } from "./identity";
 import { browserLifecycleSource, type PartyLifecycleSource } from "./lifecycle";
 import { clearPartyRecovery, savePartyRecovery } from "./party-recovery";
@@ -120,6 +121,7 @@ export type PartyPhase =
   | "starting"
   | "playing"
   | "reconnecting"
+  | "removed"
   | "error";
 
 /** The full engine snapshot the UI projects. */
@@ -147,6 +149,22 @@ export interface PartyEngineState {
   readonly startBlockedReason: string | null;
   /** Set after the game ended; the lobby returns with this banner. */
   readonly endedReason: string | null;
+  /**
+   * Classic external iframe game for the party (7.7.4): the host creates
+   * the room once and shares the URL spec so every player embeds the same
+   * room with their own name. Null for Nova API games.
+   */
+  readonly classicGame: {
+    readonly gameId: string;
+    readonly title: string;
+    readonly connectResult: ClassicGameConnectResult;
+  } | null;
+  /** Non-null when the host removed this member from the party (7.29). */
+  readonly removedReason: string | null;
+  /**
+   * Bumped to remount the classic iframe (7.29 reload my game / reload all).
+   */
+  readonly classicFrameEpoch: number;
   readonly diagnostics: PartyDiagnostics | null;
   readonly notices: readonly PartyNotice[];
   readonly lastError: string | null;
@@ -225,6 +243,20 @@ export interface PartySourceSpec {
   readonly apiVersion?: number;
 }
 
+/**
+ * A classic external iframe game selected for the party (7.7.4): the room
+ * was created once in the host's browser and the URL spec is shared with
+ * every member through the party plane.
+ */
+interface ClassicSelection {
+  readonly gameId: string;
+  readonly title: string;
+  readonly connectResult: ClassicGameConnectResult;
+}
+
+/** The party-plane payload for a classic room announcement (7.7.4). */
+type ClassicAnnouncement = Parameters<PartySession["announceClassicRoom"]>[0];
+
 interface PartyEngineDefaults {
   transportFactory: PartyTransportFactory;
   runtimeOrigin: string;
@@ -286,6 +318,9 @@ export class PartyEngine {
   private runtime: RuntimeHostClient | null = null;
   private container: HTMLElement | null = null;
   private pendingSource: PartySourceSpec | null = null;
+  private classic: ClassicSelection | null = null;
+  private classicFrameEpoch = 0;
+  private removedReason: string | null = null;
   private frameStarted = false;
   private registered = false;
 
@@ -342,15 +377,23 @@ export class PartyEngine {
     const party = this.party;
     const identity = this.identity;
     const members = this.buildMembers();
-    const allReady = members.length > 0 && members.every((member) => member.ready);
+    // Classic games have no HTML source to transfer or verify and no
+    // runtime to register: the shared room announcement IS the source
+    // (7.7.4), so the transfer/ready gates don't apply.
+    const classicActive = this.classic !== null;
+    const allReady =
+      classicActive || (members.length > 0 && members.every((member) => member.ready));
     const allVerified =
-      members.length > 0 &&
-      members.every((member) =>
-        member.isSelf ? this.selfVerified : this.isSourceVerified(member.memberId),
-      );
-    const anyFailed = members.some(
-      (member) => member.transferState === "failed" || member.transferState === "incompatible",
-    );
+      classicActive ||
+      (members.length > 0 &&
+        members.every((member) =>
+          member.isSelf ? this.selfVerified : this.isSourceVerified(member.memberId),
+        ));
+    const anyFailed = classicActive
+      ? false
+      : members.some(
+          (member) => member.transferState === "failed" || member.transferState === "incompatible",
+        );
     const ended = this.session?.isEnded() ?? false;
     const inLobby = this.phase === "lobby";
 
@@ -403,6 +446,16 @@ export class PartyEngine {
         inLobby && this.game !== null && !ended && !anyFailed && allVerified && !allReady,
       startBlockedReason,
       endedReason: this.endedReason,
+      classicGame:
+        this.classic === null
+          ? null
+          : {
+              gameId: this.classic.gameId,
+              title: this.classic.title,
+              connectResult: this.classic.connectResult,
+            },
+      removedReason: this.removedReason,
+      classicFrameEpoch: this.classicFrameEpoch,
       diagnostics: this.buildDiagnostics(),
       notices: [...this.notices],
       lastError: this.lastError,
@@ -540,6 +593,7 @@ export class PartyEngine {
         .catch((error: unknown) =>
           this.addNotice("warn", `Could not ask the party for the game: ${errorMessage(error)}`),
         );
+      this.askForClassicRoom();
     } catch (error) {
       this.failSetup(error);
     }
@@ -583,6 +637,7 @@ export class PartyEngine {
         .catch((error: unknown) =>
           this.addNotice("warn", `Could not ask the party for the game: ${errorMessage(error)}`),
         );
+      this.askForClassicRoom();
     } catch (error) {
       this.failSetup(error);
     }
@@ -598,8 +653,97 @@ export class PartyEngine {
       return;
     }
     this.game = { gameId: input.gameId, title: input.title, mode: input.mode };
+    // Switching from a classic game to a Nova game: drop the classic room
+    // (and any stale runtime from an earlier pick) so the Nova source owns
+    // the frame.
+    this.classic = null;
+    this.teardownRuntimeFrame();
     this.emit();
     this.registerSource(input);
+  }
+
+  /**
+   * Host picks a classic external iframe game (7.7.4): the room is created
+   * ONCE in the host's browser and the URL spec is shared with the whole
+   * party through the party plane, so every player embeds the same room
+   * with their own name (classic parity). Rejects silently when the caller
+   * is not the creator or the party is not in the lobby.
+   */
+  async selectClassicGame(gameId: string): Promise<void> {
+    if (this.phase !== "lobby" || this.party === null || this.party?.role !== "creator") {
+      return;
+    }
+    const game = findClassicGame(gameId);
+    if (game === undefined) {
+      this.addNotice("error", `Unknown classic game "${gameId}".`);
+      this.emit();
+      return;
+    }
+    try {
+      const connectResult = await game.connectToGame();
+      this.classic = { gameId, title: game.name, connectResult };
+      this.game = { gameId, title: game.name, mode: "state" };
+      this.selfVerified = true;
+      this.registered = true;
+      // No Nova runtime frame for classic games — the UI embeds the iframe
+      // directly from state.classicGame. Drop any previous Nova source.
+      this.teardownRuntimeFrame();
+      await this.party.announceClassicRoom(this.classicAnnouncement());
+      this.addNotice("info", `${game.name} is set up — everyone joins the same room.`);
+    } catch (error) {
+      this.addNotice("error", `Couldn't set up ${game.name}: ${errorMessage(error)}`);
+    }
+    this.emit();
+  }
+
+  /** Reload only the local game frame (7.29 classic parity). */
+  reloadMyGame(): void {
+    if (this.classic !== null) {
+      // Classic iframes are remounted by the UI keyed on this epoch.
+      this.classicFrameEpoch += 1;
+    } else {
+      this.runtime?.reload();
+    }
+    this.emit();
+  }
+
+  /**
+   * Host: reload every player's game frame (7.29 classic parity). Non-hosts
+   * are ignored; every member (including the host) reloads its own frame.
+   */
+  reloadAllGames(): void {
+    if (this.party?.role !== "creator" || this.party === null) {
+      return;
+    }
+    void this.party.announceReloadAll().catch(() => undefined);
+    this.reloadMyGame();
+  }
+
+  /**
+   * Host: remove a member from the party (7.29 classic parity). Cooperative
+   * in the peer-to-peer transport — the kicked member's client leaves on
+   * receipt and the others observe its `peer:left`. Non-hosts are ignored.
+   */
+  kickMember(memberId: string): void {
+    if (
+      this.party?.role !== "creator" ||
+      this.party === null ||
+      memberId === this.identity.memberId
+    ) {
+      return;
+    }
+    void this.party
+      .kickMember(memberId, "The host removed you from the party.")
+      .catch(() => undefined);
+    this.addNotice("warn", `${this.displayNameOf(memberId)} was removed from the party.`);
+    this.emit();
+  }
+
+  /** Leave the "you were removed" screen and return to the entry UI (7.29). */
+  dismissRemoved(): void {
+    this.removedReason = null;
+    this.phase = "idle";
+    this.emit();
   }
 
   /**
@@ -721,9 +865,11 @@ export class PartyEngine {
   /**
    * Leave the party cleanly: destroy the runtime frame, detach every
    * listener, dispose the coordinator and session, and leave BOTH Trystero
-   * rooms (rule 22). Resolves once cleanup completes.
+   * rooms (rule 22). Resolves once cleanup completes. `nextPhase` defaults
+   * to idle; a kicked member leaves into the "removed" phase (7.29) so the
+   * UI never flashes the entry screen.
    */
-  async leaveParty(): Promise<void> {
+  async leaveParty(nextPhase: PartyPhase = "idle"): Promise<void> {
     if (!this.isActive()) {
       return;
     }
@@ -759,13 +905,14 @@ export class PartyEngine {
     }
     this.pendingSource = null;
     this.game = null;
+    this.classic = null;
     this.transfers.clear();
     this.selfVerified = false;
     this.endedReason = null;
     this.notices = [];
     this.lastError = null;
     this.lastSetup = null;
-    this.phase = "idle";
+    this.phase = nextPhase;
     this.phaseDetail = null;
     this.gameStarted = false;
     this.reconnectAttempts = 0;
@@ -1098,6 +1245,60 @@ export class PartyEngine {
     await session.attach();
   }
 
+  /**
+   * Destroy the Nova runtime frame (if any) and clear the pending source so
+   * a classic game owns the frame area instead (7.7.4). The party session
+   * and coordinator are untouched.
+   */
+  private teardownRuntimeFrame(): void {
+    this.runtime?.destroy("user_exit");
+    this.runtime = null;
+    this.frameStarted = false;
+    this.registered = false;
+    this.pendingSource = null;
+  }
+
+  /** The party-plane payload for the current classic room (7.7.4). */
+  private classicAnnouncement(): ClassicAnnouncement {
+    const classic = this.classic;
+    if (classic === null) {
+      throw new Error("classicAnnouncement called with no classic game selected");
+    }
+    const specOf = (spec: {
+      url?: string;
+      customQueryParams?: Record<string, string>;
+      afterQueryParams?: string;
+    }) => ({
+      ...(spec.url !== undefined ? { url: spec.url } : {}),
+      ...(spec.customQueryParams !== undefined
+        ? { customQueryParams: spec.customQueryParams }
+        : {}),
+      ...(spec.afterQueryParams !== undefined ? { afterQueryParams: spec.afterQueryParams } : {}),
+    });
+    const result = classic.connectResult;
+    return {
+      gameId: classic.gameId,
+      player: {
+        url: result.player.url,
+        ...(result.player.customQueryParams !== undefined
+          ? { customQueryParams: result.player.customQueryParams }
+          : {}),
+        ...(result.player.afterQueryParams !== undefined
+          ? { afterQueryParams: result.player.afterQueryParams }
+          : {}),
+      },
+      ...(result.host !== undefined ? { host: specOf(result.host) } : {}),
+    };
+  }
+
+  /** Ask the host for the current classic room (late joiners, 7.7.4). */
+  private askForClassicRoom(): void {
+    if (this.party?.role === "creator" || this.party === null || this.classic !== null) {
+      return;
+    }
+    void this.party.requestClassicRoom().catch(() => undefined);
+  }
+
   /** The host registers the verified source and announces it to the party. */
   private registerSource(input: PartySourceSpec): void {
     this.pendingSource = input;
@@ -1354,6 +1555,71 @@ export class PartyEngine {
         // the member view; the name itself comes from the party layer.
         this.emit();
         break;
+      case "classicRoom": {
+        // The host shared the classic room (7.7.4): joiners build their own
+        // per-player URL from the spec and become ready to start.
+        if (this.party?.role === "creator") {
+          break;
+        }
+        const game = findClassicGame(event.gameId);
+        const title = game?.name ?? "Classic game";
+        if (this.classic === null || this.classic.gameId !== event.gameId) {
+          this.classic = {
+            gameId: event.gameId,
+            title,
+            connectResult: {
+              player: {
+                url: event.player.url,
+                ...(event.player.customQueryParams !== undefined
+                  ? { customQueryParams: event.player.customQueryParams }
+                  : {}),
+                ...(event.player.afterQueryParams !== undefined
+                  ? { afterQueryParams: event.player.afterQueryParams }
+                  : {}),
+              },
+              ...(event.host !== undefined ? { host: event.host } : {}),
+            },
+          };
+          this.game = { gameId: event.gameId, title, mode: "state" };
+          this.selfVerified = true;
+          this.registered = true;
+          this.addNotice("info", `${title} has been selected for the party.`);
+        }
+        this.emit();
+        break;
+      }
+      case "classicRoomRequest":
+        // A late joiner asked for the current classic room: re-announce it.
+        if (this.party?.role === "creator" && this.classic !== null && this.party !== null) {
+          void this.party.announceClassicRoom(this.classicAnnouncement()).catch(() => undefined);
+        }
+        break;
+      case "kick": {
+        if (event.targetMemberId === this.identity.memberId) {
+          // This member was removed by the host (7.29): record the reason
+          // and tear the party down into the "removed" phase.
+          this.removedReason = event.reason ?? "The host removed you from the party.";
+          this.addNotice("error", this.removedReason);
+          this.emit();
+          void this.leaveParty("removed");
+        } else {
+          this.addNotice(
+            "warn",
+            `${this.displayNameOf(event.targetMemberId)} was removed from the party.`,
+          );
+          this.emit();
+        }
+        break;
+      }
+      case "reloadAll":
+        // The host asked every player to reload its game frame (7.29).
+        if (this.classic !== null) {
+          this.classicFrameEpoch += 1;
+        } else {
+          this.runtime?.reload();
+        }
+        this.emit();
+        break;
       case "greeter":
         this.addNotice(
           "info",
@@ -1408,6 +1674,8 @@ export class PartyEngine {
         .catch((error: unknown) =>
           this.addNotice("warn", `Could not ask the party for the game: ${errorMessage(error)}`),
         );
+      // Re-request the classic room after a rejoin (7.7.4).
+      this.askForClassicRoom();
     }
   }
 
@@ -1678,7 +1946,13 @@ export class PartyEngine {
       let transferState: PartyMemberView["transferState"];
       let transferProgress: number | null;
       let transferDetail: string | null;
-      if (isSelf) {
+      if (this.classic !== null) {
+        // Classic games have no HTML source to transfer or register: the
+        // shared room announcement IS the source (7.7.4).
+        transferState = "complete";
+        transferProgress = 1;
+        transferDetail = "Classic game ready";
+      } else if (isSelf) {
         if (this.selfVerified) {
           transferState = "complete";
           transferProgress = 1;
@@ -1711,7 +1985,7 @@ export class PartyEngine {
         transferState,
         transferProgress,
         transferDetail,
-        ready: this.session?.readyOf(memberId) ?? false,
+        ready: this.classic !== null ? true : (this.session?.readyOf(memberId) ?? false),
       });
     }
     return members;

@@ -71,6 +71,9 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     canForceStart: false,
     startBlockedReason: "Waiting for every player's game to load and register.",
     endedReason: null,
+    classicGame: null,
+    removedReason: null,
+    classicFrameEpoch: 0,
     diagnostics: null,
     notices: [],
     lastError: null,
@@ -90,6 +93,8 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
       onLeave={handlers.onLeave ?? props.onLeave}
       onRefreshDiagnostics={handlers.onRefreshDiagnostics ?? props.onRefreshDiagnostics}
       onPickGame={handlers.onPickGame ?? props.onPickGame}
+      onPickClassicGame={handlers.onPickClassicGame ?? props.onPickClassicGame}
+      onKickMember={handlers.onKickMember ?? props.onKickMember}
       onEditName={handlers.onEditName ?? props.onEditName}
     />
   );
@@ -287,5 +292,88 @@ describe("PartyLobby", () => {
     await renderLobby(state);
     expect(screen.getAllByText(/the game ended/i).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /start game/i })).toBeDisabled();
+  });
+
+  it("offers classic games in the picker and lets the host pick one (7.7.4)", async () => {
+    const state = makeState({ game: null, canStart: false, canForceStart: false });
+    const onPickClassicGame = vi.fn();
+    await renderLobby(state, { onPickClassicGame });
+    await userEvent.click(screen.getByRole("button", { name: /browse games/i }));
+    const dialog = await screen.findByRole("dialog", { name: "Pick a game" });
+    // Classic games are listed together with (empty) saved games.
+    expect(await screen.findByText("Classic games")).toBeInTheDocument();
+    const protobowl = within(dialog).getByRole("button", { name: /protobowl/i });
+    await userEvent.click(protobowl);
+    expect(onPickClassicGame).toHaveBeenCalledWith("protobowl");
+  });
+
+  it("shows a host-only kick button that removes the member (7.29)", async () => {
+    const state = makeState({
+      members: [
+        {
+          memberId: "member-a",
+          displayName: "Alex",
+          isSelf: true,
+          connectionId: "conn-a",
+          connected: true,
+          isGreeter: true,
+          transferState: "complete",
+          transferProgress: 1,
+          transferDetail: "You have the game",
+          ready: true,
+        },
+        {
+          memberId: "member-b",
+          displayName: "Bree",
+          isSelf: false,
+          connectionId: "conn-b",
+          connected: true,
+          isGreeter: false,
+          transferState: "complete",
+          transferProgress: 1,
+          transferDetail: "You have the game",
+          ready: true,
+        },
+      ],
+    });
+    const onKickMember = vi.fn();
+    await renderLobby(state, { onKickMember });
+    const kick = screen.getByRole("button", { name: /kick/i });
+    await userEvent.click(kick);
+    expect(onKickMember).toHaveBeenCalledWith("member-b");
+  });
+
+  it("hides the kick button from joiners (7.29)", async () => {
+    const state = makeState({
+      role: "joiner",
+      members: [
+        {
+          memberId: "member-a",
+          displayName: "Alex",
+          isSelf: false,
+          connectionId: "conn-a",
+          connected: true,
+          isGreeter: false,
+          transferState: "complete",
+          transferProgress: 1,
+          transferDetail: "You have the game",
+          ready: true,
+        },
+        {
+          memberId: "member-b",
+          displayName: "Bree",
+          isSelf: true,
+          connectionId: "conn-b",
+          connected: true,
+          isGreeter: true,
+          transferState: "complete",
+          transferProgress: 1,
+          transferDetail: "You have the game",
+          ready: true,
+        },
+      ],
+    });
+    await renderLobby(state);
+    expect(screen.queryByRole("button", { name: /kick/i })).not.toBeInTheDocument();
   });
 });
