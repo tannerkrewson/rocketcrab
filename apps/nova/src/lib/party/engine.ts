@@ -1238,9 +1238,16 @@ export class PartyEngine {
     return peer?.displayName ?? memberId;
   }
 
-  /** Diagnostic-only authority view (S3 formalizes real election). */
+  /**
+   * Diagnostic-only authority view. After the game starts (S3) the real
+   * authority comes from the state engine's diagnostics; before that (the
+   * lobby) the engine has not announced yet, so fall back to the first ready
+   * member — the same deterministic choice the initial election makes.
+   * Greeter status is a separate role (ADR-0007) and never used here.
+   */
   private computeAuthorityMemberId(members: readonly PartyMemberView[]): MemberId | null {
-    return members.find((member) => member.ready)?.memberId ?? null;
+    const engineAuthority = this.session?.getStateModeDiagnostics().authorityMemberId ?? null;
+    return engineAuthority ?? members.find((member) => member.ready)?.memberId ?? null;
   }
 
   private isSourceVerified(memberId: MemberId): boolean {
