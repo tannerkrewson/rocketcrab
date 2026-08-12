@@ -65,6 +65,16 @@ export interface ArenaSummary {
   readonly success: boolean;
 }
 
+/** S2 state-mode diagnostics surfaced in the arena (size + rate). */
+export interface ArenaStateDiagnostics {
+  readonly revision: number;
+  readonly stateHash: string | null;
+  readonly stateSizeBytes: number;
+  readonly appliedCount: number;
+  readonly rejectedCount: number;
+  readonly actionRatePerSecond: number;
+}
+
 /** Snapshot of the whole arena, re-emitted after every change. */
 export interface ArenaState {
   /** Arena-wide lifecycle. */
@@ -78,6 +88,8 @@ export interface ArenaState {
   readonly dropMessages: boolean;
   /** Epoch ms when the arena started the game, or null before start. */
   readonly startedAt: number | null;
+  /** S2 state diagnostics (last commit), or null before the first commit. */
+  readonly stateDiagnostics: ArenaStateDiagnostics | null;
   readonly summary: ArenaSummary;
   /** The session id labeling every message of this run. */
   readonly sessionId: string;

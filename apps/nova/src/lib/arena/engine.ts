@@ -32,6 +32,11 @@ import {
 } from "@rocketcrab/testing";
 import { RuntimeHostClient, type ChannelPort, type RuntimeHostEvent } from "../runtime-host";
 import { arenaApiCallSchemas } from "./api-calls";
+import {
+  createFrameStateExecutor,
+  type FrameStateExecutor,
+  type FrameStateResponsePayload,
+} from "./state-executor";
 import type {
   ArenaLogEntry,
   ArenaPlayer,
@@ -39,6 +44,7 @@ import type {
   ArenaRegistration,
   ArenaRunOutcome,
   ArenaState,
+  ArenaStateDiagnostics,
   ArenaSummary,
 } from "./types";
 
@@ -108,6 +114,7 @@ interface PlayerRuntime {
   client: RuntimeHostClient | null;
   transport: InMemoryTransport | null;
   session: NovaSession | null;
+  stateExecutor: FrameStateExecutor | null;
   unsubSession: (() => void) | null;
   runState: ArenaPlayerRunState;
   registered: ArenaRegistration | null;
@@ -139,6 +146,7 @@ export class ArenaEngine {
   private latencyMs = 0;
   private dropMessages = false;
   private startedAt: number | null = null;
+  private stateDiagnostics: ArenaStateDiagnostics | null = null;
   private source: string;
   private nextMemberNumber = 1;
   private lastSuccessRunId: number | null = null;
@@ -168,6 +176,7 @@ export class ArenaEngine {
       latencyMs: this.latencyMs,
       dropMessages: this.dropMessages,
       startedAt: this.startedAt,
+      stateDiagnostics: this.stateDiagnostics,
       summary,
       sessionId: this.sessionId,
       runId: this.runId,
@@ -352,10 +361,12 @@ export class ArenaEngine {
     this.hub = new InMemoryTransportHub(this.options.hubOptions);
     this.status = "starting";
     this.startedAt = null;
+    this.stateDiagnostics = null;
     for (const runtime of this.players.values()) {
       runtime.client = null;
       runtime.transport = null;
       runtime.session = null;
+      runtime.stateExecutor = null;
       runtime.unsubSession = null;
       runtime.runState = "pending";
       runtime.registered = null;
@@ -387,6 +398,7 @@ export class ArenaEngine {
       client: null,
       transport: null,
       session: null,
+      stateExecutor: null,
       unsubSession: null,
       runState: "pending",
       registered: null,
@@ -520,6 +532,12 @@ export class ArenaEngine {
       displayName: runtime.spec.name,
     });
     runtime.transport = transport;
+    // S2: the authority's actions run in this player's frame; the frame
+    // executor forwards state requests into the frame and correlates the
+    // bridge's answers.
+    runtime.stateExecutor = createFrameStateExecutor((event) =>
+      this.pushApiEvent(runtime.spec.id, event),
+    );
     const session = createNovaSession({
       transport,
       room: this.room,
@@ -530,6 +548,7 @@ export class ArenaEngine {
         mode: this.options.gameMode,
         ...(this.options.gameTitle !== undefined ? { title: this.options.gameTitle } : {}),
       },
+      stateExecutor: runtime.stateExecutor,
     });
     runtime.session = session;
     runtime.unsubSession = session.onSessionEvent((event) =>
@@ -572,13 +591,39 @@ export class ArenaEngine {
       case "error":
         this.logPlayer(id, "error", `Nova error (${event.error.code}): ${event.error.message}`);
         break;
+      case "stateCommitted":
+        // S2 diagnostics: state size + action rate are visible in the logs
+        // and the arena state snapshot.
+        this.stateDiagnostics = {
+          revision: event.revision,
+          stateHash: event.stateHash,
+          stateSizeBytes: event.stateSizeBytes,
+          appliedCount: event.appliedCount,
+          rejectedCount: event.rejectedCount,
+          actionRatePerSecond: event.actionRatePerSecond,
+        };
+        this.logPlayer(
+          id,
+          "info",
+          `State rev ${event.revision} (${event.stateSizeBytes} bytes, ${event.actionRatePerSecond.toFixed(1)} actions/s, applied ${event.appliedCount}, rejected ${event.rejectedCount}).`,
+        );
+        break;
+      case "actionRejected":
+        this.logPlayer(
+          id,
+          "warn",
+          `Action ${event.actionId} rejected (${event.code}): ${event.message}`,
+        );
+        break;
       case "rawMessage":
       case "state":
       case "simulationInput":
       case "simulationSnapshot":
-        break; // routed to the frame only
       case "actionReceived":
-        return; // host-side S2 seam; never routed to games
+        break; // routed to the frame only
+      case "actionAck":
+        // The dispatcher's frame settles its dispatch promise with this ack.
+        break;
     }
     const apiEvent = toApiEvent(event);
     if (apiEvent !== null) {
@@ -626,7 +671,7 @@ export class ArenaEngine {
           return;
         }
         void session
-          .dispatch(parsed.data.action)
+          .dispatch(parsed.data.action, parsed.data.actionId)
           .catch((error: unknown) =>
             this.logPlayer(
               runtime.spec.id,
@@ -704,6 +749,21 @@ export class ArenaEngine {
         session.sendSimulationInput(parsed.data.input);
         break;
       }
+      case "stateResponse": {
+        // S2: the authority frame's answer to a stateRequest; the frame
+        // executor correlates it back to the pending engine request.
+        const parsed = arenaApiCallSchemas.stateResponse.safeParse(message.payload);
+        if (!parsed.success) {
+          this.logPlayer(
+            runtime.spec.id,
+            "error",
+            "stateResponse call failed validation at the host; ignored.",
+          );
+          return;
+        }
+        runtime.stateExecutor?.handleResponse(parsed.data as FrameStateResponsePayload);
+        break;
+      }
     }
   }
 
@@ -745,6 +805,11 @@ export class ArenaEngine {
     const snapshot = this.getSnapshot();
     const players = snapshot.players;
     if (players.length === 0) return;
+    // Players that joined after the game already started are not started
+    // here: they begin from the authority's catch-up snapshot (S2), which
+    // also identifies the authority — starting them would race their
+    // catch-up and risk a second, conflicting authority.
+    if (players.some((player) => player.runState === "started")) return;
     const settled = players.every(
       (player) =>
         player.runState === "registered" ||
@@ -761,6 +826,14 @@ export class ArenaEngine {
   }
 
   private computeAuthorityPlayerId(players: readonly ArenaPlayer[]): string | null {
+    // S2: the authority is the session the state engine tracks (the fixed
+    // initial authority; S3 owns election/migration).
+    for (const runtime of this.players.values()) {
+      const authority = runtime.session?.getStateModeDiagnostics().authorityMemberId;
+      if (authority === null || authority === undefined) continue;
+      const player = players.find((p) => p.memberId === authority);
+      if (player !== undefined) return player.id;
+    }
     return (
       players.find((player) => player.runState === "registered" || player.runState === "started")
         ?.id ?? null
@@ -772,6 +845,8 @@ export class ArenaEngine {
       runtime.unsubSession();
       runtime.unsubSession = null;
     }
+    runtime.stateExecutor?.dispose();
+    runtime.stateExecutor = null;
     runtime.session?.dispose();
     runtime.session = null;
     runtime.transport?.dispose();
@@ -853,6 +928,17 @@ function toApiEvent(event: NovaSessionEvent): GameApiEvent | null {
       return { kind: "simulationSnapshot", snapshot: event.snapshot };
     case "error":
       return { kind: "error", code: event.error.code, message: event.error.message };
+    case "actionAck":
+      return {
+        kind: "actionAck",
+        actionId: event.ack.actionId,
+        status: event.ack.status,
+        ...(event.ack.revision !== undefined ? { revision: event.ack.revision } : {}),
+        ...(event.ack.errorCode !== undefined ? { errorCode: event.ack.errorCode } : {}),
+        ...(event.ack.errorMessage !== undefined ? { errorMessage: event.ack.errorMessage } : {}),
+      };
+    case "stateCommitted":
+    case "actionRejected":
     case "actionReceived":
       return null;
   }

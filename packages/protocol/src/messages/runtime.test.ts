@@ -175,6 +175,29 @@ describe("runtime message schemas", () => {
       }),
     );
     expect(rawSend.ok).toBe(true);
+    // S2: the authority frame's stateResponse answer parses at the boundary.
+    const stateResponse = parseRuntimeMessage(
+      baseRuntime({
+        type: "game.apiCall",
+        method: "stateResponse",
+        payload: {
+          requestId: "state-1",
+          result: { kind: "state", ok: true, state: {}, views: { "member-1": {} } },
+        },
+      }),
+    );
+    expect(stateResponse.ok).toBe(true);
+    // The protocol boundary treats call payloads as opaque (per-method
+    // payload validation happens at the runtime/host boundaries); a
+    // structurally bad payload still parses as a game.apiCall envelope.
+    const badStateResponse = parseRuntimeMessage(
+      baseRuntime({
+        type: "game.apiCall",
+        method: "stateResponse",
+        payload: { requestId: "state-1", result: { kind: "error", ok: "maybe" } },
+      }),
+    );
+    expect(badStateResponse.ok).toBe(true);
 
     // Unknown methods and malformed envelopes fail.
     const unknownMethod = parseRuntimeMessage(
@@ -211,6 +234,46 @@ describe("runtime message schemas", () => {
         kind: "error",
         code: "not_started",
         message: "nova.dispatch() is only available after start",
+      },
+      {
+        kind: "stateRequest",
+        requestId: "state-1",
+        request: {
+          kind: "createInitialState",
+          context: { self: { id: "member-1", name: "Alex" }, players: [], revision: 0, now: 1 },
+          viewers: [{ id: "member-1", name: "Alex" }],
+        },
+      },
+      {
+        kind: "stateRequest",
+        requestId: "state-2",
+        request: {
+          kind: "applyAction",
+          actionId: "action-1",
+          actionType: "drawCard",
+          payload: {},
+          state: { deck: ["ace"] },
+          context: { self: { id: "member-1", name: "Alex" }, players: [], revision: 1, now: 1 },
+          viewers: [{ id: "member-1", name: "Alex" }],
+        },
+      },
+      {
+        kind: "stateRequest",
+        requestId: "state-3",
+        request: { kind: "computeView", state: {}, viewer: { id: "member-2", name: "Blair" } },
+      },
+      {
+        kind: "actionAck",
+        actionId: "action-1",
+        status: "accepted",
+        revision: 2,
+      },
+      {
+        kind: "actionAck",
+        actionId: "action-2",
+        status: "rejected",
+        errorCode: "stale_revision",
+        errorMessage: "based on revision 1; current is 2",
       },
     ];
     for (const event of events) {

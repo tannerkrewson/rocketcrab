@@ -131,8 +131,22 @@ describe("novaApiCallSchemas", () => {
   it("accepts valid forwarded calls", () => {
     expect(novaApiCallSchemas.ready.safeParse({}).success).toBe(true);
     expect(
-      novaApiCallSchemas.dispatch.safeParse({ action: { type: "playCard", payload: { c: 1 } } })
-        .success,
+      novaApiCallSchemas.dispatch.safeParse({
+        action: { type: "playCard", payload: { c: 1 } },
+        actionId: "action-frame-1",
+      }).success,
+    ).toBe(true);
+    expect(
+      novaApiCallSchemas.stateResponse.safeParse({
+        requestId: "state-1",
+        result: { kind: "view", ok: true, view: { hand: "ace" } },
+      }).success,
+    ).toBe(true);
+    expect(
+      novaApiCallSchemas.stateResponse.safeParse({
+        requestId: "state-1",
+        result: { kind: "error", ok: false, code: "handler_error", message: "boom" },
+      }).success,
     ).toBe(true);
     expect(
       novaApiCallSchemas["raw.createChannel"].safeParse({
@@ -156,6 +170,13 @@ describe("novaApiCallSchemas", () => {
   it("rejects malformed forwarded calls", () => {
     expect(novaApiCallSchemas.ready.safeParse({ extra: 1 }).success).toBe(false);
     expect(novaApiCallSchemas.dispatch.safeParse({ action: { type: "" } }).success).toBe(false);
+    expect(novaApiCallSchemas.dispatch.safeParse({ action: { type: "x" } }).success).toBe(false);
+    expect(
+      novaApiCallSchemas.stateResponse.safeParse({
+        requestId: "state-1",
+        result: { kind: "state", ok: true, state: {} },
+      }).success,
+    ).toBe(false);
     expect(
       novaApiCallSchemas["raw.createChannel"].safeParse({ spec: { name: "x".repeat(65) } }).success,
     ).toBe(false);

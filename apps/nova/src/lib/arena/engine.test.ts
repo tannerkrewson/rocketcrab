@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArenaEngine, type ArenaEngineOptions, type ArenaPlayerSpec } from "./engine";
 import type { ArenaState } from "./types";
 import {
+  answerStateRequests,
   apiCallMessage,
   createHarness,
   deliver,
@@ -81,6 +82,9 @@ async function runToStartWithEngine(
 ): Promise<void> {
   await runToStart(harness.channels, count, baseline);
   await vi.waitFor(() => {
+    // S2: the authority's frame must answer the engine's state requests
+    // before the game can start (the fake frame answers immediately).
+    answerStateRequests(harness.channels, count, baseline);
     const snapshot = engine.getSnapshot();
     expect(snapshot.players.every((player) => player.runState === "started")).toBe(true);
   });
@@ -137,6 +141,104 @@ describe("ArenaEngine — happy path", () => {
     expect(bootstraps[0]?.player).toEqual({ memberId: "member-1", displayName: "Player 1" });
     expect(bootstraps[1]?.player).toEqual({ memberId: "member-2", displayName: "Player 2" });
     expect(bootstraps.every((bootstrap) => bootstrap.sessionId === snapshot.sessionId)).toBe(true);
+  });
+
+  it("runs a state-mode game: actions apply through the authority frame (S2)", async () => {
+    const harness = createHarness();
+    mountContainers(harness, 2);
+    const engine = createEngine(harness);
+    engine.start();
+    await runToStart(harness.channels, 2);
+
+    // The fake authority frame plays a real game: a shared deck where a
+    // drawCard action pops one card for the actor.
+    const gameState: { deck: string[]; hands: Record<string, string> } = {
+      deck: ["ace", "king"],
+      hands: {},
+    };
+    const answerGame = (): void => {
+      for (let index = 0; index < 2; index += 1) {
+        const port = harness.channels[index]!.port1;
+        const requests = port.sent
+          .filter((m) => (m as { type?: string }).type === "game.apiEvent")
+          .map((m) => (m as { event: GameApiEvent }).event)
+          .filter((event) => event.kind === "stateRequest");
+        for (const request of requests) {
+          if (request.request.kind === "applyAction") {
+            const context = request.request.context as {
+              actor?: { id?: string };
+            } | null;
+            const actor = context?.actor?.id;
+            if (actor !== undefined && gameState.hands[actor] === undefined) {
+              gameState.hands[actor] = gameState.deck.pop() ?? "";
+            }
+          }
+          const viewers =
+            request.request.kind === "computeView"
+              ? [request.request.viewer]
+              : request.request.viewers;
+          const views: Record<string, unknown> = {};
+          for (const viewer of viewers) {
+            views[viewer.id] = {
+              hand: gameState.hands[viewer.id],
+              cardsLeft: gameState.deck.length,
+            };
+          }
+          deliver(
+            port,
+            apiCallMessage("stateResponse", {
+              requestId: request.requestId,
+              result: { kind: "state", ok: true, state: gameState, views },
+            }),
+          );
+        }
+      }
+    };
+
+    await vi.waitFor(() => {
+      answerGame();
+      expect(engine.getSnapshot().players.every((p) => p.runState === "started")).toBe(true);
+    });
+    let snapshot = engine.getSnapshot();
+    expect(snapshot.stateDiagnostics?.revision).toBe(1);
+    expect(snapshot.stateDiagnostics?.stateSizeBytes).toBeGreaterThan(0);
+    expect(snapshot.authorityPlayerId).toBe("player-1");
+
+    // Player 1 dispatches drawCard; the authority frame applies it and the
+    // engine publishes revision 2 with updated per-player views.
+    deliver(
+      harness.channels[0]!.port1,
+      apiCallMessage("dispatch", {
+        action: { type: "drawCard" },
+        actionId: "action-arena-1",
+      }),
+    );
+    await vi.waitFor(() => {
+      answerGame();
+      expect(engine.getSnapshot().stateDiagnostics?.revision).toBe(2);
+    });
+    snapshot = engine.getSnapshot();
+    expect(snapshot.stateDiagnostics?.appliedCount).toBe(2); // initial + action
+
+    // Player 1's frame saw the new view (its hand) and the accepted ack.
+    const states0 = apiEventsOf(harness, 0).filter((event) => event.kind === "state");
+    expect(states0.at(-1)).toEqual({
+      kind: "state",
+      state: { hand: "king", cardsLeft: 1 },
+    });
+    const acks0 = apiEventsOf(harness, 0).filter((event) => event.kind === "actionAck");
+    expect(acks0).toContainEqual({
+      kind: "actionAck",
+      actionId: "action-arena-1",
+      status: "accepted",
+      revision: 2,
+    });
+    // Player 2's frame saw only its own view — never the full state.
+    const states1 = apiEventsOf(harness, 1).filter((event) => event.kind === "state");
+    expect(states1.at(-1)).toEqual({
+      kind: "state",
+      state: { hand: undefined, cardsLeft: 1 },
+    });
   });
 
   it("runs six simulated players on one page (acceptance: >= 6)", async () => {

@@ -432,13 +432,20 @@ describe("RuntimeInstance protocol boundary", () => {
   it("forwards validated Nova API calls to the host session router (U6)", () => {
     const { port } = setup();
     hook().report("ready", {});
-    hook().report("dispatch", { action: { type: "playCard", payload: { c: 1 } } });
+    hook().report("dispatch", {
+      action: { type: "playCard", payload: { c: 1 } },
+      actionId: "action-frame-1",
+    });
     hook().report("raw.createChannel", { spec: { name: "chat" } });
     hook().report("raw.send", { name: "chat", payload: "hi", options: { to: "member-2" } });
     hook().report("simulation.register", {});
     hook().report("simulation.sendInput", { input: { type: "move", tick: 3 } });
+    hook().report("stateResponse", {
+      requestId: "state-1",
+      result: { kind: "view", ok: true, view: { hand: "ace" } },
+    });
     const calls = port.sent.filter((m) => (m as { type: string }).type === "game.apiCall");
-    expect(calls).toHaveLength(6);
+    expect(calls).toHaveLength(7);
     const byMethod = new Map(calls.map((m) => [(m as { method: string }).method, m]));
     expect([...byMethod.keys()].sort()).toEqual([
       "dispatch",
@@ -447,11 +454,13 @@ describe("RuntimeInstance protocol boundary", () => {
       "ready",
       "simulation.register",
       "simulation.sendInput",
+      "stateResponse",
     ]);
     // The validated payload is forwarded verbatim and the envelope carries
     // the runtime instance id and session id.
     expect((byMethod.get("dispatch") as { payload: unknown }).payload).toEqual({
       action: { type: "playCard", payload: { c: 1 } },
+      actionId: "action-frame-1",
     });
     expect((byMethod.get("ready") as { runtimeInstanceId: string }).runtimeInstanceId).toBe(
       "runtime-1",
