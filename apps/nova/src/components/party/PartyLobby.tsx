@@ -498,8 +498,8 @@ function GamePicker({ onPick }: { onPick: (gameId: string) => void }) {
         <p className="text-sm text-base-content/70">
           No saved games yet — create one in the editor first.
         </p>
-        <Link to="/create" className={buttonStyles("primary", "md")}>
-          Create a game
+        <Link to="/build" className={buttonStyles("primary", "md")}>
+          Build a game
         </Link>
       </div>
     );
