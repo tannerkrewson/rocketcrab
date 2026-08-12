@@ -24,9 +24,11 @@ test-results/
 .idea/
 
 # agent tooling
+.pi/
 .pi-subagents/
 .pi/
 
 # local beads database (also excluded via .git/info/exclude)
 .beads
 node_modules
+.beads

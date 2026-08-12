@@ -1,10 +1,17 @@
 import { beforeEach, describe, expect, it } from "vitest";
-import { localPartyIdentity, resetPartyIdentityForTests } from "./identity";
+import {
+  getSavedPlayerName,
+  localPartyIdentity,
+  resetPartyIdentityForTests,
+  setSavedPlayerName,
+  updatePartyDisplayName,
+} from "./identity";
 
 /**
  * Party identity tests (P4/M1): the member identity is generated once and
  * persisted locally so a reloaded Mobile Safari tab rejoins the party as
- * the same member (ADR-0007, ADR-0012).
+ * the same member (ADR-0007, ADR-0012). The player's chosen name (7.5) is
+ * stored separately and preferred over the generated name.
  */
 describe("party identity", () => {
   beforeEach(() => {
@@ -29,5 +36,28 @@ describe("party identity", () => {
   it("reuses the cached identity within a page", () => {
     const first = localPartyIdentity();
     expect(localPartyIdentity()).toEqual(first);
+  });
+
+  it("uses the saved player name as the display name (7.5)", () => {
+    setSavedPlayerName("Ada");
+    expect(localPartyIdentity().displayName).toBe("Ada");
+    expect(getSavedPlayerName()).toBe("Ada");
+  });
+
+  it("generates a fallback name when the player never set one (7.5)", () => {
+    expect(getSavedPlayerName()).toBeNull();
+    expect(localPartyIdentity().displayName).toMatch(/^Player [A-F0-9]{4}$/);
+  });
+
+  it("updatePartyDisplayName persists the change and updates the identity", () => {
+    const before = localPartyIdentity();
+    const updated = updatePartyDisplayName("Grace");
+    expect(updated).not.toBeNull();
+    expect(updated?.memberId).toBe(before.memberId);
+    expect(updated?.displayName).toBe("Grace");
+    expect(getSavedPlayerName()).toBe("Grace");
+    expect(localPartyIdentity().displayName).toBe("Grace");
+    // Blank names are rejected.
+    expect(updatePartyDisplayName("   ")).toBeNull();
   });
 });
