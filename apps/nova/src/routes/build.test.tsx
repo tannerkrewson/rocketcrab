@@ -4,28 +4,31 @@ import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { NOVA_API_VERSION } from "@rocketcrab/nova-api";
-import { MASTER_PROMPT_VERSION, buildMasterPrompt } from "../lib/prompt/master-prompt";
+import { buildMasterPrompt } from "../lib/prompt/master-prompt";
 import { readDraftSource, storeDraftSource } from "../lib/editor/draft-handoff";
 import { routeTree } from "../routeTree.gen";
 
 /**
- * Generator page tests (A4): the /create route presents the short
+ * Generator page tests (A4): the /build route presents the short
  * explanation, the generated master prompt, the copy button with success
- * feedback, the expandable API details, the examples link, the
- * continue-to-editor button, and the paste target that creates a new local
- * draft immediately.
+ * feedback, a link to the GitHub-hosted API reference, the examples link,
+ * the continue-to-editor button, and the paste target that creates a new
+ * local draft immediately.
  */
 
 const PROMPT = buildMasterPrompt();
 
-function renderCreate() {
+/** GitHub link to the docs, branch-free (GitHub resolves the default branch). */
+const NOVA_API_REFERENCE_URL =
+  "https://github.com/tannerkrewson/rocketcrab/blob/docs/api/nova-api-ai-reference.md";
+
+function renderBuild() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
   const router = createRouter({
     routeTree,
-    history: createMemoryHistory({ initialEntries: ["/create"] }),
+    history: createMemoryHistory({ initialEntries: ["/build"] }),
   });
   const wrapper = ({ children }: { children: ReactNode }) => (
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
@@ -51,31 +54,24 @@ afterEach(() => {
   delete (navigator as { clipboard?: unknown }).clipboard;
 });
 
-describe("/create — master prompt generator", () => {
+describe("/build — master prompt generator", () => {
   it("presents a short explanation and the generated prompt", async () => {
-    renderCreate();
+    renderBuild();
 
-    expect(await screen.findByRole("heading", { name: "Create a game" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Build a game" })).toBeInTheDocument();
     expect(
       screen.getByText(/Copy the master prompt below into any AI chat service/),
     ).toBeInTheDocument();
 
-    // The complete generated prompt is present (inside the expandable panel)
-    // and carries the versioned template + API versions (badge and prompt
-    // title both show it).
-    expect(
-      (
-        await screen.findAllByText(
-          new RegExp(`template v${MASTER_PROMPT_VERSION} · Nova API v${NOVA_API_VERSION}`),
-        )
-      ).length,
-    ).toBeGreaterThan(0);
+    // The complete generated prompt is present (inside the expandable panel).
     expect(screen.getByText(new RegExp("Nova Master Prompt"))).toBeInTheDocument();
     expect(
       screen.getByText(new RegExp("Interview the user before writing any code")),
     ).toBeInTheDocument();
     // The embedded API reference travels with the prompt.
     expect(screen.getByText(new RegExp("The whole API in one block"))).toBeInTheDocument();
+    // The version badge was removed from the generator UI and the prompt.
+    expect(screen.queryByText(/template v\d+ · Nova API v\d+/)).not.toBeInTheDocument();
   });
 
   it("copies the full prompt and shows success feedback", async () => {
@@ -84,7 +80,7 @@ describe("/create — master prompt generator", () => {
       value: { writeText },
       configurable: true,
     });
-    renderCreate();
+    renderBuild();
 
     await userEvent.click(await screen.findByRole("button", { name: "Copy the master prompt" }));
 
@@ -93,29 +89,16 @@ describe("/create — master prompt generator", () => {
     expect(await screen.findByRole("button", { name: "Prompt copied!" })).toBeInTheDocument();
   });
 
-  it("shows the expandable API details", async () => {
-    renderCreate();
+  it("links to the Nova API reference on GitHub (branch-free URL)", async () => {
+    renderBuild();
 
-    const summary = await screen.findByText("What's in the Nova API reference");
-    const details = summary.closest("details");
-    expect(details).not.toBeNull();
-    expect(details?.open).toBe(false);
-
-    await userEvent.click(summary);
-    expect(details?.open).toBe(true);
-    expect(
-      screen.getByText(
-        new RegExp(`The prompt embeds the full Nova API reference \\(v${NOVA_API_VERSION}\\)`),
-      ),
-    ).toBeInTheDocument();
-    // The instruction appears in both the prompt panel and the API details.
-    expect(
-      screen.getAllByText(/Prefer state mode unless the game genuinely needs another mode/),
-    ).not.toHaveLength(0);
+    const link = await screen.findByRole("link", { name: "Nova API reference" });
+    expect(link).toHaveAttribute("href", NOVA_API_REFERENCE_URL);
+    expect(link.getAttribute("href")).not.toMatch(/\/blob\/(nova|dev|main|master)\//);
   });
 
   it("links to the example games", async () => {
-    renderCreate();
+    renderBuild();
 
     const link = await screen.findByRole("link", { name: "See example games" });
     expect(link).toHaveAttribute("href", "/examples");
@@ -130,7 +113,7 @@ describe("/create — master prompt generator", () => {
   it("continues to a blank editor without a stale draft", async () => {
     // A stale draft from a previous session must not leak into the blank editor.
     storeDraftSource("<p>stale draft</p>");
-    renderCreate();
+    renderBuild();
 
     await userEvent.click(
       await screen.findByRole("button", { name: "Continue to a blank editor" }),
@@ -143,7 +126,7 @@ describe("/create — master prompt generator", () => {
 
   it("turns pasted HTML into a new local draft immediately", async () => {
     const pasted = "<!doctype html><title>Draft</title><p>hello nova</p>";
-    renderCreate();
+    renderBuild();
 
     await userEvent.type(await screen.findByRole("textbox", { name: "Paste game HTML" }), pasted);
     await userEvent.click(screen.getByRole("button", { name: "Open in the editor" }));

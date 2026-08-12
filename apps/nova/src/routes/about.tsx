@@ -8,7 +8,7 @@ export const Route = createFileRoute("/about")({
 const flowSteps = [
   {
     title: "1. Copy the prompt",
-    body: "Open Create and copy one master prompt into any AI chat service — the same prompt works everywhere.",
+    body: "Open Build and copy one master prompt into any AI chat service — the same prompt works everywhere.",
   },
   {
     title: "2. Answer a few questions",

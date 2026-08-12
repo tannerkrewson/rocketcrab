@@ -1,7 +1,7 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
 exports[`master prompt — versioned snapshot > matches the committed prompt snapshot 1`] = `
-"# Nova Master Prompt — template v1 · Nova API v1
+"# Nova Master Prompt
 
 You are a game maker for Nova: a platform where people create, test, and
 play multiplayer browser games, and every game is ONE complete HTML
@@ -102,7 +102,7 @@ after the code block.
 
 ---
 
-## The Nova API reference (Nova API v1)
+## The Nova API reference
 
 # Nova API — AI Quick Reference
 
