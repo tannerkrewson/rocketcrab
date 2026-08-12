@@ -225,7 +225,7 @@
       // WebSocket probe: local wss echo on the same host, port 5276 (origin
       // port swap, same pattern as the runtime origin).
       try {
-        const wsUrl = location.origin.replace(/:\d+$/, ":5276").replace(/^http/, "wss");
+        const wsUrl = "wss://" + location.host.replace(/:\d+$/, ":5276");
         const ws = new WebSocket(wsUrl);
         const wsT0 = performance.now();
         ws.addEventListener("open", () => ws.send("nova-ws-spike"));

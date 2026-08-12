@@ -54,11 +54,15 @@ function createGameFrame(html: string): void {
   // origin (remote ESM/CDN/fetch/canvas/audio all keep working). No
   // allow-top-navigation: the game must not be able to navigate the top
   // Nova tab.
-  frame.setAttribute("sandbox", "allow-scripts allow-same-origin");
-  // Delegate camera/mic/clipboard permission to the game frame (production
-  // will do this via the runtime origin's Permissions-Policy / allow
-  // attributes on both iframes).
-  frame.setAttribute("allow", "camera; microphone; clipboard-read; clipboard-write");
+  frame.setAttribute(
+    "sandbox",
+    "allow-scripts allow-same-origin allow-pointer-lock allow-fullscreen",
+  );
+  // Delegate camera/mic/clipboard/fullscreen permission to the game frame
+  // (production will do this via the runtime origin's Permissions-Policy /
+  // allow attributes on both iframes).
+  frame.setAttribute("allow", "camera; microphone; clipboard-read; clipboard-write; fullscreen");
+  frame.allowFullscreen = true;
   frame.setAttribute("title", "game sandbox");
   frame.src = "about:blank";
   container.replaceChildren(frame);
