@@ -101,6 +101,9 @@ describe("NOVA_BRIDGE_SCRIPT", () => {
       "'rawMessage'",
       "'simulationInput'",
       "'simulationSnapshot'",
+      "'simulationTick'",
+      "'simulationAuthorityChange'",
+      "'simulationRequest'",
       "'error'",
     ]) {
       expect(NOVA_BRIDGE_SCRIPT).toContain(`case ${kind}:`);
@@ -183,6 +186,12 @@ describe("novaApiCallSchemas", () => {
         input: { type: "move", tick: 3 },
       }).success,
     ).toBe(true);
+    expect(
+      novaApiCallSchemas.simulationResponse.safeParse({
+        requestId: "sim-1",
+        result: { kind: "state", ok: true, state: { puck: { x: 1 } } },
+      }).success,
+    ).toBe(true);
   });
 
   it("rejects malformed forwarded calls", () => {
@@ -203,6 +212,12 @@ describe("novaApiCallSchemas", () => {
     expect(
       novaApiCallSchemas["simulation.sendInput"].safeParse({ input: { type: "move", tick: -1 } })
         .success,
+    ).toBe(false);
+    expect(
+      novaApiCallSchemas.simulationResponse.safeParse({
+        requestId: "sim-1",
+        result: { kind: "view", ok: true, view: {} },
+      }).success,
     ).toBe(false);
   });
 });
