@@ -826,3 +826,82 @@ describe("rename announcements (7.25)", () => {
     expect(joiner.getMemberName("creator")).toBe("New Creator Name");
   });
 });
+
+describe("classic-room, kick, and reloadAll control messages (7.7.4, 7.29)", () => {
+  it("shares the host's classic room with joiners via the party plane", async () => {
+    const world = makeWorld();
+    const joinerEvents: PartyEvent[] = [];
+    const creator = await makeCreator(world);
+    const _joiner = await makeJoiner(world, { onEvent: (e) => joinerEvents.push(e) });
+
+    await creator.announceClassicRoom({
+      gameId: "protobowl",
+      player: {
+        url: "https://protobowl.com/rocketcrab-abc123",
+        customQueryParams: { room: "abc123" },
+      },
+      host: { afterQueryParams: "#host" },
+    });
+    await settle(world);
+
+    const received = joinerEvents.find((e) => e.type === "classicRoom");
+    expect(received).toMatchObject({
+      type: "classicRoom",
+      gameId: "protobowl",
+      player: {
+        url: "https://protobowl.com/rocketcrab-abc123",
+        customQueryParams: { room: "abc123" },
+      },
+      host: { afterQueryParams: "#host" },
+      senderMemberId: "creator",
+    });
+  });
+
+  it("re-announces the classic room when a member asks for it", async () => {
+    const world = makeWorld();
+    const hostEvents: PartyEvent[] = [];
+    const creator = await makeCreator(world, { onEvent: (e) => hostEvents.push(e) });
+    const joiner = await makeJoiner(world);
+
+    await creator.announceClassicRoom({
+      gameId: "protobowl",
+      player: { url: "https://protobowl.com/rocketcrab-abc123" },
+    });
+    await settle(world);
+    await joiner.requestClassicRoom();
+    await settle(world);
+
+    expect(hostEvents.some((e) => e.type === "classicRoomRequest")).toBe(true);
+  });
+
+  it("delivers kick to the target with the reason", async () => {
+    const world = makeWorld();
+    const joinerEvents: PartyEvent[] = [];
+    const creator = await makeCreator(world);
+    const _joiner = await makeJoiner(world, { onEvent: (e) => joinerEvents.push(e) });
+
+    await creator.kickMember("joiner", "The host removed you from the party.");
+    await settle(world);
+
+    expect(
+      joinerEvents.some(
+        (e) =>
+          e.type === "kick" &&
+          e.targetMemberId === "joiner" &&
+          e.reason === "The host removed you from the party.",
+      ),
+    ).toBe(true);
+  });
+
+  it("delivers reloadAll to every member", async () => {
+    const world = makeWorld();
+    const joinerEvents: PartyEvent[] = [];
+    const creator = await makeCreator(world);
+    const _joiner = await makeJoiner(world, { onEvent: (e) => joinerEvents.push(e) });
+
+    await creator.announceReloadAll();
+    await settle(world);
+
+    expect(joinerEvents.some((e) => e.type === "reloadAll")).toBe(true);
+  });
+});

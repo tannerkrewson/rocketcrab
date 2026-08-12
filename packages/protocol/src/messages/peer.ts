@@ -101,6 +101,67 @@ export const partyRenameMessageSchema = z.object({
 });
 export type PartyRenameMessage = z.infer<typeof partyRenameMessageSchema>;
 
+/**
+ * Classic external iframe game URL spec (7.7.4): the embeddable room URL
+ * plus optional per-game query/hash extras (classic `ConnectedGameURL`).
+ */
+export const classicUrlSpecMessageSchema = z.object({
+  url: z.string().min(1).max(2048),
+  customQueryParams: z.record(z.string(), z.string()).optional(),
+  afterQueryParams: z.string().max(512).optional(),
+});
+export type ClassicUrlSpecMessage = z.infer<typeof classicUrlSpecMessageSchema>;
+
+/**
+ * Classic room: the host created a room on an external service and shares
+ * the URL spec so every player embeds the SAME room with their own
+ * rocketcrab/name/ishost params (7.7.4). The optional `host` overrides are
+ * merged only for the host's own frame.
+ */
+export const partyClassicRoomMessageSchema = z.object({
+  ...peerEnvelopeFields,
+  type: z.literal("party.classicRoom"),
+  gameId: gameIdSchema,
+  player: classicUrlSpecMessageSchema,
+  host: classicUrlSpecMessageSchema.partial().optional(),
+});
+export type PartyClassicRoomMessage = z.infer<typeof partyClassicRoomMessageSchema>;
+
+/**
+ * Classic room request: a late joiner (or a reconnecting member) asks the
+ * party for the current classic room (7.7.4). The host re-announces the
+ * `party.classicRoom` message in reply.
+ */
+export const partyClassicRoomRequestMessageSchema = z.object({
+  ...peerEnvelopeFields,
+  type: z.literal("party.classicRoom.request"),
+});
+export type PartyClassicRoomRequestMessage = z.infer<typeof partyClassicRoomRequestMessageSchema>;
+
+/**
+ * Party kick: the host removes a member from the party (7.29 classic
+ * parity). Broadcast so the kicked member sees the reason and the other
+ * members can update their view; the kicked member's client leaves.
+ */
+export const partyKickMessageSchema = z.object({
+  ...peerEnvelopeFields,
+  type: z.literal("party.kick"),
+  targetMemberId: memberIdSchema,
+  reason: z.string().max(256).optional(),
+});
+export type PartyKickMessage = z.infer<typeof partyKickMessageSchema>;
+
+/**
+ * Reload every player's game frame (7.29 classic parity). Sent by the host;
+ * each member re-runs its own frame (runtime.reload or a classic iframe
+ * remount).
+ */
+export const partyReloadAllMessageSchema = z.object({
+  ...peerEnvelopeFields,
+  type: z.literal("party.reloadAll"),
+});
+export type PartyReloadAllMessage = z.infer<typeof partyReloadAllMessageSchema>;
+
 /** Join request: a joiner asks the greeter for admission (ADR-0004). */
 export const joinRequestMessageSchema = z.object({
   ...peerEnvelopeFields,
@@ -454,6 +515,10 @@ export const peerMessagesSchema = z.discriminatedUnion("type", [
   partyGreeterMessageSchema,
   playerIdentityMessageSchema,
   partyRenameMessageSchema,
+  partyClassicRoomMessageSchema,
+  partyClassicRoomRequestMessageSchema,
+  partyKickMessageSchema,
+  partyReloadAllMessageSchema,
   joinRequestMessageSchema,
   admissionResponseMessageSchema,
   connectionStatusMessageSchema,

@@ -1,4 +1,5 @@
 import type {
+  ClassicUrlSpecMessage,
   ConnectionId,
   JoinRequestMessage,
   MemberId,
@@ -18,8 +19,12 @@ import {
   PARTY_CONTROL_CHANNEL,
   buildAdmissionResponseMessage,
   buildJoinRequestMessage,
+  buildPartyClassicRoomMessage,
+  buildPartyClassicRoomRequestMessage,
   buildPartyGreeterMessage,
   buildPartyIdentityMessage,
+  buildPartyKickMessage,
+  buildPartyReloadAllMessage,
   buildPartyRenameMessage,
   buildPartySessionMessage,
   looksLikeJoinRequest,
@@ -163,6 +168,31 @@ export type PartyEvent =
       readonly memberId: MemberId;
       readonly displayName: string;
     }
+  | {
+      /** The host shared a classic external iframe room (7.7.4). */
+      readonly type: "classicRoom";
+      readonly gameId: string;
+      readonly player: ClassicUrlSpecMessage;
+      readonly host?: Partial<ClassicUrlSpecMessage>;
+      readonly senderMemberId: MemberId;
+    }
+  | {
+      /** A joiner asked for the current classic room (7.7.4). */
+      readonly type: "classicRoomRequest";
+      readonly senderMemberId: MemberId;
+    }
+  | {
+      /** The host removed a member from the party (7.29). */
+      readonly type: "kick";
+      readonly targetMemberId: MemberId;
+      readonly reason?: string;
+      readonly senderMemberId: MemberId;
+    }
+  | {
+      /** The host asked every player to reload their game frame (7.29). */
+      readonly type: "reloadAll";
+      readonly senderMemberId: MemberId;
+    }
   | { readonly type: "error"; readonly error: unknown };
 
 /** Structured party-layer failures (join/admission/creation). */
@@ -303,6 +333,71 @@ export class PartySession {
     });
   }
 
+  /**
+   * Broadcast the classic external iframe room the host created (7.7.4) so
+   * every player embeds the SAME room with their own name/ishost params.
+   */
+  async announceClassicRoom(input: {
+    gameId: string;
+    player: ClassicUrlSpecMessage;
+    host?: Partial<ClassicUrlSpecMessage>;
+  }): Promise<void> {
+    if (this.disposed) {
+      return;
+    }
+    await this.privateTransport.send({
+      channel: PARTY_CONTROL_CHANNEL,
+      payload: buildPartyClassicRoomMessage(
+        this.baseFor(this.privateTransport, this.material.sessionId),
+        input,
+      ),
+    });
+  }
+
+  /** Ask the party for the current classic room (late joiners, 7.7.4). */
+  async requestClassicRoom(): Promise<void> {
+    if (this.disposed) {
+      return;
+    }
+    await this.privateTransport.send({
+      channel: PARTY_CONTROL_CHANNEL,
+      payload: buildPartyClassicRoomRequestMessage(
+        this.baseFor(this.privateTransport, this.material.sessionId),
+      ),
+    });
+  }
+
+  /**
+   * The host removes a member from the party (7.29). Cooperative in the
+   * peer-to-peer transport: the kicked member's client leaves on receipt;
+   * the other members observe its `peer:left`.
+   */
+  async kickMember(targetMemberId: MemberId, reason?: string): Promise<void> {
+    if (this.disposed) {
+      return;
+    }
+    await this.privateTransport.send({
+      channel: PARTY_CONTROL_CHANNEL,
+      payload: buildPartyKickMessage(this.baseFor(this.privateTransport, this.material.sessionId), {
+        targetMemberId,
+        ...(reason !== undefined ? { reason } : {}),
+      }),
+    });
+  }
+
+  /** The host asks every player to reload their game frame (7.29). */
+  async announceReloadAll(): Promise<void> {
+    if (this.disposed) {
+      return;
+    }
+    await this.privateTransport.send({
+      channel: PARTY_CONTROL_CHANNEL,
+      payload: buildPartyReloadAllMessage(
+        this.baseFor(this.privateTransport, this.material.sessionId),
+      ),
+    });
+  }
+
   /** The rendezvous transport while this member is greeter, else null. */
   get rendezvousTransport(): NovaTransport | null {
     return this.rendezvous;
@@ -394,6 +489,29 @@ export class PartySession {
         memberId: parsed.value.senderMemberId,
         displayName: parsed.value.displayName,
       });
+    } else if (parsed.value.type === "party.classicRoom") {
+      // The host shared the classic room URL spec (7.7.4): every player
+      // builds their own per-player URL from it.
+      this.emit({
+        type: "classicRoom",
+        gameId: parsed.value.gameId,
+        player: parsed.value.player,
+        ...(parsed.value.host !== undefined ? { host: parsed.value.host } : {}),
+        senderMemberId: parsed.value.senderMemberId,
+      });
+    } else if (parsed.value.type === "party.classicRoom.request") {
+      // A late joiner asked for the current classic room (7.7.4); the host
+      // re-announces it in reply.
+      this.emit({ type: "classicRoomRequest", senderMemberId: parsed.value.senderMemberId });
+    } else if (parsed.value.type === "party.kick") {
+      this.emit({
+        type: "kick",
+        targetMemberId: parsed.value.targetMemberId,
+        ...(parsed.value.reason !== undefined ? { reason: parsed.value.reason } : {}),
+        senderMemberId: parsed.value.senderMemberId,
+      });
+    } else if (parsed.value.type === "party.reloadAll") {
+      this.emit({ type: "reloadAll", senderMemberId: parsed.value.senderMemberId });
     }
   }
 

@@ -1,4 +1,4 @@
-import { LogOut, Menu, OctagonX, Users, Wifi } from "lucide-react";
+import { LogOut, Menu, OctagonX, RotateCcw, Users, Wifi } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { writeToClipboard } from "../../lib/editor/clipboard";
@@ -9,17 +9,30 @@ export interface PartyPlayShellProps {
   state: PartyEngineState;
   onEndGame: () => void;
   onLeave: () => void;
+  /** Reload only the local game frame (7.29). */
+  onReloadMyGame: () => void;
+  /** Host: reload every player's game frame (7.29). */
+  onReloadAllGames: () => void;
+  /** Host: remove a member from the party (7.29). */
+  onKickMember: (memberId: string) => void;
 }
 
 /**
  * The play shell (P4 / 7.4): classic-style in-game chrome floating over the
  * fullscreen game frame — logo, game title, the room code (click to copy
- * the invite link), and a Menu dropdown (Players, Exit to party for the
- * host, Leave party). The emergency teardown ("Exit to party") lives here,
- * outside the game frame (T6/T21 — game code cannot disable it); game-end
- * returns everyone to the lobby.
+ * the invite link), and a Menu dropdown (Players, Reload my game, Reload
+ * all for the host, Exit to party for the host, Leave party). The emergency
+ * teardown ("Exit to party") lives here, outside the game frame (T6/T21 —
+ * game code cannot disable it); game-end returns everyone to the lobby.
  */
-export function PartyPlayShell({ state, onEndGame, onLeave }: PartyPlayShellProps) {
+export function PartyPlayShell({
+  state,
+  onEndGame,
+  onLeave,
+  onReloadMyGame,
+  onReloadAllGames,
+  onKickMember,
+}: PartyPlayShellProps) {
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [playersOpen, setPlayersOpen] = useState(false);
@@ -88,6 +101,32 @@ export function PartyPlayShell({ state, onEndGame, onLeave }: PartyPlayShellProp
             <Users className="h-4 w-4" aria-hidden="true" />
             Players
           </button>
+          <button
+            type="button"
+            role="menuitem"
+            className="btn btn-ghost btn-sm justify-start"
+            onClick={() => {
+              setMenuOpen(false);
+              onReloadMyGame();
+            }}
+          >
+            <RotateCcw className="h-4 w-4" aria-hidden="true" />
+            Reload my game
+          </button>
+          {state.role === "creator" ? (
+            <button
+              type="button"
+              role="menuitem"
+              className="btn btn-ghost btn-sm justify-start"
+              onClick={() => {
+                setMenuOpen(false);
+                onReloadAllGames();
+              }}
+            >
+              <RotateCcw className="h-4 w-4" aria-hidden="true" />
+              Reload all
+            </button>
+          ) : null}
           {state.role === "creator" ? (
             <button
               type="button"
@@ -134,6 +173,16 @@ export function PartyPlayShell({ state, onEndGame, onLeave }: PartyPlayShellProp
               ) : (
                 <span className="badge badge-error badge-sm">Disconnected</span>
               )}
+              {state.role === "creator" && !member.isSelf ? (
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-xs text-error"
+                  onClick={() => onKickMember(member.memberId)}
+                  title={`Remove ${member.displayName} from the party`}
+                >
+                  Kick
+                </button>
+              ) : null}
             </div>
           ))}
         </div>

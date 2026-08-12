@@ -15,6 +15,7 @@ import {
 import { useState } from "react";
 import type { PartyEngineState, PartyMemberView } from "../../lib/party/engine";
 import { useSavedGames } from "../../lib/games/queries";
+import { CLASSIC_GAMES } from "../../lib/classic";
 import { Button, buttonStyles } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { ErrorPanel } from "../ui/ErrorPanel";
@@ -30,6 +31,10 @@ export interface PartyLobbyProps {
   onRefreshDiagnostics: () => void;
   /** Pick a saved game for a party that was started without one (7.6). */
   onPickGame: (gameId: string) => void;
+  /** Pick a classic external iframe game for the party (7.7.4). */
+  onPickClassicGame: (gameId: string) => void;
+  /** Kick a member from the party (host only, 7.29). */
+  onKickMember: (memberId: string) => void;
   /** Apply an edited player name (7.5). */
   onEditName: (name: string) => void;
 }
@@ -93,6 +98,8 @@ export function PartyLobby({
   onLeave,
   onRefreshDiagnostics,
   onPickGame,
+  onPickClassicGame,
+  onKickMember,
   onEditName,
 }: PartyLobbyProps) {
   const [forceDialog, setForceDialog] = useState(false);
@@ -310,6 +317,17 @@ export function PartyLobby({
                   {connectionBadge(member)}
                   {transferBadge(member)}
                   {readyBadge(member)}
+                  {state.role === "creator" && !member.isSelf ? (
+                    <button
+                      type="button"
+                      className="btn btn-ghost btn-xs text-error"
+                      onClick={() => onKickMember(member.memberId)}
+                      title={`Remove ${member.displayName} from the party`}
+                    >
+                      <X className="h-3 w-3" aria-hidden="true" />
+                      Kick
+                    </button>
+                  ) : null}
                 </div>
                 {member.transferProgress !== null && member.transferState === "transferring" ? (
                   <div className="flex items-center gap-2">
@@ -435,6 +453,10 @@ export function PartyLobby({
               setPickerOpen(false);
               onPickGame(gameId);
             }}
+            onPickClassic={(gameId) => {
+              setPickerOpen(false);
+              onPickClassicGame(gameId);
+            }}
           />
         </Dialog>
       ) : null}
@@ -446,8 +468,16 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
 }
 
-/** Saved-game list for the lobby's pick-a-game dialog (7.6). */
-function GamePicker({ onPick }: { onPick: (gameId: string) => void }) {
+/** Game picker for the lobby's pick-a-game dialog (7.6 + 7.7.4): saved
+ * Nova games first, then the classic external iframe games with a
+ * "classic" badge. */
+function GamePicker({
+  onPick,
+  onPickClassic,
+}: {
+  onPick: (gameId: string) => void;
+  onPickClassic: (gameId: string) => void;
+}) {
   const gamesQuery = useSavedGames();
   if (gamesQuery.isLoading) {
     return <LoadingState label="Loading your games…" />;
@@ -456,32 +486,57 @@ function GamePicker({ onPick }: { onPick: (gameId: string) => void }) {
     return <ErrorPanel title="Couldn't load your games" message={errorMessage(gamesQuery.error)} />;
   }
   const games = gamesQuery.data ?? [];
-  if (games.length === 0) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-4 text-center">
-        <p className="text-sm text-base-content/70">
-          No saved games yet — create one in the editor first.
-        </p>
-        <Link to="/build" className={buttonStyles("primary", "md")}>
-          Build a game
-        </Link>
-      </div>
-    );
-  }
   return (
-    <ul className="flex max-h-96 flex-col gap-2 overflow-y-auto" aria-label="Saved games">
-      {games.map((game) => (
-        <li key={game.id}>
-          <button
-            type="button"
-            onClick={() => onPick(game.id)}
-            className="flex w-full items-center justify-between gap-2 rounded-box border border-base-300 bg-base-200 px-3 py-2 text-left hover:border-primary"
-          >
-            <span className="min-w-0 flex-1 truncate font-bold">{game.title}</span>
-            <span className="badge badge-ghost badge-sm">{game.mode ?? "state"}</span>
-          </button>
-        </li>
-      ))}
-    </ul>
+    <div className="flex max-h-96 flex-col gap-4 overflow-y-auto">
+      <section aria-label="Saved games">
+        <p className="mb-1 text-sm font-black uppercase tracking-widest text-base-content/60">
+          My games
+        </p>
+        {games.length === 0 ? (
+          <div className="flex flex-col items-center gap-3 py-4 text-center">
+            <p className="text-sm text-base-content/70">
+              No saved games yet — create one in the editor first.
+            </p>
+            <Link to="/build" className={buttonStyles("primary", "md")}>
+              Build a game
+            </Link>
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-2">
+            {games.map((game) => (
+              <li key={game.id}>
+                <button
+                  type="button"
+                  onClick={() => onPick(game.id)}
+                  className="flex w-full items-center justify-between gap-2 rounded-box border border-base-300 bg-base-200 px-3 py-2 text-left hover:border-primary"
+                >
+                  <span className="min-w-0 flex-1 truncate font-bold">{game.title}</span>
+                  <span className="badge badge-ghost badge-sm">{game.mode ?? "state"}</span>
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </section>
+      <section aria-label="Classic games">
+        <p className="mb-1 text-sm font-black uppercase tracking-widest text-base-content/60">
+          Classic games
+        </p>
+        <ul className="flex flex-col gap-2">
+          {CLASSIC_GAMES.map((game) => (
+            <li key={game.id}>
+              <button
+                type="button"
+                onClick={() => onPickClassic(game.id)}
+                className="flex w-full items-center justify-between gap-2 rounded-box border border-base-300 bg-base-200 px-3 py-2 text-left hover:border-primary"
+              >
+                <span className="min-w-0 flex-1 truncate font-bold">{game.name}</span>
+                <span className="badge badge-ghost badge-sm">classic</span>
+              </button>
+            </li>
+          ))}
+        </ul>
+      </section>
+    </div>
   );
 }

@@ -1,9 +1,11 @@
 import { Loader2, PartyPopper } from "lucide-react";
+import { useMemo } from "react";
 import { toast } from "sonner";
 import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
 import { cn } from "../../lib/cn";
 import { usePartyEngine } from "../../lib/party/use-party";
 import type { PartyEngineState } from "../../lib/party/engine";
+import { buildClassicGameUrl, findClassicGame } from "../../lib/classic";
 import { gameRepository } from "../../lib/games/instance";
 import { Button } from "../ui/Button";
 import { ErrorPanel } from "../ui/ErrorPanel";
@@ -57,6 +59,23 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
     }
   };
 
+  // 7.7.4: picking a classic game hands the engine the game id; the host
+  // creates the room once and the party plane shares it with everyone.
+  const handlePickClassicGame = async (gameId: string) => {
+    await engine.selectClassicGame(gameId);
+  };
+
+  // 7.29: in-game menu + lobby controls (classic parity).
+  const handleKickMember = (memberId: string) => {
+    engine.kickMember(memberId);
+  };
+  const handleReloadMyGame = () => {
+    engine.reloadMyGame();
+  };
+  const handleReloadAllGames = () => {
+    engine.reloadAllGames();
+  };
+
   // 7.5: apply the edited name to the engine identity (persisted there).
   const handleEditName = (name: string) => {
     engine.setDisplayName(name);
@@ -64,7 +83,9 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
   };
 
   // The frame container: the same DOM node for the whole party. The lobby
-  // shows it as a preview card; the play shell expands it full-screen.
+  // shows it as a preview card; the play shell expands it full-screen. For
+  // classic external iframe games (7.7.4) the container hosts a plain
+  // iframe built from the shared room URL spec instead of the Nova runtime.
   const frameMounted =
     state.phase === "lobby" ||
     state.phase === "starting" ||
@@ -72,24 +93,68 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
     state.phase === "reconnecting";
   const frameFullscreen = state.phase === "playing";
 
+  // The per-player classic URL: the host merges the host overrides and
+  // passes ishost=true; every other player builds the same room with their
+  // own name and ishost=false.
+  const classicUrl = useMemo(() => {
+    const classic = state.classicGame;
+    if (classic === null) {
+      return null;
+    }
+    const game = findClassicGame(classic.gameId);
+    return buildClassicGameUrl(
+      classic.connectResult,
+      { renameParams: game?.renameParams },
+      { name: state.displayName, isHost: state.role === "creator" },
+    );
+  }, [state.classicGame, state.displayName, state.role]);
+
   const frameContainer = frameMounted ? (
-    <div
-      ref={bindContainer}
-      data-testid="party-frame"
-      aria-label="Your game"
-      className={cn(
-        "overflow-hidden bg-black",
-        frameFullscreen
-          ? "fixed inset-0 z-40"
-          : "relative h-64 w-full rounded-box border-2 border-base-300 md:h-96",
-      )}
-    />
+    state.classicGame !== null ? (
+      <div
+        data-testid="party-classic-frame"
+        aria-label="Classic game"
+        className={cn(
+          "overflow-hidden bg-black",
+          frameFullscreen
+            ? "fixed inset-0 z-40"
+            : "relative h-64 w-full rounded-box border-2 border-base-300 md:h-96",
+        )}
+      >
+        {classicUrl !== null ? (
+          <iframe
+            key={state.classicFrameEpoch}
+            title={state.classicGame.title}
+            src={classicUrl}
+            className="h-full w-full border-0"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <div className="flex h-full items-center justify-center p-4 text-center text-sm font-semibold text-base-content/60">
+            Waiting for the host&apos;s room…
+          </div>
+        )}
+      </div>
+    ) : (
+      <div
+        ref={bindContainer}
+        data-testid="party-frame"
+        aria-label="Your game"
+        className={cn(
+          "overflow-hidden bg-black",
+          frameFullscreen
+            ? "fixed inset-0 z-40"
+            : "relative h-64 w-full rounded-box border-2 border-base-300 md:h-96",
+        )}
+      />
+    )
   ) : null;
 
   // 7.22: the classic shell header (logo + big code + phonetic + invite)
   // sits above every live party phase. During "playing" the fullscreen
   // frame (z-40) covers it and the play shell's own top bar takes over.
-  const shellShown = state.phase !== "idle" && state.phase !== "error";
+  // A kicked member (7.29) sees the removed panel instead of the shell.
+  const shellShown = state.phase !== "idle" && state.phase !== "error" && state.phase !== "removed";
   const showInviteDetails = state.phase === "lobby" || state.phase === "starting";
 
   return (
@@ -112,11 +177,23 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
               state={state}
               onEndGame={() => engine.endGame("host_closed")}
               onLeave={() => void handleLeave()}
+              onReloadMyGame={handleReloadMyGame}
+              onReloadAllGames={handleReloadAllGames}
+              onKickMember={handleKickMember}
             />
           </div>
         </div>
       ) : null}
-      {renderPhase(state, engine, handleLeave, handlePickGame, handleEditName, onLeft)}
+      {renderPhase(
+        state,
+        engine,
+        handleLeave,
+        handlePickGame,
+        handlePickClassicGame,
+        handleEditName,
+        handleKickMember,
+        onLeft,
+      )}
     </div>
   );
 }
@@ -126,7 +203,9 @@ function renderPhase(
   engine: ReturnType<typeof usePartyEngine>["engine"],
   handleLeave: () => Promise<void>,
   handlePickGame: (gameId: string) => Promise<void>,
+  handlePickClassicGame: (gameId: string) => Promise<void>,
   handleEditName: (name: string) => void,
+  handleKickMember: (memberId: string) => void,
   onLeft?: () => void,
 ) {
   switch (state.phase) {
@@ -157,6 +236,8 @@ function renderPhase(
           onLeave={() => void handleLeave()}
           onRefreshDiagnostics={() => void engine.refreshDiagnostics()}
           onPickGame={(gameId) => void handlePickGame(gameId)}
+          onPickClassicGame={(gameId) => void handlePickClassicGame(gameId)}
+          onKickMember={handleKickMember}
           onEditName={handleEditName}
         />
       );
@@ -193,6 +274,27 @@ function renderPhase(
             >
               <PartyPopper className="h-4 w-4" aria-hidden="true" />
               Back
+            </Button>
+          </div>
+        </div>
+      );
+    case "removed":
+      return (
+        <div className="mx-auto flex w-full max-w-md flex-col gap-4 py-6">
+          <ErrorPanel
+            title="You were removed from the party"
+            message={state.removedReason ?? "The host removed you from the party."}
+          />
+          <div className="flex justify-center">
+            <Button
+              variant="primary"
+              onClick={() => {
+                engine.dismissRemoved();
+                onLeft?.();
+              }}
+            >
+              <PartyPopper className="h-4 w-4" aria-hidden="true" />
+              Back to games
             </Button>
           </div>
         </div>
