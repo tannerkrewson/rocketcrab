@@ -172,6 +172,28 @@ export class InMemoryTransport implements NovaTransport, InMemoryPeer {
     this.emit("peer:left", peer);
   }
 
+  /**
+   * Reconcile this transport's peer roster with `peers` (the current room
+   * members), emitting `peer:left`/`peer:joined` for the diff. Real
+   * transports re-discover the room roster on rejoin, so a transport that
+   * was disconnected while another member left must learn about it —
+   * otherwise the session keeps a departed member in its eligible set and
+   * elections can name a ghost as the winner forever (rocketcrab-9fv.7.31).
+   */
+  syncPeers(peers: readonly TransportPeerInfo[]): void {
+    const incoming = new Map(peers.map((peer) => [peer.connectionId, peer]));
+    for (const existing of [...this.peersList]) {
+      if (!incoming.has(existing.connectionId)) {
+        this.notifyPeerLeft(existing);
+      }
+    }
+    for (const peer of peers) {
+      if (!this.peersList.some((p) => p.connectionId === peer.connectionId)) {
+        this.notifyPeerJoined(peer);
+      }
+    }
+  }
+
   notifyReconnected(event: TransportReconnectEvent): void {
     // A fresh connection id means every per-(sender, channel) ordered stream
     // and every in-flight chunk transfer from the old connection is stale:
