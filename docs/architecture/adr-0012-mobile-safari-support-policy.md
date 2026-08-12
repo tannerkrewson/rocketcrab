@@ -1,6 +1,8 @@
 # ADR-0012: Mobile Safari support policy
 
-- **Status:** Accepted (physical-device capability matrix **Pending** F4 pass)
+- **Status:** Accepted (F4 physical-device capability matrix **completed**;
+  M1 shell hardening **implemented** — lifecycle handling, reconnect
+  progress, local recovery info, visibility-aware heartbeats)
 - **Date:** 2026-08-01
 - **Owner:** Rocketcrab Nova planning (Phase 1)
 - **Related:** F4 (sandbox spike), M1 (hardening), B6 (suspension),
@@ -37,6 +39,11 @@ instability, and strict audio/user-gesture rules.
   migrate (ADR-0007, ADR-0004). The shell uses `pagehide`/`pageshow`,
   visibility, and network events, saves session recovery information locally,
   treats suspended authority as replaceable, and preserves an emergency exit.
+  (M1 implementation: the party engine reacts to those events, probes a
+  resumed connection and rejoins with a fresh connection when a
+  backgrounded phone's link died silently (F11), auto-retries with backoff,
+  persists a local recovery record for one-tap rejoin after a reload, and
+  pauses its runtime heartbeat while hidden.)
 - **Rendering reality:** avoid viewport units that break with changing browser
   chrome; respect safe-area insets; audio requires a user gesture and startup
   instructions must be clear (M1).
