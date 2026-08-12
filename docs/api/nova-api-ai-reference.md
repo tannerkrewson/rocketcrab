@@ -79,6 +79,12 @@ nova.raw.onMessage("chat", (message) => {
 });
 nova.raw.close("chat"); // channel lifecycle: local sends then fail
 
+// --- Media (EXPERIMENTAL — do not build voice/video multiplayer on it) ---
+// Camera/mic acquisition works INSIDE your frame with ordinary prompts:
+// const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+// nova.media.isSupported(); // platform probe; false rules media out
+// nova.media.publish(stream); // always throws { code: "media_unsupported" } in this build
+
 // --- Errors ---
 nova.onError((error) => {
   /* error: { code, message } */
@@ -106,6 +112,7 @@ nova.onError((error) => {
 8. **Prefer state mode** unless the game genuinely needs another mode.
 9. **State-mode handler functions never leave your context.** `createInitialState`, `actions`, `selectView`, and `render` are functions you pass to `defineGame`; Nova runs them for you. Everything else is plain data.
 10. **Treat state as read-only and dispatch to change it.** Never mutate a value from `nova.state.get()` — return a new state from a handler or mutate the draft Nova gives you.
+11. **Media publishing is experimental and unavailable.** You may capture camera/mic inside your frame with ordinary permission prompts (`navigator.mediaDevices.getUserMedia`), but `nova.media.publish()` always throws `media_unsupported` in this build — never design a game that requires voice/video across players. `nova.media.isSupported()` probes the platform and returns false on unsupported browsers.
 
 ## The three modes
 

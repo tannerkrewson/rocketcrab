@@ -373,34 +373,81 @@ the AI reference (A4) follows the same guidance.
 
 ---
 
-## 11. Errors
+## 11. Media (experimental — A3)
+
+`nova.media` is the experimental camera/microphone surface. The A3 spike
+(`docs/testing/media-bridging-findings.md`) evaluated how a game frame that
+acquires media could publish it through the party transport; the verdict is
+that cross-frame media transport is **experimental and unsupported in this
+build** (Blocker Register B7): media objects cannot cross the runtime frame
+boundary until device verification passes.
+
+```js
+// Acquisition stays inside your frame: ordinary browser permission prompts.
+var stream = await navigator.mediaDevices.getUserMedia({ video: true });
+
+// Probe the platform: can this realm structured-clone a MediaStream?
+// false rules the whole bridge out on this platform.
+var platformCanClone = nova.media.isSupported();
+
+// Publishing is EXPERIMENTAL: in this build it always throws a NovaError
+// with code "media_unsupported" (after lifecycle + input validation).
+// Do not build voice/video multiplayer on nova.media yet.
+try {
+  nova.media.publish(stream);
+} catch (error) {
+  nova.log(error.code, error.message); // "media_unsupported"
+}
+```
+
+Contract:
+
+- `nova.media.isSupported()` — platform capability probe (can this realm
+  structured-clone a `MediaStream`). `true` is necessary but **not
+  sufficient** for the bridge; `false` means cross-frame media transfer is
+  certainly unavailable on this platform.
+- `nova.media.publish(trackOrStream)` — takes a live `MediaStreamTrack` or
+  `MediaStream` from **this** frame (cross-realm or plain objects are
+  rejected with `invalid_options`), then throws `media_unsupported` in this
+  build. Lifecycle gating matches every sending call: `not_started` before
+  start, `ended` after end.
+- Media **never reaches the party** today: no track/stream crosses the
+  frame boundary, no protocol message exists, and the data-only MVP is
+  untouched. Camera/mic capture inside the game frame works (F4 verified on
+  Mobile Safari) with ordinary permission prompts; permission scope is
+  origin-wide (ADR-0008).
+
+---
+
+## 12. Errors
 
 Every API failure is a `NovaError` with a stable `code` and a human message:
 
-| Code                      | Meaning                                                                  |
-| ------------------------- | ------------------------------------------------------------------------ |
-| `unsupported_api_version` | `defineGame` targeted an API version this build cannot serve.            |
-| `already_registered`      | `defineGame` was called more than once.                                  |
-| `not_registered`          | A call requires `defineGame` to have run first.                          |
-| `already_ready`           | `ready` was called more than once.                                       |
-| `already_started`         | A lifecycle transition was attempted after the game started.             |
-| `not_started`             | A sending call ran before the game started (see `onStart`).              |
-| `ended`                   | A call ran after the game ended.                                         |
-| `invalid_options`         | Options or arguments failed structural validation.                       |
-| `invalid_payload`         | A payload is not structured-clone-compatible / JSON plain data.          |
-| `unknown_channel`         | A raw send referenced a channel that was not created.                    |
-| `reserved_channel`        | A raw channel used the reserved protocol name.                           |
-| `rate_limited`            | A raw send exceeded the per-second rate limit (A2).                      |
-| `not_connected`           | A targeted send referenced a player who is not connected.                |
-| `invalid_message`         | The host received an invalid protocol message (delivered via `onError`). |
-| `unsupported`             | The operation is not available in this build (reported by the runtime).  |
+| Code                      | Meaning                                                                                                      |
+| ------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| `unsupported_api_version` | `defineGame` targeted an API version this build cannot serve.                                                |
+| `already_registered`      | `defineGame` was called more than once.                                                                      |
+| `not_registered`          | A call requires `defineGame` to have run first.                                                              |
+| `already_ready`           | `ready` was called more than once.                                                                           |
+| `already_started`         | A lifecycle transition was attempted after the game started.                                                 |
+| `not_started`             | A sending call ran before the game started (see `onStart`).                                                  |
+| `ended`                   | A call ran after the game ended.                                                                             |
+| `invalid_options`         | Options or arguments failed structural validation.                                                           |
+| `invalid_payload`         | A payload is not structured-clone-compatible / JSON plain data.                                              |
+| `unknown_channel`         | A raw send referenced a channel that was not created.                                                        |
+| `reserved_channel`        | A raw channel used the reserved protocol name.                                                               |
+| `rate_limited`            | A raw send exceeded the per-second rate limit (A2).                                                          |
+| `not_connected`           | A targeted send referenced a player who is not connected.                                                    |
+| `invalid_message`         | The host received an invalid protocol message (delivered via `onError`).                                     |
+| `unsupported`             | The operation is not available in this build (reported by the runtime).                                      |
+| `media_unsupported`       | `nova.media.publish` ran in a build/platform where media cannot cross the frame boundary (experimental; A3). |
 
 Unknown methods fail as `TypeError`s (reported as game errors), never as
 silent no-ops.
 
 ---
 
-## 12. What crosses the frame
+## 13. What crosses the frame
 
 Everything a game sends through `nova` must be **structured-clone-compatible
 plain data** (the same rule `postMessage` enforces). Functions registered
@@ -410,7 +457,7 @@ on raw channels.
 
 ---
 
-## 13. Where the API lives and why it behaves the same everywhere
+## 14. Where the API lives and why it behaves the same everywhere
 
 - `packages/nova-api` defines the surface (`createNovaClient`) and the
   transport-neutral session engine (`NovaSession`) that drives it over the
@@ -424,7 +471,7 @@ on raw channels.
 
 ---
 
-## 14. Deliberate non-goals (S1/S2)
+## 15. Deliberate non-goals (S1/S2)
 
 - S1 shipped the common surface without mode semantics; S2 shipped the full
   state-mode engine (action application, revisioned snapshots, per-player
