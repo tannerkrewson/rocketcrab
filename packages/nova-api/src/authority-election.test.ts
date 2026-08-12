@@ -130,6 +130,7 @@ function makeEngine(
     restoreWindowMs: number;
     gracePeriodMs: number;
     heartbeatIntervalMs: number;
+    stateHash: (value: unknown) => Promise<string>;
   }> = {},
 ): { engine: NovaStateEngine; host: RecordingHost } {
   const host = new RecordingHost();
@@ -152,6 +153,7 @@ function makeEngine(
       ...(options.heartbeatIntervalMs !== undefined
         ? { heartbeatIntervalMs: options.heartbeatIntervalMs }
         : {}),
+      ...(options.stateHash !== undefined ? { stateHash: options.stateHash } : {}),
     }),
   );
   engine.beginGame();
@@ -372,6 +374,58 @@ describe(
       expect(engine.getDiagnostics().revision).toBe(2);
       expect(engine.getCanonicalState()).toEqual({ count: 1 });
       expect(host.acks.filter((ack) => ack.ack.actionId === "act-dup")).toHaveLength(1);
+    });
+
+    it("drops a commit raced by an authority change silently instead of acking invalid_state (7.30)", async () => {
+      // Deferred digest: the commit waits on our gate, so the authority
+      // change lands deterministically inside the state-hash window.
+      let releaseDigest!: () => void;
+      const digestGate = new Promise<void>((resolve) => {
+        releaseDigest = resolve;
+      });
+      let digestStarted = false;
+      const { engine, host } = makeEngine("member-a", {
+        stateHash: async () => {
+          digestStarted = true;
+          await digestGate;
+          return "f".repeat(64);
+        },
+      });
+      // member-a is the sitting authority at term 1 with replicated state.
+      engine.handleAnnounce({ term: 1, authorityMemberId: "member-a", stateRevision: 1 });
+      engine.handleSnapshot({
+        revision: 1,
+        stateHash: "0".repeat(64),
+        term: 1,
+        authorityMemberId: "member-a",
+        processedActionIds: [],
+        state: { count: 0 },
+      });
+      // A local action starts applying; commit stalls on the digest gate.
+      engine.handleLocalAction({
+        actionId: "act-race",
+        type: "increment",
+        payload: { by: 1 },
+        baseRevision: 1,
+      });
+      await waitForEngine(() => digestStarted, "commit digest started");
+      // The authority steps down mid-digest: a higher-term campaign lands.
+      engine.handleElection({
+        term: 2,
+        candidateMemberId: "member-b",
+        observed: [{ memberId: "member-b", revision: 1, stateHash: "0".repeat(64) }],
+      });
+      expect(engine.getAuthorityMemberId()).toBeNull();
+      // Release the digest: commit re-checks authority, fails, and the
+      // action is dropped silently (the dispatcher re-sends it to the new
+      // authority; deduplication keeps it exactly-once).
+      releaseDigest();
+      await engine.flushPending();
+      const racedAcks = host.acks.filter((ack) => ack.ack.actionId === "act-race");
+      expect(racedAcks).toHaveLength(0); // never acked as invalid (or anything)
+      expect(host.events.some((event) => event.type === "actionRejected")).toBe(false);
+      expect(engine.getDiagnostics().revision).toBe(1); // nothing committed
+      expect(engine.getDiagnostics().pendingActionCount).toBe(0);
     });
 
     it("reconciles conflicting announcements: higher term, then revision, then member id", async () => {
@@ -681,16 +735,6 @@ describe(
       // miss heartbeats, suspect simultaneously, and campaign (their messages
       // sit undelivered); the authority keeps committing locally.
       await advance(400);
-      console.error(
-        "DBG after partition b.term",
-        b.getStateModeDiagnostics().term,
-        "b.election",
-        b.getStateModeDiagnostics().electionInProgress,
-        "b.authority",
-        b.getStateModeDiagnostics().authorityMemberId,
-        "c.term",
-        c.getStateModeDiagnostics().term,
-      );
       const aSide = a.client.dispatch({ type: "mark", payload: { marker: "a-side" } }).then(
         () => "accepted",
         (error: unknown) => (error as { code?: string }).code ?? "rejected",
@@ -701,10 +745,20 @@ describe(
         (error: unknown) => error,
       );
       await advance(100);
-      await pumpUntil(hub, () => a.getStateModeDiagnostics().revision === 2, "local commit");
-      // Local commit on the authority: the ack must come back accepted. (The
-      // handler above keeps a mid-commit authority change from surfacing as an
-      // unhandled rejection — that race is tracked as rocketcrab-9fv.7.30.)
+      // The local commit happens while the partition is still strict (no
+      // drain), so the campaigns stay undelivered and the commit can never
+      // race the authority change. The mid-commit authority-loss race is
+      // covered deterministically by the engine commit-race test and the
+      // reconnect-mid-campaign integration test (rocketcrab-9fv.7.30); here
+      // the merge below is the single delivery point.
+      const localDeadline = performance.now() + WAIT_BUDGET_MS;
+      while (a.getStateModeDiagnostics().revision !== 2 && performance.now() < localDeadline) {
+        await advance(100);
+      }
+      // Local commit on the authority: the ack must come back accepted. (A
+      // mid-commit authority change must never surface as an unhandled
+      // rejection or an invalid_state ack — rocketcrab-9fv.7.30.)
+      expect(a.getStateModeDiagnostics().revision).toBe(2);
       expect(await aSide).toBe("accepted");
 
       // Merge: deliver everything; the campaigns reach the authority, which
@@ -792,6 +846,52 @@ describe(
       await expect(dispatched).resolves.toBeUndefined();
       expect(b.getCanonicalState()?.state).toEqual({ count: 1, markers: ["after-resume"] });
       expect(a.getCanonicalState()?.state).toEqual(b.getCanonicalState()?.state);
+    });
+
+    it("reconnects the authority mid-campaign with a committed action and converges (7.31)", async () => {
+      // The exact property-test counterexample that wedged under load:
+      // dispatch on the authority, then drop (reconnect) it. The followers
+      // campaign at term 2 while the authority is out of the room, so it
+      // never hears the campaign; the winner-wait re-election must still
+      // converge every shell on one authority and the committed state
+      // (rocketcrab-9fv.7.31), and the local action must be re-sent, not
+      // rejected as invalid_state (rocketcrab-9fv.7.30).
+      const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+      const [a, b, c] = trio(sessions);
+      const outcome = a.client.dispatch({ type: "mark", payload: { marker: "m0" } }).then(
+        () => "accepted",
+        (error: unknown) => (error as { code?: string }).code ?? "rejected",
+      );
+      await a.transport.reconnect();
+      await pump(hub);
+      for (let i = 0; i < 50; i += 1) {
+        await advance(100);
+        await pump(hub);
+      }
+      // The local action is applied exactly once (never invalid_state).
+      expect(await outcome).toBe("accepted");
+      // Every connected shell agrees on ONE authority (non-null).
+      const authorities = sessions.map(
+        (session) => session.getStateModeDiagnostics().authorityMemberId,
+      );
+      expect(authorities[0]).not.toBeNull();
+      expect(new Set(authorities).size).toBe(1);
+      // Identical state everywhere; m0 contributed exactly one marker.
+      const states = sessions.map((session) => session.getCanonicalState());
+      expect(states[1]?.state).toEqual(states[0]?.state);
+      expect(states[2]?.state).toEqual(states[0]?.state);
+      expect(states[0]?.state as { count: number; markers: string[] } | null).toEqual({
+        count: 1,
+        markers: ["m0"],
+      });
+      // The party keeps working under the settled authority.
+      const later = c.client.dispatch({ type: "mark", payload: { marker: "m1" } });
+      await pumpUntil(
+        hub,
+        () => (b.getCanonicalState()?.state as { count?: number } | null)?.count === 2,
+        "post-reconnect dispatch applies",
+      );
+      await expect(later).resolves.toBeUndefined();
     });
   },
 );
@@ -900,13 +1000,24 @@ async function runPropertyScenario(
       );
     const electionsSettled = () => {
       const shells = connectedStarted();
+      if (shells.length === 0) return true; // nobody connected: vacuous
       if (shells.some((session) => session.getStateModeDiagnostics().electionInProgress)) {
         return false;
       }
-      const known = shells
-        .map((session) => session.getStateModeDiagnostics().authorityMemberId)
-        .filter((authority) => authority !== null);
-      return known.length === 0 || new Set(known).size === 1;
+      const authorities = shells.map(
+        (session) => session.getStateModeDiagnostics().authorityMemberId,
+      );
+      // Every connected started shell must KNOW the authority and agree.
+      // A null authority while not electing is the 7.31 wedge — winner-
+      // waiting for a reconnected member that never heard the campaign —
+      // so the settle loop must keep going until the re-election converges.
+      if (authorities.some((authority) => authority === null)) return false;
+      if (new Set(authorities).size !== 1) return false;
+      // State must have converged too: agreeing on the authority is not
+      // enough while the newly elected authority is still inside its
+      // restore window (restoreDone=false, pre-replication) — 7.31.
+      const revisions = shells.map((session) => session.getStateModeDiagnostics().revision);
+      return new Set(revisions).size === 1;
     };
     let settled = false;
     for (let fake = 0; fake < 30_000; fake += 100) {
@@ -919,7 +1030,7 @@ async function runPropertyScenario(
     }
     if (!settled) {
       throw new Error(
-        `Timed out settling elections: ${connectedStarted()
+        `Timed out settling elections (ops: ${JSON.stringify(ops)}; received: ${JSON.stringify([...received])}): ${connectedStarted()
           .map(
             (session) =>
               `${session.player.id}:auth=${String(session.getStateModeDiagnostics().authorityMemberId)}:term=${session.getStateModeDiagnostics().term}:electing=${session.getStateModeDiagnostics().electionInProgress}`,

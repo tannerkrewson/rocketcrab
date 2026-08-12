@@ -679,11 +679,14 @@ export class InMemoryTransportHub {
     });
     const self = this.peerInfo(transport);
     if (room !== undefined) {
-      for (const member of room.members) {
-        if (member !== transport) {
-          member.notifyPeerJoined(self);
-        }
+      const roster = room.members.filter((member) => member !== transport);
+      for (const member of roster) {
+        member.notifyPeerJoined(self);
       }
+      // The rejoining transport re-discovers the current roster (real
+      // transports re-list peers on rejoin): a member that left while it
+      // was away drops out of its peer view (rocketcrab-9fv.7.31).
+      transport.syncPeers(roster.map((member) => this.peerInfo(member)));
     }
   }
 
