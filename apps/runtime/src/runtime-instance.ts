@@ -325,6 +325,7 @@ export class RuntimeInstance {
       case "ready":
       case "dispatch":
       case "raw.createChannel":
+      case "raw.close":
       case "raw.send":
       case "simulation.register":
       case "simulation.sendInput":
