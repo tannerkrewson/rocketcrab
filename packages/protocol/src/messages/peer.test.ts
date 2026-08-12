@@ -19,6 +19,7 @@ import {
   joinRequestMessageSchema,
   partyGreeterMessageSchema,
   partyIdentityMessageSchema,
+  partyRenameMessageSchema,
   partySessionMessageSchema,
   peerCapabilitiesMessageSchema,
   peerMessagesSchema,
@@ -50,6 +51,7 @@ describe("peer message schemas", () => {
       partyIdentityMessageSchema,
       partySessionMessageSchema,
       partyGreeterMessageSchema,
+      partyRenameMessageSchema,
       playerIdentityMessageSchema,
       joinRequestMessageSchema,
       admissionResponseMessageSchema,
@@ -101,6 +103,12 @@ describe("peer message schemas", () => {
         basePeer({
           type: "party.greeter",
           greeterMemberId: "member-2",
+        }),
+      ),
+      partyRenameMessageSchema.parse(
+        basePeer({
+          type: "party.rename",
+          displayName: "Renamed Alex",
         }),
       ),
       playerIdentityMessageSchema.parse(
@@ -301,6 +309,7 @@ describe("peer message schemas", () => {
       basePeer({ type: "party.identity", partyCode: "ABC", memberCount: 0 }),
       basePeer({ type: "party.session", partyCode: "ABCD", secret: "nope" }),
       basePeer({ type: "party.greeter", greeterMemberId: "" }),
+      basePeer({ type: "party.rename", displayName: "" }),
       basePeer({ type: "player.identity", authorityEligible: "yes" }),
       basePeer({ type: "join.request", partyCode: "ABCD" }),
       basePeer({ type: "join.admission", partyCode: "ABCD", decision: "maybe" }),

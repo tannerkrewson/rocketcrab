@@ -6,6 +6,7 @@ import {
   parsePeerMessage,
   partyGreeterMessageSchema,
   partyIdentityMessageSchema,
+  partyRenameMessageSchema,
   partySessionMessageSchema,
   type PartyCode,
   type ParseResult,
@@ -133,6 +134,20 @@ export function buildPartyGreeterMessage(
       ...envelope(base),
       type: "party.greeter",
       greeterMemberId: input.greeterMemberId,
+    }),
+  );
+}
+
+/** Build and validate a `party.rename` announcement (private room, 7.25). */
+export function buildPartyRenameMessage(
+  base: PartyControlBase,
+  input: { displayName: string },
+): PeerMessage {
+  return assertPeerMessage(
+    partyRenameMessageSchema.parse({
+      ...envelope(base),
+      type: "party.rename",
+      displayName: input.displayName,
     }),
   );
 }
