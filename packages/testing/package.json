@@ -12,7 +12,12 @@
     "test": "vitest run",
     "test:watch": "vitest"
   },
+  "dependencies": {
+    "@rocketcrab/core": "0.0.0",
+    "@rocketcrab/protocol": "0.0.0"
+  },
   "devDependencies": {
+    "fast-check": "4.9.0",
     "typescript": "7.0.2",
     "vitest": "4.1.10"
   }
