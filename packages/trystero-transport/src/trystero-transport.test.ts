@@ -647,7 +647,7 @@ describe("TrysteroTransport transfer progress", () => {
     const sendOptions = room.action.send.mock.calls[0]![1] as {
       onProgress: (percent: number) => void;
     };
-    sendOptions.onProgress(50);
+    sendOptions.onProgress(0.5);
     expect(progress).toEqual([
       {
         direction: "send",
@@ -666,7 +666,7 @@ describe("TrysteroTransport transfer progress", () => {
     adapter.on("transfer:progress", (p) => {
       progress.push(p);
     });
-    room.action.onReceiveProgress!(25, {
+    room.action.onReceiveProgress!(0.25, {
       peerId: "peer-1",
       metadata: {
         v: 1,
