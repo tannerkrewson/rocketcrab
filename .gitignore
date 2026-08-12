@@ -23,3 +23,4 @@ test-results/
 # agent tooling
 .pi-subagents/
 
+node_modules
