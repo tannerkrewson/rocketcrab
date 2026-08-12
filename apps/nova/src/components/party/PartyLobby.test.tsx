@@ -16,7 +16,7 @@ import { PartyLobby, type PartyLobbyProps } from "./PartyLobby";
 import type { PartyMemberView } from "../../lib/party/engine";
 
 /**
- * Party lobby UI tests (P4): the lobby renders the large four-letter code,
+ * Party lobby UI tests (P4): the lobby renders the classic status card,
  * the QR invite and copyable invite link, the player list distinguishing
  * waiting / transferring / ready / failed states, the greeter and the
  * diagnostic authority labels, start / force-start / leave controls, and
@@ -114,31 +114,11 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
   const result = render(<RouterProvider router={router} />, { wrapper });
-  await result.findByTestId("party-code");
+  await result.findByRole("button", { name: /start game/i });
   return result;
 }
 
 describe("PartyLobby", () => {
-  it("shows the large four-letter code and the QR + invite link", async () => {
-    await renderLobby(makeState());
-    expect(screen.getByTestId("party-code")).toHaveTextContent("ABCD");
-    expect(screen.getByLabelText("Party invite QR code")).toBeInTheDocument();
-    expect(screen.getAllByText(INVITE_URL).length).toBeGreaterThan(0);
-    expect(screen.getByRole("button", { name: /copy invite link/i })).toBeInTheDocument();
-  });
-
-  it("copies the invite link to the clipboard", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "clipboard", {
-      value: { writeText },
-      configurable: true,
-    });
-    await renderLobby(makeState());
-    await userEvent.click(screen.getByRole("button", { name: /copy invite link/i }));
-    expect(writeText).toHaveBeenCalledWith(INVITE_URL);
-    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
-  });
-
   it("lists players with their transfer and ready states", async () => {
     await renderLobby(makeState());
     const rowA = screen.getByTestId("party-member-member-a");
@@ -268,9 +248,10 @@ describe("PartyLobby", () => {
     const onPickGame = vi.fn();
     await renderLobby(state, { onPickGame });
     expect(screen.getByText(/no game yet/i)).toBeInTheDocument();
-    const pickButton = screen.getByRole("button", { name: /pick a game/i });
-    expect(pickButton).toBeInTheDocument();
-    await userEvent.click(pickButton);
+    expect(screen.getByText(/you must select the game/i)).toBeInTheDocument();
+    const browseButton = screen.getByRole("button", { name: /browse games/i });
+    expect(browseButton).toBeInTheDocument();
+    await userEvent.click(browseButton);
     // The picker dialog opens (empty library in tests).
     expect(await screen.findByRole("dialog", { name: "Pick a game" })).toBeInTheDocument();
     expect(await screen.findByText(/no saved games yet/i)).toBeInTheDocument();
@@ -281,7 +262,7 @@ describe("PartyLobby", () => {
     const state = makeState({ role: "joiner", game: null });
     await renderLobby(state);
     expect(screen.getByText(/waiting for the host to pick a game/i)).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /pick a game/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /browse games/i })).not.toBeInTheDocument();
   });
 
   it("edits the player name from the lobby (7.5)", async () => {
