@@ -47,6 +47,7 @@ import type {
   ArenaPlayerRunState,
   ArenaRegistration,
   ArenaRunOutcome,
+  ArenaSimulationDiagnostics,
   ArenaState,
   ArenaStateDiagnostics,
   ArenaSummary,
@@ -182,6 +183,7 @@ export class ArenaEngine {
       dropMessages: this.dropMessages,
       startedAt: this.startedAt,
       stateDiagnostics: this.stateDiagnostics,
+      simulationDiagnostics: this.computeSimulationDiagnostics(players),
       summary,
       sessionId: this.sessionId,
       runId: this.runId,
@@ -883,6 +885,36 @@ export class ArenaEngine {
     for (const runtime of this.players.values()) {
       runtime.session?.start();
     }
+  }
+
+  /**
+   * A1 simulation diagnostics: read live from the current authority's
+   * session (the arena re-reads on every snapshot, so latency and drift
+   * stay visible as the game runs). Null before any connected session.
+   */
+  private computeSimulationDiagnostics(
+    players: readonly ArenaPlayer[],
+  ): ArenaSimulationDiagnostics | null {
+    const authorityId = this.computeAuthorityPlayerId(players);
+    for (const runtime of this.players.values()) {
+      const session = runtime.session;
+      if (authorityId !== null && runtime.spec.id !== authorityId) continue;
+      if (session === null) continue;
+      const diag = session.getSimulationDiagnostics();
+      return {
+        tick: diag.tick,
+        tickMs: diag.tickMs,
+        snapshotIntervalMs: diag.snapshotIntervalMs,
+        authorityTick: diag.authorityTick,
+        snapshotsReceived: diag.snapshotsReceived,
+        inputRatePerSecond: diag.inputRatePerSecond,
+        inputLatencyMs: diag.inputLatencyMs,
+        highLatency: diag.highLatency,
+        driftTicks: diag.driftTicks,
+        term: diag.term,
+      };
+    }
+    return null;
   }
 
   private computeAuthorityPlayerId(players: readonly ArenaPlayer[]): string | null {

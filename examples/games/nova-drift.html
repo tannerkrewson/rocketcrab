@@ -1,0 +1,216 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Nova Drift</title>
+    <style>
+      /* Nova Drift — a complete simulation-mode example game (A1).
+         Continuous 2D movement: every player steers a shared puck with the
+         arrow keys. Each frame runs its own local simulation copy (inputs
+         are applied on the Nova-provided tick); Nova owns input ordering,
+         the clock, authority selection, and authoritative snapshots, so the
+         puck converges on every screen without any networking code. */
+      :root {
+        --bg: #0f1220;
+        --card: #1a1f35;
+        --ink: #f2f4ff;
+        --muted: #98a0c0;
+        --accent: #7c6cff;
+        --good: #2dd4a7;
+        --bad: #ff6b81;
+        --warn: #ffc857;
+        --line: #2e3657;
+        --radius: 16px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+      #drift-app {
+        width: 100%;
+        max-width: 520px;
+        padding: max(12px, env(safe-area-inset-top)) 14px max(20px, env(safe-area-inset-bottom));
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      header.top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      header.top h1 {
+        font-size: 20px;
+        margin: 0;
+      }
+      .status {
+        color: var(--muted);
+        font-size: 13px;
+        margin-left: auto;
+      }
+      canvas.field {
+        width: 100%;
+        aspect-ratio: 16 / 10;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        touch-action: none;
+      }
+      .legend {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .hint {
+        color: var(--accent);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="drift-app">
+      <header class="top">
+        <h1>Nova Drift</h1>
+        <span class="status" id="status">connecting…</span>
+      </header>
+      <canvas class="field" id="field" width="800" height="500"></canvas>
+      <p class="legend">
+        Steer the puck with the <b>arrow keys</b> (or <b>WASD</b>). Every screen runs its own local
+        simulation; Nova orders the inputs, drives the tick clock, and broadcasts authoritative
+        snapshots that keep everyone on the same puck.
+      </p>
+      <p class="hint" id="hint">waiting for the game to start…</p>
+    </div>
+    <script type="module">
+      // Nova Drift — simulation mode. The game owns the rules (simple 2D
+      // kinematics) and renders the local simulation; Nova owns input
+      // ordering, the tick clock, authority selection, and authoritative
+      // snapshots (restore after migration included).
+      nova.defineGame({ title: "Nova Drift", mode: "simulation", version: "1.0.0" });
+
+      // Local simulation state (each frame has its own copy).
+      var sim = { puck: { x: 400, y: 250 }, keys: {} };
+      var queued = []; // inputs received since the last tick (Nova-ordered)
+
+      function applyInput(input) {
+        // Keys are sticky per player: "keydown" adds, "keyup" removes.
+        if (input.type === "keydown") {
+          sim.keys[input.sender.id + ":" + input.payload.key] = true;
+        } else if (input.type === "keyup") {
+          delete sim.keys[input.sender.id + ":" + input.payload.key];
+        }
+      }
+
+      nova.simulation.register({
+        onInput: function (input) {
+          queued.push(input); // apply during the next tick (local prediction)
+        },
+        onTick: function () {
+          // Advance one fixed step (the Nova-provided time step).
+          while (queued.length > 0) applyInput(queued.shift());
+          var dx = 0;
+          var dy = 0;
+          for (var key in sim.keys) {
+            if (sim.keys[key]) {
+              if (key.endsWith("ArrowLeft") || key.endsWith("a")) dx -= 1;
+              if (key.endsWith("ArrowRight") || key.endsWith("d")) dx += 1;
+              if (key.endsWith("ArrowUp") || key.endsWith("w")) dy -= 1;
+              if (key.endsWith("ArrowDown") || key.endsWith("s")) dy += 1;
+            }
+          }
+          var len = Math.max(1, Math.abs(dx) + Math.abs(dy));
+          sim.puck.x = clamp(sim.puck.x + (dx / len) * 6, 10, 790);
+          sim.puck.y = clamp(sim.puck.y + (dy / len) * 6, 10, 490);
+        },
+        onSnapshot: function (snapshot) {
+          // Authoritative correction (or restore after a migration): drop
+          // local prediction and adopt the replicated state.
+          sim.puck = { x: snapshot.state.puck.x, y: snapshot.state.puck.y };
+        },
+        serializeState: function () {
+          // Authority side: the snapshot Nova replicates to every player.
+          return { puck: { x: sim.puck.x, y: sim.puck.y } };
+        },
+      });
+
+      // Subscribe to migrations: the next snapshot is the restore point.
+      nova.simulation.onAuthorityChange(function () {
+        setStatus("re-syncing…");
+      });
+
+      var keymap = {
+        ArrowLeft: "ArrowLeft",
+        ArrowRight: "ArrowRight",
+        ArrowUp: "ArrowUp",
+        ArrowDown: "ArrowDown",
+        a: "a",
+        w: "w",
+        s: "s",
+        d: "d",
+      };
+
+      if (typeof document !== "undefined") {
+        document.addEventListener("keydown", function (event) {
+          var key = keymap[event.key];
+          if (key === undefined) return;
+          event.preventDefault();
+          nova.simulation.sendInput({ type: "keydown", payload: { key: key } });
+        });
+        document.addEventListener("keyup", function (event) {
+          var key = keymap[event.key];
+          if (key === undefined) return;
+          nova.simulation.sendInput({ type: "keyup", payload: { key: key } });
+        });
+      }
+
+      nova.onStart(function () {
+        setStatus("playing (tick " + nova.simulation.getTick() + ")");
+      });
+
+      nova.onConnectionChange(function (status) {
+        setStatus(status);
+      });
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function setStatus(text) {
+        var el = typeof document !== "undefined" ? document.getElementById("status") : null;
+        if (el) el.textContent = String(text);
+      }
+
+      // Test seam: nothing in a real browser reads this (the test suite
+      // drives the exact same source and asserts on the local simulation).
+      if (typeof globalThis !== "undefined") {
+        globalThis.__novaDriftSeam = {
+          getSim: function () {
+            return sim;
+          },
+          applyInput: applyInput,
+        };
+      }
+
+      nova.ready();
+    </script>
+  </body>
+</html>
