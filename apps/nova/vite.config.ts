@@ -6,6 +6,7 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 import { defineConfig } from "vite";
+import { CLASSIC_FRAME_ORIGINS } from "./src/lib/classic/games";
 
 // Local HTTPS dev certs (scripts/gen-certs.mjs). `npm run dev:https` starts
 // the dev server with `--mode https`; the server uses HTTPS only then, so
@@ -38,6 +39,11 @@ function httpsServerConfig(mode: string) {
  * blocked — a loud misconfiguration, never a silent loosening. The runtime
  * origin has NO CSP meta on purpose: it must keep ordinary web capabilities
  * for game HTML (permissive runtime policy, docs/architecture/deployment.md).
+ *
+ * Classic external iframe games (rocketcrab-9fv.7.7.1) are embedded on the
+ * main origin, so their origins are allowlisted in `frame-src` alongside the
+ * runtime origin. The allowlist is the static set of classic game origins
+ * (CLASSIC_FRAME_ORIGINS) — never a wildcard.
  */
 function cspMetaPlugin(): Plugin {
   return {
@@ -53,6 +59,10 @@ function cspMetaPlugin(): Plugin {
         );
       }
       const runtimeOrigin = rawOrigin === "" ? "" : new URL(rawOrigin).origin;
+      const frameSources = [
+        ...(runtimeOrigin === "" ? [] : [runtimeOrigin]),
+        ...CLASSIC_FRAME_ORIGINS,
+      ];
       const csp = [
         "default-src 'self'",
         "script-src 'self'",
@@ -65,7 +75,7 @@ function cspMetaPlugin(): Plugin {
         "object-src 'none'",
         "base-uri 'self'",
         "form-action 'self'",
-        ...(runtimeOrigin === "" ? [] : [`frame-src ${runtimeOrigin}`]),
+        ...(frameSources.length === 0 ? [] : [`frame-src ${frameSources.join(" ")}`]),
       ].join("; ");
       return {
         html,
