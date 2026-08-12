@@ -164,6 +164,20 @@ describe("master prompt — acceptance criteria", () => {
     );
   });
 
+  it("instructs games to render immediately in a session-less preview (no 'Connecting' hang)", () => {
+    // rocketcrab-9fv.7.11: a generated game hung at "Connecting" forever in
+    // the editor preview because the preview has no party session and no
+    // connection/start event ever fires. The prompt must tell games to
+    // render immediately and treat a connection as an enhancement.
+    expect(normalized).toContain("PREVIEW with no party");
+    expect(normalized).toContain("Never wait for those events before rendering");
+    expect(normalized).toContain("nova.connectionStatus` stays");
+    expect(normalized).toContain("never blank the screen behind a connection spinner");
+    expect(normalized).toContain(
+      'Start real-time play only when `onConnectionChange` reports `"connected"`',
+    );
+  });
+
   it("keeps the template version in code but shows no version badge in the prompt text", () => {
     // MASTER_PROMPT_VERSION still pins the snapshot checkpoint in code;
     // the prompt itself carries no "template vX · Nova API vY" badge or
