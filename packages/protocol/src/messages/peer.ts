@@ -7,6 +7,7 @@ import {
   memberIdSchema,
   monotonicSequenceSchema,
   partyCodeSchema,
+  sessionSecretSchema,
   sha256Schema,
   timestampSchema,
   titleSchema,
@@ -41,6 +42,36 @@ export const partyIdentityMessageSchema = z.object({
   greeterMemberId: memberIdSchema.optional(),
 });
 export type PartyIdentityMessage = z.infer<typeof partyIdentityMessageSchema>;
+
+/**
+ * Party session handoff: the greeter sends the private session secret to an
+ * admitted joiner over the established encrypted peer connection (ADR-0004
+ * step 9; ADR-0011). Never advertised, never sent before admission, never a
+ * game-plane message. Both sides derive the private room name, Trystero
+ * password, and private session ID from the secret with the same Web Crypto
+ * derivation (P2). The party code travels along so invite-link joiners can
+ * serve as greeter after migration.
+ */
+export const partySessionMessageSchema = z.object({
+  ...peerEnvelopeFields,
+  type: z.literal("party.session"),
+  partyCode: partyCodeSchema,
+  secret: sessionSecretSchema,
+});
+export type PartySessionMessage = z.infer<typeof partySessionMessageSchema>;
+
+/**
+ * Greeter announcement: broadcast in the private room whenever the
+ * rendezvous greeter changes (greeter migration, ADR-0004). Greeter status
+ * is separate from game authority (ADR-0007) — the announcement names the
+ * greeter only, never a term or authority role.
+ */
+export const partyGreeterMessageSchema = z.object({
+  ...peerEnvelopeFields,
+  type: z.literal("party.greeter"),
+  greeterMemberId: memberIdSchema,
+});
+export type PartyGreeterMessage = z.infer<typeof partyGreeterMessageSchema>;
 
 /**
  * Player identity: a member announces or updates their profile to the party
@@ -339,6 +370,8 @@ export type TransferAcknowledgementMessage = z.infer<typeof transferAcknowledgem
 /** Every peer-plane message schema, discriminated by `type`. */
 export const peerMessagesSchema = z.discriminatedUnion("type", [
   partyIdentityMessageSchema,
+  partySessionMessageSchema,
+  partyGreeterMessageSchema,
   playerIdentityMessageSchema,
   joinRequestMessageSchema,
   admissionResponseMessageSchema,
