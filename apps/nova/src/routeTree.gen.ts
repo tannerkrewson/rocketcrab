@@ -19,6 +19,7 @@ import { Route as LibraryRouteImport } from './routes/library'
 import { Route as PartyRouteImport } from './routes/party'
 import { Route as PlayRouteImport } from './routes/play'
 import { Route as TestRouteImport } from './routes/test'
+import { Route as ClassicGameIdRouteImport } from './routes/classic/$gameId'
 import { Route as GamesGameIdEditRouteImport } from './routes/games/$gameId/edit'
 import { Route as GamesGameIdTestRouteImport } from './routes/games/$gameId/test'
 
@@ -72,6 +73,11 @@ const TestRoute = TestRouteImport.update({
   path: '/test',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ClassicGameIdRoute = ClassicGameIdRouteImport.update({
+  id: '/classic/$gameId',
+  path: '/classic/$gameId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GamesGameIdEditRoute = GamesGameIdEditRouteImport.update({
   id: '/games/$gameId/edit',
   path: '/games/$gameId/edit',
@@ -94,6 +100,7 @@ export interface FileRoutesByFullPath {
   '/party': typeof PartyRoute
   '/play': typeof PlayRoute
   '/test': typeof TestRoute
+  '/classic/$gameId': typeof ClassicGameIdRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
   '/games/$gameId/test': typeof GamesGameIdTestRoute
 }
@@ -108,6 +115,7 @@ export interface FileRoutesByTo {
   '/party': typeof PartyRoute
   '/play': typeof PlayRoute
   '/test': typeof TestRoute
+  '/classic/$gameId': typeof ClassicGameIdRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
   '/games/$gameId/test': typeof GamesGameIdTestRoute
 }
@@ -123,6 +131,7 @@ export interface FileRoutesById {
   '/party': typeof PartyRoute
   '/play': typeof PlayRoute
   '/test': typeof TestRoute
+  '/classic/$gameId': typeof ClassicGameIdRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
   '/games/$gameId/test': typeof GamesGameIdTestRoute
 }
@@ -139,6 +148,7 @@ export interface FileRouteTypes {
     | '/party'
     | '/play'
     | '/test'
+    | '/classic/$gameId'
     | '/games/$gameId/edit'
     | '/games/$gameId/test'
   fileRoutesByTo: FileRoutesByTo
@@ -153,6 +163,7 @@ export interface FileRouteTypes {
     | '/party'
     | '/play'
     | '/test'
+    | '/classic/$gameId'
     | '/games/$gameId/edit'
     | '/games/$gameId/test'
   id:
@@ -167,6 +178,7 @@ export interface FileRouteTypes {
     | '/party'
     | '/play'
     | '/test'
+    | '/classic/$gameId'
     | '/games/$gameId/edit'
     | '/games/$gameId/test'
   fileRoutesById: FileRoutesById
@@ -182,6 +194,7 @@ export interface RootRouteChildren {
   PartyRoute: typeof PartyRoute
   PlayRoute: typeof PlayRoute
   TestRoute: typeof TestRoute
+  ClassicGameIdRoute: typeof ClassicGameIdRoute
   GamesGameIdEditRoute: typeof GamesGameIdEditRoute
   GamesGameIdTestRoute: typeof GamesGameIdTestRoute
 }
@@ -258,6 +271,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TestRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/classic/$gameId': {
+      id: '/classic/$gameId'
+      path: '/classic/$gameId'
+      fullPath: '/classic/$gameId'
+      preLoaderRoute: typeof ClassicGameIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/games/$gameId/edit': {
       id: '/games/$gameId/edit'
       path: '/games/$gameId/edit'
@@ -286,6 +306,7 @@ const rootRouteChildren: RootRouteChildren = {
   PartyRoute: PartyRoute,
   PlayRoute: PlayRoute,
   TestRoute: TestRoute,
+  ClassicGameIdRoute: ClassicGameIdRoute,
   GamesGameIdEditRoute: GamesGameIdEditRoute,
   GamesGameIdTestRoute: GamesGameIdTestRoute,
 }
