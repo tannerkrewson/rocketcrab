@@ -670,6 +670,10 @@ export class PartyEngine {
     this.phase = "reconnecting";
     this.phaseDetail = `Reconnecting… (attempt ${this.reconnectAttempts})`;
     this.emit();
+    const party = this.party;
+    if (party === null) {
+      return;
+    }
     try {
       if (transport.connectionState === "connected") {
         // A link that looks alive but whose peers stopped answering (the
@@ -678,8 +682,17 @@ export class PartyEngine {
       }
       if (transport.connectionState === "suspended") {
         await transport.resume();
-      } else if (transport.connectionState === "disconnected") {
-        await transport.reconnect();
+      } else if (
+        transport.connectionState === "idle" ||
+        transport.connectionState === "disconnected"
+      ) {
+        // A failed attempt tore the room down (relay_unreachable / join
+        // timeout while temporarily offline): re-join the private room from
+        // the party material with a fresh connection.
+        await transport.join({
+          room: party.material.roomId,
+          sessionId: party.material.sessionId,
+        });
       } else {
         // Mid-join (joining): the connection:state handler settles the phase.
         return;
