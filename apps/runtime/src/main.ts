@@ -38,13 +38,11 @@ if ("serviceWorker" in navigator) {
 }
 
 const containerEl = document.getElementById("game-container");
-const barEl = document.getElementById("bar");
-if (!containerEl || !barEl) {
-  throw new Error("runtime page is missing #game-container or #bar");
+if (!containerEl) {
+  throw new Error("runtime page is missing #game-container");
 }
-// Narrowed locals: the closures below must not see possibly-null captures.
+// Narrowed local: the closures below must not see a possibly-null capture.
 const container: HTMLElement = containerEl;
-const bar: HTMLElement = barEl;
 
 let activeInstance: RuntimeInstance | null = null;
 
@@ -118,7 +116,6 @@ function handleBootstrap(event: MessageEvent): void {
     port,
     frameFactory: createFrameFactory(),
   });
-  bar.textContent = "runtime origin — bootstrapped by Nova";
 }
 
 // Exact-origin bootstrap handshake: only a page on MAIN_ORIGIN may start a

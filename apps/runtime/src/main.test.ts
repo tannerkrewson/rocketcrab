@@ -9,8 +9,7 @@ import { MAIN_ORIGIN_PORT, RUNTIME_ORIGIN_PORT } from "./origins";
 import { createFakePort, receiveOnPort, type FakePort } from "./test/fakes";
 
 // The runtime page's required elements must exist before main.ts runs.
-document.body.innerHTML =
-  '<div id="bar">runtime origin — waiting for bootstrap</div><div id="game-container"></div>';
+document.body.innerHTML = '<div id="game-container"></div>';
 await import("./main");
 
 const MAIN_ORIGIN = `http://localhost:${MAIN_ORIGIN_PORT}`;
