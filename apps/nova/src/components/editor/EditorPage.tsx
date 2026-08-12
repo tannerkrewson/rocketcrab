@@ -101,15 +101,17 @@ function useIsDesktop(): boolean {
  * Errors tabs with a sticky Run / Save bar. Replacing the source and Run
  * always destroys and recreates the runtime frame (no hot-module
  * replacement); unsaved source is never written over the saved version.
+ * `initialSource` seeds a new-game draft (A4 generator handoff); the
+ * caller keys the component so a new draft remounts it.
  */
-export function EditorPage({ game }: { game?: SavedGame }) {
+export function EditorPage({ game, initialSource }: { game?: SavedGame; initialSource?: string }) {
   const navigate = useNavigate();
   const createGame = useCreateGame();
   const updateGame = useUpdateGame();
   const recordTestResults = useRecordTestResults();
   const seams = useContext(EditorRuntimeSeamsContext);
 
-  const savedSource = game?.html ?? "";
+  const savedSource = initialSource ?? game?.html ?? "";
   // New-game mode starts with an empty title; the game's declared title
   // (nova.defineGame) fills the gap on save when the creator typed nothing.
   const savedTitle = game?.title ?? "";

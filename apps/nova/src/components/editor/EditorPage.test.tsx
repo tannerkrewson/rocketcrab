@@ -15,7 +15,7 @@ import type { ChannelPort } from "../../lib/runtime-host";
 import { EditorRuntimeSeamsContext, type EditorRuntimeSeams } from "./EditorPage";
 
 /**
- * Editor integration tests (U4): the real /create and /games/:id/edit routes
+ * Editor integration tests (U4): the real /editor and /games/:id/edit routes
  * through the TanStack Router, real CodeMirror, and a fake runtime host
  * (the same seams RuntimeHostClient already exposes — U3's bridge is used
  * verbatim). Covers paste → run → save, validation gating, unsaved-change
@@ -210,11 +210,11 @@ afterEach(() => {
   delete (navigator as { clipboard?: unknown }).clipboard;
 });
 
-describe("/create — paste, run, save", () => {
+describe("/editor — paste, run, save", () => {
   it("pastes from the clipboard, runs the source, and saves it", async () => {
     mockClipboard(PASTED_SOURCE);
     const harness = createHostHarness();
-    renderEditor(["/create"], harness);
+    renderEditor(["/editor"], harness);
 
     const desktop = await layout("desktop-layout");
     await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
@@ -286,7 +286,7 @@ describe("/create — paste, run, save", () => {
   it("test-multiplayer is gated on validation errors", async () => {
     mockClipboard("");
     const harness = createHostHarness();
-    renderEditor(["/create"], harness);
+    renderEditor(["/editor"], harness);
     const desktop = await layout("desktop-layout");
     await userEvent.click(desktop.getByRole("button", { name: /Test multiplayer/ }));
     await waitFor(() =>
@@ -297,7 +297,7 @@ describe("/create — paste, run, save", () => {
 
   it("does not start a run for an empty source", async () => {
     const harness = createHostHarness();
-    renderEditor(["/create"], harness);
+    renderEditor(["/editor"], harness);
 
     const desktop = await layout("desktop-layout");
     await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
@@ -312,7 +312,7 @@ describe("/create — paste, run, save", () => {
     const oversized = `<!doctype html>${"x".repeat(2 * 1024 * 1024)}`;
     mockClipboard(oversized);
     const harness = createHostHarness();
-    renderEditor(["/create"], harness);
+    renderEditor(["/editor"], harness);
 
     const desktop = await layout("desktop-layout");
     await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
@@ -327,7 +327,7 @@ describe("/create — paste, run, save", () => {
   it("warns about missing HTML structure but still runs", async () => {
     mockClipboard("<div>a fragment</div>");
     const harness = createHostHarness();
-    renderEditor(["/create"], harness);
+    renderEditor(["/editor"], harness);
 
     const desktop = await layout("desktop-layout");
     await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
@@ -342,7 +342,7 @@ describe("/create — paste, run, save", () => {
   it("shows runtime error categories, including unsupported Nova API versions", async () => {
     mockClipboard(PASTED_SOURCE);
     const harness = createHostHarness();
-    renderEditor(["/create"], harness);
+    renderEditor(["/editor"], harness);
 
     const desktop = await layout("desktop-layout");
     await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
@@ -366,7 +366,7 @@ describe("/create — paste, run, save", () => {
   it("reports a runtime startup failure as a diagnostic", async () => {
     mockClipboard(PASTED_SOURCE);
     const harness = createHostHarness();
-    renderEditor(["/create"], harness, { bootstrapTimeoutMs: 50 });
+    renderEditor(["/editor"], harness, { bootstrapTimeoutMs: 50 });
 
     const desktop = await layout("desktop-layout");
     await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
@@ -539,7 +539,7 @@ describe("diagnostic report", () => {
   it("copies a report with the source hash and diagnostics", async () => {
     const { writeText } = mockClipboard(PASTED_SOURCE);
     const harness = createHostHarness();
-    renderEditor(["/create"], harness);
+    renderEditor(["/editor"], harness);
 
     const desktop = await layout("desktop-layout");
     await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
@@ -564,7 +564,7 @@ describe("diagnostic report", () => {
 describe("phone layout", () => {
   it("switches between Code, Preview, and Errors tabs", async () => {
     const harness = createHostHarness();
-    renderEditor(["/create"], harness);
+    renderEditor(["/editor"], harness);
 
     const mobile = await layout("mobile-layout");
     const tabs = within(mobile.getByRole("tablist", { name: "Editor views" }));
@@ -586,7 +586,7 @@ describe("phone layout", () => {
   it("replaces the runtime frame completely on every run (no HMR)", async () => {
     mockClipboard(PASTED_SOURCE);
     const harness = createHostHarness();
-    renderEditor(["/create"], harness);
+    renderEditor(["/editor"], harness);
 
     const desktop = await layout("desktop-layout");
     await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));

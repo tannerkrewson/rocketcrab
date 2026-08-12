@@ -12,6 +12,8 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as CreateRouteImport } from './routes/create'
+import { Route as EditorRouteImport } from './routes/editor'
+import { Route as ExamplesRouteImport } from './routes/examples'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as PartyRouteImport } from './routes/party'
@@ -33,6 +35,16 @@ const AboutRoute = AboutRouteImport.update({
 const CreateRoute = CreateRouteImport.update({
   id: '/create',
   path: '/create',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EditorRoute = EditorRouteImport.update({
+  id: '/editor',
+  path: '/editor',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ExamplesRoute = ExamplesRouteImport.update({
+  id: '/examples',
+  path: '/examples',
   getParentRoute: () => rootRouteImport,
 } as any)
 const JoinRoute = JoinRouteImport.update({
@@ -75,6 +87,8 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/create': typeof CreateRoute
+  '/editor': typeof EditorRoute
+  '/examples': typeof ExamplesRoute
   '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
   '/party': typeof PartyRoute
@@ -87,6 +101,8 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/create': typeof CreateRoute
+  '/editor': typeof EditorRoute
+  '/examples': typeof ExamplesRoute
   '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
   '/party': typeof PartyRoute
@@ -100,6 +116,8 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/about': typeof AboutRoute
   '/create': typeof CreateRoute
+  '/editor': typeof EditorRoute
+  '/examples': typeof ExamplesRoute
   '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
   '/party': typeof PartyRoute
@@ -114,6 +132,8 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/create'
+    | '/editor'
+    | '/examples'
     | '/join'
     | '/library'
     | '/party'
@@ -126,6 +146,8 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/create'
+    | '/editor'
+    | '/examples'
     | '/join'
     | '/library'
     | '/party'
@@ -138,6 +160,8 @@ export interface FileRouteTypes {
     | '/'
     | '/about'
     | '/create'
+    | '/editor'
+    | '/examples'
     | '/join'
     | '/library'
     | '/party'
@@ -151,6 +175,8 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AboutRoute: typeof AboutRoute
   CreateRoute: typeof CreateRoute
+  EditorRoute: typeof EditorRoute
+  ExamplesRoute: typeof ExamplesRoute
   JoinRoute: typeof JoinRoute
   LibraryRoute: typeof LibraryRoute
   PartyRoute: typeof PartyRoute
@@ -181,6 +207,20 @@ declare module '@tanstack/react-router' {
       path: '/create'
       fullPath: '/create'
       preLoaderRoute: typeof CreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/editor': {
+      id: '/editor'
+      path: '/editor'
+      fullPath: '/editor'
+      preLoaderRoute: typeof EditorRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/examples': {
+      id: '/examples'
+      path: '/examples'
+      fullPath: '/examples'
+      preLoaderRoute: typeof ExamplesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/join': {
@@ -239,6 +279,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AboutRoute: AboutRoute,
   CreateRoute: CreateRoute,
+  EditorRoute: EditorRoute,
+  ExamplesRoute: ExamplesRoute,
   JoinRoute: JoinRoute,
   LibraryRoute: LibraryRoute,
   PartyRoute: PartyRoute,
