@@ -194,6 +194,8 @@ export class RuntimeHostClient {
   private unresponsive = false;
   private missedPongs = 0;
   private heartbeatTimer: number | undefined;
+  private pageHidden = false;
+  private readonly lifecycleUnsubscribers: Array<() => void> = [];
   private lastGame: LoadGameInput | null = null;
   private lastEvent: RuntimeHostEvent | null = null;
   private readonly recentEvents: RuntimeHostEvent[] = [];
@@ -214,6 +216,44 @@ export class RuntimeHostClient {
         const channel = new MessageChannel();
         return { port1: channel.port1, port2: channel.port2 };
       });
+    // Page-visibility awareness (M1, ADR-0012): Mobile Safari suspends
+    // timers while the page is backgrounded, so the heartbeat must not
+    // accumulate missed pongs (or fire at all) while hidden; it pauses and
+    // re-syncs with an immediate ping on return.
+    if (typeof window !== "undefined") {
+      const onVisibility = (): void => this.setPageVisibility(document.hidden);
+      const onPageHide = (): void => this.setPageVisibility(true);
+      const onPageShow = (): void => this.setPageVisibility(false);
+      window.addEventListener("visibilitychange", onVisibility);
+      window.addEventListener("pagehide", onPageHide);
+      window.addEventListener("pageshow", onPageShow);
+      this.lifecycleUnsubscribers.push(
+        () => window.removeEventListener("visibilitychange", onVisibility),
+        () => window.removeEventListener("pagehide", onPageHide),
+        () => window.removeEventListener("pageshow", onPageShow),
+      );
+    }
+  }
+
+  /**
+   * Page visibility for the heartbeat (Mobile Safari backgrounding). While
+   * hidden the heartbeat pauses; on return it resets the missed-pong
+   * counter and pings immediately so a stale "unresponsive" state never
+   * survives a background/foreground cycle. Wired to the browser's
+   * visibility/pagehide/pageshow events and exposed publicly for tests.
+   */
+  setPageVisibility(hidden: boolean): void {
+    this.pageHidden = hidden;
+    if (hidden) {
+      this.stopHeartbeat();
+      return;
+    }
+    this.missedPongs = 0;
+    if (this.ready && this.port && this.runtimeInstanceId !== null) {
+      // Re-sync immediately instead of waiting for the next interval tick.
+      this.send(buildPingMessage(this.runtimeInstanceId, this.sessionId));
+    }
+    this.startHeartbeat();
   }
 
   /**
@@ -318,6 +358,10 @@ export class RuntimeHostClient {
   /** Remove the frame and all listeners without sending further messages. */
   dispose(): void {
     this.stopHeartbeat();
+    for (const unsubscribe of this.lifecycleUnsubscribers) {
+      unsubscribe();
+    }
+    this.lifecycleUnsubscribers.length = 0;
     this.teardownFrame();
   }
 
@@ -430,6 +474,11 @@ export class RuntimeHostClient {
 
   private startHeartbeat(): void {
     this.stopHeartbeat();
+    if (this.pageHidden) {
+      // Timers are unreliable while backgrounded (ADR-0012/B6); the
+      // heartbeat resumes on setPageVisibility(false).
+      return;
+    }
     this.heartbeatTimer = window.setInterval(() => {
       if (!this.port || !this.ready) return;
       this.missedPongs += 1;
