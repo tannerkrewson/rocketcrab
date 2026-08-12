@@ -445,8 +445,12 @@ describe("RuntimeInstance protocol boundary", () => {
       requestId: "state-1",
       result: { kind: "view", ok: true, view: { hand: "ace" } },
     });
+    hook().report("simulationResponse", {
+      requestId: "sim-1",
+      result: { kind: "state", ok: true, state: { puck: { x: 1 } } },
+    });
     const calls = port.sent.filter((m) => (m as { type: string }).type === "game.apiCall");
-    expect(calls).toHaveLength(8);
+    expect(calls).toHaveLength(9);
     const byMethod = new Map(calls.map((m) => [(m as { method: string }).method, m]));
     expect([...byMethod.keys()].sort()).toEqual([
       "dispatch",
@@ -456,6 +460,7 @@ describe("RuntimeInstance protocol boundary", () => {
       "ready",
       "simulation.register",
       "simulation.sendInput",
+      "simulationResponse",
       "stateResponse",
     ]);
     // The validated payload is forwarded verbatim and the envelope carries
