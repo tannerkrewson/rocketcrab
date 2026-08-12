@@ -875,6 +875,17 @@ export class PartyEngine {
         }
         break;
       }
+      case "raw.close": {
+        const parsed = arenaApiCallSchemas["raw.close"].safeParse(payload);
+        if (parsed.success) {
+          try {
+            session.closeRawChannel(parsed.data.name);
+          } catch (error) {
+            this.addNotice("error", `nova.raw.close() failed: ${errorMessage(error)}`);
+          }
+        }
+        break;
+      }
       case "simulation.register":
         if (arenaApiCallSchemas["simulation.register"].safeParse(payload).success) {
           session.registerSimulation();
