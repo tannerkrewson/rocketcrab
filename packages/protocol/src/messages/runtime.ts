@@ -27,6 +27,8 @@ import { gameEndReasonSchema, gameModeSchema } from "./shared";
  * Nova API call methods the runtime forwards to the host (the session
  * router). Mirrors `novaApiCallSchemas` in apps/runtime (the runtime
  * validates before forwarding; the host re-validates at its boundary).
+ * `stateResponse` (S2) carries the authority frame's answer to a
+ * `stateRequest` host event.
  */
 export const NOVA_API_CALL_METHODS = [
   "ready",
@@ -35,6 +37,7 @@ export const NOVA_API_CALL_METHODS = [
   "raw.send",
   "simulation.register",
   "simulation.sendInput",
+  "stateResponse",
 ] as const;
 
 export type NovaApiCallMethod = (typeof NOVA_API_CALL_METHODS)[number];
@@ -71,6 +74,88 @@ export const novaPlayerSchema = z.object({
   name: displayNameSchema,
 });
 export type NovaPlayer = z.infer<typeof novaPlayerSchema>;
+
+/**
+ * S2 state-mode requests the host sends into the authority's game frame
+ * (`stateRequest` apiEvent): create the initial state, apply one action to
+ * the canonical state, or compute one player's view. The game's handler
+ * functions live in the frame; only plain data crosses the boundary.
+ */
+export const stateRequestSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("createInitialState"),
+      context: z.unknown(),
+      viewers: z.array(novaPlayerSchema),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("applyAction"),
+      actionId: z.string().min(1).max(64),
+      actionType: z.string().min(1).max(64),
+      payload: z.unknown(),
+      state: z.unknown(),
+      context: z.unknown(),
+      viewers: z.array(novaPlayerSchema),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("computeView"),
+      state: z.unknown(),
+      viewer: novaPlayerSchema,
+    })
+    .strict(),
+]);
+export type StateRequest = z.infer<typeof stateRequestSchema>;
+
+/**
+ * The frame's answer to a `stateRequest`: the new canonical state plus
+ * every player's view, one player's view, or a stable rejection.
+ */
+export const stateResponseSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("state"),
+      ok: z.literal(true),
+      state: z.unknown(),
+      views: z.record(memberIdSchema, z.unknown()),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("view"),
+      ok: z.literal(true),
+      view: z.unknown(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("error"),
+      ok: z.literal(false),
+      code: z.string().min(1).max(64),
+      message: z.string().max(256),
+    })
+    .strict(),
+]);
+export type StateResponse = z.infer<typeof stateResponseSchema>;
+
+/**
+ * S2 action acks pushed into the dispatcher's frame so `nova.dispatch`
+ * promises resolve when the authority applies or rejects the action.
+ */
+export const actionAckEventSchema = z
+  .object({
+    kind: z.literal("actionAck"),
+    actionId: z.string().min(1).max(64),
+    status: z.enum(["accepted", "rejected", "superseded"]),
+    revision: z.number().int().nonnegative().optional(),
+    errorCode: z.string().min(1).max(64).optional(),
+    errorMessage: z.string().max(256).optional(),
+  })
+  .strict();
+export type ActionAckEvent = z.infer<typeof actionAckEventSchema>;
 
 /**
  * A session event pushed from the host into one runtime frame. Plain data
@@ -113,6 +198,14 @@ export const gameApiEventSchema = z.discriminatedUnion("kind", [
     code: z.string().min(1).max(64),
     message: z.string().min(1).max(512),
   }),
+  z
+    .object({
+      kind: z.literal("stateRequest"),
+      requestId: z.string().min(1).max(64),
+      request: stateRequestSchema,
+    })
+    .strict(),
+  actionAckEventSchema,
 ]);
 export type GameApiEvent = z.infer<typeof gameApiEventSchema>;
 

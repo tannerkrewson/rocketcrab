@@ -81,6 +81,18 @@ nova.defineGame({
   mode: "state", // "state" (default) | "simulation" | "raw"
   version: "1.2.0", // optional game version string, <= 32 chars
   apiVersion: 1, // optional; defaults to nova.version
+  // State mode only: handler functions stay in your context and are never
+  // serialized (see section 8).
+  createInitialState: function (context) {
+    return {};
+  },
+  actions: {/* name(draft, context, payload) */},
+  selectView: function (state, viewer) {
+    return state;
+  },
+  render: function (view) {
+    /* optional */
+  },
 });
 ```
 
@@ -88,8 +100,9 @@ Rules:
 
 - Call `defineGame` exactly once, as the first `nova` call.
 - A second call throws `already_registered`.
-- Options are plain data only (they cross the runtime frame boundary — no
-  functions).
+- The declaration is plain data (it crosses the runtime frame boundary);
+  state-mode handler functions are kept by Nova in the game's own context
+  and never cross a boundary.
 - The host-declared game id and mode can never be overridden by game code;
   game metadata is validated before it is ever forwarded.
 
@@ -159,34 +172,80 @@ the host to surface in diagnostics.
 
 ## 8. State mode (`mode: "state"`, the default)
 
-Nova owns canonical state, action ordering, deduplication, and authority.
-Game code describes actions; it never writes state directly.
+Nova owns canonical state, action ordering, deduplication, rejection, and
+authority. The game only describes the rules: build the initial state,
+register action handlers that mutate an Immer draft, and select each
+player's view. No networking code, ever.
 
 ```js
-nova.defineGame({ title: "Draw One", mode: "state" });
-
-// Subscribe to canonical state changes (fires on every applied update).
-nova.state.onChange((state) => {
-  render(state);
+nova.defineGame({
+  title: "Draw One",
+  mode: "state",
+  createInitialState: function (context) {
+    return { deck: ["ace", "king", "queen"], hands: {} };
+  },
+  actions: {
+    // Validate and mutate the Immer draft. `context.actor` is the player
+    // who dispatched. Returning a value replaces the draft entirely.
+    drawCard: function (draft, context, payload) {
+      if (draft.hands[context.actor.id]) return;
+      draft.hands[context.actor.id] = draft.deck.pop();
+    },
+  },
+  selectView: function (state, viewer) {
+    // Non-authority frames receive ONLY this view — never the full state.
+    return { hand: state.hands[viewer.id], cardsLeft: state.deck.length };
+  },
 });
 
-// When you act, dispatch a plain-data action.
-nova.onStart(() => {
-  nova.dispatch({ type: "drawCard", payload: { deck: "main" } });
+// Subscribe to your selected view; render from it.
+nova.state.onChange(function (view) {
+  render(view);
 });
 
-// Read the current state anytime (null before the first update arrives).
+// Act by dispatching a plain-data action. Resolves when the authority
+// applied it; rejects with a stable error code otherwise (see below).
+nova.onStart(function () {
+  nova.dispatch({ type: "drawCard" }).catch(function (error) {
+    // e.g. stale_revision: retry from the latest view.
+  });
+});
+
+// Read your current view anytime (null before the game starts).
 const current = nova.state.get();
 ```
 
-- `nova.dispatch(action)` returns a Promise that resolves once Nova accepted
-  the action for delivery. Action application and rejection semantics arrive
-  with the state-mode milestone (S2).
+### The game contract
+
+- `createInitialState(context)` builds the canonical state (default `{}`).
+- `actions[name](draft, context, payload)` runs on the current authority's
+  runtime through Immer (ADR-0006); the resulting state gets a new revision.
+- `selectView(state, viewer)` computes the view one player sees (default:
+  the full state). Only your own view ever reaches your frame.
+- `render(view)` is an optional convenience called with each new view;
+  subscription-based rendering via `nova.state.onChange` is preferred.
+- `context` is `{ self, players, revision, now, actor? }` — plain data.
+
+### The action protocol
+
+- `nova.dispatch(action)` returns a Promise that **resolves when the
+  authority applied the action** (a new revision was committed) and
+  **rejects with a `NovaError`** on rejection or timeout. Stable `code`s
+  include `stale_revision` (your action was based on an outdated revision),
+  `timed_out`, `unknown_action`, `payload_too_large`, `state_too_large`,
+  `game_ended`, and `no_authority`.
 - Actions are `{ type, payload?, baseRevision? }`: `type` is 1..64
-  characters, `payload` must be plain JSON data, `baseRevision` is the
-  state revision the action was based on (default 0).
+  characters, `payload` must be plain JSON data, `baseRevision` defaults to
+  the latest revision your frame has seen.
 - Payloads must be structured-clone-compatible: no functions, no cycles, no
   `BigInt`, no DOM nodes. Violations throw `invalid_payload`.
+- If two players race on the same revision, exactly one action applies; the
+  other is rejected `stale_revision` — react to the new view and retry.
+- Duplicate deliveries are applied exactly once (actions carry a unique id;
+  the authority keeps a bounded history and replays the result).
+- `nova.state.get()` / `onChange` expose your **selected view**, not the
+  canonical state (ADR-0006: non-authority frames receive only their view;
+  canonical state is replicated between Nova shells for migration).
 
 ---
 
@@ -305,13 +364,21 @@ on raw channels.
 
 ---
 
-## 14. Deliberate non-goals (S1)
+## 14. Deliberate non-goals (S1/S2)
 
-- No action application, snapshots, or authority election yet — those arrive
-  with the state-mode and authority milestones (S2/S3); `dispatch` sends and
-  `state` subscription already function over the transport.
+- S1 shipped the common surface without mode semantics; S2 shipped the full
+  state-mode engine (action application, revisioned snapshots, per-player
+  views, deduplication, rejections, late joining, diagnostics).
+- Authority election, heartbeats, buffering during election, and migration
+  arrive with S3. Until then the authority is the lowest connected member at
+  game start and stays fixed for the game; if it leaves, dispatches fail
+  with `no_authority` and every shell keeps the last committed state.
 - No simulation clock or snapshots yet (A1).
+- Raw-mode guarantees are separate from state-mode guarantees (A2).
 - Since the U6 arena session router landed, the runtime forwards validated
   calls to the host (`game.apiCall`) and the host routes them into the
   player's session over the transport; session events return as
-  `game.apiEvent`. Authority/state semantics still arrive with S2/S3.
+  `game.apiEvent`. State-mode execution runs through the same channel: the
+  authority's frame answers `stateRequest` events with `stateResponse`
+  calls, so the same game code works in the arena and over party
+  transports.

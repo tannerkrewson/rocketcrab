@@ -14,6 +14,20 @@ nova.defineGame({
   mode: "state", // "state" (default) | "simulation" | "raw"
   version: "1.0.0", // optional game version, <= 32 chars
   apiVersion: 1, // optional; must match nova.version
+  // State mode (default): describe the rules, never networking.
+  createInitialState(context) {
+    return {}; // canonical state (default {})
+  },
+  actions: {
+    playCard(draft, context, payload) {
+      // Validate + mutate the Immer draft. context.actor is the player
+      // who acted. May also return a new state.
+    },
+  },
+  selectView(state, viewer) {
+    return state; // each player sees only their own view
+  },
+  render(view) {}, // optional; prefer nova.state.onChange
 });
 
 // --- Lifecycle ---
@@ -38,11 +52,13 @@ nova.onPlayerLeave((player) => {});
 nova.log("anything", ...args); // captured + rate-limited by the runtime
 
 // --- State mode (default) ---
-nova.state.get(); // current canonical state (or null)
-nova.state.onChange((state) => {
-  render(state);
+nova.state.get(); // your selected view (or null before start)
+nova.state.onChange((view) => {
+  render(view);
 });
-nova.dispatch({ type: "playCard", payload: { card: "ace" } }); // Promise; after start
+nova.dispatch({ type: "playCard", payload: { card: "ace" } });
+// Promise resolves when the authority APPLIED it; rejects with
+// { code, message } on rejection (e.g. stale_revision, timed_out).
 
 // --- Simulation mode ---
 nova.simulation.register({
@@ -83,12 +99,66 @@ nova.onError((error) => {
    never detect one, and never write networking code. Nova owns ordering,
    authority, and migration invisibly.
 8. **Prefer state mode** unless the game genuinely needs another mode.
+9. **State-mode handler functions never leave your context.** `createInitialState`, `actions`, `selectView`, and `render` are functions you pass to `defineGame`; Nova runs them for you. Everything else is plain data.
+10. **Treat state as read-only and dispatch to change it.** Never mutate a value from `nova.state.get()` — return a new state from a handler or mutate the draft Nova gives you.
 
 ## The three modes
 
 - **`state` (default)** — turn-based/board/card/trivia/party games. Nova owns
-  the canonical state; your game dispatches plain actions and subscribes to
-  state changes. No networking code required.
+  the canonical state and executes your action handlers through Immer on
+  the current authority's runtime; you dispatch plain actions and subscribe
+  to your own view. No networking code required.
+
+### State mode contract (the part AI games must get right)
+
+```js
+nova.defineGame({
+  title: "Draw One",
+  mode: "state",
+  createInitialState: function (context) {
+    // context: { self, players, revision, now }
+    return { deck: ["ace", "king", "queen"], hands: {} };
+  },
+  actions: {
+    drawCard: function (draft, context, payload) {
+      // draft is the canonical state (Immer). context.actor is the player
+      // who dispatched. Mutate the draft freely, or return a new state.
+      if (draft.hands[context.actor.id]) return; // already drew
+      draft.hands[context.actor.id] = draft.deck.pop();
+    },
+  },
+  selectView: function (state, viewer) {
+    // Each player receives ONLY this view — never the full state.
+    return { hand: state.hands[viewer.id], cardsLeft: state.deck.length };
+  },
+});
+
+nova.onStart(function () {
+  draw();
+});
+
+nova.state.onChange(function (view) {
+  render(view);
+  if (!view.hand) draw(); // retry after a rejected (stale) dispatch
+});
+
+function draw() {
+  nova.dispatch({ type: "drawCard" }).catch(function (error) {
+    // Rejection codes: stale_revision, timed_out, unknown_action,
+    // payload_too_large, state_too_large, game_ended, no_authority.
+  });
+}
+```
+
+State-mode behavior Nova guarantees:
+
+- Actions from the same state revision apply in order; a stale action is
+  rejected with `stale_revision` and never mutates state — retry from the
+  newest `onChange` view.
+- Every action is applied exactly once (unique ids + deduplication), and a
+  late joiner automatically receives the current state and their view.
+- `nova.dispatch` resolves when the action was applied, rejects on
+  rejection/timeout. Rejections never corrupt state.
 - **`simulation`** — faster continuous games. Register input handlers and
   send ordered inputs; Nova owns input ordering and (later) the simulation
   clock and snapshots.

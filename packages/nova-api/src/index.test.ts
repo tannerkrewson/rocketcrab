@@ -51,6 +51,8 @@ describe("nova-api package surface", () => {
       "createNovaClient",
       "createNovaSession",
       "NovaSession",
+      "NovaStateEngine",
+      "LocalGameExecutor",
       "MINIMAL_GAME_EXAMPLE",
       "STATE_MODE_EXAMPLE",
       "SIMULATION_MODE_EXAMPLE",

@@ -1,5 +1,6 @@
 /**
- * Transport-agnostic Nova session contract suite (S1).
+ * Transport-agnostic Nova session contract suite (S1 surface + S2 state
+ * mode).
  *
  * `runNovaSessionContractTests` runs the same two-player game scenarios
  * against any {@link NovaTransport} implementation provided by a harness.
@@ -7,25 +8,22 @@
  * (real parties, P1) must pass the same suite (ADR-0003: the game-facing
  * API behaves identically over both transports).
  *
- * The suite drives sessions directly (register → join → ready → start →
- * play) and asserts every S1 concept functions over the transport: player
- * lists and join/leave subscriptions, connection status, the ready
- * lifecycle, game start/end, dispatch, state subscription, raw channels
- * (JSON and binary, broadcast and targeted), simulation inputs, and clear
- * errors for invalid inbound messages.
+ * S2 state mode is exercised through the same transport-neutral seam games
+ * use in the arena: handlers registered via `nova.defineGame` run
+ * in-process (LocalGameExecutor, immer), so the suite covers initial
+ * state, revisioned snapshots, per-player views, sequential application,
+ * exactly-once deduplication, late joining, rejections, and diagnostics —
+ * over any transport.
  *
  * Import as `@rocketcrab/nova-api/contract-suite` (vitest is a
  * devDependency of this package; the suite is test infrastructure).
  */
 import { describe, expect, it } from "vitest";
 import type { NovaTransport } from "@rocketcrab/core";
-import {
-  PROTOCOL_VERSION,
-  assertPeerMessage,
-  stateSnapshotMessageSchema,
-} from "@rocketcrab/protocol";
+import { PROTOCOL_VERSION, assertPeerMessage } from "@rocketcrab/protocol";
 import { createNovaSession, type NovaSession } from "./session";
-import type { NovaPlayer, NovaRawMessage, NovaSimulationInput } from "./types";
+import { buildActionDispatchMessage, type PeerMessageBase } from "./messages";
+import type { NovaPlayer, NovaRawMessage, NovaSimulationInput, NovaStateHandlers } from "./types";
 
 /** A transport factory plus a deterministic delivery pump (see module docs). */
 export interface NovaTransportHarness {
@@ -44,16 +42,62 @@ interface Pair {
   b: NovaSession;
 }
 
+/**
+ * Drain + flush: the state engine's async apply path and sha256 hashing
+ * need real event-loop turns, so tests settle with a few macrotasks between
+ * drains (deterministic — the in-memory hub only delivers on drain()).
+ */
 async function settle(harness: NovaTransportHarness): Promise<void> {
-  harness.drain();
+  for (let i = 0; i < 2; i += 1) {
+    await flushMacrotasks();
+    harness.drain();
+  }
+  await flushMacrotasks();
+}
+
+async function flushMacrotasks(): Promise<void> {
+  for (let i = 0; i < 8; i += 1) {
+    await new Promise((resolve) => setTimeout(resolve, 0));
+  }
   await Promise.resolve();
+}
+
+/** The contract-suite test game: draw cards from a shared deck. */
+export function contractGameHandlers(): NovaStateHandlers {
+  return {
+    createInitialState: () => ({
+      deck: ["ace", "king", "queen"],
+      hands: {} as Record<string, string>,
+      log: [] as string[],
+    }),
+    actions: {
+      drawCard(draft: { deck: string[]; hands: Record<string, string>; log: string[] }, context) {
+        const actor = context.actor;
+        if (actor === undefined) throw new Error("drawCard requires an actor");
+        if (draft.hands[actor.id] !== undefined) {
+          throw new Error("already drew a card");
+        }
+        const card = draft.deck.pop();
+        if (card === undefined) throw new Error("deck is empty");
+        draft.hands[actor.id] = card;
+        draft.log.push(`${actor.id} drew ${card}`);
+      },
+    },
+    selectView: (state: { deck: string[]; hands: Record<string, string> }, viewer) => ({
+      hand: state.hands[viewer.id],
+      deckCount: state.deck.length,
+    }),
+  };
 }
 
 /** Create two joined sessions over a fresh harness. */
 async function makePair(
   harnessFactory: () => NovaTransportHarness,
-  setup?: (a: NovaSession, b: NovaSession) => void,
+  options:
+    | { handlers?: NovaStateHandlers; setup?: (a: NovaSession, b: NovaSession) => void }
+    | ((a: NovaSession, b: NovaSession) => void) = {},
 ): Promise<Pair> {
+  const config = typeof options === "function" ? { setup: options } : options;
   const harness = harnessFactory();
   const transportA = harness.createTransport({ memberId: "member-a", displayName: "Ada" });
   const transportB = harness.createTransport({ memberId: "member-b", displayName: "Ben" });
@@ -71,9 +115,9 @@ async function makePair(
     player: { memberId: "member-b", displayName: "Ben" },
     game: { gameId: "game-1", mode: "state", title: "Contract Game" },
   });
-  a.client.defineGame({ title: "Contract Game", mode: "state" });
-  b.client.defineGame({ title: "Contract Game", mode: "state" });
-  setup?.(a, b); // subscribe before the first join so no event is missed
+  a.client.defineGame({ title: "Contract Game", mode: "state", ...config.handlers });
+  b.client.defineGame({ title: "Contract Game", mode: "state", ...config.handlers });
+  config.setup?.(a, b); // subscribe before the first join so no event is missed
   await a.join();
   await b.join();
   await settle(harness);
@@ -81,9 +125,18 @@ async function makePair(
 }
 
 /** Start both sessions the way a host/arena policy would. */
-function startBoth(pair: Pair): void {
+async function startBoth(pair: Pair): Promise<void> {
   pair.a.start();
   pair.b.start();
+  await settle(pair.harness);
+}
+
+/** A bare action.dispatch sent directly over the transport (dedup tests). */
+function buildInjectedDispatch(
+  base: PeerMessageBase,
+  input: Parameters<typeof buildActionDispatchMessage>[1],
+) {
+  return buildActionDispatchMessage(base, input);
 }
 
 export function runNovaSessionContractTests(harnessFactory: () => NovaTransportHarness): void {
@@ -93,6 +146,7 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       expect(a.client.player).toEqual({ id: "member-a", name: "Ada" });
       expect(b.client.player).toEqual({ id: "member-b", name: "Ben" });
       expect(a.client.version).toBe(1);
+      // The declaration is plain data: handler functions never cross.
       expect(a.declaration).toEqual({ title: "Contract Game", mode: "state" });
       expect(b.declaration).toEqual({ title: "Contract Game", mode: "state" });
     });
@@ -183,11 +237,15 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       expect(bStarted).toHaveLength(0); // start is host policy, not automatic
 
       a.start();
+      b.start();
       await settle(harness);
       expect(aStarted).toHaveLength(1);
       expect(bStarted).toHaveLength(1);
       expect(a.isStarted()).toBe(true);
       expect(b.isStarted()).toBe(true);
+      // Even without declared handlers, the default initial state {} commits.
+      expect(a.getStateModeDiagnostics().revision).toBe(1);
+      expect(b.getStateModeDiagnostics().revision).toBe(1);
     });
 
     it("propagates game end over the transport", async () => {
@@ -209,62 +267,340 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       expect(aEnded).toEqual(["user_exit"]);
     });
 
-    it("dispatches actions over the transport", async () => {
-      const { harness, a, b } = await makePair(harnessFactory);
-      startBoth({ harness, a, b });
-      const received: Array<{ type: string; payload: unknown }> = [];
-      b.onSessionEvent((event) => {
-        if (event.type === "actionReceived") {
-          received.push({ type: event.action.type, payload: event.action.payload });
-        }
+    // ------------------------------------------------------------------
+    // S2 state mode
+    // ------------------------------------------------------------------
+
+    it("creates the initial state and delivers each player's selected view", async () => {
+      const { harness, a, b } = await makePair(harnessFactory, {
+        handlers: contractGameHandlers(),
       });
-      const sent = a.client.dispatch({ type: "playCard", payload: { card: "ace" } });
-      await settle(harness);
-      await expect(sent).resolves.toBeUndefined();
-      expect(received).toHaveLength(1);
-      expect(received[0]).toEqual({ type: "playCard", payload: { card: "ace" } });
+      expect(b.client.state.get()).toBeNull();
+      await startBoth({ harness, a, b });
+      // Frames receive only their selected view — never the full state.
+      expect(a.client.state.get()).toEqual({ hand: undefined, deckCount: 3 });
+      expect(b.client.state.get()).toEqual({ hand: undefined, deckCount: 3 });
+      // Shells retain the canonical state for migration (host-side only).
+      const canonical = a.getCanonicalState();
+      expect(canonical?.revision).toBe(1);
+      expect(canonical?.state).toEqual({
+        deck: ["ace", "king", "queen"],
+        hands: {},
+        log: [],
+      });
+      expect(canonical?.stateHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(a.getStateModeDiagnostics().authorityMemberId).toBe("member-a");
+      expect(b.getStateModeDiagnostics().authorityMemberId).toBe("member-a");
     });
 
-    it("delivers state snapshots to state subscribers", async () => {
-      const { harness, a, b } = await makePair(harnessFactory);
-      const changes: unknown[] = [];
-      b.client.state.onChange((state) => changes.push(state));
-      expect(b.client.state.get()).toBeNull();
+    it("applies actions on the authority and updates every player's view", async () => {
+      const { harness, a, b } = await makePair(harnessFactory, {
+        handlers: contractGameHandlers(),
+      });
+      await startBoth({ harness, a, b });
+      const bChanges: unknown[] = [];
+      b.client.state.onChange((state) => bChanges.push(state));
 
-      // S2 owns the publishing side; for S1 the receive path is exercised
-      // with a schema-valid state.snapshot sent over the protocol channel.
-      await a.transport.send({
+      await expect(a.client.dispatch({ type: "drawCard" })).resolves.toBeUndefined();
+      await settle(harness);
+
+      const diagnostics = a.getStateModeDiagnostics();
+      expect(diagnostics.revision).toBe(2);
+      expect(diagnostics.stateSizeBytes).toBeGreaterThan(0);
+      expect(diagnostics.stateHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(diagnostics.appliedCount).toBe(2); // initial commit + action
+      // The action ran through Immer with the actor in context.
+      const canonical = a.getCanonicalState();
+      expect(canonical?.state).toMatchObject({
+        log: ["member-a drew queen"],
+        hands: { "member-a": "queen" },
+      });
+      // Both players see their own view: Ada has the card, Ben doesn't.
+      expect(a.client.state.get()).toEqual({ hand: "queen", deckCount: 2 });
+      expect(b.client.state.get()).toEqual({ hand: undefined, deckCount: 2 });
+      // Subscribed after start, so only the action's view is observed.
+      expect(bChanges).toHaveLength(1);
+      expect(bChanges[0]).toEqual({ hand: undefined, deckCount: 2 });
+    });
+
+    it("rejects invalid actions without mutating state", async () => {
+      const { harness, a, b } = await makePair(harnessFactory, {
+        handlers: contractGameHandlers(),
+      });
+      await startBoth({ harness, a, b });
+      await expect(a.client.dispatch({ type: "noSuchAction" })).rejects.toMatchObject({
+        code: "unknown_action",
+      });
+      await expect(a.client.dispatch({ type: "drawCard", baseRevision: 0 })).rejects.toMatchObject({
+        code: "stale_revision",
+      });
+      await settle(harness);
+      expect(a.getStateModeDiagnostics().revision).toBe(1); // nothing committed
+      expect(a.getStateModeDiagnostics().rejectedCount).toBe(2);
+      expect(a.getCanonicalState()?.state).toMatchObject({ hands: {} });
+    });
+
+    it("processes duplicate actions exactly once and replays the ack", async () => {
+      const { harness, a, b } = await makePair(harnessFactory, {
+        handlers: contractGameHandlers(),
+      });
+      await startBoth({ harness, a, b });
+      // Inject the same action twice from Ben (as a transport re-delivery).
+      const base: PeerMessageBase = {
+        sessionId: SESSION,
+        senderMemberId: "member-b",
+        senderConnectionId: b.transport.selfConnectionId,
+      };
+      const dispatch = buildInjectedDispatch(base, {
+        seq: 1,
+        actionId: "action-dup-1",
+        baseRevision: 1,
+        actionType: "drawCard",
+        payload: {},
+      });
+      await b.transport.send({
         channel: "nova.protocol",
-        payload: assertPeerMessage(
-          stateSnapshotMessageSchema.parse({
-            version: PROTOCOL_VERSION,
-            sessionId: SESSION,
-            senderMemberId: "member-a",
-            senderConnectionId: a.transport.selfConnectionId,
-            messageId: "snapshot-1",
-            sentAt: 1_700_000_000_000,
-            seq: 1,
-            type: "state.snapshot",
-            revision: 1,
-            term: 1,
-            authorityMemberId: "member-a",
-            processedActionIds: [],
-            state: { deck: ["ace"] },
-          }),
-        ),
+        payload: dispatch,
         version: PROTOCOL_VERSION,
         reliability: "reliable",
         ordering: "ordered",
       });
       await settle(harness);
-      expect(b.client.state.get()).toEqual({ deck: ["ace"] });
-      expect(changes).toHaveLength(1);
-      expect(changes[0]).toEqual({ deck: ["ace"] });
+      expect(a.getStateModeDiagnostics().revision).toBe(2);
+      await b.transport.send({
+        channel: "nova.protocol",
+        payload: buildInjectedDispatch(base, {
+          seq: 1,
+          actionId: "action-dup-1",
+          baseRevision: 1,
+          actionType: "drawCard",
+          payload: {},
+        }),
+        version: PROTOCOL_VERSION,
+        reliability: "reliable",
+        ordering: "ordered",
+      });
+      await settle(harness);
+      // Exactly once: the deck lost only one card.
+      expect(a.getStateModeDiagnostics().revision).toBe(2);
+      expect(a.getCanonicalState()?.state).toMatchObject({
+        deck: ["ace", "king"],
+        hands: { "member-b": "queen" },
+      });
+      // The duplicate got a replayed ack, so a reconnecting dispatcher's
+      // frame learns the result without a second application.
+      const acks: string[] = [];
+      b.onSessionEvent((event) => {
+        if (event.type === "actionAck") acks.push(event.ack.actionId);
+      });
+      await b.transport.send({
+        channel: "nova.protocol",
+        payload: buildInjectedDispatch(base, {
+          seq: 1,
+          actionId: "action-dup-1",
+          baseRevision: 1,
+          actionType: "drawCard",
+          payload: {},
+        }),
+        version: PROTOCOL_VERSION,
+        reliability: "reliable",
+        ordering: "ordered",
+      });
+      await settle(harness);
+      expect(acks.filter((id) => id === "action-dup-1")).toHaveLength(1);
     });
+
+    it("delivers state to late joiners: snapshot, view, and start", async () => {
+      const harness = harnessFactory();
+      const transportA = harness.createTransport({ memberId: "member-a", displayName: "Ada" });
+      const a = createNovaSession({
+        transport: transportA,
+        room: ROOM,
+        sessionId: SESSION,
+        player: { memberId: "member-a", displayName: "Ada" },
+        game: { gameId: "game-1", mode: "state", title: "Contract Game" },
+      });
+      a.client.defineGame({ title: "Contract Game", mode: "state", ...contractGameHandlers() });
+      await a.join();
+      await settle(harness);
+      a.start();
+      await settle(harness);
+      await a.client.dispatch({ type: "drawCard" });
+      await settle(harness);
+      expect(a.getStateModeDiagnostics().revision).toBe(2);
+
+      // A third player joins after the game started.
+      const transportC = harness.createTransport({ memberId: "member-c", displayName: "Cara" });
+      const c = createNovaSession({
+        transport: transportC,
+        room: ROOM,
+        sessionId: SESSION,
+        player: { memberId: "member-c", displayName: "Cara" },
+        game: { gameId: "game-1", mode: "state", title: "Contract Game" },
+      });
+      c.client.defineGame({ title: "Contract Game", mode: "state", ...contractGameHandlers() });
+      const cStarted: number[] = [];
+      const cChanges: unknown[] = [];
+      c.client.onStart(() => cStarted.push(1));
+      c.client.state.onChange((state) => cChanges.push(state));
+      await c.join();
+      await settle(harness);
+      expect(cStarted).toHaveLength(1); // late joiners start from the snapshot
+      expect(c.client.state.get()).toEqual({ hand: undefined, deckCount: 2 });
+      expect(c.getStateModeDiagnostics().revision).toBe(2);
+      expect(c.getStateModeDiagnostics().authorityMemberId).toBe("member-a");
+      // Cara can now play.
+      await expect(c.client.dispatch({ type: "drawCard" })).resolves.toBeUndefined();
+      await settle(harness);
+      expect(c.getStateModeDiagnostics().revision).toBe(3);
+      expect(c.client.state.get()).toEqual({ hand: "king", deckCount: 1 });
+      expect(a.getCanonicalState()?.state).toMatchObject({
+        hands: { "member-a": "queen", "member-c": "king" },
+      });
+    });
+
+    it("keeps the last committed state when the authority runtime fails", async () => {
+      const harness = harnessFactory();
+      const transportA = harness.createTransport({ memberId: "member-a", displayName: "Ada" });
+      const transportB = harness.createTransport({ memberId: "member-b", displayName: "Ben" });
+      let failNext = false;
+      const executor = {
+        createInitialState: async () => ({
+          ok: true as const,
+          state: { deck: ["ace"], hands: {} as Record<string, string> },
+          views: {
+            "member-a": { hand: undefined, deckCount: 1 },
+            "member-b": { hand: undefined, deckCount: 1 },
+          },
+        }),
+        applyAction: async () => {
+          if (failNext) {
+            return { ok: false as const, code: "execution_failed", message: "frame crashed" };
+          }
+          return {
+            ok: true as const,
+            state: { deck: [], hands: { "member-a": "ace" } },
+            views: {
+              "member-a": { hand: "ace", deckCount: 0 },
+              "member-b": { hand: undefined, deckCount: 0 },
+            },
+          };
+        },
+        computeView: async () => ({ ok: false as const, code: "view_error", message: "no view" }),
+      };
+      const a = createNovaSession({
+        transport: transportA,
+        room: ROOM,
+        sessionId: SESSION,
+        player: { memberId: "member-a", displayName: "Ada" },
+        game: { gameId: "game-1", mode: "state" },
+        stateExecutor: executor,
+      });
+      const b = createNovaSession({
+        transport: transportB,
+        room: ROOM,
+        sessionId: SESSION,
+        player: { memberId: "member-b", displayName: "Ben" },
+        game: { gameId: "game-1", mode: "state" },
+      });
+      a.client.defineGame({ title: "Contract Game", mode: "state" });
+      b.client.defineGame({ title: "Contract Game", mode: "state" });
+      await a.join();
+      await b.join();
+      await settle(harness);
+      a.start();
+      b.start();
+      await settle(harness);
+      expect(a.getStateModeDiagnostics().revision).toBe(1);
+
+      failNext = true;
+      await expect(a.client.dispatch({ type: "drawCard" })).rejects.toMatchObject({
+        code: "execution_failed",
+      });
+      await settle(harness);
+      // The last committed state is intact.
+      expect(a.getStateModeDiagnostics().revision).toBe(1);
+      expect(a.getCanonicalState()?.state).toEqual({
+        deck: ["ace"],
+        hands: {},
+      });
+      expect(b.getCanonicalState()?.state).toEqual({ deck: ["ace"], hands: {} });
+    });
+
+    it("exposes state-size and action-rate diagnostics", async () => {
+      const { harness, a, b } = await makePair(harnessFactory, {
+        handlers: contractGameHandlers(),
+      });
+      await startBoth({ harness, a, b });
+      const committed: Array<{
+        revision: number;
+        stateSizeBytes: number;
+        actionRatePerSecond: number;
+      }> = [];
+      a.onSessionEvent((event) => {
+        if (event.type === "stateCommitted") {
+          committed.push({
+            revision: event.revision,
+            stateSizeBytes: event.stateSizeBytes,
+            actionRatePerSecond: event.actionRatePerSecond,
+          });
+        }
+      });
+      await a.client.dispatch({ type: "drawCard" });
+      await settle(harness);
+      const diagnostics = a.getStateModeDiagnostics();
+      expect(diagnostics.revision).toBe(2);
+      expect(diagnostics.stateSizeBytes).toBeGreaterThan(0);
+      expect(diagnostics.stateHash).toMatch(/^[0-9a-f]{64}$/);
+      expect(diagnostics.appliedCount).toBeGreaterThanOrEqual(2);
+      expect(committed).toHaveLength(1); // the drawCard commit (after the listener)
+      expect(committed.at(-1)?.revision).toBe(2);
+      expect(committed.at(-1)?.stateSizeBytes).toBeGreaterThan(0);
+    });
+
+    it("rejects dispatches when no authority is active", async () => {
+      const harness = harnessFactory();
+      const transportA = harness.createTransport({ memberId: "member-a", displayName: "Ada" });
+      const transportB = harness.createTransport({ memberId: "member-b", displayName: "Ben" });
+      const a = createNovaSession({
+        transport: transportA,
+        room: ROOM,
+        sessionId: SESSION,
+        player: { memberId: "member-a", displayName: "Ada" },
+        game: { gameId: "game-1", mode: "state" },
+      });
+      const b = createNovaSession({
+        transport: transportB,
+        room: ROOM,
+        sessionId: SESSION,
+        player: { memberId: "member-b", displayName: "Ben" },
+        game: { gameId: "game-1", mode: "state" },
+      });
+      a.client.defineGame({ title: "Contract Game", mode: "state", ...contractGameHandlers() });
+      b.client.defineGame({ title: "Contract Game", mode: "state", ...contractGameHandlers() });
+      await a.join();
+      await b.join();
+      await settle(harness);
+      a.start();
+      b.start();
+      await settle(harness);
+      // The authority leaves; followers reject dispatches with a clear error
+      // and keep the last committed state (S3 owns election/migration).
+      await a.leave();
+      await settle(harness);
+      await expect(b.client.dispatch({ type: "drawCard" })).rejects.toMatchObject({
+        code: "no_authority",
+      });
+      expect(b.getStateModeDiagnostics().revision).toBe(1);
+    });
+
+    // ------------------------------------------------------------------
+    // Raw, simulation, and protocol boundaries (S1)
+    // ------------------------------------------------------------------
 
     it("exchanges raw channel messages, targeted and binary", async () => {
       const { harness, a, b } = await makePair(harnessFactory);
-      startBoth({ harness, a, b });
+      await startBoth({ harness, a, b });
       const aReceived: NovaRawMessage[] = [];
       const bReceived: NovaRawMessage[] = [];
       a.client.raw.createChannel({ name: "chat", reliable: true, ordered: true });
@@ -294,7 +630,7 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
 
     it("routes simulation inputs to registered handlers", async () => {
       const { harness, a, b } = await makePair(harnessFactory);
-      startBoth({ harness, a, b });
+      await startBoth({ harness, a, b });
       const received: NovaSimulationInput[] = [];
       let sender: NovaPlayer | null = null;
       b.client.simulation.register({
@@ -322,6 +658,40 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       expect(errors).toHaveLength(1);
       expect(errors[0]?.code).toBe("invalid_message");
       expect(errors[0]?.message).toContain("protocol message");
+    });
+
+    it("replicates canonical snapshots to every shell (never to game frames)", async () => {
+      const { harness, a, b } = await makePair(harnessFactory, {
+        handlers: contractGameHandlers(),
+      });
+      await startBoth({ harness, a, b });
+      // A raw snapshot pushed over the transport updates the shell copy...
+      await a.transport.send({
+        channel: "nova.protocol",
+        payload: assertPeerMessage({
+          version: PROTOCOL_VERSION,
+          sessionId: SESSION,
+          senderMemberId: "member-a",
+          senderConnectionId: a.transport.selfConnectionId,
+          messageId: "snapshot-manual",
+          sentAt: 1_700_000_000_000,
+          seq: 999,
+          type: "state.snapshot",
+          revision: 5,
+          stateHash: "a".repeat(64),
+          term: 1,
+          authorityMemberId: "member-a",
+          processedActionIds: [],
+          state: { shellOnly: true },
+        }),
+        version: PROTOCOL_VERSION,
+        reliability: "reliable",
+        ordering: "ordered",
+      });
+      await settle(harness);
+      expect(b.getCanonicalState()?.state).toEqual({ shellOnly: true });
+      // ...but never reaches the game-facing state handle.
+      expect(b.client.state.get()).toEqual({ hand: undefined, deckCount: 3 });
     });
   });
 }

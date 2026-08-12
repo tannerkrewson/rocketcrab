@@ -30,7 +30,14 @@
  * across restarts. The bridge never touches the host origin, never touches
  * Trystero, and contains no Nova secrets.
  */
-import { PROTOCOL_VERSION, gameModeSchema, titleSchema, type GameMode } from "@rocketcrab/protocol";
+import {
+  PROTOCOL_VERSION,
+  actionTimeoutMs,
+  gameModeSchema,
+  stateResponseSchema,
+  titleSchema,
+  type GameMode,
+} from "@rocketcrab/protocol";
 import { NOVA_API_VERSION } from "@rocketcrab/nova-api/version";
 import { z } from "zod";
 
@@ -66,6 +73,9 @@ export const novaApiCallSchemas = {
         payload: z.unknown().optional(),
         baseRevision: z.number().int().nonnegative().optional(),
       }),
+      // The frame generates the action id so the host can correlate the
+      // authority's ack back to the dispatch promise (S2).
+      actionId: z.string().min(1).max(64),
     })
     .strict(),
   "raw.createChannel": z
@@ -99,6 +109,13 @@ export const novaApiCallSchemas = {
         payload: z.unknown().optional(),
         tick: z.number().int().nonnegative().optional(),
       }),
+    })
+    .strict(),
+  // S2: the authority frame's answer to a stateRequest host event.
+  stateResponse: z
+    .object({
+      requestId: z.string().min(1).max(64),
+      result: stateResponseSchema,
     })
     .strict(),
 } as const;
@@ -168,6 +185,14 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
   var players = [];
   var connectionStatus = 'disconnected';
   var stateValue = null;
+  // S2 state-mode handlers captured at defineGame; they stay in this frame
+  // and never cross to the host (the host only sees plain-data requests).
+  var stateCreateInitialState = null;
+  var stateActions = null;
+  var stateSelectView = null;
+  var stateRender = null;
+  var ACTION_TIMEOUT_MS = ${actionTimeoutMs};
+  var pendingDispatches = {};
   try {
     var bootstrapPlayer = window.__novaBootstrap && window.__novaBootstrap.player;
     if (bootstrapPlayer && bootstrapPlayer.memberId) {
@@ -185,6 +210,102 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
   }
   function fail(code, message) {
     throw new NovaError(code, message);
+  }
+  function novaId(prefix) {
+    var id = (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function')
+      ? crypto.randomUUID()
+      : (Date.now() + '-' + Math.random().toString(36).slice(2, 12));
+    return prefix + '-' + id;
+  }
+  function produceState(state, recipe) {
+    // Immer-compatible produce for the untrusted frame (no module loading):
+    // clone the canonical state, run the recipe on the draft, and adopt the
+    // recipe's return value when it returns one (Immer recipe semantics).
+    var draft = structuredClone(state);
+    var result = recipe(draft);
+    return result === undefined ? draft : result;
+  }
+  function failState(requestId, code, message) {
+    report('stateResponse', {
+      requestId: requestId,
+      result: { kind: 'error', ok: false, code: code, message: String(message || code).slice(0, 256) }
+    });
+  }
+  function computeViews(state, viewers) {
+    // Compute every viewer's selected view; a failing selectView leaves that
+    // viewer without a view (the host surfaces it) without failing the whole
+    // request. Sync and async selectView are both supported.
+    var views = {};
+    var pending = [];
+    for (var i = 0; i < viewers.length; i++) {
+      (function (viewer) {
+        var out;
+        try {
+          out = stateSelectView ? stateSelectView(state, viewer) : state;
+        } catch (_) { return; }
+        if (out && typeof out.then === 'function') {
+          pending.push(out.then(function (resolved) { views[viewer.id] = resolved; }));
+        } else {
+          views[viewer.id] = out;
+        }
+      })(viewers[i]);
+    }
+    return Promise.all(pending).then(function () { return views; });
+  }
+  function reportState(requestId, state, viewers) {
+    computeViews(state, viewers).then(function (views) {
+      report('stateResponse', {
+        requestId: requestId,
+        result: { ok: true, kind: 'state', state: state, views: views }
+      });
+    }, function (err) {
+      failState(requestId, 'view_error', err);
+    });
+  }
+  function handleStateRequest(requestId, request) {
+    if (request.kind === 'createInitialState') {
+      var created;
+      try {
+        created = stateCreateInitialState ? stateCreateInitialState(request.context) : {};
+      } catch (err) { failState(requestId, 'initial_state_error', err); return; }
+      Promise.resolve(created).then(function (state) {
+        reportState(requestId, state, request.viewers);
+      }, function (err) {
+        failState(requestId, 'initial_state_error', err);
+      });
+    } else if (request.kind === 'applyAction') {
+      var handler = stateActions && stateActions[request.actionType];
+      if (typeof handler !== 'function') {
+        failState(requestId, 'unknown_action', 'No action handler named "' + request.actionType + '".');
+        return;
+      }
+      var next;
+      try {
+        next = produceState(request.state, function (draft) {
+          return handler(draft, request.context, request.payload);
+        });
+      } catch (err) { failState(requestId, 'handler_error', err); return; }
+      Promise.resolve(next).then(function (state) {
+        reportState(requestId, state, request.viewers);
+      }, function (err) {
+        failState(requestId, 'handler_error', err);
+      });
+    } else if (request.kind === 'computeView') {
+      var view;
+      try {
+        view = stateSelectView ? stateSelectView(request.state, request.viewer) : request.state;
+      } catch (err) { failState(requestId, 'view_error', err); return; }
+      Promise.resolve(view).then(function (resolved) {
+        report('stateResponse', {
+          requestId: requestId,
+          result: { ok: true, kind: 'view', view: resolved }
+        });
+      }, function (err) {
+        failState(requestId, 'view_error', err);
+      });
+    } else {
+      failState(requestId, 'invalid_request', 'Unknown state request kind: ' + String(request.kind));
+    }
   }
   function subscribe(list, fn) {
     if (typeof fn !== 'function') return function () {};
@@ -314,7 +435,33 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
       case 'state':
         stateValue = payload && payload.state;
         callHandlers(stateHandlers, stateValue);
+        if (stateRender) {
+          try { stateRender(stateValue); } catch (_) {}
+        }
         break;
+      case 'stateRequest':
+        if (payload && payload.requestId && payload.request) {
+          handleStateRequest(payload.requestId, payload.request);
+        }
+        break;
+      case 'actionAck': {
+        if (payload && payload.actionId) {
+          var pending = pendingDispatches[payload.actionId];
+          if (pending) {
+            delete pendingDispatches[payload.actionId];
+            clearTimeout(pending.timer);
+            if (payload.status === 'accepted') {
+              pending.resolve();
+            } else {
+              pending.reject(new NovaError(
+                String(payload.errorCode || 'rejected'),
+                String(payload.errorMessage || 'The action was rejected by the authority.')
+              ));
+            }
+          }
+        }
+        break;
+      }
       case 'rawMessage':
         if (payload && payload.channel) {
           var list = rawHandlers[payload.channel];
@@ -354,6 +501,14 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
       if (options != null && typeof options.apiVersion === 'number' && options.apiVersion !== API_VERSION) {
         fail('unsupported_api_version', 'nova.defineGame() targets API version ' + options.apiVersion + ', but this build supports version(s) [' + API_VERSION + '].');
       }
+      // S2: state-mode handler functions stay in this frame (they are never
+      // serialized); only the plain-data declaration reaches the host.
+      if (options != null) {
+        if (typeof options.createInitialState === 'function') stateCreateInitialState = options.createInitialState;
+        if (options.actions != null && typeof options.actions === 'object') stateActions = options.actions;
+        if (typeof options.selectView === 'function') stateSelectView = options.selectView;
+        if (typeof options.render === 'function') stateRender = options.render;
+      }
       registered = true;
       report('defineGame', { options: gameDeclaration(options) });
     },
@@ -377,7 +532,20 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
     onError: function (fn) { return subscribe(errorHandlers, fn); },
     dispatch: function (action) {
       requireStarted('dispatch');
-      report('dispatch', { action: action });
+      // The frame generates the action id so the authority's ack (pushed
+      // back as an actionAck event) settles this promise (S2).
+      var actionId = novaId('action');
+      return new Promise(function (resolve, reject) {
+        var timer = setTimeout(function () {
+          var pending = pendingDispatches[actionId];
+          if (pending) {
+            delete pendingDispatches[actionId];
+            pending.reject(new NovaError('timed_out', 'The action timed out waiting for the authority\\'s ack.'));
+          }
+        }, ACTION_TIMEOUT_MS + 2000);
+        pendingDispatches[actionId] = { resolve: resolve, reject: reject, timer: timer };
+        report('dispatch', { action: action, actionId: actionId });
+      });
     },
     state: stateHandle,
     raw: rawHandle,

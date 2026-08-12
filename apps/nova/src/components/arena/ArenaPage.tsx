@@ -311,6 +311,12 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
       {summary.failed > 0 ? (
         <span className="badge badge-error badge-sm">{summary.failed} failed</span>
       ) : null}
+      {state.stateDiagnostics !== null ? (
+        <span className="badge badge-ghost badge-sm font-mono" title="State-mode diagnostics">
+          state rev {state.stateDiagnostics.revision} · {state.stateDiagnostics.stateSizeBytes} B ·{" "}
+          {state.stateDiagnostics.actionRatePerSecond.toFixed(1)} act/s
+        </span>
+      ) : null}
       <span
         className={summary.success ? "badge badge-success badge-sm" : "badge badge-ghost badge-sm"}
       >

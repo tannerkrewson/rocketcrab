@@ -56,6 +56,18 @@ function logs(): Array<unknown[]> {
   return entries;
 }
 
+/** Drain + macrotask flush: the state engine's async apply and sha256 need
+ * real event-loop turns (the hub only delivers on drain()). */
+async function flush(harness: ReturnType<typeof createInMemoryHarness>): Promise<void> {
+  for (let i = 0; i < 2; i += 1) {
+    for (let j = 0; j < 8; j += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    }
+    harness.drain();
+  }
+  await Promise.resolve();
+}
+
 describe("documented examples", () => {
   it("keeps the minimal game under the ~30-line acceptance threshold", () => {
     const lines = MINIMAL_GAME_EXAMPLE.split("\n").filter((line) => line.trim().length > 0);
@@ -84,28 +96,46 @@ describe("documented examples", () => {
     expect(a.declaration).toEqual({ title: "Hello Nova", mode: "state" });
     expect(b.readyOf("member-a")).toBe(true); // ready crossed the transport
     a.start();
-    harness.drain();
+    b.start();
+    await flush(harness);
     expect(aStarted).toHaveLength(1);
     expect(bStarted).toHaveLength(1);
+    // The default initial state {} committed even without declared handlers.
+    expect(a.getStateModeDiagnostics().revision).toBe(1);
   });
 
-  it("state-mode example dispatches an action that reaches the other player", async () => {
+  it("state-mode example dispatches actions that the authority applies", async () => {
     const harness = createInMemoryHarness();
     const a = runExample(harness, STATE_MODE_EXAMPLE, "member-a", "Ada");
     const b = runExample(harness, STATE_MODE_EXAMPLE, "member-b", "Ben");
-    const received: Array<{ type: string; payload: unknown }> = [];
-    b.onSessionEvent((event) => {
-      if (event.type === "actionReceived") {
-        received.push({ type: event.action.type, payload: event.action.payload });
-      }
-    });
-    await a.join();
-    await b.join();
-    harness.drain();
-    a.start();
-    b.start();
-    harness.drain();
-    expect(received).toContainEqual({ type: "drawCard", payload: { deck: "main" } });
+    const entries = logs();
+    try {
+      await a.join();
+      await b.join();
+      await flush(harness);
+      a.start();
+      b.start();
+      await flush(harness);
+      // Both players' onStart dispatches ran; the authority applied them.
+      const diagnostics = a.getStateModeDiagnostics();
+      expect(diagnostics.revision).toBe(3); // initial + Ada's draw + Ben's draw
+      expect(diagnostics.appliedCount).toBe(3);
+      // Both frames received only their selected view (never the deck).
+      const stateLogs = entries.filter(
+        (args) => args[0] === "State changed:" && typeof args[1] === "object",
+      );
+      expect(stateLogs.length).toBeGreaterThanOrEqual(2);
+      const views = stateLogs.map((args) => args[1] as { hand?: string; cardsLeft?: number });
+      expect(views.every((view) => typeof view.cardsLeft === "number")).toBe(true);
+      expect(views.some((view) => typeof view.hand === "string")).toBe(true);
+      expect(a.getCanonicalState()?.state).toMatchObject({ deck: ["ace", "king"] });
+      // A stale race was rejected with a clear code (caught by the example).
+      const rejectionLogs = entries.filter((args) => args[0] === "Draw rejected:");
+      expect(rejectionLogs.length).toBeGreaterThanOrEqual(1);
+      expect(rejectionLogs[0]?.[1]).toBe("stale_revision");
+    } finally {
+      vi.restoreAllMocks();
+    }
   });
 
   it("simulation-mode example routes inputs between players", async () => {
@@ -116,10 +146,10 @@ describe("documented examples", () => {
     try {
       await a.join();
       await b.join();
-      harness.drain();
+      await flush(harness);
       a.start();
       b.start();
-      harness.drain();
+      await flush(harness);
       const messages = entries.map((args) => args.join(" ")).join("\n");
       expect(messages).toContain("Ada moved: move"); // B received A's input
       expect(messages).toContain("Ben moved: move"); // A received B's input
@@ -136,10 +166,10 @@ describe("documented examples", () => {
     try {
       await a.join();
       await b.join();
-      harness.drain();
+      await flush(harness);
       a.start();
       b.start();
-      harness.drain();
+      await flush(harness);
       const messages = entries.map((args) => args.join(" ")).join("\n");
       expect(messages).toContain("Ada says: hello everyone");
       expect(messages).toContain("Ben says: hello everyone");
