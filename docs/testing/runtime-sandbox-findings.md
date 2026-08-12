@@ -56,15 +56,19 @@ through, and M2 must set the matching Permissions-Policy on the runtime
 origin. A3's media bridging work will build on this.
 
 **CPU-exhaustion finding (important, environment-dependent):** a synchronous
-infinite loop in the game frame wedges the **whole tab** in this headless
-shell because cross-origin process isolation (OOPIF) is unavailable there.
-Recovery is still possible at the browser level (fresh page), and the runtime
-session survives finite heavy CPU bursts, but the "host shell stays responsive
-and its emergency stop keeps working while the game frame spins" property
-**could not be verified in this environment**. Real desktop and mobile
-browsers isolate cross-origin frames into separate processes (Chrome desktop,
-Safari WebContent process groups); that claim must be verified on the
-physical-device pass. This is Blocker Register B6 / M1 material.
+infinite loop in the game frame wedges the **whole tab**. This happens in the
+headless shell **and on real browsers** — verified on the physical pass:
+standard desktop Chromium (headed, LAN IP and localhost) and iPhone Safari
+both freeze the shell. Root cause: Chromium/WebKit process isolation is
+**per-`site` (scheme + host), not per-origin** — the host (`:5273`) and
+runtime (`:5274`) share one host, so different ports do **not** create
+separate processes (OOPIF), and the game loop (same-origin with the runtime
+page) wedges the shared renderer that also runs the host UI. Recovery is
+still possible at the browser level (fresh page), and the runtime session
+survives finite heavy CPU bursts, but the "host shell stays responsive and
+its emergency stop keeps working while the game frame spins" property does
+**not** hold with a port-only origin split. This is Blocker Register B6 /
+M1 material.
 
 ## Physical-device results (2026-08-01, iPhone + Mobile Safari)
 
@@ -90,17 +94,20 @@ a phone with no JS console.
   not present the prompt for a cross-origin sandboxed iframe in this setup.
   Finding: orientation/motion needs a host-origin permission flow (request +
   delegation) or must be documented unsupported for games — A3/M1 material.
-- **CPU exhaustion: FAIL on physical iPhone, matching the headless caveat.**
-  An infinite-loop game freezes the entire Safari tab: pinch-zoom still
-  works but every control (including Emergency stop) is unresponsive and
-  page reload is very slow. Cross-origin iframes do **not** get a separate
-  process on iOS Safari in this configuration, so the "shell stays
-  responsive while the game spins" property does **not** hold on the primary
-  target device. Neither the privileged nor an opaque-sandbox runtime avoids
-  same-tab wedging on iOS (the game still executes in the tab), so this does
-  not flip the runtime-model recommendation; mitigation belongs in M1/U3
-  (document the limitation, reload-based recovery, WebWorker execution for
-  non-DOM games). Decisive input for Blocker Register B1/B6.
+- **CPU exhaustion: FAIL on iPhone AND desktop Chromium.** An infinite-loop
+  game freezes the entire Safari tab (pinch-zoom works but every control,
+  including Emergency stop, is unresponsive; reload is very slow), and the
+  same happens in **standard headed desktop Chromium** (verified with
+  Playwright against both the LAN IP and localhost). Root cause: isolation
+  is per-site (scheme+host); host and runtime differ only by port, so they
+  share a renderer process and the game wedge takes the shell down with it.
+  Neither the privileged nor an opaque-sandbox runtime avoids same-process
+  wedging (the game still executes in the shared renderer), so this does not
+  flip the runtime-model recommendation; it **does** mean shell-survival
+  requires the runtime on a **distinct hostname** (unique runtime subdomain),
+  not a distinct port — M1/M2/U3 must carry this (document the limitation,
+  reload-based recovery, WebWorker execution for non-DOM games). Decisive
+  input for Blocker Register B1/B6.
 - **WebSocket:** local wss echo probe added to the hello game; exercise by
   re-loading the hello game (echo server runs on `:5276` with the spike
   certs).
@@ -124,11 +131,15 @@ a phone with no JS console.
 showed no capability failure that an opaque sandbox would avoid. Every
 required capability held on device except platform limitations (fullscreen
 and pointer lock unsupported by iOS Safari; motion permission denied for the
-sandboxed frame) and the CPU-exhaustion tab-wedge, which affects any in-tab
-execution model on iOS and is a M1/U3 mitigation concern, not a model
-differentiator. B5 (shared runtime origin) remains the open design
-constraint; revisit (unique subdomains or a two-tier model) only if B5 proves
-unacceptable for v1.
+sandboxed frame) and the CPU-exhaustion tab-wedge — which affects any
+in-tab execution model and is a M1/U3 mitigation concern, **not** a model
+differentiator. The containment evidence does add one concrete architectural
+requirement: with a port-only origin split, host and runtime share a renderer
+process (isolation is per-site, scheme+host), so the runtime must live on a
+**distinct hostname** for shell-survival — the deferred "unique runtime
+subdomains" option becomes required for this property (M2 deployment,
+U3 runtime, M1 hardening). B5 (shared runtime origin) remains the open design
+constraint; revisit (two-tier model) only if B5 proves unacceptable for v1.
 
 ## Notes for downstream issues
 

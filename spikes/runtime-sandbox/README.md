@@ -67,7 +67,10 @@ See `docs/testing/runtime-sandbox-findings.md`. The short version:
   ADR-0008 / B5) — the runtime page must remain secret-free by design.
 - Camera/mic/clipboard require permission delegation on **both** iframes.
 - WebGL/audio work in a sandboxed game frame (headless needs SwiftShader flags).
-- An infinite-loop game freezes the whole tab in this headless shell because
-  cross-origin process isolation (OOPIF) is unavailable there — **shell
-  survival under CPU exhaustion must be verified on physical browsers**; this
-  is the F4 physical-device pass.
+- An infinite-loop game freezes the whole tab — in this headless shell AND in
+  real desktop Chromium and iPhone Safari (verified on the F4 physical pass,
+  2026-08-01). Process isolation is per-`site` (scheme + host), and the
+  host/runtime/game frames share one host (different ports only), so they
+  share a renderer process; the wedge takes the shell with it. Real
+  containment needs a distinct runtime HOSTNAME (subdomain), not a distinct
+  port — M1/M2/U3 material.
