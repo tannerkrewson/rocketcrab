@@ -846,7 +846,7 @@ export class PartyEngine {
         const parsed = arenaApiCallSchemas.dispatch.safeParse(payload);
         if (parsed.success) {
           void session
-            .dispatch(parsed.data.action as NovaAction)
+            .dispatch(parsed.data.action as NovaAction, parsed.data.actionId)
             .catch((error: unknown) =>
               this.addNotice("error", `nova.dispatch() failed: ${errorMessage(error)}`),
             );
