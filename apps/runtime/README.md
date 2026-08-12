@@ -55,7 +55,10 @@ allow-pointer-lock allow-fullscreen` and delegates camera/microphone/
   page through a per-instance hook (no extra message listeners — nothing to
   leak across restarts). Game-declared metadata is schema-validated before
   it is ever forwarded (`game.registration`); the host-declared `gameId` is
-  never overridable.
+  never overridable. A declaration may carry the Nova API version the game
+  was built against (`apiVersion`); an unsupported version is reported as
+  a `runtime.error` with category `unsupported` (U4 validation) while the
+  game still runs.
 - **Registration timeout**: if the game does not call `nova.defineGame`
   within 10s, the runtime reports `missing_registration`
   (`runtime.error`).
