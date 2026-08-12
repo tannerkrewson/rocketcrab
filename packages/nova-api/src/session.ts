@@ -491,7 +491,12 @@ export class NovaSession implements NovaClientBackend {
 
   private handleReconnected(): void {
     this.selfPlayer.connectionId = this.transport.selfConnectionId;
+    // The transport is already connected again (its rejoin completed before
+    // the reconnected event fires): surface the transient reconnecting state,
+    // then settle on connected so games never see a stuck "reconnecting".
     this.status = "reconnecting";
+    this.emit({ type: "connection", status: this.status });
+    this.status = "connected";
     this.emit({ type: "connection", status: this.status });
   }
 

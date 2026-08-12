@@ -61,6 +61,7 @@ const loadGame = {
   gameSource: "<!doctype html><html><body>hi</body></html>",
   player: { memberId: "member-1", displayName: "Alex" },
   gameTitle: "Hello Game",
+  sessionId: "session-1",
 };
 
 function readyMessage(): Record<string, unknown> {
@@ -190,6 +191,81 @@ describe("RuntimeHostClient event forwarding", () => {
     expect(types).toContain("console");
     expect(types).toContain("lifecycle");
     expect(bridge.diagnose().recentEvents).toHaveLength(5); // ready + 4 events
+  });
+
+  it("forwards game.apiCall to the session router with the payload intact", async () => {
+    const harness = createHarness();
+    await started(harness);
+    deliver(harness.port1, {
+      version: 1,
+      runtimeInstanceId: "runtime-1",
+      sessionId: "session-1",
+      messageId: "message-call",
+      sentAt: 1_700_000_000_005,
+      type: "game.apiCall",
+      method: "dispatch",
+      payload: { action: { type: "playCard", payload: { c: 1 } } },
+    });
+    const call = harness.events.find((e) => e.type === "apiCall");
+    expect(call?.type).toBe("apiCall");
+    if (call?.type === "apiCall") {
+      expect(call.message.method).toBe("dispatch");
+      expect(call.message.payload).toEqual({ action: { type: "playCard", payload: { c: 1 } } });
+    }
+  });
+
+  it("pushApiEvent posts a validated game.apiEvent on the instance channel", async () => {
+    const harness = createHarness();
+    await started(harness);
+    // Let the bootstrap postMessage reach the fake frame window.
+    await flush();
+    // The client generates its own runtime instance id for the bootstrap;
+    // the pushed event must ride the same instance.
+    const bootstrap = harness.windowMessages
+      .map((m) => m.data as Record<string, unknown>)
+      .find((m) => m.type === "runtime.bootstrap");
+    const runtimeInstanceId = bootstrap?.runtimeInstanceId as string;
+    harness.bridge.pushApiEvent({
+      kind: "playerJoined",
+      player: { id: "member-2", name: "Blair" },
+    });
+    const message = harness.port1.sent.at(-1) as Record<string, unknown>;
+    expect(message.type).toBe("game.apiEvent");
+    expect(message.runtimeInstanceId).toBe(runtimeInstanceId);
+    expect(message.sessionId).toBe("session-1");
+    expect(message.event).toEqual({
+      kind: "playerJoined",
+      player: { id: "member-2", name: "Blair" },
+    });
+    // Raw channel messages with binary payloads survive the envelope.
+    harness.bridge.pushApiEvent({
+      kind: "rawMessage",
+      channel: "chat",
+      message: {
+        from: { id: "member-2", name: "Blair" },
+        payload: new Uint8Array([1, 2]),
+        binary: true,
+      },
+    });
+    const raw = harness.port1.sent.at(-1) as {
+      event: { message: { payload: Uint8Array } };
+    };
+    expect(raw.event.message.payload).toBeInstanceOf(Uint8Array);
+    // No-op before a load: no port exists yet.
+    const idle = createHarness();
+    idle.bridge.pushApiEvent({ kind: "start" });
+    expect(idle.port1.sent).toHaveLength(0);
+  });
+
+  it("rejects invalid apiEvent shapes before posting them", async () => {
+    const harness = createHarness();
+    await started(harness);
+    expect(() =>
+      harness.bridge.pushApiEvent({ kind: "connection", status: "flaky" } as never),
+    ).toThrow();
+    expect((harness.port1.sent.at(-1) as { type?: string } | undefined)?.type).not.toBe(
+      "game.apiEvent",
+    );
   });
 
   it("emits fatal for invalid inbound messages", async () => {
