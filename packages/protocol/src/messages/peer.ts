@@ -328,11 +328,19 @@ export type RawChannelMetadataMessage = z.infer<typeof rawChannelMetadataMessage
 /**
  * Game source metadata: the pre-transfer descriptor for a peer-to-peer game
  * source transfer (P3). Receivers can decide to accept before any bytes move.
+ * The optional `title`, `apiVersion`, and `mode` fields (P3 additions, F6
+ * additive) let the receiver run its runtime compatibility check and show
+ * lobby UI before any bytes move.
  */
 export const gameSourceMetadataMessageSchema = z.object({
   ...peerEnvelopeFields,
   type: z.literal("game.source.metadata"),
   gameId: gameIdSchema,
+  title: titleSchema.optional(),
+  /** Nova API version the game was built against (S1 `nova.defineGame`). */
+  apiVersion: z.number().int().min(1).optional(),
+  /** Execution mode the host will launch (state / simulation / raw). */
+  mode: gameModeSchema.optional(),
   sourceSha256: sha256Schema,
   sourceSizeBytes: z.number().int().nonnegative(),
   chunkCount: z.number().int().min(1),
@@ -367,6 +375,48 @@ export const transferAcknowledgementMessageSchema = z.object({
 });
 export type TransferAcknowledgementMessage = z.infer<typeof transferAcknowledgementMessageSchema>;
 
+/**
+ * Game source request: a joiner asks a source holder for the game document
+ * (P3). Requests travel on the private-party transport only, so only admitted
+ * members can ask (ADR-0004, ADR-0010). A request without `gameId` asks every
+ * holder to announce the current game (refresh after a missed announcement);
+ * a request with `gameId` (and its SHA-256) asks one holder to start the
+ * transfer. `sourceSha256` is only meaningful with `gameId`, so the schema
+ * rejects that combination.
+ */
+export const gameSourceRequestMessageSchema = z
+  .object({
+    ...peerEnvelopeFields,
+    type: z.literal("game.source.request"),
+    gameId: gameIdSchema.optional(),
+    sourceSha256: sha256Schema.optional(),
+  })
+  .superRefine((value, ctx) => {
+    if (value.sourceSha256 !== undefined && value.gameId === undefined) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["sourceSha256"],
+        message: "sourceSha256 requires a gameId.",
+      });
+    }
+  });
+export type GameSourceRequestMessage = z.infer<typeof gameSourceRequestMessageSchema>;
+
+/**
+ * Game source cancellation: either side aborts an in-flight source transfer
+ * (P3). The sender stops sending remaining chunks; the receiver discards the
+ * partial source and clears its transfer state (engineering rule 22 — no
+ * orphaned listeners or partial state after an abort).
+ */
+export const gameSourceCancelMessageSchema = z.object({
+  ...peerEnvelopeFields,
+  type: z.literal("game.source.cancel"),
+  gameId: gameIdSchema,
+  sourceSha256: sha256Schema,
+  reason: z.string().max(256).optional(),
+});
+export type GameSourceCancelMessage = z.infer<typeof gameSourceCancelMessageSchema>;
+
 /** Every peer-plane message schema, discriminated by `type`. */
 export const peerMessagesSchema = z.discriminatedUnion("type", [
   partyIdentityMessageSchema,
@@ -393,6 +443,8 @@ export const peerMessagesSchema = z.discriminatedUnion("type", [
   gameSourceMetadataMessageSchema,
   gameSourceTransferMessageSchema,
   transferAcknowledgementMessageSchema,
+  gameSourceRequestMessageSchema,
+  gameSourceCancelMessageSchema,
 ]);
 
 /** All peer-plane message type strings, for useful unknown-type errors. */

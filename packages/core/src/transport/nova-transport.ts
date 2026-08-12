@@ -1,4 +1,4 @@
-import type { ConnectionId, MemberId } from "@rocketcrab/protocol";
+import type { ConnectionId, MemberId, SessionId } from "@rocketcrab/protocol";
 import type {
   TransportConnectionState,
   TransportEventMap,
@@ -29,6 +29,12 @@ export interface NovaTransport {
   /** Current connection identity; changes when the transport reconnects. */
   readonly selfConnectionId: ConnectionId;
   readonly connectionState: TransportConnectionState;
+  /**
+   * The session this transport is joined to (the join request's sessionId),
+   * or null before join completes / after leave. Labels every message this
+   * transport sends (peer-envelope compatibility).
+   */
+  readonly sessionId: SessionId | null;
   /** Peers currently connected, in join order. */
   readonly peers: readonly TransportPeerInfo[];
 

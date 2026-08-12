@@ -225,6 +225,30 @@ describe("InMemoryTransport lifecycle", () => {
     expect(states).toEqual(["joining", "connected", "suspended", "connected"]);
   });
 
+  it("delivers messages after a RECEIVER reconnect mid-stream (fresh ordered stream)", async () => {
+    const hub = new InMemoryTransportHub({ now: () => 1000 });
+    const a = hub.createTransport({ memberId: "member-a" });
+    const b = hub.createTransport({ memberId: "member-b" });
+    await joinRoom(a);
+    await joinRoom(b);
+    const bReceived = collectMessages(b);
+
+    // A few ordered messages establish the per-(sender, channel) sequence.
+    await a.send({ channel: "state", payload: "one" });
+    await a.send({ channel: "state", payload: "two" });
+    hub.drain();
+    expect(bReceived.map((m) => m.payload)).toEqual(["one", "two"]);
+
+    // The RECEIVER reconnects: the sender restarts the delivery sequence for
+    // the new connection pairing, so the receiver must reset its ordered
+    // state instead of dropping the first post-reconnect message as stale.
+    await b.reconnect();
+    const receivedAfter = collectMessages(b);
+    await a.send({ channel: "state", payload: "three" });
+    hub.drain();
+    expect(receivedAfter.map((m) => m.payload)).toEqual(["three"]);
+  });
+
   it("drops incoming messages while suspended when dropWhileSuspended is set", async () => {
     const hub = new InMemoryTransportHub({ now: () => 1000 });
     const a = hub.createTransport({ memberId: "member-a" });

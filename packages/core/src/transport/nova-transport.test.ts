@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import type { SessionId } from "@rocketcrab/protocol";
 import type { NovaTransport } from "./nova-transport";
 import type {
   TransportConnectionState,
@@ -18,6 +19,7 @@ class MockTransport implements NovaTransport {
   readonly selfMemberId = "member-1";
   readonly selfConnectionId = "connection-1";
   connectionState: TransportConnectionState = "idle";
+  readonly sessionId: SessionId | null = "session-1";
   readonly peers: readonly TransportPeerInfo[] = [];
 
   on(): () => void {
