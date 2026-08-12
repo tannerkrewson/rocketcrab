@@ -67,6 +67,34 @@ describe("CLASSIC_GAMES data", () => {
     expect(findClassicGame("does-not-exist")).toBeUndefined();
   });
 
+  it("marks verified CORS-blocked games (7.7.3) so the browse UI can document them", () => {
+    const blocked = CLASSIC_GAMES.filter((game) => game.connectStatus === "blocked").map(
+      (game) => game.id,
+    );
+    // Verified live: these endpoints send no Access-Control-Allow-Origin, so
+    // the client-side room-creation fetch fails in the browser.
+    expect(blocked).toEqual(
+      expect.arrayContaining([
+        "drawphone",
+        "drawphone-kids",
+        "netgamesio-avalon",
+        "netgamesio-enigma",
+        "ooc-story",
+        "ooc-redacted",
+        "ooc-recipe",
+        "secrethitler-duc",
+        "snakeout",
+        "tk-spyfall",
+        "werewolfnight",
+      ]),
+    );
+    // Random-room-id games that need no fetch are NOT blocked.
+    expect(findClassicGame("protobowl")?.connectStatus).toBeUndefined();
+    expect(findClassicGame("justone")?.connectStatus).toBeUndefined();
+    // fishbowl's GraphQL endpoint reflects the Origin (verified live) — not blocked.
+    expect(findClassicGame("fishbowl")?.connectStatus).toBeUndefined();
+  });
+
   it("CLASSIC_FRAME_ORIGINS is the unique origin set incl. both drawphone origins", () => {
     expect(new Set(CLASSIC_FRAME_ORIGINS).size).toBe(CLASSIC_FRAME_ORIGINS.length);
     expect(CLASSIC_FRAME_ORIGINS).toContain("https://drawphone.tannerkrewson.com");
