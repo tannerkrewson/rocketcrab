@@ -15,8 +15,9 @@
  * change; the UI (ArenaPage) is a pure projection. The creator's controls
  * map to transport operations exactly: disconnect = clean leave, reconnect =
  * fresh join, suspend/resume = simulated background suspension (U5),
- * authority loss = forced reconnect of the current authority player (S3 owns
- * real election/migration).
+ * authority loss = forced reconnect of the current authority player (S3:
+ * the drop triggers a real election, and the arena displays the migrated
+ * authority from the session diagnostics).
  */
 import type {
   GameApiCallMessage,
@@ -291,9 +292,9 @@ export class ArenaEngine {
 
   /**
    * Trigger authority loss: force the current authority player's connection
-   * to drop and rejoin (visible as a disconnect/reconnect of that player).
-   * Real authority election/migration is S3's scope; this is the S1-visible
-   * simulation of the loss event.
+   * to drop and rejoin. With S3 the drop is a real loss event: peers suspect
+   * immediately, elect a new authority, and the game continues — the arena
+   * displays the migrated authority from session diagnostics.
    */
   async triggerAuthorityLoss(): Promise<void> {
     const authorityId = this.getSnapshot().authorityPlayerId;
@@ -826,8 +827,8 @@ export class ArenaEngine {
   }
 
   private computeAuthorityPlayerId(players: readonly ArenaPlayer[]): string | null {
-    // S2: the authority is the session the state engine tracks (the fixed
-    // initial authority; S3 owns election/migration).
+    // The authority is the session the state engine tracks (S3: the current
+    // term's elected authority, tracked through elections and migrations).
     for (const runtime of this.players.values()) {
       const authority = runtime.session?.getStateModeDiagnostics().authorityMemberId;
       if (authority === null || authority === undefined) continue;
