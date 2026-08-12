@@ -1,0 +1,175 @@
+import { z } from "zod";
+import { runtimeEnvelopeFields } from "../envelope";
+import {
+  displayNameSchema,
+  gameIdSchema,
+  memberIdSchema,
+  sha256Schema,
+  timestampSchema,
+  titleSchema,
+} from "../ids";
+import { htmlSourceSchema } from "../limits";
+import { gameModeSchema } from "./shared";
+
+/**
+ * Runtime-plane messages (host ↔ runtime): messages between the Nova shell
+ * and the runtime frame over the dedicated MessageChannel (U3, F4 spike
+ * shape). Every schema extends the runtime envelope, so each message carries
+ * the protocol version, message type, runtime instance ID, unique message
+ * ID, and timestamp. Unlike peer messages there are no member/connection IDs:
+ * the runtime frame is not a party member, it is an isolated execution
+ * context (ADR-0001, ADR-0008).
+ */
+
+/**
+ * Runtime bootstrap: the host hands a game document to the runtime frame for
+ * execution (F4 spike bootstrap shape). Carries the full untrusted HTML
+ * source, bounded by `htmlSourceBytes`, plus the player's identity and any
+ * delegated permissions (F4 finding: `allow` must be carried at every iframe
+ * hop).
+ */
+export const runtimeBootstrapMessageSchema = z.object({
+  ...runtimeEnvelopeFields,
+  type: z.literal("runtime.bootstrap"),
+  gameId: gameIdSchema,
+  gameTitle: titleSchema.optional(),
+  gameMode: gameModeSchema,
+  gameSource: htmlSourceSchema,
+  player: z.object({
+    memberId: memberIdSchema,
+    displayName: displayNameSchema,
+  }),
+  permissions: z
+    .object({
+      allow: z.array(z.string().min(1).max(32)),
+    })
+    .optional(),
+});
+export type RuntimeBootstrapMessage = z.infer<typeof runtimeBootstrapMessageSchema>;
+
+/** Runtime readiness: the runtime processed the bootstrap and is ready. */
+export const runtimeReadinessMessageSchema = z.object({
+  ...runtimeEnvelopeFields,
+  type: z.literal("runtime.ready"),
+  status: z.literal("ready"),
+});
+export type RuntimeReadinessMessage = z.infer<typeof runtimeReadinessMessageSchema>;
+
+/**
+ * Game registration: the game (via the Nova API bridge) declares itself to
+ * the runtime, which forwards the registration to the host (S1, U4).
+ */
+export const gameRegistrationMessageSchema = z.object({
+  ...runtimeEnvelopeFields,
+  type: z.literal("game.registration"),
+  gameId: gameIdSchema,
+  title: titleSchema,
+  gameMode: gameModeSchema,
+  /** The game's own declared version; distinct from the protocol version. */
+  gameVersion: z.string().min(1).max(32).optional(),
+});
+export type GameRegistrationMessage = z.infer<typeof gameRegistrationMessageSchema>;
+
+/**
+ * Game metadata: the descriptor for a saved game (ADR-0005 local storage)
+ * shared between host contexts, and the same descriptor embedded as a
+ * runtime-plane message when the host hands metadata to the runtime or test
+ * arena.
+ */
+export const gameMetadataSchema = z.object({
+  gameId: gameIdSchema,
+  title: titleSchema,
+  description: z.string().max(512).optional(),
+  createdAtMs: timestampSchema,
+  updatedAtMs: timestampSchema,
+  sourceSha256: sha256Schema,
+  sourceSizeBytes: z.number().int().nonnegative(),
+});
+export type GameMetadata = z.infer<typeof gameMetadataSchema>;
+
+export const gameMetadataMessageSchema = z.object({
+  ...runtimeEnvelopeFields,
+  type: z.literal("game.metadata"),
+  game: gameMetadataSchema,
+});
+export type GameMetadataMessage = z.infer<typeof gameMetadataMessageSchema>;
+
+/**
+ * Runtime error: an observable failure report from the runtime (U4
+ * categories: empty source, missing structure/registration, oversized source,
+ * syntax errors, remote load failures). Rate-limited by
+ * `errorReportRatePerSecond`.
+ */
+export const runtimeErrorMessageSchema = z.object({
+  ...runtimeEnvelopeFields,
+  type: z.literal("runtime.error"),
+  category: z.enum([
+    "empty_source",
+    "invalid_html",
+    "missing_registration",
+    "oversized_source",
+    "syntax",
+    "remote_load",
+    "runtime",
+    "crash",
+    "security",
+    "unsupported",
+  ]),
+  message: z.string().min(1).max(512),
+  details: z.record(z.string(), z.unknown()).optional(),
+  stack: z.string().max(4096).optional(),
+});
+export type RuntimeErrorMessage = z.infer<typeof runtimeErrorMessageSchema>;
+
+/**
+ * Game lifecycle event: state transitions of the game frame (F4 spike
+ * lifecycle: load / reload / destroy; M1: suspend / resume / restore).
+ */
+export const gameLifecycleEventMessageSchema = z.object({
+  ...runtimeEnvelopeFields,
+  type: z.literal("game.lifecycle"),
+  event: z.enum([
+    "created",
+    "loaded",
+    "started",
+    "paused",
+    "resumed",
+    "suspended",
+    "restored",
+    "reloaded",
+    "destroyed",
+  ]),
+  detail: z.string().max(256).optional(),
+});
+export type GameLifecycleEventMessage = z.infer<typeof gameLifecycleEventMessageSchema>;
+
+/**
+ * End-game request: the host asks the runtime to tear the game down (the
+ * Emergency Stop control lives outside the frame and cannot be disabled by
+ * game code — threat model T6/T21).
+ */
+export const endGameRequestMessageSchema = z.object({
+  ...runtimeEnvelopeFields,
+  type: z.literal("game.end"),
+  reason: z.enum(["user_exit", "host_closed", "authority_migrated", "error"]),
+});
+export type EndGameRequestMessage = z.infer<typeof endGameRequestMessageSchema>;
+
+/** Every runtime-plane message schema, discriminated by `type`. */
+export const runtimeMessagesSchema = z.discriminatedUnion("type", [
+  runtimeBootstrapMessageSchema,
+  runtimeReadinessMessageSchema,
+  gameRegistrationMessageSchema,
+  gameMetadataMessageSchema,
+  runtimeErrorMessageSchema,
+  gameLifecycleEventMessageSchema,
+  endGameRequestMessageSchema,
+]);
+
+/** All runtime-plane message type strings, for useful unknown-type errors. */
+export const RUNTIME_MESSAGE_TYPES: readonly string[] = runtimeMessagesSchema.options.map(
+  (option) => option.shape.type.value,
+);
+
+/** Any valid runtime-plane message. */
+export type RuntimeMessage = z.infer<typeof runtimeMessagesSchema>;
