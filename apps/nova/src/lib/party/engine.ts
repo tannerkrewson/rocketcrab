@@ -42,6 +42,7 @@ import type { NovaAction, NovaSessionEvent } from "@rocketcrab/nova-api";
 import { createNovaSession } from "@rocketcrab/nova-api";
 import { RuntimeHostClient, type ChannelPort, type RuntimeHostEvent } from "../runtime-host";
 import { arenaApiCallSchemas } from "../arena/api-calls";
+import { toApiEvent } from "../arena/api-events";
 import { runtimeOriginForMainOrigin } from "../runtime-origin";
 import { localPartyIdentity, updatePartyDisplayName } from "./identity";
 import { browserLifecycleSource, type PartyLifecycleSource } from "./lifecycle";
@@ -602,9 +603,10 @@ export class PartyEngine {
   }
 
   /**
-   * Update this player's display name (7.5): persists it for next time and
-   * applies it locally immediately. Peers see the new name on their next
-   * handshake/rejoin (the transport bakes names into the handshake).
+   * Update this player's display name (7.5): persists it for next time,
+   * applies it locally immediately, and announces it to connected peers on
+   * the party control plane (7.25) so their lobbies update without a
+   * rejoin. The local frame's `nova.player` is refreshed too.
    */
   setDisplayName(name: string): void {
     const trimmed = name.trim();
@@ -613,6 +615,14 @@ export class PartyEngine {
     }
     updatePartyDisplayName(trimmed);
     this.identity = { ...this.identity, displayName: trimmed };
+    const party = this.party;
+    if (party !== null) {
+      void party.announceRename(trimmed).catch(() => undefined);
+    }
+    this.runtime?.pushApiEvent({
+      kind: "identity",
+      player: { id: this.identity.memberId, name: trimmed },
+    });
     this.emit();
   }
 
@@ -1194,6 +1204,10 @@ export class PartyEngine {
         // Ready = the game loaded + registered (P4 deliverable); the game's
         // own nova.ready() call is also routed (idempotent in the session).
         this.session?.ready();
+        // The session attached (and replayed peers/status) before the frame
+        // existed, so those events were dropped; replay the snapshot now so
+        // the game sees its identity, connection status, and roster (7.26).
+        this.pushSessionSnapshot();
         this.emit();
         break;
       case "apiCall":
@@ -1333,6 +1347,11 @@ export class PartyEngine {
         break;
       case "memberJoined":
       case "memberLeft":
+        this.emit();
+        break;
+      case "memberRenamed":
+        // A connected peer announced a new display name (7.25): re-render
+        // the member view; the name itself comes from the party layer.
         this.emit();
         break;
       case "greeter":
@@ -1608,6 +1627,38 @@ export class PartyEngine {
       default:
         break; // raw/state/simulation events route to the frame only
     }
+    // Forward every session event the game can observe into the runtime
+    // frame (U6 parity with the arena; 7.26): connection, start/end, player
+    // joins/leaves, state, raw messages, simulation traffic. Events that
+    // arrive before the frame exists are dropped here and replayed by
+    // pushSessionSnapshot once the game registers.
+    const apiEvent = toApiEvent(event);
+    if (apiEvent !== null) {
+      this.runtime?.pushApiEvent(apiEvent);
+    }
+  }
+
+  /**
+   * Replay the session snapshot the frame missed (7.26): its identity, the
+   * current connection status, the full roster, and the started flag. The
+   * session attached during `establish()` — before the runtime frame was
+   * created — so its initial connection/playerJoined events went nowhere.
+   * The game-side client dedups players by id, so re-pushing is safe.
+   */
+  private pushSessionSnapshot(): void {
+    const session = this.session;
+    const runtime = this.runtime;
+    if (session === null || runtime === null) {
+      return;
+    }
+    runtime.pushApiEvent({ kind: "identity", player: session.player });
+    runtime.pushApiEvent({ kind: "connection", status: session.connectionStatus });
+    for (const player of session.players) {
+      runtime.pushApiEvent({ kind: "playerJoined", player });
+    }
+    if (session.isStarted()) {
+      runtime.pushApiEvent({ kind: "start" });
+    }
   }
 
   // ------------------------------------------------------------------
@@ -1671,10 +1722,9 @@ export class PartyEngine {
     if (memberId === identity.memberId) {
       return identity.displayName;
     }
-    const peer = this.party?.privateTransport.peers.find(
-      (candidate) => candidate.memberId === memberId,
-    );
-    return peer?.displayName ?? memberId;
+    // The party layer owns member names: handshake names plus any
+    // `party.rename` announcements (7.25).
+    return this.party?.getMemberName(memberId) ?? memberId;
   }
 
   /**
