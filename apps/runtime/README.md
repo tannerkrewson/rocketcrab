@@ -56,11 +56,15 @@ allow-pointer-lock allow-fullscreen` and delegates camera/microphone/
   `@rocketcrab/nova-api`. The lifecycle is enforced in the frame too
   (calls before readiness fail with a clear `NovaError`), and every
   forwarded call is schema-validated here before it reaches the host.
-  Because no host-side session router exists yet (the arena/party
-  milestones U6/P1 own it), forwarded calls other than `defineGame` are
-  surfaced as a clear `runtime.error` (`unsupported`) instead of being
-  silently dropped; the session router replaces that branch later.
-  The bridge also captures window errors, unhandled rejections, and
+  The host session router (U6 arena / P1 party) then routes the validated
+  call into the player's `NovaSession` over the transport: the runtime
+  forwards it as a `game.apiCall` message on the instance channel, and
+  host-pushed session events arrive as `game.apiEvent` and are dispatched
+  to the matching `window.nova` handlers through `__novaGameBridge.receive`
+  (same-origin hook; functions registered by a game never cross the
+  frame). The validated bootstrap player identity is injected into the
+  frame before the bridge runs, so `nova.player` is correct from the first
+  tick. The bridge also captures window errors, unhandled rejections, and
   console output, and reports them to the runtime page through a
   per-instance hook (no extra message listeners — nothing to leak across
   restarts). Game-declared metadata is schema-validated before it is

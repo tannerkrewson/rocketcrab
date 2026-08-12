@@ -257,6 +257,44 @@ describe("/create — paste, run, save", () => {
     expect(reopened.textContent).toContain("cards");
   });
 
+  it("test-multiplayer hands the current source to the arena and navigates", async () => {
+    const game = await gameRepository.create({ title: "Rocket Rumble", html: SAVED_SOURCE });
+    mockClipboard(PASTED_SOURCE);
+    const harness = createHostHarness();
+    renderEditor([`/games/${game.id}/edit`], harness);
+
+    const desktop = await layout("desktop-layout");
+    const editor = desktop.getByRole("textbox", { name: "Game HTML source" });
+    await waitFor(() => expect(editor.textContent).toContain("rockets"));
+    // Paste unsaved source, then test it multiplayer.
+    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
+    await waitFor(() => expect(editor.textContent).toContain("cards"));
+    await userEvent.click(desktop.getByRole("button", { name: /Test multiplayer/ }));
+
+    // The arena route opens with the current (unsaved) source handed over.
+    await screen.findByTestId("arena-desktop");
+    const stored = JSON.parse(sessionStorage.getItem("nova:arena-source:v1") ?? "{}") as {
+      gameId?: string;
+      source?: string;
+    };
+    expect(stored.gameId).toBe(game.id);
+    expect(stored.source).toBe(PASTED_SOURCE);
+    // The saved version is untouched.
+    expect((await gameRepository.read(game.id)).html).toBe(SAVED_SOURCE);
+  });
+
+  it("test-multiplayer is gated on validation errors", async () => {
+    mockClipboard("");
+    const harness = createHostHarness();
+    renderEditor(["/create"], harness);
+    const desktop = await layout("desktop-layout");
+    await userEvent.click(desktop.getByRole("button", { name: /Test multiplayer/ }));
+    await waitFor(() =>
+      expect(desktop.getAllByText(/Game source is empty/).length).toBeGreaterThan(0),
+    );
+    expect(harness.bootstraps).toHaveLength(0);
+  });
+
   it("does not start a run for an empty source", async () => {
     const harness = createHostHarness();
     renderEditor(["/create"], harness);

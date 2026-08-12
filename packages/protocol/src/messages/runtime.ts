@@ -12,6 +12,121 @@ import { htmlSourceSchema } from "../limits";
 import { gameEndReasonSchema, gameModeSchema } from "./shared";
 
 /**
+ * Runtime-plane message schemas (host ↔ runtime).
+ *
+ * U6 added the session-router messages that make the local test arena (and,
+ * later, a real party) work end-to-end without bypassing the runtime
+ * protocol: `game.apiCall` carries a validated Nova API call from the game
+ * frame (via the runtime) to the host's session router, and `game.apiEvent`
+ * carries a session event from the host back into the frame. Both travel on
+ * the same dedicated MessageChannel as every other runtime message and are
+ * validated at both ends.
+ */
+
+/**
+ * Nova API call methods the runtime forwards to the host (the session
+ * router). Mirrors `novaApiCallSchemas` in apps/runtime (the runtime
+ * validates before forwarding; the host re-validates at its boundary).
+ */
+export const NOVA_API_CALL_METHODS = [
+  "ready",
+  "dispatch",
+  "raw.createChannel",
+  "raw.send",
+  "simulation.register",
+  "simulation.sendInput",
+] as const;
+
+export type NovaApiCallMethod = (typeof NOVA_API_CALL_METHODS)[number];
+
+/**
+ * A forwarded Nova API call: the runtime validated the payload already
+ * (never trust game input), then forwards it to the host session router
+ * (U6/P1). The payload is the same shape the runtime's `novaApiCallSchemas`
+ * accepted.
+ */
+export const gameApiCallMessageSchema = z
+  .object({
+    ...runtimeEnvelopeFields,
+    type: z.literal("game.apiCall"),
+    method: z.enum(NOVA_API_CALL_METHODS),
+    payload: z.unknown(),
+  })
+  .strict();
+export type GameApiCallMessage = z.infer<typeof gameApiCallMessageSchema>;
+
+/** Connection status values the arena pushes into a frame (S1 surface). */
+export const novaConnectionStatusSchema = z.enum([
+  "connecting",
+  "connected",
+  "reconnecting",
+  "suspended",
+  "disconnected",
+]);
+export type NovaConnectionStatus = z.infer<typeof novaConnectionStatusSchema>;
+
+/** One player as the host pushes it into a frame (S1 `NovaPlayer` shape). */
+export const novaPlayerSchema = z.object({
+  id: memberIdSchema,
+  name: displayNameSchema,
+});
+export type NovaPlayer = z.infer<typeof novaPlayerSchema>;
+
+/**
+ * A session event pushed from the host into one runtime frame. Plain data
+ * only (functions registered by a game never cross the frame); the bridge
+ * dispatches each kind to the matching `window.nova` handler list.
+ */
+export const gameApiEventSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("identity"), player: novaPlayerSchema }),
+  z.object({ kind: z.literal("playerJoined"), player: novaPlayerSchema }),
+  z.object({ kind: z.literal("playerLeft"), player: novaPlayerSchema }),
+  z.object({ kind: z.literal("connection"), status: novaConnectionStatusSchema }),
+  z.object({ kind: z.literal("start") }),
+  z.object({ kind: z.literal("end"), reason: gameEndReasonSchema }),
+  z.object({ kind: z.literal("state"), state: z.unknown() }),
+  z
+    .object({
+      kind: z.literal("rawMessage"),
+      channel: z.string().min(1).max(64),
+      message: z.object({
+        from: novaPlayerSchema,
+        payload: z.unknown(),
+        binary: z.boolean(),
+      }),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("simulationInput"),
+      input: z.object({
+        type: z.string().min(1).max(64),
+        payload: z.unknown().optional(),
+        tick: z.number().int().nonnegative().optional(),
+        sender: novaPlayerSchema,
+      }),
+    })
+    .strict(),
+  z.object({ kind: z.literal("simulationSnapshot"), snapshot: z.unknown() }),
+  z.object({
+    kind: z.literal("error"),
+    code: z.string().min(1).max(64),
+    message: z.string().min(1).max(512),
+  }),
+]);
+export type GameApiEvent = z.infer<typeof gameApiEventSchema>;
+
+/** Host → runtime: push one session event into the game frame. */
+export const gameApiEventMessageSchema = z
+  .object({
+    ...runtimeEnvelopeFields,
+    type: z.literal("game.apiEvent"),
+    event: gameApiEventSchema,
+  })
+  .strict();
+export type GameApiEventMessage = z.infer<typeof gameApiEventMessageSchema>;
+
+/**
  * Runtime-plane messages (host ↔ runtime): messages between the Nova shell
  * and the runtime frame over the dedicated MessageChannel (U3, F4 spike
  * shape). Every schema extends the runtime envelope, so each message carries
@@ -222,6 +337,8 @@ export const runtimeMessagesSchema = z.discriminatedUnion("type", [
   runtimePongMessageSchema,
   runtimeReloadMessageSchema,
   runtimeConsoleMessageSchema,
+  gameApiCallMessageSchema,
+  gameApiEventMessageSchema,
 ]);
 
 /** All runtime-plane message type strings, for useful unknown-type errors. */

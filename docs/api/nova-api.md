@@ -311,8 +311,7 @@ on raw channels.
   with the state-mode and authority milestones (S2/S3); `dispatch` sends and
   `state` subscription already function over the transport.
 - No simulation clock or snapshots yet (A1).
-- In the browser frame, forwarded calls other than `defineGame` currently
-  surface as a clear `runtime.error` (`unsupported`) because the host-side
-  session router does not exist yet (the arena/party milestones wire it);
-  the in-frame lifecycle guarantees everything reachable in S1 behaves like
-  the arena client.
+- Since the U6 arena session router landed, the runtime forwards validated
+  calls to the host (`game.apiCall`) and the host routes them into the
+  player's session over the transport; session events return as
+  `game.apiEvent`. Authority/state semantics still arrive with S2/S3.

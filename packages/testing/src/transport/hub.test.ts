@@ -23,6 +23,39 @@ function collectMessages(
 }
 
 describe("InMemoryTransportHub — messaging", () => {
+  it("lets a transport that left cleanly re-join the room (U6 reconnect)", async () => {
+    const hub = new InMemoryTransportHub();
+    const a = hub.createTransport({ memberId: "member-a" });
+    const b = hub.createTransport({ memberId: "member-b" });
+    const bJoined: TransportPeerInfo[] = [];
+    b.on("peer:joined", (peer) => bJoined.push(peer));
+    await joinRoom(a);
+    await joinRoom(b);
+
+    // Disconnect (clean leave) then reconnect (fresh join): the peer
+    // observes leave then a second join, and messages flow again.
+    await a.leave();
+    expect(a.connectionState).toBe("disconnected");
+    expect(b.peers).toHaveLength(0);
+    await joinRoom(a);
+    expect(a.connectionState).toBe("connected");
+    expect(b.peers.map((p) => p.memberId)).toEqual(["member-a"]);
+    expect(bJoined).toHaveLength(2); // original join + rejoin
+
+    const received = collectMessages(b);
+    await a.send({ channel: "state", payload: "after-rejoin" });
+    hub.drain();
+    expect(received.map((m) => m.payload)).toEqual(["after-rejoin"]);
+  });
+
+  it("rejects a second join while joining or connected", async () => {
+    const hub = new InMemoryTransportHub();
+    const a = hub.createTransport({ memberId: "member-a", faults: { joinDelayMs: 30 } });
+    const join = joinRoom(a);
+    await expect(joinRoom(a)).rejects.toThrow(/already joining/);
+    await join;
+    await expect(joinRoom(a)).rejects.toThrow(/already connected/);
+  });
   it("lets two independent transports communicate in the same room", async () => {
     const hub = new InMemoryTransportHub();
     const a = hub.createTransport({ memberId: "member-a" });

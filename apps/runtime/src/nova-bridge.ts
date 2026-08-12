@@ -16,15 +16,13 @@
  *   metadata; threat model T10). The lifecycle is enforced in the frame too,
  *   so calls fail with a clear `NovaError` before readiness (S1 acceptance).
  *
- * S1 note: the runtime page validates forwarded calls but cannot route them
- * to a party session yet — no host-side session router exists before the
- * arena/party milestones (U6/P1). Validated calls therefore surface as a
- * clear `runtime.error` (category `unsupported`) instead of being silently
- * dropped; the session-router milestones replace that branch with real
- * forwarding. The in-frame lifecycle guarantees that everything reachable in
- * S1 (registration, logging, subscriptions, reads) behaves exactly like the
- * arena client; post-start calls cannot occur in S1 because no inbound path
- * delivers `onStart` to the frame yet.
+ * S1 note: the runtime page validates forwarded calls and — since the host
+ * session router landed (U6 arena, P1 party) — forwards them to the host as
+ * `game.apiCall` messages, which the host routes into the player's
+ * NovaSession over the transport. Host-pushed session events arrive as
+ * `game.apiEvent` and are dispatched to the matching handlers by
+ * `__novaGameBridge.receive`. The in-frame lifecycle guarantees that
+ * everything reachable behaves exactly like the arena client.
  *
  * The game frame is same-origin with the runtime page (ADR-0008/B5), so the
  * bridge reports through a per-instance hook on the runtime page rather than
@@ -162,6 +160,23 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
   var readySent = false;
   var started = false;
   var ended = false;
+  // Session state pushed by the host (U6 session router): this player's
+  // identity, the player list, the connection status, and canonical state.
+  // The identity comes from the validated runtime.bootstrap, injected by the
+  // runtime page before the bridge runs.
+  var selfPlayer = null;
+  var players = [];
+  var connectionStatus = 'disconnected';
+  var stateValue = null;
+  try {
+    var bootstrapPlayer = window.__novaBootstrap && window.__novaBootstrap.player;
+    if (bootstrapPlayer && bootstrapPlayer.memberId) {
+      selfPlayer = {
+        id: String(bootstrapPlayer.memberId),
+        name: String(bootstrapPlayer.displayName || bootstrapPlayer.memberId)
+      };
+    }
+  } catch (_) {}
 
   function NovaError(code, message) {
     this.name = 'NovaError';
@@ -207,7 +222,7 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
   var simulationSnapshotHandler = null;
 
   var stateHandle = {
-    get: function () { return null; },
+    get: function () { return stateValue; },
     onChange: function (fn) { return subscribe(stateHandlers, fn); }
   };
   var rawHandle = {
@@ -244,6 +259,94 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
     }
   };
 
+  function hasPlayer(id) {
+    for (var i = 0; i < players.length; i++) {
+      if (players[i].id === id) return true;
+    }
+    return false;
+  }
+  function removePlayer(id) {
+    for (var i = 0; i < players.length; i++) {
+      if (players[i].id === id) { players.splice(i, 1); return; }
+    }
+  }
+  function callHandlers(list, arg) {
+    var copy = list.slice();
+    for (var i = 0; i < copy.length; i++) {
+      try { copy[i](arg); } catch (_) {}
+    }
+  }
+  /**
+   * Receive one host-pushed session event (a validated \`game.apiEvent\`
+   * payload: \`kind\` plus the event's data fields) and dispatch it to the
+   * matching window.nova handlers. Plain data only: game-registered
+   * functions never cross the frame.
+   */
+  function receive(kind, payload) {
+    switch (kind) {
+      case 'identity':
+        if (payload && payload.player && payload.player.id) selfPlayer = payload.player;
+        break;
+      case 'playerJoined': {
+        var joined = payload && payload.player;
+        if (joined && joined.id && !hasPlayer(joined.id)) players.push(joined);
+        callHandlers(joinHandlers, joined);
+        break;
+      }
+      case 'playerLeft': {
+        var left = payload && payload.player;
+        if (left && left.id) removePlayer(left.id);
+        callHandlers(leaveHandlers, left);
+        break;
+      }
+      case 'connection':
+        connectionStatus = payload && payload.status;
+        callHandlers(connectionHandlers, connectionStatus);
+        break;
+      case 'start':
+        started = true;
+        callHandlers(startHandlers);
+        break;
+      case 'end':
+        ended = true;
+        callHandlers(endHandlers, payload && payload.reason);
+        break;
+      case 'state':
+        stateValue = payload && payload.state;
+        callHandlers(stateHandlers, stateValue);
+        break;
+      case 'rawMessage':
+        if (payload && payload.channel) {
+          var list = rawHandlers[payload.channel];
+          if (list) {
+            var message = payload.message;
+            for (var j = 0; j < list.length; j++) {
+              try { list[j](message); } catch (_) {}
+            }
+          }
+        }
+        break;
+      case 'simulationInput':
+        if (simulationInputHandler) {
+          try { simulationInputHandler(payload && payload.input); } catch (_) {}
+        }
+        break;
+      case 'simulationSnapshot':
+        if (simulationSnapshotHandler) {
+          try { simulationSnapshotHandler(payload && payload.snapshot); } catch (_) {}
+        }
+        break;
+      case 'error':
+        if (payload) {
+          callHandlers(errorHandlers, new NovaError(
+            String(payload.code || 'runtime'),
+            String(payload.message || 'Runtime error')
+          ));
+        }
+        break;
+    }
+  }
+
   var api = {
     version: API_VERSION,
     defineGame: function (options) {
@@ -263,9 +366,9 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
       report('ready', {});
     },
     log: function () { console.log.apply(console, arguments); },
-    player: null,
-    players: [],
-    connectionStatus: 'disconnected',
+    get player() { return selfPlayer; },
+    get players() { return players; },
+    get connectionStatus() { return connectionStatus; },
     onPlayerJoin: function (fn) { return subscribe(joinHandlers, fn); },
     onPlayerLeave: function (fn) { return subscribe(leaveHandlers, fn); },
     onConnectionChange: function (fn) { return subscribe(connectionHandlers, fn); },
@@ -281,7 +384,7 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
     simulation: simulationHandle
   };
   window.nova = api;
-  window.__novaGameBridge = { version: ${PROTOCOL_VERSION} };
+  window.__novaGameBridge = { version: ${PROTOCOL_VERSION}, receive: receive };
 })();
 `;
 

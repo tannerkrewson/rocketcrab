@@ -285,7 +285,11 @@ export class InMemoryTransportHub {
 
   join(transport: InMemoryTransport, roomName: string, sessionId: SessionId): Promise<void> {
     this.assertNotDisposed();
-    if (transport.connectionState !== "idle") {
+    // "disconnected" joins like "idle": a transport that left cleanly can
+    // re-join the same (or a new) room with a fresh connection, exactly
+    // like a real transport (F11 rejoin). Sessions use this for the arena's
+    // disconnect → reconnect controls.
+    if (transport.connectionState !== "idle" && transport.connectionState !== "disconnected") {
       return Promise.reject(
         new Error(`InMemoryTransport.join: already ${transport.connectionState}; leave() first.`),
       );
