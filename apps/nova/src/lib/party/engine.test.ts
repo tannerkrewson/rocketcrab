@@ -796,6 +796,26 @@ describe("party engine — M1 lifecycle: backgrounding, resume, and F11 rejoin",
     expect(a.engine.getState().reconnectAttempts).toBe(0);
   });
 
+  it("rejoins with a fresh join when a failed attempt tore the room down", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    await runCreate(a, world);
+
+    // A failed reconnect on a real device tears the room down and leaves
+    // the transport idle/disconnected (relay_unreachable while offline);
+    // the next retry must re-join the private room from the party material.
+    const privateTransport = world.transports.find((t) => t.selfMemberId === a.memberId);
+    await privateTransport?.leave();
+    await settle(world);
+    expect(a.engine.getState().phase).toBe("reconnecting");
+
+    const reconnectPromise = a.engine.reconnect();
+    await settle(world);
+    await reconnectPromise;
+    expect(a.engine.getState().phase).toBe("lobby");
+    expect(a.engine.getState().connectionState).toBe("connected");
+  });
+
   it("a playing phone that backgrounds and returns rejoins into the playing game (S4 slice)", async () => {
     const world = makeWorld();
     const lifecycle = createMemoryLifecycleSource();
