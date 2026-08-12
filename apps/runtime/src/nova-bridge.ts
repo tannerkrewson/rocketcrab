@@ -29,6 +29,12 @@
  * a second postMessage channel — no extra message listeners, nothing to leak
  * across restarts. The bridge never touches the host origin, never touches
  * Trystero, and contains no Nova secrets.
+ *
+ * A3: `nova.media` is the experimental media surface (option 5 verdict in
+ * `docs/testing/media-bridging-findings.md`). It probes platform support and
+ * fails clearly (`media_unsupported`); it never reports media to the runtime
+ * because no media transport path exists in this build — the data-only
+ * protocol is untouched.
  */
 import {
   PROTOCOL_VERSION,
@@ -389,6 +395,37 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
     }
   };
 
+  // --- Experimental media surface (A3). ---
+  // The A3 spike verdict: media transport cannot cross the frame boundary
+  // in this build (Blocker Register B7; see docs/testing/
+  // media-bridging-findings.md). The surface exists so games can probe the
+  // platform and fail clearly; publish never reports to the runtime because
+  // there is no media transport path (the data-only protocol is untouched).
+  function mediaIsSupported() {
+    try {
+      if (typeof structuredClone !== 'function') return false;
+      if (typeof MediaStream === 'undefined') return false;
+      var probe = new MediaStream();
+      return structuredClone(probe) instanceof MediaStream;
+    } catch (_) { return false; }
+  }
+  function isMediaInput(value) {
+    if (value === null || value === undefined) return false;
+    if (typeof MediaStreamTrack !== 'undefined' && value instanceof MediaStreamTrack) return true;
+    if (typeof MediaStream !== 'undefined' && value instanceof MediaStream) return true;
+    return false;
+  }
+  var mediaHandle = {
+    isSupported: mediaIsSupported,
+    publish: function (trackOrStream) {
+      requireStarted('media.publish');
+      if (!isMediaInput(trackOrStream)) {
+        fail('invalid_options', 'nova.media.publish expects a MediaStreamTrack or MediaStream.');
+      }
+      fail('media_unsupported', 'Media transport is experimental in this build: camera/microphone media cannot cross the runtime frame boundary yet.');
+    }
+  };
+
   function hasPlayer(id) {
     for (var i = 0; i < players.length; i++) {
       if (players[i].id === id) return true;
@@ -558,7 +595,8 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
     },
     state: stateHandle,
     raw: rawHandle,
-    simulation: simulationHandle
+    simulation: simulationHandle,
+    media: mediaHandle
   };
   window.nova = api;
   window.__novaGameBridge = { version: ${PROTOCOL_VERSION}, receive: receive };

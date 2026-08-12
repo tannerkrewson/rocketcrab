@@ -38,6 +38,23 @@ describe("NOVA_BRIDGE_SCRIPT", () => {
     }
   });
 
+  it("exposes the experimental media surface and fails clearly (A3)", () => {
+    // The A3 verdict: media transport cannot cross the frame boundary in
+    // this build (option 5 — see docs/testing/media-bridging-findings.md).
+    // The bridge mirrors createNovaClient: probe + clear failure, no
+    // protocol message (the data-only MVP is untouched).
+    expect(NOVA_BRIDGE_SCRIPT).toContain("mediaHandle");
+    expect(NOVA_BRIDGE_SCRIPT).toContain("mediaIsSupported");
+    expect(NOVA_BRIDGE_SCRIPT).toContain("isMediaInput");
+    expect(NOVA_BRIDGE_SCRIPT).toContain("MediaStreamTrack");
+    expect(NOVA_BRIDGE_SCRIPT).toContain("media_unsupported");
+    expect(NOVA_BRIDGE_SCRIPT).toContain("requireStarted('media.publish')");
+    expect(NOVA_BRIDGE_SCRIPT).toContain("invalid_options");
+    // Experimental media never forwards to the runtime (no transport path),
+    // so it must not appear in the forwarded-call method list.
+    expect(NOVA_API_CALL_METHODS).not.toContain("media.publish");
+  });
+
   it("carries no game-hosting, deployment, or transport vocabulary", () => {
     expect(NOVA_BRIDGE_SCRIPT).not.toMatch(/host\(/i);
     expect(NOVA_BRIDGE_SCRIPT).not.toMatch(/deploy/i);
