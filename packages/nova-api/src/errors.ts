@@ -1,0 +1,70 @@
+/**
+ * Nova API errors.
+ *
+ * Every failure the game-facing API produces is a {@link NovaError} with a
+ * stable machine-readable `code`, so games can react to failures and the
+ * runtime can surface them clearly (S1 acceptance: API calls fail clearly
+ * before readiness; unknown methods or versions fail safely).
+ */
+
+/** Stable error codes of the Nova API. */
+export const NOVA_ERROR_CODES = {
+  /** `nova.defineGame` targets an API version this build cannot serve. */
+  unsupported_api_version: "unsupported_api_version",
+  /** A method that does not exist on this API version was invoked. */
+  unknown_method: "unknown_method",
+  /** `nova.defineGame` was called more than once. */
+  already_registered: "already_registered",
+  /** A call requires `nova.defineGame` to have run first. */
+  not_registered: "not_registered",
+  /** `nova.ready` was called more than once. */
+  already_ready: "already_ready",
+  /** A call is only available after the game starts (see `nova.onStart`). */
+  not_started: "not_started",
+  /** A lifecycle transition was attempted after the game already started. */
+  already_started: "already_started",
+  /** A call is not available after the game ended. */
+  ended: "ended",
+  /** Options or arguments failed structural validation. */
+  invalid_options: "invalid_options",
+  /** A payload is not JSON-serializable / structured-clone-compatible. */
+  invalid_payload: "invalid_payload",
+  /** A raw channel name is not known to this session. */
+  unknown_channel: "unknown_channel",
+  /** A raw channel name collides with a reserved protocol name. */
+  reserved_channel: "reserved_channel",
+  /** A targeted send referenced a player that is not connected. */
+  not_connected: "not_connected",
+  /** An inbound protocol message failed validation at the boundary. */
+  invalid_message: "invalid_message",
+  /** The host cannot perform the requested operation in this build. */
+  unsupported: "unsupported",
+} as const;
+
+export type NovaErrorCode = (typeof NOVA_ERROR_CODES)[keyof typeof NOVA_ERROR_CODES];
+
+/** A Nova API failure with a stable `code` and a human-readable message. */
+export class NovaError extends Error {
+  readonly code: NovaErrorCode;
+
+  constructor(code: NovaErrorCode, message: string) {
+    super(message);
+    this.name = "NovaError";
+    this.code = code;
+  }
+}
+
+/** Error message for calls gated on registration (S1 lifecycle). */
+export function notRegisteredMessage(method: string): string {
+  return `nova.${method}() must be called after nova.defineGame().`;
+}
+
+/** Error message for calls gated on game start (S1 lifecycle). */
+export function notStartedMessage(method: string): string {
+  return `nova.${method}() is only available after the game starts (see nova.onStart).`;
+}
+
+/** Error message for calls after the game ended (S1 lifecycle). */
+export function endedMessage(method: string): string {
+  return `nova.${method}() is not available after the game ended.`;
+}
