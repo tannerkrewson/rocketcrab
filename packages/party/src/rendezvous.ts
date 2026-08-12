@@ -595,6 +595,13 @@ export class PartySession {
       void this.becomeGreeter().catch((error: unknown) => this.emitError(error));
       return;
     }
+    if (this._amGreeter) {
+      // Another member took over the greeter role (e.g. our connection
+      // dropped and the party migrated while we were away): step down so
+      // the rendezvous room never has two advertisers (F11 rejoin).
+      this._amGreeter = false;
+      void this.teardownRendezvous().catch((error: unknown) => this.emitError(error));
+    }
     this._greeterMemberId = greeterMemberId;
     this.emit({ type: "greeter", greeterMemberId });
   }
@@ -872,8 +879,8 @@ export async function joinPartyByCode(options: JoinByCodeOptions): Promise<Party
     memberId: options.memberId,
     displayName: options.displayName,
   });
-  await rendezvous.join({ room: rendezvousRoomName(code), sessionId: rendezvousSessionId(code) });
   try {
+    await rendezvous.join({ room: rendezvousRoomName(code), sessionId: rendezvousSessionId(code) });
     const adverts = await discoverAdverts({
       rendezvous,
       code,
