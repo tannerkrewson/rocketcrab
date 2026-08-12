@@ -10,6 +10,9 @@ const here = path.dirname(fileURLToPath(import.meta.url));
 const certDir = path.resolve(here, "../certs");
 const cert = path.join(certDir, "cert.pem");
 const key = path.join(certDir, "key.pem");
+// Optional LAN IP for physical-device testing (e.g. `node scripts/gen-certs.mjs 192.168.1.10`).
+// Without it, real iPhones/desktops on the LAN cannot trust the runtime iframe origin.
+const lanIp = process.argv[2] ?? "";
 
 if (existsSync(cert) && existsSync(key)) {
   console.log("[gen-certs] certs already present, skipping");
@@ -17,8 +20,9 @@ if (existsSync(cert) && existsSync(key)) {
 }
 
 mkdirSync(certDir, { recursive: true });
+const san = `DNS:localhost,IP:127.0.0.1${lanIp ? `,IP:${lanIp}` : ""}`;
 execSync(
-  `openssl req -x509 -newkey rsa:2048 -keyout ${key} -out ${cert} -days 30 -nodes -subj "/CN=localhost" -addext "subjectAltName=DNS:localhost,IP:127.0.0.1"`,
+  `openssl req -x509 -newkey rsa:2048 -keyout ${key} -out ${cert} -days 30 -nodes -subj "/CN=localhost" -addext "subjectAltName=${san}"`,
   { stdio: "inherit" },
 );
 console.log(`[gen-certs] generated self-signed certs in ${certDir}`);
