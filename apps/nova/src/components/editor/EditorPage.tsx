@@ -167,7 +167,8 @@ export function EditorPage({ game }: { game?: SavedGame }) {
     (event: RuntimeHostEvent) => {
       switch (event.type) {
         case "registration":
-          setRegistration({ gameMode: event.message.gameMode, title: event.message.title }); // A successful run of the *saved* source updates the saved-game
+          setRegistration({ gameMode: event.message.gameMode, title: event.message.title });
+          // A successful run of the *saved* source updates the saved-game
           // test metadata (U4 acceptance: successful tests update metadata).
           if (game && lastRunSourceRef.current !== null && lastRunSourceRef.current === game.html) {
             recordTestResults.mutate({
@@ -384,8 +385,9 @@ export function EditorPage({ game }: { game?: SavedGame }) {
 
   // Unsaved-change protection (U4): block in-app navigation and tab close
   // while the draft differs from the saved version, with a custom dialog.
+  const shouldBlockNavigation = useCallback(() => dirty, [dirty]);
   const blocker = useBlocker({
-    shouldBlockFn: () => dirty,
+    shouldBlockFn: shouldBlockNavigation,
     enableBeforeUnload: dirty,
     withResolver: true,
   });
