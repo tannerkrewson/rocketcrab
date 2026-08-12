@@ -785,7 +785,13 @@ export class ArenaEngine {
           );
           return;
         }
-        session.sendSimulationInput(parsed.data.input);
+        try {
+          session.sendSimulationInput(parsed.data.input);
+        } catch (error) {
+          // Rate-limit and connectivity rejections surface as Nova errors
+          // (the frame observes them through nova.onError).
+          this.logPlayer(runtime.spec.id, "error", errorMessage(error));
+        }
         break;
       }
       case "stateResponse": {

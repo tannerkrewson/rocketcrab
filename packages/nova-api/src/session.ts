@@ -395,6 +395,19 @@ export class NovaSession implements NovaClientBackend {
     return this.simulationEngine.getDiagnostics();
   }
 
+  /**
+   * The latest replicated authoritative simulation snapshot this shell
+   * retains (A1; host-side only — the game frame receives it through
+   * `nova.simulation`'s `onSnapshot`). Null before the first snapshot.
+   */
+  getSimulationSnapshot(): {
+    tick: number;
+    state: unknown;
+    stateHash: string | null;
+  } | null {
+    return this.simulationEngine.getLatestSnapshot();
+  }
+
   /** Raw-mode traffic diagnostics (A2; host/arena visible). */
   getRawDiagnostics(): NovaRawDiagnostics {
     this.pruneRawRateWindow();
@@ -828,6 +841,20 @@ export class NovaSession implements NovaClientBackend {
         }),
       { seq },
     ).catch((error: unknown) => this.emitError(error));
+    // Local loop-back: the sender's own frame receives its input exactly
+    // like every other player's (a uniform onInput contract — the game
+    // applies every input, including its own, in onInput/onTick; the
+    // transport never loops a broadcast back to its sender).
+    this.simulationEngine.handleInputReceived(Date.now());
+    this.emit({
+      type: "simulationInput",
+      input: {
+        type: input.type,
+        payload: input.payload,
+        ...(input.tick !== undefined ? { tick: input.tick } : {}),
+        sender: this.player,
+      },
+    });
   }
 
   onEvent(handler: (event: NovaSessionEvent) => void): () => void {
