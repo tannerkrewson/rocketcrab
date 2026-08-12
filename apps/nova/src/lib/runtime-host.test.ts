@@ -310,6 +310,40 @@ describe("RuntimeHostClient heartbeat", () => {
     });
     expect(events.map((e) => e.type)).toContain("responsive");
   });
+
+  it("pauses while the page is hidden and re-syncs with an immediate ping on return (M1)", async () => {
+    vi.useFakeTimers();
+    const harness = createHarness();
+    const { bridge, port1 } = harness;
+    const loadPromise = bridge.load(loadGame);
+    deliver(port1, readyMessage());
+    await loadPromise;
+
+    // Hidden: the heartbeat stops (no new pings while backgrounded).
+    bridge.setPageVisibility(true);
+    const pingsBefore = port1.sent.filter(
+      (m) => (m as { type: string }).type === "runtime.ping",
+    ).length;
+    vi.advanceTimersByTime(10_000);
+    const pingsAfter = port1.sent.filter(
+      (m) => (m as { type: string }).type === "runtime.ping",
+    ).length;
+    expect(pingsAfter).toBe(pingsBefore);
+
+    // Return: an immediate ping re-syncs, then the interval resumes.
+    bridge.setPageVisibility(false);
+    const last = port1.sent.at(-1) as { type: string };
+    expect(last.type).toBe("runtime.ping");
+    deliver(port1, {
+      version: 1,
+      runtimeInstanceId: "runtime-1",
+      messageId: "message-pong-resume",
+      sentAt: 1_700_000_000_030,
+      type: "runtime.pong",
+    });
+    vi.advanceTimersByTime(1000);
+    expect((port1.sent.at(-1) as { type: string }).type).toBe("runtime.ping");
+  });
 });
 
 describe("RuntimeHostClient parent controls", () => {

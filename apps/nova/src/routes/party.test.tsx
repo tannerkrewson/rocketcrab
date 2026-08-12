@@ -1,9 +1,14 @@
 import { RouterProvider, createMemoryHistory, createRouter } from "@tanstack/react-router";
-import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { gameRepository } from "../lib/games/instance";
 import type { PartyEngineState } from "../lib/party/engine";
+import {
+  clearPartyRecovery,
+  readPartyRecovery,
+  savePartyRecovery,
+} from "../lib/party/party-recovery";
 import { resetPartySourceForTests, storePartySource } from "../lib/party/source-handoff";
 import { routeTree } from "../routeTree.gen";
 
@@ -80,6 +85,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   await gameRepository.clear();
   resetPartySourceForTests();
+  clearPartyRecovery();
 });
 
 describe("/party", () => {
@@ -117,5 +123,39 @@ describe("/party", () => {
     expect(stubEngine.createParty).toHaveBeenCalledWith(
       expect.objectContaining({ gameId: game.id, source: unsaved }),
     );
+  });
+
+  it("offers a one-tap rejoin from a saved recovery record after a reload (M1)", async () => {
+    const secret = "B".repeat(43);
+    savePartyRecovery({
+      role: "joiner",
+      code: "ABCD",
+      secret,
+      memberId: "member-a",
+      displayName: "Player A",
+      game: { gameId: "game-1", title: "Rocket Rumble", mode: "state" },
+    });
+    renderParty("/party");
+    expect(await screen.findByTestId("party-resume-banner")).toBeInTheDocument();
+    expect(screen.getByText(/Rocket Rumble/)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /rejoin party/i }));
+    await waitFor(() =>
+      expect(stubEngine.joinByInvite).toHaveBeenCalledWith({ secret, code: "ABCD" }),
+    );
+  });
+
+  it("dismissing the resume banner clears the recovery record", async () => {
+    savePartyRecovery({
+      role: "joiner",
+      code: "ABCD",
+      secret: "C".repeat(43),
+      memberId: "member-a",
+      displayName: "Player A",
+      game: null,
+    });
+    renderParty("/party");
+    fireEvent.click(await screen.findByRole("button", { name: /not now/i }));
+    expect(screen.queryByTestId("party-resume-banner")).not.toBeInTheDocument();
+    expect(readPartyRecovery()).toBeNull();
   });
 });

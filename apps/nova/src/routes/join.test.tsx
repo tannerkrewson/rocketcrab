@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PartyEngineState } from "../lib/party/engine";
 import { resetInviteImportForTests } from "../lib/party/invite-import";
+import { clearPartyRecovery, savePartyRecovery } from "../lib/party/party-recovery";
 import { routeTree } from "../routeTree.gen";
 
 /**
@@ -79,6 +80,7 @@ const VALID_SECRET = "A".repeat(43);
 beforeEach(() => {
   vi.clearAllMocks();
   resetInviteImportForTests();
+  clearPartyRecovery();
   window.history.pushState({}, "", "/join");
 });
 
@@ -114,5 +116,23 @@ describe("/join", () => {
     await waitFor(() => expect(window.location.hash).toBe(""));
     expect(stubEngine.joinByInvite).not.toHaveBeenCalled();
     expect(stubEngine.joinByCode).not.toHaveBeenCalled();
+  });
+
+  it("offers a one-tap rejoin from a saved recovery record (M1)", async () => {
+    const secret = "D".repeat(43);
+    savePartyRecovery({
+      role: "joiner",
+      code: "EFGH",
+      secret,
+      memberId: "member-a",
+      displayName: "Player A",
+      game: { gameId: "game-1", title: "Rocket Rumble", mode: "state" },
+    });
+    renderJoin();
+    expect(await screen.findByTestId("party-resume-banner")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /rejoin party/i }));
+    await waitFor(() =>
+      expect(stubEngine.joinByInvite).toHaveBeenCalledWith({ secret, code: "EFGH" }),
+    );
   });
 });

@@ -292,6 +292,8 @@ export class PartyEngine {
   private phase: PartyPhase = "idle";
   private phaseDetail: string | null = null;
   private connectionState: TransportConnectionState = "idle";
+  /** True once this shell's game started (survives reconnects; M1). */
+  private gameStarted = false;
 
   // M1 lifecycle bookkeeping (ADR-0012/B6).
   private pageWasHidden = false;
@@ -642,6 +644,7 @@ export class PartyEngine {
     this.lastError = null;
     this.phase = "idle";
     this.phaseDetail = null;
+    this.gameStarted = false;
     this.reconnectAttempts = 0;
     this.offline = false;
     this.pageWasHidden = false;
@@ -1247,7 +1250,10 @@ export class PartyEngine {
       this.reconnectAttempts = 0;
       this.offline = false;
       this.cancelReconnectRetry();
-      this.phase = this.session?.isStarted() === true ? "playing" : "lobby";
+      // gameStarted (not session.isStarted()) decides the phase: followers
+      // never broadcast start themselves, so isStarted() is false for them
+      // even while their game is running (M1 restore-after-reconnect).
+      this.phase = this.gameStarted ? "playing" : "lobby";
       this.phaseDetail = null;
       this.emit();
       // Re-announce the game after a rejoin so this member's coordinator
@@ -1448,12 +1454,14 @@ export class PartyEngine {
         this.connectionState = "connected";
         break;
       case "start":
+        this.gameStarted = true;
         this.phase = "playing";
         this.phaseDetail = null;
         this.addNotice("info", "The game started.");
         this.emit();
         break;
       case "end":
+        this.gameStarted = false;
         this.endedReason = event.reason;
         this.phase = "lobby";
         this.phaseDetail = null;

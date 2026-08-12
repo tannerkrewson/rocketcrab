@@ -2,9 +2,12 @@ import { beforeEach, describe, expect, it } from "vitest";
 // The complete S4 example game document, verbatim (Vite ?raw import).
 import EXAMPLE_GAME_SOURCE from "../../../../../examples/games/nova-quiz.html?raw";
 import { parseInviteFragment, type PartyTransportFactory } from "@rocketcrab/party";
+import type { NovaTransport, TransportEventMap } from "@rocketcrab/core";
 import { InMemoryTransportHub } from "@rocketcrab/testing";
 import type { ChannelPort } from "../runtime-host";
 import { PartyEngine, type PartyRuntimeSeams } from "./engine";
+import { createMemoryLifecycleSource } from "./lifecycle";
+import { clearPartyRecovery, readPartyRecovery } from "./party-recovery";
 
 /**
  * P4 party-engine integration tests: the complete user-facing party flow
@@ -217,7 +220,11 @@ function makeWorld(): World {
   return { clock, hub, transports, factory };
 }
 
-function makePlayer(world: World, id: string): Player {
+function makePlayer(
+  world: World,
+  id: string,
+  overrides: ConstructorParameters<typeof PartyEngine>[0] = {},
+): Player {
   const harness = createHostHarness();
   const memberId = `member-${id}`;
   const engine = new PartyEngine({
@@ -231,6 +238,7 @@ function makePlayer(world: World, id: string): Player {
     discoveryTimeoutMs: 20_000,
     admissionTimeoutMs: 30_000,
     advertIntervalMs: 5_000,
+    ...overrides,
   });
   const container = document.createElement("div");
   engine.setContainer(container);
@@ -290,6 +298,7 @@ function memberOf(state: ReturnType<PartyEngine["getState"]>, memberId: string) 
 
 beforeEach(() => {
   document.body.innerHTML = "";
+  clearPartyRecovery();
 });
 
 describe("party engine — two phones end to end", () => {
@@ -628,5 +637,262 @@ describe("the S4 example game over the party flow", () => {
     expect(world.hub.roomNames().every((room) => world.hub.membersOf(room).length === 0)).toBe(
       true,
     );
+  });
+});
+
+// ---------------------------------------------------------------------------
+// M1 — Mobile Safari lifecycle resilience (ADR-0012 / Blocker Register B6)
+// ---------------------------------------------------------------------------
+
+/**
+ * A transport wrapper that reports the delegate's state but whose pings
+ * never answer — the F11 shape: a backgrounded phone whose WebRTC link iOS
+ * killed silently, so the local transport still believes it is connected.
+ * The engine's resume health probe must detect this and rejoin fresh.
+ */
+class StalePingTransport implements NovaTransport {
+  readonly kind = "in-memory";
+
+  constructor(private readonly delegate: NovaTransport) {}
+
+  get selfMemberId(): string {
+    return this.delegate.selfMemberId;
+  }
+  get selfConnectionId(): string {
+    return this.delegate.selfConnectionId;
+  }
+  get connectionState() {
+    return this.delegate.connectionState;
+  }
+  get sessionId() {
+    return this.delegate.sessionId;
+  }
+  get peers() {
+    return this.delegate.peers;
+  }
+  on<K extends keyof TransportEventMap>(event: K, handler: TransportEventMap[K]): () => void {
+    return this.delegate.on(event, handler);
+  }
+  join(request: Parameters<NovaTransport["join"]>[0]): Promise<void> {
+    return this.delegate.join(request);
+  }
+  leave(): Promise<void> {
+    return this.delegate.leave();
+  }
+  reconnect(): Promise<void> {
+    return this.delegate.reconnect();
+  }
+  suspend(): Promise<void> {
+    return this.delegate.suspend();
+  }
+  resume(): Promise<void> {
+    return this.delegate.resume();
+  }
+  send(options: Parameters<NovaTransport["send"]>[0]): Promise<void> {
+    return this.delegate.send(options);
+  }
+  /** The lying probe: peers never answer, even though the link looks up. */
+  ping(): Promise<number | null> {
+    return Promise.resolve(null);
+  }
+}
+
+/** A world whose named member's private transport lies about pings (F11). */
+function makeWorldWithStaleJoiner(joinerMemberId: string): World {
+  const world = makeWorld();
+  const baseCreatePrivate = world.factory.createPrivateTransport.bind(world.factory);
+  world.factory.createPrivateTransport = (identity) => {
+    const transport = baseCreatePrivate(identity);
+    return identity.memberId === joinerMemberId ? new StalePingTransport(transport) : transport;
+  };
+  return world;
+}
+
+describe("party engine — M1 lifecycle: backgrounding, resume, and F11 rejoin", () => {
+  it("a backgrounded phone whose link went quiet rejoins with a fresh connection (F11)", async () => {
+    const world = makeWorldWithStaleJoiner("member-b");
+    const lifecycle = createMemoryLifecycleSource();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b", { lifecycle: lifecycle.source });
+    const code = await runCreate(a, world);
+    await registerLocalGame(a, world);
+
+    const { join: joinPromise, settled } = startJoin(b, world, code);
+    await settled;
+    a.engine.respondToJoinRequest(b.memberId, true);
+    await settle(world);
+    await joinPromise;
+    await settle(world);
+    expect(memberOf(b.engine.getState(), b.memberId).transferState).toBe("complete");
+    await registerLocalGame(b, world);
+    expect(a.engine.getState().members).toHaveLength(2);
+
+    // The phone backgrounds; iOS kills the WebRTC link, but the transport
+    // does not notice (it still reports connected). On return, the resume
+    // health probe must catch the dead link and rejoin with a fresh
+    // connection id instead of sitting on the stale handle.
+    lifecycle.hide();
+    expect(b.engine.getState().connectionState).toBe("connected");
+    lifecycle.show();
+    await settle(world);
+
+    const bState = b.engine.getState();
+    expect(bState.phase).toBe("lobby");
+    expect(bState.connectionState).toBe("connected");
+    expect(bState.reconnectAttempts).toBe(0);
+    expect(bState.members).toHaveLength(2);
+    // The other phone observed the leave + clean rejoin (F11: no stale peer).
+    expect(a.engine.getState().members).toHaveLength(2);
+  });
+
+  it("going offline enters the reconnect flow; coming back online reconnects automatically", async () => {
+    const world = makeWorld();
+    const lifecycle = createMemoryLifecycleSource();
+    const a = makePlayer(world, "a", { lifecycle: lifecycle.source });
+    await runCreate(a, world);
+    expect(a.engine.getState().phase).toBe("lobby");
+
+    lifecycle.goOffline();
+    expect(a.engine.getState().phase).toBe("reconnecting");
+    expect(a.engine.getState().phaseDetail).toMatch(/offline/i);
+
+    lifecycle.goOnline();
+    await settle(world);
+    expect(a.engine.getState().phase).toBe("lobby");
+  });
+
+  it("auto-retries with backoff while the connection stays down, then recovers", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    await runCreate(a, world);
+
+    const privateTransport = world.transports.find((t) => t.selfMemberId === a.memberId);
+    await privateTransport?.suspend();
+    await settle(world);
+    expect(a.engine.getState().phase).toBe("reconnecting");
+
+    // No manual reconnect: the scheduled auto-retry fires after the base
+    // backoff delay and rejoins.
+    world.clock.advance(5_000);
+    await settle(world);
+    expect(a.engine.getState().phase).toBe("lobby");
+    expect(a.engine.getState().reconnectAttempts).toBe(0);
+  });
+
+  it("reconnect() reports attempts while reconnecting and resets on success", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    await runCreate(a, world);
+
+    const privateTransport = world.transports.find((t) => t.selfMemberId === a.memberId);
+    await privateTransport?.suspend();
+    await settle(world);
+    expect(a.engine.getState().phase).toBe("reconnecting");
+
+    const reconnectPromise = a.engine.reconnect();
+    await settle(world);
+    await reconnectPromise;
+    expect(a.engine.getState().phase).toBe("lobby");
+    expect(a.engine.getState().reconnectAttempts).toBe(0);
+  });
+
+  it("a playing phone that backgrounds and returns rejoins into the playing game (S4 slice)", async () => {
+    const world = makeWorld();
+    const lifecycle = createMemoryLifecycleSource();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b", { lifecycle: lifecycle.source });
+    const code = await runCreate(a, world);
+    await registerLocalGame(a, world);
+
+    const { join: joinPromise, settled } = startJoin(b, world, code);
+    await settled;
+    a.engine.respondToJoinRequest(b.memberId, true);
+    await settle(world);
+    await joinPromise;
+    await settle(world);
+    await registerLocalGame(b, world);
+    a.engine.startGame();
+    await settle(world);
+    expect(a.engine.getState().phase).toBe("playing");
+    expect(b.engine.getState().phase).toBe("playing");
+
+    // The phone backgrounded: its transport suspends (iOS kills WebRTC);
+    // the page returns and the shell auto-reconnects.
+    lifecycle.hide();
+    const bTransport = world.transports.find(
+      (t) => t.selfMemberId === b.memberId && t.connectionState === "connected",
+    );
+    await bTransport?.suspend();
+    await settle(world);
+    expect(b.engine.getState().phase).toBe("reconnecting");
+
+    lifecycle.show();
+    await settle(world);
+    const bAfter = b.engine.getState();
+    console.log(
+      "B after resume:",
+      JSON.stringify({
+        phase: bAfter.phase,
+        conn: bAfter.connectionState,
+        attempts: bAfter.reconnectAttempts,
+        notices: bAfter.notices.map((n) => n.message),
+        detail: bAfter.phaseDetail,
+      }),
+    );
+    expect(b.engine.getState().phase).toBe("playing");
+    expect(b.engine.getState().connectionState).toBe("connected");
+    // The other phone kept playing through the backgrounding.
+    expect(a.engine.getState().phase).toBe("playing");
+  });
+});
+
+describe("party engine — M1 local recovery record", () => {
+  it("persists a recovery record on create and clears it on a clean leave", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    await runCreate(a, world);
+
+    const record = readPartyRecovery();
+    expect(record).not.toBeNull();
+    expect(record?.role).toBe("creator");
+    expect(record?.code).toBe(a.engine.getState().code);
+    expect(record?.game?.gameId).toBe(GAME.gameId);
+    expect(record?.memberId).toBe(a.memberId);
+
+    await a.engine.leaveParty();
+    await settle(world);
+    expect(readPartyRecovery()).toBeNull();
+  });
+
+  it("a reloaded page rejoins the live party from the saved record (M1)", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const code = await runCreate(a, world);
+    const record = readPartyRecovery();
+    expect(record).not.toBeNull();
+
+    // The phone reloaded: a brand-new engine (fresh page) with the SAME
+    // persisted identity reads the record and rejoins by invite.
+    const reloaded = makePlayer(world, "reload", {
+      identity: {
+        memberId: record?.memberId ?? "member-reload",
+        displayName: record?.displayName ?? "Player RELOAD",
+      },
+    });
+    const joinPromise = reloaded.engine.joinByInvite({
+      secret: record?.secret ?? "",
+      code: record?.code ?? code,
+    });
+    await settle(world);
+    await joinPromise;
+    expect(reloaded.engine.getState().phase).toBe("lobby");
+    expect(reloaded.engine.getState().code).toBe(code);
+    await settle(world);
+    expect(a.engine.getState().members).toHaveLength(2);
+
+    await reloaded.engine.leaveParty();
+    await a.engine.leaveParty();
+    await settle(world);
+    expect(readPartyRecovery()).toBeNull();
   });
 });
