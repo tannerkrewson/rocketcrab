@@ -63,13 +63,19 @@ function cspMetaPlugin(): Plugin {
         ...(runtimeOrigin === "" ? [] : [runtimeOrigin]),
         ...CLASSIC_FRAME_ORIGINS,
       ];
+      // Scoped CORS relay origin (rocketcrab-9fv.7.7.5): when the deploy
+      // workflow sets VITE_CLASSIC_RELAY_ORIGIN, allow the classic
+      // room-creation relay in connect-src. Empty by default — the classic
+      // games keep their documented direct-fetch behavior until then.
+      const relayOrigin = process.env.VITE_CLASSIC_RELAY_ORIGIN?.trim() ?? "";
+      const relayConnectSrc = relayOrigin === "" ? "" : ` ${new URL(relayOrigin).origin}`;
       const csp = [
         "default-src 'self'",
         "script-src 'self'",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob:",
         "font-src 'self' data:",
-        "connect-src 'self' wss: ws:",
+        `connect-src 'self' wss: ws:${relayConnectSrc}`,
         "media-src 'self' blob:",
         "worker-src 'self' blob:",
         "object-src 'none'",
