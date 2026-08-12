@@ -39,27 +39,33 @@ const IDLE_STATE: PartyEngineState = {
   lastError: null,
 };
 
-const { stubEngine } = vi.hoisted(() => ({
-  stubEngine: {
-    getState: vi.fn((): PartyEngineState => IDLE_STATE),
-    onState: vi.fn(() => () => undefined),
-    isActive: vi.fn(() => false),
-    setContainer: vi.fn(),
-    setDisplayName: vi.fn(),
-    selectGame: vi.fn(async () => undefined),
-    retrySetup: vi.fn(),
-    dismissError: vi.fn(),
-    createParty: vi.fn(async () => undefined),
-    joinByCode: vi.fn(async () => undefined),
-    joinByInvite: vi.fn(async () => undefined),
-    respondToJoinRequest: vi.fn(),
-    startGame: vi.fn(),
-    endGame: vi.fn(),
-    leaveParty: vi.fn(async () => undefined),
-    reconnect: vi.fn(async () => undefined),
-    refreshDiagnostics: vi.fn(async () => undefined),
-  },
-}));
+const { stubEngine, stubs } = vi.hoisted(() => {
+  const stubs = { joinCalled: false };
+  return {
+    stubs,
+    stubEngine: {
+      getState: vi.fn((): PartyEngineState => (stubs.joinCalled ? ERROR_STATE : IDLE_STATE)),
+      onState: vi.fn(() => () => undefined),
+      isActive: vi.fn(() => false),
+      setContainer: vi.fn(),
+      setDisplayName: vi.fn(),
+      selectGame: vi.fn(async () => undefined),
+      retrySetup: vi.fn(),
+      dismissError: vi.fn(),
+      createParty: vi.fn(async () => undefined),
+      joinByCode: vi.fn(async () => {
+        stubs.joinCalled = true;
+      }),
+      joinByInvite: vi.fn(async () => undefined),
+      respondToJoinRequest: vi.fn(),
+      startGame: vi.fn(),
+      endGame: vi.fn(),
+      leaveParty: vi.fn(async () => undefined),
+      reconnect: vi.fn(async () => undefined),
+      refreshDiagnostics: vi.fn(async () => undefined),
+    },
+  };
+});
 
 vi.mock("../lib/party/engine", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/party/engine")>();
@@ -81,8 +87,16 @@ function renderJoin() {
 
 const VALID_SECRET = "A".repeat(43);
 
+const ERROR_STATE: PartyEngineState = {
+  ...IDLE_STATE,
+  phase: "error",
+  lastError:
+    "No party is advertising code ZZZZ. Double-check the code with your friend and that they are waiting in their lobby.",
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
+  stubs.joinCalled = false;
   resetInviteImportForTests();
   clearPartyRecovery();
   window.history.pushState({}, "", "/join");
@@ -101,7 +115,7 @@ describe("/join", () => {
     fireEvent.change(nameInput, { target: { value: "Ada" } });
     const input = await screen.findByLabelText("Four-letter party code");
     fireEvent.change(input, { target: { value: " abcd " } });
-    fireEvent.click(screen.getByRole("button", { name: /join party/i }));
+    fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
     await waitFor(() => expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada"));
     await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("ABCD"));
   });
@@ -123,6 +137,33 @@ describe("/join", () => {
     await waitFor(() => expect(window.location.hash).toBe(""));
     expect(stubEngine.joinByInvite).not.toHaveBeenCalled();
     expect(stubEngine.joinByCode).not.toHaveBeenCalled();
+  });
+
+  it("keeps Join disabled until the code is four letters", async () => {
+    renderJoin();
+    const input = await screen.findByLabelText("Four-letter party code");
+    const joinButton = screen.getByRole("button", { name: /^join$/i });
+    expect(joinButton).toBeDisabled();
+    fireEvent.change(input, { target: { value: "abc" } });
+    expect(joinButton).toBeDisabled();
+    fireEvent.change(input, { target: { value: "abcd" } });
+    expect(joinButton).toBeEnabled();
+  });
+
+  it("filters non-letter key presses on the code input", async () => {
+    renderJoin();
+    const input = await screen.findByLabelText("Four-letter party code");
+    expect(fireEvent.keyDown(input, { key: "1" })).toBe(false); // defaultPrevented
+    expect(fireEvent.keyDown(input, { key: "a" })).toBe(true);
+  });
+
+  it("shows a classic 'does not exist' inline error for an unadvertised code", async () => {
+    renderJoin();
+    const input = await screen.findByLabelText("Four-letter party code");
+    fireEvent.change(input, { target: { value: "zzzz" } });
+    fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
+    await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("ZZZZ"));
+    expect(await screen.findByText(/ZZZZ does not exist/)).toBeInTheDocument();
   });
 
   it("offers a one-tap rejoin from a saved recovery record (M1)", async () => {
