@@ -14,14 +14,16 @@ export default defineConfig({
   expect: { timeout: 20_000 },
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
-    baseURL: "http://localhost:5199",
+    baseURL: "https://localhost:5199",
+    ignoreHTTPSErrors: true, // spike certs are self-signed
     trace: "on-first-retry",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],
   webServer: {
     command: "node ../../node_modules/vite/bin/vite.js --port 5199 --strictPort",
-    url: "http://localhost:5199",
+    url: "https://localhost:5199",
     reuseExistingServer: !process.env.CI,
+    ignoreHTTPSErrors: true,
     timeout: 60_000,
   },
 });

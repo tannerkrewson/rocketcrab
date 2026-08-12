@@ -97,11 +97,29 @@ multiple pages in one headless Chromium instance on one machine.
   `incorrect room password when decrypting offer` (or `incorrect password for
 overlapping room` for overlapping-room cases) as a `JoinError`.
 
+- **F9 — The harness must be HTTPS for real devices (WebCrypto secure
+  context).** Trystero uses `crypto.subtle.importKey` (ECDH keygen) and
+  `crypto.subtle.digest` (room namespace hash). `crypto.subtle` is only
+  defined in secure contexts (HTTPS or `localhost`), so the harness served
+  over plain HTTP on a LAN IP fails at `genKey`/`deriveRoomNamespace` with
+  "Cannot read properties of undefined (reading 'importKey')" and peers
+  never appear (0 peers). The automated suite passed on `http://localhost`
+  precisely because localhost is a secure context, hiding this. Fixed
+  2026-08-01: spike serves HTTPS with the F4 spike's locally-trusted certs
+  (see checklist prerequisites).
+- **F10 — Trystero's default relays are unreliable; pin verified relays.**
+  On this network `wss://strfry.openhoofd.nl` fails TLS (`write EPROTO`)
+  and others in `defaultRelayUrls` are dead/flaky. The spike now pins
+  `GOOD_RELAYS` (`relay.damus.io`, `nos.lol`, `relay.primal.net`,
+  `nostr.mom`, `relay.snort.social`, `offchain.pub`, `relay.nostr.info` —
+  all probed reachable, 100–370 ms) with `relayConfig.urls` + redundancy 5.
+  The recommendation-table row below is updated accordingly.
+
 ## 5. Recommendations (automated-pass basis; pending human-pass confirmation)
 
 | Topic                             | Recommendation                                                                                                                                                                                                                                                                                                                                                                             |
 | --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| Default Nostr relay configuration | Ship with Trystero defaults (5 relays seeded by `appId`) for now, but make `relayConfig.urls` configurable and log which relays were selected. Re-evaluate pinning a curated healthy subset after the human pass measures real cross-network reliability.                                                                                                                                  |
+| Default Nostr relay configuration | Ship with a pinned verified-reachable subset (the spike uses `GOOD_RELAYS`, 7 relays probed healthy, redundancy 5) and log which relays were selected; keep `relayConfig.urls` configurable. Trystero's `defaultRelayUrls` include dead/flaky endpoints (F10) — do not ship defaults unverified. Re-evaluate after the human pass measures real cross-network reliability.                 |
 | TURN                              | **TURN disabled by default for the automated tests; likely required for phone-to-phone.** Cannot conclude until the human pass. Keep `turnConfig` wiring in the transport adapter from day one (a hook, not a hard dependency). If the human pass shows ordinary phone-to-phone fails without TURN, create the P0 TURN-credentials issue (per F5 blocking conditions) that blocks release. |
 | Connection timeout                | Impose a Nova-level discovery/join timeout (~20–30 s) with visible progress, because Trystero's join can otherwise hang silently (F5). Distinguish "still connecting" from "relay unreachable".                                                                                                                                                                                            |
 | Retry behavior                    | On structured `JoinError`: show the category (password mismatch, rejected, timed out) and offer retry. On relay failure: rely on built-in auto-reconnect, but surface relay state to the lobby; do not silently wait. Rejected joiners must leave the rendezvous immediately (F4).                                                                                                         |

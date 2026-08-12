@@ -8,16 +8,26 @@ runs this pass with a human.
 
 ## Prerequisites
 
-1. Serve the harness so phones can reach it:
+1. Serve the harness over **HTTPS** — required, not optional. Trystero uses
+   WebCrypto (`crypto.subtle.importKey` / `digest`), which only exists in
+   **secure contexts**. Plain HTTP works on `localhost` (a secure context —
+   which is why the automated suite passed) but on a LAN IP `crypto.subtle`
+   is undefined and room creation fails with "Cannot read properties of
+   undefined (reading 'importKey')". The spike serves HTTPS with the same
+   locally-trusted certs as the F4 spike (`vite.config.ts` + `certs/`):
    ```sh
    cd spikes/trystero-connectivity
-   npm run dev:host        # vite on 0.0.0.0:5199
+   npm run dev:host        # HTTPS on 0.0.0.0:5199
    # or: npm run build && npm run preview -- --host 0.0.0.0
    ```
-   Get this machine's LAN IP (`hostname -I` or `ipconfig`). Phones must open
-   `http://<LAN-IP>:5199`. (This URL only loads the page JS; all P2P traffic is
-   relays + WebRTC, so corporate/guest Wi-Fi may block the LAN URL — in that case
-   temporarily serve the harness from any HTTPS static host.)
+   Get this machine's LAN IP (`hostname -I` or `ipconfig`). Devices open
+   `https://<LAN-IP>:5199` and trust the self-signed cert once (iPhone:
+   install profile + enable full trust in Settings → General → About →
+   Certificate Trust Settings; desktop: `sudo trust anchor --store certs/cert.pem`
+   or click through once). The page also connects to public Nostr relays
+   (wss) for signaling; the spike pins verified-reachable relays
+   (`GOOD_RELAYS` in `src/driver.ts`) because Trystero's defaults include
+   dead/flaky relays.
 2. Devices: at least 2 desktop browsers (can be this machine + a second laptop)
    and at least 2 iPhones (Mobile Safari). Best coverage: one iPhone on the same
    Wi-Fi as a desktop, one iPhone on cellular.
