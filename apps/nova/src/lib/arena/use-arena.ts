@@ -95,6 +95,8 @@ export function useArena(options: UseArenaOptions) {
       setDropMessages: (enabled: boolean) => engineRef.current?.setDropMessages(enabled),
       clearLogs: () => engineRef.current?.clearLogs(),
       restartAll: () => engineRef.current?.restartAll(),
+      /** Replace the tested source and restart every player (7.40). */
+      replaceSource: (source: string) => void engineRef.current?.replaceSource(source),
       stop: () => engineRef.current?.stop(),
     }),
     [],

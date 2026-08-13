@@ -9,11 +9,10 @@ import { readDraftSource, storeDraftSource } from "../lib/editor/draft-handoff";
 import { routeTree } from "../routeTree.gen";
 
 /**
- * Generator page tests (A4): the /build route presents the short
- * explanation, the generated master prompt, the copy button with success
- * feedback, a link to the GitHub-hosted API reference, the examples link,
- * the continue-to-editor button, and the paste target that creates a new
- * local draft immediately.
+ * Generator page tests (A4): the /build route presents the generated master
+ * prompt, the copy button with success feedback, a link to the GitHub-hosted
+ * API reference, the examples link, and the open-the-editor action (7.44:
+ * no AI-slop prose, no paste box — the user pastes directly in the editor).
  */
 
 const PROMPT = buildMasterPrompt();
@@ -46,6 +45,7 @@ async function editorSourceTextbox() {
 
 beforeEach(() => {
   window.history.pushState({}, "", "/");
+  window.localStorage.clear();
 });
 
 afterEach(() => {
@@ -55,13 +55,10 @@ afterEach(() => {
 });
 
 describe("/build — master prompt generator", () => {
-  it("presents a short explanation and the generated prompt", async () => {
+  it("presents the generated prompt with the embedded API reference", async () => {
     renderBuild();
 
     expect(await screen.findByRole("heading", { name: "Build a game" })).toBeInTheDocument();
-    expect(
-      screen.getByText(/Copy the master prompt below into any AI chat service/),
-    ).toBeInTheDocument();
 
     // The complete generated prompt is present (inside the expandable panel).
     expect(screen.getByText(new RegExp("Nova Master Prompt"))).toBeInTheDocument();
@@ -110,31 +107,29 @@ describe("/build — master prompt generator", () => {
     expect(screen.getByText("Chatter (raw mode sample)")).toBeInTheDocument();
   });
 
-  it("continues to a blank editor without a stale draft", async () => {
+  it("has no AI-slop prose and no paste box (7.44)", async () => {
+    renderBuild();
+
+    // The paste-your-HTML-here flow is gone; the user pastes in the editor.
+    expect(screen.queryByTestId("paste-target")).not.toBeInTheDocument();
+    expect(screen.queryByRole("textbox", { name: "Paste game HTML" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open in the editor" })).not.toBeInTheDocument();
+    // No long descriptive intro paragraph or next-steps card.
+    expect(
+      screen.queryByText(/Copy the master prompt below into any AI chat service/),
+    ).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Next steps" })).not.toBeInTheDocument();
+  });
+
+  it("opens a blank editor without a stale draft", async () => {
     // A stale draft from a previous session must not leak into the blank editor.
     storeDraftSource("<p>stale draft</p>");
     renderBuild();
 
-    await userEvent.click(
-      await screen.findByRole("button", { name: "Continue to a blank editor" }),
-    );
+    await userEvent.click(await screen.findByRole("button", { name: "Open the editor" }));
 
     const editor = await editorSourceTextbox();
     expect(editor.textContent?.trim()).toBe("");
     expect(readDraftSource()).toBeNull();
-  });
-
-  it("turns pasted HTML into a new local draft immediately", async () => {
-    const pasted = "<!doctype html><title>Draft</title><p>hello nova</p>";
-    renderBuild();
-
-    await userEvent.type(await screen.findByRole("textbox", { name: "Paste game HTML" }), pasted);
-    await userEvent.click(screen.getByRole("button", { name: "Open in the editor" }));
-
-    const editor = await editorSourceTextbox();
-    expect(editor.textContent).toContain("hello nova");
-    const draft = readDraftSource();
-    expect(draft?.source).toBe(pasted);
-    expect(draft?.gameId.startsWith("draft-")).toBe(true);
   });
 });

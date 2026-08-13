@@ -12,6 +12,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { gameRepository } from "../../lib/games/instance";
 import { routeTree } from "../../routeTree.gen";
 import type { ChannelPort } from "../../lib/runtime-host";
+import { runToStart } from "../../lib/arena/test-harness";
 import { EditorRuntimeSeamsContext, type EditorRuntimeSeams } from "./EditorPage";
 
 /**
@@ -52,6 +53,7 @@ interface HostHarness {
   seams: EditorRuntimeSeams;
   windowMessages: Array<{ data: unknown }>;
   frames: HTMLIFrameElement[];
+  channels: Array<{ port1: FakePort; port2: FakePort }>;
   port1: FakePort;
   bootstraps: Record<string, unknown>[];
   ready(): void;
@@ -64,14 +66,14 @@ interface HostHarness {
 function createHostHarness(): HostHarness {
   const windowMessages: HostHarness["windowMessages"] = [];
   const frames: HTMLIFrameElement[] = [];
-  const channels: FakePort[] = [];
+  const channels: HostHarness["channels"] = [];
 
   const harness: HostHarness = {
     seams: {
       createChannel() {
         const port1 = createFakePort();
         const port2 = createFakePort();
-        channels.push(port1);
+        channels.push({ port1, port2 });
         return { port1, port2 };
       },
       async waitForFrameLoad(iframe) {
@@ -83,8 +85,9 @@ function createHostHarness(): HostHarness {
     },
     windowMessages,
     frames,
+    channels,
     get port1() {
-      return channels.at(-1) as FakePort;
+      return channels.at(-1)!.port1;
     },
     get bootstraps() {
       return windowMessages
@@ -202,6 +205,7 @@ async function editorInDesktop() {
 beforeEach(async () => {
   await gameRepository.clear();
   window.history.pushState({}, "", "/");
+  window.localStorage.clear();
 });
 
 afterEach(() => {
@@ -257,7 +261,7 @@ describe("/editor — paste, run, save", () => {
     expect(reopened.textContent).toContain("cards");
   });
 
-  it("test-multiplayer hands the current source to the arena and navigates", async () => {
+  it("test-multiplayer mounts the arena on the same page with the current source", async () => {
     const game = await gameRepository.create({ title: "Rocket Rumble", html: SAVED_SOURCE });
     mockClipboard(PASTED_SOURCE);
     const harness = createHostHarness();
@@ -271,14 +275,16 @@ describe("/editor — paste, run, save", () => {
     await waitFor(() => expect(editor.textContent).toContain("cards"));
     await userEvent.click(desktop.getByRole("button", { name: /Test multiplayer/ }));
 
-    // The arena route opens with the current (unsaved) source handed over.
-    await screen.findByTestId("arena-desktop");
-    const stored = JSON.parse(sessionStorage.getItem("nova:arena-source:v1") ?? "{}") as {
-      gameId?: string;
-      source?: string;
-    };
-    expect(stored.gameId).toBe(game.id);
-    expect(stored.source).toBe(PASTED_SOURCE);
+    // The arena opens in place on the same page (no navigation, no
+    // sessionStorage handoff) and runs the CURRENT (unsaved) source.
+    await screen.findByTestId("arena-section");
+    expect(screen.queryByTestId("phone-prompt")).toBeInTheDocument();
+    expect(sessionStorage.getItem("nova:arena-source:v1")).toBeNull();
+    await runToStart(harness.channels, 2);
+    const bootstraps = harness.windowMessages
+      .map((message) => message.data as Record<string, unknown>)
+      .filter((message) => message.type === "runtime.bootstrap");
+    expect(bootstraps[0]?.gameSource).toBe(PASTED_SOURCE);
     // The saved version is untouched.
     expect((await gameRepository.read(game.id)).html).toBe(SAVED_SOURCE);
   });
@@ -292,7 +298,49 @@ describe("/editor — paste, run, save", () => {
     await waitFor(() =>
       expect(desktop.getAllByText(/Game source is empty/).length).toBeGreaterThan(0),
     );
+    // The arena never mounts for an invalid source.
+    expect(screen.queryByTestId("arena-section")).not.toBeInTheDocument();
     expect(harness.bootstraps).toHaveLength(0);
+  });
+
+  it("clear-all deletes every line of code after confirmation", async () => {
+    mockClipboard(PASTED_SOURCE);
+    const harness = createHostHarness();
+    renderEditor(["/editor"], harness);
+
+    const desktop = await layout("desktop-layout");
+    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
+    const editor = await editorInDesktop();
+    await waitFor(() => expect(editor.textContent).toContain("cards"));
+
+    // Cancel keeps the code.
+    await userEvent.click(desktop.getByRole("button", { name: /Clear all/ }));
+    const dialog = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog).getByRole("button", { name: "Keep code" }));
+    expect(editor.textContent).toContain("cards");
+
+    // Confirm clears the editor.
+    await userEvent.click(desktop.getByRole("button", { name: /Clear all/ }));
+    const dialog2 = await screen.findByRole("dialog");
+    await userEvent.click(within(dialog2).getByRole("button", { name: /Clear all/ }));
+    await waitFor(() => expect(editor.textContent?.trim()).toBe(""));
+    expect(harness.bootstraps).toHaveLength(0);
+  });
+
+  it("shows the first-run tutorial and dismisses it permanently", async () => {
+    const harness = createHostHarness();
+    renderEditor(["/editor"], harness);
+
+    expect(await screen.findByTestId("first-run-tutorial")).toBeInTheDocument();
+    expect(screen.getByText(/New to Nova\? Here's how the editor works/)).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "Got it" }));
+    await waitFor(() => expect(screen.queryByTestId("first-run-tutorial")).not.toBeInTheDocument());
+
+    // A fresh visit (same browser) doesn't show it again.
+    document.body.innerHTML = "";
+    renderEditor(["/editor"], harness);
+    expect(screen.queryByTestId("first-run-tutorial")).not.toBeInTheDocument();
   });
 
   it("does not start a run for an empty source", async () => {
@@ -579,8 +627,9 @@ describe("phone layout", () => {
     expect(mobile.getByText("No runtime errors from the last run.")).toBeInTheDocument();
 
     // The sticky bar keeps Run and Save reachable on the phone.
-    expect(mobile.getByRole("button", { name: /^Run$/ })).toBeInTheDocument();
-    expect(mobile.getByRole("button", { name: /^Save$/ })).toBeInTheDocument();
+    const bar = within(await screen.findByTestId("mobile-actions-bar"));
+    expect(bar.getByRole("button", { name: /^Run$/ })).toBeInTheDocument();
+    expect(bar.getByRole("button", { name: /^Save$/ })).toBeInTheDocument();
   });
 
   it("replaces the runtime frame completely on every run (no HMR)", async () => {
