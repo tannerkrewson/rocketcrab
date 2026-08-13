@@ -6,6 +6,8 @@ import { cn } from "../../lib/cn";
 import { usePartyEngine } from "../../lib/party/use-party";
 import type { PartyEngineState } from "../../lib/party/engine";
 import { buildClassicGameUrl, findClassicGame } from "../../lib/classic";
+import { findNovaPrebuiltGame } from "../../lib/browse/nova-games";
+import type { BrowseEntry } from "../../lib/browse";
 import { gameRepository } from "../../lib/games/instance";
 import { Button } from "../ui/Button";
 import { ErrorPanel } from "../ui/ErrorPanel";
@@ -23,6 +25,11 @@ function errorMessage(error: unknown): string {
  * lifecycle phases — creating, joining, lobby, playing, reconnecting, and
  * errors — plus the single runtime-frame container that stays mounted for
  * the whole party (a phase change never destroys the game frame).
+ *
+ * Classic parity (7.38): the lobby has NO game preview (the frame loads
+ * invisibly so the ready gate still works), and while playing the top bar
+ * sits in flow ABOVE the frame — the frame fills the remaining space and is
+ * never a floating overlay.
  */
 export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
   const { state, engine, bindContainer } = usePartyEngine();
@@ -42,8 +49,8 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
     onLeft?.();
   };
 
-  // 7.6: the lobby's pick-a-game dialog loads the saved game and hands it
-  // to the engine, which registers/announces it for the whole party.
+  // 7.6: the lobby's browse loads a saved game and hands it to the engine,
+  // which registers/announces it for the whole party.
   const handlePickGame = async (gameId: string) => {
     try {
       const game = await gameRepository.read(gameId);
@@ -59,10 +66,44 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
     }
   };
 
-  // 7.7.4: picking a classic game hands the engine the game id; the host
-  // creates the room once and the party plane shares it with everyone.
-  const handlePickClassicGame = async (gameId: string) => {
-    await engine.selectClassicGame(gameId);
+  // 7.43: picking a prebuilt game (classic or nova) from the shared browse
+  // UI. Classic games hand the engine the game id (the host creates the
+  // room once and the party plane shares it); Nova games load their source
+  // and select it like a saved game.
+  const handlePickPrebuilt = async (entry: BrowseEntry) => {
+    if (entry.kind === "classic") {
+      await engine.selectClassicGame(entry.id);
+      return;
+    }
+    const prebuilt = findNovaPrebuiltGame(entry.id);
+    if (prebuilt === undefined) {
+      return;
+    }
+    try {
+      const { default: source } = await prebuilt.load();
+      await engine.selectGame({
+        gameId: entry.id,
+        title: entry.name,
+        mode: entry.mode,
+        source,
+        apiVersion: PROTOCOL_VERSION,
+      });
+    } catch (error) {
+      toast.error(`Couldn't load that game: ${errorMessage(error)}`);
+    }
+  };
+
+  /**
+   * Picking a game from the in-game browse while playing ends the running
+   * game first (session.end flips the phase back to lobby synchronously),
+   * then selects the new game — everyone returns to the lobby with the new
+   * game registered. From the lobby (never playing) the pick is direct.
+   */
+  const handlePickFromInGame = (pick: () => Promise<void>) => {
+    if (state.phase === "playing") {
+      engine.endGame("host_closed");
+    }
+    void pick();
   };
 
   // 7.29: in-game menu + lobby controls (classic parity).
@@ -82,16 +123,7 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
     toast.success("Name updated.");
   };
 
-  // The frame container: the same DOM node for the whole party. The lobby
-  // shows it as a preview card; the play shell expands it full-screen. For
-  // classic external iframe games (7.7.4) the container hosts a plain
-  // iframe built from the shared room URL spec instead of the Nova runtime.
-  const frameMounted =
-    state.phase === "lobby" ||
-    state.phase === "starting" ||
-    state.phase === "playing" ||
-    state.phase === "reconnecting";
-  const frameFullscreen = state.phase === "playing";
+  const playing = state.phase === "playing";
 
   // The per-player classic URL: the host merges the host overrides and
   // passes ishost=true; every other player builds the same room with their
@@ -109,53 +141,66 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
     );
   }, [state.classicGame, state.displayName, state.role]);
 
-  const frameContainer = frameMounted ? (
+  // The runtime frame container: ONE DOM node for the whole party. In the
+  // lobby it is invisible (7.38: no game preview — classic parity) but
+  // still mounted so the game boots and the ready gate opens; while
+  // playing the SAME node fills the space below the in-flow top bar (never
+  // remounted, never restarted). Classic games embed a plain iframe built
+  // from the shared room URL spec instead of the Nova runtime.
+  const frameArea =
     state.classicGame !== null ? (
-      <div
-        data-testid="party-classic-frame"
-        aria-label="Classic game"
-        className={cn(
-          "overflow-hidden bg-black",
-          frameFullscreen
-            ? "fixed inset-0 z-40"
-            : "relative h-64 w-full rounded-box border-2 border-base-300 md:h-96",
-        )}
-      >
-        {classicUrl !== null ? (
-          <iframe
-            key={state.classicFrameEpoch}
-            title={state.classicGame.title}
-            src={classicUrl}
-            className="h-full w-full border-0"
-            referrerPolicy="no-referrer"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center p-4 text-center text-sm font-semibold text-base-content/60">
-            Waiting for the host&apos;s room…
-          </div>
-        )}
-      </div>
+      playing ? (
+        <div
+          data-testid="party-classic-frame"
+          aria-label="Classic game"
+          className="h-full w-full overflow-hidden bg-black"
+        >
+          {classicUrl !== null ? (
+            <iframe
+              key={state.classicFrameEpoch}
+              title={state.classicGame.title}
+              src={classicUrl}
+              className="h-full w-full border-0"
+              referrerPolicy="no-referrer"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center p-4 text-center text-sm font-semibold text-base-content/60">
+              Waiting for the host&apos;s room…
+            </div>
+          )}
+        </div>
+      ) : null
     ) : (
       <div
         ref={bindContainer}
         data-testid="party-frame"
         aria-label="Your game"
-        className={cn(
-          "overflow-hidden bg-black",
-          frameFullscreen
-            ? "fixed inset-0 z-40"
-            : "relative h-64 w-full rounded-box border-2 border-base-300 md:h-96",
-        )}
+        className={cn("h-full w-full overflow-hidden bg-black", !playing && "invisible")}
       />
-    )
-  ) : null;
+    );
 
   // 7.22: the classic shell header (logo + big code + phonetic + invite)
-  // sits above every live party phase. During "playing" the fullscreen
-  // frame (z-40) covers it and the play shell's own top bar takes over.
-  // A kicked member (7.29) sees the removed panel instead of the shell.
+  // sits above every live party phase EXCEPT playing, where the in-flow
+  // play shell's compact top bar takes over (7.38).
   const shellShown = state.phase !== "idle" && state.phase !== "error" && state.phase !== "removed";
   const showInviteDetails = state.phase === "lobby" || state.phase === "starting";
+
+  if (playing) {
+    return (
+      <PartyPlayShell
+        state={state}
+        onEndGame={() => engine.endGame("host_closed")}
+        onLeave={() => void handleLeave()}
+        onReloadMyGame={handleReloadMyGame}
+        onReloadAllGames={handleReloadAllGames}
+        onKickMember={handleKickMember}
+        onPickGame={(gameId) => handlePickFromInGame(() => handlePickGame(gameId))}
+        onPickPrebuilt={(entry) => handlePickFromInGame(() => handlePickPrebuilt(entry))}
+      >
+        <div className="h-full w-full">{frameArea}</div>
+      </PartyPlayShell>
+    );
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -166,30 +211,13 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
           showInviteDetails={showInviteDetails}
         />
       ) : null}
-      {frameContainer}
-      {frameFullscreen ? (
-        // The play-shell controls float ABOVE the fullscreen frame; the
-        // container itself never moves so the runtime frame survives the
-        // lobby → playing transition (never remounted, never restarted).
-        <div className="pointer-events-none fixed inset-x-0 top-0 z-50 pt-safe">
-          <div className="pointer-events-auto">
-            <PartyPlayShell
-              state={state}
-              onEndGame={() => engine.endGame("host_closed")}
-              onLeave={() => void handleLeave()}
-              onReloadMyGame={handleReloadMyGame}
-              onReloadAllGames={handleReloadAllGames}
-              onKickMember={handleKickMember}
-            />
-          </div>
-        </div>
-      ) : null}
+      {frameArea}
       {renderPhase(
         state,
         engine,
         handleLeave,
         handlePickGame,
-        handlePickClassicGame,
+        handlePickPrebuilt,
         handleEditName,
         handleKickMember,
         onLeft,
@@ -203,7 +231,7 @@ function renderPhase(
   engine: ReturnType<typeof usePartyEngine>["engine"],
   handleLeave: () => Promise<void>,
   handlePickGame: (gameId: string) => Promise<void>,
-  handlePickClassicGame: (gameId: string) => Promise<void>,
+  handlePickPrebuilt: (entry: BrowseEntry) => Promise<void>,
   handleEditName: (name: string) => void,
   handleKickMember: (memberId: string) => void,
   onLeft?: () => void,
@@ -236,14 +264,14 @@ function renderPhase(
           onLeave={() => void handleLeave()}
           onRefreshDiagnostics={() => void engine.refreshDiagnostics()}
           onPickGame={(gameId) => void handlePickGame(gameId)}
-          onPickClassicGame={(gameId) => void handlePickClassicGame(gameId)}
+          onPickPrebuilt={(entry) => void handlePickPrebuilt(entry)}
           onKickMember={handleKickMember}
           onEditName={handleEditName}
         />
       );
     case "playing":
-      // The play shell controls are the fullscreen overlay above; the lobby
-      // content is intentionally hidden while playing.
+      // The play shell renders the whole playing view (in-flow top bar +
+      // frame); the lobby content is intentionally hidden while playing.
       return null;
     case "reconnecting":
       return (
