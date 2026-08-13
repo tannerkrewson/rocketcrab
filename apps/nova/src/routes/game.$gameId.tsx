@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { Button } from "../components/ui/Button";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
+import { ScreenshotCarousel } from "../components/games/ScreenshotCarousel";
 import { findBrowseGame } from "../lib/browse";
 import { NOVA_MODE_LABELS } from "../lib/browse/nova-games";
 import { storeDraftSource } from "../lib/editor/draft-handoff";
@@ -55,11 +56,12 @@ export function BrowseGamePage() {
     }
   };
 
+  // Classic games get a red badge, Nova games a blue one (7.42).
   const badge =
     game.kind === "classic" ? (
-      <span className="badge badge-info badge-outline font-bold">classic</span>
+      <span className="badge badge-error badge-outline font-bold">classic</span>
     ) : (
-      <span className="badge badge-accent badge-outline font-bold">
+      <span className="badge badge-info badge-outline font-bold">
         nova · {NOVA_MODE_LABELS[game.mode]}
       </span>
     );
@@ -116,17 +118,7 @@ export function BrowseGamePage() {
       {tab === "info" ? (
         <section aria-label="Info" className="flex flex-col gap-4">
           {game.pictures && game.pictures.length > 0 ? (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-              {game.pictures.map((src) => (
-                <img
-                  key={src}
-                  src={src}
-                  alt={`${game.name} screenshot`}
-                  loading="lazy"
-                  className="aspect-[4/3] w-full rounded-box border border-base-300 object-cover"
-                />
-              ))}
-            </div>
+            <ScreenshotCarousel images={game.pictures} gameName={game.name} />
           ) : null}
 
           <div className="flex flex-wrap gap-1.5">
@@ -206,22 +198,22 @@ export function BrowseGamePage() {
           <Link
             to="/classic/$gameId"
             params={{ gameId: game.id }}
-            className="btn btn-primary font-bold"
+            className="btn btn-primary w-full font-bold sm:w-fit"
           >
             <Play className="h-4 w-4" aria-hidden="true" />
             Play game
           </Link>
         ) : (
-          <Button variant="primary" onClick={() => void handleOpenNova()} disabled={opening}>
+          <Button
+            variant="primary"
+            className="w-full sm:w-fit"
+            onClick={() => void handleOpenNova()}
+            disabled={opening}
+          >
             <Code2 className="h-4 w-4" aria-hidden="true" />
             {opening ? "Opening…" : "Open in the editor"}
           </Button>
         )}
-        <span className="text-sm font-medium text-base-content/50">
-          {game.kind === "classic"
-            ? "Creates a room on the game's server, then embeds it."
-            : "Opens the game source as a new draft."}
-        </span>
       </div>
     </div>
   );
