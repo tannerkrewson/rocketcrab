@@ -77,14 +77,6 @@ export function BrowseGamePage() {
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-3xl font-black">{game.name}</h1>
           {badge}
-          {game.connectBlocked ? (
-            <span
-              className="badge badge-warning badge-outline font-bold"
-              title="The game's server blocks room creation from the browser (no CORS headers)."
-            >
-              room creation blocked
-            </span>
-          ) : null}
         </div>
         <p className="font-semibold text-base-content/50">by {game.author}</p>
         {game.players ? (
@@ -154,26 +146,6 @@ export function BrowseGamePage() {
                 </a>
               ) : null}
             </div>
-          ) : null}
-
-          {game.connectBlocked ? (
-            <p className="rounded-box border border-warning/40 bg-warning/10 p-3 text-sm text-base-content/80">
-              This game's server doesn't allow room creation from a browser (no CORS headers), so it
-              may not start from Nova yet. Play it on{" "}
-              {game.kind === "classic" && game.displayUrlHref ? (
-                <a
-                  href={game.displayUrlHref}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="link font-bold"
-                >
-                  {game.displayUrlText ?? "the game's site"}
-                </a>
-              ) : (
-                "the game's site"
-              )}{" "}
-              directly, or come back when Nova's scoped relay lands.
-            </p>
           ) : null}
         </section>
       ) : (

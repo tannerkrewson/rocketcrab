@@ -11,7 +11,7 @@ import { routeTree } from "../routeTree.gen";
  * Prebuilt-game browser tests (rocketcrab-9fv.7.7.2 / 7.23): /browse lists
  * classic external iframe games and Nova's own games together with distinct
  * badges, filters by search and category (classic layout: search + 2-column
- * category grid + cards), documents CORS-blocked games (7.7.3), and
+ * category grid + cards) with classic/nova badges, and
  * /browse/:gameId shows the classic Info | Guide detail with a play/open
  * action.
  */
@@ -63,13 +63,6 @@ describe("/browse", () => {
     for (const badge of novaBadges) {
       expect(badge.className).toContain("badge-info");
     }
-  });
-
-  it("marks CORS-blocked classic games with a warning (7.7.3)", async () => {
-    renderAt("/browse");
-
-    const blocked = await screen.findAllByText("room creation blocked");
-    expect(blocked.length).toBeGreaterThan(0);
   });
 
   it("filters games by search", async () => {
@@ -128,8 +121,6 @@ describe("/game/:gameId", () => {
     // Play action goes to the classic play route.
     const play = screen.getByRole("link", { name: /Play game/ });
     expect(play.getAttribute("href")).toBe("/classic/drawphone");
-    // CORS-blocked warning is documented on the detail too.
-    expect(screen.getByText(/room creation from a browser/)).toBeInTheDocument();
   });
 
   it("switches between Info and Guide tabs (classic layout)", async () => {

@@ -4,7 +4,7 @@ import { classicRelayBaseUrl, relayConfigured, relayRequest } from "./relay";
 /**
  * Scoped CORS relay client tests (rocketcrab-9fv.7.7.5): the relay base URL
  * comes from the VITE_CLASSIC_RELAY_ORIGIN build-time env (same pattern as
- * VITE_RUNTIME_ORIGIN, M2) and is empty until the relay is deployed.
+ * VITE_RUNTIME_ORIGIN, M2) and is empty when the build pins no origin.
  */
 
 describe("classicRelayBaseUrl / relayConfigured", () => {
@@ -30,9 +30,9 @@ describe("relayRequest", () => {
     vi.unstubAllEnvs();
   });
 
-  it("throws a clear error when the relay is not configured", async () => {
+  it("throws a clear error when the build pins no relay origin", async () => {
     await expect(relayRequest("drawphone-new")).rejects.toThrow(
-      /CORS relay, which isn't deployed/i,
+      /doesn't set VITE_CLASSIC_RELAY_ORIGIN/i,
     );
   });
 

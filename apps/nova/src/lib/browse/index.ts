@@ -20,7 +20,6 @@ export type BrowseEntry =
       players?: string;
       pictures?: string[];
       guideUrl?: string;
-      connectBlocked: boolean;
       displayUrlHref?: string;
       displayUrlText?: string;
       donationUrlHref?: string;
@@ -37,7 +36,6 @@ export type BrowseEntry =
       players?: string;
       pictures?: string[];
       guideUrl?: string;
-      connectBlocked: false;
       mode: NovaPrebuiltGame["mode"];
       load: NovaPrebuiltGame["load"];
     };
@@ -52,7 +50,6 @@ const classicEntries: BrowseEntry[] = CLASSIC_GAMES.map((game: ClassicGame) => (
   players: game.players,
   pictures: game.pictures,
   guideUrl: game.guideUrl,
-  connectBlocked: game.connectStatus === "blocked",
   displayUrlHref: game.displayUrlHref,
   displayUrlText: game.displayUrlText,
   donationUrlHref: game.donationUrlHref,
@@ -67,7 +64,6 @@ const novaEntries: BrowseEntry[] = NOVA_PREBUILT_GAMES.map((game) => ({
   author: "Rocketcrab Nova",
   description: game.description,
   category: ["nova"],
-  connectBlocked: false,
   mode: game.mode,
   load: game.load,
 }));

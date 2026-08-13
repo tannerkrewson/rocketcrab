@@ -3,15 +3,16 @@
  *
  * The relay (deploy/relay/worker.ts) forwards classic room-creation requests
  * to the allowlisted third-party endpoints so the browser never hits their
- * missing CORS headers. It is NOT deployed yet: the deploy workflow sets
- * VITE_CLASSIC_RELAY_ORIGIN to the relay's origin (the same pattern as
+ * missing CORS headers. It is deployed at VITE_CLASSIC_RELAY_ORIGIN (7.33,
+ * currently https://rocketcrab-cors-relay.tannerkrewson.workers.dev): the
+ * deploy workflow bakes that origin into the build (same pattern as
  * VITE_RUNTIME_ORIGIN, M2), and the strict CSP (apps/nova/vite.config.ts)
- * then allowlists that origin in connect-src. Until then, classic games with
- * CORS-blocked room creation keep their direct (failing) fetch path and the
- * "room creation blocked" browse badge stays accurate.
+ * then allowlists it in connect-src. Classic games whose endpoints send no
+ * CORS headers always create rooms through the relay; builds without the
+ * env var surface a readable error instead of a confusing CORS failure.
  */
 
-/** Base origin of the scoped CORS relay; "" until it is deployed. */
+/** Base origin of the scoped CORS relay; "" when the build pins no VITE_CLASSIC_RELAY_ORIGIN. */
 export function classicRelayBaseUrl(): string {
   const raw = import.meta.env.VITE_CLASSIC_RELAY_ORIGIN;
   return typeof raw === "string" ? raw.trim() : "";
@@ -57,8 +58,8 @@ export async function relayRequest<T>(
   const base = classicRelayBaseUrl();
   if (base === "") {
     throw new Error(
-      "This game creates rooms through the Rocketcrab CORS relay, which isn't deployed yet " +
-        "(VITE_CLASSIC_RELAY_ORIGIN unset; see deploy/relay).",
+      "This game creates rooms through the Rocketcrab CORS relay (deploy/relay), but this build " +
+        "doesn't set VITE_CLASSIC_RELAY_ORIGIN.",
     );
   }
   const res = await fetch(base, {

@@ -65,14 +65,6 @@ function GameCard({ game, onPick }: { game: BrowseEntry; onPick?: (entry: Browse
         <span className="flex flex-wrap items-center gap-2">
           <span className="font-black">{game.name}</span>
           <KindBadge kind={game.kind} />
-          {game.connectBlocked ? (
-            <span
-              className="badge badge-warning badge-outline font-bold"
-              title="The game's server blocks room creation from the browser (no CORS headers), so it may not start from Nova yet."
-            >
-              room creation blocked
-            </span>
-          ) : null}
         </span>
         <span className="text-sm font-medium text-base-content/50">by {game.author}</span>
       </span>
