@@ -1,15 +1,19 @@
 /**
- * The U6 multi-player test arena page.
+ * The U6 multi-player test arena, embedded in the consolidated editor page
+ * (7.40): several simulated players on one screen, each a real runtime
+ * frame (U3) connected through the InMemoryTransport (U5) via its own
+ * NovaSession (S1) — the runtime protocol is never bypassed.
  *
- * Several simulated players on one screen: each is a real runtime frame
- * (U3) connected through the InMemoryTransport (U5) via its own NovaSession
- * (S1) — the runtime protocol is never bypassed. Desktop shows a responsive
- * grid of player frames with a shared simulation toolbar; phones show one
- * player at a time in tabs with the shared controls in a collapsible panel
- * (never covering the game). Per-player connection state reflects the
- * simulated transport state (disconnect → leave, reconnect → rejoin,
- * suspend → background suspension), and every player's console/errors land
- * in its own log panel.
+ * This is the arena section of the editor, not a standalone page: the
+ * editor hands over the source that was on screen when the creator pressed
+ * Test multiplayer (frozen at that moment; the editor re-tests by passing a
+ * new source, which restarts every player). Desktop shows a responsive grid
+ * of player frames with a shared simulation toolbar; phones show one player
+ * at a time in tabs with the shared controls in a collapsible panel (never
+ * covering the game). Per-player connection state reflects the simulated
+ * transport state (disconnect → leave, reconnect → rejoin, suspend →
+ * background suspension), and every player's console/errors land in its own
+ * log panel.
  */
 import type { SavedGame } from "@rocketcrab/core";
 import { Link } from "@tanstack/react-router";
@@ -24,7 +28,6 @@ import {
   GripHorizontal,
   PartyPopper,
   Pause,
-  Pencil,
   Play,
   Plus,
   RotateCcw,
@@ -38,6 +41,7 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
@@ -127,22 +131,25 @@ function runStateLabel(player: ArenaPlayer): string {
   }
 }
 
-export interface ArenaPageProps {
-  /** Saved game under test (undefined for draft-arena mode). */
+export interface ArenaSectionProps {
+  /** Saved game under test (undefined for a blank-editor draft run). */
   game?: SavedGame;
-  /** Editor source override (test the current, possibly unsaved, source). */
-  overrideSource?: string;
-  /** Draft mode: test an unsaved editor source without a saved game. */
-  draftSource?: { gameId: string; source: string };
+  /**
+   * The source under test, frozen when the creator pressed Test
+   * multiplayer. Passing a NEW source restarts every player with it.
+   */
+  source: string;
+  /** The editor's current source differs from the frozen test source. */
+  stale: boolean;
+  /** Unmount the arena (stops every runtime frame). */
+  onClose: () => void;
 }
 
-export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps) {
+export function ArenaSection({ game, source, stale, onClose }: ArenaSectionProps) {
   const seams = useContext(ArenaRuntimeSeamsContext);
   const recordTestResults = useRecordTestResults();
 
-  const savedSource = game?.html ?? "";
-  const source = overrideSource ?? draftSource?.source ?? savedSource;
-  const gameId = game?.id ?? draftSource?.gameId ?? "draft";
+  const gameId = game?.id ?? "draft";
   const gameMode = game?.mode ?? "state";
 
   const onRunSucceeded = useCallback(
@@ -174,6 +181,16 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
     seams,
     onRunSucceeded,
   });
+
+  // The engine mounts once per arena mount; when the editor re-tests with a
+  // new source (a later Test-multiplayer press), restart every player with
+  // it instead of remounting the whole section.
+  const lastSourceRef = useRef(source);
+  useEffect(() => {
+    if (lastSourceRef.current === source) return;
+    lastSourceRef.current = source;
+    actions.replaceSource(source);
+  }, [actions, source]);
 
   const [activePlayerId, setActivePlayerId] = useState("player-1");
   const [newPlayerName, setNewPlayerName] = useState("");
@@ -328,7 +345,7 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
           </>
         ) : null}
         <Button
-          variant="ghost"
+          variant="outline"
           size="md"
           onClick={actions.clearLogs}
           title="Clear every player's logs"
@@ -336,26 +353,6 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
           <X className="h-4 w-4" aria-hidden="true" />
           Clear logs
         </Button>
-        {game !== undefined ? (
-          <Link
-            to="/games/$gameId/edit"
-            params={{ gameId: game.id }}
-            className="btn btn-outline btn-md font-bold"
-            title="Return to this game's editor"
-          >
-            <Pencil className="h-4 w-4" aria-hidden="true" />
-            Back to editor
-          </Link>
-        ) : (
-          <Link
-            to="/editor"
-            className="btn btn-outline btn-md font-bold"
-            title="Return to the editor"
-          >
-            <Pencil className="h-4 w-4" aria-hidden="true" />
-            Back to editor
-          </Link>
-        )}
         <Button
           variant="outline"
           size="md"
@@ -427,7 +424,7 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
         <div className="flex-1" />
         {player.sessionStatus === "disconnected" ? (
           <Button
-            variant="ghost"
+            variant="outline"
             size="md"
             onClick={() => void actions.reconnectPlayer(player.id)}
             title="Reconnect this player"
@@ -437,7 +434,7 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
           </Button>
         ) : (
           <Button
-            variant="ghost"
+            variant="outline"
             size="md"
             onClick={() => void actions.disconnectPlayer(player.id)}
             disabled={player.connectionState !== "connected"}
@@ -449,7 +446,7 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
         )}
         {player.sessionStatus === "suspended" ? (
           <Button
-            variant="ghost"
+            variant="outline"
             size="md"
             onClick={() => void actions.resumePlayer(player.id)}
             title="Resume this player from background suspension"
@@ -459,7 +456,7 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
           </Button>
         ) : (
           <Button
-            variant="ghost"
+            variant="outline"
             size="md"
             onClick={() => void actions.suspendPlayer(player.id)}
             disabled={player.connectionState !== "connected"}
@@ -470,7 +467,7 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
           </Button>
         )}
         <Button
-          variant="ghost"
+          variant="outline"
           size="md"
           onClick={() => actions.removePlayer(player.id)}
           title="Remove this player"
@@ -544,17 +541,27 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
   );
 
   return (
-    <div className="flex flex-col gap-4">
-      <header className="flex flex-wrap items-center gap-3">
+    <div className="flex flex-col gap-3" data-testid="arena-section">
+      <div className="flex flex-wrap items-center gap-3">
         <div className="min-w-0 flex-1">
-          <h1 className="text-2xl font-black">Test arena</h1>
+          <h2 className="flex items-center gap-2 text-xl font-black">
+            <FlaskConical className="h-5 w-5" aria-hidden="true" />
+            Multi-player test
+          </h2>
           <p className="text-sm text-base-content/70">
             {game !== undefined ? `“${game.title}” · ` : ""}
-            {overrideSource !== undefined && game !== undefined
-              ? "testing the editor's unsaved source"
-              : `${summary.total} simulated players on this page`}
+            {summary.total} simulated players on this page
+            {stale ? " · testing the editor's previous source" : ""}
           </p>
         </div>
+        {stale ? (
+          <span
+            className="badge badge-warning badge-md"
+            title="The editor changed since this test run"
+          >
+            Editor changed — press Test multiplayer to re-run
+          </span>
+        ) : null}
         {game !== undefined ? (
           <Link
             to="/party"
@@ -566,10 +573,16 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
             Play with friends
           </Link>
         ) : null}
-        <Link to="/library" className="btn btn-ghost btn-sm font-bold">
-          Back to games
-        </Link>
-      </header>
+        <Button
+          variant="outline"
+          size="md"
+          onClick={onClose}
+          title="Close the test arena and stop every simulated player"
+        >
+          <X className="h-4 w-4" aria-hidden="true" />
+          Close
+        </Button>
+      </div>
 
       {summaryBar}
 
@@ -646,7 +659,7 @@ export function ArenaPage({ game, overrideSource, draftSource }: ArenaPageProps)
               }}
             />
             <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setRenameTarget(null)}>
+              <Button variant="outline" onClick={() => setRenameTarget(null)}>
                 Cancel
               </Button>
               <Button variant="primary" onClick={handleRename}>

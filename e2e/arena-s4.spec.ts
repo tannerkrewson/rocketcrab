@@ -8,7 +8,7 @@
  * the real session engine. This is the "run four simulated players" step of
  * the S4 end-to-end flow, automated:
  *
- *  1. seed the example game as a draft arena source, open /test;
+ *  1. seed the example game as a draft, open /editor, press Test multiplayer;
  *  2. add players 3 and 4 (four simulated players total);
  *  3. play round 1: answer in every non-quizmaster frame, reveal via the
  *     quizmaster, verify the public results and scores;
@@ -171,16 +171,23 @@ async function capture(page: Page, name: string): Promise<void> {
   await page.screenshot({ path: path.join(dir, name), fullPage: false });
 }
 
-/** Seed the draft arena source, open the arena, and reach four players. */
+/** Seed the draft, open the consolidated editor, and reach four players in
+ *  the embedded test arena (the arena moved onto the editor page, 7.40). */
 async function openArenaWithFourPlayers(page: Page): Promise<void> {
+  // Seed the example game as a draft so the /editor route opens with it.
   await page.goto("/");
   await page.evaluate((source) => {
     sessionStorage.setItem(
-      "nova:arena-source:v1",
+      "nova:draft-source:v1",
       JSON.stringify({ gameId: "draft-s4", source, updatedAt: Date.now() }),
     );
   }, GAME_HTML);
-  await page.goto("/test");
+  await page.goto("/editor");
+
+  // The test arena lives on the editor page now: open it with the draft.
+  const testButton = page.getByRole("button", { name: /Test multiplayer/ }).first();
+  await expect(testButton).toBeVisible({ timeout: 30_000 });
+  await testButton.click();
 
   const addButton = page.getByRole("button", { name: /Add player/ });
   await expect(addButton).toBeVisible({ timeout: 30_000 });

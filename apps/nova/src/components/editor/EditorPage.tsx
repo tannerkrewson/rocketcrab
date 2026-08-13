@@ -6,9 +6,12 @@ import {
   CopyPlus,
   Eraser,
   FlaskConical,
+  GripHorizontal,
+  MonitorSmartphone,
   PartyPopper,
   Play,
   Save,
+  Trash2,
 } from "lucide-react";
 import {
   useCallback,
@@ -18,10 +21,12 @@ import {
   useRef,
   useState,
   createContext,
+  type PointerEvent as ReactPointerEvent,
 } from "react";
 import { toast } from "sonner";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
+import { EmptyState } from "../ui/EmptyState";
 import { useCreateGame, useRecordTestResults, useUpdateGame } from "../../lib/games/queries";
 import { hashSource, sourceByteLength } from "../../lib/games/hashing";
 import type { ChannelPort, RuntimeHostEvent } from "../../lib/runtime-host";
@@ -36,11 +41,12 @@ import {
 import { useRuntimeSession } from "../../lib/editor/runtime-session";
 import { formatBytes, validateSource } from "../../lib/editor/validation";
 import { readFromClipboard, writeToClipboard } from "../../lib/editor/clipboard";
-import { storeArenaSource } from "../../lib/arena/draft-source";
 import { storePartySource } from "../../lib/party/source-handoff";
 import { CodeEditor } from "./CodeEditor";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import { PreviewPanel } from "./PreviewPanel";
+import { ArenaSection, ArenaRuntimeSeamsContext } from "./ArenaSection";
+import { FirstRunTutorial } from "./FirstRunTutorial";
 
 /** Default title for a new, unnamed game (matches the runtime's fallback). */
 export const DEFAULT_GAME_TITLE = "Untitled game";
@@ -94,15 +100,30 @@ function useIsDesktop(): boolean {
   return isDesktop;
 }
 
+/** The code editor's default height (~22% of the viewport, "fairly small"). */
+function defaultEditorHeightPx(): number {
+  return clampEditorHeight(
+    Math.round((typeof window === "undefined" ? 800 : window.innerHeight) * 0.22),
+  );
+}
+
+function clampEditorHeight(value: number): number {
+  const max = typeof window === "undefined" ? 500 : Math.round(window.innerHeight * 0.5);
+  return Math.min(Math.max(value, 160), max);
+}
+
 /**
- * The U4 editor: paste, edit, run, validate, and save one complete HTML
- * game (ADR-0002 single-HTML model). Desktop shows the editor beside the
- * runtime preview + diagnostics; phones get segmented Code / Preview /
- * Errors tabs with a sticky Run / Save bar. Replacing the source and Run
- * always destroys and recreates the runtime frame (no hot-module
- * replacement); unsaved source is never written over the saved version.
- * `initialSource` seeds a new-game draft (A4 generator handoff); the
- * caller keys the component so a new draft remounts it.
+ * The consolidated U4 editor + U6 test arena (7.40): one page holding the
+ * CodeMirror editor, the runtime preview + diagnostics, and the multiplayer
+ * test arena together. The code editor sits at the top, small by default,
+ * with a drag handle to enlarge it; the arena takes the remaining vertical
+ * space on desktop. Phones (below the sm: breakpoint — not tablets) get a
+ * "use the editor on desktop" prompt above the still-working mobile tabs.
+ *
+ * Replacing the source and Run always destroys and recreates the runtime
+ * frame (no hot-module replacement); unsaved source is never written over
+ * the saved version. `initialSource` seeds a new-game draft (A4 generator
+ * handoff); the caller keys the component so a new draft remounts it.
  */
 export function EditorPage({ game, initialSource }: { game?: SavedGame; initialSource?: string }) {
   const navigate = useNavigate();
@@ -131,6 +152,13 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
   } | null>(null);
   const [mobileTab, setMobileTab] = useState<"code" | "preview" | "errors">("code");
   const [discardDialog, setDiscardDialog] = useState<{ onConfirm: () => void } | null>(null);
+  const [clearAllDialog, setClearAllDialog] = useState(false);
+  // The arena's source, frozen when the creator pressed Test multiplayer.
+  // The arena mounts only while set; a later Test press replaces the source
+  // (which restarts every simulated player with it).
+  const [arenaSource, setArenaSource] = useState<string | null>(null);
+  const [editorHeightPx, setEditorHeightPx] = useState(defaultEditorHeightPx);
+  const arenaSectionRef = useRef<HTMLDivElement | null>(null);
   const isDesktop = useIsDesktop();
 
   const dirty = source !== savedSource || title !== savedTitle;
@@ -154,6 +182,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     setConsoleEntries([]);
     setRegistration(null);
     setRunInfo(null);
+    setArenaSource(null);
     lastRunSourceRef.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
@@ -297,10 +326,10 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
   }, []);
 
   /**
-   * Test multiplayer (U6): hand the CURRENT editor source (saved or not) to
-   * the test arena via sessionStorage and open it. The arena tests exactly
-   * what the creator sees in the editor; unsaved changes are not written to
-   * the saved game.
+   * Test multiplayer (U6, 7.40): mount the test arena right here on the
+   * page with the CURRENT editor source (saved or not) and scroll to it.
+   * Re-testing hands over a new source, which restarts every simulated
+   * player. Unsaved changes are never written to the saved game.
    */
   const handleTestMultiplayer = useCallback(() => {
     const errors = validateSource(source).filter((issue) => issue.severity === "error");
@@ -308,18 +337,22 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       toast.error("Fix the validation errors before testing multiplayer.");
       return;
     }
-    const id = game?.id ?? draftGameId();
-    storeArenaSource({ gameId: id, source });
-    if (game !== undefined) {
-      void navigate({
-        to: "/games/$gameId/test",
-        params: { gameId: game.id },
-        ignoreBlocker: true,
-      });
+    setArenaSource(source);
+    // Reveal the arena; scrollIntoView is a browser nicety (guarded so
+    // jsdom and other minimal environments stay happy).
+    const reveal = () => {
+      try {
+        arenaSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
+      } catch {
+        // scrollIntoView unavailable; the arena is already on the page.
+      }
+    };
+    if (typeof window.requestAnimationFrame === "function") {
+      window.requestAnimationFrame(reveal);
     } else {
-      void navigate({ to: "/test", ignoreBlocker: true });
+      window.setTimeout(reveal, 0);
     }
-  }, [game, navigate, source]);
+  }, [source]);
 
   /**
    * Play with friends (P4): create a REAL party from the CURRENT editor
@@ -423,6 +456,48 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedSource, savedTitle, session]);
 
+  /** Clear all: delete every line of code (saved games keep their saved copy). */
+  const handleClearAll = useCallback(() => {
+    setSource("");
+    setDiagnostics([]);
+    setConsoleEntries([]);
+    setRegistration(null);
+    setRunInfo(null);
+    lastRunSourceRef.current = null;
+    session.stop();
+    setClearAllDialog(false);
+    setMobileTab("code");
+    toast.info("Editor cleared.");
+  }, [session]);
+
+  /** Drag the splitter: enlarge/shrink the code editor pane (7.40). */
+  const handleEditorResize = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const handle = event.currentTarget;
+      const startY = event.clientY;
+      const startHeight = editorHeightPx;
+      try {
+        handle.setPointerCapture(event.pointerId);
+      } catch {
+        // Pointer capture unavailable (some test environments); the window
+        // listeners below still track the drag.
+      }
+      const onMove = (moveEvent: PointerEvent) => {
+        setEditorHeightPx(clampEditorHeight(startHeight + (moveEvent.clientY - startY)));
+      };
+      const onEnd = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onEnd);
+        window.removeEventListener("pointercancel", onEnd);
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onEnd);
+      window.addEventListener("pointercancel", onEnd);
+    },
+    [editorHeightPx],
+  );
+
   const handleCopyReport = useCallback(async () => {
     const report = buildDiagnosticReport({
       title: title.trim() || DEFAULT_GAME_TITLE,
@@ -468,6 +543,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
 
   const validationIssues = useMemo(() => validateSource(source), [source]);
   const stalePreview = runStatus === "running" && source !== lastRunSourceRef.current;
+  const arenaStale = arenaSource !== null && arenaSource !== source;
 
   const actions = (
     <>
@@ -478,6 +554,15 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       >
         <ClipboardPaste className="h-4 w-4" aria-hidden="true" />
         Paste
+      </Button>
+      <Button
+        variant="outline"
+        onClick={() => setClearAllDialog(true)}
+        disabled={source.length === 0}
+        title="Delete every line of code in the editor"
+      >
+        <Trash2 className="h-4 w-4" aria-hidden="true" />
+        Clear all
       </Button>
       <Button
         variant="ghost"
@@ -561,8 +646,50 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     </div>
   );
 
+  /** The arena section, mounted only once the creator presses Test multiplayer. */
+  const arenaSection =
+    arenaSource !== null ? (
+      <ArenaRuntimeSeamsContext.Provider value={seams}>
+        <ArenaSection
+          game={game}
+          source={arenaSource}
+          stale={arenaStale}
+          onClose={() => setArenaSource(null)}
+        />
+      </ArenaRuntimeSeamsContext.Provider>
+    ) : (
+      <EmptyState
+        icon={<FlaskConical />}
+        title="Multi-player test arena"
+        description="Press Test multiplayer to run the current code with several simulated players right here on this page."
+        action={
+          <Button variant="secondary" size="md" onClick={handleTestMultiplayer}>
+            <FlaskConical className="h-4 w-4" aria-hidden="true" />
+            Test multiplayer
+          </Button>
+        }
+      />
+    );
+
   return (
-    <div className="flex flex-col gap-4">
+    <div className="flex flex-col gap-4 md:h-[calc(100dvh-16rem)]">
+      <FirstRunTutorial />
+
+      {/* Phone-size prompt (below sm: — not tablets): editing and testing a
+          game needs a real screen. */}
+      <div className="sm:hidden" data-testid="phone-prompt">
+        <div role="alert" className="alert alert-warning">
+          <MonitorSmartphone className="h-6 w-6 shrink-0" aria-hidden="true" />
+          <div>
+            <h2 className="font-black">The editor works best on a computer</h2>
+            <p className="text-sm text-base-content/80">
+              Writing and testing a game needs a big screen. Open Rocketcrab Nova on a laptop or
+              desktop to use the editor and test arena.
+            </p>
+          </div>
+        </div>
+      </div>
+
       <header className="flex flex-wrap items-center gap-3">
         <input
           type="text"
@@ -582,33 +709,51 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         </Link>
       </header>
 
-      {/* Desktop: editor left, preview + diagnostics right. */}
-      <div className="hidden gap-4 md:grid md:grid-cols-2" data-testid="desktop-layout">
-        <section className="flex flex-col gap-3" aria-label="Editor">
-          <div className="overflow-hidden rounded-box border-2 border-base-300 bg-base-100">
-            <div className="h-[55vh] min-h-80">
-              <CodeEditor value={source} onChange={setSource} ariaLabel="Game HTML source" />
-            </div>
+      {/* Desktop: actions, small resizable editor, and the arena fills the
+          remaining vertical space (7.40). */}
+      <div className="hidden min-h-0 flex-1 flex-col gap-4 md:flex" data-testid="desktop-layout">
+        <div className="flex flex-wrap items-center gap-2">{actions}</div>
+        <div style={{ height: `${editorHeightPx}px` }} className="min-h-0">
+          <div className="grid h-full gap-4 grid-cols-2">
+            <section
+              className="min-h-0 overflow-hidden rounded-box border-2 border-base-300 bg-base-100"
+              aria-label="Editor"
+            >
+              <div className="h-full">
+                <CodeEditor value={source} onChange={setSource} ariaLabel="Game HTML source" />
+              </div>
+            </section>
+            <section
+              className="flex min-h-0 flex-col gap-4 overflow-y-auto"
+              aria-label="Preview and diagnostics"
+            >
+              <PreviewPanel
+                containerRef={desktopPreviewRef}
+                status={runStatus}
+                onStop={session.stop}
+                stale={stalePreview}
+              />
+              <DiagnosticsPanel
+                sourceBytes={sourceByteLength(source)}
+                sourceHash={sourceHash}
+                validationIssues={validationIssues}
+                diagnostics={diagnostics}
+                consoleEntries={consoleEntries}
+                onCopyReport={() => void handleCopyReport()}
+                busy={createGame.isPending || updateGame.isPending}
+              />
+            </section>
           </div>
-          <div className="flex flex-wrap items-center gap-2">{actions}</div>
-        </section>
-        <section className="flex flex-col gap-4">
-          <PreviewPanel
-            containerRef={desktopPreviewRef}
-            status={runStatus}
-            onStop={session.stop}
-            stale={stalePreview}
-          />
-          <DiagnosticsPanel
-            sourceBytes={sourceByteLength(source)}
-            sourceHash={sourceHash}
-            validationIssues={validationIssues}
-            diagnostics={diagnostics}
-            consoleEntries={consoleEntries}
-            onCopyReport={() => void handleCopyReport()}
-            busy={createGame.isPending || updateGame.isPending}
-          />
-        </section>
+        </div>
+        <div
+          role="separator"
+          aria-label="Resize the code editor"
+          className="flex h-3 cursor-ns-resize select-none items-center justify-center rounded-md border border-base-300 bg-base-200 text-base-content/40"
+          onPointerDown={handleEditorResize}
+          title="Drag to resize the code editor"
+        >
+          <GripHorizontal className="h-3 w-3" aria-hidden="true" />
+        </div>
       </div>
 
       {/* Phone: segmented Code / Preview / Errors tabs with a sticky bar. */}
@@ -642,66 +787,86 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
             busy={createGame.isPending || updateGame.isPending}
           />
         ) : null}
-        <div className="sticky bottom-0 z-20 -mx-4 flex items-center gap-2 border-t-2 border-base-300 bg-base-100 px-4 py-2 pb-safe">
-          <Button
-            variant="ghost"
-            size="md"
-            onClick={handlePaste}
-            title="Paste from clipboard (replaces the editor content)"
-          >
-            <ClipboardPaste className="h-4 w-4" aria-hidden="true" />
-          </Button>
-          <Button
-            variant="ghost"
-            size="md"
-            onClick={() => setDiscardDialog({ onConfirm: confirmReset })}
-            disabled={!dirty}
-            title="Reset unsaved changes"
-          >
-            <Eraser className="h-4 w-4" aria-hidden="true" />
-          </Button>
-          <div className="flex-1" />
-          <Button variant="outline" size="md" onClick={handleSaveAsCopy}>
-            <CopyPlus className="h-4 w-4" aria-hidden="true" />
-            Copy
-          </Button>
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={handleSave}
-            disabled={createGame.isPending || updateGame.isPending}
-          >
-            <Save className="h-4 w-4" aria-hidden="true" />
-            Save
-          </Button>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={() => void handleRun()}
-            disabled={runStatus === "starting"}
-          >
-            <Play className="h-4 w-4" aria-hidden="true" />
-            Run
-          </Button>
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={handleTestMultiplayer}
-            title="Run this source with several simulated players in the test arena"
-          >
-            <FlaskConical className="h-4 w-4" aria-hidden="true" />
-            Test
-          </Button>
-          <Button
-            variant="primary"
-            size="md"
-            onClick={handlePlayWithFriends}
-            title="Create a real party from this source and play it with friends"
-          >
-            <PartyPopper className="h-4 w-4" aria-hidden="true" />
-            Party
-          </Button>
-        </div>
+      </div>
+
+      {/* The test arena: one shared rendering for both layouts. On desktop it
+          expands to the remaining vertical space (the flex-1 wrapper); on
+          phones it sits between the editor tabs and the sticky bar. */}
+      <div ref={arenaSectionRef} className="min-h-0 md:flex-1 md:overflow-y-auto">
+        {arenaSection}
+      </div>
+
+      <div
+        className="sticky bottom-0 z-20 -mx-4 flex items-center gap-2 border-t-2 border-base-300 bg-base-100 px-4 py-2 pb-safe md:hidden"
+        data-testid="mobile-actions-bar"
+      >
+        <Button
+          variant="ghost"
+          size="md"
+          onClick={handlePaste}
+          title="Paste from clipboard (replaces the editor content)"
+        >
+          <ClipboardPaste className="h-4 w-4" aria-hidden="true" />
+        </Button>
+        <Button
+          variant="outline"
+          size="md"
+          onClick={() => setClearAllDialog(true)}
+          disabled={source.length === 0}
+          title="Delete every line of code in the editor"
+        >
+          <Trash2 className="h-4 w-4" aria-hidden="true" />
+        </Button>
+        <Button
+          variant="ghost"
+          size="md"
+          onClick={() => setDiscardDialog({ onConfirm: confirmReset })}
+          disabled={!dirty}
+          title="Reset unsaved changes"
+        >
+          <Eraser className="h-4 w-4" aria-hidden="true" />
+        </Button>
+        <div className="flex-1" />
+        <Button variant="outline" size="md" onClick={handleSaveAsCopy}>
+          <CopyPlus className="h-4 w-4" aria-hidden="true" />
+          Copy
+        </Button>
+        <Button
+          variant="secondary"
+          size="md"
+          onClick={handleSave}
+          disabled={createGame.isPending || updateGame.isPending}
+        >
+          <Save className="h-4 w-4" aria-hidden="true" />
+          Save
+        </Button>
+        <Button
+          variant="primary"
+          size="md"
+          onClick={() => void handleRun()}
+          disabled={runStatus === "starting"}
+        >
+          <Play className="h-4 w-4" aria-hidden="true" />
+          Run
+        </Button>
+        <Button
+          variant="secondary"
+          size="md"
+          onClick={handleTestMultiplayer}
+          title="Run this source with several simulated players in the test arena"
+        >
+          <FlaskConical className="h-4 w-4" aria-hidden="true" />
+          Test
+        </Button>
+        <Button
+          variant="primary"
+          size="md"
+          onClick={handlePlayWithFriends}
+          title="Create a real party from this source and play it with friends"
+        >
+          <PartyPopper className="h-4 w-4" aria-hidden="true" />
+          Party
+        </Button>
       </div>
 
       <Dialog
@@ -730,6 +895,28 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
             </Button>
             <Button variant="danger" onClick={() => discardDialog?.onConfirm()}>
               Discard changes
+            </Button>
+          </div>
+        </div>
+      </Dialog>
+
+      <Dialog
+        open={clearAllDialog}
+        onClose={() => setClearAllDialog(false)}
+        title="Clear all code?"
+      >
+        <div className="flex flex-col gap-4">
+          <p>
+            This deletes every line of code in the editor.
+            {game ? " Your saved version is untouched — Reset restores it." : ""}
+          </p>
+          <div className="flex justify-end gap-2">
+            <Button variant="outline" onClick={() => setClearAllDialog(false)}>
+              Keep code
+            </Button>
+            <Button variant="danger" onClick={handleClearAll}>
+              <Trash2 className="h-4 w-4" aria-hidden="true" />
+              Clear all
             </Button>
           </div>
         </div>
