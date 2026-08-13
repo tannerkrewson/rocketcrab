@@ -146,15 +146,15 @@ function quizmasterPlayerId(quizmaster: string | null): string {
   return `player-${number}`;
 }
 
-/** The arena player card (scoped to the desktop grid: every card also
- * renders in the phone-tab layout, so unscoped locators would be strict-mode
- * violations). */
+/** The arena player card. The consolidated editor renders each player
+ * exactly once (7.40): the phone layout hides cards with CSS instead of
+ * duplicating them, so the plain testid is unique. */
 function playerCard(page: Page, playerId: string): ReturnType<Page["locator"]> {
-  return page.locator(`[data-testid="arena-desktop"] [data-testid="arena-player-${playerId}"]`);
+  return page.locator(`[data-testid="arena-grid"] [data-testid="arena-player-${playerId}"]`);
 }
 
 async function authorityPlayerId(page: Page): Promise<string | null> {
-  const cards = page.locator('[data-testid="arena-desktop"] section[data-testid^="arena-player-"]');
+  const cards = page.locator('[data-testid="arena-grid"] section[data-testid^="arena-player-"]');
   for (let index = 0; index < (await cards.count()); index += 1) {
     const card = cards.nth(index);
     if ((await card.locator(".badge-accent").count()) > 0) {
