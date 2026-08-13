@@ -1,40 +1,27 @@
 import { Link, Outlet, useLocation } from "@tanstack/react-router";
-import { Home, Info, Library, PlusCircle, Rocket, Users } from "lucide-react";
-import type { ComponentType } from "react";
-import { cn } from "../../lib/cn";
 import { ThemeSelector } from "./ThemeSelector";
 
-interface NavItem {
-  to: "/" | "/build" | "/browse" | "/join" | "/about";
+interface FooterLink {
+  to: "/" | "/build" | "/browse" | "/library" | "/join" | "/about";
   label: string;
-  icon: ComponentType<{ className?: string; "aria-hidden"?: boolean | "true" | "false" }>;
-  exact?: boolean;
 }
 
-const navItems: NavItem[] = [
-  { to: "/", label: "Home", icon: Home, exact: true },
-  { to: "/build", label: "Build", icon: PlusCircle },
-  { to: "/browse", label: "Games", icon: Library },
-  { to: "/join", label: "Join", icon: Users },
-  { to: "/about", label: "About", icon: Info },
+/** Every non-party page stays reachable from the shared footer (7.34). */
+const footerLinks: FooterLink[] = [
+  { to: "/", label: "Home" },
+  { to: "/build", label: "Build" },
+  { to: "/browse", label: "Games" },
+  { to: "/library", label: "Library" },
+  { to: "/join", label: "Join" },
+  { to: "/about", label: "About" },
 ];
 
-function BrandLink() {
-  return (
-    <Link to="/" className="flex items-center gap-2 px-1 text-lg font-black tracking-tight">
-      <Rocket className="h-6 w-6 text-primary" aria-hidden="true" />
-      <span>
-        Rocketcrab <span className="text-primary">Nova</span>
-      </span>
-    </Link>
-  );
-}
-
 /**
- * App-wide shell: top bar (brand + desktop links + theme selector), page
- * content, and a thumb-friendly bottom navigation on mobile. Party routes
- * (/join, /party, /play) swap the generic chrome for the classic party shell
- * header (7.22), which those routes render themselves.
+ * App-wide shell (7.34/7.36): a single consistent page column plus a minimal
+ * shared footer (site links + theme toggle). The navbar and mobile bottom
+ * nav are gone; every non-party page inherits the footer automatically.
+ * Party routes (/join, /party, /play) render their own classic party-shell
+ * chrome, so the app footer is skipped there (7.22).
  */
 export function AppLayout() {
   const location = useLocation();
@@ -44,61 +31,33 @@ export function AppLayout() {
     location.pathname === "/play";
 
   return (
-    <div className="min-h-screen bg-base-200 text-base-content">
-      {isPartyRoute ? null : (
-        <header className="sticky top-0 z-40 pt-safe">
-          <div className="navbar mx-auto max-w-5xl rounded-b-box border-2 border-t-0 border-base-300 bg-base-100 px-3 shadow-sm">
-            <div className="navbar-start">
-              <BrandLink />
-            </div>
-            <nav className="navbar-center hidden gap-1 md:flex" aria-label="Primary">
-              {navItems.map((item) => (
-                <Link
-                  key={item.to}
-                  to={item.to}
-                  activeOptions={{ exact: item.exact }}
-                  activeProps={{ className: "btn-primary" }}
-                  inactiveProps={{ className: "btn-ghost" }}
-                  className="btn min-h-11 px-4 text-sm font-bold"
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
-            <div className="navbar-end flex gap-2">
-              <ThemeSelector />
-            </div>
-          </div>
-        </header>
-      )}
-
-      <main
-        className={cn("mx-auto w-full max-w-5xl px-4 pb-28 pt-6 md:pb-12", isPartyRoute && "pb-12")}
-      >
+    <div className="flex min-h-screen flex-col bg-base-200 text-base-content">
+      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-12 pt-6">
         <Outlet />
       </main>
 
       {isPartyRoute ? null : (
-        <nav
-          className="btm-nav btm-nav-lg z-40 border-t-2 border-base-300 bg-base-100 pb-safe md:hidden"
-          aria-label="Primary mobile"
-        >
-          {navItems.map((item) => {
-            const Icon = item.icon;
-            return (
-              <Link
-                key={item.to}
-                to={item.to}
-                activeOptions={{ exact: item.exact }}
-                activeProps={{ className: "active text-primary" }}
-                className={cn("flex flex-col items-center gap-0.5 py-1 text-xs font-bold")}
-              >
-                <Icon className="h-6 w-6" aria-hidden="true" />
-                {item.label}
-              </Link>
-            );
-          })}
-        </nav>
+        <footer className="border-t-2 border-base-300 bg-base-100">
+          <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-6">
+            <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2">
+              {footerLinks.map((link) => (
+                <Link
+                  key={link.to}
+                  to={link.to}
+                  className="text-sm font-bold text-base-content/70 transition-colors hover:text-base-content"
+                >
+                  {link.label}
+                </Link>
+              ))}
+            </nav>
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <p className="text-xs text-base-content/50">
+                Rocketcrab Nova — party games for phones
+              </p>
+              <ThemeSelector />
+            </div>
+          </div>
+        </footer>
       )}
     </div>
   );

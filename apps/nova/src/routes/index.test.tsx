@@ -5,8 +5,9 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { routeTree } from "../routeTree.gen";
 
 /**
- * Home route tests (7.20): the classic-conformed layout — tagline, side-by-side
- * Start/Join party primaries, secondary action column, and Recent games below.
+ * Home route tests (7.20/7.35): the classic-conformed layout — tagline,
+ * side-by-side Start/Join party primaries, and a secondary action column
+ * (no recent-games browser since 7.35).
  */
 
 function renderHome() {
@@ -42,9 +43,11 @@ describe("/", () => {
     expect(within(more).getByRole("link", { name: "About" })).toBeInTheDocument();
   });
 
-  it("keeps the Recent games section at the bottom", async () => {
+  it("no longer shows the Recent games section (7.35)", async () => {
     renderHome();
-    expect(await screen.findByRole("heading", { name: "Recent games" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "See all" })).toBeInTheDocument();
+    await screen.findByRole("heading", { name: /Rocketcrab Nova/ });
+    expect(screen.queryByRole("heading", { name: "Recent games" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "See all" })).not.toBeInTheDocument();
+    expect(screen.queryByText("No games yet")).not.toBeInTheDocument();
   });
 });
