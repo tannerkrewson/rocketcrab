@@ -6,7 +6,8 @@
  * (which may be unsaved) in sessionStorage before navigating to the party
  * route; the party route picks it up when the stored gameId matches,
  * falling back to the saved game source otherwise. Same pattern (and TTL
- * policy) as the U6 arena's draft-source handoff.
+ * policy) as the draft-source handoff (7.40: the arena handoff was removed
+ * when the arena moved onto the editor page).
  */
 const STORAGE_KEY = "nova:party-source:v1";
 export const PARTY_SOURCE_TTL_MS = 30 * 60 * 1000;

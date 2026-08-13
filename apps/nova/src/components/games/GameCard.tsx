@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Copy, FlaskConical, PartyPopper, Pencil, Trash2 } from "lucide-react";
+import { Copy, PartyPopper, Pencil, Trash2 } from "lucide-react";
 import type { SavedGame } from "@rocketcrab/core";
 import { Button, buttonStyles } from "../ui/Button";
 import { Card } from "../ui/Card";
@@ -38,8 +38,8 @@ function TestStatusBadge({ game }: { game: SavedGame }) {
 }
 
 /**
- * Library card for one saved game: metadata plus edit / test / duplicate /
- * delete actions. Edit and Test land on the U4 editor and U6 arena routes;
+ * Library card for one saved game: metadata plus edit / play / duplicate /
+ * delete actions. Edit opens the consolidated editor + test arena (7.40);
  * delete is confirmed by the caller (U2 acceptance: delete requires
  * confirmation).
  */
@@ -57,14 +57,6 @@ export function GameCard({ game, onDuplicate, onDelete, busy = false }: GameCard
           >
             <Pencil className="h-4 w-4" aria-hidden="true" />
             Edit
-          </Link>
-          <Link
-            to="/games/$gameId/test"
-            params={{ gameId: game.id }}
-            className={buttonStyles("secondary", "md")}
-          >
-            <FlaskConical className="h-4 w-4" aria-hidden="true" />
-            Test
           </Link>
           <Link
             to="/party"
