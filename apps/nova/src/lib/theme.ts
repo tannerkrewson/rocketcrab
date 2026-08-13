@@ -62,6 +62,106 @@ export const THEME_OPTIONS: ThemeOption[] = [
 
 const OPTION_IDS = new Set(THEME_OPTIONS.map((option) => option.id));
 
+// ---------------------------------------------------------------------------
+// Light/dark classification (rocketcrab-9fv.7.45). Nova's own themes plus
+// daisyUI v5.7.9's built-ins, split by each theme's `color-scheme`.
+// ---------------------------------------------------------------------------
+
+export type ThemeMode = "light" | "dark";
+
+/** Themes whose color-scheme is light: nova + 21 daisyUI built-ins. */
+export const LIGHT_THEME_IDS: readonly string[] = [
+  "nova",
+  "light",
+  "lemonade",
+  "retro",
+  "bumblebee",
+  "caramellatte",
+  "silk",
+  "corporate",
+  "cupcake",
+  "autumn",
+  "fantasy",
+  "nord",
+  "cyberpunk",
+  "wireframe",
+  "acid",
+  "winter",
+  "valentine",
+  "pastel",
+  "lofi",
+  "garden",
+  "emerald",
+  "cmyk",
+];
+
+/** Themes whose color-scheme is dark: nova-dark + 14 daisyUI built-ins. */
+export const DARK_THEME_IDS: readonly string[] = [
+  "nova-dark",
+  "black",
+  "halloween",
+  "forest",
+  "night",
+  "abyss",
+  "synthwave",
+  "dim",
+  "aqua",
+  "dark",
+  "coffee",
+  "business",
+  "luxury",
+  "dracula",
+  "sunset",
+];
+
+const LIGHT_IDS = new Set(LIGHT_THEME_IDS);
+const DARK_IDS = new Set(DARK_THEME_IDS);
+
+/** The default theme applied when the user picks a mode explicitly (7.45). */
+export const DEFAULT_LIGHT_THEME_ID = "nova";
+export const DEFAULT_DARK_THEME_ID = "nova-dark";
+
+/** Dice pools exclude the mode defaults so rolling always changes the look. */
+const LIGHT_DICE_POOL = LIGHT_THEME_IDS.filter((id) => id !== DEFAULT_LIGHT_THEME_ID);
+const DARK_DICE_POOL = DARK_THEME_IDS.filter((id) => id !== DEFAULT_DARK_THEME_ID);
+
+export function isLightTheme(id: string): boolean {
+  return LIGHT_IDS.has(id);
+}
+
+export function isDarkTheme(id: string): boolean {
+  return DARK_IDS.has(id);
+}
+
+/** The light/dark mode a theme id belongs to (light for unknown ids). */
+export function themeMode(id: string): ThemeMode {
+  return isDarkTheme(id) ? "dark" : "light";
+}
+
+/** True when the OS prefers dark (false when matchMedia is unavailable). */
+export function systemPrefersDark(): boolean {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") {
+    return false;
+  }
+  return window.matchMedia("(prefers-color-scheme: dark)").matches;
+}
+
+/**
+ * The effective mode: the persisted theme's mode when one is stored,
+ * otherwise the OS preference (light when unknown).
+ */
+export function currentThemeMode(): ThemeMode {
+  const stored = getStoredTheme();
+  if (stored !== null) return themeMode(stored);
+  return systemPrefersDark() ? "dark" : "light";
+}
+
+/** A random theme matching `mode`, never the mode's default (7.45 dice). */
+export function randomThemeForMode(mode: ThemeMode): string {
+  const pool = mode === "dark" ? DARK_DICE_POOL : LIGHT_DICE_POOL;
+  return pool[Math.floor(Math.random() * pool.length)] ?? DEFAULT_LIGHT_THEME_ID;
+}
+
 /** The persisted theme id, or null when the user is on the system default. */
 export function getStoredTheme(): string | null {
   if (typeof window === "undefined") return null;

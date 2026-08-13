@@ -1,47 +1,80 @@
-import { Palette } from "lucide-react";
+import { Dices, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
+import { cn } from "../../lib/cn";
 import {
-  SYSTEM_THEME_ID,
-  THEME_OPTIONS,
+  DEFAULT_DARK_THEME_ID,
+  DEFAULT_LIGHT_THEME_ID,
+  applyTheme,
+  currentThemeMode,
   getStoredTheme,
   initTheme,
+  randomThemeForMode,
   setTheme,
+  type ThemeMode,
 } from "../../lib/theme";
 
 // Apply the persisted theme before first paint (see lib/theme.ts).
 initTheme();
 
 /**
- * Theme picker over all default daisyUI themes (rocketcrab-9fv.7.3).
- * "System" removes the data-theme override and follows the OS preference
- * (the rocketcrab-9fv.7.2 default).
+ * Theme picker (rocketcrab-9fv.7.45): a light/dark toggle plus a dice that
+ * rolls a random theme from the pool matching the current mode. The toggle
+ * applies Nova's default theme for the mode; both choices persist via
+ * lib/theme.ts, so they survive reloads.
  */
 export function ThemeSelector() {
-  const [theme, setThemeId] = useState<string>(() => getStoredTheme() ?? SYSTEM_THEME_ID);
+  const [mode, setMode] = useState<ThemeMode>(() => currentThemeMode());
 
-  // Keep data-theme + storage in sync with the picker (mount included, so
-  // the component is self-contained even when initTheme ran earlier).
+  // Re-apply the persisted theme on mount so the selector is self-contained
+  // even when initTheme ran before the persisted value existed (tests, hot
+  // reload).
   useEffect(() => {
-    setTheme(theme);
-  }, [theme]);
+    applyTheme(getStoredTheme());
+  }, []);
+
+  const selectMode = (next: ThemeMode) => {
+    setMode(next);
+    setTheme(next === "dark" ? DEFAULT_DARK_THEME_ID : DEFAULT_LIGHT_THEME_ID);
+  };
+
+  const rollDice = () => {
+    // The dice pool always matches `mode`, so the mode itself doesn't change.
+    setTheme(randomThemeForMode(mode));
+  };
+
+  const isDark = mode === "dark";
 
   return (
-    <label className="flex items-center gap-1.5">
-      <Palette className="h-4 w-4 shrink-0 text-base-content/60" aria-hidden="true" />
-      <span className="sr-only">Theme</span>
-      <select
-        className="select select-bordered select-sm w-32 font-semibold"
-        value={theme}
-        onChange={(event) => setThemeId(event.target.value)}
-        aria-label="Theme"
+    <div className="flex items-center gap-2" role="group" aria-label="Theme">
+      <div className="join">
+        <button
+          type="button"
+          aria-pressed={!isDark}
+          onClick={() => selectMode("light")}
+          className={cn("btn btn-sm join-item", !isDark && "btn-primary")}
+        >
+          <Sun className="h-4 w-4" aria-hidden="true" />
+          Light
+        </button>
+        <button
+          type="button"
+          aria-pressed={isDark}
+          onClick={() => selectMode("dark")}
+          className={cn("btn btn-sm join-item", isDark && "btn-primary")}
+        >
+          <Moon className="h-4 w-4" aria-hidden="true" />
+          Dark
+        </button>
+      </div>
+      <button
+        type="button"
+        onClick={rollDice}
+        aria-label="Random theme"
+        title="Random theme"
+        className="btn btn-sm btn-circle border-2 border-base-300"
       >
-        <option value={SYSTEM_THEME_ID}>System</option>
-        {THEME_OPTIONS.map((option) => (
-          <option key={option.id} value={option.id}>
-            {option.label}
-          </option>
-        ))}
-      </select>
-    </label>
+        <Dices className="h-4 w-4" aria-hidden="true" />
+      </button>
+    </div>
   );
 }
