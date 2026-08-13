@@ -10,7 +10,8 @@ import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { gameRepository } from "../../lib/games/instance";
 import type { PartyEngineState } from "../../lib/party/engine";
 import { PartyLobby, type PartyLobbyProps } from "./PartyLobby";
 import type { PartyMemberView } from "../../lib/party/engine";
@@ -81,6 +82,10 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
   };
 }
 
+beforeEach(async () => {
+  await gameRepository.clear();
+});
+
 async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobbyProps> = {}) {
   cleanup(); // isolate: some tests render the lobby twice
   const queryClient = new QueryClient();
@@ -93,7 +98,7 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
       onLeave={handlers.onLeave ?? props.onLeave}
       onRefreshDiagnostics={handlers.onRefreshDiagnostics ?? props.onRefreshDiagnostics}
       onPickGame={handlers.onPickGame ?? props.onPickGame}
-      onPickClassicGame={handlers.onPickClassicGame ?? props.onPickClassicGame}
+      onPickPrebuilt={handlers.onPickPrebuilt ?? props.onPickPrebuilt}
       onKickMember={handlers.onKickMember ?? props.onKickMember}
       onEditName={handlers.onEditName ?? props.onEditName}
     />
@@ -243,7 +248,7 @@ describe("PartyLobby", () => {
     expect(onLeave).toHaveBeenCalled();
   });
 
-  it("prompts the creator to pick a game when the party has none (7.6)", async () => {
+  it("browses games with the shared browse UI when the party has none (7.6/7.43)", async () => {
     const state = makeState({
       game: null,
       canStart: false,
@@ -257,10 +262,46 @@ describe("PartyLobby", () => {
     const browseButton = screen.getByRole("button", { name: /browse games/i });
     expect(browseButton).toBeInTheDocument();
     await userEvent.click(browseButton);
-    // The picker dialog opens (empty library in tests).
-    expect(await screen.findByRole("dialog", { name: "Pick a game" })).toBeInTheDocument();
+    // The shared browse UI (same as /browse) opens inline: search + the
+    // player's own saved games section (empty library in tests).
+    expect(screen.getByRole("searchbox", { name: "Search games" })).toBeInTheDocument();
+    expect(screen.getByText("My games")).toBeInTheDocument();
     expect(await screen.findByText(/no saved games yet/i)).toBeInTheDocument();
     expect(onPickGame).not.toHaveBeenCalled();
+    // Back returns to the lobby.
+    await userEvent.click(screen.getByRole("button", { name: /back to lobby/i }));
+    expect(screen.getByRole("button", { name: /start game/i })).toBeInTheDocument();
+  });
+
+  it("picks a saved game from the shared browse UI (7.43)", async () => {
+    const state = makeState({ game: null, canStart: false, canForceStart: false });
+    const game = await gameRepository.create({
+      title: "Rocket Rumble",
+      html: "<!doctype html><html><body><p>rockets</p></body></html>",
+      mode: "state",
+    });
+    const onPickGame = vi.fn();
+    await renderLobby(state, { onPickGame });
+    await userEvent.click(screen.getByRole("button", { name: /browse games/i }));
+    const saved = await screen.findByRole("button", { name: /Rocket Rumble/ });
+    await userEvent.click(saved);
+    expect(onPickGame).toHaveBeenCalledWith(game.id);
+    // Picking returns to the lobby.
+    expect(screen.getByRole("button", { name: /start game/i })).toBeInTheDocument();
+  });
+
+  it("picks a classic game from the shared browse UI (7.7.4/7.43)", async () => {
+    const state = makeState({ game: null, canStart: false, canForceStart: false });
+    const onPickPrebuilt = vi.fn();
+    await renderLobby(state, { onPickPrebuilt });
+    await userEvent.click(screen.getByRole("button", { name: /browse games/i }));
+    // Classic games are listed together with (empty) saved games.
+    expect(await screen.findByRole("searchbox", { name: "Search games" })).toBeInTheDocument();
+    const protobowl = screen.getByRole("button", { name: /Protobowl/ });
+    await userEvent.click(protobowl);
+    expect(onPickPrebuilt).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "classic", id: "protobowl" }),
+    );
   });
 
   it("tells joiners to wait when the party has no game (7.6)", async () => {
@@ -292,19 +333,6 @@ describe("PartyLobby", () => {
     await renderLobby(state);
     expect(screen.getAllByText(/the game ended/i).length).toBeGreaterThan(0);
     expect(screen.getByRole("button", { name: /start game/i })).toBeDisabled();
-  });
-
-  it("offers classic games in the picker and lets the host pick one (7.7.4)", async () => {
-    const state = makeState({ game: null, canStart: false, canForceStart: false });
-    const onPickClassicGame = vi.fn();
-    await renderLobby(state, { onPickClassicGame });
-    await userEvent.click(screen.getByRole("button", { name: /browse games/i }));
-    const dialog = await screen.findByRole("dialog", { name: "Pick a game" });
-    // Classic games are listed together with (empty) saved games.
-    expect(await screen.findByText("Classic games")).toBeInTheDocument();
-    const protobowl = within(dialog).getByRole("button", { name: /protobowl/i });
-    await userEvent.click(protobowl);
-    expect(onPickClassicGame).toHaveBeenCalledWith("protobowl");
   });
 
   it("shows a host-only kick button that removes the member (7.29)", async () => {

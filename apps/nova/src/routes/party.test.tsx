@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { gameRepository } from "../lib/games/instance";
 import type { PartyEngineState } from "../lib/party/engine";
+import { resetPartyIdentityForTests, updatePartyDisplayName } from "../lib/party/identity";
 import {
   clearPartyRecovery,
   readPartyRecovery,
@@ -14,8 +15,10 @@ import { routeTree } from "../routeTree.gen";
 
 /**
  * Party route tests (P4): the route creates a party from a saved game (or
- * from the editor's handed-off source) when `gameId` is present, and shows
- * an entry point when no party is active.
+ * from the editor's handed-off source) when `gameId` is present, shows an
+ * entry point when no party is active (7.37: name + Start a party only,
+ * and a saved name skips the entry page entirely), and renders the party
+ * experience once a party is active.
  */
 
 const IDLE_STATE: PartyEngineState = {
@@ -46,27 +49,72 @@ const IDLE_STATE: PartyEngineState = {
   lastError: null,
 };
 
-const { stubEngine } = vi.hoisted(() => ({
-  stubEngine: {
-    getState: vi.fn((): PartyEngineState => IDLE_STATE),
-    onState: vi.fn(() => () => undefined),
-    isActive: vi.fn(() => false),
-    setContainer: vi.fn(),
-    setDisplayName: vi.fn(),
-    selectGame: vi.fn(async () => undefined),
-    retrySetup: vi.fn(),
-    dismissError: vi.fn(),
-    createParty: vi.fn(async () => undefined),
-    joinByCode: vi.fn(async () => undefined),
-    joinByInvite: vi.fn(async () => undefined),
-    respondToJoinRequest: vi.fn(),
-    startGame: vi.fn(),
-    endGame: vi.fn(),
-    leaveParty: vi.fn(async () => undefined),
-    reconnect: vi.fn(async () => undefined),
-    refreshDiagnostics: vi.fn(async () => undefined),
-  },
-}));
+/** A live lobby (game not yet picked), used once `createParty` runs. */
+const ACTIVE_STATE: PartyEngineState = {
+  ...IDLE_STATE,
+  phase: "lobby",
+  role: "creator",
+  code: "RCRB",
+  displayName: "Ada",
+  members: [
+    {
+      memberId: "member-a",
+      displayName: "Ada",
+      isSelf: true,
+      connectionId: "conn-a",
+      connected: true,
+      isGreeter: true,
+      transferState: "waiting",
+      transferProgress: null,
+      transferDetail: null,
+      ready: false,
+    },
+  ],
+  greeterMemberId: "member-a",
+  amGreeter: true,
+  authorityMemberId: "member-a",
+  inviteUrl: "http://localhost:5173/join#code=RCRB&secret=invite-secret",
+  connectionState: "connected",
+  canStart: false,
+  canForceStart: false,
+  startBlockedReason: "Pick a game before starting the party.",
+};
+
+const { stubEngine, stubs } = vi.hoisted(() => {
+  const stubs: {
+    started: boolean;
+    handler: ((state: PartyEngineState) => void) | null;
+  } = { started: false, handler: null };
+  return {
+    stubs,
+    stubEngine: {
+      getState: vi.fn((): PartyEngineState => (stubs.started ? ACTIVE_STATE : IDLE_STATE)),
+      onState: vi.fn((handler: (state: PartyEngineState) => void) => {
+        stubs.handler = handler;
+        handler(stubs.started ? ACTIVE_STATE : IDLE_STATE);
+        return () => undefined;
+      }),
+      isActive: vi.fn(() => stubs.started),
+      setContainer: vi.fn(),
+      setDisplayName: vi.fn(),
+      selectGame: vi.fn(async () => undefined),
+      retrySetup: vi.fn(),
+      dismissError: vi.fn(),
+      createParty: vi.fn(async () => {
+        stubs.started = true;
+        stubs.handler?.(ACTIVE_STATE);
+      }),
+      joinByCode: vi.fn(async () => undefined),
+      joinByInvite: vi.fn(async () => undefined),
+      respondToJoinRequest: vi.fn(),
+      startGame: vi.fn(),
+      endGame: vi.fn(),
+      leaveParty: vi.fn(async () => undefined),
+      reconnect: vi.fn(async () => undefined),
+      refreshDiagnostics: vi.fn(async () => undefined),
+    },
+  };
+});
 
 vi.mock("../lib/party/engine", async (importOriginal) => {
   const actual = await importOriginal<typeof import("../lib/party/engine")>();
@@ -90,26 +138,50 @@ const SAVED_HTML = "<!doctype html><html><body><p>rockets</p></body></html>";
 
 beforeEach(async () => {
   vi.clearAllMocks();
+  stubs.started = false;
+  stubs.handler = null;
   await gameRepository.clear();
   resetPartySourceForTests();
   clearPartyRecovery();
+  // 7.37: a saved player name changes the entry behavior — start fresh.
+  resetPartyIdentityForTests();
 });
 
 describe("/party", () => {
   it("shows the entry point when no party is active and no game is chosen", async () => {
     renderParty("/party");
-    expect(await screen.findByText("No party here yet")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Start a party" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Your player name")).toBeInTheDocument();
     expect(stubEngine.createParty).not.toHaveBeenCalled();
+  });
+
+  it("shows no secondary actions on the start-party page (7.37)", async () => {
+    renderParty("/party");
+    await screen.findByRole("heading", { name: "Start a party" });
+    expect(screen.queryByRole("link", { name: /start with a game/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /join a party/i })).not.toBeInTheDocument();
   });
 
   it("starts a party without a game, applying the entered name first (7.5/7.6)", async () => {
     renderParty("/party");
-    await screen.findByText("No party here yet");
+    await screen.findByRole("heading", { name: "Start a party" });
     const nameInput = await screen.findByLabelText("Your player name");
     fireEvent.change(nameInput, { target: { value: "Ada" } });
     fireEvent.click(screen.getByRole("button", { name: /start a party/i }));
     await waitFor(() => expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada"));
     await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledWith());
+  });
+
+  it("skips the entry page for a returning player with a saved name (7.37)", async () => {
+    // The player set a name before; the next visit lands straight in the
+    // party without showing the name prompt.
+    updatePartyDisplayName("Ada");
+    renderParty("/party");
+    await waitFor(() => expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada"));
+    await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledWith());
+    // The party experience renders the lobby instead of the entry page.
+    expect(await screen.findByText("Welcome to Rocketcrab!")).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Start a party" })).not.toBeInTheDocument();
   });
 
   it("creates a party from a saved game", async () => {
