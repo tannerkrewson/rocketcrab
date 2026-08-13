@@ -24,6 +24,7 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "sonner": "2.0.7",
+    "swiper": "14.1.0",
     "tailwind-merge": "3.6.0",
     "zustand": "5.0.14"
   },

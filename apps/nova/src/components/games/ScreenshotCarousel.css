@@ -1,0 +1,30 @@
+/*
+ * App-store style screenshot carousel (rocketcrab-9fv.7.46): theme swiper's
+ * internals with Nova's tokens. Plain unlayered CSS imported after swiper's
+ * styles, so these rules win at equal specificity.
+ */
+
+.nova-screenshots .swiper-slide {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* Dots sit below the screenshot (static, not overlapping it) and use the
+ * app's theme tokens instead of swiper's default black. */
+.nova-screenshots .swiper-pagination {
+  position: static;
+  margin-top: 1.25rem;
+}
+
+.nova-screenshots .swiper-pagination-bullet {
+  width: 0.5rem;
+  height: 0.5rem;
+  border-radius: 9999px;
+  background-color: color-mix(in oklab, var(--color-base-content) 30%, transparent);
+  opacity: 1;
+}
+
+.nova-screenshots .swiper-pagination-bullet-active {
+  background-color: var(--color-primary);
+}
