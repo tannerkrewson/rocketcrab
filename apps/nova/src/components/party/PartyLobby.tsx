@@ -1,5 +1,5 @@
-import { Link } from "@tanstack/react-router";
 import {
+  ArrowLeft,
   Check,
   Crown,
   Gamepad2,
@@ -13,13 +13,10 @@ import {
   X,
 } from "lucide-react";
 import { useState } from "react";
+import type { BrowseEntry } from "../../lib/browse";
 import type { PartyEngineState, PartyMemberView } from "../../lib/party/engine";
-import { useSavedGames } from "../../lib/games/queries";
-import { CLASSIC_GAMES } from "../../lib/classic";
-import { Button, buttonStyles } from "../ui/Button";
-import { Dialog } from "../ui/Dialog";
-import { ErrorPanel } from "../ui/ErrorPanel";
-import { LoadingState } from "../ui/LoadingState";
+import { Button } from "../ui/Button";
+import { GameBrowser } from "./GameBrowser";
 import { PartyDiagnosticsPanel } from "./PartyDiagnostics";
 
 export interface PartyLobbyProps {
@@ -31,8 +28,8 @@ export interface PartyLobbyProps {
   onRefreshDiagnostics: () => void;
   /** Pick a saved game for a party that was started without one (7.6). */
   onPickGame: (gameId: string) => void;
-  /** Pick a classic external iframe game for the party (7.7.4). */
-  onPickClassicGame: (gameId: string) => void;
+  /** Pick a prebuilt classic/nova game via the shared browse UI (7.43). */
+  onPickPrebuilt: (entry: BrowseEntry) => void;
   /** Kick a member from the party (host only, 7.29). */
   onKickMember: (memberId: string) => void;
   /** Apply an edited player name (7.5). */
@@ -89,6 +86,10 @@ function readyBadge(member: PartyMemberView) {
  * greeter, the current internal authority (DIAGNOSTIC ONLY), start /
  * force-start / leave controls, and connection diagnostics. The party
  * creator, greeter, and authority are deliberately shown as separate roles.
+ *
+ * The lobby has no game preview (7.38 — classic parity); the host browses
+ * games through the SHARED game browser (7.43) rendered inline in pick
+ * mode, instead of the old bespoke picker dialog.
  */
 export function PartyLobby({
   state,
@@ -98,12 +99,14 @@ export function PartyLobby({
   onLeave,
   onRefreshDiagnostics,
   onPickGame,
-  onPickClassicGame,
+  onPickPrebuilt,
   onKickMember,
   onEditName,
 }: PartyLobbyProps) {
   const [forceDialog, setForceDialog] = useState(false);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  // 7.43: "Browse games" swaps the lobby for the shared browse UI (pick
+  // mode) until the host picks a game or goes back.
+  const [browsing, setBrowsing] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(state.displayName);
 
@@ -111,6 +114,33 @@ export function PartyLobby({
     state.members.find((member) => member.memberId === state.greeterMemberId)?.displayName ??
     state.greeterMemberId ??
     "—";
+
+  const handlePickFromBrowse = (pick: () => void) => {
+    setBrowsing(false);
+    pick();
+  };
+
+  if (browsing) {
+    return (
+      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+        <section aria-label="Pick a game" className="flex flex-col gap-3">
+          <button
+            type="button"
+            className="btn btn-outline btn-sm w-fit"
+            onClick={() => setBrowsing(false)}
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Back to lobby
+          </button>
+          <GameBrowser
+            compact
+            onPick={(entry) => handlePickFromBrowse(() => onPickPrebuilt(entry))}
+            onPickSaved={(gameId) => handlePickFromBrowse(() => onPickGame(gameId))}
+          />
+        </section>
+      </div>
+    );
+  }
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
@@ -162,7 +192,7 @@ export function PartyLobby({
         {editingName ? null : (
           <button
             type="button"
-            className="btn btn-ghost btn-xs"
+            className="btn btn-xs"
             onClick={() => {
               setNameDraft(state.displayName);
               setEditingName(true);
@@ -196,7 +226,7 @@ export function PartyLobby({
           <Button variant="primary" size="md" type="submit">
             Save
           </Button>
-          <Button variant="ghost" size="md" onClick={() => setEditingName(false)}>
+          <Button variant="outline" size="md" onClick={() => setEditingName(false)}>
             Cancel
           </Button>
         </form>
@@ -272,7 +302,7 @@ export function PartyLobby({
                   Approve
                 </Button>
                 <Button
-                  variant="ghost"
+                  variant="outline"
                   size="md"
                   onClick={() => onReject(request.memberId)}
                   title="Refuse this player"
@@ -320,7 +350,7 @@ export function PartyLobby({
                   {state.role === "creator" && !member.isSelf ? (
                     <button
                       type="button"
-                      className="btn btn-ghost btn-xs text-error"
+                      className="btn btn-xs text-error"
                       onClick={() => onKickMember(member.memberId)}
                       title={`Remove ${member.displayName} from the party`}
                     >
@@ -374,7 +404,7 @@ export function PartyLobby({
           force-start and leave alongside. */}
       <section className="flex flex-wrap items-center gap-2">
         {state.role === "creator" ? (
-          <Button variant="secondary" size="lg" onClick={() => setPickerOpen(true)}>
+          <Button variant="secondary" size="lg" onClick={() => setBrowsing(true)}>
             <Gamepad2 className="h-5 w-5" aria-hidden="true" />
             Browse games
           </Button>
@@ -409,12 +439,6 @@ export function PartyLobby({
 
       <PartyDiagnosticsPanel diagnostics={state.diagnostics} onRefresh={onRefreshDiagnostics} />
 
-      <div className="flex justify-center">
-        <Link to="/library" className={buttonStyles("ghost")}>
-          Back to games
-        </Link>
-      </div>
-
       {forceDialog ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -429,7 +453,7 @@ export function PartyLobby({
               some players may miss the start signal. They can still rejoin.
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setForceDialog(false)}>
+              <Button variant="outline" onClick={() => setForceDialog(false)}>
                 Cancel
               </Button>
               <Button
@@ -445,98 +469,6 @@ export function PartyLobby({
           </div>
         </div>
       ) : null}
-
-      {pickerOpen ? (
-        <Dialog open onClose={() => setPickerOpen(false)} title="Pick a game">
-          <GamePicker
-            onPick={(gameId) => {
-              setPickerOpen(false);
-              onPickGame(gameId);
-            }}
-            onPickClassic={(gameId) => {
-              setPickerOpen(false);
-              onPickClassicGame(gameId);
-            }}
-          />
-        </Dialog>
-      ) : null}
-    </div>
-  );
-}
-
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Something went wrong.";
-}
-
-/** Game picker for the lobby's pick-a-game dialog (7.6 + 7.7.4): saved
- * Nova games first, then the classic external iframe games with a
- * "classic" badge. */
-function GamePicker({
-  onPick,
-  onPickClassic,
-}: {
-  onPick: (gameId: string) => void;
-  onPickClassic: (gameId: string) => void;
-}) {
-  const gamesQuery = useSavedGames();
-  if (gamesQuery.isLoading) {
-    return <LoadingState label="Loading your games…" />;
-  }
-  if (gamesQuery.isError) {
-    return <ErrorPanel title="Couldn't load your games" message={errorMessage(gamesQuery.error)} />;
-  }
-  const games = gamesQuery.data ?? [];
-  return (
-    <div className="flex max-h-96 flex-col gap-4 overflow-y-auto">
-      <section aria-label="Saved games">
-        <p className="mb-1 text-sm font-black uppercase tracking-widest text-base-content/60">
-          My games
-        </p>
-        {games.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 py-4 text-center">
-            <p className="text-sm text-base-content/70">
-              No saved games yet — create one in the editor first.
-            </p>
-            <Link to="/build" className={buttonStyles("primary", "md")}>
-              Build a game
-            </Link>
-          </div>
-        ) : (
-          <ul className="flex flex-col gap-2">
-            {games.map((game) => (
-              <li key={game.id}>
-                <button
-                  type="button"
-                  onClick={() => onPick(game.id)}
-                  className="flex w-full items-center justify-between gap-2 rounded-box border border-base-300 bg-base-200 px-3 py-2 text-left hover:border-primary"
-                >
-                  <span className="min-w-0 flex-1 truncate font-bold">{game.title}</span>
-                  <span className="badge badge-ghost badge-sm">{game.mode ?? "state"}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </section>
-      <section aria-label="Classic games">
-        <p className="mb-1 text-sm font-black uppercase tracking-widest text-base-content/60">
-          Classic games
-        </p>
-        <ul className="flex flex-col gap-2">
-          {CLASSIC_GAMES.map((game) => (
-            <li key={game.id}>
-              <button
-                type="button"
-                onClick={() => onPickClassic(game.id)}
-                className="flex w-full items-center justify-between gap-2 rounded-box border border-base-300 bg-base-200 px-3 py-2 text-left hover:border-primary"
-              >
-                <span className="min-w-0 flex-1 truncate font-bold">{game.name}</span>
-                <span className="badge badge-ghost badge-sm">classic</span>
-              </button>
-            </li>
-          ))}
-        </ul>
-      </section>
     </div>
   );
 }

@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createMemoryHistory, createRouter } from "@tanstack/react-router";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
@@ -47,6 +47,22 @@ describe("/browse", () => {
     expect(screen.getAllByText("nova").length).toBeGreaterThan(0);
     // "by author" grey line per classic's card layout (several games share an author).
     expect(screen.getAllByText(/^by Tanner Krewson$/).length).toBeGreaterThan(0);
+  });
+
+  it("badges classic games red and nova games blue (7.42)", async () => {
+    renderAt("/browse");
+    await screen.findByText("Drawphone");
+
+    const classicBadges = screen.getAllByText("classic");
+    expect(classicBadges.length).toBeGreaterThan(0);
+    for (const badge of classicBadges) {
+      expect(badge.className).toContain("badge-error");
+    }
+    const novaBadges = screen.getAllByText("nova");
+    expect(novaBadges.length).toBeGreaterThan(0);
+    for (const badge of novaBadges) {
+      expect(badge.className).toContain("badge-info");
+    }
   });
 
   it("marks CORS-blocked classic games with a warning (7.7.3)", async () => {

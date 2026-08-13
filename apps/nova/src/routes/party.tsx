@@ -1,14 +1,13 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Gamepad2, PartyPopper, Users } from "lucide-react";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { PartyPopper } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { PROTOCOL_VERSION, type GameMode } from "@rocketcrab/protocol";
 import { PartyExperience } from "../components/party/PartyExperience";
 import { PartyResumeBanner } from "../components/party/PartyResumeBanner";
 import { PartyShellHeader } from "../components/party/PartyShellHeader";
-import { EmptyState } from "../components/ui/EmptyState";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
 import { LoadingState } from "../components/ui/LoadingState";
-import { Button, buttonStyles } from "../components/ui/Button";
+import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { usePartyEngine } from "../lib/party/use-party";
 import { takePartySource } from "../lib/party/source-handoff";
@@ -39,6 +38,10 @@ function errorMessage(error: unknown): string {
  * creates a party from a saved game (or the editor's handed-off source);
  * otherwise it shows an entry point, and once a party is active it renders
  * the whole lobby/play experience. Invite links land on /join instead.
+ *
+ * 7.37: the entry page is just the name + Start a party (no secondary
+ * actions); a returning player with a saved name skips the entry page
+ * entirely and lands straight in the party.
  */
 function PartyPage() {
   const search = Route.useSearch();
@@ -56,6 +59,15 @@ function PartyPage() {
     }
     const gameId = search.gameId;
     if (gameId === undefined) {
+      // 7.37: a returning player with a saved name skips the entry page —
+      // apply the name and go straight into the party.
+      const savedName = getSavedPlayerName();
+      if (savedName === null) {
+        return;
+      }
+      startedRef.current = true;
+      engine.setDisplayName(savedName);
+      void engine.createParty();
       return;
     }
     const mode = search.mode ?? "state";
@@ -113,54 +125,36 @@ function PartyPage() {
     return <LoadingState label="Loading game…" />;
   }
   return (
-    <div className="mx-auto flex w-full max-w-xl flex-col gap-4 py-6">
+    <div className="mx-auto flex w-full max-w-md flex-col gap-4">
       {/* Classic party shell (7.22): logo header even before a party exists. */}
       <PartyShellHeader />
       <PartyResumeBanner engine={engine} />
-      <EmptyState
-        icon={<PartyPopper />}
-        title="No party here yet"
-        description="Start a party now and pick a game from the lobby, start from a game in your library, or join a friend's party with their four-letter code."
-        action={
-          <div className="flex w-full max-w-sm flex-col items-stretch gap-3">
-            <Card>
-              <div className="flex flex-col gap-2">
-                <label htmlFor="party-name" className="text-sm font-bold">
-                  Your name
-                </label>
-                <input
-                  id="party-name"
-                  type="text"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  placeholder="Your name"
-                  maxLength={24}
-                  autoComplete="nickname"
-                  aria-label="Your player name"
-                  className="input input-bordered w-full"
-                />
-                <Button variant="primary" size="lg" onClick={handleStartParty}>
-                  <PartyPopper className="h-5 w-5" aria-hidden="true" />
-                  Start a party
-                </Button>
-                <p className="text-center text-xs text-base-content/60">
-                  Your party starts in the lobby; pick a game there before anyone starts playing.
-                </p>
-              </div>
-            </Card>
-            <div className="flex flex-wrap justify-center gap-2">
-              <Link to="/library" className={buttonStyles("secondary")}>
-                <Gamepad2 className="h-5 w-5" aria-hidden="true" />
-                Start with a game
-              </Link>
-              <Link to="/join" className={buttonStyles("ghost")}>
-                <Users className="h-5 w-5" aria-hidden="true" />
-                Join a party
-              </Link>
-            </div>
-          </div>
-        }
-      />
+      <Card>
+        <div className="flex flex-col gap-3">
+          <h1 className="text-2xl font-black">Start a party</h1>
+          <p className="text-sm text-base-content/70">
+            Your party starts in the lobby; pick a game there before anyone starts playing.
+          </p>
+          <label htmlFor="party-name" className="text-sm font-bold">
+            Your name
+          </label>
+          <input
+            id="party-name"
+            type="text"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Your name"
+            maxLength={24}
+            autoComplete="nickname"
+            aria-label="Your player name"
+            className="input input-bordered w-full"
+          />
+          <Button variant="primary" size="lg" onClick={handleStartParty}>
+            <PartyPopper className="h-5 w-5" aria-hidden="true" />
+            Start a party
+          </Button>
+        </div>
+      </Card>
     </div>
   );
 }
