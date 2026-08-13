@@ -67,6 +67,15 @@ on:
         required: false
         type: string
         default: ""
+      relay_origin:
+        description: >-
+          (nova only) Origin of the classic CORS relay worker, e.g.
+          https://rocketcrab-cors-relay.<account>.workers.dev. Baked into the
+          build as VITE_CLASSIC_RELAY_ORIGIN and allowlisted in the app CSP
+          connect-src. Empty disables the relay path.
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -99,6 +108,7 @@ jobs:
         env:
           VITE_RUNTIME_ORIGIN: ${{ inputs.runtime_origin }}
           VITE_RUNTIME_BASE: ${{ inputs.runtime_base }}
+          VITE_CLASSIC_RELAY_ORIGIN: ${{ inputs.relay_origin }}
 
       - name: Build Runtime origin
         if: inputs.origin == 'runtime'

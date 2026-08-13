@@ -1,0 +1,45 @@
+# Deploy the Rocketcrab classic CORS relay (deploy/relay) to Cloudflare
+# Workers (beads rocketcrab-9fv.7.33). Standard Workers deployment via
+# cloudflare/wrangler-action.
+#
+# Required repo secrets (Settings -> Secrets and variables -> Actions):
+#   CLOUDFLARE_API_TOKEN  - API token with Workers Scripts edit permission
+#   CLOUDFLARE_ACCOUNT_ID - Cloudflare account id
+#
+# After the first deploy the worker lives at
+#   https://rocketcrab-cors-relay.<your-account-subdomain>.workers.dev
+# Feed that origin into the nova deploy workflow's `relay_origin` input
+# (it becomes VITE_CLASSIC_RELAY_ORIGIN, baked into the app CSP's
+# connect-src), then flip connectStatus: "blocked" off in
+# apps/nova/src/lib/classic/games.ts and remove the "room creation blocked"
+# badge code (see bead notes).
+name: Deploy classic CORS relay
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [nova]
+    paths:
+      - deploy/relay/**
+
+permissions:
+  contents: read
+
+concurrency:
+  group: cors-relay-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    name: Deploy relay worker
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Deploy to Cloudflare Workers
+        uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: deploy/relay

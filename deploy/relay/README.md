@@ -38,19 +38,33 @@ credential endpoint (`rocketcrab-23s`).
 - A sync test (`apps/nova/src/lib/classic/relay-worker.test.ts`) keeps
   the worker allowlist and the client endpoint keys identical.
 
-## Deploy (NOT DONE — pending provider decision)
+## Deploy (GitHub Actions -> Cloudflare Workers)
 
-Deployment intentionally mirrors the TURN credential endpoint's decision
-record (`rocketcrab-23s`): evaluate free/zero-cost options first, surface
-any paid-account decision to the user, add rate limiting and origin checks
-before production.
+The worker deploys through the standard pipeline in
+`.github/workflows/relay.yml` (cloudflare/wrangler-action, runs on pushes
+that touch `deploy/relay/**` and via manual dispatch).
 
-1. Deploy `worker.ts` to a Workers-compatible host (e.g. Cloudflare
-   Workers, Deno Deploy). It is self-contained (zero imports).
-2. Set `VITE_CLASSIC_RELAY_ORIGIN` in the nova deploy workflow to the
-   relay's origin.
-3. Verify each of the 16 blocked games creates a room through the relay
-   from the browser (play each via the `/classic/:gameId` route).
-4. Once verified, flip `connectStatus: "blocked"` off in
-   `apps/nova/src/lib/classic/games.ts` (the browse UI badge updates
-   automatically via `connectBlocked`).
+1. **Secrets** (repo Settings -> Secrets and variables -> Actions): add
+   `CLOUDFLARE_API_TOKEN` (Workers Scripts edit) and
+   `CLOUDFLARE_ACCOUNT_ID`. Configuration lives in `wrangler.toml`
+   (`name = "rocketcrab-cors-relay"`, `workers_dev = true`).
+2. Run the `Deploy classic CORS relay` workflow (manual dispatch, or push
+   to `nova` touching `deploy/relay/**`). The worker appears at
+   `https://rocketcrab-cors-relay.<your-account-subdomain>.workers.dev`
+   (a custom domain can be added later via the Cloudflare dashboard).
+3. **Enable in the app**: re-run the `Deploy to GitHub Pages` workflow for
+   `origin: nova` with `relay_origin` set to the worker's origin. That
+   bakes `VITE_CLASSIC_RELAY_ORIGIN` into the build (the strict CSP in
+   `apps/nova/vite.config.ts` adds it to `connect-src` automatically).
+4. **Verify**: play each of the 16 previously-blocked games via the
+   `/classic/:gameId` route and confirm room creation succeeds through the
+   relay (no CORS errors).
+5. **Remove the blocked badges**: once verified, flip `connectStatus:
+"blocked"` off in `apps/nova/src/lib/classic/games.ts` and delete the
+   "room creation blocked" badge + warning copy in
+   `apps/nova/src/routes/game.$gameId.tsx` and any other `connectBlocked`
+   UI (the browse badge updates automatically via `connectBlocked`).
+
+Before a public release, add origin checks (verify the request Origin is a
+Rocketcrab origin) and rate limiting to the worker — see the safety notes
+below and the deployment follow-up bead (7.33).

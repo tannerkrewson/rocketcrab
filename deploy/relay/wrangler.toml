@@ -1,0 +1,6 @@
+# Cloudflare Workers config for the classic CORS relay
+# (beads rocketcrab-9fv.7.33). See README.md for deploy steps.
+name = "rocketcrab-cors-relay"
+main = "worker.ts"
+compatibility_date = "2025-01-01"
+workers_dev = true
