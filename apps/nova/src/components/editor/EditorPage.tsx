@@ -548,7 +548,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
   const actions = (
     <>
       <Button
-        variant="ghost"
+        variant="outline"
         onClick={handlePaste}
         title="Paste from clipboard (replaces the editor content)"
       >
@@ -565,7 +565,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         Clear all
       </Button>
       <Button
-        variant="ghost"
+        variant="outline"
         onClick={() => setDiscardDialog({ onConfirm: confirmReset })}
         disabled={!dirty}
         title="Reset unsaved changes"
@@ -704,7 +704,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
           {formatBytes(sourceByteLength(source))}
           {dirty ? " · unsaved changes" : null}
         </span>
-        <Link to="/library" className="btn btn-ghost btn-sm font-bold">
+        <Link to="/library" className="btn btn-link btn-sm font-bold">
           Back to games
         </Link>
       </header>
@@ -801,7 +801,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         data-testid="mobile-actions-bar"
       >
         <Button
-          variant="ghost"
+          variant="outline"
           size="md"
           onClick={handlePaste}
           title="Paste from clipboard (replaces the editor content)"
@@ -818,7 +818,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
           <Trash2 className="h-4 w-4" aria-hidden="true" />
         </Button>
         <Button
-          variant="ghost"
+          variant="outline"
           size="md"
           onClick={() => setDiscardDialog({ onConfirm: confirmReset })}
           disabled={!dirty}
@@ -881,7 +881,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
           </p>
           <div className="flex justify-end gap-2">
             <Button
-              variant="ghost"
+              variant="outline"
               onClick={() => {
                 if (discardDialog?.onConfirm === confirmReset) {
                   setDiscardDialog(null);

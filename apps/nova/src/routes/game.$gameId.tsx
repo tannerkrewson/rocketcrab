@@ -35,7 +35,7 @@ export function BrowseGamePage() {
     return (
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4 py-6">
         <ErrorPanel title="Unknown game" message={`No prebuilt game with the id "${gameId}".`} />
-        <Link to="/browse" className="btn btn-ghost btn-sm self-start font-bold">
+        <Link to="/browse" className="btn btn-link btn-sm self-start font-bold">
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           Back to games
         </Link>
@@ -68,7 +68,7 @@ export function BrowseGamePage() {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-      <Link to="/browse" className="btn btn-ghost btn-sm self-start font-bold">
+      <Link to="/browse" className="btn btn-link btn-sm self-start font-bold">
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         Back to games
       </Link>

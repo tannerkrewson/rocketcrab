@@ -67,7 +67,7 @@ export function GameCard({ game, onDuplicate, onDelete, busy = false }: GameCard
             <PartyPopper className="h-4 w-4" aria-hidden="true" />
             Play
           </Link>
-          <Button variant="ghost" onClick={onDuplicate} disabled={busy}>
+          <Button variant="outline" onClick={onDuplicate} disabled={busy}>
             <Copy className="h-4 w-4" aria-hidden="true" />
             Duplicate
           </Button>

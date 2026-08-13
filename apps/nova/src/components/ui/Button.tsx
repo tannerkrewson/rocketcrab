@@ -1,14 +1,13 @@
 import type { ButtonHTMLAttributes } from "react";
 import { cn } from "../../lib/cn";
 
-export type ButtonVariant = "primary" | "secondary" | "accent" | "ghost" | "outline" | "danger";
+export type ButtonVariant = "primary" | "secondary" | "accent" | "outline" | "danger";
 export type ButtonSize = "md" | "lg";
 
 const variantClasses: Record<ButtonVariant, string> = {
   primary: "btn-primary",
   secondary: "btn-secondary",
   accent: "btn-accent",
-  ghost: "btn-ghost",
   outline: "btn-outline",
   danger: "btn-error",
 };

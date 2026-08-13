@@ -140,7 +140,7 @@ export function LibraryPage() {
               be undone.
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="ghost" onClick={() => setPendingDelete(null)}>
+              <Button variant="outline" onClick={() => setPendingDelete(null)}>
                 Cancel
               </Button>
               <Button variant="danger" onClick={handleDelete} disabled={deleteGame.isPending}>
