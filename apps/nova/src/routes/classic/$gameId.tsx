@@ -104,7 +104,7 @@ function ClassicGamePage() {
         <p className="text-sm text-base-content/70">
           Creating a room on the game's server. It can take a few seconds.
         </p>
-        <Link to="/library" className={buttonStyles("ghost")}>
+        <Link to="/library" className={buttonStyles("outline")}>
           Cancel
         </Link>
       </div>
@@ -124,7 +124,7 @@ function ClassicGamePage() {
       />
       <Link
         to="/library"
-        className="btn btn-sm btn-ghost absolute left-3 top-3 z-10 border-2 border-base-300 bg-base-100/90 text-base-content shadow-sm backdrop-blur"
+        className="btn btn-sm absolute left-3 top-3 z-10 border-2 border-base-300 bg-base-100/90 text-base-content shadow-sm backdrop-blur"
         aria-label="Back to games"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
