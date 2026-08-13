@@ -1,7 +1,11 @@
 # Rocketcrab CORS relay (classic room creation)
 
 Scoped CORS relay for classic rocketcrab room-creation endpoints
-(beads `rocketcrab-9fv.7.7.5`).
+(beads `rocketcrab-9fv.7.7.5`, deployed 2026-08-13 as `7.33`).
+
+**Current deployment:** Cloudflare Worker `rocketcrab-cors-relay`, live at
+`https://rocketcrab-cors-relay.tannerkrewson.workers.dev` (workers.dev
+enabled; the account's subdomain is `tannerkrewson`).
 
 ## Why
 

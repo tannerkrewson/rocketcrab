@@ -87,13 +87,4 @@ export interface ClassicGame {
    * `frame-src` allowlist on Nova's main origin (strict CSP, ADR-0001).
    */
   frameOrigins: string[];
-  /**
-   * Browser room-creation capability (rocketcrab-9fv.7.7.3). Classic ran
-   * room creation on its server; Nova runs `connectToGame` client-side, so
-   * endpoints that send no CORS headers make the fetch fail in the browser
-   * (`Failed to fetch`). "blocked" = verified CORS-blocked from the browser
-   * (the play route surfaces a readable error; the browse UI documents it).
-   * Absent = works from the browser or not yet assessed.
-   */
-  connectStatus?: "blocked";
 }

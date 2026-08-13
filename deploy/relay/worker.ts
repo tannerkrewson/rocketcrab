@@ -21,9 +21,10 @@
  * the endpoint keys in sync with RELAY_ENDPOINT_KEYS in
  * apps/nova/src/lib/classic/relay.ts (a sync test enforces it).
  *
- * Deployment is intentionally NOT done yet — it needs a provider decision
- * that mirrors the TURN endpoint's decision record (rocketcrab-23s). See
- * deploy/relay/README.md and the beads deployment follow-up issue.
+ * Deployed: Cloudflare Worker "rocketcrab-cors-relay" (7.33), live at
+ * https://rocketcrab-cors-relay.tannerkrewson.workers.dev, via the GitHub
+ * Actions pipeline in .github/workflows/relay.yml (wrangler). See
+ * deploy/relay/README.md.
  */
 
 /** One allowlisted classic room-creation endpoint. */

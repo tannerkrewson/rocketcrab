@@ -1,5 +1,5 @@
 import type { ClassicGame } from "./types";
-import { relayConfigured, relayRequest } from "./relay";
+import { relayRequest } from "./relay";
 import { postJson, randomRoomId } from "./url";
 
 /**
@@ -111,13 +111,10 @@ const drawphoneBase: Omit<ClassicGame, "id" | "name" | "frameOrigins" | "connect
 const drawphoneConnect =
   (baseUrl: string, relayEndpoint: string) =>
   async (): Promise<{ player: { url: string; customQueryParams: { code: string } } }> => {
-    // CORS-blocked endpoint (7.7.3): once the scoped relay is deployed and
-    // VITE_CLASSIC_RELAY_ORIGIN is set, create the room through it; until
-    // then keep the direct fetch (whose CORS failure is documented in the
-    // browse UI as "room creation blocked").
-    const { gameCode } = relayConfigured()
-      ? await relayRequest<{ gameCode?: string }>(relayEndpoint)
-      : await postJson<{ gameCode?: string }>(baseUrl + "new");
+    // The room-creation endpoint sends no CORS headers (7.7.3), so the room
+    // is created through the scoped relay (deploy/relay, live at
+    // VITE_CLASSIC_RELAY_ORIGIN, 7.33) instead of a browser-side fetch.
+    const { gameCode } = await relayRequest<{ gameCode?: string }>(relayEndpoint);
     if (typeof gameCode !== "string") {
       throw new Error("Drawphone didn't return a game code.");
     }
@@ -134,8 +131,6 @@ const drawphone: ClassicGame = {
   id: "drawphone",
   name: "Drawphone",
   frameOrigins: origins("https://drawphone.tannerkrewson.com/", "https://dpk.tannerkrewson.com"),
-  // Verified CORS-blocked: /new returns 200 with no Access-Control-Allow-Origin (7.7.3).
-  connectStatus: "blocked",
   connectToGame: drawphoneConnect("https://drawphone.tannerkrewson.com/", "drawphone-new"),
 };
 
@@ -147,7 +142,6 @@ const drawphoneKids: ClassicGame = {
     drawphoneBase.description +
     "\n\nNOTE: Age-restricted word packs are removed from Drawphone for Kids. Players can still draw and guess unrestricted.",
   frameOrigins: origins("https://drawphone.tannerkrewson.com/", "https://dpk.tannerkrewson.com"),
-  connectStatus: "blocked",
   connectToGame: drawphoneConnect("https://dpk.tannerkrewson.com/", "dpk-new"),
 };
 
@@ -297,24 +291,14 @@ function netgamesioGame(
     ...(pictures ? { pictures } : {}),
     frameOrigins: origins("https://netgames.io/"),
     // netgames.io /new 302-redirects with no Access-Control-Allow-Origin, so
-    // the room-creation fetch is CORS-blocked from the browser (7.7.3). Once
-    // the scoped relay is configured, the redirect is followed server-side
-    // and the final room URL is returned.
-    connectStatus: "blocked",
+    // the room-creation fetch is CORS-blocked from the browser (7.7.3); the
+    // scoped relay follows the redirect server-side (7.33).
     connectToGame: async () => {
-      if (relayConfigured()) {
-        const { url } = await relayRequest<{ url: string }>("netgamesio-new", { urlId });
-        if (typeof url !== "string") {
-          throw new Error("netgames.io couldn't create a room.");
-        }
-        return { player: { url } };
+      const { url } = await relayRequest<{ url: string }>("netgamesio-new", { urlId });
+      if (typeof url !== "string") {
+        throw new Error("netgames.io couldn't create a room.");
       }
-      const res = await fetch(`https://netgames.io/games/${urlId}/new`);
-      if (!res.ok) {
-        throw new Error(`netgames.io couldn't create a room (HTTP ${res.status}).`);
-      }
-      // The endpoint redirects to the new room; the final response URL is the room.
-      return { player: { url: res.url } };
+      return { player: { url } };
     },
   };
 }
@@ -512,17 +496,12 @@ function outOfContextGame(
     players,
     ...(pictures ? { pictures } : {}),
     frameOrigins: origins(origin + "/"),
-    // outofcontext.party/api/v1/rocketcrab returns 403 with no CORS headers (7.7.3).
-    connectStatus: "blocked",
+    // outofcontext.party/api/v1/rocketcrab returns 403 with no CORS headers
+    // (7.7.3); the room is created through the scoped relay (7.33).
     connectToGame: async () => {
-      const { code } = relayConfigured()
-        ? await relayRequest<{ code?: string }>("ooc-rocketcrab", {
-            body: { game, version: 1 },
-          })
-        : await postJson<{ code?: string }>(`${origin}/api/v1/rocketcrab`, {
-            game,
-            version: 1,
-          });
+      const { code } = await relayRequest<{ code?: string }>("ooc-rocketcrab", {
+        body: { game, version: 1 },
+      });
       if (typeof code !== "string") {
         throw new Error("outofcontext.party didn't return a room code.");
       }
@@ -655,13 +634,10 @@ const secrethitlerDuc: ClassicGame = {
   minPlayers: 5,
   maxPlayers: 10,
   frameOrigins: origins("https://secret-hitler.com/"),
-  // netlify function returns 200 with no CORS headers (7.7.3).
-  connectStatus: "blocked",
+  // netlify function returns 200 with no CORS headers (7.7.3); rooms are
+  // created through the scoped relay (7.33).
   connectToGame: async () => {
-    const newUrl = "https://inspiring-hugle-c583a0.netlify.app/.netlify/functions/secretHitler";
-    const { gameCode } = relayConfigured()
-      ? await relayRequest<{ gameCode?: string }>("secret-hitler-netlify")
-      : await postJson<{ gameCode?: string }>(newUrl);
+    const { gameCode } = await relayRequest<{ gameCode?: string }>("secret-hitler-netlify");
     if (typeof gameCode !== "string") {
       throw new Error("Secret Hitler didn't return a room code.");
     }
@@ -708,13 +684,10 @@ const snakeout: ClassicGame = {
   category: ["medium"],
   players: "5-10",
   frameOrigins: origins("https://snakeout.tannerkrewson.com/"),
-  // snakeout.tannerkrewson.com/new returns 200 with no CORS headers (7.7.3).
-  connectStatus: "blocked",
+  // snakeout.tannerkrewson.com/new returns 200 with no CORS headers (7.7.3);
+  // rooms are created through the scoped relay (7.33).
   connectToGame: async () => {
-    const newUrl = "https://snakeout.tannerkrewson.com/new";
-    const { gameCode } = relayConfigured()
-      ? await relayRequest<{ gameCode?: string }>("snakeout-new")
-      : await postJson<{ gameCode?: string }>(newUrl);
+    const { gameCode } = await relayRequest<{ gameCode?: string }>("snakeout-new");
     if (typeof gameCode !== "string") {
       throw new Error("Snakeout didn't return a room code.");
     }
@@ -763,13 +736,10 @@ const tkSpyfall: ClassicGame = {
   maxPlayers: Number.POSITIVE_INFINITY,
   pictures: ["https://i.imgur.com/gAYGUUC.jpg", "https://i.imgur.com/8VMpYns.jpg"],
   frameOrigins: origins("https://spyfall.tannerkrewson.com/"),
-  // spyfall.tannerkrewson.com/new returns 200 with no CORS headers (7.7.3).
-  connectStatus: "blocked",
+  // spyfall.tannerkrewson.com/new returns 200 with no CORS headers (7.7.3);
+  // rooms are created through the scoped relay (7.33).
   connectToGame: async () => {
-    const newUrl = "https://spyfall.tannerkrewson.com/new";
-    const { gameCode } = relayConfigured()
-      ? await relayRequest<{ gameCode?: string }>("spyfall-new")
-      : await postJson<{ gameCode?: string }>(newUrl);
+    const { gameCode } = await relayRequest<{ gameCode?: string }>("spyfall-new");
     if (!gameCode) throw new Error("Failed to create Spyfall game");
     return { player: { url: `https://spyfall.tannerkrewson.com/${gameCode}` } };
   },
@@ -807,13 +777,10 @@ const werewolfnight: ClassicGame = {
   minPlayers: 5,
   maxPlayers: 16,
   frameOrigins: origins("https://werewolf-night.com/"),
-  // werewolf.uber.space/newRoom returns 200 with no CORS headers (7.7.3).
-  connectStatus: "blocked",
+  // werewolf.uber.space/newRoom returns 200 with no CORS headers (7.7.3);
+  // rooms are created through the scoped relay (7.33).
   connectToGame: async () => {
-    const newUrl = "https://werewolf.uber.space/newRoom";
-    const { gameCode } = relayConfigured()
-      ? await relayRequest<{ gameCode?: string }>("werewolf-newroom")
-      : await postJson<{ gameCode?: string }>(newUrl);
+    const { gameCode } = await relayRequest<{ gameCode?: string }>("werewolf-newroom");
     if (typeof gameCode !== "string") {
       throw new Error("werewolf-night.com didn't return a room code.");
     }

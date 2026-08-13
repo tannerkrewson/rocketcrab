@@ -67,34 +67,6 @@ describe("CLASSIC_GAMES data", () => {
     expect(findClassicGame("does-not-exist")).toBeUndefined();
   });
 
-  it("marks verified CORS-blocked games (7.7.3) so the browse UI can document them", () => {
-    const blocked = CLASSIC_GAMES.filter((game) => game.connectStatus === "blocked").map(
-      (game) => game.id,
-    );
-    // Verified live: these endpoints send no Access-Control-Allow-Origin, so
-    // the client-side room-creation fetch fails in the browser.
-    expect(blocked).toEqual(
-      expect.arrayContaining([
-        "drawphone",
-        "drawphone-kids",
-        "netgamesio-avalon",
-        "netgamesio-enigma",
-        "ooc-story",
-        "ooc-redacted",
-        "ooc-recipe",
-        "secrethitler-duc",
-        "snakeout",
-        "tk-spyfall",
-        "werewolfnight",
-      ]),
-    );
-    // Random-room-id games that need no fetch are NOT blocked.
-    expect(findClassicGame("protobowl")?.connectStatus).toBeUndefined();
-    expect(findClassicGame("justone")?.connectStatus).toBeUndefined();
-    // fishbowl's GraphQL endpoint reflects the Origin (verified live) — not blocked.
-    expect(findClassicGame("fishbowl")?.connectStatus).toBeUndefined();
-  });
-
   it("CLASSIC_FRAME_ORIGINS is the unique origin set incl. both drawphone origins", () => {
     expect(new Set(CLASSIC_FRAME_ORIGINS).size).toBe(CLASSIC_FRAME_ORIGINS.length);
     expect(CLASSIC_FRAME_ORIGINS).toContain("https://drawphone.tannerkrewson.com");
@@ -117,82 +89,6 @@ describe("classic room-creation flows (client-side connectToGame)", () => {
     vi.unstubAllEnvs();
   });
 
-  it("drawphone POSTs /new and returns the room code as a query param", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
-        jsonResponse({ gameCode: "ABC123" }),
-      ),
-    );
-    const connected = await findClassicGame("drawphone")!.connectToGame();
-    expect(connected.player).toEqual({
-      url: "https://drawphone.tannerkrewson.com/",
-      customQueryParams: { code: "ABC123" },
-    });
-  });
-
-  it("drawphone-kids uses the dpk origin", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
-        jsonResponse({ gameCode: "K1D5" }),
-      ),
-    );
-    const connected = await findClassicGame("drawphone-kids")!.connectToGame();
-    expect(connected.player.url).toBe("https://dpk.tannerkrewson.com/");
-    expect(connected.player.customQueryParams).toEqual({ code: "K1D5" });
-  });
-
-  it("outofcontext.party games POST the game id and join the lobby URL", async () => {
-    const fetchMock = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
-      jsonResponse({ code: "RC42" }),
-    );
-    vi.stubGlobal("fetch", fetchMock);
-    const connected = await findClassicGame("ooc-story")!.connectToGame();
-    expect(connected.player).toEqual({ url: "https://outofcontext.party/lobby/RC42" });
-    const [url, init] = fetchMock.mock.calls[0]!;
-    expect(url).toBe("https://outofcontext.party/api/v1/rocketcrab");
-    expect(JSON.parse(String(init?.body))).toEqual({ game: "story", version: 1 });
-  });
-
-  it("netgames.io games use the redirected room URL", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => ({
-        ok: true,
-        status: 200,
-        url: "https://netgames.io/games/avalon/ROOM-1",
-      })),
-    );
-    const connected = await findClassicGame("netgamesio-avalon")!.connectToGame();
-    expect(connected.player).toEqual({ url: "https://netgames.io/games/avalon/ROOM-1" });
-  });
-
-  it("tk-spyfall joins the created room by path", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
-        jsonResponse({ gameCode: "XYZ9" }),
-      ),
-    );
-    const connected = await findClassicGame("tk-spyfall")!.connectToGame();
-    expect(connected.player).toEqual({ url: "https://spyfall.tannerkrewson.com/XYZ9" });
-  });
-
-  it("snakeout returns the room code as a query param", async () => {
-    vi.stubGlobal(
-      "fetch",
-      vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) =>
-        jsonResponse({ gameCode: "SNAKE" }),
-      ),
-    );
-    const connected = await findClassicGame("snakeout")!.connectToGame();
-    expect(connected.player).toEqual({
-      url: "https://snakeout.tannerkrewson.com/",
-      customQueryParams: { code: "SNAKE" },
-    });
-  });
-
   it("protobowl and justone derive room URLs from random ids without a fetch", async () => {
     const connected = await findClassicGame("protobowl")!.connectToGame();
     expect(connected.player.url).toMatch(/^https:\/\/protobowl\.com\/rocketcrab-[0-9a-f]{16}$/);
@@ -202,13 +98,14 @@ describe("classic room-creation flows (client-side connectToGame)", () => {
     );
   });
 
-  it("surfaces a readable error when the room-creation endpoint fails", async () => {
+  it("surfaces a readable error when the room-creation relay fails", async () => {
+    vi.stubEnv("VITE_CLASSIC_RELAY_ORIGIN", "https://relay.example.net");
     vi.stubGlobal(
       "fetch",
       vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => ({ ok: false, status: 503 })),
     );
     await expect(findClassicGame("drawphone")!.connectToGame()).rejects.toThrow(
-      /Couldn't reach drawphone\.tannerkrewson\.com to create a room \(HTTP 503\)/,
+      /CORS relay request failed \(HTTP 503\)/,
     );
   });
 

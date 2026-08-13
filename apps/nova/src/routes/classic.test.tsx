@@ -40,6 +40,7 @@ beforeEach(() => {
 afterEach(() => {
   document.body.innerHTML = "";
   vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
 });
 
 describe("/classic/:gameId", () => {
@@ -50,6 +51,9 @@ describe("/classic/:gameId", () => {
   });
 
   it("connects to the game's server and embeds the game in an iframe", async () => {
+    // Drawphone's room creation goes through the scoped relay (7.33): the
+    // relay origin is pinned at build time via VITE_CLASSIC_RELAY_ORIGIN.
+    vi.stubEnv("VITE_CLASSIC_RELAY_ORIGIN", "https://relay.example.net");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => okJson({ gameCode: "ABC123" })),
@@ -65,6 +69,7 @@ describe("/classic/:gameId", () => {
   });
 
   it("shows the connecting state while the room is being created", async () => {
+    vi.stubEnv("VITE_CLASSIC_RELAY_ORIGIN", "https://relay.example.net");
     vi.stubGlobal(
       "fetch",
       vi.fn(
@@ -81,6 +86,7 @@ describe("/classic/:gameId", () => {
   });
 
   it("surfaces a readable error when the game's server is unreachable", async () => {
+    vi.stubEnv("VITE_CLASSIC_RELAY_ORIGIN", "https://relay.example.net");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({ ok: false, status: 503 })),
@@ -92,6 +98,7 @@ describe("/classic/:gameId", () => {
   });
 
   it("retries the connect flow from the error panel", async () => {
+    vi.stubEnv("VITE_CLASSIC_RELAY_ORIGIN", "https://relay.example.net");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({ ok: false, status: 503 })),
