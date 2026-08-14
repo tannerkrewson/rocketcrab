@@ -28,16 +28,26 @@
  *      mints over-count — SAFE for a kill-switch that errs on the safe
  *      side. KV unavailable (e.g. binding missing in dev) FAILS OPEN.
  *
+ * A separate scheduled handler (cron, 09:00 UTC, rocketcrab-23s.5) runs the
+ * usage watchdog from watchdog.ts (same TURN_BUDGET namespace): it queries
+ * the Realtime TURN analytics GraphQL dataset and alerts near the monthly
+ * budget. Manual trigger: GET /__watchdog.
+ *
  * The TURN key (TURN_KEY_ID + TURN_KEY_API_TOKEN) is a long-term secret and
  * lives ONLY as a Worker secret — never in code, config, or public JS. The
  * endpoint executes NO game code and keeps NO room-state database
  * (stateless).
  *
- * Self-contained on purpose (zero imports): drop this single file into any
- * Workers-compatible runtime. Logic lives in pure exported functions (parse
- * allowlist, port-53 filter, rate-limit window, budget counters, upstream
- * request builder) with a thin fetch handler; see worker.test.ts.
+ * Self-contained on purpose (zero EXTERNAL dependencies): worker.ts plus the
+ * local watchdog.ts module (no imports beyond each other) drop into any
+ * Workers-compatible runtime; wrangler bundles them into one script. Logic
+ * lives in pure exported functions (parse allowlist, port-53 filter,
+ * rate-limit window, budget counters, upstream request builder) with a thin
+ * fetch handler; see worker.test.ts and watchdog.test.ts.
  */
+
+import { runWatchdog } from "./watchdog";
+import type { WatchdogEnv } from "./watchdog";
 
 /** Production origin + local dev origins used when ORIGIN_ALLOWLIST is unset. */
 export const DEFAULT_ORIGIN_ALLOWLIST = [
@@ -71,6 +81,9 @@ export const DEFAULT_MINT_DAILY_CAP = 5000;
 export const DEFAULT_MINT_TOTAL_CAP = 50000;
 /** Daily counter keys self-expire after 2 days (stale day keys never linger). */
 export const DAILY_COUNTER_TTL_SECONDS = 2 * 24 * 60 * 60;
+
+/** Path that manually triggers a watchdog run (the cron drives it in prod). */
+export const WATCHDOG_TRIGGER_PATH = "/__watchdog";
 
 /**
  * Cap on tracked rate-limit keys; past it, expired windows are pruned so a
@@ -592,4 +605,43 @@ export async function handleTurnCredsRequest(
   return jsonResponse(200, filterPort53IceServers(body), cors);
 }
 
-export default { fetch: handleTurnCredsRequest };
+/**
+ * Manual watchdog trigger (GET /__watchdog): runs one watchdog pass and
+ * returns its summary. Used for dev smoke tests and on-demand checks; the
+ * daily cron drives the same code via the scheduled handler.
+ */
+export async function handleWatchdogRequest(request: Request, env: WatchdogEnv): Promise<Response> {
+  void request;
+  const summary = await runWatchdog(env, Date.now());
+  return new Response(JSON.stringify(summary), {
+    status: summary.ok ? 200 : 502,
+    headers: { ...JSON_HEADERS, "Cache-Control": "no-store" },
+  });
+}
+
+/**
+ * Cron-driven watchdog (rocketcrab-23s.5): wrangler cron triggers fire the
+ * scheduled handler (never fetch), so the watchdog is a scheduled handler
+ * here. Runs in the background via ctx.waitUntil; failures are logged.
+ */
+function handleScheduled(
+  _controller: unknown,
+  env: TurnCredsEnv & WatchdogEnv,
+  ctx: { waitUntil(promise: Promise<unknown>): void },
+): void {
+  ctx.waitUntil(
+    runWatchdog(env, Date.now()).catch((err: unknown) => {
+      console.log(`turn-creds: watchdog scheduled run failed: ${String(err)}`);
+    }),
+  );
+}
+
+export default {
+  fetch: (request: Request, env: TurnCredsEnv & WatchdogEnv): Promise<Response> => {
+    if (new URL(request.url).pathname === WATCHDOG_TRIGGER_PATH) {
+      return handleWatchdogRequest(request, env);
+    }
+    return handleTurnCredsRequest(request, env);
+  },
+  scheduled: handleScheduled,
+};

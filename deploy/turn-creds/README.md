@@ -35,6 +35,10 @@ headers so the browser can read it.
   credentials can be minted per day and since the counters were last
   re-armed; when a cap is hit the worker answers `429 budget_exceeded`
   **before** any upstream call (see "Budget kill-switch" below).
+- **Usage watchdog** (rocketcrab-23s.5): a daily cron queries the Realtime
+  TURN analytics GraphQL dataset and alerts at 10% / 50% / 90% of the
+  monthly egress budget (see "Watchdog" below). The kill-switch stays the
+  hard stop; the watchdog is the early warning.
 - **Secrets stay secret**: `TURN_KEY_ID` / `TURN_KEY_API_TOKEN` are set as
   Worker secrets only — never in code, `wrangler.toml`, or the client build.
 
@@ -46,6 +50,8 @@ headers so the browser can read it.
 | `RATE_LIMIT_PER_MIN` | `10`                                                                                                               | Requests per minute per client IP allowed by the in-worker fast-fail counter (60s fixed window).                                                                                                    |
 | `MINT_DAILY_CAP`     | `5000`                                                                                                             | Maximum successful mints per UTC calendar day (kill-switch; see below). A new day starts a fresh counter automatically.                                                                             |
 | `MINT_TOTAL_CAP`     | `50000`                                                                                                            | Maximum successful mints since the counters were last re-armed (kill-switch; see below). Re-arm by deleting the counters (see "Re-arming the counters").                                            |
+| `WATCHDOG_GB_BUDGET` | `200`                                                                                                              | Monthly TURN egress budget in GiB (1024^3 bytes) that the watchdog alerts against (see "Watchdog").                                                                                                 |
+| `ALERT_WEBHOOK_URL`  | _(unset → console.log only)_                                                                                       | Webhook that receives watchdog alert JSON. Unset, alerts are written to the Worker logs only.                                                                                                       |
 
 A single-variable env override (unset = the default above). For example, to
 allow a staging origin:
@@ -54,9 +60,10 @@ allow a staging origin:
 wrangler var set ORIGIN_ALLOWLIST "https://rocketcrab.com,https://staging.rocketcrab.com"
 ```
 
-(`ORIGIN_ALLOWLIST`, `MINT_DAILY_CAP`, `MINT_TOTAL_CAP` are not sensitive —
-they can live in `[vars]` in `wrangler.toml` or as plain `wrangler var set`;
-the two TURN secrets below are the sensitive ones.)
+(`ORIGIN_ALLOWLIST`, `MINT_DAILY_CAP`, `MINT_TOTAL_CAP`, `WATCHDOG_GB_BUDGET`,
+`ALERT_WEBHOOK_URL` are not sensitive — they can live in `[vars]` in
+`wrangler.toml` or as plain `wrangler var set`; the secrets below are the
+sensitive ones.)
 
 ## Worker secrets
 
@@ -66,6 +73,8 @@ secret):
 ```sh
 wrangler secret put TURN_KEY_ID          # e.g. the Cloudflare Realtime key token id
 wrangler secret put TURN_KEY_API_TOKEN   # the matching API token
+wrangler secret put CLOUDFLARE_ACCOUNT_ID    # watchdog: Cloudflare account id (GraphQL accountTag)
+wrangler secret put CLOUDFLARE_API_TOKEN     # watchdog: API token with the "Account Analytics" permission
 ```
 
 Local dev: create a gitignored `deploy/turn-creds/.dev.vars` with the same
@@ -85,7 +94,10 @@ wrangler kv namespace create TURN_BUDGET
 
 `wrangler deploy` fails until the placeholder id is replaced (by design — the
 kill-switch must exist in prod). In dev, `wrangler dev` uses a local KV
-simulator keyed by binding name, so the placeholder id is fine locally.
+simulator keyed by binding name, so the placeholder id is fine locally. The
+same namespace holds the watchdog's alert watermarks (`last-alerted:<pct>`,
+rocketcrab-23s.5) — re-arming the mint counters deletes only `mints:*` keys,
+so watermarks survive (each threshold still fires exactly once per month).
 
 ## Deploy
 
@@ -97,7 +109,9 @@ wrangler login
 wrangler kv namespace create TURN_BUDGET   # once; paste the id into wrangler.toml
 wrangler secret put TURN_KEY_ID
 wrangler secret put TURN_KEY_API_TOKEN
-wrangler deploy
+wrangler secret put CLOUDFLARE_ACCOUNT_ID
+wrangler secret put CLOUDFLARE_API_TOKEN
+wrangler deploy                            # deploys the worker AND its cron trigger
 ```
 
 The worker appears at
@@ -122,6 +136,14 @@ deploy, check the counters moved:
 
 ```sh
 wrangler kv key list --binding TURN_BUDGET
+```
+
+Smoke-test the watchdog without waiting for the cron (runs one pass and
+returns the JSON summary; no Origin needed — this route is outside the mint
+flow):
+
+```sh
+curl -s https://rocketcrab-turn-creds.<your-account-subdomain>.workers.dev/__watchdog
 ```
 
 ## Origin allowlist and CORS (rocketcrab-23s.1)
@@ -293,6 +315,47 @@ wrangler kv key delete mints:2026-08-13 --binding TURN_BUDGET   # the daily key 
 or delete everything at once from the dashboard (Workers -> KV ->
 `TURN_BUDGET`). Daily keys roll over on their own, so only `mints:total`
 strictly needs the manual re-arm.
+
+## Watchdog (rocketcrab-23s.5)
+
+A daily cron (09:00 UTC, `triggers.crons` in `wrangler.toml`) runs an
+**alerting watchdog** for the account's TURN egress — the early warning that
+sits _in front of_ the kill-switch. It queries the Cloudflare Realtime TURN
+analytics dataset via the standard GraphQL Analytics API
+(`https://api.cloudflare.com/client/v4/graphql`, `Authorization: Bearer
+<CLOUDFLARE_API_TOKEN>`, requires the **Account Analytics** permission),
+sums `egressBytes` (the direction Cloudflare bills for) for the current
+calendar month, and alerts when usage crosses **10% / 50% / 90%** of
+`WATCHDOG_GB_BUDGET` (default **200 GiB**). Each threshold fires **exactly
+once per month**: a KV watermark (`last-alerted:10`, `last-alerted:50`,
+`last-alerted:90` in the same `TURN_BUDGET` namespace, value = `YYYY-MM`)
+records the month it fired, so the next day's run does not re-alert.
+
+- **Alert delivery**: `POST` JSON to `ALERT_WEBHOOK_URL` (e.g. a Slack /
+  PagerDuty / Discord hook):
+  `{"alert":"turn_budget","month":"2026-08","thresholdPct":50,"egressBytes":…,"egressGiB":…,"budgetGiB":200,"usagePct":52.3,"ts":"…"}`.
+  `ALERT_WEBHOOK_URL` unset → alerts go to `console.log` (Workers logs) only.
+- **Graceful failure**: analytics unreachable / non-2xx / invalid response →
+  log and skip the run, **no alert**. The watchdog is a warning system; the
+  **kill-switch remains the hard stop** and does not depend on analytics.
+- **Manual trigger**: `GET /__watchdog` on the worker runs one pass and
+  returns the JSON summary (`200`, or `502` with `error` on failure) — handy
+  for dev and smoke tests, since wrangler cron triggers only fire the
+  `scheduled` handler and do not run in `wrangler dev` (use
+  `wrangler dev --test-scheduled` or the `__watchdog` route). The route is
+  outside the mint
+  flow (no Origin check) and harmless to expose: watermarks dedupe alerts.
+- **GraphQL query**: the worker queries `viewer.accounts(filter: {accountTag})
+{ callsTurnUsageAdaptiveGroups(limit: 10000, filter: { date_geq,
+date_leq }) { dimensions { datetime } sum { egressBytes } } }` with
+  `date_geq`/`date_leq` = `YYYY-MM-DD`. The dataset name, field names, and
+  filter keys follow the Realtime TURN analytics docs
+  (developers.cloudflare.com/realtime/turn/analytics) and are defined as
+  clearly-named constants at the top of `deploy/turn-creds/watchdog.ts` —
+  **verify them against the live GraphQL schema at deploy time** (e.g. via
+  schema introspection in GraphiQL) in case Cloudflare renames anything.
+- **Secrets**: `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` (Worker
+  secrets, "Account Analytics" permission). They never leave the Worker.
 
 ### Why not HMAC refresh tickets / an external rate-limit library?
 
