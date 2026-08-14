@@ -31,6 +31,14 @@ headers so the browser can read it.
 - **Per-IP rate limiting** (rocketcrab-23s.3): an in-worker fixed-window
   fast-fail check plus a durable Cloudflare route-level rate rule (see
   "Rate limiting" below).
+- **Budget kill-switch** (rocketcrab-23s.4): KV counters cap how many
+  credentials can be minted per day and since the counters were last
+  re-armed; when a cap is hit the worker answers `429 budget_exceeded`
+  **before** any upstream call (see "Budget kill-switch" below).
+- **Usage watchdog** (rocketcrab-23s.5): a daily cron queries the Realtime
+  TURN analytics GraphQL dataset and alerts at 10% / 50% / 90% of the
+  monthly egress budget (see "Watchdog" below). The kill-switch stays the
+  hard stop; the watchdog is the early warning.
 - **Secrets stay secret**: `TURN_KEY_ID` / `TURN_KEY_API_TOKEN` are set as
   Worker secrets only — never in code, `wrangler.toml`, or the client build.
 
@@ -40,6 +48,10 @@ headers so the browser can read it.
 | -------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ORIGIN_ALLOWLIST`   | `https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173` | Comma-separated origins allowed to call the mint endpoint. Each entry may be a full origin (`scheme://host[:port]`); a trailing slash is tolerated. Matching against the request `Origin` is exact. |
 | `RATE_LIMIT_PER_MIN` | `10`                                                                                                               | Requests per minute per client IP allowed by the in-worker fast-fail counter (60s fixed window).                                                                                                    |
+| `MINT_DAILY_CAP`     | `5000`                                                                                                             | Maximum successful mints per UTC calendar day (kill-switch; see below). A new day starts a fresh counter automatically.                                                                             |
+| `MINT_TOTAL_CAP`     | `50000`                                                                                                            | Maximum successful mints since the counters were last re-armed (kill-switch; see below). Re-arm by deleting the counters (see "Re-arming the counters").                                            |
+| `WATCHDOG_GB_BUDGET` | `200`                                                                                                              | Monthly TURN egress budget in GiB (1024^3 bytes) that the watchdog alerts against (see "Watchdog").                                                                                                 |
+| `ALERT_WEBHOOK_URL`  | _(unset → console.log only)_                                                                                       | Webhook that receives watchdog alert JSON. Unset, alerts are written to the Worker logs only.                                                                                                       |
 
 A single-variable env override (unset = the default above). For example, to
 allow a staging origin:
@@ -48,9 +60,10 @@ allow a staging origin:
 wrangler var set ORIGIN_ALLOWLIST "https://rocketcrab.com,https://staging.rocketcrab.com"
 ```
 
-(`ORIGIN_ALLOWLIST` is not sensitive — it can live in `[vars]` in
-`wrangler.toml` or as a plain `wrangler var set`; the two TURN secrets below
-are the sensitive ones.)
+(`ORIGIN_ALLOWLIST`, `MINT_DAILY_CAP`, `MINT_TOTAL_CAP`, `WATCHDOG_GB_BUDGET`,
+`ALERT_WEBHOOK_URL` are not sensitive — they can live in `[vars]` in
+`wrangler.toml` or as plain `wrangler var set`; the secrets below are the
+sensitive ones.)
 
 ## Worker secrets
 
@@ -60,11 +73,31 @@ secret):
 ```sh
 wrangler secret put TURN_KEY_ID          # e.g. the Cloudflare Realtime key token id
 wrangler secret put TURN_KEY_API_TOKEN   # the matching API token
+wrangler secret put CLOUDFLARE_ACCOUNT_ID    # watchdog: Cloudflare account id (GraphQL accountTag)
+wrangler secret put CLOUDFLARE_API_TOKEN     # watchdog: API token with the "Account Analytics" permission
 ```
 
 Local dev: create a gitignored `deploy/turn-creds/.dev.vars` with the same
 names (`wrangler dev` reads it). The repo `.gitignore` now excludes
 `.dev.vars` — never commit it.
+
+## KV namespace (TURN_BUDGET)
+
+The budget kill-switch counts successful mints in a KV namespace bound as
+`TURN_BUDGET` (declared in `wrangler.toml` with a placeholder id). Create the
+namespace once, then paste the id into `wrangler.toml`:
+
+```sh
+wrangler kv namespace create TURN_BUDGET
+# -> id: <namespace-id>   (paste it into kv_namespaces in wrangler.toml)
+```
+
+`wrangler deploy` fails until the placeholder id is replaced (by design — the
+kill-switch must exist in prod). In dev, `wrangler dev` uses a local KV
+simulator keyed by binding name, so the placeholder id is fine locally. The
+same namespace holds the watchdog's alert watermarks (`last-alerted:<pct>`,
+rocketcrab-23s.5) — re-arming the mint counters deletes only `mints:*` keys,
+so watermarks survive (each threshold still fires exactly once per month).
 
 ## Deploy
 
@@ -73,9 +106,12 @@ names (`wrangler dev` reads it). The repo `.gitignore` now excludes
 ```sh
 cd deploy/turn-creds
 wrangler login
+wrangler kv namespace create TURN_BUDGET   # once; paste the id into wrangler.toml
 wrangler secret put TURN_KEY_ID
 wrangler secret put TURN_KEY_API_TOKEN
-wrangler deploy
+wrangler secret put CLOUDFLARE_ACCOUNT_ID
+wrangler secret put CLOUDFLARE_API_TOKEN
+wrangler deploy                            # deploys the worker AND its cron trigger
 ```
 
 The worker appears at
@@ -95,7 +131,20 @@ curl -si https://rocketcrab-turn-creds.<your-account-subdomain>.workers.dev/ \
 ```
 
 Expect `200` with `access-control-allow-origin: https://rocketcrab.com` and
-an `iceServers` array. A request without `Origin` returns `403`.
+an `iceServers` array. A request without `Origin` returns `403`. After
+deploy, check the counters moved:
+
+```sh
+wrangler kv key list --binding TURN_BUDGET
+```
+
+Smoke-test the watchdog without waiting for the cron (runs one pass and
+returns the JSON summary; no Origin needed — this route is outside the mint
+flow):
+
+```sh
+curl -s https://rocketcrab-turn-creds.<your-account-subdomain>.workers.dev/__watchdog
+```
 
 ## Origin allowlist and CORS (rocketcrab-23s.1)
 
@@ -205,12 +254,116 @@ the Cloudflare dashboard under Security -> WAF -> Rate limiting rules. Keep
 `RATE_LIMIT_PER_MIN` and the rule's `requests_per_period` in sync — both
 default to 10/min.
 
+## Budget kill-switch (rocketcrab-23s.4)
+
+Nova users author their own games, so the mint endpoint must never be
+abusable enough to blow the account's TURN allowance. The kill-switch is the
+**hard stop**: two KV counters, checked on every mint **before any upstream
+call**:
+
+| Counter          | Key                | Reset                                    |
+| ---------------- | ------------------ | ---------------------------------------- |
+| Daily mints      | `mints:YYYY-MM-DD` | Automatic at UTC midnight (new key)      |
+| Cumulative mints | `mints:total`      | Manual, by deleting the counters (below) |
+
+On every **successful** mint the worker increments both counters
+(read-modify-write; KV has **no atomic increment**, so concurrent mints can
+over-count — that is SAFE and correct for a kill-switch: it errs on the safe
+side and can only ever trip _early_, never late). When either counter reaches
+its cap (`MINT_DAILY_CAP` default **5000**, `MINT_TOTAL_CAP` default
+**50000**), the worker answers:
+
+```json
+{
+  "error": {
+    "code": "budget_exceeded",
+    "message": "mint budget exhausted: daily cap (5000) reached for 2026-08-13",
+    "cap": "daily",
+    "limit": 5000
+  }
+}
+```
+
+with HTTP `429`, **no upstream call**, and the usual CORS headers so the
+browser can read it. Failed mints (upstream `502`s, bad origins, rate-limit
+`429`s) never touch the counters — only credentials that were actually
+minted cost allowance.
+
+**Fail-open behavior**: if the `TURN_BUDGET` binding is missing (dev) or KV
+is unreachable, the worker logs and **proceeds with the mint**. That is fine
+for dev and correct under an outage — abuse stays bounded by the per-IP rate
+limiter meanwhile. In prod the binding **must** exist (wrangler.toml has a
+placeholder id and `wrangler deploy` fails until it is replaced). Daily
+counter keys self-expire after 2 days, so stale day keys never accumulate.
+
+**Mint logging**: every successful mint is logged to the Workers logs as a
+JSON line (`event: "turn_cred_mint"`, `ip`, `origin`, `ttl`, `ts`) via
+`console.log` — free Workers analytics that feeds the usage watchdog and
+makes post-mortems easy.
+
+### Re-arming the counters
+
+The cumulative counter (`mints:total`) only resets when you delete it —
+deliberate, so a re-arm is a conscious operator action. To reset the budget
+(after, say, raising `MINT_TOTAL_CAP` or fixing an abuse incident):
+
+```sh
+wrangler kv key delete mints:total --binding TURN_BUDGET
+wrangler kv key delete mints:2026-08-13 --binding TURN_BUDGET   # the daily key for today
+```
+
+or delete everything at once from the dashboard (Workers -> KV ->
+`TURN_BUDGET`). Daily keys roll over on their own, so only `mints:total`
+strictly needs the manual re-arm.
+
+## Watchdog (rocketcrab-23s.5)
+
+A daily cron (09:00 UTC, `triggers.crons` in `wrangler.toml`) runs an
+**alerting watchdog** for the account's TURN egress — the early warning that
+sits _in front of_ the kill-switch. It queries the Cloudflare Realtime TURN
+analytics dataset via the standard GraphQL Analytics API
+(`https://api.cloudflare.com/client/v4/graphql`, `Authorization: Bearer
+<CLOUDFLARE_API_TOKEN>`, requires the **Account Analytics** permission),
+sums `egressBytes` (the direction Cloudflare bills for) for the current
+calendar month, and alerts when usage crosses **10% / 50% / 90%** of
+`WATCHDOG_GB_BUDGET` (default **200 GiB**). Each threshold fires **exactly
+once per month**: a KV watermark (`last-alerted:10`, `last-alerted:50`,
+`last-alerted:90` in the same `TURN_BUDGET` namespace, value = `YYYY-MM`)
+records the month it fired, so the next day's run does not re-alert.
+
+- **Alert delivery**: `POST` JSON to `ALERT_WEBHOOK_URL` (e.g. a Slack /
+  PagerDuty / Discord hook):
+  `{"alert":"turn_budget","month":"2026-08","thresholdPct":50,"egressBytes":…,"egressGiB":…,"budgetGiB":200,"usagePct":52.3,"ts":"…"}`.
+  `ALERT_WEBHOOK_URL` unset → alerts go to `console.log` (Workers logs) only.
+- **Graceful failure**: analytics unreachable / non-2xx / invalid response →
+  log and skip the run, **no alert**. The watchdog is a warning system; the
+  **kill-switch remains the hard stop** and does not depend on analytics.
+- **Manual trigger**: `GET /__watchdog` on the worker runs one pass and
+  returns the JSON summary (`200`, or `502` with `error` on failure) — handy
+  for dev and smoke tests, since wrangler cron triggers only fire the
+  `scheduled` handler and do not run in `wrangler dev` (use
+  `wrangler dev --test-scheduled` or the `__watchdog` route). The route is
+  outside the mint
+  flow (no Origin check) and harmless to expose: watermarks dedupe alerts.
+- **GraphQL query**: the worker queries `viewer.accounts(filter: {accountTag})
+{ callsTurnUsageAdaptiveGroups(limit: 10000, filter: { date_geq,
+date_leq }) { dimensions { datetime } sum { egressBytes } } }` with
+  `date_geq`/`date_leq` = `YYYY-MM-DD`. The dataset name, field names, and
+  filter keys follow the Realtime TURN analytics docs
+  (developers.cloudflare.com/realtime/turn/analytics) and are defined as
+  clearly-named constants at the top of `deploy/turn-creds/watchdog.ts` —
+  **verify them against the live GraphQL schema at deploy time** (e.g. via
+  schema introspection in GraphiQL) in case Cloudflare renames anything.
+- **Secrets**: `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` (Worker
+  secrets, "Account Analytics" permission). They never leave the Worker.
+
 ### Why not HMAC refresh tickets / an external rate-limit library?
 
 Deliberately NOT doing: HMAC refresh tickets, per-room quotas, or external
 rate-limit libraries. Complexity > value here: the credential TTL (10 min)
 means extracted credentials self-expire, the in-worker counter stops
-per-IP farming at the source, and the zone rule survives isolate restarts.
-Those two layers already bound farming tightly enough for a party app —
-adding a third-party library or a refresh-ticket scheme would add attack
-surface and operational complexity for no measurable gain.
+per-IP farming at the source, the zone rule survives isolate restarts, and
+the budget kill-switch caps the account-wide worst case. Those layers bound
+farming tightly enough for a party app — adding a third-party library or a
+refresh-ticket scheme would add attack surface and operational complexity
+for no measurable gain.
