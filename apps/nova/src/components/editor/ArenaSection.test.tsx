@@ -134,6 +134,44 @@ describe("ArenaSection — desktop grid", () => {
     expect(screen.getByText(/run #1/)).toBeInTheDocument();
   });
 
+  it("resizes every frame's width with the shared horizontal drag handle", async () => {
+    const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
+    const harness = createHarness();
+    renderEditor([`/games/${game.id}/edit`], harness);
+    await openArena();
+    const grid = await gridLayout();
+    await runToStart(harness.channels, 2);
+
+    // Frames fill their grid cell by default: no fixed width.
+    expect(grid.getByTestId("arena-player-player-1").style.width).toBe("");
+
+    // Drag the width handle on player 1's card: every frame card shares
+    // the fixed width (same session-local state as the shared height).
+    const handle = grid.getByRole("separator", {
+      name: /Resize Player 1's game frame width/,
+    });
+    fireEvent.pointerDown(handle, { clientX: 300, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientX: 400, clientY: 0 });
+    fireEvent.pointerUp(window);
+    await waitFor(() => {
+      expect(grid.getByTestId("arena-player-player-1").style.width).toBe("580px");
+    });
+    expect(grid.getByTestId("arena-player-player-2").style.width).toBe("580px");
+
+    // The height handle still resizes the frame height independently.
+    const heightHandle = grid.getByRole("separator", {
+      name: /Resize Player 1's game frame$/,
+    });
+    const frame = grid.getByTestId("arena-frame-player-1");
+    const initialHeight = Number.parseInt(frame.style.height, 10);
+    fireEvent.pointerDown(heightHandle, { clientY: 400, pointerId: 2 });
+    fireEvent.pointerMove(window, { clientY: 550, clientX: 400 });
+    fireEvent.pointerUp(window);
+    await waitFor(() => {
+      expect(frame.style.height).toBe(`${initialHeight + 150}px`);
+    });
+  });
+
   it("shows per-player connection badges and per-player controls", async () => {
     const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
     const harness = createHarness();

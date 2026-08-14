@@ -23,9 +23,9 @@ import {
   ArrowRight,
   Bug,
   Droplets,
-  FlaskConical,
   Gauge,
   GripHorizontal,
+  GripVertical,
   PartyPopper,
   Pause,
   Play,
@@ -82,6 +82,14 @@ function defaultFrameHeightPx(): number {
 function clampFrameHeight(value: number): number {
   const max = typeof window === "undefined" ? 1200 : Math.round(window.innerHeight * 0.8);
   return Math.min(Math.max(value, 160), max);
+}
+
+/** Game-frame widths: frames fill their grid cell by default; once
+ *  dragged, a fixed pixel width with hard clamps. */
+function clampFrameWidth(value: number): number {
+  const max =
+    typeof window === "undefined" ? 1200 : Math.max(320, Math.round(window.innerWidth * 0.92));
+  return Math.min(Math.max(value, 240), max);
 }
 
 function connectionBadge(player: ArenaPlayer): ReactNode {
@@ -193,6 +201,9 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
   const [newPlayerName, setNewPlayerName] = useState("");
   const [debugOpen, setDebugOpen] = useState(false);
   const [frameHeightPx, setFrameHeightPx] = useState(defaultFrameHeightPx);
+  // null = the frame fills its grid cell (no fixed width); a drag fixes a
+  // shared pixel width for every frame, session-local like the height.
+  const [frameWidthPx, setFrameWidthPx] = useState<number | null>(null);
   const [renameTarget, setRenameTarget] = useState<ArenaPlayer | null>(null);
 
   // Keep the mobile tab on an existing player when players are removed.
@@ -234,6 +245,38 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
       window.addEventListener("pointercancel", onEnd);
     },
     [frameHeightPx],
+  );
+
+  /** Shared horizontal drag: resize every game frame's width (11.15). */
+  const handleFrameWidthResize = useCallback(
+    (event: ReactPointerEvent<HTMLDivElement>) => {
+      event.preventDefault();
+      const handle = event.currentTarget;
+      const startX = event.clientX;
+      // At the default auto width the frames fill their grid cell, so seed
+      // the drag from the frame's rendered width — the first drag shouldn't
+      // jump.
+      const frame = handle.previousElementSibling as HTMLElement | null;
+      const startWidth = frameWidthPx ?? (frame?.offsetWidth || 480);
+      try {
+        handle.setPointerCapture(event.pointerId);
+      } catch {
+        // Pointer capture unavailable (some test environments); the window
+        // listeners below still track the drag.
+      }
+      const onMove = (moveEvent: PointerEvent) => {
+        setFrameWidthPx(clampFrameWidth(startWidth + (moveEvent.clientX - startX)));
+      };
+      const onEnd = () => {
+        window.removeEventListener("pointermove", onMove);
+        window.removeEventListener("pointerup", onEnd);
+        window.removeEventListener("pointercancel", onEnd);
+      };
+      window.addEventListener("pointermove", onMove);
+      window.addEventListener("pointerup", onEnd);
+      window.addEventListener("pointercancel", onEnd);
+    },
+    [frameWidthPx],
   );
 
   const handleRename = useCallback(() => {
@@ -359,12 +402,6 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
 
   const summaryBar = (
     <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-base-content/70">
-      <span className="badge badge-ghost badge-sm">
-        {summary.registered}/{summary.total} registered
-      </span>
-      <span className="badge badge-ghost badge-sm">
-        {summary.started}/{summary.total} started
-      </span>
       {summary.failed > 0 ? (
         <span className="badge badge-error badge-sm">{summary.failed} failed</span>
       ) : null}
@@ -394,6 +431,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
       key={player.id}
       data-testid={`arena-player-${player.id}`}
       className="flex flex-col gap-2 rounded-box border-2 border-base-300 bg-base-100 p-3"
+      style={frameWidthPx !== null ? { width: `${frameWidthPx}px` } : undefined}
       aria-label={`Player ${player.name}`}
     >
       <div className="flex flex-wrap items-center gap-2">
@@ -483,12 +521,23 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
           <span>session: {player.sessionStatus}</span>
         ) : null}
       </div>
-      <div
-        className="overflow-hidden rounded-md border border-base-300 bg-black"
-        style={{ height: `${frameHeightPx}px` }}
-        data-testid={`arena-frame-${player.id}`}
-      >
-        <div ref={bindContainer(player.id)} className="h-full w-full" />
+      <div className="flex items-stretch gap-1">
+        <div
+          className="min-w-0 flex-1 overflow-hidden rounded-md border border-base-300 bg-black"
+          style={{ height: `${frameHeightPx}px` }}
+          data-testid={`arena-frame-${player.id}`}
+        >
+          <div ref={bindContainer(player.id)} className="h-full w-full" />
+        </div>
+        <div
+          role="separator"
+          aria-label={`Resize ${player.name}'s game frame width`}
+          className="flex w-3 cursor-ew-resize select-none items-center justify-center rounded-md border border-base-300 bg-base-200 text-base-content/40"
+          onPointerDown={handleFrameWidthResize}
+          title="Drag to resize width"
+        >
+          <GripVertical className="h-3 w-3" aria-hidden="true" />
+        </div>
       </div>
       <div
         role="separator"
@@ -533,38 +582,33 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
 
   return (
     <div className="flex flex-col gap-3" data-testid="arena-section">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="flex items-center gap-2 text-xl font-black">
-            <FlaskConical className="h-5 w-5" aria-hidden="true" />
-            Multi-player test
-          </h2>
-          <p className="text-sm text-base-content/70">
-            {game !== undefined ? `“${game.title}” · ` : ""}
-            {summary.total} simulated players on this page
-            {stale ? " · testing the editor's previous source" : ""}
-          </p>
+      {/* Quiet arena header: only the stale badge (something needs
+          attention) and the launch-into-party action remain — the stage
+          speaks for itself. */}
+      {stale || game !== undefined ? (
+        <div className="flex flex-wrap items-center gap-3">
+          {stale ? (
+            <span
+              className="badge badge-warning badge-md"
+              title="The editor changed since this test run"
+            >
+              Editor changed — press Run to re-test
+            </span>
+          ) : null}
+          <div className="flex-1" />
+          {game !== undefined ? (
+            <Link
+              to="/party"
+              search={{ gameId: game.id, mode: game.mode ?? "state", title: game.title }}
+              className={buttonStyles("secondary")}
+              title="Launch this game into a real party"
+            >
+              <PartyPopper className="h-4 w-4" aria-hidden="true" />
+              Play with friends
+            </Link>
+          ) : null}
         </div>
-        {stale ? (
-          <span
-            className="badge badge-warning badge-md"
-            title="The editor changed since this test run"
-          >
-            Editor changed — press Run to re-test
-          </span>
-        ) : null}
-        {game !== undefined ? (
-          <Link
-            to="/party"
-            search={{ gameId: game.id, mode: game.mode ?? "state", title: game.title }}
-            className={buttonStyles("secondary")}
-            title="Launch this game into a real party"
-          >
-            <PartyPopper className="h-4 w-4" aria-hidden="true" />
-            Play with friends
-          </Link>
-        ) : null}
-      </div>
+      ) : null}
 
       {summaryBar}
 
