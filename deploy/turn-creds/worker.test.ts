@@ -12,6 +12,7 @@ import {
   exceededCap,
   filterPort53IceServers,
   handleTurnCredsRequest,
+  handleWatchdogRequest,
   isPort53IceUrl,
   nextCounterValue,
   normalizeOrigin,
@@ -24,6 +25,7 @@ import {
   type KvStore,
   type TurnCredsEnv,
 } from "./worker";
+import { TURN_ANALYTICS_ENDPOINT } from "./watchdog";
 
 /**
  * TURN credential mint worker tests (beads rocketcrab-23s). The worker
@@ -702,5 +704,32 @@ describe("budget kill-switch via KV counters (rocketcrab-23s.4)", () => {
       makeEnv({ TURN_BUDGET: kv2 }),
     );
     expect(res2.status).toBe(200);
+  });
+
+  it("GET /__watchdog runs one watchdog pass and returns its summary (manual cron trigger)", async () => {
+    fetchMock.mockImplementation(async (url: string | URL) => {
+      if (String(url) === TURN_ANALYTICS_ENDPOINT) {
+        return new Response(
+          JSON.stringify({
+            data: {
+              viewer: {
+                accounts: [{ callsTurnUsageAdaptiveGroups: [{ sum: { egressBytes: 1000 } }] }],
+              },
+            },
+          }),
+          { status: 200 },
+        );
+      }
+      return new Response("unexpected fetch", { status: 500 });
+    });
+
+    const res = await handleWatchdogRequest(
+      new Request("https://turn-creds.example.net/__watchdog"),
+      { CLOUDFLARE_ACCOUNT_ID: "test-account", CLOUDFLARE_API_TOKEN: "test-token" },
+    );
+    expect(res.status).toBe(200);
+    const summary = (await res.json()) as { ok: boolean; egressBytes: number; error?: string };
+    expect(summary.ok).toBe(true);
+    expect(summary.egressBytes).toBe(1000);
   });
 });
