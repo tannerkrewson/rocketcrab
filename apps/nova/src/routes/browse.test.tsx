@@ -8,12 +8,11 @@ import { readDraftSource } from "../lib/editor/draft-handoff";
 import { routeTree } from "../routeTree.gen";
 
 /**
- * Prebuilt-game browser tests (rocketcrab-9fv.7.7.2 / 7.23): /browse lists
- * classic external iframe games and Nova's own games together with distinct
- * badges, filters by search and category (classic layout: search + 2-column
- * category grid + cards) with classic/nova badges, and
- * /browse/:gameId shows the classic Info | Guide detail with a play/open
- * action.
+ * Prebuilt-game browser tests (rocketcrab-9fv.7.7.2 / 7.23 / 10.9): /browse
+ * lists classic external iframe games and Nova's own games together with
+ * distinct badges. The game list is hidden until a category opens or the
+ * user searches (10.9); opening a category swaps to the list alone (no
+ * category buttons, back affordance), and "My games" is a category card.
  */
 
 function renderAt(path: string) {
@@ -35,10 +34,21 @@ beforeEach(() => {
 });
 
 describe("/browse", () => {
+  it("shows only the category cards by default — no game list (10.9)", async () => {
+    renderAt("/browse");
+    expect(await screen.findByRole("heading", { name: "Games" })).toBeInTheDocument();
+    // Category cards (All games, My games, and the classic boxes).
+    expect(screen.getByRole("button", { name: /All games/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /My games/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /netgames\.io/ })).toBeInTheDocument();
+    // The list is NOT shown by default.
+    expect(screen.queryByText("Drawphone")).not.toBeInTheDocument();
+    expect(screen.queryByText("Nova Quiz")).not.toBeInTheDocument();
+  });
+
   it("lists classic and nova games together with distinct badges", async () => {
     renderAt("/browse");
-
-    expect(await screen.findByRole("heading", { name: "Games" })).toBeInTheDocument();
+    await userEvent.click(await screen.findByRole("button", { name: /All games/ }));
     // A classic game and a Nova game, side by side.
     expect(screen.getByText("Drawphone")).toBeInTheDocument();
     expect(screen.getByText("Nova Quiz")).toBeInTheDocument();
@@ -51,6 +61,8 @@ describe("/browse", () => {
 
   it("badges classic games red and nova games blue (7.42)", async () => {
     renderAt("/browse");
+    await screen.findByRole("button", { name: /All games/ });
+    await userEvent.click(screen.getByRole("button", { name: /All games/ }));
     await screen.findByText("Drawphone");
 
     const classicBadges = screen.getAllByText("classic");
@@ -65,31 +77,45 @@ describe("/browse", () => {
     }
   });
 
-  it("filters games by search", async () => {
+  it("filters games by search (the list appears, category cards hide)", async () => {
     renderAt("/browse");
-    await screen.findByText("Drawphone");
+    await screen.findByRole("searchbox", { name: "Search games" });
 
     await userEvent.type(screen.getByRole("searchbox", { name: "Search games" }), "quiz");
 
     expect(screen.getByText("Nova Quiz")).toBeInTheDocument();
     expect(screen.queryByText("Drawphone")).not.toBeInTheDocument();
+    // Searching hides the category buttons (10.9).
+    expect(screen.queryByRole("button", { name: /All games/ })).not.toBeInTheDocument();
   });
 
-  it("filters games by category box (netgames.io)", async () => {
+  it("filters games by category box and shows only the list (netgames.io)", async () => {
     renderAt("/browse");
-    await screen.findByText("Drawphone");
-
+    await screen.findByRole("button", { name: /netgames\.io/ });
     await userEvent.click(screen.getByRole("button", { name: /netgames\.io/ }));
 
     expect(screen.getByText("Avalon")).toBeInTheDocument();
     expect(screen.queryByText("Drawphone")).not.toBeInTheDocument();
     expect(screen.queryByText("Nova Quiz")).not.toBeInTheDocument();
+    // Only the list shows: no category buttons, and a way back.
+    expect(screen.queryByRole("button", { name: /All games/ })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /All categories/ })).toBeInTheDocument();
+  });
+
+  it("returns to the category cards from an open category (10.9)", async () => {
+    renderAt("/browse");
+    await screen.findByRole("button", { name: /netgames\.io/ });
+    await userEvent.click(screen.getByRole("button", { name: /netgames\.io/ }));
+    expect(screen.getByText("Avalon")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /All categories/ }));
+    expect(screen.getByRole("button", { name: /All games/ })).toBeInTheDocument();
+    expect(screen.queryByText("Avalon")).not.toBeInTheDocument();
   });
 
   it("filters to Nova games via the Nova category box", async () => {
     renderAt("/browse");
-    await screen.findByText("Drawphone");
-
+    await screen.findByRole("button", { name: /Nova/ });
     await userEvent.click(screen.getByRole("button", { name: /Nova/ }));
 
     expect(screen.getByText("Nova Quiz")).toBeInTheDocument();
