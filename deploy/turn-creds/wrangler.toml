@@ -1,0 +1,6 @@
+# Cloudflare Workers config for the TURN credential mint endpoint
+# (beads rocketcrab-23s). See README.md for deploy steps and secrets.
+name = "rocketcrab-turn-creds"
+main = "worker.ts"
+compatibility_date = "2025-01-01"
+workers_dev = true
