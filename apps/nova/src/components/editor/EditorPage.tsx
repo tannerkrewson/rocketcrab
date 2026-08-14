@@ -710,7 +710,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       <div className="hidden flex-col gap-4 md:flex" data-testid="desktop-layout">
         <div className="flex flex-wrap items-center gap-2">{actions}</div>
         <div style={{ height: `${editorHeightPx}px` }}>
-          <div className="grid gap-4 grid-cols-2">
+          <div className="grid h-full gap-4 grid-cols-2">
             <section
               className="min-h-0 overflow-hidden rounded-box border-2 border-base-300 bg-base-100"
               aria-label="Editor"
@@ -719,15 +719,20 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
                 <CodeEditor value={source} onChange={setSource} ariaLabel="Game HTML source" />
               </div>
             </section>
-            <DiagnosticsPanel
-              sourceBytes={sourceByteLength(source)}
-              sourceHash={sourceHash}
-              validationIssues={validationIssues}
-              diagnostics={diagnostics}
-              consoleEntries={consoleEntries}
-              onCopyReport={() => void handleCopyReport()}
-              busy={createGame.isPending || updateGame.isPending}
-            />
+            <section
+              className="flex min-h-0 flex-col gap-4 overflow-y-auto"
+              aria-label="Diagnostics"
+            >
+              <DiagnosticsPanel
+                sourceBytes={sourceByteLength(source)}
+                sourceHash={sourceHash}
+                validationIssues={validationIssues}
+                diagnostics={diagnostics}
+                consoleEntries={consoleEntries}
+                onCopyReport={() => void handleCopyReport()}
+                busy={createGame.isPending || updateGame.isPending}
+              />
+            </section>
           </div>
         </div>
         <div
