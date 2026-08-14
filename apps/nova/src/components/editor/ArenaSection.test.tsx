@@ -1,12 +1,12 @@
 /**
- * Arena UI tests (U6, 7.40): the multi-player test arena now lives INSIDE
- * the consolidated editor page, so these tests render the real /editor and
- * /games/:id/edit routes, press Test multiplayer, and exercise the arena
- * through the fake runtime hosts (the same seams RuntimeHostClient exposes).
- * Covers the responsive player grid, mobile player tabs, shared toolbar
- * controls, per-player logs, the close action, re-testing with a changed
- * source, test-result persistence (U2 recordTestResults), and the
- * launch-into-party action.
+ * Arena UI tests (U6, 7.40): the multi-player test arena lives INSIDE
+ * the consolidated editor page and is live by default (Task 1:
+ * arena-default-on), so these tests render the real /editor and
+ * /games/:id/edit routes and exercise the arena through the fake runtime
+ * hosts (the same seams RuntimeHostClient exposes). Covers the responsive
+ * player grid, mobile player tabs, shared toolbar controls, per-player
+ * logs, re-testing with a changed source, test-result persistence (U2
+ * recordTestResults), and the launch-into-party action.
  */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createMemoryHistory, createRouter } from "@tanstack/react-router";
@@ -33,7 +33,7 @@ const SOURCE =
 const PASTED_SOURCE =
   "<!doctype html><html><head><title>Card Sharks</title></head><body><p>cards</p></body></html>";
 
-/** Render the consolidated editor route; Test multiplayer opens the arena. */
+/** Render the consolidated editor route; the arena is live on load. */
 function renderEditor(initialEntries: string[], harness: ArenaHarness) {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -61,10 +61,8 @@ function mockClipboard(text: string) {
   });
 }
 
-/** Open the arena from the desktop actions bar and scope to its section. */
+/** The arena is live on load; scope queries to its section. */
 async function openArena() {
-  const desktop = within(await screen.findByTestId("desktop-layout"));
-  await userEvent.click(desktop.getByRole("button", { name: /Test multiplayer/ }));
   return within(await screen.findByTestId("arena-section"));
 }
 
@@ -74,6 +72,22 @@ async function desktopLayout() {
 
 async function gridLayout() {
   return within(await screen.findByTestId("arena-grid"));
+}
+
+/** Bootstraps posted for one arena player (memberId-tagged). */
+function arenaBootstraps(harness: ArenaHarness, memberId: string) {
+  return harness.windowMessages
+    .map((message) => message.data as Record<string, unknown>)
+    .filter(
+      (message) =>
+        message.type === "runtime.bootstrap" &&
+        (message.player as { memberId?: string })?.memberId === memberId,
+    );
+}
+
+/** Only the single-player runtime session's bootstraps (local-creator). */
+function runtimeBootstraps(harness: ArenaHarness) {
+  return arenaBootstraps(harness, "local-creator");
 }
 
 beforeEach(async () => {
@@ -233,17 +247,21 @@ describe("ArenaSection — desktop grid", () => {
     await waitFor(() => expect(desktop.getByText("Drop messages")).toBeInTheDocument());
   });
 
-  it("closes the arena and stops every player", async () => {
+  it("removes a player and stops its frame, staying mounted", async () => {
     const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
     const harness = createHarness();
     renderEditor([`/games/${game.id}/edit`], harness);
     const section = await openArena();
     await runToStart(harness.channels, 2);
 
-    await userEvent.click(section.getByRole("button", { name: /Close/ }));
-    await waitFor(() => expect(screen.queryByTestId("arena-section")).not.toBeInTheDocument());
-    // The empty-state placeholder returns; nothing is running.
-    expect(screen.getByText("Multi-player test arena")).toBeInTheDocument();
+    await userEvent.click(section.getByRole("button", { name: /Remove Player 2/ }));
+    const grid = within(await screen.findByTestId("arena-grid"));
+    await waitFor(() =>
+      expect(grid.queryByTestId("arena-player-player-2")).not.toBeInTheDocument(),
+    );
+    expect(grid.getByTestId("arena-player-player-1")).toBeInTheDocument();
+    // The arena is always mounted now — there is no close flow.
+    expect(screen.getByTestId("arena-section")).toBeInTheDocument();
   });
 });
 
@@ -288,22 +306,29 @@ describe("ArenaSection — phone layout", () => {
 });
 
 describe("ArenaSection — source handoff and re-testing", () => {
-  it("tests the editor's current source for a saved game without touching the saved copy", async () => {
+  it("runs the editor's current source in the arena without touching the saved copy", async () => {
     const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
     mockClipboard(PASTED_SOURCE);
     const harness = createHarness();
     renderEditor([`/games/${game.id}/edit`], harness);
     const desktop = within(await screen.findByTestId("desktop-layout"));
 
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
-    await userEvent.click(desktop.getByRole("button", { name: /Test multiplayer/ }));
-    await screen.findByTestId("arena-section");
+    // The arena boots the saved source on load…
     await runToStart(harness.channels, 2);
+    await waitFor(() => expect(screen.getByText("Test passed")).toBeInTheDocument());
 
-    const bootstraps = harness.windowMessages
-      .map((message) => message.data as Record<string, unknown>)
-      .filter((message) => message.type === "runtime.bootstrap");
-    expect(bootstraps[0]?.gameSource).toBe(PASTED_SOURCE);
+    // …and Run applies the pasted (unsaved) source to the arena, restarting
+    // every player with it (the arena restarts once the hidden runtime run
+    // resolves, so ready its channel first).
+    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
+    await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
+    await vi.waitFor(() => expect(runtimeBootstraps(harness)).toHaveLength(1));
+    const runtimeIndex = harness.channels.length - 1;
+    deliver(harness.channels[runtimeIndex]!.port1, readyMessage());
+    await vi.waitFor(() => {
+      const restarts = arenaBootstraps(harness, "member-1");
+      expect(restarts.at(-1)?.gameSource).toBe(PASTED_SOURCE);
+    });
     // The saved source is untouched.
     const saved = await gameRepository.read(game.id);
     expect(saved.html).toBe(SOURCE);
@@ -318,42 +343,61 @@ describe("ArenaSection — source handoff and re-testing", () => {
     renderEditor([`/games/${game.id}/edit`], harness);
     const desktop = within(await screen.findByTestId("desktop-layout"));
 
-    // First test run.
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
-    await userEvent.click(desktop.getByRole("button", { name: /Test multiplayer/ }));
-    await screen.findByTestId("arena-section");
+    // First run: the saved source passes in the arena.
     await runToStart(harness.channels, 2);
     await waitFor(() => expect(screen.getByText("Test passed")).toBeInTheDocument());
+    expect(screen.getByText(/run #1/)).toBeInTheDocument();
 
     // Editing the source marks the running arena stale…
-    mockClipboard(SOURCE);
     await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
     await waitFor(() =>
-      expect(
-        screen.getByText(/Editor changed — press Test multiplayer to re-run/),
-      ).toBeInTheDocument(),
+      expect(screen.getByText(/Editor changed — press Run to re-test/)).toBeInTheDocument(),
     );
 
-    // …and pressing Test multiplayer again restarts every player with it.
-    // load() awaits the runtime's ready, so the players' new channels appear
-    // one at a time (ready delivered as each is created).
-    await userEvent.click(desktop.getByRole("button", { name: /Test multiplayer/ }));
-    await vi.waitFor(() => expect(harness.channels.length).toBeGreaterThanOrEqual(3));
-    await runToStart(harness.channels, 2, 2);
+    // …and Run restarts every player with the pasted source (run #2). The
+    // arena restarts only once the hidden runtime run resolves, so ready
+    // the runtime's channel first (its channel is the newest at the moment
+    // its bootstrap appears; the arena restart follows).
+    await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
+    await vi.waitFor(() => expect(runtimeBootstraps(harness)).toHaveLength(1));
+    const runtimeIndex = harness.channels.length - 1;
+    deliver(harness.channels[runtimeIndex]!.port1, readyMessage());
+
+    // The arena's restarted players load right after the runtime's channel:
+    // player 1 then player 2 (each waits for the previous one's ready).
+    await vi.waitFor(() =>
+      expect(harness.channels.length).toBeGreaterThanOrEqual(runtimeIndex + 2),
+    );
+    deliver(harness.channels[runtimeIndex + 1]!.port1, readyMessage());
+    await vi.waitFor(() =>
+      expect(harness.channels.length).toBeGreaterThanOrEqual(runtimeIndex + 3),
+    );
+    deliver(harness.channels[runtimeIndex + 2]!.port1, readyMessage());
+    deliver(harness.channels[runtimeIndex + 1]!.port1, registrationMessage("Game 1"));
+    deliver(harness.channels[runtimeIndex + 1]!.port1, apiCallMessage("ready", {}));
+    deliver(harness.channels[runtimeIndex + 2]!.port1, registrationMessage("Game 2"));
+    deliver(harness.channels[runtimeIndex + 2]!.port1, apiCallMessage("ready", {}));
+
+    await waitFor(() => expect(screen.getByText("Test passed")).toBeInTheDocument());
     await waitFor(() => expect(screen.getByText(/run #2/)).toBeInTheDocument());
     await waitFor(() => expect(screen.queryByText(/Editor changed/)).not.toBeInTheDocument());
-    const bootstraps = harness.windowMessages
-      .map((message) => message.data as Record<string, unknown>)
-      .filter((message) => message.type === "runtime.bootstrap");
-    expect(bootstraps.at(-1)?.gameSource).toBe(SOURCE);
+    expect(arenaBootstraps(harness, "member-1").at(-1)?.gameSource).toBe(PASTED_SOURCE);
   });
 
-  it("shows a placeholder until Test multiplayer is pressed", async () => {
+  it("mounts the arena by default and seeds it with the current source", async () => {
     const harness = createHarness();
     renderEditor(["/editor"], harness);
 
-    expect(await screen.findByText("Multi-player test arena")).toBeInTheDocument();
-    expect(screen.queryByTestId("arena-grid")).not.toBeInTheDocument();
-    expect(harness.channels).toHaveLength(0);
+    // The arena is live on load — no Test-multiplayer press needed.
+    const section = await openArena();
+    expect(section.getByTestId("arena-grid")).toBeInTheDocument();
+    expect(within(section.getByTestId("arena-grid")).getByText("Player 1")).toBeInTheDocument();
+    expect(within(section.getByTestId("arena-grid")).getByText("Player 2")).toBeInTheDocument();
+
+    // It starts loading the players' runtime frames immediately.
+    await vi.waitFor(() => expect(harness.channels.length).toBeGreaterThanOrEqual(1));
+    await vi.waitFor(() =>
+      expect(arenaBootstraps(harness, "member-1").length).toBeGreaterThanOrEqual(1),
+    );
   });
 });

@@ -47,12 +47,12 @@ export function FirstRunTutorial() {
               let an AI write the first draft.
             </li>
             <li>
-              Press <b>Run</b> to play the current code in the preview and check the errors panel
-              for problems.
+              Press <b>Run</b> to apply your code to the live test arena below and check the errors
+              panel for problems.
             </li>
             <li>
-              Press <b>Test multiplayer</b> to simulate several players on this page and see how the
-              game behaves in a party.
+              The arena simulates several players on this page, so you can watch how the game
+              behaves in a party as you build. Edit the code and press <b>Run</b> again to re-test.
             </li>
             <li>
               Press <b>Save</b> to keep your game, or <b>Play with friends</b> to launch a real
