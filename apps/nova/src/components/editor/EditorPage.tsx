@@ -40,7 +40,7 @@ import {
   type Diagnostic,
 } from "../../lib/editor/diagnostics";
 import { useRuntimeSession } from "../../lib/editor/runtime-session";
-import { formatBytes, validateSource } from "../../lib/editor/validation";
+import { validateSource } from "../../lib/editor/validation";
 import { readFromClipboard, writeToClipboard } from "../../lib/editor/clipboard";
 import { storePartySource } from "../../lib/party/source-handoff";
 import { CodeEditor } from "./CodeEditor";
@@ -655,8 +655,8 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       </div>
 
       {/* Chrome row (Task 2): identity (logo mark, no text), orientation
-          (back to the library), the click-to-edit title, and the byte
-          count + unsaved-changes indicator. */}
+          (back to the library), the click-to-edit title, and the
+          unsaved-changes indicator. */}
       <header className="flex flex-wrap items-center gap-3">
         <Link
           to="/"
@@ -699,10 +699,9 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
             </button>
           )}
         </div>
-        <span className="text-xs font-semibold text-base-content/60">
-          {formatBytes(sourceByteLength(source))}
-          {dirty ? " · unsaved changes" : null}
-        </span>
+        {dirty ? (
+          <span className="text-xs font-semibold text-base-content/60">· unsaved changes</span>
+        ) : null}
       </header>
 
       {/* Desktop: actions, small resizable editor, then the arena flows in
