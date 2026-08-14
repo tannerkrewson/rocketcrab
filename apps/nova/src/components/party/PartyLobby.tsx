@@ -16,7 +16,7 @@ import {
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { writeToClipboard } from "../../lib/editor/clipboard";
-import type { PartyEngineState, PartyMemberView } from "../../lib/party/engine";
+import type { PartyEngineState, PartyMemberView, PartyNotice } from "../../lib/party/engine";
 import { Button } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
 import { IdleParticles } from "./IdleParticles";
@@ -86,6 +86,34 @@ function transferIndicator(member: PartyMemberView) {
 }
 
 /**
+ * Unified copy for the ended-state banner (11.8): every "game ended"
+ * variant (host_closed / user_exit / error / unknown) reads the same way,
+ * with correct copy per reason — one banner owns all of them.
+ */
+function endedBannerText(reason: string): string {
+  switch (reason) {
+    case "host_closed":
+      return "The game ended — the host closed it. The party is still open; leave when you're done.";
+    case "error":
+      return "The game ended due to an error. The party is still open — leave when you're done.";
+    default:
+      return "The game ended. The party is still open — leave when you're done.";
+  }
+}
+
+/** True for engine end notices — owned by the ended-state banner (11.8). */
+function isEndedNotice(message: string): boolean {
+  return message.startsWith("The game ended");
+}
+
+/** Alert level classes for lobby notices (outline-styled per 9fv.11.3). */
+const NOTICE_ALERT_LEVELS: Record<PartyNotice["level"], string> = {
+  error: "alert-error",
+  warn: "alert-warning",
+  info: "alert-info",
+};
+
+/**
  * The party lobby (P4): the invite card (Copy URL / QR in a modal), the
  * welcome card with the selected game, the classic 2-column player grid
  * with per-player state, start / force-start / leave controls, and
@@ -146,6 +174,15 @@ export function PartyLobby({
       document.title = previous;
     };
   }, [pageTitle]);
+
+  // 11.8: the notice banner shows the LATEST relevant notice only (a
+  // capped, deduped set from the engine) — never a growing list of
+  // identical alerts. Once the game ended, the ended-state banner owns the
+  // status area and the notice banner hides entirely.
+  const latestNotice =
+    state.endedReason !== null || state.notices.length === 0
+      ? null
+      : ([...state.notices].reverse().find((notice) => !isEndedNotice(notice.message)) ?? null);
 
   const copyInvite = async () => {
     if (state.inviteUrl === null) return;
@@ -237,10 +274,13 @@ export function PartyLobby({
           <p className="text-sm text-base-content/70">No game selected yet</p>
         )}
       </section>
+      {/* 11.8: ONE unified ended-state banner — every "game ended" variant
+          (host_closed / user_exit / error) reads the same way with copy per
+          reason; the engine's raw ended notices are filtered out of the
+          notice banner below (this banner owns that state). */}
       {state.endedReason !== null ? (
-        <div className="rounded-box border-2 border-accent bg-accent/10 p-3 text-sm font-semibold">
-          The game ended{state.endedReason === undefined ? "." : ` (${state.endedReason}).`} The
-          party is still open — leave when you&apos;re done.
+        <div role="alert" className="alert alert-outline alert-info">
+          <span className="text-sm font-semibold">{endedBannerText(state.endedReason)}</span>
         </div>
       ) : null}
       {/* 10.7: the greeter and authority role badges are gone from the
@@ -314,12 +354,14 @@ export function PartyLobby({
       </section>
       {/* The blocked-reason copy (10.7): shown as a styled warning alert;
           the "Pick a game before starting the party." message is gone —
-          the welcome card covers the no-game case. */}
+          the welcome card covers the no-game case. The ended case is
+          covered by the unified ended banner above (11.8). */}
       {state.game !== null &&
+      state.endedReason === null &&
       !state.canStart &&
       !state.canForceStart &&
       state.startBlockedReason !== null ? (
-        <div role="alert" className="alert alert-warning mx-auto w-fit">
+        <div role="alert" className="alert alert-outline alert-warning mx-auto w-fit">
           <span className="text-sm font-semibold">{state.startBlockedReason}</span>
         </div>
       ) : null}
@@ -443,26 +485,16 @@ export function PartyLobby({
           </ul>
         </div>
       </details>
-      {/* Notices (a failed peer never freezes the lobby) — styled alerts
-          instead of bare colored text (10.7). */}
-      {state.notices.length > 0 ? (
-        <ul className="flex flex-col gap-2" aria-label="Lobby notices">
-          {state.notices.map((notice) => (
-            <li
-              key={notice.id}
-              role="alert"
-              className={
-                notice.level === "error"
-                  ? "alert alert-error"
-                  : notice.level === "warn"
-                    ? "alert alert-warning"
-                    : "alert alert-info"
-              }
-            >
-              <span className="text-sm font-semibold">{notice.message}</span>
-            </li>
-          ))}
-        </ul>
+      {/* Notices (11.8): ONE compact status banner showing the latest
+          relevant notice instead of a growing list of identical alerts.
+          Colored alerts are outline-styled, never solid (9fv.11.3). */}
+      {latestNotice !== null ? (
+        <div
+          role="alert"
+          className={`alert alert-outline ${NOTICE_ALERT_LEVELS[latestNotice.level]} mx-auto w-fit`}
+        >
+          <span className="text-sm font-semibold">{latestNotice.message}</span>
+        </div>
       ) : null}
       <PartyDiagnosticsPanel
         diagnostics={state.diagnostics}

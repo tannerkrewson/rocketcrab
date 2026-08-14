@@ -584,6 +584,34 @@ describe("party engine — readiness and start gating", () => {
   });
 });
 
+describe("party engine — lobby notices", () => {
+  it("dedupes identical notices instead of piling up alerts (11.8)", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    const code = await runCreate(a, world);
+    const { join: joinPromise, settled } = startJoin(b, world, code);
+    await settled;
+    a.engine.respondToJoinRequest(b.memberId, true);
+    await settle(world);
+    await joinPromise;
+    await settle(world);
+    expect(a.engine.getState().members).toHaveLength(2);
+
+    // Two kicks for the same member in quick succession (the production
+    // repro for a repeated event re-adding the same notice) previously
+    // appended two identical notices; dedupe keeps one.
+    a.engine.kickMember(b.memberId);
+    a.engine.kickMember(b.memberId);
+
+    const messages = a.engine.getState().notices.map((notice) => notice.message);
+    expect(new Set(messages).size).toBe(messages.length);
+    expect(
+      messages.filter((message) => message.includes(`${b.displayName} was removed`)),
+    ).toHaveLength(1);
+  });
+});
+
 describe("party engine — roles, reconnect, and cleanup", () => {
   it("the creator can leave; the joiner becomes the greeter (migration)", async () => {
     const world = makeWorld();

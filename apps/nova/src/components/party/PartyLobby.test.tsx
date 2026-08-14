@@ -210,17 +210,19 @@ describe("PartyLobby", () => {
     expect(screen.queryByText(/pick a game before starting/i)).not.toBeInTheDocument();
   });
 
-  it("shows the start-blocked reason as a styled alert when a game is selected (10.7)", async () => {
+  it("shows the start-blocked reason as a styled outline alert when a game is selected (10.7)", async () => {
     const state = makeState({
       startBlockedReason: "Waiting for every player's game to load and register.",
     });
     await renderLobby(state);
     const alert = screen.getByRole("alert");
+    // Colored alerts in the lobby are outline-styled, never solid (9fv.11.3).
+    expect(alert).toHaveClass("alert-outline");
     expect(alert).toHaveClass("alert-warning");
     expect(within(alert).getByText(/waiting for every player/i)).toBeInTheDocument();
   });
 
-  it("styles lobby notices as alerts instead of bare text (10.7)", async () => {
+  it("shows ONE compact notice banner with the latest notice (11.8)", async () => {
     const state = makeState({
       canStart: true,
       startBlockedReason: null,
@@ -231,14 +233,34 @@ describe("PartyLobby", () => {
       ],
     });
     await renderLobby(state);
+    // One status banner, not a growing list of identical alerts.
     const alerts = screen.getAllByRole("alert");
-    expect(alerts).toHaveLength(3);
-    expect(alerts[0]).toHaveClass("alert-error");
-    expect(alerts[1]).toHaveClass("alert-warning");
-    expect(alerts[2]).toHaveClass("alert-info");
-    expect(
-      within(alerts[0]!).getByText("Player B could not receive the game."),
-    ).toBeInTheDocument();
+    expect(alerts).toHaveLength(1);
+    // The latest notice wins and colored alerts are outline-styled (9fv.11.3).
+    expect(alerts[0]).toHaveClass("alert-outline");
+    expect(alerts[0]).toHaveClass("alert-info");
+    expect(within(alerts[0]!).getByText("Your game loaded and registered.")).toBeInTheDocument();
+  });
+
+  it("hides older notices once a game-ended notice is owned by the ended banner (11.8)", async () => {
+    const state = makeState({
+      endedReason: "host_closed",
+      canStart: false,
+      canForceStart: false,
+      startBlockedReason: "The game ended; leave the party to play again.",
+      notices: [
+        { id: "notice-1", level: "info", message: "Your game loaded and registered." },
+        { id: "notice-2", level: "info", message: "The game started." },
+        { id: "notice-3", level: "info", message: "The game ended (host_closed)." },
+      ],
+    });
+    await renderLobby(state);
+    // The ended banner owns the ended state; the raw ended notice and the
+    // older transient notices are not re-shown.
+    expect(screen.getByRole("alert")).toHaveClass("alert-outline");
+    expect(screen.getByText(/the game ended — the host closed it/i)).toBeInTheDocument();
+    expect(screen.queryByText("The game ended (host_closed).")).not.toBeInTheDocument();
+    expect(screen.queryByText("Your game loaded and registered.")).not.toBeInTheDocument();
   });
 
   it("places the action row above the players box and leave at the bottom (10.7)", async () => {
@@ -400,7 +422,7 @@ describe("PartyLobby", () => {
     expect(onEditName).toHaveBeenCalledWith("Grace");
   });
 
-  it("shows the ended-game banner and disables start after a game ends", async () => {
+  it("shows ONE unified ended-game banner and disables start after a game ends (11.8)", async () => {
     const state = makeState({
       endedReason: "host_closed",
       canStart: false,
@@ -408,7 +430,12 @@ describe("PartyLobby", () => {
       startBlockedReason: "The game ended; leave the party to play again.",
     });
     await renderLobby(state);
-    expect(screen.getAllByText(/the game ended/i).length).toBeGreaterThan(0);
+    // One unified ended banner with host_closed copy — the separate
+    // "game ended; leave the party to play again" warning alert is gone.
+    expect(screen.getByText(/the game ended — the host closed it/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText("The game ended; leave the party to play again."),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /start game/i })).toBeDisabled();
   });
 

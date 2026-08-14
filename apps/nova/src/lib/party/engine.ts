@@ -237,7 +237,7 @@ interface PendingApproval {
   resolve: (approved: boolean) => void;
 }
 
-const MAX_NOTICES = 12;
+const MAX_NOTICES = 8;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -2183,7 +2183,18 @@ export class PartyEngine {
   }
 
   private addNotice(level: PartyNotice["level"], message: string): void {
-    this.notices = [...this.notices, makeNotice(level, message)].slice(-MAX_NOTICES);
+    // 11.8: identical notices collapse to ONE — a re-broadcast (e.g. a
+    // session end event that fires again) must not pile up duplicate
+    // alerts. A repeat moves to the newest slot so recency ordering stays
+    // honest, and the list is capped so the visible set stays small.
+    const duplicateIndex = this.notices.findIndex(
+      (notice) => notice.message === message && notice.level === level,
+    );
+    const deduped =
+      duplicateIndex === -1
+        ? this.notices
+        : [...this.notices.slice(0, duplicateIndex), ...this.notices.slice(duplicateIndex + 1)];
+    this.notices = [...deduped, makeNotice(level, message)].slice(-MAX_NOTICES);
   }
 
   private prepareSetup(): void {
