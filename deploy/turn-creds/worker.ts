@@ -20,6 +20,13 @@
  *   3. Per-IP rate limiting (rocketcrab-23s.3): in-worker fixed-window
  *      counter (fast-fail backstop) + a durable Cloudflare route-level
  *      rate rule (see README.md for the Rulesets curl).
+ *   4. Budget kill-switch (rocketcrab-23s.4): KV counters in the TURN_BUDGET
+ *      namespace (mints:YYYY-MM-DD + mints:total) are checked BEFORE any
+ *      upstream call; when MINT_DAILY_CAP / MINT_TOTAL_CAP is exceeded the
+ *      worker answers 429 budget_exceeded. Counters are incremented only
+ *      on successful mints. KV has no atomic increment, so concurrent
+ *      mints over-count — SAFE for a kill-switch that errs on the safe
+ *      side. KV unavailable (e.g. binding missing in dev) FAILS OPEN.
  *
  * The TURN key (TURN_KEY_ID + TURN_KEY_API_TOKEN) is a long-term secret and
  * lives ONLY as a Worker secret — never in code, config, or public JS. The
@@ -28,8 +35,8 @@
  *
  * Self-contained on purpose (zero imports): drop this single file into any
  * Workers-compatible runtime. Logic lives in pure exported functions (parse
- * allowlist, port-53 filter, rate-limit window, upstream request builder)
- * with a thin fetch handler; see worker.test.ts.
+ * allowlist, port-53 filter, rate-limit window, budget counters, upstream
+ * request builder) with a thin fetch handler; see worker.test.ts.
  */
 
 /** Production origin + local dev origins used when ORIGIN_ALLOWLIST is unset. */
@@ -54,6 +61,17 @@ export const RATE_LIMIT_WINDOW_MS = 60_000;
 /** Requests per minute per IP when RATE_LIMIT_PER_MIN is unset. */
 export const DEFAULT_RATE_LIMIT_PER_MIN = 10;
 
+/** KV key prefix for the daily mint counter (full key: `mints:YYYY-MM-DD`). */
+export const MINT_DAILY_KEY_PREFIX = "mints:";
+/** KV key for the cumulative mint counter (since the counters were re-armed). */
+export const MINT_TOTAL_KEY = "mints:total";
+/** Daily mint cap when MINT_DAILY_CAP is unset (rocketcrab-23s.4). */
+export const DEFAULT_MINT_DAILY_CAP = 5000;
+/** Cumulative mint cap when MINT_TOTAL_CAP is unset (rocketcrab-23s.4). */
+export const DEFAULT_MINT_TOTAL_CAP = 50000;
+/** Daily counter keys self-expire after 2 days (stale day keys never linger). */
+export const DAILY_COUNTER_TTL_SECONDS = 2 * 24 * 60 * 60;
+
 /**
  * Cap on tracked rate-limit keys; past it, expired windows are pruned so a
  * long-lived isolate cannot accumulate unbounded state.
@@ -70,6 +88,22 @@ export interface TurnCredsEnv {
   TURN_KEY_ID?: string;
   /** Cloudflare Realtime TURN key API token (Worker secret). */
   TURN_KEY_API_TOKEN?: string;
+  /** Daily mint cap. Unset -> 5000. */
+  MINT_DAILY_CAP?: string;
+  /** Cumulative mint cap since the counters were re-armed. Unset -> 50000. */
+  MINT_TOTAL_CAP?: string;
+  /** KV namespace binding (TURN_BUDGET) holding the mint counters. */
+  TURN_BUDGET?: KvStore;
+}
+
+/**
+ * The KV binding surface this worker uses (structural subset of Cloudflare's
+ * KVNamespace). Declared locally so the worker and its tests do not depend on
+ * @cloudflare/workers-types.
+ */
+export interface KvStore {
+  get(key: string): Promise<string | null>;
+  put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
 }
 
 /** One ICE server entry in Cloudflare's documented response shape. */
@@ -184,15 +218,16 @@ function jsonResponse(
   });
 }
 
-/** Structured JSON error: { error: { code, message } }. */
+/** Structured JSON error: { error: { code, message, ...details } }. */
 function jsonError(
   status: number,
   code: string,
   message: string,
   cors?: Record<string, string>,
   extra?: Record<string, string>,
+  details?: Record<string, unknown>,
 ): Response {
-  return jsonResponse(status, { error: { code, message } }, cors, extra);
+  return jsonResponse(status, { error: { code, message, ...details } }, cors, extra);
 }
 
 /**
@@ -212,6 +247,132 @@ export function parseRateLimit(raw: string | undefined): number {
  */
 export function clientIp(request: Request): string {
   return request.headers.get("CF-Connecting-IP") ?? "unknown";
+}
+
+/** UTC calendar date (YYYY-MM-DD) for a timestamp: the daily counter suffix. */
+export function utcDateKey(now: number): string {
+  return new Date(now).toISOString().slice(0, 10);
+}
+
+/** KV key of the daily mint counter for `now`. */
+export function dailyCounterKey(now: number): string {
+  return `${MINT_DAILY_KEY_PREFIX}${utcDateKey(now)}`;
+}
+
+/**
+ * Parse a cap env var (MINT_DAILY_CAP / MINT_TOTAL_CAP): a positive integer,
+ * falling back to `fallback` when unset or invalid.
+ */
+export function parseCap(raw: string | undefined, fallback: number): number {
+  if (raw === undefined) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isNaN(parsed) || parsed < 1 ? fallback : parsed;
+}
+
+/** Next counter value: parse the stored string (0 when absent/unparseable) + 1. */
+export function nextCounterValue(stored: string | null): number {
+  const current = stored === null ? 0 : Number.parseInt(stored, 10);
+  return (Number.isNaN(current) ? 0 : current) + 1;
+}
+
+/**
+ * Which budget cap, if any, the counters have exceeded (kill-switch verdict).
+ * Daily is reported first when both are exceeded (it resets tomorrow, so
+ * naming the daily cap is the actionable answer).
+ */
+export function exceededCap(
+  daily: number,
+  total: number,
+  dailyCap: number,
+  totalCap: number,
+): { cap: "daily" | "total" } | null {
+  if (daily >= dailyCap) return { cap: "daily" };
+  if (total >= totalCap) return { cap: "total" };
+  return null;
+}
+
+// The KV-unavailable warning is logged once per isolate (it would fire on
+// every request in dev where the binding is missing).
+let warnedKvMissing = false;
+
+function warnKvMissing(): void {
+  if (warnedKvMissing) return;
+  warnedKvMissing = true;
+  console.log(
+    "turn-creds: TURN_BUDGET KV binding missing — budget kill-switch and mint counters disabled (fail-open; create the namespace in prod, see README)",
+  );
+}
+
+/**
+ * Read both mint counters. Returns null when the KV binding is missing or
+ * the read fails — the budget check FAILS OPEN in that case. Fail-open is
+ * fine for dev; in prod the binding must exist, and even with it down,
+ * abuse stays bounded by the per-IP rate limiter and the watchdog.
+ */
+export async function readBudgetCounters(
+  kv: KvStore | undefined,
+  now: number,
+): Promise<{ daily: number; total: number } | null> {
+  if (kv === undefined) {
+    warnKvMissing();
+    return null;
+  }
+  try {
+    const [daily, total] = await Promise.all([
+      kv.get(dailyCounterKey(now)),
+      kv.get(MINT_TOTAL_KEY),
+    ]);
+    return {
+      daily: Number.parseInt(daily ?? "0", 10) || 0,
+      total: Number.parseInt(total ?? "0", 10) || 0,
+    };
+  } catch (err) {
+    console.log(`turn-creds: budget counter read failed, failing open: ${String(err)}`);
+    return null;
+  }
+}
+
+/**
+ * Increment both mint counters after a SUCCESSFUL mint (KV read-modify-write;
+ * KV has NO atomic increment). Concurrent mints can over-count, which is SAFE
+ * here: a kill-switch errs on the safe side (it only ever trips early, never
+ * late). Fails open: a failed write is logged, the mint has already happened.
+ */
+export async function incrementBudgetCounters(kv: KvStore | undefined, now: number): Promise<void> {
+  if (kv === undefined) {
+    warnKvMissing();
+    return;
+  }
+  const dailyKey = dailyCounterKey(now);
+  try {
+    const [daily, total] = await Promise.all([kv.get(dailyKey), kv.get(MINT_TOTAL_KEY)]);
+    await Promise.all([
+      kv.put(dailyKey, String(nextCounterValue(daily)), {
+        expirationTtl: DAILY_COUNTER_TTL_SECONDS,
+      }),
+      kv.put(MINT_TOTAL_KEY, String(nextCounterValue(total))),
+    ]);
+  } catch (err) {
+    console.log(
+      `turn-creds: budget counter increment failed (mint already succeeded): ${String(err)}`,
+    );
+  }
+}
+
+/**
+ * Log one successful mint for Workers analytics / the watchdog (IP, origin,
+ * ttl, timestamp). No PII beyond the client IP the edge already sees.
+ */
+export function logMint(request: Request, ttlSeconds: number, now: number): void {
+  console.log(
+    JSON.stringify({
+      event: "turn_cred_mint",
+      ip: clientIp(request),
+      origin: request.headers.get("Origin") ?? null,
+      ttl: ttlSeconds,
+      ts: new Date(now).toISOString(),
+    }),
+  );
 }
 
 /**
@@ -343,7 +504,32 @@ export async function handleTurnCredsRequest(
     );
   }
 
-  // 4. Mint: proxy to the Cloudflare Realtime credentials API with a fixed
+  // 4. Budget kill-switch (rocketcrab-23s.4): KV counters are read BEFORE
+  // any upstream call. When either cap is exceeded the worker answers 429
+  // naming the cap. KV unavailable (dev / outage) FAILS OPEN — the check
+  // degrades to a no-op with a log.
+  const now = Date.now();
+  const counters = await readBudgetCounters(env.TURN_BUDGET, now);
+  if (counters !== null) {
+    const dailyCap = parseCap(env.MINT_DAILY_CAP, DEFAULT_MINT_DAILY_CAP);
+    const totalCap = parseCap(env.MINT_TOTAL_CAP, DEFAULT_MINT_TOTAL_CAP);
+    const verdict = exceededCap(counters.daily, counters.total, dailyCap, totalCap);
+    if (verdict !== null) {
+      const cap = verdict.cap;
+      const limit = cap === "daily" ? dailyCap : totalCap;
+      const scope = cap === "daily" ? utcDateKey(now) : "since the counters were last re-armed";
+      return jsonError(
+        429,
+        "budget_exceeded",
+        `mint budget exhausted: ${cap} cap (${limit}) reached for ${scope}`,
+        cors,
+        undefined,
+        { cap, limit },
+      );
+    }
+  }
+
+  // 5. Mint: proxy to the Cloudflare Realtime credentials API with a fixed
   // short TTL (rocketcrab-23s.2), then drop port-53 URLs from the response
   // (browsers block port 53). Never leak the API token in any response.
   const upstream = buildMintRequest(env);
@@ -395,6 +581,13 @@ export async function handleTurnCredsRequest(
       cors,
     );
   }
+
+  // Count every SUCCESSFUL mint: increment both KV counters (kill-switch
+  // bookkeeping, rocketcrab-23s.4) and log the mint for Workers analytics
+  // / the watchdog (IP, origin, ttl, timestamp). Both are best-effort — the
+  // credentials are already minted and must not be lost to a KV hiccup.
+  await incrementBudgetCounters(env.TURN_BUDGET, now);
+  logMint(request, MINT_TTL_SECONDS, now);
 
   return jsonResponse(200, filterPort53IceServers(body), cors);
 }
