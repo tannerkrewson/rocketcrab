@@ -1,5 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { Library } from "lucide-react";
+import { ArrowLeft, Library } from "lucide-react";
 import { buttonStyles } from "../components/ui/Button";
 import { GameBrowser } from "../components/party/GameBrowser";
 
@@ -24,10 +24,16 @@ export function BrowsePage() {
             Classic external iframe games and Nova's own games, side by side.
           </p>
         </div>
-        <Link to="/library" className={buttonStyles("secondary")}>
-          <Library className="h-4 w-4" aria-hidden="true" />
-          Your games
-        </Link>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link to="/" className={buttonStyles("outline")} title="Back to home">
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Back to home
+          </Link>
+          <Link to="/library" className={buttonStyles("secondary")}>
+            <Library className="h-4 w-4" aria-hidden="true" />
+            Your games
+          </Link>
+        </div>
       </header>
 
       <GameBrowser />

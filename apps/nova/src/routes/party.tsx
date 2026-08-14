@@ -1,5 +1,5 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { PartyPopper } from "lucide-react";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { ArrowLeft, PartyPopper } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { PROTOCOL_VERSION, type GameMode } from "@rocketcrab/protocol";
 import { PartyExperience } from "../components/party/PartyExperience";
@@ -7,7 +7,7 @@ import { PartyResumeBanner } from "../components/party/PartyResumeBanner";
 import { PartyShellHeader } from "../components/party/PartyShellHeader";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
 import { LoadingState } from "../components/ui/LoadingState";
-import { Button } from "../components/ui/Button";
+import { Button, buttonStyles } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { usePartyEngine } from "../lib/party/use-party";
 import { takePartySource } from "../lib/party/source-handoff";
@@ -116,8 +116,12 @@ function PartyPage() {
   }
   if (loadError !== null) {
     return (
-      <div className="mx-auto w-full max-w-md py-6">
+      <div className="mx-auto flex w-full max-w-md flex-col gap-4 py-6">
         <ErrorPanel title="Couldn't start the party" message={loadError} onRetry={handleRetry} />
+        <Link to="/" className={buttonStyles("outline", "md", "self-start")} title="Back to home">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          Back to home
+        </Link>
       </div>
     );
   }
@@ -155,6 +159,10 @@ function PartyPage() {
           </Button>
         </div>
       </Card>
+      <Link to="/" className={buttonStyles("outline", "md", "self-center")} title="Back to home">
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        Back to home
+      </Link>
     </div>
   );
 }

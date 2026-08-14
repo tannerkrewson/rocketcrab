@@ -777,7 +777,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       {arenaSection}
 
       <div
-        className="sticky bottom-0 z-20 -mx-4 flex items-center gap-2 border-t-2 border-base-300 bg-base-100 px-4 py-2 pb-safe md:hidden"
+        className="sticky bottom-0 z-20 -mx-4 flex items-center gap-2 overflow-x-auto border-t-2 border-base-300 bg-base-100 py-2 pb-safe pl-4 pr-[9.5rem] md:hidden"
         data-testid="mobile-actions-bar"
       >
         <Button

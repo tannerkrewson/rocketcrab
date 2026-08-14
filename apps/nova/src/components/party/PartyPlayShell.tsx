@@ -5,6 +5,7 @@ import type { BrowseEntry } from "../../lib/browse";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState } from "../../lib/party/engine";
 import { BrandLogo } from "../layout/BrandLogo";
+import { ThemeSelector } from "../layout/ThemeSelector";
 import { Button } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
 
@@ -326,6 +327,16 @@ export function PartyPlayShell({
             </div>
           </div>
         ) : null}
+      </div>
+
+      {/* 11.1: the one floating theme/color control, bottom-right on every
+          page — this shell is full-screen (z-40) and covers AppLayout's
+          copy, so it renders its own above the game, safe-area aware. */}
+      <div
+        className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-3 z-30 rounded-box border-2 border-base-300 bg-base-100 p-1 shadow-md"
+        data-testid="floating-theme-control"
+      >
+        <ThemeSelector />
       </div>
 
       {/* 7.38: collapsed mode — only the floating logo remains; tap to
