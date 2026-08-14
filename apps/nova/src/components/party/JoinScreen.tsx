@@ -1,13 +1,20 @@
 import { Link } from "@tanstack/react-router";
 import { KeyRound, Loader2, UserRound } from "lucide-react";
 import type { FormEvent, KeyboardEvent } from "react";
+import { phoneticSpelling } from "../../lib/party/phonetic";
 import { Button, buttonStyles } from "../ui/Button";
+
+export type JoinStep = "code" | "name";
 
 export interface JoinScreenProps {
   /** Error from a failed join attempt (rejection, not found, timeout). */
   error: string | null;
   /** True while a join is in flight (the party route renders the lobby). */
   joining: boolean;
+  /** Current step of the two-step join flow (code entry → player name). */
+  step: JoinStep;
+  /** Advance to the name step or go back to edit the code. */
+  onStepChange: (step: JoinStep) => void;
   /** Controlled code input (state lives in the route so it survives the
    *  joining → error transition and "Try again" keeps the typed code). */
   code: string;
@@ -20,16 +27,18 @@ export interface JoinScreenProps {
 }
 
 /**
- * The four-letter join screen, conformed to classic rocketcrab's layout
- * (7.21): one centered code input with large mono text, an inline "does not
- * exist" error under it, and Back + Join buttons below. Codes are normalized
- * to uppercase on entry; the party layer validates the alphabet (no I/O/L).
- * The player's name is asked here, before they enter the lobby (7.5),
- * prefilled from the last saved name.
+ * Two-step join flow (7.47): enter the four-letter code first in a tall,
+ * wide mono input (Continue stays disabled until it is complete), then
+ * confirm the code with its phonetic spelling and enter your player name
+ * before joining. Codes are normalized to uppercase on entry; the party
+ * layer validates the alphabet (no I/O/L). The player's name is prefilled
+ * from the last saved name (7.5).
  */
 export function JoinScreen({
   error,
   joining,
+  step,
+  onStepChange,
   code,
   onCodeChange,
   name,
@@ -40,7 +49,11 @@ export function JoinScreen({
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (normalized.length !== 4) {
+    if (step === "code") {
+      if (normalized.length !== 4) {
+        return;
+      }
+      onStepChange("name");
       return;
     }
     onSubmit(normalized, name.trim());
@@ -67,85 +80,109 @@ export function JoinScreen({
       </div>
 
       <form onSubmit={handleSubmit} className="flex w-full flex-col gap-5" noValidate>
-        <div className="flex flex-col gap-1.5">
-          <label htmlFor="player-name" className="text-sm font-bold">
-            Your name
-          </label>
-          <div className="relative">
-            <UserRound
-              className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-base-content/40"
-              aria-hidden="true"
-            />
+        {step === "code" ? (
+          <div className="flex flex-col items-center gap-1.5">
+            <label htmlFor="party-code" className="text-sm font-bold">
+              Party code
+            </label>
             <input
-              id="player-name"
+              id="party-code"
               type="text"
-              value={name}
-              onChange={(event) => onNameChange(event.target.value)}
-              placeholder="Your name"
-              maxLength={24}
-              autoComplete="nickname"
-              aria-label="Your player name"
-              className="input input-bordered w-full pl-10"
+              value={code}
+              onChange={(event) => onCodeChange(event.target.value.toUpperCase())}
+              onKeyDown={handleKeyDown}
+              placeholder="abcd"
+              maxLength={4}
+              autoFocus
+              autoCapitalize="characters"
+              autoCorrect="off"
+              spellCheck={false}
+              aria-label="Four-letter party code"
+              className="input input-bordered input-xl w-48 text-center font-mono text-4xl font-black tracking-[0.4em] placeholder:tracking-[0.4em]"
             />
           </div>
-        </div>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="player-name" className="text-sm font-bold">
+              Your name
+            </label>
+            <div className="relative">
+              <UserRound
+                className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-base-content/40"
+                aria-hidden="true"
+              />
+              <input
+                id="player-name"
+                type="text"
+                value={name}
+                onChange={(event) => onNameChange(event.target.value)}
+                placeholder="Your name"
+                maxLength={24}
+                autoComplete="nickname"
+                aria-label="Your player name"
+                className="input input-bordered w-full pl-10"
+              />
+            </div>
+          </div>
+        )}
 
-        <div className="flex flex-col items-center gap-1.5">
-          <label htmlFor="party-code" className="text-sm font-bold">
-            Join Party
-          </label>
-          <input
-            id="party-code"
-            type="text"
-            value={code}
-            onChange={(event) => onCodeChange(event.target.value.toUpperCase())}
-            onKeyDown={handleKeyDown}
-            placeholder="abcd"
-            maxLength={4}
-            autoFocus
-            autoCapitalize="characters"
-            autoCorrect="off"
-            spellCheck={false}
-            aria-label="Four-letter party code"
-            className="input input-bordered w-40 text-center font-mono text-4xl font-black tracking-[0.4em] placeholder:tracking-[0.4em]"
-          />
-          {inlineError !== null ? (
-            <p role="alert" className="mt-1 text-center text-sm font-medium text-error">
-              {inlineError}
-            </p>
-          ) : null}
-          {notFound ? (
-            <p className="text-center text-xs text-base-content/60">
-              Double-check the code with your friend and that they are waiting in their lobby.
-            </p>
-          ) : null}
-        </div>
+        {inlineError !== null ? (
+          <p role="alert" className="text-center text-sm font-medium text-error">
+            {inlineError}
+          </p>
+        ) : null}
+        {notFound ? (
+          <p className="text-center text-xs text-base-content/60">
+            Double-check the code with your friend and that they are waiting in their lobby.
+          </p>
+        ) : null}
+
+        {step === "name" ? (
+          <p className="text-center text-sm text-base-content/60">
+            Joining party <span className="font-mono font-bold text-primary">{normalized}</span> —{" "}
+            <span className="text-base-content/50">({phoneticSpelling(normalized)})</span>
+          </p>
+        ) : null}
 
         <div className="flex justify-center gap-3">
-          <Link to="/" className={buttonStyles("outline", "lg", "flex-1")}>
-            Back
-          </Link>
-          <Button
-            variant="primary"
-            size="lg"
-            type="submit"
-            disabled={joining || normalized.length !== 4}
-            className="flex-1"
-          >
-            {joining ? (
-              <>
-                <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
-                Joining…
-              </>
-            ) : (
-              "Join"
-            )}
-          </Button>
+          {step === "code" ? (
+            <Link to="/" className={buttonStyles("outline", "lg", "flex-1")}>
+              Back
+            </Link>
+          ) : (
+            <Button
+              variant="outline"
+              size="lg"
+              type="button"
+              className="flex-1"
+              onClick={() => onStepChange("code")}
+            >
+              Back
+            </Button>
+          )}
+          {step === "code" ? (
+            <Button
+              variant="primary"
+              size="lg"
+              type="submit"
+              disabled={normalized.length !== 4}
+              className="flex-1"
+            >
+              Continue
+            </Button>
+          ) : (
+            <Button variant="primary" size="lg" type="submit" disabled={joining} className="flex-1">
+              {joining ? (
+                <>
+                  <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />
+                  Joining…
+                </>
+              ) : (
+                "Join"
+              )}
+            </Button>
+          )}
         </div>
-
-        <p className="text-center text-xs text-base-content/60">
-          Codes are four letters (no I, O, or L) — for example “RCRB”.
-        </p>
       </form>
     </div>
   );

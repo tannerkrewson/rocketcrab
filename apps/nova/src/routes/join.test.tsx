@@ -8,10 +8,12 @@ import { clearPartyRecovery, savePartyRecovery } from "../lib/party/party-recove
 import { routeTree } from "../routeTree.gen";
 
 /**
- * Join route tests (P4): the four-letter entry form, the invite-fragment
- * import (ADR-0011 — the secret is read into session memory and the
- * fragment is stripped from the URL before the party experience renders),
- * and the code-submit wiring into the party engine.
+ * Join route tests (P4/7.47): the two-step join flow — room code first
+ * (tall mono input, Continue gated on four letters), then the player name
+ * with a code confirmation — plus the invite-fragment import (ADR-0011 —
+ * the secret is read into session memory and the fragment is stripped from
+ * the URL before the party experience renders) and the code-submit wiring
+ * into the party engine.
  */
 
 const IDLE_STATE: PartyEngineState = {
@@ -106,21 +108,50 @@ beforeEach(() => {
 });
 
 describe("/join", () => {
-  it("shows the four-letter join form when no party is active", async () => {
+  it("starts with only the room-code input; the name step comes after a code", async () => {
     renderJoin();
     expect(await screen.findByText("Join a party")).toBeInTheDocument();
     expect(screen.getByLabelText("Four-letter party code")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Your player name")).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText("Four-letter party code"), {
+      target: { value: "abcd" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+    expect(await screen.findByLabelText("Your player name")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^join$/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Four-letter party code")).not.toBeInTheDocument();
   });
 
   it("submits the normalized code and the player name to the engine", async () => {
     renderJoin();
-    const nameInput = await screen.findByLabelText("Your player name");
-    fireEvent.change(nameInput, { target: { value: "Ada" } });
     const input = await screen.findByLabelText("Four-letter party code");
     fireEvent.change(input, { target: { value: " abcd " } });
+    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+    const nameInput = await screen.findByLabelText("Your player name");
+    fireEvent.change(nameInput, { target: { value: "Ada" } });
     fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
     await waitFor(() => expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada"));
     await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("ABCD"));
+  });
+
+  it("shows the code with its lowercase phonetic spelling on the name step", async () => {
+    renderJoin();
+    const input = await screen.findByLabelText("Four-letter party code");
+    fireEvent.change(input, { target: { value: "xaby" } });
+    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+    expect(await screen.findByText(/\(xray alpha bravo yankee\)/)).toBeInTheDocument();
+  });
+
+  it("keeps the typed code when going Back from the name step", async () => {
+    renderJoin();
+    const input = await screen.findByLabelText("Four-letter party code");
+    fireEvent.change(input, { target: { value: "abcd" } });
+    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+    await screen.findByLabelText("Your player name");
+    fireEvent.click(screen.getByRole("button", { name: /^back$/i }));
+    const backInput = await screen.findByLabelText("Four-letter party code");
+    expect((backInput as HTMLInputElement).value).toBe("ABCD");
   });
 
   it("imports an invite fragment secret and strips it from the URL", async () => {
@@ -142,15 +173,15 @@ describe("/join", () => {
     expect(stubEngine.joinByCode).not.toHaveBeenCalled();
   });
 
-  it("keeps Join disabled until the code is four letters", async () => {
+  it("keeps Continue disabled until the code is four letters", async () => {
     renderJoin();
     const input = await screen.findByLabelText("Four-letter party code");
-    const joinButton = screen.getByRole("button", { name: /^join$/i });
-    expect(joinButton).toBeDisabled();
+    const continueButton = screen.getByRole("button", { name: /^continue$/i });
+    expect(continueButton).toBeDisabled();
     fireEvent.change(input, { target: { value: "abc" } });
-    expect(joinButton).toBeDisabled();
+    expect(continueButton).toBeDisabled();
     fireEvent.change(input, { target: { value: "abcd" } });
-    expect(joinButton).toBeEnabled();
+    expect(continueButton).toBeEnabled();
   });
 
   it("filters non-letter key presses on the code input", async () => {
@@ -164,6 +195,8 @@ describe("/join", () => {
     renderJoin();
     const input = await screen.findByLabelText("Four-letter party code");
     fireEvent.change(input, { target: { value: "zzzz" } });
+    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
+    await screen.findByLabelText("Your player name");
     fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
     await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("ZZZZ"));
     expect(await screen.findByText(/ZZZZ does not exist/)).toBeInTheDocument();
