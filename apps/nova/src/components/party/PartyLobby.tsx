@@ -9,6 +9,7 @@ import {
   Pencil,
   Play,
   QrCode,
+  UserRound,
   Users,
   X,
 } from "lucide-react";
@@ -393,8 +394,12 @@ export function PartyLobby({
                   className={`flex min-w-0 flex-col items-center gap-1.5 rounded-box border-2 bg-base-100 p-3 text-center ${playerBorderColor(index)}`}
                 >
                   {member.isSelf && editingName ? (
+                    /* 11.10: the SAME name-entry presentation as the join
+                       screen's name step (UserRound icon, pl-10 input,
+                       visible label) — the lobby never invents its own
+                       mini-form. Validation stays: trim + maxLength. */
                     <form
-                      className="flex w-full flex-col items-center gap-2"
+                      className="flex w-full flex-col gap-1.5"
                       onSubmit={(event) => {
                         event.preventDefault();
                         const trimmed = nameDraft.trim();
@@ -404,15 +409,27 @@ export function PartyLobby({
                         setEditingName(false);
                       }}
                     >
-                      <input
-                        type="text"
-                        value={nameDraft}
-                        onChange={(event) => setNameDraft(event.target.value)}
-                        maxLength={24}
-                        aria-label="Your player name"
-                        className="input input-bordered input-sm w-full"
-                      />
-                      <div className="flex gap-2">
+                      <label htmlFor="player-name" className="text-sm font-bold">
+                        Your name
+                      </label>
+                      <div className="relative">
+                        <UserRound
+                          className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-base-content/40"
+                          aria-hidden="true"
+                        />
+                        <input
+                          id="player-name"
+                          type="text"
+                          value={nameDraft}
+                          onChange={(event) => setNameDraft(event.target.value)}
+                          placeholder="Your name"
+                          maxLength={24}
+                          autoComplete="nickname"
+                          aria-label="Your player name"
+                          className="input input-bordered w-full pl-10"
+                        />
+                      </div>
+                      <div className="mt-1 flex justify-center gap-3">
                         <Button variant="primary" size="md" type="submit">
                           Save
                         </Button>
