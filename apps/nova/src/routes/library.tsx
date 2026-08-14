@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Compass, Gamepad2, PlusCircle, Search, ArrowLeft } from "lucide-react";
+import { ArrowLeft, Compass, Gamepad2, PlusCircle, Search } from "lucide-react";
 import { gameMatchesQuery, type SavedGame } from "@rocketcrab/core";
 import { GameCard } from "../components/games/GameCard";
 import { Button, buttonStyles } from "../components/ui/Button";
@@ -23,6 +23,9 @@ function errorMessage(error: unknown): string {
  * The local game library (ADR-0005): saved games are listed straight from
  * the browser's IndexedDB, searchable, and editable/tested/duplicated from
  * here. Deleting always asks for confirmation first.
+ *
+ * The Home link (rocketcrab-9fv.11.13) keeps the page reachable from the
+ * homepage now that the shared footer is gone (9fv.11.1).
  */
 export function LibraryPage() {
   const gamesQuery = useSavedGames();
@@ -58,6 +61,11 @@ export function LibraryPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <Link to="/" className={buttonStyles("outline", "md", "self-start")}>
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        Home
+      </Link>
+
       <header className="flex flex-wrap items-end justify-between gap-4">
         <div>
           <h1 className="text-3xl font-black">My games</h1>
@@ -70,11 +78,12 @@ export function LibraryPage() {
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             Back to home
           </Link>
-          <Link to="/browse" className={buttonStyles("secondary")}>
+          <Link to="/browse" className={buttonStyles("primary", "lg")}>
             <Compass className="h-4 w-4" aria-hidden="true" />
             Browse games
           </Link>
           <Link to="/build" className={buttonStyles("primary", "lg")}>
+            <PlusCircle className="h-4 w-4" aria-hidden="true" />
             Build a game
           </Link>
         </div>

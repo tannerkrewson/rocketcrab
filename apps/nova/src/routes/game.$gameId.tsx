@@ -53,7 +53,7 @@ export function BrowseGamePage() {
   const backLabel = inPartyLobby ? "Back to party" : "Back to games";
 
   const backLink = (
-    <Link to={backTarget} className={buttonStyles("outline")} title={backLabel}>
+    <Link to={backTarget} className={buttonStyles("outline", "md", "self-start")} title={backLabel}>
       <ArrowLeft className="h-4 w-4" aria-hidden="true" />
       {backLabel}
     </Link>
@@ -123,7 +123,7 @@ export function BrowseGamePage() {
         <p className="whitespace-pre-line text-base-content/80">
           {saved.description ?? "No description yet — open it in the editor to learn more."}
         </p>
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="flex flex-wrap items-center justify-center gap-3">
           {selectForParty(async () => {
             await engine.selectGame({
               gameId: saved.id,
@@ -257,7 +257,7 @@ export function BrowseGamePage() {
         </section>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
+      <div className="flex flex-wrap items-center justify-center gap-3">
         {prebuilt.kind === "classic"
           ? selectForParty(async () => {
               await engine.selectClassicGame(prebuilt.id);
@@ -276,7 +276,7 @@ export function BrowseGamePage() {
           <Link
             to="/classic/$gameId"
             params={{ gameId: prebuilt.id }}
-            className="btn btn-primary w-full font-bold sm:w-fit"
+            className={buttonStyles("primary", "lg")}
           >
             <Play className="h-4 w-4" aria-hidden="true" />
             Play game
@@ -284,7 +284,7 @@ export function BrowseGamePage() {
         ) : (
           <Button
             variant="primary"
-            className="w-full sm:w-fit"
+            size="lg"
             onClick={() => void handleOpenNova()}
             disabled={opening}
           >
