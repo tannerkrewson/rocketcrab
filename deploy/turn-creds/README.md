@@ -36,9 +36,10 @@ headers so the browser can read it.
 
 ## Environment variables
 
-| Variable           | Default                                                                                                            | Meaning                                                                                                                                                                                             |
-| ------------------ | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ORIGIN_ALLOWLIST` | `https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173` | Comma-separated origins allowed to call the mint endpoint. Each entry may be a full origin (`scheme://host[:port]`); a trailing slash is tolerated. Matching against the request `Origin` is exact. |
+| Variable             | Default                                                                                                            | Meaning                                                                                                                                                                                             |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ORIGIN_ALLOWLIST`   | `https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173` | Comma-separated origins allowed to call the mint endpoint. Each entry may be a full origin (`scheme://host[:port]`); a trailing slash is tolerated. Matching against the request `Origin` is exact. |
+| `RATE_LIMIT_PER_MIN` | `10`                                                                                                               | Requests per minute per client IP allowed by the in-worker fast-fail counter (60s fixed window).                                                                                                    |
 
 A single-variable env override (unset = the default above). For example, to
 allow a staging origin:
@@ -150,3 +151,66 @@ LAN override is dev-only. For the equivalent in `.dev.vars`:
 - Upstream failures (network error, non-2xx, invalid JSON, wrong shape)
   return `502` with a structured JSON error; the TURN API token never appears
   in any response.
+
+## Rate limiting (rocketcrab-23s.3)
+
+Two cheap layers (no external library — Cloudflare platform primitives only):
+
+### 1. In-worker fast-fail check (code-level backstop)
+
+A simple **fixed-window counter keyed by client IP** (`CF-Connecting-IP`,
+edge-set and not client-spoofable) in the worker itself. Over the limit, the
+worker answers `429` with a `Retry-After` header **before any upstream call**.
+The window is 60s; the limit is `RATE_LIMIT_PER_MIN` (default **10/min**).
+In-memory per-isolate state is fine here: this is a fast-fail backstop, and
+over-counting under concurrency is SAFE (it only ever rejects more
+aggressively, never less).
+
+### 2. Cloudflare route-level rate rule (durable backstop)
+
+The worker's own counter resets when an isolate restarts; the durable
+backstop is a **Cloudflare rate-limiting rule** on the mint route (zone
+level, per IP) via the Rulesets API — wrangler cannot manage rate rules, so
+this curl is the reproducibility path. It needs a proxied zone hostname
+(custom domain) for the mint route; the workers.dev host has no zone to hang
+a rule on. Put the mint on a custom route (e.g. `turn-creds.rocketcrab.com/*`
+or `rocketcrab.com/turn-creds/*`), then:
+
+```sh
+# 10 requests/min per IP on the mint route (action: block, 60s window)
+curl -X PUT \
+  "https://api.cloudflare.com/client/v4/zones/<ZONE_ID>/rulesets/phases/http_ratelimit/entrypoint" \
+  -H "Authorization: Bearer <API_TOKEN>" \
+  -H "Content-Type: application/json" \
+  --data '{
+    "rules": [
+      {
+        "expression": "(http.request.method eq \"POST\") and (http.request.uri.path starts_with \"/\")",
+        "description": "rocketcrab-turn-creds: 10 requests/min per IP",
+        "action": "block",
+        "ratelimit": {
+          "characteristics": ["ip.src"],
+          "period": 60,
+          "requests_per_period": 10,
+          "mitigation_timeout": 60
+        }
+      }
+    ]
+  }'
+```
+
+(`<ZONE_ID>` and `<API_TOKEN>` come from the zone and an API token with
+Zone > Config > Rulesets edit permission.) The same rule is configurable in
+the Cloudflare dashboard under Security -> WAF -> Rate limiting rules. Keep
+`RATE_LIMIT_PER_MIN` and the rule's `requests_per_period` in sync — both
+default to 10/min.
+
+### Why not HMAC refresh tickets / an external rate-limit library?
+
+Deliberately NOT doing: HMAC refresh tickets, per-room quotas, or external
+rate-limit libraries. Complexity > value here: the credential TTL (10 min)
+means extracted credentials self-expire, the in-worker counter stops
+per-IP farming at the source, and the zone rule survives isolate restarts.
+Those two layers already bound farming tightly enough for a party app —
+adding a third-party library or a refresh-ticket scheme would add attack
+surface and operational complexity for no measurable gain.
