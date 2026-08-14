@@ -38,19 +38,24 @@ designed but not yet deployed** (verified live 2026-08-14).
   the 22 ported classic games create rooms by fetching third-party endpoints
   that send no `Access-Control-Allow-Origin` headers; the relay forwards
   those requests from the server side and returns the upstream JSON with
-  permissive CORS headers (beads `rocketcrab-9fv.7.33`). It is an
-  allowlist-only forwarder — never an open proxy.
+  CORS headers echoing the allowlisted origin (beads `rocketcrab-9fv.7.33`,
+  hardening `rocketcrab-9fv.3.5`). It is an allowlist-only forwarder — never
+  an open proxy — with an origin allowlist (403 before forwarding) and
+  per-IP rate limiting (429 + Retry-After), mirroring the turn-creds Worker.
 - **Live URL:** `https://rocketcrab-cors-relay.tannerkrewson.workers.dev`
   (verified responding 2026-08-14).
 - **Repo files:** `deploy/relay/worker.ts` (self-contained, zero imports;
   endpoint allowlist lives in `RELAY_ENDPOINTS`), `deploy/relay/wrangler.toml`
   (`name = "rocketcrab-cors-relay"`, `workers_dev = true`,
-  `compatibility_date = "2025-01-01"`), `deploy/relay/README.md`, and the CI
-  workflow `.github/workflows/relay.yml`.
-- **Worker env / secrets:** **none.** The relay takes no environment
-  variables and no Worker secrets. The only credentials involved are the repo
-  CI secrets (§4). `VITE_CLASSIC_RELAY_ORIGIN` is a _client_ build-time var
-  baked into the Nova app's CSP `connect-src` — it is not a Worker setting.
+  `compatibility_date = "2025-01-01"`), `deploy/relay/README.md`
+  (+ `worker.test.ts`), and the CI workflow `.github/workflows/relay.yml`.
+- **Worker env / secrets:** two optional non-secret vars, both with safe
+  in-code defaults (see `deploy/relay/README.md`): `ORIGIN_ALLOWLIST`
+  (comma-separated origins; default `https://rocketcrab.com` +
+  localhost dev origins on `:5173`) and `RATE_LIMIT_PER_MIN` (default 20).
+  No Worker secrets. The only credentials involved are the repo CI secrets
+  (§4). `VITE_CLASSIC_RELAY_ORIGIN` is a _client_ build-time var baked into
+  the Nova app's CSP `connect-src` — it is not a Worker setting.
 - **How to recreate:** push to `nova` touching `deploy/relay/**` (triggers
   `.github/workflows/relay.yml`) or run the workflow manually; equivalent
   manual path: `cd deploy/relay && wrangler login && wrangler deploy`.

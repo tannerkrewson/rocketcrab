@@ -74,8 +74,20 @@ export async function relayRequest<T>(
   if (!res.ok) {
     let detail = `HTTP ${res.status}`;
     try {
-      const data = (await res.json()) as { error?: string };
-      if (typeof data.error === "string" && data.error !== "") detail = data.error;
+      // The hardened relay answers with a structured { error: { code,
+      // message } } body; tolerate the legacy flat { error: string } shape
+      // from older worker deployments.
+      const data = (await res.json()) as { error?: string | { message?: string } };
+      if (typeof data.error === "string" && data.error !== "") {
+        detail = data.error;
+      } else if (
+        typeof data.error === "object" &&
+        data.error !== null &&
+        typeof data.error.message === "string" &&
+        data.error.message !== ""
+      ) {
+        detail = data.error.message;
+      }
     } catch {
       // Non-JSON error body; keep the HTTP status detail.
     }
