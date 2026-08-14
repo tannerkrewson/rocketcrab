@@ -97,6 +97,15 @@
   --noise: 0;
 }
 
+@theme {
+  /* Mukta is the single UI font (rocketcrab-9fv.10.2): overriding Tailwind's
+   * default sans stack means html/body, every daisyUI component, and the
+   * homepage title all inherit it. Weights 400-800 are loaded in main.tsx
+   * and cover the app's font-medium/semibold/bold/black usage (Mukta tops
+   * out at 800, so font-black (900) renders at its heaviest weight). */
+  --font-sans: "Mukta", ui-sans-serif, system-ui, sans-serif;
+}
+
 @layer base {
   html {
     /* Keep font scaling predictable on mobile; avoid iOS zoom jumps. */
