@@ -127,27 +127,30 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
 }
 
 describe("PartyLobby", () => {
-  it("lists players in the classic grid with transfer and ready states (10.8)", async () => {
+  it("lists players with connection + transfer states only (10.8/11.9)", async () => {
     await renderLobby(makeState());
     const rowA = screen.getByTestId("party-member-member-a");
     const rowB = screen.getByTestId("party-member-member-b");
     // Own tile: centered name, "You, Host" role label (creator + self),
-    // connected + ready indicators, transfer complete, and the pencil.
+    // connected indicator, and the pencil. The always-green "Game ready"
+    // badge and the standalone ready check are gone (11.9) — readiness is
+    // the start flow's job.
     expect(within(rowA).getByText("Player A")).toBeInTheDocument();
     expect(within(rowA).getByText("You, Host")).toBeInTheDocument();
     expect(within(rowA).getByTitle("Connected")).toBeInTheDocument();
-    expect(within(rowA).getByTitle("Ready")).toBeInTheDocument();
-    expect(within(rowA).getByText("Game ready")).toBeInTheDocument();
+    expect(within(rowA).queryByText("Game ready")).not.toBeInTheDocument();
+    expect(within(rowA).queryByTitle("Ready")).not.toBeInTheDocument();
     expect(within(rowA).getByRole("button", { name: /edit your name/i })).toBeInTheDocument();
     // The dense badge rows are gone.
     expect(within(rowA).queryByText("(you)")).not.toBeInTheDocument();
     expect(within(rowA).queryByText("Greeter")).not.toBeInTheDocument();
 
-    // Peer tile: name, transferring progress bar with byte detail.
+    // Peer tile: name, transferring progress bar with byte detail — and no
+    // ready check next to it.
     expect(within(rowB).getByText("Player B")).toBeInTheDocument();
     expect(within(rowB).getByRole("progressbar")).toBeInTheDocument();
     expect(within(rowB).getByText("32 KB of 64 KB")).toBeInTheDocument();
-    expect(within(rowB).getByTitle("Not ready")).toBeInTheDocument();
+    expect(within(rowB).queryByTitle("Not ready")).not.toBeInTheDocument();
   });
 
   it("distinguishes failed and incompatible transfer states", async () => {
@@ -210,17 +213,19 @@ describe("PartyLobby", () => {
     expect(screen.queryByText(/pick a game before starting/i)).not.toBeInTheDocument();
   });
 
-  it("shows the start-blocked reason as a styled alert when a game is selected (10.7)", async () => {
+  it("shows the start-blocked reason as a styled outline alert when a game is selected (10.7)", async () => {
     const state = makeState({
       startBlockedReason: "Waiting for every player's game to load and register.",
     });
     await renderLobby(state);
     const alert = screen.getByRole("alert");
+    // Colored alerts in the lobby are outline-styled, never solid (9fv.11.3).
+    expect(alert).toHaveClass("alert-outline");
     expect(alert).toHaveClass("alert-warning");
     expect(within(alert).getByText(/waiting for every player/i)).toBeInTheDocument();
   });
 
-  it("styles lobby notices as alerts instead of bare text (10.7)", async () => {
+  it("shows ONE compact notice banner with the latest notice (11.8)", async () => {
     const state = makeState({
       canStart: true,
       startBlockedReason: null,
@@ -231,14 +236,34 @@ describe("PartyLobby", () => {
       ],
     });
     await renderLobby(state);
+    // One status banner, not a growing list of identical alerts.
     const alerts = screen.getAllByRole("alert");
-    expect(alerts).toHaveLength(3);
-    expect(alerts[0]).toHaveClass("alert-error");
-    expect(alerts[1]).toHaveClass("alert-warning");
-    expect(alerts[2]).toHaveClass("alert-info");
-    expect(
-      within(alerts[0]!).getByText("Player B could not receive the game."),
-    ).toBeInTheDocument();
+    expect(alerts).toHaveLength(1);
+    // The latest notice wins and colored alerts are outline-styled (9fv.11.3).
+    expect(alerts[0]).toHaveClass("alert-outline");
+    expect(alerts[0]).toHaveClass("alert-info");
+    expect(within(alerts[0]!).getByText("Your game loaded and registered.")).toBeInTheDocument();
+  });
+
+  it("hides older notices once a game-ended notice is owned by the ended banner (11.8)", async () => {
+    const state = makeState({
+      endedReason: "host_closed",
+      canStart: false,
+      canForceStart: false,
+      startBlockedReason: "The game ended; leave the party to play again.",
+      notices: [
+        { id: "notice-1", level: "info", message: "Your game loaded and registered." },
+        { id: "notice-2", level: "info", message: "The game started." },
+        { id: "notice-3", level: "info", message: "The game ended (host_closed)." },
+      ],
+    });
+    await renderLobby(state);
+    // The ended banner owns the ended state; the raw ended notice and the
+    // older transient notices are not re-shown.
+    expect(screen.getByRole("alert")).toHaveClass("alert-outline");
+    expect(screen.getByText(/the game ended — the host closed it/i)).toBeInTheDocument();
+    expect(screen.queryByText("The game ended (host_closed).")).not.toBeInTheDocument();
+    expect(screen.queryByText("Your game loaded and registered.")).not.toBeInTheDocument();
   });
 
   it("places the action row above the players box and leave at the bottom (10.7)", async () => {
@@ -386,21 +411,27 @@ describe("PartyLobby", () => {
     expect(screen.queryByRole("button", { name: /browse games/i })).not.toBeInTheDocument();
   });
 
-  it("edits the player name from the player's own tile pencil (7.5/10.8)", async () => {
+  it("edits the player name with the join screen's name UI (7.5/10.8/11.10)", async () => {
     const onEditName = vi.fn();
     await renderLobby(makeState(), { onEditName });
     // The "You are playing as" line and its separate Edit name button are gone.
     expect(screen.queryByText(/you are playing as/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^edit name$/i })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /edit your name/i }));
+    // 11.10: the lobby reuses the join screen's name-entry presentation —
+    // the visible "Your name" label, the UserRound icon input (pl-10),
+    // and maxLength 24 — not a bespoke mini-form.
     const input = screen.getByLabelText("Your player name");
+    expect(screen.getByText("Your name")).toBeInTheDocument();
+    expect(input).toHaveAttribute("maxlength", "24");
+    expect(input.className).toContain("pl-10");
     await userEvent.clear(input);
     await userEvent.type(input, "Grace");
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
     expect(onEditName).toHaveBeenCalledWith("Grace");
   });
 
-  it("shows the ended-game banner and disables start after a game ends", async () => {
+  it("shows ONE unified ended-game banner and disables start after a game ends (11.8)", async () => {
     const state = makeState({
       endedReason: "host_closed",
       canStart: false,
@@ -408,7 +439,12 @@ describe("PartyLobby", () => {
       startBlockedReason: "The game ended; leave the party to play again.",
     });
     await renderLobby(state);
-    expect(screen.getAllByText(/the game ended/i).length).toBeGreaterThan(0);
+    // One unified ended banner with host_closed copy — the separate
+    // "game ended; leave the party to play again" warning alert is gone.
+    expect(screen.getByText(/the game ended — the host closed it/i)).toBeInTheDocument();
+    expect(
+      screen.queryByText("The game ended; leave the party to play again."),
+    ).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /start game/i })).toBeDisabled();
   });
 
@@ -482,14 +518,15 @@ describe("PartyLobby", () => {
     expect(screen.queryByRole("button", { name: /kick/i })).not.toBeInTheDocument();
   });
 
-  it("shows the invite card with Copy URL + QR Code and an origin+code title (10.5)", async () => {
+  it("shows the invite card with Copy URL + QR and no code/URL text (10.5/11.6)", async () => {
     await renderLobby(makeState());
     expect(screen.getByText("Get your friends to join!")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy url/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /qr code/i })).toBeInTheDocument();
-    // The lobby page title is origin + code — the full invite URL is never
-    // rendered (ADR-0011).
-    expect(screen.getByText(`${window.location.host}/abcd`)).toBeInTheDocument();
+    // The origin+code title lives in the party shell header (11.6) — the
+    // lobby card never re-renders it. The code is never shown separately
+    // from the title, and the full invite URL is never rendered (ADR-0011).
+    expect(screen.queryByText(`${window.location.host}/abcd`)).not.toBeInTheDocument();
     expect(screen.queryByText(INVITE_URL)).not.toBeInTheDocument();
     expect(screen.queryByText(/invite-secret/)).not.toBeInTheDocument();
     // The QR is not shown directly on the lobby.

@@ -2,7 +2,6 @@ import {
   ArrowLeft,
   BookOpen,
   Check,
-  Clock3,
   Copy,
   Gamepad2,
   LogOut,
@@ -10,13 +9,14 @@ import {
   Pencil,
   Play,
   QrCode,
+  UserRound,
   Users,
   X,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { writeToClipboard } from "../../lib/editor/clipboard";
-import type { PartyEngineState, PartyMemberView } from "../../lib/party/engine";
+import type { PartyEngineState, PartyMemberView, PartyNotice } from "../../lib/party/engine";
 import { Button } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
 import { IdleParticles } from "./IdleParticles";
@@ -61,7 +61,14 @@ function roleLabels(member: PartyMemberView, isCreator: boolean): string {
   return labels.join(", ");
 }
 
-/** Tiny transfer-state indicator inside a player tile (10.8). */
+/**
+ * Tiny transfer-state indicator inside a player tile (10.8 / 11.9): only
+ * genuinely operational states show — an in-flight transfer bar, a
+ * failure, or the muted "waiting for game" gap. The always-green "Game
+ * ready" badge is gone (has-the-game is the default end state, and
+ * readiness belongs to the start flow, which the start button + blocked
+ * reason already communicate). The connection dot carries presence.
+ */
 function transferIndicator(member: PartyMemberView) {
   switch (member.transferState) {
     case "transferring":
@@ -73,8 +80,6 @@ function transferIndicator(member: PartyMemberView) {
           aria-label={`Game transfer progress for ${member.displayName}`}
         />
       );
-    case "complete":
-      return <span className="text-[10px] font-bold text-success">Game ready</span>;
     case "failed":
       return <span className="text-[10px] font-bold text-error">Failed</span>;
     case "incompatible":
@@ -82,8 +87,38 @@ function transferIndicator(member: PartyMemberView) {
     case "waiting":
     case "none":
       return <span className="text-[10px] font-bold text-base-content/40">Waiting for game</span>;
+    case "complete":
+      return null;
   }
 }
+
+/**
+ * Unified copy for the ended-state banner (11.8): every "game ended"
+ * variant (host_closed / user_exit / error / unknown) reads the same way,
+ * with correct copy per reason — one banner owns all of them.
+ */
+function endedBannerText(reason: string): string {
+  switch (reason) {
+    case "host_closed":
+      return "The game ended — the host closed it. The party is still open; leave when you're done.";
+    case "error":
+      return "The game ended due to an error. The party is still open — leave when you're done.";
+    default:
+      return "The game ended. The party is still open — leave when you're done.";
+  }
+}
+
+/** True for engine end notices — owned by the ended-state banner (11.8). */
+function isEndedNotice(message: string): boolean {
+  return message.startsWith("The game ended");
+}
+
+/** Alert level classes for lobby notices (outline-styled per 9fv.11.3). */
+const NOTICE_ALERT_LEVELS: Record<PartyNotice["level"], string> = {
+  error: "alert-error",
+  warn: "alert-warning",
+  info: "alert-info",
+};
 
 /**
  * The party lobby (P4): the invite card (Copy URL / QR in a modal), the
@@ -147,6 +182,15 @@ export function PartyLobby({
     };
   }, [pageTitle]);
 
+  // 11.8: the notice banner shows the LATEST relevant notice only (a
+  // capped, deduped set from the engine) — never a growing list of
+  // identical alerts. Once the game ended, the ended-state banner owns the
+  // status area and the notice banner hides entirely.
+  const latestNotice =
+    state.endedReason !== null || state.notices.length === 0
+      ? null
+      : ([...state.notices].reverse().find((notice) => !isEndedNotice(notice.message)) ?? null);
+
   const copyInvite = async () => {
     if (state.inviteUrl === null) return;
     const ok = await writeToClipboard(state.inviteUrl);
@@ -162,7 +206,7 @@ export function PartyLobby({
     // (/game/$gameId, saved games included); the pick happens there and
     // returns to /party. The lobby never sets the game directly.
     return (
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
         <section aria-label="Pick a game" className="flex flex-col gap-3">
           <button
             type="button"
@@ -179,19 +223,20 @@ export function PartyLobby({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
       {/* 10.5: the invite card — get your friends in via URL or QR. The QR
           is NOT shown on the page; it opens in a modal. Only the origin +
           code are ever rendered (ADR-0011: the session secret stays in the
           URL fragment, never on the page). */}
+      {/* 11.6: the title (origin + code) lives in the party shell header as
+          ONE string — the invite card never renders it again (the code is
+          never shown separately from the title). The card is the invite
+          ACTION: Copy URL / QR only. */}
       <section
         aria-label="Invite your friends"
         className="flex flex-col items-center gap-3 rounded-box border-2 border-base-300 bg-base-100 p-5 text-center"
       >
         <h2 className="text-lg font-black">Get your friends to join!</h2>
-        {pageTitle !== null ? (
-          <p className="font-mono text-sm font-bold text-primary">{pageTitle}</p>
-        ) : null}
         <div className="flex items-center justify-center gap-2">
           <Button variant="primary" size="md" onClick={() => void copyInvite()}>
             <Copy className="h-4 w-4" aria-hidden="true" />
@@ -236,10 +281,13 @@ export function PartyLobby({
           <p className="text-sm text-base-content/70">No game selected yet</p>
         )}
       </section>
+      {/* 11.8: ONE unified ended-state banner — every "game ended" variant
+          (host_closed / user_exit / error) reads the same way with copy per
+          reason; the engine's raw ended notices are filtered out of the
+          notice banner below (this banner owns that state). */}
       {state.endedReason !== null ? (
-        <div className="rounded-box border-2 border-accent bg-accent/10 p-3 text-sm font-semibold">
-          The game ended{state.endedReason === undefined ? "." : ` (${state.endedReason}).`} The
-          party is still open — leave when you&apos;re done.
+        <div role="alert" className="alert alert-outline alert-info">
+          <span className="text-sm font-semibold">{endedBannerText(state.endedReason)}</span>
         </div>
       ) : null}
       {/* 10.7: the greeter and authority role badges are gone from the
@@ -313,19 +361,22 @@ export function PartyLobby({
       </section>
       {/* The blocked-reason copy (10.7): shown as a styled warning alert;
           the "Pick a game before starting the party." message is gone —
-          the welcome card covers the no-game case. */}
+          the welcome card covers the no-game case. The ended case is
+          covered by the unified ended banner above (11.8). */}
       {state.game !== null &&
+      state.endedReason === null &&
       !state.canStart &&
       !state.canForceStart &&
       state.startBlockedReason !== null ? (
-        <div role="alert" className="alert alert-warning mx-auto w-fit">
+        <div role="alert" className="alert alert-outline alert-warning mx-auto w-fit">
           <span className="text-sm font-semibold">{state.startBlockedReason}</span>
         </div>
       ) : null}
-      {/* 10.8: the classic player grid — 2 columns of rounded tiles, each
-          with a centered name, a pencil (own tile = edit name), a small
-          role-labels line ("You, Host" style), a per-player border color,
-          and tiny status indicators (connection, ready, transfer). */}
+      {/* 10.8 / 11.9: the classic player grid — 2 columns of rounded tiles,
+          each with a centered name, a pencil (own tile = edit name), a
+          small role-labels line ("You, Host" style), a per-player border
+          color, and ONE meaningful status: the connection dot + the
+          transfer state (progress bar / failure / waiting). */}
       <details
         className="collapse collapse-arrow rounded-box border-2 border-base-300 bg-base-100"
         open
@@ -344,8 +395,12 @@ export function PartyLobby({
                   className={`flex min-w-0 flex-col items-center gap-1.5 rounded-box border-2 bg-base-100 p-3 text-center ${playerBorderColor(index)}`}
                 >
                   {member.isSelf && editingName ? (
+                    /* 11.10: the SAME name-entry presentation as the join
+                       screen's name step (UserRound icon, pl-10 input,
+                       visible label) — the lobby never invents its own
+                       mini-form. Validation stays: trim + maxLength. */
                     <form
-                      className="flex w-full flex-col items-center gap-2"
+                      className="flex w-full flex-col gap-1.5"
                       onSubmit={(event) => {
                         event.preventDefault();
                         const trimmed = nameDraft.trim();
@@ -355,15 +410,27 @@ export function PartyLobby({
                         setEditingName(false);
                       }}
                     >
-                      <input
-                        type="text"
-                        value={nameDraft}
-                        onChange={(event) => setNameDraft(event.target.value)}
-                        maxLength={24}
-                        aria-label="Your player name"
-                        className="input input-bordered input-sm w-full"
-                      />
-                      <div className="flex gap-2">
+                      <label htmlFor="player-name" className="text-sm font-bold">
+                        Your name
+                      </label>
+                      <div className="relative">
+                        <UserRound
+                          className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-base-content/40"
+                          aria-hidden="true"
+                        />
+                        <input
+                          id="player-name"
+                          type="text"
+                          value={nameDraft}
+                          onChange={(event) => setNameDraft(event.target.value)}
+                          placeholder="Your name"
+                          maxLength={24}
+                          autoComplete="nickname"
+                          aria-label="Your player name"
+                          className="input input-bordered w-full pl-10"
+                        />
+                      </div>
+                      <div className="mt-1 flex justify-center gap-3">
                         <Button variant="primary" size="md" type="submit">
                           Save
                         </Button>
@@ -388,13 +455,8 @@ export function PartyLobby({
                             aria-hidden="true"
                           />
                         )}
-                        <span title={member.ready ? "Ready" : "Not ready"}>
-                          {member.ready ? (
-                            <Check className="h-3.5 w-3.5 text-success" aria-hidden="true" />
-                          ) : (
-                            <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
-                          )}
-                        </span>
+                        {/* 11.9: no standalone ready check — readiness is the
+                            start flow's job (start button + blocked reason). */}
                         {transferIndicator(member)}
                         {state.role === "creator" && !member.isSelf ? (
                           <button
@@ -442,26 +504,16 @@ export function PartyLobby({
           </ul>
         </div>
       </details>
-      {/* Notices (a failed peer never freezes the lobby) — styled alerts
-          instead of bare colored text (10.7). */}
-      {state.notices.length > 0 ? (
-        <ul className="flex flex-col gap-2" aria-label="Lobby notices">
-          {state.notices.map((notice) => (
-            <li
-              key={notice.id}
-              role="alert"
-              className={
-                notice.level === "error"
-                  ? "alert alert-error"
-                  : notice.level === "warn"
-                    ? "alert alert-warning"
-                    : "alert alert-info"
-              }
-            >
-              <span className="text-sm font-semibold">{notice.message}</span>
-            </li>
-          ))}
-        </ul>
+      {/* Notices (11.8): ONE compact status banner showing the latest
+          relevant notice instead of a growing list of identical alerts.
+          Colored alerts are outline-styled, never solid (9fv.11.3). */}
+      {latestNotice !== null ? (
+        <div
+          role="alert"
+          className={`alert alert-outline ${NOTICE_ALERT_LEVELS[latestNotice.level]} mx-auto w-fit`}
+        >
+          <span className="text-sm font-semibold">{latestNotice.message}</span>
+        </div>
       ) : null}
       <PartyDiagnosticsPanel
         diagnostics={state.diagnostics}
