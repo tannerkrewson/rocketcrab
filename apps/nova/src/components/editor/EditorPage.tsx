@@ -2,12 +2,14 @@ import { PROTOCOL_VERSION, type GameMode } from "@rocketcrab/protocol";
 import type { SavedGame } from "@rocketcrab/core";
 import { Link, useBlocker, useNavigate } from "@tanstack/react-router";
 import {
+  ArrowLeft,
   ClipboardPaste,
   CopyPlus,
   Eraser,
   GripHorizontal,
   MonitorSmartphone,
   PartyPopper,
+  Pencil,
   Play,
   Save,
   Trash2,
@@ -20,10 +22,11 @@ import {
   useRef,
   useState,
   createContext,
+  type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
 import { toast } from "sonner";
-import { Button } from "../ui/Button";
+import { Button, buttonStyles } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { useCreateGame, useRecordTestResults, useUpdateGame } from "../../lib/games/queries";
 import { hashSource, sourceByteLength } from "../../lib/games/hashing";
@@ -134,6 +137,38 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     runtimeInstanceId: string | null;
   } | null>(null);
   const [mobileTab, setMobileTab] = useState<"code" | "errors">("code");
+  const [titleEditing, setTitleEditing] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement | null>(null);
+  // The title shown when not editing: the typed title, else the game's
+  // declared title (nova.defineGame), else the default.
+  const displayTitle = title.trim() || registration?.title || DEFAULT_GAME_TITLE;
+  // The pre-edit title, so Escape can cancel an in-progress edit.
+  const titleDraftRef = useRef(title);
+
+  const startEditingTitle = useCallback(() => {
+    titleDraftRef.current = title;
+    setTitleEditing(true);
+  }, [title]);
+
+  const commitTitle = useCallback(() => {
+    setTitleEditing(false);
+  }, []);
+
+  const handleTitleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") {
+      setTitleEditing(false);
+    } else if (event.key === "Escape") {
+      setTitle(titleDraftRef.current);
+      setTitleEditing(false);
+    }
+  }, []);
+
+  // Swap to an editing input: autofocus and select the whole title.
+  useEffect(() => {
+    if (!titleEditing) return;
+    titleInputRef.current?.focus();
+    titleInputRef.current?.select();
+  }, [titleEditing]);
   const [discardDialog, setDiscardDialog] = useState<{ onConfirm: () => void } | null>(null);
   const [clearAllDialog, setClearAllDialog] = useState(false);
   // The arena's source, seeded with the saved source so the arena is live by
@@ -617,23 +652,55 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         </div>
       </div>
 
+      {/* Chrome row (Task 2): identity (logo mark, no text), orientation
+          (back to the library), the click-to-edit title, and the byte
+          count + unsaved-changes indicator. */}
       <header className="flex flex-wrap items-center gap-3">
-        <input
-          type="text"
-          value={title}
-          onChange={(event) => setTitle(event.target.value)}
-          placeholder="Game title"
-          aria-label="Game title"
-          maxLength={64}
-          className="input input-bordered min-w-40 flex-1"
-        />
+        <Link
+          to="/"
+          className="text-2xl leading-none"
+          aria-label="Rocketcrab Nova home"
+          title="Rocketcrab Nova"
+        >
+          <span aria-hidden="true">🦀🚀</span>
+        </Link>
+        <Link to="/library" className={buttonStyles("outline")} title="Back to your games">
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          My games
+        </Link>
+        <div className="min-w-0 flex-1">
+          {titleEditing ? (
+            <input
+              ref={titleInputRef}
+              type="text"
+              value={title}
+              onChange={(event) => setTitle(event.target.value)}
+              onFocus={(event) => event.target.select()}
+              onKeyDown={handleTitleKeyDown}
+              onBlur={commitTitle}
+              aria-label="Game title"
+              maxLength={64}
+              className="input input-bordered w-full max-w-md text-lg font-black"
+            />
+          ) : (
+            <button
+              type="button"
+              onClick={startEditingTitle}
+              className="group inline-flex max-w-full items-center gap-2 rounded-md px-1 py-0.5 -mx-1 hover:bg-base-200/60"
+              title="Click to edit the game title"
+            >
+              <h1 className="truncate text-xl font-black">{displayTitle}</h1>
+              <Pencil
+                className="h-4 w-4 shrink-0 text-base-content/40 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                aria-hidden="true"
+              />
+            </button>
+          )}
+        </div>
         <span className="text-xs font-semibold text-base-content/60">
           {formatBytes(sourceByteLength(source))}
           {dirty ? " · unsaved changes" : null}
         </span>
-        <Link to="/library" className="btn btn-link btn-sm font-bold">
-          Back to games
-        </Link>
       </header>
 
       {/* Desktop: actions, small resizable editor, then the arena flows in
