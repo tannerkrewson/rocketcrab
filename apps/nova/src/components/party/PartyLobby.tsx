@@ -2,9 +2,9 @@ import {
   ArrowLeft,
   BookOpen,
   Check,
+  Clock3,
   Copy,
   Gamepad2,
-  Loader2,
   LogOut,
   PartyPopper,
   Pencil,
@@ -42,56 +42,60 @@ export interface PartyLobbyProps {
   onEditName: (name: string) => void;
 }
 
-function connectionBadge(member: PartyMemberView) {
-  if (!member.connected) {
-    return <span className="badge badge-error badge-sm">Disconnected</span>;
-  }
-  return <span className="badge badge-success badge-sm">Connected</span>;
+/** Per-player tile border colors (10.8): each player gets a distinct color. */
+const PLAYER_BORDER_COLORS = [
+  "border-primary",
+  "border-secondary",
+  "border-accent",
+  "border-info",
+  "border-success",
+  "border-warning",
+  "border-error",
+] as const;
+
+function playerBorderColor(index: number): string {
+  return PLAYER_BORDER_COLORS[index % PLAYER_BORDER_COLORS.length] ?? "border-primary";
 }
 
-function transferBadge(member: PartyMemberView) {
+/** Comma-separated role labels for a player tile ("You, Host" style, 10.8). */
+function roleLabels(member: PartyMemberView, isCreator: boolean): string {
+  const labels: string[] = [];
+  if (member.isSelf) labels.push("You");
+  if (member.isSelf && isCreator) labels.push("Host");
+  if (member.isGreeter && !member.isSelf) labels.push("Greeter");
+  return labels.join(", ");
+}
+
+/** Tiny transfer-state indicator inside a player tile (10.8). */
+function transferIndicator(member: PartyMemberView) {
   switch (member.transferState) {
-    case "complete":
-      return <span className="badge badge-success badge-sm">Game ready</span>;
     case "transferring":
       return (
-        <span className="badge badge-info badge-sm" title={member.transferDetail ?? undefined}>
-          <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-          Transferring
-        </span>
+        <progress
+          className="progress progress-info h-1.5 w-16"
+          value={member.transferProgress ?? 0}
+          max={1}
+          aria-label={`Game transfer progress for ${member.displayName}`}
+        />
       );
+    case "complete":
+      return <span className="text-[10px] font-bold text-success">Game ready</span>;
     case "failed":
-      return (
-        <span className="badge badge-error badge-sm" title={member.transferDetail ?? undefined}>
-          Failed
-        </span>
-      );
+      return <span className="text-[10px] font-bold text-error">Failed</span>;
     case "incompatible":
-      return (
-        <span className="badge badge-error badge-sm" title={member.transferDetail ?? undefined}>
-          Incompatible
-        </span>
-      );
+      return <span className="text-[10px] font-bold text-error">Incompatible</span>;
     case "waiting":
     case "none":
-      return <span className="badge badge-ghost badge-sm">Waiting for game</span>;
+      return <span className="text-[10px] font-bold text-base-content/40">Waiting for game</span>;
   }
-}
-
-function readyBadge(member: PartyMemberView) {
-  return member.ready ? (
-    <span className="badge badge-accent badge-sm">Ready</span>
-  ) : (
-    <span className="badge badge-ghost badge-sm">Not ready</span>
-  );
 }
 
 /**
- * The party lobby (P4): the large four-letter code, QR + invite link,
- * the player list with per-player transfer and ready state, the current
- * greeter, the current internal authority (DIAGNOSTIC ONLY), start /
- * force-start / leave controls, and connection diagnostics. The party
- * creator, greeter, and authority are deliberately shown as separate roles.
+ * The party lobby (P4): the invite card (Copy URL / QR in a modal), the
+ * welcome card with the selected game, the classic 2-column player grid
+ * with per-player state, start / force-start / leave controls, and
+ * connection diagnostics. Greeter and authority stay diagnostic (10.7) —
+ * they live in the diagnostics panel and the engine state, not the lobby.
  *
  * The lobby has no game preview (7.38 — classic parity); the host browses
  * games through the SHARED game browser (7.43) rendered inline in pick
@@ -245,55 +249,6 @@ export function PartyLobby({
           <p className="text-sm text-base-content/70">No game selected yet</p>
         )}
       </section>
-      {/* Player name, editable (7.5 — classic parity: the name is asked
-          before the lobby and can be changed at any time). */}
-      <section className="flex flex-wrap items-center gap-2 text-sm font-semibold text-base-content/70">
-        <span>
-          You are playing as{" "}
-          <span className="font-black text-base-content">{state.displayName}</span>
-        </span>
-        {editingName ? null : (
-          <button
-            type="button"
-            className="btn btn-xs"
-            onClick={() => {
-              setNameDraft(state.displayName);
-              setEditingName(true);
-            }}
-          >
-            <Pencil className="h-3 w-3" aria-hidden="true" />
-            Edit name
-          </button>
-        )}
-      </section>
-      {editingName ? (
-        <form
-          className="flex flex-wrap items-center gap-2"
-          onSubmit={(event) => {
-            event.preventDefault();
-            const trimmed = nameDraft.trim();
-            if (trimmed.length > 0) {
-              onEditName(trimmed);
-            }
-            setEditingName(false);
-          }}
-        >
-          <input
-            type="text"
-            value={nameDraft}
-            onChange={(event) => setNameDraft(event.target.value)}
-            maxLength={24}
-            aria-label="Your player name"
-            className="input input-bordered input-sm min-w-40 flex-1"
-          />
-          <Button variant="primary" size="md" type="submit">
-            Save
-          </Button>
-          <Button variant="outline" size="md" onClick={() => setEditingName(false)}>
-            Cancel
-          </Button>
-        </form>
-      ) : null}
       {state.endedReason !== null ? (
         <div className="rounded-box border-2 border-accent bg-accent/10 p-3 text-sm font-semibold">
           The game ended{state.endedReason === undefined ? "." : ` (${state.endedReason}).`} The
@@ -382,9 +337,10 @@ export function PartyLobby({
           <span className="text-sm font-semibold">{state.startBlockedReason}</span>
         </div>
       ) : null}
-      {/* Player list with per-player transfer + ready status. */}
-      {/* Classic collapsible Players card (7.4): badge count + per-player
-          rows with transfer/ready state. Open by default. */}
+      {/* 10.8: the classic player grid — 2 columns of rounded tiles, each
+          with a centered name, a pencil (own tile = edit name), a small
+          role-labels line ("You, Host" style), a per-player border color,
+          and tiny status indicators (connection, ready, transfer). */}
       <details
         className="collapse collapse-arrow rounded-box border-2 border-base-300 bg-base-100"
         open
@@ -393,55 +349,111 @@ export function PartyLobby({
           Players ({state.members.length})
         </summary>
         <div className="collapse-content">
-          <ul className="flex flex-col gap-2">
-            {state.members.map((member) => (
-              <li
-                key={member.memberId}
-                className="flex flex-col gap-2 rounded-box border-2 border-base-300 bg-base-100 p-3"
-                data-testid={`party-member-${member.memberId}`}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="font-black">
-                    {member.displayName}
-                    {member.isSelf ? <span className="text-base-content/50"> (you)</span> : null}
-                  </span>
-                  {member.isGreeter ? (
-                    <span className="badge badge-secondary badge-sm" title="Rendezvous greeter">
-                      Greeter
-                    </span>
-                  ) : null}
-                  {connectionBadge(member)}
-                  {transferBadge(member)}
-                  {readyBadge(member)}
-                  {state.role === "creator" && !member.isSelf ? (
-                    <button
-                      type="button"
-                      className="btn btn-xs text-error"
-                      onClick={() => onKickMember(member.memberId)}
-                      title={`Remove ${member.displayName} from the party`}
+          <ul className="grid grid-cols-2 gap-3">
+            {state.members.map((member, index) => {
+              const roleLabel = roleLabels(member, state.role === "creator");
+              return (
+                <li
+                  key={member.memberId}
+                  data-testid={`party-member-${member.memberId}`}
+                  className={`flex min-w-0 flex-col items-center gap-1.5 rounded-box border-2 bg-base-100 p-3 text-center ${playerBorderColor(index)}`}
+                >
+                  {member.isSelf && editingName ? (
+                    <form
+                      className="flex w-full flex-col items-center gap-2"
+                      onSubmit={(event) => {
+                        event.preventDefault();
+                        const trimmed = nameDraft.trim();
+                        if (trimmed.length > 0) {
+                          onEditName(trimmed);
+                        }
+                        setEditingName(false);
+                      }}
                     >
-                      <X className="h-3 w-3" aria-hidden="true" />
-                      Kick
-                    </button>
-                  ) : null}
-                </div>
-                {member.transferProgress !== null && member.transferState === "transferring" ? (
-                  <div className="flex items-center gap-2">
-                    <progress
-                      className="progress progress-info w-full"
-                      value={member.transferProgress}
-                      max={1}
-                      aria-label={`Game transfer progress for ${member.displayName}`}
-                    />
-                    <span className="shrink-0 text-xs font-semibold text-base-content/60">
-                      {member.transferDetail ?? `${Math.round(member.transferProgress * 100)}%`}
-                    </span>
-                  </div>
-                ) : member.transferDetail !== null ? (
-                  <p className="text-xs text-base-content/60">{member.transferDetail}</p>
-                ) : null}
-              </li>
-            ))}
+                      <input
+                        type="text"
+                        value={nameDraft}
+                        onChange={(event) => setNameDraft(event.target.value)}
+                        maxLength={24}
+                        aria-label="Your player name"
+                        className="input input-bordered input-sm w-full"
+                      />
+                      <div className="flex gap-2">
+                        <Button variant="primary" size="md" type="submit">
+                          Save
+                        </Button>
+                        <Button variant="outline" size="md" onClick={() => setEditingName(false)}>
+                          Cancel
+                        </Button>
+                      </div>
+                    </form>
+                  ) : (
+                    <>
+                      <div className="flex w-full items-center justify-end gap-1.5 text-base-content/60">
+                        {member.connected ? (
+                          <span
+                            title="Connected"
+                            className="inline-block h-2 w-2 rounded-full bg-success"
+                            aria-hidden="true"
+                          />
+                        ) : (
+                          <span
+                            title="Disconnected"
+                            className="inline-block h-2 w-2 rounded-full bg-error"
+                            aria-hidden="true"
+                          />
+                        )}
+                        <span title={member.ready ? "Ready" : "Not ready"}>
+                          {member.ready ? (
+                            <Check className="h-3.5 w-3.5 text-success" aria-hidden="true" />
+                          ) : (
+                            <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
+                          )}
+                        </span>
+                        {transferIndicator(member)}
+                        {state.role === "creator" && !member.isSelf ? (
+                          <button
+                            type="button"
+                            className="btn btn-xs text-error"
+                            onClick={() => onKickMember(member.memberId)}
+                            aria-label={`Kick ${member.displayName}`}
+                          >
+                            <X className="h-3 w-3" aria-hidden="true" />
+                          </button>
+                        ) : null}
+                      </div>
+                      <div className="flex min-w-0 items-center justify-center gap-1.5">
+                        <p className="truncate font-black">{member.displayName}</p>
+                        {member.isSelf ? (
+                          <button
+                            type="button"
+                            className="btn btn-xs"
+                            aria-label="Edit your name"
+                            onClick={() => {
+                              setNameDraft(state.displayName);
+                              setEditingName(true);
+                            }}
+                          >
+                            <Pencil className="h-3 w-3" aria-hidden="true" />
+                          </button>
+                        ) : null}
+                      </div>
+                      {roleLabel !== "" ? (
+                        <p className="text-xs font-semibold text-base-content/60">{roleLabel}</p>
+                      ) : null}
+                      {member.transferDetail !== null && member.transferState !== "complete" ? (
+                        <p
+                          className="text-[10px] leading-tight text-base-content/50"
+                          title={member.transferDetail}
+                        >
+                          {member.transferDetail}
+                        </p>
+                      ) : null}
+                    </>
+                  )}
+                </li>
+              );
+            })}
           </ul>
         </div>
       </details>
