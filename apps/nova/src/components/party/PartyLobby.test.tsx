@@ -129,20 +129,27 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
 }
 
 describe("PartyLobby", () => {
-  it("lists players with their transfer and ready states", async () => {
+  it("lists players in the classic grid with transfer and ready states (10.8)", async () => {
     await renderLobby(makeState());
     const rowA = screen.getByTestId("party-member-member-a");
     const rowB = screen.getByTestId("party-member-member-b");
+    // Own tile: centered name, "You, Host" role label (creator + self),
+    // connected + ready indicators, transfer complete, and the pencil.
     expect(within(rowA).getByText("Player A")).toBeInTheDocument();
-    expect(within(rowA).getByText("(you)")).toBeInTheDocument();
-    expect(within(rowA).getByText("Greeter")).toBeInTheDocument();
-    expect(within(rowA).getByText("Ready")).toBeInTheDocument();
+    expect(within(rowA).getByText("You, Host")).toBeInTheDocument();
+    expect(within(rowA).getByTitle("Connected")).toBeInTheDocument();
+    expect(within(rowA).getByTitle("Ready")).toBeInTheDocument();
     expect(within(rowA).getByText("Game ready")).toBeInTheDocument();
+    expect(within(rowA).getByRole("button", { name: /edit your name/i })).toBeInTheDocument();
+    // The dense badge rows are gone.
+    expect(within(rowA).queryByText("(you)")).not.toBeInTheDocument();
+    expect(within(rowA).queryByText("Greeter")).not.toBeInTheDocument();
 
+    // Peer tile: name, transferring progress bar with byte detail.
     expect(within(rowB).getByText("Player B")).toBeInTheDocument();
-    expect(within(rowB).getByText("Transferring")).toBeInTheDocument();
-    expect(within(rowB).getByText("Not ready")).toBeInTheDocument();
     expect(within(rowB).getByRole("progressbar")).toBeInTheDocument();
+    expect(within(rowB).getByText("32 KB of 64 KB")).toBeInTheDocument();
+    expect(within(rowB).getByTitle("Not ready")).toBeInTheDocument();
   });
 
   it("distinguishes failed and incompatible transfer states", async () => {
@@ -383,11 +390,13 @@ describe("PartyLobby", () => {
     expect(screen.queryByRole("button", { name: /browse games/i })).not.toBeInTheDocument();
   });
 
-  it("edits the player name from the lobby (7.5)", async () => {
+  it("edits the player name from the player's own tile pencil (7.5/10.8)", async () => {
     const onEditName = vi.fn();
     await renderLobby(makeState(), { onEditName });
-    expect(screen.getByText(/you are playing as/i)).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /edit name/i }));
+    // The "You are playing as" line and its separate Edit name button are gone.
+    expect(screen.queryByText(/you are playing as/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^edit name$/i })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /edit your name/i }));
     const input = screen.getByLabelText("Your player name");
     await userEvent.clear(input);
     await userEvent.type(input, "Grace");
