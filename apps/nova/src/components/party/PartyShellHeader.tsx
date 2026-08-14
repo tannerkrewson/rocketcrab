@@ -63,8 +63,10 @@ export function PartyShellHeader({
           >
             {code}
           </button>
+          {/* 7.47: phonetic words stay lowercase ("(xray alpha bravo
+              yankee)") — the `uppercase` class is intentionally absent. */}
           {!disablePhonetic ? (
-            <p className="text-xs font-semibold uppercase tracking-widest text-base-content/60">
+            <p className="text-xs font-semibold tracking-widest text-base-content/60">
               ({phoneticSpelling(code)})
             </p>
           ) : null}

@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { JoinScreen } from "../components/party/JoinScreen";
+import { JoinScreen, type JoinStep } from "../components/party/JoinScreen";
 import { PartyExperience } from "../components/party/PartyExperience";
 import { PartyResumeBanner } from "../components/party/PartyResumeBanner";
 import { PartyShellHeader } from "../components/party/PartyShellHeader";
@@ -17,13 +17,16 @@ export const Route = createFileRoute("/join")({
  * Invite secrets arrive in the URL fragment (ADR-0011); the fragment is
  * parsed and imported into session memory BEFORE the party route renders,
  * then stripped from the URL so the secret does not linger in history.
- * The code/name state lives HERE (not in JoinScreen) so it survives the
- * joining → error transition: "Try again" keeps the typed code (7.10).
+ * The code/name/step state lives HERE (not in JoinScreen) so it survives
+ * the joining → error transition: "Try again" keeps the typed code (7.10)
+ * and the step (7.47).
  */
 function JoinPage() {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [code, setCode] = useState("");
   const [name, setName] = useState(() => getSavedPlayerName() ?? "");
+  // Two-step join flow (7.47): room code first, player name second.
+  const [step, setStep] = useState<JoinStep>("code");
 
   // Import the invite fragment (if any) once per page load.
   useEffect(() => {
@@ -53,6 +56,10 @@ function JoinPage() {
       const latest = partyEngine.getState();
       if (latest.phase === "error" && latest.lastError !== null) {
         setJoinError(latest.lastError);
+      } else {
+        // Joined — next time the form shows (after leaving a party) it
+        // starts again at the code step.
+        setStep("code");
       }
     });
   };
@@ -71,6 +78,8 @@ function JoinPage() {
         <JoinScreen
           error={joinError ?? (state.phase === "error" ? state.lastError : null)}
           joining={false}
+          step={step}
+          onStepChange={setStep}
           code={code}
           onCodeChange={setCode}
           name={name}

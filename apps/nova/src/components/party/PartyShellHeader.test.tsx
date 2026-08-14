@@ -17,10 +17,11 @@ afterEach(() => {
 });
 
 describe("PartyShellHeader", () => {
-  it("renders the logo and the big mono code with phonetic spelling", () => {
+  it("renders the logo and the big mono code with a lowercase phonetic spelling", () => {
     render(<PartyShellHeader code="RCRB" inviteUrl={INVITE_URL} />);
     expect(screen.getByTestId("party-code")).toHaveTextContent("RCRB");
-    expect(screen.getByText(/romeo charlie romeo bravo/i)).toBeInTheDocument();
+    // 7.47: the phonetic words render lowercase, not all caps.
+    expect(screen.getByText("(romeo charlie romeo bravo)")).toBeInTheDocument();
   });
 
   it("renders only the logo when no code is known yet", () => {
@@ -50,6 +51,6 @@ describe("PartyShellHeader", () => {
 
   it("suppresses the phonetic spelling when disabled (classic join page)", () => {
     render(<PartyShellHeader code="RCRB" disablePhonetic />);
-    expect(screen.queryByText(/romeo charlie romeo bravo/i)).not.toBeInTheDocument();
+    expect(screen.queryByText("(romeo charlie romeo bravo)")).not.toBeInTheDocument();
   });
 });
