@@ -31,7 +31,10 @@ describe("PartyShellHeader", () => {
   it("renders only the logo when no code is known yet", () => {
     render(<PartyShellHeader />);
     expect(screen.queryByTestId("party-code")).not.toBeInTheDocument();
-    expect(screen.getByText("🦀🚀")).toBeInTheDocument();
+    // The real SVG brand mark (rocket + crab, 11.2) — never the emoji pair.
+    const logo = screen.getByTestId("brand-logo");
+    expect(logo.querySelector('img[src="/rocket.svg"]')).not.toBeNull();
+    expect(logo.querySelector('img[src="/crab.svg"]')).not.toBeNull();
   });
 
   it("copies the invite link when the code is clicked", async () => {

@@ -1,5 +1,6 @@
 import { Link, createRootRoute } from "@tanstack/react-router";
 import { AppLayout } from "../components/layout/AppLayout";
+import { BrandLogo } from "../components/layout/BrandLogo";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
 import { buttonStyles } from "../components/ui/Button";
 
@@ -34,9 +35,7 @@ function RootErrorComponent({ error }: { error: unknown }) {
 function RootNotFoundComponent() {
   return (
     <main className="mx-auto flex w-full max-w-xl flex-col items-center justify-center gap-4 px-4 py-16 text-center">
-      <p className="text-6xl" aria-hidden="true">
-        🚀
-      </p>
+      <BrandLogo size={48} />
       <h1 className="text-3xl font-black">Lost in space</h1>
       <p className="text-base-content/70">
         That page drifted off into the void. It doesn't exist (or hasn't been built yet).
