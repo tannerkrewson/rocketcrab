@@ -23,7 +23,6 @@ import {
   ArrowRight,
   Bug,
   Droplets,
-  FlaskConical,
   Gauge,
   GripHorizontal,
   PartyPopper,
@@ -359,12 +358,6 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
 
   const summaryBar = (
     <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-base-content/70">
-      <span className="badge badge-ghost badge-sm">
-        {summary.registered}/{summary.total} registered
-      </span>
-      <span className="badge badge-ghost badge-sm">
-        {summary.started}/{summary.total} started
-      </span>
       {summary.failed > 0 ? (
         <span className="badge badge-error badge-sm">{summary.failed} failed</span>
       ) : null}
@@ -533,38 +526,33 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
 
   return (
     <div className="flex flex-col gap-3" data-testid="arena-section">
-      <div className="flex flex-wrap items-center gap-3">
-        <div className="min-w-0 flex-1">
-          <h2 className="flex items-center gap-2 text-xl font-black">
-            <FlaskConical className="h-5 w-5" aria-hidden="true" />
-            Multi-player test
-          </h2>
-          <p className="text-sm text-base-content/70">
-            {game !== undefined ? `“${game.title}” · ` : ""}
-            {summary.total} simulated players on this page
-            {stale ? " · testing the editor's previous source" : ""}
-          </p>
+      {/* Quiet arena header: only the stale badge (something needs
+          attention) and the launch-into-party action remain — the stage
+          speaks for itself. */}
+      {stale || game !== undefined ? (
+        <div className="flex flex-wrap items-center gap-3">
+          {stale ? (
+            <span
+              className="badge badge-warning badge-md"
+              title="The editor changed since this test run"
+            >
+              Editor changed — press Run to re-test
+            </span>
+          ) : null}
+          <div className="flex-1" />
+          {game !== undefined ? (
+            <Link
+              to="/party"
+              search={{ gameId: game.id, mode: game.mode ?? "state", title: game.title }}
+              className={buttonStyles("secondary")}
+              title="Launch this game into a real party"
+            >
+              <PartyPopper className="h-4 w-4" aria-hidden="true" />
+              Play with friends
+            </Link>
+          ) : null}
         </div>
-        {stale ? (
-          <span
-            className="badge badge-warning badge-md"
-            title="The editor changed since this test run"
-          >
-            Editor changed — press Run to re-test
-          </span>
-        ) : null}
-        {game !== undefined ? (
-          <Link
-            to="/party"
-            search={{ gameId: game.id, mode: game.mode ?? "state", title: game.title }}
-            className={buttonStyles("secondary")}
-            title="Launch this game into a real party"
-          >
-            <PartyPopper className="h-4 w-4" aria-hidden="true" />
-            Play with friends
-          </Link>
-        ) : null}
-      </div>
+      ) : null}
 
       {summaryBar}
 
