@@ -52,7 +52,7 @@ export function PartyShellHeader({
         <>
           <button
             type="button"
-            className="mt-2 cursor-pointer text-4xl font-black tracking-tight text-base-content sm:text-5xl"
+            className="font-title mt-2 cursor-pointer text-4xl font-black tracking-tight text-base-content sm:text-5xl"
             data-testid="party-title"
             onClick={() => void copyInvite()}
             disabled={inviteUrl === null}

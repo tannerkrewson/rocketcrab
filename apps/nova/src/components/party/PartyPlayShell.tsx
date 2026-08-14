@@ -114,7 +114,7 @@ export function PartyPlayShell({
           <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <button
               type="button"
-              className="whitespace-nowrap font-mono text-sm font-black tracking-wide text-base-content"
+              className="font-title whitespace-nowrap text-sm font-black tracking-wide text-base-content"
               onClick={() => void copyInvite()}
               disabled={state.inviteUrl === null}
               title={state.inviteUrl === null ? roomUrl : "Copy the invite link"}
