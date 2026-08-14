@@ -5,6 +5,10 @@ import type { PartyDiagnostics } from "../../lib/party/engine";
 export interface PartyDiagnosticsPanelProps {
   diagnostics: PartyDiagnostics | null;
   onRefresh: () => void;
+  /** Rendezvous greeter display name (kept accessible here, 10.7). */
+  greeterName?: string | null;
+  /** Current internal authority display name (kept accessible here, 10.7). */
+  authorityName?: string | null;
 }
 
 function connectionLabel(state: string): string {
@@ -27,9 +31,16 @@ function connectionLabel(state: string): string {
 /**
  * Connection diagnostics for the party (P4): relay sockets, join errors,
  * peer latency samples, and the transport's identity — the same telemetry
- * the P1 adapter exposes. Purely informational.
+ * the P1 adapter exposes. Purely informational. The greeter/authority role
+ * summary (10.7) lives here too: those roles are diagnostic until S3
+ * formalizes authority, so the lobby itself no longer shows them.
  */
-export function PartyDiagnosticsPanel({ diagnostics, onRefresh }: PartyDiagnosticsPanelProps) {
+export function PartyDiagnosticsPanel({
+  diagnostics,
+  onRefresh,
+  greeterName,
+  authorityName,
+}: PartyDiagnosticsPanelProps) {
   const [open, setOpen] = useState(false);
   if (diagnostics === null) {
     return null;
@@ -54,6 +65,12 @@ export function PartyDiagnosticsPanel({ diagnostics, onRefresh }: PartyDiagnosti
         </span>
       </summary>
       <div className="collapse-content flex flex-col gap-2 text-xs">
+        {greeterName !== undefined || authorityName !== undefined ? (
+          <div className="flex flex-wrap gap-x-6 gap-y-1 font-mono text-base-content/70">
+            <span>greeter: {greeterName ?? "—"}</span>
+            <span>authority: {authorityName ?? "—"}</span>
+          </div>
+        ) : null}
         <div className="flex flex-wrap gap-x-6 gap-y-1 font-mono text-base-content/70">
           <span>connection: {diagnostics.connectionState}</span>
           <span>connectionId: {diagnostics.selfConnectionId}</span>
