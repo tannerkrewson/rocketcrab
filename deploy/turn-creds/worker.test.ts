@@ -3,7 +3,9 @@ import {
   DEFAULT_ORIGIN_ALLOWLIST,
   MINT_TTL_SECONDS,
   buildMintRequest,
+  filterPort53IceServers,
   handleTurnCredsRequest,
+  isPort53IceUrl,
   normalizeOrigin,
   originAllowed,
   parseAllowlist,
@@ -120,6 +122,83 @@ describe("buildMintRequest", () => {
   });
 });
 
+describe("isPort53IceUrl / filterPort53IceServers (rocketcrab-23s.2)", () => {
+  it("flags only URLs whose port list includes exactly 53", () => {
+    expect(isPort53IceUrl("stun:turn.cloudflare.com:53?transport=udp")).toBe(true);
+    expect(isPort53IceUrl("turn:turn.cloudflare.com:53?transport=udp")).toBe(true);
+    expect(isPort53IceUrl("turns:turn.cloudflare.com:53?transport=tcp")).toBe(true);
+    // The documented primary set must survive: never match inside :5349.
+    expect(isPort53IceUrl("turns:turn.cloudflare.com:5349|443?transport=tcp")).toBe(false);
+    expect(isPort53IceUrl("turn:turn.cloudflare.com:3478?transport=udp")).toBe(false);
+    expect(isPort53IceUrl("turn:turn.cloudflare.com:3478?transport=tcp")).toBe(false);
+    expect(isPort53IceUrl("stun:turn.cloudflare.com:3478?transport=udp")).toBe(false);
+  });
+
+  it("drops port-53 URLs from a minted response and keeps the documented primary set", () => {
+    const body = {
+      iceServers: [
+        {
+          urls: [
+            "stun:turn.cloudflare.com:3478?transport=udp",
+            "turn:turn.cloudflare.com:3478?transport=udp",
+            "turn:turn.cloudflare.com:3478?transport=tcp",
+            "turns:turn.cloudflare.com:5349|443?transport=tcp",
+            "turn:turn.cloudflare.com:53?transport=udp",
+            "turns:turn.cloudflare.com:53?transport=tcp",
+            "stun:turn.cloudflare.com:53?transport=udp",
+          ],
+          username: "u1",
+          credential: "c1",
+        },
+      ],
+      ttl: 600,
+    };
+    const filtered = filterPort53IceServers(body);
+    expect(filtered).toEqual({
+      iceServers: [
+        {
+          urls: [
+            "stun:turn.cloudflare.com:3478?transport=udp",
+            "turn:turn.cloudflare.com:3478?transport=udp",
+            "turn:turn.cloudflare.com:3478?transport=tcp",
+            "turns:turn.cloudflare.com:5349|443?transport=tcp",
+          ],
+          username: "u1",
+          credential: "c1",
+        },
+      ],
+      ttl: 600,
+    });
+    expect(
+      filtered.iceServers?.flatMap((s) => (Array.isArray(s.urls) ? s.urls : [s.urls])),
+    ).not.toEqual(expect.arrayContaining([expect.stringContaining(":53?")]));
+  });
+
+  it("keeps entries whose urls is a single non-53 string and drops 53 ones", () => {
+    const filtered = filterPort53IceServers({
+      iceServers: [
+        { urls: "turn:turn.cloudflare.com:3478?transport=udp", username: "a", credential: "b" },
+        { urls: "stun:turn.cloudflare.com:53?transport=udp", username: "c", credential: "d" },
+      ],
+    });
+    expect(filtered.iceServers).toEqual([
+      { urls: "turn:turn.cloudflare.com:3478?transport=udp", username: "a", credential: "b" },
+    ]);
+  });
+
+  it("removes an entry entirely when all of its urls are port-53", () => {
+    const filtered = filterPort53IceServers({
+      iceServers: [
+        { urls: ["turn:turn.cloudflare.com:53?transport=udp"], username: "x", credential: "y" },
+        { urls: ["turn:turn.cloudflare.com:3478?transport=udp"], username: "z", credential: "w" },
+      ],
+    });
+    expect(filtered.iceServers).toEqual([
+      { urls: ["turn:turn.cloudflare.com:3478?transport=udp"], username: "z", credential: "w" },
+    ]);
+  });
+});
+
 describe("handleTurnCredsRequest (rocketcrab-23s.1: origin allowlist + CORS)", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
@@ -208,6 +287,45 @@ describe("handleTurnCredsRequest (rocketcrab-23s.1: origin allowlist + CORS)", (
       `https://rtc.live.cloudflare.com/v1/turn/keys/${TEST_KEY_ID}/credentials/generate-ice-servers`,
     );
     expect(JSON.parse(String(init?.body))).toEqual({ ttl: MINT_TTL_SECONDS });
+  });
+
+  it("strips port-53 URLs end to end while keeping the primary set and shape", async () => {
+    fetchMock.mockImplementation(
+      async () =>
+        new Response(
+          JSON.stringify({
+            iceServers: [
+              {
+                urls: [
+                  "turn:turn.cloudflare.com:3478?transport=udp",
+                  "turns:turn.cloudflare.com:5349|443?transport=tcp",
+                  "turn:turn.cloudflare.com:53?transport=udp",
+                ],
+                username: "u1",
+                credential: "c1",
+              },
+            ],
+            ttl: 600,
+          }),
+          { status: 200 },
+        ),
+    );
+
+    const res = await handleTurnCredsRequest(mintRequest(ALLOWED_ORIGIN), makeEnv());
+    expect(res.status).toBe(200);
+    const body = (await res.json()) as {
+      iceServers: Array<{ urls: string[]; username: string; credential: string }>;
+    };
+    expect(body.iceServers).toEqual([
+      {
+        urls: [
+          "turn:turn.cloudflare.com:3478?transport=udp",
+          "turns:turn.cloudflare.com:5349|443?transport=tcp",
+        ],
+        username: "u1",
+        credential: "c1",
+      },
+    ]);
   });
 
   it("returns 502 with a structured error when the upstream call throws", async () => {
