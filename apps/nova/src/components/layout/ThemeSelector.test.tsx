@@ -34,20 +34,45 @@ describe("ThemeSelector (rocketcrab-9fv.7.45)", () => {
 
   it("defaults to light (system) with no stored theme and no override applied", () => {
     render(<ThemeSelector />);
-    expect(screen.getByRole("button", { name: "Light" })).toHaveAttribute("aria-pressed", "true");
-    expect(screen.getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "false");
+    expect(screen.getByRole("button", { name: "Light theme" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
+    expect(screen.getByRole("button", { name: "Dark theme" })).toHaveAttribute(
+      "aria-pressed",
+      "false",
+    );
     expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
+  });
+
+  it("is icon-only with no visible Light/Dark labels (7.47)", () => {
+    render(<ThemeSelector />);
+    expect(screen.queryByText("Light")).not.toBeInTheDocument();
+    expect(screen.queryByText("Dark")).not.toBeInTheDocument();
+    // The controls stay keyboard- and screen-reader accessible via labels.
+    expect(screen.getByRole("button", { name: "Light theme" })).toHaveAttribute(
+      "title",
+      "Light theme",
+    );
+    expect(screen.getByRole("button", { name: "Dark theme" })).toHaveAttribute(
+      "title",
+      "Dark theme",
+    );
+    expect(screen.getByRole("button", { name: "Random theme" })).toBeInTheDocument();
   });
 
   it("defaults to dark when the system prefers dark and nothing is stored", () => {
     mockSystemDark(true);
     render(<ThemeSelector />);
-    expect(screen.getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Dark theme" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
   });
 
   it("applies and persists Nova's dark theme when Dark is picked", () => {
     render(<ThemeSelector />);
-    fireEvent.click(screen.getByRole("button", { name: "Dark" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dark theme" }));
     expect(document.documentElement.getAttribute("data-theme")).toBe(DEFAULT_DARK_THEME_ID);
     expect(window.localStorage.getItem("nova.theme")).toBe(DEFAULT_DARK_THEME_ID);
   });
@@ -55,7 +80,7 @@ describe("ThemeSelector (rocketcrab-9fv.7.45)", () => {
   it("applies and persists Nova's light theme when Light is picked", () => {
     window.localStorage.setItem("nova.theme", "dracula");
     render(<ThemeSelector />);
-    fireEvent.click(screen.getByRole("button", { name: "Light" }));
+    fireEvent.click(screen.getByRole("button", { name: "Light theme" }));
     expect(document.documentElement.getAttribute("data-theme")).toBe(DEFAULT_LIGHT_THEME_ID);
     expect(window.localStorage.getItem("nova.theme")).toBe(DEFAULT_LIGHT_THEME_ID);
   });
@@ -75,7 +100,7 @@ describe("ThemeSelector (rocketcrab-9fv.7.45)", () => {
   it("rolls a random dark theme matching the dark mode and persists it", () => {
     vi.spyOn(Math, "random").mockReturnValue(0.5);
     render(<ThemeSelector />);
-    fireEvent.click(screen.getByRole("button", { name: "Dark" }));
+    fireEvent.click(screen.getByRole("button", { name: "Dark theme" }));
     fireEvent.click(screen.getByRole("button", { name: "Random theme" }));
     const applied = document.documentElement.getAttribute("data-theme");
     expect(applied).not.toBeNull();
@@ -88,7 +113,10 @@ describe("ThemeSelector (rocketcrab-9fv.7.45)", () => {
   it("reflects a persisted random theme on mount", () => {
     window.localStorage.setItem("nova.theme", "synthwave");
     render(<ThemeSelector />);
-    expect(screen.getByRole("button", { name: "Dark" })).toHaveAttribute("aria-pressed", "true");
+    expect(screen.getByRole("button", { name: "Dark theme" })).toHaveAttribute(
+      "aria-pressed",
+      "true",
+    );
     expect(document.documentElement.getAttribute("data-theme")).toBe("synthwave");
   });
 });

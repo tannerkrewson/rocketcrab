@@ -1,27 +1,19 @@
 import { Link, Outlet, useLocation } from "@tanstack/react-router";
 import { ThemeSelector } from "./ThemeSelector";
 
-interface FooterLink {
-  to: "/" | "/build" | "/browse" | "/library" | "/join" | "/about";
-  label: string;
-}
-
-/** Every non-party page stays reachable from the shared footer (7.34). */
-const footerLinks: FooterLink[] = [
-  { to: "/", label: "Home" },
-  { to: "/build", label: "Build" },
-  { to: "/browse", label: "Games" },
-  { to: "/library", label: "Library" },
-  { to: "/join", label: "Join" },
-  { to: "/about", label: "About" },
-];
-
 /**
- * App-wide shell (7.34/7.36): a single consistent page column plus a minimal
- * shared footer (site links + theme toggle). The navbar and mobile bottom
- * nav are gone; every non-party page inherits the footer automatically.
+ * App-wide shell (7.34/7.36, footer removed in 7.47): a slim sticky top bar
+ * (wordmark home link + icon-only theme/color controls) above a single
+ * consistent page column. There is no footer and no bottom nav; every
+ * non-party page inherits the top bar, so the theme controls and a way
+ * home stay reachable from anywhere.
+ *
  * Party routes (/join, /party, /play) render their own classic party-shell
- * chrome, so the app footer is skipped there (7.22).
+ * chrome, so the wordmark bar is skipped there (7.22); they get a compact
+ * floating theme control in the top-right corner instead, so the controls
+ * stay reachable on every page. The full-screen play shell (fixed, z-40)
+ * covers that floating control while a game is live, exactly as it covers
+ * all other app chrome.
  */
 export function AppLayout() {
   const location = useLocation();
@@ -32,33 +24,33 @@ export function AppLayout() {
 
   return (
     <div className="flex min-h-screen flex-col bg-base-200 text-base-content">
+      {isPartyRoute ? (
+        <div
+          className="fixed right-3 top-[max(0.75rem,env(safe-area-inset-top))] z-30 rounded-box border-2 border-base-300 bg-base-100 p-1 shadow-md"
+          data-testid="party-route-theme-control"
+        >
+          <ThemeSelector />
+        </div>
+      ) : (
+        <header className="sticky top-0 z-40 border-b-2 border-base-300 bg-base-100">
+          <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-3">
+            <Link
+              to="/"
+              className="flex items-center gap-2 text-sm font-black tracking-tight text-base-content transition-opacity hover:opacity-70"
+            >
+              <span className="text-xl leading-none" aria-hidden="true">
+                🦀🚀
+              </span>
+              <span>Rocketcrab Nova</span>
+            </Link>
+            <ThemeSelector />
+          </div>
+        </header>
+      )}
+
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-12 pt-6">
         <Outlet />
       </main>
-
-      {isPartyRoute ? null : (
-        <footer className="border-t-2 border-base-300 bg-base-100">
-          <div className="mx-auto flex w-full max-w-5xl flex-col gap-4 px-4 py-6">
-            <nav aria-label="Footer" className="flex flex-wrap gap-x-6 gap-y-2">
-              {footerLinks.map((link) => (
-                <Link
-                  key={link.to}
-                  to={link.to}
-                  className="text-sm font-bold text-base-content/70 transition-colors hover:text-base-content"
-                >
-                  {link.label}
-                </Link>
-              ))}
-            </nav>
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <p className="text-xs text-base-content/50">
-                Rocketcrab Nova — party games for phones
-              </p>
-              <ThemeSelector />
-            </div>
-          </div>
-        </footer>
-      )}
     </div>
   );
 }

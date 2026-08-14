@@ -62,4 +62,10 @@ describe("styles.css theme setup", () => {
     // Near-white content on black.
     expect(dark).toMatch(/--color-base-content: oklch\((9[0-9]|100)% 0 0\)/);
   });
+
+  it("applies Mukta as the single UI font (10.2)", () => {
+    // The sans stack is overridden in @theme so html/body and every daisyUI
+    // component inherit Mukta (weights 400-800 are imported in main.tsx).
+    expect(styles).toContain('--font-sans: "Mukta", ui-sans-serif, system-ui, sans-serif;');
+  });
 });
