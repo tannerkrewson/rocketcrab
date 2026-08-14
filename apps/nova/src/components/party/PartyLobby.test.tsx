@@ -411,14 +411,20 @@ describe("PartyLobby", () => {
     expect(screen.queryByRole("button", { name: /browse games/i })).not.toBeInTheDocument();
   });
 
-  it("edits the player name from the player's own tile pencil (7.5/10.8)", async () => {
+  it("edits the player name with the join screen's name UI (7.5/10.8/11.10)", async () => {
     const onEditName = vi.fn();
     await renderLobby(makeState(), { onEditName });
     // The "You are playing as" line and its separate Edit name button are gone.
     expect(screen.queryByText(/you are playing as/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^edit name$/i })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /edit your name/i }));
+    // 11.10: the lobby reuses the join screen's name-entry presentation —
+    // the visible "Your name" label, the UserRound icon input (pl-10),
+    // and maxLength 24 — not a bespoke mini-form.
     const input = screen.getByLabelText("Your player name");
+    expect(screen.getByText("Your name")).toBeInTheDocument();
+    expect(input).toHaveAttribute("maxlength", "24");
+    expect(input.className).toContain("pl-10");
     await userEvent.clear(input);
     await userEvent.type(input, "Grace");
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
