@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "../../lib/cn";
+import { BrandLogo } from "../layout/BrandLogo";
 import { buttonStyles } from "../ui/Button";
 import { ErrorPanel } from "../ui/ErrorPanel";
 import { LoadingState } from "../ui/LoadingState";
@@ -155,14 +156,17 @@ function SavedGameRow({
   );
 }
 
-/** One category card (10.9): emoji + label + count, like the classic boxes. */
+/** One category card (10.9): emoji + label + count, like the classic boxes.
+ * The Nova box swaps the emoji for the real crab/rocket SVG mark (11.2). */
 function CategoryCard({
   emoji,
+  icon,
   label,
   count,
   onClick,
 }: {
-  emoji: string;
+  emoji?: string;
+  icon?: "brand";
   label: string;
   count: number | null;
   onClick: () => void;
@@ -173,9 +177,13 @@ function CategoryCard({
       onClick={onClick}
       className="flex flex-col gap-1 rounded-box border-2 border-base-300 bg-base-100 p-3 text-left transition-colors hover:border-primary"
     >
-      <span className="text-2xl" aria-hidden="true">
-        {emoji}
-      </span>
+      {icon === "brand" ? (
+        <BrandLogo size={22} />
+      ) : (
+        <span className="text-2xl" aria-hidden="true">
+          {emoji}
+        </span>
+      )}
       <span className="font-black">{label}</span>
       <span className="text-xs font-semibold text-base-content/50">{count ?? "…"}</span>
     </button>
@@ -261,6 +269,7 @@ export function GameBrowser({ onPick, onPickSaved, compact = false }: GameBrowse
             <CategoryCard
               key={box.id}
               emoji={box.emoji}
+              icon={box.icon}
               label={box.label}
               count={categoryCount(box.match, BROWSE_GAMES)}
               onClick={() => setView(box.id)}

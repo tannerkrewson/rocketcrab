@@ -44,10 +44,13 @@ describe("/", () => {
   it("shows the brand header: logo, title, tagline, and the Introducing Nova alert", async () => {
     renderHome();
     expect(await screen.findByRole("heading", { name: "rocketcrab.com" })).toBeInTheDocument();
-    expect(screen.getByRole("img", { name: "Rocketcrab logo" })).toHaveAttribute(
-      "src",
-      "/crab.svg",
-    );
+    // The brand mark is the real rocket + crab SVG pair (11.2) — decorative
+    // behind the h1 (aria-hidden), never the 🦀🚀 emoji pair.
+    const logo = screen.getByTestId("brand-logo");
+    expect(logo.querySelector('img[src="/rocket.svg"]')).not.toBeNull();
+    expect(logo.querySelector('img[src="/crab.svg"]')).not.toBeNull();
+    expect(screen.queryByText("🦀")).not.toBeInTheDocument();
+    expect(screen.queryByText("🚀")).not.toBeInTheDocument();
     expect(screen.getByText("party games for phones")).toBeInTheDocument();
     const alert = screen.getByRole("status");
     expect(within(alert).getByText("Introducing Nova")).toBeInTheDocument();
