@@ -37,6 +37,29 @@ describe("/library", () => {
     expect(await screen.findByText("No saved games yet")).toBeInTheDocument();
   });
 
+  it("links back home and offers equal-sized browse/build actions", async () => {
+    // Seed a game so the empty-state CTA (a second "Build a game" link)
+    // does not collide with the header action under test.
+    await gameRepository.create({ title: "Rockets", html: "<p>a</p>" });
+    renderLibrary();
+
+    // The Home link (rocketcrab-9fv.11.13) keeps the page reachable from
+    // the homepage now that the shared footer is gone.
+    const home = await screen.findByRole("link", { name: "Home" });
+    expect(home.getAttribute("href")).toBe("/");
+    expect(home.className).toContain("btn-outline");
+    expect(home.className).toContain("self-start");
+
+    // "Browse games" and "Build a game" share the same variant and size
+    // (rocketcrab-9fv.11.13) so the header actions render consistently.
+    const browse = screen.getByRole("link", { name: "Browse games" });
+    const build = screen.getByRole("link", { name: "Build a game" });
+    expect(browse.className).toContain("btn-primary");
+    expect(browse.className).toContain("btn-lg");
+    expect(build.className).toContain("btn-primary");
+    expect(build.className).toContain("btn-lg");
+  });
+
   it("lists saved games with their metadata", async () => {
     await gameRepository.create({
       title: "Rocket Rumble",
