@@ -372,10 +372,11 @@ export function PartyLobby({
           <span className="text-sm font-semibold">{state.startBlockedReason}</span>
         </div>
       ) : null}
-      {/* 10.8: the classic player grid — 2 columns of rounded tiles, each
-          with a centered name, a pencil (own tile = edit name), a small
-          role-labels line ("You, Host" style), a per-player border color,
-          and tiny status indicators (connection, ready, transfer). */}
+      {/* 10.8 / 11.9: the classic player grid — 2 columns of rounded tiles,
+          each with a centered name, a pencil (own tile = edit name), a
+          small role-labels line ("You, Host" style), a per-player border
+          color, and ONE meaningful status: the connection dot + the
+          transfer state (progress bar / failure / waiting). */}
       <details
         className="collapse collapse-arrow rounded-box border-2 border-base-300 bg-base-100"
         open
