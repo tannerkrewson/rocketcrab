@@ -76,6 +76,16 @@ on:
         required: false
         type: string
         default: ""
+      turn_creds_origin:
+        description: >-
+          (nova only) Origin of the TURN credential mint worker (P0,
+          rocketcrab-23s), e.g. https://rocketcrab-turn-creds.<account>.workers.dev.
+          Baked into the build as VITE_TURN_CREDS_ORIGIN and allowlisted in
+          the app CSP connect-src so the join-time mint fetch works. Empty
+          disables TURN entirely (parties work exactly as before).
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -109,6 +119,7 @@ jobs:
           VITE_RUNTIME_ORIGIN: ${{ inputs.runtime_origin }}
           VITE_RUNTIME_BASE: ${{ inputs.runtime_base }}
           VITE_CLASSIC_RELAY_ORIGIN: ${{ inputs.relay_origin }}
+          VITE_TURN_CREDS_ORIGIN: ${{ inputs.turn_creds_origin }}
 
       - name: Build Runtime origin
         if: inputs.origin == 'runtime'

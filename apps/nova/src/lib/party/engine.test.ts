@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The complete S4 example game document, verbatim (Vite ?raw import).
 import EXAMPLE_GAME_SOURCE from "../../../../../examples/games/nova-quiz.html?raw";
 import { parseInviteFragment, type PartyTransportFactory } from "@rocketcrab/party";
@@ -8,6 +8,21 @@ import type { ChannelPort } from "../runtime-host";
 import { PartyEngine, type PartyRuntimeSeams } from "./engine";
 import { createMemoryLifecycleSource } from "./lifecycle";
 import { clearPartyRecovery, readPartyRecovery } from "./party-recovery";
+import type { TurnCredentialsResult } from "./turn-creds";
+
+/**
+ * The default-factory path is mocked so the TURN acceptance tests can
+ * observe what config the engine bakes into the factory without building
+ * real Trystero rooms. Tests that inject a transportFactory (the in-memory
+ * hub) never call this mock.
+ */
+const transportFactoryMocks = vi.hoisted(() => ({
+  createTrysteroPartyTransportFactory: vi.fn(),
+}));
+
+vi.mock("./transport-factory", () => ({
+  createTrysteroPartyTransportFactory: transportFactoryMocks.createTrysteroPartyTransportFactory,
+}));
 
 /**
  * P4 party-engine integration tests: the complete user-facing party flow
@@ -1232,5 +1247,129 @@ describe("party engine — classic games, kick, and reload (7.7.4, 7.29)", () =>
     await settle(world);
     const sentB = b.harness.port1.sent as Array<{ type: string }>;
     expect(sentB.some((message) => message.type === "runtime.reload")).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// TURN credential minting (P0, beads rocketcrab-23s)
+//
+// The engine mints short-lived TURN credentials at setup start (once, cached
+// on success) and bakes them into the default Trystero transport factory.
+// A mint outage NEVER blocks a party: it proceeds without TURN and records
+// a warn notice + diagnostics flag. These tests drive the DEFAULT factory
+// path (no injected transportFactory) with the factory mock returning the
+// in-memory world factory, so the whole create flow runs end to end.
+// ---------------------------------------------------------------------------
+
+describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+    transportFactoryMocks.createTrysteroPartyTransportFactory.mockReset();
+  });
+
+  /** A player on the DEFAULT factory path (mocked to the in-memory hub). */
+  function makeDefaultFactoryPlayer(
+    world: World,
+    overrides: ConstructorParameters<typeof PartyEngine>[0] = {},
+  ): Player {
+    transportFactoryMocks.createTrysteroPartyTransportFactory.mockReturnValue(world.factory);
+    // NOTE: no transportFactory injected — the engine must resolve the
+    // default factory itself, minting TURN credentials on the way.
+    // (`transportFactory: undefined` neutralizes makePlayer's default.)
+    return makePlayer(world, "host", { transportFactory: undefined, ...overrides });
+  }
+
+  it("env unset → no mint fetch, no TURN wiring, no notice (works as today)", async () => {
+    const world = makeWorld();
+    const fetchSpy = vi.fn();
+    vi.stubGlobal("fetch", fetchSpy);
+    // No VITE_TURN_CREDS_ORIGIN stub → unconfigured build; the real mint
+    // client short-circuits before touching fetch.
+    const player = makeDefaultFactoryPlayer(world);
+    await runCreate(player, world);
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenCalledWith();
+    const state = player.engine.getState();
+    expect(state.phase).toBe("lobby");
+    expect(state.notices.some((notice) => notice.message.includes("TURN"))).toBe(false);
+    expect(state.diagnostics?.turn).toBe("disabled");
+  });
+
+  it("mint success → turnConfig baked into the default factory + configured diagnostic", async () => {
+    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", "https://turn-creds.example.workers.dev");
+    const world = makeWorld();
+    const turnConfig = [
+      {
+        urls: ["turn:turn.cloudflare.com:3478?transport=udp"],
+        username: "u1",
+        credential: "c1",
+      },
+    ];
+    const player = makeDefaultFactoryPlayer(world, {
+      turnCreds: async (): Promise<TurnCredentialsResult> => ({ ok: true, turnConfig }),
+    });
+    await runCreate(player, world);
+
+    expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenCalledWith({
+      turnConfig,
+    });
+    const state = player.engine.getState();
+    expect(state.phase).toBe("lobby");
+    expect(state.diagnostics?.turn).toBe("configured");
+    expect(state.notices.some((notice) => notice.message.includes("TURN"))).toBe(false);
+  });
+
+  it("mint failure (network/403/5xx/timeout) → party still creates WITHOUT TURN + warn notice", async () => {
+    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", "https://turn-creds.example.workers.dev");
+    const world = makeWorld();
+    const player = makeDefaultFactoryPlayer(world, {
+      turnCreds: async (): Promise<TurnCredentialsResult> => ({
+        ok: false,
+        reason: "the mint returned HTTP 403.",
+      }),
+    });
+    await runCreate(player, world);
+
+    expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenCalledWith();
+    const state = player.engine.getState();
+    expect(state.phase).toBe("lobby");
+    expect(state.diagnostics?.turn).toBe("unavailable");
+    expect(
+      state.notices.some((notice) =>
+        notice.message.includes("TURN credentials unavailable (the mint returned HTTP 403.)"),
+      ),
+    ).toBe(true);
+  });
+
+  it("mints ONCE and reuses the cached turnConfig across setup attempts", async () => {
+    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", "https://turn-creds.example.workers.dev");
+    const world = makeWorld();
+    const turnConfig = [
+      {
+        urls: ["turn:turn.cloudflare.com:3478?transport=udp"],
+        username: "u1",
+        credential: "c1",
+      },
+    ];
+    const turnCreds = vi.fn(
+      async (): Promise<TurnCredentialsResult> => ({
+        ok: true,
+        turnConfig,
+      }),
+    );
+    const player = makeDefaultFactoryPlayer(world, { turnCreds });
+    await runCreate(player, world);
+    expect(turnCreds).toHaveBeenCalledTimes(1);
+
+    // Leave and create a second party on the same engine (the page
+    // singleton semantics): the cached minted config is reused.
+    await player.engine.leaveParty();
+    await runCreate(player, world);
+    expect(turnCreds).toHaveBeenCalledTimes(1);
+    expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenLastCalledWith({
+      turnConfig,
+    });
   });
 });

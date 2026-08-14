@@ -69,13 +69,21 @@ function cspMetaPlugin(): Plugin {
       // games keep their documented direct-fetch behavior until then.
       const relayOrigin = process.env.VITE_CLASSIC_RELAY_ORIGIN?.trim() ?? "";
       const relayConnectSrc = relayOrigin === "" ? "" : ` ${new URL(relayOrigin).origin}`;
+      // TURN credential mint origin (P0, rocketcrab-23s): same pattern —
+      // when the deploy workflow sets VITE_TURN_CREDS_ORIGIN, allow the
+      // mint in connect-src so the join-time fetch can read its response
+      // under the strict CSP. Empty by default: builds without the env var
+      // never fetch TURN credentials at all.
+      const turnCredsOrigin = process.env.VITE_TURN_CREDS_ORIGIN?.trim() ?? "";
+      const turnCredsConnectSrc =
+        turnCredsOrigin === "" ? "" : ` ${new URL(turnCredsOrigin).origin}`;
       const csp = [
         "default-src 'self'",
         "script-src 'self'",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob:",
         "font-src 'self' data:",
-        `connect-src 'self' wss: ws:${relayConnectSrc}`,
+        `connect-src 'self' wss: ws:${relayConnectSrc}${turnCredsConnectSrc}`,
         "media-src 'self' blob:",
         "worker-src 'self' blob:",
         "object-src 'none'",

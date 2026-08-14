@@ -59,6 +59,7 @@ export function PartyDiagnosticsPanel({ diagnostics, onRefresh }: PartyDiagnosti
           <span>connectionId: {diagnostics.selfConnectionId}</span>
           <span>room: {diagnostics.room}</span>
           <span>session: {diagnostics.sessionId ?? "—"}</span>
+          <span title="TURN credential state (P0)">turn: {diagnostics.turn ?? "—"}</span>
         </div>
         {diagnostics.relays !== null ? (
           <div className="flex flex-col gap-1">
