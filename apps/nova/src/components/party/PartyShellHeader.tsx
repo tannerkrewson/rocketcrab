@@ -12,26 +12,32 @@ export interface PartyShellHeaderProps {
 }
 
 /**
- * Classic-style party shell header (7.22): the rocket + crab logo with a
- * large mono room code that copies the invite link on click, and the
- * lowercase phonetic spelling of the code underneath — the classic
- * rocketcrab MainTitle ported to Nova's shell.
+ * Classic-style party shell header (7.22 / 11.6): the rocket + crab logo
+ * with the lobby page title — ONE "rocketcrab.com/abcd" string (origin +
+ * lowercase code) styled like the homepage title. Tapping the title copies
+ * the invite link to the clipboard (cursor + title attribute hint that it
+ * is copyable), and the lowercase phonetic spelling of the code sits
+ * underneath — the classic rocketcrab MainTitle ported to Nova's shell.
  *
+ * The four-letter code is never shown separately from the title, and the
+ * full invite URL (session secret) never appears on the page (ADR-0011).
  * The invite details (QR / URL / copy row) live in the lobby's invite card
  * (10.5) instead of the header: the header stays the classic identity —
- * big code + phonetic only. Only the code and origin are ever rendered; the
- * full invite URL (session secret) never appears on the page (ADR-0011).
+ * one title + phonetic only.
  */
 export function PartyShellHeader({
   code,
   inviteUrl,
   disablePhonetic = false,
 }: PartyShellHeaderProps) {
+  const pageTitle =
+    code === null || code === undefined ? null : `${window.location.host}/${code.toLowerCase()}`;
+
   const copyInvite = async () => {
     if (inviteUrl === null || inviteUrl === undefined) return;
     const ok = await writeToClipboard(inviteUrl);
     if (ok) {
-      toast.success("Invite link copied.");
+      toast.success("Invite title copied.");
     } else {
       toast.error("Couldn't copy the link — try the Copy URL button in the lobby.");
     }
@@ -42,24 +48,24 @@ export function PartyShellHeader({
       <p className="text-4xl leading-none" aria-hidden="true">
         🦀🚀
       </p>
-      {code !== null && code !== undefined ? (
+      {pageTitle !== null ? (
         <>
           <button
             type="button"
-            className="mt-2 font-mono text-4xl font-black tracking-[0.25em] text-primary sm:text-5xl"
-            data-testid="party-code"
+            className="mt-2 cursor-pointer text-4xl font-black tracking-tight text-base-content sm:text-5xl"
+            data-testid="party-title"
             onClick={() => void copyInvite()}
             disabled={inviteUrl === null}
-            title={inviteUrl === null ? code : "Copy the invite link"}
-            aria-label={`Party code ${code}`}
+            title={inviteUrl === null ? pageTitle : "Copy the invite link"}
+            aria-label={`Party title ${pageTitle}`}
           >
-            {code}
+            {pageTitle}
           </button>
           {/* 7.47: phonetic words stay lowercase ("(xray alpha bravo
               yankee)") — the `uppercase` class is intentionally absent. */}
           {!disablePhonetic ? (
             <p className="text-xs font-semibold tracking-widest text-base-content/60">
-              ({phoneticSpelling(code)})
+              ({phoneticSpelling(code ?? "")})
             </p>
           ) : null}
         </>
