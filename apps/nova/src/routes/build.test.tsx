@@ -9,10 +9,11 @@ import { readDraftSource, storeDraftSource } from "../lib/editor/draft-handoff";
 import { routeTree } from "../routeTree.gen";
 
 /**
- * Generator page tests (A4): the /build route presents the generated master
- * prompt, the copy button with success feedback, a link to the GitHub-hosted
- * API reference, the examples link, and the open-the-editor action (7.44:
- * no AI-slop prose, no paste box — the user pastes directly in the editor).
+ * Build-page gateway tests (rocketcrab-9fv.10.11): the centered /build route
+ * introduces the master-prompt flow in three steps, offers the copyable
+ * master prompt as the main call to action, links to the GitHub-hosted API
+ * reference and example games, and opens a blank editor without a stale
+ * draft (7.44: no paste box — the user pastes directly in the editor).
  */
 
 const PROMPT = buildMasterPrompt();
@@ -54,7 +55,22 @@ afterEach(() => {
   delete (navigator as { clipboard?: unknown }).clipboard;
 });
 
-describe("/build — master prompt generator", () => {
+describe("/build — build a game gateway", () => {
+  it("introduces the master-prompt flow with a hero and three steps", async () => {
+    renderBuild();
+
+    expect(await screen.findByRole("heading", { name: "Build a game" })).toBeInTheDocument();
+    expect(screen.getByText(/You bring the idea — the AI writes the code/)).toBeInTheDocument();
+
+    // The three-step flow is spelled out in order.
+    const steps = screen.getByRole("list", { name: "How to build a game" });
+    const items = within(steps).getAllByRole("listitem");
+    expect(items).toHaveLength(3);
+    expect(within(items[0]!).getByText("Get the prompt")).toBeInTheDocument();
+    expect(within(items[1]!).getByText("Describe your game")).toBeInTheDocument();
+    expect(within(items[2]!).getByText("Paste it in the editor")).toBeInTheDocument();
+  });
+
   it("presents the generated prompt with the embedded API reference", async () => {
     renderBuild();
 
@@ -107,8 +123,10 @@ describe("/build — master prompt generator", () => {
     expect(screen.getByText("Chatter (raw mode sample)")).toBeInTheDocument();
   });
 
-  it("has no AI-slop prose and no paste box (7.44)", async () => {
+  it("keeps the editor as the paste target — no paste box on this page (7.44)", async () => {
     renderBuild();
+
+    await screen.findByRole("heading", { name: "Build a game" });
 
     // The paste-your-HTML-here flow is gone; the user pastes in the editor.
     expect(screen.queryByTestId("paste-target")).not.toBeInTheDocument();
