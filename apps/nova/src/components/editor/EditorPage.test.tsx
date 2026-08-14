@@ -54,12 +54,14 @@ interface HostHarness {
   windowMessages: Array<{ data: unknown }>;
   frames: HTMLIFrameElement[];
   channels: Array<{ port1: FakePort; port2: FakePort }>;
-  port1: FakePort;
-  bootstraps: Record<string, unknown>[];
-  ready(): void;
-  register(title: string, gameMode?: string): void;
-  runtimeError(category: string, message: string): void;
-  console(level: string, message: string): void;
+  /** Deliver runtime.ready to ONE channel — the runtime session's channel,
+   *  identified by its index (see runtimeChannelIndex). The arena's
+   *  simulated players share the same fake host, so these helpers never
+   *  target at(-1) blindly. */
+  ready(index: number): void;
+  register(index: number, title: string, gameMode?: string): void;
+  runtimeError(index: number, category: string, message: string): void;
+  console(index: number, level: string, message: string): void;
 }
 
 /** Fake host matching RuntimeHostClient's seams; a fresh channel per load. */
@@ -86,16 +88,8 @@ function createHostHarness(): HostHarness {
     windowMessages,
     frames,
     channels,
-    get port1() {
-      return channels.at(-1)!.port1;
-    },
-    get bootstraps() {
-      return windowMessages
-        .map((message) => message.data as Record<string, unknown>)
-        .filter((message) => message.type === "runtime.bootstrap");
-    },
-    ready() {
-      deliver(harness.port1, {
+    ready(index: number) {
+      deliver(harness.channels[index]!.port1, {
         version: 1,
         runtimeInstanceId: "runtime-1",
         messageId: "message-ready",
@@ -104,8 +98,8 @@ function createHostHarness(): HostHarness {
         status: "ready",
       });
     },
-    register(title: string, gameMode = "state") {
-      deliver(harness.port1, {
+    register(index: number, title: string, gameMode = "state") {
+      deliver(harness.channels[index]!.port1, {
         version: 1,
         runtimeInstanceId: "runtime-1",
         messageId: "message-reg",
@@ -116,8 +110,8 @@ function createHostHarness(): HostHarness {
         gameMode,
       });
     },
-    runtimeError(category: string, message: string) {
-      deliver(harness.port1, {
+    runtimeError(index: number, category: string, message: string) {
+      deliver(harness.channels[index]!.port1, {
         version: 1,
         runtimeInstanceId: "runtime-1",
         messageId: "message-err",
@@ -127,8 +121,8 @@ function createHostHarness(): HostHarness {
         message,
       });
     },
-    console(level: string, message: string) {
-      deliver(harness.port1, {
+    console(index: number, level: string, message: string) {
+      deliver(harness.channels[index]!.port1, {
         version: 1,
         runtimeInstanceId: "runtime-1",
         messageId: "message-console",
@@ -188,6 +182,29 @@ function mockClipboard(text: string) {
   return { readText, writeText };
 }
 
+/** Only the single-player runtime session's bootstraps (the arena's
+ *  simulated players use member-1/member-2). */
+function runtimeBootstraps(harness: HostHarness) {
+  return harness.windowMessages
+    .map((message) => message.data as Record<string, unknown>)
+    .filter(
+      (message) =>
+        message.type === "runtime.bootstrap" &&
+        (message.player as { memberId?: string })?.memberId === "local-creator",
+    );
+}
+
+/**
+ * Wait until the runtime has bootstrapped `count` times, then return the
+ * index of its just-created channel. The runtime's channel is the last one
+ * at that moment: the arena restarts only after a run resolves (Task 1
+ * handleRun), so no arena restart channels exist yet.
+ */
+async function runtimeChannelIndex(harness: HostHarness, count = 1): Promise<number> {
+  await vi.waitFor(() => expect(runtimeBootstraps(harness)).toHaveLength(count));
+  return harness.channels.length - 1;
+}
+
 /** Query the currently mounted layout subtree (re-queried after navigation). */
 async function layout(layout: "desktop-layout" | "mobile-layout") {
   const element = await screen.findByTestId(layout);
@@ -227,21 +244,27 @@ describe("/editor — paste, run, save", () => {
 
     // Run the pasted source: a fresh runtime frame is bootstrapped.
     await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
-    await vi.waitFor(() => expect(harness.bootstraps).toHaveLength(1));
-    expect(harness.bootstraps[0]?.gameSource).toBe(PASTED_SOURCE);
-    expect(harness.bootstraps[0]?.gameId).toMatch(/^draft-/);
-    expect(harness.bootstraps[0]?.player).toEqual({
+    const runtimeIndex = await runtimeChannelIndex(harness);
+    expect(runtimeBootstraps(harness)[0]?.gameSource).toBe(PASTED_SOURCE);
+    expect(runtimeBootstraps(harness)[0]?.gameId).toMatch(/^draft-/);
+    expect(runtimeBootstraps(harness)[0]?.player).toEqual({
       memberId: "local-creator",
       displayName: "You",
     });
 
-    harness.ready();
-    await waitFor(() => expect(desktop.getByText("Running")).toBeInTheDocument());
-    expect(document.querySelectorAll("iframe")).toHaveLength(1);
+    harness.ready(runtimeIndex);
+    await waitFor(() =>
+      expect(desktop.getByRole("button", { name: /^Re-run$/ })).toBeInTheDocument(),
+    );
+    // The single-player runtime frame lives in the hidden diagnostics
+    // container; the arena's player frames live in the grid below.
+    expect(
+      document.querySelectorAll('[data-testid="hidden-runtime-container"] iframe'),
+    ).toHaveLength(1);
 
     // The game registers; console output lands in the diagnostics panel.
-    harness.register("Card Sharks");
-    harness.console("log", "dealt 5 cards");
+    harness.register(runtimeIndex, "Card Sharks");
+    harness.console(runtimeIndex, "log", "dealt 5 cards");
     await waitFor(() => expect(desktop.getByText("dealt 5 cards")).toBeInTheDocument());
 
     // Save creates the game and navigates to its edit route.
@@ -261,46 +284,45 @@ describe("/editor — paste, run, save", () => {
     expect(reopened.textContent).toContain("cards");
   });
 
-  it("test-multiplayer mounts the arena on the same page with the current source", async () => {
+  it("mounts the test arena by default and seeds it with the saved source", async () => {
     const game = await gameRepository.create({ title: "Rocket Rumble", html: SAVED_SOURCE });
     mockClipboard(PASTED_SOURCE);
     const harness = createHostHarness();
     renderEditor([`/games/${game.id}/edit`], harness);
 
-    const desktop = await layout("desktop-layout");
-    const editor = desktop.getByRole("textbox", { name: "Game HTML source" });
-    await waitFor(() => expect(editor.textContent).toContain("rockets"));
-    // Paste unsaved source, then test it multiplayer.
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
-    await waitFor(() => expect(editor.textContent).toContain("cards"));
-    await userEvent.click(desktop.getByRole("button", { name: /Test multiplayer/ }));
+    // The arena is live on load — no Test-multiplayer press needed.
+    const arena = within(await screen.findByTestId("arena-section"));
+    const grid = within(arena.getByTestId("arena-grid"));
+    expect(grid.getByText("Player 1")).toBeInTheDocument();
+    expect(grid.getByText("Player 2")).toBeInTheDocument();
 
-    // The arena opens in place on the same page (no navigation, no
-    // sessionStorage handoff) and runs the CURRENT (unsaved) source.
-    await screen.findByTestId("arena-section");
-    expect(screen.queryByTestId("phone-prompt")).toBeInTheDocument();
-    expect(sessionStorage.getItem("nova:arena-source:v1")).toBeNull();
+    // It runs the seeded (saved) source: every simulated player bootstraps
+    // it, on the same page (no navigation, no sessionStorage handoff).
     await runToStart(harness.channels, 2);
-    const bootstraps = harness.windowMessages
+    const arenaBootstraps = harness.windowMessages
       .map((message) => message.data as Record<string, unknown>)
       .filter((message) => message.type === "runtime.bootstrap");
-    expect(bootstraps[0]?.gameSource).toBe(PASTED_SOURCE);
+    expect(arenaBootstraps).toHaveLength(2);
+    expect(arenaBootstraps[0]?.gameSource).toBe(SAVED_SOURCE);
+    expect(arenaBootstraps[1]?.gameSource).toBe(SAVED_SOURCE);
+    expect(sessionStorage.getItem("nova:arena-source:v1")).toBeNull();
     // The saved version is untouched.
     expect((await gameRepository.read(game.id)).html).toBe(SAVED_SOURCE);
   });
 
-  it("test-multiplayer is gated on validation errors", async () => {
+  it("Run is gated on validation errors", async () => {
     mockClipboard("");
     const harness = createHostHarness();
     renderEditor(["/editor"], harness);
     const desktop = await layout("desktop-layout");
-    await userEvent.click(desktop.getByRole("button", { name: /Test multiplayer/ }));
+    await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
     await waitFor(() =>
       expect(desktop.getAllByText(/Game source is empty/).length).toBeGreaterThan(0),
     );
-    // The arena never mounts for an invalid source.
-    expect(screen.queryByTestId("arena-section")).not.toBeInTheDocument();
-    expect(harness.bootstraps).toHaveLength(0);
+    // The single-player runtime never starts for an invalid source.
+    expect(runtimeBootstraps(harness)).toHaveLength(0);
+    // The arena stays mounted regardless — it is the stage, always live.
+    expect(screen.getByTestId("arena-section")).toBeInTheDocument();
   });
 
   it("clear-all deletes every line of code after confirmation", async () => {
@@ -324,7 +346,7 @@ describe("/editor — paste, run, save", () => {
     const dialog2 = await screen.findByRole("dialog");
     await userEvent.click(within(dialog2).getByRole("button", { name: /Clear all/ }));
     await waitFor(() => expect(editor.textContent?.trim()).toBe(""));
-    expect(harness.bootstraps).toHaveLength(0);
+    expect(runtimeBootstraps(harness)).toHaveLength(0);
   });
 
   it("shows the first-run tutorial and dismisses it permanently", async () => {
@@ -353,7 +375,7 @@ describe("/editor — paste, run, save", () => {
     await waitFor(() =>
       expect(desktop.getAllByText(/Game source is empty/).length).toBeGreaterThan(0),
     );
-    expect(harness.bootstraps).toHaveLength(0);
+    expect(runtimeBootstraps(harness)).toHaveLength(0);
   });
 
   it("does not start a run for an oversized source", async () => {
@@ -369,7 +391,7 @@ describe("/editor — paste, run, save", () => {
     await waitFor(() =>
       expect(desktop.getAllByText(/over the .* hard limit/).length).toBeGreaterThan(0),
     );
-    expect(harness.bootstraps).toHaveLength(0);
+    expect(runtimeBootstraps(harness)).toHaveLength(0);
   });
 
   it("warns about missing HTML structure but still runs", async () => {
@@ -384,7 +406,7 @@ describe("/editor — paste, run, save", () => {
     await waitFor(() =>
       expect(desktop.getAllByText(/No <!doctype> or <html> tag found/).length).toBeGreaterThan(0),
     );
-    await vi.waitFor(() => expect(harness.bootstraps).toHaveLength(1));
+    await vi.waitFor(() => expect(runtimeBootstraps(harness)).toHaveLength(1));
   });
 
   it("shows runtime error categories, including unsupported Nova API versions", async () => {
@@ -395,14 +417,17 @@ describe("/editor — paste, run, save", () => {
     const desktop = await layout("desktop-layout");
     await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
     await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
-    await vi.waitFor(() => expect(harness.bootstraps).toHaveLength(1));
-    harness.ready();
-    await waitFor(() => expect(desktop.getByText("Running")).toBeInTheDocument());
+    const runtimeIndex = await runtimeChannelIndex(harness);
+    harness.ready(runtimeIndex);
+    await waitFor(() =>
+      expect(desktop.getByRole("button", { name: /^Re-run$/ })).toBeInTheDocument(),
+    );
 
-    harness.runtimeError("syntax", "Unexpected token");
+    harness.runtimeError(runtimeIndex, "syntax", "Unexpected token");
     await waitFor(() => expect(desktop.getByText(/Unexpected token/)).toBeInTheDocument());
 
     harness.runtimeError(
+      runtimeIndex,
       "unsupported",
       "Unsupported Nova API version 99. Supported versions: [1].",
     );
@@ -463,10 +488,10 @@ describe("/games/:id/edit — saved games", () => {
     // Paste unsaved source and run it.
     await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
     await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
-    await vi.waitFor(() => expect(harness.bootstraps).toHaveLength(1));
-    expect(harness.bootstraps[0]?.gameSource).toBe(PASTED_SOURCE);
-    harness.ready();
-    harness.register("Rocket Rumble");
+    const runtimeIndex = await runtimeChannelIndex(harness);
+    expect(runtimeBootstraps(harness)[0]?.gameSource).toBe(PASTED_SOURCE);
+    harness.ready(runtimeIndex);
+    harness.register(runtimeIndex, "Rocket Rumble");
 
     // The saved version is untouched and its metadata is not updated by the
     // unsaved run.
@@ -485,10 +510,12 @@ describe("/games/:id/edit — saved games", () => {
     await waitFor(() => expect(editor.textContent).toContain("rockets"));
 
     await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
-    await vi.waitFor(() => expect(harness.bootstraps).toHaveLength(1));
-    harness.ready();
-    await waitFor(() => expect(desktop.getByText("Running")).toBeInTheDocument());
-    harness.register("Rocket Rumble");
+    const runtimeIndex = await runtimeChannelIndex(harness);
+    harness.ready(runtimeIndex);
+    await waitFor(() =>
+      expect(desktop.getByRole("button", { name: /^Re-run$/ })).toBeInTheDocument(),
+    );
+    harness.register(runtimeIndex, "Rocket Rumble");
 
     await vi.waitFor(async () => {
       const saved = await gameRepository.read(game.id);
@@ -592,9 +619,9 @@ describe("diagnostic report", () => {
     const desktop = await layout("desktop-layout");
     await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
     await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
-    await vi.waitFor(() => expect(harness.bootstraps).toHaveLength(1));
-    harness.ready();
-    harness.runtimeError("syntax", "Unexpected token");
+    const runtimeIndex = await runtimeChannelIndex(harness);
+    harness.ready(runtimeIndex);
+    harness.runtimeError(runtimeIndex, "syntax", "Unexpected token");
 
     // Wait for the debounced source hash to appear.
     await waitFor(() => expect(desktop.getByText(/^[0-9a-f]{12}…$/)).toBeInTheDocument());
@@ -610,17 +637,15 @@ describe("diagnostic report", () => {
 });
 
 describe("phone layout", () => {
-  it("switches between Code, Preview, and Errors tabs", async () => {
+  it("switches between Code and Errors tabs", async () => {
     const harness = createHostHarness();
     renderEditor(["/editor"], harness);
 
     const mobile = await layout("mobile-layout");
     const tabs = within(mobile.getByRole("tablist", { name: "Editor views" }));
     expect(tabs.getByRole("tab", { name: "Code" })).toHaveAttribute("aria-selected", "true");
-
-    await userEvent.click(tabs.getByRole("tab", { name: "Preview" }));
-    expect(tabs.getByRole("tab", { name: "Preview" })).toHaveAttribute("aria-selected", "true");
-    expect(mobile.getByText("Not running")).toBeInTheDocument();
+    // The Preview tab is gone: the arena below is the live preview now.
+    expect(tabs.queryByRole("tab", { name: "Preview" })).not.toBeInTheDocument();
 
     await userEvent.click(tabs.getByRole("tab", { name: "Errors" }));
     expect(tabs.getByRole("tab", { name: "Errors" })).toHaveAttribute("aria-selected", "true");
@@ -642,25 +667,31 @@ describe("phone layout", () => {
 
     // First run.
     await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
-    await vi.waitFor(() => expect(harness.bootstraps).toHaveLength(1));
-    harness.ready();
-    await waitFor(() => expect(desktop.getByText("Running")).toBeInTheDocument());
-    const firstFrame = document.querySelector("iframe");
+    const firstRuntimeIndex = await runtimeChannelIndex(harness);
+    harness.ready(firstRuntimeIndex);
+    await waitFor(() =>
+      expect(desktop.getByRole("button", { name: /^Re-run$/ })).toBeInTheDocument(),
+    );
+    const firstFrame = document.querySelector('[data-testid="hidden-runtime-container"] iframe');
 
     // Change the source and run again: a brand-new frame is created and the
     // old one is gone (destroy + recreate, never hot-module replacement).
     mockClipboard(SAVED_SOURCE);
     await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
     await userEvent.click(desktop.getByRole("button", { name: /Re-run/ }));
-    await vi.waitFor(() => expect(harness.bootstraps).toHaveLength(2));
-    expect(harness.bootstraps[1]?.gameSource).toBe(SAVED_SOURCE);
-    harness.ready();
-    await waitFor(() => expect(desktop.getByText("Running")).toBeInTheDocument());
+    const secondRuntimeIndex = await runtimeChannelIndex(harness, 2);
+    expect(runtimeBootstraps(harness)[1]?.gameSource).toBe(SAVED_SOURCE);
+    harness.ready(secondRuntimeIndex);
+    await waitFor(() =>
+      expect(desktop.getByRole("button", { name: /^Re-run$/ })).toBeInTheDocument(),
+    );
 
-    const frames = document.querySelectorAll("iframe");
-    expect(frames).toHaveLength(1);
-    expect(frames[0]).not.toBe(firstFrame);
-    // Two frames were created over the two runs (destroy + recreate).
-    expect(harness.frames).toHaveLength(2);
+    const runtimeFrames = document.querySelectorAll(
+      '[data-testid="hidden-runtime-container"] iframe',
+    );
+    expect(runtimeFrames).toHaveLength(1);
+    expect(runtimeFrames[0]).not.toBe(firstFrame);
+    // The run-1 frame is gone entirely (destroy + recreate, never HMR).
+    expect(firstFrame?.isConnected).toBe(false);
   });
 });
