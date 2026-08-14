@@ -689,7 +689,6 @@ export class PartyEngine {
       // directly from state.classicGame. Drop any previous Nova source.
       this.teardownRuntimeFrame();
       await this.party.announceClassicRoom(this.classicAnnouncement());
-      this.addNotice("info", `${game.name} is set up — everyone joins the same room.`);
     } catch (error) {
       this.addNotice("error", `Couldn't set up ${game.name}: ${errorMessage(error)}`);
     }

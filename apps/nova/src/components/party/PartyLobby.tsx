@@ -3,7 +3,6 @@ import {
   BookOpen,
   Check,
   Copy,
-  Crown,
   Gamepad2,
   Loader2,
   LogOut,
@@ -11,7 +10,6 @@ import {
   Pencil,
   Play,
   QrCode,
-  ShieldQuestion,
   Users,
   X,
 } from "lucide-react";
@@ -126,7 +124,14 @@ export function PartyLobby({
   const greeterName =
     state.members.find((member) => member.memberId === state.greeterMemberId)?.displayName ??
     state.greeterMemberId ??
-    "—";
+    null;
+  // 10.7: greeter + authority are diagnostic (S3 formalizes authority); the
+  // lobby itself does not show them — they stay accessible in the
+  // diagnostics panel and the engine state.
+  const authorityName =
+    state.members.find((member) => member.memberId === state.authorityMemberId)?.displayName ??
+    state.authorityMemberId ??
+    null;
 
   // The lobby page title: origin + four-letter code, e.g. "rocketcrab.com/abcd".
   // The full invite URL (with the session secret in the fragment) is never
@@ -297,23 +302,8 @@ export function PartyLobby({
       ) : null}
       {/* The big code + invite (QR, URL, copy) now live in the classic
           party shell header (7.22) rendered by PartyExperience. */}
-      {/* Roles: greeter + authority are separate (ADR-0004/0007). */}
-      <section className="flex flex-wrap items-center gap-2 text-sm font-semibold text-base-content/70">
-        <span className="badge badge-ghost badge-sm" title="Rendezvous greeter (ADR-0004)">
-          <Crown className="mr-1 h-3 w-3" aria-hidden="true" />
-          Greeter: {greeterName}
-          {state.amGreeter ? " · you" : ""}
-        </span>
-        <span
-          className="badge badge-ghost badge-sm"
-          title="Current internal authority — diagnostic only; S3 formalizes authority"
-        >
-          <ShieldQuestion className="mr-1 h-3 w-3" aria-hidden="true" />
-          Authority (diagnostic):{" "}
-          {state.members.find((member) => member.memberId === state.authorityMemberId)
-            ?.displayName ?? "—"}
-        </span>
-      </section>
+      {/* 10.7: the greeter and authority role badges are gone from the
+          lobby (diagnostic only) — see the diagnostics panel below. */}
       {/* Join requests (greeter only). */}
       {state.amGreeter && state.pendingJoinRequests.length > 0 ? (
         <section
@@ -353,6 +343,44 @@ export function PartyLobby({
             ))}
           </ul>
         </section>
+      ) : null}
+      {/* 10.7: the action row (Browse games left, Start game right) sits
+          ABOVE the players box, horizontally centered — leave is its own
+          quiet control at the bottom of the page. */}
+      <section className="flex flex-wrap items-center justify-center gap-2">
+        {state.role === "creator" ? (
+          <Button variant="secondary" size="lg" onClick={() => setBrowsing(true)}>
+            <Gamepad2 className="h-5 w-5" aria-hidden="true" />
+            Browse games
+          </Button>
+        ) : null}
+        <Button
+          variant="primary"
+          size="lg"
+          disabled={!state.canStart}
+          onClick={() => onStart(false)}
+          title={state.startBlockedReason ?? "Start the game once every player is ready"}
+        >
+          <Play className="h-5 w-5" aria-hidden="true" />
+          Start game
+        </Button>
+        {state.canForceStart ? (
+          <Button variant="outline" size="lg" onClick={() => setForceDialog(true)}>
+            <PartyPopper className="h-5 w-5" aria-hidden="true" />
+            Start anyway
+          </Button>
+        ) : null}
+      </section>
+      {/* The blocked-reason copy (10.7): shown as a styled warning alert;
+          the "Pick a game before starting the party." message is gone —
+          the welcome card covers the no-game case. */}
+      {state.game !== null &&
+      !state.canStart &&
+      !state.canForceStart &&
+      state.startBlockedReason !== null ? (
+        <div role="alert" className="alert alert-warning mx-auto w-fit">
+          <span className="text-sm font-semibold">{state.startBlockedReason}</span>
+        </div>
       ) : null}
       {/* Player list with per-player transfer + ready status. */}
       {/* Classic collapsible Players card (7.4): badge count + per-player
@@ -417,62 +445,41 @@ export function PartyLobby({
           </ul>
         </div>
       </details>
-      {/* Notices (a failed peer never freezes the lobby). */}
+      {/* Notices (a failed peer never freezes the lobby) — styled alerts
+          instead of bare colored text (10.7). */}
       {state.notices.length > 0 ? (
-        <ul className="flex flex-col gap-1 text-xs" aria-label="Lobby notices">
+        <ul className="flex flex-col gap-2" aria-label="Lobby notices">
           {state.notices.map((notice) => (
             <li
               key={notice.id}
+              role="alert"
               className={
                 notice.level === "error"
-                  ? "text-error"
+                  ? "alert alert-error"
                   : notice.level === "warn"
-                    ? "text-warning"
-                    : "text-base-content/60"
+                    ? "alert alert-warning"
+                    : "alert alert-info"
               }
             >
-              {notice.message}
+              <span className="text-sm font-semibold">{notice.message}</span>
             </li>
           ))}
         </ul>
       ) : null}
-      {/* Classic action row (7.4): Browse games (host) + Start game, with
-          force-start and leave alongside. */}
-      <section className="flex flex-wrap items-center gap-2">
-        {state.role === "creator" ? (
-          <Button variant="secondary" size="lg" onClick={() => setBrowsing(true)}>
-            <Gamepad2 className="h-5 w-5" aria-hidden="true" />
-            Browse games
-          </Button>
-        ) : null}
-        <Button
-          variant="primary"
-          size="lg"
-          disabled={!state.canStart}
-          onClick={() => onStart(false)}
-          title={state.startBlockedReason ?? "Start the game once every player is ready"}
-        >
-          <Play className="h-5 w-5" aria-hidden="true" />
-          Start game
-        </Button>
-        {state.canForceStart ? (
-          <Button variant="outline" size="lg" onClick={() => setForceDialog(true)}>
-            <PartyPopper className="h-5 w-5" aria-hidden="true" />
-            Start anyway
-          </Button>
-        ) : null}
-        {state.canStart || state.canForceStart ? null : state.startBlockedReason !== null ? (
-          <span className="text-xs font-semibold text-base-content/60">
-            {state.startBlockedReason}
-          </span>
-        ) : null}
-        <div className="flex-1" />
-        <Button variant="danger" size="lg" onClick={onLeave}>
-          <LogOut className="h-5 w-5" aria-hidden="true" />
+      <PartyDiagnosticsPanel
+        diagnostics={state.diagnostics}
+        onRefresh={onRefreshDiagnostics}
+        greeterName={greeterName}
+        authorityName={authorityName}
+      />
+      {/* 10.7: Leave party is a smaller, centered control at the very
+          bottom of the page. */}
+      <div className="flex justify-center">
+        <Button variant="danger" size="md" onClick={onLeave}>
+          <LogOut className="h-4 w-4" aria-hidden="true" />
           Leave party
         </Button>
-      </section>
-      <PartyDiagnosticsPanel diagnostics={state.diagnostics} onRefresh={onRefreshDiagnostics} />
+      </div>
       {/* The QR invite modal (10.5): the QR lives here, not on the lobby.
           The full invite URL is encoded in the QR only; the label under it
           is the safe origin + code form. */}{" "}

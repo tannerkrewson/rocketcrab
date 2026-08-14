@@ -170,10 +170,80 @@ describe("PartyLobby", () => {
     expect(within(rowB).getByText("retries exhausted")).toBeInTheDocument();
   });
 
-  it("separates the greeter from the diagnostic authority label", async () => {
+  it("hides the greeter and authority badges but keeps them in diagnostics (10.7)", async () => {
+    const state = makeState({
+      diagnostics: {
+        connectionState: "connected",
+        selfConnectionId: "conn-a",
+        room: "room-1",
+        sessionId: "session-1",
+        relays: null,
+        joinErrors: null,
+        peers: [],
+        lastQuality: [],
+      },
+    });
+    await renderLobby(state);
+    // Gone from the lobby itself.
+    expect(screen.queryByText(/Greeter:/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Authority \(diagnostic\)/)).not.toBeInTheDocument();
+    // Still accessible in the diagnostics panel.
+    await userEvent.click(screen.getByText("Connection diagnostics"));
+    expect(screen.getByText(/greeter: Player A/)).toBeInTheDocument();
+    expect(screen.getByText(/authority: Player A/)).toBeInTheDocument();
+  });
+
+  it("does not show the pick-a-game blocker text near the buttons (10.7)", async () => {
+    const state = makeState({
+      game: null,
+      canStart: false,
+      canForceStart: false,
+      startBlockedReason: "Pick a game before starting the party.",
+    });
+    await renderLobby(state);
+    expect(screen.queryByText(/pick a game before starting/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the start-blocked reason as a styled alert when a game is selected (10.7)", async () => {
+    const state = makeState({
+      startBlockedReason: "Waiting for every player's game to load and register.",
+    });
+    await renderLobby(state);
+    const alert = screen.getByRole("alert");
+    expect(alert).toHaveClass("alert-warning");
+    expect(within(alert).getByText(/waiting for every player/i)).toBeInTheDocument();
+  });
+
+  it("styles lobby notices as alerts instead of bare text (10.7)", async () => {
+    const state = makeState({
+      canStart: true,
+      startBlockedReason: null,
+      notices: [
+        { id: "notice-1", level: "error", message: "Player B could not receive the game." },
+        { id: "notice-2", level: "warn", message: "Player C is reconnecting." },
+        { id: "notice-3", level: "info", message: "Your game loaded and registered." },
+      ],
+    });
+    await renderLobby(state);
+    const alerts = screen.getAllByRole("alert");
+    expect(alerts).toHaveLength(3);
+    expect(alerts[0]).toHaveClass("alert-error");
+    expect(alerts[1]).toHaveClass("alert-warning");
+    expect(alerts[2]).toHaveClass("alert-info");
+    expect(within(alerts[0]).getByText("Player B could not receive the game.")).toBeInTheDocument();
+  });
+
+  it("places the action row above the players box and leave at the bottom (10.7)", async () => {
     await renderLobby(makeState());
-    expect(screen.getByText(/Greeter: Player A/)).toBeInTheDocument();
-    expect(screen.getByText(/Authority \(diagnostic\): Player A/)).toBeInTheDocument();
+    const browse = screen.getByRole("button", { name: /browse games/i });
+    const start = screen.getByRole("button", { name: /start game/i });
+    const players = screen.getByText(/Players \(2\)/);
+    const leave = screen.getByRole("button", { name: /leave party/i });
+    // Browse (left) and start (right) sit side by side ABOVE the players box.
+    expect(browse.compareDocumentPosition(start) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(start.compareDocumentPosition(players) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    // Leave sits below the players box.
+    expect(players.compareDocumentPosition(leave) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it("disables start while players are not ready and enables it when they are", async () => {
