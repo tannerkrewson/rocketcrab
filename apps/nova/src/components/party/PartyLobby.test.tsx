@@ -97,8 +97,6 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
       onStart={handlers.onStart ?? props.onStart}
       onLeave={handlers.onLeave ?? props.onLeave}
       onRefreshDiagnostics={handlers.onRefreshDiagnostics ?? props.onRefreshDiagnostics}
-      onPickGame={handlers.onPickGame ?? props.onPickGame}
-      onPickPrebuilt={handlers.onPickPrebuilt ?? props.onPickPrebuilt}
       onKickMember={handlers.onKickMember ?? props.onKickMember}
       onEditName={handlers.onEditName ?? props.onEditName}
     />
@@ -237,7 +235,9 @@ describe("PartyLobby", () => {
     expect(alerts[0]).toHaveClass("alert-error");
     expect(alerts[1]).toHaveClass("alert-warning");
     expect(alerts[2]).toHaveClass("alert-info");
-    expect(within(alerts[0]).getByText("Player B could not receive the game.")).toBeInTheDocument();
+    expect(
+      within(alerts[0]!).getByText("Player B could not receive the game."),
+    ).toBeInTheDocument();
   });
 
   it("places the action row above the players box and leave at the bottom (10.7)", async () => {
@@ -332,8 +332,7 @@ describe("PartyLobby", () => {
       canForceStart: false,
       startBlockedReason: "Pick a game before starting the party.",
     });
-    const onPickGame = vi.fn();
-    await renderLobby(state, { onPickGame });
+    await renderLobby(state);
     // 10.6: the welcome card replaces the old empty-state sentence.
     expect(screen.getByText("No game selected yet")).toBeInTheDocument();
     expect(screen.queryByText(/no game yet/i)).not.toBeInTheDocument();
@@ -342,44 +341,40 @@ describe("PartyLobby", () => {
     expect(browseButton).toBeInTheDocument();
     await userEvent.click(browseButton);
     // The shared browse UI (same as /browse) opens inline: search + the
-    // player's own saved games section (empty library in tests).
+    // category cards ("My games" among them); the list is hidden until a
+    // category opens or the user searches (10.9).
     expect(screen.getByRole("searchbox", { name: "Search games" })).toBeInTheDocument();
-    expect(screen.getByText("My games")).toBeInTheDocument();
-    expect(onPickGame).not.toHaveBeenCalled();
+    expect(screen.getByRole("button", { name: /My games/ })).toBeInTheDocument();
+    expect(screen.queryByText("Nova Quiz")).not.toBeInTheDocument();
     // Back returns to the lobby.
     await userEvent.click(screen.getByRole("button", { name: /back to lobby/i }));
     expect(screen.getByRole("button", { name: /start game/i })).toBeInTheDocument();
   });
 
-  it("picks a saved game from the shared browse UI (7.43)", async () => {
+  it("links a saved game to its details page instead of picking it (10.9)", async () => {
     const state = makeState({ game: null, canStart: false, canForceStart: false });
     const game = await gameRepository.create({
       title: "Rocket Rumble",
       html: "<!doctype html><html><body><p>rockets</p></body></html>",
       mode: "state",
     });
-    const onPickGame = vi.fn();
-    await renderLobby(state, { onPickGame });
+    await renderLobby(state);
     await userEvent.click(screen.getByRole("button", { name: /browse games/i }));
-    const saved = await screen.findByRole("button", { name: /Rocket Rumble/ });
-    await userEvent.click(saved);
-    expect(onPickGame).toHaveBeenCalledWith(game.id);
-    // Picking returns to the lobby.
-    expect(screen.getByRole("button", { name: /start game/i })).toBeInTheDocument();
+    // "My games" is a category card now; opening it shows the saved list.
+    await userEvent.click(screen.getByRole("button", { name: /My games/ }));
+    const savedLink = await screen.findByRole("link", { name: /Rocket Rumble/ });
+    expect(savedLink.getAttribute("href")).toBe(`/game/${game.id}`);
+    // Selecting never sets the lobby's game directly — it's a details link.
+    expect(savedLink.tagName.toLowerCase()).toBe("a");
   });
 
-  it("picks a classic game from the shared browse UI (7.7.4/7.43)", async () => {
+  it("links a classic game to its details page instead of picking it (10.9)", async () => {
     const state = makeState({ game: null, canStart: false, canForceStart: false });
-    const onPickPrebuilt = vi.fn();
-    await renderLobby(state, { onPickPrebuilt });
+    await renderLobby(state);
     await userEvent.click(screen.getByRole("button", { name: /browse games/i }));
-    // Classic games are listed together with (empty) saved games.
-    expect(await screen.findByRole("searchbox", { name: "Search games" })).toBeInTheDocument();
-    const protobowl = screen.getByRole("button", { name: /Protobowl/ });
-    await userEvent.click(protobowl);
-    expect(onPickPrebuilt).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: "classic", id: "protobowl" }),
-    );
+    await userEvent.click(screen.getByRole("button", { name: /All games/ }));
+    const protobowl = await screen.findByRole("link", { name: /Protobowl/ });
+    expect(protobowl.getAttribute("href")).toBe("/game/protobowl");
   });
 
   it("tells joiners the party is waiting when it has no game (10.6)", async () => {

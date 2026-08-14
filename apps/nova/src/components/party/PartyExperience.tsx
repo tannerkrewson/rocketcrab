@@ -257,8 +257,6 @@ function renderPhase(
           onStart={(force) => engine.startGame(force)}
           onLeave={() => void handleLeave()}
           onRefreshDiagnostics={() => void engine.refreshDiagnostics()}
-          onPickGame={(gameId) => void handlePickGame(gameId)}
-          onPickPrebuilt={(entry) => void handlePickPrebuilt(entry)}
           onKickMember={handleKickMember}
           onEditName={handleEditName}
         />

@@ -239,8 +239,10 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
     await userEvent.click(screen.getByRole("button", { name: /browse games/i }));
     const browse = screen.getByRole("dialog", { name: "Pick a game" });
-    // The SAME shared browse UI as /browse: search + classic/nova cards.
+    // The SAME shared browse UI as /browse: search + category cards; the
+    // list only shows once a category opens (10.9).
     expect(within(browse).getByRole("searchbox", { name: "Search games" })).toBeInTheDocument();
+    await userEvent.click(within(browse).getByRole("button", { name: /All games/ }));
     const protobowl = within(browse).getByRole("button", { name: /Protobowl/ });
     await userEvent.click(protobowl);
     expect(onPickPrebuilt).toHaveBeenCalledWith(

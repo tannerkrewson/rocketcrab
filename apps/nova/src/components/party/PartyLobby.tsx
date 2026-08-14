@@ -15,7 +15,6 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import type { BrowseEntry } from "../../lib/browse";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState, PartyMemberView } from "../../lib/party/engine";
 import { Button } from "../ui/Button";
@@ -32,10 +31,6 @@ export interface PartyLobbyProps {
   onStart: (force: boolean) => void;
   onLeave: () => void;
   onRefreshDiagnostics: () => void;
-  /** Pick a saved game for a party that was started without one (7.6). */
-  onPickGame: (gameId: string) => void;
-  /** Pick a prebuilt classic/nova game via the shared browse UI (7.43). */
-  onPickPrebuilt: (entry: BrowseEntry) => void;
   /** Kick a member from the party (host only, 7.29). */
   onKickMember: (memberId: string) => void;
   /** Apply an edited player name (7.5). */
@@ -108,8 +103,6 @@ export function PartyLobby({
   onStart,
   onLeave,
   onRefreshDiagnostics,
-  onPickGame,
-  onPickPrebuilt,
   onKickMember,
   onEditName,
 }: PartyLobbyProps) {
@@ -164,12 +157,10 @@ export function PartyLobby({
     }
   };
 
-  const handlePickFromBrowse = (pick: () => void) => {
-    setBrowsing(false);
-    pick();
-  };
-
   if (browsing) {
+    // 10.9: browse mode — selecting a game ALWAYS opens its details page
+    // (/game/$gameId, saved games included); the pick happens there and
+    // returns to /party. The lobby never sets the game directly.
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
         <section aria-label="Pick a game" className="flex flex-col gap-3">
@@ -181,11 +172,7 @@ export function PartyLobby({
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
             Back to lobby
           </button>
-          <GameBrowser
-            compact
-            onPick={(entry) => handlePickFromBrowse(() => onPickPrebuilt(entry))}
-            onPickSaved={(gameId) => handlePickFromBrowse(() => onPickGame(gameId))}
-          />
+          <GameBrowser compact />
         </section>
       </div>
     );
