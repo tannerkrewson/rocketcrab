@@ -45,7 +45,7 @@ A single-variable env override (unset = the default above). For example, to
 allow a staging origin:
 
 ```sh
-wrangler secret put ORIGIN_ALLOWLIST  # not a secret, but see note below
+wrangler var set ORIGIN_ALLOWLIST "https://rocketcrab.com,https://staging.rocketcrab.com"
 ```
 
 (`ORIGIN_ALLOWLIST` is not sensitive — it can live in `[vars]` in
