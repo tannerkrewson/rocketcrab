@@ -49,6 +49,12 @@ import { localPartyIdentity, updatePartyDisplayName } from "./identity";
 import { browserLifecycleSource, type PartyLifecycleSource } from "./lifecycle";
 import { clearPartyRecovery, savePartyRecovery } from "./party-recovery";
 import { createTrysteroPartyTransportFactory } from "./transport-factory";
+import {
+  fetchTurnCredentials,
+  turnCredsConfigured,
+  type TurnCredentialsResult,
+  type TurnServerConfigLike,
+} from "./turn-creds";
 
 /** Runtime-bridge test seams (no-op in production; mirror U6's arena). */
 export interface PartyRuntimeSeams {
@@ -104,6 +110,14 @@ export interface PartyDiagnostics {
   readonly joinErrors: Array<{ category: string; message: string }> | null;
   readonly peers: Array<{ memberId: string; connectionId: string; displayName?: string }>;
   readonly lastQuality: Array<{ memberId: string; pingMs: number | null; sampledAt: number }>;
+  /**
+   * TURN credential state (P0, rocketcrab-23s): "configured" when minted
+   * credentials were baked into the transports, "unavailable" when the mint
+   * failed (the party proceeded without TURN), "disabled" when the build
+   * pins no mint origin, and null while unknown (no setup attempted yet or
+   * an injected test factory).
+   */
+  readonly turn: "configured" | "unavailable" | "disabled" | null;
 }
 
 /** One lobby notice (non-blocking; a failed peer never freezes the lobby). */
@@ -193,6 +207,13 @@ export interface PartyEngineConfig {
   advertIntervalMs?: number;
   /** Adapter diagnostics (Trystero getDiagnostics); duck-typed when present. */
   diagnostics?: () => unknown;
+  /**
+   * TURN credential mint fetch (P0, rocketcrab-23s). Defaults to the real
+   * mint client ({@link fetchTurnCredentials}); tests inject a deterministic
+   * stub. Only consulted when no `transportFactory` is injected (the real
+   * Trystero path) — injected factories own transport construction.
+   */
+  turnCreds?: () => Promise<TurnCredentialsResult>;
 }
 
 /** The game the party is playing, as the coordinator reports it. */
@@ -258,7 +279,9 @@ interface ClassicSelection {
 type ClassicAnnouncement = Parameters<PartySession["announceClassicRoom"]>[0];
 
 interface PartyEngineDefaults {
-  transportFactory: PartyTransportFactory;
+  /** Injected factory (tests/embedders) or null → build the Trystero factory lazily. */
+  transportFactory: PartyTransportFactory | null;
+  turnCreds: () => Promise<TurnCredentialsResult>;
   runtimeOrigin: string;
   seams: PartyRuntimeSeams;
   collisionListenMs: number;
@@ -306,6 +329,11 @@ export class PartyEngine {
   private readonly lifecycle: PartyLifecycleSource;
   private readonly lifecycleUnsubscribers: Array<() => void> = [];
 
+  /** Minted TURN config cache (fetched once per engine; P0 rocketcrab-23s). */
+  private turnCredsCache: { readonly turnConfig: readonly TurnServerConfigLike[] } | null = null;
+  /** Latest TURN credential outcome, surfaced in engine diagnostics. */
+  private turnStatus: "configured" | "unavailable" | "disabled" | null = null;
+
   private readonly listeners = new Set<(state: PartyEngineState) => void>();
   private party: PartySession | null = null;
   private coordinator: GameSourceCoordinator | null = null;
@@ -349,7 +377,8 @@ export class PartyEngine {
 
   constructor(config: PartyEngineConfig = {}) {
     this.defaults = {
-      transportFactory: config.transportFactory ?? createTrysteroPartyTransportFactory(),
+      transportFactory: config.transportFactory ?? null,
+      turnCreds: config.turnCreds ?? fetchTurnCredentials,
       runtimeOrigin: config.runtimeOrigin ?? defaultRuntimeOrigin(),
       seams: config.seams ?? {},
       collisionListenMs: config.collisionListenMs ?? 2_000,
@@ -519,7 +548,7 @@ export class PartyEngine {
       const party = await createParty({
         memberId: identity.memberId,
         displayName: identity.displayName,
-        transportFactory: this.defaults.transportFactory,
+        transportFactory: await this.resolveTransportFactory(),
         partyName: "Nova party",
         gameTitle: input?.title ?? "Nova party",
         onJoinRequest: (request) => this.queueApproval(request),
@@ -567,7 +596,7 @@ export class PartyEngine {
         code,
         memberId: identity.memberId,
         displayName: identity.displayName,
-        transportFactory: this.defaults.transportFactory,
+        transportFactory: await this.resolveTransportFactory(),
         onJoinRequest: (request) => this.queueApproval(request),
         discoveryTimeoutMs: this.defaults.discoveryTimeoutMs,
         earlyMissTimeoutMs: this.defaults.earlyMissTimeoutMs,
@@ -614,7 +643,7 @@ export class PartyEngine {
         ...(input.code !== undefined ? { code: input.code } : {}),
         memberId: identity.memberId,
         displayName: identity.displayName,
-        transportFactory: this.defaults.transportFactory,
+        transportFactory: await this.resolveTransportFactory(),
         onJoinRequest: (request) => this.queueApproval(request),
         advertIntervalMs: this.defaults.advertIntervalMs,
         ...(this.schedule !== undefined ? { schedule: this.schedule } : {}),
@@ -1215,6 +1244,49 @@ export class PartyEngine {
   // ------------------------------------------------------------------
   // Setup internals
   // ------------------------------------------------------------------
+
+  /**
+   * The transport factory for one setup attempt. Injected factories (tests,
+   * embedders) are used as-is and never trigger a mint. The real Trystero
+   * path mints short-lived TURN credentials ONCE (cached on success) and
+   * closes over them for both transports; a mint outage never blocks a
+   * party — the factory degrades to no-TURN and the failure is recorded as
+   * a warn notice + a diagnostics flag (P0 acceptance criterion).
+   */
+  private async resolveTransportFactory(): Promise<PartyTransportFactory> {
+    const injected = this.defaults.transportFactory;
+    if (injected !== null) {
+      return injected;
+    }
+    if (!turnCredsConfigured()) {
+      this.turnStatus = "disabled";
+      return createTrysteroPartyTransportFactory();
+    }
+    const result = await this.fetchTurnCredentialsOnce();
+    if (result.ok) {
+      this.turnStatus = "configured";
+      return createTrysteroPartyTransportFactory({ turnConfig: result.turnConfig });
+    }
+    // Mint failure (network, 403, 5xx, timeout): proceed WITHOUT TURN.
+    this.turnStatus = "unavailable";
+    this.addNotice(
+      "warn",
+      `TURN credentials unavailable (${result.reason}) — the party will connect without a TURN relay.`,
+    );
+    return createTrysteroPartyTransportFactory();
+  }
+
+  /** Fetch minted TURN credentials once; successes are cached (failures retry). */
+  private async fetchTurnCredentialsOnce(): Promise<TurnCredentialsResult> {
+    if (this.turnCredsCache !== null) {
+      return { ok: true, turnConfig: this.turnCredsCache.turnConfig };
+    }
+    const result = await this.defaults.turnCreds();
+    if (result.ok) {
+      this.turnCredsCache = { turnConfig: result.turnConfig };
+    }
+    return result;
+  }
 
   /** Wire the party session, coordinator, S1 session, and transport events. */
   private async establish(party: PartySession): Promise<void> {
@@ -2107,6 +2179,7 @@ export class PartyEngine {
       joinErrors: adapter?.joinErrors ?? null,
       peers: adapter?.peers ?? transport.peers.map((peer) => ({ ...peer })),
       lastQuality: adapter?.lastQuality ?? [],
+      turn: this.turnStatus,
     };
   }
 
