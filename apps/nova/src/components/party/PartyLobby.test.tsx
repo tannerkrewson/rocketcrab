@@ -404,4 +404,43 @@ describe("PartyLobby", () => {
     await renderLobby(state);
     expect(screen.queryByRole("button", { name: /kick/i })).not.toBeInTheDocument();
   });
+
+  it("shows the invite card with Copy URL + QR Code and an origin+code title (10.5)", async () => {
+    await renderLobby(makeState());
+    expect(screen.getByText("Get your friends to join!")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /copy url/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /qr code/i })).toBeInTheDocument();
+    // The lobby page title is origin + code — the full invite URL is never
+    // rendered (ADR-0011).
+    expect(screen.getByText(`${window.location.host}/abcd`)).toBeInTheDocument();
+    expect(screen.queryByText(INVITE_URL)).not.toBeInTheDocument();
+    expect(screen.queryByText(/invite-secret/)).not.toBeInTheDocument();
+    // The QR is not shown directly on the lobby.
+    expect(screen.queryByLabelText("Party invite QR code")).not.toBeInTheDocument();
+  });
+
+  it("copies the invite URL from the Copy URL button (10.5)", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    await renderLobby(makeState());
+    await userEvent.click(screen.getByRole("button", { name: /copy url/i }));
+    expect(writeText).toHaveBeenCalledWith(INVITE_URL);
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+  });
+
+  it("opens the QR code in a modal with the safe label (10.5)", async () => {
+    await renderLobby(makeState());
+    await userEvent.click(screen.getByRole("button", { name: /qr code/i }));
+    const dialog = screen.getByRole("dialog", { name: "Party QR code" });
+    expect(within(dialog).getByLabelText("Party invite QR code")).toBeInTheDocument();
+    expect(within(dialog).getByText(`${window.location.host}/abcd`)).toBeInTheDocument();
+    // The secret never appears as text anywhere on the page.
+    expect(screen.queryByText(/invite-secret/)).not.toBeInTheDocument();
+    // Closing the modal hides the QR again.
+    await userEvent.click(within(dialog).getByRole("button", { name: /close/i }));
+    expect(screen.queryByLabelText("Party invite QR code")).not.toBeInTheDocument();
+  });
 });

@@ -179,11 +179,11 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
       />
     );
 
-  // 7.22: the classic shell header (logo + big code + phonetic + invite)
-  // sits above every live party phase EXCEPT playing, where the in-flow
-  // play shell's compact top bar takes over (7.38).
+  // 7.22: the classic shell header (logo + big code + phonetic) sits above
+  // every live party phase EXCEPT playing, where the in-flow play shell's
+  // compact top bar takes over (7.38). The invite details (QR/URL/copy)
+  // live in the lobby's invite card (10.5), not the header.
   const shellShown = state.phase !== "idle" && state.phase !== "error" && state.phase !== "removed";
-  const showInviteDetails = state.phase === "lobby" || state.phase === "starting";
 
   if (playing) {
     return (
@@ -204,13 +204,7 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {shellShown ? (
-        <PartyShellHeader
-          code={state.code}
-          inviteUrl={state.inviteUrl}
-          showInviteDetails={showInviteDetails}
-        />
-      ) : null}
+      {shellShown ? <PartyShellHeader code={state.code} inviteUrl={state.inviteUrl} /> : null}
       {frameArea}
       {renderPhase(
         state,

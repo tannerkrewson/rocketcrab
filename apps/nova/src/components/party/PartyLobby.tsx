@@ -1,6 +1,7 @@
 import {
   ArrowLeft,
   Check,
+  Copy,
   Crown,
   Gamepad2,
   Loader2,
@@ -8,16 +9,20 @@ import {
   PartyPopper,
   Pencil,
   Play,
+  QrCode,
   ShieldQuestion,
   Users,
   X,
 } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import type { BrowseEntry } from "../../lib/browse";
+import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState, PartyMemberView } from "../../lib/party/engine";
 import { Button } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
 import { PartyDiagnosticsPanel } from "./PartyDiagnostics";
+import { PartyInviteQr } from "./PartyInviteQr";
 
 export interface PartyLobbyProps {
   state: PartyEngineState;
@@ -109,11 +114,41 @@ export function PartyLobby({
   const [browsing, setBrowsing] = useState(false);
   const [editingName, setEditingName] = useState(false);
   const [nameDraft, setNameDraft] = useState(state.displayName);
+  // 10.5: the QR code lives behind a modal; the invite URL is never
+  // rendered as text (only the origin + code page title is).
+  const [qrOpen, setQrOpen] = useState(false);
 
   const greeterName =
     state.members.find((member) => member.memberId === state.greeterMemberId)?.displayName ??
     state.greeterMemberId ??
     "—";
+
+  // The lobby page title: origin + four-letter code, e.g. "rocketcrab.com/abcd".
+  // The full invite URL (with the session secret in the fragment) is never
+  // shown on the page (ADR-0011 / 10.5).
+  const pageTitle =
+    state.code === null ? null : `${window.location.host}/${state.code.toLowerCase()}`;
+
+  // 10.5: the browser tab reads the origin + code page title (never the
+  // invite URL with its fragment secret). Restore on unmount.
+  useEffect(() => {
+    if (pageTitle === null) return;
+    const previous = document.title;
+    document.title = pageTitle;
+    return () => {
+      document.title = previous;
+    };
+  }, [pageTitle]);
+
+  const copyInvite = async () => {
+    if (state.inviteUrl === null) return;
+    const ok = await writeToClipboard(state.inviteUrl);
+    if (ok) {
+      toast.success("Invite link copied.");
+    } else {
+      toast.error("Couldn't copy the link — try again.");
+    }
+  };
 
   const handlePickFromBrowse = (pick: () => void) => {
     setBrowsing(false);
@@ -144,6 +179,35 @@ export function PartyLobby({
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+      {/* 10.5: the invite card — get your friends in via URL or QR. The QR
+          is NOT shown on the page; it opens in a modal. Only the origin +
+          code are ever rendered (ADR-0011: the session secret stays in the
+          URL fragment, never on the page). */}
+      <section
+        aria-label="Invite your friends"
+        className="flex flex-col items-center gap-3 rounded-box border-2 border-base-300 bg-base-100 p-5 text-center"
+      >
+        <h2 className="text-lg font-black">Get your friends to join!</h2>
+        {pageTitle !== null ? (
+          <p className="font-mono text-sm font-bold text-primary">{pageTitle}</p>
+        ) : null}
+        <div className="flex items-center justify-center gap-2">
+          <Button variant="primary" size="md" onClick={() => void copyInvite()}>
+            <Copy className="h-4 w-4" aria-hidden="true" />
+            Copy URL
+          </Button>
+          <Button
+            variant="outline"
+            size="md"
+            onClick={() => setQrOpen(true)}
+            disabled={state.inviteUrl === null}
+          >
+            <QrCode className="h-4 w-4" aria-hidden="true" />
+            QR Code
+          </Button>
+        </div>
+      </section>
+
       {/* Classic-style party status card (7.4): what's selected and whose
           turn it is to act — the lobby's main heading. */}
       <header
@@ -438,6 +502,26 @@ export function PartyLobby({
       </section>
 
       <PartyDiagnosticsPanel diagnostics={state.diagnostics} onRefresh={onRefreshDiagnostics} />
+
+      {/* The QR invite modal (10.5): the QR lives here, not on the lobby.
+          The full invite URL is encoded in the QR only; the label under it
+          is the safe origin + code form. */}
+      {qrOpen && state.inviteUrl !== null ? (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-label="Party QR code"
+        >
+          <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-box border-2 border-base-300 bg-base-100 p-5">
+            <p className="font-black">Scan to join the party</p>
+            <PartyInviteQr inviteUrl={state.inviteUrl} size={200} label={pageTitle ?? undefined} />
+            <Button variant="outline" onClick={() => setQrOpen(false)}>
+              Close
+            </Button>
+          </div>
+        </div>
+      ) : null}
 
       {forceDialog ? (
         <div
