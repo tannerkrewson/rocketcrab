@@ -140,7 +140,10 @@ describe("/game/:gameId — saved games and party selection (10.9)", () => {
     expect(screen.getByText("Blast off with friends.")).toBeInTheDocument();
     // Without an active party there is no select action.
     expect(screen.queryByRole("button", { name: /select for party/i })).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Back to games" })).toBeInTheDocument();
+    // The back link is a compact outline button, not a full-width bar.
+    const back = screen.getByRole("link", { name: "Back to games" });
+    expect(back.className).toContain("btn-outline");
+    expect(back.className).toContain("self-start");
   });
 
   it("selects a saved game for the active party and returns to the lobby (10.9)", async () => {
@@ -184,11 +187,28 @@ describe("/game/:gameId — saved games and party selection (10.9)", () => {
     stubs.active = true;
     renderAt("/game/nova-quiz");
 
-    expect(await screen.findByRole("button", { name: /select for party/i })).toBeInTheDocument();
-    // Nova prebuilt games keep their editor action.
-    expect(screen.getByRole("button", { name: /open in the editor/i })).toBeInTheDocument();
+    const select = await screen.findByRole("button", { name: /select for party/i });
     // The back link returns to the party, not the browse page.
     const back = screen.getByRole("link", { name: "Back to party" });
     expect(back.getAttribute("href")).toBe("/party");
+    expect(back.className).toContain("self-start");
+
+    // Nova prebuilt games keep their editor action.
+    const editor = screen.getByRole("button", { name: /open in the editor/i });
+    // "Select for party" and "Open in the editor" share the same size so
+    // the centered action group renders two identical-height buttons
+    // (rocketcrab-9fv.11.12).
+    expect(select.className).toContain("btn-lg");
+    expect(editor.className).toContain("btn-lg");
+    expect(editor.className).toContain("btn-primary");
+    expect(select.className).toContain("btn-primary");
+  });
+
+  it("renders the classic play action as a same-size primary button", async () => {
+    renderAt("/game/drawphone");
+
+    const play = await screen.findByRole("link", { name: "Play game" });
+    expect(play.className).toContain("btn-primary");
+    expect(play.className).toContain("btn-lg");
   });
 });
