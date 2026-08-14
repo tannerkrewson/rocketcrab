@@ -137,5 +137,7 @@
 }
 
 @utility pt-safe {
-  padding-top: env(safe-area-inset-top);
+  /* 9fv.11.11: never flush with the top edge — at least 0.5rem even when
+     the browser reports no notch inset (desktop). */
+  padding-top: max(0.5rem, env(safe-area-inset-top));
 }

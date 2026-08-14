@@ -1,4 +1,4 @@
-import { ArrowLeft, Gamepad2, LogOut, Menu, OctagonX, RotateCcw, Users } from "lucide-react";
+import { ArrowLeft, BookOpen, Gamepad2, Menu, OctagonX, RotateCcw, Users } from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { BrowseEntry } from "../../lib/browse";
@@ -6,6 +6,7 @@ import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState } from "../../lib/party/engine";
 import { Button } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
+import { PartyGameDetailsModal } from "./PartyGameDetails";
 
 export interface PartyPlayShellProps {
   state: PartyEngineState;
@@ -31,21 +32,23 @@ type PlayShellPanel = "menu" | "players" | "browse" | null;
 /**
  * The play shell (P4 / 7.4, redesigned for classic parity in 7.38): the
  * in-game chrome sits IN FLOW ABOVE the game frame — a compact top bar
- * (the 🦀🚀 logo collapses to a bare floating logo on tap, a centered
+ * (the crab logo collapses to a bare floating logo on tap, a centered
  * rocketcrab.com/CODE URL copies the invite, and a Menu dropdown opens a
  * compact, flush dropdown), plus a Players POPUP (7.45: a compact overlay
  * anchored top-center BELOW the top bar - never a full-page takeover, so
  * the game keeps running underneath) and the shared pick-a-game browser.
- * Minimal chrome, the code
- * front and center: classic parity. The emergency teardown ("Exit to
- * lobby") lives here, outside the game frame (T6/T21 — game code cannot
- * disable it); game-end returns everyone to the lobby.
+ * The menu (9fv.11.11) holds Browse games (host only — picking a game
+ * while playing ends it for everyone) and About this game (the same
+ * details overlay the lobby's "What is GameName?" opens); leaving the
+ * party happens back in the lobby. Minimal chrome, the code front and
+ * center: classic parity. The emergency teardown ("Exit to lobby") lives
+ * here, outside the game frame (T6/T21 — game code cannot disable it);
+ * game-end returns everyone to the lobby.
  */
 export function PartyPlayShell({
   state,
   children,
   onEndGame,
-  onLeave,
   onReloadMyGame,
   onReloadAllGames,
   onKickMember,
@@ -58,6 +61,8 @@ export function PartyPlayShell({
   // 7.38: only one panel is open at a time (menu / players / browse).
   const [panel, setPanel] = useState<PlayShellPanel>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  // 9fv.11.11: "About this game" reuses the lobby's details overlay.
+  const [detailsOpen, setDetailsOpen] = useState(false);
   // 7.38: "Reload all" is red and asks first — players' games will be lost.
   const [confirmReloadAll, setConfirmReloadAll] = useState(false);
 
@@ -103,9 +108,7 @@ export function PartyPlayShell({
             aria-label="Hide the top bar"
             title="Hide the top bar"
           >
-            <span className="text-xl leading-none" aria-hidden="true">
-              🦀🚀
-            </span>
+            <img src="/crab.svg" alt="" className="h-5 w-5" />
           </button>
 
           <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -150,6 +153,37 @@ export function PartyPlayShell({
                 >
                   <Users className="h-4 w-4" aria-hidden="true" />
                   Players
+                </button>
+              </li>
+              {/* 9fv.11.11: Browse games moved from the Players popup into the
+                  menu (host only — picking a game while playing ends it for
+                  everyone, so joiners never see it). */}
+              {state.role === "creator" ? (
+                <li>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 rounded-box px-3 py-2 text-sm font-bold hover:bg-base-200"
+                    onClick={() => setPanel("browse")}
+                  >
+                    <Gamepad2 className="h-4 w-4" aria-hidden="true" />
+                    Browse games
+                  </button>
+                </li>
+              ) : null}
+              <li>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 rounded-box px-3 py-2 text-sm font-bold hover:bg-base-200"
+                  onClick={() => {
+                    setPanel(null);
+                    setDetailsOpen(true);
+                  }}
+                  disabled={state.game === null}
+                >
+                  <BookOpen className="h-4 w-4" aria-hidden="true" />
+                  About this game
                 </button>
               </li>
               <li>
@@ -198,20 +232,6 @@ export function PartyPlayShell({
                   </button>
                 </li>
               ) : null}
-              <li>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="flex w-full items-center gap-2 rounded-box px-3 py-2 text-sm font-bold hover:bg-base-200"
-                  onClick={() => {
-                    setPanel(null);
-                    onLeave();
-                  }}
-                >
-                  <LogOut className="h-4 w-4" aria-hidden="true" />
-                  Leave party
-                </button>
-              </li>
             </ul>
           ) : null}
         </header>
@@ -253,16 +273,6 @@ export function PartyPlayShell({
                 </button>
                 <p className="font-black">Players ({state.members.length})</p>
                 <div className="min-w-0 flex-1" />
-                {state.role === "creator" ? (
-                  <button
-                    type="button"
-                    className="btn btn-secondary btn-sm"
-                    onClick={() => setPanel("browse")}
-                  >
-                    <Gamepad2 className="h-4 w-4" aria-hidden="true" />
-                    Browse games
-                  </button>
-                ) : null}
               </div>
               <div className="min-h-0 overflow-y-auto p-3">
                 <ul className="flex flex-col gap-2">
@@ -303,7 +313,9 @@ export function PartyPlayShell({
         {/* 7.43: pick a game - the SAME shared browse UI as /browse, in pick
             mode, so the host can switch the game without leaving the party.
             7.45: rendered inside the frame area so its back row sits below
-            the fixed top bar too. */}
+            the fixed top bar too. 9fv.11.11: opened from the menu (the
+            Players popup's browse button moved there); Back returns to the
+            running game. */}
         {panel === "browse" ? (
           <div
             className="absolute inset-0 z-40 flex flex-col bg-base-200"
@@ -314,8 +326,8 @@ export function PartyPlayShell({
               <button
                 type="button"
                 className="btn btn-sm"
-                onClick={() => setPanel("players")}
-                aria-label="Back to players"
+                onClick={() => setPanel(null)}
+                aria-label="Back to the game"
               >
                 <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                 Back
@@ -334,15 +346,20 @@ export function PartyPlayShell({
       {barHidden ? (
         <button
           type="button"
-          className="btn btn-circle btn-sm absolute left-2 top-2 z-50 opacity-80 hover:opacity-100"
+          className="btn btn-circle btn-sm absolute left-[max(0.5rem,env(safe-area-inset-left))] top-[max(0.5rem,env(safe-area-inset-top))] z-50 opacity-80 hover:opacity-100"
           onClick={() => setBarHidden(false)}
           aria-label="Show the top bar"
           title="Show the top bar"
         >
-          <span className="text-xl leading-none" aria-hidden="true">
-            🦀🚀
-          </span>
+          <img src="/crab.svg" alt="" className="h-5 w-5" />
         </button>
+      ) : null}
+
+      {/* 9fv.11.11: About this game opens the SAME details overlay the
+          lobby's "What is GameName?" does, in-game (title / description /
+          how-to-play); the game keeps running underneath. */}
+      {detailsOpen ? (
+        <PartyGameDetailsModal game={state.game} onClose={() => setDetailsOpen(false)} />
       ) : null}
 
       {confirmEnd ? (
