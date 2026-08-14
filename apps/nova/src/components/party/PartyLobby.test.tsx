@@ -186,6 +186,7 @@ describe("PartyLobby", () => {
         joinErrors: null,
         peers: [],
         lastQuality: [],
+        turn: null,
       },
     });
     await renderLobby(state);
