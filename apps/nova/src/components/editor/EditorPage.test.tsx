@@ -267,9 +267,10 @@ describe("/editor — paste, run, save", () => {
     harness.console(runtimeIndex, "log", "dealt 5 cards");
     await waitFor(() => expect(desktop.getByText("dealt 5 cards")).toBeInTheDocument());
 
-    // Save creates the game and navigates to its edit route.
+    // Save creates the game and navigates to its edit route (the arena
+    // gains the launch-into-party action once the game is saved).
     await userEvent.click(desktop.getByRole("button", { name: /^Save$/ }));
-    await screen.findByText("Editing a saved game — unsaved edits never touch the saved version.");
+    await screen.findByRole("link", { name: /Play with friends/ });
 
     const games = await gameRepository.list();
     expect(games).toHaveLength(1);
@@ -534,9 +535,10 @@ describe("/games/:id/edit — saved games", () => {
     const editor = desktop.getByRole("textbox", { name: "Game HTML source" });
     await waitFor(() => expect(editor.textContent).toContain("rockets"));
 
-    // Save as copy of the *current editor* source.
+    // Save as copy of the *current editor* source; navigation lands on the
+    // copy's edit route (its title heading).
     await userEvent.click(desktop.getByRole("button", { name: /Save as copy/ }));
-    await screen.findByText("Editing a saved game — unsaved edits never touch the saved version.");
+    await screen.findByRole("heading", { level: 1, name: "Rocket Rumble (copy)" });
 
     const games = await gameRepository.list();
     expect(games).toHaveLength(2);

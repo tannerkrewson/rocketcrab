@@ -1,5 +1,4 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { Code2 } from "lucide-react";
 import { EditorPage } from "../../../components/editor/EditorPage";
 import { ErrorPanel } from "../../../components/ui/ErrorPanel";
 import { LoadingState } from "../../../components/ui/LoadingState";
@@ -36,10 +35,6 @@ function EditGamePage() {
   }
   return (
     <div className="flex flex-col gap-4">
-      <div className="flex items-center gap-2 text-sm font-semibold text-base-content/60">
-        <Code2 className="h-4 w-4" aria-hidden="true" />
-        Editing a saved game — unsaved edits never touch the saved version.
-      </div>
       <EditorPage game={gameQuery.data} />
     </div>
   );
