@@ -242,8 +242,6 @@ export function PartyLobby({
           party is still open — leave when you&apos;re done.
         </div>
       ) : null}
-      {/* The big code + invite (QR, URL, copy) now live in the classic
-          party shell header (7.22) rendered by PartyExperience. */}
       {/* 10.7: the greeter and authority role badges are gone from the
           lobby (diagnostic only) — see the diagnostics panel below. */}
       {/* Join requests (greeter only). */}
