@@ -12,6 +12,10 @@ import "@fontsource/mukta/500.css";
 import "@fontsource/mukta/600.css";
 import "@fontsource/mukta/700.css";
 import "@fontsource/mukta/800.css";
+// Inconsolata Variable (200-900) is the monospace brand font for the
+// rocketcrab.com homepage title only (rocketcrab-9fv.11.5); the rest of the
+// UI keeps Mukta. The `font-title` utility in styles.css references it.
+import "@fontsource-variable/inconsolata";
 import { normalizeBasePath } from "./lib/basepath";
 import { routeTree } from "./routeTree.gen";
 import "./styles.css";
