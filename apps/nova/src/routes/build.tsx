@@ -1,19 +1,10 @@
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
-import {
-  Bot,
-  Check,
-  ClipboardCopy,
-  ClipboardPaste,
-  Code2,
-  ScrollText,
-  Sparkles,
-} from "lucide-react";
+import { createFileRoute } from "@tanstack/react-router";
+import { Bot, Check, ClipboardCopy, ClipboardPaste, ScrollText, Sparkles } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Button, buttonStyles } from "../components/ui/Button";
+import { Button } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { writeToClipboard } from "../lib/editor/clipboard";
-import { clearDraftSource } from "../lib/editor/draft-handoff";
 import { buildMasterPrompt } from "../lib/prompt/master-prompt";
 
 export const Route = createFileRoute("/build")({
@@ -30,9 +21,10 @@ const NOVA_API_REFERENCE_URL =
  * about your idea, and paste the resulting HTML into the editor. The
  * generation flow is unchanged (7.44): one copyable prompt that works in any
  * AI chat service, and the editor is the paste target (no paste box here).
+ * The page ends at the master-prompt card — the old "start another way"
+ * row was removed (9fv.11.14) because the editor step is unavoidable.
  */
 export function BuildPage() {
-  const navigate = useNavigate();
   const prompt = useMemo(() => buildMasterPrompt(), []);
   const [copied, setCopied] = useState(false);
 
@@ -44,12 +36,6 @@ export function BuildPage() {
     } else {
       toast.error("Couldn't copy the prompt — expand it below and copy manually.");
     }
-  };
-
-  /** Open a blank editor; clear any stale draft handoff. */
-  const handleOpenEditor = () => {
-    clearDraftSource();
-    void navigate({ to: "/editor" });
   };
 
   return (
@@ -163,23 +149,6 @@ export function BuildPage() {
             .
           </p>
         </Card>
-      </section>
-
-      <section aria-label="Other ways to start" className="flex flex-col items-center gap-3">
-        <p className="text-sm font-bold text-base-content/60">Or start another way</p>
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          <Button variant="secondary" size="lg" onClick={handleOpenEditor}>
-            <Code2 className="h-5 w-5" aria-hidden="true" />
-            Open the editor
-          </Button>
-          <Link
-            to="/examples"
-            className={buttonStyles("outline", "lg")}
-            title="Open complete example games in the editor"
-          >
-            See example games
-          </Link>
-        </div>
       </section>
     </div>
   );
