@@ -17,10 +17,12 @@ import {
 initTheme();
 
 /**
- * Theme picker (rocketcrab-9fv.7.45): a light/dark toggle plus a dice that
- * rolls a random theme from the pool matching the current mode. The toggle
- * applies Nova's default theme for the mode; both choices persist via
- * lib/theme.ts, so they survive reloads.
+ * Theme picker (rocketcrab-9fv.7.45, icon-only since 7.47): a light/dark
+ * toggle plus a dice that rolls a random theme from the pool matching the
+ * current mode. The toggle applies Nova's default theme for the mode; both
+ * choices persist via lib/theme.ts, so they survive reloads. Buttons are
+ * icon-only (aria-labels/titles keep them accessible) so the control stays
+ * compact in the top bar.
  */
 export function ThemeSelector() {
   const [mode, setMode] = useState<ThemeMode>(() => currentThemeMode());
@@ -50,20 +52,22 @@ export function ThemeSelector() {
         <button
           type="button"
           aria-pressed={!isDark}
+          aria-label="Light theme"
+          title="Light theme"
           onClick={() => selectMode("light")}
           className={cn("btn btn-sm join-item", !isDark && "btn-primary")}
         >
           <Sun className="h-4 w-4" aria-hidden="true" />
-          Light
         </button>
         <button
           type="button"
           aria-pressed={isDark}
+          aria-label="Dark theme"
+          title="Dark theme"
           onClick={() => selectMode("dark")}
           className={cn("btn btn-sm join-item", isDark && "btn-primary")}
         >
           <Moon className="h-4 w-4" aria-hidden="true" />
-          Dark
         </button>
       </div>
       <button
