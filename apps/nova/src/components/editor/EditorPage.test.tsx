@@ -579,14 +579,17 @@ describe("/games/:id/edit — saved games", () => {
     expect(unloadEvent.defaultPrevented).toBe(true);
 
     // In-app navigation is blocked with a dialog.
-    await userEvent.click(screen.getByRole("link", { name: "Back to games" }));
+    await userEvent.click(screen.getByRole("link", { name: "My games" }));
     const dialog = await screen.findByRole("dialog");
     await userEvent.click(within(dialog).getByRole("button", { name: "Keep editing" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-    expect(screen.getByRole("textbox", { name: "Game title" })).toBeInTheDocument();
+    // The chrome shows the title as a heading (the input only appears while
+    // editing) with the pencil affordance.
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Rocket Rumble");
+    expect(screen.getByRole("button", { name: "Rocket Rumble" })).toBeInTheDocument();
 
     // Discard changes proceeds to the library.
-    await userEvent.click(screen.getByRole("link", { name: "Back to games" }));
+    await userEvent.click(screen.getByRole("link", { name: "My games" }));
     const dialog2 = await screen.findByRole("dialog");
     await userEvent.click(within(dialog2).getByRole("button", { name: "Discard changes" }));
     expect(await screen.findByText("My games")).toBeInTheDocument();
@@ -605,8 +608,46 @@ describe("/games/:id/edit — saved games", () => {
     window.dispatchEvent(unloadEvent);
     expect(unloadEvent.defaultPrevented).toBe(false);
 
-    await userEvent.click(screen.getByRole("link", { name: "Back to games" }));
+    await userEvent.click(screen.getByRole("link", { name: "My games" }));
     expect(await screen.findByText("My games")).toBeInTheDocument();
+  });
+
+  it("edits the game title inline (click-to-edit)", async () => {
+    const game = await gameRepository.create({ title: "Rocket Rumble", html: SAVED_SOURCE });
+    const harness = createHostHarness();
+    renderEditor([`/games/${game.id}/edit`], harness);
+    await layout("desktop-layout");
+
+    // Display mode: the saved title renders as a heading, not a text box.
+    expect(screen.queryByRole("textbox", { name: "Game title" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Rocket Rumble");
+
+    // Click swaps in an autofocused, select-all input.
+    await userEvent.click(screen.getByRole("heading", { level: 1 }));
+    const input = screen.getByRole("textbox", { name: "Game title" });
+    await waitFor(() => expect(input).toHaveFocus());
+    expect(input).toHaveValue("Rocket Rumble");
+
+    // Type over the selection and commit with Enter.
+    await userEvent.keyboard("Card Sharks{Enter}");
+    expect(screen.queryByRole("textbox", { name: "Game title" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Card Sharks");
+
+    // The rename is unsaved: the dirty indicator appears.
+    expect(screen.getByText(/· unsaved changes/)).toBeInTheDocument();
+
+    // Escape cancels an in-progress edit, restoring the pre-edit title.
+    await userEvent.click(screen.getByRole("heading", { level: 1 }));
+    await userEvent.keyboard("Trivia Night{Escape}");
+    expect(screen.queryByRole("textbox", { name: "Game title" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Card Sharks");
+
+    // Blur commits the edit too.
+    await userEvent.click(screen.getByRole("heading", { level: 1 }));
+    await userEvent.keyboard("Bingo");
+    await userEvent.tab();
+    expect(screen.queryByRole("textbox", { name: "Game title" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Bingo");
   });
 });
 
