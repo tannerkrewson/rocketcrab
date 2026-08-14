@@ -643,7 +643,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       {/* Phone-size prompt (below sm: — not tablets): editing and testing a
           game needs a real screen. */}
       <div className="sm:hidden" data-testid="phone-prompt">
-        <div role="alert" className="alert alert-warning">
+        <div role="alert" className="alert alert-warning alert-outline">
           <MonitorSmartphone className="h-6 w-6 shrink-0" aria-hidden="true" />
           <div>
             <h2 className="font-black">The editor works best on a computer</h2>
