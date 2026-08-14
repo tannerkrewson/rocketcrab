@@ -47,6 +47,7 @@ import { CodeEditor } from "./CodeEditor";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
 import { ArenaSection, ArenaRuntimeSeamsContext } from "./ArenaSection";
 import { FirstRunTutorial } from "./FirstRunTutorial";
+import { PromptExportMenu } from "./PromptExportMenu";
 
 /** Default title for a new, unnamed game (matches the runtime's fallback). */
 export const DEFAULT_GAME_TITLE = "Untitled game";
@@ -593,6 +594,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         <PartyPopper className="h-4 w-4" aria-hidden="true" />
         Play with friends
       </Button>
+      <PromptExportMenu source={source} title={title} />
     </>
   );
 

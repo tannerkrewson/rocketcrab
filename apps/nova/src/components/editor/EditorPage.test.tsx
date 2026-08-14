@@ -677,6 +677,39 @@ describe("diagnostic report", () => {
   });
 });
 
+describe("prompt export (Task 3)", () => {
+  it("copies the raw master prompt from the actions row", async () => {
+    const { writeText } = mockClipboard(PASTED_SOURCE);
+    const harness = createHostHarness();
+    renderEditor(["/editor"], harness);
+    const desktop = await layout("desktop-layout");
+
+    await userEvent.click(desktop.getByText("Copy prompt"));
+    await userEvent.click(screen.getByRole("button", { name: "Master prompt" }));
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const copied = writeText.mock.calls[0]?.[0] as string;
+    expect(copied).toContain("# Nova Master Prompt");
+    expect(copied).not.toContain("## Your existing game");
+  });
+
+  it("copies the prompt plus the current game source", async () => {
+    const { writeText } = mockClipboard(PASTED_SOURCE);
+    const harness = createHostHarness();
+    renderEditor(["/editor"], harness);
+    const desktop = await layout("desktop-layout");
+
+    // Paste a source first so the copy embeds real code.
+    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
+    await userEvent.click(desktop.getByText("Copy prompt"));
+    await userEvent.click(screen.getByRole("button", { name: "Prompt + my game" }));
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
+    const copied = writeText.mock.calls[0]?.[0] as string;
+    expect(copied).toContain("# Nova Master Prompt");
+    expect(copied).toContain("## Your existing game");
+    expect(copied).toContain(PASTED_SOURCE);
+  });
+});
+
 describe("phone layout", () => {
   it("switches between Code and Errors tabs", async () => {
     const harness = createHostHarness();
