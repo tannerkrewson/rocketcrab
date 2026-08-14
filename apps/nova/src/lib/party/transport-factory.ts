@@ -8,17 +8,40 @@
  * room admission stays at the transport level (F8). The appId defaults to
  * the environment-specific `rocketcrab-nova-dev` / `-prod` (never colliding
  * between dev and prod rooms; `app-id.ts`).
+ *
+ * TURN credentials (P0, beads rocketcrab-23s): the factory methods are
+ * SYNC (TrysteroTransport construction is synchronous), so the engine mints
+ * short-lived credentials ONCE at setup start and closes over them here as
+ * `turnConfig` for BOTH transports (the rendezvous and the private room —
+ * each room's WebRTC needs the relayed path, and both transports are
+ * created fresh per party). Without minted credentials the factory behaves
+ * exactly as before: no TURN.
  */
 import type { PartyTransportFactory } from "@rocketcrab/party";
 import { TrysteroTransport } from "@rocketcrab/trystero-transport";
+import type { TurnServerConfigLike } from "./turn-creds";
+
+/** Options closed over by the factory at construction time (sync methods). */
+export interface TrysteroPartyTransportFactoryOptions {
+  /**
+   * Minted short-lived TURN servers (Trystero `TurnServerConfig` shape).
+   * Omit for builds without VITE_TURN_CREDS_ORIGIN or after a mint failure
+   * (graceful degradation: the party proceeds without TURN).
+   */
+  readonly turnConfig?: readonly TurnServerConfigLike[];
+}
 
 /** The transport factory real parties run over (dev/prod appId by env). */
-export function createTrysteroPartyTransportFactory(): PartyTransportFactory {
+export function createTrysteroPartyTransportFactory(
+  options: TrysteroPartyTransportFactoryOptions = {},
+): PartyTransportFactory {
+  const { turnConfig } = options;
   return {
     createRendezvousTransport(identity) {
       return new TrysteroTransport({
         memberId: identity.memberId,
         displayName: identity.displayName,
+        ...(turnConfig !== undefined ? { turnConfig } : {}),
       });
     },
     createPrivateTransport(identity) {
@@ -26,6 +49,7 @@ export function createTrysteroPartyTransportFactory(): PartyTransportFactory {
         memberId: identity.memberId,
         displayName: identity.displayName,
         password: identity.password,
+        ...(turnConfig !== undefined ? { turnConfig } : {}),
       });
     },
   };
