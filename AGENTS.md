@@ -14,3 +14,17 @@ React + TanStack Router + daisyUI in apps/nova).
 - Prefer the shared `Button` component over raw `btn` classes. For router
   `Link` elements, use `buttonStyles(...)` to keep the same look and
   touch-target size while preserving type-safe route props.
+
+## Docs ownership
+
+- Every file under `docs/` must be reachable from a canonical index or an
+  owning ADR: the ADRs in `docs/architecture/` are self-owning, the
+  README's Documentation section is the top-level index, and
+  milestone/findings docs are linked from their owning ADR (e.g. ADR-0006
+  → the S4 vertical slice).
+- New docs need an owner link at creation time. Unreferenced docs get
+  linked or deleted — never orphaned.
+- Cloudflare infrastructure state and the recreate-without-Terraform
+  runbook live in `deploy/cloudflare.md`. Record every infra change there
+  (dashboard/MCP edits included); CI workflows are the deploy source of
+  truth.
