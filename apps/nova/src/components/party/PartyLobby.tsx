@@ -162,7 +162,7 @@ export function PartyLobby({
     // (/game/$gameId, saved games included); the pick happens there and
     // returns to /party. The lobby never sets the game directly.
     return (
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+      <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
         <section aria-label="Pick a game" className="flex flex-col gap-3">
           <button
             type="button"
@@ -179,19 +179,20 @@ export function PartyLobby({
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
       {/* 10.5: the invite card — get your friends in via URL or QR. The QR
           is NOT shown on the page; it opens in a modal. Only the origin +
           code are ever rendered (ADR-0011: the session secret stays in the
           URL fragment, never on the page). */}
+      {/* 11.6: the title (origin + code) lives in the party shell header as
+          ONE string — the invite card never renders it again (the code is
+          never shown separately from the title). The card is the invite
+          ACTION: Copy URL / QR only. */}
       <section
         aria-label="Invite your friends"
         className="flex flex-col items-center gap-3 rounded-box border-2 border-base-300 bg-base-100 p-5 text-center"
       >
         <h2 className="text-lg font-black">Get your friends to join!</h2>
-        {pageTitle !== null ? (
-          <p className="font-mono text-sm font-bold text-primary">{pageTitle}</p>
-        ) : null}
         <div className="flex items-center justify-center gap-2">
           <Button variant="primary" size="md" onClick={() => void copyInvite()}>
             <Copy className="h-4 w-4" aria-hidden="true" />

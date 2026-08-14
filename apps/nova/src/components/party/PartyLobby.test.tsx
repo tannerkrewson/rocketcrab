@@ -482,14 +482,15 @@ describe("PartyLobby", () => {
     expect(screen.queryByRole("button", { name: /kick/i })).not.toBeInTheDocument();
   });
 
-  it("shows the invite card with Copy URL + QR Code and an origin+code title (10.5)", async () => {
+  it("shows the invite card with Copy URL + QR and no code/URL text (10.5/11.6)", async () => {
     await renderLobby(makeState());
     expect(screen.getByText("Get your friends to join!")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy url/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /qr code/i })).toBeInTheDocument();
-    // The lobby page title is origin + code — the full invite URL is never
-    // rendered (ADR-0011).
-    expect(screen.getByText(`${window.location.host}/abcd`)).toBeInTheDocument();
+    // The origin+code title lives in the party shell header (11.6) — the
+    // lobby card never re-renders it. The code is never shown separately
+    // from the title, and the full invite URL is never rendered (ADR-0011).
+    expect(screen.queryByText(`${window.location.host}/abcd`)).not.toBeInTheDocument();
     expect(screen.queryByText(INVITE_URL)).not.toBeInTheDocument();
     expect(screen.queryByText(/invite-secret/)).not.toBeInTheDocument();
     // The QR is not shown directly on the lobby.
