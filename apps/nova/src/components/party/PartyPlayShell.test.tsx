@@ -16,12 +16,14 @@ import { PartyPlayShell, type PartyPlayShellProps } from "./PartyPlayShell";
 
 /**
  * In-game play shell tests (7.29 + 7.38 + 7.45): the compact top bar (logo
- * collapse, centered party URL), the mutually-exclusive menu / players /
- * browse panels, the players popup (7.45: a compact overlay anchored below
- * the top bar - never a full-page takeover - dismissed by Back, outside
- * click, or Escape; back button + host "Browse games"), and the confirmed
- * actions - Reload all is red and asks first, "Exit to lobby" ends the
- * game for everyone.
+ * collapse, centered party URL — tap to copy), the mutually-exclusive
+ * menu / players / browse panels, the players popup (7.45: a compact
+ * overlay anchored below the top bar - never a full-page takeover -
+ * dismissed by Back, outside click, or Escape), and the confirmed actions
+ * - Reload all is red and asks first, "Exit to lobby" ends the game for
+ * everyone. The menu (9fv.11.11) hosts Browse games (host only; it moved
+ * out of the players popup) and About this game (the lobby's details
+ * overlay, in-game); Leave party was removed from the in-game menu.
  */
 
 function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState {
@@ -240,6 +242,9 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
   it("hides kick and Browse games from joiners", async () => {
     await renderShell(makeState({ role: "joiner" }));
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
+    // Browse games is host-only (picking while playing ends the game for
+    // everyone) and no longer lives in the Players popup at all.
+    expect(screen.queryByRole("menuitem", { name: /browse games/i })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
     const players = screen.getByRole("dialog", { name: "Players" });
     expect(within(players).queryByRole("button", { name: /kick/i })).not.toBeInTheDocument();
@@ -260,21 +265,23 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     // The popup's Back button closes the panel.
     await userEvent.click(screen.getByRole("button", { name: /back to the game/i }));
     expect(screen.queryByRole("dialog", { name: "Players" })).not.toBeInTheDocument();
-    // Browse (host) replaces Players — never both at once.
+    // Browse (host) opens from the menu — never both at once.
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
-    await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
-    await userEvent.click(screen.getByRole("button", { name: /browse games/i }));
-    expect(screen.queryByRole("dialog", { name: "Players" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("menuitem", { name: /browse games/i }));
+    expect(screen.queryByRole("menu", { name: /game menu/i })).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Pick a game" })).toBeInTheDocument();
+    // Back returns to the running game (browse no longer sits under the
+    // players popup).
+    await userEvent.click(screen.getByRole("button", { name: /back to the game/i }));
+    expect(screen.queryByRole("dialog", { name: "Pick a game" })).not.toBeInTheDocument();
   });
 
-  it("browses games with the shared browse UI and picks from it (7.43)", async () => {
+  it("browses games from the menu and picks from the shared browse UI (7.43/9fv.11.11)", async () => {
     const onPickGame = vi.fn();
     const onPickPrebuilt = vi.fn();
     await renderShell(makeState(), { onPickGame, onPickPrebuilt });
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
-    await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
-    await userEvent.click(screen.getByRole("button", { name: /browse games/i }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /browse games/i }));
     const browse = screen.getByRole("dialog", { name: "Pick a game" });
     // The SAME shared browse UI as /browse: search + category cards; the
     // list only shows once a category opens (10.9).
@@ -285,8 +292,38 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(onPickPrebuilt).toHaveBeenCalledWith(
       expect.objectContaining({ kind: "classic", id: "protobowl" }),
     );
-    // Back returns to the players popup.
-    await userEvent.click(screen.getByRole("button", { name: /back to players/i }));
-    expect(screen.getByRole("dialog", { name: "Players" })).toBeInTheDocument();
+    // Back returns to the running game (browse opens from the menu now,
+    // not the players popup).
+    await userEvent.click(screen.getByRole("button", { name: /back to the game/i }));
+    expect(screen.queryByRole("dialog", { name: "Pick a game" })).not.toBeInTheDocument();
+  });
+
+  it("opens About this game from the menu (9fv.11.11)", async () => {
+    // Drawphone is a prebuilt classic game with a description + guide; the
+    // overlay is the SAME one the lobby's "What is GameName?" opens.
+    const state = makeState({ game: { gameId: "drawphone", title: "Drawphone", mode: "state" } });
+    await renderShell(state);
+    await userEvent.click(screen.getByRole("button", { name: /menu/i }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /about this game/i }));
+    const dialog = screen.getByRole("dialog", { name: "About Drawphone" });
+    expect(within(dialog).getByText(/In Drawphone, there are no winners/)).toBeInTheDocument();
+    // The game keeps running underneath; the X closes the overlay.
+    expect(screen.getByTestId("game-frame")).toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: /close game details/i }));
+    expect(screen.queryByRole("dialog", { name: "About Drawphone" })).not.toBeInTheDocument();
+  });
+
+  it("copies the invite URL when the centered party URL is tapped (9fv.11.11)", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    await renderShell(makeState());
+    await userEvent.click(screen.getByLabelText("Party link rocketcrab.com/abcd"));
+    expect(writeText).toHaveBeenCalledWith(
+      "http://localhost:5173/join#code=ABCD&secret=invite-secret",
+    );
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
   });
 });
