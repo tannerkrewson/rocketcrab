@@ -5,15 +5,15 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildMasterPrompt } from "../lib/prompt/master-prompt";
-import { readDraftSource, storeDraftSource } from "../lib/editor/draft-handoff";
 import { routeTree } from "../routeTree.gen";
 
 /**
  * Build-page gateway tests (rocketcrab-9fv.10.11): the centered /build route
- * introduces the master-prompt flow in three steps, offers the copyable
- * master prompt as the main call to action, links to the GitHub-hosted API
- * reference and example games, and opens a blank editor without a stale
- * draft (7.44: no paste box — the user pastes directly in the editor).
+ * introduces the master-prompt flow in three steps and offers the copyable
+ * master prompt as the main call to action, linking to the GitHub-hosted API
+ * reference. The old "start another way" row (Open the editor / See example
+ * games) was removed (9fv.11.14): the editor is an unavoidable step, so the
+ * page ends at the master-prompt card.
  */
 
 const PROMPT = buildMasterPrompt();
@@ -34,14 +34,6 @@ function renderBuild() {
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
   return render(<RouterProvider router={router} />, { wrapper });
-}
-
-async function editorSourceTextbox() {
-  // The /editor route's CodeMirror surfaces as a textbox with this label.
-  // Scope to the desktop layout: the phone layout mounts a second CodeMirror
-  // that jsdom's CSS-less environment never hides.
-  const desktop = await screen.findByTestId("desktop-layout");
-  return within(desktop).getByRole("textbox", { name: "Game HTML source" });
 }
 
 beforeEach(() => {
@@ -110,17 +102,14 @@ describe("/build — build a game gateway", () => {
     expect(link.getAttribute("href")).not.toMatch(/\/blob\/(nova|dev|main|master)\//);
   });
 
-  it("links to the example games", async () => {
+  it("no longer offers the start-another-way row (9fv.11.14)", async () => {
     renderBuild();
 
-    const link = await screen.findByRole("link", { name: "See example games" });
-    expect(link).toHaveAttribute("href", "/examples");
+    await screen.findByRole("heading", { name: "Build a game" });
 
-    await userEvent.click(link);
-    expect(await screen.findByRole("heading", { name: "Example games" })).toBeInTheDocument();
-    expect(screen.getByText("Nova Quiz")).toBeInTheDocument();
-    expect(screen.getByText("Nova Drift")).toBeInTheDocument();
-    expect(screen.getByText("Chatter (raw mode sample)")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Open the editor" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: "See example games" })).not.toBeInTheDocument();
+    expect(screen.queryByText("Or start another way")).not.toBeInTheDocument();
   });
 
   it("keeps the editor as the paste target — no paste box on this page (7.44)", async () => {
@@ -137,17 +126,5 @@ describe("/build — build a game gateway", () => {
       screen.queryByText(/Copy the master prompt below into any AI chat service/),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Next steps" })).not.toBeInTheDocument();
-  });
-
-  it("opens a blank editor without a stale draft", async () => {
-    // A stale draft from a previous session must not leak into the blank editor.
-    storeDraftSource("<p>stale draft</p>");
-    renderBuild();
-
-    await userEvent.click(await screen.findByRole("button", { name: "Open the editor" }));
-
-    const editor = await editorSourceTextbox();
-    expect(editor.textContent?.trim()).toBe("");
-    expect(readDraftSource()).toBeNull();
   });
 });
