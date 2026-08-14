@@ -73,6 +73,41 @@ export interface IceServersResponse {
   ttl?: number;
 }
 
+/**
+ * True when an ICE URL's port list includes exactly 53 (browsers block
+ * port 53 / DNS traffic, so those candidates would hang on timeouts).
+ *
+ * Cloudflare URLs look like "turn:turn.cloudflare.com:3478?transport=udp"
+ * or "turns:turn.cloudflare.com:5349|443?transport=tcp". A naive
+ * `includes(":53")` would also match the ":5349" fallback port in the
+ * documented primary set, so the port list is extracted and compared
+ * exactly instead.
+ */
+export function isPort53IceUrl(url: string): boolean {
+  const queryStart = url.indexOf("?");
+  const beforeQuery = queryStart === -1 ? url : url.slice(0, queryStart);
+  const portList = beforeQuery.slice(beforeQuery.lastIndexOf(":") + 1);
+  return portList.split("|").includes("53");
+}
+
+/**
+ * Drop every ICE server entry whose URLs include a port-53 candidate
+ * (both stun: and turn: URLs). Entries with any surviving URL are kept
+ * with their username/credential intact; entries whose URLs are all
+ * dropped are removed. The iceServers array shape is preserved.
+ */
+export function filterPort53IceServers(response: IceServersResponse): IceServersResponse {
+  const iceServers = (response.iceServers ?? []).flatMap((server) => {
+    if (typeof server.urls === "string") {
+      return isPort53IceUrl(server.urls) ? [] : [server];
+    }
+    if (!Array.isArray(server.urls)) return [];
+    const urls = server.urls.filter((url) => !isPort53IceUrl(url));
+    return urls.length === 0 ? [] : [{ ...server, urls }];
+  });
+  return { ...response, iceServers };
+}
+
 /** Parsed origin allowlist from ORIGIN_ALLOWLIST (or the default). */
 export function parseAllowlist(raw: string | undefined): string[] {
   const source = raw === undefined ? "" : raw;
@@ -203,7 +238,8 @@ export async function handleTurnCredsRequest(
   }
 
   // 3. Mint: proxy to the Cloudflare Realtime credentials API with a fixed
-  // short TTL. Never leak the API token in any response.
+  // short TTL (rocketcrab-23s.2), then drop port-53 URLs from the response
+  // (browsers block port 53). Never leak the API token in any response.
   const upstream = buildMintRequest(env);
   if (upstream === null) {
     return jsonError(
@@ -254,7 +290,7 @@ export async function handleTurnCredsRequest(
     );
   }
 
-  return jsonResponse(200, body, cors);
+  return jsonResponse(200, filterPort53IceServers(body), cors);
 }
 
 export default { fetch: handleTurnCredsRequest };

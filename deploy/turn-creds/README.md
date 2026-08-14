@@ -125,3 +125,28 @@ wrangler dev --var ORIGIN_ALLOWLIST:https://192.168.1.10:5173,https://rocketcrab
 Prod always uses the deployed `ORIGIN_ALLOWLIST` (or its default), so the
 LAN override is dev-only. For the equivalent in `.dev.vars`:
 `ORIGIN_ALLOWLIST=https://192.168.1.10:5173,https://rocketcrab.com`.
+
+## Credential TTL and port-53 URLs (rocketcrab-23s.2)
+
+- The upstream call always requests `{"ttl": 600}` — a **10-minute** credential
+  lifetime, baked into the worker (`MINT_TTL_SECONDS`). Short enough that an
+  extracted credential is worthless, long enough for a full party. The client
+  cannot change it (request bodies are ignored).
+- Cloudflare's `generate-ice-servers` response includes alternate **port-53**
+  URLs (`stun:`/`turn:` on port 53), which browsers block — ICE would stall on
+  timeouts, and Nova does not use trickle ICE. The worker drops every URL
+  whose port list includes exactly `53` and keeps the documented primary set:
+
+  ```
+  turn:turn.cloudflare.com:3478?transport=udp
+  turn:turn.cloudflare.com:3478?transport=tcp
+  turns:turn.cloudflare.com:5349|443?transport=tcp
+  ```
+
+  The check is port-exact (`:5349` is kept; only `:53` candidates are
+  dropped) and the `iceServers` array shape (urls/username/credential per
+  entry) is preserved.
+
+- Upstream failures (network error, non-2xx, invalid JSON, wrong shape)
+  return `502` with a structured JSON error; the TURN API token never appears
+  in any response.
