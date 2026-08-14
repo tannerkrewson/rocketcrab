@@ -145,3 +145,28 @@ after the code block.
 ${novaApiReference}
 `;
 }
+
+/**
+ * Build the master prompt extended with the creator's existing game (Task 3:
+ * prompt export): the full interview-and-build instructions followed by a
+ * "## Your existing game" section carrying the current source, so an AI can
+ * continue and improve this exact game instead of starting a fresh
+ * interview. `buildMasterPrompt` itself stays byte-identical (its snapshot
+ * test pins it).
+ */
+export function buildMasterPromptWithGame(html: string, title?: string): string {
+  const titleLine =
+    title !== undefined && title.trim().length > 0 ? `\nTitle: ${title.trim()}` : "";
+  return `${buildMasterPrompt()}
+
+## Your existing game
+
+The creator already has a game they want you to continue and improve.${titleLine}
+
+\`\`\`html
+${html}
+\`\`\`
+
+Continue and improve this exact game — keep its rules, controls, and visuals, and build on what is
+already there instead of re-interviewing the creator.`;
+}

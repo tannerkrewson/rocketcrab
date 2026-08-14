@@ -2,7 +2,11 @@ import { existsSync, readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { MASTER_PROMPT_VERSION, buildMasterPrompt } from "./master-prompt";
+import {
+  MASTER_PROMPT_VERSION,
+  buildMasterPrompt,
+  buildMasterPromptWithGame,
+} from "./master-prompt";
 
 /**
  * Master prompt template tests (A4). The prompt is the single artifact users
@@ -209,6 +213,30 @@ describe("master prompt — acceptance criteria", () => {
     expect(normalized).toContain("selectView");
     expect(normalized).toContain("nova.onStart");
     expect(normalized).toContain("Minimal game");
+  });
+});
+
+describe("master prompt — prompt with the existing game (Task 3)", () => {
+  it("appends the existing-game section with the title, source, and a continue instruction", () => {
+    const withGame = buildMasterPromptWithGame("<p>hi</p>", "Card Sharks");
+    // The plain master prompt stays byte-identical as the prefix.
+    expect(withGame.startsWith(prompt)).toBe(true);
+    expect(withGame).toContain("## Your existing game");
+    expect(withGame).toContain("Title: Card Sharks");
+    expect(withGame).toContain("```html\n<p>hi</p>\n```");
+    expect(withGame).toContain("Continue and improve this exact game");
+  });
+
+  it("omits the title line when no title is given and still embeds the source", () => {
+    const withGame = buildMasterPromptWithGame("<p>hi</p>");
+    expect(withGame.startsWith(prompt)).toBe(true);
+    expect(withGame).not.toContain("Title:");
+    expect(withGame).toContain("```html\n<p>hi</p>\n```");
+    expect(withGame).toContain("Continue and improve this exact game");
+  });
+
+  it("keeps the plain master prompt byte-identical", () => {
+    expect(buildMasterPrompt()).toBe(prompt);
   });
 });
 
