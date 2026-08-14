@@ -104,6 +104,11 @@
    * and cover the app's font-medium/semibold/bold/black usage (Mukta tops
    * out at 800, so font-black (900) renders at its heaviest weight). */
   --font-sans: "Mukta", ui-sans-serif, system-ui, sans-serif;
+
+  /* Monospace brand font for the rocketcrab.com homepage title only
+   * (rocketcrab-9fv.11.5). Inconsolata Variable (200-900) is loaded in
+   * main.tsx; everything else keeps Mukta. */
+  --font-title: "Inconsolata Variable", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
 
 @layer base {
