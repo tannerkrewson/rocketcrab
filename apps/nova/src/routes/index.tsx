@@ -1,4 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { BrandLogo } from "../components/layout/BrandLogo";
 import { buttonStyles } from "../components/ui/Button";
 
 export const Route = createFileRoute("/")({
@@ -17,7 +18,7 @@ function HomeComponent() {
   return (
     <div className="flex min-h-[calc(100dvh-16rem)] flex-col items-center justify-center gap-10">
       <section className="flex flex-col items-center gap-3 text-center">
-        <img src="/crab.svg" alt="Rocketcrab logo" className="h-20 w-20" />
+        <BrandLogo size={80} />
         <h1 className="text-4xl font-black tracking-tight text-base-content sm:text-5xl">
           rocketcrab<span className="text-primary">.com</span>
         </h1>

@@ -4,6 +4,7 @@ import { toast } from "sonner";
 import type { BrowseEntry } from "../../lib/browse";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState } from "../../lib/party/engine";
+import { BrandLogo } from "../layout/BrandLogo";
 import { Button } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
 
@@ -31,7 +32,7 @@ type PlayShellPanel = "menu" | "players" | "browse" | null;
 /**
  * The play shell (P4 / 7.4, redesigned for classic parity in 7.38): the
  * in-game chrome sits IN FLOW ABOVE the game frame — a compact top bar
- * (the 🦀🚀 logo collapses to a bare floating logo on tap, a centered
+ * (the SVG brand logo collapses to a bare floating logo on tap, a centered
  * rocketcrab.com/CODE URL copies the invite, and a Menu dropdown opens a
  * compact, flush dropdown), plus a Players POPUP (7.45: a compact overlay
  * anchored top-center BELOW the top bar - never a full-page takeover, so
@@ -103,9 +104,7 @@ export function PartyPlayShell({
             aria-label="Hide the top bar"
             title="Hide the top bar"
           >
-            <span className="text-xl leading-none" aria-hidden="true">
-              🦀🚀
-            </span>
+            <BrandLogo size={20} />
           </button>
 
           <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -334,14 +333,12 @@ export function PartyPlayShell({
       {barHidden ? (
         <button
           type="button"
-          className="btn btn-circle btn-sm absolute left-2 top-2 z-50 opacity-80 hover:opacity-100"
+          className="btn btn-sm absolute left-2 top-2 z-50 opacity-80 hover:opacity-100"
           onClick={() => setBarHidden(false)}
           aria-label="Show the top bar"
           title="Show the top bar"
         >
-          <span className="text-xl leading-none" aria-hidden="true">
-            🦀🚀
-          </span>
+          <BrandLogo size={18} />
         </button>
       ) : null}
 
