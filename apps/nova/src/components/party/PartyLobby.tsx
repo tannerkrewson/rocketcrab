@@ -2,7 +2,6 @@ import {
   ArrowLeft,
   BookOpen,
   Check,
-  Clock3,
   Copy,
   Gamepad2,
   LogOut,
@@ -61,7 +60,14 @@ function roleLabels(member: PartyMemberView, isCreator: boolean): string {
   return labels.join(", ");
 }
 
-/** Tiny transfer-state indicator inside a player tile (10.8). */
+/**
+ * Tiny transfer-state indicator inside a player tile (10.8 / 11.9): only
+ * genuinely operational states show — an in-flight transfer bar, a
+ * failure, or the muted "waiting for game" gap. The always-green "Game
+ * ready" badge is gone (has-the-game is the default end state, and
+ * readiness belongs to the start flow, which the start button + blocked
+ * reason already communicate). The connection dot carries presence.
+ */
 function transferIndicator(member: PartyMemberView) {
   switch (member.transferState) {
     case "transferring":
@@ -73,8 +79,6 @@ function transferIndicator(member: PartyMemberView) {
           aria-label={`Game transfer progress for ${member.displayName}`}
         />
       );
-    case "complete":
-      return <span className="text-[10px] font-bold text-success">Game ready</span>;
     case "failed":
       return <span className="text-[10px] font-bold text-error">Failed</span>;
     case "incompatible":
@@ -82,6 +86,8 @@ function transferIndicator(member: PartyMemberView) {
     case "waiting":
     case "none":
       return <span className="text-[10px] font-bold text-base-content/40">Waiting for game</span>;
+    case "complete":
+      return null;
   }
 }
 
@@ -431,13 +437,8 @@ export function PartyLobby({
                             aria-hidden="true"
                           />
                         )}
-                        <span title={member.ready ? "Ready" : "Not ready"}>
-                          {member.ready ? (
-                            <Check className="h-3.5 w-3.5 text-success" aria-hidden="true" />
-                          ) : (
-                            <Clock3 className="h-3.5 w-3.5" aria-hidden="true" />
-                          )}
-                        </span>
+                        {/* 11.9: no standalone ready check — readiness is the
+                            start flow's job (start button + blocked reason). */}
                         {transferIndicator(member)}
                         {state.role === "creator" && !member.isSelf ? (
                           <button
