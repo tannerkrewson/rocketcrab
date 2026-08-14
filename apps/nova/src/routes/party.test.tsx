@@ -180,7 +180,7 @@ describe("/party", () => {
     await waitFor(() => expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada"));
     await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledWith());
     // The party experience renders the lobby instead of the entry page.
-    expect(await screen.findByText("Welcome to Rocketcrab!")).toBeInTheDocument();
+    expect(await screen.findByText("Welcome to rocketcrab!")).toBeInTheDocument();
     expect(screen.queryByRole("heading", { name: "Start a party" })).not.toBeInTheDocument();
   });
 

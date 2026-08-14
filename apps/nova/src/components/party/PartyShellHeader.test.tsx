@@ -5,9 +5,10 @@ import { PartyShellHeader } from "./PartyShellHeader";
 
 /**
  * Party shell header tests (7.22): the classic-style header shows the
- * rocket + crab logo, the big mono room code, the phonetic spelling, and —
- * when requested — the Nova-only invite QR + copy row. Clicking the code
- * copies the invite link.
+ * rocket + crab logo, the big mono room code, and the lowercase phonetic
+ * spelling. Clicking the code copies the invite link. The invite details
+ * (QR / URL / copy row) moved to the lobby's invite card (10.5) — the
+ * header stays the classic identity.
  */
 
 const INVITE_URL = "http://localhost:5173/join#code=RCRB&secret=invite-secret";
@@ -17,11 +18,14 @@ afterEach(() => {
 });
 
 describe("PartyShellHeader", () => {
-  it("renders the logo and the big mono code with a lowercase phonetic spelling", () => {
+  it("renders the logo and the big mono code with lowercase phonetic spelling", () => {
     render(<PartyShellHeader code="RCRB" inviteUrl={INVITE_URL} />);
     expect(screen.getByTestId("party-code")).toHaveTextContent("RCRB");
-    // 7.47: the phonetic words render lowercase, not all caps.
-    expect(screen.getByText("(romeo charlie romeo bravo)")).toBeInTheDocument();
+    const phonetic = screen.getByText(/romeo charlie romeo bravo/i);
+    expect(phonetic).toBeInTheDocument();
+    // 10.5: the phonetic is lowercase (never ALL CAPS), consistent with the
+    // join page.
+    expect(phonetic.textContent).toBe("(romeo charlie romeo bravo)");
   });
 
   it("renders only the logo when no code is known yet", () => {
@@ -42,11 +46,10 @@ describe("PartyShellHeader", () => {
     Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
   });
 
-  it("shows the invite QR + copy row when requested", () => {
-    render(<PartyShellHeader code="RCRB" inviteUrl={INVITE_URL} showInviteDetails />);
-    expect(screen.getByLabelText("Party invite QR code")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /copy invite link/i })).toBeInTheDocument();
-    expect(screen.getAllByText(INVITE_URL).length).toBeGreaterThan(0);
+  it("never renders the invite URL text (10.5 / ADR-0011)", () => {
+    render(<PartyShellHeader code="RCRB" inviteUrl={INVITE_URL} />);
+    expect(screen.queryByText(INVITE_URL)).not.toBeInTheDocument();
+    expect(screen.queryByText(/invite-secret/)).not.toBeInTheDocument();
   });
 
   it("suppresses the phonetic spelling when disabled (classic join page)", () => {
