@@ -48,8 +48,9 @@ describe("AppLayout", () => {
     renderAt("/about");
     await screen.findByRole("heading", { name: "Coming soon" });
 
-    const home = screen.getByRole("link", { name: /Rocketcrab Nova/ });
+    const home = screen.getByRole("link", { name: /Rocketcrab home/ });
     expect(home.getAttribute("href")).toBe("/");
+    expect(home.querySelector("img")).toHaveAttribute("src", "/crab.svg");
 
     // Icon-only theme/color controls: labels are accessible, no visible text.
     expect(screen.getByRole("button", { name: "Light theme" })).toBeInTheDocument();
@@ -60,14 +61,14 @@ describe("AppLayout", () => {
   });
 
   it("renders the compact floating theme control on party routes (no wordmark bar)", async () => {
-    renderAt("/play");
-    await screen.findByRole("heading", { name: "Play" });
+    renderAt("/join");
+    await screen.findByRole("heading", { name: "Join a party" });
 
     expect(screen.getByTestId("party-route-theme-control")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Light theme" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Random theme" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Rocketcrab Nova/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Rocketcrab home/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("contentinfo")).not.toBeInTheDocument();
   });
 

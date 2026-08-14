@@ -660,11 +660,11 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       <header className="flex flex-wrap items-center gap-3">
         <Link
           to="/"
-          className="text-2xl leading-none"
+          className="flex items-center"
           aria-label="Rocketcrab Nova home"
           title="Rocketcrab Nova"
         >
-          <span aria-hidden="true">🦀🚀</span>
+          <img src="/crab.svg" alt="" className="h-9 w-9" />
         </Link>
         <Link to="/library" className={buttonStyles("outline")} title="Back to your games">
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
