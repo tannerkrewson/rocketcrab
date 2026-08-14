@@ -1,6 +1,7 @@
 import { toast } from "sonner";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import { phoneticSpelling } from "../../lib/party/phonetic";
+import { BrandLogo } from "../layout/BrandLogo";
 
 export interface PartyShellHeaderProps {
   /** Four-letter party code; omit (or null) for the bare logo header. */
@@ -45,9 +46,7 @@ export function PartyShellHeader({
 
   return (
     <header className="flex flex-col items-center gap-1 py-3 text-center">
-      <p className="text-4xl leading-none" aria-hidden="true">
-        🦀🚀
-      </p>
+      <BrandLogo size={36} />
       {pageTitle !== null ? (
         <>
           <button

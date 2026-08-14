@@ -80,7 +80,10 @@ export function findBrowseGame(id: string): BrowseEntry | undefined {
 export interface BrowseCategory {
   id: string;
   label: string;
-  emoji: string;
+  /** Classic-style emoji icon; the Nova box carries the real brand mark instead. */
+  emoji?: string;
+  /** The Nova box renders the crab/rocket SVG brand mark (rocketcrab-9fv.11.2). */
+  icon?: "brand";
   /** Classic data category matched by the box (or "nova" for Nova games). */
   match: string;
 }
@@ -88,8 +91,9 @@ export interface BrowseCategory {
 /**
  * Classic's category boxes (dev branch components/library): emoji + label,
  * 2-column grid, filtered list on selection. Nova has no play-history, so
- * classic's dynamic ✨ New / ⏱️ Recently played boxes are omitted; a 🦀 Nova
- * box keeps Nova's own games alongside classic's boxes.
+ * classic's dynamic ✨ New / ⏱️ Recently played boxes are omitted; a Nova
+ * box with the real crab/rocket SVG mark keeps Nova's own games alongside
+ * classic's boxes.
  */
 export const BROWSE_CATEGORIES: readonly BrowseCategory[] = [
   { id: "easy", label: "Very simple", emoji: "🟢", match: "easy" },
@@ -99,7 +103,7 @@ export const BROWSE_CATEGORIES: readonly BrowseCategory[] = [
   { id: "writing", label: "Writing", emoji: "✍️", match: "writing" },
   { id: "trivia", label: "Trivia", emoji: "❓", match: "trivia" },
   { id: "netgamesio", label: "netgames.io", emoji: "💎", match: "netgamesio" },
-  { id: "nova", label: "Nova", emoji: "🦀", match: "nova" },
+  { id: "nova", label: "Nova", icon: "brand", match: "nova" },
 ];
 
 /** Count games per category box (used for the box subtitle). */

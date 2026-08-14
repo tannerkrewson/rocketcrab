@@ -4,6 +4,8 @@ import { toast } from "sonner";
 import type { BrowseEntry } from "../../lib/browse";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState } from "../../lib/party/engine";
+import { BrandLogo } from "../layout/BrandLogo";
+import { ThemeSelector } from "../layout/ThemeSelector";
 import { Button } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
 import { PartyGameDetailsModal } from "./PartyGameDetails";
@@ -32,7 +34,7 @@ type PlayShellPanel = "menu" | "players" | "browse" | null;
 /**
  * The play shell (P4 / 7.4, redesigned for classic parity in 7.38): the
  * in-game chrome sits IN FLOW ABOVE the game frame — a compact top bar
- * (the crab logo collapses to a bare floating logo on tap, a centered
+ * (the SVG brand logo collapses to a bare floating logo on tap, a centered
  * rocketcrab.com/CODE URL copies the invite, and a Menu dropdown opens a
  * compact, flush dropdown), plus a Players POPUP (7.45: a compact overlay
  * anchored top-center BELOW the top bar - never a full-page takeover, so
@@ -108,7 +110,7 @@ export function PartyPlayShell({
             aria-label="Hide the top bar"
             title="Hide the top bar"
           >
-            <img src="/crab.svg" alt="" className="h-5 w-5" />
+            <BrandLogo size={20} />
           </button>
 
           <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -341,17 +343,27 @@ export function PartyPlayShell({
         ) : null}
       </div>
 
+      {/* 11.1: the one floating theme/color control, bottom-right on every
+          page — this shell is full-screen (z-40) and covers AppLayout's
+          copy, so it renders its own above the game, safe-area aware. */}
+      <div
+        className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-3 z-30 rounded-box border-2 border-base-300 bg-base-100 p-1 shadow-md"
+        data-testid="floating-theme-control"
+      >
+        <ThemeSelector />
+      </div>
+
       {/* 7.38: collapsed mode — only the floating logo remains; tap to
           reopen the full top bar. */}
       {barHidden ? (
         <button
           type="button"
-          className="btn btn-circle btn-sm absolute left-[max(0.5rem,env(safe-area-inset-left))] top-[max(0.5rem,env(safe-area-inset-top))] z-50 opacity-80 hover:opacity-100"
+          className="btn btn-sm absolute left-[max(0.5rem,env(safe-area-inset-left))] top-[max(0.5rem,env(safe-area-inset-top))] z-50 opacity-80 hover:opacity-100"
           onClick={() => setBarHidden(false)}
           aria-label="Show the top bar"
           title="Show the top bar"
         >
-          <img src="/crab.svg" alt="" className="h-5 w-5" />
+          <BrandLogo size={18} />
         </button>
       ) : null}
 

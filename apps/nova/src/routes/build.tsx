@@ -1,8 +1,16 @@
-import { createFileRoute } from "@tanstack/react-router";
-import { Bot, Check, ClipboardCopy, ClipboardPaste, ScrollText, Sparkles } from "lucide-react";
+import { Link, createFileRoute } from "@tanstack/react-router";
+import {
+  ArrowLeft,
+  Bot,
+  Check,
+  ClipboardCopy,
+  ClipboardPaste,
+  ScrollText,
+  Sparkles,
+} from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Button } from "../components/ui/Button";
+import { Button, buttonStyles } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { writeToClipboard } from "../lib/editor/clipboard";
 import { buildMasterPrompt } from "../lib/prompt/master-prompt";
@@ -40,6 +48,11 @@ export function BuildPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-10 text-center">
+      <Link to="/" className={buttonStyles("outline", "md", "self-start")} title="Back to home">
+        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+        Back to home
+      </Link>
+
       <header className="flex flex-col items-center gap-3 pt-4">
         <span className="text-5xl" aria-hidden="true">
           🎮

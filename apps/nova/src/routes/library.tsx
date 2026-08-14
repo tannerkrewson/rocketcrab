@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { Compass, Gamepad2, PlusCircle, Search } from "lucide-react";
+import { Compass, Gamepad2, PlusCircle, Search, ArrowLeft } from "lucide-react";
 import { gameMatchesQuery, type SavedGame } from "@rocketcrab/core";
 import { GameCard } from "../components/games/GameCard";
 import { Button, buttonStyles } from "../components/ui/Button";
@@ -66,6 +66,10 @@ export function LibraryPage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
+          <Link to="/" className={buttonStyles("outline")} title="Back to home">
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            Back to home
+          </Link>
           <Link to="/browse" className={buttonStyles("secondary")}>
             <Compass className="h-4 w-4" aria-hidden="true" />
             Browse games
