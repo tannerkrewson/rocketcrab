@@ -127,27 +127,30 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
 }
 
 describe("PartyLobby", () => {
-  it("lists players in the classic grid with transfer and ready states (10.8)", async () => {
+  it("lists players with connection + transfer states only (10.8/11.9)", async () => {
     await renderLobby(makeState());
     const rowA = screen.getByTestId("party-member-member-a");
     const rowB = screen.getByTestId("party-member-member-b");
     // Own tile: centered name, "You, Host" role label (creator + self),
-    // connected + ready indicators, transfer complete, and the pencil.
+    // connected indicator, and the pencil. The always-green "Game ready"
+    // badge and the standalone ready check are gone (11.9) — readiness is
+    // the start flow's job.
     expect(within(rowA).getByText("Player A")).toBeInTheDocument();
     expect(within(rowA).getByText("You, Host")).toBeInTheDocument();
     expect(within(rowA).getByTitle("Connected")).toBeInTheDocument();
-    expect(within(rowA).getByTitle("Ready")).toBeInTheDocument();
-    expect(within(rowA).getByText("Game ready")).toBeInTheDocument();
+    expect(within(rowA).queryByText("Game ready")).not.toBeInTheDocument();
+    expect(within(rowA).queryByTitle("Ready")).not.toBeInTheDocument();
     expect(within(rowA).getByRole("button", { name: /edit your name/i })).toBeInTheDocument();
     // The dense badge rows are gone.
     expect(within(rowA).queryByText("(you)")).not.toBeInTheDocument();
     expect(within(rowA).queryByText("Greeter")).not.toBeInTheDocument();
 
-    // Peer tile: name, transferring progress bar with byte detail.
+    // Peer tile: name, transferring progress bar with byte detail — and no
+    // ready check next to it.
     expect(within(rowB).getByText("Player B")).toBeInTheDocument();
     expect(within(rowB).getByRole("progressbar")).toBeInTheDocument();
     expect(within(rowB).getByText("32 KB of 64 KB")).toBeInTheDocument();
-    expect(within(rowB).getByTitle("Not ready")).toBeInTheDocument();
+    expect(within(rowB).queryByTitle("Not ready")).not.toBeInTheDocument();
   });
 
   it("distinguishes failed and incompatible transfer states", async () => {
