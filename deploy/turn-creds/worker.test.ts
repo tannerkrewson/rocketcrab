@@ -2,13 +2,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_ORIGIN_ALLOWLIST,
   MINT_TTL_SECONDS,
+  RATE_LIMIT_WINDOW_MS,
+  RateLimiter,
   buildMintRequest,
+  clientIp,
   filterPort53IceServers,
   handleTurnCredsRequest,
   isPort53IceUrl,
   normalizeOrigin,
   originAllowed,
   parseAllowlist,
+  parseRateLimit,
+  resetRateLimiter,
   type TurnCredsEnv,
 } from "./worker";
 
@@ -199,10 +204,64 @@ describe("isPort53IceUrl / filterPort53IceServers (rocketcrab-23s.2)", () => {
   });
 });
 
+describe("parseRateLimit / clientIp / RateLimiter (rocketcrab-23s.3)", () => {
+  it("defaults RATE_LIMIT_PER_MIN to 10 and parses positive integers", () => {
+    expect(parseRateLimit(undefined)).toBe(10);
+    expect(parseRateLimit("25")).toBe(25);
+    expect(parseRateLimit("  3 ")).toBe(3);
+  });
+
+  it("falls back to the default for invalid or non-positive values", () => {
+    expect(parseRateLimit("abc")).toBe(10);
+    expect(parseRateLimit("")).toBe(10);
+    expect(parseRateLimit("0")).toBe(10);
+    expect(parseRateLimit("-5")).toBe(10);
+  });
+
+  it("reads the client IP from CF-Connecting-IP (edge-set, not spoofable)", () => {
+    const req = new Request("https://x.example/", {
+      headers: { "CF-Connecting-IP": "203.0.113.9" },
+    });
+    expect(clientIp(req)).toBe("203.0.113.9");
+    expect(clientIp(new Request("https://x.example/"))).toBe("unknown");
+  });
+
+  it("allows up to the limit per fixed 60s window, then denies with Retry-After", () => {
+    const limiter = new RateLimiter();
+    const now = 1_000_000;
+    expect(limiter.check("1.2.3.4", 2, now)).toEqual({ allowed: true, retryAfterSeconds: 0 });
+    expect(limiter.check("1.2.3.4", 2, now + 1_000)).toEqual({
+      allowed: true,
+      retryAfterSeconds: 0,
+    });
+    const denied = limiter.check("1.2.3.4", 2, now + 2_000);
+    expect(denied.allowed).toBe(false);
+    expect(denied.retryAfterSeconds).toBeGreaterThanOrEqual(1);
+    expect(denied.retryAfterSeconds).toBeLessThanOrEqual(60);
+  });
+
+  it("keys windows per client IP", () => {
+    const limiter = new RateLimiter();
+    const now = 1_000_000;
+    expect(limiter.check("1.1.1.1", 1, now).allowed).toBe(true);
+    expect(limiter.check("2.2.2.2", 1, now).allowed).toBe(true);
+    expect(limiter.check("1.1.1.1", 1, now).allowed).toBe(false);
+  });
+
+  it("resets the window after 60s", () => {
+    const limiter = new RateLimiter();
+    const start = 1_000_000;
+    limiter.check("1.2.3.4", 1, start);
+    expect(limiter.check("1.2.3.4", 1, start + 5_000).allowed).toBe(false);
+    expect(limiter.check("1.2.3.4", 1, start + RATE_LIMIT_WINDOW_MS).allowed).toBe(true);
+  });
+});
+
 describe("handleTurnCredsRequest (rocketcrab-23s.1: origin allowlist + CORS)", () => {
   let fetchMock: ReturnType<typeof vi.fn>;
 
   beforeEach(() => {
+    resetRateLimiter();
     fetchMock = vi.fn(
       async () => new Response(JSON.stringify({ iceServers: [], ttl: 600 }), { status: 200 }),
     );
@@ -211,6 +270,8 @@ describe("handleTurnCredsRequest (rocketcrab-23s.1: origin allowlist + CORS)", (
 
   afterEach(() => {
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    resetRateLimiter();
   });
 
   it("rejects a non-allowlisted Origin with 403 and never calls upstream", async () => {
@@ -371,5 +432,76 @@ describe("handleTurnCredsRequest (rocketcrab-23s.1: origin allowlist + CORS)", (
     expect(res.status).toBe(500);
     expect(await errorBody(res)).toMatchObject({ code: "worker_misconfigured" });
     expect(upstreamCalled(fetchMock)).toBe(false);
+  });
+});
+
+describe("handleTurnCredsRequest (rocketcrab-23s.3: per-IP rate limiting)", () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  // Limit 2/min so the third request from one IP trips the limiter.
+  const limitedEnv = makeEnv({ RATE_LIMIT_PER_MIN: "2" });
+
+  beforeEach(() => {
+    resetRateLimiter();
+    fetchMock = vi.fn(
+      async () => new Response(JSON.stringify({ iceServers: [], ttl: 600 }), { status: 200 }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+    resetRateLimiter();
+  });
+
+  function mintFromIp(ip: string): Promise<Response> {
+    return handleTurnCredsRequest(
+      new Request("https://turn-creds.example.net/", {
+        method: "POST",
+        headers: { Origin: ALLOWED_ORIGIN, "CF-Connecting-IP": ip },
+      }),
+      limitedEnv,
+    );
+  }
+
+  it("returns 429 with Retry-After once a single IP exceeds the limit, no upstream call", async () => {
+    expect((await mintFromIp("203.0.113.9")).status).toBe(200);
+    expect((await mintFromIp("203.0.113.9")).status).toBe(200);
+    const limited = await mintFromIp("203.0.113.9");
+    expect(limited.status).toBe(429);
+    expect(await errorBody(limited)).toMatchObject({ code: "rate_limited" });
+    expect(limited.headers.get("Retry-After")).not.toBeNull();
+    expect(Number(limited.headers.get("Retry-After"))).toBeGreaterThanOrEqual(1);
+    // The 429 happens before any upstream call: only 2 fetches total.
+    expect(fetchMock.mock.calls).toHaveLength(2);
+  });
+
+  it("still serves CORS headers on the 429 so the browser can read the error", async () => {
+    await mintFromIp("203.0.113.9");
+    await mintFromIp("203.0.113.9");
+    const limited = await mintFromIp("203.0.113.9");
+    expect(limited.headers.get("Access-Control-Allow-Origin")).toBe(ALLOWED_ORIGIN);
+    expect(limited.headers.get("Content-Type")).toContain("application/json");
+  });
+
+  it("rate limits per IP, not globally", async () => {
+    expect((await mintFromIp("203.0.113.1")).status).toBe(200);
+    expect((await mintFromIp("203.0.113.1")).status).toBe(200);
+    expect((await mintFromIp("203.0.113.1")).status).toBe(429);
+    // A different IP is unaffected.
+    expect((await mintFromIp("203.0.113.2")).status).toBe(200);
+    expect(fetchMock.mock.calls).toHaveLength(3);
+  });
+
+  it("resets a client's window after 60 seconds", async () => {
+    const nowSpy = vi.spyOn(Date, "now").mockReturnValue(1_000_000);
+    await mintFromIp("203.0.113.9");
+    await mintFromIp("203.0.113.9");
+    expect((await mintFromIp("203.0.113.9")).status).toBe(429);
+
+    nowSpy.mockReturnValue(1_000_000 + RATE_LIMIT_WINDOW_MS);
+    const after = await mintFromIp("203.0.113.9");
+    expect(after.status).toBe(200);
   });
 });

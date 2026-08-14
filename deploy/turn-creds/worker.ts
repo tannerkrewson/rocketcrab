@@ -48,6 +48,18 @@ export const TURN_CREDS_API_PATH_PREFIX = "/v1/turn/keys/";
 /** Credential lifetime requested from Cloudflare (seconds). */
 export const MINT_TTL_SECONDS = 600;
 
+/** Fixed rate-limit window length (milliseconds). */
+export const RATE_LIMIT_WINDOW_MS = 60_000;
+
+/** Requests per minute per IP when RATE_LIMIT_PER_MIN is unset. */
+export const DEFAULT_RATE_LIMIT_PER_MIN = 10;
+
+/**
+ * Cap on tracked rate-limit keys; past it, expired windows are pruned so a
+ * long-lived isolate cannot accumulate unbounded state.
+ */
+const MAX_RATE_LIMIT_KEYS = 10_000;
+
 /** Worker environment: vars are `string | undefined`; secrets too. */
 export interface TurnCredsEnv {
   /** Comma-separated origin allowlist. Unset -> DEFAULT_ORIGIN_ALLOWLIST. */
@@ -184,6 +196,82 @@ function jsonError(
 }
 
 /**
+ * Parse RATE_LIMIT_PER_MIN: a positive integer, defaulting to
+ * DEFAULT_RATE_LIMIT_PER_MIN when unset or invalid.
+ */
+export function parseRateLimit(raw: string | undefined): number {
+  if (raw === undefined) return DEFAULT_RATE_LIMIT_PER_MIN;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isNaN(parsed) || parsed < 1 ? DEFAULT_RATE_LIMIT_PER_MIN : parsed;
+}
+
+/**
+ * Client IP for rate limiting: CF-Connecting-IP is set by Cloudflare's edge
+ * and cannot be spoofed by clients; "unknown" when absent (impossible in
+ * production — wrangler dev only).
+ */
+export function clientIp(request: Request): string {
+  return request.headers.get("CF-Connecting-IP") ?? "unknown";
+}
+
+/**
+ * In-memory fixed-window rate limiter keyed by client IP
+ * (rocketcrab-23s.3). Per-isolate state is fine: this is the fast-fail
+ * backstop, and over-counting under concurrency is SAFE (it only ever
+ * rejects more aggressively). The durable backstop is a Cloudflare
+ * route-level rate rule (README).
+ */
+export class RateLimiter {
+  private readonly windows = new Map<string, { start: number; count: number }>();
+
+  /**
+   * Count one request for `key` in the 60s window containing `now`.
+   * Returns { allowed, retryAfterSeconds }; retryAfterSeconds is the
+   * seconds until the window resets (only meaningful when denied).
+   */
+  check(key: string, limit: number, now: number): { allowed: boolean; retryAfterSeconds: number } {
+    const current = this.windows.get(key);
+    if (current === undefined || now - current.start >= RATE_LIMIT_WINDOW_MS) {
+      this.windows.set(key, { start: now, count: 1 });
+      this.prune(now);
+      return { allowed: true, retryAfterSeconds: 0 };
+    }
+    if (current.count >= limit) {
+      return {
+        allowed: false,
+        retryAfterSeconds: Math.max(
+          1,
+          Math.ceil((current.start + RATE_LIMIT_WINDOW_MS - now) / 1000),
+        ),
+      };
+    }
+    current.count += 1;
+    return { allowed: true, retryAfterSeconds: 0 };
+  }
+
+  /** Drop expired windows once the key map grows past the cap. */
+  private prune(now: number): void {
+    if (this.windows.size < MAX_RATE_LIMIT_KEYS) return;
+    for (const [key, entry] of this.windows) {
+      if (now - entry.start >= RATE_LIMIT_WINDOW_MS) this.windows.delete(key);
+    }
+  }
+}
+
+// Module-level per-isolate limiter (the worker's fast-fail backstop).
+let limiter: RateLimiter | undefined;
+
+function getLimiter(): RateLimiter {
+  limiter ??= new RateLimiter();
+  return limiter;
+}
+
+/** Test helper: clear the module-level limiter so tests start from a clean window. */
+export function resetRateLimiter(): void {
+  limiter = undefined;
+}
+
+/**
  * Build the upstream mint request. Returns null when the worker is
  * misconfigured (TURN key secrets missing) so callers can fail loudly.
  * The API token is only ever placed in the Authorization header — never in
@@ -237,7 +325,25 @@ export async function handleTurnCredsRequest(
     return jsonError(405, "method_not_allowed", `method ${request.method} is not allowed`, cors);
   }
 
-  // 3. Mint: proxy to the Cloudflare Realtime credentials API with a fixed
+  // 3. Per-IP rate limit (fast-fail backstop, rocketcrab-23s.3): reject
+  // BEFORE any upstream call. Over-counting under concurrency is safe.
+  const rateLimit = parseRateLimit(env.RATE_LIMIT_PER_MIN);
+  const { allowed, retryAfterSeconds } = getLimiter().check(
+    clientIp(request),
+    rateLimit,
+    Date.now(),
+  );
+  if (!allowed) {
+    return jsonError(
+      429,
+      "rate_limited",
+      "too many requests; retry after the rate-limit window resets",
+      cors,
+      { "Retry-After": String(retryAfterSeconds) },
+    );
+  }
+
+  // 4. Mint: proxy to the Cloudflare Realtime credentials API with a fixed
   // short TTL (rocketcrab-23s.2), then drop port-53 URLs from the response
   // (browsers block port 53). Never leak the API token in any response.
   const upstream = buildMintRequest(env);
