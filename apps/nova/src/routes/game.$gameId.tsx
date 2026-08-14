@@ -3,7 +3,7 @@ import { ArrowLeft, BookOpen, Code2, ExternalLink, PartyPopper, Play } from "luc
 import { useState } from "react";
 import { toast } from "sonner";
 import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
-import { Button } from "../components/ui/Button";
+import { Button, buttonStyles } from "../components/ui/Button";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
 import { LoadingState } from "../components/ui/LoadingState";
 import { ScreenshotCarousel } from "../components/games/ScreenshotCarousel";
@@ -53,7 +53,7 @@ export function BrowseGamePage() {
   const backLabel = inPartyLobby ? "Back to party" : "Back to games";
 
   const backLink = (
-    <Link to={backTarget} className="btn btn-link btn-sm self-start font-bold">
+    <Link to={backTarget} className={buttonStyles("outline")} title={backLabel}>
       <ArrowLeft className="h-4 w-4" aria-hidden="true" />
       {backLabel}
     </Link>

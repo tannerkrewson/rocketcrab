@@ -17,10 +17,7 @@ import { ThemeSelector } from "./ThemeSelector";
  */
 export function AppLayout() {
   const location = useLocation();
-  const isPartyRoute =
-    location.pathname === "/join" ||
-    location.pathname === "/party" ||
-    location.pathname === "/play";
+  const isPartyRoute = location.pathname === "/join" || location.pathname === "/party";
 
   return (
     <div className="flex min-h-screen flex-col bg-base-200 text-base-content">
@@ -36,12 +33,11 @@ export function AppLayout() {
           <div className="mx-auto flex w-full max-w-5xl items-center justify-between gap-4 px-4 py-3">
             <Link
               to="/"
-              className="flex items-center gap-2 text-sm font-black tracking-tight text-base-content transition-opacity hover:opacity-70"
+              className="flex items-center transition-opacity hover:opacity-70"
+              aria-label="Rocketcrab home"
+              title="Rocketcrab home"
             >
-              <span className="text-xl leading-none" aria-hidden="true">
-                🦀🚀
-              </span>
-              <span>Rocketcrab Nova</span>
+              <img src="/crab.svg" alt="" className="h-9 w-9" />
             </Link>
             <ThemeSelector />
           </div>
