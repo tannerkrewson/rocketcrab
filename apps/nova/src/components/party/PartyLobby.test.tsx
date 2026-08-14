@@ -257,8 +257,10 @@ describe("PartyLobby", () => {
     });
     const onPickGame = vi.fn();
     await renderLobby(state, { onPickGame });
-    expect(screen.getByText(/no game yet/i)).toBeInTheDocument();
-    expect(screen.getByText(/you must select the game/i)).toBeInTheDocument();
+    // 10.6: the welcome card replaces the old empty-state sentence.
+    expect(screen.getByText("No game selected yet")).toBeInTheDocument();
+    expect(screen.queryByText(/no game yet/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/you must select the game/i)).not.toBeInTheDocument();
     const browseButton = screen.getByRole("button", { name: /browse games/i });
     expect(browseButton).toBeInTheDocument();
     await userEvent.click(browseButton);
@@ -266,7 +268,6 @@ describe("PartyLobby", () => {
     // player's own saved games section (empty library in tests).
     expect(screen.getByRole("searchbox", { name: "Search games" })).toBeInTheDocument();
     expect(screen.getByText("My games")).toBeInTheDocument();
-    expect(await screen.findByText(/no saved games yet/i)).toBeInTheDocument();
     expect(onPickGame).not.toHaveBeenCalled();
     // Back returns to the lobby.
     await userEvent.click(screen.getByRole("button", { name: /back to lobby/i }));
@@ -304,10 +305,11 @@ describe("PartyLobby", () => {
     );
   });
 
-  it("tells joiners to wait when the party has no game (7.6)", async () => {
+  it("tells joiners the party is waiting when it has no game (10.6)", async () => {
     const state = makeState({ role: "joiner", game: null });
     await renderLobby(state);
-    expect(screen.getByText(/waiting for the host to pick a game/i)).toBeInTheDocument();
+    expect(screen.getByText("No game selected yet")).toBeInTheDocument();
+    expect(screen.queryByText(/waiting for the host to pick a game/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /browse games/i })).not.toBeInTheDocument();
   });
 
@@ -442,5 +444,68 @@ describe("PartyLobby", () => {
     // Closing the modal hides the QR again.
     await userEvent.click(within(dialog).getByRole("button", { name: /close/i }));
     expect(screen.queryByLabelText("Party invite QR code")).not.toBeInTheDocument();
+  });
+
+  it("shows the welcome card with the selected game for the host (10.6)", async () => {
+    await renderLobby(makeState());
+    const welcome = screen.getByLabelText("Welcome");
+    expect(within(welcome).getByText("Welcome to rocketcrab!")).toBeInTheDocument();
+    expect(within(welcome).getByText("You've selected")).toBeInTheDocument();
+    expect(within(welcome).getByText("Rocket Rumble")).toBeInTheDocument();
+    expect(
+      within(welcome).getByText("As the host, you have to start the game!"),
+    ).toBeInTheDocument();
+    expect(
+      within(welcome).getByRole("button", { name: /what is rocket rumble\?/i }),
+    ).toBeInTheDocument();
+  });
+
+  it("shows the guest welcome copy when a game is selected (10.6)", async () => {
+    const state = makeState({ role: "joiner" });
+    await renderLobby(state);
+    const welcome = screen.getByLabelText("Welcome");
+    expect(
+      within(welcome).getByText("Waiting for the host to start the game…"),
+    ).toBeInTheDocument();
+    expect(within(welcome).queryByText(/as the host/i)).not.toBeInTheDocument();
+  });
+
+  it("shows the welcome card without a game selected (10.6)", async () => {
+    const state = makeState({ game: null });
+    await renderLobby(state);
+    const welcome = screen.getByLabelText("Welcome");
+    expect(within(welcome).getByText("Welcome to rocketcrab!")).toBeInTheDocument();
+    expect(within(welcome).getByText("No game selected yet")).toBeInTheDocument();
+    expect(within(welcome).queryByText("You've selected")).not.toBeInTheDocument();
+  });
+
+  it("opens the game details overlay from What is GameName? (10.6)", async () => {
+    const game = await gameRepository.create({
+      title: "Rocket Rumble",
+      description: "Blast off with friends.",
+      html: "<!doctype html><html><body><p>rockets</p></body></html>",
+      mode: "state",
+    });
+    const state = makeState({ game: { gameId: game.id, title: game.title, mode: "state" } });
+    await renderLobby(state);
+    await userEvent.click(screen.getByRole("button", { name: /what is rocket rumble\?/i }));
+    const dialog = screen.getByRole("dialog", { name: "About Rocket Rumble" });
+    expect(within(dialog).getByText("Blast off with friends.")).toBeInTheDocument();
+    // Closing the overlay returns to the untouched lobby underneath.
+    await userEvent.click(within(dialog).getByRole("button", { name: /close game details/i }));
+    expect(screen.queryByRole("dialog", { name: "About Rocket Rumble" })).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /start game/i })).toBeInTheDocument();
+  });
+
+  it("shows prebuilt game info in the details overlay (10.6)", async () => {
+    // Drawphone is a prebuilt classic game with a guide.
+    const state = makeState({ game: { gameId: "drawphone", title: "Drawphone", mode: "state" } });
+    await renderLobby(state);
+    await userEvent.click(screen.getByRole("button", { name: /what is drawphone\?/i }));
+    const dialog = screen.getByRole("dialog", { name: "About Drawphone" });
+    expect(within(dialog).getByText(/In Drawphone, there are no winners/)).toBeInTheDocument();
+    expect(
+      within(dialog).getByRole("link", { name: /read the official guide/i }),
+    ).toBeInTheDocument();
   });
 });

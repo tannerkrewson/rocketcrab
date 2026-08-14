@@ -1,5 +1,6 @@
 import {
   ArrowLeft,
+  BookOpen,
   Check,
   Copy,
   Crown,
@@ -21,7 +22,9 @@ import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState, PartyMemberView } from "../../lib/party/engine";
 import { Button } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
+import { IdleParticles } from "./IdleParticles";
 import { PartyDiagnosticsPanel } from "./PartyDiagnostics";
+import { PartyGameDetailsModal } from "./PartyGameDetails";
 import { PartyInviteQr } from "./PartyInviteQr";
 
 export interface PartyLobbyProps {
@@ -117,6 +120,8 @@ export function PartyLobby({
   // 10.5: the QR code lives behind a modal; the invite URL is never
   // rendered as text (only the origin + code page title is).
   const [qrOpen, setQrOpen] = useState(false);
+  // 10.6: "What is GameName?" opens an in-lobby details overlay.
+  const [detailsOpen, setDetailsOpen] = useState(false);
 
   const greeterName =
     state.members.find((member) => member.memberId === state.greeterMemberId)?.displayName ??
@@ -207,45 +212,34 @@ export function PartyLobby({
           </Button>
         </div>
       </section>
-
-      {/* Classic-style party status card (7.4): what's selected and whose
-          turn it is to act — the lobby's main heading. */}
-      <header
-        className="flex flex-wrap items-center gap-3 rounded-box border-2 border-base-300 bg-base-100 p-4"
-        aria-label="Party status"
+      {/* 10.6: the welcome card — the lobby's main heading. A simple idle
+          animation, then what's selected and whose turn it is to act.
+          Guests see the host-starting copy; when nothing is selected the
+          card just says so (the old empty-state sentence is gone). */}
+      <section
+        aria-label="Welcome"
+        className="flex flex-col items-center gap-3 overflow-hidden rounded-box border-2 border-base-300 bg-base-100 p-5 text-center"
       >
-        <div className="min-w-0 flex-1">
-          <p className="text-xl font-black">
-            {state.game !== null ? (
-              state.role === "creator" ? (
-                <>
-                  You&apos;ve selected: <span className="text-primary">“{state.game.title}”</span>
-                </>
-              ) : (
-                <>“{state.game.title}” has been selected</>
-              )
-            ) : (
-              "Welcome to Rocketcrab!"
-            )}
-          </p>
-          <p className="text-sm text-base-content/70">
-            {state.game !== null
-              ? state.role === "creator"
+        <IdleParticles />
+        <h2 className="text-xl font-black">Welcome to rocketcrab!</h2>
+        {state.game !== null ? (
+          <>
+            <p className="text-sm font-semibold text-base-content/70">You&apos;ve selected</p>
+            <p className="text-2xl font-black text-primary">{state.game.title}</p>
+            <p className="text-sm text-base-content/70">
+              {state.role === "creator"
                 ? "As the host, you have to start the game!"
-                : "Waiting for the host to start…"
-              : state.role === "creator"
-                ? "As the host, you must select the game!"
-                : "Waiting for the host to select a game…"}
-          </p>
-        </div>
-        <span
-          className="badge badge-ghost badge-sm"
-          title={`Connection state: ${state.connectionState}`}
-        >
-          {state.connectionState}
-        </span>
-      </header>
-
+                : "Waiting for the host to start the game…"}
+            </p>
+            <Button variant="outline" size="md" onClick={() => setDetailsOpen(true)}>
+              <BookOpen className="h-4 w-4" aria-hidden="true" />
+              What is {state.game.title}?
+            </Button>
+          </>
+        ) : (
+          <p className="text-sm text-base-content/70">No game selected yet</p>
+        )}
+      </section>
       {/* Player name, editable (7.5 — classic parity: the name is asked
           before the lobby and can be changed at any time). */}
       <section className="flex flex-wrap items-center gap-2 text-sm font-semibold text-base-content/70">
@@ -295,32 +289,14 @@ export function PartyLobby({
           </Button>
         </form>
       ) : null}
-
-      {/* No game selected yet (7.6): the host picks one via the action
-          row's Browse games button; joiners wait. */}
-      {state.game === null ? (
-        <section
-          className="flex flex-wrap items-center gap-3 rounded-box border-2 border-dashed border-base-300 bg-base-100 p-4"
-          aria-label="No game selected"
-        >
-          <p className="min-w-0 flex-1 text-sm font-semibold text-base-content/70">
-            {state.role === "creator"
-              ? "No game yet — pick one from your saved games to start playing."
-              : "Waiting for the host to pick a game…"}
-          </p>
-        </section>
-      ) : null}
-
       {state.endedReason !== null ? (
         <div className="rounded-box border-2 border-accent bg-accent/10 p-3 text-sm font-semibold">
           The game ended{state.endedReason === undefined ? "." : ` (${state.endedReason}).`} The
           party is still open — leave when you&apos;re done.
         </div>
       ) : null}
-
       {/* The big code + invite (QR, URL, copy) now live in the classic
           party shell header (7.22) rendered by PartyExperience. */}
-
       {/* Roles: greeter + authority are separate (ADR-0004/0007). */}
       <section className="flex flex-wrap items-center gap-2 text-sm font-semibold text-base-content/70">
         <span className="badge badge-ghost badge-sm" title="Rendezvous greeter (ADR-0004)">
@@ -338,7 +314,6 @@ export function PartyLobby({
             ?.displayName ?? "—"}
         </span>
       </section>
-
       {/* Join requests (greeter only). */}
       {state.amGreeter && state.pendingJoinRequests.length > 0 ? (
         <section
@@ -379,7 +354,6 @@ export function PartyLobby({
           </ul>
         </section>
       ) : null}
-
       {/* Player list with per-player transfer + ready status. */}
       {/* Classic collapsible Players card (7.4): badge count + per-player
           rows with transfer/ready state. Open by default. */}
@@ -443,7 +417,6 @@ export function PartyLobby({
           </ul>
         </div>
       </details>
-
       {/* Notices (a failed peer never freezes the lobby). */}
       {state.notices.length > 0 ? (
         <ul className="flex flex-col gap-1 text-xs" aria-label="Lobby notices">
@@ -463,7 +436,6 @@ export function PartyLobby({
           ))}
         </ul>
       ) : null}
-
       {/* Classic action row (7.4): Browse games (host) + Start game, with
           force-start and leave alongside. */}
       <section className="flex flex-wrap items-center gap-2">
@@ -500,12 +472,13 @@ export function PartyLobby({
           Leave party
         </Button>
       </section>
-
       <PartyDiagnosticsPanel diagnostics={state.diagnostics} onRefresh={onRefreshDiagnostics} />
-
       {/* The QR invite modal (10.5): the QR lives here, not on the lobby.
           The full invite URL is encoded in the QR only; the label under it
-          is the safe origin + code form. */}
+          is the safe origin + code form. */}{" "}
+      {detailsOpen ? (
+        <PartyGameDetailsModal game={state.game} onClose={() => setDetailsOpen(false)} />
+      ) : null}
       {qrOpen && state.inviteUrl !== null ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -522,7 +495,6 @@ export function PartyLobby({
           </div>
         </div>
       ) : null}
-
       {forceDialog ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
