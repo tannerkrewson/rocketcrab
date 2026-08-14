@@ -74,16 +74,31 @@ describe("relayRequest", () => {
     });
   });
 
-  it("surfaces the relay's error detail on a failed response", async () => {
+  it("surfaces the relay's structured error message on a failed response", async () => {
     vi.stubEnv("VITE_CLASSIC_RELAY_ORIGIN", "https://relay.example.net");
     vi.stubGlobal(
       "fetch",
       vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => ({
         ok: false,
         status: 502,
-        json: async () => ({ error: "upstream HTTP 500" }),
+        json: async () => ({ error: { code: "upstream_error", message: "upstream HTTP 500" } }),
       })),
     );
     await expect(relayRequest("snakeout-new")).rejects.toThrow(/upstream HTTP 500/);
+  });
+
+  it("still reads the legacy flat error string from older relay deployments", async () => {
+    vi.stubEnv("VITE_CLASSIC_RELAY_ORIGIN", "https://relay.example.net");
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => ({
+        ok: false,
+        status: 403,
+        json: async () => ({ error: "request Origin is missing or not allowlisted" }),
+      })),
+    );
+    await expect(relayRequest("drawphone-new")).rejects.toThrow(
+      /origin is missing or not allowlisted/i,
+    );
   });
 });
