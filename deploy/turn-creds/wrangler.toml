@@ -4,3 +4,16 @@ name = "rocketcrab-turn-creds"
 main = "worker.ts"
 compatibility_date = "2025-01-01"
 workers_dev = true
+
+# TURN_BUDGET KV namespace: mint counters (mints:YYYY-MM-DD, mints:total) for
+# the budget kill-switch (rocketcrab-23s.4). Create it once, then paste the id:
+#   wrangler kv namespace create TURN_BUDGET
+# The placeholder below makes `wrangler dev` use the local KV simulator and
+# `wrangler deploy` fail until the real id is set (by design).
+kv_namespaces = [{ binding = "TURN_BUDGET", id = "REPLACE_WITH_KV_NAMESPACE_ID" }]
+
+# Daily 09:00 UTC usage watchdog (rocketcrab-23s.5): wrangler cron triggers
+# fire the worker's `scheduled` handler (never fetch), so the watchdog is a
+# scheduled handler in worker.ts. Manual trigger for dev/smoke: GET /__watchdog.
+[triggers]
+crons = ["0 9 * * *"]
