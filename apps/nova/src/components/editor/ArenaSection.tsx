@@ -5,9 +5,9 @@
  * NovaSession (S1) — the runtime protocol is never bypassed.
  *
  * This is the arena section of the editor, not a standalone page: the
- * editor hands over the source that was on screen when the creator pressed
- * Test multiplayer (frozen at that moment; the editor re-tests by passing a
- * new source, which restarts every player). Desktop shows a responsive grid
+ * editor hands over the source that was on screen (seeded with the saved
+ * source on load; the editor re-tests by pressing Run with a new source,
+ * which restarts every player). Desktop shows a responsive grid
  * of player frames with a shared simulation toolbar; phones show one player
  * at a time in tabs with the shared controls in a collapsible panel (never
  * covering the game). Per-player connection state reflects the simulated
@@ -46,9 +46,8 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { Button } from "../ui/Button";
+import { Button, buttonStyles } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
-import { EmptyState } from "../ui/EmptyState";
 import { useRecordTestResults } from "../../lib/games/queries";
 import { useArena } from "../../lib/arena/use-arena";
 import { getSavedPlayerName } from "../../lib/party/identity";
@@ -139,13 +138,11 @@ export interface ArenaSectionProps {
    * multiplayer. Passing a NEW source restarts every player with it.
    */
   source: string;
-  /** The editor's current source differs from the frozen test source. */
+  /** The editor's current source differs from the source under test. */
   stale: boolean;
-  /** Unmount the arena (stops every runtime frame). */
-  onClose: () => void;
 }
 
-export function ArenaSection({ game, source, stale, onClose }: ArenaSectionProps) {
+export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
   const seams = useContext(ArenaRuntimeSeamsContext);
   const recordTestResults = useRecordTestResults();
 
@@ -183,8 +180,8 @@ export function ArenaSection({ game, source, stale, onClose }: ArenaSectionProps
   });
 
   // The engine mounts once per arena mount; when the editor re-tests with a
-  // new source (a later Test-multiplayer press), restart every player with
-  // it instead of remounting the whole section.
+  // new source (a Run press), restart every player with it instead of
+  // remounting the whole section.
   const lastSourceRef = useRef(source);
   useEffect(() => {
     if (lastSourceRef.current === source) return;
@@ -251,14 +248,8 @@ export function ArenaSection({ game, source, stale, onClose }: ArenaSectionProps
     setRenameTarget(null);
   }, [actions, renameTarget]);
 
-  if (state === null || state.players.length === 0) {
-    return (
-      <EmptyState
-        icon={<FlaskConical />}
-        title="Multi-player test arena"
-        description="Several simulated players run your game on one page so you can see how it plays before the real party."
-      />
-    );
+  if (state === null) {
+    return null;
   }
 
   const summary = state.summary;
@@ -559,29 +550,20 @@ export function ArenaSection({ game, source, stale, onClose }: ArenaSectionProps
             className="badge badge-warning badge-md"
             title="The editor changed since this test run"
           >
-            Editor changed — press Test multiplayer to re-run
+            Editor changed — press Run to re-test
           </span>
         ) : null}
         {game !== undefined ? (
           <Link
             to="/party"
             search={{ gameId: game.id, mode: game.mode ?? "state", title: game.title }}
-            className="btn btn-secondary btn-md font-bold"
+            className={buttonStyles("secondary")}
             title="Launch this game into a real party"
           >
             <PartyPopper className="h-4 w-4" aria-hidden="true" />
             Play with friends
           </Link>
         ) : null}
-        <Button
-          variant="outline"
-          size="md"
-          onClick={onClose}
-          title="Close the test arena and stop every simulated player"
-        >
-          <X className="h-4 w-4" aria-hidden="true" />
-          Close
-        </Button>
       </div>
 
       {summaryBar}

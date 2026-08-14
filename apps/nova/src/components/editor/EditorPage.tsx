@@ -5,7 +5,6 @@ import {
   ClipboardPaste,
   CopyPlus,
   Eraser,
-  FlaskConical,
   GripHorizontal,
   MonitorSmartphone,
   PartyPopper,
@@ -26,7 +25,6 @@ import {
 import { toast } from "sonner";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
-import { EmptyState } from "../ui/EmptyState";
 import { useCreateGame, useRecordTestResults, useUpdateGame } from "../../lib/games/queries";
 import { hashSource, sourceByteLength } from "../../lib/games/hashing";
 import type { ChannelPort, RuntimeHostEvent } from "../../lib/runtime-host";
@@ -44,7 +42,6 @@ import { readFromClipboard, writeToClipboard } from "../../lib/editor/clipboard"
 import { storePartySource } from "../../lib/party/source-handoff";
 import { CodeEditor } from "./CodeEditor";
 import { DiagnosticsPanel } from "./DiagnosticsPanel";
-import { PreviewPanel } from "./PreviewPanel";
 import { ArenaSection, ArenaRuntimeSeamsContext } from "./ArenaSection";
 import { FirstRunTutorial } from "./FirstRunTutorial";
 
@@ -83,23 +80,6 @@ function draftGameId(): string {
   return `draft-${Date.now().toString(36)}`;
 }
 
-/** Viewport breakpoint matching the md: grid (desktop editor layout). */
-function useIsDesktop(): boolean {
-  const [isDesktop, setIsDesktop] = useState(() =>
-    typeof window.matchMedia === "function"
-      ? window.matchMedia("(min-width: 768px)").matches
-      : true,
-  );
-  useEffect(() => {
-    if (typeof window.matchMedia !== "function") return;
-    const mediaQuery = window.matchMedia("(min-width: 768px)");
-    const onChange = (event: MediaQueryListEvent) => setIsDesktop(event.matches);
-    mediaQuery.addEventListener("change", onChange);
-    return () => mediaQuery.removeEventListener("change", onChange);
-  }, []);
-  return isDesktop;
-}
-
 /** The code editor's default height (~22% of the viewport, "fairly small"). */
 function defaultEditorHeightPx(): number {
   return clampEditorHeight(
@@ -114,11 +94,14 @@ function clampEditorHeight(value: number): number {
 
 /**
  * The consolidated U4 editor + U6 test arena (7.40): one page holding the
- * CodeMirror editor, the runtime preview + diagnostics, and the multiplayer
- * test arena together. The code editor sits at the top, small by default,
- * with a drag handle to enlarge it; the arena takes the remaining vertical
- * space on desktop. Phones (below the sm: breakpoint — not tablets) get a
- * "use the editor on desktop" prompt above the still-working mobile tabs.
+ * CodeMirror editor, the diagnostics panel, and the multiplayer test arena
+ * together. The code editor sits at the top, small by default, with a drag
+ * handle to enlarge it; the arena is always mounted and live below it,
+ * flowing in the normal document flow (Task 1: arena-default-on). The
+ * single-player runtime session stays mounted in a hidden container purely
+ * as the diagnostics / mode-detection / test-metadata engine. Phones
+ * (below the sm: breakpoint — not tablets) get a "use the editor on
+ * desktop" prompt above the still-working mobile tabs.
  *
  * Replacing the source and Run always destroys and recreates the runtime
  * frame (no hot-module replacement); unsaved source is never written over
@@ -150,29 +133,22 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     sourceHash: string;
     runtimeInstanceId: string | null;
   } | null>(null);
-  const [mobileTab, setMobileTab] = useState<"code" | "preview" | "errors">("code");
+  const [mobileTab, setMobileTab] = useState<"code" | "errors">("code");
   const [discardDialog, setDiscardDialog] = useState<{ onConfirm: () => void } | null>(null);
   const [clearAllDialog, setClearAllDialog] = useState(false);
-  // The arena's source, frozen when the creator pressed Test multiplayer.
-  // The arena mounts only while set; a later Test press replaces the source
-  // (which restarts every simulated player with it).
-  const [arenaSource, setArenaSource] = useState<string | null>(null);
+  // The arena's source, seeded with the saved source so the arena is live by
+  // default (Task 1: arena-default-on). Run re-applies the current editor
+  // source, which restarts every simulated player with it.
+  const [arenaSource, setArenaSource] = useState<string>(savedSource);
   const [editorHeightPx, setEditorHeightPx] = useState(defaultEditorHeightPx);
-  const arenaSectionRef = useRef<HTMLDivElement | null>(null);
-  const isDesktop = useIsDesktop();
+  // The single-player runtime session lives in a hidden container: it stays
+  // mounted purely as the diagnostics / mode-detection / saved-source-test-
+  // metadata engine (DiagnosticsPanel, registration, recordTestResults).
+  const hiddenRuntimeRef = useRef<HTMLDivElement | null>(null);
 
   const dirty = source !== savedSource || title !== savedTitle;
   const savingRef = useRef(false);
   const lastRunSourceRef = useRef<string | null>(null);
-  // Two preview spots exist (desktop column, phone preview tab); the active
-  // one is whichever layout the viewport is showing, so the runtime frame is
-  // always embedded where the user can see it.
-  const desktopPreviewRef = useRef<HTMLDivElement | null>(null);
-  const mobilePreviewRef = useRef<HTMLDivElement | null>(null);
-  const activePreviewRef = useRef<HTMLDivElement | null>(null);
-  useEffect(() => {
-    activePreviewRef.current = isDesktop ? desktopPreviewRef.current : mobilePreviewRef.current;
-  }, [isDesktop]);
 
   // Reinitialize when the route's game changes (edit → another edit).
   useEffect(() => {
@@ -182,7 +158,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     setConsoleEntries([]);
     setRegistration(null);
     setRunInfo(null);
-    setArenaSource(null);
+    setArenaSource(savedSource);
     lastRunSourceRef.current = null;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
@@ -234,7 +210,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
 
   const session = useRuntimeSession({
     runtimeOrigin: runtimeOriginForMainOrigin(window.location.origin),
-    containerRef: activePreviewRef,
+    containerRef: hiddenRuntimeRef,
     onEvent: (event) => handleRuntimeEventRef.current(event),
     ...(seams.createChannel !== undefined ? { createChannel: seams.createChannel } : {}),
     ...(seams.waitForFrameLoad !== undefined ? { waitForFrameLoad: seams.waitForFrameLoad } : {}),
@@ -287,6 +263,12 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         player: { memberId: "local-creator", displayName: "You" },
         ...(title.trim().length > 0 ? { gameTitle: title.trim() } : {}),
       });
+      // Run re-applies the current source to the live arena too (Task 1:
+      // one Run means "apply my code to the stage and re-test"). The arena
+      // restarts only once the run actually started, so its restart channels
+      // always follow the runtime's own — and on a startup failure the
+      // stage keeps the last testable state (the stale badge explains).
+      setArenaSource(source);
       setRunInfo((previous) =>
         previous
           ? {
@@ -324,35 +306,6 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       );
     }
   }, []);
-
-  /**
-   * Test multiplayer (U6, 7.40): mount the test arena right here on the
-   * page with the CURRENT editor source (saved or not) and scroll to it.
-   * Re-testing hands over a new source, which restarts every simulated
-   * player. Unsaved changes are never written to the saved game.
-   */
-  const handleTestMultiplayer = useCallback(() => {
-    const errors = validateSource(source).filter((issue) => issue.severity === "error");
-    if (errors.length > 0) {
-      toast.error("Fix the validation errors before testing multiplayer.");
-      return;
-    }
-    setArenaSource(source);
-    // Reveal the arena; scrollIntoView is a browser nicety (guarded so
-    // jsdom and other minimal environments stay happy).
-    const reveal = () => {
-      try {
-        arenaSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
-      } catch {
-        // scrollIntoView unavailable; the arena is already on the page.
-      }
-    };
-    if (typeof window.requestAnimationFrame === "function") {
-      window.requestAnimationFrame(reveal);
-    } else {
-      window.setTimeout(reveal, 0);
-    }
-  }, [source]);
 
   /**
    * Play with friends (P4): create a REAL party from the CURRENT editor
@@ -542,8 +495,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
   }, [blocker.status]);
 
   const validationIssues = useMemo(() => validateSource(source), [source]);
-  const stalePreview = runStatus === "running" && source !== lastRunSourceRef.current;
-  const arenaStale = arenaSource !== null && arenaSource !== source;
+  const arenaStale = arenaSource !== source;
 
   const actions = (
     <>
@@ -599,14 +551,6 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         {runStatus === "running" ? "Re-run" : "Run"}
       </Button>
       <Button
-        variant="secondary"
-        onClick={handleTestMultiplayer}
-        title="Run this source with several simulated players in the test arena"
-      >
-        <FlaskConical className="h-4 w-4" aria-hidden="true" />
-        Test multiplayer
-      </Button>
-      <Button
         variant="primary"
         onClick={handlePlayWithFriends}
         title="Create a real party from this source and play it with friends"
@@ -622,7 +566,6 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       {(
         [
           { id: "code", label: "Code" },
-          { id: "preview", label: "Preview" },
           {
             id: "errors",
             label:
@@ -646,33 +589,17 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     </div>
   );
 
-  /** The arena section, mounted only once the creator presses Test multiplayer. */
-  const arenaSection =
-    arenaSource !== null ? (
-      <ArenaRuntimeSeamsContext.Provider value={seams}>
-        <ArenaSection
-          game={game}
-          source={arenaSource}
-          stale={arenaStale}
-          onClose={() => setArenaSource(null)}
-        />
-      </ArenaRuntimeSeamsContext.Provider>
-    ) : (
-      <EmptyState
-        icon={<FlaskConical />}
-        title="Multi-player test arena"
-        description="Press Test multiplayer to run the current code with several simulated players right here on this page."
-        action={
-          <Button variant="secondary" size="md" onClick={handleTestMultiplayer}>
-            <FlaskConical className="h-4 w-4" aria-hidden="true" />
-            Test multiplayer
-          </Button>
-        }
-      />
-    );
+  // The arena is always mounted and live (Task 1): the stage is what the
+  // creator is making — seeded with the saved source on load, re-applied
+  // whenever Run is pressed.
+  const arenaSection = (
+    <ArenaRuntimeSeamsContext.Provider value={seams}>
+      <ArenaSection game={game} source={arenaSource} stale={arenaStale} />
+    </ArenaRuntimeSeamsContext.Provider>
+  );
 
   return (
-    <div className="flex flex-col gap-4 md:h-[calc(100dvh-16rem)]">
+    <div className="flex flex-col gap-4">
       <FirstRunTutorial />
 
       {/* Phone-size prompt (below sm: — not tablets): editing and testing a
@@ -709,12 +636,12 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         </Link>
       </header>
 
-      {/* Desktop: actions, small resizable editor, and the arena fills the
-          remaining vertical space (7.40). */}
-      <div className="hidden min-h-0 flex-1 flex-col gap-4 md:flex" data-testid="desktop-layout">
+      {/* Desktop: actions, small resizable editor, then the arena flows in
+          the normal document flow below (7.40). */}
+      <div className="hidden flex-col gap-4 md:flex" data-testid="desktop-layout">
         <div className="flex flex-wrap items-center gap-2">{actions}</div>
-        <div style={{ height: `${editorHeightPx}px` }} className="min-h-0">
-          <div className="grid h-full gap-4 grid-cols-2">
+        <div style={{ height: `${editorHeightPx}px` }}>
+          <div className="grid gap-4 grid-cols-2">
             <section
               className="min-h-0 overflow-hidden rounded-box border-2 border-base-300 bg-base-100"
               aria-label="Editor"
@@ -723,26 +650,15 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
                 <CodeEditor value={source} onChange={setSource} ariaLabel="Game HTML source" />
               </div>
             </section>
-            <section
-              className="flex min-h-0 flex-col gap-4 overflow-y-auto"
-              aria-label="Preview and diagnostics"
-            >
-              <PreviewPanel
-                containerRef={desktopPreviewRef}
-                status={runStatus}
-                onStop={session.stop}
-                stale={stalePreview}
-              />
-              <DiagnosticsPanel
-                sourceBytes={sourceByteLength(source)}
-                sourceHash={sourceHash}
-                validationIssues={validationIssues}
-                diagnostics={diagnostics}
-                consoleEntries={consoleEntries}
-                onCopyReport={() => void handleCopyReport()}
-                busy={createGame.isPending || updateGame.isPending}
-              />
-            </section>
+            <DiagnosticsPanel
+              sourceBytes={sourceByteLength(source)}
+              sourceHash={sourceHash}
+              validationIssues={validationIssues}
+              diagnostics={diagnostics}
+              consoleEntries={consoleEntries}
+              onCopyReport={() => void handleCopyReport()}
+              busy={createGame.isPending || updateGame.isPending}
+            />
           </div>
         </div>
         <div
@@ -766,16 +682,6 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
             </div>
           </div>
         ) : null}
-        {/* Always mounted so the runtime frame has a stable phone home even
-            while another tab is active. */}
-        <div className={mobileTab === "preview" ? "" : "hidden"}>
-          <PreviewPanel
-            containerRef={mobilePreviewRef}
-            status={runStatus}
-            onStop={session.stop}
-            stale={stalePreview}
-          />
-        </div>
         {mobileTab === "errors" ? (
           <DiagnosticsPanel
             sourceBytes={sourceByteLength(source)}
@@ -789,12 +695,11 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         ) : null}
       </div>
 
-      {/* The test arena: one shared rendering for both layouts. On desktop it
-          expands to the remaining vertical space (the flex-1 wrapper); on
-          phones it sits between the editor tabs and the sticky bar. */}
-      <div ref={arenaSectionRef} className="min-h-0 md:flex-1 md:overflow-y-auto">
-        {arenaSection}
-      </div>
+      {/* The test arena: one shared rendering for both layouts. It flows in
+          the normal document flow (the page scrolls like every other Nova
+          page); on phones it sits between the editor tabs and the sticky
+          bar. */}
+      {arenaSection}
 
       <div
         className="sticky bottom-0 z-20 -mx-4 flex items-center gap-2 border-t-2 border-base-300 bg-base-100 px-4 py-2 pb-safe md:hidden"
@@ -848,15 +753,6 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         >
           <Play className="h-4 w-4" aria-hidden="true" />
           Run
-        </Button>
-        <Button
-          variant="secondary"
-          size="md"
-          onClick={handleTestMultiplayer}
-          title="Run this source with several simulated players in the test arena"
-        >
-          <FlaskConical className="h-4 w-4" aria-hidden="true" />
-          Test
         </Button>
         <Button
           variant="primary"
@@ -921,6 +817,14 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
           </div>
         </div>
       </Dialog>
+
+      {/* The single-player runtime stays mounted in a hidden container: it
+          is the diagnostics / mode-detection / saved-source-test-metadata
+          engine (registration + recordTestResults) — its frame is never
+          visible. */}
+      <div className="hidden" data-testid="hidden-runtime-container" aria-hidden="true">
+        <div ref={hiddenRuntimeRef} />
+      </div>
     </div>
   );
 }
