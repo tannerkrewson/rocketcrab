@@ -4,7 +4,8 @@
 - **Date:** 2026-08-01
 - **Owner:** Rocketcrab Nova planning (Phase 1)
 - **Related:** S1 (Nova API), S2 (state mode), A1 (simulation), A2 (raw),
-  S4 (state-mode MVP), ADR-0007 (authority)
+  S4 (state-mode MVP; verification in
+  `docs/testing/state-mode-vertical-slice.md`), ADR-0007 (authority)
 
 ## Context
 

@@ -59,6 +59,22 @@ Packages are consumed as TypeScript source by the apps (via the npm workspace
 protocol); Vite handles transpilation at build time. A package's `build` script
 type-checks its source; apps produce real static bundles with `vite build`.
 
+## Documentation
+
+The docs tree is the single source of truth; every file is owned by a
+canonical index or an ADR:
+
+- `docs/architecture/` — 13 ADRs (`adr-0001`..`adr-0013`), the threat model
+  (`threat-model.md`), and the deployment guide (`deployment.md`).
+- `docs/api/nova-api.md` — the full game-developer API reference; the
+  condensed, prompt-embedded version is `docs/api/nova-api-ai-reference.md`.
+- `docs/testing/` — milestone findings and checklists, each linked from its
+  owning ADR (e.g. the S4 state-mode vertical slice from ADR-0006).
+- `docs/editor-cohesion-design.md` — the editor third-pass UI blueprint
+  (implementation tasks; beads 9fv.10.12).
+- `deploy/cloudflare.md` — Cloudflare infrastructure state + reproduction
+  runbook (wrangler + documented one-time steps; no Terraform).
+
 ## Getting started
 
 Requires Node.js >= 20 and npm (see `packageManager`).

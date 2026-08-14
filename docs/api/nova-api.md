@@ -7,6 +7,10 @@ every mode. Games receive it as `window.nova` inside the runtime frame
 in the local test arena and in real parties — the transport behind it is
 never visible to game code.
 
+For a condensed, prompt-embedded version of this same surface (what the
+master prompt gives an AI to write games), see
+`docs/api/nova-api-ai-reference.md`.
+
 The authoritative source of these types is
 `packages/nova-api/src/types.ts` (`@rocketcrab/nova-api`); this reference is
 checked against it by the package surface tests (see
