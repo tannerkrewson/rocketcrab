@@ -15,11 +15,13 @@ import type { PartyEngineState } from "../../lib/party/engine";
 import { PartyPlayShell, type PartyPlayShellProps } from "./PartyPlayShell";
 
 /**
- * In-game play shell tests (7.29 + 7.38): the compact top bar (logo
+ * In-game play shell tests (7.29 + 7.38 + 7.45): the compact top bar (logo
  * collapse, centered party URL), the mutually-exclusive menu / players /
- * browse panels, the players page (back + host Browse games), and the
- * confirmed actions — Reload all is red and asks first, "Exit to lobby"
- * ends the game for everyone.
+ * browse panels, the players popup (7.45: a compact overlay anchored below
+ * the top bar - never a full-page takeover - dismissed by Back, outside
+ * click, or Escape; back button + host "Browse games"), and the confirmed
+ * actions - Reload all is red and asks first, "Exit to lobby" ends the
+ * game for everyone.
  */
 
 function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState {
@@ -189,7 +191,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(onEndGame).toHaveBeenCalledTimes(1);
   });
 
-  it("lets the host kick a member from the Players page (7.29/7.38)", async () => {
+  it("lets the host kick a member from the Players popup (7.29/7.38)", async () => {
     const onKickMember = vi.fn();
     await renderShell(makeState(), { onKickMember });
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
@@ -198,6 +200,41 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     const kick = within(players).getByRole("button", { name: /kick/i });
     await userEvent.click(kick);
     expect(onKickMember).toHaveBeenCalledWith("member-b");
+  });
+
+  it("shows the players list as a compact popup that never covers the game frame (7.45)", async () => {
+    await renderShell(makeState());
+    await userEvent.click(screen.getByRole("button", { name: /menu/i }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
+    const popup = screen.getByRole("dialog", { name: "Players" });
+    // The popup carries its own title + Back row, so it never relies on the
+    // fixed top bar for its header (no invisible controls under the bar).
+    expect(within(popup).getByText(/^Players \(\d+\)$/)).toBeInTheDocument();
+    expect(within(popup).getByRole("button", { name: /back to the game/i })).toBeInTheDocument();
+    // The game frame stays mounted underneath and the top bar stays usable.
+    expect(screen.getByTestId("game-frame")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /menu/i })).toBeInTheDocument();
+  });
+
+  it("dismisses the players popup on outside click, Escape, and Back (7.45)", async () => {
+    await renderShell(makeState());
+    const openPopup = async () => {
+      await userEvent.click(screen.getByRole("button", { name: /menu/i }));
+      await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
+    };
+    // Clicking outside (the invisible backdrop) closes it.
+    await openPopup();
+    expect(screen.getByRole("dialog", { name: "Players" })).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId("players-popup-backdrop"));
+    expect(screen.queryByRole("dialog", { name: "Players" })).not.toBeInTheDocument();
+    // Escape closes it.
+    await openPopup();
+    await userEvent.keyboard("{Escape}");
+    expect(screen.queryByRole("dialog", { name: "Players" })).not.toBeInTheDocument();
+    // The Back button closes it.
+    await openPopup();
+    await userEvent.click(screen.getByRole("button", { name: /back to the game/i }));
+    expect(screen.queryByRole("dialog", { name: "Players" })).not.toBeInTheDocument();
   });
 
   it("hides kick and Browse games from joiners", async () => {
@@ -220,7 +257,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
     expect(screen.queryByRole("menu", { name: /game menu/i })).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Players" })).toBeInTheDocument();
-    // The players page's back button closes the panel.
+    // The popup's Back button closes the panel.
     await userEvent.click(screen.getByRole("button", { name: /back to the game/i }));
     expect(screen.queryByRole("dialog", { name: "Players" })).not.toBeInTheDocument();
     // Browse (host) replaces Players — never both at once.
@@ -246,7 +283,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(onPickPrebuilt).toHaveBeenCalledWith(
       expect.objectContaining({ kind: "classic", id: "protobowl" }),
     );
-    // Back returns to the players page.
+    // Back returns to the players popup.
     await userEvent.click(screen.getByRole("button", { name: /back to players/i }));
     expect(screen.getByRole("dialog", { name: "Players" })).toBeInTheDocument();
   });

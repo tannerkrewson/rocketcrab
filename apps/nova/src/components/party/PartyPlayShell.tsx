@@ -1,5 +1,5 @@
 import { ArrowLeft, Gamepad2, LogOut, Menu, OctagonX, RotateCcw, Users } from "lucide-react";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { BrowseEntry } from "../../lib/browse";
 import { writeToClipboard } from "../../lib/editor/clipboard";
@@ -33,8 +33,10 @@ type PlayShellPanel = "menu" | "players" | "browse" | null;
  * in-game chrome sits IN FLOW ABOVE the game frame — a compact top bar
  * (the 🦀🚀 logo collapses to a bare floating logo on tap, a centered
  * rocketcrab.com/CODE URL copies the invite, and a Menu dropdown opens a
- * compact, flush dropdown), plus a Players page (back button + host "Browse
- * games") and the shared pick-a-game browser. Minimal chrome, the code
+ * compact, flush dropdown), plus a Players POPUP (7.45: a compact overlay
+ * anchored top-center BELOW the top bar - never a full-page takeover, so
+ * the game keeps running underneath) and the shared pick-a-game browser.
+ * Minimal chrome, the code
  * front and center: classic parity. The emergency teardown ("Exit to
  * lobby") lives here, outside the game frame (T6/T21 — game code cannot
  * disable it); game-end returns everyone to the lobby.
@@ -58,6 +60,21 @@ export function PartyPlayShell({
   const [confirmEnd, setConfirmEnd] = useState(false);
   // 7.38: "Reload all" is red and asks first — players' games will be lost.
   const [confirmReloadAll, setConfirmReloadAll] = useState(false);
+
+  // 7.45: Escape closes the open panel (the players popup or the pick-a-
+  // game panel); the top bar and the game keep running while it is open.
+  useEffect(() => {
+    if (panel === null) {
+      return;
+    }
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setPanel(null);
+      }
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [panel]);
 
   const copyInvite = async () => {
     if (state.inviteUrl === null) return;
@@ -201,8 +218,116 @@ export function PartyPlayShell({
       ) : null}
 
       {/* The game frame fills everything below the top bar (in flow, never
-          floating over the game). */}
-      <div className="min-h-0 flex-1">{children}</div>
+          floating over the game). The players popup and the pick-a-game
+          panel live INSIDE this area (7.45), so they always start BELOW the
+          fixed top bar - the bar can never overlap their title/back row. */}
+      <div className="relative min-h-0 flex-1">
+        {children}
+
+        {/* 7.45: the Players POPUP - a compact overlay anchored top-center
+            just below the top bar (never a full-page takeover). The game
+            keeps running underneath; clicking outside, Escape, or Back
+            dismisses it. The invisible backdrop catches outside clicks. */}
+        {panel === "players" ? (
+          <>
+            <div
+              className="absolute inset-0 z-40"
+              onClick={() => setPanel(null)}
+              aria-hidden="true"
+              data-testid="players-popup-backdrop"
+            />
+            <div
+              className="absolute left-1/2 top-3 z-50 flex max-h-[calc(100%-1.5rem)] w-[min(28rem,calc(100%-1.5rem))] -translate-x-1/2 flex-col overflow-hidden rounded-box border-2 border-base-300 bg-base-100 shadow-xl"
+              role="dialog"
+              aria-label="Players"
+            >
+              <div className="flex items-center gap-2 border-b-2 border-base-300 px-3 py-2">
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => setPanel(null)}
+                  aria-label="Back to the game"
+                >
+                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                  Back
+                </button>
+                <p className="font-black">Players ({state.members.length})</p>
+                <div className="min-w-0 flex-1" />
+                {state.role === "creator" ? (
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setPanel("browse")}
+                  >
+                    <Gamepad2 className="h-4 w-4" aria-hidden="true" />
+                    Browse games
+                  </button>
+                ) : null}
+              </div>
+              <div className="min-h-0 overflow-y-auto p-3">
+                <ul className="flex flex-col gap-2">
+                  {state.members.map((member) => (
+                    <li
+                      key={member.memberId}
+                      className="flex items-center gap-2 rounded-box border-2 border-base-300 bg-base-100 px-3 py-2 text-sm"
+                    >
+                      <span className="min-w-0 flex-1 truncate font-bold">
+                        {member.displayName}
+                        {member.isSelf ? (
+                          <span className="text-base-content/50"> (you)</span>
+                        ) : null}
+                      </span>
+                      {member.connected ? (
+                        <span className="badge badge-success badge-sm">Connected</span>
+                      ) : (
+                        <span className="badge badge-error badge-sm">Disconnected</span>
+                      )}
+                      {state.role === "creator" && !member.isSelf ? (
+                        <button
+                          type="button"
+                          className="btn btn-xs text-error"
+                          onClick={() => onKickMember(member.memberId)}
+                          title={`Remove ${member.displayName} from the party`}
+                        >
+                          Kick
+                        </button>
+                      ) : null}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          </>
+        ) : null}
+
+        {/* 7.43: pick a game - the SAME shared browse UI as /browse, in pick
+            mode, so the host can switch the game without leaving the party.
+            7.45: rendered inside the frame area so its back row sits below
+            the fixed top bar too. */}
+        {panel === "browse" ? (
+          <div
+            className="absolute inset-0 z-40 flex flex-col bg-base-200"
+            role="dialog"
+            aria-label="Pick a game"
+          >
+            <div className="flex items-center gap-2 border-b-2 border-base-300 bg-base-100 px-3 py-2">
+              <button
+                type="button"
+                className="btn btn-sm"
+                onClick={() => setPanel("players")}
+                aria-label="Back to players"
+              >
+                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                Back
+              </button>
+              <p className="font-black">Pick a game</p>
+            </div>
+            <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
+              <GameBrowser compact onPick={onPickPrebuilt} onPickSaved={onPickGame} />
+            </div>
+          </div>
+        ) : null}
+      </div>
 
       {/* 7.38: collapsed mode — only the floating logo remains; tap to
           reopen the full top bar. */}
@@ -218,96 +343,6 @@ export function PartyPlayShell({
             🦀🚀
           </span>
         </button>
-      ) : null}
-
-      {/* 7.38: the Players page — back button, and the host can switch the
-          game from here (Browse games). */}
-      {panel === "players" ? (
-        <div
-          className="absolute inset-0 z-40 flex flex-col bg-base-200"
-          role="dialog"
-          aria-label="Players"
-        >
-          <div className="flex items-center gap-2 border-b-2 border-base-300 bg-base-100 px-3 py-2">
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => setPanel(null)}
-              aria-label="Back to the game"
-            >
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              Back
-            </button>
-            <p className="font-black">Players ({state.members.length})</p>
-            <div className="min-w-0 flex-1" />
-            {state.role === "creator" ? (
-              <button
-                type="button"
-                className="btn btn-secondary btn-sm"
-                onClick={() => setPanel("browse")}
-              >
-                <Gamepad2 className="h-4 w-4" aria-hidden="true" />
-                Browse games
-              </button>
-            ) : null}
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-3">
-            <ul className="flex flex-col gap-2">
-              {state.members.map((member) => (
-                <li
-                  key={member.memberId}
-                  className="flex items-center gap-2 rounded-box border-2 border-base-300 bg-base-100 px-3 py-2 text-sm"
-                >
-                  <span className="min-w-0 flex-1 truncate font-bold">
-                    {member.displayName}
-                    {member.isSelf ? <span className="text-base-content/50"> (you)</span> : null}
-                  </span>
-                  {member.connected ? (
-                    <span className="badge badge-success badge-sm">Connected</span>
-                  ) : (
-                    <span className="badge badge-error badge-sm">Disconnected</span>
-                  )}
-                  {state.role === "creator" && !member.isSelf ? (
-                    <button
-                      type="button"
-                      className="btn btn-xs text-error"
-                      onClick={() => onKickMember(member.memberId)}
-                      title={`Remove ${member.displayName} from the party`}
-                    >
-                      Kick
-                    </button>
-                  ) : null}
-                </li>
-              ))}
-            </ul>
-          </div>
-        </div>
-      ) : null}
-
-      {/* 7.43: pick a game — the SAME shared browse UI as /browse, in pick
-          mode, so the host can switch the game without leaving the party. */}
-      {panel === "browse" ? (
-        <div
-          className="absolute inset-0 z-40 flex flex-col bg-base-200"
-          role="dialog"
-          aria-label="Pick a game"
-        >
-          <div className="flex items-center gap-2 border-b-2 border-base-300 bg-base-100 px-3 py-2">
-            <button
-              type="button"
-              className="btn btn-sm"
-              onClick={() => setPanel("players")}
-              aria-label="Back to players"
-            >
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              Back
-            </button>
-            <p className="font-black">Pick a game</p>
-          </div>
-          <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
-            <GameBrowser compact onPick={onPickPrebuilt} onPickSaved={onPickGame} />
-          </div>
-        </div>
       ) : null}
 
       {confirmEnd ? (
