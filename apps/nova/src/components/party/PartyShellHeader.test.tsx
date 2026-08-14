@@ -4,11 +4,13 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { PartyShellHeader } from "./PartyShellHeader";
 
 /**
- * Party shell header tests (7.22): the classic-style header shows the
- * rocket + crab logo, the big mono room code, and the lowercase phonetic
- * spelling. Clicking the code copies the invite link. The invite details
- * (QR / URL / copy row) moved to the lobby's invite card (10.5) — the
- * header stays the classic identity.
+ * Party shell header tests (7.22 / 11.6): the classic-style header shows
+ * the rocket + crab logo, ONE lobby page title — "origin/lowercase-code"
+ * (e.g. "localhost/rcrb") styled like the homepage title — and the
+ * lowercase phonetic spelling. Tapping the title copies the invite link;
+ * the cursor + title attribute hint that it is copyable. The invite
+ * details (QR / URL / copy row) live in the lobby's invite card (10.5) —
+ * the header stays the classic identity.
  */
 
 const INVITE_URL = "http://localhost:5173/join#code=RCRB&secret=invite-secret";
@@ -18,9 +20,13 @@ afterEach(() => {
 });
 
 describe("PartyShellHeader", () => {
-  it("renders the logo and the big mono code with lowercase phonetic spelling", () => {
+  it("renders the logo and one origin+code title with lowercase phonetic spelling", () => {
     render(<PartyShellHeader code="RCRB" inviteUrl={INVITE_URL} />);
-    expect(screen.getByTestId("party-code")).toHaveTextContent("RCRB");
+    const title = screen.getByTestId("party-title");
+    // The title is ONE "origin/code" string; the code is lowercase and is
+    // never shown separately from the title.
+    expect(title.textContent).toBe(`${window.location.host}/rcrb`);
+    expect(screen.queryByText("RCRB")).not.toBeInTheDocument();
     const phonetic = screen.getByText(/romeo charlie romeo bravo/i);
     expect(phonetic).toBeInTheDocument();
     // 10.5: the phonetic is lowercase (never ALL CAPS), consistent with the
@@ -30,18 +36,22 @@ describe("PartyShellHeader", () => {
 
   it("renders only the logo when no code is known yet", () => {
     render(<PartyShellHeader />);
-    expect(screen.queryByTestId("party-code")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("party-title")).not.toBeInTheDocument();
     expect(screen.getByText("🦀🚀")).toBeInTheDocument();
   });
 
-  it("copies the invite link when the code is clicked", async () => {
+  it("copies the invite link when the title is tapped", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText },
       configurable: true,
     });
     render(<PartyShellHeader code="RCRB" inviteUrl={INVITE_URL} />);
-    await userEvent.click(screen.getByTestId("party-code"));
+    const title = screen.getByTestId("party-title");
+    // Cursor + title attribute hint that the title is copyable.
+    expect(title).toHaveClass("cursor-pointer");
+    expect(title).toHaveAttribute("title", "Copy the invite link");
+    await userEvent.click(title);
     expect(writeText).toHaveBeenCalledWith(INVITE_URL);
     Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
   });
