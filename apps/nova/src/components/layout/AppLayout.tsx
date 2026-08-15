@@ -1,4 +1,5 @@
 import { Outlet } from "@tanstack/react-router";
+import { StarfieldBackground } from "./StarfieldBackground";
 import { ThemeSelector } from "./ThemeSelector";
 
 /**
@@ -13,7 +14,13 @@ import { ThemeSelector } from "./ThemeSelector";
  */
 export function AppLayout() {
   return (
-    <div className="flex min-h-screen flex-col bg-base-200 text-base-content">
+    // `isolate` gives the shell its own stacking context so the homepage
+    // starfield's -z-10 sits behind the page content but above the shell's
+    // background (rocketcrab-5cl.4).
+    <div className="isolate flex min-h-screen flex-col bg-base-200 text-base-content">
+      {/* Homepage starfield: always mounted so it can fade out when the user
+          leaves "/" and back in on return (rocketcrab-5cl.4). */}
+      <StarfieldBackground />
       <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-12 pt-6">
         <Outlet />
       </main>
