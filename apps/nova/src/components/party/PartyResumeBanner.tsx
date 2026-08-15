@@ -85,7 +85,7 @@ export function PartyResumeBanner({ engine }: PartyResumeBannerProps) {
           <RotateCcw className="h-4 w-4" aria-hidden="true" />
           {rejoining ? "Rejoining…" : "Rejoin party"}
         </Button>
-        <Button variant="outline" size="md" onClick={handleDismiss}>
+        <Button variant="neutral" soft size="md" onClick={handleDismiss}>
           <X className="h-4 w-4" aria-hidden="true" />
           Not now
         </Button>

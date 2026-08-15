@@ -31,7 +31,7 @@ export function ErrorPanel({
       {message ? <p className="text-base-content/80">{message}</p> : null}
       {onRetry ? (
         <div className="mt-1">
-          <Button variant="outline" onClick={onRetry}>
+          <Button variant="neutral" soft onClick={onRetry}>
             Try again
           </Button>
         </div>

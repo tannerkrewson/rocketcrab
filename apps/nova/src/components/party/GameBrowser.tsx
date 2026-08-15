@@ -271,7 +271,7 @@ export function GameBrowser({ onPick, onPickSaved, compact = false, onBack }: Ga
         <button
           type="button"
           onClick={handleBack}
-          className={buttonStyles("outline", "md", "self-start")}
+          className={buttonStyles("neutral", "md", "self-start", true)}
           title={compact ? "Back to lobby" : "Back to home"}
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />

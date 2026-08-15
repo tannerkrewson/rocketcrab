@@ -156,11 +156,18 @@ export function JoinScreen({
 
         <div className="flex justify-center gap-3">
           {editing ? (
-            <Button variant="outline" size="lg" type="button" className="flex-1" onClick={onBack}>
+            <Button
+              variant="neutral"
+              soft
+              size="lg"
+              type="button"
+              className="flex-1"
+              onClick={onBack}
+            >
               Back
             </Button>
           ) : (
-            <Link to="/" className={buttonStyles("outline", "lg", "flex-1")}>
+            <Link to="/" className={buttonStyles("neutral", "lg", "flex-1", true)}>
               Back
             </Link>
           )}

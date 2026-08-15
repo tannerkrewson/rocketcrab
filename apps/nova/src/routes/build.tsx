@@ -54,7 +54,7 @@ export function BuildPage() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-10 text-center">
       <BrandHeader />
-      <Link to="/" className={buttonStyles("outline", "md", "self-start")}>
+      <Link to="/" className={buttonStyles("neutral", "md", "self-start", true)}>
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         back
       </Link>
