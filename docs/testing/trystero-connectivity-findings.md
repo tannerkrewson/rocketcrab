@@ -203,3 +203,99 @@ connectivity is **unreliable without TURN**. Created P0 discovered issue
 `rocketcrab-23s` (temporary TURN credentials) **blocking production release**
 (blocks M4 `rocketcrab-9fv.6.4`) per the F5 blocking conditions. Do not
 silently replace Trystero.
+
+---
+
+# Re-probe of pinned GOOD_RELAYS (2026-08-15) — relay-failure investigation
+
+Beads: `rocketcrab-ont` (investigation), `rocketcrab-iha` (blocked decision).
+Re-probed the F10 `GOOD_RELAYS` set after the Nova console began logging
+constant relay failures every few seconds (offchain.pub web-of-trust
+rejection, relay.damus.io rate-limit, relay.nostr.info kind rejection).
+Probe scripts: `scripts/probes/` (`probe-relays.mjs`, `probe-burst.mjs`,
+`probe-candidates.mjs`, `probe-final-set.mjs`) and the browser-level
+`e2e-trystero/e2e/discovery-probe.spec.ts` (real Trystero 0.25.3 via the
+adapter harness; run with `npm run test:e2e:trystero -- --grep "discovery probe"`).
+
+## Method
+
+- Raw WS probe (node, global WebSocket + `@noble/secp256k1` schnorr): for each
+  relay — connect, NIP-11 doc, publish **signed** kind 22774 and 22734 events
+  with a **fresh random pubkey**, record OK accept/reject + NOTICE reasons;
+  repeat rounds and bursts (12–25 events) to characterize quota throttling.
+- Browser probe (Playwright, two pages through the real adapter): measure
+  room discovery with the pinned 7-relay set vs a healthy 4-relay set, and
+  capture the console relay-failure lines.
+
+## Per-relay results (pinned GOOD_RELAYS, 2026-08-15)
+
+| Relay                    | WS reachable                                    | kind 22774                                              | kind 22734                                | Burst (12–25)                                                               | Verdict                                                              |
+| ------------------------ | ----------------------------------------------- | ------------------------------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------- |
+| wss://relay.damus.io     | yes (intermittent; 6/14 rapid connects refused) | accepted                                                | accepted                                  | ~3–5 accepted then `rate-limited: you are noting too much`                  | **quota-throttled** — low practical contribution, spam               |
+| wss://nos.lol            | yes                                             | accepted                                                | accepted                                  | 12/12, both rounds                                                          | healthy                                                              |
+| wss://relay.primal.net   | yes                                             | accepted                                                | accepted                                  | 12/12, both rounds                                                          | healthy                                                              |
+| wss://nostr.mom          | yes                                             | accepted                                                | accepted                                  | 12/12, both rounds                                                          | healthy                                                              |
+| wss://relay.snort.social | yes (NIP-11 idle_timeout 10 s)                  | accepted                                                | accepted                                  | 12/12                                                                       | healthy                                                              |
+| wss://offchain.pub       | yes                                             | accepted                                                | accepted                                  | ~3–5 accepted then `Policy violated and pubkey is not in our web of trust.` | **quota-throttled** — web-of-trust kicks in after a few events       |
+| wss://relay.nostr.info   | yes                                             | **rejected** (`kind 22774 not permitted in this relay`) | **rejected** (`kind 22734 not permitted`) | 0/25                                                                        | **hard policy rejection** (strfry kind allowlist) — contributes zero |
+
+Notes:
+
+- The Trystero room kind is derived per topic (`strToNum(sha1(topic),1e4)+2e4`);
+  observed kinds 22774 / 22734 / 22724 all rejected by relay.nostr.info.
+- damus/offchain throttling is quota-style (per-pubkey/per-IP, cooldown-based),
+  not a permanent ban: fresh pubkeys get a few accepts, then sustained
+  rejection. The app re-announces every 5 s (`advertIntervalMs`), so both
+  relays reject on nearly every publish → the constant console spam.
+
+## Impact assessment (evidence)
+
+- **Discovery is NOT broken.** Browser probe: two pages through the real
+  adapter discovered each other in **2029 ms with the pinned 7-relay set**
+  vs **2027 ms with the healthy 4-relay set** — no measurable degradation,
+  and zero console failures with the healthy set.
+- Trystero sends every event to **all** pinned URLs (`getRelays` returns
+  `relayConfig.urls` verbatim); `redundancy` only slices the _default_ relay
+  list, so `DEFAULT_RELAY_REDUNDANCY = 5` is **inert** when URLs are pinned.
+  The effective healthy-relay count is 4 of 7 (nostr.info contributes zero;
+  damus/offchain accept only a handful of events per cooldown window).
+- The adapter's join-time check needs **one** OPEN socket (`connectedCount > 0`
+  settles the join; `relay_unreachable` only when 0 sockets open in 15 s).
+  Nothing warns when fewer than `redundancy` relays are _usable_ — and the
+  `RelayDiagnostics.connected` flag is socket-level, so rejecting relays
+  (nostr.info) still show as connected in the lobby's diagnostics panel.
+- **Production UI surfaces nothing**: the `PartyEngine` singleton is created
+  without a `diagnostics` provider, so `PartyDiagnosticsPanel` shows no relay
+  state at all; `onRelayStateChange`/`signalingDown` are unused by apps/nova.
+
+## Candidate replacements probed (2026-08-15)
+
+- **wss://relay.nostr.net — VERIFIED GOOD**: accepts both kinds, burst 12/12
+  across 2 rounds, no throttling, no write restriction.
+- wss://nostr.bitcoiner.social — **rejected**: same web-of-trust policy as
+  offchain.pub (identical rejection message) after the first few events.
+- nostr.wine (write restricted, signup), eden.nostr.land (paywall), f7z.io /
+  pyramid.f7z.io / brb.io / rel.duti.dev / relay.nostr.bg / momostr.com /
+  siamstr.in / relay.current.fyi / relay.0xchat.com / relay.nostr.vet /
+  relay.nostr.band — unreachable or write-restricted from this network.
+
+## Recommended remediation (for human sign-off — rocketcrab-iha; NOT applied)
+
+1. **GOOD_RELAYS → `[nos.lol, relay.primal.net, nostr.mom, relay.snort.social, relay.nostr.net]`**
+   (5 relays, all verified kind-22774-accepting, no throttling in probe).
+   Drop relay.damus.io, offchain.pub (quota-throttled), relay.nostr.info
+   (hard kind rejection).
+2. **Redundancy**: keep `DEFAULT_RELAY_REDUNDANCY = 5` — with pinned URLs it
+   is inert anyway; 5 pinned × 5 nominal now actually lines up.
+3. **Config surface (optional)**: read an optional `VITE_TRYSTERO_RELAYS`
+   (comma-separated) in `transport-factory.ts` so relays can be swapped
+   without a code change (still a build, not a runtime fetch).
+4. **Follow-up (new sub-issue)**: surface relay-health diagnostics in the UI
+   and count _usable_ relays (kind-accepting), not just OPEN sockets.
+
+Tradeoffs: 5 verified relays gives less absolute margin than 7 pinned, but all
+5 actually carry traffic (vs 4 of 7 today); relay.nostr.net is less
+established than damus — worth monitoring; good open arbitrary-kind public
+relays are scarce (most are unreachable, paywalled, or write-restricted), so
+a private relay (alongside the Cloudflare work, rocketcrab-23s) remains the
+long-term option.
