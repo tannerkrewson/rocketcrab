@@ -22,7 +22,7 @@
  * {@link TrysteroTransport} in production and over the in-memory hub with
  * injected seams (fake clock, fake runtime bridge) in deterministic tests.
  */
-import type { GameMode, MemberId, PartyCode } from "@rocketcrab/protocol";
+import type { GameApiEvent, GameMode, MemberId, PartyCode } from "@rocketcrab/protocol";
 import type { TransportConnectionState } from "@rocketcrab/core";
 import {
   GameSourceCoordinator,
@@ -40,10 +40,28 @@ import {
   type Scheduler,
 } from "@rocketcrab/party";
 import type { NovaAction, NovaSessionEvent } from "@rocketcrab/nova-api";
-import { createNovaSession } from "@rocketcrab/nova-api";
+import {
+  createNovaSession,
+  LocalGameExecutor,
+  LocalSimulationExecutor,
+  type NovaGameContext,
+  type NovaPlayer,
+  type NovaSimulationExecutor,
+  type NovaStateExecutor,
+  type NovaStateStateResult,
+  type NovaStateViewResult,
+} from "@rocketcrab/nova-api";
 import { RuntimeHostClient, type ChannelPort, type RuntimeHostEvent } from "../runtime-host";
 import { arenaApiCallSchemas } from "../arena/api-calls";
 import { toApiEvent } from "../arena/api-events";
+import {
+  createFrameSimulationExecutor,
+  createFrameStateExecutor,
+  type FrameSimulationExecutor,
+  type FrameSimulationResponsePayload,
+  type FrameStateExecutor,
+  type FrameStateResponsePayload,
+} from "../arena/state-executor";
 import { runtimeOriginForMainOrigin } from "../runtime-origin";
 import { findClassicGame, type ClassicGameConnectResult } from "../classic";
 import { localPartyIdentity, updatePartyDisplayName } from "./identity";
@@ -358,6 +376,96 @@ interface PartyMemberIdentity {
   displayName: string;
 }
 
+/**
+ * The party's S2 state executor (5cl.14): the NovaSession runs the game's
+ * state handlers IN the runtime frame (U6 parity with the arena) — the
+ * engine forwards `stateRequest` apiEvents into the frame and correlates
+ * the `stateResponse` apiCalls back. When no Nova runtime frame exists
+ * (classic games — their iframe is embedded by the UI directly, 7.7.4 — or
+ * a frame that failed to boot), the requests fall back to the same
+ * no-op semantics the engine used before (empty `{}` state, no views), so
+ * the start flow still completes instead of timing out on the 10 s frame
+ * executor. `runtime()` is read at call time so a rebooted frame is always
+ * the target.
+ */
+class PartyStateExecutor implements NovaStateExecutor {
+  private readonly frame: FrameStateExecutor;
+  private readonly local = new LocalGameExecutor(null);
+  private readonly runtime: () => RuntimeHostClient | null;
+
+  constructor(runtime: () => RuntimeHostClient | null) {
+    this.runtime = runtime;
+    this.frame = createFrameStateExecutor((event) => runtime()?.pushApiEvent(event));
+  }
+
+  createInitialState(input: {
+    context: NovaGameContext;
+    viewers: readonly NovaPlayer[];
+  }): Promise<NovaStateStateResult> {
+    return this.runtime() !== null
+      ? this.frame.createInitialState(input)
+      : this.local.createInitialState(input);
+  }
+
+  applyAction(input: {
+    actionId: string;
+    type: string;
+    payload: unknown;
+    state: unknown;
+    context: NovaGameContext;
+    viewers: readonly NovaPlayer[];
+  }): Promise<NovaStateStateResult> {
+    return this.runtime() !== null ? this.frame.applyAction(input) : this.local.applyAction(input);
+  }
+
+  computeView(input: { state: unknown; viewer: NovaPlayer }): Promise<NovaStateViewResult> {
+    return this.runtime() !== null ? this.frame.computeView(input) : this.local.computeView(input);
+  }
+
+  /** Route a frame `stateResponse` apiCall back to its pending request. */
+  handleResponse(payload: FrameStateResponsePayload): void {
+    this.frame.handleResponse(payload);
+  }
+
+  dispose(): void {
+    this.frame.dispose();
+  }
+}
+
+/**
+ * The party's A1 simulation executor (5cl.14): forwards `simulationRequest`
+ * apiEvents to the frame (the game's `serializeState` snapshot callback)
+ * and correlates `simulationResponse`s; falls back to the no-handler local
+ * executor when no Nova runtime frame exists (classic games / boot
+ * failure).
+ */
+class PartySimulationExecutor implements NovaSimulationExecutor {
+  private readonly frame: FrameSimulationExecutor;
+  private readonly local = new LocalSimulationExecutor(null);
+  private readonly runtime: () => RuntimeHostClient | null;
+
+  constructor(runtime: () => RuntimeHostClient | null) {
+    this.runtime = runtime;
+    this.frame = createFrameSimulationExecutor((event) => runtime()?.pushApiEvent(event));
+  }
+
+  serializeState(): Promise<
+    | { readonly ok: true; readonly state: unknown }
+    | { readonly ok: false; readonly code: string; readonly message: string }
+  > {
+    return this.runtime() !== null ? this.frame.serializeState() : this.local.serializeState();
+  }
+
+  /** Route a frame `simulationResponse` apiCall back to its request. */
+  handleResponse(payload: FrameSimulationResponsePayload): void {
+    this.frame.handleResponse(payload);
+  }
+
+  dispose(): void {
+    this.frame.dispose();
+  }
+}
+
 export class PartyEngine {
   private readonly defaults: PartyEngineDefaults;
   private identity: PartyMemberIdentity;
@@ -390,6 +498,26 @@ export class PartyEngine {
   private removedReason: string | null = null;
   private frameStarted = false;
   private registered = false;
+
+  /**
+   * S2/A1 frame executors (5cl.14): the party's NovaSession runs the
+   * game's state/simulation handlers IN the runtime frame (U6 parity with
+   * the arena) instead of a local no-op executor. Without them the state
+   * engine ran `LocalGameExecutor(null)` — the game's `createInitialState`
+   * and `actions` never executed, the initial state was `{}`, and a
+   * state-mode game could never render its real view.
+   */
+  private stateExecutor: PartyStateExecutor | null = null;
+  private simulationExecutor: PartySimulationExecutor | null = null;
+  /**
+   * The last self state view forwarded to the frame (5cl.14). The lobby →
+   * playing phase flip rebinds the frame container (2t1.6), which disposes
+   * and reboots the runtime frame; the fresh frame misses the initial
+   * `state` event, so its game hangs at its own waiting screen. The view is
+   * replayed by {@link pushSessionSnapshot} when the rebooted frame
+   * registers.
+   */
+  private lastStateApiEvent: GameApiEvent | null = null;
 
   private pendingApprovals = new Map<MemberId, PendingApproval>();
   private transfers = new Map<MemberId, TransferState>();
@@ -610,9 +738,12 @@ export class PartyEngine {
         await party.leave().catch(() => undefined);
         return;
       }
-      await this.establish(party);
+      // 5cl.14: the host's game is known BEFORE the session attaches so
+      // `establish` bakes the real mode into the NovaSession (state vs
+      // simulation drives the whole runtime path).
       this.game =
         input === undefined ? null : { gameId: input.gameId, title: input.title, mode: input.mode };
+      await this.establish(party);
       this.phase = "lobby";
       this.phaseDetail = null;
       this.lastSetup = null;
@@ -979,6 +1110,12 @@ export class PartyEngine {
     if (party !== null) {
       await party.leave().catch(() => undefined);
     }
+    // 5cl.14: frame executors are per-party; dispose them with the session.
+    this.stateExecutor?.dispose();
+    this.stateExecutor = null;
+    this.simulationExecutor?.dispose();
+    this.simulationExecutor = null;
+    this.lastStateApiEvent = null;
     this.pendingSource = null;
     this.game = null;
     this.classic = null;
@@ -1306,14 +1443,15 @@ export class PartyEngine {
     if (injected !== null) {
       return injected;
     }
+    const options = { onJoinError: (error: unknown) => this.handleJoinErrorNotice(error) };
     if (!turnCredsConfigured()) {
       this.turnStatus = "disabled";
-      return createTrysteroPartyTransportFactory();
+      return createTrysteroPartyTransportFactory(options);
     }
     const result = await this.fetchTurnCredentialsOnce();
     if (result.ok) {
       this.turnStatus = "configured";
-      return createTrysteroPartyTransportFactory({ turnConfig: result.turnConfig });
+      return createTrysteroPartyTransportFactory({ ...options, turnConfig: result.turnConfig });
     }
     // Mint failure (network, 403, 5xx, timeout): proceed WITHOUT TURN.
     this.turnStatus = "unavailable";
@@ -1321,7 +1459,39 @@ export class PartyEngine {
       "warn",
       `TURN credentials unavailable (${result.reason}) — the party will connect without a TURN relay.`,
     );
-    return createTrysteroPartyTransportFactory();
+    return createTrysteroPartyTransportFactory(options);
+  }
+
+  /**
+   * Surface transport join failures as ONE friendly lobby notice (5cl.1).
+   * The `peer_connection_failed` signature ("could not connect to peer …
+   * configure TURN servers") is the documented no-TURN cross-network
+   * failure (ADR-0003 Outcome B, beads rocketcrab-23s): both sides then
+   * see only themselves because the WebRTC data channel never opens. The
+   * TURN fix itself is infrastructure (rocketcrab-23s); this notice makes
+   * the symptom legible instead of a silent 1-player lobby. Deduped to one
+   * notice per category per engine.
+   */
+  private readonly joinErrorNoticesShown = new Set<string>();
+  private handleJoinErrorNotice(error: unknown): void {
+    const category =
+      typeof error === "object" &&
+      error !== null &&
+      "category" in error &&
+      typeof (error as { category: unknown }).category === "string"
+        ? ((error as { category: string }).category as string)
+        : "unknown";
+    if (category === "peer_connection_failed") {
+      if (this.joinErrorNoticesShown.has(category)) {
+        return;
+      }
+      this.joinErrorNoticesShown.add(category);
+      this.addNotice(
+        "warn",
+        "A player couldn't be reached directly over the network (no TURN relay available). They may not appear in the lobby until TURN is configured.",
+      );
+      this.emit();
+    }
   }
 
   /** Fetch minted TURN credentials once; successes are cached (failures retry). */
@@ -1351,6 +1521,16 @@ export class PartyEngine {
     this.unsubCoordinator = this.coordinator.subscribe((event) =>
       this.handleCoordinatorEvent(event),
     );
+    // 5cl.14: fresh frame executors for this party's session. They forward
+    // the state engine's requests into the CURRENT runtime frame (read at
+    // call time, so a rebooted frame is always the target) and correlate
+    // the frame's answers (routed in routeApiCall). One pair per session;
+    // disposed on leave/reset so in-flight requests never bleed across
+    // parties (rule 22).
+    this.stateExecutor?.dispose();
+    this.simulationExecutor?.dispose();
+    this.stateExecutor = new PartyStateExecutor(() => this.runtime);
+    this.simulationExecutor = new PartySimulationExecutor(() => this.runtime);
     const session = createNovaSession({
       transport: party.privateTransport,
       room: party.material.roomId,
@@ -1359,7 +1539,17 @@ export class PartyEngine {
         memberId: this.identity.memberId,
         displayName: this.identity.displayName,
       },
-      game: { gameId: "party", mode: "state" },
+      // The known game (host with a source) drives the session's mode; a
+      // joiner learns the game later from the coordinator (5cl.14 note:
+      // the session's game is fixed at construction, so a joiner's
+      // simulation-mode game still runs in state mode — tracked in beads).
+      game: {
+        gameId: this.game?.gameId ?? "party",
+        mode: this.game?.mode ?? "state",
+        ...(this.game?.title !== undefined ? { title: this.game.title } : {}),
+      },
+      stateExecutor: this.stateExecutor,
+      simulationExecutor: this.simulationExecutor,
     });
     this.session = session;
     this.unsubSession = session.onSessionEvent((event) => this.handleSessionEvent(event));
@@ -1406,6 +1596,14 @@ export class PartyEngine {
       }
       this.session?.dispose();
       this.session = null;
+      // 5cl.14: a fresh session gets fresh frame executors (stale in-flight
+      // requests from the ended game must never settle into the next one)
+      // and a cleared state-view cache (the rebooted frame starts clean).
+      this.stateExecutor?.dispose();
+      this.simulationExecutor?.dispose();
+      this.stateExecutor = new PartyStateExecutor(() => this.runtime);
+      this.simulationExecutor = new PartySimulationExecutor(() => this.runtime);
+      this.lastStateApiEvent = null;
       const party = this.party;
       const session = createNovaSession({
         transport: party.privateTransport,
@@ -1415,7 +1613,13 @@ export class PartyEngine {
           memberId: this.identity.memberId,
           displayName: this.identity.displayName,
         },
-        game: { gameId: "party", mode: "state" },
+        game: {
+          gameId: this.game?.gameId ?? "party",
+          mode: this.game?.mode ?? "state",
+          ...(this.game?.title !== undefined ? { title: this.game.title } : {}),
+        },
+        stateExecutor: this.stateExecutor,
+        simulationExecutor: this.simulationExecutor,
       });
       this.session = session;
       this.unsubSession = session.onSessionEvent((event) => this.handleSessionEvent(event));
@@ -1705,6 +1909,25 @@ export class PartyEngine {
           } catch (error) {
             this.addNotice("error", `nova.simulation.sendInput() failed: ${errorMessage(error)}`);
           }
+        }
+        break;
+      }
+      case "stateResponse": {
+        // S2 (5cl.14): the runtime frame's answer to a stateRequest the
+        // frame executor forwarded; correlate it back to the pending engine
+        // request (same path the arena uses).
+        const parsed = arenaApiCallSchemas.stateResponse.safeParse(payload);
+        if (parsed.success) {
+          this.stateExecutor?.handleResponse(parsed.data as FrameStateResponsePayload);
+        }
+        break;
+      }
+      case "simulationResponse": {
+        // A1 (5cl.14): the authority frame's answer to a simulationRequest
+        // the simulation executor forwarded.
+        const parsed = arenaApiCallSchemas.simulationResponse.safeParse(payload);
+        if (parsed.success) {
+          this.simulationExecutor?.handleResponse(parsed.data as FrameSimulationResponsePayload);
         }
         break;
       }
@@ -2091,6 +2314,13 @@ export class PartyEngine {
     // pushSessionSnapshot once the game registers.
     const apiEvent = toApiEvent(event);
     if (apiEvent !== null) {
+      // 5cl.14: retain the last self state view so a rebooted frame (the
+      // lobby → playing container rebind, 2t1.6) can be replayed it via
+      // pushSessionSnapshot — the rebooted game never re-receives the
+      // initial view otherwise and hangs at its own waiting screen.
+      if (apiEvent.kind === "state") {
+        this.lastStateApiEvent = apiEvent;
+      }
       this.runtime?.pushApiEvent(apiEvent);
     }
   }
@@ -2112,6 +2342,13 @@ export class PartyEngine {
     runtime.pushApiEvent({ kind: "connection", status: session.connectionStatus });
     for (const player of session.players) {
       runtime.pushApiEvent({ kind: "playerJoined", player });
+    }
+    // 5cl.14: replay the last self view BEFORE start (the game's onStart
+    // may dispatch actions against it). A rebooted frame (container rebind
+    // on the lobby → playing flip) missed the initial state event; without
+    // this replay it hangs at its own waiting screen.
+    if (this.lastStateApiEvent !== null) {
+      runtime.pushApiEvent(this.lastStateApiEvent);
     }
     if (session.isStarted()) {
       runtime.pushApiEvent({ kind: "start" });
