@@ -53,6 +53,10 @@ describe("/", () => {
     expect(screen.queryByText("🚀")).not.toBeInTheDocument();
     expect(screen.getByText("party games for phones")).toBeInTheDocument();
     const alert = screen.getByRole("status");
+    // rocketcrab-5cl.6: the daisyUI aura wrapper, glowing orb, and twinkling
+    // stars are gone — the alert keeps just its dotted outline and text.
+    expect(alert.parentElement).not.toHaveClass("aura");
+    expect(document.querySelector(".rc-alert-orb, .rc-alert-star")).toBeNull();
     // rocketcrab-2t1.8: the Nova alert is a dotted outline (not solid).
     expect(alert).toHaveClass("alert-outline", "border-dotted");
     expect(within(alert).getByText("Introducing Nova")).toBeInTheDocument();

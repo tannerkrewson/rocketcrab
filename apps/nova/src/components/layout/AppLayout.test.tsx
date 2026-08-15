@@ -71,6 +71,16 @@ describe("AppLayout", () => {
     expect(screen.queryByText("Dark")).not.toBeInTheDocument();
   });
 
+  it("fades the homepage starfield in only on the homepage (5cl.4)", async () => {
+    renderAt("/");
+    await screen.findByRole("heading", { name: "rocketcrab.com" });
+    expect(screen.getByTestId("home-starfield")).toHaveClass("opacity-100");
+
+    renderAt("/about");
+    await screen.findByRole("heading", { name: "Coming soon" });
+    expect(screen.getByTestId("home-starfield")).toHaveClass("opacity-0");
+  });
+
   it("keeps the same floating bottom-right theme control on party routes", async () => {
     renderAt("/join");
     await screen.findByRole("heading", { name: "Join a party" });
