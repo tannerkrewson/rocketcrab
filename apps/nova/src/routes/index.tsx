@@ -11,9 +11,10 @@ export const Route = createFileRoute("/")({
 /**
  * Home screen (7.20 layout, 7.47 brand header): the crab logo and
  * rocketcrab.com title centered with the "party games for phones" tagline,
- * and the "Introducing Nova" alert below it (rocketcrab-2t1.8: dotted
- * outline with an info-colored glowing orb and softly twinkling stars),
- * Join/Start party soft-primary buttons side by side (Join first), and a
+ * and the "Introducing Nova" alert below it (rocketcrab-2t1.8 dotted
+ * outline; the aura, glowing orb, and twinkling stars were removed in
+ * rocketcrab-5cl.6), Join/Start party soft-primary buttons (side by side
+ * from sm, stacked full-width on phones — rocketcrab-5cl.5), and a
  * column of soft-default actions below (My games before Browse games since
  * rocketcrab-2t1.1). The stack hugs its content and is vertically centered
  * in the space above the shared footer (no recent-games browser since
@@ -35,9 +36,9 @@ function HomeComponent() {
   return (
     <div className="flex min-h-[calc(100dvh-16rem)] flex-col items-center justify-center gap-10">
       <section className="flex flex-col items-center gap-3 text-center">
-        <BrandLogo size={80} />
+        <BrandLogo size={80} responsive />
         <h1
-          className="font-title cursor-pointer text-4xl font-black text-base-content transition-transform active:scale-95 sm:text-5xl"
+          className="font-title cursor-pointer text-[2.5rem] font-black leading-none text-base-content transition-transform active:scale-95 sm:text-5xl"
           title="Copy rocketcrab.com to your clipboard"
           tabIndex={0}
           onClick={() => void handleCopyTitle()}
@@ -51,65 +52,35 @@ function HomeComponent() {
           rocketcrab<span className="text-primary">.com</span>
         </h1>
         <p className="text-lg text-base-content/70">party games for phones</p>
-        {/* rocketcrab-2t1.8: dotted info alert below the tagline, with the
-            same soft glowing-orb family as the lobby idle orbs (info color)
-            and a few gently twinkling stars. Purely decorative (aria-hidden)
-            and CSS-only, scoped so the homepage stays self-contained.
-            2t1.3: the whole alert wears the daisyUI aura in the nova/info
-            color — the one aura on the page. */}
-        <div className="aura text-info">
-          <div
-            role="status"
-            className="alert alert-info alert-outline relative w-fit overflow-hidden border-dotted"
-          >
-            <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-              <span className="rc-alert-orb absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-info/25 blur-2xl" />
-              <span className="rc-alert-star absolute left-7 top-3 h-1 w-1 rounded-full bg-info" />
-              <span
-                className="rc-alert-star absolute right-10 top-5 h-1.5 w-1.5 rounded-full bg-info"
-                style={{ animationDelay: "0.7s" }}
-              />
-              <span
-                className="rc-alert-star absolute bottom-4 left-12 h-1 w-1 rounded-full bg-info"
-                style={{ animationDelay: "1.4s" }}
-              />
-            </div>
-            <style>{`
-            @keyframes rc-alert-orb-breathe {
-              0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
-              50% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
-            }
-            @keyframes rc-alert-star-twinkle {
-              0%, 100% { opacity: 0.2; transform: scale(0.8); }
-              50% { opacity: 1; transform: scale(1.15); }
-            }
-            .rc-alert-orb { animation: rc-alert-orb-breathe 6s ease-in-out infinite; }
-            .rc-alert-star { animation: rc-alert-star-twinkle 2.4s ease-in-out infinite; }
-            @media (prefers-reduced-motion: reduce) {
-              .rc-alert-orb, .rc-alert-star { animation: none !important; }
-            }
-          `}</style>
-            <div className="relative text-center">
-              <p className="text-sm font-black">Introducing Nova</p>
-              <p className="text-xs opacity-80">
-                Build your own games and play them with friends, instantly.
-              </p>
-            </div>
+        {/* rocketcrab-2t1.8: dotted info alert below the tagline
+            (rocketcrab-5cl.6: the daisyUI aura, the glowing orb, and the
+            twinkling stars are gone — just the dotted outline and text). */}
+        <div role="status" className="alert alert-info alert-outline w-fit border-dotted">
+          <div className="text-center">
+            <p className="text-sm font-black">Introducing Nova</p>
+            <p className="text-xs opacity-80">
+              Build your own games and play them with friends, instantly.
+            </p>
           </div>
         </div>
       </section>
 
-      <section aria-label="Start or join a party" className="flex justify-center gap-3">
+      {/* rocketcrab-5cl.5: on phones the two CTAs stack full-width so their
+          labels never wrap; from sm they sit side by side again. */}
+      <section
+        aria-label="Start or join a party"
+        className="flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row"
+      >
         <Link
           to="/join"
-          className={buttonStyles("primary", "lg", "flex-1 px-4 sm:flex-none sm:px-10", true)}
+          className={buttonStyles("primary", "lg", "w-full sm:w-auto sm:px-10", true)}
         >
           Join party
         </Link>
         <Link
           to="/party"
           search={{ gameId: undefined, mode: undefined, title: undefined }}
-          className={buttonStyles("primary", "lg", "flex-1 px-4 sm:flex-none sm:px-10", true)}
+          className={buttonStyles("primary", "lg", "w-full sm:w-auto sm:px-10", true)}
         >
           Start party
         </Link>
