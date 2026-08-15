@@ -73,7 +73,7 @@ test("back link is a compact button, not a full-width bar", async ({ page }) => 
   await page.goto("/game/drawphone");
   const back = page.getByRole("link", { name: "Back to games" });
   await expect(back).toBeVisible();
-  await expect(back).toHaveClass(/btn-outline/);
+  await expect(back).toHaveClass(/btn-soft/);
 
   // It sits left-aligned and only as wide as its label, inside the page
   // column (the pre-fix version stretched across the whole column).
