@@ -1,5 +1,5 @@
 import { RouterProvider, createMemoryHistory, createRouter } from "@tanstack/react-router";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PartyEngineState } from "../lib/party/engine";
@@ -48,12 +48,44 @@ const IDLE_STATE: PartyEngineState = {
 };
 
 const { stubEngine, stubs } = vi.hoisted(() => {
-  const stubs = { joinCalled: false };
+  const handlers: Array<(state: PartyEngineState) => void> = [];
+  const stubs = {
+    joinCalled: false,
+    failedJoin: false,
+    // The in-flight join's promise resolver: tests hold the join pending
+    // until they flip the failure flag, mirroring the real engine (which
+    // only settles after the network round-trip fails).
+    resolveJoin: null as null | (() => void),
+    notify: () => {
+      const state = stubEngine.getState();
+      // Copy so a handler that unsubscribes (e.g. PartyExperience unmounting
+      // when JoinFlow flips back to the form) never skips a sibling.
+      for (const handler of handlers.slice()) {
+        handler(state);
+      }
+    },
+  };
   return {
     stubs,
     stubEngine: {
-      getState: vi.fn((): PartyEngineState => (stubs.joinCalled ? ERROR_STATE : IDLE_STATE)),
-      onState: vi.fn(() => () => undefined),
+      getState: vi.fn(
+        (): PartyEngineState =>
+          stubs.failedJoin ? ERROR_STATE : stubs.joinCalled ? JOINING_STATE : IDLE_STATE,
+      ),
+      // 5cl.3: the stub mirrors the real engine's emit-on-change: it calls
+      // every subscriber at subscribe time and remembers the handlers so
+      // tests can push a fresh snapshot (joining → error) and re-render
+      // all subscribers (JoinFlow + the PartyExperience it renders).
+      onState: vi.fn((handler: (state: PartyEngineState) => void) => {
+        handlers.push(handler);
+        handler(stubEngine.getState());
+        return () => {
+          const index = handlers.indexOf(handler);
+          if (index >= 0) {
+            handlers.splice(index, 1);
+          }
+        };
+      }),
       isActive: vi.fn(() => false),
       setContainer: vi.fn(),
       setDisplayName: vi.fn(),
@@ -63,8 +95,18 @@ const { stubEngine, stubs } = vi.hoisted(() => {
       createParty: vi.fn(async () => undefined),
       joinByCode: vi.fn(async () => {
         stubs.joinCalled = true;
+        stubs.notify();
+        await new Promise<void>((resolve) => {
+          stubs.resolveJoin = resolve;
+        });
       }),
-      joinByInvite: vi.fn(async () => undefined),
+      joinByInvite: vi.fn(async () => {
+        stubs.joinCalled = true;
+        stubs.notify();
+        await new Promise<void>((resolve) => {
+          stubs.resolveJoin = resolve;
+        });
+      }),
       respondToJoinRequest: vi.fn(),
       startGame: vi.fn(),
       endGame: vi.fn(),
@@ -102,9 +144,18 @@ const ERROR_STATE: PartyEngineState = {
     "No party is advertising code ZZZZ. Double-check the code with your friend and that they are waiting in their lobby.",
 };
 
+/** 5cl.3: the engine reports the join in flight → the loading screen. */
+const JOINING_STATE: PartyEngineState = {
+  ...IDLE_STATE,
+  phase: "joining",
+  phaseDetail: "Joining party abcd…",
+  code: "abcd",
+};
+
 beforeEach(() => {
   vi.clearAllMocks();
   stubs.joinCalled = false;
+  stubs.failedJoin = false;
   resetInviteImportForTests();
   resetPartyIdentityForTests();
   clearPartyRecovery();
@@ -196,7 +247,47 @@ describe("/join", () => {
     fireEvent.change(input, { target: { value: "zzzz" } });
     fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
     await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("zzzz"));
+    // The join fails: the engine flips to the error phase and the flow
+    // returns to the form with the engine's error inline (7.10).
+    stubs.failedJoin = true;
+    act(() => stubs.notify());
+    stubs.resolveJoin?.();
     expect(await screen.findByText(/zzzz does not exist/)).toBeInTheDocument();
+  });
+
+  it("shows the loading screen while a button-driven join is in flight (5cl.3)", async () => {
+    renderJoin();
+    const input = await screen.findByLabelText("Four-letter party code");
+    fireEvent.change(input, { target: { value: "abcd" } });
+    fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
+    // joinByCode emits "joining" synchronously; the flow re-renders as the
+    // PartyExperience loading screen (before any network round-trip).
+    expect(await screen.findByText(/Searching the network for the party/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Four-letter party code")).not.toBeInTheDocument();
+  });
+
+  it("shows the loading screen for a URL-driven invite join (5cl.3)", async () => {
+    window.history.pushState({}, "", `/join#code=ABCD&secret=${VALID_SECRET}`);
+    renderJoin();
+    // The fragment import fires joinByInvite → "joining" → loading screen.
+    await waitFor(() => expect(stubEngine.joinByInvite).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/Searching the network for the party/)).toBeInTheDocument();
+    expect(screen.queryByLabelText("Four-letter party code")).not.toBeInTheDocument();
+  });
+
+  it("surfaces a failed URL-driven join on the form (5cl.3)", async () => {
+    window.history.pushState({}, "", `/join#code=ZZZZ&secret=${VALID_SECRET}`);
+    renderJoin();
+    await waitFor(() => expect(stubEngine.joinByInvite).toHaveBeenCalledTimes(1));
+    // The engine failed the join: the flow returns to the form with the
+    // error inline instead of silently sitting on a dead form.
+    stubs.failedJoin = true;
+    act(() => stubs.notify());
+    stubs.resolveJoin?.();
+    // The code form is back with the engine's error inline (the fragment's
+    // code went to the engine, so the form shows the generic phrasing).
+    expect(await screen.findByText(/does not exist/)).toBeInTheDocument();
+    expect(screen.getByLabelText("Four-letter party code")).toBeInTheDocument();
   });
 
   it("offers a one-tap rejoin from a saved recovery record (M1)", async () => {
