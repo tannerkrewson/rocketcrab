@@ -118,7 +118,11 @@ function PartyPage() {
     return (
       <div className="mx-auto flex w-full max-w-md flex-col gap-4 py-6">
         <ErrorPanel title="Couldn't start the party" message={loadError} onRetry={handleRetry} />
-        <Link to="/" className={buttonStyles("outline", "md", "self-start")} title="Back to home">
+        <Link
+          to="/"
+          className={buttonStyles("neutral", "md", "self-start", true)}
+          title="Back to home"
+        >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           Back to home
         </Link>
@@ -159,7 +163,11 @@ function PartyPage() {
           </Button>
         </div>
       </Card>
-      <Link to="/" className={buttonStyles("outline", "md", "self-center")} title="Back to home">
+      <Link
+        to="/"
+        className={buttonStyles("neutral", "md", "self-center", true)}
+        title="Back to home"
+      >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         Back to home
       </Link>

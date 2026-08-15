@@ -53,7 +53,7 @@ export function DiagnosticsPanel({
     <section className="flex flex-col gap-3" aria-label="Errors and diagnostics">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-black">Diagnostics</h2>
-        <Button variant="outline" size="md" onClick={onCopyReport} disabled={busy}>
+        <Button variant="neutral" soft size="md" onClick={onCopyReport} disabled={busy}>
           <Copy className="h-4 w-4" aria-hidden="true" />
           Copy report
         </Button>
@@ -74,9 +74,7 @@ export function DiagnosticsPanel({
       </div>
 
       <div className="flex flex-col gap-2 rounded-box border-2 border-base-300 bg-base-100 p-3">
-        <h3 className="text-xs font-black uppercase tracking-wide text-base-content/60">
-          Validation
-        </h3>
+        <h3 className="text-xs font-black uppercase text-base-content/60">Validation</h3>
         {validationIssues.length === 0 ? (
           <p className="text-sm text-base-content/60">Looks like a complete HTML document.</p>
         ) : (
@@ -92,9 +90,7 @@ export function DiagnosticsPanel({
       </div>
 
       <div className="flex flex-col gap-2 rounded-box border-2 border-base-300 bg-base-100 p-3">
-        <h3 className="text-xs font-black uppercase tracking-wide text-base-content/60">
-          Runtime errors
-        </h3>
+        <h3 className="text-xs font-black uppercase text-base-content/60">Runtime errors</h3>
         {diagnostics.length === 0 ? (
           <p className="text-sm text-base-content/60">No runtime errors from the last run.</p>
         ) : (
@@ -119,7 +115,7 @@ export function DiagnosticsPanel({
       </div>
 
       <div className="flex flex-col gap-2 rounded-box border-2 border-base-300 bg-base-100 p-3">
-        <h3 className="text-xs font-black uppercase tracking-wide text-base-content/60">Console</h3>
+        <h3 className="text-xs font-black uppercase text-base-content/60">Console</h3>
         {consoleEntries.length === 0 ? (
           <p className="text-sm text-base-content/60">No console output from the last run.</p>
         ) : (

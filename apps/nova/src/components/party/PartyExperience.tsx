@@ -250,7 +250,7 @@ function renderPhase(
               ? "Searching the network for the party — this can take a few seconds. If it never appears, double-check the code with your friend."
               : "Your party is being set up — it takes a few seconds."}
           </p>
-          <Button variant="outline" size="md" onClick={() => void handleLeave()}>
+          <Button variant="neutral" soft size="md" onClick={() => void handleLeave()}>
             Cancel
           </Button>
         </div>
@@ -295,7 +295,8 @@ function renderPhase(
           />
           <div className="flex justify-center">
             <Button
-              variant="outline"
+              variant="neutral"
+              soft
               onClick={() => {
                 engine.dismissError();
                 onLeft?.();

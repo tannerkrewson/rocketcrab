@@ -1,8 +1,8 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createRouter } from "@tanstack/react-router";
-import { StrictMode } from "react";
+import { StrictMode, useEffect } from "react";
 import { createRoot } from "react-dom/client";
-import { Toaster } from "sonner";
+import { Toaster, toast } from "sonner";
 // Mukta is the single UI font (rocketcrab-9fv.10.2). Static weights cover
 // everything the app uses: regular (400), medium (500), semibold (600),
 // bold (700), and extra-bold (800) — Mukta tops out at 800, so font-black
@@ -36,13 +36,60 @@ declare module "@tanstack/react-router" {
   }
 }
 
+/**
+ * Sonner toaster with the app-wide toast behavior (rocketcrab-2t1.3):
+ * bottom-left placement, and tapping ANYWHERE on a toast dismisses it.
+ *
+ * Sonner 2.0.7 has no per-toast onClick (verified against its types), so a
+ * delegated listener on the toaster container matches the clicked toast's
+ * DOM `data-index` back to its id via `toast.getToasts()` and dismisses it.
+ * New toasts are prepended by sonner, so DOM index 0 (front toast)
+ * corresponds to the LAST entry of `getToasts()`. Clicks on the toast's own
+ * interactive controls (action/cancel/close buttons, links, inputs) are
+ * left alone so toast actions keep working.
+ */
+function TapToDismissToaster() {
+  useEffect(() => {
+    const onDocumentClick = (event: MouseEvent) => {
+      if (!(event.target instanceof Element)) return;
+      const toastEl = event.target.closest("[data-sonner-toast]");
+      if (toastEl === null) return;
+      // Never hijack clicks on the toast's own interactive controls.
+      if (
+        event.target.closest(
+          "button, a, input, textarea, select, [role='button'], [data-close-button]",
+        ) !== null
+      ) {
+        return;
+      }
+      const index = Number(toastEl.getAttribute("data-index"));
+      if (!Number.isFinite(index)) return;
+      const activeToasts = toast.getToasts();
+      const target = activeToasts[activeToasts.length - 1 - index];
+      if (target !== undefined) {
+        toast.dismiss(target.id);
+      }
+    };
+    document.addEventListener("click", onDocumentClick);
+    return () => document.removeEventListener("click", onDocumentClick);
+  }, []);
+
+  return (
+    <Toaster
+      position="bottom-left"
+      richColors
+      toastOptions={{ classNames: { toast: "cursor-pointer" } }}
+    />
+  );
+}
+
 const rootElement = document.getElementById("root");
 if (rootElement) {
   createRoot(rootElement).render(
     <StrictMode>
       <QueryClientProvider client={queryClient}>
         <RouterProvider router={router} />
-        <Toaster position="top-center" richColors />
+        <TapToDismissToaster />
       </QueryClientProvider>
     </StrictMode>,
   );

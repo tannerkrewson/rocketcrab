@@ -37,7 +37,13 @@ export function PartyGameDetailsModal({ game, onClose }: PartyGameDetailsModalPr
       <div className="flex max-h-[80vh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-box border-2 border-base-300 bg-base-100 p-5">
         <div className="flex items-start justify-between gap-2">
           <h2 className="text-xl font-black">{game.title}</h2>
-          <Button variant="outline" size="md" onClick={onClose} aria-label="Close game details">
+          <Button
+            variant="neutral"
+            soft
+            size="md"
+            onClick={onClose}
+            aria-label="Close game details"
+          >
             <X className="h-4 w-4" aria-hidden="true" />
           </Button>
         </div>

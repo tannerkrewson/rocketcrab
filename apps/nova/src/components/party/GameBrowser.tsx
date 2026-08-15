@@ -165,19 +165,23 @@ function SavedGameRow({
 /** One category card (2t1.1 redesign): a large icon tile + bold label + game
  * count, with a soft lift + primary glow on hover. Classic boxes keep their
  * emoji; the Nova box uses a lucide icon (the crab/rocket mark stays in the
- * brand header, not on a category tile). */
+ * brand header, not on a category tile). The Nova box wears the info color
+ * (2t1.3: info IS nova) so its tile reads as the brand's own box. */
 function CategoryCard({
   emoji,
   icon: Icon,
   label,
   count,
   onClick,
+  infoTint = false,
 }: {
   emoji?: string;
   icon?: LucideIcon;
   label: string;
   count: number | null;
   onClick: () => void;
+  /** Nova box: info-colored icon tile (2t1.3). */
+  infoTint?: boolean;
 }) {
   return (
     <button
@@ -186,10 +190,19 @@ function CategoryCard({
       className="group flex flex-col items-start gap-3 rounded-box border-2 border-base-300 bg-base-100 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-lg hover:shadow-primary/10 sm:p-5"
     >
       <span
-        className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-base-300 bg-base-200 text-2xl transition-colors group-hover:border-primary/40 group-hover:bg-primary/5"
+        className={cn(
+          "flex h-12 w-12 items-center justify-center rounded-xl border-2 bg-base-200 text-2xl transition-colors",
+          infoTint
+            ? "border-info/40 bg-info/10 text-info group-hover:border-info/60 group-hover:bg-info/15"
+            : "border-base-300 group-hover:border-primary/40 group-hover:bg-primary/5",
+        )}
         aria-hidden="true"
       >
-        {Icon !== undefined ? <Icon className="h-6 w-6 text-base-content" /> : <span>{emoji}</span>}
+        {Icon !== undefined ? (
+          <Icon className={cn("h-6 w-6", infoTint ? "" : "text-base-content")} />
+        ) : (
+          <span>{emoji}</span>
+        )}
       </span>
       <span className="flex w-full flex-col gap-0.5">
         <span className="text-base font-black leading-tight sm:text-lg">{label}</span>
@@ -271,7 +284,7 @@ export function GameBrowser({ onPick, onPickSaved, compact = false, onBack }: Ga
         <button
           type="button"
           onClick={handleBack}
-          className={buttonStyles("outline", "md", "self-start")}
+          className={buttonStyles("neutral", "md", "self-start", true)}
           title={compact ? "Back to lobby" : "Back to home"}
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
@@ -317,6 +330,7 @@ export function GameBrowser({ onPick, onPickSaved, compact = false, onBack }: Ga
               label={box.label}
               count={categoryCount(box.match, BROWSE_GAMES)}
               onClick={() => setView(box.id)}
+              infoTint={box.id === "nova"}
             />
           ))}
         </section>

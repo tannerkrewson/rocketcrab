@@ -58,7 +58,7 @@ describe("/library", () => {
     expect(backs).toHaveLength(1);
     const back = backs[0];
     expect(back!.getAttribute("href")).toBe("/");
-    expect(back!.className).toContain("btn-outline");
+    expect(back!.className).toContain("btn-soft");
     expect(back!.className).toContain("self-start");
     expect(screen.queryByRole("link", { name: /Browse games/ })).not.toBeInTheDocument();
 

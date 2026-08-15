@@ -537,7 +537,8 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
   const actions = (
     <>
       <Button
-        variant="outline"
+        variant="neutral"
+        soft
         onClick={handlePaste}
         title="Paste from clipboard (replaces the editor content)"
       >
@@ -545,7 +546,8 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         Paste
       </Button>
       <Button
-        variant="outline"
+        variant="danger"
+        soft
         onClick={() => setClearAllDialog(true)}
         disabled={source.length === 0}
         title="Delete every line of code in the editor"
@@ -554,7 +556,8 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         Clear all
       </Button>
       <Button
-        variant="outline"
+        variant="neutral"
+        soft
         onClick={() => setDiscardDialog({ onConfirm: confirmReset })}
         disabled={!dirty}
         title="Reset unsaved changes"
@@ -564,7 +567,8 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       </Button>
       <div className="flex-1" />
       <Button
-        variant="outline"
+        variant="neutral"
+        soft
         onClick={handleSaveAsCopy}
         title="Save the current source as a new game"
       >
@@ -667,7 +671,11 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         >
           <BrandLogo size={36} />
         </Link>
-        <Link to="/library" className={buttonStyles("outline")} title="Back to your games">
+        <Link
+          to="/library"
+          className={buttonStyles("neutral", "md", undefined, true)}
+          title="Back to your games"
+        >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           My games
         </Link>
@@ -780,7 +788,8 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         data-testid="mobile-actions-bar"
       >
         <Button
-          variant="outline"
+          variant="neutral"
+          soft
           size="md"
           onClick={handlePaste}
           title="Paste from clipboard (replaces the editor content)"
@@ -788,7 +797,8 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
           <ClipboardPaste className="h-4 w-4" aria-hidden="true" />
         </Button>
         <Button
-          variant="outline"
+          variant="danger"
+          soft
           size="md"
           onClick={() => setClearAllDialog(true)}
           disabled={source.length === 0}
@@ -797,7 +807,8 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
           <Trash2 className="h-4 w-4" aria-hidden="true" />
         </Button>
         <Button
-          variant="outline"
+          variant="neutral"
+          soft
           size="md"
           onClick={() => setDiscardDialog({ onConfirm: confirmReset })}
           disabled={!dirty}
@@ -806,7 +817,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
           <Eraser className="h-4 w-4" aria-hidden="true" />
         </Button>
         <div className="flex-1" />
-        <Button variant="outline" size="md" onClick={handleSaveAsCopy}>
+        <Button variant="neutral" soft size="md" onClick={handleSaveAsCopy}>
           <CopyPlus className="h-4 w-4" aria-hidden="true" />
           Copy
         </Button>
@@ -851,7 +862,8 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
           </p>
           <div className="flex justify-end gap-2">
             <Button
-              variant="outline"
+              variant="neutral"
+              soft
               onClick={() => {
                 if (discardDialog?.onConfirm === confirmReset) {
                   setDiscardDialog(null);
@@ -881,7 +893,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
             {game ? " Your saved version is untouched — Reset restores it." : ""}
           </p>
           <div className="flex justify-end gap-2">
-            <Button variant="outline" onClick={() => setClearAllDialog(false)}>
+            <Button variant="neutral" soft onClick={() => setClearAllDialog(false)}>
               Keep code
             </Button>
             <Button variant="danger" onClick={handleClearAll}>
