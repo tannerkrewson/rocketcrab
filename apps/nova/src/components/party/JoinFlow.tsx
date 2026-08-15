@@ -1,8 +1,8 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { partyEngine } from "../../lib/party/engine";
 import { getSavedPlayerName } from "../../lib/party/identity";
 import { importInviteFromLocation } from "../../lib/party/invite-import";
+import { usePartyEngine } from "../../lib/party/use-party";
 import { JoinScreen } from "./JoinScreen";
 import { PartyExperience } from "./PartyExperience";
 import { PartyResumeBanner } from "./PartyResumeBanner";
@@ -30,6 +30,16 @@ export interface JoinFlowProps {
  * name-editing page the lobby's pencil opens (`/join?edit=name`). The
  * code/name state lives HERE (not in JoinScreen) so it survives the
  * joining → error transition: "Try again" keeps the typed code (7.10).
+ *
+ * 5cl.3: this component SUBSCRIBES to the party engine (usePartyEngine) so
+ * phase changes re-render it. Before that, a join (button- or URL-driven)
+ * flipped the engine to "joining" but JoinFlow read
+ * `partyEngine.getState()` only on its own re-renders — the form stayed
+ * put while the join ran (or failed) in the background: no loading screen,
+ * and a failed fragment invite never surfaced its error. The subscription
+ * makes the "joining"/"creating" phases render the PartyExperience loading
+ * screen immediately (before the network round-trip), and a failed URL
+ * join re-renders the form with the engine's error inline.
  */
 export function JoinFlow({ initialCode = "" }: JoinFlowProps) {
   // 2t1.9: `?edit=name` opens the name-editing page (the same name step as
@@ -41,6 +51,10 @@ export function JoinFlow({ initialCode = "" }: JoinFlowProps) {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [code, setCode] = useState(initialCode);
   const [name, setName] = useState(() => getSavedPlayerName() ?? "");
+
+  // 5cl.3: the engine subscription (see the component JSDoc). `state` is
+  // the live snapshot; `engine` is the page singleton.
+  const { state, engine } = usePartyEngine();
 
   // Import the invite fragment (if any) once per page load. Runs FIRST so
   // a full secret invite always beats the path code (9fv.8: the path code
@@ -60,11 +74,13 @@ export function JoinFlow({ initialCode = "" }: JoinFlowProps) {
         invite.code === undefined && initialCode !== ""
           ? { secret: invite.secret, code: initialCode }
           : invite;
-      void partyEngine.joinByInvite(withPathCode);
+      // 5cl.3: fire-and-forget is fine — the phase subscription above
+      // flips this flow to the loading screen the moment the engine emits
+      // "joining", and to the form + error on failure.
+      void engine.joinByInvite(withPathCode);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  const state = partyEngine.getState();
 
   // 2t1.9: joining is code-only — no name prompt up front. The player's
   // saved (or generated) name goes in as-is; the name is asked later, in
@@ -74,8 +90,8 @@ export function JoinFlow({ initialCode = "" }: JoinFlowProps) {
     if (submittedCode.length === 0) {
       return;
     }
-    void partyEngine.joinByCode(submittedCode).then(() => {
-      const latest = partyEngine.getState();
+    void engine.joinByCode(submittedCode).then(() => {
+      const latest = engine.getState();
       if (latest.phase === "error" && latest.lastError !== null) {
         setJoinError(latest.lastError);
       } else {
@@ -90,7 +106,7 @@ export function JoinFlow({ initialCode = "" }: JoinFlowProps) {
   // the party — the engine is still active, so /join renders the lobby.
   const handleSaveName = (submittedName: string) => {
     if (submittedName.trim().length > 0) {
-      partyEngine.setDisplayName(submittedName);
+      engine.setDisplayName(submittedName);
     }
     void navigate({ to: "/join", search: { edit: undefined } });
   };
@@ -127,7 +143,7 @@ export function JoinFlow({ initialCode = "" }: JoinFlowProps) {
       <div className="mx-auto flex w-full max-w-md flex-col gap-4">
         {/* Classic party shell (7.22): logo header above the join form. */}
         <PartyShellHeader />
-        <PartyResumeBanner engine={partyEngine} />
+        <PartyResumeBanner engine={engine} />
         <JoinScreen
           error={joinError ?? (state.phase === "error" ? state.lastError : null)}
           joining={false}

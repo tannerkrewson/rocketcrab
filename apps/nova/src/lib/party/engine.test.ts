@@ -150,6 +150,44 @@ function createHostHarness(): HostHarness {
         const port1 = createFakePort();
         const port2 = createFakePort();
         ports.push(port1);
+        // 5cl.14: auto-answer frame state/simulation requests. The real
+        // runtime's game frame answers these with `stateResponse` /
+        // `simulationResponse` apiCalls; the fake frame answers
+        // deterministically so the state engine's authority start and
+        // action applications resolve instead of timing out (10 s executor
+        // timeout). Delivered synchronously on the same port.
+        const originalPost = port1.postMessage.bind(port1);
+        port1.postMessage = (message: unknown) => {
+          originalPost(message);
+          const msg = message as { type?: string; event?: { kind?: string } };
+          if (msg?.type !== "game.apiEvent") {
+            return;
+          }
+          const event = msg.event as {
+            kind?: string;
+            requestId?: string;
+            request?: { kind?: string; viewers?: Array<{ id: string }> };
+          };
+          if (event?.kind === "stateRequest") {
+            const viewers = event.request?.viewers ?? [];
+            const views: Record<string, unknown> = {};
+            for (const viewer of viewers) {
+              views[viewer.id] = {};
+            }
+            harness.apiCall("stateResponse", {
+              requestId: event.requestId,
+              result:
+                event.request?.kind === "computeView"
+                  ? { ok: true, kind: "view", view: {} }
+                  : { ok: true, kind: "state", state: {}, views },
+            });
+          } else if (event?.kind === "simulationRequest") {
+            harness.apiCall("simulationResponse", {
+              requestId: event.requestId,
+              result: { ok: true, kind: "state", state: {} },
+            });
+          }
+        };
         return { port1, port2 };
       },
       async waitForFrameLoad(iframe) {
@@ -197,6 +235,13 @@ function createHostHarness(): HostHarness {
   return harness;
 }
 
+/**
+ * 5cl.14: answer every frame stateRequest/simulationRequest the engine
+ * pushed into the fake frame (they appear in `port1.sent` as `game.apiEvent`
+ * messages). The real runtime's game frame answers these; the fake frame
+ * answers deterministically so the state engine's authority start and action
+ * applications resolve instead of timing out (10 s executor timeout).
+ */
 // ---------------------------------------------------------------------------
 // Player + flow helpers
 // ---------------------------------------------------------------------------
@@ -1211,6 +1256,68 @@ describe("party engine — session events reach game frames (7.26)", () => {
   });
 });
 
+describe("party engine — frame state executor + rebooted-frame replay (5cl.14)", () => {
+  const apiEventsOf = (player: Player) =>
+    player.harness.port1.sent
+      .filter((message) => (message as { type?: string }).type === "game.apiEvent")
+      .map(
+        (message) =>
+          (message as { event: { kind: string } }).event as { kind: string } & Record<
+            string,
+            unknown
+          >,
+      );
+
+  it("runs the game's state handlers in the frame (stateRequest → stateResponse) and starts", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    await runCreate(a, world);
+    await registerLocalGame(a, world);
+
+    a.engine.startGame();
+    await settle(world);
+
+    const state = a.engine.getState();
+    expect(state.phase).toBe("playing");
+    // The state engine asked the FRAME for the initial state (the frame
+    // executor forwarded a stateRequest apiEvent; the fake frame answered
+    // with a stateResponse). Before 5cl.14 a local no-op executor ran the
+    // game's handlers nowhere and the initial state was always {}.
+    const requests = apiEventsOf(a).filter((event) => event.kind === "stateRequest");
+    expect(requests.length).toBeGreaterThan(0);
+    expect(requests[0]?.request).toMatchObject({ kind: "createInitialState" });
+  });
+
+  it("replays the last state view into a rebooted frame after the container rebind (lobby→playing)", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    await runCreate(a, world);
+    await registerLocalGame(a, world);
+    a.engine.startGame();
+    await settle(world);
+    expect(a.engine.getState().phase).toBe("playing");
+
+    // 2t1.6: the lobby → playing phase flip rebinds the frame container —
+    // a fresh element arrives, so the engine disposes the runtime and
+    // reboots the frame. The rebooted frame's registration must replay the
+    // last state view (then start); without the replay it hangs at the
+    // game's own waiting screen.
+    const newContainer = document.createElement("div");
+    a.engine.setContainer(newContainer);
+    await flush();
+    a.harness.ready();
+    a.harness.register(GAME.title);
+    await settle(world);
+
+    const kinds = apiEventsOf(a).map((event) => event.kind);
+    expect(kinds).toContain("state");
+    expect(kinds).toContain("start");
+    // The state view must be replayed BEFORE the start signal: the game's
+    // onStart dispatches actions against the current view.
+    expect(kinds.indexOf("state")).toBeLessThan(kinds.indexOf("start"));
+  });
+});
+
 describe("party engine — rename announcements (7.25)", () => {
   it("broadcasts a display-name change; peers' member view updates without a rejoin", async () => {
     const world = makeWorld();
@@ -1407,7 +1514,9 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     await runCreate(player, world);
 
     expect(fetchSpy).not.toHaveBeenCalled();
-    expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenCalledWith();
+    expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenCalledWith({
+      onJoinError: expect.any(Function),
+    });
     const state = player.engine.getState();
     expect(state.phase).toBe("lobby");
     expect(state.notices.some((notice) => notice.message.includes("TURN"))).toBe(false);
@@ -1430,6 +1539,7 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     await runCreate(player, world);
 
     expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenCalledWith({
+      onJoinError: expect.any(Function),
       turnConfig,
     });
     const state = player.engine.getState();
@@ -1449,7 +1559,9 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     });
     await runCreate(player, world);
 
-    expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenCalledWith();
+    expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenCalledWith({
+      onJoinError: expect.any(Function),
+    });
     const state = player.engine.getState();
     expect(state.phase).toBe("lobby");
     expect(state.diagnostics?.turn).toBe("unavailable");
@@ -1486,6 +1598,7 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     await runCreate(player, world);
     expect(turnCreds).toHaveBeenCalledTimes(1);
     expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenLastCalledWith({
+      onJoinError: expect.any(Function),
       turnConfig,
     });
   });

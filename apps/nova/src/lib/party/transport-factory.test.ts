@@ -78,4 +78,18 @@ describe("createTrysteroPartyTransportFactory", () => {
     const [, second] = mocks.constructed as [Record<string, unknown>, Record<string, unknown>];
     expect(second.turnConfig).toBe(TURN_CONFIG);
   });
+
+  it("threads an onJoinError observer to BOTH transports (5cl.1)", () => {
+    const onJoinError = vi.fn();
+    const factory = createTrysteroPartyTransportFactory({ onJoinError });
+    factory.createRendezvousTransport({ memberId: "m1", displayName: "A" });
+    factory.createPrivateTransport({ memberId: "m2", displayName: "B", password: "pw" });
+
+    const [rendezvous, privateRoom] = mocks.constructed as [
+      Record<string, unknown>,
+      Record<string, unknown>,
+    ];
+    expect(rendezvous.onJoinError).toBe(onJoinError);
+    expect(privateRoom.onJoinError).toBe(onJoinError);
+  });
 });
