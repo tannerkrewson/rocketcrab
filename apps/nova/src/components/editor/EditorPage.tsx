@@ -718,7 +718,10 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       <div className="hidden flex-col gap-4 md:flex" data-testid="desktop-layout">
         <div className="flex flex-wrap items-center gap-2">{actions}</div>
         <div style={{ height: `${editorHeightPx}px` }}>
-          <div className="grid h-full gap-4 grid-cols-2">
+          {/* 5cl.15: on xl+ the code editor takes the extra width and the
+              diagnostics panel stays a comfortable fixed column, so the
+              editor uses wide screens instead of leaving dead space. */}
+          <div className="grid h-full grid-cols-2 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
             <section
               className="min-h-0 overflow-hidden rounded-box border-2 border-base-300 bg-base-100"
               aria-label="Editor"

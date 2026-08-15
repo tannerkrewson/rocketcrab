@@ -7,8 +7,9 @@
  * This is the arena section of the editor, not a standalone page: the
  * editor hands over the source that was on screen (seeded with the saved
  * source on load; the editor re-tests by pressing Run with a new source,
- * which restarts every player). Desktop shows a responsive grid
- * of player frames with a shared simulation toolbar; phones show one player
+ * which restarts every player). Desktop shows the player frames in a
+ * wrapping flex row (5cl.15: auto-fit widths, dragged frames wrap instead
+ * of overlapping) with a shared simulation toolbar; phones show one player
  * at a time in tabs with the shared controls in a collapsible panel (never
  * covering the game). Per-player connection state reflects the simulated
  * transport state (disconnect → leave, reconnect → rejoin, suspend →
@@ -48,6 +49,7 @@ import {
 } from "react";
 import { Button, buttonStyles } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
+import { cn } from "../../lib/cn";
 import { useRecordTestResults } from "../../lib/games/queries";
 import { useArena } from "../../lib/arena/use-arena";
 import { getSavedPlayerName } from "../../lib/party/identity";
@@ -658,16 +660,19 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
       {/* The one and only set of player frames. Phones show the active
           player and hide the rest with CSS (`max-md:hidden`), so every
           frame stays mounted and switching tabs never reloads it; desktop
-          shows them all in a responsive grid. A single rendering per player
-          also keeps each frame bound to exactly one visible container. */}
-      <div
-        className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3"
-        data-testid="arena-grid"
-      >
+          shows them all in a wrapping flex row. 5cl.15: the row is
+          flex-wrap with each frame's width as its flex-basis — frames that
+          were dragged wider than the row simply wrap to the next line, so
+          test pages can NEVER overlap at any viewport width, and at the
+          default (auto) width every frame shares the row equally, filling
+          the editor's width on large screens instead of leaving empty
+          columns. */}
+      <div className="flex flex-wrap gap-4" data-testid="arena-grid">
         {state.players.map((player) => (
           <div
             key={player.id}
-            className={activePlayerId === player.id ? "" : "max-md:hidden"}
+            className={cn("min-w-0", activePlayerId === player.id ? "" : "max-md:hidden")}
+            style={frameWidthPx === null ? { flex: "1 1 0%" } : { flex: `0 0 ${frameWidthPx}px` }}
             data-testid={`arena-card-${player.id}`}
           >
             {playerCard(player)}

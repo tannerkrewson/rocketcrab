@@ -454,7 +454,7 @@ describe("PartyLobby", () => {
     await renderLobby(state);
     // 10.6 + 2t1.9: the welcome card covers the no-game case with a
     // role-aware message (host = must select).
-    expect(screen.getByText("As the host you must select a game")).toBeInTheDocument();
+    expect(screen.getByText("As the host, you must select a game.")).toBeInTheDocument();
     expect(screen.queryByText(/no game yet/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/you must select the game/i)).not.toBeInTheDocument();
     const browseButton = screen.getByRole("button", { name: /browse games/i });
@@ -492,9 +492,9 @@ describe("PartyLobby", () => {
     const state = makeState({ game: null, canStart: false, canForceStart: false });
     await renderLobby(state);
     await userEvent.click(screen.getByRole("button", { name: /browse games/i }));
-    // 2t1.1: in-party browsing keeps a small, faded brand row so the
-    // rocketcrab URL + logo stay visible while the browser is the focus.
-    expect(screen.getByTestId("browser-brand-row")).toBeInTheDocument();
+    // 5cl.8: the browser no longer renders its own brand row — the shared
+    // party shell header stays mounted (compact + faded) while browsing.
+    expect(screen.queryByTestId("browser-brand-row")).not.toBeInTheDocument();
     // No "All games" box (2t1.1): Protobowl lives in the Trivia box.
     await userEvent.click(screen.getByRole("button", { name: /Trivia/ }));
     const protobowl = await screen.findByRole("link", { name: /Protobowl/ });
@@ -727,7 +727,7 @@ describe("PartyLobby", () => {
     await renderLobby(state);
     const welcome = screen.getByLabelText("Welcome");
     expect(within(welcome).getByText("Welcome to rocketcrab!")).toBeInTheDocument();
-    expect(within(welcome).getByText("As the host you must select a game")).toBeInTheDocument();
+    expect(within(welcome).getByText("As the host, you must select a game.")).toBeInTheDocument();
     expect(within(welcome).queryByText("You've selected")).not.toBeInTheDocument();
   });
 

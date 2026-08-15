@@ -14,7 +14,7 @@ import { ThemeSelector } from "./ThemeSelector";
 export function AppLayout() {
   return (
     <div className="flex min-h-screen flex-col bg-base-200 text-base-content">
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-12 pt-6">
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-12 pt-6">
         <Outlet />
       </main>
 

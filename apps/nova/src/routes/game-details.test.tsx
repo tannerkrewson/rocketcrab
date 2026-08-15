@@ -9,13 +9,16 @@ import type { PartyEngineState } from "../lib/party/engine";
 import { routeTree } from "../routeTree.gen";
 
 /**
- * Game detail page party tests (10.9 / 2t1.10): the shared /game/:gameId
- * page also serves saved games (title, description, mode from the IndexedDB
- * repository). The CTA is contextual: when a party is waiting in its lobby
- * the creator gets a "Select game" action that hands the game to the party
- * engine and returns to /party; when no party is active the page offers
- * "Start party" (with the game preselected for saved/Nova games, plain
- * /party for classic). There is no standalone "play game" view anymore.
+ * Game detail page party tests (10.9 / 2t1.10 / 5cl.8 / 5cl.10): the
+ * shared /game/:gameId page also serves saved games (title, description,
+ * mode from the IndexedDB repository). The CTA is contextual: when a party
+ * is waiting in its lobby the creator gets a "Select game" action that
+ * hands the game to the party engine and returns to /party; when no party
+ * is active the page offers "Start party" (with the game preselected for
+ * saved games, plain /party for classic). There is no standalone "play
+ * game" view anymore. The browser is classic-only (5cl.10), and inside a
+ * party the page shows the party shell header (logo + code) instead of the
+ * brand row (5cl.8).
  */
 
 const IDLE_STATE: PartyEngineState = {
@@ -147,6 +150,7 @@ const SAVED_HTML = "<!doctype html><html><body><p>rockets</p></body></html>";
 beforeEach(async () => {
   vi.clearAllMocks();
   stubs.mode = "idle";
+  window.sessionStorage.clear();
   await gameRepository.clear();
 });
 
@@ -215,31 +219,30 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
   });
 
-  it("keeps the editor action alongside the party select (10.9/2t1.10)", async () => {
+  it("shares the party shell header (logo + code) while in a lobby (5cl.8)", async () => {
     stubs.mode = "lobby";
-    renderAt("/game/nova-quiz");
+    renderAt("/game/drawphone");
 
-    const select = await screen.findByRole("button", { name: /select game/i });
+    // The lobby's shared header (origin + lowercase code) replaces the
+    // standalone brand row on the details page reached from a party.
+    const title = await screen.findByTestId("party-title");
+    expect(title.textContent).toBe(`${window.location.host}/rcrb`);
+    expect(screen.queryByRole("link", { name: /rocketcrab\.com/ })).not.toBeInTheDocument();
     // The back link returns to the party, not the browse page.
     const back = screen.getByRole("link", { name: "Back to party" });
     expect(back.getAttribute("href")).toBe("/party");
     expect(back.className).toContain("self-start");
-
-    // Nova prebuilt games keep their editor action.
-    const editor = screen.getByRole("button", { name: /open in the editor/i });
-    // "Select game" and "Open in the editor" share the same size so
-    // the centered action group renders two identical-height buttons.
+    // The host can still select this classic game for the party.
+    const select = screen.getByRole("button", { name: /select game/i });
     expect(select.className).toContain("btn-lg");
-    expect(editor.className).toContain("btn-lg");
-    expect(editor.className).toContain("btn-primary");
     expect(select.className).toContain("btn-primary");
   });
 
   it("shows no CTA to a guest in a party — the host picks (2t1.10)", async () => {
     stubs.mode = "guest";
-    renderAt("/game/nova-quiz");
+    renderAt("/game/drawphone");
 
-    await screen.findByRole("heading", { name: "Nova Quiz" });
+    await screen.findByRole("heading", { name: "Drawphone" });
     expect(screen.queryByRole("button", { name: /select game/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Start party/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Start party/ })).not.toBeInTheDocument();
