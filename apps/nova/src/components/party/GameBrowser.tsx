@@ -197,7 +197,7 @@ function SavedGameRow({
         to="/games/$gameId/edit"
         params={{ gameId: game.id }}
         onClick={onOpen}
-        className={buttonStyles("neutral", "md", "shrink-0", true)}
+        className={buttonStyles("default", "md", "shrink-0", true)}
         title={`Open “${game.title}” in the editor`}
       >
         <Code2 className="h-4 w-4" aria-hidden="true" />
@@ -350,7 +350,7 @@ export function GameBrowser({
         <button
           type="button"
           onClick={handleBack}
-          className={buttonStyles("neutral", "md", "self-start", true)}
+          className={buttonStyles("default", "md", "self-start", true)}
           title={compact ? "Back to lobby" : "Back to home"}
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />

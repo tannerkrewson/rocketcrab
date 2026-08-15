@@ -82,7 +82,7 @@ export function BrowseGamePage() {
     <Link
       to="/party"
       search={{ browse: true, gameId: undefined, mode: undefined, title: undefined }}
-      className={buttonStyles("neutral", "md", "self-start", true)}
+      className={buttonStyles("default", "md", "self-start", true)}
       title={backLabel}
     >
       <ArrowLeft className="h-4 w-4" aria-hidden="true" />
@@ -91,7 +91,7 @@ export function BrowseGamePage() {
   ) : (
     <Link
       to={backTarget}
-      className={buttonStyles("neutral", "md", "self-start", true)}
+      className={buttonStyles("default", "md", "self-start", true)}
       title={backLabel}
     >
       <ArrowLeft className="h-4 w-4" aria-hidden="true" />
@@ -285,7 +285,7 @@ export function BrowseGamePage() {
             href={prebuilt.guideUrl}
             target="_blank"
             rel="noreferrer"
-            className={buttonStyles("neutral", "md", "self-start", true)}
+            className={buttonStyles("default", "md", "self-start", true)}
           >
             <BookOpen className="h-4 w-4" aria-hidden="true" />
             Read the guide

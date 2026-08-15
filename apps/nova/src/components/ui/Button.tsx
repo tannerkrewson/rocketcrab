@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes } from "react";
 import { cn } from "../../lib/cn";
 
-export type ButtonVariant = "primary" | "secondary" | "accent" | "outline" | "danger" | "neutral";
+export type ButtonVariant = "primary" | "secondary" | "accent" | "outline" | "danger" | "default";
 export type ButtonSize = "md" | "lg";
 
 const variantClasses: Record<ButtonVariant, string> = {
@@ -10,7 +10,10 @@ const variantClasses: Record<ButtonVariant, string> = {
   accent: "btn-accent",
   outline: "btn-outline",
   danger: "btn-error",
-  neutral: "btn-neutral",
+  // 5cl.5: the plain daisyUI `btn` is the default button — the neutral
+  // variant (btn-neutral) is gone; everywhere it was used now uses
+  // "default" (with the same soft/plain treatment as before).
+  default: "",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {

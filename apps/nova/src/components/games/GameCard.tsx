@@ -53,7 +53,7 @@ export function GameCard({ game, onDuplicate, onDelete, busy = false }: GameCard
           <Link
             to="/games/$gameId/edit"
             params={{ gameId: game.id }}
-            className={buttonStyles("neutral", "md", undefined, true)}
+            className={buttonStyles("default", "md", undefined, true)}
           >
             <Pencil className="h-4 w-4" aria-hidden="true" />
             Edit
@@ -67,7 +67,7 @@ export function GameCard({ game, onDuplicate, onDelete, busy = false }: GameCard
             <PartyPopper className="h-4 w-4" aria-hidden="true" />
             Start party
           </Link>
-          <Button variant="neutral" soft onClick={onDuplicate} disabled={busy}>
+          <Button variant="default" soft onClick={onDuplicate} disabled={busy}>
             <Copy className="h-4 w-4" aria-hidden="true" />
             Duplicate
           </Button>

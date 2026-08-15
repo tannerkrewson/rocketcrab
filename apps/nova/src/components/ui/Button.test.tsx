@@ -26,9 +26,10 @@ describe("Button", () => {
     expect(screen.getByRole("button", { name: "Big" })).toHaveClass("btn-secondary", "btn-lg");
   });
 
-  it("applies the neutral variant (soft-default stack, 2t1.8)", () => {
-    render(<Button variant="neutral">Neutral</Button>);
-    expect(screen.getByRole("button", { name: "Neutral" })).toHaveClass("btn-neutral");
+  it("applies the default variant (plain btn; the old neutral is gone, 5cl.5)", () => {
+    render(<Button variant="default">Default</Button>);
+    expect(screen.getByRole("button", { name: "Default" })).toHaveClass("btn");
+    expect(screen.getByRole("button", { name: "Default" })).not.toHaveClass("btn-neutral");
   });
 
   it("applies the soft style when soft is set (2t1.8)", () => {
@@ -38,7 +39,7 @@ describe("Button", () => {
   });
 
   it("keeps the solid look when soft is unset (backward compatible)", () => {
-    render(<Button variant="neutral">Solid</Button>);
+    render(<Button variant="default">Solid</Button>);
     expect(screen.getByRole("button", { name: "Solid" })).not.toHaveClass("btn-soft");
   });
 
@@ -54,8 +55,8 @@ describe("Button", () => {
   });
 
   it("buttonStyles appends btn-soft for the soft flag (2t1.8)", () => {
-    expect(buttonStyles("neutral", "lg", undefined, true)).toContain("btn-neutral");
-    expect(buttonStyles("neutral", "lg", undefined, true)).toContain("btn-soft");
+    expect(buttonStyles("default", "lg", undefined, true)).toContain("btn-soft");
+    expect(buttonStyles("default", "lg", undefined, true)).not.toContain("btn-neutral");
     expect(buttonStyles("primary", "lg", "px-8", true)).toContain("btn-primary");
     expect(buttonStyles("primary", "lg", "px-8", true)).toContain("btn-soft");
     expect(buttonStyles("primary", "lg", "px-8", true)).toContain("px-8");

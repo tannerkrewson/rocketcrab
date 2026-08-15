@@ -87,16 +87,16 @@ function HomeComponent() {
       </section>
 
       <section aria-label="More" className="flex w-fit flex-col gap-2">
-        <Link to="/build" className={buttonStyles("neutral", "lg", undefined, true)}>
+        <Link to="/build" className={buttonStyles("default", "lg", undefined, true)}>
           Build a game
         </Link>
-        <Link to="/library" className={buttonStyles("neutral", "lg", undefined, true)}>
+        <Link to="/library" className={buttonStyles("default", "lg", undefined, true)}>
           My games
         </Link>
-        <Link to="/browse" className={buttonStyles("neutral", "lg", undefined, true)}>
+        <Link to="/browse" className={buttonStyles("default", "lg", undefined, true)}>
           Browse games
         </Link>
-        <Link to="/about" className={buttonStyles("neutral", "lg", undefined, true)}>
+        <Link to="/about" className={buttonStyles("default", "lg", undefined, true)}>
           About
         </Link>
       </section>
