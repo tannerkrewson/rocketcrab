@@ -65,7 +65,7 @@ export function GameCard({ game, onDuplicate, onDelete, busy = false }: GameCard
             title="Create a party from this game and play it with friends"
           >
             <PartyPopper className="h-4 w-4" aria-hidden="true" />
-            Play
+            Start party
           </Link>
           <Button variant="outline" onClick={onDuplicate} disabled={busy}>
             <Copy className="h-4 w-4" aria-hidden="true" />

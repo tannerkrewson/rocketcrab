@@ -18,7 +18,6 @@ import { Route as ExamplesRouteImport } from './routes/examples'
 import { Route as JoinRouteImport } from './routes/join'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as PartyRouteImport } from './routes/party'
-import { Route as ClassicGameIdRouteImport } from './routes/classic/$gameId'
 import { Route as GameGameIdRouteImport } from './routes/game.$gameId'
 import { Route as GamesGameIdEditRouteImport } from './routes/games/$gameId/edit'
 
@@ -67,11 +66,6 @@ const PartyRoute = PartyRouteImport.update({
   path: '/party',
   getParentRoute: () => rootRouteImport,
 } as any)
-const ClassicGameIdRoute = ClassicGameIdRouteImport.update({
-  id: '/classic/$gameId',
-  path: '/classic/$gameId',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const GameGameIdRoute = GameGameIdRouteImport.update({
   id: '/game/$gameId',
   path: '/game/$gameId',
@@ -93,7 +87,6 @@ export interface FileRoutesByFullPath {
   '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
   '/party': typeof PartyRoute
-  '/classic/$gameId': typeof ClassicGameIdRoute
   '/game/$gameId': typeof GameGameIdRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
 }
@@ -107,7 +100,6 @@ export interface FileRoutesByTo {
   '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
   '/party': typeof PartyRoute
-  '/classic/$gameId': typeof ClassicGameIdRoute
   '/game/$gameId': typeof GameGameIdRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
 }
@@ -122,7 +114,6 @@ export interface FileRoutesById {
   '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
   '/party': typeof PartyRoute
-  '/classic/$gameId': typeof ClassicGameIdRoute
   '/game/$gameId': typeof GameGameIdRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
 }
@@ -138,7 +129,6 @@ export interface FileRouteTypes {
     | '/join'
     | '/library'
     | '/party'
-    | '/classic/$gameId'
     | '/game/$gameId'
     | '/games/$gameId/edit'
   fileRoutesByTo: FileRoutesByTo
@@ -152,7 +142,6 @@ export interface FileRouteTypes {
     | '/join'
     | '/library'
     | '/party'
-    | '/classic/$gameId'
     | '/game/$gameId'
     | '/games/$gameId/edit'
   id:
@@ -166,7 +155,6 @@ export interface FileRouteTypes {
     | '/join'
     | '/library'
     | '/party'
-    | '/classic/$gameId'
     | '/game/$gameId'
     | '/games/$gameId/edit'
   fileRoutesById: FileRoutesById
@@ -181,7 +169,6 @@ export interface RootRouteChildren {
   JoinRoute: typeof JoinRoute
   LibraryRoute: typeof LibraryRoute
   PartyRoute: typeof PartyRoute
-  ClassicGameIdRoute: typeof ClassicGameIdRoute
   GameGameIdRoute: typeof GameGameIdRoute
   GamesGameIdEditRoute: typeof GamesGameIdEditRoute
 }
@@ -251,13 +238,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PartyRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/classic/$gameId': {
-      id: '/classic/$gameId'
-      path: '/classic/$gameId'
-      fullPath: '/classic/$gameId'
-      preLoaderRoute: typeof ClassicGameIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/game/$gameId': {
       id: '/game/$gameId'
       path: '/game/$gameId'
@@ -285,7 +265,6 @@ const rootRouteChildren: RootRouteChildren = {
   JoinRoute: JoinRoute,
   LibraryRoute: LibraryRoute,
   PartyRoute: PartyRoute,
-  ClassicGameIdRoute: ClassicGameIdRoute,
   GameGameIdRoute: GameGameIdRoute,
   GamesGameIdEditRoute: GamesGameIdEditRoute,
 }
