@@ -103,9 +103,14 @@ export function PartyPlayShell({
     <div className="fixed inset-0 z-40 flex flex-col bg-black" data-testid="party-play-view">
       {!barHidden ? (
         <header className="relative z-50 flex items-center gap-2 border-b-2 border-base-300 bg-base-100 px-3 pb-2 pt-safe">
+          {/* 5cl.14: while the navbar is showing, the logo sits bare on the
+              bar — no btn background/border/shadow (that chrome only
+              returns on the floating collapsed-mode logo below). hover/
+              active keep a subtle fill so the tap target still reads as
+              tappable. */}
           <button
             type="button"
-            className="btn btn-sm shrink-0"
+            className="btn btn-sm shrink-0 border-transparent bg-transparent shadow-none hover:bg-base-200 active:bg-base-300"
             onClick={() => setBarHidden(true)}
             aria-label="Hide the top bar"
             title="Hide the top bar"
@@ -128,9 +133,13 @@ export function PartyPlayShell({
 
           <div className="min-w-0 flex-1" />
 
+          {/* 5cl.14: the menu button needs contrast against the base-100 bar
+              in every theme — btn-outline draws a base-content border and
+              label (the default btn fill is base-200, near-invisible on
+              dark themes like the default one). */}
           <button
             type="button"
-            className="btn btn-sm shrink-0"
+            className="btn btn-sm btn-outline shrink-0"
             aria-expanded={menuOpen}
             onClick={() => setPanel(menuOpen ? null : "menu")}
           >
