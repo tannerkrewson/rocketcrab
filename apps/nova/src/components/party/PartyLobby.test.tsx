@@ -232,7 +232,7 @@ describe("PartyLobby", () => {
       notices: [
         { id: "notice-1", level: "error", message: "Player B could not receive the game." },
         { id: "notice-2", level: "warn", message: "Player C is reconnecting." },
-        { id: "notice-3", level: "info", message: "Your game loaded and registered." },
+        { id: "notice-3", level: "info", message: "Player B joined the party." },
       ],
     });
     await renderLobby(state);
@@ -242,7 +242,7 @@ describe("PartyLobby", () => {
     // The latest notice wins and colored alerts are outline-styled (9fv.11.3).
     expect(alerts[0]).toHaveClass("alert-outline");
     expect(alerts[0]).toHaveClass("alert-info");
-    expect(within(alerts[0]!).getByText("Your game loaded and registered.")).toBeInTheDocument();
+    expect(within(alerts[0]!).getByText("Player B joined the party.")).toBeInTheDocument();
   });
 
   it("hides older notices once a game-ended notice is owned by the ended banner (11.8)", async () => {
@@ -252,7 +252,7 @@ describe("PartyLobby", () => {
       canForceStart: false,
       startBlockedReason: "The game ended; leave the party to play again.",
       notices: [
-        { id: "notice-1", level: "info", message: "Your game loaded and registered." },
+        { id: "notice-1", level: "info", message: "Player B joined the party." },
         { id: "notice-2", level: "info", message: "The game started." },
         { id: "notice-3", level: "info", message: "The game ended (host_closed)." },
       ],
@@ -263,7 +263,7 @@ describe("PartyLobby", () => {
     expect(screen.getByRole("alert")).toHaveClass("alert-outline");
     expect(screen.getByText(/the game ended — the host closed it/i)).toBeInTheDocument();
     expect(screen.queryByText("The game ended (host_closed).")).not.toBeInTheDocument();
-    expect(screen.queryByText("Your game loaded and registered.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Player B joined the party.")).not.toBeInTheDocument();
   });
 
   it("places the action row above the players box and leave at the bottom (10.7)", async () => {
