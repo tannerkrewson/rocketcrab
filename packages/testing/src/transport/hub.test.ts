@@ -23,6 +23,59 @@ function collectMessages(
 }
 
 describe("InMemoryTransportHub — messaging", () => {
+  it("drops in-flight messages to a reconnected transport's old connection so the new stream is never corrupted (9fv.4.5)", async () => {
+    // Regression (rocketcrab-9fv.4.5): a receiver reconnect tears the old
+    // connection down. Messages that were in flight to the OLD connection
+    // (already stamped for the old per-(sender, target) link) must be dropped
+    // at delivery time — otherwise their stale stamps land in the fresh
+    // ordered stream (expectedSeq restarted at 1), buffer, and then flush
+    // when the new link's stamps catch up — inflating expectedSeq past the
+    // new link's stamp space and silently dropping the first post-reconnect
+    // messages. In the authority-election property that wedged a follower
+    // one revision behind the authority forever.
+    const hub = new InMemoryTransportHub({ schedule: () => () => undefined });
+    const a = hub.createTransport({ memberId: "member-a" });
+    const b = hub.createTransport({ memberId: "member-b" });
+    const c = hub.createTransport({ memberId: "member-c" });
+    const received = collectMessages(b);
+    await joinRoom(a);
+    await joinRoom(b);
+    await joinRoom(c);
+
+    // m1..m5 establish the old connection's stream (stamps 1..5 on a→b).
+    for (let i = 1; i <= 5; i += 1) {
+      await a.send({ channel: "state", payload: `m${i}` });
+    }
+    hub.drain();
+    expect(received).toHaveLength(5);
+    received.length = 0;
+
+    // m6..m8 go in flight toward the OLD connection (stamps 6..8 on a→b).
+    for (let i = 6; i <= 8; i += 1) {
+      await a.send({ channel: "state", payload: `m${i}` });
+    }
+
+    // b reconnects: the old connection (and its in-flight messages) is dead.
+    await b.reconnect();
+
+    // n1..n5 are sent on the new connection's fresh stream (stamps 1..5).
+    for (let i = 1; i <= 5; i += 1) {
+      await a.send({ channel: "state", payload: `n${i}` });
+    }
+    hub.drain();
+    expect(received.map((m) => m.payload)).toEqual(["n1", "n2", "n3", "n4", "n5"]);
+    received.length = 0;
+
+    // n6..n8 continue the new stream (stamps 6..8). Without the fix the
+    // stale m6..m8 would have flushed on the previous drain, inflating the
+    // receiver's expected sequence to 9 and dropping n6..n8 as duplicates.
+    for (let i = 6; i <= 8; i += 1) {
+      await a.send({ channel: "state", payload: `n${i}` });
+    }
+    hub.drain();
+    expect(received.map((m) => m.payload)).toEqual(["n6", "n7", "n8"]);
+  });
+
   it("lets a transport that left cleanly re-join the room (U6 reconnect)", async () => {
     const hub = new InMemoryTransportHub();
     const a = hub.createTransport({ memberId: "member-a" });
