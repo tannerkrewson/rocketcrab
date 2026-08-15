@@ -8,12 +8,13 @@ import { buildMasterPrompt } from "../lib/prompt/master-prompt";
 import { routeTree } from "../routeTree.gen";
 
 /**
- * Build-page gateway tests (rocketcrab-9fv.10.11): the centered /build route
- * introduces the master-prompt flow in three steps and offers the copyable
- * master prompt as the main call to action, linking to the GitHub-hosted API
- * reference. The old "start another way" row (Open the editor / See example
- * games) was removed (9fv.11.14): the editor is an unavoidable step, so the
- * page ends at the master-prompt card.
+ * Build-page gateway tests (rocketcrab-9fv.10.11 / 2t1.7): the centered
+ * /build route introduces the master-prompt flow in three steps and offers
+ * the copyable master prompt as the main call to action, linking to the
+ * GitHub-hosted API reference. The old "start another way" row (Open the
+ * editor / See example games) is gone (9fv.11.14); the page now ends with
+ * a prominent "Open the editor" CTA (2t1.7) — the editor is the
+ * unavoidable next step.
  */
 
 const PROMPT = buildMasterPrompt();
@@ -110,6 +111,17 @@ describe("/build — build a game gateway", () => {
     expect(screen.queryByRole("button", { name: "Open the editor" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "See example games" })).not.toBeInTheDocument();
     expect(screen.queryByText("Or start another way")).not.toBeInTheDocument();
+  });
+
+  it("closes with a prominent Open-the-editor CTA (2t1.7)", async () => {
+    renderBuild();
+
+    await screen.findByRole("heading", { name: "Build a game" });
+
+    const editor = screen.getByRole("link", { name: "Open the editor" });
+    expect(editor.getAttribute("href")).toBe("/editor");
+    expect(editor.className).toContain("btn-primary");
+    expect(editor.className).toContain("btn-lg");
   });
 
   it("keeps the editor as the paste target — no paste box on this page (7.44)", async () => {
