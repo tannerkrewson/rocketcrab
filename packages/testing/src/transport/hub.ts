@@ -465,12 +465,26 @@ export class InMemoryTransportHub {
       // never stamped, so a dropped unreliable message leaves no gap.
       const deliveries = targets.map((target) => ({
         target,
+        // The connection this delivery was stamped for. A receiver that
+        // reconnects tears its old connection down (like a real transport):
+        // in-flight messages destined for the old connection are dropped at
+        // delivery time instead of reaching the new connection's restarted
+        // sequence space. Without this, stale old-link stamps (e.g. 6,7,8)
+        // arrive against the fresh stream (expected=1), buffer, then flush —
+        // inflating the receiver's expected sequence past the new link's
+        // stamps and silently dropping the first post-reconnect messages
+        // (rocketcrab-9fv.4.5: a follower that missed one commit broadcast
+        // never converged).
+        targetConn: target.selfConnectionId,
         message: this.stampForTarget(message, transport, target),
       }));
       for (let copy = 0; copy <= roll.duplicateCount; copy += 1) {
         this.schedule(
           () => {
             for (const delivery of deliveries) {
+              if (delivery.targetConn !== delivery.target.selfConnectionId) {
+                continue; // the target reconnected; its old connection is gone
+              }
               delivery.target.deliver(delivery.message);
             }
           },
@@ -489,6 +503,7 @@ export class InMemoryTransportHub {
     // lossy ordered channel.
     const deliveries = targets.map((target) => ({
       target,
+      targetConn: target.selfConnectionId,
       message: this.stampForTarget(message, transport, target),
     }));
     const { bytes, kind } = serializePayload(options.payload);
@@ -525,6 +540,9 @@ export class InMemoryTransportHub {
         this.schedule(
           () => {
             for (const delivery of deliveries) {
+              if (delivery.targetConn !== delivery.target.selfConnectionId) {
+                continue; // the target reconnected; its old connection is gone
+              }
               delivery.target.deliverChunk({
                 ...baseChunk,
                 deliverySeq: delivery.message.deliverySeq,
