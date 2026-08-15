@@ -1,0 +1,61 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="100%" height="100%">
+  <!-- Rocket Fire (Underneath Body) -->
+  <g>
+    <!-- Outer Flame -->
+    <path d="M 48,82 Q 40,108 64,125 Q 88,108 80,82 Z" fill="#FF5722" stroke="#1D1D1D" stroke-width="3.5" stroke-linejoin="round" />
+    <!-- Middle Flame -->
+    <path d="M 52,82 Q 46,104 64,118 Q 82,104 76,82 Z" fill="#FF9800" />
+    <!-- Inner Flame -->
+    <path d="M 57,82 Q 54,100 64,110 Q 74,100 71,82 Z" fill="#FFC107" />
+  </g>
+
+  <!-- Thruster Nozzle Base -->
+  <path d="M 50,80 L 78,80 L 74,86 L 54,86 Z" fill="#424242" stroke="#1D1D1D" stroke-width="3" stroke-linejoin="round" />
+
+  <!-- Solid Legs (Left Side) -->
+  <g fill="#E53935" stroke="#1D1D1D" stroke-width="3.5" stroke-linejoin="round">
+    <path d="M 38,58 C 22,56 12,68 10,74 C 16,76 26,68 38,64 Z" />
+    <path d="M 40,66 C 24,68 14,82 14,90 C 20,90 28,80 40,72 Z" />
+    <path d="M 44,73 C 30,80 22,92 24,100 C 30,98 34,88 44,78 Z" />
+  </g>
+
+  <!-- Solid Legs (Right Side) -->
+  <g fill="#E53935" stroke="#1D1D1D" stroke-width="3.5" stroke-linejoin="round">
+    <path d="M 90,58 C 106,56 116,68 118,74 C 112,76 102,68 90,64 Z" />
+    <path d="M 88,66 C 104,68 114,82 114,90 C 108,90 100,80 88,72 Z" />
+    <path d="M 84,73 C 98,80 106,92 104,100 C 98,98 94,88 84,78 Z" />
+  </g>
+
+  <!-- Arm Outlines & Color (Pushed Outward) -->
+  <path d="M 42,54 C 24,42 20,30 28,24" stroke="#1D1D1D" stroke-width="8" stroke-linecap="round" fill="none" />
+  <path d="M 42,54 C 24,42 20,30 28,24" stroke="#E53935" stroke-width="3.5" stroke-linecap="round" fill="none" />
+
+  <path d="M 86,54 C 104,42 108,30 100,24" stroke="#1D1D1D" stroke-width="8" stroke-linecap="round" fill="none" />
+  <path d="M 86,54 C 104,42 108,30 100,24" stroke="#E53935" stroke-width="3.5" stroke-linecap="round" fill="none" />
+
+  <!-- Larger Left Claw (Shifted Left to Clear Eye) -->
+  <path d="M 28,24 C 12,18 4,-2 24,0 C 30,8 25,15 28,18 C 36,10 41,12 36,26 Z" 
+        fill="#FF5252" stroke="#1D1D1D" stroke-width="3.5" stroke-linejoin="round" />
+
+  <!-- Larger Right Claw (Shifted Right to Clear Eye) -->
+  <path d="M 100,24 C 116,18 124,-2 104,0 C 98,8 103,15 100,18 C 92,10 87,12 92,26 Z" 
+        fill="#FF5252" stroke="#1D1D1D" stroke-width="3.5" stroke-linejoin="round" />
+
+  <!-- Main Body Shell -->
+  <ellipse cx="64" cy="62" rx="38" ry="25" fill="#FF5252" stroke="#1D1D1D" stroke-width="3.5" />
+  <ellipse cx="64" cy="58" rx="30" ry="15" fill="#FF7979" opacity="0.35" />
+
+  <!-- Eye Stalks -->
+  <rect x="47" y="30" width="6" height="12" rx="3" fill="#E53935" stroke="#1D1D1D" stroke-width="3.5" />
+  <rect x="75" y="30" width="6" height="12" rx="3" fill="#E53935" stroke="#1D1D1D" stroke-width="3.5" />
+
+  <!-- Eyes -->
+  <circle cx="50" cy="28" r="6" fill="#FFFFFF" stroke="#1D1D1D" stroke-width="3" />
+  <circle cx="50" cy="28" r="2.5" fill="#1D1D1D" />
+
+  <circle cx="78" cy="28" r="6" fill="#FFFFFF" stroke="#1D1D1D" stroke-width="3" />
+  <circle cx="78" cy="28" r="2.5" fill="#1D1D1D" />
+
+  <!-- Smile -->
+  <path d="M 58,66 Q 64,72 70,66" stroke="#1D1D1D" stroke-width="3.5" stroke-linecap="round" fill="none" />
+</svg>
