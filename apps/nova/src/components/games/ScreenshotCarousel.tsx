@@ -15,7 +15,9 @@ export interface ScreenshotCarouselProps {
  * App-store style tall portrait screenshot carousel (rocketcrab-9fv.7.46).
  * The games' screenshots are already portrait, so each slide shows the full
  * image tall — swiped horizontally with clickable pagination dots — instead
- * of the old 4:3 thumbnail grid.
+ * of the old 4:3 thumbnail grid. 2t1.3: `slidesPerView` is 2.5 so two and
+ * a half screenshots are visible on first load (the centered slide plus
+ * the halves peeking in on either side).
  *
  * `w-full` is load-bearing (rocketcrab-9fv.11.12): without a definite width
  * the container's used width follows the wrapper's min-content (the sum of
@@ -33,12 +35,12 @@ export function ScreenshotCarousel({ images, gameName }: ScreenshotCarouselProps
   return (
     <Swiper
       modules={[A11y, Pagination]}
-      slidesPerView={1.15}
+      slidesPerView={2.5}
       centeredSlides
       spaceBetween={14}
       // Loop only when there are enough slides for swiper's loop clones
-      // (centeredSlides + slidesPerView 1.15 needs 5+ slides); with 3-4
-      // slides swiper would silently disable loop and log a warning.
+      // (centeredSlides + slidesPerView 2.5 needs 6+ slides); with fewer
+      // swiper would silently disable loop and log a warning.
       loop={images.length >= 5}
       grabCursor
       pagination={{ clickable: true }}

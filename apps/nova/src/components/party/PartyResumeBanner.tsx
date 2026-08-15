@@ -75,7 +75,7 @@ export function PartyResumeBanner({ engine }: PartyResumeBannerProps) {
         {record.code !== null ? (
           <>
             {" "}
-            (code <span className="font-mono font-bold">{record.code}</span>)
+            (code <span className="font-mono font-bold">{record.code.toLowerCase()}</span>)
           </>
         ) : null}
         . The party is still open — rejoin where you left off.

@@ -51,7 +51,7 @@ export function PartyShellHeader({
         <>
           <button
             type="button"
-            className="font-title mt-2 cursor-pointer text-4xl font-black tracking-tight text-base-content sm:text-5xl"
+            className="font-title mt-2 cursor-pointer text-4xl font-black text-base-content sm:text-5xl"
             data-testid="party-title"
             onClick={() => void copyInvite()}
             disabled={inviteUrl === null}
@@ -61,9 +61,11 @@ export function PartyShellHeader({
             {pageTitle}
           </button>
           {/* 7.47: phonetic words stay lowercase ("(xray alpha bravo
-              yankee)") — the `uppercase` class is intentionally absent. */}
+              yankee)") — the `uppercase` class is intentionally absent.
+              2t1.3: default letter-spacing, a size up from text-xs so the
+              code is easier to read aloud over a call. */}
           {!disablePhonetic ? (
-            <p className="text-xs font-semibold tracking-widest text-base-content/60">
+            <p className="text-sm font-semibold text-base-content/60">
               ({phoneticSpelling(code ?? "")})
             </p>
           ) : null}

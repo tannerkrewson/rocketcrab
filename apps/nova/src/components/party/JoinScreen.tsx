@@ -33,8 +33,8 @@ export interface JoinScreenProps {
  * Join flow (7.47, reworked 2t1.9): enter the four-letter code in a tall,
  * wide mono input — the join happens directly from the code step, and the
  * player's name is ONLY asked once they are in the lobby (the edit mode
- * below). Codes are normalized to uppercase on entry; the party layer
- * validates the alphabet (no I/O/L). The phonetic spelling confirms the
+ * below). Codes are normalized to lowercase on entry (the party layer
+ * validates its own alphabet); the phonetic spelling confirms the
  * code inline once it is complete. The player's name is prefilled from the
  * last saved name (7.5).
  *
@@ -55,7 +55,7 @@ export function JoinScreen({
   onBack,
 }: JoinScreenProps) {
   const editing = mode === "edit";
-  const normalized = code.trim().toUpperCase();
+  const normalized = code.trim().toLowerCase();
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -123,19 +123,19 @@ export function JoinScreen({
               id="party-code"
               type="text"
               value={code}
-              onChange={(event) => onCodeChange(event.target.value.toUpperCase())}
+              onChange={(event) => onCodeChange(event.target.value.toLowerCase())}
               onKeyDown={handleKeyDown}
               placeholder="abcd"
               maxLength={4}
               autoFocus
-              autoCapitalize="characters"
+              autoCapitalize="none"
               autoCorrect="off"
               spellCheck={false}
               aria-label="Four-letter party code"
-              className="input input-bordered input-xl w-48 text-center font-mono text-4xl font-black tracking-[0.4em] placeholder:tracking-[0.4em]"
+              className="input input-bordered input-xl w-48 text-center font-mono text-4xl font-black"
             />
             {normalized.length === 4 ? (
-              <p className="text-center text-xs text-base-content/60">
+              <p className="text-center text-sm text-base-content/60">
                 <span className="font-mono font-bold text-primary">{normalized}</span> —{" "}
                 <span className="text-base-content/50">({phoneticSpelling(normalized)})</span>
               </p>
