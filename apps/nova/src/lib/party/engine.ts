@@ -594,7 +594,7 @@ export class PartyEngine {
     const identity = this.identity;
     this.lastSetup = { kind: "join-code", code };
     this.phase = "joining";
-    this.phaseDetail = `Joining party ${code.toUpperCase()}…`;
+    this.phaseDetail = `Joining party ${code.toLowerCase()}…`;
     this.lastError = null;
     this.emit();
     try {

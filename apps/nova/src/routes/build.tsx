@@ -59,22 +59,24 @@ export function BuildPage() {
         back
       </Link>
 
-      <header className="flex flex-col items-center gap-5 pt-4">
-        <span
-          className="glow-info flex h-20 w-20 items-center justify-center rounded-box border-2 border-info/40 bg-base-100"
-          aria-hidden="true"
-        >
-          <BrandLogo size={40} />
-        </span>
-        <div className="flex flex-col items-center gap-2">
-          <h1 className="text-glow-info text-4xl font-black tracking-tight text-base-content sm:text-5xl">
-            Build a game
-          </h1>
-          <p className="max-w-md text-lg leading-relaxed text-base-content/70">
-            You bring the idea — the AI writes the code, Nova brings the players.
-          </p>
-        </div>
-      </header>
+      <div className="aura text-info">
+        <header className="flex flex-col items-center gap-5 pt-4">
+          <span
+            className="glow-info flex h-20 w-20 items-center justify-center rounded-box border-2 border-info/40 bg-base-100"
+            aria-hidden="true"
+          >
+            <BrandLogo size={40} />
+          </span>
+          <div className="flex flex-col items-center gap-2">
+            <h1 className="text-glow-info text-4xl font-black text-base-content sm:text-5xl">
+              Build a game
+            </h1>
+            <p className="max-w-md text-lg leading-relaxed text-base-content/70">
+              You bring the idea — the AI writes the code, Nova brings the players.
+            </p>
+          </div>
+        </header>
+      </div>
 
       <ol
         aria-label="How to build a game"
@@ -87,9 +89,7 @@ export function BuildPage() {
           >
             <Sparkles className="h-5 w-5" />
           </span>
-          <p className="text-xs font-black uppercase tracking-widest text-base-content/50">
-            Step 1
-          </p>
+          <p className="text-xs font-black uppercase text-base-content/50">Step 1</p>
           <p className="text-lg font-black leading-tight">Get the prompt</p>
           <p className="text-sm leading-relaxed text-base-content/70">
             One copyable prompt that turns any AI chatbot into a Nova game maker.
@@ -102,9 +102,7 @@ export function BuildPage() {
           >
             <Bot className="h-5 w-5" />
           </span>
-          <p className="text-xs font-black uppercase tracking-widest text-base-content/50">
-            Step 2
-          </p>
+          <p className="text-xs font-black uppercase text-base-content/50">Step 2</p>
           <p className="text-lg font-black leading-tight">Describe your game</p>
           <p className="text-sm leading-relaxed text-base-content/70">
             Paste the prompt into ChatGPT, Claude, or Gemini. The AI interviews you, then writes
@@ -118,9 +116,7 @@ export function BuildPage() {
           >
             <ClipboardPaste className="h-5 w-5" />
           </span>
-          <p className="text-xs font-black uppercase tracking-widest text-base-content/50">
-            Step 3
-          </p>
+          <p className="text-xs font-black uppercase text-base-content/50">Step 3</p>
           <p className="text-lg font-black leading-tight">Paste it in the editor</p>
           <p className="text-sm leading-relaxed text-base-content/70">
             The AI returns one complete HTML file. Paste it in the editor, run it, and make it
