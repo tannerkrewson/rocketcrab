@@ -36,6 +36,10 @@ export interface PartyLobbyProps {
   /** Retained for PartyExperience compatibility: the lobby no longer edits
    *  names inline (2t1.9) — the pencil opens /join?edit=name instead. */
   onEditName: (name: string) => void;
+  /** 2t1.1: notify the shell when the lobby enters/leaves browse mode so
+   *  the full-size party header can hide (GameBrowser owns the compact
+   *  dimmed brand row while browsing). */
+  onBrowseModeChange?: (browsing: boolean) => void;
 }
 
 /** Per-player tile border colors (10.8): each player gets a distinct color. */
@@ -140,11 +144,18 @@ export function PartyLobby({
   onLeave,
   onRefreshDiagnostics,
   onKickMember,
+  onBrowseModeChange,
 }: PartyLobbyProps) {
   const [forceDialog, setForceDialog] = useState(false);
   // 7.43: "Browse games" swaps the lobby for the shared browse UI (pick
   // mode) until the host picks a game or goes back.
   const [browsing, setBrowsing] = useState(false);
+  // 2t1.1: tell the shell when browse mode toggles so it can hide the
+  // full-size party header (GameBrowser's compact dimmed brand row takes
+  // over while browsing).
+  useEffect(() => {
+    onBrowseModeChange?.(browsing);
+  }, [browsing, onBrowseModeChange]);
   // 10.5: the QR code lives behind a modal; the invite URL is never
   // rendered as text (only the origin + code page title is).
   const [qrOpen, setQrOpen] = useState(false);
