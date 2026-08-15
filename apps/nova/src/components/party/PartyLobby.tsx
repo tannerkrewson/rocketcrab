@@ -221,7 +221,7 @@ export function PartyLobby({
     return (
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
         <section aria-label="Pick a game" className="flex flex-col gap-3">
-          <GameBrowser compact />
+          <GameBrowser compact onBack={() => setBrowsing(false)} />
         </section>
       </div>
     );
