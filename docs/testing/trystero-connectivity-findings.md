@@ -299,3 +299,30 @@ established than damus — worth monitoring; good open arbitrary-kind public
 relays are scarce (most are unreachable, paywalled, or write-restricted), so
 a private relay (alongside the Cloudflare work, rocketcrab-23s) remains the
 long-term option.
+
+## Diagnostics surfacing in the app (rocketcrab-ont.1, 2026-08-15)
+
+Follow-up from the relay-failure investigation: relay-health diagnostics are
+now surfaced in the lobby's connection-diagnostics panel (beads
+`rocketcrab-ont.1`), and the panel distinguishes **usable** relays from mere
+socket-OPEN ones.
+
+- **Production wiring**: the `PartyEngine` singleton now reads the private
+  transport's own adapter diagnostics (`TrysteroTransport.getDiagnostics()`)
+  when no provider is injected, and subscribes to `onRelayStateChange` for
+  live push updates — `buildDiagnostics()` no longer returns `relays: null`
+  in production.
+- **Usable vs connected**: the transport watches each relay socket's
+  messages (the same NOTICE / OK:false signals Trystero's console "relay
+  failure" warnings use) and marks a relay `degraded` when it has recently
+  rejected or throttled party traffic. A relay is **usable** only when its
+  socket is OPEN **and** it is not degraded. `RelayDiagnostics` now carries
+  `usableCount` / `degradedCount` and an overall `degraded` flag
+  (usable < configured redundancy); failure observations decay after 60 s.
+  The panel shows per-relay `usable` / `rejecting` status and a warning when
+  usable relays fall below redundancy (nostr.info hard rejection and
+  damus/offchain throttling now show up instead of "connected").
+- **Out of scope (unchanged)**: the pinned `GOOD_RELAYS` list and relay
+  configuration are untouched (blocked human decision `rocketcrab-iha`); the
+  discovery path is unchanged. Relays that drop traffic silently (no NOTICE,
+  no OK response) are not yet detected — only observable rejections are.

@@ -47,6 +47,9 @@ export function PartyDiagnosticsPanel({
   }
   const relayCount = diagnostics.relays?.length ?? 0;
   const connectedRelays = diagnostics.relays?.filter((relay) => relay.connected).length ?? 0;
+  const usableRelays =
+    diagnostics.relays?.filter((relay) => relay.connected && !relay.degraded).length ?? 0;
+  const relayHealth = diagnostics.relayHealth;
 
   return (
     <details
@@ -60,11 +63,36 @@ export function PartyDiagnosticsPanel({
         <span className="badge badge-ghost badge-sm">
           {connectionLabel(diagnostics.connectionState)}
         </span>
-        <span className="badge badge-ghost badge-sm" title="Connected relays">
-          {connectedRelays}/{relayCount} relays
+        <span
+          className="badge badge-ghost badge-sm"
+          title={
+            relayCount === 0
+              ? "No relay sockets observed yet"
+              : `${usableRelays}/${relayCount} relays usable (open and accepting party traffic); ${connectedRelays} open sockets`
+          }
+        >
+          {relayCount === 0 ? "0 relays" : `${usableRelays}/${relayCount} relays`}
         </span>
+        {relayHealth !== null && relayHealth.degraded ? (
+          <span className="badge badge-warning badge-sm" title="Usable relays below redundancy">
+            degraded
+          </span>
+        ) : null}
       </summary>
       <div className="collapse-content flex flex-col gap-2 text-xs">
+        {relayHealth !== null && relayHealth.degraded ? (
+          <div role="alert" className="alert alert-outline alert-warning mx-auto w-fit text-xs">
+            <span>
+              Signaling degraded: {relayHealth.usable} of {relayHealth.total} relays usable —
+              connected relays are rejecting or throttling party messages.
+            </span>
+          </div>
+        ) : null}
+        {relayHealth !== null && relayHealth.signalingDown ? (
+          <div role="alert" className="alert alert-outline alert-error mx-auto w-fit text-xs">
+            <span>No relay socket is open — signaling is down.</span>
+          </div>
+        ) : null}
         {greeterName !== undefined || authorityName !== undefined ? (
           <div className="flex flex-wrap gap-x-6 gap-y-1 font-mono text-base-content/70">
             <span>greeter: {greeterName ?? "—"}</span>
@@ -87,13 +115,30 @@ export function PartyDiagnosticsPanel({
               ) : (
                 diagnostics.relays.map((relay) => (
                   <li key={relay.url} className="flex items-center gap-2">
-                    <Wifi
-                      className={relay.connected ? "h-3 w-3 text-success" : "h-3 w-3 text-error"}
-                      aria-hidden="true"
-                    />
+                    {relay.connected && !relay.degraded ? (
+                      <span title="Open and accepting party traffic">
+                        <Wifi className="h-3 w-3 text-success" aria-hidden="true" />
+                      </span>
+                    ) : relay.connected && relay.degraded ? (
+                      <span title="Open but rejecting/throttling party traffic">
+                        <Wifi className="h-3 w-3 text-warning" aria-hidden="true" />
+                      </span>
+                    ) : (
+                      <Wifi className="h-3 w-3 text-error" aria-hidden="true" />
+                    )}
                     <span className="break-all">{relay.url}</span>
-                    <span className="ml-auto text-base-content/50">
-                      {relay.connected ? "connected" : `readyState ${relay.readyState}`}
+                    <span
+                      className={`ml-auto whitespace-nowrap ${
+                        relay.connected && relay.degraded
+                          ? "font-bold text-warning"
+                          : "text-base-content/50"
+                      }`}
+                    >
+                      {relay.connected && !relay.degraded
+                        ? "usable"
+                        : relay.connected && relay.degraded
+                          ? "rejecting"
+                          : `readyState ${relay.readyState}`}
                     </span>
                   </li>
                 ))
