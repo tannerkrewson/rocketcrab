@@ -47,6 +47,7 @@ const IDLE_STATE: PartyEngineState = {
   classicFrameEpoch: 0,
   diagnostics: null,
   notices: [],
+  runtimeLogs: [],
   lastError: null,
 };
 

@@ -78,6 +78,7 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     classicFrameEpoch: 0,
     diagnostics: null,
     notices: [],
+    runtimeLogs: [],
     lastError: null,
     ...overrides,
   };

@@ -54,6 +54,7 @@ import {
 import { RuntimeHostClient, type ChannelPort, type RuntimeHostEvent } from "../runtime-host";
 import { arenaApiCallSchemas } from "../arena/api-calls";
 import { toApiEvent } from "../arena/api-events";
+import type { ArenaLogEntry } from "../arena/types";
 import {
   createFrameSimulationExecutor,
   createFrameStateExecutor,
@@ -239,6 +240,9 @@ export interface PartyEngineState {
   readonly diagnostics: PartyDiagnostics | null;
   readonly notices: readonly PartyNotice[];
   readonly lastError: string | null;
+  /** Ring-buffer of the game's runtime console output (5cl.11) — the
+   *  in-game Logs panel shows this for the user's own games. */
+  readonly runtimeLogs: readonly ArenaLogEntry[];
 }
 
 /** Engine configuration (defaults to the real Trystero + runtime bridge). */
@@ -295,6 +299,10 @@ interface PendingApproval {
 }
 
 const MAX_NOTICES = 8;
+/** 5cl.11: cap for the party game's runtime console ring buffer. */
+const MAX_PARTY_LOG_ENTRIES = 200;
+
+let partyLogCounter = 0;
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
@@ -528,6 +536,8 @@ export class PartyEngine {
   private notices: PartyNotice[] = [];
   private lastError: string | null = null;
   private lastSetup: LastSetup | null = null;
+  /** Ring-buffer of the game's runtime console output (5cl.11). */
+  private runtimeLogs: ArenaLogEntry[] = [];
   private lastDiagnostics: unknown = null;
 
   private phase: PartyPhase = "idle";
@@ -653,6 +663,7 @@ export class PartyEngine {
             },
       removedReason: this.removedReason,
       classicFrameEpoch: this.classicFrameEpoch,
+      runtimeLogs: this.runtimeLogs,
       diagnostics: this.buildDiagnostics(),
       notices: [...this.notices],
       lastError: this.lastError,
@@ -1187,6 +1198,13 @@ export class PartyEngine {
       this.emit();
       this.scheduleReconnectRetry();
     }
+  }
+
+  /** Clear the runtime console ring buffer (the in-game Logs panel). */
+  clearRuntimeLogs(): void {
+    if (this.runtimeLogs.length === 0) return;
+    this.runtimeLogs = [];
+    this.emit();
   }
 
   /** Refresh adapter diagnostics (relay state, join errors, pings). */
@@ -1833,9 +1851,34 @@ export class PartyEngine {
         break;
       case "ready":
       case "metadata":
-      case "console":
       case "lifecycle":
         break; // handled by the runtime; not lobby-facing in P4
+      case "console": {
+        // 5cl.11: capture the game's console output into a bounded ring
+        // buffer so the in-game Logs menu can show it for the user's own
+        // games. Mirrors the arena's logPlayer (arena/engine.ts) — same
+        // ArenaLogEntry shape, same cap.
+        const { level, message, details, dropped } = event.message;
+        const entry: ArenaLogEntry = {
+          id: `party-log-${++partyLogCounter}`,
+          timestamp: Date.now(),
+          level: level === "debug" ? "log" : level,
+          message,
+          ...(details !== undefined ? { details } : {}),
+        };
+        this.runtimeLogs = [...this.runtimeLogs, entry].slice(-MAX_PARTY_LOG_ENTRIES);
+        if ((dropped ?? 0) > 0) {
+          const droppedEntry: ArenaLogEntry = {
+            id: `party-log-${++partyLogCounter}`,
+            timestamp: Date.now(),
+            level: "warn",
+            message: `${dropped} console ${dropped === 1 ? "entry" : "entries"} dropped (rate limit)`,
+          };
+          this.runtimeLogs = [...this.runtimeLogs, droppedEntry].slice(-MAX_PARTY_LOG_ENTRIES);
+        }
+        this.emit();
+        break;
+      }
     }
   }
 

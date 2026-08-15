@@ -190,6 +190,7 @@ export function PartyExperience({
         onKickMember={handleKickMember}
         onPickGame={(gameId) => handlePickFromInGame(() => handlePickGame(gameId))}
         onPickPrebuilt={(entry) => handlePickFromInGame(() => handlePickPrebuilt(entry))}
+        onClearLogs={() => engine.clearRuntimeLogs()}
       >
         <div className="h-full w-full">{frameArea}</div>
       </PartyPlayShell>
