@@ -6,7 +6,6 @@ import { cn } from "../../lib/cn";
 import { usePartyEngine } from "../../lib/party/use-party";
 import type { PartyEngineState } from "../../lib/party/engine";
 import { buildClassicGameUrl, findClassicGame } from "../../lib/classic";
-import { findNovaPrebuiltGame } from "../../lib/browse/nova-games";
 import type { BrowseEntry } from "../../lib/browse";
 import { gameRepository } from "../../lib/games/instance";
 import { Button } from "../ui/Button";
@@ -66,31 +65,13 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
     }
   };
 
-  // 7.43: picking a prebuilt game (classic or nova) from the shared browse
-  // UI. Classic games hand the engine the game id (the host creates the
-  // room once and the party plane shares it); Nova games load their source
-  // and select it like a saved game.
+  // 7.43: picking a prebuilt game from the shared browse UI. 5cl.10: the
+  // browser is classic-only now (Nova's example games were removed, and
+  // Nova's own games are saved games picked via selectGame), so every
+  // prebuilt pick is a classic external iframe game — the host creates the
+  // room once and the party plane shares it.
   const handlePickPrebuilt = async (entry: BrowseEntry) => {
-    if (entry.kind === "classic") {
-      await engine.selectClassicGame(entry.id);
-      return;
-    }
-    const prebuilt = findNovaPrebuiltGame(entry.id);
-    if (prebuilt === undefined) {
-      return;
-    }
-    try {
-      const { default: source } = await prebuilt.load();
-      await engine.selectGame({
-        gameId: entry.id,
-        title: entry.name,
-        mode: entry.mode,
-        source,
-        apiVersion: PROTOCOL_VERSION,
-      });
-    } catch (error) {
-      toast.error(`Couldn't load that game: ${errorMessage(error)}`);
-    }
+    await engine.selectClassicGame(entry.id);
   };
 
   /**
@@ -183,8 +164,10 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
   // every live party phase EXCEPT playing, where the in-flow play shell's
   // compact top bar takes over (7.38). The invite details (QR/URL/copy)
   // live in the lobby's invite card (10.5), not the header.
-  // 2t1.1: while the host browses games in the lobby, the full-size party
-  // header hides — GameBrowser's compact dimmed brand row takes over.
+  // 5cl.8: while the host browses games in the lobby the header STAYS
+  // MOUNTED and animates to a compact, slightly faded state (smaller logo +
+  // title, reduced opacity) so the game browser beneath is the focus — the
+  // browser no longer renders its own brand row.
   const [browsing, setBrowsing] = useState(false);
 
   const shellShown = state.phase !== "idle" && state.phase !== "error" && state.phase !== "removed";
@@ -208,8 +191,8 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {shellShown && !browsing ? (
-        <PartyShellHeader code={state.code} inviteUrl={state.inviteUrl} />
+      {shellShown ? (
+        <PartyShellHeader code={state.code} inviteUrl={state.inviteUrl} compact={browsing} />
       ) : null}
       {frameArea}
       {renderPhase(

@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { cn } from "../../lib/cn";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import { phoneticSpelling } from "../../lib/party/phonetic";
 import { BrandLogo } from "../layout/BrandLogo";
@@ -10,6 +11,13 @@ export interface PartyShellHeaderProps {
   readonly inviteUrl?: string | null;
   /** Hide the phonetic spelling (classic's join page does this). */
   readonly disablePhonetic?: boolean;
+  /**
+   * Compact/faded state (5cl.8): the party shell header stays mounted while
+   * the host browses games in the lobby, animating to a slightly smaller,
+   * slightly faded version so the game browser beneath is the focus. The
+   * transition is a pure CSS animation and respects prefers-reduced-motion.
+   */
+  readonly compact?: boolean;
 }
 
 /**
@@ -25,11 +33,15 @@ export interface PartyShellHeaderProps {
  * The invite details (QR / URL / copy row) live in the lobby's invite card
  * (10.5) instead of the header: the header stays the classic identity —
  * one title + phonetic only.
+ *
+ * 5cl.8: while the host browses games the header renders `compact` — same
+ * header, smaller logo + title and reduced opacity, animated via CSS.
  */
 export function PartyShellHeader({
   code,
   inviteUrl,
   disablePhonetic = false,
+  compact = false,
 }: PartyShellHeaderProps) {
   const pageTitle =
     code === null || code === undefined ? null : `${window.location.host}/${code.toLowerCase()}`;
@@ -45,13 +57,21 @@ export function PartyShellHeader({
   };
 
   return (
-    <header className="flex flex-col items-center gap-1 py-3 text-center">
-      <BrandLogo size={36} />
+    <header
+      className={cn(
+        "flex flex-col items-center gap-1 text-center transition-all duration-300 ease-out motion-reduce:transition-none",
+        compact ? "py-1.5 opacity-70" : "py-3",
+      )}
+    >
+      <BrandLogo size={compact ? 20 : 36} />
       {pageTitle !== null ? (
         <>
           <button
             type="button"
-            className="font-title mt-2 cursor-pointer text-4xl font-black text-base-content sm:text-5xl"
+            className={cn(
+              "font-title mt-2 cursor-pointer font-black text-base-content",
+              compact ? "text-2xl" : "text-4xl sm:text-5xl",
+            )}
             data-testid="party-title"
             onClick={() => void copyInvite()}
             disabled={inviteUrl === null}
