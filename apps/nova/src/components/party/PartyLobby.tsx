@@ -40,6 +40,9 @@ export interface PartyLobbyProps {
    *  the full-size party header can hide (GameBrowser owns the compact
    *  dimmed brand row while browsing). */
   onBrowseModeChange?: (browsing: boolean) => void;
+  /** 5cl.7: open straight into browse mode (details-page back returns
+   *  here via /party?browse=1; GameBrowser restores the category). */
+  initialBrowsing?: boolean;
 }
 
 /** Per-player tile border colors (10.8): each player gets a distinct color. */
@@ -135,11 +138,13 @@ export function PartyLobby({
   onRefreshDiagnostics,
   onKickMember,
   onBrowseModeChange,
+  initialBrowsing = false,
 }: PartyLobbyProps) {
   const [forceDialog, setForceDialog] = useState(false);
   // 7.43: "Browse games" swaps the lobby for the shared browse UI (pick
-  // mode) until the host picks a game or goes back.
-  const [browsing, setBrowsing] = useState(false);
+  // mode) until the host picks a game or goes back. 5cl.7: the details-
+  // page back button can land here already in browse mode (initialBrowsing).
+  const [browsing, setBrowsing] = useState(initialBrowsing);
   // 2t1.1: tell the shell when browse mode toggles so it can hide the
   // full-size party header (GameBrowser's compact dimmed brand row takes
   // over while browsing).
