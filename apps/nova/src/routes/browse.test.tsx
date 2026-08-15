@@ -4,18 +4,21 @@ import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
-import { readDraftSource } from "../lib/editor/draft-handoff";
 import { routeTree } from "../routeTree.gen";
 
 /**
  * Prebuilt-game browser tests (rocketcrab-9fv.7.7.2 / 7.23 / 10.9 / 2t1.1):
- * /browse lists classic external iframe games and Nova's own games together
- * with distinct badges. The game list is hidden until a category opens or the
- * user searches (10.9); opening a category swaps to the list alone (no
- * category buttons), and the ONE unified "back" button returns to the
- * category cards while a list is open, or leaves the browser (home) at the
- * top level. The "All games" box is gone (2t1.1): category boxes are the
- * only entry point, and the Nova box uses a lucide icon, not the brand mark.
+ * /browse lists classic external iframe games with the classic badge. The
+ * game list is hidden until a category opens or the user searches (10.9);
+ * opening a category swaps to the list alone (no category buttons), and the
+ * ONE unified "back" button returns to the category cards while a list is
+ * open, or leaves the browser (home) at the top level. The "All games" box
+ * is gone (2t1.1): category boxes are the only entry point.
+ *
+ * 5cl.10: Nova's example games were removed from the browser — it is
+ * classic-only, and the "My games" box links to the full-featured library
+ * page (5cl.12). 5cl.7: opening a game records the browse position, and the
+ * details page's back button returns to the same category (?view=).
  */
 
 function renderAt(path: string) {
@@ -35,6 +38,7 @@ function renderAt(path: string) {
 
 beforeEach(() => {
   window.history.pushState({}, "", "/");
+  window.sessionStorage.clear();
 });
 
 describe("/browse", () => {
@@ -43,45 +47,27 @@ describe("/browse", () => {
     expect(await screen.findByRole("heading", { name: "Games" })).toBeInTheDocument();
     // The brand row stays on the page (2t1.1).
     expect(screen.getByRole("link", { name: /rocketcrab\.com/ })).toBeInTheDocument();
-    // Category cards (My games + the classic boxes + Nova); no "All games".
-    expect(screen.getByRole("button", { name: /My games/ })).toBeInTheDocument();
+    // Category cards (My games + the classic boxes); no "All games".
+    expect(screen.getByRole("link", { name: /My games/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /netgames\.io/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /All games/ })).not.toBeInTheDocument();
     // The list is NOT shown by default.
     expect(screen.queryByText("Drawphone")).not.toBeInTheDocument();
-    expect(screen.queryByText("Nova Quiz")).not.toBeInTheDocument();
   });
 
-  it("lists classic and nova games in their category boxes with distinct badges", async () => {
+  it("lists classic games in their category boxes with the classic badge", async () => {
     renderAt("/browse");
-    // Nova games in the Nova box (lucide sparkle icon, no brand mark).
-    await userEvent.click(await screen.findByRole("button", { name: /Nova/ }));
-    expect(screen.getByText("Nova Quiz")).toBeInTheDocument();
-    expect(screen.getByText("Nova Drift")).toBeInTheDocument();
-    expect(screen.getAllByText("nova").length).toBeGreaterThan(0);
-
-    // Back to the category cards, then a classic box (Drawing).
-    await userEvent.click(screen.getByRole("button", { name: /back/i }));
-    await userEvent.click(screen.getByRole("button", { name: /Drawing/ }));
+    // A classic box (Drawing) opens its list with classic badges.
+    await userEvent.click(await screen.findByRole("button", { name: /Drawing/ }));
     expect(screen.getByText("Drawphone")).toBeInTheDocument();
     expect(screen.getAllByText("classic").length).toBeGreaterThan(0);
     // "by author" grey line per classic's card layout.
     expect(screen.getAllByText(/^by Tanner Krewson$/).length).toBeGreaterThan(0);
   });
 
-  it("badges classic games red and nova games blue (7.42)", async () => {
+  it("badges classic games red (7.42)", async () => {
     renderAt("/browse");
-    await screen.findByRole("button", { name: /Nova/ });
-    await userEvent.click(screen.getByRole("button", { name: /Nova/ }));
-    await screen.findByText("Nova Quiz");
-
-    const novaBadges = screen.getAllByText("nova");
-    expect(novaBadges.length).toBeGreaterThan(0);
-    for (const badge of novaBadges) {
-      expect(badge.className).toContain("badge-info");
-    }
-
-    await userEvent.click(screen.getByRole("button", { name: /back/i }));
+    await screen.findByRole("button", { name: /Drawing/ });
     await userEvent.click(screen.getByRole("button", { name: /Drawing/ }));
     await screen.findByText("Drawphone");
 
@@ -96,12 +82,12 @@ describe("/browse", () => {
     renderAt("/browse");
     await screen.findByRole("searchbox", { name: "Search games" });
 
-    await userEvent.type(screen.getByRole("searchbox", { name: "Search games" }), "quiz");
+    await userEvent.type(screen.getByRole("searchbox", { name: "Search games" }), "drawphone");
 
-    expect(screen.getByText("Nova Quiz")).toBeInTheDocument();
-    expect(screen.queryByText("Drawphone")).not.toBeInTheDocument();
+    expect(screen.getByText("Drawphone")).toBeInTheDocument();
+    expect(screen.queryByText("Avalon")).not.toBeInTheDocument();
     // Searching hides the category buttons (10.9).
-    expect(screen.queryByRole("button", { name: /My games/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /My games/ })).not.toBeInTheDocument();
   });
 
   it("filters games by category box and shows only the list (netgames.io)", async () => {
@@ -111,9 +97,8 @@ describe("/browse", () => {
 
     expect(screen.getByText("Avalon")).toBeInTheDocument();
     expect(screen.queryByText("Drawphone")).not.toBeInTheDocument();
-    expect(screen.queryByText("Nova Quiz")).not.toBeInTheDocument();
-    // Only the list shows: no category buttons, and the unified back.
-    expect(screen.queryByRole("button", { name: /My games/ })).not.toBeInTheDocument();
+    // Only the list shows: no category cards, and the unified back.
+    expect(screen.queryByRole("link", { name: /My games/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /back/i })).toBeInTheDocument();
   });
 
@@ -124,18 +109,8 @@ describe("/browse", () => {
     expect(screen.getByText("Avalon")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /back/i }));
-    expect(screen.getByRole("button", { name: /My games/ })).toBeInTheDocument();
+    expect(screen.getByRole("link", { name: /My games/ })).toBeInTheDocument();
     expect(screen.queryByText("Avalon")).not.toBeInTheDocument();
-  });
-
-  it("filters to Nova games via the Nova category box", async () => {
-    renderAt("/browse");
-    await screen.findByRole("button", { name: /Nova/ });
-    await userEvent.click(screen.getByRole("button", { name: /Nova/ }));
-
-    expect(screen.getByText("Nova Quiz")).toBeInTheDocument();
-    expect(screen.getByText("Nova Drift")).toBeInTheDocument();
-    expect(screen.queryByText("Drawphone")).not.toBeInTheDocument();
   });
 
   it("navigates home from the top-level back button (2t1.1)", async () => {
@@ -144,6 +119,35 @@ describe("/browse", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /back/i }));
     await waitFor(() => expect(router.state.location.pathname).toBe("/"));
+  });
+
+  it("links the My games box to the library page (5cl.12)", async () => {
+    renderAt("/browse");
+    const myGames = await screen.findByRole("link", { name: /My games/ });
+    expect(myGames.getAttribute("href")).toBe("/library");
+  });
+
+  it("returns to the category from the details page's back button (5cl.7)", async () => {
+    const router = renderAt("/browse");
+    await screen.findByRole("button", { name: /Drawing/ });
+    await userEvent.click(screen.getByRole("button", { name: /Drawing/ }));
+    // Opening a game from inside a category records the browse position.
+    const drawphone = (await screen.findAllByRole("link", { name: /Drawphone/ })).find(
+      (link) => link.getAttribute("href") === "/game/drawphone",
+    );
+    expect(drawphone).toBeDefined();
+    await userEvent.click(drawphone!);
+    await waitFor(() => expect(router.state.location.pathname).toBe("/game/drawphone"));
+
+    // The details page's back button returns to the category, not /browse.
+    const back = await screen.findByRole("link", { name: "Back to games" });
+    expect(back.getAttribute("href")).toBe("/browse?view=drawing&q=");
+
+    // Following it restores the Drawing category list.
+    await userEvent.click(back);
+    await waitFor(() => expect(router.state.location.pathname).toBe("/browse"));
+    expect(router.state.location.searchStr).toContain("view=drawing");
+    expect(await screen.findByText("Drawphone")).toBeInTheDocument();
   });
 });
 
@@ -179,34 +183,6 @@ describe("/game/:gameId", () => {
 
     expect(screen.getByRole("link", { name: /Read the guide/ })).toBeInTheDocument();
     expect(screen.queryByText(/In Drawphone, there are no winners/)).not.toBeInTheDocument();
-  });
-
-  it("opens a Nova game in the editor as a new draft", async () => {
-    renderAt("/game/nova-quiz");
-
-    const openButton = await screen.findByRole("button", { name: /Open in the editor/ });
-    await userEvent.click(openButton);
-
-    // The lazy source import + draft handoff resolve asynchronously.
-    await waitFor(() => expect(readDraftSource()?.source).toContain("nova.defineGame"));
-    const draft = readDraftSource();
-    expect(draft?.gameId.startsWith("draft-")).toBe(true);
-    expect(draft?.source).toContain("Nova Quiz");
-  });
-
-  it("starts a party with a Nova prebuilt game preselected (2t1.10)", async () => {
-    const router = renderAt("/game/nova-quiz");
-
-    const start = await screen.findByRole("button", { name: /Start party/ });
-    await userEvent.click(start);
-
-    // The source is handed to the party route via the source handoff and
-    // the URL carries the game id, mode, and title.
-    await waitFor(() => expect(router.state.location.pathname).toBe("/party"));
-    const search = router.state.location.search as Record<string, unknown>;
-    expect(search.gameId).toBe("nova-quiz");
-    expect(search.mode).toBe("state");
-    expect(search.title).toBe("Nova Quiz");
   });
 
   it("shows an error panel for an unknown game id", async () => {

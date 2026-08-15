@@ -21,7 +21,9 @@ export function AppLayout() {
       {/* Homepage starfield: always mounted so it can fade out when the user
           leaves "/" and back in on return (rocketcrab-5cl.4). */}
       <StarfieldBackground />
-      <main className="mx-auto w-full max-w-5xl flex-1 px-4 pb-12 pt-6">
+      {/* 5cl.15: max-w-7xl lets the editor (and other pages) use the
+          widescreen space instead of leaving blank gutters on both sides. */}
+      <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-12 pt-6">
         <Outlet />
       </main>
 
