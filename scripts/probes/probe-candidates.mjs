@@ -37,7 +37,16 @@ async function makeEvent(kind) {
   const content = `{"probe":true,"ts":${Date.now()}}`;
   const tags = [["x", `probe:${Date.now()}:${Math.random().toString(36).slice(2)}`]];
   const payload = { kind, tags, created_at: now(), content, pubkey };
-  const idHex = sha256hex(JSON.stringify([0, payload.pubkey, payload.created_at, payload.kind, payload.tags, payload.content]));
+  const idHex = sha256hex(
+    JSON.stringify([
+      0,
+      payload.pubkey,
+      payload.created_at,
+      payload.kind,
+      payload.tags,
+      payload.content,
+    ]),
+  );
   const sig = toHex(await schnorr.signAsync(new Uint8Array(Buffer.from(idHex, "hex")), secretKey));
   return { id: idHex, sig, ...payload };
 }
@@ -48,9 +57,33 @@ function probeRelay(url, kinds) {
     let inBurst = false;
     let settled = false;
     let ws;
-    const timer = setTimeout(() => { if (!settled) { settled = true; out.error = "timeout"; try { ws?.close(); } catch {} resolve(out); } }, 10000);
-    const finish = () => { if (!settled) { settled = true; clearTimeout(timer); try { ws?.close(); } catch {} resolve(out); } };
-    try { ws = new WebSocket(url); } catch (e) { out.error = String(e); finish(); return; }
+    const timer = setTimeout(() => {
+      if (!settled) {
+        settled = true;
+        out.error = "timeout";
+        try {
+          ws?.close();
+        } catch {}
+        resolve(out);
+      }
+    }, 10000);
+    const finish = () => {
+      if (!settled) {
+        settled = true;
+        clearTimeout(timer);
+        try {
+          ws?.close();
+        } catch {}
+        resolve(out);
+      }
+    };
+    try {
+      ws = new WebSocket(url);
+    } catch (_e) {
+      out.error = String(e);
+      finish();
+      return;
+    }
 
     const pending = new Map();
     ws.onopen = () => {
@@ -61,7 +94,10 @@ function probeRelay(url, kinds) {
           out.kinds[kind] = { sent: true, eventId: ev.id };
           const pr = new Promise((r) => {
             const t = setTimeout(() => r({ status: "no-ok", reason: "timeout" }), 6000);
-            pending.set(ev.id, (v) => { clearTimeout(t); r(v); });
+            pending.set(ev.id, (v) => {
+              clearTimeout(t);
+              r(v);
+            });
           });
           ws.send(JSON.stringify(["EVENT", ev]));
           out.kinds[kind] = { ...out.kinds[kind], ...(await pr) };
@@ -78,11 +114,20 @@ function probeRelay(url, kinds) {
         setTimeout(finish, 200);
       })();
     };
-    ws.onerror = () => { out.error = out.error ?? "websocket error"; };
-    ws.onclose = () => { if (!out.connected) out.error = out.error ?? "closed before open"; finish(); };
+    ws.onerror = () => {
+      out.error = out.error ?? "websocket error";
+    };
+    ws.onclose = () => {
+      if (!out.connected) out.error = out.error ?? "closed before open";
+      finish();
+    };
     ws.onmessage = (e) => {
       let msg;
-      try { msg = JSON.parse(String(e.data)); } catch { return; }
+      try {
+        msg = JSON.parse(String(e.data));
+      } catch {
+        return;
+      }
       if (out.info === null) out.info = String(e.data).slice(0, 200);
       const [type, ...rest] = msg;
       if (type === "OK") {
@@ -103,11 +148,14 @@ function probeRelay(url, kinds) {
 async function fetchNip11(url) {
   const httpUrl = url.replace(/^wss:\/\//, "https://").replace(/^ws:\/\//, "http://");
   try {
-    const res = await fetch(httpUrl, { headers: { Accept: "application/nostr+json", "User-Agent": "rocketcrab-probe/0.1" }, signal: AbortSignal.timeout(8000) });
+    const res = await fetch(httpUrl, {
+      headers: { Accept: "application/nostr+json", "User-Agent": "rocketcrab-probe/0.1" },
+      signal: AbortSignal.timeout(8000),
+    });
     if (!res.ok) return { error: `HTTP ${res.status}` };
     const j = await res.json();
     return { name: j.name, nips: j.supported_nips };
-  } catch (e) {
+  } catch (_e) {
     return { error: String(e).slice(0, 120) };
   }
 }
@@ -116,14 +164,27 @@ async function main() {
   for (const url of CANDIDATES) {
     const nip = await fetchNip11(url);
     const r = await probeRelay(url, [22774, 22734]);
-    const k = Object.entries(r.kinds).map(([kind, v]) => `${kind}=${v.status ?? "?"}${v.reason && v.status !== "accepted" ? `("${v.reason}")` : ""}`).join(" ");
+    const k = Object.entries(r.kinds)
+      .map(
+        ([kind, v]) =>
+          `${kind}=${v.status ?? "?"}${v.reason && v.status !== "accepted" ? `("${v.reason}")` : ""}`,
+      )
+      .join(" ");
     const okBurst = (r.burst ?? []).filter((b) => b.ok).length;
-    const rejBurst = (r.burst ?? []).filter((b) => !b.ok).map((b) => b.reason).slice(0, 2);
+    const rejBurst = (r.burst ?? [])
+      .filter((b) => !b.ok)
+      .map((b) => b.reason)
+      .slice(0, 2);
     console.log(`${url}`);
     console.log(`  nip11: ${nip.name ?? "?"} nips=[${nip.nips?.join(",") ?? nip.error}]`);
-    console.log(`  connect=${r.connected}${r.error ? ` err=${r.error}` : ""}  ${k}  burst10: ${okBurst} ok${rejBurst.length ? ` rejects=${JSON.stringify(rejBurst)}` : ""}`);
+    console.log(
+      `  connect=${r.connected}${r.error ? ` err=${r.error}` : ""}  ${k}  burst10: ${okBurst} ok${rejBurst.length ? ` rejects=${JSON.stringify(rejBurst)}` : ""}`,
+    );
     await sleep(400);
   }
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
