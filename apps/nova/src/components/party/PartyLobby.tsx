@@ -4,7 +4,6 @@ import {
   Check,
   Copy,
   Gamepad2,
-  Link2,
   LogOut,
   PartyPopper,
   Pencil,
@@ -68,12 +67,14 @@ function roleLabels(member: PartyMemberView, isCreator: boolean): string {
 }
 
 /**
- * Tiny transfer-state indicator inside a player tile (10.8 / 11.9): only
- * genuinely operational states show — an in-flight transfer bar, a
- * failure, or the muted "waiting for game" gap. The always-green "Game
- * ready" badge is gone (has-the-game is the default end state, and
- * readiness belongs to the start flow, which the start button + blocked
- * reason already communicate). The connection dot carries presence.
+ * Tiny transfer-state indicator inside a player tile (10.8 / 11.9,
+ * redesigned 5cl.9): only genuinely operational states show — an
+ * in-flight transfer bar, a failure, or an incompatibility. The always-
+ * green "Game ready" badge is gone (has-the-game is the default end
+ * state, and readiness belongs to the start flow, which the start button
+ * + blocked reason already communicate), and the quiet "Waiting for
+ * game" gap is gone too (5cl.9): waiting/none tiles render nothing. The
+ * connection dot carries presence.
  */
 function transferIndicator(member: PartyMemberView) {
   switch (member.transferState) {
@@ -92,29 +93,17 @@ function transferIndicator(member: PartyMemberView) {
       return <span className="text-[10px] font-bold text-error">Incompatible</span>;
     case "waiting":
     case "none":
-      return <span className="text-[10px] font-bold text-base-content/40">Waiting for game</span>;
+      // 5cl.9: no status text while waiting — the connection dot carries
+      // presence and the transfer bar appears only once it is moving.
+      return null;
     case "complete":
       return null;
   }
 }
 
-/**
- * Unified copy for the ended-state banner (11.8): every "game ended"
- * variant (host_closed / user_exit / error / unknown) reads the same way,
- * with correct copy per reason — one banner owns all of them. The
- * host_closed-specific sentence was removed (2t1.9) — that reason now
- * reads the generic ended copy like every other.
- */
-function endedBannerText(reason: string): string {
-  switch (reason) {
-    case "error":
-      return "The game ended due to an error. The party is still open — leave when you're done.";
-    default:
-      return "The game ended. The party is still open — leave when you're done.";
-  }
-}
-
-/** True for engine end notices — owned by the ended-state banner (11.8). */
+/** True for engine end notices (5cl.9): the lobby shows NO "game ended"
+ *  alert at all — the ended-state banner is gone, and raw ended notices
+ *  are filtered out of the notice banner below. */
 function isEndedNotice(message: string): boolean {
   return message.startsWith("The game ended");
 }
@@ -180,12 +169,21 @@ export function PartyLobby({
   // name-editing page as the pencil (/join?edit=name).
   const needsName = getSavedPlayerName() === null;
 
-  // 2t1.9: role-aware no-game message — the host must pick a game, guests
-  // wait for the host.
-  const noGameMessage =
-    state.role === "creator"
-      ? "As the host, you must select a game."
-      : "Waiting for the host to select a game";
+  // 2t1.9 + 5cl.9: role-aware no-game message — the host must pick a
+  // game, guests wait for the HOST BY NAME. The engine exposes no creator
+  // member id; the creator is installed as the initial rendezvous greeter
+  // (createParty passes its own memberId as initialGreeterMemberId), so
+  // greeterMemberId is the best available signal for who the host is. If
+  // the greeter is somehow not a member, fall back to the generic wording.
+  const hostName =
+    state.members.find((member) => member.memberId === state.greeterMemberId)?.displayName ?? null;
+  let noGameMessage = "As the host, you must select a game.";
+  if (state.role !== "creator") {
+    noGameMessage =
+      hostName === null
+        ? "Waiting for the host to select a game"
+        : `Waiting for ${hostName} to select a game`;
+  }
 
   // The lobby page title: origin + four-letter code, e.g. "rocketcrab.com/abcd".
   // The full invite URL (with the session secret in the fragment) is never
@@ -204,10 +202,11 @@ export function PartyLobby({
     };
   }, [pageTitle]);
 
-  // 11.8: the notice banner shows the LATEST relevant notice only (a
-  // capped, deduped set from the engine) — never a growing list of
-  // identical alerts. Once the game ended, the ended-state banner owns the
-  // status area and the notice banner hides entirely.
+  // 11.8 / 5cl.9: the notice banner shows the LATEST relevant notice only
+  // (a capped, deduped set from the engine) — never a growing list of
+  // identical alerts. End notices are filtered out (no "game ended" alert
+  // at all, 5cl.9) and once the game ended the notice banner hides
+  // entirely.
   const latestNotice =
     state.endedReason !== null || state.notices.length === 0
       ? null
@@ -218,21 +217,6 @@ export function PartyLobby({
     const ok = await writeToClipboard(state.inviteUrl);
     if (ok) {
       toast.success("Invite link copied.");
-    } else {
-      toast.error("Couldn't copy the link — try again.");
-    }
-  };
-
-  // 9fv.8: the SHORT join URL (origin + "/" + code) is a secondary
-  // shareable affordance — no secret in the path (codes are public
-  // rendezvous namespaces, ADR-0004; the secret stays fragment-only,
-  // ADR-0011). The full secret invite URL stays the primary invite for
-  // Copy URL and the QR code.
-  const copyShortLink = async () => {
-    if (state.shortInviteUrl === null) return;
-    const ok = await writeToClipboard(state.shortInviteUrl);
-    if (ok) {
-      toast.success("Short link copied.");
     } else {
       toast.error("Couldn't copy the link — try again.");
     }
@@ -285,25 +269,10 @@ export function PartyLobby({
             QR Code
           </Button>
         </div>
-        {/* 9fv.8: the short link is a quieter SECONDARY affordance below the
-            primary copy/QR row — origin + code only, no secret. The URL
-            itself is never rendered as text (it equals the header title,
-            10.5/11.6); it is copy-only. */}
-        <div className="flex flex-col items-center gap-1">
-          <Button
-            variant="neutral"
-            soft
-            size="md"
-            onClick={() => void copyShortLink()}
-            disabled={state.shortInviteUrl === null}
-          >
-            <Link2 className="h-4 w-4" aria-hidden="true" />
-            Copy short link
-          </Button>
-          <p className="text-xs text-base-content/50">
-            Easy to type or read aloud — no secret included.
-          </p>
-        </div>
+        {/* 5cl.2: the separate "Copy short link" affordance is gone —
+            copying always copies the LONG secret URL. The short URL still
+            works as an entry point (join-by-code); it just isn't what
+            gets copied. */}
       </section>
       {/* 10.6: the welcome card — the lobby's main heading. A soft ambient
           glow behind the content, then what's selected and whose turn it
@@ -356,15 +325,6 @@ export function PartyLobby({
             Set your name
           </Link>
         </section>
-      ) : null}
-      {/* 11.8: ONE unified ended-state banner — every "game ended" variant
-          (host_closed / user_exit / error) reads the same way with copy per
-          reason; the engine's raw ended notices are filtered out of the
-          notice banner below (this banner owns that state). */}
-      {state.endedReason !== null ? (
-        <div role="alert" className="alert alert-outline alert-info">
-          <span className="text-sm font-semibold">{endedBannerText(state.endedReason)}</span>
-        </div>
       ) : null}
       {/* 10.7: the greeter and authority role badges are gone from the
           lobby (diagnostic only) — see the diagnostics panel below. */}
@@ -438,8 +398,8 @@ export function PartyLobby({
       </section>
       {/* The blocked-reason copy (10.7): shown as a styled warning alert;
           the "Pick a game before starting the party." message is gone —
-          the welcome card covers the no-game case. The ended case is
-          covered by the unified ended banner above (11.8). */}
+          the welcome card covers the no-game case. The ended case shows
+          no alert at all (5cl.9). */}
       {state.game !== null &&
       state.endedReason === null &&
       !state.canStart &&
@@ -449,14 +409,16 @@ export function PartyLobby({
           <span className="text-sm font-semibold">{state.startBlockedReason}</span>
         </div>
       ) : null}
-      {/* 10.8 / 11.9, redesigned 2t1.9: the player grid — compact rows
-          that use the tile width instead of stacking everything vertically:
-          presence dot + name (+ role label / transfer detail) on the left,
-          transfer state + actions (pencil / kick) on the right, a
-          per-player border color, and ONE meaningful status: the connection
-          dot + the transfer state (progress bar / failure / waiting). The
-          pencil is a LINK to the shared name-editing page (/join?edit=name)
-          — the in-tile edit form is gone (2t1.9). */}
+      {/* 10.8 / 11.9, redesigned 2t1.9 + 5cl.9: the player grid — compact
+          rows that use the tile width instead of stacking everything
+          vertically: presence dot + name (+ role label / transfer detail)
+          on the left, transfer state + actions (pencil / kick) on the
+          right, a per-player border color, and ONE meaningful status: the
+          connection dot + the transfer state (progress bar / failure). The
+          name is larger with roomier padding (5cl.9) and the "Waiting for
+          game" gap is gone. The pencil is a LINK to the shared
+          name-editing page (/join?edit=name) — the in-tile edit form is
+          gone (2t1.9). */}
       <details
         className="collapse collapse-arrow rounded-box border-2 border-base-300 bg-base-100"
         open
@@ -472,35 +434,35 @@ export function PartyLobby({
                 <li
                   key={member.memberId}
                   data-testid={`party-member-${member.memberId}`}
-                  className={`flex min-w-0 items-center gap-2.5 rounded-box border-2 bg-base-100 p-2.5 ${playerBorderColor(index)}`}
+                  className={`flex min-w-0 items-center gap-3 rounded-box border-2 bg-base-100 p-3.5 ${playerBorderColor(index)}`}
                 >
                   {/* Presence + identity on the left. */}
-                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                  <div className="flex min-w-0 flex-1 items-center gap-2.5">
                     {member.connected ? (
                       <span
                         title="Connected"
-                        className="inline-block h-2 w-2 shrink-0 rounded-full bg-success"
+                        className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-success"
                         aria-hidden="true"
                       />
                     ) : (
                       <span
                         title="Disconnected"
-                        className="inline-block h-2 w-2 shrink-0 rounded-full bg-error"
+                        className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-error"
                         aria-hidden="true"
                       />
                     )}
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-black leading-tight">
+                      <p className="truncate text-lg font-black leading-tight">
                         {member.displayName}
                       </p>
                       {roleLabel !== "" ? (
-                        <p className="truncate text-[10px] font-semibold text-base-content/60">
+                        <p className="truncate text-xs font-semibold text-base-content/60">
                           {roleLabel}
                         </p>
                       ) : null}
                       {member.transferDetail !== null && member.transferState !== "complete" ? (
                         <p
-                          className="truncate text-[10px] leading-tight text-base-content/50"
+                          className="truncate text-xs leading-tight text-base-content/50"
                           title={member.transferDetail}
                         >
                           {member.transferDetail}
