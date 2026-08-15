@@ -337,7 +337,15 @@ export function PartyPlayShell({
               <p className="font-black">Pick a game</p>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
-              <GameBrowser compact onPick={onPickPrebuilt} onPickSaved={onPickGame} />
+              <GameBrowser
+                compact
+                onPick={onPickPrebuilt}
+                onPickSaved={onPickGame}
+                // 2t1.1 coordination: the unified back button closes the
+                // in-game browse panel (the fallback navigate would be a
+                // no-op from the party route).
+                onBack={() => setPanel(null)}
+              />
             </div>
           </div>
         ) : null}
