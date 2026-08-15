@@ -116,7 +116,7 @@ export function PartyPlayShell({
           <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <button
               type="button"
-              className="font-title whitespace-nowrap text-sm font-black tracking-wide text-base-content"
+              className="font-title whitespace-nowrap text-lg font-black tracking-wide text-base-content md:text-xl"
               onClick={() => void copyInvite()}
               disabled={state.inviteUrl === null}
               title={state.inviteUrl === null ? roomUrl : "Copy the invite link"}
@@ -337,7 +337,15 @@ export function PartyPlayShell({
               <p className="font-black">Pick a game</p>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
-              <GameBrowser compact onPick={onPickPrebuilt} onPickSaved={onPickGame} />
+              <GameBrowser
+                compact
+                onPick={onPickPrebuilt}
+                onPickSaved={onPickGame}
+                // 2t1.1 coordination: the unified back button closes the
+                // in-game browse panel (the fallback navigate would be a
+                // no-op from the party route).
+                onBack={() => setPanel(null)}
+              />
             </div>
           </div>
         ) : null}
