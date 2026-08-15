@@ -1,8 +1,19 @@
-import { ArrowLeft, BookOpen, Gamepad2, Menu, OctagonX, RotateCcw, Users } from "lucide-react";
+import {
+  ArrowLeft,
+  BookOpen,
+  Eraser,
+  Gamepad2,
+  Menu,
+  OctagonX,
+  RotateCcw,
+  Terminal,
+  Users,
+} from "lucide-react";
 import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { BrowseEntry } from "../../lib/browse";
 import { writeToClipboard } from "../../lib/editor/clipboard";
+import { cn } from "../../lib/cn";
 import type { PartyEngineState } from "../../lib/party/engine";
 import { BrandLogo } from "../layout/BrandLogo";
 import { ThemeSelector } from "../layout/ThemeSelector";
@@ -26,10 +37,13 @@ export interface PartyPlayShellProps {
   onPickGame: (gameId: string) => void;
   /** Pick a prebuilt classic/nova game for the party (7.43 shared browse). */
   onPickPrebuilt: (entry: BrowseEntry) => void;
+  /** 5cl.11: clear the runtime console ring buffer (Logs panel). */
+  onClearLogs?: () => void;
 }
 
-/** Which single panel is open (7.38: the panels are mutually exclusive). */
-type PlayShellPanel = "menu" | "players" | "browse" | null;
+/** Which single panel is open (7.38: the panels are mutually exclusive).
+ *  5cl.11: "logs" is the in-game runtime console panel (nova games only). */
+type PlayShellPanel = "menu" | "players" | "browse" | "logs" | null;
 
 /**
  * The play shell (P4 / 7.4, redesigned for classic parity in 7.38): the
@@ -56,6 +70,7 @@ export function PartyPlayShell({
   onKickMember,
   onPickGame,
   onPickPrebuilt,
+  onClearLogs,
 }: PartyPlayShellProps) {
   // 7.38: the top bar can collapse to just the floating logo (classic's
   // minimal-chrome mode) so the game gets the whole screen.
@@ -197,6 +212,21 @@ export function PartyPlayShell({
                   About this game
                 </button>
               </li>
+              {/* 5cl.11: runtime console logs — nova-mode games only (classic
+                  games run in their own iframe and emit nothing here). */}
+              {state.classicGame === null && state.game !== null ? (
+                <li>
+                  <button
+                    type="button"
+                    role="menuitem"
+                    className="flex w-full items-center gap-2 rounded-box px-3 py-2 text-sm font-bold hover:bg-base-200"
+                    onClick={() => setPanel("logs")}
+                  >
+                    <Terminal className="h-4 w-4" aria-hidden="true" />
+                    Logs
+                  </button>
+                </li>
+              ) : null}
               <li>
                 <button
                   type="button"
@@ -316,6 +346,85 @@ export function PartyPlayShell({
                     </li>
                   ))}
                 </ul>
+              </div>
+            </div>
+          </>
+        ) : null}
+
+        {/* 5cl.11: the Logs panel — the game's runtime console output for
+            the user's own (nova-mode) games. Compact overlay like the
+            players popup; the game keeps running underneath. */}
+        {panel === "logs" ? (
+          <>
+            <div
+              className="absolute inset-0 z-40"
+              onClick={() => setPanel(null)}
+              aria-hidden="true"
+              data-testid="logs-panel-backdrop"
+            />
+            <div
+              className="absolute left-1/2 top-3 z-50 flex max-h-[calc(100%-1.5rem)] w-[min(32rem,calc(100%-1.5rem))] -translate-x-1/2 flex-col overflow-hidden rounded-box border-2 border-base-300 bg-base-100 shadow-xl"
+              role="dialog"
+              aria-label="Logs"
+            >
+              <div className="flex items-center gap-2 border-b-2 border-base-300 px-3 py-2">
+                <button
+                  type="button"
+                  className="btn btn-sm"
+                  onClick={() => setPanel(null)}
+                  aria-label="Back to the game"
+                >
+                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                  Back
+                </button>
+                <p className="font-black">Logs</p>
+                <div className="min-w-0 flex-1" />
+                <button
+                  type="button"
+                  className="btn btn-sm btn-outline"
+                  onClick={() => onClearLogs?.()}
+                  disabled={state.runtimeLogs.length === 0}
+                  title="Clear these logs"
+                >
+                  <Eraser className="h-4 w-4" aria-hidden="true" />
+                  Clear
+                </button>
+              </div>
+              <div className="min-h-0 overflow-y-auto p-3">
+                {state.runtimeLogs.length === 0 ? (
+                  <p className="rounded-box border-2 border-dashed border-base-300 p-6 text-center text-sm text-base-content/60">
+                    No logs yet — the game&apos;s console output will appear here.
+                  </p>
+                ) : (
+                  <ul className="flex flex-col gap-1.5 font-mono text-xs">
+                    {state.runtimeLogs.map((entry) => (
+                      <li
+                        key={entry.id}
+                        className={cn(
+                          "break-words rounded-box border-2 border-base-300 bg-base-200/50 px-2.5 py-1.5",
+                          entry.level === "error" && "border-error/40 text-error",
+                          entry.level === "warn" && "border-warning/40 text-warning",
+                        )}
+                      >
+                        <span className="mr-2 text-base-content/40">
+                          {new Date(entry.timestamp).toLocaleTimeString([], {
+                            hour12: false,
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            second: "2-digit",
+                          })}
+                        </span>
+                        <span className="font-bold uppercase">{entry.level}</span>
+                        <span className="ml-2">{entry.message}</span>
+                        {entry.details !== undefined ? (
+                          <pre className="mt-1 whitespace-pre-wrap text-[10px] text-base-content/60">
+                            {entry.details}
+                          </pre>
+                        ) : null}
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
           </>
