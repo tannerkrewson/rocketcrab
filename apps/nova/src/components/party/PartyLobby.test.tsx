@@ -68,6 +68,7 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     amGreeter: true,
     authorityMemberId: "member-a",
     inviteUrl: INVITE_URL,
+    shortInviteUrl: "http://localhost:5173/abcd",
     connectionState: "connected",
     canStart: false,
     canForceStart: false,
@@ -582,6 +583,29 @@ describe("PartyLobby", () => {
     await userEvent.click(screen.getByRole("button", { name: /copy url/i }));
     expect(writeText).toHaveBeenCalledWith(INVITE_URL);
     Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+  });
+
+  it("copies the SHORT join URL (origin + code, no secret) from Copy short link (9fv.8)", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    await renderLobby(makeState());
+    await userEvent.click(screen.getByRole("button", { name: /copy short link/i }));
+    // Origin + lowercase code only — never the secret (ADR-0011).
+    expect(writeText).toHaveBeenCalledWith("http://localhost:5173/abcd");
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+  });
+
+  it("shows the short-link affordance without rendering the URL or any secret (9fv.8)", async () => {
+    await renderLobby(makeState());
+    expect(screen.getByRole("button", { name: /copy short link/i })).toBeInTheDocument();
+    expect(screen.getByText(/easy to type or read aloud/i)).toBeInTheDocument();
+    // The short URL is never rendered as text (it equals the header title,
+    // 10.5/11.6) and no secret appears anywhere.
+    expect(screen.queryByText("http://localhost:5173/abcd")).not.toBeInTheDocument();
+    expect(screen.queryByText(/invite-secret/)).not.toBeInTheDocument();
   });
 
   it("opens the QR code in a modal with the safe label (10.5)", async () => {

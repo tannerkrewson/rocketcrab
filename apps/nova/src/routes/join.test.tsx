@@ -33,6 +33,7 @@ const IDLE_STATE: PartyEngineState = {
   amGreeter: false,
   authorityMemberId: null,
   inviteUrl: null,
+  shortInviteUrl: null,
   connectionState: "idle",
   canStart: false,
   canForceStart: false,
