@@ -67,6 +67,7 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     amGreeter: true,
     authorityMemberId: "member-a",
     inviteUrl: "http://localhost:5173/join#code=ABCD&secret=invite-secret",
+    shortInviteUrl: "http://localhost:5173/abcd",
     connectionState: "connected",
     canStart: false,
     canForceStart: false,

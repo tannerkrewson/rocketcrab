@@ -9,6 +9,12 @@ document in one code block, pastes it into Nova, tests several simulated players
 on one page, saves the game in their browser, creates a party with a four-letter
 code, and plays through a Nova-managed peer-to-peer session.
 
+Joining a party works two ways: the short link `https://rocketcrab.com/<code>`
+(four-letter code as a path segment — a public rendezvous namespace, never a
+secret) for typing or voice, or the full secret invite link behind the lobby's
+Copy URL / QR buttons for one-tap direct join. The session secret travels only
+in the URL fragment, never in a path or query (ADR-0011).
+
 Nova does not generate games itself, and it does not require game creators to
 install tools, understand code, deploy a website, or create a repository.
 

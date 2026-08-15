@@ -4,6 +4,7 @@ import {
   Check,
   Copy,
   Gamepad2,
+  Link2,
   LogOut,
   PartyPopper,
   Pencil,
@@ -222,6 +223,21 @@ export function PartyLobby({
     }
   };
 
+  // 9fv.8: the SHORT join URL (origin + "/" + code) is a secondary
+  // shareable affordance — no secret in the path (codes are public
+  // rendezvous namespaces, ADR-0004; the secret stays fragment-only,
+  // ADR-0011). The full secret invite URL stays the primary invite for
+  // Copy URL and the QR code.
+  const copyShortLink = async () => {
+    if (state.shortInviteUrl === null) return;
+    const ok = await writeToClipboard(state.shortInviteUrl);
+    if (ok) {
+      toast.success("Short link copied.");
+    } else {
+      toast.error("Couldn't copy the link — try again.");
+    }
+  };
+
   if (browsing) {
     // 10.9: browse mode — selecting a game ALWAYS opens its details page
     // (/game/$gameId, saved games included); the pick happens there and
@@ -268,6 +284,25 @@ export function PartyLobby({
             <QrCode className="h-4 w-4" aria-hidden="true" />
             QR Code
           </Button>
+        </div>
+        {/* 9fv.8: the short link is a quieter SECONDARY affordance below the
+            primary copy/QR row — origin + code only, no secret. The URL
+            itself is never rendered as text (it equals the header title,
+            10.5/11.6); it is copy-only. */}
+        <div className="flex flex-col items-center gap-1">
+          <Button
+            variant="neutral"
+            soft
+            size="md"
+            onClick={() => void copyShortLink()}
+            disabled={state.shortInviteUrl === null}
+          >
+            <Link2 className="h-4 w-4" aria-hidden="true" />
+            Copy short link
+          </Button>
+          <p className="text-xs text-base-content/50">
+            Easy to type or read aloud — no secret included.
+          </p>
         </div>
       </section>
       {/* 10.6: the welcome card — the lobby's main heading. A soft ambient
