@@ -414,7 +414,11 @@ describe("PartyLobby", () => {
     const state = makeState({ game: null, canStart: false, canForceStart: false });
     await renderLobby(state);
     await userEvent.click(screen.getByRole("button", { name: /browse games/i }));
-    await userEvent.click(screen.getByRole("button", { name: /All games/ }));
+    // 2t1.1: in-party browsing keeps a small, faded brand row so the
+    // rocketcrab URL + logo stay visible while the browser is the focus.
+    expect(screen.getByTestId("browser-brand-row")).toBeInTheDocument();
+    // No "All games" box (2t1.1): Protobowl lives in the Trivia box.
+    await userEvent.click(screen.getByRole("button", { name: /Trivia/ }));
     const protobowl = await screen.findByRole("link", { name: /Protobowl/ });
     expect(protobowl.getAttribute("href")).toBe("/game/protobowl");
   });

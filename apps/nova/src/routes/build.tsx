@@ -5,11 +5,14 @@ import {
   Check,
   ClipboardCopy,
   ClipboardPaste,
+  Code2,
   ScrollText,
   Sparkles,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
+import { BrandHeader } from "../components/layout/BrandHeader";
+import { BrandLogo } from "../components/layout/BrandLogo";
 import { Button, buttonStyles } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { writeToClipboard } from "../lib/editor/clipboard";
@@ -24,13 +27,15 @@ const NOVA_API_REFERENCE_URL =
   "https://github.com/tannerkrewson/rocketcrab/blob/docs/api/nova-api-ai-reference.md";
 
 /**
- * The build-a-game gateway (rocketcrab-9fv.10.11): a centered, three-step
- * introduction to the master-prompt flow — copy the prompt, chat with any AI
- * about your idea, and paste the resulting HTML into the editor. The
- * generation flow is unchanged (7.44): one copyable prompt that works in any
- * AI chat service, and the editor is the paste target (no paste box here).
- * The page ends at the master-prompt card — the old "start another way"
- * row was removed (9fv.11.14) because the editor step is unavoidable.
+ * The build-a-game gateway (rocketcrab-9fv.10.11 / 2t1.7): a centered,
+ * three-step introduction to the master-prompt flow — copy the prompt, chat
+ * with any AI about your idea, and paste the resulting HTML into the editor.
+ * The generation flow is unchanged (7.44): one copyable prompt that works
+ * in any AI chat service, and the editor is the paste target (no paste box
+ * here). The page ends at the master-prompt card (9fv.11.14) and now closes
+ * with a prominent "Open the editor" CTA (2t1.7) — the editor is the
+ * unavoidable next step, so it gets a real button instead of a dead end.
+ * The hero carries the nova brand treatment (rocketcrab mark + info glow).
  */
 export function BuildPage() {
   const prompt = useMemo(() => buildMasterPrompt(), []);
@@ -48,21 +53,27 @@ export function BuildPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-10 text-center">
-      <Link to="/" className={buttonStyles("outline", "md", "self-start")} title="Back to home">
+      <BrandHeader />
+      <Link to="/" className={buttonStyles("outline", "md", "self-start")}>
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        Back to home
+        back
       </Link>
 
-      <header className="flex flex-col items-center gap-3 pt-4">
-        <span className="text-5xl" aria-hidden="true">
-          🎮
+      <header className="flex flex-col items-center gap-5 pt-4">
+        <span
+          className="glow-info flex h-20 w-20 items-center justify-center rounded-box border-2 border-info/40 bg-base-100"
+          aria-hidden="true"
+        >
+          <BrandLogo size={40} />
         </span>
-        <h1 className="text-4xl font-black tracking-tight text-base-content sm:text-5xl">
-          Build a game
-        </h1>
-        <p className="max-w-md text-lg leading-relaxed text-base-content/70">
-          You bring the idea — the AI writes the code, Nova brings the players.
-        </p>
+        <div className="flex flex-col items-center gap-2">
+          <h1 className="text-glow-info text-4xl font-black tracking-tight text-base-content sm:text-5xl">
+            Build a game
+          </h1>
+          <p className="max-w-md text-lg leading-relaxed text-base-content/70">
+            You bring the idea — the AI writes the code, Nova brings the players.
+          </p>
+        </div>
       </header>
 
       <ol
@@ -162,6 +173,26 @@ export function BuildPage() {
             .
           </p>
         </Card>
+      </section>
+
+      {/* 2t1.7: the editor is the unavoidable next step — a real, prominent
+          CTA instead of a dead end. The master prompt itself stays on this
+          page (it's an AI prompt, not game HTML, so nothing is handed off
+          to the editor; it opens blank, ready to paste). */}
+      <section
+        aria-label="Next step"
+        className="flex w-full flex-col items-center gap-3 rounded-box border-2 border-info/40 bg-base-100 p-8 text-center"
+      >
+        <Code2 className="h-8 w-8 text-info" aria-hidden="true" />
+        <h2 className="text-2xl font-black">Ready for your game?</h2>
+        <p className="max-w-md text-base-content/70">
+          When your AI chat returns the HTML, open the editor and paste it there to run it and play
+          it with friends.
+        </p>
+        <Link to="/editor" className={buttonStyles("primary", "lg", "mt-1 sm:px-16")}>
+          <Code2 className="h-5 w-5" aria-hidden="true" />
+          Open the editor
+        </Link>
       </section>
     </div>
   );
