@@ -52,7 +52,7 @@ export function PartyReconnectScreen({ state, onReconnect, onLeave }: PartyRecon
             </>
           )}
         </Button>
-        <Button variant="outline" size="md" className="w-full" onClick={onLeave}>
+        <Button variant="danger" soft size="md" className="w-full" onClick={onLeave}>
           Leave party
         </Button>
       </div>

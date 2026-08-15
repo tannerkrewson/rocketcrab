@@ -116,7 +116,7 @@ export function PartyPlayShell({
           <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <button
               type="button"
-              className="font-title whitespace-nowrap text-lg font-black tracking-wide text-base-content md:text-xl"
+              className="font-title whitespace-nowrap text-lg font-black text-base-content md:text-xl"
               onClick={() => void copyInvite()}
               disabled={state.inviteUrl === null}
               title={state.inviteUrl === null ? roomUrl : "Copy the invite link"}
@@ -396,7 +396,7 @@ export function PartyPlayShell({
               emergency stop — game code cannot disable it.
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setConfirmEnd(false)}>
+              <Button variant="neutral" soft onClick={() => setConfirmEnd(false)}>
                 Keep playing
               </Button>
               <Button
@@ -427,7 +427,7 @@ export function PartyPlayShell({
               will be lost. Are you sure?
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setConfirmReloadAll(false)}>
+              <Button variant="neutral" soft onClick={() => setConfirmReloadAll(false)}>
                 Cancel
               </Button>
               <Button

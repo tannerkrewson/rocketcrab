@@ -37,7 +37,7 @@ function HomeComponent() {
       <section className="flex flex-col items-center gap-3 text-center">
         <BrandLogo size={80} />
         <h1
-          className="font-title cursor-pointer text-4xl font-black tracking-tight text-base-content transition-transform active:scale-95 sm:text-5xl"
+          className="font-title cursor-pointer text-4xl font-black text-base-content transition-transform active:scale-95 sm:text-5xl"
           title="Copy rocketcrab.com to your clipboard"
           tabIndex={0}
           onClick={() => void handleCopyTitle()}
@@ -54,24 +54,27 @@ function HomeComponent() {
         {/* rocketcrab-2t1.8: dotted info alert below the tagline, with the
             same soft glowing-orb family as the lobby idle orbs (info color)
             and a few gently twinkling stars. Purely decorative (aria-hidden)
-            and CSS-only, scoped so the homepage stays self-contained. */}
-        <div
-          role="status"
-          className="alert alert-info alert-outline relative w-fit overflow-hidden border-dotted"
-        >
-          <div aria-hidden="true" className="pointer-events-none absolute inset-0">
-            <span className="rc-alert-orb absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-info/25 blur-2xl" />
-            <span className="rc-alert-star absolute left-7 top-3 h-1 w-1 rounded-full bg-info" />
-            <span
-              className="rc-alert-star absolute right-10 top-5 h-1.5 w-1.5 rounded-full bg-info"
-              style={{ animationDelay: "0.7s" }}
-            />
-            <span
-              className="rc-alert-star absolute bottom-4 left-12 h-1 w-1 rounded-full bg-info"
-              style={{ animationDelay: "1.4s" }}
-            />
-          </div>
-          <style>{`
+            and CSS-only, scoped so the homepage stays self-contained.
+            2t1.3: the whole alert wears the daisyUI aura in the nova/info
+            color — the one aura on the page. */}
+        <div className="aura text-info">
+          <div
+            role="status"
+            className="alert alert-info alert-outline relative w-fit overflow-hidden border-dotted"
+          >
+            <div aria-hidden="true" className="pointer-events-none absolute inset-0">
+              <span className="rc-alert-orb absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-info/25 blur-2xl" />
+              <span className="rc-alert-star absolute left-7 top-3 h-1 w-1 rounded-full bg-info" />
+              <span
+                className="rc-alert-star absolute right-10 top-5 h-1.5 w-1.5 rounded-full bg-info"
+                style={{ animationDelay: "0.7s" }}
+              />
+              <span
+                className="rc-alert-star absolute bottom-4 left-12 h-1 w-1 rounded-full bg-info"
+                style={{ animationDelay: "1.4s" }}
+              />
+            </div>
+            <style>{`
             @keyframes rc-alert-orb-breathe {
               0%, 100% { opacity: 0.7; transform: translate(-50%, -50%) scale(1); }
               50% { opacity: 1; transform: translate(-50%, -50%) scale(1.12); }
@@ -86,11 +89,12 @@ function HomeComponent() {
               .rc-alert-orb, .rc-alert-star { animation: none !important; }
             }
           `}</style>
-          <div className="relative text-center">
-            <p className="text-sm font-black">Introducing Nova</p>
-            <p className="text-xs opacity-80">
-              Build your own games and play them with friends, instantly.
-            </p>
+            <div className="relative text-center">
+              <p className="text-sm font-black">Introducing Nova</p>
+              <p className="text-xs opacity-80">
+                Build your own games and play them with friends, instantly.
+              </p>
+            </div>
           </div>
         </div>
       </section>

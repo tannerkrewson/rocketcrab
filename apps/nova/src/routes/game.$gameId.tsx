@@ -61,7 +61,12 @@ export function BrowseGamePage() {
   const backLabel = inPartyLobby ? "Back to party" : "Back to games";
 
   const backLink = (
-    <Link to={backTarget} className={buttonStyles("outline", "md", "self-start")} title={backLabel}>
+    <Link
+      to={backTarget}
+      className={buttonStyles("neutral", "md", "self-start", true)}
+      title={backLabel}
+    >
+      {" "}
       <ArrowLeft className="h-4 w-4" aria-hidden="true" />
       {backLabel}
     </Link>
@@ -288,7 +293,7 @@ export function BrowseGamePage() {
             href={prebuilt.guideUrl}
             target="_blank"
             rel="noreferrer"
-            className="btn btn-outline self-start font-bold"
+            className={buttonStyles("neutral", "md", "self-start", true)}
           >
             <BookOpen className="h-4 w-4" aria-hidden="true" />
             Read the guide

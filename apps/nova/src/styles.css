@@ -48,6 +48,12 @@
 
   --color-neutral: oklch(28% 0.02 262);
   --color-neutral-content: oklch(96% 0.01 90);
+
+  /* 2t1.3: nova IS the info color — the brand cyan glow (glow-info /
+     text-glow-info use oklch(72% 0.11 225)); slightly brighter here so
+     info elements pop on the pure-white surface. */
+  --color-info: oklch(74% 0.11 225);
+  --color-info-content: oklch(26% 0.05 225);
 }
 
 @plugin "daisyui/theme" {

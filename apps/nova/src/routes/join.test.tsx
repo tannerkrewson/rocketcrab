@@ -122,7 +122,7 @@ describe("/join", () => {
       target: { value: "abcd" },
     });
     fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
-    await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("ABCD"));
+    await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("abcd"));
     // No name step appears after submitting either — the name is asked in
     // the lobby, not during the join.
     expect(screen.queryByLabelText("Your player name")).not.toBeInTheDocument();
@@ -133,7 +133,7 @@ describe("/join", () => {
     const input = await screen.findByLabelText("Four-letter party code");
     fireEvent.change(input, { target: { value: " abcd " } });
     fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
-    await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("ABCD"));
+    await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("abcd"));
     // The name is only asked once the player is in the lobby.
     expect(stubEngine.setDisplayName).not.toHaveBeenCalled();
   });
@@ -194,8 +194,8 @@ describe("/join", () => {
     const input = await screen.findByLabelText("Four-letter party code");
     fireEvent.change(input, { target: { value: "zzzz" } });
     fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
-    await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("ZZZZ"));
-    expect(await screen.findByText(/ZZZZ does not exist/)).toBeInTheDocument();
+    await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("zzzz"));
+    expect(await screen.findByText(/zzzz does not exist/)).toBeInTheDocument();
   });
 
   it("offers a one-tap rejoin from a saved recovery record (M1)", async () => {
