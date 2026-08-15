@@ -28,7 +28,16 @@ async function makeEvent(kind, { sameKey = null } = {}) {
   const content = `{"probe":true,"ts":${Date.now()}}`;
   const tags = [["x", `probe:${Date.now()}:${Math.random().toString(36).slice(2)}`]];
   const payload = { kind, tags, created_at: now(), content, pubkey };
-  const idHex = sha256hex(JSON.stringify([0, payload.pubkey, payload.created_at, payload.kind, payload.tags, payload.content]));
+  const idHex = sha256hex(
+    JSON.stringify([
+      0,
+      payload.pubkey,
+      payload.created_at,
+      payload.kind,
+      payload.tags,
+      payload.content,
+    ]),
+  );
   const sig = toHex(await schnorr.signAsync(new Uint8Array(Buffer.from(idHex, "hex")), secretKey));
   return { id: idHex, sig, ...payload, secretKey, publicKey };
 }
@@ -38,11 +47,25 @@ function openSocket(url) {
     let ws;
     try {
       ws = new WebSocket(url);
-    } catch (e) { reject(e); return; }
-    const t = setTimeout(() => { try { ws.close(); } catch {} reject(new Error("connect timeout")); }, 8000);
-    ws.onopen = () => { clearTimeout(t); resolve(ws); };
+    } catch (_e) {
+      reject(e);
+      return;
+    }
+    const t = setTimeout(() => {
+      try {
+        ws.close();
+      } catch {}
+      reject(new Error("connect timeout"));
+    }, 8000);
+    ws.onopen = () => {
+      clearTimeout(t);
+      resolve(ws);
+    };
     ws.onerror = () => {};
-    ws.onclose = () => { clearTimeout(t); reject(new Error("closed before open")); };
+    ws.onclose = () => {
+      clearTimeout(t);
+      reject(new Error("closed before open"));
+    };
   });
 }
 
@@ -54,7 +77,11 @@ async function burstPublish(ws, kind, n, opts = {}) {
     ws.onmessage = (e) => {
       ws.__prev?.(e);
       let msg;
-      try { msg = JSON.parse(String(e.data)); } catch { return; }
+      try {
+        msg = JSON.parse(String(e.data));
+      } catch {
+        return;
+      }
       if (msg[0] === "OK") out.push({ ok: msg[2], reason: msg[3] ?? "" });
       if (out.length >= n) resolve();
     };
@@ -62,7 +89,20 @@ async function burstPublish(ws, kind, n, opts = {}) {
   });
   for (let i = 0; i < n; i++) {
     const ev = await makeEvent(kind, opts);
-    ws.send(JSON.stringify(["EVENT", { kind: ev.kind, tags: ev.tags, created_at: ev.created_at, content: ev.content, pubkey: ev.pubkey, id: ev.id, sig: ev.sig }]));
+    ws.send(
+      JSON.stringify([
+        "EVENT",
+        {
+          kind: ev.kind,
+          tags: ev.tags,
+          created_at: ev.created_at,
+          content: ev.content,
+          pubkey: ev.pubkey,
+          id: ev.id,
+          sig: ev.sig,
+        },
+      ]),
+    );
     await new Promise((r) => setTimeout(r, 200));
   }
   await waiter;
@@ -75,11 +115,19 @@ async function main() {
 
     // Test A: fresh pubkey, burst of 25 events on one socket
     console.log("A) fresh pubkey, burst of 25 events, one socket:");
-    const ws1 = await openSocket(url).catch((e) => { console.log("   connect failed:", String(e)); return null; });
+    const ws1 = await openSocket(url).catch((e) => {
+      console.log("   connect failed:", String(e));
+      return null;
+    });
     if (ws1) {
       const res = await burstPublish(ws1, 22774, 25, {});
       const ok = res.filter((r) => r.ok).length;
-      console.log(`   accepted=${ok}/${res.length}  rejects=${res.filter((r) => !r.ok).map((r) => JSON.stringify(r.reason)).slice(0, 3)}`);
+      console.log(
+        `   accepted=${ok}/${res.length}  rejects=${res
+          .filter((r) => !r.ok)
+          .map((r) => JSON.stringify(r.reason))
+          .slice(0, 3)}`,
+      );
       ws1.close();
     }
 
@@ -101,10 +149,14 @@ async function main() {
 
     // Test C: rapid connect/disconnect churn (14 sockets like the app) - do reconnects get refused?
     console.log("C) 14 rapid sequential connects:");
-    let opened = 0, refused = 0;
+    let opened = 0,
+      refused = 0;
     for (let i = 0; i < 14; i++) {
       const ws = await openSocket(url).catch(() => null);
-      if (ws) { opened++; ws.close(); } else refused++;
+      if (ws) {
+        opened++;
+        ws.close();
+      } else refused++;
       await new Promise((r) => setTimeout(r, 150));
     }
     console.log(`   opened=${opened} refused=${refused}`);
@@ -112,4 +164,7 @@ async function main() {
   }
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

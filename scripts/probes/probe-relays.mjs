@@ -36,7 +36,14 @@ async function makeEvent(kind) {
   const tags = [["x", `probe:${Date.now()}:${Math.random().toString(36).slice(2)}`]];
   const payload = { kind, tags, created_at: now(), content, pubkey };
   const idHex = sha256hex(
-    JSON.stringify([0, payload.pubkey, payload.created_at, payload.kind, payload.tags, payload.content]),
+    JSON.stringify([
+      0,
+      payload.pubkey,
+      payload.created_at,
+      payload.kind,
+      payload.tags,
+      payload.content,
+    ]),
   );
   const sig = toHex(await schnorr.signAsync(new Uint8Array(Buffer.from(idHex, "hex")), secretKey));
   return { id: idHex, sig, ...payload };
@@ -59,7 +66,9 @@ function probeRelay(url, kinds) {
       if (!settled) {
         settled = true;
         result.connectError = "timeout";
-        try { ws?.close(); } catch {}
+        try {
+          ws?.close();
+        } catch {}
         resolve(result);
       }
     }, CONNECT_TIMEOUT_MS);
@@ -68,13 +77,15 @@ function probeRelay(url, kinds) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      try { ws?.close(); } catch {}
+      try {
+        ws?.close();
+      } catch {}
       resolve(result);
     };
 
     try {
       ws = new WebSocket(url);
-    } catch (e) {
+    } catch (_e) {
       result.connectError = String(e);
       finish();
       return;
@@ -90,8 +101,16 @@ function probeRelay(url, kinds) {
           const event = await makeEvent(kind);
           result.kinds[kind] = { sent: true, eventId: event.id };
           const pr = new Promise((r) => {
-            const t = setTimeout(() => r({ status: "no-ok-response", reason: "timeout" }), RESPONSE_TIMEOUT_MS);
-            pending.set(kind, { resolve: (v) => { clearTimeout(t); r(v); } });
+            const t = setTimeout(
+              () => r({ status: "no-ok-response", reason: "timeout" }),
+              RESPONSE_TIMEOUT_MS,
+            );
+            pending.set(kind, {
+              resolve: (v) => {
+                clearTimeout(t);
+                r(v);
+              },
+            });
           });
           ws.send(JSON.stringify(["EVENT", event]));
           const verdict = await pr;
@@ -112,7 +131,11 @@ function probeRelay(url, kinds) {
     };
     ws.onmessage = (e) => {
       let msg;
-      try { msg = JSON.parse(String(e.data)); } catch { return; }
+      try {
+        msg = JSON.parse(String(e.data));
+      } catch {
+        return;
+      }
       if (result.messages.length < 20) result.messages.push(String(e.data).slice(0, 400));
       if (result.info === null) result.info = String(e.data).slice(0, 400);
       const [type, ...rest] = msg;
@@ -123,7 +146,9 @@ function probeRelay(url, kinds) {
         const [eventId, accepted, reason] = rest;
         for (const [kind, entry] of Object.entries(result.kinds)) {
           if (entry.eventId === eventId && !entry.status) {
-            pending.get(Number(kind))?.resolve({ status: accepted ? "accepted" : "rejected", reason: reason ?? null });
+            pending
+              .get(Number(kind))
+              ?.resolve({ status: accepted ? "accepted" : "rejected", reason: reason ?? null });
           }
         }
       } else if (type === "NOTICE") {
@@ -154,7 +179,7 @@ async function fetchNip11(url) {
       limitation: json.limitation,
       retention: json.retention?.kinds,
     };
-  } catch (e) {
+  } catch (_e) {
     return { error: String(e).slice(0, 200) };
   }
 }
@@ -174,4 +199,7 @@ async function main() {
   console.log(JSON.stringify(summary, null, 2));
 }
 
-main().catch((e) => { console.error(e); process.exit(1); });
+main().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});
