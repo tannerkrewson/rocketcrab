@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "sonner";
-import { ArrowLeft, Compass, Gamepad2, PlusCircle, Search } from "lucide-react";
+import { ArrowLeft, Gamepad2, PlusCircle, Search } from "lucide-react";
 import { gameMatchesQuery, type SavedGame } from "@rocketcrab/core";
 import { GameCard } from "../components/games/GameCard";
+import { BrandHeader } from "../components/layout/BrandHeader";
 import { Button, buttonStyles } from "../components/ui/Button";
 import { Dialog } from "../components/ui/Dialog";
 import { EmptyState } from "../components/ui/EmptyState";
@@ -20,12 +21,14 @@ function errorMessage(error: unknown): string {
 }
 
 /**
- * The local game library (ADR-0005): saved games are listed straight from
- * the browser's IndexedDB, searchable, and editable/tested/duplicated from
- * here. Deleting always asks for confirmation first.
+ * The local game library (ADR-0005 / 2t1.5): saved games are listed straight
+ * from the browser's IndexedDB, searchable, and editable/played/duplicated
+ * from here. Deleting always asks for confirmation first.
  *
- * The Home link (rocketcrab-9fv.11.13) keeps the page reachable from the
- * homepage now that the shared footer is gone (9fv.11.1).
+ * The brand row (rocketcrab.com) stays visible and ONE outline "back"
+ * button returns home; the header's only action is "New game" (renamed from
+ * "Build a game", 2t1.5) — "Browse games" is gone (the browse page is one
+ * tap from home). Cards use the shared GameCard ("Start party" action).
  */
 export function LibraryPage() {
   const gamesQuery = useSavedGames();
@@ -61,9 +64,11 @@ export function LibraryPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <BrandHeader />
+
       <Link to="/" className={buttonStyles("outline", "md", "self-start")}>
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        Home
+        back
       </Link>
 
       <header className="flex flex-wrap items-end justify-between gap-4">
@@ -73,20 +78,10 @@ export function LibraryPage() {
             Games are saved right in this browser. Nothing is uploaded.
           </p>
         </div>
-        <div className="flex flex-wrap items-center gap-2">
-          <Link to="/" className={buttonStyles("outline")} title="Back to home">
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            Back to home
-          </Link>
-          <Link to="/browse" className={buttonStyles("primary", "lg")}>
-            <Compass className="h-4 w-4" aria-hidden="true" />
-            Browse games
-          </Link>
-          <Link to="/build" className={buttonStyles("primary", "lg")}>
-            <PlusCircle className="h-4 w-4" aria-hidden="true" />
-            Build a game
-          </Link>
-        </div>
+        <Link to="/build" className={buttonStyles("primary", "lg")}>
+          <PlusCircle className="h-4 w-4" aria-hidden="true" />
+          New game
+        </Link>
       </header>
 
       <div className="relative">
@@ -121,7 +116,7 @@ export function LibraryPage() {
             action={
               <Link to="/build" className={buttonStyles("primary", "lg")}>
                 <PlusCircle className="h-5 w-5" aria-hidden="true" />
-                Build a game
+                New game
               </Link>
             }
           />
