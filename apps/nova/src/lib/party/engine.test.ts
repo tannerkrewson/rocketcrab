@@ -329,6 +329,9 @@ describe("party engine — two phones end to end", () => {
     expect(creatorState.role).toBe("creator");
     expect(creatorState.members).toHaveLength(1);
     expect(creatorState.inviteUrl).toContain(`/join#code=${code}&secret=`);
+    // 9fv.8: the short URL is origin + lowercase code — no secret, ever.
+    expect(creatorState.shortInviteUrl).toBe(`${window.location.origin}/${code.toLowerCase()}`);
+    expect(creatorState.shortInviteUrl).not.toContain("secret");
     expect(creatorState.greeterMemberId).toBe(a.memberId);
     expect(creatorState.amGreeter).toBe(true);
 

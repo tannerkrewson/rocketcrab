@@ -28,6 +28,7 @@ import {
   GameSourceCoordinator,
   PartyError,
   buildInviteUrl,
+  buildShortJoinUrl,
   createParty,
   joinPartyByCode,
   joinPartyByInvite,
@@ -191,6 +192,10 @@ export interface PartyEngineState {
   /** Current internal authority — DIAGNOSTIC ONLY (S3 formalizes). */
   readonly authorityMemberId: MemberId | null;
   readonly inviteUrl: string | null;
+  /** Short shareable join URL (origin + "/" + code; NO secret — codes are
+   *  public rendezvous namespaces, ADR-0004; the secret stays fragment-only,
+   *  ADR-0011). Secondary invite affordance beside {@link inviteUrl}. */
+  readonly shortInviteUrl: string | null;
   readonly connectionState: TransportConnectionState;
   readonly canStart: boolean;
   readonly canForceStart: boolean;
@@ -503,6 +508,7 @@ export class PartyEngine {
       amGreeter: party?.amGreeter ?? false,
       authorityMemberId: this.computeAuthorityMemberId(members),
       inviteUrl: this.buildInviteUrl(),
+      shortInviteUrl: this.buildShortInviteUrl(),
       connectionState: this.connectionState,
       canStart: inLobby && this.game !== null && !ended && !anyFailed && allVerified && allReady,
       canForceStart:
@@ -2258,6 +2264,20 @@ export class PartyEngine {
         code,
         secret: party.secret,
       });
+    } catch {
+      return null;
+    }
+  }
+
+  /** The short typeable/shareable URL: origin + "/" + lowercase code (no
+   *  secret). Same null-when-no-party rule as {@link buildInviteUrl}. */
+  private buildShortInviteUrl(): string | null {
+    const code = this.party?.code;
+    if (code === undefined || code === null) {
+      return null;
+    }
+    try {
+      return buildShortJoinUrl({ baseUrl: defaultBaseUrl(), code });
     } catch {
       return null;
     }

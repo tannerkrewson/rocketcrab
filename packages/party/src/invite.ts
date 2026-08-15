@@ -50,6 +50,30 @@ export function buildInviteUrl(options: {
 }
 
 /**
+ * Build a SHORT join URL: the site origin + the four-letter code as a path
+ * segment (rocketcrab.com/cvvu), with NO secret — codes are public
+ * rendezvous namespaces (ADR-0004), so a path segment is safe; the secret
+ * must stay fragment-only (ADR-0011). The code is lowercased to match how
+ * codes are displayed/typed in the UI; the route normalizes either case.
+ * The full secret invite URL ({@link buildInviteUrl}) stays the primary
+ * invite for the copy button and QR code; this is the typeable/shareable
+ * alternative.
+ */
+export function buildShortJoinUrl(options: {
+  /** Site root (origin), e.g. "https://rocketcrab.com" — NOT /join. */
+  readonly baseUrl: string;
+  /** Four-letter party code (any case). */
+  readonly code: string;
+}): string {
+  const code = normalizePartyCode(options.code);
+  if (!isValidPartyCode(code)) {
+    throw new Error(`buildShortJoinUrl: invalid party code "${options.code}".`);
+  }
+  const base = options.baseUrl.replace(/#.*$/u, "").replace(/\/+$/u, "");
+  return `${base}/${code.toLowerCase()}`;
+}
+
+/**
  * Parse an invite-link fragment (the string after `#`, with or without the
  * leading `#`). Returns null for fragments that carry no party link data or
  * fail validation (a malformed secret is rejected rather than accepted).
