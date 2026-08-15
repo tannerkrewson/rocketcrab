@@ -8,13 +8,14 @@ import { buildMasterPrompt } from "../lib/prompt/master-prompt";
 import { routeTree } from "../routeTree.gen";
 
 /**
- * Build-page gateway tests (rocketcrab-9fv.10.11 / 2t1.7): the centered
- * /build route introduces the master-prompt flow in three steps and offers
- * the copyable master prompt as the main call to action, linking to the
- * GitHub-hosted API reference. The old "start another way" row (Open the
- * editor / See example games) is gone (9fv.11.14); the page now ends with
- * a prominent "Open the editor" CTA (2t1.7) — the editor is the
- * unavoidable next step.
+ * Build-page gateway tests (rocketcrab-9fv.10.11 / 2t1.7, hero redesigned
+ * 5cl.16): the centered /build route opens with ONE cohesive hero card —
+ * the "Rocketcrab Nova" headline (no brand row, no logo mark) with the
+ * "Open the editor" CTA inside it — then introduces the master-prompt flow
+ * in three steps and offers the copyable master prompt as the main call to
+ * action, linking to the GitHub-hosted API reference. The old "start
+ * another way" row (Open the editor / See example games) is gone
+ * (9fv.11.14); the editor CTA now lives in the hero (2t1.7 / 5cl.16).
  */
 
 const PROMPT = buildMasterPrompt();
@@ -49,11 +50,21 @@ afterEach(() => {
 });
 
 describe("/build — build a game gateway", () => {
-  it("introduces the master-prompt flow with a hero and three steps", async () => {
+  it("opens with one cohesive 'Rocketcrab Nova' hero card and three steps (5cl.16)", async () => {
     renderBuild();
 
-    expect(await screen.findByRole("heading", { name: "Build a game" })).toBeInTheDocument();
+    // The hero is a single card: the prominent brand headline (no "Build a
+    // game" heading anymore) plus the tagline and the editor entry action.
+    expect(await screen.findByRole("heading", { name: "Rocketcrab Nova" })).toBeInTheDocument();
     expect(screen.getByText(/You bring the idea — the AI writes the code/)).toBeInTheDocument();
+
+    const hero = screen.getByTestId("build-hero");
+    expect(hero.className).toContain("rounded-box");
+    const editor = within(hero).getByRole("link", { name: "Open the editor" });
+    expect(editor.getAttribute("href")).toBe("/editor");
+
+    // The brand row (rocketcrab.com + logo) no longer tops this page (5cl.16).
+    expect(screen.queryByRole("link", { name: /rocketcrab\.com — home/ })).not.toBeInTheDocument();
 
     // The three-step flow is spelled out in order.
     const steps = screen.getByRole("list", { name: "How to build a game" });
@@ -67,7 +78,7 @@ describe("/build — build a game gateway", () => {
   it("presents the generated prompt with the embedded API reference", async () => {
     renderBuild();
 
-    expect(await screen.findByRole("heading", { name: "Build a game" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Rocketcrab Nova" })).toBeInTheDocument();
 
     // The complete generated prompt is present (inside the expandable panel).
     expect(screen.getByText(new RegExp("Nova Master Prompt"))).toBeInTheDocument();
@@ -106,19 +117,20 @@ describe("/build — build a game gateway", () => {
   it("no longer offers the start-another-way row (9fv.11.14)", async () => {
     renderBuild();
 
-    await screen.findByRole("heading", { name: "Build a game" });
+    await screen.findByRole("heading", { name: "Rocketcrab Nova" });
 
     expect(screen.queryByRole("button", { name: "Open the editor" })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: "See example games" })).not.toBeInTheDocument();
     expect(screen.queryByText("Or start another way")).not.toBeInTheDocument();
   });
 
-  it("closes with a prominent Open-the-editor CTA (2t1.7)", async () => {
+  it("keeps the Open-the-editor CTA prominent inside the hero (2t1.7 / 5cl.16)", async () => {
     renderBuild();
 
-    await screen.findByRole("heading", { name: "Build a game" });
+    await screen.findByRole("heading", { name: "Rocketcrab Nova" });
 
-    const editor = screen.getByRole("link", { name: "Open the editor" });
+    const hero = screen.getByTestId("build-hero");
+    const editor = within(hero).getByRole("link", { name: "Open the editor" });
     expect(editor.getAttribute("href")).toBe("/editor");
     expect(editor.className).toContain("btn-primary");
     expect(editor.className).toContain("btn-lg");
@@ -127,7 +139,7 @@ describe("/build — build a game gateway", () => {
   it("keeps the editor as the paste target — no paste box on this page (7.44)", async () => {
     renderBuild();
 
-    await screen.findByRole("heading", { name: "Build a game" });
+    await screen.findByRole("heading", { name: "Rocketcrab Nova" });
 
     // The paste-your-HTML-here flow is gone; the user pastes in the editor.
     expect(screen.queryByTestId("paste-target")).not.toBeInTheDocument();
