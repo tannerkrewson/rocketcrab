@@ -584,6 +584,92 @@ describe("party engine — readiness and start gating", () => {
   });
 });
 
+describe("party engine — restart after exiting to the lobby (2t1.4)", () => {
+  it("can start the game again after exiting to the lobby from a game", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    const code = await runCreate(a, world);
+    await registerLocalGame(a, world);
+
+    const { join: joinPromise, settled } = startJoin(b, world, code);
+    await settled;
+    const pending = a.engine.getState().pendingJoinRequests;
+    a.engine.respondToJoinRequest(pending[0]?.memberId ?? "", true);
+    await settle(world);
+    await joinPromise;
+    await settle(world);
+    await registerLocalGame(b, world);
+    await settle(world);
+
+    expect(a.engine.getState().canStart).toBe(true);
+    a.engine.startGame();
+    await settle(world);
+    expect(a.engine.getState().phase).toBe("playing");
+    expect(b.engine.getState().phase).toBe("playing");
+
+    // Emergency teardown: everyone returns to the lobby with the banner.
+    a.engine.endGame("host_closed");
+    await settle(world);
+    expect(a.engine.getState().phase).toBe("lobby");
+    expect(b.engine.getState().phase).toBe("lobby");
+    expect(a.engine.getState().endedReason).toBe("host_closed");
+
+    // The ended session is swapped for a fresh one (one-shot start/end):
+    // the ended-state start gate opens again. The lobby re-boots each
+    // player's runtime frame (the phase flip remounts the frame container;
+    // setContainer reboots the runtime), and the frames re-register into
+    // the fresh session so the ready gate re-opens.
+    a.engine.setContainer(null);
+    b.engine.setContainer(null);
+    a.engine.setContainer(a.container);
+    b.engine.setContainer(b.container);
+    await settle(world);
+    await registerLocalGame(a, world);
+    await registerLocalGame(b, world);
+    await settle(world);
+
+    expect(a.engine.getState().startBlockedReason).toBeNull();
+    expect(a.engine.getState().canStart).toBe(true);
+    a.engine.startGame();
+    await settle(world);
+    expect(a.engine.getState().phase).toBe("playing");
+    expect(b.engine.getState().phase).toBe("playing");
+
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+    await settle(world);
+    expect(world.hub.roomNames().every((room) => world.hub.membersOf(room).length === 0)).toBe(
+      true,
+    );
+  });
+
+  it("reboots the runtime frame when the container is rebound after a phase flip (2t1.6)", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    await runCreate(a, world);
+    await registerLocalGame(a, world);
+    expect(a.harness.frames).toHaveLength(1);
+    expect(a.container.querySelector("iframe")).not.toBeNull();
+
+    // The lobby->playing flip remounts the frame container: React detaches
+    // the old ref (null) before attaching the new element. The stale
+    // runtime must be torn down and a fresh frame booted in the rebound
+    // container, or the area stays black with no iframe.
+    a.engine.setContainer(null);
+    a.engine.setContainer(a.container);
+    await settle(world);
+
+    expect(a.harness.frames).toHaveLength(2);
+    expect(a.container.querySelector("iframe")).not.toBeNull();
+    await registerLocalGame(a, world);
+    expect(a.engine.getState().members[0]?.ready).toBe(true);
+
+    await a.engine.leaveParty();
+    await settle(world);
+  });
+});
+
 describe("party engine — lobby notices", () => {
   it("dedupes identical notices instead of piling up alerts (11.8)", async () => {
     const world = makeWorld();
