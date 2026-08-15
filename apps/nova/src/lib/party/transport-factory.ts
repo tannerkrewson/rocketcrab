@@ -18,7 +18,7 @@
  * exactly as before: no TURN.
  */
 import type { PartyTransportFactory } from "@rocketcrab/party";
-import { TrysteroTransport } from "@rocketcrab/trystero-transport";
+import { TrysteroTransport, type TrysteroJoinError } from "@rocketcrab/trystero-transport";
 import type { TurnServerConfigLike } from "./turn-creds";
 
 /** Options closed over by the factory at construction time (sync methods). */
@@ -29,19 +29,26 @@ export interface TrysteroPartyTransportFactoryOptions {
    * (graceful degradation: the party proceeds without TURN).
    */
   readonly turnConfig?: readonly TurnServerConfigLike[];
+  /**
+   * Join-error observer (5cl.1): both transports report categorized
+   * peer/relay failures here so the shell can surface a friendly notice
+   * (e.g. the no-TURN `peer_connection_failed` signature).
+   */
+  readonly onJoinError?: (error: TrysteroJoinError) => void;
 }
 
 /** The transport factory real parties run over (dev/prod appId by env). */
 export function createTrysteroPartyTransportFactory(
   options: TrysteroPartyTransportFactoryOptions = {},
 ): PartyTransportFactory {
-  const { turnConfig } = options;
+  const { turnConfig, onJoinError } = options;
   return {
     createRendezvousTransport(identity) {
       return new TrysteroTransport({
         memberId: identity.memberId,
         displayName: identity.displayName,
         ...(turnConfig !== undefined ? { turnConfig } : {}),
+        ...(onJoinError !== undefined ? { onJoinError } : {}),
       });
     },
     createPrivateTransport(identity) {
@@ -50,6 +57,7 @@ export function createTrysteroPartyTransportFactory(
         displayName: identity.displayName,
         password: identity.password,
         ...(turnConfig !== undefined ? { turnConfig } : {}),
+        ...(onJoinError !== undefined ? { onJoinError } : {}),
       });
     },
   };
