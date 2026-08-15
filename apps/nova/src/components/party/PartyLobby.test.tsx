@@ -13,6 +13,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { gameRepository } from "../../lib/games/instance";
 import type { PartyEngineState } from "../../lib/party/engine";
+import { resetPartyIdentityForTests, setSavedPlayerName } from "../../lib/party/identity";
 import { PartyLobby, type PartyLobbyProps } from "./PartyLobby";
 import type { PartyMemberView } from "../../lib/party/engine";
 
@@ -84,6 +85,10 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
 
 beforeEach(async () => {
   await gameRepository.clear();
+  // 2t1.9: seed a saved player name so the lobby's no-name prompt stays
+  // hidden in most tests; the dedicated prompt test clears it first.
+  resetPartyIdentityForTests();
+  setSavedPlayerName("Player A");
 });
 
 async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobbyProps> = {}) {
@@ -108,12 +113,18 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
     path: "/library",
     component: () => null,
   });
+  // 2t1.9: the pencil / no-name prompt link to the shared name-editing page.
+  const joinRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/join",
+    component: () => null,
+  });
   const lobbyRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: "/",
     component: () => lobby({ state, ...handlers } as PartyLobbyProps),
   });
-  const routeTree = rootRoute.addChildren([libraryRoute, lobbyRoute]);
+  const routeTree = rootRoute.addChildren([libraryRoute, joinRoute, lobbyRoute]);
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({ initialEntries: ["/"] }),
@@ -140,7 +151,9 @@ describe("PartyLobby", () => {
     expect(within(rowA).getByTitle("Connected")).toBeInTheDocument();
     expect(within(rowA).queryByText("Game ready")).not.toBeInTheDocument();
     expect(within(rowA).queryByTitle("Ready")).not.toBeInTheDocument();
-    expect(within(rowA).getByRole("button", { name: /edit your name/i })).toBeInTheDocument();
+    // 2t1.9: the pencil is a link to the shared name-editing page, not a
+    // button that opens an inline form.
+    expect(within(rowA).getByRole("link", { name: /edit your name/i })).toBeInTheDocument();
     // The dense badge rows are gone.
     expect(within(rowA).queryByText("(you)")).not.toBeInTheDocument();
     expect(within(rowA).queryByText("Greeter")).not.toBeInTheDocument();
@@ -259,9 +272,11 @@ describe("PartyLobby", () => {
     });
     await renderLobby(state);
     // The ended banner owns the ended state; the raw ended notice and the
-    // older transient notices are not re-shown.
+    // older transient notices are not re-shown. 2t1.9: host_closed reads
+    // the generic ended copy (the host_closed sentence was removed).
     expect(screen.getByRole("alert")).toHaveClass("alert-outline");
-    expect(screen.getByText(/the game ended — the host closed it/i)).toBeInTheDocument();
+    expect(screen.getByText(/the game ended\./i)).toBeInTheDocument();
+    expect(screen.queryByText(/the host closed it/i)).not.toBeInTheDocument();
     expect(screen.queryByText("The game ended (host_closed).")).not.toBeInTheDocument();
     expect(screen.queryByText("Your game loaded and registered.")).not.toBeInTheDocument();
   });
@@ -359,8 +374,9 @@ describe("PartyLobby", () => {
       startBlockedReason: "Pick a game before starting the party.",
     });
     await renderLobby(state);
-    // 10.6: the welcome card replaces the old empty-state sentence.
-    expect(screen.getByText("No game selected yet")).toBeInTheDocument();
+    // 10.6 + 2t1.9: the welcome card covers the no-game case with a
+    // role-aware message (host = must select).
+    expect(screen.getByText("As the host you must select a game")).toBeInTheDocument();
     expect(screen.queryByText(/no game yet/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/you must select the game/i)).not.toBeInTheDocument();
     const browseButton = screen.getByRole("button", { name: /browse games/i });
@@ -372,9 +388,9 @@ describe("PartyLobby", () => {
     expect(screen.getByRole("searchbox", { name: "Search games" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /My games/ })).toBeInTheDocument();
     expect(screen.queryByText("Nova Quiz")).not.toBeInTheDocument();
-    // Back returns to the lobby.
-    await userEvent.click(screen.getByRole("button", { name: /back to lobby/i }));
-    expect(screen.getByRole("button", { name: /start game/i })).toBeInTheDocument();
+    // 2t1.9: the lobby's redundant "Back to lobby" button is gone — the
+    // shared GameBrowser owns its own back navigation.
+    expect(screen.queryByRole("button", { name: /back to lobby/i })).not.toBeInTheDocument();
   });
 
   it("links a saved game to its details page instead of picking it (10.9)", async () => {
@@ -403,32 +419,49 @@ describe("PartyLobby", () => {
     expect(protobowl.getAttribute("href")).toBe("/game/protobowl");
   });
 
-  it("tells joiners the party is waiting when it has no game (10.6)", async () => {
+  it("tells joiners the party is waiting when it has no game (2t1.9)", async () => {
     const state = makeState({ role: "joiner", game: null });
     await renderLobby(state);
-    expect(screen.getByText("No game selected yet")).toBeInTheDocument();
-    expect(screen.queryByText(/waiting for the host to pick a game/i)).not.toBeInTheDocument();
+    expect(screen.getByText("Waiting for the host to select a game")).toBeInTheDocument();
+    expect(screen.queryByText("No game selected yet")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /browse games/i })).not.toBeInTheDocument();
   });
 
-  it("edits the player name with the join screen's name UI (7.5/10.8/11.10)", async () => {
+  it("opens the shared name-editing page from the pencil (2t1.9)", async () => {
     const onEditName = vi.fn();
     await renderLobby(makeState(), { onEditName });
     // The "You are playing as" line and its separate Edit name button are gone.
     expect(screen.queryByText(/you are playing as/i)).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^edit name$/i })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /edit your name/i }));
-    // 11.10: the lobby reuses the join screen's name-entry presentation —
-    // the visible "Your name" label, the UserRound icon input (pl-10),
-    // and maxLength 24 — not a bespoke mini-form.
-    const input = screen.getByLabelText("Your player name");
-    expect(screen.getByText("Your name")).toBeInTheDocument();
-    expect(input).toHaveAttribute("maxlength", "24");
-    expect(input.className).toContain("pl-10");
-    await userEvent.clear(input);
-    await userEvent.type(input, "Grace");
-    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
-    expect(onEditName).toHaveBeenCalledWith("Grace");
+    // The pencil links to the shared name-editing page instead of opening
+    // an inline form in the tile.
+    const pencil = screen.getByRole("link", { name: /edit your name/i });
+    expect(pencil.getAttribute("href")).toBe("/join?edit=name");
+    expect(screen.queryByLabelText("Your player name")).not.toBeInTheDocument();
+    expect(onEditName).not.toHaveBeenCalled();
+  });
+
+  it("prompts for a name once in the lobby when none was ever set (2t1.9)", async () => {
+    resetPartyIdentityForTests();
+    await renderLobby(makeState());
+    const prompt = screen.getByLabelText("Set your name");
+    expect(within(prompt).getByText(/you haven't set a name yet/i)).toBeInTheDocument();
+    expect(within(prompt).getByRole("link", { name: /set your name/i })).toBeInTheDocument();
+    expect(within(prompt).getByRole("link").getAttribute("href")).toBe("/join?edit=name");
+  });
+
+  it("does not prompt for a name once one is saved (2t1.9)", async () => {
+    await renderLobby(makeState());
+    expect(screen.queryByLabelText("Set your name")).not.toBeInTheDocument();
+  });
+
+  it("labels the leave button End party when alone in the party (2t1.9)", async () => {
+    const state = makeState({
+      members: [makeState().members[0] as PartyMemberView],
+    });
+    await renderLobby(state);
+    expect(screen.getByRole("button", { name: /end party/i })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /leave party/i })).not.toBeInTheDocument();
   });
 
   it("shows ONE unified ended-game banner and disables start after a game ends (11.8)", async () => {
@@ -439,9 +472,11 @@ describe("PartyLobby", () => {
       startBlockedReason: "The game ended; leave the party to play again.",
     });
     await renderLobby(state);
-    // One unified ended banner with host_closed copy — the separate
-    // "game ended; leave the party to play again" warning alert is gone.
-    expect(screen.getByText(/the game ended — the host closed it/i)).toBeInTheDocument();
+    // One unified ended banner with the generic ended copy — the separate
+    // "game ended; leave the party to play again" warning alert is gone,
+    // and host_closed no longer has its own sentence (2t1.9).
+    expect(screen.getByText(/the game ended\./i)).toBeInTheDocument();
+    expect(screen.queryByText(/the host closed it/i)).not.toBeInTheDocument();
     expect(
       screen.queryByText("The game ended; leave the party to play again."),
     ).not.toBeInTheDocument();
@@ -582,12 +617,12 @@ describe("PartyLobby", () => {
     expect(within(welcome).queryByText(/as the host/i)).not.toBeInTheDocument();
   });
 
-  it("shows the welcome card without a game selected (10.6)", async () => {
+  it("shows the welcome card without a game selected (2t1.9)", async () => {
     const state = makeState({ game: null });
     await renderLobby(state);
     const welcome = screen.getByLabelText("Welcome");
     expect(within(welcome).getByText("Welcome to rocketcrab!")).toBeInTheDocument();
-    expect(within(welcome).getByText("No game selected yet")).toBeInTheDocument();
+    expect(within(welcome).getByText("As the host you must select a game")).toBeInTheDocument();
     expect(within(welcome).queryByText("You've selected")).not.toBeInTheDocument();
   });
 

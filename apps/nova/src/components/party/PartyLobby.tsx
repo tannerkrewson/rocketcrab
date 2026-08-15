@@ -1,5 +1,5 @@
+import { Link } from "@tanstack/react-router";
 import {
-  ArrowLeft,
   BookOpen,
   Check,
   Copy,
@@ -9,7 +9,6 @@ import {
   Pencil,
   Play,
   QrCode,
-  UserRound,
   Users,
   X,
 } from "lucide-react";
@@ -17,7 +16,8 @@ import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState, PartyMemberView, PartyNotice } from "../../lib/party/engine";
-import { Button } from "../ui/Button";
+import { getSavedPlayerName } from "../../lib/party/identity";
+import { Button, buttonStyles } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
 import { IdleParticles } from "./IdleParticles";
 import { PartyDiagnosticsPanel } from "./PartyDiagnostics";
@@ -33,7 +33,8 @@ export interface PartyLobbyProps {
   onRefreshDiagnostics: () => void;
   /** Kick a member from the party (host only, 7.29). */
   onKickMember: (memberId: string) => void;
-  /** Apply an edited player name (7.5). */
+  /** Retained for PartyExperience compatibility: the lobby no longer edits
+   *  names inline (2t1.9) — the pencil opens /join?edit=name instead. */
   onEditName: (name: string) => void;
 }
 
@@ -95,12 +96,12 @@ function transferIndicator(member: PartyMemberView) {
 /**
  * Unified copy for the ended-state banner (11.8): every "game ended"
  * variant (host_closed / user_exit / error / unknown) reads the same way,
- * with correct copy per reason — one banner owns all of them.
+ * with correct copy per reason — one banner owns all of them. The
+ * host_closed-specific sentence was removed (2t1.9) — that reason now
+ * reads the generic ended copy like every other.
  */
 function endedBannerText(reason: string): string {
   switch (reason) {
-    case "host_closed":
-      return "The game ended — the host closed it. The party is still open; leave when you're done.";
     case "error":
       return "The game ended due to an error. The party is still open — leave when you're done.";
     default:
@@ -139,14 +140,11 @@ export function PartyLobby({
   onLeave,
   onRefreshDiagnostics,
   onKickMember,
-  onEditName,
 }: PartyLobbyProps) {
   const [forceDialog, setForceDialog] = useState(false);
   // 7.43: "Browse games" swaps the lobby for the shared browse UI (pick
   // mode) until the host picks a game or goes back.
   const [browsing, setBrowsing] = useState(false);
-  const [editingName, setEditingName] = useState(false);
-  const [nameDraft, setNameDraft] = useState(state.displayName);
   // 10.5: the QR code lives behind a modal; the invite URL is never
   // rendered as text (only the origin + code page title is).
   const [qrOpen, setQrOpen] = useState(false);
@@ -164,6 +162,18 @@ export function PartyLobby({
     state.members.find((member) => member.memberId === state.authorityMemberId)?.displayName ??
     state.authorityMemberId ??
     null;
+
+  // 2t1.9: the player is asked for a name only once they're in the lobby
+  // (and only if they never set one) — the prompt opens the same
+  // name-editing page as the pencil (/join?edit=name).
+  const needsName = getSavedPlayerName() === null;
+
+  // 2t1.9: role-aware no-game message — the host must pick a game, guests
+  // wait for the host.
+  const noGameMessage =
+    state.role === "creator"
+      ? "As the host you must select a game"
+      : "Waiting for the host to select a game";
 
   // The lobby page title: origin + four-letter code, e.g. "rocketcrab.com/abcd".
   // The full invite URL (with the session secret in the fragment) is never
@@ -205,17 +215,12 @@ export function PartyLobby({
     // 10.9: browse mode — selecting a game ALWAYS opens its details page
     // (/game/$gameId, saved games included); the pick happens there and
     // returns to /party. The lobby never sets the game directly.
+    // 2t1.9: the shared GameBrowser owns its own back navigation (its
+    // unified "back" button) — the lobby's redundant "Back to lobby"
+    // button is gone.
     return (
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
         <section aria-label="Pick a game" className="flex flex-col gap-3">
-          <button
-            type="button"
-            className="btn btn-outline btn-sm w-fit"
-            onClick={() => setBrowsing(false)}
-          >
-            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            Back to lobby
-          </button>
           <GameBrowser compact />
         </section>
       </div>
@@ -253,34 +258,58 @@ export function PartyLobby({
           </Button>
         </div>
       </section>
-      {/* 10.6: the welcome card — the lobby's main heading. A simple idle
-          animation, then what's selected and whose turn it is to act.
-          Guests see the host-starting copy; when nothing is selected the
-          card just says so (the old empty-state sentence is gone). */}
+      {/* 10.6: the welcome card — the lobby's main heading. A soft ambient
+          glow behind the content, then what's selected and whose turn it
+          is to act. Guests see the host-starting copy; when nothing is
+          selected the card says so with a role-aware message (2t1.9). */}
       <section
         aria-label="Welcome"
-        className="flex flex-col items-center gap-3 overflow-hidden rounded-box border-2 border-base-300 bg-base-100 p-5 text-center"
+        className="relative flex flex-col items-center gap-3 overflow-hidden rounded-box border-2 border-base-300 bg-base-100 p-5 text-center"
       >
+        {/* 2t1.9: the idle glow is a wide ambient background BEHIND the
+            card content (absolute, clipped by the card); the text sits on
+            top of it. */}
         <IdleParticles />
-        <h2 className="text-xl font-black">Welcome to rocketcrab!</h2>
-        {state.game !== null ? (
-          <>
-            <p className="text-sm font-semibold text-base-content/70">You&apos;ve selected</p>
-            <p className="text-2xl font-black text-primary">{state.game.title}</p>
-            <p className="text-sm text-base-content/70">
-              {state.role === "creator"
-                ? "As the host, you have to start the game!"
-                : "Waiting for the host to start the game…"}
-            </p>
-            <Button variant="outline" size="md" onClick={() => setDetailsOpen(true)}>
-              <BookOpen className="h-4 w-4" aria-hidden="true" />
-              What is {state.game.title}?
-            </Button>
-          </>
-        ) : (
-          <p className="text-sm text-base-content/70">No game selected yet</p>
-        )}
+        <div className="relative flex flex-col items-center gap-3">
+          <h2 className="text-xl font-black">Welcome to rocketcrab!</h2>
+          {state.game !== null ? (
+            <>
+              <p className="text-sm font-semibold text-base-content/70">You&apos;ve selected</p>
+              <p className="text-2xl font-black text-primary">{state.game.title}</p>
+              <p className="text-sm text-base-content/70">
+                {state.role === "creator"
+                  ? "As the host, you have to start the game!"
+                  : "Waiting for the host to start the game…"}
+              </p>
+              <Button variant="outline" size="md" onClick={() => setDetailsOpen(true)}>
+                <BookOpen className="h-4 w-4" aria-hidden="true" />
+                What is {state.game.title}?
+              </Button>
+            </>
+          ) : (
+            <p className="text-sm font-semibold text-base-content/70">{noGameMessage}</p>
+          )}
+        </div>
       </section>
+      {/* 2t1.9: the name prompt — the player is only asked for a name once
+          they are IN the lobby, and only when they never set one (the old
+          join-time name step is gone). Opens the same /join?edit=name page
+          as the pencil. */}
+      {needsName ? (
+        <section
+          aria-label="Set your name"
+          className="flex flex-wrap items-center justify-center gap-3 rounded-box border-2 border-primary/40 bg-base-100 p-4"
+        >
+          <p className="text-sm font-semibold">
+            You haven&apos;t set a name yet — friends see you as{" "}
+            <span className="font-black">{state.displayName}</span>.
+          </p>
+          <Link to="/join" search={{ edit: "name" }} className={buttonStyles("primary", "md")}>
+            <Pencil className="h-4 w-4" aria-hidden="true" />
+            Set your name
+          </Link>
+        </section>
+      ) : null}
       {/* 11.8: ONE unified ended-state banner — every "game ended" variant
           (host_closed / user_exit / error) reads the same way with copy per
           reason; the engine's raw ended notices are filtered out of the
@@ -372,11 +401,14 @@ export function PartyLobby({
           <span className="text-sm font-semibold">{state.startBlockedReason}</span>
         </div>
       ) : null}
-      {/* 10.8 / 11.9: the classic player grid — 2 columns of rounded tiles,
-          each with a centered name, a pencil (own tile = edit name), a
-          small role-labels line ("You, Host" style), a per-player border
-          color, and ONE meaningful status: the connection dot + the
-          transfer state (progress bar / failure / waiting). */}
+      {/* 10.8 / 11.9, redesigned 2t1.9: the player grid — compact rows
+          that use the tile width instead of stacking everything vertically:
+          presence dot + name (+ role label / transfer detail) on the left,
+          transfer state + actions (pencil / kick) on the right, a
+          per-player border color, and ONE meaningful status: the connection
+          dot + the transfer state (progress bar / failure / waiting). The
+          pencil is a LINK to the shared name-editing page (/join?edit=name)
+          — the in-tile edit form is gone (2t1.9). */}
       <details
         className="collapse collapse-arrow rounded-box border-2 border-base-300 bg-base-100"
         open
@@ -385,119 +417,76 @@ export function PartyLobby({
           Players ({state.members.length})
         </summary>
         <div className="collapse-content">
-          <ul className="grid grid-cols-2 gap-3">
+          <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             {state.members.map((member, index) => {
               const roleLabel = roleLabels(member, state.role === "creator");
               return (
                 <li
                   key={member.memberId}
                   data-testid={`party-member-${member.memberId}`}
-                  className={`flex min-w-0 flex-col items-center gap-1.5 rounded-box border-2 bg-base-100 p-3 text-center ${playerBorderColor(index)}`}
+                  className={`flex min-w-0 items-center gap-2.5 rounded-box border-2 bg-base-100 p-2.5 ${playerBorderColor(index)}`}
                 >
-                  {member.isSelf && editingName ? (
-                    /* 11.10: the SAME name-entry presentation as the join
-                       screen's name step (UserRound icon, pl-10 input,
-                       visible label) — the lobby never invents its own
-                       mini-form. Validation stays: trim + maxLength. */
-                    <form
-                      className="flex w-full flex-col gap-1.5"
-                      onSubmit={(event) => {
-                        event.preventDefault();
-                        const trimmed = nameDraft.trim();
-                        if (trimmed.length > 0) {
-                          onEditName(trimmed);
-                        }
-                        setEditingName(false);
-                      }}
-                    >
-                      <label htmlFor="player-name" className="text-sm font-bold">
-                        Your name
-                      </label>
-                      <div className="relative">
-                        <UserRound
-                          className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-base-content/40"
-                          aria-hidden="true"
-                        />
-                        <input
-                          id="player-name"
-                          type="text"
-                          value={nameDraft}
-                          onChange={(event) => setNameDraft(event.target.value)}
-                          placeholder="Your name"
-                          maxLength={24}
-                          autoComplete="nickname"
-                          aria-label="Your player name"
-                          className="input input-bordered w-full pl-10"
-                        />
-                      </div>
-                      <div className="mt-1 flex justify-center gap-3">
-                        <Button variant="primary" size="md" type="submit">
-                          Save
-                        </Button>
-                        <Button variant="outline" size="md" onClick={() => setEditingName(false)}>
-                          Cancel
-                        </Button>
-                      </div>
-                    </form>
-                  ) : (
-                    <>
-                      <div className="flex w-full items-center justify-end gap-1.5 text-base-content/60">
-                        {member.connected ? (
-                          <span
-                            title="Connected"
-                            className="inline-block h-2 w-2 rounded-full bg-success"
-                            aria-hidden="true"
-                          />
-                        ) : (
-                          <span
-                            title="Disconnected"
-                            className="inline-block h-2 w-2 rounded-full bg-error"
-                            aria-hidden="true"
-                          />
-                        )}
-                        {/* 11.9: no standalone ready check — readiness is the
-                            start flow's job (start button + blocked reason). */}
-                        {transferIndicator(member)}
-                        {state.role === "creator" && !member.isSelf ? (
-                          <button
-                            type="button"
-                            className="btn btn-xs text-error"
-                            onClick={() => onKickMember(member.memberId)}
-                            aria-label={`Kick ${member.displayName}`}
-                          >
-                            <X className="h-3 w-3" aria-hidden="true" />
-                          </button>
-                        ) : null}
-                      </div>
-                      <div className="flex min-w-0 items-center justify-center gap-1.5">
-                        <p className="truncate font-black">{member.displayName}</p>
-                        {member.isSelf ? (
-                          <button
-                            type="button"
-                            className="btn btn-xs"
-                            aria-label="Edit your name"
-                            onClick={() => {
-                              setNameDraft(state.displayName);
-                              setEditingName(true);
-                            }}
-                          >
-                            <Pencil className="h-3 w-3" aria-hidden="true" />
-                          </button>
-                        ) : null}
-                      </div>
+                  {/* Presence + identity on the left. */}
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    {member.connected ? (
+                      <span
+                        title="Connected"
+                        className="inline-block h-2 w-2 shrink-0 rounded-full bg-success"
+                        aria-hidden="true"
+                      />
+                    ) : (
+                      <span
+                        title="Disconnected"
+                        className="inline-block h-2 w-2 shrink-0 rounded-full bg-error"
+                        aria-hidden="true"
+                      />
+                    )}
+                    <div className="min-w-0">
+                      <p className="truncate text-sm font-black leading-tight">
+                        {member.displayName}
+                      </p>
                       {roleLabel !== "" ? (
-                        <p className="text-xs font-semibold text-base-content/60">{roleLabel}</p>
+                        <p className="truncate text-[10px] font-semibold text-base-content/60">
+                          {roleLabel}
+                        </p>
                       ) : null}
                       {member.transferDetail !== null && member.transferState !== "complete" ? (
                         <p
-                          className="text-[10px] leading-tight text-base-content/50"
+                          className="truncate text-[10px] leading-tight text-base-content/50"
                           title={member.transferDetail}
                         >
                           {member.transferDetail}
                         </p>
                       ) : null}
-                    </>
-                  )}
+                    </div>
+                  </div>
+                  {/* Transfer state + actions on the right. */}
+                  <div className="flex shrink-0 items-center gap-1.5">
+                    {transferIndicator(member)}
+                    {member.isSelf ? (
+                      /* 2t1.9: the pencil opens the shared name-editing page
+                         (/join?edit=name) instead of an inline form. */
+                      <Link
+                        to="/join"
+                        search={{ edit: "name" }}
+                        className={buttonStyles("outline", "md", "btn-xs")}
+                        aria-label="Edit your name"
+                        title="Edit your name"
+                      >
+                        <Pencil className="h-3 w-3" aria-hidden="true" />
+                      </Link>
+                    ) : null}
+                    {state.role === "creator" && !member.isSelf ? (
+                      <button
+                        type="button"
+                        className="btn btn-xs text-error"
+                        onClick={() => onKickMember(member.memberId)}
+                        aria-label={`Kick ${member.displayName}`}
+                      >
+                        <X className="h-3 w-3" aria-hidden="true" />
+                      </button>
+                    ) : null}
+                  </div>
                 </li>
               );
             })}
@@ -522,11 +511,12 @@ export function PartyLobby({
         authorityName={authorityName}
       />
       {/* 10.7: Leave party is a smaller, centered control at the very
-          bottom of the page. */}
+          bottom of the page. 2t1.9: when the current user is the ONLY
+          player left, leaving ends the party — the button says so. */}
       <div className="flex justify-center">
         <Button variant="danger" size="md" onClick={onLeave}>
           <LogOut className="h-4 w-4" aria-hidden="true" />
-          Leave party
+          {state.members.length === 1 ? "End party" : "Leave party"}
         </Button>
       </div>
       {/* The QR invite modal (10.5): the QR lives here, not on the lobby.

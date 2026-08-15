@@ -146,3 +146,14 @@
      the browser reports no notch inset (desktop). */
   padding-top: max(0.5rem, env(safe-area-inset-top));
 }
+
+/* 2t1.9: the lobby's invisible runtime frame (PartyExperience) must never
+   take vertical space. While a game is selected the game boots inside this
+   hidden container, and the booted game iframe's default height would
+   otherwise inflate it — leaving a weird gap between the party header and
+   the lobby exactly when a game IS selected (no gap when nothing is
+   selected, because no iframe exists yet). Height is restored once the
+   game starts (the `invisible` class drops then). */
+[data-testid="party-frame"].invisible {
+  height: 0;
+}
