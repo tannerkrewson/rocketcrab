@@ -11,7 +11,7 @@ import type {
 import type { JoinRoomCallbacks } from "trystero";
 import { TrysteroTransport } from "./trystero-transport";
 import type { TrysteroTransportOptions } from "./trystero-transport";
-import { GOOD_RELAYS } from "./relays";
+import { GOOD_RELAYS, RELAY_FAILURE_WINDOW_MS } from "./relays";
 import type { RelayDiagnostics } from "./relays";
 import type { TrysteroJoinError } from "./errors";
 
@@ -766,6 +766,63 @@ describe("TrysteroTransport relay diagnostics", () => {
     // monitor must not reschedule (no new relay-state events)
     clock.advance(10_000);
     expect(adapter.getRelayDiagnostics()).toBeNull();
+  });
+
+  it("marks a rejecting relay degraded and reports usable count (rocketcrab-ont.1)", async () => {
+    const { adapter, clock } = setup({ redundancy: 1 });
+    mocks.joinRoom.mockReturnValue(makeFakeRoom());
+    // A real WebSocket-like relay socket: message listeners wire on poll.
+    const listeners = new Set<(event: { data: unknown }) => void>();
+    const socket = {
+      readyState: 1,
+      addEventListener: (_type: string, handler: (event: { data: unknown }) => void) => {
+        listeners.add(handler);
+      },
+      fire: (data: unknown) => {
+        for (const handler of listeners) {
+          handler({ data });
+        }
+      },
+    };
+    mocks.relaySockets[RELAY] = socket;
+    const changes: RelayDiagnostics[] = [];
+    adapter.onRelayStateChange((diagnostics) => {
+      changes.push(diagnostics);
+    });
+    const promise = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    // first poll wires the listener and settles the join (socket OPEN)
+    clock.advance(1000);
+    await promise;
+    expect(adapter.getRelayDiagnostics()?.usableCount).toBe(1);
+
+    // The relay rejects an event submission (the same signal Trystero's
+    // console "relay failure from ..." warning watches).
+    socket.fire(["OK", "event-1", false, "blocked: kind 22774 not permitted"]);
+    clock.advance(1000);
+    const degraded = adapter.getRelayDiagnostics();
+    expect(degraded?.connectedCount).toBe(1);
+    expect(degraded?.usableCount).toBe(0);
+    expect(degraded?.degradedCount).toBe(1);
+    expect(degraded?.relays[0]).toMatchObject({ connected: true, degraded: true });
+    // usable 0 < redundancy 5 → overall degraded
+    expect(degraded?.degraded).toBe(true);
+    // the change was pushed through onRelayStateChange
+    expect(changes.some((entry) => entry.usableCount === 0 && entry.degraded)).toBe(true);
+
+    // NOTICE is a failure signal too.
+    socket.fire(["NOTICE", "sub", "rate limited"]);
+    clock.advance(1000);
+    expect(adapter.getRelayDiagnostics()?.usableCount).toBe(0);
+
+    // An accepted event is NOT a failure; the degraded flag still decays
+    // only after the failure window passes.
+    socket.fire(["OK", "event-2", true, "saved"]);
+    clock.advance(1000);
+    expect(adapter.getRelayDiagnostics()?.usableCount).toBe(0);
+    clock.advance(RELAY_FAILURE_WINDOW_MS);
+    expect(adapter.getRelayDiagnostics()?.usableCount).toBe(1);
+    expect(adapter.getRelayDiagnostics()?.relays[0]?.degraded).toBe(false);
+    expect(adapter.getRelayDiagnostics()?.degraded).toBe(false);
   });
 });
 

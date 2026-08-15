@@ -100,13 +100,47 @@ export interface JoinRequestView extends JoinRequestInfo {
   readonly id: string;
 }
 
+/** One relay socket as surfaced in engine diagnostics (rocketcrab-ont.1). */
+export interface PartyRelayView {
+  readonly url: string;
+  /** Raw WebSocket readyState (0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED). */
+  readonly readyState: number;
+  /** True when the socket is OPEN (socket-level signaling available). */
+  readonly connected: boolean;
+  /**
+   * True when this OPEN relay has recently been observed rejecting or
+   * throttling Trystero traffic (OK:false / NOTICE) — connected but NOT
+   * usable (relay.nostr.info rejects every event; damus/offchain.pub
+   * throttle after a few events).
+   */
+  readonly degraded: boolean;
+}
+
+/** Aggregate relay signaling health (null until an adapter snapshot exists). */
+export interface PartyRelayHealth {
+  /** Number of configured relays observed. */
+  readonly total: number;
+  /** Number of relays whose socket is OPEN. */
+  readonly connected: number;
+  /** Number of OPEN relays not observed rejecting/throttling. */
+  readonly usable: number;
+  /** Number of relays with a recent failure observation. */
+  readonly degradedCount: number;
+  /** True when no relay socket is OPEN (no signaling at all). */
+  readonly signalingDown: boolean;
+  /** True when usable relays are below the configured redundancy. */
+  readonly degraded: boolean;
+}
+
 /** Connection diagnostics (adapter-specific when available). */
 export interface PartyDiagnostics {
   readonly connectionState: TransportConnectionState;
   readonly selfConnectionId: string;
   readonly room: string;
   readonly sessionId: string | null;
-  readonly relays: Array<{ url: string; readyState: number; connected: boolean }> | null;
+  readonly relays: readonly PartyRelayView[] | null;
+  /** Aggregate relay health; null when no adapter relay snapshot yet. */
+  readonly relayHealth: PartyRelayHealth | null;
   readonly joinErrors: Array<{ category: string; message: string }> | null;
   readonly peers: Array<{ memberId: string; connectionId: string; displayName?: string }>;
   readonly lastQuality: Array<{ memberId: string; pingMs: number | null; sampledAt: number }>;
@@ -1015,7 +1049,8 @@ export class PartyEngine {
   /** Refresh adapter diagnostics (relay state, join errors, pings). */
   async refreshDiagnostics(): Promise<void> {
     const transport = this.party?.privateTransport;
-    this.lastDiagnostics = this.diagnosticsProvider?.() ?? null;
+    this.lastDiagnostics =
+      this.diagnosticsProvider?.() ?? this.transportDiagnostics(transport) ?? null;
     if (transport !== null && transport !== undefined) {
       const sampler = (
         transport as unknown as {
@@ -1302,6 +1337,7 @@ export class PartyEngine {
     this.unsubParty = party.onEvent((event) => this.handlePartyEvent(event));
     this.unsubTransport = [
       party.privateTransport.on("connection:state", (state) => this.handleTransportState(state)),
+      ...this.subscribeRelayState(party),
     ];
     this.coordinator = new GameSourceCoordinator({
       transport: party.privateTransport,
@@ -1322,6 +1358,25 @@ export class PartyEngine {
     this.session = session;
     this.unsubSession = session.onSessionEvent((event) => this.handleSessionEvent(event));
     await session.attach();
+  }
+
+  /**
+   * Subscribe to adapter relay-state pushes (the Trystero transport's
+   * `onRelayStateChange`) so the diagnostics panel reflects socket and
+   * rejection changes LIVE (rocketcrab-ont.1). Duck-typed: only the
+   * Trystero transport exposes it; the in-memory hub has no relays, and
+   * injected factories simply yield no subscription. The transport replays
+   * the latest snapshot immediately, so the panel populates right after
+   * the private room joins.
+   */
+  private subscribeRelayState(party: PartySession): Array<() => void> {
+    const transport = party.privateTransport as unknown as {
+      onRelayStateChange?: (handler: () => void) => () => void;
+    };
+    if (typeof transport.onRelayStateChange !== "function") {
+      return [];
+    }
+    return [transport.onRelayStateChange(() => this.emit())];
   }
 
   /**
@@ -2215,28 +2270,94 @@ export class PartyEngine {
     }
     const transport = party.privateTransport;
     const transportRoom = (transport as { roomName?: string }).roomName ?? "";
-    const raw = this.diagnosticsProvider?.() ?? this.lastDiagnostics;
+    // Prefer the injected provider (tests), then the transport's own
+    // adapter diagnostics (production: the Trystero transport exposes
+    // getDiagnostics()), then the last refreshed snapshot.
+    const raw =
+      this.diagnosticsProvider?.() ?? this.transportDiagnostics(transport) ?? this.lastDiagnostics;
     const adapter = raw as {
       connectionState?: TransportConnectionState;
       selfConnectionId?: string;
       room?: string;
       sessionId?: string | null;
-      relays?: Array<{ url: string; readyState: number; connected: boolean }> | null;
+      relays?: {
+        relays?: Array<{
+          url: string;
+          readyState: number;
+          connected: boolean;
+          degraded?: boolean;
+        }>;
+        total?: number;
+        connectedCount?: number;
+        usableCount?: number;
+        degradedCount?: number;
+        signalingDown?: boolean;
+        degraded?: boolean;
+      } | null;
       joinErrors?: Array<{ category: string; message: string }> | null;
       peers?: Array<{ memberId: string; connectionId: string; displayName?: string }>;
       lastQuality?: Array<{ memberId: string; pingMs: number | null; sampledAt: number }>;
     } | null;
+    const relaySnapshot = adapter?.relays ?? null;
+    // Accept both the adapter snapshot shape ({ relays: [...] , total, ... })
+    // and a plain relay-views array (the engine's own PartyDiagnostics
+    // shape, as an injected provider might supply).
+    const relayViews =
+      relaySnapshot !== null && Array.isArray(relaySnapshot.relays)
+        ? relaySnapshot.relays
+        : Array.isArray(relaySnapshot)
+          ? (relaySnapshot as Array<{
+              url: string;
+              readyState: number;
+              connected: boolean;
+              degraded?: boolean;
+            }>)
+          : null;
+    const relays: PartyDiagnostics["relays"] =
+      relayViews === null
+        ? null
+        : relayViews.map((relay) => ({ ...relay, degraded: relay.degraded ?? false }));
+    const relayHealth: PartyDiagnostics["relayHealth"] =
+      relays === null
+        ? null
+        : {
+            total: relaySnapshot?.total ?? relays.length,
+            connected:
+              relaySnapshot?.connectedCount ?? relays.filter((relay) => relay.connected).length,
+            usable:
+              relaySnapshot?.usableCount ??
+              relays.filter((relay) => relay.connected && !relay.degraded).length,
+            degradedCount:
+              relaySnapshot?.degradedCount ?? relays.filter((relay) => relay.degraded).length,
+            signalingDown:
+              relaySnapshot?.signalingDown ?? relays.every((relay) => !relay.connected),
+            degraded:
+              relaySnapshot?.degraded ??
+              relays.filter((relay) => relay.connected && !relay.degraded).length < relays.length,
+          };
     return {
       connectionState: adapter?.connectionState ?? transport.connectionState,
       selfConnectionId: adapter?.selfConnectionId ?? transport.selfConnectionId,
       room: adapter?.room ?? transportRoom,
       sessionId: adapter?.sessionId ?? transport.sessionId,
-      relays: adapter?.relays ?? null,
+      relays,
+      relayHealth,
       joinErrors: adapter?.joinErrors ?? null,
       peers: adapter?.peers ?? transport.peers.map((peer) => ({ ...peer })),
       lastQuality: adapter?.lastQuality ?? [],
       turn: this.turnStatus,
     };
+  }
+
+  /**
+   * Adapter diagnostics straight from the private transport (duck-typed;
+   * only the Trystero transport exposes `getDiagnostics()`). This is the
+   * production path: the real engine has no injected provider, so the
+   * transport's own relay snapshot reaches the lobby panel.
+   */
+  private transportDiagnostics(transport: unknown): unknown | null {
+    const getter = (transport as { getDiagnostics?: () => unknown } | undefined)?.getDiagnostics;
+    return typeof getter === "function" ? (getter.call(transport) as unknown) : null;
   }
 
   private addNotice(level: PartyNotice["level"], message: string): void {

@@ -25,6 +25,7 @@ import { TrysteroJoinError, toTrysteroJoinError, type TrysteroJoinErrorReport } 
 import {
   DEFAULT_RELAY_REDUNDANCY,
   GOOD_RELAYS,
+  isRelayFailureSignal,
   relayDiagnosticsEqual,
   snapshotRelays,
   type RelayDiagnostics,
@@ -122,6 +123,14 @@ export class TrysteroTransport implements NovaTransport {
   private joinTimers: Array<() => void> = [];
   private relayMonitorTimer: (() => void) | null = null;
   private lastRelayDiagnostics: RelayDiagnostics | null = null;
+  /**
+   * Relay URL → epoch-ms of its most recent failure observation (an OK:false
+   * rejection or a NOTICE on the relay socket). Drives the per-relay
+   * `degraded` flag / `usableCount` in relay diagnostics (rocketcrab-ont.1).
+   */
+  private readonly relayFailures = new Map<string, number>();
+  /** Sockets already wired with a failure-observation listener (dedup). */
+  private wiredRelaySockets = new WeakSet<object>();
 
   constructor(options: TrysteroTransportOptions) {
     this.options = {
@@ -608,7 +617,13 @@ export class TrysteroTransport implements NovaTransport {
 
   private pollRelays(): void {
     const sockets = getRelaySockets() as Record<string, { readonly readyState: number }>;
-    const diagnostics = snapshotRelays(sockets, this.now());
+    this.wireRelayFailureListeners(sockets);
+    const diagnostics = snapshotRelays(
+      sockets,
+      this.now(),
+      this.relayFailures,
+      this.options.redundancy,
+    );
     const changed =
       this.lastRelayDiagnostics === null ||
       !relayDiagnosticsEqual(this.lastRelayDiagnostics, diagnostics);
@@ -624,6 +639,37 @@ export class TrysteroTransport implements NovaTransport {
     }
     if (this.connectionState === "joining" || this.connectionState === "connected") {
       this.relayMonitorTimer = this.scheduleFn(() => this.pollRelays(), this.options.relayPollMs);
+    }
+  }
+
+  /**
+   * Attach a failure-observation listener to each live relay socket
+   * (Trystero exposes no callback for its "relay failure" warnings, but the
+   * sockets from `getRelaySockets()` are real WebSockets, so the adapter
+   * watches their messages directly — the same NOTICE / OK:false signals
+   * Trystero's own handler warns about). Listeners are attached once per
+   * socket object; reconnects surface a new socket and are picked up on the
+   * next poll. Test sockets without `addEventListener` are skipped.
+   */
+  private wireRelayFailureListeners(
+    sockets: Record<string, { readonly readyState: number }>,
+  ): void {
+    for (const [url, socket] of Object.entries(sockets)) {
+      const candidate = socket as { addEventListener?: unknown };
+      if (typeof candidate.addEventListener !== "function" || this.wiredRelaySockets.has(socket)) {
+        continue;
+      }
+      this.wiredRelaySockets.add(socket);
+      const onMessage = (event: { data: unknown }): void => {
+        if (isRelayFailureSignal(event.data)) {
+          this.relayFailures.set(url, this.now());
+        }
+      };
+      (
+        candidate as {
+          addEventListener: (type: string, handler: (event: { data: unknown }) => void) => void;
+        }
+      ).addEventListener("message", onMessage);
     }
   }
 
@@ -792,6 +838,8 @@ export class TrysteroTransport implements NovaTransport {
     this.peerJoinedAt.clear();
     this.deliverySeqCounters.clear();
     this.lastRelayDiagnostics = null;
+    this.relayFailures.clear();
+    this.wiredRelaySockets = new WeakSet();
   }
 
   private assertConnected(): void {
