@@ -15,15 +15,26 @@ import { getSavedPlayerName } from "../lib/party/identity";
 import { gameRepository } from "../lib/games/instance";
 
 export const Route = createFileRoute("/party")({
-  validateSearch: (search: Record<string, unknown>) => ({
+  validateSearch: (search: Record<string, unknown>): PartySearch => ({
     gameId: typeof search.gameId === "string" ? search.gameId : undefined,
     mode: isGameMode(search.mode) ? search.mode : undefined,
     title: typeof search.title === "string" ? search.title : undefined,
+    // 5cl.7: ?browse=1 reopens the lobby straight into browse mode (the
+    // game-details back button uses it so back returns to the category).
+    browse: search.browse === true ? true : undefined,
   }),
   component: PartyPage,
 });
 
 const GAME_MODES: readonly GameMode[] = ["state", "simulation", "raw"];
+
+/** /party search params (all optional; 5cl.7 adds ?browse=1). */
+interface PartySearch {
+  gameId?: string;
+  mode?: GameMode;
+  title?: string;
+  browse?: boolean;
+}
 
 function isGameMode(value: unknown): value is GameMode {
   return typeof value === "string" && (GAME_MODES as readonly string[]).includes(value);
@@ -113,7 +124,12 @@ function PartyPage() {
     // A party is being created, joining, in the lobby, playing, or
     // reconnecting — render the full experience. 5cl.9: leaving the party
     // returns to the HOMEPAGE (was /library).
-    return <PartyExperience onLeft={() => void navigate({ to: "/" })} />;
+    return (
+      <PartyExperience
+        onLeft={() => void navigate({ to: "/" })}
+        initialBrowse={search.browse === true}
+      />
+    );
   }
   if (loadError !== null) {
     return (

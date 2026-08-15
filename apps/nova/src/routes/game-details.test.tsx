@@ -228,9 +228,10 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     const title = await screen.findByTestId("party-title");
     expect(title.textContent).toBe(`${window.location.host}/rcrb`);
     expect(screen.queryByRole("link", { name: /rocketcrab\.com/ })).not.toBeInTheDocument();
-    // The back link returns to the party, not the browse page.
-    const back = screen.getByRole("link", { name: "Back to party" });
-    expect(back.getAttribute("href")).toBe("/party");
+    // The back link returns to the party's browse mode (5cl.7: /party?browse=1
+    // reopens the lobby browser, which restores the category the host left).
+    const back = screen.getByRole("link", { name: "Back to category" });
+    expect(back.getAttribute("href")).toBe("/party?browse=true");
     expect(back.className).toContain("self-start");
     // The host can still select this classic game for the party.
     const select = screen.getByRole("button", { name: /select game/i });

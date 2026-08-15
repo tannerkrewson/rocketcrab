@@ -30,7 +30,13 @@ function errorMessage(error: unknown): string {
  * sits in flow ABOVE the frame — the frame fills the remaining space and is
  * never a floating overlay.
  */
-export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
+export function PartyExperience({
+  onLeft,
+  initialBrowse = false,
+}: {
+  onLeft?: () => void;
+  initialBrowse?: boolean;
+}) {
   const { state, engine, bindContainer } = usePartyEngine();
 
   const handleLeave = async () => {
@@ -167,8 +173,9 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
   // 5cl.8: while the host browses games in the lobby the header STAYS
   // MOUNTED and animates to a compact, slightly faded state (smaller logo +
   // title, reduced opacity) so the game browser beneath is the focus — the
-  // browser no longer renders its own brand row.
-  const [browsing, setBrowsing] = useState(false);
+  // browser no longer renders its own brand row. 5cl.7: the details-page
+  // back button can return here already in browse mode (initialBrowse).
+  const [browsing, setBrowsing] = useState(initialBrowse);
 
   const shellShown = state.phase !== "idle" && state.phase !== "error" && state.phase !== "removed";
 
@@ -205,6 +212,7 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
         handleKickMember,
         setBrowsing,
         onLeft,
+        initialBrowse,
       )}
     </div>
   );
@@ -220,6 +228,7 @@ function renderPhase(
   handleKickMember: (memberId: string) => void,
   onBrowseModeChange: (browsing: boolean) => void,
   onLeft?: () => void,
+  initialBrowse = false,
 ) {
   switch (state.phase) {
     case "creating":
@@ -251,6 +260,7 @@ function renderPhase(
           onKickMember={handleKickMember}
           onEditName={handleEditName}
           onBrowseModeChange={onBrowseModeChange}
+          initialBrowsing={initialBrowse}
         />
       );
     case "playing":

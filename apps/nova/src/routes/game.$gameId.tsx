@@ -66,25 +66,34 @@ export function BrowseGamePage() {
   const notInParty = state.phase === "idle";
 
   // 5cl.7: the browser recorded its view + query before navigating here.
-  // In a party the back target is always the lobby (the lobby browser
-  // restores its position from the same store when it remounts); otherwise
-  // the back button returns to the exact category/search via /browse?view=&q=.
+  // In a party the back button returns to /party?browse=1 — the lobby
+  // reopens straight into browse mode and its GameBrowser restores the
+  // stored category on mount (so back lands on the exact category page the
+  // user left). Otherwise the back button returns to the exact
+  // category/search via /browse?view=&q=.
   const browseBack = readBrowseContext();
   const backTarget =
-    inPartyLobby || browseBack === null || browseBack.view === null
-      ? inPartyLobby
-        ? "/party"
-        : "/browse"
+    browseBack === null || browseBack.view === null
+      ? "/browse"
       : `/browse?view=${encodeURIComponent(browseBack.view)}&q=${encodeURIComponent(browseBack.query)}`;
-  const backLabel = inPartyLobby ? "Back to party" : "Back to games";
+  const backLabel = inPartyLobby ? "Back to category" : "Back to games";
 
-  const backLink = (
+  const backLink = inPartyLobby ? (
+    <Link
+      to="/party"
+      search={{ browse: true, gameId: undefined, mode: undefined, title: undefined }}
+      className={buttonStyles("neutral", "md", "self-start", true)}
+      title={backLabel}
+    >
+      <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+      {backLabel}
+    </Link>
+  ) : (
     <Link
       to={backTarget}
       className={buttonStyles("neutral", "md", "self-start", true)}
       title={backLabel}
     >
-      {" "}
       <ArrowLeft className="h-4 w-4" aria-hidden="true" />
       {backLabel}
     </Link>
