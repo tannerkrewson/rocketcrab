@@ -184,7 +184,7 @@ export function PartyLobby({
   // wait for the host.
   const noGameMessage =
     state.role === "creator"
-      ? "As the host you must select a game"
+      ? "As the host, you must select a game."
       : "Waiting for the host to select a game";
 
   // The lobby page title: origin + four-letter code, e.g. "rocketcrab.com/abcd".
