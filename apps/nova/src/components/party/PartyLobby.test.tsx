@@ -336,7 +336,7 @@ describe("PartyLobby", () => {
     expect(within(alerts[0]!).getByText("Player B joined the party.")).toBeInTheDocument();
   });
 
-  it("hides older notices once a game-ended notice is owned by the ended banner (11.8)", async () => {
+  it("shows NO game-ended alert after a game ends — the ended banner is gone (5cl.9)", async () => {
     const state = makeState({
       endedReason: "host_closed",
       canStart: false,
@@ -349,14 +349,15 @@ describe("PartyLobby", () => {
       ],
     });
     await renderLobby(state);
-    // The ended banner owns the ended state; the raw ended notice and the
-    // older transient notices are not re-shown. 2t1.9: host_closed reads
-    // the generic ended copy (the host_closed sentence was removed).
-    expect(screen.getByRole("alert")).toHaveClass("alert-outline");
-    expect(screen.getByText(/the game ended\./i)).toBeInTheDocument();
+    // 5cl.9: no "game ended" alert at all in the lobby — the ended-state
+    // banner is gone, the raw ended notice stays filtered out, and the
+    // notice banner hides entirely once the game ended.
+    expect(screen.queryByText(/the game ended\./i)).not.toBeInTheDocument();
     expect(screen.queryByText(/the host closed it/i)).not.toBeInTheDocument();
     expect(screen.queryByText("The game ended (host_closed).")).not.toBeInTheDocument();
     expect(screen.queryByText("Player B joined the party.")).not.toBeInTheDocument();
+    expect(screen.queryByText("The game started.")).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("places the action row above the players box and leave at the bottom (10.7)", async () => {
@@ -454,7 +455,7 @@ describe("PartyLobby", () => {
     await renderLobby(state);
     // 10.6 + 2t1.9: the welcome card covers the no-game case with a
     // role-aware message (host = must select).
-    expect(screen.getByText("As the host you must select a game")).toBeInTheDocument();
+    expect(screen.getByText("As the host, you must select a game.")).toBeInTheDocument();
     expect(screen.queryByText(/no game yet/i)).not.toBeInTheDocument();
     expect(screen.queryByText(/you must select the game/i)).not.toBeInTheDocument();
     const browseButton = screen.getByRole("button", { name: /browse games/i });
@@ -501,10 +502,13 @@ describe("PartyLobby", () => {
     expect(protobowl.getAttribute("href")).toBe("/game/protobowl");
   });
 
-  it("tells joiners the party is waiting when it has no game (2t1.9)", async () => {
+  it("tells joiners the party is waiting when it has no game — naming the host (2t1.9/5cl.9)", async () => {
     const state = makeState({ role: "joiner", game: null });
     await renderLobby(state);
-    expect(screen.getByText("Waiting for the host to select a game")).toBeInTheDocument();
+    // 5cl.9: the message names the HOST — the greeter member (the creator
+    // is installed as the initial greeter, so greeterMemberId is the best
+    // available signal for who the host is).
+    expect(screen.getByText("Waiting for Player A to select a game")).toBeInTheDocument();
     expect(screen.queryByText("No game selected yet")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /browse games/i })).not.toBeInTheDocument();
   });
@@ -546,7 +550,7 @@ describe("PartyLobby", () => {
     expect(screen.queryByRole("button", { name: /leave party/i })).not.toBeInTheDocument();
   });
 
-  it("shows ONE unified ended-game banner and disables start after a game ends (11.8)", async () => {
+  it("shows NO ended banner and disables start after a game ends (5cl.9)", async () => {
     const state = makeState({
       endedReason: "host_closed",
       canStart: false,
@@ -554,14 +558,15 @@ describe("PartyLobby", () => {
       startBlockedReason: "The game ended; leave the party to play again.",
     });
     await renderLobby(state);
-    // One unified ended banner with the generic ended copy — the separate
-    // "game ended; leave the party to play again" warning alert is gone,
-    // and host_closed no longer has its own sentence (2t1.9).
-    expect(screen.getByText(/the game ended\./i)).toBeInTheDocument();
+    // 5cl.9: the ended-state banner is gone entirely — no "game ended"
+    // text anywhere in the lobby; the blocked-reason alert is suppressed
+    // once a game ends. Start stays disabled.
+    expect(screen.queryByText(/the game ended\./i)).not.toBeInTheDocument();
     expect(screen.queryByText(/the host closed it/i)).not.toBeInTheDocument();
     expect(
       screen.queryByText("The game ended; leave the party to play again."),
     ).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /start game/i })).toBeDisabled();
   });
 
@@ -662,23 +667,13 @@ describe("PartyLobby", () => {
     Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
   });
 
-  it("copies the SHORT join URL (origin + code, no secret) from Copy short link (9fv.8)", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "clipboard", {
-      value: { writeText },
-      configurable: true,
-    });
+  it("offers no separate Copy short link affordance — copying is always the long URL (5cl.2)", async () => {
     await renderLobby(makeState());
-    await userEvent.click(screen.getByRole("button", { name: /copy short link/i }));
-    // Origin + lowercase code only — never the secret (ADR-0011).
-    expect(writeText).toHaveBeenCalledWith("http://localhost:5173/abcd");
-    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
-  });
-
-  it("shows the short-link affordance without rendering the URL or any secret (9fv.8)", async () => {
-    await renderLobby(makeState());
-    expect(screen.getByRole("button", { name: /copy short link/i })).toBeInTheDocument();
-    expect(screen.getByText(/easy to type or read aloud/i)).toBeInTheDocument();
+    // 5cl.2: the short-link button and its "Easy to type or read aloud"
+    // label are gone; the primary Copy URL button remains.
+    expect(screen.queryByRole("button", { name: /copy short link/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/easy to type or read aloud/i)).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /copy url/i })).toBeInTheDocument();
     // The short URL is never rendered as text (it equals the header title,
     // 10.5/11.6) and no secret appears anywhere.
     expect(screen.queryByText("http://localhost:5173/abcd")).not.toBeInTheDocument();
@@ -727,7 +722,7 @@ describe("PartyLobby", () => {
     await renderLobby(state);
     const welcome = screen.getByLabelText("Welcome");
     expect(within(welcome).getByText("Welcome to rocketcrab!")).toBeInTheDocument();
-    expect(within(welcome).getByText("As the host you must select a game")).toBeInTheDocument();
+    expect(within(welcome).getByText("As the host, you must select a game.")).toBeInTheDocument();
     expect(within(welcome).queryByText("You've selected")).not.toBeInTheDocument();
   });
 
