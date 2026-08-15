@@ -3,17 +3,19 @@ import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/re
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { PartyEngineState } from "../lib/party/engine";
+import { resetPartyIdentityForTests, setSavedPlayerName } from "../lib/party/identity";
 import { resetInviteImportForTests } from "../lib/party/invite-import";
 import { clearPartyRecovery, savePartyRecovery } from "../lib/party/party-recovery";
 import { routeTree } from "../routeTree.gen";
 
 /**
- * Join route tests (P4/7.47): the two-step join flow — room code first
- * (tall mono input, Continue gated on four letters), then the player name
- * with a code confirmation — plus the invite-fragment import (ADR-0011 —
- * the secret is read into session memory and the fragment is stripped from
- * the URL before the party experience renders) and the code-submit wiring
- * into the party engine.
+ * Join route tests (P4/7.47, reworked 2t1.9): the join is a SINGLE step —
+ * enter the room code (tall mono input, Join gated on four letters) and
+ * join straight away; the player's name is never asked up front. The
+ * phonetic spelling confirms the code inline once it is complete, the
+ * invite-fragment import (ADR-0011) still strips the secret from the URL,
+ * and `/join?edit=name` renders the shared name-editing page (the same
+ * name step the lobby's pencil / no-name prompt open).
  */
 
 const IDLE_STATE: PartyEngineState = {
@@ -80,11 +82,11 @@ vi.mock("../lib/party/engine", async (importOriginal) => {
   };
 });
 
-function renderJoin() {
+function renderJoin(initialEntry = "/join") {
   cleanup();
   const router = createRouter({
     routeTree,
-    history: createMemoryHistory({ initialEntries: ["/join"] }),
+    history: createMemoryHistory({ initialEntries: [initialEntry] }),
   });
   const wrapper = ({ children }: { children: ReactNode }) => <>{children}</>;
   return render(<RouterProvider router={router} />, { wrapper });
@@ -103,55 +105,51 @@ beforeEach(() => {
   vi.clearAllMocks();
   stubs.joinCalled = false;
   resetInviteImportForTests();
+  resetPartyIdentityForTests();
   clearPartyRecovery();
   window.history.pushState({}, "", "/join");
 });
 
 describe("/join", () => {
-  it("starts with only the room-code input; the name step comes after a code", async () => {
+  it("joins directly from the room-code step and never asks for a name up front (2t1.9)", async () => {
     renderJoin();
     expect(await screen.findByText("Join a party")).toBeInTheDocument();
     expect(screen.getByLabelText("Four-letter party code")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^join$/i })).toBeInTheDocument();
     expect(screen.queryByLabelText("Your player name")).not.toBeInTheDocument();
 
     fireEvent.change(screen.getByLabelText("Four-letter party code"), {
       target: { value: "abcd" },
     });
-    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
-    expect(await screen.findByLabelText("Your player name")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /^join$/i })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Four-letter party code")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
+    await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("ABCD"));
+    // No name step appears after submitting either — the name is asked in
+    // the lobby, not during the join.
+    expect(screen.queryByLabelText("Your player name")).not.toBeInTheDocument();
   });
 
-  it("submits the normalized code and the player name to the engine", async () => {
+  it("joins with the normalized code and does not set a name during the join (2t1.9)", async () => {
     renderJoin();
     const input = await screen.findByLabelText("Four-letter party code");
     fireEvent.change(input, { target: { value: " abcd " } });
-    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
-    const nameInput = await screen.findByLabelText("Your player name");
-    fireEvent.change(nameInput, { target: { value: "Ada" } });
     fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
-    await waitFor(() => expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada"));
     await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("ABCD"));
+    // The name is only asked once the player is in the lobby.
+    expect(stubEngine.setDisplayName).not.toHaveBeenCalled();
   });
 
-  it("shows the code with its lowercase phonetic spelling on the name step", async () => {
+  it("shows the code with its lowercase phonetic spelling once it is complete", async () => {
     renderJoin();
     const input = await screen.findByLabelText("Four-letter party code");
     fireEvent.change(input, { target: { value: "xaby" } });
-    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
     expect(await screen.findByText(/\(xray alpha bravo yankee\)/)).toBeInTheDocument();
   });
 
-  it("keeps the typed code when going Back from the name step", async () => {
+  it("links Back to the homepage from the code step", async () => {
     renderJoin();
-    const input = await screen.findByLabelText("Four-letter party code");
-    fireEvent.change(input, { target: { value: "abcd" } });
-    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
-    await screen.findByLabelText("Your player name");
-    fireEvent.click(screen.getByRole("button", { name: /^back$/i }));
-    const backInput = await screen.findByLabelText("Four-letter party code");
-    expect((backInput as HTMLInputElement).value).toBe("ABCD");
+    await screen.findByLabelText("Four-letter party code");
+    const back = screen.getByRole("link", { name: /^back$/i });
+    expect(back.getAttribute("href")).toBe("/");
   });
 
   it("imports an invite fragment secret and strips it from the URL", async () => {
@@ -173,15 +171,15 @@ describe("/join", () => {
     expect(stubEngine.joinByCode).not.toHaveBeenCalled();
   });
 
-  it("keeps Continue disabled until the code is four letters", async () => {
+  it("keeps Join disabled until the code is four letters", async () => {
     renderJoin();
     const input = await screen.findByLabelText("Four-letter party code");
-    const continueButton = screen.getByRole("button", { name: /^continue$/i });
-    expect(continueButton).toBeDisabled();
+    const joinButton = screen.getByRole("button", { name: /^join$/i });
+    expect(joinButton).toBeDisabled();
     fireEvent.change(input, { target: { value: "abc" } });
-    expect(continueButton).toBeDisabled();
+    expect(joinButton).toBeDisabled();
     fireEvent.change(input, { target: { value: "abcd" } });
-    expect(continueButton).toBeEnabled();
+    expect(joinButton).toBeEnabled();
   });
 
   it("filters non-letter key presses on the code input", async () => {
@@ -195,8 +193,6 @@ describe("/join", () => {
     renderJoin();
     const input = await screen.findByLabelText("Four-letter party code");
     fireEvent.change(input, { target: { value: "zzzz" } });
-    fireEvent.click(screen.getByRole("button", { name: /^continue$/i }));
-    await screen.findByLabelText("Your player name");
     fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
     await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("ZZZZ"));
     expect(await screen.findByText(/ZZZZ does not exist/)).toBeInTheDocument();
@@ -218,5 +214,39 @@ describe("/join", () => {
     await waitFor(() =>
       expect(stubEngine.joinByInvite).toHaveBeenCalledWith({ secret, code: "EFGH" }),
     );
+  });
+
+  it("renders the name-editing page at /join?edit=name (2t1.9)", async () => {
+    renderJoin("/join?edit=name");
+    expect(await screen.findByRole("heading", { name: "Your name" })).toBeInTheDocument();
+    expect(screen.getByLabelText("Your player name")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Four-letter party code")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^save$/i })).toBeInTheDocument();
+  });
+
+  it("prefills the name page from the saved name (7.5)", async () => {
+    setSavedPlayerName("Ada");
+    renderJoin("/join?edit=name");
+    const input = (await screen.findByLabelText("Your player name")) as HTMLInputElement;
+    expect(input.value).toBe("Ada");
+  });
+
+  it("saves the edited name and returns to the join page (2t1.9)", async () => {
+    renderJoin("/join?edit=name");
+    const input = await screen.findByLabelText("Your player name");
+    fireEvent.change(input, { target: { value: "Ada" } });
+    fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    await waitFor(() => expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada"));
+    // Back on the join page (engine idle → the code form), edit mode off.
+    expect(await screen.findByText("Join a party")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Your player name")).not.toBeInTheDocument();
+  });
+
+  it("Back on the name page returns to the join page without saving (2t1.9)", async () => {
+    renderJoin("/join?edit=name");
+    await screen.findByLabelText("Your player name");
+    fireEvent.click(screen.getByRole("button", { name: /^back$/i }));
+    expect(await screen.findByText("Join a party")).toBeInTheDocument();
+    expect(stubEngine.setDisplayName).not.toHaveBeenCalled();
   });
 });
