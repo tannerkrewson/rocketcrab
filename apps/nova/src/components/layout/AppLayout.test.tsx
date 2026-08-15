@@ -88,29 +88,43 @@ describe("AppLayout", () => {
     expect(screen.queryByRole("contentinfo")).not.toBeInTheDocument();
   });
 
-  it("keeps theme controls reachable on the library page, which links back home and to browse", async () => {
+  it("keeps theme controls reachable on the library page, which links back home and to build (2t1.5)", async () => {
     renderAt("/library");
     await screen.findByRole("heading", { name: "My games" });
 
     expect(screen.getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
-    const home = screen.getByRole("link", { name: "Back to home" });
+    const home = screen.getByRole("link", { name: "back" });
     expect(home.getAttribute("href")).toBe("/");
-    const browse = screen.getByRole("link", { name: /Browse games/ });
-    expect(browse.getAttribute("href")).toBe("/browse");
+    // The header "New game" action (the empty-state CTA shares the label).
+    const builds = screen.getAllByRole("link", { name: /New game/ });
+    expect(builds.length).toBeGreaterThanOrEqual(1);
+    for (const build of builds) {
+      expect(build.getAttribute("href")).toBe("/build");
+    }
+    // "Browse games" is gone from the header (2t1.5) — the browse page is
+    // one tap from home.
+    expect(screen.queryByRole("link", { name: /Browse games/ })).not.toBeInTheDocument();
   });
 
-  it("gives every content page an explicit way back home (11.1)", async () => {
+  it("gives every content page an explicit way back home (11.1/2t1.1)", async () => {
+    // Homepage sub-pages carry the brand row (rocketcrab.com → home); the
+    // browse page's own unified back button also navigates home, and
+    // /examples keeps its classic "Back to home" link.
     for (const [path, heading] of [
       ["/browse", "Games"],
       ["/library", "My games"],
-      ["/examples", "Example games"],
       ["/about", "Coming soon"],
       ["/build", "Build a game"],
     ] as const) {
       renderAt(path);
       await screen.findByRole("heading", { name: heading });
-      const home = screen.getByRole("link", { name: "Back to home" });
-      expect(home.getAttribute("href")).toBe("/");
+      const brand = screen.getByRole("link", { name: /rocketcrab\.com — home/ });
+      expect(brand.getAttribute("href")).toBe("/");
     }
+
+    renderAt("/examples");
+    await screen.findByRole("heading", { name: "Example games" });
+    const home = screen.getByRole("link", { name: "Back to home" });
+    expect(home.getAttribute("href")).toBe("/");
   });
 });

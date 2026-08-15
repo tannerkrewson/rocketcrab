@@ -32,30 +32,39 @@ beforeEach(async () => {
 });
 
 describe("/library", () => {
-  it("shows the empty state when there are no saved games", async () => {
+  it("shows the empty state with a New-game CTA (2t1.5)", async () => {
     renderLibrary();
     expect(await screen.findByText("No saved games yet")).toBeInTheDocument();
+    // The empty-state action is the renamed "New game" CTA (the header
+    // action has the same label, so both links are present).
+    const ctas = screen.getAllByRole("link", { name: "New game" });
+    expect(ctas.length).toBeGreaterThanOrEqual(1);
+    for (const cta of ctas) {
+      expect(cta.getAttribute("href")).toBe("/build");
+    }
   });
 
-  it("links back home and offers equal-sized browse/build actions", async () => {
-    // Seed a game so the empty-state CTA (a second "Build a game" link)
+  it("shows ONE back button and a New-game action in the header (2t1.5)", async () => {
+    // Seed a game so the empty-state CTA (a second "New game" link)
     // does not collide with the header action under test.
     await gameRepository.create({ title: "Rockets", html: "<p>a</p>" });
     renderLibrary();
 
-    // The Home link (rocketcrab-9fv.11.13) keeps the page reachable from
-    // the homepage now that the shared footer is gone.
-    const home = await screen.findByRole("link", { name: "Home" });
-    expect(home.getAttribute("href")).toBe("/");
-    expect(home.className).toContain("btn-outline");
-    expect(home.className).toContain("self-start");
+    // The brand row (rocketcrab.com) stays visible (2t1.1).
+    expect(await screen.findByRole("link", { name: /rocketcrab\.com/ })).toBeInTheDocument();
 
-    // "Browse games" and "Build a game" share the same variant and size
-    // (rocketcrab-9fv.11.13) so the header actions render consistently.
-    const browse = screen.getByRole("link", { name: "Browse games" });
-    const build = screen.getByRole("link", { name: "Build a game" });
-    expect(browse.className).toContain("btn-primary");
-    expect(browse.className).toContain("btn-lg");
+    // ONE back button (the header duplicate and "Browse games" are gone).
+    const backs = screen.getAllByRole("link", { name: "back" });
+    expect(backs).toHaveLength(1);
+    const back = backs[0];
+    expect(back!.getAttribute("href")).toBe("/");
+    expect(back!.className).toContain("btn-outline");
+    expect(back!.className).toContain("self-start");
+    expect(screen.queryByRole("link", { name: /Browse games/ })).not.toBeInTheDocument();
+
+    // The header action is "New game" (renamed from "Build a game").
+    const build = screen.getByRole("link", { name: "New game" });
+    expect(build.getAttribute("href")).toBe("/build");
     expect(build.className).toContain("btn-primary");
     expect(build.className).toContain("btn-lg");
   });
@@ -74,6 +83,11 @@ describe("/library", () => {
     expect(screen.getByText("Card Sharks")).toBeInTheDocument();
     expect(screen.getByText("state mode")).toBeInTheDocument();
     expect(screen.getAllByText("Not tested")).toHaveLength(2);
+    // The card's play action is "Start party" (2t1.5) and links to /party
+    // with the game preselected (one per card).
+    const starts = screen.getAllByRole("link", { name: "Start party" });
+    expect(starts).toHaveLength(2);
+    expect(starts[0]!.getAttribute("href")).toContain("/party?gameId=");
   });
 
   it("filters games as you type in the search box", async () => {
