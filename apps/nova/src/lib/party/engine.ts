@@ -510,9 +510,15 @@ export class PartyEngine {
     if (element === this.container) {
       return;
     }
-    if (this.container !== null && element !== null && this.runtime !== null) {
-      // The UI remounted a fresh container (route change): rebuild the
-      // frame so the game keeps running in the new spot.
+    // The UI rebinds the frame container on the lobby<->playing phase flip
+    // (PartyExperience renders the SAME frame div inside a different tree,
+    // so React detaches the old ref with null before attaching the new
+    // element). A runtime still bound to the previous container is stale —
+    // its iframe was removed with the old node — so tear it down and reboot
+    // the frame in the new spot whenever a fresh element arrives while a
+    // runtime exists (rocketcrab-2t1.6: black screen, no iframe). A plain
+    // detach (null) leaves the runtime alone; the leave path owns it.
+    if (element !== null && this.runtime !== null) {
       this.runtime.dispose();
       this.runtime = null;
       this.frameStarted = false;
@@ -871,6 +877,8 @@ export class PartyEngine {
       this.emit();
       return;
     }
+    // A fresh start clears the previous game's ended banner (2t1.4).
+    this.endedReason = null;
     this.phase = "starting";
     this.phaseDetail = null;
     this.emit();
@@ -1317,6 +1325,51 @@ export class PartyEngine {
   }
 
   /**
+   * Recreate the S1 session after a game ends so the party can start again
+   * (rocketcrab-2t1.4): `NovaSession.start()`/`end()` are one-shot (started
+   * and ended never reset), so an ended session can never broadcast a
+   * second `game.start`. A fresh session attached to the same already-joined
+   * party transport resets the state engine, simulation engine, readiness,
+   * and authority election for the next game. Deferred one microtask so it
+   * never disposes the session from inside its own event loop; guarded so a
+   * leave that lands in between is left alone.
+   */
+  private resetSessionForNextGame(): void {
+    queueMicrotask(() => {
+      if (this.party === null || this.leaving) {
+        return;
+      }
+      if (this.unsubSession !== null) {
+        this.unsubSession();
+        this.unsubSession = null;
+      }
+      this.session?.dispose();
+      this.session = null;
+      const party = this.party;
+      const session = createNovaSession({
+        transport: party.privateTransport,
+        room: party.material.roomId,
+        sessionId: party.material.sessionId,
+        player: {
+          memberId: this.identity.memberId,
+          displayName: this.identity.displayName,
+        },
+        game: { gameId: "party", mode: "state" },
+      });
+      this.session = session;
+      this.unsubSession = session.onSessionEvent((event) => this.handleSessionEvent(event));
+      // The fresh session has no readiness: the next game's ready gate
+      // re-opens once the rebooted runtime frames re-register.
+      this.registered = false;
+      void session.attach().catch((error: unknown) => {
+        this.addNotice("error", `The game session could not be reset: ${errorMessage(error)}`);
+        this.emit();
+      });
+      this.emit();
+    });
+  }
+
+  /**
    * Destroy the Nova runtime frame (if any) and clear the pending source so
    * a classic game owns the frame area instead (7.7.4). The party session
    * and coordinator are untouched.
@@ -1472,7 +1525,6 @@ export class PartyEngine {
     switch (event.type) {
       case "registration":
         this.registered = true;
-        this.addNotice("info", "Your game loaded and registered.");
         // Ready = the game loaded + registered (P4 deliverable); the game's
         // own nova.ready() call is also routed (idempotent in the session).
         this.session?.ready();
@@ -1954,6 +2006,11 @@ export class PartyEngine {
           `The game ended${event.reason === undefined ? "." : ` (${event.reason}).`}`,
         );
         this.emit();
+        // NovaSession start/end are one-shot (started and ended never reset),
+        // so an ended session can never broadcast a second game.start. Swap
+        // in a fresh session attached to the same party transport so the
+        // host can start the game again after exiting to the lobby (2t1.4).
+        this.resetSessionForNextGame();
         break;
       case "playerJoined":
       case "playerLeft":
