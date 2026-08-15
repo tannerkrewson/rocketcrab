@@ -111,8 +111,9 @@ function PartyPage() {
 
   if (engine.isActive()) {
     // A party is being created, joining, in the lobby, playing, or
-    // reconnecting — render the full experience.
-    return <PartyExperience onLeft={() => void navigate({ to: "/library" })} />;
+    // reconnecting — render the full experience. 5cl.9: leaving the party
+    // returns to the HOMEPAGE (was /library).
+    return <PartyExperience onLeft={() => void navigate({ to: "/" })} />;
   }
   if (loadError !== null) {
     return (
