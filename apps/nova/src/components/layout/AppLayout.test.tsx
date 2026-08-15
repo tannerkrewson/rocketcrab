@@ -124,13 +124,19 @@ describe("AppLayout", () => {
       ["/browse", "Games"],
       ["/library", "My games"],
       ["/about", "Coming soon"],
-      ["/build", "Build a game"],
     ] as const) {
       renderAt(path);
       await screen.findByRole("heading", { name: heading });
       const brand = screen.getByRole("link", { name: /rocketcrab\.com — home/ });
       expect(brand.getAttribute("href")).toBe("/");
     }
+
+    // /build (5cl.16): the tiny rocketcrab.com brand row is gone — the
+    // hero card is the page's identity. Its own "back" link goes home.
+    renderAt("/build");
+    await screen.findByRole("heading", { name: "Rocketcrab Nova" });
+    const buildBack = screen.getByRole("link", { name: "back" });
+    expect(buildBack.getAttribute("href")).toBe("/");
 
     renderAt("/examples");
     await screen.findByRole("heading", { name: "Example games" });
