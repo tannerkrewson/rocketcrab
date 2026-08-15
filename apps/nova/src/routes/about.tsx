@@ -20,7 +20,7 @@ function AboutPage() {
   return (
     <div className="flex flex-col gap-6">
       <BrandHeader />
-      <Link to="/" className={buttonStyles("neutral", "md", "self-start", true)}>
+      <Link to="/" className={buttonStyles("default", "md", "self-start", true)}>
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         back
       </Link>

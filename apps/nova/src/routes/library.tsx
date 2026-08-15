@@ -66,7 +66,7 @@ export function LibraryPage() {
     <div className="flex flex-col gap-6">
       <BrandHeader />
 
-      <Link to="/" className={buttonStyles("neutral", "md", "self-start", true)}>
+      <Link to="/" className={buttonStyles("default", "md", "self-start", true)}>
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         back
       </Link>
@@ -154,7 +154,7 @@ export function LibraryPage() {
               be undone.
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="neutral" soft onClick={() => setPendingDelete(null)}>
+              <Button variant="default" soft onClick={() => setPendingDelete(null)}>
                 Cancel
               </Button>
               <Button variant="danger" onClick={handleDelete} disabled={deleteGame.isPending}>

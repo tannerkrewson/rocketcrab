@@ -34,7 +34,7 @@ export function PromptExportMenu({ source, title }: PromptExportMenuProps) {
   return (
     <details ref={detailsRef} className="dropdown dropdown-end" data-testid="prompt-export-menu">
       <summary
-        className={buttonStyles("neutral", "md", undefined, true)}
+        className={buttonStyles("default", "md", undefined, true)}
         title="Copy the master prompt, or the prompt plus your current game code"
       >
         <ScrollText className="h-4 w-4" aria-hidden="true" />

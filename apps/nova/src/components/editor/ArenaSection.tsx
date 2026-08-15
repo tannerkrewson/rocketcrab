@@ -331,7 +331,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
           </Button>
         </div>
         <Button
-          variant={debugOpen ? "accent" : "neutral"}
+          variant={debugOpen ? "accent" : "default"}
           soft={!debugOpen}
           size="md"
           onClick={() => setDebugOpen((open) => !open)}
@@ -360,7 +360,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
                 aria-label="Artificial latency"
               />
               <Button
-                variant={state.dropMessages ? "accent" : "neutral"}
+                variant={state.dropMessages ? "accent" : "default"}
                 soft={!state.dropMessages}
                 size="md"
                 onClick={() => actions.setDropMessages(!state.dropMessages)}
@@ -393,7 +393,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
           Clear logs
         </Button>
         <Button
-          variant="neutral"
+          variant="default"
           soft
           size="md"
           onClick={actions.restartAll}
@@ -459,7 +459,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
         <div className="flex-1" />
         {player.sessionStatus === "disconnected" ? (
           <Button
-            variant="neutral"
+            variant="default"
             soft
             size="md"
             onClick={() => void actions.reconnectPlayer(player.id)}
@@ -470,7 +470,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
           </Button>
         ) : (
           <Button
-            variant="neutral"
+            variant="default"
             soft
             size="md"
             onClick={() => void actions.disconnectPlayer(player.id)}
@@ -483,7 +483,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
         )}
         {player.sessionStatus === "suspended" ? (
           <Button
-            variant="neutral"
+            variant="default"
             soft
             size="md"
             onClick={() => void actions.resumePlayer(player.id)}
@@ -494,7 +494,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
           </Button>
         ) : (
           <Button
-            variant="neutral"
+            variant="default"
             soft
             size="md"
             onClick={() => void actions.suspendPlayer(player.id)}
@@ -699,7 +699,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
               }}
             />
             <div className="flex justify-end gap-2">
-              <Button variant="neutral" soft onClick={() => setRenameTarget(null)}>
+              <Button variant="default" soft onClick={() => setRenameTarget(null)}>
                 Cancel
               </Button>
               <Button variant="primary" onClick={handleRename}>

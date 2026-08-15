@@ -53,7 +53,7 @@ export function DiagnosticsPanel({
     <section className="flex flex-col gap-3" aria-label="Errors and diagnostics">
       <header className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="text-sm font-black">Diagnostics</h2>
-        <Button variant="neutral" soft size="md" onClick={onCopyReport} disabled={busy}>
+        <Button variant="default" soft size="md" onClick={onCopyReport} disabled={busy}>
           <Copy className="h-4 w-4" aria-hidden="true" />
           Copy report
         </Button>

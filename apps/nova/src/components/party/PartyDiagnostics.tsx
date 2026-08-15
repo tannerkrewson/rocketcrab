@@ -173,7 +173,7 @@ export function PartyDiagnosticsPanel({
         <div className="mt-1">
           <button
             type="button"
-            className="btn btn-neutral btn-soft btn-xs font-bold"
+            className="btn btn-soft btn-xs font-bold"
             onClick={onRefresh}
             title="Re-sample connection quality and relay state"
           >

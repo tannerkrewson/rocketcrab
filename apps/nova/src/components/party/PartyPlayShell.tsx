@@ -405,7 +405,7 @@ export function PartyPlayShell({
               emergency stop — game code cannot disable it.
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="neutral" soft onClick={() => setConfirmEnd(false)}>
+              <Button variant="default" soft onClick={() => setConfirmEnd(false)}>
                 Keep playing
               </Button>
               <Button
@@ -436,7 +436,7 @@ export function PartyPlayShell({
               will be lost. Are you sure?
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="neutral" soft onClick={() => setConfirmReloadAll(false)}>
+              <Button variant="default" soft onClick={() => setConfirmReloadAll(false)}>
                 Cancel
               </Button>
               <Button

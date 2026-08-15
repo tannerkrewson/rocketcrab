@@ -137,7 +137,7 @@ function PartyPage() {
         <ErrorPanel title="Couldn't start the party" message={loadError} onRetry={handleRetry} />
         <Link
           to="/"
-          className={buttonStyles("neutral", "md", "self-start", true)}
+          className={buttonStyles("default", "md", "self-start", true)}
           title="Back to home"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
@@ -182,7 +182,7 @@ function PartyPage() {
       </Card>
       <Link
         to="/"
-        className={buttonStyles("neutral", "md", "self-center", true)}
+        className={buttonStyles("default", "md", "self-center", true)}
         title="Back to home"
       >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />

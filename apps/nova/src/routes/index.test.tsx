@@ -95,7 +95,7 @@ describe("/", () => {
     );
   });
 
-  it("styles the party buttons soft-primary and the stack soft-neutral (2t1.8)", async () => {
+  it("styles the party buttons soft-primary and the stack soft-default (2t1.8/5cl.5)", async () => {
     renderHome();
     const primaryRow = await screen.findByRole("region", { name: "Start or join a party" });
     for (const link of within(primaryRow).getAllByRole("link")) {
@@ -103,7 +103,8 @@ describe("/", () => {
     }
     const more = await screen.findByRole("region", { name: "More" });
     for (const link of within(more).getAllByRole("link")) {
-      expect(link).toHaveClass("btn-neutral", "btn-soft");
+      expect(link).toHaveClass("btn-soft");
+      expect(link).not.toHaveClass("btn-neutral");
     }
   });
 

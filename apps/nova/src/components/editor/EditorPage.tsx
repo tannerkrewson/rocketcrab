@@ -537,7 +537,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
   const actions = (
     <>
       <Button
-        variant="neutral"
+        variant="default"
         soft
         onClick={handlePaste}
         title="Paste from clipboard (replaces the editor content)"
@@ -556,7 +556,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         Clear all
       </Button>
       <Button
-        variant="neutral"
+        variant="default"
         soft
         onClick={() => setDiscardDialog({ onConfirm: confirmReset })}
         disabled={!dirty}
@@ -567,7 +567,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       </Button>
       <div className="flex-1" />
       <Button
-        variant="neutral"
+        variant="default"
         soft
         onClick={handleSaveAsCopy}
         title="Save the current source as a new game"
@@ -673,7 +673,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         </Link>
         <Link
           to="/library"
-          className={buttonStyles("neutral", "md", undefined, true)}
+          className={buttonStyles("default", "md", undefined, true)}
           title="Back to your games"
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
@@ -791,7 +791,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         data-testid="mobile-actions-bar"
       >
         <Button
-          variant="neutral"
+          variant="default"
           soft
           size="md"
           onClick={handlePaste}
@@ -810,7 +810,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
           <Trash2 className="h-4 w-4" aria-hidden="true" />
         </Button>
         <Button
-          variant="neutral"
+          variant="default"
           soft
           size="md"
           onClick={() => setDiscardDialog({ onConfirm: confirmReset })}
@@ -820,7 +820,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
           <Eraser className="h-4 w-4" aria-hidden="true" />
         </Button>
         <div className="flex-1" />
-        <Button variant="neutral" soft size="md" onClick={handleSaveAsCopy}>
+        <Button variant="default" soft size="md" onClick={handleSaveAsCopy}>
           <CopyPlus className="h-4 w-4" aria-hidden="true" />
           Copy
         </Button>
@@ -865,7 +865,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
           </p>
           <div className="flex justify-end gap-2">
             <Button
-              variant="neutral"
+              variant="default"
               soft
               onClick={() => {
                 if (discardDialog?.onConfirm === confirmReset) {
@@ -896,7 +896,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
             {game ? " Your saved version is untouched — Reset restores it." : ""}
           </p>
           <div className="flex justify-end gap-2">
-            <Button variant="neutral" soft onClick={() => setClearAllDialog(false)}>
+            <Button variant="default" soft onClick={() => setClearAllDialog(false)}>
               Keep code
             </Button>
             <Button variant="danger" onClick={handleClearAll}>

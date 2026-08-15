@@ -38,7 +38,7 @@ export function PartyGameDetailsModal({ game, onClose }: PartyGameDetailsModalPr
         <div className="flex items-start justify-between gap-2">
           <h2 className="text-xl font-black">{game.title}</h2>
           <Button
-            variant="neutral"
+            variant="default"
             soft
             size="md"
             onClick={onClose}

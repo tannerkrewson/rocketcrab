@@ -157,7 +157,7 @@ export function JoinScreen({
         <div className="flex justify-center gap-3">
           {editing ? (
             <Button
-              variant="neutral"
+              variant="default"
               soft
               size="lg"
               type="button"
@@ -167,7 +167,7 @@ export function JoinScreen({
               Back
             </Button>
           ) : (
-            <Link to="/" className={buttonStyles("neutral", "lg", "flex-1", true)}>
+            <Link to="/" className={buttonStyles("default", "lg", "flex-1", true)}>
               Back
             </Link>
           )}

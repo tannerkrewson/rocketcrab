@@ -115,7 +115,7 @@ export function BuildPage() {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-10 text-center">
-      <Link to="/" className={buttonStyles("neutral", "md", "self-start", true)}>
+      <Link to="/" className={buttonStyles("default", "md", "self-start", true)}>
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         back
       </Link>
