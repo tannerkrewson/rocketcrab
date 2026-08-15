@@ -53,6 +53,8 @@ describe("/", () => {
     expect(screen.queryByText("🚀")).not.toBeInTheDocument();
     expect(screen.getByText("party games for phones")).toBeInTheDocument();
     const alert = screen.getByRole("status");
+    // rocketcrab-2t1.8: the Nova alert is a dotted outline (not solid).
+    expect(alert).toHaveClass("alert-outline", "border-dotted");
     expect(within(alert).getByText("Introducing Nova")).toBeInTheDocument();
     expect(
       within(alert).getByText("Build your own games and play them with friends, instantly."),
@@ -70,13 +72,42 @@ describe("/", () => {
   it("lists the secondary actions column below the primaries", async () => {
     renderHome();
     const more = await screen.findByRole("region", { name: "More" });
-    expect(within(more).getByRole("link", { name: "Build a game" })).toBeInTheDocument();
+    const links = within(more).getAllByRole("link");
+    // rocketcrab-2t1.1: My games now sits before Browse games; the
+    // build-a-game button keeps its original position (pending user
+    // clarification on the truncated note).
+    expect(links.map((link) => link.textContent)).toEqual([
+      "Build a game",
+      "My games",
+      "Browse games",
+      "About",
+    ]);
     expect(within(more).getByRole("link", { name: "Browse games" })).toHaveAttribute(
       "href",
       "/browse",
     );
-    expect(within(more).getByRole("link", { name: "My games" })).toBeInTheDocument();
-    expect(within(more).getByRole("link", { name: "About" })).toBeInTheDocument();
+    expect(within(more).getByRole("link", { name: "My games" })).toHaveAttribute(
+      "href",
+      "/library",
+    );
+  });
+
+  it("styles the party buttons soft-primary and the stack soft-neutral (2t1.8)", async () => {
+    renderHome();
+    const primaryRow = await screen.findByRole("region", { name: "Start or join a party" });
+    for (const link of within(primaryRow).getAllByRole("link")) {
+      expect(link).toHaveClass("btn-primary", "btn-soft");
+    }
+    const more = await screen.findByRole("region", { name: "More" });
+    for (const link of within(more).getAllByRole("link")) {
+      expect(link).toHaveClass("btn-neutral", "btn-soft");
+    }
+  });
+
+  it("scales the title down on press (2t1.8)", async () => {
+    renderHome();
+    const title = await screen.findByRole("heading", { name: "rocketcrab.com" });
+    expect(title).toHaveClass("active:scale-95", "transition-transform", "cursor-pointer");
   });
 
   it("no longer shows the Recent games section (7.35)", async () => {

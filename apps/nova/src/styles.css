@@ -146,3 +146,24 @@
      the browser reports no notch inset (desktop). */
   padding-top: max(0.5rem, env(safe-area-inset-top));
 }
+
+/* Nova brand glow (2t1.7): the build page's hero uses the info color's
+   soft halo, matching the rocket/crab logo drop-shadow glow. */
+@utility glow-info {
+  box-shadow: 0 0 26px -6px oklch(72% 0.11 225 / 0.6);
+}
+
+@utility text-glow-info {
+  text-shadow: 0 0 20px oklch(72% 0.11 225 / 0.55);
+}
+
+/* 2t1.9: the lobby's invisible runtime frame (PartyExperience) must never
+   take vertical space. While a game is selected the game boots inside this
+   hidden container, and the booted game iframe's default height would
+   otherwise inflate it — leaving a weird gap between the party header and
+   the lobby exactly when a game IS selected (no gap when nothing is
+   selected, because no iframe exists yet). Height is restored once the
+   game starts (the `invisible` class drops then). */
+[data-testid="party-frame"].invisible {
+  height: 0;
+}

@@ -4,17 +4,17 @@ import type { FormEvent, KeyboardEvent } from "react";
 import { phoneticSpelling } from "../../lib/party/phonetic";
 import { Button, buttonStyles } from "../ui/Button";
 
-export type JoinStep = "code" | "name";
+/** What this screen is doing: joining a party, or editing the player name. */
+export type JoinMode = "join" | "edit";
 
 export interface JoinScreenProps {
+  /** "join" = the /join code-entry flow; "edit" = the name-editing page
+   *  (the same name step, opened from the lobby's pencil / no-name prompt). */
+  mode?: JoinMode;
   /** Error from a failed join attempt (rejection, not found, timeout). */
   error: string | null;
   /** True while a join is in flight (the party route renders the lobby). */
   joining: boolean;
-  /** Current step of the two-step join flow (code entry → player name). */
-  step: JoinStep;
-  /** Advance to the name step or go back to edit the code. */
-  onStepChange: (step: JoinStep) => void;
   /** Controlled code input (state lives in the route so it survives the
    *  joining → error transition and "Try again" keeps the typed code). */
   code: string;
@@ -22,38 +22,44 @@ export interface JoinScreenProps {
   /** Controlled name input (prefilled from the saved player name, 7.5). */
   name: string;
   onNameChange: (name: string) => void;
-  /** Submit a join attempt with the chosen player name (7.5). */
+  /** Submit: join mode = join with the code and current name; edit mode =
+   *  save the chosen player name (7.5). */
   onSubmit: (code: string, name: string) => void;
+  /** Edit mode: navigate back (to the party/lobby or the join form). */
+  onBack: () => void;
 }
 
 /**
- * Two-step join flow (7.47): enter the four-letter code first in a tall,
- * wide mono input (Continue stays disabled until it is complete), then
- * confirm the code with its phonetic spelling and enter your player name
- * before joining. Codes are normalized to uppercase on entry; the party
- * layer validates the alphabet (no I/O/L). The player's name is prefilled
- * from the last saved name (7.5).
+ * Join flow (7.47, reworked 2t1.9): enter the four-letter code in a tall,
+ * wide mono input — the join happens directly from the code step, and the
+ * player's name is ONLY asked once they are in the lobby (the edit mode
+ * below). Codes are normalized to uppercase on entry; the party layer
+ * validates the alphabet (no I/O/L). The phonetic spelling confirms the
+ * code inline once it is complete. The player's name is prefilled from the
+ * last saved name (7.5).
+ *
+ * Edit mode reuses the same name-entry presentation (UserRound icon,
+ * pl-10 input, visible "Your name" label, maxLength 24) as the old join
+ * name step — the lobby's pencil / no-name prompt land here via
+ * `/join?edit=name`.
  */
 export function JoinScreen({
+  mode = "join",
   error,
   joining,
-  step,
-  onStepChange,
   code,
   onCodeChange,
   name,
   onNameChange,
   onSubmit,
+  onBack,
 }: JoinScreenProps) {
+  const editing = mode === "edit";
   const normalized = code.trim().toUpperCase();
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
-    if (step === "code") {
-      if (normalized.length !== 4) {
-        return;
-      }
-      onStepChange("name");
+    if (!editing && normalized.length !== 4) {
       return;
     }
     onSubmit(normalized, name.trim());
@@ -75,12 +81,40 @@ export function JoinScreen({
   return (
     <div className="mx-auto flex w-full max-w-md flex-col items-center gap-6">
       <div className="flex flex-col items-center gap-2 pt-4 text-center">
-        <KeyRound className="h-10 w-10 text-primary" aria-hidden="true" />
-        <h1 className="text-3xl font-black">Join a party</h1>
+        {editing ? (
+          <UserRound className="h-10 w-10 text-primary" aria-hidden="true" />
+        ) : (
+          <KeyRound className="h-10 w-10 text-primary" aria-hidden="true" />
+        )}
+        <h1 className="text-3xl font-black">{editing ? "Your name" : "Join a party"}</h1>
       </div>
 
       <form onSubmit={handleSubmit} className="flex w-full flex-col gap-5" noValidate>
-        {step === "code" ? (
+        {editing ? (
+          <div className="flex flex-col gap-1.5">
+            <label htmlFor="player-name" className="text-sm font-bold">
+              Your name
+            </label>
+            <div className="relative">
+              <UserRound
+                className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-base-content/40"
+                aria-hidden="true"
+              />
+              <input
+                id="player-name"
+                type="text"
+                value={name}
+                onChange={(event) => onNameChange(event.target.value)}
+                placeholder="Your name"
+                maxLength={24}
+                autoComplete="nickname"
+                aria-label="Your player name"
+                autoFocus
+                className="input input-bordered w-full pl-10"
+              />
+            </div>
+          </div>
+        ) : (
           <div className="flex flex-col items-center gap-1.5">
             <label htmlFor="party-code" className="text-sm font-bold">
               Party code
@@ -100,29 +134,12 @@ export function JoinScreen({
               aria-label="Four-letter party code"
               className="input input-bordered input-xl w-48 text-center font-mono text-4xl font-black tracking-[0.4em] placeholder:tracking-[0.4em]"
             />
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            <label htmlFor="player-name" className="text-sm font-bold">
-              Your name
-            </label>
-            <div className="relative">
-              <UserRound
-                className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-base-content/40"
-                aria-hidden="true"
-              />
-              <input
-                id="player-name"
-                type="text"
-                value={name}
-                onChange={(event) => onNameChange(event.target.value)}
-                placeholder="Your name"
-                maxLength={24}
-                autoComplete="nickname"
-                aria-label="Your player name"
-                className="input input-bordered w-full pl-10"
-              />
-            </div>
+            {normalized.length === 4 ? (
+              <p className="text-center text-xs text-base-content/60">
+                <span className="font-mono font-bold text-primary">{normalized}</span> —{" "}
+                <span className="text-base-content/50">({phoneticSpelling(normalized)})</span>
+              </p>
+            ) : null}
           </div>
         )}
 
@@ -137,41 +154,34 @@ export function JoinScreen({
           </p>
         ) : null}
 
-        {step === "name" ? (
-          <p className="text-center text-sm text-base-content/60">
-            Joining party <span className="font-mono font-bold text-primary">{normalized}</span> —{" "}
-            <span className="text-base-content/50">({phoneticSpelling(normalized)})</span>
-          </p>
-        ) : null}
-
         <div className="flex justify-center gap-3">
-          {step === "code" ? (
+          {editing ? (
+            <Button variant="outline" size="lg" type="button" className="flex-1" onClick={onBack}>
+              Back
+            </Button>
+          ) : (
             <Link to="/" className={buttonStyles("outline", "lg", "flex-1")}>
               Back
             </Link>
-          ) : (
-            <Button
-              variant="outline"
-              size="lg"
-              type="button"
-              className="flex-1"
-              onClick={() => onStepChange("code")}
-            >
-              Back
-            </Button>
           )}
-          {step === "code" ? (
+          {editing ? (
             <Button
               variant="primary"
               size="lg"
               type="submit"
-              disabled={normalized.length !== 4}
+              disabled={name.trim().length === 0}
               className="flex-1"
             >
-              Continue
+              Save
             </Button>
           ) : (
-            <Button variant="primary" size="lg" type="submit" disabled={joining} className="flex-1">
+            <Button
+              variant="primary"
+              size="lg"
+              type="submit"
+              disabled={normalized.length !== 4 || joining}
+              className="flex-1"
+            >
               {joining ? (
                 <>
                   <Loader2 className="h-5 w-5 animate-spin" aria-hidden="true" />

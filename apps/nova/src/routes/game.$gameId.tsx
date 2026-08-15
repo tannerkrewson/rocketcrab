@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, BookOpen, Code2, ExternalLink, PartyPopper, Play } from "lucide-react";
+import { ArrowLeft, BookOpen, Code2, ExternalLink, PartyPopper } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
@@ -7,9 +7,11 @@ import { Button, buttonStyles } from "../components/ui/Button";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
 import { LoadingState } from "../components/ui/LoadingState";
 import { ScreenshotCarousel } from "../components/games/ScreenshotCarousel";
+import { BrandHeader } from "../components/layout/BrandHeader";
 import { findBrowseGame } from "../lib/browse";
 import { NOVA_MODE_LABELS } from "../lib/browse/nova-games";
 import { storeDraftSource } from "../lib/editor/draft-handoff";
+import { storePartySource } from "../lib/party/source-handoff";
 import { useSavedGame } from "../lib/games/queries";
 import { usePartyEngine } from "../lib/party/use-party";
 import { cn } from "../lib/cn";
@@ -27,15 +29,20 @@ function errorMessage(error: unknown): string {
 }
 
 /**
- * Game detail page (7.23 / 10.9): classic-style Info | Guide tabs for
- * prebuilt games, and metadata (title, description, mode) for the player's
- * own saved games loaded from the IndexedDB repository.
+ * Game detail page (7.23 / 10.9 / 2t1.10): classic-style Info | Guide tabs
+ * for prebuilt games, and metadata (title, description, mode) for the
+ * player's own saved games loaded from the IndexedDB repository. The brand
+ * row (rocketcrab.com) stays visible (2t1.1).
  *
- * When a party is waiting in its lobby and the viewer is the creator, a
- * "Select for party" action appears: it hands the game to the party engine
- * (saved / nova games via selectGame, classic games via selectClassicGame)
- * and returns to /party — the party session never left the page (the
- * engine is a module singleton), so the lobby shows the selected game.
+ * The call to action is contextual — there is NO standalone "play game"
+ * view (2t1.10): when a party is waiting in its lobby and the viewer is the
+ * creator, "Select game" hands the game to the party engine (saved / nova
+ * games via selectGame, classic games via selectClassicGame) and returns to
+ * /party; when the viewer is not in a party, "Start party" creates one with
+ * the game preselected (saved / nova via /party search params + source
+ * handoff; classic games can't be preselected over the URL, so the party
+ * starts and the lobby's pick-a-game browser shows the classic boxes).
+ * Guests in a party get no CTA — the host picks.
  */
 export function BrowseGamePage() {
   const { gameId } = Route.useParams();
@@ -49,6 +56,7 @@ export function BrowseGamePage() {
 
   const inPartyLobby =
     (state.phase === "lobby" || state.phase === "starting") && state.role === "creator";
+  const notInParty = state.phase === "idle";
   const backTarget = inPartyLobby ? "/party" : "/browse";
   const backLabel = inPartyLobby ? "Back to party" : "Back to games";
 
@@ -78,7 +86,7 @@ export function BrowseGamePage() {
     }
   };
 
-  /** The host-only party-pick button (absent when no party is waiting). */
+  /** The host-only "Select game" action (absent when no party is waiting). */
   const selectForParty = (pick: () => Promise<void>) =>
     inPartyLobby ? (
       <Button
@@ -88,7 +96,7 @@ export function BrowseGamePage() {
         disabled={selecting}
       >
         <PartyPopper className="h-4 w-4" aria-hidden="true" />
-        {selecting ? "Selecting…" : "Select for party"}
+        {selecting ? "Selecting…" : "Select game"}
       </Button>
     ) : null;
 
@@ -111,6 +119,7 @@ export function BrowseGamePage() {
     }
     return (
       <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+        <BrandHeader />
         {backLink}
         <header className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
@@ -124,6 +133,17 @@ export function BrowseGamePage() {
           {saved.description ?? "No description yet — open it in the editor to learn more."}
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
+          {notInParty ? (
+            <Link
+              to="/party"
+              search={{ gameId: saved.id, mode: saved.mode ?? "state", title: saved.title }}
+              className={buttonStyles("primary", "lg")}
+              title="Create a party from this game and play it with friends"
+            >
+              <PartyPopper className="h-4 w-4" aria-hidden="true" />
+              Start party
+            </Link>
+          ) : null}
           {selectForParty(async () => {
             await engine.selectGame({
               gameId: saved.id,
@@ -151,6 +171,24 @@ export function BrowseGamePage() {
     }
   };
 
+  /** Not in a party: start one with a Nova prebuilt game preselected. The
+   * source goes through the party source handoff so /party can load it. */
+  const handleStartPartyFromNova = async () => {
+    if (prebuilt.kind !== "nova" || opening) return;
+    setOpening(true);
+    try {
+      const source = (await prebuilt.load()).default;
+      storePartySource({ gameId: prebuilt.id, source });
+      await navigate({
+        to: "/party",
+        search: { gameId: prebuilt.id, mode: prebuilt.mode, title: prebuilt.name },
+      });
+    } catch {
+      toast.error("Couldn't load this game.");
+      setOpening(false);
+    }
+  };
+
   // Classic games get a red badge, Nova games a blue one (7.42).
   const badge =
     prebuilt.kind === "classic" ? (
@@ -163,6 +201,7 @@ export function BrowseGamePage() {
 
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+      <BrandHeader />
       {backLink}
 
       <header className="flex flex-col gap-2">
@@ -258,6 +297,32 @@ export function BrowseGamePage() {
       )}
 
       <div className="flex flex-wrap items-center justify-center gap-3">
+        {notInParty ? (
+          prebuilt.kind === "classic" ? (
+            // Classic games can't be preselected over the URL (the engine
+            // creates their room in the lobby), so the party starts plain
+            // and the lobby's pick-a-game browser shows the classic boxes.
+            <Link
+              to="/party"
+              search={{ gameId: undefined, mode: undefined, title: undefined }}
+              className={buttonStyles("primary", "lg")}
+              title="Start a party and pick this game in the lobby"
+            >
+              <PartyPopper className="h-4 w-4" aria-hidden="true" />
+              Start party
+            </Link>
+          ) : (
+            <Button
+              variant="primary"
+              size="lg"
+              onClick={() => void handleStartPartyFromNova()}
+              disabled={opening}
+            >
+              <PartyPopper className="h-4 w-4" aria-hidden="true" />
+              {opening ? "Starting…" : "Start party"}
+            </Button>
+          )
+        ) : null}
         {prebuilt.kind === "classic"
           ? selectForParty(async () => {
               await engine.selectClassicGame(prebuilt.id);
@@ -272,16 +337,7 @@ export function BrowseGamePage() {
                 apiVersion: PROTOCOL_VERSION,
               });
             })}
-        {prebuilt.kind === "classic" ? (
-          <Link
-            to="/classic/$gameId"
-            params={{ gameId: prebuilt.id }}
-            className={buttonStyles("primary", "lg")}
-          >
-            <Play className="h-4 w-4" aria-hidden="true" />
-            Play game
-          </Link>
-        ) : (
+        {prebuilt.kind === "nova" ? (
           <Button
             variant="primary"
             size="lg"
@@ -291,7 +347,7 @@ export function BrowseGamePage() {
             <Code2 className="h-4 w-4" aria-hidden="true" />
             {opening ? "Opening…" : "Open in the editor"}
           </Button>
-        )}
+        ) : null}
       </div>
     </div>
   );

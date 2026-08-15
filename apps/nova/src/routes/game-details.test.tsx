@@ -9,11 +9,13 @@ import type { PartyEngineState } from "../lib/party/engine";
 import { routeTree } from "../routeTree.gen";
 
 /**
- * Game detail page party-pick tests (10.9): the shared /game/:gameId page
- * also serves saved games (title, description, mode from the IndexedDB
- * repository), and when a party is waiting in its lobby the creator gets a
- * "Select for party" action that hands the game to the party engine and
- * returns to /party — the lobby never sets the game directly.
+ * Game detail page party tests (10.9 / 2t1.10): the shared /game/:gameId
+ * page also serves saved games (title, description, mode from the IndexedDB
+ * repository). The CTA is contextual: when a party is waiting in its lobby
+ * the creator gets a "Select game" action that hands the game to the party
+ * engine and returns to /party; when no party is active the page offers
+ * "Start party" (with the game preselected for saved/Nova games, plain
+ * /party for classic). There is no standalone "play game" view anymore.
  */
 
 const IDLE_STATE: PartyEngineState = {
@@ -75,17 +77,38 @@ const LOBBY_STATE: PartyEngineState = {
   startBlockedReason: "Pick a game before starting the party.",
 };
 
+/** A guest sitting in a party's lobby (no pick rights). */
+const GUEST_STATE: PartyEngineState = {
+  ...LOBBY_STATE,
+  role: "joiner",
+  memberId: "member-b",
+  displayName: "Player B",
+  greeterMemberId: null,
+  amGreeter: false,
+  authorityMemberId: "member-a",
+};
+
 const { stubEngine, stubs } = vi.hoisted(() => {
-  const stubs: { active: boolean } = { active: false };
+  const stubs: { mode: "idle" | "lobby" | "guest" } = { mode: "idle" };
+  const stateFor = (): PartyEngineState => {
+    switch (stubs.mode) {
+      case "lobby":
+        return LOBBY_STATE;
+      case "guest":
+        return GUEST_STATE;
+      default:
+        return IDLE_STATE;
+    }
+  };
   return {
     stubs,
     stubEngine: {
-      getState: vi.fn((): PartyEngineState => (stubs.active ? LOBBY_STATE : IDLE_STATE)),
+      getState: vi.fn(stateFor),
       onState: vi.fn((handler: (state: PartyEngineState) => void) => {
-        handler(stubs.active ? LOBBY_STATE : IDLE_STATE);
+        handler(stateFor());
         return () => undefined;
       }),
-      isActive: vi.fn(() => stubs.active),
+      isActive: vi.fn(() => stubs.mode !== "idle"),
       setContainer: vi.fn(),
       selectGame: vi.fn(async () => undefined),
       selectClassicGame: vi.fn(async () => undefined),
@@ -121,11 +144,11 @@ const SAVED_HTML = "<!doctype html><html><body><p>rockets</p></body></html>";
 
 beforeEach(async () => {
   vi.clearAllMocks();
-  stubs.active = false;
+  stubs.mode = "idle";
   await gameRepository.clear();
 });
 
-describe("/game/:gameId — saved games and party selection (10.9)", () => {
+describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () => {
   it("renders saved-game details from the repository (title, mode, description)", async () => {
     const game = await gameRepository.create({
       title: "Rocket Rumble",
@@ -138,16 +161,23 @@ describe("/game/:gameId — saved games and party selection (10.9)", () => {
     expect(await screen.findByRole("heading", { name: "Rocket Rumble" })).toBeInTheDocument();
     expect(screen.getByText(/simulation mode · saved/)).toBeInTheDocument();
     expect(screen.getByText("Blast off with friends.")).toBeInTheDocument();
-    // Without an active party there is no select action.
-    expect(screen.queryByRole("button", { name: /select for party/i })).not.toBeInTheDocument();
+    // Without an active party there is no select action — but a "Start
+    // party" CTA that preseeds this game (2t1.10).
+    expect(screen.queryByRole("button", { name: /select game/i })).not.toBeInTheDocument();
+    const start = screen.getByRole("link", { name: /Start party/ });
+    expect(start.getAttribute("href")).toBe(
+      `/party?gameId=${game.id}&mode=simulation&title=Rocket+Rumble`,
+    );
     // The back link is a compact outline button, not a full-width bar.
     const back = screen.getByRole("link", { name: "Back to games" });
     expect(back.className).toContain("btn-outline");
     expect(back.className).toContain("self-start");
+    // The brand row stays visible on the details page (2t1.1).
+    expect(screen.getByRole("link", { name: /rocketcrab\.com/ })).toBeInTheDocument();
   });
 
   it("selects a saved game for the active party and returns to the lobby (10.9)", async () => {
-    stubs.active = true;
+    stubs.mode = "lobby";
     const game = await gameRepository.create({
       title: "Rocket Rumble",
       html: SAVED_HTML,
@@ -155,7 +185,7 @@ describe("/game/:gameId — saved games and party selection (10.9)", () => {
     });
     const router = renderAt(`/game/${game.id}`);
 
-    const select = await screen.findByRole("button", { name: /select for party/i });
+    const select = await screen.findByRole("button", { name: /select game/i });
     await userEvent.click(select);
 
     await vi.waitFor(() =>
@@ -169,25 +199,25 @@ describe("/game/:gameId — saved games and party selection (10.9)", () => {
     );
     // Back in the party lobby.
     await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
-    expect(screen.queryByRole("button", { name: /select for party/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /select game/i })).not.toBeInTheDocument();
   });
 
   it("selects a classic game for the active party via selectClassicGame (10.9)", async () => {
-    stubs.active = true;
+    stubs.mode = "lobby";
     const router = renderAt("/game/drawphone");
 
-    const select = await screen.findByRole("button", { name: /select for party/i });
+    const select = await screen.findByRole("button", { name: /select game/i });
     await userEvent.click(select);
 
     await vi.waitFor(() => expect(stubEngine.selectClassicGame).toHaveBeenCalledWith("drawphone"));
     await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
   });
 
-  it("keeps the play/open actions alongside the party select (10.9)", async () => {
-    stubs.active = true;
+  it("keeps the editor action alongside the party select (10.9/2t1.10)", async () => {
+    stubs.mode = "lobby";
     renderAt("/game/nova-quiz");
 
-    const select = await screen.findByRole("button", { name: /select for party/i });
+    const select = await screen.findByRole("button", { name: /select game/i });
     // The back link returns to the party, not the browse page.
     const back = screen.getByRole("link", { name: "Back to party" });
     expect(back.getAttribute("href")).toBe("/party");
@@ -195,20 +225,33 @@ describe("/game/:gameId — saved games and party selection (10.9)", () => {
 
     // Nova prebuilt games keep their editor action.
     const editor = screen.getByRole("button", { name: /open in the editor/i });
-    // "Select for party" and "Open in the editor" share the same size so
-    // the centered action group renders two identical-height buttons
-    // (rocketcrab-9fv.11.12).
+    // "Select game" and "Open in the editor" share the same size so
+    // the centered action group renders two identical-height buttons.
     expect(select.className).toContain("btn-lg");
     expect(editor.className).toContain("btn-lg");
     expect(editor.className).toContain("btn-primary");
     expect(select.className).toContain("btn-primary");
   });
 
-  it("renders the classic play action as a same-size primary button", async () => {
+  it("shows no CTA to a guest in a party — the host picks (2t1.10)", async () => {
+    stubs.mode = "guest";
+    renderAt("/game/nova-quiz");
+
+    await screen.findByRole("heading", { name: "Nova Quiz" });
+    expect(screen.queryByRole("button", { name: /select game/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /Start party/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /Start party/ })).not.toBeInTheDocument();
+  });
+
+  it("offers a same-size primary Start-party CTA for classic games outside a party (2t1.10)", async () => {
     renderAt("/game/drawphone");
 
-    const play = await screen.findByRole("link", { name: "Play game" });
-    expect(play.className).toContain("btn-primary");
-    expect(play.className).toContain("btn-lg");
+    const start = await screen.findByRole("link", { name: "Start party" });
+    expect(start.className).toContain("btn-primary");
+    expect(start.className).toContain("btn-lg");
+    // Classic games can't be preselected over the URL — plain /party entry.
+    expect(start.getAttribute("href")).toBe("/party");
+    // And the old standalone play-game view is gone.
+    expect(screen.queryByRole("link", { name: /Play game/ })).not.toBeInTheDocument();
   });
 });

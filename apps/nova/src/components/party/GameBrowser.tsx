@@ -1,9 +1,9 @@
 import type { SavedGame } from "@rocketcrab/core";
-import { Link } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Search } from "lucide-react";
+import { Link, useNavigate } from "@tanstack/react-router";
+import { ArrowLeft, ArrowRight, Search, type LucideIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "../../lib/cn";
-import { BrandLogo } from "../layout/BrandLogo";
+import { BrandHeader } from "../layout/BrandHeader";
 import { buttonStyles } from "../ui/Button";
 import { ErrorPanel } from "../ui/ErrorPanel";
 import { LoadingState } from "../ui/LoadingState";
@@ -30,13 +30,19 @@ export interface GameBrowserProps {
   onPickSaved?: (gameId: string) => void;
   /** Tighter vertical rhythm for embedded use (lobby / in-game panels). */
   compact?: boolean;
+  /**
+   * Custom "back" navigation at the browser's top level (category cards).
+   * Parents that render the browser as a panel (party lobby / play shell)
+   * pass this to close their panel; without it, compact browsers navigate
+   * to /party and standalone ones to the homepage.
+   */
+  onBack?: () => void;
 }
 
-/**
- * Which view the browser is showing: a category (prebuilt "all" or a
- * specific box), the player's own saved games ("mine"), or no list at all.
- */
-type BrowseView = "all" | "mine" | BrowseCategory["id"];
+/** Which view the browser is showing: the player's own saved games or a
+ * prebuilt category box. There is no "all games" box (2t1.1) — the category
+ * cards are the entry point. */
+type BrowseView = "mine" | BrowseCategory["id"];
 
 /** Badge text/color per game kind (7.42): classic = red, nova = blue. */
 function KindBadge({ kind }: { kind: BrowseEntry["kind"] }) {
@@ -156,17 +162,19 @@ function SavedGameRow({
   );
 }
 
-/** One category card (10.9): emoji + label + count, like the classic boxes.
- * The Nova box swaps the emoji for the real crab/rocket SVG mark (11.2). */
+/** One category card (2t1.1 redesign): a large icon tile + bold label + game
+ * count, with a soft lift + primary glow on hover. Classic boxes keep their
+ * emoji; the Nova box uses a lucide icon (the crab/rocket mark stays in the
+ * brand header, not on a category tile). */
 function CategoryCard({
   emoji,
-  icon,
+  icon: Icon,
   label,
   count,
   onClick,
 }: {
   emoji?: string;
-  icon?: "brand";
+  icon?: LucideIcon;
   label: string;
   count: number | null;
   onClick: () => void;
@@ -175,36 +183,41 @@ function CategoryCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col gap-1 rounded-box border-2 border-base-300 bg-base-100 p-3 text-left transition-colors hover:border-primary"
+      className="group flex flex-col items-start gap-3 rounded-box border-2 border-base-300 bg-base-100 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-lg hover:shadow-primary/10 sm:p-5"
     >
-      {icon === "brand" ? (
-        <BrandLogo size={22} />
-      ) : (
-        <span className="text-2xl" aria-hidden="true">
-          {emoji}
+      <span
+        className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-base-300 bg-base-200 text-2xl transition-colors group-hover:border-primary/40 group-hover:bg-primary/5"
+        aria-hidden="true"
+      >
+        {Icon !== undefined ? <Icon className="h-6 w-6 text-base-content" /> : <span>{emoji}</span>}
+      </span>
+      <span className="flex w-full flex-col gap-0.5">
+        <span className="text-base font-black leading-tight sm:text-lg">{label}</span>
+        <span className="text-xs font-semibold text-base-content/50">
+          {count === null ? "…" : `${count} ${count === 1 ? "game" : "games"}`}
         </span>
-      )}
-      <span className="font-black">{label}</span>
-      <span className="text-xs font-semibold text-base-content/50">{count ?? "…"}</span>
+      </span>
     </button>
   );
 }
 
 /**
- * The shared prebuilt-game browser (7.7.2 / 7.23 / 10.9): classic external
- * iframe games and Nova's own games live together, badged classic/nova,
- * laid out like classic rocketcrab's games page. "My games" (the player's
- * own saved games) is a button category card like the other boxes, not a
- * separate section.
+ * The shared prebuilt-game browser (7.7.2 / 7.23 / 10.9 / 2t1.1): classic
+ * external iframe games and Nova's own games live together, badged
+ * classic/nova. "My games" (the player's own saved games) is a category
+ * card like the other boxes, not a separate section.
  *
  * The game list is NOT shown by default: only the category cards render.
  * Opening a category (or searching) swaps to just the list — the category
- * buttons hide while it's open, and a small "All categories" back button
- * returns. Selecting a game never sets it directly: in browse mode it
- * ALWAYS opens the game's details page (/game/$gameId — saved games
- * included), where the party pick happens (10.9).
+ * buttons hide while it's open. The ONE unified "back" button (2t1.1)
+ * returns to the category cards while a list is open, and leaves the
+ * browser (lobby in a party, home otherwise) at the top level. Selecting a
+ * game never sets it directly: in browse mode it ALWAYS opens the game's
+ * details page (/game/$gameId — saved games included), where the party pick
+ * happens (10.9).
  */
-export function GameBrowser({ onPick, onPickSaved, compact = false }: GameBrowserProps) {
+export function GameBrowser({ onPick, onPickSaved, compact = false, onBack }: GameBrowserProps) {
+  const navigate = useNavigate();
   const [query, setQuery] = useState("");
   const [view, setView] = useState<BrowseView | null>(null);
   const savedGamesQuery = useSavedGames();
@@ -212,7 +225,7 @@ export function GameBrowser({ onPick, onPickSaved, compact = false }: GameBrowse
 
   const prebuiltGames = useMemo(() => {
     const inCategory =
-      view === null || view === "all" || view === "mine"
+      view === null || view === "mine"
         ? BROWSE_GAMES
         : BROWSE_GAMES.filter((game) => game.category.includes(view));
     return inCategory.filter((game) => matchesQuery(game, query));
@@ -232,33 +245,64 @@ export function GameBrowser({ onPick, onPickSaved, compact = false }: GameBrowse
     setQuery("");
   };
 
+  /** The one unified back button (2t1.1): while a list is open it returns
+   * to the category cards; at the top level it leaves the browser. */
+  const handleBack = () => {
+    if (view !== null || query !== "") {
+      backToCategories();
+      return;
+    }
+    if (onBack !== undefined) {
+      onBack();
+      return;
+    }
+    void navigate({ to: compact ? "/party" : "/" });
+  };
+
   return (
     <div className={cn("flex flex-col", compact ? "gap-4" : "gap-6")}>
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-base-content/40"
-          aria-hidden="true"
-        />
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search games…"
-          aria-label="Search games"
-          className="input input-bordered w-full pl-10"
-        />
+      {/* 2t1.1: in a party the brand stays visible but small + faded so the
+          game browser is the focus (the party shell header handles the
+          full-size lobby chrome). Non-link: tapping it must not leave the
+          party. */}
+      {compact ? <BrandHeader size={20} dimmed noLink /> : null}
+
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <button
+          type="button"
+          onClick={handleBack}
+          className={buttonStyles("outline", "md", "self-start")}
+          title={compact ? "Back to lobby" : "Back to home"}
+        >
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          back
+        </button>
+        <div className="relative min-w-0 flex-1 basis-56">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-base-content/40"
+            aria-hidden="true"
+          />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search games…"
+            aria-label="Search games"
+            className="input input-bordered w-full pl-10"
+          />
+        </div>
       </div>
 
       {/* Category cards: hidden while a category is open or the user is
           searching — the list takes over (10.9). */}
       {view === null && query === "" ? (
-        <section aria-label="Categories" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-          <CategoryCard
-            emoji="🎲"
-            label="All games"
-            count={BROWSE_GAMES.length}
-            onClick={() => setView("all")}
-          />
+        <section
+          aria-label="Categories"
+          className={cn(
+            "grid grid-cols-2 gap-3",
+            compact ? "sm:grid-cols-4" : "sm:grid-cols-3 lg:grid-cols-4",
+          )}
+        >
           <CategoryCard
             emoji="📦"
             label="My games"
@@ -280,16 +324,6 @@ export function GameBrowser({ onPick, onPickSaved, compact = false }: GameBrowse
 
       {showingList ? (
         <section aria-label="Games" className="flex flex-col gap-3">
-          {view !== null ? (
-            <button
-              type="button"
-              className="btn btn-outline btn-sm w-fit"
-              onClick={backToCategories}
-            >
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              All categories
-            </button>
-          ) : null}
           {view === "mine" ? (
             <SavedGamesList
               query={query}
@@ -305,8 +339,7 @@ export function GameBrowser({ onPick, onPickSaved, compact = false }: GameBrowse
             />
           ) : prebuiltGames.length === 0 ? (
             <p className="rounded-box border-2 border-base-300 bg-base-100 p-6 text-center text-base-content/70">
-              No games match {view !== null && view !== "all" ? "this category" : ""}
-              {query !== "" ? ` “${query}”` : ""}.
+              No games match{query !== "" ? ` “${query}”` : ""}.
             </p>
           ) : (
             prebuiltGames.map((game) => <GameCard key={game.id} game={game} onPick={onPick} />)
@@ -347,7 +380,7 @@ function SavedGamesList({
             : "No saved games yet — create one in the editor first."}
         </p>
         <Link to="/build" className={buttonStyles("primary", "md")}>
-          Build a game
+          New game
         </Link>
       </div>
     );

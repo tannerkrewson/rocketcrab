@@ -1,7 +1,7 @@
 import type { ButtonHTMLAttributes } from "react";
 import { cn } from "../../lib/cn";
 
-export type ButtonVariant = "primary" | "secondary" | "accent" | "outline" | "danger";
+export type ButtonVariant = "primary" | "secondary" | "accent" | "outline" | "danger" | "neutral";
 export type ButtonSize = "md" | "lg";
 
 const variantClasses: Record<ButtonVariant, string> = {
@@ -10,6 +10,7 @@ const variantClasses: Record<ButtonVariant, string> = {
   accent: "btn-accent",
   outline: "btn-outline",
   danger: "btn-error",
+  neutral: "btn-neutral",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
@@ -20,6 +21,8 @@ const sizeClasses: Record<ButtonSize, string> = {
 export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   variant?: ButtonVariant;
   size?: ButtonSize;
+  /** Soft (tinted) style — appends `btn-soft` (rocketcrab-2t1.8). */
+  soft?: boolean;
 }
 
 /**
@@ -31,10 +34,25 @@ export function buttonStyles(
   variant: ButtonVariant = "primary",
   size: ButtonSize = "md",
   className?: string,
+  soft = false,
 ) {
-  return cn("btn font-bold", variantClasses[variant], sizeClasses[size], className);
+  return cn(
+    "btn font-bold",
+    variantClasses[variant],
+    sizeClasses[size],
+    soft && "btn-soft",
+    className,
+  );
 }
 
-export function Button({ variant = "primary", size = "md", className, ...props }: ButtonProps) {
-  return <button type="button" className={buttonStyles(variant, size, className)} {...props} />;
+export function Button({
+  variant = "primary",
+  size = "md",
+  soft = false,
+  className,
+  ...props
+}: ButtonProps) {
+  return (
+    <button type="button" className={buttonStyles(variant, size, className, soft)} {...props} />
+  );
 }

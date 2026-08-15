@@ -5,6 +5,7 @@
  * "classic" / "nova" badges.
  */
 
+import { Sparkles, type LucideIcon } from "lucide-react";
 import { CLASSIC_GAMES, type ClassicGame } from "../classic";
 import { NOVA_PREBUILT_GAMES, type NovaPrebuiltGame } from "./nova-games";
 
@@ -80,10 +81,10 @@ export function findBrowseGame(id: string): BrowseEntry | undefined {
 export interface BrowseCategory {
   id: string;
   label: string;
-  /** Classic-style emoji icon; the Nova box carries the real brand mark instead. */
+  /** Classic-style emoji icon; the Nova box carries a lucide icon instead. */
   emoji?: string;
-  /** The Nova box renders the crab/rocket SVG brand mark (rocketcrab-9fv.11.2). */
-  icon?: "brand";
+  /** Lucide icon for boxes that don't use an emoji (e.g. Nova's sparkle). */
+  icon?: LucideIcon;
   /** Classic data category matched by the box (or "nova" for Nova games). */
   match: string;
 }
@@ -103,7 +104,7 @@ export const BROWSE_CATEGORIES: readonly BrowseCategory[] = [
   { id: "writing", label: "Writing", emoji: "✍️", match: "writing" },
   { id: "trivia", label: "Trivia", emoji: "❓", match: "trivia" },
   { id: "netgamesio", label: "netgames.io", emoji: "💎", match: "netgamesio" },
-  { id: "nova", label: "Nova", icon: "brand", match: "nova" },
+  { id: "nova", label: "Nova", icon: Sparkles, match: "nova" },
 ];
 
 /** Count games per category box (used for the box subtitle). */
