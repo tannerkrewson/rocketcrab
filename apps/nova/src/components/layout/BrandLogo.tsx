@@ -2,8 +2,7 @@ import { cn } from "../../lib/cn";
 
 export interface BrandLogoProps {
   /**
-   * Height of each mark in px. The rocket and crab share it, exactly like
-   * classic's MainTitle (2.6em) and GameLayout (1.5em) logo compositions.
+   * Height of the mark in px (the mark is squarish, so width ≈ size too).
    */
   size?: number;
   /**
@@ -15,37 +14,29 @@ export interface BrandLogoProps {
 }
 
 /**
- * The Rocketcrab brand mark (rocketcrab-9fv.11.2): the real SVG logo, never
- * the 🦀🚀 emoji pair. Rocket left, crab right — the classic composition
- * from 83dae6d "use svgs for logo" (components/atoms/MainTitle.tsx) and
- * components/layout/GameLayout.tsx — each with its classic drop-shadow
- * glow: cyan on the rocket, red on the crab. Mark only, no text, and
+ * The Rocketcrab brand mark (rocketcrab-5cl.13): the single squarish
+ * rocketcrab logo, glow version, replacing the old dual rocket+crab pair
+ * (public/rocket.svg + public/crab.svg — deleted). Mark only, no text, and
  * decorative by default (aria-hidden), so callers pair it with their own
- * accessible label (link aria-label, heading text, …).
+ * accessible label (link aria-label, heading text, …). The non-glowing
+ * variant is committed too (public/rocketcrab-logo-no-glow.svg) for
+ * contexts that want a flat mark; this component renders the glow version
+ * for everything.
  */
 export function BrandLogo({ size = 32, responsive = false, className }: BrandLogoProps) {
-  const gap = Math.max(2, Math.round(size * 0.2));
   const height = responsive ? `min(${size}px, 16vw)` : `${size}px`;
   return (
     <span
       className={cn("inline-flex items-center", className)}
-      style={{ gap: `${gap}px` }}
       aria-hidden="true"
       data-testid="brand-logo"
     >
       <img
-        src="/rocket.svg"
+        src="/rocketcrab-logo.svg"
         alt=""
         draggable={false}
         className="block"
-        style={{ height, filter: "drop-shadow(0 0 6px cyan)" }}
-      />
-      <img
-        src="/crab.svg"
-        alt=""
-        draggable={false}
-        className="block"
-        style={{ height, filter: "drop-shadow(0 0 6px #ff0000d9)" }}
+        style={{ height }}
       />
     </span>
   );
