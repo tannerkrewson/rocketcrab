@@ -48,7 +48,7 @@ export function Dialog({ open, onClose, title, children, className }: DialogProp
           </h2>
           <button
             type="button"
-            className="btn btn-circle btn-outline btn-sm"
+            className="btn btn-circle btn-neutral btn-soft btn-sm"
             aria-label="Close dialog"
             onClick={onClose}
           >

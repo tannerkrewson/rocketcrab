@@ -259,7 +259,8 @@ export function PartyLobby({
             Copy URL
           </Button>
           <Button
-            variant="outline"
+            variant="neutral"
+            soft
             size="md"
             onClick={() => setQrOpen(true)}
             disabled={state.inviteUrl === null}
@@ -292,7 +293,7 @@ export function PartyLobby({
                   ? "As the host, you have to start the game!"
                   : "Waiting for the host to start the game…"}
               </p>
-              <Button variant="outline" size="md" onClick={() => setDetailsOpen(true)}>
+              <Button variant="neutral" soft size="md" onClick={() => setDetailsOpen(true)}>
                 <BookOpen className="h-4 w-4" aria-hidden="true" />
                 What is {state.game.title}?
               </Button>
@@ -359,7 +360,8 @@ export function PartyLobby({
                   Approve
                 </Button>
                 <Button
-                  variant="outline"
+                  variant="danger"
+                  soft
                   size="md"
                   onClick={() => onReject(request.memberId)}
                   title="Refuse this player"
@@ -393,7 +395,7 @@ export function PartyLobby({
           Start game
         </Button>
         {state.canForceStart ? (
-          <Button variant="outline" size="lg" onClick={() => setForceDialog(true)}>
+          <Button variant="neutral" soft size="lg" onClick={() => setForceDialog(true)}>
             <PartyPopper className="h-5 w-5" aria-hidden="true" />
             Start anyway
           </Button>
@@ -480,7 +482,7 @@ export function PartyLobby({
                       <Link
                         to="/join"
                         search={{ edit: "name" }}
-                        className={buttonStyles("outline", "md", "btn-xs")}
+                        className={buttonStyles("neutral", "md", "btn-xs", true)}
                         aria-label="Edit your name"
                         title="Edit your name"
                       >
@@ -546,7 +548,7 @@ export function PartyLobby({
           <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-box border-2 border-base-300 bg-base-100 p-5">
             <p className="font-black">Scan to join the party</p>
             <PartyInviteQr inviteUrl={state.inviteUrl} size={200} label={pageTitle ?? undefined} />
-            <Button variant="outline" onClick={() => setQrOpen(false)}>
+            <Button variant="neutral" soft onClick={() => setQrOpen(false)}>
               Close
             </Button>
           </div>
@@ -566,7 +568,7 @@ export function PartyLobby({
               some players may miss the start signal. They can still rejoin.
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setForceDialog(false)}>
+              <Button variant="neutral" soft onClick={() => setForceDialog(false)}>
                 Cancel
               </Button>
               <Button

@@ -168,9 +168,9 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     expect(start.getAttribute("href")).toBe(
       `/party?gameId=${game.id}&mode=simulation&title=Rocket+Rumble`,
     );
-    // The back link is a compact outline button, not a full-width bar.
+    // The back link is a compact soft button, not a full-width bar.
     const back = screen.getByRole("link", { name: "Back to games" });
-    expect(back.className).toContain("btn-outline");
+    expect(back.className).toContain("btn-soft");
     expect(back.className).toContain("self-start");
     // The brand row stays visible on the details page (2t1.1).
     expect(screen.getByRole("link", { name: /rocketcrab\.com/ })).toBeInTheDocument();

@@ -329,7 +329,8 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
           </Button>
         </div>
         <Button
-          variant={debugOpen ? "accent" : "outline"}
+          variant={debugOpen ? "accent" : "neutral"}
+          soft={!debugOpen}
           size="md"
           onClick={() => setDebugOpen((open) => !open)}
           aria-expanded={debugOpen}
@@ -357,7 +358,8 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
                 aria-label="Artificial latency"
               />
               <Button
-                variant={state.dropMessages ? "accent" : "outline"}
+                variant={state.dropMessages ? "accent" : "neutral"}
+                soft={!state.dropMessages}
                 size="md"
                 onClick={() => actions.setDropMessages(!state.dropMessages)}
                 title="Toggle simulated message drops on unreliable channels"
@@ -379,7 +381,8 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
           </>
         ) : null}
         <Button
-          variant="outline"
+          variant="danger"
+          soft
           size="md"
           onClick={actions.clearLogs}
           title="Clear every player's logs"
@@ -388,7 +391,8 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
           Clear logs
         </Button>
         <Button
-          variant="outline"
+          variant="neutral"
+          soft
           size="md"
           onClick={actions.restartAll}
           title="Restart every simulated player"
@@ -453,7 +457,8 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
         <div className="flex-1" />
         {player.sessionStatus === "disconnected" ? (
           <Button
-            variant="outline"
+            variant="neutral"
+            soft
             size="md"
             onClick={() => void actions.reconnectPlayer(player.id)}
             title="Reconnect this player"
@@ -463,7 +468,8 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
           </Button>
         ) : (
           <Button
-            variant="outline"
+            variant="neutral"
+            soft
             size="md"
             onClick={() => void actions.disconnectPlayer(player.id)}
             disabled={player.connectionState !== "connected"}
@@ -475,7 +481,8 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
         )}
         {player.sessionStatus === "suspended" ? (
           <Button
-            variant="outline"
+            variant="neutral"
+            soft
             size="md"
             onClick={() => void actions.resumePlayer(player.id)}
             title="Resume this player from background suspension"
@@ -485,7 +492,8 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
           </Button>
         ) : (
           <Button
-            variant="outline"
+            variant="neutral"
+            soft
             size="md"
             onClick={() => void actions.suspendPlayer(player.id)}
             disabled={player.connectionState !== "connected"}
@@ -496,7 +504,8 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
           </Button>
         )}
         <Button
-          variant="outline"
+          variant="danger"
+          soft
           size="md"
           onClick={() => actions.removePlayer(player.id)}
           title="Remove this player"
@@ -685,7 +694,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
               }}
             />
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setRenameTarget(null)}>
+              <Button variant="neutral" soft onClick={() => setRenameTarget(null)}>
                 Cancel
               </Button>
               <Button variant="primary" onClick={handleRename}>
