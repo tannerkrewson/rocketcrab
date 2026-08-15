@@ -1,5 +1,5 @@
 import { Loader2, PartyPopper } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
 import { cn } from "../../lib/cn";
@@ -183,6 +183,10 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
   // every live party phase EXCEPT playing, where the in-flow play shell's
   // compact top bar takes over (7.38). The invite details (QR/URL/copy)
   // live in the lobby's invite card (10.5), not the header.
+  // 2t1.1: while the host browses games in the lobby, the full-size party
+  // header hides — GameBrowser's compact dimmed brand row takes over.
+  const [browsing, setBrowsing] = useState(false);
+
   const shellShown = state.phase !== "idle" && state.phase !== "error" && state.phase !== "removed";
 
   if (playing) {
@@ -204,7 +208,9 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {shellShown ? <PartyShellHeader code={state.code} inviteUrl={state.inviteUrl} /> : null}
+      {shellShown && !browsing ? (
+        <PartyShellHeader code={state.code} inviteUrl={state.inviteUrl} />
+      ) : null}
       {frameArea}
       {renderPhase(
         state,
@@ -214,6 +220,7 @@ export function PartyExperience({ onLeft }: { onLeft?: () => void }) {
         handlePickPrebuilt,
         handleEditName,
         handleKickMember,
+        setBrowsing,
         onLeft,
       )}
     </div>
@@ -228,6 +235,7 @@ function renderPhase(
   handlePickPrebuilt: (entry: BrowseEntry) => Promise<void>,
   handleEditName: (name: string) => void,
   handleKickMember: (memberId: string) => void,
+  onBrowseModeChange: (browsing: boolean) => void,
   onLeft?: () => void,
 ) {
   switch (state.phase) {
@@ -259,6 +267,7 @@ function renderPhase(
           onRefreshDiagnostics={() => void engine.refreshDiagnostics()}
           onKickMember={handleKickMember}
           onEditName={handleEditName}
+          onBrowseModeChange={onBrowseModeChange}
         />
       );
     case "playing":
