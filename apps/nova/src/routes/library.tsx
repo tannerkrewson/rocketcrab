@@ -72,12 +72,7 @@ export function LibraryPage() {
       </Link>
 
       <header className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-black">My games</h1>
-          <p className="text-base-content/70">
-            Games are saved right in this browser. Nothing is uploaded.
-          </p>
-        </div>
+        <h1 className="text-3xl font-black">My games</h1>
         <Link to="/build" className={buttonStyles("primary", "lg")}>
           <PlusCircle className="h-4 w-4" aria-hidden="true" />
           New game
@@ -113,12 +108,6 @@ export function LibraryPage() {
             icon={<Gamepad2 />}
             title="No saved games yet"
             description="Once you build or paste a game it will be listed here for testing, editing, and playing."
-            action={
-              <Link to="/build" className={buttonStyles("primary", "lg")}>
-                <PlusCircle className="h-5 w-5" aria-hidden="true" />
-                New game
-              </Link>
-            }
           />
         ) : (
           <EmptyState
