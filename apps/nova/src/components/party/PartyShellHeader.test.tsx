@@ -13,10 +13,18 @@ import { PartyShellHeader } from "./PartyShellHeader";
  * the header stays the classic identity.
  */
 
+const { toastMock } = vi.hoisted(() => ({
+  toastMock: { success: vi.fn(), error: vi.fn() },
+}));
+
+vi.mock("sonner", () => ({ toast: toastMock }));
+
 const INVITE_URL = "http://localhost:5173/join#code=RCRB&secret=invite-secret";
 
 afterEach(() => {
   cleanup();
+  toastMock.success.mockClear();
+  toastMock.error.mockClear();
 });
 
 describe("PartyShellHeader", () => {
@@ -56,7 +64,15 @@ describe("PartyShellHeader", () => {
     expect(title).toHaveAttribute("title", "Copy the invite link");
     await userEvent.click(title);
     expect(writeText).toHaveBeenCalledWith(INVITE_URL);
+    // 2z9: the toast says "url", matching the invite URL that was copied.
+    expect(toastMock.success).toHaveBeenCalledWith("Invite url copied.");
     Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+  });
+
+  it("scales the title down while pressed like the homepage title (0dd)", () => {
+    render(<PartyShellHeader code="RCRB" inviteUrl={INVITE_URL} />);
+    const title = screen.getByTestId("party-title");
+    expect(title).toHaveClass("active:scale-95", "transition-all", "cursor-pointer");
   });
 
   it("never renders the invite URL text (10.5 / ADR-0011)", () => {

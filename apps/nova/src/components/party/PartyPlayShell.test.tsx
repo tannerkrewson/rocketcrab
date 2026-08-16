@@ -196,15 +196,37 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(onEndGame).toHaveBeenCalledTimes(1);
   });
 
-  it("lets the host kick a member from the Players popup (7.29/7.38)", async () => {
+  it("lets the host kick a member from the Players popup after confirming (7.29/7.38/2z9)", async () => {
     const onKickMember = vi.fn();
     await renderShell(makeState(), { onKickMember });
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
     const players = screen.getByRole("dialog", { name: "Players" });
     const kick = within(players).getByRole("button", { name: /kick/i });
+    // 2z9: kicking asks first — the first tap only opens the confirm.
     await userEvent.click(kick);
+    expect(onKickMember).not.toHaveBeenCalled();
+    const confirm = screen.getByRole("dialog", { name: /kick a player/i });
+    expect(within(confirm).getByText(/Kick Player B from the party\?/)).toBeInTheDocument();
+    await userEvent.click(within(confirm).getByRole("button", { name: /^kick player$/i }));
     expect(onKickMember).toHaveBeenCalledWith("member-b");
+  });
+
+  it("cancels the kick confirmation without removing anyone (2z9)", async () => {
+    const onKickMember = vi.fn();
+    await renderShell(makeState(), { onKickMember });
+    await userEvent.click(screen.getByRole("button", { name: /menu/i }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
+    const players = screen.getByRole("dialog", { name: "Players" });
+    await userEvent.click(within(players).getByRole("button", { name: /kick/i }));
+    await userEvent.click(
+      within(screen.getByRole("dialog", { name: /kick a player/i })).getByRole("button", {
+        name: /^cancel$/i,
+      }),
+    );
+    expect(onKickMember).not.toHaveBeenCalled();
+    // The players popup stays open under the dismissed confirm.
+    expect(screen.getByRole("dialog", { name: "Players" })).toBeInTheDocument();
   });
 
   it("shows the players list as a compact popup that never covers the game frame (7.45)", async () => {
@@ -328,7 +350,38 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(screen.queryByRole("dialog", { name: "About Drawphone" })).not.toBeInTheDocument();
   });
 
-  it("copies the invite URL when the centered party URL is tapped (9fv.11.11)", async () => {
+  it("moves the dark/light/dice theme control into the Menu (i47)", async () => {
+    await renderShell(makeState());
+    // No floating bottom-right control in the in-game shell anymore.
+    expect(screen.queryByTestId("floating-theme-control")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Dark theme" })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /menu/i }));
+    const menu = screen.getByRole("menu", { name: /game menu/i });
+    // The theme control lives INSIDE the menu, below the menu items.
+    expect(within(menu).getByRole("button", { name: "Light theme" })).toBeInTheDocument();
+    expect(within(menu).getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
+    expect(within(menu).getByRole("button", { name: "Random theme" })).toBeInTheDocument();
+    expect(screen.queryByTestId("floating-theme-control")).not.toBeInTheDocument();
+  });
+
+  it("scales the party URL down while pressed like the homepage title (0dd)", async () => {
+    await renderShell(makeState());
+    const url = screen.getByLabelText("Party link rocketcrab.com/abcd");
+    expect(url).toHaveClass("active:scale-95", "transition-transform");
+  });
+
+  it("uses the non-glowing brand mark in the top bar and collapsed logo (ch6)", async () => {
+    await renderShell(makeState());
+    const hide = screen.getByRole("button", { name: /hide the top bar/i });
+    const topMark = hide.querySelector('img[src="/rocketcrab-logo-no-glow.svg"]');
+    expect(topMark).not.toBeNull();
+    await userEvent.click(hide);
+    const show = screen.getByRole("button", { name: /show the top bar/i });
+    const collapsedMark = show.querySelector('img[src="/rocketcrab-logo-no-glow.svg"]');
+    expect(collapsedMark).not.toBeNull();
+  });
+
+  it("copies the invite URL when the centered party URL is tapped (9fv.11.11 / nil)", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText },

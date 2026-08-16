@@ -1033,7 +1033,9 @@ export class PartyEngine {
     void this.party
       .kickMember(memberId, "The host removed you from the party.")
       .catch(() => undefined);
-    this.addNotice("warn", `${this.displayNameOf(memberId)} was removed from the party.`);
+    if (this.hasDisplayName(memberId)) {
+      this.addNotice("warn", `${this.displayNameOf(memberId)} was removed from the party.`);
+    }
     this.emit();
   }
 
@@ -1116,12 +1118,16 @@ export class PartyEngine {
     }
     this.pendingApprovals.delete(memberId);
     pending.resolve(approved);
-    this.addNotice(
-      approved ? "info" : "warn",
-      approved
-        ? `${this.displayNameOf(memberId)} was admitted to the party.`
-        : `${this.displayNameOf(memberId)} was not admitted.`,
-    );
+    // 2z9: same id-name gate as the admission event — a no-name member is
+    // approved silently (the joined/removed notices are gated too).
+    if (this.hasDisplayName(memberId)) {
+      this.addNotice(
+        approved ? "info" : "warn",
+        approved
+          ? `${this.displayNameOf(memberId)} was admitted to the party.`
+          : `${this.displayNameOf(memberId)} was not admitted.`,
+      );
+    }
     this.emit();
   }
 
@@ -2131,12 +2137,18 @@ export class PartyEngine {
         this.emit();
         break;
       case "admission":
-        this.addNotice(
-          event.decision === "approved" ? "info" : "warn",
-          event.decision === "approved"
-            ? `${this.displayNameOf(event.memberId)} joined the party.`
-            : `${this.displayNameOf(event.memberId)} was not admitted (${event.reason ?? "rejected"}).`,
-        );
+        // 2z9: a member with no real display name yet (displayNameOf still
+        // returns the generated member-… id) is silently absorbed — no
+        // "member-abc1234 joined the party." noise in the banner or the
+        // membership toasts until they actually have a name.
+        if (event.decision === "approved" && this.hasDisplayName(event.memberId)) {
+          this.addNotice("info", `${this.displayNameOf(event.memberId)} joined the party.`);
+        } else if (event.decision !== "approved") {
+          this.addNotice(
+            "warn",
+            `${this.displayNameOf(event.memberId)} was not admitted (${event.reason ?? "rejected"}).`,
+          );
+        }
         this.emit();
         break;
       case "memberJoined":
@@ -2195,11 +2207,13 @@ export class PartyEngine {
           this.addNotice("error", this.removedReason);
           this.emit();
           void this.leaveParty("removed");
-        } else {
+        } else if (this.hasDisplayName(event.targetMemberId)) {
           this.addNotice(
             "warn",
             `${this.displayNameOf(event.targetMemberId)} was removed from the party.`,
           );
+          this.emit();
+        } else {
           this.emit();
         }
         break;
@@ -2620,6 +2634,14 @@ export class PartyEngine {
     // The party layer owns member names: handshake names plus any
     // `party.rename` announcements (7.25).
     return this.party?.getMemberName(memberId) ?? memberId;
+  }
+
+  /** 2z9: true once a member has a real (player-chosen or generated)
+   *  display name — displayNameOf falls back to the member-… id itself for
+   *  no-name members, and "member-abc123 joined/removed" membership
+   *  messages are noise. */
+  private hasDisplayName(memberId: MemberId): boolean {
+    return this.displayNameOf(memberId) !== memberId;
   }
 
   /**
