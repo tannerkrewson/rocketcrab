@@ -80,6 +80,9 @@ export function PartyPlayShell({
   // 7.38: only one panel is open at a time (menu / players / browse).
   const [panel, setPanel] = useState<PlayShellPanel>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
+  // 2z9: removing a player exits them from the party — a mis-tap boots
+  // someone out, so the kick buttons ask first (like Reload all / Exit).
+  const [confirmKickMemberId, setConfirmKickMemberId] = useState<string | null>(null);
   // 9fv.11.11: "About this game" reuses the lobby's details overlay.
   const [detailsOpen, setDetailsOpen] = useState(false);
   // 7.38: "Reload all" is red and asks first — players' games will be lost.
@@ -358,7 +361,7 @@ export function PartyPlayShell({
                         <button
                           type="button"
                           className="btn btn-xs text-error"
-                          onClick={() => onKickMember(member.memberId)}
+                          onClick={() => setConfirmKickMemberId(member.memberId)}
                           title={`Remove ${member.displayName} from the party`}
                         >
                           Kick
@@ -584,6 +587,57 @@ export function PartyPlayShell({
           </div>
         </div>
       ) : null}
+
+      {/* 2z9: kicking asks first — a mis-tap would boot a player from the
+          party (mirrors the confirmEnd/confirmReloadAll pattern above). */}
+      {confirmKickMemberId !== null ? (
+        <PartyKickConfirm
+          memberName={
+            state.members.find((member) => member.memberId === confirmKickMemberId)?.displayName ??
+            confirmKickMemberId
+          }
+          onCancel={() => setConfirmKickMemberId(null)}
+          onConfirm={() => {
+            setConfirmKickMemberId(null);
+            onKickMember(confirmKickMemberId);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** 2z9: shared kick-confirmation dialog (host only, in-game + lobby). */
+function PartyKickConfirm({
+  memberName,
+  onCancel,
+  onConfirm,
+}: {
+  memberName: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Kick a player from the party"
+    >
+      <div className="flex w-full max-w-sm flex-col gap-4 rounded-box border-2 border-base-300 bg-base-100 p-5">
+        <p className="font-black">Kick {memberName} from the party?</p>
+        <p className="text-sm text-base-content/70">
+          {memberName} will be removed from the party and will have to rejoin with the invite link.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="default" soft onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={onConfirm}>
+            Kick player
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }
