@@ -12,15 +12,17 @@ import { routeTree } from "../routeTree.gen";
  * Join route tests (P4/7.47, reworked 2t1.9): the join is a SINGLE step —
  * enter the room code (tall mono input, Join gated on four letters) and
  * join straight away; the player's name is never asked up front. The
- * phonetic spelling confirms the code inline once it is complete, the
- * invite-fragment import (ADR-0011) still strips the secret from the URL,
- * and `/join?edit=name` renders the shared name-editing page (the same
- * name step the lobby's pencil / no-name prompt open).
+ * phonetic spelling lives in the party shell header (7.22), not the join
+ * form (rocketcrab-if2) — the invite-fragment import (ADR-0011) still
+ * strips the secret from the URL, and `/join?edit=name` renders the
+ * shared name-editing page (the same name step the lobby's pencil /
+ * no-name prompt open).
  */
 
 const IDLE_STATE: PartyEngineState = {
   phase: "idle",
   phaseDetail: null,
+  joinStage: null,
   reconnectAttempts: 0,
   role: null,
   code: null,
@@ -191,11 +193,15 @@ describe("/join", () => {
     expect(stubEngine.setDisplayName).not.toHaveBeenCalled();
   });
 
-  it("shows the code with its lowercase phonetic spelling once it is complete", async () => {
+  it("shows the completed lowercase code inline without a phonetic label (rocketcrab-if2)", async () => {
     renderJoin();
     const input = await screen.findByLabelText("Four-letter party code");
     fireEvent.change(input, { target: { value: "xaby" } });
-    expect(await screen.findByText(/\(xray alpha bravo yankee\)/)).toBeInTheDocument();
+    // The code itself is confirmed inline; the phonetic spelling is the
+    // party header's job (7.22), not the join form's (rocketcrab-if2).
+    expect(await screen.findByText("xaby")).toBeInTheDocument();
+    expect(screen.queryByText(/alpha bravo/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/xray/)).not.toBeInTheDocument();
   });
 
   it("links Back to the homepage from the code step", async () => {
