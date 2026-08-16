@@ -13,6 +13,7 @@ import { useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Button, buttonStyles } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
+import { BrandLogo } from "../components/layout/BrandLogo";
 import { storeDraftSource } from "../lib/editor/draft-handoff";
 import { exampleGames, exampleModeLabel } from "../lib/editor/example-games";
 import { writeToClipboard } from "../lib/editor/clipboard";
@@ -209,15 +210,8 @@ function BuildHeroPage() {
         `}</style>
         <div className="relative flex flex-col items-center gap-4 px-6 py-12 sm:px-12 sm:py-16">
           {/* Non-glow rocketcrab mark above the headline (kqo): the
-              BrandLogo lane's glow variant is for elsewhere; this page
-              renders the flat mark directly. */}
-          <img
-            src="/rocketcrab-logo-no-glow.svg"
-            alt=""
-            draggable={false}
-            aria-hidden="true"
-            className="h-20 w-20 sm:h-24 sm:w-24"
-          />
+              flat mark via the BrandLogo no-glow variant. */}
+          <BrandLogo variant="no-glow" size={80} responsive aria-hidden />
           <h1
             id="build-hero-heading"
             className="text-glow-info text-4xl font-black text-base-content sm:text-5xl"

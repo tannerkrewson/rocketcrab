@@ -16,6 +16,7 @@ import { writeToClipboard } from "../../lib/editor/clipboard";
 import { cn } from "../../lib/cn";
 import type { PartyEngineState } from "../../lib/party/engine";
 import { ThemeSelector } from "../layout/ThemeSelector";
+import { BrandLogo } from "../layout/BrandLogo";
 import { Button } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
 import { PartyGameDetailsModal } from "./PartyGameDetails";
@@ -137,13 +138,7 @@ export function PartyPlayShell({
             aria-label="Hide the top bar"
             title="Hide the top bar"
           >
-            <img
-              src="/rocketcrab-logo-no-glow.svg"
-              alt=""
-              draggable={false}
-              className="block"
-              style={{ height: "1.625rem" }}
-            />
+            <BrandLogo variant="no-glow" size={26} className="shrink-0" />
           </button>
 
           <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
@@ -510,13 +505,7 @@ export function PartyPlayShell({
           aria-label="Show the top bar"
           title="Show the top bar"
         >
-          <img
-            src="/rocketcrab-logo-no-glow.svg"
-            alt=""
-            draggable={false}
-            className="block"
-            style={{ height: "1.75rem" }}
-          />
+          <BrandLogo variant="no-glow" size={28} />
         </button>
       ) : null}
 
