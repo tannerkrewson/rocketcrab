@@ -18,7 +18,8 @@ import { routeTree } from "../routeTree.gen";
  * saved games, plain /party for classic). There is no standalone "play
  * game" view anymore. The browser is classic-only (5cl.10), and inside a
  * party the page shows the party shell header (logo + code) instead of the
- * brand row (5cl.8).
+ * brand row (5cl.8). Select actions still navigate to /party; the host's
+ * address bar then normalizes to /<code> in place (rocketcrab-r0f).
  */
 
 const IDLE_STATE: PartyEngineState = {
@@ -205,8 +206,9 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
         apiVersion: 1,
       }),
     );
-    // Back in the party lobby.
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
+    // Back in the party lobby — the host's address bar now reads the code
+    // (rocketcrab-r0f replaces /party with /<code> once a party is active).
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/RCRB"));
     expect(screen.queryByRole("button", { name: /select game/i })).not.toBeInTheDocument();
   });
 
@@ -218,7 +220,9 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     await userEvent.click(select);
 
     await vi.waitFor(() => expect(stubEngine.selectClassicGame).toHaveBeenCalledWith("drawphone"));
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
+    // Back in the party lobby — the address bar reads the code, not /party
+    // (rocketcrab-r0f).
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/RCRB"));
   });
 
   it("shares the party shell header (logo + code) while in a lobby (5cl.8)", async () => {
