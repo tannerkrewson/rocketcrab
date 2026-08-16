@@ -1,6 +1,6 @@
-import { useRouterState } from "@tanstack/react-router";
 import type { CSSProperties } from "react";
-import { cn } from "../../lib/cn";
+import type { PartyEngine } from "../../lib/party/engine";
+import { usePartyEngine } from "../../lib/party/use-party";
 
 /**
  * Deterministic seeded PRNG (mulberry32) so the same starfield renders on
@@ -36,18 +36,30 @@ const STARS: CSSProperties[] = (() => {
 })();
 
 /**
- * Subtle full-page twinkling-star background for the homepage (5cl.4),
- * always mounted in the shared AppLayout so leaving "/" fades the stars out
- * (opacity transition) and returning fades them back in. The field sits
- * behind the page content — negative z-index inside the shell's `isolate`
- * stacking context, above the shell's own background — and is decorative
- * only (aria-hidden) and pointer-events-none everywhere. No canvas, no JS
+ * Subtle full-page twinkling-star background (5cl.4, site-wide 22n): every
+ * page gets the stars EXCEPT while a party is actively playing a game —
+ * the in-game condition is `state.game !== null` on the shared party engine
+ * (the full-screen play shell is up by then, so stars would be noise behind
+ * the game). There is no fade logic: the field is simply present (or
+ * unmounted in-game), and the stars twinkle in place. The field sits behind
+ * the page content — negative z-index inside the shell's `isolate` stacking
+ * context, above the shell's own background — and is decorative only
+ * (aria-hidden) and pointer-events-none everywhere. No canvas, no JS
  * animation loop: ~36 CSS-only dots driven by one keyframe, mirroring the
  * IdleParticles approach (2t1.9); prefers-reduced-motion keeps the stars
  * static instead of twinkling.
+ *
+ * The optional `engine` is a test seam matching `usePartyEngine`'s own
+ * injectable engine; production always uses the page singleton.
  */
-export function StarfieldBackground() {
-  const isHome = useRouterState({ select: (state) => state.location.pathname === "/" });
+export function StarfieldBackground({ engine }: { engine?: PartyEngine }) {
+  const { state } = usePartyEngine(engine);
+  // Bead 22n: in-game = the party engine has an active `game`. During the
+  // lobby (and everywhere else) the stars stay up; once a game is live the
+  // shell covers the screen and the stars unmount.
+  if (state.game !== null) {
+    return null;
+  }
   return (
     <>
       <style>{`
@@ -69,11 +81,8 @@ export function StarfieldBackground() {
       `}</style>
       <div
         aria-hidden="true"
-        data-testid="home-starfield"
-        className={cn(
-          "pointer-events-none fixed inset-0 -z-10 transition-opacity duration-1000",
-          isHome ? "opacity-100" : "opacity-0",
-        )}
+        data-testid="app-starfield"
+        className="pointer-events-none fixed inset-0 -z-10"
       >
         {STARS.map((star, index) => (
           <span key={index} className="rc-star bg-base-content" style={star} />

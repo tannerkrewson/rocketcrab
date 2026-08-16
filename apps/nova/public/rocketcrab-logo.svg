@@ -1,4 +1,4 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-36 -40 200 200" width="100%" height="100%">
   <defs>
     <!-- Top-to-Bottom Glow Gradient (Crab Red to Flame Yellow) -->
     <linearGradient id="crabFlameGlow" x1="0%" y1="0%" x2="0%" y2="100%">
@@ -7,15 +7,21 @@
       <stop offset="100%" stop-color="#FFC107" />
     </linearGradient>
 
-    <!-- Blur Filter for Expanded Ambient Glow -->
+    <!-- Blur Filter for Expanded Soft Glow. The region is huge relative to
+         the ellipse so no glow is cut off, and the viewBox (200x200, crab
+         art centered with 36px/40px of breathing room) has an opaque
+         background nowhere: every glow pixel is inside the canvas
+         (rocketcrab-5u7: glow was clipped by the old 128x128 viewBox). -->
     <filter id="glowBlur" x="-100%" y="-100%" width="300%" height="300%">
-      <feGaussianBlur stdDeviation="16" result="blur" />
+      <feGaussianBlur stdDeviation="10" result="blur" />
     </filter>
   </defs>
 
-  <!-- Larger Ambient Glow Aura (Behind Everything) -->
-  <g filter="url(#glowBlur)" opacity="0.9">
-    <ellipse cx="64" cy="60" rx="64" ry="66" fill="url(#crabFlameGlow)" />
+  <!-- Soft Ambient Glow Aura (Behind Everything). Slightly smaller than the
+       old full-bleed ellipse and at lower opacity/blur so it reads as a
+       gentle halo instead of a maxed-out glow wall (rocketcrab-5u7). -->
+  <g filter="url(#glowBlur)" opacity="0.6">
+    <ellipse cx="64" cy="60" rx="56" ry="62" fill="url(#crabFlameGlow)" />
   </g>
 
   <!-- Rocket Fire (Underneath Body) -->

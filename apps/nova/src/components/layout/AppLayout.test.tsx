@@ -71,14 +71,16 @@ describe("AppLayout", () => {
     expect(screen.queryByText("Dark")).not.toBeInTheDocument();
   });
 
-  it("fades the homepage starfield in only on the homepage (5cl.4)", async () => {
+  it("shows the starfield on every page when no game is live (5cl.4/22n)", async () => {
+    // Homepage keeps its stars…
     renderAt("/");
     await screen.findByRole("heading", { name: "rocketcrab.com" });
-    expect(screen.getByTestId("home-starfield")).toHaveClass("opacity-100");
+    expect(screen.getByTestId("app-starfield")).toBeInTheDocument();
 
+    // …and so does every other page: no more homepage-only fade (22n).
     renderAt("/about");
     await screen.findByRole("heading", { name: "Coming soon" });
-    expect(screen.getByTestId("home-starfield")).toHaveClass("opacity-0");
+    expect(screen.getByTestId("app-starfield")).toBeInTheDocument();
   });
 
   it("keeps the same floating bottom-right theme control on party routes", async () => {

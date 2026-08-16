@@ -18,8 +18,9 @@ export function AppLayout() {
     // starfield's -z-10 sits behind the page content but above the shell's
     // background (rocketcrab-5cl.4).
     <div className="isolate flex min-h-screen flex-col bg-base-200 text-base-content">
-      {/* Homepage starfield: always mounted so it can fade out when the user
-          leaves "/" and back in on return (rocketcrab-5cl.4). */}
+      {/* Starfield: always mounted across the whole app so the site
+          consistently has stars — hidden only while a party is actively
+          playing a game (rocketcrab-22n; no more homepage-only fade). */}
       <StarfieldBackground />
       {/* 5cl.15: max-w-7xl lets the editor (and other pages) use the
           widescreen space instead of leaving blank gutters on both sides. */}
