@@ -192,11 +192,22 @@ export type PartyPhase =
   | "removed"
   | "error";
 
+/**
+ * Where a code/invite join is inside the "joining" phase. Lets the loading
+ * screen say something accurate instead of a generic "searching": the join
+ * request is away and the host must approve (rocketcrab-erx), or the joiner
+ * is admitted and waiting for a direct peer connection before the lobby
+ * may appear (rocketcrab-5ae). Null outside the joining phase.
+ */
+export type JoinStage = "discovering" | "awaitingApproval" | "connecting" | null;
+
 /** The full engine snapshot the UI projects. */
 export interface PartyEngineState {
   readonly phase: PartyPhase;
   /** Human-readable progress for the creating/joining phases. */
   readonly phaseDetail: string | null;
+  /** Sub-stage while joining (see {@link JoinStage}). */
+  readonly joinStage: JoinStage;
   /** Reconnect attempts since the last connected state (reconnect UX). */
   readonly reconnectAttempts: number;
   readonly role: "creator" | "joiner" | null;
@@ -266,6 +277,13 @@ export interface PartyEngineConfig {
   earlyMissTimeoutMs?: number;
   admissionTimeoutMs?: number;
   advertIntervalMs?: number;
+  /**
+   * How long an admitted code/invite joiner waits for the first private-room
+   * peer before the join fails (default 15 s; rocketcrab-5ae — cross-network
+   * joins signal fine but no data channel opens without TURN, so the joiner
+   * must land on a loading → error path instead of a fake empty lobby).
+   */
+  peerConnectTimeoutMs?: number;
   /** Adapter diagnostics (Trystero getDiagnostics); duck-typed when present. */
   diagnostics?: () => unknown;
   /**
@@ -355,6 +373,7 @@ interface PartyEngineDefaults {
   earlyMissTimeoutMs: number;
   admissionTimeoutMs: number;
   advertIntervalMs: number;
+  peerConnectTimeoutMs: number;
 }
 
 /** How long the resume health probe waits for one peer's ping (M1). */
@@ -363,6 +382,13 @@ const PARTY_HEALTH_PROBE_TIMEOUT_MS = 2_000;
 const RECONNECT_RETRY_BASE_MS = 5_000;
 /** Auto-reconnect retry backoff cap (M1). */
 const RECONNECT_RETRY_CAP_MS = 30_000;
+/**
+ * How long an admitted joiner waits for a private-room peer before giving up
+ * (rocketcrab-5ae). Signaling can connect without any peer data channel ever
+ * opening (no TURN across networks): the joiner must NOT see a fake empty
+ * lobby — a loading screen, then a clear error, is the honest outcome.
+ */
+const DEFAULT_PEER_CONNECT_TIMEOUT_MS = 15_000;
 
 /** Injectable scheduler for engine-owned timers (defaults to setTimeout). */
 function defaultScheduler(callback: () => void, delayMs: number): () => void {
@@ -542,6 +568,8 @@ export class PartyEngine {
 
   private phase: PartyPhase = "idle";
   private phaseDetail: string | null = null;
+  /** Join sub-stage while phase === "joining" (rocketcrab-erx / 5ae). */
+  private joinStage: JoinStage = null;
   private connectionState: TransportConnectionState = "idle";
   /** True once this shell's game started (survives reconnects; M1). */
   private gameStarted = false;
@@ -564,6 +592,7 @@ export class PartyEngine {
       earlyMissTimeoutMs: config.earlyMissTimeoutMs ?? 7_000,
       admissionTimeoutMs: config.admissionTimeoutMs ?? 30_000,
       advertIntervalMs: config.advertIntervalMs ?? 5_000,
+      peerConnectTimeoutMs: config.peerConnectTimeoutMs ?? DEFAULT_PEER_CONNECT_TIMEOUT_MS,
     };
     this.identity = config.identity ?? localPartyIdentity();
     this.schedule = config.schedule;
@@ -631,6 +660,7 @@ export class PartyEngine {
     return {
       phase: this.phase,
       phaseDetail: this.phaseDetail,
+      joinStage: this.joinStage,
       reconnectAttempts: this.reconnectAttempts,
       role: party?.role ?? null,
       code: party?.code ?? null,
@@ -776,6 +806,7 @@ export class PartyEngine {
     const identity = this.identity;
     this.lastSetup = { kind: "join-code", code };
     this.phase = "joining";
+    this.joinStage = "discovering";
     this.phaseDetail = `Joining party ${code.toLowerCase()}…`;
     this.lastError = null;
     this.emit();
@@ -785,6 +816,11 @@ export class PartyEngine {
         memberId: identity.memberId,
         displayName: identity.displayName,
         transportFactory: await this.resolveTransportFactory(),
+        // rocketcrab-erx: once the join request is away, the loading
+        // screen flips to "Waiting for the host's approval…" (the host
+        // name isn't carried in the public advert — ADR-0004 keeps it
+        // minimal — so the UI says "the host").
+        onAdmissionPending: () => this.handleAdmissionPending(),
         onJoinRequest: (request) => this.queueApproval(request),
         discoveryTimeoutMs: this.defaults.discoveryTimeoutMs,
         earlyMissTimeoutMs: this.defaults.earlyMissTimeoutMs,
@@ -800,8 +836,33 @@ export class PartyEngine {
         return;
       }
       await this.establish(party);
+      // rocketcrab-5ae: keep the joiner on the loading screen until the
+      // private room shows a real peer; the lobby must never be a fake
+      // solo room the host never appears in.
+      try {
+        await this.waitForPeerConnect(party);
+      } catch (error) {
+        // Cancelled while waiting: leaveParty already cleaned everything up
+        // (this.party is null) — just stop; never resurrect a lobby behind
+        // the user's back or fail into the error screen.
+        if (this.party === null) {
+          return;
+        }
+        // The join established but no peer ever appeared (dead-end room):
+        // tear the session down so the error screen doesn't sit on a live
+        // but empty party room, and keep the setup record so Retry can
+        // re-run this join (retrySetup depends on lastSetup).
+        const setup = this.lastSetup;
+        await this.leaveParty().catch(() => undefined);
+        this.lastSetup = setup;
+        throw error;
+      }
+      if (this.party === null) {
+        return; // cancelled while waiting — leaveParty already cleaned up
+      }
       this.phase = "lobby";
       this.phaseDetail = null;
+      this.joinStage = null;
       this.lastSetup = null;
       this.saveRecovery();
       this.emit();
@@ -822,6 +883,7 @@ export class PartyEngine {
     const identity = this.identity;
     this.lastSetup = { kind: "join-invite", input };
     this.phase = "joining";
+    this.joinStage = "discovering";
     this.phaseDetail = "Joining the party from your invite…";
     this.lastError = null;
     this.emit();
@@ -844,8 +906,25 @@ export class PartyEngine {
         return;
       }
       await this.establish(party);
+      // rocketcrab-5ae: same peer gate as the code join — a stale invite
+      // (host offline) must never drop the joiner into a fake empty lobby.
+      try {
+        await this.waitForPeerConnect(party);
+      } catch (error) {
+        if (this.party === null) {
+          return; // cancelled while waiting — leaveParty already cleaned up
+        }
+        const setup = this.lastSetup;
+        await this.leaveParty().catch(() => undefined);
+        this.lastSetup = setup;
+        throw error;
+      }
+      if (this.party === null) {
+        return; // cancelled while waiting — leaveParty already cleaned up
+      }
       this.phase = "lobby";
       this.phaseDetail = null;
+      this.joinStage = null;
       this.lastSetup = null;
       this.saveRecovery();
       this.emit();
@@ -1017,6 +1096,7 @@ export class PartyEngine {
     this.lastError = null;
     this.phase = "idle";
     this.phaseDetail = null;
+    this.joinStage = null;
     this.notices = [];
     this.emit();
   }
@@ -1138,6 +1218,7 @@ export class PartyEngine {
     this.lastSetup = null;
     this.phase = nextPhase;
     this.phaseDetail = null;
+    this.joinStage = null;
     this.gameStarted = false;
     this.reconnectAttempts = 0;
     this.offline = false;
@@ -1751,7 +1832,66 @@ export class PartyEngine {
     this.lastError = errorMessage(error);
     this.phase = "error";
     this.phaseDetail = null;
+    this.joinStage = null;
     this.emit();
+  }
+
+  /**
+   * The joiner's join request was sent and the greeter must now decide
+   * (ADR-0004 step 6). Flips the loading screen from "searching" to
+   * "waiting for the host's approval" (rocketcrab-erx). The host's display
+   * name is NOT in the public advert (minimal summary, ADR-0004), so the
+   * copy uses a generic "the host"; putting the host's name in the advert
+   * would publicize it to anyone guessing the code.
+   */
+  private handleAdmissionPending(): void {
+    if (this.phase !== "joining") {
+      return;
+    }
+    this.joinStage = "awaitingApproval";
+    this.phaseDetail = "Waiting for the host's approval…";
+    this.emit();
+  }
+
+  /**
+   * The joiner was admitted but no private-room peer has appeared (the
+   * cross-network no-TURN case, rocketcrab-5ae): stay on the loading screen
+   * until the first peer joins the private room, or fail setup when none
+   * ever does. The creator never waits — a solo host lobby is legitimate.
+   */
+  private waitForPeerConnect(party: PartySession): Promise<void> {
+    if (party.role === "creator" || party.privateTransport.peers.length > 0) {
+      return Promise.resolve();
+    }
+    this.joinStage = "connecting";
+    this.phaseDetail = "Connecting to the host…";
+    this.emit();
+    return new Promise<void>((resolve, reject) => {
+      let settled = false;
+      let cancel: () => void = () => undefined;
+      const unsubscribe = party.privateTransport.on("peer:joined", () => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cancel();
+        unsubscribe();
+        resolve();
+      });
+      cancel = this.scheduleFn(() => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        unsubscribe();
+        reject(
+          new PartyError(
+            "peer_unreachable",
+            "Couldn't reach the host. The party may be on a network that can't connect to yours — check the code with your friend, or ask for an invite link.",
+          ),
+        );
+      }, this.defaults.peerConnectTimeoutMs);
+    });
   }
 
   // ------------------------------------------------------------------
@@ -2108,6 +2248,15 @@ export class PartyEngine {
       return;
     }
     if (state === "connected") {
+      // rocketcrab-5ae: while a join is still landing, the explicit join
+      // path owns the phase (the transport's signaling-level "connected"
+      // must never render a lobby with zero peers — Trystero reports
+      // "connected" once the relays are up, before any peer data channel
+      // opens). The rejoin/resume handler below is what legitimately
+      // returns to the lobby after a reconnect.
+      if (this.phase === "joining" || this.phase === "creating") {
+        return;
+      }
       this.reconnectAttempts = 0;
       this.offline = false;
       this.cancelReconnectRetry();
@@ -2688,6 +2837,7 @@ export class PartyEngine {
     this.lastError = null;
     this.phase = "idle";
     this.phaseDetail = null;
+    this.joinStage = null;
     this.notices = [];
     this.emit();
   }

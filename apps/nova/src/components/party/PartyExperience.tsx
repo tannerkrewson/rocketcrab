@@ -240,7 +240,15 @@ function renderPhase(
           <p className="font-black">{state.phaseDetail ?? "Working…"}</p>
           <p className="text-sm text-base-content/70">
             {state.phase === "joining"
-              ? "Searching the network for the party — this can take a few seconds. If it never appears, double-check the code with your friend."
+              ? // rocketcrab-erx: once the join request is away the host must
+                // approve (ADR-0004 step 6) — say so instead of "searching".
+                state.joinStage === "awaitingApproval"
+                ? "The host needs to approve your join request from their lobby — it can take a moment."
+                : // rocketcrab-5ae: admitted but no peer yet — keep the
+                  // joiner on loading, not a fake empty lobby.
+                  state.joinStage === "connecting"
+                  ? "Waiting for a direct connection with the party. If it never appears, the host and you may be on networks that can't reach each other."
+                  : "Searching the network for the party — this can take a few seconds. If it never appears, double-check the code with your friend."
               : "Your party is being set up — it takes a few seconds."}
           </p>
           <Button variant="default" soft size="md" onClick={() => void handleLeave()}>

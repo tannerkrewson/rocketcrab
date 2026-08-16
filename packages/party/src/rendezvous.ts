@@ -204,6 +204,7 @@ export type PartyErrorCode =
   | "admission_timeout" // no admission response within the timeout
   | "invalid_invite" // invite fragment secret/code malformed
   | "invalid_state" // operation not valid in the current session state
+  | "peer_unreachable" // admitted but no private-room peer ever appeared
   | "connection_lost" // the private party connection dropped
   | "cancelled"; // operation abandoned (e.g. leave during join)
 
@@ -932,6 +933,15 @@ export interface JoinByCodeOptions {
   readonly earlyMissTimeoutMs?: number;
   /** Admission exchange timeout (default LIMITS.handshakeTimeoutMs). */
   readonly admissionTimeoutMs?: number;
+  /**
+   * Called once the join request was sent and the joiner is waiting for the
+   * greeter's admission decision (ADR-0004 step 6). Lets the UI say
+   * "waiting for the host's approval" instead of "searching" (rocketcrab-erx).
+   * No host display name is available to the joiner at this point (the
+   * advert is a minimal public summary, ADR-0004) — the UI uses a generic
+   * "the host".
+   */
+  readonly onAdmissionPending?: () => void;
   /** Policy used if this joiner later becomes greeter after migration. */
   readonly onJoinRequest?: (request: JoinRequestInfo) => boolean | Promise<boolean>;
   /** Party size cap if this joiner later becomes greeter. */
@@ -1105,6 +1115,7 @@ export async function joinPartyByCode(options: JoinByCodeOptions): Promise<Party
       displayName: options.displayName ?? options.memberId,
       timeoutMs: options.admissionTimeoutMs ?? LIMITS.handshakeTimeoutMs,
       schedule,
+      onPending: options.onAdmissionPending,
     });
     const derive = options.derive ?? deriveSessionMaterial;
     const material = await derive(secret);
@@ -1358,6 +1369,8 @@ async function requestAdmission(input: {
   displayName: string;
   timeoutMs: number;
   schedule: Scheduler;
+  /** Fired once the join request is away and the greeter must decide. */
+  onPending?: () => void;
 }): Promise<SessionSecret> {
   return new Promise<SessionSecret>((resolve, reject) => {
     let settled = false;
@@ -1431,6 +1444,9 @@ async function requestAdmission(input: {
           { partyCode: input.code, displayName: input.displayName },
         ),
         targetConnectionId: input.advert.greeterConnectionId,
+      })
+      .then(() => {
+        input.onPending?.();
       })
       .catch((error: unknown) => {
         finish(new PartyError("invalid_state", `Join request failed to send: ${String(error)}`));
