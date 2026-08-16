@@ -38,6 +38,7 @@ const IDLE_STATE: PartyEngineState = {
   diagnostics: null,
   notices: [],
   runtimeLogs: [],
+  joinStage: null,
   lastError: null,
 };
 
