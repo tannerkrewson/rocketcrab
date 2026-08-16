@@ -9,17 +9,20 @@ import { clearPartyRecovery } from "../lib/party/party-recovery";
 import { routeTree } from "../routeTree.gen";
 
 /**
- * Short join URL tests (9fv.8): a four-letter code in the PATH — either
- * under /join (/join/cvvu) or at the root (rocketcrab.com/cvvu) — lands in
- * the join flow with the code prefilled. Only codes ride in the path, never
- * secrets (ADR-0004 / ADR-0011); a fragment invite on top of the path still
- * takes the direct-join path, and invalid params fall through to the 404
- * page.
+ * Short join URL tests (9fv.8 / rocketcrab-if2): a four-letter code in the
+ * PATH — either under /join (/join/cvvu) or at the root
+ * (rocketcrab.com/cvvu) — lands in the join flow with the code prefilled
+ * AND auto-submits the join on load (mirroring the fragment-invite
+ * auto-join; a code with `?edit=name` never auto-joins). Only codes ride
+ * in the path, never secrets (ADR-0004 / ADR-0011); a fragment invite on
+ * top of the path still takes the direct-join path, and invalid params
+ * fall through to the 404 page.
  */
 
 const IDLE_STATE: PartyEngineState = {
   phase: "idle",
   phaseDetail: null,
+  joinStage: null,
   reconnectAttempts: 0,
   role: null,
   code: null,
@@ -98,18 +101,29 @@ beforeEach(() => {
 });
 
 describe("/join/:code (short join URL)", () => {
-  it("prefills the code input from the path and joins on submit", async () => {
+  it("prefills the code input from the path and auto-joins on load (rocketcrab-if2)", async () => {
     renderShortJoin("/join/cvvu");
     const input = (await screen.findByLabelText("Four-letter party code")) as HTMLInputElement;
     expect(input.value).toBe("cvvu");
-    fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
+    // No Join click needed: the prefilled path code auto-submits, exactly
+    // like a fragment invite auto-joins (rocketcrab-if2).
     await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("cvvu"));
+    expect(stubEngine.joinByCode).toHaveBeenCalledTimes(1);
   });
 
   it("normalizes an uppercase path code to lowercase", async () => {
     renderShortJoin("/join/CVVU");
     const input = (await screen.findByLabelText("Four-letter party code")) as HTMLInputElement;
     expect(input.value).toBe("cvvu");
+    await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("cvvu"));
+  });
+
+  it("does not auto-join a path code when the ?edit=name page is open (rocketcrab-if2)", async () => {
+    renderShortJoin("/join/cvvu?edit=name");
+    // The name-editing page renders instead of the join form.
+    expect(await screen.findByRole("heading", { name: "Your name" })).toBeInTheDocument();
+    expect(stubEngine.joinByCode).not.toHaveBeenCalled();
+    expect(stubEngine.joinByInvite).not.toHaveBeenCalled();
   });
 
   it("falls through to the 404 page for a non-letter code", async () => {
@@ -151,18 +165,22 @@ describe("/join/:code (short join URL)", () => {
 });
 
 describe("/:code (root short join URL, rocketcrab.com/cvvu)", () => {
-  it("prefills the code input from a bare four-letter path segment", async () => {
+  it("prefills the code input and auto-joins from a bare four-letter path segment", async () => {
     renderShortJoin("/cvvu");
     const input = (await screen.findByLabelText("Four-letter party code")) as HTMLInputElement;
     expect(input.value).toBe("cvvu");
+    await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("cvvu"));
     expect(screen.queryByText("Lost in space")).not.toBeInTheDocument();
   });
 
-  it("joins with the prefilled code on submit", async () => {
+  it("does not join twice when the user also presses Join", async () => {
     renderShortJoin("/cvvu");
     await screen.findByLabelText("Four-letter party code");
+    // The auto-join fired on load; a manual Join click on the prefilled
+    // form is a second join request (the engine guards double-joins).
+    await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledTimes(1));
     fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
-    await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("cvvu"));
+    await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledTimes(2));
   });
 
   it("does not hijack real routes — /about still renders", async () => {
