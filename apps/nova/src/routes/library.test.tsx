@@ -32,16 +32,16 @@ beforeEach(async () => {
 });
 
 describe("/library", () => {
-  it("shows the empty state with a New-game CTA (2t1.5)", async () => {
+  it("shows the empty state with only the header New-game CTA (2t1.5/ini)", async () => {
     renderLibrary();
     expect(await screen.findByText("No saved games yet")).toBeInTheDocument();
-    // The empty-state action is the renamed "New game" CTA (the header
-    // action has the same label, so both links are present).
+    // ini: the duplicate empty-state "New game" button is gone — the header
+    // action is the only one on the page.
     const ctas = screen.getAllByRole("link", { name: "New game" });
-    expect(ctas.length).toBeGreaterThanOrEqual(1);
-    for (const cta of ctas) {
-      expect(cta.getAttribute("href")).toBe("/build");
-    }
+    expect(ctas).toHaveLength(1);
+    expect(ctas[0]!.getAttribute("href")).toBe("/build");
+    // ini: the "nothing is uploaded" copy is removed.
+    expect(screen.queryByText(/Games are saved right in this browser/)).not.toBeInTheDocument();
   });
 
   it("shows ONE back button and a New-game action in the header (2t1.5)", async () => {
