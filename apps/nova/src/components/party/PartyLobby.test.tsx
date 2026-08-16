@@ -32,6 +32,7 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
   return {
     phase: "lobby",
     phaseDetail: null,
+    joinStage: null,
     reconnectAttempts: 0,
     role: "creator",
     code: "ABCD",

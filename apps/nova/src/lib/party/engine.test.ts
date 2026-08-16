@@ -467,6 +467,87 @@ describe("party engine — two phones end to end", () => {
   });
 });
 
+describe("party engine — join loading stages (rocketcrab-erx / rocketcrab-5ae)", () => {
+  it("shows 'waiting for approval' while the host must approve, then lands in the lobby (erx)", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    const code = await runCreate(a, world);
+
+    const { join: joinPromise, settled } = startJoin(b, world, code);
+    await settled;
+
+    // The join request is away; the joiner's loading screen now says the
+    // host must approve (the admission exchange exists in the transport:
+    // join.request → join.admission, ADR-0004 steps 5-6).
+    expect(b.engine.getState().phase).toBe("joining");
+    expect(b.engine.getState().joinStage).toBe("awaitingApproval");
+    expect(b.engine.getState().phaseDetail).toMatch(/approval/i);
+
+    a.engine.respondToJoinRequest(b.memberId, true);
+    await settle(world);
+    await joinPromise;
+
+    expect(b.engine.getState().phase).toBe("lobby");
+    expect(b.engine.getState().joinStage).toBeNull();
+    expect(a.engine.getState().members).toHaveLength(2);
+    expect(b.engine.getState().members).toHaveLength(2);
+  });
+
+  it("keeps a joiner on loading then errors when no peer can be reached (5ae)", async () => {
+    const world = makeWorld();
+    // No host at all: an invite join derives a private room nobody is in
+    // (the stale-invite / cross-network no-TURN shape). The joiner must sit
+    // on the loading screen and then hit a clear error — never a fake lobby.
+    const b = makePlayer(world, "b", { peerConnectTimeoutMs: 1_000 });
+    const joinPromise = b.engine.joinByInvite({ secret: "E".repeat(43), code: "ABCD" });
+    await settle(world);
+    expect(b.engine.getState().phase).toBe("joining");
+    expect(b.engine.getState().joinStage).toBe("connecting");
+
+    // Still loading after additional time (the signaling layer itself may
+    // have connected; the peer gate is what matters).
+    world.clock.advance(500);
+    await settle(world);
+    expect(b.engine.getState().phase).toBe("joining");
+
+    // The peer window closes: loading → error, and the dead-end room is
+    // torn down (no rooms left, so nobody else bumps into this joiner).
+    world.clock.advance(500);
+    await settle(world);
+    await joinPromise;
+    expect(b.engine.getState().phase).toBe("error");
+    expect(b.engine.getState().lastError).toMatch(/couldn't reach the host/i);
+    expect(world.hub.roomNames().every((room) => world.hub.membersOf(room).length === 0)).toBe(
+      true,
+    );
+  });
+
+  it("lets a Cancel during the peer wait return to idle without an error (5ae)", async () => {
+    const world = makeWorld();
+    const b = makePlayer(world, "b", { peerConnectTimeoutMs: 5_000 });
+    const joinPromise = b.engine.joinByInvite({ secret: "F".repeat(43), code: "ABCD" });
+    await settle(world);
+    expect(b.engine.getState().phase).toBe("joining");
+    expect(b.engine.getState().joinStage).toBe("connecting");
+
+    // The user presses Cancel on the loading screen: the party is torn
+    // down and the flow returns to the entry UI — no error screen, no
+    // phantom lobby if a peer were to appear later.
+    await b.engine.leaveParty();
+    await settle(world);
+    expect(b.engine.getState().phase).toBe("idle");
+    // The join's peer-wait timer still pends; once it fires after the
+    // cancel, the join flow must stop silently instead of failing into the
+    // error screen.
+    world.clock.advance(5_500);
+    await settle(world);
+    await joinPromise;
+    expect(b.engine.getState().phase).toBe("idle");
+    expect(b.engine.getState().joinStage).toBeNull();
+  });
+});
+
 describe("party engine — readiness and start gating", () => {
   it("prevents starting until every player is ready; force-start works once verified", async () => {
     const world = makeWorld();

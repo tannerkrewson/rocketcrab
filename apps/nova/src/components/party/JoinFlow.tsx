@@ -1,5 +1,5 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { getSavedPlayerName } from "../../lib/party/identity";
 import { importInviteFromLocation } from "../../lib/party/invite-import";
 import { usePartyEngine } from "../../lib/party/use-party";
@@ -51,6 +51,12 @@ export function JoinFlow({ initialCode = "" }: JoinFlowProps) {
   const [joinError, setJoinError] = useState<string | null>(null);
   const [code, setCode] = useState(initialCode);
   const [name, setName] = useState(() => getSavedPlayerName() ?? "");
+  // rocketcrab-if2: the URL-driven join effect below must run exactly once
+  // per mount — StrictMode's double effect on a dev mount would otherwise
+  // auto-join twice (a fragment visit would then ALSO re-join by path
+  // code). The invite import already guards itself, but the code join
+  // needs its own one-shot guard.
+  const autoJoinTriedRef = useRef(false);
 
   // 5cl.3: the engine subscription (see the component JSDoc). `state` is
   // the live snapshot; `engine` is the page singleton.
@@ -61,6 +67,10 @@ export function JoinFlow({ initialCode = "" }: JoinFlowProps) {
   // is a public rendezvous namespace, the fragment secret is the
   // direct-join capability — the secret must win, ADR-0011).
   useEffect(() => {
+    if (autoJoinTriedRef.current) {
+      return;
+    }
+    autoJoinTriedRef.current = true;
     const invite = importInviteFromLocation({
       hash: window.location.hash,
       pathname: window.location.pathname,
@@ -78,6 +88,24 @@ export function JoinFlow({ initialCode = "" }: JoinFlowProps) {
       // flips this flow to the loading screen the moment the engine emits
       // "joining", and to the form + error on failure.
       void engine.joinByInvite(withPathCode);
+      return;
+    }
+    // rocketcrab-if2: a bare four-letter code in the path auto-submits the
+    // join on load (mirrors the fragment-invite auto-join above). The
+    // `?edit=name` page is for renaming, never joining — a code in the
+    // path must NOT auto-join there.
+    if (initialCode !== "" && search.edit !== "name" && !engine.isActive()) {
+      void engine
+        .joinByCode(initialCode)
+        .then(() => {
+          const latest = engine.getState();
+          if (latest.phase === "error" && latest.lastError !== null) {
+            setJoinError(latest.lastError);
+          }
+        })
+        // An already-active party (user wandered back to a /:code URL while
+        // in a party) makes prepareSetup reject — the live party wins.
+        .catch(() => undefined);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

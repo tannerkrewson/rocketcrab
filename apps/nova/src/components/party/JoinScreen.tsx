@@ -1,7 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { KeyRound, Loader2, UserRound } from "lucide-react";
 import type { FormEvent, KeyboardEvent } from "react";
-import { phoneticSpelling } from "../../lib/party/phonetic";
 import { Button, buttonStyles } from "../ui/Button";
 
 /** What this screen is doing: joining a party, or editing the player name. */
@@ -34,9 +33,9 @@ export interface JoinScreenProps {
  * wide mono input — the join happens directly from the code step, and the
  * player's name is ONLY asked once they are in the lobby (the edit mode
  * below). Codes are normalized to lowercase on entry (the party layer
- * validates its own alphabet); the phonetic spelling confirms the
- * code inline once it is complete. The player's name is prefilled from the
- * last saved name (7.5).
+ * validates its own alphabet). The player's name is prefilled from the
+ * last saved name (7.5). The phonetic spelling lives in the party shell
+ * header above the form (7.22), not here (rocketcrab-if2).
  *
  * Edit mode reuses the same name-entry presentation (UserRound icon,
  * pl-10 input, visible "Your name" label, maxLength 24) as the old join
@@ -136,8 +135,7 @@ export function JoinScreen({
             />
             {normalized.length === 4 ? (
               <p className="text-center text-sm text-base-content/60">
-                <span className="font-mono font-bold text-primary">{normalized}</span> —{" "}
-                <span className="text-base-content/50">({phoneticSpelling(normalized)})</span>
+                <span className="font-mono font-bold text-primary">{normalized}</span>
               </p>
             ) : null}
           </div>
