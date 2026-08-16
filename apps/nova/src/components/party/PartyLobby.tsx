@@ -9,6 +9,7 @@ import {
   Pencil,
   Play,
   QrCode,
+  Share2,
   Users,
   X,
 } from "lucide-react";
@@ -60,12 +61,16 @@ function playerBorderColor(index: number): string {
   return PLAYER_BORDER_COLORS[index % PLAYER_BORDER_COLORS.length] ?? "border-primary";
 }
 
-/** Comma-separated role labels for a player tile ("You, Host" style, 10.8). */
+/** Comma-separated role labels for a player tile ("You, Host" style, 10.8).
+ *  Users only ever see "host" (rocketcrab-rfk): the greeter IS the host —
+ *  the creator is installed as the initial rendezvous greeter — so a host
+ *  peer's tile reads "Host", never "Greeter". The greeter concept stays
+ *  diagnostic-only (diagnostics panel + engine state). */
 function roleLabels(member: PartyMemberView, isCreator: boolean): string {
   const labels: string[] = [];
   if (member.isSelf) labels.push("You");
   if (member.isSelf && isCreator) labels.push("Host");
-  if (member.isGreeter && !member.isSelf) labels.push("Greeter");
+  if (member.isGreeter && !member.isSelf) labels.push("Host");
   return labels.join(", ");
 }
 
@@ -117,6 +122,26 @@ const NOTICE_ALERT_LEVELS: Record<PartyNotice["level"], string> = {
   warn: "alert-warning",
   info: "alert-info",
 };
+
+/** True when the platform's native share sheet can take the invite URL
+ *  (rocketcrab-ucz): both `navigator.share` and `navigator.canShare` must
+ *  exist and accept the payload — jsdom and desktop browsers without Web
+ *  Share hide the button entirely. */
+function canNativeShare(url: string | null): boolean {
+  if (
+    url === null ||
+    typeof navigator === "undefined" ||
+    typeof navigator.share !== "function" ||
+    typeof navigator.canShare !== "function"
+  ) {
+    return false;
+  }
+  try {
+    return navigator.canShare({ url });
+  } catch {
+    return false;
+  }
+}
 
 /**
  * The party lobby (P4): the invite card (Copy URL / QR in a modal), the
@@ -227,6 +252,23 @@ export function PartyLobby({
     }
   };
 
+  // rocketcrab-ucz: native share of the invite URL. Cancelling the share
+  // sheet (AbortError / not-allowed) is not an error — silently ignore it.
+  const shareInvite = async () => {
+    if (state.inviteUrl === null || typeof navigator.share !== "function") return;
+    try {
+      await navigator.share({ title: "Play rocketcrab with me!", url: state.inviteUrl });
+    } catch {
+      // The user dismissed the sheet or the platform refused — the lobby's
+      // Copy URL affordance stays available either way.
+    }
+  };
+
+  // rocketcrab-ucz: the native Share button only exists where the platform
+  // supports it (feature-detected — hidden in jsdom and non-Web-Share
+  // browsers); the copy + QR affordances stay for everyone.
+  const showShareButton = canNativeShare(state.inviteUrl);
+
   if (browsing) {
     // 10.9: browse mode — selecting a game ALWAYS opens its details page
     // (/game/$gameId, saved games included); the pick happens there and
@@ -252,7 +294,7 @@ export function PartyLobby({
       {/* 11.6: the title (origin + code) lives in the party shell header as
           ONE string — the invite card never renders it again (the code is
           never shown separately from the title). The card is the invite
-          ACTION: Copy URL / QR only. */}
+          ACTION: Copy URL / QR (+ native Share where supported, ucz). */}
       <section
         aria-label="Invite your friends"
         className="flex flex-col items-center gap-3 rounded-box border-2 border-base-300 bg-base-100 p-5 text-center"
@@ -273,6 +315,18 @@ export function PartyLobby({
             <QrCode className="h-4 w-4" aria-hidden="true" />
             QR Code
           </Button>
+          {showShareButton ? (
+            <Button
+              variant="default"
+              soft
+              size="md"
+              onClick={() => void shareInvite()}
+              title="Share the invite link with a friend"
+            >
+              <Share2 className="h-4 w-4" aria-hidden="true" />
+              Share
+            </Button>
+          ) : null}
         </div>
         {/* 5cl.2: the separate "Copy short link" affordance is gone —
             copying always copies the LONG secret URL. The short URL still
@@ -295,7 +349,13 @@ export function PartyLobby({
           <h2 className="text-xl font-black">Welcome to rocketcrab!</h2>
           {state.game !== null ? (
             <>
-              <p className="text-sm font-semibold text-base-content/70">You&apos;ve selected</p>
+              <p className="text-sm font-semibold text-base-content/70">
+                {/* rocketcrab-ack: only the host says "You've selected" —
+                    guests see the host's name, e.g. "Bob has selected". */}
+                {state.role === "creator"
+                  ? "You've selected"
+                  : `${hostName ?? "The host"} has selected`}
+              </p>
               <p className="text-2xl font-black text-primary">{state.game.title}</p>
               <p className="text-sm text-base-content/70">
                 {state.role === "creator"
@@ -376,7 +436,10 @@ export function PartyLobby({
       ) : null}
       {/* 10.7: the action row (Browse games left, Start game right) sits
           ABOVE the players box, horizontally centered — leave is its own
-          quiet control at the bottom of the page. */}
+          quiet control at the bottom of the page. rocketcrab-b73: START is
+          host-only — joiners get no Start game / Start anyway buttons and
+          no blocked-reason alert; browsing is host-only too, so a joiner
+          has no path to pick or start a game from the lobby. */}
       <section className="flex flex-wrap items-center justify-center gap-2">
         {state.role === "creator" ? (
           <Button variant="secondary" size="lg" onClick={() => setBrowsing(true)}>
@@ -384,17 +447,19 @@ export function PartyLobby({
             Browse games
           </Button>
         ) : null}
-        <Button
-          variant="primary"
-          size="lg"
-          disabled={!state.canStart}
-          onClick={() => onStart(false)}
-          title={state.startBlockedReason ?? "Start the game once every player is ready"}
-        >
-          <Play className="h-5 w-5" aria-hidden="true" />
-          Start game
-        </Button>
-        {state.canForceStart ? (
+        {state.role === "creator" ? (
+          <Button
+            variant="primary"
+            size="lg"
+            disabled={!state.canStart}
+            onClick={() => onStart(false)}
+            title={state.startBlockedReason ?? "Start the game once every player is ready"}
+          >
+            <Play className="h-5 w-5" aria-hidden="true" />
+            Start game
+          </Button>
+        ) : null}
+        {state.role === "creator" && state.canForceStart ? (
           <Button variant="default" soft size="lg" onClick={() => setForceDialog(true)}>
             <PartyPopper className="h-5 w-5" aria-hidden="true" />
             Start anyway
@@ -404,8 +469,10 @@ export function PartyLobby({
       {/* The blocked-reason copy (10.7): shown as a styled warning alert;
           the "Pick a game before starting the party." message is gone —
           the welcome card covers the no-game case. The ended case shows
-          no alert at all (5cl.9). */}
-      {state.game !== null &&
+          no alert at all (5cl.9), and joiners never see it (b73 — the
+          reason is the host's start gate). */}
+      {state.role === "creator" &&
+      state.game !== null &&
       state.endedReason === null &&
       !state.canStart &&
       !state.canForceStart &&
