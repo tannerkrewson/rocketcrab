@@ -1,7 +1,14 @@
 import type { ButtonHTMLAttributes } from "react";
 import { cn } from "../../lib/cn";
 
-export type ButtonVariant = "primary" | "secondary" | "accent" | "outline" | "danger" | "default";
+export type ButtonVariant =
+  | "primary"
+  | "secondary"
+  | "accent"
+  | "outline"
+  | "danger"
+  | "default"
+  | "info";
 export type ButtonSize = "md" | "lg";
 
 const variantClasses: Record<ButtonVariant, string> = {
@@ -14,6 +21,9 @@ const variantClasses: Record<ButtonVariant, string> = {
   // variant (btn-neutral) is gone; everywhere it was used now uses
   // "default" (with the same soft/plain treatment as before).
   default: "",
+  // 7th pass: the build hero CTA uses the Nova brand color — daisyUI
+  // `btn-info` (nova IS the info color, 2t1.3).
+  info: "btn-info",
 };
 
 const sizeClasses: Record<ButtonSize, string> = {
