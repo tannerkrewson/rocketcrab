@@ -9,6 +9,7 @@ import {
   Pencil,
   Play,
   QrCode,
+  Share2,
   Users,
   X,
 } from "lucide-react";
@@ -122,6 +123,26 @@ const NOTICE_ALERT_LEVELS: Record<PartyNotice["level"], string> = {
   info: "alert-info",
 };
 
+/** True when the platform's native share sheet can take the invite URL
+ *  (rocketcrab-ucz): both `navigator.share` and `navigator.canShare` must
+ *  exist and accept the payload — jsdom and desktop browsers without Web
+ *  Share hide the button entirely. */
+function canNativeShare(url: string | null): boolean {
+  if (
+    url === null ||
+    typeof navigator === "undefined" ||
+    typeof navigator.share !== "function" ||
+    typeof navigator.canShare !== "function"
+  ) {
+    return false;
+  }
+  try {
+    return navigator.canShare({ url });
+  } catch {
+    return false;
+  }
+}
+
 /**
  * The party lobby (P4): the invite card (Copy URL / QR in a modal), the
  * welcome card with the selected game, the classic 2-column player grid
@@ -231,6 +252,23 @@ export function PartyLobby({
     }
   };
 
+  // rocketcrab-ucz: native share of the invite URL. Cancelling the share
+  // sheet (AbortError / not-allowed) is not an error — silently ignore it.
+  const shareInvite = async () => {
+    if (state.inviteUrl === null || typeof navigator.share !== "function") return;
+    try {
+      await navigator.share({ title: "Play rocketcrab with me!", url: state.inviteUrl });
+    } catch {
+      // The user dismissed the sheet or the platform refused — the lobby's
+      // Copy URL affordance stays available either way.
+    }
+  };
+
+  // rocketcrab-ucz: the native Share button only exists where the platform
+  // supports it (feature-detected — hidden in jsdom and non-Web-Share
+  // browsers); the copy + QR affordances stay for everyone.
+  const showShareButton = canNativeShare(state.inviteUrl);
+
   if (browsing) {
     // 10.9: browse mode — selecting a game ALWAYS opens its details page
     // (/game/$gameId, saved games included); the pick happens there and
@@ -256,7 +294,7 @@ export function PartyLobby({
       {/* 11.6: the title (origin + code) lives in the party shell header as
           ONE string — the invite card never renders it again (the code is
           never shown separately from the title). The card is the invite
-          ACTION: Copy URL / QR only. */}
+          ACTION: Copy URL / QR (+ native Share where supported, ucz). */}
       <section
         aria-label="Invite your friends"
         className="flex flex-col items-center gap-3 rounded-box border-2 border-base-300 bg-base-100 p-5 text-center"
@@ -277,6 +315,18 @@ export function PartyLobby({
             <QrCode className="h-4 w-4" aria-hidden="true" />
             QR Code
           </Button>
+          {showShareButton ? (
+            <Button
+              variant="default"
+              soft
+              size="md"
+              onClick={() => void shareInvite()}
+              title="Share the invite link with a friend"
+            >
+              <Share2 className="h-4 w-4" aria-hidden="true" />
+              Share
+            </Button>
+          ) : null}
         </div>
         {/* 5cl.2: the separate "Copy short link" affordance is gone —
             copying always copies the LONG secret URL. The short URL still
