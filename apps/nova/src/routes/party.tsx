@@ -1,4 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { ArrowLeft, PartyPopper } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { PROTOCOL_VERSION, type GameMode } from "@rocketcrab/protocol";
@@ -61,7 +61,11 @@ function errorMessage(error: unknown): string {
 function PartyPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const { engine } = usePartyEngine();
+  const { state, engine } = usePartyEngine();
+  // rocketcrab-r0f: the host URL normalization watches the router pathname
+  // directly so it can tell "/party" apart from the short-code "/<code>" it
+  // replaces it with.
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
   const startedRef = useRef(false);
   const [attempt, setAttempt] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -105,6 +109,27 @@ function PartyPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, search.gameId, search.mode, search.title, attempt]);
+
+  // rocketcrab-r0f: once a party is ACTIVE with a known code, normalize the
+  // host's address bar to the short-code route /<code> IN PLACE (replace,
+  // never push — no history spam) so the code reads in the URL for the whole
+  // session. Cosmetic/in-session only: the engine page-singleton keeps its
+  // role, so there is NO engine re-entry, NO rejoin, and no join flow
+  // (/$code with an active engine renders the same PartyExperience). Skipped
+  // whenever ?browse=true — the in-party game-details 'back to category'
+  // entry (5cl.7) must keep delivering initialBrowse to the lobby. The
+  // pathname guard kills any loop: after the replace the route is /<code>,
+  // never /party.
+  useEffect(() => {
+    if (search.browse === true || !engine.isActive()) {
+      return;
+    }
+    const code = state.code;
+    if (code === null || pathname !== "/party") {
+      return;
+    }
+    void navigate({ to: "/$code", params: { code }, replace: true });
+  }, [engine, navigate, pathname, search.browse, state.code, state.phase]);
 
   const handleRetry = () => {
     startedRef.current = false;

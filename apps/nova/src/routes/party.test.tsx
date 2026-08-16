@@ -1,3 +1,4 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createMemoryHistory, createRouter } from "@tanstack/react-router";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
@@ -19,7 +20,9 @@ import { routeTree } from "../routeTree.gen";
  * entry point when no party is active (7.37: a single "Start a party"
  * action — rocketcrab-9j3 removed the entry's name step so /join?edit=name
  * is the ONLY name page; a saved name still skips the entry page
- * entirely), and renders the party experience once a party is active.
+ * entirely), renders the party experience once a party is active, and
+ * normalizes the host's address bar to /<code> in place once a party is
+ * active (rocketcrab-r0f — except on /party?browse=true, 5cl.7).
  */
 
 const IDLE_STATE: PartyEngineState = {
@@ -85,21 +88,32 @@ const ACTIVE_STATE: PartyEngineState = {
   startBlockedReason: "Pick a game before starting the party.",
 };
 
+/** A party still being created: engine active but no code known yet. */
+const CREATING_STATE: PartyEngineState = {
+  ...IDLE_STATE,
+  phase: "creating",
+  phaseDetail: "Creating party…",
+  connectionState: "joining",
+};
+
 const { stubEngine, stubs } = vi.hoisted(() => {
   const stubs: {
     started: boolean;
+    state: PartyEngineState | null;
     handler: ((state: PartyEngineState) => void) | null;
-  } = { started: false, handler: null };
+  } = { started: false, state: null, handler: null };
+  const currentState = (): PartyEngineState =>
+    stubs.state ?? (stubs.started ? ACTIVE_STATE : IDLE_STATE);
   return {
     stubs,
     stubEngine: {
-      getState: vi.fn((): PartyEngineState => (stubs.started ? ACTIVE_STATE : IDLE_STATE)),
+      getState: vi.fn((): PartyEngineState => currentState()),
       onState: vi.fn((handler: (state: PartyEngineState) => void) => {
         stubs.handler = handler;
-        handler(stubs.started ? ACTIVE_STATE : IDLE_STATE);
+        handler(currentState());
         return () => undefined;
       }),
-      isActive: vi.fn(() => stubs.started),
+      isActive: vi.fn(() => currentState().phase !== "idle"),
       setContainer: vi.fn(),
       setDisplayName: vi.fn(),
       selectGame: vi.fn(async () => undefined),
@@ -135,8 +149,14 @@ function renderParty(entry: string) {
     routeTree,
     history: createMemoryHistory({ initialEntries: [entry] }),
   });
-  const wrapper = ({ children }: { children: ReactNode }) => <>{children}</>;
-  return render(<RouterProvider router={router} />, { wrapper });
+  // The lobby's game browser (browse mode, initialBrowse) queries saved
+  // games, so give every render a fresh query client.
+  const queryClient = new QueryClient();
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+  render(<RouterProvider router={router} />, { wrapper });
+  return router;
 }
 
 const SAVED_HTML = "<!doctype html><html><body><p>rockets</p></body></html>";
@@ -144,6 +164,7 @@ const SAVED_HTML = "<!doctype html><html><body><p>rockets</p></body></html>";
 beforeEach(async () => {
   vi.clearAllMocks();
   stubs.started = false;
+  stubs.state = null;
   stubs.handler = null;
   await gameRepository.clear();
   resetPartySourceForTests();
@@ -254,5 +275,49 @@ describe("/party", () => {
     fireEvent.click(await screen.findByRole("button", { name: /not now/i }));
     expect(screen.queryByTestId("party-resume-banner")).not.toBeInTheDocument();
     expect(readPartyRecovery()).toBeNull();
+  });
+
+  describe("host URL normalization to /<code> (rocketcrab-r0f)", () => {
+    it("replaces /party with /<code> once a party is active", async () => {
+      const router = renderParty("/party");
+      // Start a party from the entry; once the engine is active with a code
+      // the address bar must read the party code instead of /party.
+      fireEvent.click(await screen.findByRole("button", { name: /start a party/i }));
+      await vi.waitFor(() => expect(router.state.location.pathname).toBe("/RCRB"));
+      // The rewrite is a REPLACE: the /party entry is gone from history, so
+      // there is no back-navigation spam into the party flow.
+      expect(router.history.canGoBack()).toBe(false);
+      // The party experience (not the join flow) is what renders on /<code>.
+      await vi.waitFor(() =>
+        expect(screen.getByText("Welcome to rocketcrab!")).toBeInTheDocument(),
+      );
+    });
+
+    it("keeps /party?browse=true in browse mode (5cl.7 back-to-category entry)", async () => {
+      stubs.started = true;
+      const router = renderParty("/party?browse=true");
+      // The lobby (in browse mode) renders and the URL stays untouched — the
+      // game-details 'back to category' link must keep delivering
+      // initialBrowse to the lobby. (The router serializes search browse:true
+      // as ?browse=true and validateSearch restores the boolean, so this is
+      // the real URL form the app produces; plain ?browse=1 never
+      // round-trips to the /party route's boolean.)
+      expect(await screen.findByTestId("party-title")).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe("/party");
+      expect(router.state.location.searchStr).toBe("?browse=true");
+    });
+
+    it("never redirects while idle or still creating", async () => {
+      // Idle: no party — the entry page stays put.
+      let router = renderParty("/party");
+      expect(await screen.findByRole("heading", { name: "Start a party" })).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe("/party");
+      // Creating: engine active but no code yet — the address bar must not
+      // jump anywhere until a code exists.
+      stubs.state = CREATING_STATE;
+      router = renderParty("/party");
+      expect(await screen.findByText("Creating party…")).toBeInTheDocument();
+      expect(router.state.location.pathname).toBe("/party");
+    });
   });
 });
