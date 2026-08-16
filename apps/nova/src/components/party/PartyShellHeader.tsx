@@ -36,6 +36,9 @@ export interface PartyShellHeaderProps {
  *
  * 5cl.8: while the host browses games the header renders `compact` — same
  * header, smaller logo + title and reduced opacity, animated via CSS.
+ * 480: the shrink ANIMATES — the mark's height transitions on the img
+ * (BrandLogo) and the title's font-size transitions on the button; both
+ * are motion-reduce safe alongside the header's own transition.
  */
 export function PartyShellHeader({
   code,
@@ -50,7 +53,7 @@ export function PartyShellHeader({
     if (inviteUrl === null || inviteUrl === undefined) return;
     const ok = await writeToClipboard(inviteUrl);
     if (ok) {
-      toast.success("Invite title copied.");
+      toast.success("Invite url copied.");
     } else {
       toast.error("Couldn't copy the link — try the Copy URL button in the lobby.");
     }
@@ -69,7 +72,7 @@ export function PartyShellHeader({
           <button
             type="button"
             className={cn(
-              "font-title mt-2 cursor-pointer font-black text-base-content",
+              "font-title mt-2 cursor-pointer font-black text-base-content transition-all duration-300 ease-out motion-reduce:transition-none active:scale-95",
               compact ? "text-2xl" : "text-4xl sm:text-5xl",
             )}
             data-testid="party-title"

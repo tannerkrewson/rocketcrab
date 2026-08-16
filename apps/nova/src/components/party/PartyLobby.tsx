@@ -13,7 +13,7 @@ import {
   Users,
   X,
 } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState, PartyMemberView, PartyNotice } from "../../lib/party/engine";
@@ -116,6 +116,13 @@ function isEndedNotice(message: string): boolean {
   return message.startsWith("The game ended");
 }
 
+/** 2z9: membership notices ("X joined the party." / "X was removed from
+ *  the party.") are TEMPORARY smart toasts — the same sonner system the
+ *  URL copy uses — never persistent banner alerts. */
+function isMembershipNotice(message: string): boolean {
+  return message.endsWith("joined the party.") || message.endsWith("was removed from the party.");
+}
+
 /** Alert level classes for lobby notices (outline-styled per 9fv.11.3). */
 const NOTICE_ALERT_LEVELS: Record<PartyNotice["level"], string> = {
   error: "alert-error",
@@ -166,6 +173,9 @@ export function PartyLobby({
   initialBrowsing = false,
 }: PartyLobbyProps) {
   const [forceDialog, setForceDialog] = useState(false);
+  // 2z9: kicking removes a player from the party — the X asks first (the
+  // candidate memberId is held here until confirmed).
+  const [kickPending, setKickPending] = useState<string | null>(null);
   // 7.43: "Browse games" swaps the lobby for the shared browse UI (pick
   // mode) until the host picks a game or goes back. 5cl.7: the details-
   // page back button can land here already in browse mode (initialBrowsing).
@@ -236,11 +246,37 @@ export function PartyLobby({
   // (a capped, deduped set from the engine) — never a growing list of
   // identical alerts. End notices are filtered out (no "game ended" alert
   // at all, 5cl.9) and once the game ended the notice banner hides
-  // entirely.
+  // entirely. 2z9: membership notices (joined / removed) are filtered out
+  // too — they toast instead, below.
   const latestNotice =
     state.endedReason !== null || state.notices.length === 0
       ? null
-      : ([...state.notices].reverse().find((notice) => !isEndedNotice(notice.message)) ?? null);
+      : ([...state.notices]
+          .reverse()
+          .find(
+            (notice) => !isEndedNotice(notice.message) && !isMembershipNotice(notice.message),
+          ) ?? null);
+
+  // 2z9: membership notices use the same TEMPORARY smart toast system the
+  // URL copy does (sonner) — one toast per notice, deduped by notice id so
+  // re-renders never re-fire (the engine already collapses identical
+  // repeats). The engine itself skips these while a member still has the
+  // generated member-… id name, so no id-like text ever appears.
+  const toastedNoticeIds = useRef<readonly string[]>([]);
+  useEffect(() => {
+    for (const notice of state.notices) {
+      if (toastedNoticeIds.current.includes(notice.id)) continue;
+      if (!isMembershipNotice(notice.message)) continue;
+      toastedNoticeIds.current = [...toastedNoticeIds.current, notice.id];
+      if (notice.level === "error") {
+        toast.error(notice.message);
+      } else if (notice.level === "warn") {
+        toast.warning(notice.message);
+      } else {
+        toast.info(notice.message);
+      }
+    }
+  }, [state.notices]);
 
   const copyInvite = async () => {
     if (state.inviteUrl === null) return;
@@ -562,7 +598,7 @@ export function PartyLobby({
                       <button
                         type="button"
                         className="btn btn-xs text-error"
-                        onClick={() => onKickMember(member.memberId)}
+                        onClick={() => setKickPending(member.memberId)}
                         aria-label={`Kick ${member.displayName}`}
                       >
                         <X className="h-3 w-3" aria-hidden="true" />
@@ -653,6 +689,57 @@ export function PartyLobby({
           </div>
         </div>
       ) : null}
+      {/* 2z9: kicking asks first — a mis-tap would boot a player from the
+          party (same confirm pattern as force-start above). */}
+      {kickPending !== null ? (
+        <PartyKickConfirm
+          memberName={
+            state.members.find((member) => member.memberId === kickPending)?.displayName ??
+            kickPending
+          }
+          onCancel={() => setKickPending(null)}
+          onConfirm={() => {
+            setKickPending(null);
+            onKickMember(kickPending);
+          }}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** 2z9: kick-confirmation dialog (host only) — mirrors the in-game
+ *  shell's PartyKickConfirm so kicking always asks first. */
+function PartyKickConfirm({
+  memberName,
+  onCancel,
+  onConfirm,
+}: {
+  memberName: string;
+  onCancel: () => void;
+  onConfirm: () => void;
+}) {
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
+      role="dialog"
+      aria-modal="true"
+      aria-label="Kick a player from the party"
+    >
+      <div className="flex w-full max-w-sm flex-col gap-4 rounded-box border-2 border-base-300 bg-base-100 p-5">
+        <p className="font-black">Kick {memberName} from the party?</p>
+        <p className="text-sm text-base-content/70">
+          {memberName} will be removed from the party and will have to rejoin with the invite link.
+        </p>
+        <div className="flex justify-end gap-2">
+          <Button variant="default" soft onClick={onCancel}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={onConfirm}>
+            Kick player
+          </Button>
+        </div>
+      </div>
     </div>
   );
 }

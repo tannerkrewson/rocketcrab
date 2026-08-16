@@ -26,6 +26,12 @@ import type { PartyMemberView } from "../../lib/party/engine";
  * are HOST-ONLY — joiners see no start buttons or blocked-reason alert.
  */
 
+const { toastMock } = vi.hoisted(() => ({
+  toastMock: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+}));
+
+vi.mock("sonner", () => ({ toast: toastMock }));
+
 const INVITE_URL = "http://localhost:5173/join#code=ABCD&secret=invite-secret";
 
 function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState {
@@ -93,6 +99,10 @@ beforeEach(async () => {
   // hidden in most tests; the dedicated prompt test clears it first.
   resetPartyIdentityForTests();
   setSavedPlayerName("Player A");
+  toastMock.success.mockClear();
+  toastMock.error.mockClear();
+  toastMock.warning.mockClear();
+  toastMock.info.mockClear();
 });
 
 async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobbyProps> = {}) {
@@ -375,7 +385,7 @@ describe("PartyLobby", () => {
     expect(within(alert).getByText(/waiting for every player/i)).toBeInTheDocument();
   });
 
-  it("shows ONE compact notice banner with the latest notice (11.8)", async () => {
+  it("shows ONE compact notice banner with the latest non-membership notice (11.8/2z9)", async () => {
     const state = makeState({
       canStart: true,
       startBlockedReason: null,
@@ -389,10 +399,49 @@ describe("PartyLobby", () => {
     // One status banner, not a growing list of identical alerts.
     const alerts = screen.getAllByRole("alert");
     expect(alerts).toHaveLength(1);
-    // The latest notice wins and colored alerts are outline-styled (9fv.11.3).
-    expect(alerts[0]).toHaveClass("alert-outline");
-    expect(alerts[0]).toHaveClass("alert-info");
-    expect(within(alerts[0]!).getByText("Player B joined the party.")).toBeInTheDocument();
+    // 2z9: membership notices ("joined the party.") are smart toasts, NOT
+    // banner alerts — the banner shows the latest REMAINING notice and the
+    // joined message is toasted exactly once (deduped by notice id).
+    expect(within(alerts[0]!).getByText("Player C is reconnecting.")).toBeInTheDocument();
+    expect(screen.queryByText("Player B joined the party.")).not.toBeInTheDocument();
+    expect(toastMock.info).toHaveBeenCalledWith("Player B joined the party.");
+    expect(toastMock.warning).not.toHaveBeenCalled();
+  });
+
+  it("toasts a removed-notice instead of showing it as a banner alert (2z9)", async () => {
+    const state = makeState({
+      canStart: true,
+      startBlockedReason: null,
+      notices: [
+        { id: "notice-1", level: "warn", message: "Player B was removed from the party." },
+        { id: "notice-2", level: "info", message: "The game started." },
+      ],
+    });
+    await renderLobby(state);
+    expect(screen.queryByText("Player B was removed from the party.")).not.toBeInTheDocument();
+    expect(toastMock.warning).toHaveBeenCalledWith("Player B was removed from the party.");
+    // The banner still shows the remaining notice.
+    expect(within(screen.getByRole("alert")).getByText("The game started.")).toBeInTheDocument();
+  });
+
+  it("does not re-toast a membership notice on ordinary re-renders (2z9 dedupe)", async () => {
+    const state = makeState({
+      canStart: true,
+      startBlockedReason: null,
+      notices: [{ id: "notice-1", level: "info", message: "Player B joined the party." }],
+    });
+    await renderLobby(state);
+    expect(toastMock.info).toHaveBeenCalledTimes(1);
+    // A local re-render (opening and closing the QR modal) must not fire
+    // the smart toast again — the toast effect is keyed by the notices
+    // array and deduped by notice id.
+    await userEvent.click(screen.getByRole("button", { name: /qr code/i }));
+    await userEvent.click(
+      within(screen.getByRole("dialog", { name: "Party QR code" })).getByRole("button", {
+        name: /close/i,
+      }),
+    );
+    expect(toastMock.info).toHaveBeenCalledTimes(1);
   });
 
   it("shows NO game-ended alert after a game ends — the ended banner is gone (5cl.9)", async () => {
@@ -629,7 +678,7 @@ describe("PartyLobby", () => {
     expect(screen.getByRole("button", { name: /start game/i })).toBeDisabled();
   });
 
-  it("shows a host-only kick button that removes the member (7.29)", async () => {
+  it("shows a host-only kick button that confirms before removing the member (7.29/2z9)", async () => {
     const state = makeState({
       members: [
         {
@@ -661,7 +710,13 @@ describe("PartyLobby", () => {
     const onKickMember = vi.fn();
     await renderLobby(state, { onKickMember });
     const kick = screen.getByRole("button", { name: /kick/i });
+    // 2z9: the first tap only opens the confirmation — the member is not
+    // removed until the host confirms (a mis-tap would boot them).
     await userEvent.click(kick);
+    expect(onKickMember).not.toHaveBeenCalled();
+    const confirm = screen.getByRole("dialog", { name: /kick a player/i });
+    expect(within(confirm).getByText(/Kick Bree from the party\?/)).toBeInTheDocument();
+    await userEvent.click(within(confirm).getByRole("button", { name: /^kick player$/i }));
     expect(onKickMember).toHaveBeenCalledWith("member-b");
   });
 
