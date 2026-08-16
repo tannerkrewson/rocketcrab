@@ -14,11 +14,31 @@ import { routeTree } from "../routeTree.gen";
  * Inconsolata Variable brand font and the stack gains a Browse games link.
  */
 
-const { toastMock } = vi.hoisted(() => ({
-  toastMock: { success: vi.fn(), error: vi.fn() },
-}));
+const { toastMock, partyStub } = vi.hoisted(() => {
+  const party: { active: boolean; phase: string } = { active: false, phase: "lobby" };
+  const engine = {
+    isActive: vi.fn(() => party.active),
+    leaveParty: vi.fn(async () => undefined),
+  };
+  return {
+    toastMock: { success: vi.fn(), error: vi.fn() },
+    partyStub: {
+      party,
+      engine,
+      usePartyEngine: () => ({
+        state: { phase: party.phase },
+        engine,
+      }),
+    },
+  };
+});
 
 vi.mock("sonner", () => ({ toast: toastMock }));
+// 8z9: the homepage guard leaves any active party — control the engine
+// through the stub instead of the real (idle) singleton.
+vi.mock("../lib/party/use-party", () => ({
+  usePartyEngine: partyStub.usePartyEngine,
+}));
 
 function renderHome() {
   cleanup();
@@ -34,6 +54,10 @@ beforeEach(() => {
   cleanup();
   toastMock.success.mockClear();
   toastMock.error.mockClear();
+  partyStub.engine.isActive.mockClear();
+  partyStub.engine.leaveParty.mockClear();
+  // Default: no active party, so the guard is a no-op for the page tests.
+  partyStub.party.active = false;
 });
 
 afterEach(() => {
@@ -145,5 +169,17 @@ describe("/", () => {
     expect(writeText).toHaveBeenCalledWith("rocketcrab.com");
     expect(toastMock.success).toHaveBeenCalledWith("Copied rocketcrab.com to your clipboard.");
     expect(toastMock.error).not.toHaveBeenCalled();
+  });
+
+  it("leaves any active party when the homepage is shown (8z9)", async () => {
+    // A party is live (e.g. the user pressed the native back button from
+    // the lobby) — sitting on "/" must tear it down, not keep a ghost
+    // party running.
+    partyStub.party.active = true;
+    renderHome();
+    await screen.findByRole("heading", { name: "rocketcrab.com" });
+
+    await vi.waitFor(() => expect(partyStub.engine.leaveParty).toHaveBeenCalledTimes(1));
+    expect(toastMock.success).toHaveBeenCalledWith("You left the party.");
   });
 });

@@ -21,7 +21,8 @@ export const Route = createFileRoute("/game/$gameId")({
 });
 
 function CategoryBadge({ label }: { label: string }) {
-  return <span className="badge badge-ghost badge-sm font-bold">{label}</span>;
+  // l41: badges use daisyUI's soft style (was badge-ghost).
+  return <span className="badge badge-soft badge-sm font-bold">{label}</span>;
 }
 
 function errorMessage(error: unknown): string {
@@ -164,7 +165,7 @@ export function BrowseGamePage() {
         <header className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-3xl font-black">{saved.title}</h1>
-            <span className="badge badge-info badge-outline font-bold">
+            <span className="badge badge-info badge-soft font-bold">
               {NOVA_MODE_LABELS[saved.mode ?? "state"]} · saved
             </span>
           </div>
@@ -206,12 +207,43 @@ export function BrowseGamePage() {
       <header className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-3xl font-black">{prebuilt.name}</h1>
-          <span className="badge badge-error badge-outline font-bold">classic</span>
+          <span className="badge badge-error badge-soft font-bold">classic</span>
+          {/* l41: all badges sit at the top — the category badges live next
+              to the classic badge instead of inside the Info tab. */}
+          {prebuilt.category.map((category) => (
+            <CategoryBadge key={category} label={category} />
+          ))}
         </div>
         <p className="font-semibold text-base-content/50">by {prebuilt.author}</p>
         {prebuilt.players ? (
           <p className="text-sm font-semibold text-base-content/60">{prebuilt.players} players</p>
         ) : null}
+        {/* l41: the game link + donation link moved up from the bottom of the
+            Info tab to sit right under the player count. */}
+        <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm font-semibold text-base-content/60">
+          {prebuilt.displayUrlHref ? (
+            <a
+              href={prebuilt.displayUrlHref}
+              target="_blank"
+              rel="noreferrer"
+              className="link inline-flex items-center gap-1"
+            >
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              {prebuilt.displayUrlText ?? prebuilt.displayUrlHref}
+            </a>
+          ) : null}
+          {prebuilt.donationUrlHref ? (
+            <a
+              href={prebuilt.donationUrlHref}
+              target="_blank"
+              rel="noreferrer"
+              className="link inline-flex items-center gap-1"
+            >
+              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+              {prebuilt.donationUrlText ?? "Support the author"}
+            </a>
+          ) : null}
+        </div>
       </header>
 
       <div role="tablist" aria-label="Game details" className="tabs tabs-box w-fit">
@@ -243,38 +275,7 @@ export function BrowseGamePage() {
             <ScreenshotCarousel images={prebuilt.pictures} gameName={prebuilt.name} />
           ) : null}
 
-          <div className="flex flex-wrap gap-1.5">
-            {prebuilt.category.map((category) => (
-              <CategoryBadge key={category} label={category} />
-            ))}
-          </div>
-
           <p className="whitespace-pre-line text-base-content/80">{prebuilt.description}</p>
-
-          <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm font-semibold text-base-content/60">
-            {prebuilt.displayUrlHref ? (
-              <a
-                href={prebuilt.displayUrlHref}
-                target="_blank"
-                rel="noreferrer"
-                className="link inline-flex items-center gap-1"
-              >
-                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                {prebuilt.displayUrlText ?? prebuilt.displayUrlHref}
-              </a>
-            ) : null}
-            {prebuilt.donationUrlHref ? (
-              <a
-                href={prebuilt.donationUrlHref}
-                target="_blank"
-                rel="noreferrer"
-                className="link inline-flex items-center gap-1"
-              >
-                <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-                {prebuilt.donationUrlText ?? "Support the author"}
-              </a>
-            ) : null}
-          </div>
         </section>
       ) : (
         <section aria-label="Guide" className="flex flex-col gap-3">

@@ -55,6 +55,18 @@ describe("/browse", () => {
     expect(screen.queryByText("Drawphone")).not.toBeInTheDocument();
   });
 
+  it("renders the search input with its magnifier icon — no empty gap (3wf)", async () => {
+    renderAt("/browse");
+    const searchbox = await screen.findByRole("searchbox", { name: "Search games" });
+    // The input is padded for an inline icon, and that icon actually
+    // renders inside the same relative wrapper (no dead space where the
+    // magnifier should be).
+    expect(searchbox).toHaveClass("pl-10");
+    const wrapper = searchbox.parentElement as HTMLElement;
+    expect(wrapper.className).toContain("relative");
+    expect(wrapper.querySelector("svg.lucide-search")).not.toBeNull();
+  });
+
   it("lists classic games in their category boxes with the classic badge", async () => {
     renderAt("/browse");
     // A classic box (Drawing) opens its list with classic badges.
@@ -172,6 +184,34 @@ describe("/game/:gameId", () => {
     expect(start.getAttribute("href")).toBe("/party");
     // The brand row stays visible on the details page (2t1.1).
     expect(screen.getByRole("link", { name: /rocketcrab\.com/ })).toBeInTheDocument();
+  });
+
+  it("sits every badge and the game/donation links at the top of the page (l41)", async () => {
+    renderAt("/game/drawphone");
+    await screen.findByRole("heading", { name: "Drawphone" });
+
+    const description = screen.getByText(/In Drawphone, there are no winners/);
+    const before = (a: Element, b: Element) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+    // All badges use daisyUI's soft style.
+    for (const badge of [
+      screen.getByText("classic"),
+      screen.getByText("drawing"),
+      screen.getByText("easy"),
+    ]) {
+      expect(badge.className).toContain("badge-soft");
+    }
+    // The game link + donation link sit right under the player count —
+    // both before the Info/Guide tabs and the description body.
+    const gameLink = screen.getByText("drawphone.tannerkrewson.com");
+    const donationLink = screen.getByText("Buy Tanner a taco!");
+    const tabs = screen.getByRole("tablist");
+    expect(before(gameLink, tabs)).toBe(true);
+    expect(before(donationLink, tabs)).toBe(true);
+    // Category badges live in the header (before the description body).
+    expect(before(screen.getByText("drawing"), description)).toBe(true);
+    expect(before(screen.getByText("easy"), description)).toBe(true);
   });
 
   it("switches between Info and Guide tabs (classic layout)", async () => {

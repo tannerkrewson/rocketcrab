@@ -29,13 +29,10 @@ export const Route = createFileRoute("/browse")({
 export function BrowsePage() {
   const { view, q } = Route.useSearch();
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
       <BrandHeader />
-      <header className="flex flex-col gap-1">
+      <header>
         <h1 className="text-3xl font-black">Games</h1>
-        <p className="text-base-content/70">
-          Classic party games, played in an embedded frame. Your own games live under My games.
-        </p>
       </header>
 
       <GameBrowser initialView={view} initialQuery={q} />
