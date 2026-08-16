@@ -174,6 +174,34 @@ describe("/game/:gameId", () => {
     expect(screen.getByRole("link", { name: /rocketcrab\.com/ })).toBeInTheDocument();
   });
 
+  it("sits every badge and the game/donation links at the top of the page (l41)", async () => {
+    renderAt("/game/drawphone");
+    await screen.findByRole("heading", { name: "Drawphone" });
+
+    const description = screen.getByText(/In Drawphone, there are no winners/);
+    const before = (a: Element, b: Element) =>
+      (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
+
+    // All badges use daisyUI's soft style.
+    for (const badge of [
+      screen.getByText("classic"),
+      screen.getByText("drawing"),
+      screen.getByText("easy"),
+    ]) {
+      expect(badge.className).toContain("badge-soft");
+    }
+    // The game link + donation link sit right under the player count —
+    // both before the Info/Guide tabs and the description body.
+    const gameLink = screen.getByText("drawphone.tannerkrewson.com");
+    const donationLink = screen.getByText("Buy Tanner a taco!");
+    const tabs = screen.getByRole("tablist");
+    expect(before(gameLink, tabs)).toBe(true);
+    expect(before(donationLink, tabs)).toBe(true);
+    // Category badges live in the header (before the description body).
+    expect(before(screen.getByText("drawing"), description)).toBe(true);
+    expect(before(screen.getByText("easy"), description)).toBe(true);
+  });
+
   it("switches between Info and Guide tabs (classic layout)", async () => {
     renderAt("/game/drawphone");
     await screen.findByRole("heading", { name: "Drawphone" });
