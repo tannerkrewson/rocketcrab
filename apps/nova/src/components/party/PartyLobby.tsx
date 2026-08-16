@@ -299,7 +299,13 @@ export function PartyLobby({
           <h2 className="text-xl font-black">Welcome to rocketcrab!</h2>
           {state.game !== null ? (
             <>
-              <p className="text-sm font-semibold text-base-content/70">You&apos;ve selected</p>
+              <p className="text-sm font-semibold text-base-content/70">
+                {/* rocketcrab-ack: only the host says "You've selected" —
+                    guests see the host's name, e.g. "Bob has selected". */}
+                {state.role === "creator"
+                  ? "You've selected"
+                  : `${hostName ?? "The host"} has selected`}
+              </p>
               <p className="text-2xl font-black text-primary">{state.game.title}</p>
               <p className="text-sm text-base-content/70">
                 {state.role === "creator"

@@ -765,10 +765,33 @@ describe("PartyLobby", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the guest welcome copy when a game is selected (10.6)", async () => {
-    const state = makeState({ role: "joiner" });
+  it("shows the guest welcome copy when a game is selected — naming the host (10.6/rocketcrab-ack)", async () => {
+    const state = makeState({
+      role: "joiner",
+      members: [
+        { ...makeState().members[0]!, isGreeter: false },
+        {
+          memberId: "member-b",
+          displayName: "Bob",
+          isSelf: false,
+          connectionId: "conn-b",
+          connected: true,
+          isGreeter: true,
+          transferState: "complete",
+          transferProgress: 1,
+          transferDetail: "Game received",
+          ready: true,
+        },
+      ],
+      greeterMemberId: "member-b",
+      amGreeter: false,
+    });
     await renderLobby(state);
     const welcome = screen.getByLabelText("Welcome");
+    // rocketcrab-ack: guests see WHO selected the game ("Bob has
+    // selected") — only the host's own view says "You've selected".
+    expect(within(welcome).getByText("Bob has selected")).toBeInTheDocument();
+    expect(within(welcome).queryByText("You've selected")).not.toBeInTheDocument();
     expect(
       within(welcome).getByText("Waiting for the host to start the game…"),
     ).toBeInTheDocument();
