@@ -5,7 +5,9 @@ import { ScreenshotCarousel } from "./ScreenshotCarousel";
 /**
  * Screenshot carousel tests (rocketcrab-9fv.7.46): the game detail page's
  * tall portrait screenshots render as a swiper carousel — every image with
- * its alt text, plus a pagination dot per screenshot.
+ * its alt text, plus a pagination dot per screenshot. c08: the swiper is
+ * NOT infinite (explicit start and end — `loop` is never enabled), and the
+ * whole carousel sits in ONE card (no phone-like frame per screenshot).
  *
  * The width-stability tests (rocketcrab-9fv.11.12) guard the gallery fix:
  * the swiper container must carry `w-full` so its width never depends on
@@ -50,6 +52,31 @@ describe("ScreenshotCarousel", () => {
     // swiper's containerWidth / slidesPerView slide sizing turns that into
     // a runaway feedback loop that blew the carousel up to ~33.5M px.
     expect(container.querySelector(".swiper.nova-screenshots")).toHaveClass("w-full");
+  });
+
+  it("sits in ONE card with no per-slide phone-like frame (c08)", () => {
+    const { container } = render(<ScreenshotCarousel images={images} gameName="Drawphone" />);
+
+    // The whole swiper (not each screenshot) is wrapped in the single card.
+    const swiper = container.querySelector(".swiper.nova-screenshots");
+    expect(swiper?.parentElement).toHaveClass("rounded-box", "bg-base-100", "p-4");
+    // The old per-slide frame (padding / border / rounded card) is gone.
+    for (const img of container.querySelectorAll<HTMLImageElement>(".swiper-slide img")) {
+      expect(img).not.toHaveClass("p-2", "rounded-2xl", "border", "shadow-sm");
+    }
+  });
+
+  it("is not infinite: loop is off with many images too (c08)", () => {
+    const many = Array.from({ length: 6 }, (_, i) => `/shots/many-${i}.png`);
+    const { container } = render(<ScreenshotCarousel images={many} gameName="Drawphone" />);
+
+    // Without `loop` every screenshot renders exactly once — the first
+    // slide is the explicit start, the last one the explicit end.
+    expect(container.querySelectorAll(".swiper-slide")).toHaveLength(many.length);
+    const swiperEl = container.querySelector<
+      HTMLElement & { swiper?: { params: { loop: boolean } } }
+    >(".swiper.nova-screenshots");
+    expect(swiperEl?.swiper?.params.loop).toBe(false);
   });
 
   it("keeps the same slide images across re-renders (no reload/flicker loop)", () => {
