@@ -60,12 +60,16 @@ function playerBorderColor(index: number): string {
   return PLAYER_BORDER_COLORS[index % PLAYER_BORDER_COLORS.length] ?? "border-primary";
 }
 
-/** Comma-separated role labels for a player tile ("You, Host" style, 10.8). */
+/** Comma-separated role labels for a player tile ("You, Host" style, 10.8).
+ *  Users only ever see "host" (rocketcrab-rfk): the greeter IS the host —
+ *  the creator is installed as the initial rendezvous greeter — so a host
+ *  peer's tile reads "Host", never "Greeter". The greeter concept stays
+ *  diagnostic-only (diagnostics panel + engine state). */
 function roleLabels(member: PartyMemberView, isCreator: boolean): string {
   const labels: string[] = [];
   if (member.isSelf) labels.push("You");
   if (member.isSelf && isCreator) labels.push("Host");
-  if (member.isGreeter && !member.isSelf) labels.push("Greeter");
+  if (member.isGreeter && !member.isSelf) labels.push("Host");
   return labels.join(", ");
 }
 
@@ -376,7 +380,10 @@ export function PartyLobby({
       ) : null}
       {/* 10.7: the action row (Browse games left, Start game right) sits
           ABOVE the players box, horizontally centered — leave is its own
-          quiet control at the bottom of the page. */}
+          quiet control at the bottom of the page. rocketcrab-b73: START is
+          host-only — joiners get no Start game / Start anyway buttons and
+          no blocked-reason alert; browsing is host-only too, so a joiner
+          has no path to pick or start a game from the lobby. */}
       <section className="flex flex-wrap items-center justify-center gap-2">
         {state.role === "creator" ? (
           <Button variant="secondary" size="lg" onClick={() => setBrowsing(true)}>
@@ -384,17 +391,19 @@ export function PartyLobby({
             Browse games
           </Button>
         ) : null}
-        <Button
-          variant="primary"
-          size="lg"
-          disabled={!state.canStart}
-          onClick={() => onStart(false)}
-          title={state.startBlockedReason ?? "Start the game once every player is ready"}
-        >
-          <Play className="h-5 w-5" aria-hidden="true" />
-          Start game
-        </Button>
-        {state.canForceStart ? (
+        {state.role === "creator" ? (
+          <Button
+            variant="primary"
+            size="lg"
+            disabled={!state.canStart}
+            onClick={() => onStart(false)}
+            title={state.startBlockedReason ?? "Start the game once every player is ready"}
+          >
+            <Play className="h-5 w-5" aria-hidden="true" />
+            Start game
+          </Button>
+        ) : null}
+        {state.role === "creator" && state.canForceStart ? (
           <Button variant="default" soft size="lg" onClick={() => setForceDialog(true)}>
             <PartyPopper className="h-5 w-5" aria-hidden="true" />
             Start anyway
@@ -404,8 +413,10 @@ export function PartyLobby({
       {/* The blocked-reason copy (10.7): shown as a styled warning alert;
           the "Pick a game before starting the party." message is gone —
           the welcome card covers the no-game case. The ended case shows
-          no alert at all (5cl.9). */}
-      {state.game !== null &&
+          no alert at all (5cl.9), and joiners never see it (b73 — the
+          reason is the host's start gate). */}
+      {state.role === "creator" &&
+      state.game !== null &&
       state.endedReason === null &&
       !state.canStart &&
       !state.canForceStart &&
