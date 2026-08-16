@@ -603,10 +603,13 @@ export class PartyEngine {
     const ended = this.session?.isEnded() ?? false;
     const inLobby = this.phase === "lobby";
 
+    // rfk-the-bead (b73): "The party is not in the lobby yet." is gone — a
+    // start button the host can't press is hidden (hosts only get the button
+    // in the lobby), never a greyed-out button with that message. Outside the
+    // lobby the remaining gates (no game / ended / transfer problems / not
+    // verified / not ready) still apply.
     let startBlockedReason: string | null = null;
-    if (!inLobby) {
-      startBlockedReason = "The party is not in the lobby yet.";
-    } else if (this.game === null) {
+    if (this.game === null) {
       startBlockedReason = "Pick a game before starting the party.";
     } else if (ended) {
       startBlockedReason = "The game ended; leave the party to play again.";
