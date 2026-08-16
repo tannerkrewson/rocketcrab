@@ -15,7 +15,6 @@ import type { BrowseEntry } from "../../lib/browse";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import { cn } from "../../lib/cn";
 import type { PartyEngineState } from "../../lib/party/engine";
-import { BrandLogo } from "../layout/BrandLogo";
 import { ThemeSelector } from "../layout/ThemeSelector";
 import { Button } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
@@ -55,11 +54,14 @@ type PlayShellPanel = "menu" | "players" | "browse" | "logs" | null;
  * the game keeps running underneath) and the shared pick-a-game browser.
  * The menu (9fv.11.11) holds Browse games (host only — picking a game
  * while playing ends it for everyone) and About this game (the same
- * details overlay the lobby's "What is GameName?" opens); leaving the
- * party happens back in the lobby. Minimal chrome, the code front and
- * center: classic parity. The emergency teardown ("Exit to lobby") lives
- * here, outside the game frame (T6/T21 — game code cannot disable it);
- * game-end returns everyone to the lobby.
+ * details overlay the lobby's "What is GameName?" opens), and since i47
+ * the dark/light/dice theme control lives at the bottom of the same menu
+ * (the in-game shell no longer has a floating copy); leaving the
+ * party happens back in the lobby. ch6: the in-game mark is the
+ * non-glowing brand logo, sized up without growing the bar. Minimal
+ * chrome, the code front and center: classic parity. The emergency
+ * teardown ("Exit to lobby") lives here, outside the game frame (T6/T21 —
+ * game code cannot disable it); game-end returns everyone to the lobby.
  */
 export function PartyPlayShell({
   state,
@@ -122,7 +124,9 @@ export function PartyPlayShell({
               bar — no btn background/border/shadow (that chrome only
               returns on the floating collapsed-mode logo below). hover/
               active keep a subtle fill so the tap target still reads as
-              tappable. */}
+              tappable. ch6: the in-game mark is the non-glowing brand
+              logo, sized up without growing the bar (the btn-sm box
+              already fixes the bar row's height). */}
           <button
             type="button"
             className="btn btn-sm shrink-0 border-transparent bg-transparent shadow-none hover:bg-base-200 active:bg-base-300"
@@ -130,13 +134,21 @@ export function PartyPlayShell({
             aria-label="Hide the top bar"
             title="Hide the top bar"
           >
-            <BrandLogo size={20} />
+            <img
+              src="/rocketcrab-logo-no-glow.svg"
+              alt=""
+              draggable={false}
+              className="block"
+              style={{ height: "1.625rem" }}
+            />
           </button>
 
           <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <button
               type="button"
-              className="font-title whitespace-nowrap text-lg font-black text-base-content md:text-xl"
+              // 0dd: the URL gets the same press feedback as the homepage
+              // title (rocketcrab-2t1.8) — scale down while pressed.
+              className="font-title whitespace-nowrap text-lg font-black text-base-content transition-transform active:scale-95 md:text-xl"
               onClick={() => void copyInvite()}
               disabled={state.inviteUrl === null}
               title={state.inviteUrl === null ? roomUrl : "Copy the invite link"}
@@ -273,6 +285,15 @@ export function PartyPlayShell({
                   </button>
                 </li>
               ) : null}
+              {/* i47: the dark/light/dice theme control lives INSIDE the
+                  menu now (below every menu item) — the in-game shell's
+                  old floating bottom-right control is gone. */}
+              <li role="separator" aria-hidden="true" className="my-1 border-t-2 border-base-300" />
+              <li>
+                <div className="flex items-center justify-center px-3 py-1.5">
+                  <ThemeSelector />
+                </div>
+              </li>
             </ul>
           ) : null}
         </header>
@@ -469,18 +490,14 @@ export function PartyPlayShell({
         ) : null}
       </div>
 
-      {/* 11.1: the one floating theme/color control, bottom-right on every
-          page — this shell is full-screen (z-40) and covers AppLayout's
-          copy, so it renders its own above the game, safe-area aware. */}
-      <div
-        className="absolute bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-3 z-30 rounded-box border-2 border-base-300 bg-base-100 p-1 shadow-md"
-        data-testid="floating-theme-control"
-      >
-        <ThemeSelector />
-      </div>
+      {/* i47: the in-game theme control moved INTO the Menu dropdown — the
+          floating bottom-right copy is gone from this shell (the comment
+          below is where it lived, 11.1). */}
 
       {/* 7.38: collapsed mode — only the floating logo remains; tap to
-          reopen the full top bar. */}
+          reopen the full top bar. ch6: the collapsed mark is the
+          non-glowing logo, larger (fits comfortably in the btn-sm tap
+          target). */}
       {barHidden ? (
         <button
           type="button"
@@ -489,7 +506,13 @@ export function PartyPlayShell({
           aria-label="Show the top bar"
           title="Show the top bar"
         >
-          <BrandLogo size={18} />
+          <img
+            src="/rocketcrab-logo-no-glow.svg"
+            alt=""
+            draggable={false}
+            className="block"
+            style={{ height: "1.75rem" }}
+          />
         </button>
       ) : null}
 

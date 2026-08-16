@@ -31,11 +31,15 @@ export function BrandLogo({ size = 32, responsive = false, className }: BrandLog
       aria-hidden="true"
       data-testid="brand-logo"
     >
+      {/* 480: the party shell header resizes the mark when it compacts
+          (5cl.8) — the height must transition on the img itself (a parent
+          transition never animates a child's inline style), motion-reduce
+          safe like the header's own transition. */}
       <img
         src="/rocketcrab-logo.svg"
         alt=""
         draggable={false}
-        className="block"
+        className="block transition-[height] duration-300 ease-out motion-reduce:transition-none"
         style={{ height }}
       />
     </span>
