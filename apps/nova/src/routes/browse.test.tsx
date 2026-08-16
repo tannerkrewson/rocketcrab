@@ -55,6 +55,18 @@ describe("/browse", () => {
     expect(screen.queryByText("Drawphone")).not.toBeInTheDocument();
   });
 
+  it("renders the search input with its magnifier icon — no empty gap (3wf)", async () => {
+    renderAt("/browse");
+    const searchbox = await screen.findByRole("searchbox", { name: "Search games" });
+    // The input is padded for an inline icon, and that icon actually
+    // renders inside the same relative wrapper (no dead space where the
+    // magnifier should be).
+    expect(searchbox).toHaveClass("pl-10");
+    const wrapper = searchbox.parentElement as HTMLElement;
+    expect(wrapper.className).toContain("relative");
+    expect(wrapper.querySelector("svg.lucide-search")).not.toBeNull();
+  });
+
   it("lists classic games in their category boxes with the classic badge", async () => {
     renderAt("/browse");
     // A classic box (Drawing) opens its list with classic badges.
