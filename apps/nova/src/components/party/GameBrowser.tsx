@@ -207,12 +207,13 @@ function SavedGameRow({
   );
 }
 
-/** One category card (2t1.1 redesign): a large icon tile + bold label + game
- * count, with a soft lift + primary glow on hover. Classic boxes keep their
- * emoji. The standalone "My games" box is a LINK to /library (5cl.12 — the
- * library is the one full-featured my-games page); in the lobby it stays a
- * button that opens the in-place saved list (leaving the party is wrong
- * mid-party). */
+/** One category card (2t1.1 redesign, tightened 1nm): the emoji sits
+ * directly LEFT of the label + game count in a horizontal row — the large
+ * icon box tile is gone, and the grid is always two columns. A soft lift +
+ * primary glow on hover. Classic boxes keep their emoji. The standalone
+ * "My games" box is a LINK to /library (5cl.12 — the library is the one
+ * full-featured my-games page); in the lobby it stays a button that opens
+ * the in-place saved list (leaving the party is wrong mid-party). */
 function CategoryCard({
   emoji,
   label,
@@ -228,16 +229,13 @@ function CategoryCard({
   href?: string;
 }) {
   const classes =
-    "group flex flex-col items-start gap-3 rounded-box border-2 border-base-300 bg-base-100 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-lg hover:shadow-primary/10 sm:p-5";
+    "group flex items-center gap-3 rounded-box border-2 border-base-300 bg-base-100 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-lg hover:shadow-primary/10";
   const body = (
     <>
-      <span
-        className="flex h-12 w-12 items-center justify-center rounded-xl border-2 border-base-300 bg-base-200 text-2xl transition-colors group-hover:border-primary/40 group-hover:bg-primary/5"
-        aria-hidden="true"
-      >
-        <span>{emoji}</span>
+      <span className="shrink-0 text-2xl" aria-hidden="true">
+        {emoji}
       </span>
-      <span className="flex w-full flex-col gap-0.5">
+      <span className="flex min-w-0 flex-col gap-0.5">
         <span className="text-base font-black leading-tight sm:text-lg">{label}</span>
         <span className="text-xs font-semibold text-base-content/50">
           {count === null ? "…" : `${count} ${count === 1 ? "game" : "games"}`}
@@ -375,13 +373,7 @@ export function GameBrowser({
       {/* Category cards: hidden while a category is open or the user is
           searching — the list takes over (10.9). */}
       {view === null && query === "" ? (
-        <section
-          aria-label="Categories"
-          className={cn(
-            "grid grid-cols-2 gap-3",
-            compact ? "sm:grid-cols-4" : "sm:grid-cols-3 lg:grid-cols-4",
-          )}
-        >
+        <section aria-label="Categories" className="grid grid-cols-2 gap-3">
           {/* 5cl.12: the standalone my-games box links to the full library
               page (search, start / duplicate / delete / edit); inside a
               party it opens the in-place saved list instead. */}

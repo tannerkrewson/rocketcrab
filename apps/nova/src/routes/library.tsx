@@ -63,7 +63,7 @@ export function LibraryPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
       <BrandHeader />
 
       <Link to="/" className={buttonStyles("default", "md", "self-start", true)}>
