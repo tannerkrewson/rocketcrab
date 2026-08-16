@@ -133,10 +133,10 @@ describe("AppLayout", () => {
       expect(brand.getAttribute("href")).toBe("/");
     }
 
-    // /build (5cl.16): the tiny rocketcrab.com brand row is gone — the
-    // hero card is the page's identity. Its own "back" link goes home.
+    // /build (5cl.16, gmo): the tiny rocketcrab.com brand row is gone —
+    // the hero card is the page's identity. Its own "back" link goes home.
     renderAt("/build");
-    await screen.findByRole("heading", { name: "Rocketcrab Nova" });
+    await screen.findByRole("heading", { name: "Introducing Nova" });
     const buildBack = screen.getByRole("link", { name: "back" });
     expect(buildBack.getAttribute("href")).toBe("/");
 
