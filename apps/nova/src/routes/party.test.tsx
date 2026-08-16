@@ -25,6 +25,7 @@ import { routeTree } from "../routeTree.gen";
 const IDLE_STATE: PartyEngineState = {
   phase: "idle",
   phaseDetail: null,
+  joinStage: null,
   reconnectAttempts: 0,
   role: null,
   code: null,
