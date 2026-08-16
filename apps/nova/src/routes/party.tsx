@@ -50,9 +50,13 @@ function errorMessage(error: unknown): string {
  * otherwise it shows an entry point, and once a party is active it renders
  * the whole lobby/play experience. Invite links land on /join instead.
  *
- * 7.37: the entry page is just the name + Start a party (no secondary
- * actions); a returning player with a saved name skips the entry page
- * entirely and lands straight in the party.
+ * 7.37: the entry page is a single "Start a party" action (no secondary
+ * actions, and rocketcrab-9j3: NO name step — the party just starts with
+ * the saved/generated name, and the lobby prompt / /join?edit=name page
+ * is the ONLY name-entry page in the app). A returning player with a
+ * saved name skips the entry page entirely and lands straight in the
+ * party. rocketcrab-5kz: the old placeholder copy about picking a game
+ * in the lobby is gone.
  */
 function PartyPage() {
   const search = Route.useSearch();
@@ -61,8 +65,6 @@ function PartyPage() {
   const startedRef = useRef(false);
   const [attempt, setAttempt] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
-  // 7.5: the player's name is asked before they enter a lobby (start flow).
-  const [name, setName] = useState(() => getSavedPlayerName() ?? "");
 
   useEffect(() => {
     if (startedRef.current || engine.isActive()) {
@@ -111,12 +113,11 @@ function PartyPage() {
   };
 
   // 7.6: start a party with NO game preselected — the host lands in the
-  // lobby and picks a game from there (classic parity). The name is applied
-  // to the engine identity first (7.5).
+  // lobby and picks a game from there (classic parity). rocketcrab-9j3:
+  // the entry's name-input step is GONE — the party starts with the
+  // saved/generated name and the lobby's name prompt (via /join?edit=name)
+  // is the only name-entry page in the app.
   const handleStartParty = () => {
-    if (name.trim().length > 0) {
-      engine.setDisplayName(name);
-    }
     void engine.createParty();
   };
 
@@ -157,23 +158,6 @@ function PartyPage() {
       <Card>
         <div className="flex flex-col gap-3">
           <h1 className="text-2xl font-black">Start a party</h1>
-          <p className="text-sm text-base-content/70">
-            Your party starts in the lobby; pick a game there before anyone starts playing.
-          </p>
-          <label htmlFor="party-name" className="text-sm font-bold">
-            Your name
-          </label>
-          <input
-            id="party-name"
-            type="text"
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="Your name"
-            maxLength={24}
-            autoComplete="nickname"
-            aria-label="Your player name"
-            className="input input-bordered w-full"
-          />
           <Button variant="primary" size="lg" onClick={handleStartParty}>
             <PartyPopper className="h-5 w-5" aria-hidden="true" />
             Start a party
