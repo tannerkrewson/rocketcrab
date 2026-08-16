@@ -195,15 +195,37 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(onEndGame).toHaveBeenCalledTimes(1);
   });
 
-  it("lets the host kick a member from the Players popup (7.29/7.38)", async () => {
+  it("lets the host kick a member from the Players popup after confirming (7.29/7.38/2z9)", async () => {
     const onKickMember = vi.fn();
     await renderShell(makeState(), { onKickMember });
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
     const players = screen.getByRole("dialog", { name: "Players" });
     const kick = within(players).getByRole("button", { name: /kick/i });
+    // 2z9: kicking asks first — the first tap only opens the confirm.
     await userEvent.click(kick);
+    expect(onKickMember).not.toHaveBeenCalled();
+    const confirm = screen.getByRole("dialog", { name: /kick a player/i });
+    expect(within(confirm).getByText(/Kick Player B from the party\?/)).toBeInTheDocument();
+    await userEvent.click(within(confirm).getByRole("button", { name: /^kick player$/i }));
     expect(onKickMember).toHaveBeenCalledWith("member-b");
+  });
+
+  it("cancels the kick confirmation without removing anyone (2z9)", async () => {
+    const onKickMember = vi.fn();
+    await renderShell(makeState(), { onKickMember });
+    await userEvent.click(screen.getByRole("button", { name: /menu/i }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
+    const players = screen.getByRole("dialog", { name: "Players" });
+    await userEvent.click(within(players).getByRole("button", { name: /kick/i }));
+    await userEvent.click(
+      within(screen.getByRole("dialog", { name: /kick a player/i })).getByRole("button", {
+        name: /^cancel$/i,
+      }),
+    );
+    expect(onKickMember).not.toHaveBeenCalled();
+    // The players popup stays open under the dismissed confirm.
+    expect(screen.getByRole("dialog", { name: "Players" })).toBeInTheDocument();
   });
 
   it("shows the players list as a compact popup that never covers the game frame (7.45)", async () => {

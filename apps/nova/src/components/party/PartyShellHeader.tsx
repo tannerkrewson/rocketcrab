@@ -53,7 +53,7 @@ export function PartyShellHeader({
     if (inviteUrl === null || inviteUrl === undefined) return;
     const ok = await writeToClipboard(inviteUrl);
     if (ok) {
-      toast.success("Invite title copied.");
+      toast.success("Invite url copied.");
     } else {
       toast.error("Couldn't copy the link — try the Copy URL button in the lobby.");
     }

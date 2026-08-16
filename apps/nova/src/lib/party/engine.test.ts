@@ -744,6 +744,34 @@ describe("party engine — lobby notices", () => {
       messages.filter((message) => message.includes(`${b.displayName} was removed`)),
     ).toHaveLength(1);
   });
+
+  it("skips the joined/removed notices while a member still has the id-like name (2z9)", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    // A joiner who never set a display name announces the member id itself
+    // (displayNameOf falls back to the id) — "member-b joined the party."
+    // must never surface as a banner alert or a membership toast.
+    const b = makePlayer(world, "b", {
+      identity: { memberId: "member-b", displayName: "member-b" },
+    });
+    const code = await runCreate(a, world);
+    const { join: joinPromise, settled } = startJoin(b, world, code);
+    await settled;
+    a.engine.respondToJoinRequest(b.memberId, true);
+    await settle(world);
+    await joinPromise;
+    await settle(world);
+    expect(a.engine.getState().members).toHaveLength(2);
+    const messages = a.engine.getState().notices.map((notice) => notice.message);
+    expect(messages.some((message) => message.includes("joined the party"))).toBe(false);
+    expect(messages.some((message) => message.includes("was admitted to the party"))).toBe(false);
+    // Kicking them is also silent — no "member-b was removed from the
+    // party." noise.
+    a.engine.kickMember(b.memberId);
+    await settle(world);
+    const afterKick = a.engine.getState().notices.map((notice) => notice.message);
+    expect(afterKick.some((message) => message.includes("was removed from the party"))).toBe(false);
+  });
 });
 
 describe("party engine — roles, reconnect, and cleanup", () => {
