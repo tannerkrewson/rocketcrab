@@ -428,7 +428,7 @@ export function PartyLobby({
         className="collapse collapse-arrow rounded-box border-2 border-base-300 bg-base-100"
         open
       >
-        <summary className="collapse-title flex items-center gap-2 text-sm font-black uppercase text-base-content/60">
+        <summary className="collapse-title flex items-center gap-2 text-sm font-black text-base-content/60">
           Players ({state.members.length})
         </summary>
         <div className="collapse-content">
