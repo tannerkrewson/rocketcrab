@@ -463,6 +463,7 @@ export function PartyPlayShell({
                 // in-game browse panel (the fallback navigate would be a
                 // no-op from the party route).
                 onBack={() => setPanel(null)}
+                inParty
               />
             </div>
           </div>

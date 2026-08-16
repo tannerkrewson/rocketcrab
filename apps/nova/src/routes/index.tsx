@@ -1,8 +1,10 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { useEffect, useRef } from "react";
 import { toast } from "sonner";
 import { BrandLogo } from "../components/layout/BrandLogo";
 import { buttonStyles } from "../components/ui/Button";
 import { writeToClipboard } from "../lib/editor/clipboard";
+import { usePartyEngine } from "../lib/party/use-party";
 
 export const Route = createFileRoute("/")({
   component: HomeComponent,
@@ -32,6 +34,29 @@ function HomeComponent() {
       toast.error("Couldn't copy rocketcrab.com — copy it manually.");
     }
   };
+
+  // rocketcrab-8z9: it must be impossible to sit in a party while on the
+  // homepage. Every route to "/" (the lobby browser's exit links if they
+  // slipped through, the native browser back button, a mid-flow navigate)
+  // tears the party down instead of leaving a ghost party running.
+  const { state, engine } = usePartyEngine();
+  const leftRef = useRef(false);
+  useEffect(() => {
+    if (leftRef.current || !engine.isActive()) {
+      return;
+    }
+    leftRef.current = true;
+    const wasInParty =
+      state.phase === "lobby" ||
+      state.phase === "starting" ||
+      state.phase === "playing" ||
+      state.phase === "reconnecting";
+    void engine.leaveParty().then(() => {
+      if (wasInParty) {
+        toast.success("You left the party.");
+      }
+    });
+  }, [engine, state.phase]);
 
   return (
     <div className="flex min-h-[calc(100dvh-16rem)] flex-col items-center justify-center gap-10">
