@@ -16,9 +16,10 @@ import { routeTree } from "../routeTree.gen";
 /**
  * Party route tests (P4): the route creates a party from a saved game (or
  * from the editor's handed-off source) when `gameId` is present, shows an
- * entry point when no party is active (7.37: name + Start a party only,
- * and a saved name skips the entry page entirely), and renders the party
- * experience once a party is active.
+ * entry point when no party is active (7.37: a single "Start a party"
+ * action — rocketcrab-9j3 removed the entry's name step so /join?edit=name
+ * is the ONLY name page; a saved name still skips the entry page
+ * entirely), and renders the party experience once a party is active.
  */
 
 const IDLE_STATE: PartyEngineState = {
@@ -153,8 +154,11 @@ beforeEach(async () => {
 describe("/party", () => {
   it("shows the entry point when no party is active and no game is chosen", async () => {
     renderParty("/party");
+    // 9j3: the entry has NO name step (that's /join?edit=name's job) and
+    // 5kz: no placeholder copy about picking a game in the lobby.
     expect(await screen.findByRole("heading", { name: "Start a party" })).toBeInTheDocument();
-    expect(screen.getByLabelText("Your player name")).toBeInTheDocument();
+    expect(screen.queryByLabelText("Your player name")).not.toBeInTheDocument();
+    expect(screen.queryByText(/your party starts in the lobby/i)).not.toBeInTheDocument();
     expect(stubEngine.createParty).not.toHaveBeenCalled();
   });
 
@@ -165,14 +169,14 @@ describe("/party", () => {
     expect(screen.queryByRole("link", { name: /join a party/i })).not.toBeInTheDocument();
   });
 
-  it("starts a party without a game, applying the entered name first (7.5/7.6)", async () => {
+  it("starts a party without a game directly from the entry (rocketcrab-9j3)", async () => {
     renderParty("/party");
     await screen.findByRole("heading", { name: "Start a party" });
-    const nameInput = await screen.findByLabelText("Your player name");
-    fireEvent.change(nameInput, { target: { value: "Ada" } });
+    // 9j3: the party starts with the saved/generated name — there is no
+    // name input to fill in and nothing applied before createParty.
     fireEvent.click(screen.getByRole("button", { name: /start a party/i }));
-    await waitFor(() => expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada"));
     await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledWith());
+    expect(stubEngine.setDisplayName).not.toHaveBeenCalled();
   });
 
   it("skips the entry page for a returning player with a saved name (7.37)", async () => {
