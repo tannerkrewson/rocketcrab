@@ -5,60 +5,17 @@ import { toast } from "sonner";
 import { Button, buttonStyles } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { storeDraftSource } from "../lib/editor/draft-handoff";
+import { exampleGames, exampleModeLabel, type ExampleGame } from "../lib/editor/example-games";
 
 export const Route = createFileRoute("/examples")({
   component: ExamplesPage,
 });
 
-type ExampleMode = "state" | "simulation" | "raw";
-
-interface ExampleGame {
-  id: string;
-  title: string;
-  mode: ExampleMode;
-  description: string;
-  /** Lazy raw import keeps the example sources out of the main bundle. */
-  load: () => Promise<{ default: string }>;
-}
-
-const modeLabel: Record<ExampleMode, string> = {
-  state: "state mode",
-  simulation: "simulation mode",
-  raw: "raw mode",
-};
-
-const exampleGames: ExampleGame[] = [
-  {
-    id: "nova-quiz",
-    title: "Nova Quiz",
-    mode: "state",
-    description:
-      "A round-based trivia game with questions the host writes. Showcases state mode: actions, per-player views, join/leave handling, and mobile-first layout.",
-    load: () => import("../../../../examples/games/nova-quiz.html?raw"),
-  },
-  {
-    id: "nova-drift",
-    title: "Nova Drift",
-    mode: "simulation",
-    description:
-      "Every player steers a shared puck with the arrow keys. Showcases simulation mode: ordered inputs, the Nova tick clock, and authoritative snapshots.",
-    load: () => import("../../../../examples/games/nova-drift.html?raw"),
-  },
-  {
-    id: "raw-mode",
-    title: "Chatter (raw mode sample)",
-    mode: "raw",
-    description:
-      "Named channels exchanging structured chat messages and binary position samples. Showcases raw mode: reliable/ordered channels, targeted sends, and progress.",
-    load: () => import("../../../../examples/games/raw-mode.html?raw"),
-  },
-];
-
 /**
- * Complete example games (examples/games/): each one opens in the editor as
- * a new local draft so users can run, inspect, and modify a real game for
- * each mode (state, simulation, raw) — the same handoff the /build paste
- * target uses.
+ * Complete example games (examples/games/, shared with the /build flow):
+ * each one opens in the editor as a new local draft so users can run,
+ * inspect, and modify a real game for each mode (state, simulation, raw) —
+ * the same handoff the /build paste target uses.
  */
 export function ExamplesPage() {
   const navigate = useNavigate();
@@ -99,7 +56,7 @@ export function ExamplesPage() {
               <span className="flex flex-wrap items-center gap-2">
                 {game.title}
                 <span className="badge badge-accent badge-outline font-bold">
-                  {modeLabel[game.mode]}
+                  {exampleModeLabel[game.mode]}
                 </span>
               </span>
             }

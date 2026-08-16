@@ -543,7 +543,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
         <div
           role="separator"
           aria-label={`Resize ${player.name}'s game frame width`}
-          className="flex w-3 cursor-ew-resize select-none items-center justify-center rounded-md border border-base-300 bg-base-200 text-base-content/40"
+          className="flex w-3 cursor-ew-resize select-none items-center justify-center rounded-md border border-base-content/30 bg-base-200 text-base-content/60 transition-colors hover:bg-base-300 hover:text-base-content/90"
           onPointerDown={handleFrameWidthResize}
           title="Drag to resize width"
         >
@@ -553,7 +553,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
       <div
         role="separator"
         aria-label={`Resize ${player.name}'s game frame`}
-        className="flex h-3 cursor-ns-resize select-none items-center justify-center rounded-md border border-base-300 bg-base-200 text-base-content/40"
+        className="flex h-3 cursor-ns-resize select-none items-center justify-center rounded-md border border-base-content/30 bg-base-200 text-base-content/60 transition-colors hover:bg-base-300 hover:text-base-content/90"
         onPointerDown={handleFrameResize}
         title="Drag to resize"
       >

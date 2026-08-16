@@ -749,7 +749,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         <div
           role="separator"
           aria-label="Resize the code editor"
-          className="flex h-3 cursor-ns-resize select-none items-center justify-center rounded-md border border-base-300 bg-base-200 text-base-content/40"
+          className="flex h-3 cursor-ns-resize select-none items-center justify-center rounded-md border border-base-content/30 bg-base-200 text-base-content/60 transition-colors hover:bg-base-300 hover:text-base-content/90"
           onPointerDown={handleEditorResize}
           title="Drag to resize the code editor"
         >
