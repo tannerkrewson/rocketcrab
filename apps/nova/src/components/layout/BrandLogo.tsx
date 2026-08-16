@@ -10,6 +10,16 @@ export interface BrandLogoProps {
    * marks scale down on phones (rocketcrab-5cl.5, homepage hero).
    */
   responsive?: boolean;
+  /**
+   * Which SVG to use (rocketcrab-5u7): "glow" (default) renders the soft
+   * ambient halo (public/rocketcrab-logo.svg), "no-glow" renders the flat
+   * mark (public/rocketcrab-logo-no-glow.svg). `glow={false}` is an alias
+   * for "no-glow". Contexts that need a crisp mark on busy backgrounds
+   * (in-game chrome, small inline buttons, …) can opt out.
+   */
+  variant?: "glow" | "no-glow";
+  /** Alias for `variant={"no-glow"}` (rocketcrab-5u7). */
+  glow?: boolean;
   className?: string;
 }
 
@@ -21,9 +31,17 @@ export interface BrandLogoProps {
  * accessible label (link aria-label, heading text, …). The non-glowing
  * variant is committed too (public/rocketcrab-logo-no-glow.svg) for
  * contexts that want a flat mark; this component renders the glow version
- * for everything.
+ * for everything (rocketcrab-5u7: `variant="no-glow"` / `glow={false}`
+ * switches to the flat mark).
  */
-export function BrandLogo({ size = 32, responsive = false, className }: BrandLogoProps) {
+export function BrandLogo({
+  size = 32,
+  responsive = false,
+  variant = "glow",
+  glow = true,
+  className,
+}: BrandLogoProps) {
+  const noGlow = variant === "no-glow" || glow === false;
   const height = responsive ? `min(${size}px, 16vw)` : `${size}px`;
   return (
     <span
@@ -32,7 +50,7 @@ export function BrandLogo({ size = 32, responsive = false, className }: BrandLog
       data-testid="brand-logo"
     >
       <img
-        src="/rocketcrab-logo.svg"
+        src={noGlow ? "/rocketcrab-logo-no-glow.svg" : "/rocketcrab-logo.svg"}
         alt=""
         draggable={false}
         className="block"
