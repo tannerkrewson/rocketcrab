@@ -22,7 +22,8 @@ import type { PartyMemberView } from "../../lib/party/engine";
  * the QR invite and copyable invite link, the player list distinguishing
  * waiting / transferring / ready / failed states, the greeter and the
  * diagnostic authority labels, start / force-start / leave controls, and
- * the greeter's join-request approval row.
+ * the greeter's join-request approval row. rocketcrab-b73: start controls
+ * are HOST-ONLY — joiners see no start buttons or blocked-reason alert.
  */
 
 const INVITE_URL = "http://localhost:5173/join#code=ABCD&secret=invite-secret";
@@ -135,7 +136,9 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
     <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
   );
   const result = render(<RouterProvider router={router} />, { wrapper });
-  await result.findByRole("button", { name: /start game/i });
+  // The invite card is always present in the lobby (even for joiners, and
+  // even when the host-only start controls are hidden — b73).
+  await result.findByRole("button", { name: /copy url/i });
   return result;
 }
 
@@ -166,6 +169,60 @@ describe("PartyLobby", () => {
     expect(within(rowB).getByRole("progressbar")).toBeInTheDocument();
     expect(within(rowB).getByText("32 KB of 64 KB")).toBeInTheDocument();
     expect(within(rowB).queryByTitle("Not ready")).not.toBeInTheDocument();
+  });
+
+  it("hides the start controls from joiners — start is host-only (rocketcrab-b73)", async () => {
+    const state = makeState({ role: "joiner", canForceStart: true });
+    await renderLobby(state);
+    // A joiner never sees the start buttons or the host's blocked-reason
+    // alert (Browse games is host-only too, so there is no pick path).
+    expect(screen.queryByRole("button", { name: /start game/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /start anyway/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /browse games/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    // The joiner still sees the lobby: invite card, players, leave.
+    expect(screen.getByRole("button", { name: /copy url/i })).toBeInTheDocument();
+    expect(screen.getByText(/Players \(2\)/)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /leave party/i })).toBeInTheDocument();
+  });
+
+  it("shows the start controls to the host only when the party is in the lobby (b73)", async () => {
+    await renderLobby(makeState());
+    // No "The party is not in the lobby yet." message exists anymore — the
+    // start button is simply absent outside the lobby (hidden for non-hosts)
+    // or disabled-with-reason inside it.
+    expect(screen.queryByText(/not in the lobby yet/i)).not.toBeInTheDocument();
+  });
+
+  it("labels a host peer's tile 'Host', never 'Greeter' (rocketcrab-rfk)", async () => {
+    const state = makeState({
+      role: "joiner",
+      members: [
+        { ...makeState().members[0]!, isGreeter: false },
+        {
+          memberId: "member-b",
+          displayName: "Player B",
+          isSelf: false,
+          connectionId: "conn-b",
+          connected: true,
+          isGreeter: true,
+          transferState: "complete",
+          transferProgress: 1,
+          transferDetail: "Game received",
+          ready: true,
+        },
+      ],
+      greeterMemberId: "member-b",
+      amGreeter: false,
+    });
+    await renderLobby(state);
+    // The joiner's own tile is just "You"; the host peer reads "Host".
+    const rowA = screen.getByTestId("party-member-member-a");
+    const rowB = screen.getByTestId("party-member-member-b");
+    expect(within(rowA).getByText("You")).toBeInTheDocument();
+    expect(within(rowA).queryByText("Host")).not.toBeInTheDocument();
+    expect(within(rowB).getByText("Host")).toBeInTheDocument();
+    expect(within(rowB).queryByText("Greeter")).not.toBeInTheDocument();
   });
 
   it("distinguishes failed and incompatible transfer states", async () => {
