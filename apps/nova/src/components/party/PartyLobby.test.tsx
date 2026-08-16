@@ -703,6 +703,9 @@ describe("PartyLobby", () => {
     expect(screen.getByText("Get your friends to join!")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy url/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /qr code/i })).toBeInTheDocument();
+    // rocketcrab-ucz: without native share support (jsdom) the Share
+    // button is not rendered at all.
+    expect(screen.queryByRole("button", { name: /^share$/i })).not.toBeInTheDocument();
     // The origin+code title lives in the party shell header (11.6) — the
     // lobby card never re-renders it. The code is never shown separately
     // from the title, and the full invite URL is never rendered (ADR-0011).
@@ -711,6 +714,42 @@ describe("PartyLobby", () => {
     expect(screen.queryByText(/invite-secret/)).not.toBeInTheDocument();
     // The QR is not shown directly on the lobby.
     expect(screen.queryByLabelText("Party invite QR code")).not.toBeInTheDocument();
+  });
+
+  it("shares the invite URL through the native share sheet when supported (rocketcrab-ucz)", async () => {
+    const share = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "canShare", {
+      value: vi.fn(() => true),
+      configurable: true,
+    });
+    Object.defineProperty(navigator, "share", { value: share, configurable: true });
+    await renderLobby(makeState());
+    const shareButton = screen.getByRole("button", { name: /^share$/i });
+    await userEvent.click(shareButton);
+    expect(share).toHaveBeenCalledWith({
+      title: "Play rocketcrab with me!",
+      url: INVITE_URL,
+    });
+    // Copy URL and QR stay alongside the native share affordance.
+    expect(screen.getByRole("button", { name: /copy url/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /qr code/i })).toBeInTheDocument();
+    Object.defineProperty(navigator, "canShare", { value: undefined, configurable: true });
+    Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
+  });
+
+  it("hides the native Share button when canShare rejects the URL (rocketcrab-ucz)", async () => {
+    Object.defineProperty(navigator, "canShare", {
+      value: vi.fn(() => false),
+      configurable: true,
+    });
+    Object.defineProperty(navigator, "share", {
+      value: vi.fn().mockResolvedValue(undefined),
+      configurable: true,
+    });
+    await renderLobby(makeState());
+    expect(screen.queryByRole("button", { name: /^share$/i })).not.toBeInTheDocument();
+    Object.defineProperty(navigator, "canShare", { value: undefined, configurable: true });
+    Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
   });
 
   it("copies the invite URL from the Copy URL button (10.5)", async () => {
