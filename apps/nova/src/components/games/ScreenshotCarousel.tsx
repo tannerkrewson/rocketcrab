@@ -15,9 +15,13 @@ export interface ScreenshotCarouselProps {
  * App-store style tall portrait screenshot carousel (rocketcrab-9fv.7.46).
  * The games' screenshots are already portrait, so each slide shows the full
  * image tall — swiped horizontally with clickable pagination dots — instead
- * of the old 4:3 thumbnail grid. 2t1.3: `slidesPerView` is 2.5 so two and
- * a half screenshots are visible on first load (the centered slide plus
- * the halves peeking in on either side).
+ * of the old 4:3 thumbnail grid. c08: the carousel is NOT infinite (no
+ * `loop` — explicit start and end), and the whole swiper lives in ONE card
+ * instead of a phone-like frame around every screenshot.
+ *
+ * 2t1.3: `slidesPerView` is 2.5 so two and a half screenshots are visible
+ * on first load (the centered slide plus the halves peeking in on either
+ * side).
  *
  * `w-full` is load-bearing (rocketcrab-9fv.11.12): without a definite width
  * the container's used width follows the wrapper's min-content (the sum of
@@ -33,29 +37,28 @@ export function ScreenshotCarousel({ images, gameName }: ScreenshotCarouselProps
     return null;
   }
   return (
-    <Swiper
-      modules={[A11y, Pagination]}
-      slidesPerView={2.5}
-      centeredSlides
-      spaceBetween={14}
-      // Loop only when there are enough slides for swiper's loop clones
-      // (centeredSlides + slidesPerView 2.5 needs 6+ slides); with fewer
-      // swiper would silently disable loop and log a warning.
-      loop={images.length >= 5}
-      grabCursor
-      pagination={{ clickable: true }}
-      className="nova-screenshots w-full"
-    >
-      {images.map((src, index) => (
-        <SwiperSlide key={src}>
-          <img
-            src={src}
-            alt={`${gameName} screenshot ${index + 1}`}
-            loading="lazy"
-            className="h-[58vh] max-h-[540px] w-auto max-w-full rounded-2xl border border-base-300 bg-base-200 p-2 object-contain shadow-sm"
-          />
-        </SwiperSlide>
-      ))}
-    </Swiper>
+    // c08: ONE card around the whole swiper; the per-slide frames are gone.
+    <div className="rounded-box border-2 border-base-300 bg-base-100 p-4">
+      <Swiper
+        modules={[A11y, Pagination]}
+        slidesPerView={2.5}
+        centeredSlides
+        spaceBetween={14}
+        grabCursor
+        pagination={{ clickable: true }}
+        className="nova-screenshots w-full"
+      >
+        {images.map((src, index) => (
+          <SwiperSlide key={src}>
+            <img
+              src={src}
+              alt={`${gameName} screenshot ${index + 1}`}
+              loading="lazy"
+              className="h-[58vh] max-h-[540px] w-auto max-w-full object-contain"
+            />
+          </SwiperSlide>
+        ))}
+      </Swiper>
+    </div>
   );
 }
