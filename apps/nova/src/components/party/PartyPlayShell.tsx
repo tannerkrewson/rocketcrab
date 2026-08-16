@@ -414,7 +414,7 @@ export function PartyPlayShell({
                             second: "2-digit",
                           })}
                         </span>
-                        <span className="font-bold uppercase">{entry.level}</span>
+                        <span className="font-bold">{entry.level}</span>
                         <span className="ml-2">{entry.message}</span>
                         {entry.details !== undefined ? (
                           <pre className="mt-1 whitespace-pre-wrap text-[10px] text-base-content/60">
