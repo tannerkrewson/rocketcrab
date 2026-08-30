@@ -63,6 +63,12 @@ describe("AppLayout", () => {
     expect(control.className).toContain("bottom");
     expect(control.className).toContain("right");
 
+    // The positive star layer must be above the shell background, while the
+    // route content sits above the stars. This catches the invisible
+    // negative-z child regression rather than only checking DOM presence.
+    expect(screen.getByTestId("app-starfield")).toHaveClass("z-0");
+    expect(screen.getByRole("main")).toHaveClass("relative", "z-10");
+
     // Icon-only theme/color controls: labels are accessible, no visible text.
     expect(screen.getByRole("button", { name: "Light theme" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
@@ -131,6 +137,9 @@ describe("AppLayout", () => {
       await screen.findByRole("heading", { name: heading });
       const brand = screen.getByRole("link", { name: /rocketcrab\.com — home/ });
       expect(brand.getAttribute("href")).toBe("/");
+      expect(screen.getByTestId("brand-logo").querySelector("img")).toHaveStyle({
+        height: "40px",
+      });
     }
 
     // /build (5cl.16, gmo): the tiny rocketcrab.com brand row is gone —

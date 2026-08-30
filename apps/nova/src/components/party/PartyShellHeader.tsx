@@ -66,7 +66,7 @@ export function PartyShellHeader({
         compact ? "py-1.5 opacity-70" : "py-3",
       )}
     >
-      <BrandLogo size={compact ? 20 : 36} />
+      <BrandLogo size={compact ? 20 : 40} />
       {pageTitle !== null ? (
         <>
           <button

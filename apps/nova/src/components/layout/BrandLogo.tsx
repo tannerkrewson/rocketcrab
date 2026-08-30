@@ -45,7 +45,7 @@ export function BrandLogo({
   const height = responsive ? `min(${size}px, 16vw)` : `${size}px`;
   return (
     <span
-      className={cn("inline-flex items-center", className)}
+      className={cn("inline-flex shrink-0 items-center overflow-visible", className)}
       aria-hidden="true"
       data-testid="brand-logo"
     >

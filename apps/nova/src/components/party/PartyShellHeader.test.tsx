@@ -75,6 +75,15 @@ describe("PartyShellHeader", () => {
     expect(title).toHaveClass("active:scale-95", "transition-all", "cursor-pointer");
   });
 
+  it("uses the shared larger lobby mark without changing compact browse sizing", () => {
+    render(<PartyShellHeader code="RCRB" inviteUrl={INVITE_URL} />);
+    expect(screen.getByTestId("brand-logo").querySelector("img")).toHaveStyle({ height: "40px" });
+
+    cleanup();
+    render(<PartyShellHeader code="RCRB" inviteUrl={INVITE_URL} compact />);
+    expect(screen.getByTestId("brand-logo").querySelector("img")).toHaveStyle({ height: "20px" });
+  });
+
   it("never renders the invite URL text (10.5 / ADR-0011)", () => {
     render(<PartyShellHeader code="RCRB" inviteUrl={INVITE_URL} />);
     expect(screen.queryByText(INVITE_URL)).not.toBeInTheDocument();

@@ -9,14 +9,14 @@ import { ThemeSelector } from "./ThemeSelector";
  * corner of the screen (safe-area aware), reachable from every page.
  * Every route provides its own way back (back buttons / home links); the
  * party routes (/join, /party) keep their own classic shell chrome, and the
- * full-screen play shell renders its own copy of the floating control above
- * the game so the theme picker is always available (11.1).
+ * full-screen play shell keeps the theme picker available in its Menu above
+ * the game (11.1).
  */
 export function AppLayout() {
   return (
-    // `isolate` gives the shell its own stacking context so the homepage
-    // starfield's -z-10 sits behind the page content but above the shell's
-    // background (rocketcrab-5cl.4).
+    // `isolate` gives the shell its own stacking context. The starfield is a
+    // normal positive layer inside it so the shell background cannot paint
+    // over the stars; the page content and controls sit above that layer.
     <div className="isolate flex min-h-screen flex-col bg-base-200 text-base-content">
       {/* Starfield: always mounted across the whole app so the site
           consistently has stars — hidden only while a party is actively
@@ -24,19 +24,18 @@ export function AppLayout() {
       <StarfieldBackground />
       {/* 5cl.15: max-w-7xl lets the editor (and other pages) use the
           widescreen space instead of leaving blank gutters on both sides. */}
-      <main className="mx-auto w-full max-w-7xl flex-1 px-4 pb-12 pt-6">
+      <main className="relative z-10 mx-auto w-full max-w-7xl flex-1 px-4 pb-12 pt-6">
         <Outlet />
-      </main>
 
-      {/* The one theme control, always floating bottom-right (11.1). The
-          full-screen play shell (fixed, z-40) covers this copy while a game
-          is live, so PartyPlayShell renders its own above the game. */}
-      <div
-        className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-3 z-30 rounded-box border-2 border-base-300 bg-base-100 p-1 shadow-md"
-        data-testid="floating-theme-control"
-      >
-        <ThemeSelector />
-      </div>
+        {/* Keep this control in the same shell stacking context as the play
+            view so the play shell's z-40 chrome remains above it. */}
+        <div
+          className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-3 z-30 rounded-box border-2 border-base-300 bg-base-100 p-1 shadow-md"
+          data-testid="floating-theme-control"
+        >
+          <ThemeSelector />
+        </div>
+      </main>
     </div>
   );
 }

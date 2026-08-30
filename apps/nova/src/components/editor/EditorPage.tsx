@@ -669,7 +669,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
           aria-label="Rocketcrab Nova home"
           title="Rocketcrab Nova"
         >
-          <BrandLogo size={36} />
+          <BrandLogo size={40} />
         </Link>
         <Link
           to="/library"

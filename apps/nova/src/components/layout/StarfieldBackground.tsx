@@ -38,12 +38,12 @@ const STARS: CSSProperties[] = (() => {
 /**
  * Subtle full-page twinkling-star background (5cl.4, site-wide 22n): every
  * page gets the stars EXCEPT while a party is actively playing a game —
- * the in-game condition is `state.game !== null` on the shared party engine
- * (the full-screen play shell is up by then, so stars would be noise behind
- * the game). There is no fade logic: the field is simply present (or
+ * the in-game condition is `state.phase === "playing"` on the shared party
+ * engine. A selected game in the lobby is not gameplay, so the stars stay
+ * visible there. There is no fade logic: the field is simply present (or
  * unmounted in-game), and the stars twinkle in place. The field sits behind
- * the page content — negative z-index inside the shell's `isolate` stacking
- * context, above the shell's own background — and is decorative only
+ * the page content at z-0 inside the shell's `isolate` stacking context,
+ * above the shell's own background — and is decorative only
  * (aria-hidden) and pointer-events-none everywhere. No canvas, no JS
  * animation loop: ~36 CSS-only dots driven by one keyframe, mirroring the
  * IdleParticles approach (2t1.9); prefers-reduced-motion keeps the stars
@@ -54,10 +54,9 @@ const STARS: CSSProperties[] = (() => {
  */
 export function StarfieldBackground({ engine }: { engine?: PartyEngine }) {
   const { state } = usePartyEngine(engine);
-  // Bead 22n: in-game = the party engine has an active `game`. During the
-  // lobby (and everywhere else) the stars stay up; once a game is live the
-  // shell covers the screen and the stars unmount.
-  if (state.game !== null) {
+  // A game can be selected before the host starts it. Only the playing phase
+  // mounts the full-screen shell and should remove the decorative field.
+  if (state.phase === "playing") {
     return null;
   }
   return (
@@ -82,7 +81,7 @@ export function StarfieldBackground({ engine }: { engine?: PartyEngine }) {
       <div
         aria-hidden="true"
         data-testid="app-starfield"
-        className="pointer-events-none fixed inset-0 -z-10"
+        className="pointer-events-none fixed inset-0 z-0"
       >
         {STARS.map((star, index) => (
           <span key={index} className="rc-star bg-base-content" style={star} />

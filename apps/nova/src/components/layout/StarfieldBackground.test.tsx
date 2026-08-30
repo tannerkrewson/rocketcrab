@@ -6,7 +6,8 @@ import { StarfieldBackground } from "./StarfieldBackground";
 /**
  * Starfield tests (rocketcrab-22n): the site-wide star layer renders on
  * every page and unmounts only while a party is actively playing a game
- * (`state.game !== null`). The in-game signal comes off the shared party
+ * (`state.phase === "playing"`). A selected game in the lobby is still a
+ * non-gameplay route. The in-game signal comes off the shared party
  * engine, so these tests drive an injectable fake engine instead of a real
  * party.
  */
@@ -42,10 +43,10 @@ const IDLE_STATE: PartyEngineState = {
   lastError: null,
 };
 
-/** A party that just started playing a Nova game (22n in-game signal). */
+/** A party that is actively playing a Nova game (22n in-game signal). */
 const IN_GAME_STATE: PartyEngineState = {
   ...IDLE_STATE,
-  phase: "lobby",
+  phase: "playing",
   game: { gameId: "my-game", title: "My Game", mode: "state" },
 };
 
@@ -92,6 +93,12 @@ describe("StarfieldBackground (22n)", () => {
 
   it("renders the starfield while a party is in the lobby (game not yet selected)", () => {
     const { engine } = makeEngine({ ...IDLE_STATE, phase: "lobby" });
+    renderStarfield(engine);
+    expect(screen.getByTestId("app-starfield")).toBeInTheDocument();
+  });
+
+  it("keeps the starfield visible in the lobby after a game is selected", () => {
+    const { engine } = makeEngine({ ...IN_GAME_STATE, phase: "lobby" });
     renderStarfield(engine);
     expect(screen.getByTestId("app-starfield")).toBeInTheDocument();
   });

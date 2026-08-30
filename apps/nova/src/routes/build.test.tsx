@@ -63,6 +63,9 @@ describe("/build — page 1 (hero)", () => {
     // The non-glow rocketcrab mark sits above the headline.
     const logo = hero.querySelector("img");
     expect(logo?.getAttribute("src")).toBe("/rocketcrab-logo-no-glow.svg");
+    // The hero remains larger than shared sub-page branding and uses the
+    // responsive height expression at both phone and desktop widths.
+    expect(logo?.style.height).toBe("min(80px, 16vw)");
 
     expect(
       await within(hero).findByRole("heading", { name: "Introducing Nova" }),

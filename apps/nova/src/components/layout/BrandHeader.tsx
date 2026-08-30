@@ -3,7 +3,7 @@ import { cn } from "../../lib/cn";
 import { BrandLogo } from "./BrandLogo";
 
 export interface BrandHeaderProps {
-  /** Logo height in px (default 24). */
+  /** Logo height in px (default 40). */
   size?: number;
   /** Faded treatment for in-party browsing so the browser stays the focus. */
   dimmed?: boolean;
@@ -16,15 +16,15 @@ export interface BrandHeaderProps {
 }
 
 /**
- * Small rocketcrab.com brand row (2t1.1/2t1.7): logo + monospace domain,
- * centered. The homepage keeps the big hero; every sub-page (browse / my
+ * Rocketcrab.com brand row (2t1.1/2t1.7): logo + monospace domain, centered.
+ * The homepage keeps the big hero; every sub-page (browse / my
  * games / about / build / game details) reuses this compact row so the
  * brand never disappears after leaving home. Links home by default (mark +
  * text are decorative via BrandLogo; the link carries the accessible
  * label); party contexts pass `noLink` so the row stays inert.
  */
 export function BrandHeader({
-  size = 24,
+  size = 40,
   dimmed = false,
   noLink = false,
   className,
@@ -32,7 +32,7 @@ export function BrandHeader({
   const inner = (
     <>
       <BrandLogo size={size} />
-      <span className="font-title text-lg font-black text-base-content">
+      <span className="font-title shrink-0 text-xl font-black text-base-content">
         rocketcrab<span className="text-primary">.com</span>
       </span>
     </>

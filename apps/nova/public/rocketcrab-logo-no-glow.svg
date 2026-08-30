@@ -1,4 +1,6 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="100%" height="100%">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="-8 -8 144 144" width="100%" height="100%">
+  <!-- Include the claw strokes above y=0 so the flat mark is never clipped
+       when it is rendered in a tight header or the Build hero. -->
   <!-- Rocket Fire (Underneath Body) -->
   <g>
     <!-- Outer Flame -->
