@@ -78,8 +78,8 @@ canonical index or an ADR:
   owning ADR (e.g. the S4 state-mode vertical slice from ADR-0006).
 - `docs/editor-cohesion-design.md` — the editor third-pass UI blueprint
   (implementation tasks; task 9fv.10.12).
-- `deploy/cloudflare.md` — Cloudflare infrastructure state + reproduction
-  runbook (wrangler + documented one-time steps; no Terraform).
+- `deploy/cloudflare.md` — Cloudflare infrastructure state and reproduction
+  runbook, including the OpenTofu migration and provider gaps.
 
 ## Getting started
 

@@ -36,7 +36,8 @@
  *
  * Deployed: Cloudflare Worker "rocketcrab-cors-relay" (7.33), live at
  * https://rocketcrab-cors-relay.tannerkrewson.workers.dev, via the GitHub
- * Actions pipeline in .github/workflows/relay.yml (wrangler). See
+ * OpenTofu root in deploy/opentofu/; Wrangler is used only to produce the
+ * local dry-run bundle. See
  * deploy/relay/README.md.
  */
 

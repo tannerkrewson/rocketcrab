@@ -30,3 +30,11 @@ test-results/
 .pi/
 
 node_modules
+
+# OpenTofu state, provider cache, and local Worker bundles
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!*.tfvars.example
+deploy/opentofu/.build/

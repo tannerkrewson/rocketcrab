@@ -53,21 +53,28 @@ headers so the browser can read it.
 | `WATCHDOG_GB_BUDGET` | `200`                                                                                                              | Monthly TURN egress budget in GiB (1024^3 bytes) that the watchdog alerts against (see "Watchdog").                                                                                                 |
 | `ALERT_WEBHOOK_URL`  | _(unset → console.log only)_                                                                                       | Webhook that receives watchdog alert JSON. Unset, alerts are written to the Worker logs only.                                                                                                       |
 
-A single-variable env override (unset = the default above). For example, to
-allow a staging origin:
+A single-variable env override (unset = the default above). The OpenTofu root
+represents these values as `plain_text` bindings; do not use a separate
+Wrangler variable deployment path. For example:
 
-```sh
-wrangler var set ORIGIN_ALLOWLIST "https://rocketcrab.com,https://staging.rocketcrab.com"
+```hcl
+turn_worker_variables = {
+  ALERT_WEBHOOK_URL  = ""
+  MINT_DAILY_CAP     = "5000"
+  MINT_TOTAL_CAP     = "50000"
+  ORIGIN_ALLOWLIST   = "https://rocketcrab.com,https://staging.rocketcrab.com"
+  RATE_LIMIT_PER_MIN = "10"
+  WATCHDOG_GB_BUDGET = "200"
+}
 ```
 
 (`ORIGIN_ALLOWLIST`, `MINT_DAILY_CAP`, `MINT_TOTAL_CAP`, `WATCHDOG_GB_BUDGET`,
-`ALERT_WEBHOOK_URL` are not sensitive — they can live in `[vars]` in
-`wrangler.toml` or as plain `wrangler var set`; the secrets below are the
-sensitive ones.)
+`ALERT_WEBHOOK_URL` are not sensitive; the secrets below are the sensitive
+ones.)
 
 ## Worker secrets
 
-Set once after deploy (never commit these; the TURN key is a long-term
+Set after the Worker exists (never commit these; the TURN key is a long-term
 secret):
 
 ```sh
@@ -84,42 +91,47 @@ names (`wrangler dev` reads it). The repo `.gitignore` now excludes
 ## KV namespace (TURN_BUDGET)
 
 The budget kill-switch counts successful mints in a KV namespace bound as
-`TURN_BUDGET` (declared in `wrangler.toml` with a placeholder id). Create the
-namespace once, then paste the id into `wrangler.toml`:
+`TURN_BUDGET`. The OpenTofu resource
+`cloudflare_workers_kv_namespace.turn_budget` owns the namespace. The
+placeholder in the legacy `wrangler.toml` is retained for local development
+and bundling only; do not paste a production ID into that file.
 
 ```sh
-wrangler kv namespace create TURN_BUDGET
-# -> id: <namespace-id>   (paste it into kv_namespaces in wrangler.toml)
+tofu -chdir=deploy/opentofu apply
 ```
 
-`wrangler deploy` fails until the placeholder id is replaced (by design — the
-kill-switch must exist in prod). In dev, `wrangler dev` uses a local KV
-simulator keyed by binding name, so the placeholder id is fine locally. The
-same namespace holds the watchdog's alert watermarks (`last-alerted:<pct>`,
-rocketcrab-23s.5) — re-arming the mint counters deletes only `mints:*` keys,
-so watermarks survive (each threshold still fires exactly once per month).
+The command above is intentionally not part of this migration task. Review
+the plan, state backend, and resource ownership first. In dev, `wrangler dev`
+uses a local KV simulator keyed by binding name, so the placeholder id is fine
+locally. The same namespace holds the watchdog's alert watermarks
+(`last-alerted:<pct>`, rocketcrab-23s.5) — re-arming the mint counters deletes
+only `mints:*` keys, so watermarks survive (each threshold still fires exactly
+once per month).
 
-## Deploy
+## Infrastructure management
 
-`workers_dev = true`, deployed as `rocketcrab-turn-creds`:
+The planned Worker is modeled by `cloudflare_workers_script.turn` in
+`deploy/opentofu/`, with its cron trigger and `TURN_BUDGET` binding. Wrangler
+is used only for local development and the dry-run JavaScript bundle consumed
+by OpenTofu. No deploy workflow remains in this repository.
+
+After a coordinator-approved OpenTofu apply, set the Worker secrets through
+the approved Workers Secrets API or the following human-managed Wrangler
+commands. Their values must never be committed or passed as OpenTofu
+`secret_text` bindings:
 
 ```sh
 cd deploy/turn-creds
-wrangler login
-wrangler kv namespace create TURN_BUDGET   # once; paste the id into wrangler.toml
 wrangler secret put TURN_KEY_ID
 wrangler secret put TURN_KEY_API_TOKEN
 wrangler secret put CLOUDFLARE_ACCOUNT_ID
 wrangler secret put CLOUDFLARE_API_TOKEN
-wrangler deploy                            # deploys the worker AND its cron trigger
 ```
 
 The worker appears at
-`https://rocketcrab-turn-creds.<your-account-subdomain>.workers.dev`. CI: the
-same pipeline pattern as `deploy/relay/.github/workflows/relay.yml`
-(cloudflare/wrangler-action, `workingDirectory: deploy/turn-creds`,
-secrets `CLOUDFLARE_API_TOKEN` + `CLOUDFLARE_ACCOUNT_ID`); the workflow file
-itself is owned by the orchestrator and is not part of this directory.
+`https://rocketcrab-turn-creds.<your-account-subdomain>.workers.dev` when the
+account workers.dev subdomain is enabled. The validation-only workflow is
+`.github/workflows/infrastructure-plan.yml`.
 
 Smoke test (the mint endpoint rejects missing origins by design, so send
 one — any allowlisted origin works):
@@ -292,9 +304,9 @@ minted cost allowance.
 **Fail-open behavior**: if the `TURN_BUDGET` binding is missing (dev) or KV
 is unreachable, the worker logs and **proceeds with the mint**. That is fine
 for dev and correct under an outage — abuse stays bounded by the per-IP rate
-limiter meanwhile. In prod the binding **must** exist (wrangler.toml has a
-placeholder id and `wrangler deploy` fails until it is replaced). Daily
-counter keys self-expire after 2 days, so stale day keys never accumulate.
+limiter meanwhile. In prod the binding **must** exist and is supplied by
+OpenTofu. Daily counter keys self-expire after 2 days, so stale day keys never
+accumulate.
 
 **Mint logging**: every successful mint is logged to the Workers logs as a
 JSON line (`event: "turn_cred_mint"`, `ip`, `origin`, `ttl`, `ts`) via

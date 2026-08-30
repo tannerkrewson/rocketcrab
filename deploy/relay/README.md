@@ -48,12 +48,14 @@ TURN credential endpoint (`rocketcrab-23s`).
 | `RATE_LIMIT_PER_MIN` | `20`                                                                                                               | Requests per minute per client IP allowed by the in-worker fast-fail counter (60s fixed window).                                                                                           |
 
 A single-variable env override (unset = the default above). Neither variable
-is sensitive — they can live in `[vars]` in `wrangler.toml` or as plain
-`wrangler var set`:
+is sensitive. The OpenTofu root represents these values as `plain_text`
+bindings; do not use a separate Wrangler variable deployment path.
 
-```sh
-wrangler var set ORIGIN_ALLOWLIST "https://rocketcrab.com,https://staging.rocketcrab.com"
-wrangler var set RATE_LIMIT_PER_MIN 20
+```hcl
+relay_worker_variables = {
+  ORIGIN_ALLOWLIST   = "https://rocketcrab.com,https://staging.rocketcrab.com"
+  RATE_LIMIT_PER_MIN = "20"
+}
 ```
 
 The defaults match the app's real origins: `https://rocketcrab.com` is the
@@ -112,45 +114,38 @@ current backstop.
   own suite lives in `deploy/relay/worker.test.ts` (run with
   `npx vitest run deploy/relay/worker.test.ts` from the repo root).
 
-## Deploy (GitHub Actions -> Cloudflare Workers)
+## Infrastructure management
 
-The worker deploys through the standard pipeline in
-`.github/workflows/relay.yml` (cloudflare/wrangler-action, runs on pushes
-that touch `deploy/relay/**` and via manual dispatch).
+The former Wrangler deployment workflow was removed. OpenTofu in
+`deploy/opentofu/` is the intended source of truth for this Worker and must
+import the live script before any write. Wrangler is used only for the local
+TypeScript `deploy --dry-run` bundle consumed by OpenTofu; see
+`deploy/opentofu/README.md` for the non-mutating commands and state strategy.
 
-1. **Secrets** (repo Settings -> Secrets and variables -> Actions): add
-   `CLOUDFLARE_API_TOKEN` (Workers Scripts edit) and
-   `CLOUDFLARE_ACCOUNT_ID`. Configuration lives in `wrangler.toml`
-   (`name = "rocketcrab-cors-relay"`, `workers_dev = true`). The two
-   non-secret env vars above default safely in code; override with
-   `wrangler var set` only if the defaults do not fit (e.g. a staging
-   origin).
-2. Run the `Deploy classic CORS relay` workflow (manual dispatch, or push
-   to `nova` touching `deploy/relay/**`). The worker appears at
-   `https://rocketcrab-cors-relay.<your-account-subdomain>.workers.dev`
-   (a custom domain can be added later via the Cloudflare dashboard).
-3. **Enable in the app**: re-run the `Deploy to GitHub Pages` workflow for
-   `origin: nova` with `relay_origin` set to the worker's origin. That
-   bakes `VITE_CLASSIC_RELAY_ORIGIN` into the build (the strict CSP in
-   `apps/nova/vite.config.ts` adds it to `connect-src` automatically).
-4. **Verify**: play each of the 16 previously-blocked games via the
-   `/classic/:gameId` route and confirm room creation succeeds through the
-   relay (no CORS errors). The relay rejects missing origins by design, so
-   a curl smoke test must send one (any allowlisted origin works):
+After a coordinator-approved OpenTofu migration, **enable in the app** by
+re-running the `Deploy to GitHub Pages` workflow for `origin: nova` with
+`relay_origin` set to the Worker origin. That bakes
+`VITE_CLASSIC_RELAY_ORIGIN` into the build (the strict CSP in
+`apps/nova/vite.config.ts` adds it to `connect-src` automatically).
 
-   ```sh
-   curl -si https://rocketcrab-cors-relay.<your-account-subdomain>.workers.dev/ \
-     -H "Origin: https://rocketcrab.com" \
-     -H "Content-Type: application/json" \
-     -d '{"endpoint":"drawphone-new","body":{}}'
-   ```
+**Verify** by playing each of the 16 previously-blocked games via the
+`/classic/:gameId` route and confirming room creation succeeds through the
+relay (no CORS errors). The relay rejects missing origins by design, so a curl
+smoke test must send one (any allowlisted origin works):
 
-   Expect `200` with `access-control-allow-origin: https://rocketcrab.com`
-   and the upstream JSON (e.g. a `gameCode`). A request without `Origin`
-   returns `403`, as does one from a non-allowlisted origin.
+```sh
+curl -si https://rocketcrab-cors-relay.<your-account-subdomain>.workers.dev/ \
+  -H "Origin: https://rocketcrab.com" \
+  -H "Content-Type: application/json" \
+  -d '{"endpoint":"drawphone-new","body":{}}'
+```
 
-5. **Remove the blocked badges**: once verified, flip `connectStatus:
-"blocked"` off in `apps/nova/src/lib/classic/games.ts` and delete the
-   "room creation blocked" badge + warning copy in
-   `apps/nova/src/routes/game.$gameId.tsx` and any other `connectBlocked`
-   UI (the browse badge updates automatically via `connectBlocked`).
+Expect `200` with `access-control-allow-origin: https://rocketcrab.com`
+and the upstream JSON (e.g. a `gameCode`). A request without `Origin`
+returns `403`, as does one from a non-allowlisted origin.
+
+Once verified, flip `connectStatus: "blocked"` off in
+`apps/nova/src/lib/classic/games.ts` and delete the "room creation blocked"
+badge and warning copy in `apps/nova/src/routes/game.$gameId.tsx` and any
+other `connectBlocked` UI (the browse badge updates automatically via
+`connectBlocked`).

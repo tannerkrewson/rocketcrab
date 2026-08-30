@@ -1,12 +1,13 @@
-# Cloudflare infrastructure — state and reproduction runbook
+# Cloudflare infrastructure - state and reproduction runbook
 
 - **Status:** Live state verified against the Cloudflare API 2026-08-14.
-- **Purpose:** the single source of truth for every Cloudflare resource
-  Rocketcrab Nova uses, and a recreate-on-a-fresh-account checklist that
-  makes the infra reproducible **without Terraform** — `wrangler` plus
-  documented one-time steps.
-- **Drift convention:** see §6. CI workflows are the deploy source of truth;
-  anything changed in the dashboard / via MCP gets recorded here.
+- **Purpose:** the inventory and operator runbook for every Cloudflare resource
+  Rocketcrab Nova uses. Supported resources are moving to the dedicated
+  OpenTofu root at `deploy/opentofu/`; this file remains the live-state record
+  and documents provider gaps and one-time account decisions.
+- **Drift convention:** see §6. OpenTofu is the intended source of truth for
+  supported resources. The validation workflow is plan/validate-only; no
+  Wrangler deployment workflow is retained.
 
 ## 1. Account facts
 
@@ -48,7 +49,8 @@ designed but not yet deployed** (verified live 2026-08-14).
   endpoint allowlist lives in `RELAY_ENDPOINTS`), `deploy/relay/wrangler.toml`
   (`name = "rocketcrab-cors-relay"`, `workers_dev = true`,
   `compatibility_date = "2025-01-01"`), `deploy/relay/README.md`
-  (+ `worker.test.ts`), and the CI workflow `.github/workflows/relay.yml`.
+  (+ `worker.test.ts`). OpenTofu ownership is defined in
+  `deploy/opentofu/`.
 - **Worker env / secrets:** two optional non-secret vars, both with safe
   in-code defaults (see `deploy/relay/README.md`): `ORIGIN_ALLOWLIST`
   (comma-separated origins; default `https://rocketcrab.com` +
@@ -56,9 +58,10 @@ designed but not yet deployed** (verified live 2026-08-14).
   No Worker secrets. The only credentials involved are the repo CI secrets
   (§4). `VITE_CLASSIC_RELAY_ORIGIN` is a _client_ build-time var baked into
   the Nova app's CSP `connect-src` — it is not a Worker setting.
-- **How to recreate:** push to `nova` touching `deploy/relay/**` (triggers
-  `.github/workflows/relay.yml`) or run the workflow manually; equivalent
-  manual path: `cd deploy/relay && wrangler login && wrangler deploy`.
+- **How to manage:** `cloudflare_workers_script.relay` in
+  `deploy/opentofu/` models the live Worker. Import it before any write.
+  OpenTofu consumes a local Wrangler `--dry-run` bundle of this TypeScript
+  source; Wrangler is not the deployment source of truth.
 - **Client wiring:** `apps/nova/src/lib/classic/relay.ts` +
   `apps/nova/vite.config.ts` (CSP); a sync test
   (`apps/nova/src/lib/classic/relay-worker.test.ts`) keeps the client keys
@@ -75,9 +78,9 @@ designed but not yet deployed** (verified live 2026-08-14).
   daily usage watchdog.
 - **Deployment state (verified via API 2026-08-14):** the Worker **does not
   exist** on the account yet, and the `TURN_BUDGET` KV namespace **does not
-  exist** either. Nothing to tear down; deploy when the party flow needs it.
-  The GitHub Actions workflow for it is owned by the orchestrator and is not
-  yet in-tree (see §6).
+  exist** either. Nothing to tear down; create it when the party flow needs it.
+  The GitHub Actions workflow for this infrastructure is validation-only at
+  `.github/workflows/infrastructure-plan.yml`.
 - **Repo files:** `deploy/turn-creds/worker.ts`, `watchdog.ts`
   (+ `worker.test.ts`, `watchdog.test.ts`), `wrangler.toml`, and
   `README.md`. **The README is the full operator manual** (deploy steps,
@@ -93,7 +96,7 @@ designed but not yet deployed** (verified live 2026-08-14).
   crons = ["0 9 * * *"]
   ```
 
-- **Env vars (non-secret; `[vars]` or `wrangler var set`):**
+- **Env vars (non-secret; OpenTofu `plain_text` bindings):**
 
   | Variable             | Default                                                                                                            | Meaning                                                         |
   | -------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------- |
@@ -111,23 +114,19 @@ designed but not yet deployed** (verified live 2026-08-14).
   Local dev uses a gitignored `deploy/turn-creds/.dev.vars`.
 - **KV namespace:** `TURN_BUDGET` — mint counters (`mints:YYYY-MM-DD`,
   `mints:total`) for the kill-switch plus the watchdog's alert watermarks
-  (`last-alerted:<pct>`). Created once with
-  `wrangler kv namespace create TURN_BUDGET`; the returned id goes into
-  `wrangler.toml`. `wrangler deploy` fails until the placeholder id is
-  replaced (by design — the kill-switch must exist in prod).
+  (`last-alerted:<pct>`). The OpenTofu resource
+  `cloudflare_workers_kv_namespace.turn_budget` owns it; the placeholder in
+  the legacy Wrangler config is not state.
 - **Cron trigger:** `0 9 * * *` daily — fires the `scheduled` handler
   (watchdog). Manual trigger for dev/smoke: `GET /__watchdog`.
 - **Rate limiting:** two layers — the in-worker fast-fail counter
-  (`RATE_LIMIT_PER_MIN`) and a durable **zone-level Rulesets rate rule**
-  (per-IP, block 10/min on the mint route). `wrangler` cannot manage rate
-  rules, so the reproducibility path is the Rulesets curl documented in
-  `deploy/turn-creds/README.md` §"Rate limiting" — reference that, and keep
-  the rule's `requests_per_period` in sync with `RATE_LIMIT_PER_MIN`. Note
-  it needs a proxied zone hostname (custom route); the workers.dev host has
-  no zone to hang the rule on.
-- **Recreate:** follow `deploy/turn-creds/README.md` §Deploy step by step
-  (login → KV namespace → secrets → `wrangler deploy`), then the one-time
-  account steps below.
+  (`RATE_LIMIT_PER_MIN`) and the optional provider-managed **zone-level
+  Rulesets rate rule** (per-IP, block 10/min on the mint route). It needs a
+  proxied zone hostname and an exact route/expression choice; the workers.dev
+  host has no zone to hang the rule on. The OpenTofu resource keeps
+  `requests_per_period` in sync with `turn_rate_limit_per_min`.
+- **Recreate:** use `deploy/opentofu/` after the state, route, TURN key, and
+  secret decisions below are approved. This task does not apply or import.
 
 ## 3. One-time account steps (recreate-on-fresh-account checklist)
 
@@ -136,41 +135,41 @@ designed but not yet deployed** (verified live 2026-08-14).
    `POST https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/workers/subdomain`
    with body `{"subdomain":"tannerkrewson"}`. The subdomain is the root of
    every `<name>.tannerkrewson.workers.dev` URL.
-2. **Create the KV namespace:** `cd deploy/turn-creds && wrangler kv namespace
-create TURN_BUDGET` → paste the returned id into `kv_namespaces` in
-   `deploy/turn-creds/wrangler.toml` (replace `REPLACE_WITH_KV_NAMESPACE_ID`).
-   Commit the id — it is not secret.
-3. **Create the TURN key** in the Cloudflare Realtime dashboard (Realtime →
-   TURN → Keys → Create). The **Token ID** becomes Worker secret
-   `TURN_KEY_ID`; the **API token** becomes `TURN_KEY_API_TOKEN` (shown once
-   at creation — copy it then).
+2. **Create the KV namespace:** the OpenTofu resource
+   `cloudflare_workers_kv_namespace.turn_budget` owns `TURN_BUDGET`; do not
+   paste an ID into the legacy Wrangler config. No namespace exists in the
+   verified inventory.
+3. **Create or choose the TURN key:** provider v5.24.0 has a
+   `cloudflare_calls_turn_app` resource, but it cannot import an existing key
+   and exposes the bearer key as sensitive state. Until the coordinator
+   chooses that state tradeoff, create/rotate the key in Realtime dashboard or
+   API and keep its ID/token as human-managed Worker secrets.
 4. **Set the repo CI secrets** (§4): `CLOUDFLARE_API_TOKEN` (scoped:
    Workers Scripts edit + KV + Zone Rulesets + Account Analytics) and
    `CLOUDFLARE_ACCOUNT_ID`, under GitHub repo Settings → Secrets and
    variables → Actions.
-5. **Apply the rate-limit rule** once the mint endpoint is reachable on a
-   proxied zone hostname — the Rulesets curl in
-   `deploy/turn-creds/README.md` §"Rate limiting" (or Security → WAF →
-   Rate limiting rules in the dashboard).
-6. **Deploy:** relay first (existing CI workflow; or `wrangler deploy` in
-   `deploy/relay`), then the turn-creds Worker via
-   `deploy/turn-creds/README.md` §Deploy. Verify with the smoke tests in
-   each README (relay: hit an endpoint key; turn-creds: curl with an
-   allowlisted `Origin`, expect `200` + `iceServers`).
+5. **Choose the rate-limit route:** the zone-level rule needs a proxied
+   custom route and a precise expression. Supply both, plus the real zone ID,
+   as `turn_custom_route` in the OpenTofu root. A workers.dev host cannot
+   carry this zone rule.
+6. **Apply only after review:** import the live relay into OpenTofu first,
+   then review a refresh-enabled plan. Create the planned TURN Worker only
+   after the KV/key/secrets, route, and state-backend decisions are approved.
+   This migration task does not apply, import, or deploy anything.
 
 ## 4. Secrets table
 
-| Secret                  | Scope     | Where set                                                | Needed by                                                                  |
-| ----------------------- | --------- | -------------------------------------------------------- | -------------------------------------------------------------------------- |
-| `CLOUDFLARE_API_TOKEN`  | Repo (CI) | GitHub → Settings → Secrets and variables → Actions      | `relay.yml` (and the future turn-creds workflow): `wrangler-action` deploy |
-| `CLOUDFLARE_ACCOUNT_ID` | Repo (CI) | GitHub → Settings → Secrets and variables → Actions      | `relay.yml` (and the future turn-creds workflow): `wrangler-action` deploy |
-| `TURN_KEY_ID`           | Worker    | `wrangler secret put TURN_KEY_ID` (turn-creds)           | turn-creds mint: Realtime credentials API path segment                     |
-| `TURN_KEY_API_TOKEN`    | Worker    | `wrangler secret put TURN_KEY_API_TOKEN` (turn-creds)    | turn-creds mint: `Authorization: Bearer` header                            |
-| `CLOUDFLARE_ACCOUNT_ID` | Worker    | `wrangler secret put CLOUDFLARE_ACCOUNT_ID` (turn-creds) | turn-creds watchdog: GraphQL `accountTag`                                  |
-| `CLOUDFLARE_API_TOKEN`  | Worker    | `wrangler secret put CLOUDFLARE_API_TOKEN` (turn-creds)  | turn-creds watchdog: GraphQL auth ("Account Analytics" permission)         |
+| Secret                  | Scope     | Where set                                                | Needed by                                                          |
+| ----------------------- | --------- | -------------------------------------------------------- | ------------------------------------------------------------------ |
+| `CLOUDFLARE_API_TOKEN`  | Repo (CI) | GitHub → Settings → Secrets and variables → Actions      | OpenTofu plan/review credentials (when CI is approved)             |
+| `CLOUDFLARE_ACCOUNT_ID` | Repo (CI) | GitHub → Settings → Secrets and variables → Actions      | OpenTofu variable or operator plan input                           |
+| `TURN_KEY_ID`           | Worker    | `wrangler secret put TURN_KEY_ID` (turn-creds)           | turn-creds mint: Realtime credentials API path segment             |
+| `TURN_KEY_API_TOKEN`    | Worker    | `wrangler secret put TURN_KEY_API_TOKEN` (turn-creds)    | turn-creds mint: `Authorization: Bearer` header                    |
+| `CLOUDFLARE_ACCOUNT_ID` | Worker    | `wrangler secret put CLOUDFLARE_ACCOUNT_ID` (turn-creds) | turn-creds watchdog: GraphQL `accountTag`                          |
+| `CLOUDFLARE_API_TOKEN`  | Worker    | `wrangler secret put CLOUDFLARE_API_TOKEN` (turn-creds)  | turn-creds watchdog: GraphQL auth ("Account Analytics" permission) |
 
 Recommended repo-token scope for the CI token: **Workers Scripts → Edit**
-(deploy), **Workers KV Storage → Edit** (KV namespace create/verify),
+(plan/import/apply), **Workers KV Storage → Edit** (KV namespace create/verify),
 **Zone → Config → Rulesets → Edit** (rate rule), **Account Analytics →
 Read** (watchdog parity). The relay itself needs no secrets at all.
 
@@ -203,12 +202,16 @@ curl -s https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/storage/kv/na
 
 ## 6. Drift convention
 
-- **CI workflows are the source of truth for deploys.** Today that is
-  `.github/workflows/relay.yml` (deploys on push to `nova` touching
-  `deploy/relay/**`, or manual dispatch). The turn-creds workflow follows
-  the same pattern and is owned by the orchestrator (see
-  `deploy/turn-creds/README.md` §Deploy); when it lands it becomes the
-  source of truth for that Worker.
+- **OpenTofu is the intended source of truth for supported Cloudflare
+  resources.** `deploy/opentofu/` models both Workers, the TURN_BUDGET KV
+  namespace, the watchdog cron, and optional zone route/rate-limit resources.
+  `.github/workflows/infrastructure-plan.yml` runs only formatting,
+  initialization without a backend, and validation. It never runs `tofu apply`
+  or a Wrangler deployment.
+- **Wrangler is a build input only.** Its committed Worker configs and source
+  files are used for a local `deploy --dry-run` bundle before an OpenTofu plan.
+  The old relay deployment workflow was removed rather than left as a second
+  infrastructure authority.
 - **Anything changed in the dashboard or via MCP must be recorded here**:
   new Workers, KV namespaces, cron triggers, env vars, secrets, rate rules,
   custom domains/workers.dev subdomain changes. If a change is made outside
@@ -216,3 +219,6 @@ curl -s https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/storage/kv/na
   tweak), update this file in the same change.
 - **Deletions:** removing a Cloudflare resource (e.g. an undeployed worker,
   a dead KV namespace) also removes it from this inventory.
+
+The OpenTofu migration details, import commands, state-backend questions, and
+provider limitations are maintained in `deploy/opentofu/README.md`.

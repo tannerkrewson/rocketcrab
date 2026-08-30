@@ -1,0 +1,14 @@
+# Copy this file to terraform.tfvars locally, then replace the account ID.
+# terraform.tfvars is ignored and must never be committed.
+cloudflare_account_id = "REPLACE_WITH_CLOUDFLARE_ACCOUNT_ID"
+
+# Optional: only needed to print workers.dev URLs or configure the zone route.
+# workers_dev_subdomain = "REPLACE_WITH_ACCOUNT_WORKERS_DEV_SUBDOMAIN"
+# cloudflare_zone_id    = "REPLACE_WITH_CLOUDFLARE_ZONE_ID"
+
+# Leave unset until the coordinator chooses a proxied custom route and the
+# exact Rules language expression for the zone-level TURN rate rule.
+# turn_custom_route = {
+#   pattern               = "REPLACE_WITH_PROXIED_WORKERS_ROUTE_PATTERN"
+#   rate_limit_expression = "REPLACE_WITH_TURN_POST_RATE_LIMIT_EXPRESSION"
+# }
