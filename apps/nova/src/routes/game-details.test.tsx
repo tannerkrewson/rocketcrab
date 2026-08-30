@@ -120,6 +120,7 @@ const { stubEngine, stubs } = vi.hoisted(() => {
       setContainer: vi.fn(),
       selectGame: vi.fn(async () => undefined),
       selectClassicGame: vi.fn(async () => undefined),
+      leaveParty: vi.fn(async () => undefined),
     },
   };
 });
@@ -177,6 +178,8 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     expect(start.getAttribute("href")).toBe(
       `/party?gameId=${game.id}&mode=simulation&title=Rocket+Rumble`,
     );
+    const edit = screen.getByRole("link", { name: "Edit game" });
+    expect(edit.getAttribute("href")).toBe(`/games/${game.id}/edit`);
     // The back link is a compact soft button, not a full-width bar.
     const back = screen.getByRole("link", { name: "Back to games" });
     expect(back.className).toContain("btn-soft");
@@ -227,7 +230,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
 
   it("shares the party shell header (logo + code) while in a lobby (5cl.8)", async () => {
     stubs.mode = "lobby";
-    renderAt("/game/drawphone");
+    renderAt("/game/drawphone?from=party-browse");
 
     // The lobby's shared header (origin + lowercase code) replaces the
     // standalone brand row on the details page reached from a party.
@@ -253,6 +256,44 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     expect(screen.queryByRole("button", { name: /select game/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Start party/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /Start party/ })).not.toBeInTheDocument();
+  });
+
+  it("returns from lobby What is details to the live party without leaving", async () => {
+    stubs.mode = "lobby";
+    const game = await gameRepository.create({
+      title: "Rocket Rumble",
+      description: "Blast off with friends.",
+      html: SAVED_HTML,
+      mode: "state",
+    });
+    const router = renderAt(`/game/${game.id}?from=party`);
+
+    expect(await screen.findByRole("heading", { name: "Rocket Rumble" })).toBeInTheDocument();
+    const back = screen.getByRole("link", { name: "Back to party" });
+    expect(back.getAttribute("href")).toBe("/party");
+    await userEvent.click(back);
+
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/rcrb"));
+    expect(screen.getByTestId("party-title")).toHaveTextContent(`${window.location.host}/rcrb`);
+    expect(stubEngine.leaveParty).not.toHaveBeenCalled();
+  });
+
+  it("guards saved-game editing by leaving an active party first", async () => {
+    stubs.mode = "lobby";
+    const game = await gameRepository.create({
+      title: "Rocket Rumble",
+      html: SAVED_HTML,
+      mode: "state",
+    });
+    const router = renderAt(`/game/${game.id}?from=party`);
+
+    await userEvent.click(await screen.findByRole("button", { name: "Edit game" }));
+    expect(screen.getByRole("dialog", { name: "Leave the party?" })).toBeInTheDocument();
+    expect(stubEngine.leaveParty).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "Leave party" }));
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe(`/games/${game.id}/edit`));
+    expect(stubEngine.leaveParty).toHaveBeenCalledTimes(1);
   });
 
   it("offers a same-size primary Start-party CTA for classic games outside a party (2t1.10)", async () => {

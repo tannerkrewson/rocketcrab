@@ -1,6 +1,5 @@
 import { Link } from "@tanstack/react-router";
 import {
-  BookOpen,
   Check,
   Copy,
   Gamepad2,
@@ -22,9 +21,9 @@ import { Button, buttonStyles } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
 import { IdleParticles } from "./IdleParticles";
 import { PartyDiagnosticsPanel } from "./PartyDiagnostics";
-import { PartyGameDetailsModal } from "./PartyGameDetails";
 import { PartyInviteQr } from "./PartyInviteQr";
 import { partyPageTitle } from "./PartyShellHeader";
+import { clearBrowseContext } from "../../lib/browse/back-context";
 
 export interface PartyLobbyProps {
   state: PartyEngineState;
@@ -190,9 +189,6 @@ export function PartyLobby({
   // 10.5: the QR code lives behind a modal; the invite URL is never
   // rendered as text (only the origin + code page title is).
   const [qrOpen, setQrOpen] = useState(false);
-  // 10.6: "What is GameName?" opens an in-lobby details overlay.
-  const [detailsOpen, setDetailsOpen] = useState(false);
-
   const greeterName =
     state.members.find((member) => member.memberId === state.greeterMemberId)?.displayName ??
     state.greeterMemberId ??
@@ -398,10 +394,15 @@ export function PartyLobby({
                   ? "As the host, you have to start the game!"
                   : "Waiting for the host to start the game…"}
               </p>
-              <Button variant="default" soft size="md" onClick={() => setDetailsOpen(true)}>
-                <BookOpen className="h-4 w-4" aria-hidden="true" />
+              <Link
+                to="/game/$gameId"
+                params={{ gameId: state.game.gameId }}
+                search={{ from: "party" }}
+                onClick={clearBrowseContext}
+                className={buttonStyles("default", "md", undefined, true)}
+              >
                 What is {state.game.title}?
-              </Button>
+              </Link>
             </>
           ) : (
             <p className="text-sm font-semibold text-base-content/70">{noGameMessage}</p>
@@ -639,10 +640,7 @@ export function PartyLobby({
       </div>
       {/* The QR invite modal (10.5): the QR lives here, not on the lobby.
           The full invite URL is encoded in the QR only; the label under it
-          is the safe origin + code form. */}{" "}
-      {detailsOpen ? (
-        <PartyGameDetailsModal game={state.game} onClose={() => setDetailsOpen(false)} />
-      ) : null}
+          is the safe origin + code form. */}
       {qrOpen && state.inviteUrl !== null ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"

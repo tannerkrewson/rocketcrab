@@ -13,14 +13,13 @@ export interface PartyGameDetailsModalProps {
 }
 
 /**
- * In-lobby game-details overlay (10.6): "What is GameName?" shows the
- * selected game's metadata — title, description, mode, and any how-to-play
- * guide — without leaving the party. Saved games come from the IndexedDB
- * repository; prebuilt games from the shared browse model (BrowseEntry).
+ * In-game details overlay: "About this game" shows the selected game's
+ * metadata — title, description, mode, and any how-to-play guide — without
+ * leaving the party. Saved games come from the IndexedDB repository;
+ * prebuilt games from the shared browse model (BrowseEntry).
  *
- * The overlay lives inside PartyLobby, so when the game starts the phase
- * flips to playing, the lobby unmounts, and the overlay closes with it —
- * it can never block the start transition.
+ * The overlay lives inside PartyPlayShell, so the running game stays mounted
+ * underneath it and the emergency controls remain outside the game frame.
  */
 export function PartyGameDetailsModal({ game, onClose }: PartyGameDetailsModalProps) {
   if (game === null) {

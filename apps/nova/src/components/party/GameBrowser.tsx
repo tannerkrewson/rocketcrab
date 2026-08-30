@@ -1,6 +1,6 @@
 import type { SavedGame } from "@rocketcrab/core";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, ArrowRight, Code2, Search } from "lucide-react";
+import { ArrowLeft, ArrowRight, Search } from "lucide-react";
 import { useMemo, useState } from "react";
 import { cn } from "../../lib/cn";
 import { usePartyEngine } from "../../lib/party/use-party";
@@ -55,10 +55,9 @@ export interface GameBrowserProps {
   /**
    * True when the browser is rendered inside a live party (the lobby's and
    * the in-game pick panels). Links that leave the party flow entirely —
-   * the empty-state "New game" and the saved-game "Open in editor"
-   * actions — then ask for a "Leave the party?" confirmation first and
-   * leave the party before navigating (rocketcrab-8z9), so no ghost party
-   * keeps running behind the build/editor page.
+   * the empty-state "New game" action — then ask for a "Leave the party?"
+   * confirmation first and leave the party before navigating
+   * (rocketcrab-8z9), so no ghost party keeps running behind the builder.
    */
   inParty?: boolean;
 }
@@ -85,12 +84,6 @@ function KindBadge() {
   );
 }
 
-/** An exit link inside the browser that leaves the party flow entirely
- * (rocketcrab-8z9): the empty-state "New game" action and the saved-game
- * "Open in editor" row action. Both keep working standalone; inside a
- * party they ask "Leave the party?" first. */
-type ExitTarget = { to: "/build" } | { to: "/games/$gameId/edit"; params: { gameId: string } };
-
 function matchesQuery(game: BrowseEntry, query: string): boolean {
   if (query === "") return true;
   const haystack = `${game.name} ${game.author} ${game.description}`.toLowerCase();
@@ -108,10 +101,12 @@ function GameCard({
   game,
   onPick,
   onOpen,
+  detailOrigin,
 }: {
   game: BrowseEntry;
   onPick?: (entry: BrowseEntry) => void;
   onOpen?: () => void;
+  detailOrigin?: "party-browse";
 }) {
   const body = (
     <>
@@ -146,6 +141,7 @@ function GameCard({
       key={game.id}
       to="/game/$gameId"
       params={{ gameId: game.id }}
+      search={detailOrigin === undefined ? undefined : { from: detailOrigin }}
       onClick={onOpen}
       className="group flex items-center justify-between gap-3 rounded-box border-2 border-base-300 bg-base-100 px-4 py-3 transition-colors hover:border-primary"
     >
@@ -154,27 +150,17 @@ function GameCard({
   );
 }
 
-/**
- * One saved-game row (10.9): links to the game detail page in browse mode,
- * with a distinct "Open in editor" action (5cl.10) beside the details link
- * — the editor route /games/$gameId/edit. `onOpen` records the browser's
- * position before the details navigation (5cl.7). 8z9: inside a party the
- * editor action asks "Leave the party?" first (via `inParty` +
- * `onExitRequest`) instead of navigating straight away — the editor is
- * outside the party flow.
- */
+/** One saved-game row (10.9): links to the shared game detail page. */
 function SavedGameRow({
   game,
   onPickSaved,
   onOpen,
-  inParty,
-  onExitRequest,
+  detailOrigin,
 }: {
   game: SavedGame;
   onPickSaved?: (gameId: string) => void;
   onOpen?: () => void;
-  inParty?: boolean;
-  onExitRequest?: (target: ExitTarget) => void;
+  detailOrigin?: "party-browse";
 }) {
   const body = (
     <>
@@ -211,34 +197,12 @@ function SavedGameRow({
       <Link
         to="/game/$gameId"
         params={{ gameId: game.id }}
+        search={detailOrigin === undefined ? undefined : { from: detailOrigin }}
         onClick={onOpen}
         className="flex min-w-0 flex-1 items-center justify-between gap-3"
       >
         {body}
       </Link>
-      {/* 8z9: in a party the editor action is a button that asks first. */}
-      {inParty && onExitRequest !== undefined ? (
-        <button
-          type="button"
-          onClick={() => onExitRequest({ to: "/games/$gameId/edit", params: { gameId: game.id } })}
-          className={buttonStyles("default", "md", "shrink-0", true)}
-          title={`Open “${game.title}” in the editor`}
-        >
-          <Code2 className="h-4 w-4" aria-hidden="true" />
-          Open in editor
-        </button>
-      ) : (
-        <Link
-          to="/games/$gameId/edit"
-          params={{ gameId: game.id }}
-          onClick={onOpen}
-          className={buttonStyles("default", "md", "shrink-0", true)}
-          title={`Open “${game.title}” in the editor`}
-        >
-          <Code2 className="h-4 w-4" aria-hidden="true" />
-          Open in editor
-        </Link>
-      )}
     </div>
   );
 }
@@ -299,7 +263,7 @@ function CategoryCard({
  * games) is a category card: on the standalone /browse page it links to the
  * full-featured library page (5cl.12), and inside a party (compact) it
  * opens an in-place saved list — the host can't leave the party, so the
- * list keeps the details link plus an "Open in editor" action.
+ * list keeps the shared details links.
  *
  * The game list is NOT shown by default: only the category cards render.
  * Opening a category (or searching) swaps to just the list — the category
@@ -334,8 +298,8 @@ export function GameBrowser({
     if (stored !== null && isBrowseView(stored.view)) return stored.view;
     return null;
   });
-  // 8z9: the exit target awaiting a "Leave the party?" confirmation.
-  const [pendingExit, setPendingExit] = useState<ExitTarget | null>(null);
+  // 8z9: the builder action awaiting a "Leave the party?" confirmation.
+  const [pendingExit, setPendingExit] = useState(false);
   const savedGamesQuery = useSavedGames();
   const savedGames = savedGamesQuery.data ?? [];
 
@@ -383,35 +347,22 @@ export function GameBrowser({
    * so the details page's back button returns to this category/search. */
   const recordPosition = () => saveBrowseContext(view, query);
 
-  /** 8z9: navigate to an exit target (the build or editor route). */
-  const navigateToExit = (target: ExitTarget) => {
-    if (target.to === "/build") {
-      void navigate({ to: "/build" });
-    } else {
-      void navigate({ to: "/games/$gameId/edit", params: target.params });
-    }
-  };
-
-  /** 8z9: an exit link inside the browser ("New game" / "Open in editor").
-   * Standalone it navigates straight away; inside a party it first asks
-   * "Leave the party?" and only continues once the player confirms. */
-  const requestExit = (target: ExitTarget) => {
+  /** 8z9: the builder link leaves the party only after confirmation. */
+  const requestExit = () => {
     if (!inParty) {
-      navigateToExit(target);
+      void navigate({ to: "/build" });
       return;
     }
-    setPendingExit(target);
+    setPendingExit(true);
   };
 
-  /** The confirm action of the "Leave the party?" dialog: leave the party
-   * (the prompt said so) before navigating, so no ghost party keeps running
-   * behind the build/editor page. */
+  /** Leave the party before opening the builder, so no ghost party keeps
+   * running behind it. */
   const confirmExit = async () => {
-    if (pendingExit === null) return;
-    const target = pendingExit;
-    setPendingExit(null);
+    if (!pendingExit) return;
+    setPendingExit(false);
     await engine.leaveParty();
-    navigateToExit(target);
+    void navigate({ to: "/build" });
   };
 
   return (
@@ -488,6 +439,7 @@ export function GameBrowser({
               onOpen={recordPosition}
               inParty={inParty}
               onExitRequest={requestExit}
+              detailOrigin={compact ? "party-browse" : undefined}
             />
           ) : prebuiltGames.length === 0 ? (
             <p className="rounded-box border-2 border-base-300 bg-base-100 p-6 text-center text-base-content/70">
@@ -495,16 +447,22 @@ export function GameBrowser({
             </p>
           ) : (
             prebuiltGames.map((game) => (
-              <GameCard key={game.id} game={game} onPick={onPick} onOpen={recordPosition} />
+              <GameCard
+                key={game.id}
+                game={game}
+                onPick={onPick}
+                onOpen={recordPosition}
+                detailOrigin={compact ? "party-browse" : undefined}
+              />
             ))
           )}
         </section>
       ) : null}
 
-      {/* 8z9: the "Leave the party?" confirmation for exit links in party
-          mode — mirrors the PlayShell's confirm dialogs (plain controlled
-          overlay; the shared Dialog can't be reused from party panels). */}
-      {pendingExit !== null ? (
+      {/* 8z9: the "Leave the party?" confirmation for the builder link in party
+           mode — mirrors the PlayShell's confirm dialogs (plain controlled
+           overlay; the shared Dialog can't be reused from party panels). */}
+      {pendingExit ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
           role="dialog"
@@ -514,12 +472,11 @@ export function GameBrowser({
           <div className="flex w-full max-w-sm flex-col gap-4 rounded-box border-2 border-base-300 bg-base-100 p-5">
             <p className="font-black">Leave the party?</p>
             <p className="text-sm text-base-content/70">
-              {pendingExit.to === "/build"
-                ? "To open the game builder, you'll leave this party first. You can always start or join another one later."
-                : "To open the editor, you'll leave this party first. You can always start or join another one later."}
+              To open the game builder, you&apos;ll leave this party first. You can always start or
+              join another one later.
             </p>
             <div className="flex justify-end gap-2">
-              <Button variant="default" soft onClick={() => setPendingExit(null)}>
+              <Button variant="default" soft onClick={() => setPendingExit(false)}>
                 Stay in party
               </Button>
               <Button variant="danger" onClick={() => void confirmExit()}>
@@ -543,6 +500,7 @@ function SavedGamesList({
   onOpen,
   inParty,
   onExitRequest,
+  detailOrigin,
 }: {
   query: string;
   isLoading: boolean;
@@ -552,7 +510,8 @@ function SavedGamesList({
   onPickSaved?: (gameId: string) => void;
   onOpen: () => void;
   inParty?: boolean;
-  onExitRequest?: (target: ExitTarget) => void;
+  onExitRequest?: () => void;
+  detailOrigin?: "party-browse";
 }) {
   if (isLoading) {
     return <LoadingState label="Loading your games…" />;
@@ -572,7 +531,7 @@ function SavedGamesList({
         {inParty && onExitRequest !== undefined ? (
           <button
             type="button"
-            onClick={() => onExitRequest({ to: "/build" })}
+            onClick={() => onExitRequest()}
             className={buttonStyles("primary", "md")}
           >
             New game
@@ -593,8 +552,7 @@ function SavedGamesList({
             game={game}
             onPickSaved={onPickSaved}
             onOpen={onOpen}
-            inParty={inParty}
-            onExitRequest={onExitRequest}
+            detailOrigin={detailOrigin}
           />
         </li>
       ))}

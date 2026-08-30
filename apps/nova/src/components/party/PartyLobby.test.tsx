@@ -6,7 +6,7 @@ import {
   createRootRoute,
   createRoute,
 } from "@tanstack/react-router";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
@@ -133,12 +133,17 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
     path: "/join",
     component: () => null,
   });
+  const gameDetailsRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/game/$gameId",
+    component: () => <p>Game details</p>,
+  });
   const lobbyRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: "/",
     component: () => lobby({ state, ...handlers } as PartyLobbyProps),
   });
-  const routeTree = rootRoute.addChildren([libraryRoute, joinRoute, lobbyRoute]);
+  const routeTree = rootRoute.addChildren([libraryRoute, joinRoute, gameDetailsRoute, lobbyRoute]);
   const router = createRouter({
     routeTree,
     history: createMemoryHistory({ initialEntries: ["/"] }),
@@ -150,7 +155,7 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
   // The invite card is always present in the lobby (even for joiners, and
   // even when the host-only start controls are hidden — b73).
   await result.findByRole("button", { name: /copy url/i });
-  return result;
+  return { ...result, router };
 }
 
 describe("PartyLobby", () => {
@@ -592,7 +597,7 @@ describe("PartyLobby", () => {
     // "My games" is a category card now; opening it shows the saved list.
     await userEvent.click(screen.getByRole("button", { name: /My games/ }));
     const savedLink = await screen.findByRole("link", { name: /Rocket Rumble/ });
-    expect(savedLink.getAttribute("href")).toBe(`/game/${game.id}`);
+    expect(savedLink.getAttribute("href")).toBe(`/game/${game.id}?from=party-browse`);
     // Selecting never sets the lobby's game directly — it's a details link.
     expect(savedLink.tagName.toLowerCase()).toBe("a");
   });
@@ -607,7 +612,7 @@ describe("PartyLobby", () => {
     // No "All games" box (2t1.1): Protobowl lives in the Trivia box.
     await userEvent.click(screen.getByRole("button", { name: /Trivia/ }));
     const protobowl = await screen.findByRole("link", { name: /Protobowl/ });
-    expect(protobowl.getAttribute("href")).toBe("/game/protobowl");
+    expect(protobowl.getAttribute("href")).toBe("/game/protobowl?from=party-browse");
   });
 
   it("tells joiners the party is waiting when it has no game — naming the host (2t1.9/5cl.9)", async () => {
@@ -856,7 +861,7 @@ describe("PartyLobby", () => {
       within(welcome).getByText("As the host, you have to start the game!"),
     ).toBeInTheDocument();
     expect(
-      within(welcome).getByRole("button", { name: /what is rocket rumble\?/i }),
+      within(welcome).getByRole("link", { name: /what is rocket rumble\?/i }),
     ).toBeInTheDocument();
   });
 
@@ -902,7 +907,7 @@ describe("PartyLobby", () => {
     expect(within(welcome).queryByText("You've selected")).not.toBeInTheDocument();
   });
 
-  it("opens the game details overlay from What is GameName? (10.6)", async () => {
+  it("navigates to the shared saved-game details page from What is GameName?", async () => {
     const game = await gameRepository.create({
       title: "Rocket Rumble",
       description: "Blast off with friends.",
@@ -910,25 +915,25 @@ describe("PartyLobby", () => {
       mode: "state",
     });
     const state = makeState({ game: { gameId: game.id, title: game.title, mode: "state" } });
-    await renderLobby(state);
-    await userEvent.click(screen.getByRole("button", { name: /what is rocket rumble\?/i }));
-    const dialog = screen.getByRole("dialog", { name: "About Rocket Rumble" });
-    expect(within(dialog).getByText("Blast off with friends.")).toBeInTheDocument();
-    // Closing the overlay returns to the untouched lobby underneath.
-    await userEvent.click(within(dialog).getByRole("button", { name: /close game details/i }));
-    expect(screen.queryByRole("dialog", { name: "About Rocket Rumble" })).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /start game/i })).toBeInTheDocument();
+    const onLeave = vi.fn();
+    const { router } = await renderLobby(state, { onLeave });
+    const detailsLink = screen.getByRole("link", { name: /what is rocket rumble\?/i });
+    expect(detailsLink.getAttribute("href")).toBe(`/game/${game.id}?from=party`);
+    await userEvent.click(detailsLink);
+    await waitFor(() => expect(router.state.location.pathname).toBe(`/game/${game.id}`));
+    expect(screen.getByText("Game details")).toBeInTheDocument();
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(onLeave).not.toHaveBeenCalled();
   });
 
-  it("shows prebuilt game info in the details overlay (10.6)", async () => {
-    // Drawphone is a prebuilt classic game with a guide.
+  it("navigates prebuilt games from What is GameName? to shared details", async () => {
+    // Drawphone is a prebuilt classic game.
     const state = makeState({ game: { gameId: "drawphone", title: "Drawphone", mode: "state" } });
-    await renderLobby(state);
-    await userEvent.click(screen.getByRole("button", { name: /what is drawphone\?/i }));
-    const dialog = screen.getByRole("dialog", { name: "About Drawphone" });
-    expect(within(dialog).getByText(/In Drawphone, there are no winners/)).toBeInTheDocument();
-    expect(
-      within(dialog).getByRole("link", { name: /read the official guide/i }),
-    ).toBeInTheDocument();
+    const { router } = await renderLobby(state);
+    const detailsLink = screen.getByRole("link", { name: /what is drawphone\?/i });
+    expect(detailsLink.getAttribute("href")).toBe("/game/drawphone?from=party");
+    await userEvent.click(detailsLink);
+    await waitFor(() => expect(router.state.location.pathname).toBe("/game/drawphone"));
+    expect(screen.getByText("Game details")).toBeInTheDocument();
   });
 });

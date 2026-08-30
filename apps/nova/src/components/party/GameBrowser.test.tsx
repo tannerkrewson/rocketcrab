@@ -15,12 +15,10 @@ import { gameRepository } from "../../lib/games/instance";
 import { GameBrowser } from "./GameBrowser";
 
 /**
- * GameBrowser party-exit tests (rocketcrab-8z9): the browser's exit links —
- * the empty saved-list "New game" action and the saved-game "Open in
- * editor" row action — leave the party flow entirely. In party mode
- * (`inParty`) they must ask "Leave the party?" first and only navigate
- * after the player confirms (leaving the party first); standalone they
- * keep navigating straight away.
+ * GameBrowser party-exit tests (rocketcrab-8z9): the browser's empty saved
+ * list "New game" action leaves the party flow entirely. In party mode
+ * (`inParty`) it asks "Leave the party?" first and only navigates after the
+ * player confirms (leaving the party first); standalone it stays a plain link.
  */
 
 const { leavePartyMock } = vi.hoisted(() => ({
@@ -107,7 +105,7 @@ describe("GameBrowser exit links (8z9)", () => {
     expect(leavePartyMock).toHaveBeenCalledTimes(1);
   });
 
-  it("asks before Open in editor in party mode too (8z9)", async () => {
+  it("does not render an editor action in saved-game rows", async () => {
     const game = await gameRepository.create({
       title: "Rocket Rumble",
       html: "<!doctype html><html><body><p>rockets</p></body></html>",
@@ -116,19 +114,13 @@ describe("GameBrowser exit links (8z9)", () => {
     const router = await renderBrowser({ inParty: true });
 
     await userEvent.click(screen.getByRole("button", { name: /My games/ }));
-    const editorButton = await screen.findByRole("button", { name: /open in editor/i });
-    await userEvent.click(editorButton);
+    const detailsLink = await screen.findByRole("link", { name: /Rocket Rumble/ });
+    expect(detailsLink.getAttribute("href")).toBe(`/game/${game.id}?from=party-browse`);
+    expect(screen.queryByRole("link", { name: /open in editor/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /open in editor/i })).not.toBeInTheDocument();
 
-    const dialog = screen.getByRole("dialog", { name: "Leave the party?" });
-    expect(
-      within(dialog).getByText(/open the editor, you'll leave this party/i),
-    ).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/");
     expect(leavePartyMock).not.toHaveBeenCalled();
-
-    await userEvent.click(within(dialog).getByRole("button", { name: "Leave party" }));
-    await waitFor(() => expect(router.state.location.pathname).toBe(`/games/${game.id}/edit`));
-    expect(leavePartyMock).toHaveBeenCalledTimes(1);
   });
 
   it("does not prompt outside a party — New game stays a plain link (8z9)", async () => {
@@ -138,21 +130,6 @@ describe("GameBrowser exit links (8z9)", () => {
     await userEvent.click(screen.getByRole("button", { name: /My games/ }));
     const newGameLink = await screen.findByRole("link", { name: "New game" });
     expect(newGameLink.getAttribute("href")).toBe("/build");
-    expect(leavePartyMock).not.toHaveBeenCalled();
-    expect(router.state.location.pathname).toBe("/");
-  });
-
-  it("does not prompt outside a party — Open in editor stays a plain link (8z9)", async () => {
-    const game = await gameRepository.create({
-      title: "Rocket Rumble",
-      html: "<!doctype html><html><body><p>rockets</p></body></html>",
-      mode: "state",
-    });
-    const router = await renderBrowser({ inParty: false });
-
-    await userEvent.click(screen.getByRole("button", { name: /My games/ }));
-    const editorLink = await screen.findByRole("link", { name: /open in editor/i });
-    expect(editorLink.getAttribute("href")).toBe(`/games/${game.id}/edit`);
     expect(leavePartyMock).not.toHaveBeenCalled();
     expect(router.state.location.pathname).toBe("/");
   });

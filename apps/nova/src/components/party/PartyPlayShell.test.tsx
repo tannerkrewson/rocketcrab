@@ -308,6 +308,12 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     await userEvent.click(screen.getByRole("menuitem", { name: /browse games/i }));
     const browse = screen.getByRole("dialog", { name: "Pick a game" });
+    expect(browse).toHaveClass("max-h-[calc(100%-1.5rem)]");
+    expect(browse).toHaveClass("w-[min(42rem,calc(100%-1.5rem))]");
+    expect(screen.getByTestId("browse-panel-backdrop")).toBeInTheDocument();
+    // The bounded panel does not unmount the game or hide the emergency menu.
+    expect(screen.getByTestId("game-frame")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /menu/i })).toBeInTheDocument();
     // The SAME shared browse UI as /browse: search + category cards; the
     // list only shows once a category opens (10.9).
     expect(within(browse).getByRole("searchbox", { name: "Search games" })).toBeInTheDocument();
@@ -337,7 +343,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
 
   it("opens About this game from the menu (9fv.11.11)", async () => {
     // Drawphone is a prebuilt classic game with a description + guide; the
-    // overlay is the SAME one the lobby's "What is GameName?" opens.
+    // in-game overlay keeps the running game mounted underneath.
     const state = makeState({ game: { gameId: "drawphone", title: "Drawphone", mode: "state" } });
     await renderShell(state);
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));

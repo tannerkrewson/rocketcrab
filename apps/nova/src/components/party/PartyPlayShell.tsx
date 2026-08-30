@@ -55,8 +55,8 @@ type PlayShellPanel = "menu" | "players" | "browse" | "logs" | null;
  * anchored top-center BELOW the top bar - never a full-page takeover, so
  * the game keeps running underneath) and the shared pick-a-game browser.
  * The menu (9fv.11.11) holds Browse games (host only — picking a game
- * while playing ends it for everyone) and About this game (the same
- * details overlay the lobby's "What is GameName?" opens), and since i47
+ * while playing ends it for everyone) and About this game (the party's
+ * in-game details overlay), and since i47
  * the dark/light/dice theme control lives at the bottom of the same menu
  * (the in-game shell no longer has a floating copy); leaving the
  * party happens back in the lobby. ch6: the in-game mark is the
@@ -85,7 +85,7 @@ export function PartyPlayShell({
   // 2z9: removing a player exits them from the party — a mis-tap boots
   // someone out, so the kick buttons ask first (like Reload all / Exit).
   const [confirmKickMemberId, setConfirmKickMemberId] = useState<string | null>(null);
-  // 9fv.11.11: "About this game" reuses the lobby's details overlay.
+  // 9fv.11.11: "About this game" opens the in-game details overlay.
   const [detailsOpen, setDetailsOpen] = useState(false);
   // 7.38: "Reload all" is red and asks first — players' games will be lost.
   const [confirmReloadAll, setConfirmReloadAll] = useState(false);
@@ -451,42 +451,49 @@ export function PartyPlayShell({
         ) : null}
 
         {/* 7.43: pick a game - the SAME shared browse UI as /browse, in pick
-            mode, so the host can switch the game without leaving the party.
-            7.45: rendered inside the frame area so its back row sits below
-            the fixed top bar too. 9fv.11.11: opened from the menu (the
-            Players popup's browse button moved there); Back returns to the
-            running game. */}
+             mode, so the host can switch the game without leaving the party.
+             7.45 / aqn-ui-party: a bounded overlay keeps the running game
+             mounted underneath and leaves the top bar/emergency controls
+             usable. 9fv.11.11: opened from the menu; Back returns to the game. */}
         {panel === "browse" ? (
-          <div
-            className="absolute inset-0 z-40 flex flex-col bg-base-200"
-            role="dialog"
-            aria-label="Pick a game"
-          >
-            <div className="flex items-center gap-2 border-b-2 border-base-300 bg-base-100 px-3 py-2">
-              <button
-                type="button"
-                className="btn btn-sm"
-                onClick={() => setPanel(null)}
-                aria-label="Back to the game"
-              >
-                <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                Back
-              </button>
-              <p className="font-black">Pick a game</p>
+          <>
+            <div
+              className="absolute inset-0 z-40"
+              onClick={() => setPanel(null)}
+              aria-hidden="true"
+              data-testid="browse-panel-backdrop"
+            />
+            <div
+              className="absolute left-1/2 top-3 z-50 flex max-h-[calc(100%-1.5rem)] w-[min(42rem,calc(100%-1.5rem))] -translate-x-1/2 flex-col overflow-hidden rounded-box border-2 border-base-300 bg-base-100 shadow-xl"
+              role="dialog"
+              aria-label="Pick a game"
+            >
+              <div className="flex items-center gap-2 border-b-2 border-base-300 px-3 py-2">
+                <Button
+                  variant="default"
+                  size="md"
+                  onClick={() => setPanel(null)}
+                  aria-label="Back to the game"
+                >
+                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+                  Back
+                </Button>
+                <p className="font-black">Pick a game</p>
+              </div>
+              <div className="min-h-0 overflow-y-auto p-3 md:p-4">
+                <GameBrowser
+                  compact
+                  onPick={onPickPrebuilt}
+                  onPickSaved={onPickGame}
+                  // 2t1.1 coordination: the unified back button closes the
+                  // in-game browse panel (the fallback navigate would be a
+                  // no-op from the party route).
+                  onBack={() => setPanel(null)}
+                  inParty
+                />
+              </div>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto p-3 md:p-4">
-              <GameBrowser
-                compact
-                onPick={onPickPrebuilt}
-                onPickSaved={onPickGame}
-                // 2t1.1 coordination: the unified back button closes the
-                // in-game browse panel (the fallback navigate would be a
-                // no-op from the party route).
-                onBack={() => setPanel(null)}
-                inParty
-              />
-            </div>
-          </div>
+          </>
         ) : null}
       </div>
 
@@ -510,9 +517,8 @@ export function PartyPlayShell({
         </button>
       ) : null}
 
-      {/* 9fv.11.11: About this game opens the SAME details overlay the
-          lobby's "What is GameName?" does, in-game (title / description /
-          how-to-play); the game keeps running underneath. */}
+      {/* 9fv.11.11: About this game opens the in-game details overlay (title /
+          description / how-to-play); the game keeps running underneath. */}
       {detailsOpen ? (
         <PartyGameDetailsModal game={state.game} onClose={() => setDetailsOpen(false)} />
       ) : null}

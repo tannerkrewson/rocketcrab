@@ -1,11 +1,12 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, BookOpen, ExternalLink, PartyPopper } from "lucide-react";
+import { ArrowLeft, BookOpen, ExternalLink, PartyPopper, Pencil } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
 import { Button, buttonStyles } from "../components/ui/Button";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
 import { LoadingState } from "../components/ui/LoadingState";
+import { Dialog } from "../components/ui/Dialog";
 import { ScreenshotCarousel } from "../components/games/ScreenshotCarousel";
 import { BrandHeader } from "../components/layout/BrandHeader";
 import { PartyShellHeader } from "../components/party/PartyShellHeader";
@@ -17,8 +18,21 @@ import { usePartyEngine } from "../lib/party/use-party";
 import { cn } from "../lib/cn";
 
 export const Route = createFileRoute("/game/$gameId")({
+  validateSearch: (search: Record<string, unknown>): GameDetailSearch => ({
+    from: isGameDetailOrigin(search.from) ? search.from : undefined,
+  }),
   component: BrowseGamePage,
 });
+
+type GameDetailOrigin = "party" | "party-browse";
+
+interface GameDetailSearch {
+  from?: GameDetailOrigin;
+}
+
+function isGameDetailOrigin(value: unknown): value is GameDetailOrigin {
+  return value === "party" || value === "party-browse";
+}
 
 function CategoryBadge({ label }: { label: string }) {
   // l41: badges use daisyUI's soft style (was badge-ghost).
@@ -55,16 +69,21 @@ function errorMessage(error: unknown): string {
  */
 export function BrowseGamePage() {
   const { gameId } = Route.useParams();
+  const { from } = Route.useSearch();
   const navigate = useNavigate();
   const prebuilt = findBrowseGame(gameId);
   const savedQuery = useSavedGame(prebuilt === undefined ? gameId : "");
   const { state, engine } = usePartyEngine();
   const [tab, setTab] = useState<"info" | "guide">("info");
   const [selecting, setSelecting] = useState(false);
+  const [editConfirmationOpen, setEditConfirmationOpen] = useState(false);
 
   const inPartyLobby =
     (state.phase === "lobby" || state.phase === "starting") && state.role === "creator";
   const notInParty = state.phase === "idle";
+  const inParty = engine.isActive();
+  const partyBack = from === "party" || from === "party-browse" || inPartyLobby;
+  const partyBrowseBack = from === "party-browse" || (from === undefined && inPartyLobby);
 
   // 5cl.7: the browser recorded its view + query before navigating here.
   // In a party the back button returns to /party?browse=1 — the lobby
@@ -77,12 +96,21 @@ export function BrowseGamePage() {
     browseBack === null || browseBack.view === null
       ? "/browse"
       : `/browse?view=${encodeURIComponent(browseBack.view)}&q=${encodeURIComponent(browseBack.query)}`;
-  const backLabel = inPartyLobby ? "Back to category" : "Back to games";
+  const backLabel = partyBack
+    ? partyBrowseBack
+      ? "Back to category"
+      : "Back to party"
+    : "Back to games";
 
-  const backLink = inPartyLobby ? (
+  const backLink = partyBack ? (
     <Link
       to="/party"
-      search={{ browse: true, gameId: undefined, mode: undefined, title: undefined }}
+      search={{
+        browse: partyBrowseBack ? true : undefined,
+        gameId: undefined,
+        mode: undefined,
+        title: undefined,
+      }}
       className={buttonStyles("default", "md", "self-start", true)}
       title={backLabel}
     >
@@ -100,13 +128,37 @@ export function BrowseGamePage() {
     </Link>
   );
 
-  /** 5cl.8: the party shell header (logo + code + invite copy) replaces the
-   * brand row when this page was reached from a party lobby. */
-  const header = inPartyLobby ? (
-    <PartyShellHeader code={state.code} inviteUrl={state.inviteUrl} />
-  ) : (
-    <BrandHeader />
-  );
+  /** 5cl.8: the party shell header replaces the brand row when this page was
+   * reached from a party context. */
+  const header =
+    partyBack && inParty ? (
+      <PartyShellHeader code={state.code} inviteUrl={state.inviteUrl} />
+    ) : (
+      <BrandHeader />
+    );
+
+  const navigateToEditor = () => {
+    void navigate({ to: "/games/$gameId/edit", params: { gameId } });
+  };
+
+  /** Editing is outside the party flow, so active parties must be left first. */
+  const requestEdit = () => {
+    if (!inParty) {
+      navigateToEditor();
+      return;
+    }
+    setEditConfirmationOpen(true);
+  };
+
+  const confirmEdit = async () => {
+    try {
+      await engine.leaveParty();
+      setEditConfirmationOpen(false);
+      navigateToEditor();
+    } catch (error) {
+      toast.error(`Couldn't leave the party: ${errorMessage(error)}`);
+    }
+  };
 
   /** Select the game for the active party, then return to the lobby. */
   const pickForParty = async (pick: () => Promise<void>) => {
@@ -169,6 +221,23 @@ export function BrowseGamePage() {
               {NOVA_MODE_LABELS[saved.mode ?? "state"]} · saved
             </span>
           </div>
+          <div className="flex flex-wrap gap-2">
+            {inParty ? (
+              <Button variant="default" soft size="md" onClick={requestEdit}>
+                <Pencil className="h-4 w-4" aria-hidden="true" />
+                Edit game
+              </Button>
+            ) : (
+              <Link
+                to="/games/$gameId/edit"
+                params={{ gameId: saved.id }}
+                className={buttonStyles("default", "md", undefined, true)}
+              >
+                <Pencil className="h-4 w-4" aria-hidden="true" />
+                Edit game
+              </Link>
+            )}
+          </div>
         </header>
         <p className="whitespace-pre-line text-base-content/80">
           {saved.description ?? "No description yet — open it in the editor to learn more."}
@@ -195,6 +264,26 @@ export function BrowseGamePage() {
             });
           })}
         </div>
+        <Dialog
+          open={editConfirmationOpen}
+          onClose={() => setEditConfirmationOpen(false)}
+          title="Leave the party?"
+        >
+          <div className="flex flex-col gap-4">
+            <p>
+              To open the editor, you&apos;ll leave this party first. You can always start or join
+              another one later.
+            </p>
+            <div className="flex justify-end gap-2">
+              <Button variant="default" soft onClick={() => setEditConfirmationOpen(false)}>
+                Stay in party
+              </Button>
+              <Button variant="danger" onClick={() => void confirmEdit()}>
+                Leave party
+              </Button>
+            </div>
+          </div>
+        </Dialog>
       </div>
     );
   }
