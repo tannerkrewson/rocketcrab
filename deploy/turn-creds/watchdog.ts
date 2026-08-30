@@ -60,7 +60,7 @@ export interface WatchdogEnv {
   CLOUDFLARE_API_TOKEN?: string;
   /** Monthly egress budget in GiB. Unset -> DEFAULT_GB_BUDGET (200). */
   WATCHDOG_GB_BUDGET?: string;
-  /** Alert webhook URL. Unset -> alerts go to console.log only. */
+  /** Optional Worker secret webhook URL. Unset -> alerts go to console.log only. */
   ALERT_WEBHOOK_URL?: string;
   /** KV namespace binding (TURN_BUDGET) holding the alert watermarks. */
   TURN_BUDGET?: KvStore;

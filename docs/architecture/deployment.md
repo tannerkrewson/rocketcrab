@@ -150,6 +150,18 @@ Build-time pins (also documented in `apps/nova/.env.example` and
 `apps/runtime/.env.example`): `VITE_RUNTIME_ORIGIN`, `VITE_RUNTIME_BASE`
 (nova); `VITE_MAIN_ORIGIN` (runtime).
 
+### Cloudflare runtime boundary
+
+GitHub Actions Pages deployment remains the only publisher for the static Nova
+and runtime origins. Cloudflare Workers and KV are separate infrastructure:
+their supported resources are modeled in [`deploy/opentofu/`](../../deploy/opentofu/),
+while [`deploy/cloudflare.md`](../../deploy/cloudflare.md) records live state
+and the human-only account, state, and secret decisions. The infrastructure
+workflow is validation-only and never applies OpenTofu or deploys with
+Wrangler. The relay Worker is already live; the TURN credential Worker and its
+`TURN_BUDGET` namespace remain planned until the migration decisions are
+approved.
+
 ## 7. Local HTTPS development (both origins)
 
 Production is HTTPS-only, and the runtime iframe requires a distinct origin,

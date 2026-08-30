@@ -27,6 +27,15 @@ jobs:
         with:
           tofu_version: 1.12.0
 
+      - name: Build Worker bundles without upload
+        run: |
+          npx --yes wrangler@4.127.1 deploy deploy/relay/worker.ts \
+            --config deploy/relay/wrangler.toml \
+            --dry-run --outdir deploy/opentofu/.build/relay
+          npx --yes wrangler@4.127.1 deploy deploy/turn-creds/worker.ts \
+            --config deploy/turn-creds/wrangler.toml \
+            --dry-run --outdir deploy/opentofu/.build/turn-creds
+
       - name: Check OpenTofu formatting
         run: tofu -chdir=deploy/opentofu fmt -check -diff
 
@@ -35,3 +44,8 @@ jobs:
 
       - name: Validate configuration
         run: tofu -chdir=deploy/opentofu validate
+
+      - name: Generate static no-refresh plan
+        run: >-
+          tofu -chdir=deploy/opentofu plan -refresh=false -input=false
+          -var=cloudflare_account_id=00000000000000000000000000000000

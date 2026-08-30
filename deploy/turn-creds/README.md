@@ -51,7 +51,6 @@ headers so the browser can read it.
 | `MINT_DAILY_CAP`     | `5000`                                                                                                             | Maximum successful mints per UTC calendar day (kill-switch; see below). A new day starts a fresh counter automatically.                                                                             |
 | `MINT_TOTAL_CAP`     | `50000`                                                                                                            | Maximum successful mints since the counters were last re-armed (kill-switch; see below). Re-arm by deleting the counters (see "Re-arming the counters").                                            |
 | `WATCHDOG_GB_BUDGET` | `200`                                                                                                              | Monthly TURN egress budget in GiB (1024^3 bytes) that the watchdog alerts against (see "Watchdog").                                                                                                 |
-| `ALERT_WEBHOOK_URL`  | _(unset → console.log only)_                                                                                       | Webhook that receives watchdog alert JSON. Unset, alerts are written to the Worker logs only.                                                                                                       |
 
 A single-variable env override (unset = the default above). The OpenTofu root
 represents these values as `plain_text` bindings; do not use a separate
@@ -59,7 +58,6 @@ Wrangler variable deployment path. For example:
 
 ```hcl
 turn_worker_variables = {
-  ALERT_WEBHOOK_URL  = ""
   MINT_DAILY_CAP     = "5000"
   MINT_TOTAL_CAP     = "50000"
   ORIGIN_ALLOWLIST   = "https://rocketcrab.com,https://staging.rocketcrab.com"
@@ -68,9 +66,9 @@ turn_worker_variables = {
 }
 ```
 
-(`ORIGIN_ALLOWLIST`, `MINT_DAILY_CAP`, `MINT_TOTAL_CAP`, `WATCHDOG_GB_BUDGET`,
-`ALERT_WEBHOOK_URL` are not sensitive; the secrets below are the sensitive
-ones.)
+(`ORIGIN_ALLOWLIST`, `MINT_DAILY_CAP`, `MINT_TOTAL_CAP`, and
+`WATCHDOG_GB_BUDGET` are not sensitive. `ALERT_WEBHOOK_URL` is a Worker
+secret because webhook URLs commonly contain bearer tokens.)
 
 ## Worker secrets
 
@@ -82,6 +80,7 @@ wrangler secret put TURN_KEY_ID          # e.g. the Cloudflare Realtime key toke
 wrangler secret put TURN_KEY_API_TOKEN   # the matching API token
 wrangler secret put CLOUDFLARE_ACCOUNT_ID    # watchdog: Cloudflare account id (GraphQL accountTag)
 wrangler secret put CLOUDFLARE_API_TOKEN     # watchdog: API token with the "Account Analytics" permission
+wrangler secret put ALERT_WEBHOOK_URL       # optional watchdog alert webhook
 ```
 
 Local dev: create a gitignored `deploy/turn-creds/.dev.vars` with the same
@@ -111,9 +110,11 @@ once per month).
 ## Infrastructure management
 
 The planned Worker is modeled by `cloudflare_workers_script.turn` in
-`deploy/opentofu/`, with its cron trigger and `TURN_BUDGET` binding. Wrangler
-is used only for local development and the dry-run JavaScript bundle consumed
-by OpenTofu. No deploy workflow remains in this repository.
+`deploy/opentofu/`, with its cron trigger, workers.dev subdomain, and
+`TURN_BUDGET` binding. Its optional custom domain/route and zone rate rule are
+also modeled there. Wrangler is used only for local development and the
+dry-run JavaScript bundle consumed by OpenTofu. No deploy workflow remains in
+this repository.
 
 After a coordinator-approved OpenTofu apply, set the Worker secrets through
 the approved Workers Secrets API or the following human-managed Wrangler
@@ -126,6 +127,7 @@ wrangler secret put TURN_KEY_ID
 wrangler secret put TURN_KEY_API_TOKEN
 wrangler secret put CLOUDFLARE_ACCOUNT_ID
 wrangler secret put CLOUDFLARE_API_TOKEN
+wrangler secret put ALERT_WEBHOOK_URL
 ```
 
 The worker appears at
@@ -230,12 +232,12 @@ aggressively, never less).
 ### 2. Cloudflare route-level rate rule (durable backstop)
 
 The worker's own counter resets when an isolate restarts; the durable
-backstop is a **Cloudflare rate-limiting rule** on the mint route (zone
-level, per IP) via the Rulesets API — wrangler cannot manage rate rules, so
-this curl is the reproducibility path. It needs a proxied zone hostname
-(custom domain) for the mint route; the workers.dev host has no zone to hang
-a rule on. Put the mint on a custom route (e.g. `turn-creds.rocketcrab.com/*`
-or `rocketcrab.com/turn-creds/*`), then:
+backstop is a **Cloudflare rate-limiting rule** on the mint route (zone level,
+per IP) via the provider-supported Rulesets resource. It needs a proxied zone
+hostname (a custom domain or custom route); the workers.dev host has no zone to
+hang a rule on. Choose one endpoint form in the OpenTofu variables, supply the
+exact POST expression, and review the plan. The following API call is only a
+future manual recovery path if OpenTofu is not used; it was not run:
 
 ```sh
 # 10 requests/min per IP on the mint route (action: block, 60s window)

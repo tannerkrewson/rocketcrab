@@ -117,10 +117,13 @@ current backstop.
 ## Infrastructure management
 
 The former Wrangler deployment workflow was removed. OpenTofu in
-`deploy/opentofu/` is the intended source of truth for this Worker and must
-import the live script before any write. Wrangler is used only for the local
-TypeScript `deploy --dry-run` bundle consumed by OpenTofu; see
-`deploy/opentofu/README.md` for the non-mutating commands and state strategy.
+`deploy/opentofu/` is the intended source of truth for this Worker and its
+workers.dev subdomain. Before any write, import both
+`cloudflare_workers_script.relay` and
+`cloudflare_workers_script_subdomain.relay`, then review the refresh-enabled
+plan. Wrangler is used only for the local TypeScript `deploy --dry-run` bundle
+consumed by OpenTofu; see `deploy/opentofu/README.md` for the non-mutating
+commands and state strategy.
 
 After a coordinator-approved OpenTofu migration, **enable in the app** by
 re-running the `Deploy to GitHub Pages` workflow for `origin: nova` with

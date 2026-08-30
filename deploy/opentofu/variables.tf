@@ -9,7 +9,7 @@ variable "cloudflare_account_id" {
 }
 
 variable "cloudflare_zone_id" {
-  description = "Cloudflare zone ID used only when enabling the optional custom route and rate rule."
+  description = "Cloudflare zone ID used when enabling an optional custom route, custom domain, or rate rule."
   type        = string
   default     = null
   nullable    = true
@@ -57,16 +57,39 @@ variable "relay_worker_variables" {
 variable "turn_worker_variables" {
   description = <<-EOT
     Non-secret plain-text bindings for rocketcrab-turn-creds. Secret names
-    used by the Worker are deliberately not part of this map.
+    used by the Worker are deliberately not part of this map. In particular,
+    ALERT_WEBHOOK_URL is a secret because webhook URLs commonly contain a
+    bearer token.
   EOT
   type        = map(string)
   default = {
-    ALERT_WEBHOOK_URL  = ""
     MINT_DAILY_CAP     = "5000"
     MINT_TOTAL_CAP     = "50000"
     ORIGIN_ALLOWLIST   = "https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173"
     RATE_LIMIT_PER_MIN = "10"
     WATCHDOG_GB_BUDGET = "200"
+  }
+
+  validation {
+    condition = alltrue([
+      for name in [
+        "ALERT_WEBHOOK_URL",
+        "TURN_KEY_ID",
+        "TURN_KEY_API_TOKEN",
+        "CLOUDFLARE_ACCOUNT_ID",
+        "CLOUDFLARE_API_TOKEN",
+      ] : !contains(keys(var.turn_worker_variables), name)
+    ])
+    error_message = "Secret Worker bindings must not be included in turn_worker_variables; set them through the Workers Secrets API or dashboard."
+  }
+
+  validation {
+    condition = (
+      can(tonumber(lookup(var.turn_worker_variables, "RATE_LIMIT_PER_MIN", "10"))) &&
+      tonumber(lookup(var.turn_worker_variables, "RATE_LIMIT_PER_MIN", "10")) >= 1 &&
+      tonumber(lookup(var.turn_worker_variables, "RATE_LIMIT_PER_MIN", "10")) == floor(tonumber(lookup(var.turn_worker_variables, "RATE_LIMIT_PER_MIN", "10")))
+    )
+    error_message = "turn_worker_variables.RATE_LIMIT_PER_MIN must be a positive whole number when supplied."
   }
 }
 
@@ -78,23 +101,12 @@ variable "turn_budget_title" {
 
 variable "turn_zone_rate_limit_enabled" {
   description = <<-EOT
-    Enable the supported zone-level rate-limit ruleset when a custom route
-    object is supplied. Keep this true unless the coordinator explicitly
-    chooses to rely only on the Worker's in-memory backstop.
+    Enable the supported zone-level rate-limit ruleset when a custom route or
+    custom domain is supplied. Keep this true unless the coordinator
+    explicitly chooses to rely only on the Worker's in-memory backstop.
   EOT
   type        = bool
   default     = true
-}
-
-variable "turn_rate_limit_per_min" {
-  description = "Requests per minute for the zone-level TURN mint rule. Keep in sync with the Worker binding."
-  type        = number
-  default     = 10
-
-  validation {
-    condition     = var.turn_rate_limit_per_min >= 1 && var.turn_rate_limit_per_min == floor(var.turn_rate_limit_per_min)
-    error_message = "turn_rate_limit_per_min must be a positive whole number."
-  }
 }
 
 variable "turn_custom_route" {
@@ -116,5 +128,40 @@ variable "turn_custom_route" {
       trimspace(var.turn_custom_route.rate_limit_expression) != ""
     )
     error_message = "turn_custom_route.pattern and rate_limit_expression must both be non-empty when a route is configured."
+  }
+}
+
+variable "turn_custom_domain" {
+  description = <<-EOT
+    Optional Cloudflare Workers Custom Domain for the TURN Worker. Set
+    cloudflare_zone_id as well. A custom domain and a route are alternatives;
+    do not configure both.
+  EOT
+  type = object({
+    hostname = string
+  })
+  default  = null
+  nullable = true
+
+  validation {
+    condition     = var.turn_custom_domain == null || trimspace(var.turn_custom_domain.hostname) != ""
+    error_message = "turn_custom_domain.hostname must be non-empty when a custom domain is configured."
+  }
+}
+
+variable "turn_rate_limit_expression" {
+  description = <<-EOT
+    Exact Rules language expression for a zone rate-limit rule on
+    turn_custom_domain. A route configuration carries its expression in
+    turn_custom_route instead. Required for a custom-domain rule unless the
+    zone rule is explicitly disabled.
+  EOT
+  type        = string
+  default     = null
+  nullable    = true
+
+  validation {
+    condition     = var.turn_rate_limit_expression == null || trimspace(var.turn_rate_limit_expression) != ""
+    error_message = "turn_rate_limit_expression must be non-empty when supplied."
   }
 }

@@ -33,6 +33,11 @@ output "turn_custom_route_id" {
   value       = try(cloudflare_workers_route.turn[0].id, null)
 }
 
+output "turn_custom_domain_id" {
+  description = "Optional custom domain ID, or null until a custom domain is configured."
+  value       = try(cloudflare_workers_custom_domain.turn[0].id, null)
+}
+
 output "turn_rate_limit_ruleset_id" {
   description = "Optional zone-level rate-limit ruleset ID, or null until enabled."
   value       = try(cloudflare_ruleset.turn_rate_limit[0].id, null)
@@ -45,5 +50,6 @@ output "turn_worker_secret_names" {
     "TURN_KEY_API_TOKEN",
     "CLOUDFLARE_ACCOUNT_ID",
     "CLOUDFLARE_API_TOKEN",
+    "ALERT_WEBHOOK_URL",
   ]
 }

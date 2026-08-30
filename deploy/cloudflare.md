@@ -58,8 +58,9 @@ designed but not yet deployed** (verified live 2026-08-14).
   No Worker secrets. The only credentials involved are the repo CI secrets
   (§4). `VITE_CLASSIC_RELAY_ORIGIN` is a _client_ build-time var baked into
   the Nova app's CSP `connect-src` — it is not a Worker setting.
-- **How to manage:** `cloudflare_workers_script.relay` in
-  `deploy/opentofu/` models the live Worker. Import it before any write.
+- **How to manage:** `cloudflare_workers_script.relay` and
+  `cloudflare_workers_script_subdomain.relay` in `deploy/opentofu/` model the
+  live Worker and its workers.dev hostname. Import both before any write.
   OpenTofu consumes a local Wrangler `--dry-run` bundle of this TypeScript
   source; Wrangler is not the deployment source of truth.
 - **Client wiring:** `apps/nova/src/lib/classic/relay.ts` +
@@ -105,12 +106,14 @@ designed but not yet deployed** (verified live 2026-08-14).
   | `MINT_DAILY_CAP`     | `5000`                                                                                                             | Daily mint kill-switch cap                                      |
   | `MINT_TOTAL_CAP`     | `50000`                                                                                                            | Cumulative mint kill-switch cap (re-armed by deleting counters) |
   | `WATCHDOG_GB_BUDGET` | `200`                                                                                                              | Monthly TURN egress budget (GiB) the watchdog alerts against    |
-  | `ALERT_WEBHOOK_URL`  | _(unset → console.log only)_                                                                                       | Webhook for watchdog alerts                                     |
 
 - **Worker secrets** (`wrangler secret put`, never committed — the TURN key
   is a long-term secret): `TURN_KEY_ID` + `TURN_KEY_API_TOKEN` (the Realtime
-  TURN key), plus `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` (Account
-  Analytics permission — the watchdog queries the GraphQL analytics API).
+  TURN key), `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` (Account
+  Analytics permission — the watchdog queries the GraphQL analytics API), and
+  the optional `ALERT_WEBHOOK_URL` (webhook URLs commonly contain bearer
+  tokens). The OpenTofu root preserves existing secret bindings but does not
+  create or rotate their values.
   Local dev uses a gitignored `deploy/turn-creds/.dev.vars`.
 - **KV namespace:** `TURN_BUDGET` — mint counters (`mints:YYYY-MM-DD`,
   `mints:total`) for the kill-switch plus the watchdog's alert watermarks
@@ -121,20 +124,23 @@ designed but not yet deployed** (verified live 2026-08-14).
   (watchdog). Manual trigger for dev/smoke: `GET /__watchdog`.
 - **Rate limiting:** two layers — the in-worker fast-fail counter
   (`RATE_LIMIT_PER_MIN`) and the optional provider-managed **zone-level
-  Rulesets rate rule** (per-IP, block 10/min on the mint route). It needs a
-  proxied zone hostname and an exact route/expression choice; the workers.dev
-  host has no zone to hang the rule on. The OpenTofu resource keeps
-  `requests_per_period` in sync with `turn_rate_limit_per_min`.
+  Rulesets rate rule** (per-IP, block at the same configured limit on the mint
+  route). Choose either a proxied custom route or a Workers Custom Domain and
+  provide the exact route/expression choice; the workers.dev host has no zone
+  to hang the rule on. The OpenTofu resource keeps `requests_per_period` in
+  sync with the Worker binding.
 - **Recreate:** use `deploy/opentofu/` after the state, route, TURN key, and
   secret decisions below are approved. This task does not apply or import.
 
 ## 3. One-time account steps (recreate-on-fresh-account checklist)
 
-1. **Enable the workers.dev subdomain.** Either the dashboard (Workers &
+1. **Enable the account workers.dev subdomain.** Either the dashboard (Workers &
    Pages → Workers → enable Workers.dev, subdomain `tannerkrewson`) or:
    `POST https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/workers/subdomain`
    with body `{"subdomain":"tannerkrewson"}`. The subdomain is the root of
-   every `<name>.tannerkrewson.workers.dev` URL.
+   every `<name>.tannerkrewson.workers.dev` URL. OpenTofu separately enables
+   each managed script's workers.dev hostname through
+   `cloudflare_workers_script_subdomain`.
 2. **Create the KV namespace:** the OpenTofu resource
    `cloudflare_workers_kv_namespace.turn_budget` owns `TURN_BUDGET`; do not
    paste an ID into the legacy Wrangler config. No namespace exists in the
@@ -148,10 +154,14 @@ designed but not yet deployed** (verified live 2026-08-14).
    Workers Scripts edit + KV + Zone Rulesets + Account Analytics) and
    `CLOUDFLARE_ACCOUNT_ID`, under GitHub repo Settings → Secrets and
    variables → Actions.
-5. **Choose the rate-limit route:** the zone-level rule needs a proxied
-   custom route and a precise expression. Supply both, plus the real zone ID,
-   as `turn_custom_route` in the OpenTofu root. A workers.dev host cannot
-   carry this zone rule.
+5. **Choose the TURN endpoint and rate-limit policy:** select either a proxied
+   `turn_custom_route` or `turn_custom_domain`, plus the real zone ID. A
+   custom domain provisions its DNS record and certificate through Cloudflare;
+   a route requires the chosen hostname to be proxied. If the
+   zone-level rule stays enabled, supply its exact POST expression through the
+   selected OpenTofu input (`rate_limit_expression` on a route or
+   `turn_rate_limit_expression` for a custom domain). A workers.dev host
+   cannot carry this zone rule.
 6. **Apply only after review:** import the live relay into OpenTofu first,
    then review a refresh-enabled plan. Create the planned TURN Worker only
    after the KV/key/secrets, route, and state-backend decisions are approved.
@@ -167,6 +177,7 @@ designed but not yet deployed** (verified live 2026-08-14).
 | `TURN_KEY_API_TOKEN`    | Worker    | `wrangler secret put TURN_KEY_API_TOKEN` (turn-creds)    | turn-creds mint: `Authorization: Bearer` header                    |
 | `CLOUDFLARE_ACCOUNT_ID` | Worker    | `wrangler secret put CLOUDFLARE_ACCOUNT_ID` (turn-creds) | turn-creds watchdog: GraphQL `accountTag`                          |
 | `CLOUDFLARE_API_TOKEN`  | Worker    | `wrangler secret put CLOUDFLARE_API_TOKEN` (turn-creds)  | turn-creds watchdog: GraphQL auth ("Account Analytics" permission) |
+| `ALERT_WEBHOOK_URL`     | Worker    | `wrangler secret put ALERT_WEBHOOK_URL` (turn-creds)     | turn-creds watchdog: optional alert delivery                       |
 
 Recommended repo-token scope for the CI token: **Workers Scripts → Edit**
 (plan/import/apply), **Workers KV Storage → Edit** (KV namespace create/verify),
@@ -184,8 +195,8 @@ Queried the Cloudflare API directly (not just this repo's files):
 - KV namespaces on the account: **none** (no `TURN_BUDGET` — confirms
   turn-creds is undeployed).
 - Custom domains bound to Workers: **none** (both workers are
-  workers.dev-only; the rate rule needs a custom route before it can be
-  applied).
+  workers.dev-only; the rate rule needs a custom domain or a proxied custom
+  route before it can be applied).
 - Relay reachable at
   `https://rocketcrab-cors-relay.tannerkrewson.workers.dev`
   (405 `method not allowed` on `/` and structured `missing endpoint` errors
@@ -204,10 +215,12 @@ curl -s https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/storage/kv/na
 
 - **OpenTofu is the intended source of truth for supported Cloudflare
   resources.** `deploy/opentofu/` models both Workers, the TURN_BUDGET KV
-  namespace, the watchdog cron, and optional zone route/rate-limit resources.
-  `.github/workflows/infrastructure-plan.yml` runs only formatting,
-  initialization without a backend, and validation. It never runs `tofu apply`
-  or a Wrangler deployment.
+  namespace, the watchdog cron, per-script workers.dev subdomains, and
+  optional custom domain/zone route/rate-limit resources.
+  `.github/workflows/infrastructure-plan.yml` builds bundles with Wrangler
+  `--dry-run`, then runs formatting, initialization without a backend,
+  validation, and a static `-refresh=false` plan. It never runs `tofu apply` or
+  a Wrangler deployment.
 - **Wrangler is a build input only.** Its committed Worker configs and source
   files are used for a local `deploy --dry-run` bundle before an OpenTofu plan.
   The old relay deployment workflow was removed rather than left as a second
