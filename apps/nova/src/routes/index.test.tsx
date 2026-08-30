@@ -1,9 +1,33 @@
 import { RouterProvider, createMemoryHistory, createRouter } from "@tanstack/react-router";
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { routeTree } from "../routeTree.gen";
+
+// jsdom does not provide AnimationEvent, so React otherwise skips registering
+// its animation event plugin. Install the smallest test-only implementation
+// before React DOM is loaded so lifecycle events can be exercised here.
+vi.hoisted(() => {
+  const testWindow = window as unknown as { AnimationEvent?: unknown; Event: typeof Event };
+  if (testWindow.AnimationEvent === undefined) {
+    const WindowEvent = testWindow.Event;
+
+    class TestAnimationEvent extends WindowEvent {
+      readonly animationName: string;
+
+      constructor(type: string, init?: EventInit & { animationName?: string }) {
+        super(type, init);
+        this.animationName = init?.animationName ?? "";
+      }
+    }
+
+    Object.defineProperty(window, "AnimationEvent", {
+      configurable: true,
+      value: TestAnimationEvent,
+    });
+  }
+});
 
 /**
  * Home route tests (7.20/7.35/7.47): the brand header — crab logo, the
@@ -75,7 +99,7 @@ describe("/", () => {
     expect(screen.queryByText("🦀")).not.toBeInTheDocument();
     expect(screen.queryByText("🚀")).not.toBeInTheDocument();
     expect(screen.getByText("party games for phones")).toBeInTheDocument();
-    const alert = screen.getByRole("status");
+    const alert = screen.getByRole("link", { name: /Introducing Nova/ });
     // rocketcrab-5cl.6: the daisyUI aura wrapper, glowing orb, and twinkling
     // stars are gone — the alert keeps just its dotted outline and text.
     expect(alert.parentElement).not.toHaveClass("aura");
@@ -86,6 +110,17 @@ describe("/", () => {
     expect(
       within(alert).getByText("Build your own games and play them with friends, instantly."),
     ).toBeInTheDocument();
+    expect(alert).toHaveAttribute("href", "/build");
+  });
+
+  it("navigates to Build when the entire Introducing Nova alert is activated", async () => {
+    const user = userEvent.setup();
+    renderHome();
+
+    const alert = await screen.findByRole("link", { name: /Introducing Nova/ });
+    await user.click(alert);
+
+    expect(await screen.findByRole("heading", { name: /Introducing Nova/ })).toBeInTheDocument();
   });
 
   it("shows Join party before Start party in the primary row", async () => {
@@ -136,6 +171,63 @@ describe("/", () => {
     renderHome();
     const title = await screen.findByRole("heading", { name: "rocketcrab.com" });
     expect(title).toHaveClass("active:scale-95", "transition-transform", "cursor-pointer");
+  });
+
+  it("runs the logo through shake, launch, and return phases without duplicating repeats", async () => {
+    const user = userEvent.setup();
+    renderHome();
+
+    const launchButton = await screen.findByRole("button", { name: "Launch Rocketcrab" });
+    const logoAnimation = screen.getByTestId("logo-animation");
+    expect(logoAnimation).not.toHaveClass("rc-logo-shake", "rc-logo-launch", "rc-logo-return");
+
+    await user.click(launchButton);
+    await user.click(launchButton);
+    expect(logoAnimation).toHaveClass("rc-logo-shake");
+
+    const finishAnimation = (animationName: string) =>
+      fireEvent.animationEnd(logoAnimation, { animationName });
+
+    finishAnimation("rc-logo-shake");
+    expect(logoAnimation).toHaveClass("rc-logo-launch");
+    finishAnimation("rc-logo-launch");
+    expect(logoAnimation).toHaveClass("rc-logo-return");
+    finishAnimation("rc-logo-return");
+    expect(logoAnimation).not.toHaveClass("rc-logo-shake", "rc-logo-launch", "rc-logo-return");
+  });
+
+  it("activates the logo launch control from the keyboard", async () => {
+    const user = userEvent.setup();
+    renderHome();
+
+    const launchButton = await screen.findByRole("button", { name: "Launch Rocketcrab" });
+    launchButton.focus();
+    await user.keyboard("{Enter}");
+
+    expect(screen.getByTestId("logo-animation")).toHaveClass("rc-logo-shake");
+  });
+
+  it("keeps the logo still when reduced motion is requested", async () => {
+    const originalMatchMedia = window.matchMedia;
+    Object.defineProperty(window, "matchMedia", {
+      configurable: true,
+      value: vi.fn(() => ({ matches: true }) as MediaQueryList),
+    });
+
+    try {
+      renderHome();
+      const launchButton = await screen.findByRole("button", { name: "Launch Rocketcrab" });
+      const logoAnimation = screen.getByTestId("logo-animation");
+
+      await userEvent.click(launchButton);
+
+      expect(logoAnimation).not.toHaveClass("rc-logo-shake", "rc-logo-launch", "rc-logo-return");
+    } finally {
+      Object.defineProperty(window, "matchMedia", {
+        configurable: true,
+        value: originalMatchMedia,
+      });
+    }
   });
 
   it("no longer shows the Recent games section (7.35)", async () => {

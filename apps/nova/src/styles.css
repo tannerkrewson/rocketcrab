@@ -143,6 +143,75 @@
   }
 }
 
+/* Homepage logo launch (rocketcrab-aqn.5): the browser owns the motion while
+   React advances only after each animation's lifecycle event. */
+@keyframes rc-logo-shake {
+  0%,
+  100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+  }
+  20% {
+    transform: translate3d(-0.3rem, 0, 0) rotate(-7deg);
+  }
+  40% {
+    transform: translate3d(0.3rem, 0, 0) rotate(7deg);
+  }
+  60% {
+    transform: translate3d(-0.2rem, 0, 0) rotate(-4deg);
+  }
+  80% {
+    transform: translate3d(0.2rem, 0, 0) rotate(4deg);
+  }
+}
+
+@keyframes rc-logo-launch {
+  0% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  15% {
+    transform: translate3d(0, 0.25rem, 0) scale(1.08);
+  }
+  100% {
+    opacity: 0;
+    transform: translate3d(0, calc(-100dvh - 100%), 0) scale(0.72) rotate(18deg);
+  }
+}
+
+@keyframes rc-logo-return {
+  0% {
+    opacity: 0;
+    transform: translate3d(0, calc(-100dvh - 100%), 0) scale(0.72) rotate(18deg);
+  }
+  35% {
+    opacity: 0.25;
+  }
+  100% {
+    opacity: 1;
+    transform: translate3d(0, 0, 0) scale(1) rotate(0deg);
+  }
+}
+
+.rc-logo-shake {
+  animation: rc-logo-shake 420ms ease-in-out both;
+}
+
+.rc-logo-launch {
+  animation: rc-logo-launch 520ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+}
+
+.rc-logo-return {
+  animation: rc-logo-return 620ms ease-out 180ms both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rc-logo-shake,
+  .rc-logo-launch,
+  .rc-logo-return {
+    animation: none !important;
+  }
+}
+
 @utility pb-safe {
   padding-bottom: env(safe-area-inset-bottom);
 }

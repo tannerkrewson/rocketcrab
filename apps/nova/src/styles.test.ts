@@ -68,4 +68,13 @@ describe("styles.css theme setup", () => {
     // component inherit Mukta (weights 400-800 are imported in main.tsx).
     expect(styles).toContain('--font-sans: "Mukta", ui-sans-serif, system-ui, sans-serif;');
   });
+
+  it("defines the homepage logo phases with a delayed return", () => {
+    expect(styles).toContain("@keyframes rc-logo-shake");
+    expect(styles).toContain("animation: rc-logo-shake 420ms ease-in-out both");
+    expect(styles).toContain("animation: rc-logo-launch 520ms");
+    expect(styles).toContain("animation: rc-logo-return 620ms ease-out 180ms both");
+    expect(styles).toContain(".rc-logo-return");
+    expect(styles).toContain("@media (prefers-reduced-motion: reduce)");
+  });
 });
