@@ -13,7 +13,7 @@ import { sessionSecretSchema } from "@rocketcrab/protocol";
  *
  * Fragment format (P2 decision):
  *
- *     https://host/join#code=ABCD&secret=<43-char-base64url>
+ *     https://host/join#code=abcd&secret=<43-char-base64url>
  *
  * Host-side hygiene (import into memory, then minimize history
  * persistence): after parsing, the app should read the fragment, keep it in
@@ -53,8 +53,9 @@ export function buildInviteUrl(options: {
  * Build a SHORT join URL: the site origin + the four-letter code as a path
  * segment (rocketcrab.com/cvvu), with NO secret — codes are public
  * rendezvous namespaces (ADR-0004), so a path segment is safe; the secret
- * must stay fragment-only (ADR-0011). The code is lowercased to match how
- * codes are displayed/typed in the UI; the route normalizes either case.
+ * must stay fragment-only (ADR-0011). The code is canonicalized to lowercase
+ * to match how codes are displayed/typed in the UI; the route accepts either
+ * case.
  * The full secret invite URL ({@link buildInviteUrl}) stays the primary
  * invite for the copy button and QR code; this is the typeable/shareable
  * alternative.
@@ -70,7 +71,7 @@ export function buildShortJoinUrl(options: {
     throw new Error(`buildShortJoinUrl: invalid party code "${options.code}".`);
   }
   const base = options.baseUrl.replace(/#.*$/u, "").replace(/\/+$/u, "");
-  return `${base}/${code.toLowerCase()}`;
+  return `${base}/${code}`;
 }
 
 /**

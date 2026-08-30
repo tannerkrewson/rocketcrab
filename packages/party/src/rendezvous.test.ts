@@ -120,7 +120,7 @@ function mockDerive(secret: string) {
   });
 }
 
-/** Index of a code in the 23^4 code space (for injectable codeRngs). */
+/** Index of a lowercase code in the 23^4 code space (for injectable codeRngs). */
 function codeIndex(code: string): number {
   let value = 0;
   for (let i = 0; i < code.length; i += 1) {
@@ -199,7 +199,7 @@ describe("creation + joining by four letters (ADR-0004)", () => {
     const events: PartyEvent[] = [];
     const creator = await makeCreator(world, { onEvent: (e) => events.push(e) });
 
-    expect(creator.code).toBe("AAAA");
+    expect(creator.code).toBe("aaaa");
     expect(creator.amGreeter).toBe(true);
     expect(creator.greeterMemberId).toBe("creator");
     expect(creator.members).toEqual(["creator"]);
@@ -212,7 +212,7 @@ describe("creation + joining by four letters (ADR-0004)", () => {
 
     const joiner = await makeJoiner(world);
 
-    expect(joiner.code).toBe("AAAA");
+    expect(joiner.code).toBe("aaaa");
     expect(joiner.material).toEqual(creator.material);
     expect(joiner.greeterMemberId).toBe("creator");
     expect(joiner.amGreeter).toBe(false);
@@ -231,7 +231,7 @@ describe("creation + joining by four letters (ADR-0004)", () => {
     const world = makeWorld();
     const creator = await makeCreator(world);
     const joiner = await makeJoiner(world, { code: "  aaaa  " });
-    expect(joiner.code).toBe("AAAA");
+    expect(joiner.code).toBe("aaaa");
     expect(joiner.material).toEqual(creator.material);
   });
 
@@ -271,9 +271,9 @@ describe("creation + joining by four letters (ADR-0004)", () => {
 
   it("does NOT fail fast when a peer (the greeter) is present before the early window (7.10)", async () => {
     const world = makeWorld();
-    await makeCreator(world); // greeter sits in the rendezvous room for AAAA
+    await makeCreator(world); // greeter sits in the rendezvous room for aaaa
     const joiner = await makeJoiner(world);
-    expect(joiner.code).toBe("AAAA");
+    expect(joiner.code).toBe("aaaa");
   });
 });
 
@@ -485,10 +485,10 @@ describe("collisions (T13)", () => {
   it("regenerates the code when the creator detects an existing party", async () => {
     const world = makeWorld();
     const creator = await makeCreator(world);
-    expect(creator.code).toBe("AAAA");
+    expect(creator.code).toBe("aaaa");
 
     const collisions: PartyCode[] = [];
-    const codeSequence = [codeIndex("AAAA"), codeIndex("BBBB")];
+    const codeSequence = [codeIndex("aaaa"), codeIndex("bbbb")];
     let codeStep = 0;
     const secondPromise = createParty({
       memberId: "second-creator",
@@ -516,8 +516,8 @@ describe("collisions (T13)", () => {
     const second = await secondPromise;
     await settle(world);
 
-    expect(collisions).toEqual(["AAAA"]);
-    expect(second.code).toBe("BBBB");
+    expect(collisions).toEqual(["aaaa"]);
+    expect(second.code).toBe("bbbb");
     expect(second.material.secret).not.toBe(creator.material.secret);
     // Each party lives in its own private room and its own rendezvous.
     expect(membersOf(world, rendezvousRoomName("AAAA"))).toEqual(["creator"]);
@@ -568,7 +568,7 @@ describe("collisions (T13)", () => {
     }
     const b = await bPromise;
     await settle(world);
-    expect(b.code).toBe("AAAA");
+    expect(b.code).toBe("aaaa");
 
     let seen: readonly PartyAdvert[] = [];
     const joinerPromise = joinPartyByCode({
@@ -703,7 +703,7 @@ describe("invite links (ADR-0011)", () => {
     if (parsed === null || parsed.secret === undefined) {
       throw new Error("invite did not parse");
     }
-    expect(parsed.code).toBe("AAAA");
+    expect(parsed.code).toBe("aaaa");
 
     const invitee = await joinPartyByInvite({
       secret: parsed.secret,
@@ -717,7 +717,7 @@ describe("invite links (ADR-0011)", () => {
     await settle(world);
 
     expect(invitee.material).toEqual(creator.material);
-    expect(invitee.code).toBe("AAAA");
+    expect(invitee.code).toBe("aaaa");
     expect(sorted(invitee.members)).toEqual(["creator", "invitee"]);
     expect(sorted(creator.members)).toEqual(["creator", "invitee"]);
     // No rendezvous join and no admission exchange happened.

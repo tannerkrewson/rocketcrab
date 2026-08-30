@@ -77,7 +77,7 @@ const LOBBY_STATE: PartyEngineState = {
   greeterMemberId: "member-a",
   amGreeter: true,
   authorityMemberId: "member-a",
-  inviteUrl: "http://localhost:5173/join#code=RCRB&secret=invite-secret",
+  inviteUrl: "http://localhost:5173/join#code=rcrb&secret=invite-secret",
   shortInviteUrl: "http://localhost:5173/rcrb",
   connectionState: "connected",
   canStart: false,
@@ -208,7 +208,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     );
     // Back in the party lobby — the host's address bar now reads the code
     // (rocketcrab-r0f replaces /party with /<code> once a party is active).
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/RCRB"));
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/rcrb"));
     expect(screen.queryByRole("button", { name: /select game/i })).not.toBeInTheDocument();
   });
 
@@ -222,7 +222,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     await vi.waitFor(() => expect(stubEngine.selectClassicGame).toHaveBeenCalledWith("drawphone"));
     // Back in the party lobby — the address bar reads the code, not /party
     // (rocketcrab-r0f).
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/RCRB"));
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/rcrb"));
   });
 
   it("shares the party shell header (logo + code) while in a lobby (5cl.8)", async () => {

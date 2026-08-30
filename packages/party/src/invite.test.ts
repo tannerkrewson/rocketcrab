@@ -7,26 +7,26 @@ const BASE = "https://nova.example/join";
 describe("invite links (ADR-0011)", () => {
   it("builds a URL with the secret in the fragment and nothing in the query", () => {
     const url = buildInviteUrl({ baseUrl: BASE, code: "abcd", secret: SECRET });
-    expect(url).toBe(`${BASE}#code=ABCD&secret=${SECRET}`);
+    expect(url).toBe(`${BASE}#code=abcd&secret=${SECRET}`);
     expect(url).not.toContain("?");
   });
 
   it("round-trips through parsing", () => {
     const url = buildInviteUrl({ baseUrl: BASE, code: "ABCD", secret: SECRET });
-    expect(parseInviteUrl(url)).toEqual({ code: "ABCD", secret: SECRET });
+    expect(parseInviteUrl(url)).toEqual({ code: "abcd", secret: SECRET });
     expect(parseInviteFragment(`#code=ABCD&secret=${SECRET}`)).toEqual({
-      code: "ABCD",
+      code: "abcd",
       secret: SECRET,
     });
     expect(parseInviteFragment(`code=ABCD&secret=${SECRET}`)).toEqual({
-      code: "ABCD",
+      code: "abcd",
       secret: SECRET,
     });
   });
 
   it("parses fragment-only links and ignores the query string", () => {
     const url = `${BASE}?utm_source=x#code=ABCD&secret=${SECRET}`;
-    expect(parseInviteUrl(url)).toEqual({ code: "ABCD", secret: SECRET });
+    expect(parseInviteUrl(url)).toEqual({ code: "abcd", secret: SECRET });
   });
 
   it("accepts a code-less invite (secret only)", () => {
@@ -53,7 +53,7 @@ describe("invite links (ADR-0011)", () => {
 
   it("strips any existing fragment from the base URL", () => {
     const url = buildInviteUrl({ baseUrl: `${BASE}#old`, code: "ABCD", secret: SECRET });
-    expect(url).toBe(`${BASE}#code=ABCD&secret=${SECRET}`);
+    expect(url).toBe(`${BASE}#code=abcd&secret=${SECRET}`);
   });
 });
 
@@ -70,7 +70,7 @@ describe("short join URLs (9fv.8)", () => {
     expect(url).not.toContain("secret");
   });
 
-  it("normalizes mixed-case codes to lowercase (codes are typed lowercase now)", () => {
+  it("normalizes mixed-case codes to lowercase", () => {
     expect(buildShortJoinUrl({ baseUrl: ORIGIN, code: "cVvU" })).toBe(
       "https://rocketcrab.com/cvvu",
     );

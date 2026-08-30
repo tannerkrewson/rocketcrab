@@ -80,7 +80,7 @@ const ACTIVE_STATE: PartyEngineState = {
   greeterMemberId: "member-a",
   amGreeter: true,
   authorityMemberId: "member-a",
-  inviteUrl: "http://localhost:5173/join#code=RCRB&secret=invite-secret",
+  inviteUrl: "http://localhost:5173/join#code=rcrb&secret=invite-secret",
   shortInviteUrl: "http://localhost:5173/rcrb",
   connectionState: "connected",
   canStart: false,
@@ -258,7 +258,7 @@ describe("/party", () => {
     expect(screen.getByText(/Rocket Rumble/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /rejoin party/i }));
     await waitFor(() =>
-      expect(stubEngine.joinByInvite).toHaveBeenCalledWith({ secret, code: "ABCD" }),
+      expect(stubEngine.joinByInvite).toHaveBeenCalledWith({ secret, code: "abcd" }),
     );
   });
 
@@ -283,7 +283,7 @@ describe("/party", () => {
       // Start a party from the entry; once the engine is active with a code
       // the address bar must read the party code instead of /party.
       fireEvent.click(await screen.findByRole("button", { name: /start a party/i }));
-      await vi.waitFor(() => expect(router.state.location.pathname).toBe("/RCRB"));
+      await vi.waitFor(() => expect(router.state.location.pathname).toBe("/rcrb"));
       // The rewrite is a REPLACE: the /party entry is gone from history, so
       // there is no back-navigation spam into the party flow.
       expect(router.history.canGoBack()).toBe(false);

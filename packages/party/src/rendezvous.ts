@@ -71,12 +71,12 @@ export const RENDEZVOUS_ROOM_PREFIX = "nova-rv";
 
 /** Rendezvous room name for a code (public; ADR-0004). */
 export function rendezvousRoomName(code: PartyCode): string {
-  return `${RENDEZVOUS_ROOM_PREFIX}:${code}`;
+  return `${RENDEZVOUS_ROOM_PREFIX}:${normalizePartyCode(code)}`;
 }
 
 /** Session ID shared by every peer in one rendezvous room. */
 export function rendezvousSessionId(code: PartyCode): string {
-  return `${RENDEZVOUS_ROOM_PREFIX}:${code}`;
+  return `${RENDEZVOUS_ROOM_PREFIX}:${normalizePartyCode(code)}`;
 }
 
 /** Injectable scheduler: run `callback` after `delayMs`; return a cancel fn. */
@@ -255,7 +255,7 @@ export class PartySession {
     this.role = config.role;
     this.memberId = config.memberId;
     this.displayName = config.displayName;
-    this._code = config.code;
+    this._code = config.code === null ? null : (normalizePartyCode(config.code) as PartyCode);
     this.secret = config.secret;
     this.material = config.material;
     this.factory = config.factory;
@@ -911,7 +911,7 @@ export interface CreatePartyOptions {
 
 /** Options for {@link joinPartyByCode}. */
 export interface JoinByCodeOptions {
-  /** The four-letter code as typed (trimmed and uppercased internally). */
+  /** The four-letter code as typed (trimmed and lowercased internally). */
   readonly code: string;
   readonly memberId: MemberId;
   readonly displayName?: string;

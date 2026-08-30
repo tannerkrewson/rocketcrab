@@ -20,6 +20,7 @@ import { BrandLogo } from "../layout/BrandLogo";
 import { Button } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
 import { PartyGameDetailsModal } from "./PartyGameDetails";
+import { partyPageTitle } from "./PartyShellHeader";
 
 export interface PartyPlayShellProps {
   state: PartyEngineState;
@@ -117,7 +118,7 @@ export function PartyPlayShell({
   // 7.38: the top bar shows the party URL (the code) instead of the game
   // name — classic parity (the code front and center).
   const roomUrl =
-    state.code !== null ? `rocketcrab.com/${state.code.toLowerCase()}` : "rocketcrab.com";
+    state.code !== null ? partyPageTitle(state.code, "rocketcrab.com") : "rocketcrab.com";
   const menuOpen = panel === "menu";
 
   return (

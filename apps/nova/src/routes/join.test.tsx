@@ -185,8 +185,9 @@ describe("/join", () => {
 
   it("joins with the normalized code and does not set a name during the join (2t1.9)", async () => {
     renderJoin();
-    const input = await screen.findByLabelText("Four-letter party code");
-    fireEvent.change(input, { target: { value: " abcd " } });
+    const input = (await screen.findByLabelText("Four-letter party code")) as HTMLInputElement;
+    fireEvent.change(input, { target: { value: " ABCD " } });
+    expect(input.value).toBe("abcd");
     fireEvent.click(screen.getByRole("button", { name: /^join$/i }));
     await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("abcd"));
     // The name is only asked once the player is in the lobby.
@@ -217,7 +218,7 @@ describe("/join", () => {
     await waitFor(() => expect(stubEngine.joinByInvite).toHaveBeenCalledTimes(1));
     expect(stubEngine.joinByInvite).toHaveBeenCalledWith({
       secret: VALID_SECRET,
-      code: "ABCD",
+      code: "abcd",
     });
     await waitFor(() => expect(window.location.hash).toBe(""));
   });
@@ -311,7 +312,7 @@ describe("/join", () => {
     expect(await screen.findByTestId("party-resume-banner")).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /rejoin party/i }));
     await waitFor(() =>
-      expect(stubEngine.joinByInvite).toHaveBeenCalledWith({ secret, code: "EFGH" }),
+      expect(stubEngine.joinByInvite).toHaveBeenCalledWith({ secret, code: "efgh" }),
     );
   });
 

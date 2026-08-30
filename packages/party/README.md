@@ -13,8 +13,8 @@ distinguishable, and invite links bypass four-letter discovery entirely.
 ```
 four-letter code (public)          session secret (private, CSPRNG)
         │                                   │
-        ▼                                   ▼
-nova-rv:CODE (rendezvous room)     derive (SHA-256, domain-separated)
+         ▼                                   ▼
+ nova-rv:code (rendezvous room)     derive (SHA-256, domain-separated)
 adverts · join requests ·          ┌──────────────┬───────────────┐
 admission · secret handoff         roomId        password        sessionId
         │ (post-admission only)          │
@@ -23,8 +23,9 @@ admission · secret handoff         roomId        password        sessionId
 ```
 
 - The code is a **namespace, never a secret** (engineering rule 6). 23-letter
-  alphabet `ABCDEFGHJKMNPQRSTUVWXYZ` (no I/O/L — the easily confused
-  letters), 279,841 codes, normalized to uppercase on entry.
+  alphabet `abcdefghjkmnpqrstuvwxyz` (no I/O/L — the easily confused
+  letters), 279,841 codes, normalized to lowercase on entry. Uppercase input
+  remains accepted for compatibility.
 - The secret is 32 random bytes (Web Crypto `getRandomValues`, unpadded
   base64url). The private room name, Trystero password, and session ID are
   all derived with `SHA-256(label || 0x00 || secret)` (see `secrets.ts`) —

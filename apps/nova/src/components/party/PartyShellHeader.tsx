@@ -1,4 +1,5 @@
 import { toast } from "sonner";
+import { normalizePartyCode } from "@rocketcrab/party";
 import { cn } from "../../lib/cn";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import { phoneticSpelling } from "../../lib/party/phonetic";
@@ -18,6 +19,11 @@ export interface PartyShellHeaderProps {
    * transition is a pure CSS animation and respects prefers-reduced-motion.
    */
   readonly compact?: boolean;
+}
+
+/** Format the canonical party URL used by the shell and page title. */
+export function partyPageTitle(code: string, host = window.location.host): string {
+  return `${host}/${normalizePartyCode(code)}`;
 }
 
 /**
@@ -46,8 +52,7 @@ export function PartyShellHeader({
   disablePhonetic = false,
   compact = false,
 }: PartyShellHeaderProps) {
-  const pageTitle =
-    code === null || code === undefined ? null : `${window.location.host}/${code.toLowerCase()}`;
+  const pageTitle = code === null || code === undefined ? null : partyPageTitle(code);
 
   const copyInvite = async () => {
     if (inviteUrl === null || inviteUrl === undefined) return;

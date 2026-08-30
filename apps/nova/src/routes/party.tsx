@@ -1,6 +1,7 @@
 import { createFileRoute, Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { ArrowLeft, PartyPopper } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
+import { normalizePartyCode } from "@rocketcrab/party";
 import { PROTOCOL_VERSION, type GameMode } from "@rocketcrab/protocol";
 import { PartyExperience } from "../components/party/PartyExperience";
 import { PartyResumeBanner } from "../components/party/PartyResumeBanner";
@@ -128,7 +129,11 @@ function PartyPage() {
     if (code === null || pathname !== "/party") {
       return;
     }
-    void navigate({ to: "/$code", params: { code }, replace: true });
+    void navigate({
+      to: "/$code",
+      params: { code: normalizePartyCode(code) },
+      replace: true,
+    });
   }, [engine, navigate, pathname, search.browse, state.code, state.phase]);
 
   const handleRetry = () => {

@@ -87,7 +87,8 @@ function renderShortJoin(initialEntry: string) {
     history: createMemoryHistory({ initialEntries: [initialEntry] }),
   });
   const wrapper = ({ children }: { children: ReactNode }) => <>{children}</>;
-  return render(<RouterProvider router={router} />, { wrapper });
+  render(<RouterProvider router={router} />, { wrapper });
+  return router;
 }
 
 const VALID_SECRET = "A".repeat(43);
@@ -112,10 +113,12 @@ describe("/join/:code (short join URL)", () => {
   });
 
   it("normalizes an uppercase path code to lowercase", async () => {
-    renderShortJoin("/join/CVVU");
+    const router = renderShortJoin("/join/CVVU");
     const input = (await screen.findByLabelText("Four-letter party code")) as HTMLInputElement;
     expect(input.value).toBe("cvvu");
     await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("cvvu"));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/join/cvvu"));
+    expect(router.history.canGoBack()).toBe(false);
   });
 
   it("does not auto-join a path code when the ?edit=name page is open (rocketcrab-if2)", async () => {
@@ -158,9 +161,23 @@ describe("/join/:code (short join URL)", () => {
     await waitFor(() =>
       expect(stubEngine.joinByInvite).toHaveBeenCalledWith({
         secret: VALID_SECRET,
-        code: "ABCD",
+        code: "abcd",
       }),
     );
+  });
+
+  it("canonicalizes an uppercase path without changing its invite secret", async () => {
+    const entry = `/join/CVVU#code=ABCD&secret=${VALID_SECRET}`;
+    window.history.pushState({}, "", entry);
+    const router = renderShortJoin(entry);
+    await waitFor(() =>
+      expect(stubEngine.joinByInvite).toHaveBeenCalledWith({
+        secret: VALID_SECRET,
+        code: "abcd",
+      }),
+    );
+    await waitFor(() => expect(router.state.location.pathname).toBe("/join/cvvu"));
+    expect(window.location.hash).toBe("");
   });
 });
 
@@ -171,6 +188,14 @@ describe("/:code (root short join URL, rocketcrab.com/cvvu)", () => {
     expect(input.value).toBe("cvvu");
     await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("cvvu"));
     expect(screen.queryByText("Lost in space")).not.toBeInTheDocument();
+  });
+
+  it("canonicalizes an uppercase bare path to lowercase", async () => {
+    const router = renderShortJoin("/CVVU");
+    const input = (await screen.findByLabelText("Four-letter party code")) as HTMLInputElement;
+    expect(input.value).toBe("cvvu");
+    await waitFor(() => expect(router.state.location.pathname).toBe("/cvvu"));
+    await waitFor(() => expect(stubEngine.joinByCode).toHaveBeenCalledWith("cvvu"));
   });
 
   it("does not join twice when the user also presses Join", async () => {

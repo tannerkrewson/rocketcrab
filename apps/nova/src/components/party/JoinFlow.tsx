@@ -1,5 +1,6 @@
 import { useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
+import { normalizePartyCode } from "@rocketcrab/party";
 import { getSavedPlayerName } from "../../lib/party/identity";
 import { importInviteFromLocation } from "../../lib/party/invite-import";
 import { usePartyEngine } from "../../lib/party/use-party";
@@ -48,8 +49,9 @@ export function JoinFlow({ initialCode = "" }: JoinFlowProps) {
   // the join-family routes (/join, /join/:code, /:code).
   const search = useSearch({ strict: false }) as { edit?: "name" };
   const navigate = useNavigate();
+  const normalizedInitialCode = normalizePartyCode(initialCode);
   const [joinError, setJoinError] = useState<string | null>(null);
-  const [code, setCode] = useState(initialCode);
+  const [code, setCode] = useState(() => normalizedInitialCode);
   const [name, setName] = useState(() => getSavedPlayerName() ?? "");
   // rocketcrab-if2: the URL-driven join effect below must run exactly once
   // per mount — StrictMode's double effect on a dev mount would otherwise
@@ -77,13 +79,17 @@ export function JoinFlow({ initialCode = "" }: JoinFlowProps) {
       search: window.location.search,
     });
     if (invite !== null) {
+      const normalizedInvite =
+        invite.code === undefined
+          ? invite
+          : { secret: invite.secret, code: normalizePartyCode(invite.code) };
       // A fragment invite without a code still benefits from the path's
       // code (it lets this joiner serve as greeter after migration,
       // ADR-0004) — merge it in when present.
       const withPathCode =
-        invite.code === undefined && initialCode !== ""
-          ? { secret: invite.secret, code: initialCode }
-          : invite;
+        normalizedInvite.code === undefined && normalizedInitialCode !== ""
+          ? { secret: normalizedInvite.secret, code: normalizedInitialCode }
+          : normalizedInvite;
       // 5cl.3: fire-and-forget is fine — the phase subscription above
       // flips this flow to the loading screen the moment the engine emits
       // "joining", and to the form + error on failure.
@@ -94,9 +100,9 @@ export function JoinFlow({ initialCode = "" }: JoinFlowProps) {
     // join on load (mirrors the fragment-invite auto-join above). The
     // `?edit=name` page is for renaming, never joining — a code in the
     // path must NOT auto-join there.
-    if (initialCode !== "" && search.edit !== "name" && !engine.isActive()) {
+    if (normalizedInitialCode !== "" && search.edit !== "name" && !engine.isActive()) {
       void engine
-        .joinByCode(initialCode)
+        .joinByCode(normalizedInitialCode)
         .then(() => {
           const latest = engine.getState();
           if (latest.phase === "error" && latest.lastError !== null) {

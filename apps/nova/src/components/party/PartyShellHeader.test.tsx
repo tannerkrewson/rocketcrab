@@ -19,7 +19,7 @@ const { toastMock } = vi.hoisted(() => ({
 
 vi.mock("sonner", () => ({ toast: toastMock }));
 
-const INVITE_URL = "http://localhost:5173/join#code=RCRB&secret=invite-secret";
+const INVITE_URL = "http://localhost:5173/join#code=rcrb&secret=invite-secret";
 
 afterEach(() => {
   cleanup();

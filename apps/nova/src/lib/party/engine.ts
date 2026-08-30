@@ -32,6 +32,7 @@ import {
   createParty,
   joinPartyByCode,
   joinPartyByInvite,
+  normalizePartyCode,
   type GameSourceTransferEvent,
   type JoinRequestInfo,
   type PartyEvent,
@@ -807,15 +808,16 @@ export class PartyEngine {
   async joinByCode(code: string): Promise<void> {
     this.prepareSetup();
     const identity = this.identity;
-    this.lastSetup = { kind: "join-code", code };
+    const normalizedCode = normalizePartyCode(code);
+    this.lastSetup = { kind: "join-code", code: normalizedCode };
     this.phase = "joining";
     this.joinStage = "discovering";
-    this.phaseDetail = `Joining party ${code.toLowerCase()}…`;
+    this.phaseDetail = `Joining party ${normalizedCode}…`;
     this.lastError = null;
     this.emit();
     try {
       const party = await joinPartyByCode({
-        code,
+        code: normalizedCode,
         memberId: identity.memberId,
         displayName: identity.displayName,
         transportFactory: await this.resolveTransportFactory(),
@@ -884,7 +886,11 @@ export class PartyEngine {
   async joinByInvite(input: { secret: string; code?: string }): Promise<void> {
     this.prepareSetup();
     const identity = this.identity;
-    this.lastSetup = { kind: "join-invite", input };
+    const normalizedInput =
+      input.code === undefined
+        ? input
+        : { secret: input.secret, code: normalizePartyCode(input.code) };
+    this.lastSetup = { kind: "join-invite", input: normalizedInput };
     this.phase = "joining";
     this.joinStage = "discovering";
     this.phaseDetail = "Joining the party from your invite…";
@@ -892,8 +898,8 @@ export class PartyEngine {
     this.emit();
     try {
       const party = await joinPartyByInvite({
-        secret: input.secret,
-        ...(input.code !== undefined ? { code: input.code } : {}),
+        secret: normalizedInput.secret,
+        ...(normalizedInput.code !== undefined ? { code: normalizedInput.code } : {}),
         memberId: identity.memberId,
         displayName: identity.displayName,
         transportFactory: await this.resolveTransportFactory(),

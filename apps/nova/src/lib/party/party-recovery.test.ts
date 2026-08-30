@@ -42,7 +42,7 @@ describe("party recovery record", () => {
     expect(record?.version).toBe(PARTY_RECOVERY_VERSION);
     expect(record?.savedAt).toBe(1_700_000_000_000);
     expect(record?.role).toBe("joiner");
-    expect(record?.code).toBe("ABCD");
+    expect(record?.code).toBe("abcd");
     expect(record?.secret).toBe(SECRET);
     expect(record?.memberId).toBe("member-a");
     expect(record?.game).toEqual({
@@ -57,6 +57,19 @@ describe("party recovery record", () => {
     const record = readPartyRecovery();
     expect(record?.code).toBeNull();
     expect(record?.game).toBeNull();
+  });
+
+  it("canonicalizes uppercase recovery codes without changing the secret", () => {
+    const uppercase = JSON.stringify({
+      ...input(),
+      code: "ABCD",
+      secret: SECRET,
+      version: PARTY_RECOVERY_VERSION,
+      savedAt: 1_700_000_000_000,
+    });
+    const record = parsePartyRecovery(uppercase);
+    expect(record?.code).toBe("abcd");
+    expect(record?.secret).toBe(SECRET);
   });
 
   it("clear removes the record", () => {

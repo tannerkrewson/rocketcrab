@@ -24,6 +24,7 @@ import { IdleParticles } from "./IdleParticles";
 import { PartyDiagnosticsPanel } from "./PartyDiagnostics";
 import { PartyGameDetailsModal } from "./PartyGameDetails";
 import { PartyInviteQr } from "./PartyInviteQr";
+import { partyPageTitle } from "./PartyShellHeader";
 
 export interface PartyLobbyProps {
   state: PartyEngineState;
@@ -228,8 +229,7 @@ export function PartyLobby({
   // The lobby page title: origin + four-letter code, e.g. "rocketcrab.com/abcd".
   // The full invite URL (with the session secret in the fragment) is never
   // shown on the page (ADR-0011 / 10.5).
-  const pageTitle =
-    state.code === null ? null : `${window.location.host}/${state.code.toLowerCase()}`;
+  const pageTitle = state.code === null ? null : partyPageTitle(state.code);
 
   // 10.5: the browser tab reads the origin + code page title (never the
   // invite URL with its fragment secret). Restore on unmount.

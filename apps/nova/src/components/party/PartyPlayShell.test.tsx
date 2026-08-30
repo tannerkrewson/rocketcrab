@@ -67,7 +67,7 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     greeterMemberId: "member-a",
     amGreeter: true,
     authorityMemberId: "member-a",
-    inviteUrl: "http://localhost:5173/join#code=ABCD&secret=invite-secret",
+    inviteUrl: "http://localhost:5173/join#code=abcd&secret=invite-secret",
     shortInviteUrl: "http://localhost:5173/abcd",
     connectionState: "connected",
     canStart: false,
@@ -390,7 +390,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     await renderShell(makeState());
     await userEvent.click(screen.getByLabelText("Party link rocketcrab.com/abcd"));
     expect(writeText).toHaveBeenCalledWith(
-      "http://localhost:5173/join#code=ABCD&secret=invite-secret",
+      "http://localhost:5173/join#code=abcd&secret=invite-secret",
     );
     Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
   });

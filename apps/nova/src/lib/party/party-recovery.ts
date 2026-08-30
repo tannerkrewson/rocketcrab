@@ -18,6 +18,7 @@
  */
 import type { GameMode } from "@rocketcrab/protocol";
 import { sessionSecretSchema } from "@rocketcrab/protocol";
+import { isValidPartyCode, normalizePartyCode } from "@rocketcrab/party";
 
 /** localStorage key for the party recovery record. */
 export const PARTY_RECOVERY_KEY = "nova:party:recovery:v1";
@@ -62,6 +63,7 @@ export function savePartyRecovery(
       version: PARTY_RECOVERY_VERSION,
       savedAt: now(),
       ...input,
+      code: input.code === null ? null : normalizePartyCode(input.code),
     };
     window.localStorage.setItem(PARTY_RECOVERY_KEY, JSON.stringify(record));
     return true;
@@ -116,6 +118,10 @@ export function parsePartyRecovery(raw: string): PartyRecoveryRecord | null {
   if (typeof record.code !== "string" && record.code !== null) {
     return null;
   }
+  const code = record.code === null ? null : normalizePartyCode(record.code);
+  if (code !== null && !isValidPartyCode(code)) {
+    return null;
+  }
   if (typeof record.secret !== "string" || !sessionSecretSchema.safeParse(record.secret).success) {
     return null;
   }
@@ -145,7 +151,7 @@ export function parsePartyRecovery(raw: string): PartyRecoveryRecord | null {
     version: PARTY_RECOVERY_VERSION,
     savedAt: record.savedAt,
     role: record.role,
-    code: record.code,
+    code,
     secret: record.secret,
     memberId: record.memberId,
     displayName: record.displayName,

@@ -8,42 +8,43 @@ import type { PartyCode } from "@rocketcrab/protocol";
  * where a greeter explicitly admits them; the real party room is derived
  * from a CSPRNG session secret (see `secrets.ts`).
  *
- * Alphabet (P2 decision): `ABCDEFGHJKMNPQRSTVWXYZ` — 23 letters,
+ * Alphabet (P2 decision): `abcdefghjkmnpqrstuvwxyz` — 23 letters,
  * 279,841 codes. Letters I, O, and L are omitted because they are the ones
  * most easily confused when transcribed by hand or read aloud (I with 1/l,
  * O with 0, L with I/1); the alphabet stays strictly alphabetic and drops
  * no vowel except none (A–Z minus I/O/L), so codes remain pronounceable.
- * Digits are not part of codes at all: normalization uppercases input and
+ * Digits are not part of codes at all: normalization lowercases input and
  * validation rejects anything that is not exactly four letters, so a
  * mistyped "0"/"1"/"9" surfaces as a clear validation error instead of a
- * silently different code.
+ * silently different code. Uppercase input remains accepted for compatibility
+ * but is canonicalized to lowercase at this boundary.
  */
 
 /** Party code alphabet (no I/O/L; see module docs). */
-export const PARTY_CODE_ALPHABET = "ABCDEFGHJKMNPQRSTUVWXYZ";
+export const PARTY_CODE_ALPHABET = "abcdefghjkmnpqrstuvwxyz";
 
 /** Codes are always exactly four letters. */
 export const PARTY_CODE_LENGTH = 4;
 
-/** True when `input` is already an exact four-letter uppercase code. */
+/** True when `input` is an exact four-letter code in either case. */
 export function isValidPartyCode(input: string): boolean {
-  return new RegExp(`^[A-Z]{${PARTY_CODE_LENGTH}}$`).test(input);
+  return new RegExp(`^[A-Za-z]{${PARTY_CODE_LENGTH}}$`).test(input);
 }
 
 /**
  * Normalize a raw code as typed by a player: trim surrounding whitespace
- * and uppercase. Returns the normalized string even when it is not a valid
+ * and lowercase. Returns the normalized string even when it is not a valid
  * code (callers validate with {@link isValidPartyCode} / the protocol
  * schema to give a useful error).
  */
 export function normalizePartyCode(input: string): string {
-  return input.trim().toUpperCase();
+  return input.trim().toLowerCase();
 }
 
 /**
  * Generate a random four-letter party code, uniform over the alphabet.
  * `rng` is injectable for deterministic tests: ONE draw returning a raw
- * index in [0, 23^4) selects the code (0 → "AAAA"). The default draws
+ * index in [0, 23^4) selects the code (0 → "aaaa"). The default draws
  * with `crypto.getRandomValues` (rejection sampling for uniformity).
  */
 export function generatePartyCode(rng?: () => number): PartyCode {

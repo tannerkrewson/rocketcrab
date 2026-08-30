@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import { KeyRound, Loader2, UserRound } from "lucide-react";
 import type { FormEvent, KeyboardEvent } from "react";
+import { normalizePartyCode } from "@rocketcrab/party";
 import { Button, buttonStyles } from "../ui/Button";
 
 /** What this screen is doing: joining a party, or editing the player name. */
@@ -54,7 +55,7 @@ export function JoinScreen({
   onBack,
 }: JoinScreenProps) {
   const editing = mode === "edit";
-  const normalized = code.trim().toLowerCase();
+  const normalized = normalizePartyCode(code);
 
   const handleSubmit = (event: FormEvent) => {
     event.preventDefault();
@@ -121,8 +122,8 @@ export function JoinScreen({
             <input
               id="party-code"
               type="text"
-              value={code}
-              onChange={(event) => onCodeChange(event.target.value.toLowerCase())}
+              value={normalized}
+              onChange={(event) => onCodeChange(normalizePartyCode(event.target.value))}
               onKeyDown={handleKeyDown}
               placeholder="abcd"
               maxLength={4}

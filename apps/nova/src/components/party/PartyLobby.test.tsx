@@ -32,7 +32,7 @@ const { toastMock } = vi.hoisted(() => ({
 
 vi.mock("sonner", () => ({ toast: toastMock }));
 
-const INVITE_URL = "http://localhost:5173/join#code=ABCD&secret=invite-secret";
+const INVITE_URL = "http://localhost:5173/join#code=abcd&secret=invite-secret";
 
 function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState {
   return {

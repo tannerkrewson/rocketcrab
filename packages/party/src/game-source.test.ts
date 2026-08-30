@@ -1300,7 +1300,7 @@ async function makeCreator(
     collisionRetries: 2,
     advertIntervalMs: 5000,
     onJoinRequest: () => true,
-    codeRng: () => codeIndex("AAAA"),
+    codeRng: () => codeIndex("aaaa"),
     partyName: "Party One",
     gameTitle: "Rocket Rumble",
     derive: mockDerive,

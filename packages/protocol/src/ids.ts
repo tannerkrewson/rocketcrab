@@ -36,13 +36,14 @@ export const gameIdSchema = z.string().min(1).max(64);
 export const runtimeInstanceIdSchema = z.string().min(1).max(64);
 
 /**
- * Four-letter rendezvous namespace code (ADR-0004). The code is alphabetic
- * and normalized to uppercase before parsing; the exact human-friendly
- * alphabet is owned by P2.
+ * Four-letter rendezvous namespace code (ADR-0004). Both cases are accepted
+ * at the protocol boundary for compatibility, then canonicalized to
+ * lowercase. The exact human-friendly alphabet is owned by P2.
  */
 export const partyCodeSchema = z
   .string()
-  .regex(/^[A-Z]{4}$/, "Party code must be exactly four uppercase letters A-Z.");
+  .regex(/^[A-Za-z]{4}$/, "Party code must be exactly four letters A-Z.")
+  .transform((value) => value.toLowerCase());
 
 /**
  * The 32-byte party session secret as unpadded base64url (43 characters;

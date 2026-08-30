@@ -327,6 +327,20 @@ describe("peer message schemas", () => {
     expect(validExamples).toHaveLength(PEER_MESSAGE_TYPES.length);
   });
 
+  it("accepts uppercase party codes but emits the lowercase canonical form", () => {
+    const parsed = parsePeerMessage(
+      basePeer({
+        type: "party.identity",
+        partyCode: "ABCD",
+        memberCount: 1,
+      }),
+    );
+    expect(parsed).toMatchObject({ ok: true });
+    if (parsed.ok) {
+      expect(parsed.value).toMatchObject({ type: "party.identity", partyCode: "abcd" });
+    }
+  });
+
   it("rejects an invalid example of every peer message", () => {
     const invalidExamples: unknown[] = [
       // Wrong payload types, missing required fields, and bad values.

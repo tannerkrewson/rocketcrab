@@ -320,7 +320,7 @@ async function runCreate(player: Player, world: World): Promise<string> {
   await settle(world);
   await promise;
   const code = player.engine.getState().code;
-  expect(code).toMatch(/^[A-Z]{4}$/);
+  expect(code).toMatch(/^[a-z]{4}$/);
   return code as string;
 }
 
@@ -955,7 +955,7 @@ describe("the S4 example game over the party flow", () => {
     await settle(world);
     await promise;
     const code = a.engine.getState().code;
-    expect(code).toMatch(/^[A-Z]{4}$/);
+    expect(code).toMatch(/^[a-z]{4}$/);
     expect(a.engine.getState().game?.title).toBe("Nova Quiz");
 
     // The creator's frame boots and registers the example game.

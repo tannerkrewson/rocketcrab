@@ -1,4 +1,6 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
+import { normalizePartyCode } from "@rocketcrab/party";
 import { JoinFlow } from "../components/party/JoinFlow";
 
 export const Route = createFileRoute("/join/$code")({
@@ -21,8 +23,24 @@ const SHORT_CODE_PATTERN = /^[A-Za-z]{4}$/u;
  */
 function JoinByCodePage() {
   const { code } = Route.useParams();
-  if (!SHORT_CODE_PATTERN.test(code)) {
+  const navigate = useNavigate();
+  const validCode = SHORT_CODE_PATTERN.test(code);
+  const normalizedCode = normalizePartyCode(code);
+
+  useEffect(() => {
+    if (!validCode || code === normalizedCode) {
+      return;
+    }
+    void navigate({
+      to: "/join/$code",
+      params: { code: normalizedCode },
+      hash: true,
+      replace: true,
+    });
+  }, [code, navigate, normalizedCode, validCode]);
+
+  if (!validCode) {
     throw notFound();
   }
-  return <JoinFlow initialCode={code.toLowerCase()} />;
+  return <JoinFlow initialCode={normalizedCode} />;
 }
