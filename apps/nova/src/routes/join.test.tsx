@@ -71,9 +71,8 @@ const { stubEngine, stubs } = vi.hoisted(() => {
   return {
     stubs,
     stubEngine: {
-      getState: vi.fn(
-        (): PartyEngineState =>
-          stubs.failedJoin ? ERROR_STATE : stubs.joinCalled ? JOINING_STATE : IDLE_STATE,
+      getState: vi.fn((): PartyEngineState =>
+        stubs.failedJoin ? ERROR_STATE : stubs.joinCalled ? JOINING_STATE : IDLE_STATE,
       ),
       // 5cl.3: the stub mirrors the real engine's emit-on-change: it calls
       // every subscriber at subscribe time and remembers the handlers so

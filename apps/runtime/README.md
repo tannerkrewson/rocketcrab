@@ -30,7 +30,7 @@ Nova shell (nova.example)  ──postMessage bootstrap──▶  runtime.nova.ex
   rewriting, no credential injection. A tiny Nova API bridge script is
   prepended (see below).
 - The game frame sandbox carries `allow-scripts allow-same-origin
-allow-pointer-lock allow-fullscreen` and delegates camera/microphone/
+  allow-pointer-lock allow-fullscreen` and delegates camera/microphone/
   clipboard/fullscreen via the `allow` attribute (F4 finding: delegation at
   every iframe hop). No `allow-top-navigation` — the game cannot navigate
   the Nova tab (T6/T21).

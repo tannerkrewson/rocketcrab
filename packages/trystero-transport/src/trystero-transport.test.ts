@@ -177,7 +177,7 @@ async function simulatePeerJoin(
   await callbacks.onPeerHandshake!(
     peerId,
     async () => undefined,
-    async () => ({ data: { v: 1, ...identity } }),
+    async () => ({ data: { v: 1, transportVersion: 2, ...identity } }),
     false,
   );
   room.onPeerJoin!(peerId);
@@ -390,13 +390,20 @@ describe("TrysteroTransport peer mapping", () => {
         sentIdentity = data;
       },
       async () => ({
-        data: { v: 1, memberId: "member-b", connectionId: "conn-b", displayName: "Bea" },
+        data: {
+          v: 1,
+          transportVersion: 2,
+          memberId: "member-b",
+          connectionId: "conn-b",
+          displayName: "Bea",
+        },
       }),
       false,
     );
     // we announce our own memberId + connectionId
     expect(sentIdentity).toEqual({
       v: 1,
+      transportVersion: 2,
       memberId: "member-a",
       connectionId: "self-peer-id",
       displayName: "Ada",
@@ -418,6 +425,37 @@ describe("TrysteroTransport peer mapping", () => {
     expect(adapter.peers).toHaveLength(1);
     expect(adapter.peers[0]!.memberId).toBe("member-b");
   });
+
+  it.each([undefined, 1, 3])(
+    "rejects incompatible transport version %s before actions",
+    async (transportVersion) => {
+      const onJoinError = vi.fn();
+      const { adapter, clock } = setup({ onJoinError });
+      const room = makeFakeRoom();
+      mocks.joinRoom.mockReturnValue(room);
+      mocks.relaySockets[RELAY] = { readyState: 1 };
+      await joinConnected(adapter, clock);
+      await expect(
+        capturedCallbacks().onPeerHandshake!(
+          "old-peer",
+          async () => undefined,
+          async () => ({
+            data: {
+              v: 1,
+              memberId: "old",
+              connectionId: "old-conn",
+              ...(transportVersion === undefined ? {} : { transportVersion }),
+            },
+          }),
+          false,
+        ),
+      ).rejects.toThrow(/Everyone should update\/reload/);
+      expect(adapter.peers).toEqual([]);
+      expect(onJoinError).toHaveBeenCalledWith(
+        expect.objectContaining({ category: "incompatible_version", isFatal: true }),
+      );
+    },
+  );
 
   it("fails the peer when the identity handshake is malformed (T10)", async () => {
     const { adapter, clock } = setup();

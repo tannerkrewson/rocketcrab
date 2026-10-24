@@ -1825,12 +1825,10 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
         credential: "c1",
       },
     ];
-    const turnCreds = vi.fn(
-      async (): Promise<TurnCredentialsResult> => ({
-        ok: true,
-        turnConfig,
-      }),
-    );
+    const turnCreds = vi.fn(async (): Promise<TurnCredentialsResult> => ({
+      ok: true,
+      turnConfig,
+    }));
     const player = makeDefaultFactoryPlayer(world, { turnCreds });
     await runCreate(player, world);
     expect(turnCreds).toHaveBeenCalledTimes(1);
@@ -1872,9 +1870,10 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
   it("does not mint when the transport factory is injected (tests/embedders)", async () => {
     vi.stubEnv("VITE_TURN_CREDS_ORIGIN", "https://turn-creds.example.workers.dev");
     const world = makeWorld();
-    const turnCreds = vi.fn(
-      async (): Promise<TurnCredentialsResult> => ({ ok: true, turnConfig: [] }),
-    );
+    const turnCreds = vi.fn(async (): Promise<TurnCredentialsResult> => ({
+      ok: true,
+      turnConfig: [],
+    }));
     const player = makePlayer(world, "host", { turnCreds });
     await runCreate(player, world);
     expect(turnCreds).not.toHaveBeenCalled();

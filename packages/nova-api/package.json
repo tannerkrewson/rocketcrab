@@ -17,13 +17,13 @@
   "dependencies": {
     "@rocketcrab/core": "0.0.0",
     "@rocketcrab/protocol": "0.0.0",
-    "immer": "11.1.15",
-    "zod": "4.4.3"
+    "immer": "11.2.9",
+    "zod": "4.6.7"
   },
   "devDependencies": {
     "@rocketcrab/testing": "0.0.0",
-    "fast-check": "4.9.0",
+    "fast-check": "4.10.2",
     "typescript": "7.0.2",
-    "vitest": "4.1.10"
+    "vitest": "4.1.12"
   }
 }

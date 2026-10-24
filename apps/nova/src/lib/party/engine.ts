@@ -1616,6 +1616,16 @@ export class PartyEngine {
       typeof (error as { category: unknown }).category === "string"
         ? ((error as { category: string }).category as string)
         : "unknown";
+    if (category === "incompatible_version") {
+      if (this.joinErrorNoticesShown.has(category)) return;
+      this.joinErrorNoticesShown.add(category);
+      this.addNotice(
+        "warn",
+        "Incompatible Nova version. Everyone should update/reload Nova and rejoin the party.",
+      );
+      this.emit();
+      return;
+    }
     if (category === "peer_connection_failed") {
       if (this.joinErrorNoticesShown.has(category)) {
         return;

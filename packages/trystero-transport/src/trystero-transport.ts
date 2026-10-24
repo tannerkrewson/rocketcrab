@@ -38,12 +38,13 @@ import {
   parseWireEnvelope,
   payloadSize,
   type IdentityPayload,
+  TRANSPORT_VERSION,
 } from "./wire";
 
 /**
  * Trystero transport (P1): the real-party implementation of the
  * transport-neutral {@link NovaTransport} interface (ADR-0003), built on
- * Trystero 0.25.3's Nostr strategy.
+ * Trystero 0.26.0's Nostr strategy.
  *
  * Game-facing code never sees this class (engineering rule 1): it is the
  * production twin of `InMemoryTransport` (U5, @rocketcrab/testing) and must
@@ -527,6 +528,7 @@ export class TrysteroTransport implements NovaTransport {
     };
     await send({
       v: 1,
+      transportVersion: TRANSPORT_VERSION,
       memberId: identity.memberId,
       connectionId: identity.connectionId,
       ...(identity.displayName !== undefined ? { displayName: identity.displayName } : {}),
@@ -535,6 +537,14 @@ export class TrysteroTransport implements NovaTransport {
     const remote = parseIdentityPayload(data);
     if (remote === null) {
       throw new Error("peer sent an invalid identity handshake");
+    }
+    if (remote.transportVersion !== TRANSPORT_VERSION) {
+      const message =
+        "Incompatible Nova version. Everyone should update/reload Nova and rejoin the party.";
+      // Report locally as well: older peers cannot understand the new actions,
+      // and Trystero may wrap our thrown error as a generic admission failure.
+      this.handleJoinError({ error: message, appId: this.appId, roomId: this.roomName, peerId });
+      throw new Error(message);
     }
     this.identityByPeerId.set(peerId, remote);
     this.connectionToPeerId.set(remote.connectionId, peerId);

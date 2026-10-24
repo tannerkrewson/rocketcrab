@@ -101,7 +101,7 @@ cleanup — the P1 harness now lives in `packages/trystero-transport`, e2e in
   human pass (Blocker Register B2).
 - **F8 — Password errors are structured.** Wrong password surfaces
   `incorrect room password when decrypting offer` (or `incorrect password for
-overlapping room` for overlapping-room cases) as a `JoinError`.
+  overlapping room` for overlapping-room cases) as a `JoinError`.
 
 - **F9 — The harness must be HTTPS for real devices (WebCrypto secure
   context).** Trystero uses `crypto.subtle.importKey` (ECDH keygen) and

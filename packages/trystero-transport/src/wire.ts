@@ -62,9 +62,13 @@ export function buildWireEnvelope(input: WireEnvelopeInput): WireEnvelope {
   };
 }
 
+/** Bump when the underlying action encoding is incompatible (Trystero 0.26). */
+export const TRANSPORT_VERSION = 2;
+
 /** Payload exchanged during the peer identity handshake. */
 export interface IdentityPayload {
   readonly v: 1;
+  readonly transportVersion?: number;
   readonly memberId: string;
   readonly connectionId: string;
   readonly displayName?: string;
@@ -103,7 +107,15 @@ export function parseIdentityPayload(value: unknown): IdentityPayload | null {
       return null;
     }
   }
-  return { v: 1, memberId, connectionId, displayName };
+  return {
+    v: 1,
+    memberId,
+    connectionId,
+    displayName,
+    ...(typeof candidate["transportVersion"] === "number"
+      ? { transportVersion: candidate["transportVersion"] }
+      : {}),
+  };
 }
 
 /**

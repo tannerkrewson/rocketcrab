@@ -1,7 +1,7 @@
 # @rocketcrab/trystero-transport
 
 P1 — the real-party implementation of the transport-neutral `NovaTransport`
-interface (ADR-0003), built on **Trystero 0.25.3** (Nostr strategy). This is
+interface (ADR-0003), built on **Trystero 0.26.0** (Nostr strategy). This is
 the only package allowed to import Trystero (root oxlint
 `no-restricted-imports`); generated games never see it (engineering rule 1).
 
@@ -42,6 +42,21 @@ behaves identically in the local test arena and over real parties.
 - **Cleanup** (engineering rule 22): `leave()`/`suspend()`/failed joins
   detach room + action handlers, stop the relay monitor, and call
   `room.leave()`; rejected/failed joiners leave immediately (F4).
+
+## Upgrade compatibility
+
+Trystero 0.26 changes the action wire format. Nova exchanges `transportVersion: 2`
+in the pre-action identity handshake and rejects missing/different versions with
+an update/reload notice before activating the peer. Existing old builds cannot be
+made to show new wording retroactively; the updated participant sees the notice.
+All participants must reload before joining across this upgrade.
+
+Upstream [0.26 changelog](https://github.com/dmotz/trystero/blob/0.26.0/CHANGELOG.md)
+includes Nostr subscription/reconnect recovery, offer retries/replayed answers,
+ICE validation and renegotiation fixes, stale-peer cleanup, on-demand offers,
+receive admission and bounded transfer queues. The 0.25.4 changes reduce signaling
+traffic and back off rate-limited relays. Relay defaults and duplicated transfer
+machinery are reviewed separately in simplification stage 3.
 
 ## Testing
 

@@ -28,7 +28,7 @@ re-litigates the workspace shape.
 - **Parallel scripts.** npm has no built-in parallel workspace runner, so
   `concurrently@10.0.4` drives `dev` and `test:watch` for the two apps
   (`npm run dev --workspace @rocketcrab/nova` + `--workspace
-@rocketcrab/runtime`). Sequential workspace runs (`build`, `typecheck`,
+  @rocketcrab/runtime`). Sequential workspace runs (`build`, `typecheck`,
   `test`) use `npm run <script> --workspaces --if-present`.
 - **Hooks.** Lefthook installs via the root `prepare` script and runs through
   `npm exec -- ...` (the `--` separator passes flags through to the binary,

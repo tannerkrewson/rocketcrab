@@ -14,6 +14,8 @@
 export type TrysteroJoinErrorCategory =
   /** Wrong room password (F8: structured Trystero error). */
   | "password_mismatch"
+  /** Incompatible transport/action wire format; all players must reload. */
+  | "incompatible_version"
   /** Peer rejected the join/admission or the identity handshake failed. */
   | "rejected"
   /** Peer handshake timed out (Trystero `handshakeTimeoutMs`). */
@@ -40,6 +42,7 @@ export type TrysteroJoinErrorCategory =
 /** Categories that can never recover without user action (S1 retry UX). */
 const FATAL_CATEGORIES: ReadonlySet<TrysteroJoinErrorCategory> = new Set([
   "password_mismatch",
+  "incompatible_version",
   "relay_unreachable",
   "join_timeout",
   "cancelled",
@@ -96,6 +99,9 @@ export interface TrysteroJoinErrorReport {
  * sources and the F5/F8 findings).
  */
 export function categorizeJoinError(message: string): TrysteroJoinErrorCategory {
+  if (/incompatible Nova version/i.test(message)) {
+    return "incompatible_version";
+  }
   if (/password/i.test(message)) {
     return "password_mismatch";
   }

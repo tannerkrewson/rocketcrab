@@ -267,6 +267,7 @@ class TrysteroClientImpl implements Client {
       async () => ({
         data: {
           v: 1,
+          transportVersion: 2,
           memberId: other.adapter.selfMemberId,
           connectionId: other.adapter.selfConnectionId,
           displayName: other.adapter.displayName,

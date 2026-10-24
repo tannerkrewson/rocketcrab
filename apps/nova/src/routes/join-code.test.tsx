@@ -131,13 +131,13 @@ describe("/join/:code (short join URL)", () => {
 
   it("falls through to the 404 page for a non-letter code", async () => {
     renderShortJoin("/join/ab1d");
-    expect(await screen.findByText("Lost in space")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Lost in space")).toBeInTheDocument());
     expect(stubEngine.joinByCode).not.toHaveBeenCalled();
   });
 
   it("falls through to the 404 page for a wrong-length path", async () => {
     renderShortJoin("/join/abc");
-    expect(await screen.findByText("Lost in space")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Lost in space")).toBeInTheDocument());
   });
 
   it("takes the direct-join path when a fragment secret sits on top of the path code", async () => {
@@ -219,6 +219,6 @@ describe("/:code (root short join URL, rocketcrab.com/cvvu)", () => {
 
   it("falls through to the 404 page for a non-code single segment", async () => {
     renderShortJoin("/not-a-code");
-    expect(await screen.findByText("Lost in space")).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByText("Lost in space")).toBeInTheDocument());
   });
 });

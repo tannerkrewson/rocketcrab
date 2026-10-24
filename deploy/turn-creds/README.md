@@ -369,8 +369,8 @@ records the month it fired, so the next day's run does not re-alert.
   outside the mint
   flow (no Origin check) and harmless to expose: watermarks dedupe alerts.
 - **GraphQL query**: the worker queries `viewer.accounts(filter: {accountTag})
-{ callsTurnUsageAdaptiveGroups(limit: 10000, filter: { date_geq,
-date_leq }) { dimensions { datetime } sum { egressBytes } } }` with
+  { callsTurnUsageAdaptiveGroups(limit: 10000, filter: { date_geq,
+  date_leq }) { dimensions { datetime } sum { egressBytes } } }` with
   `date_geq`/`date_leq` = `YYYY-MM-DD`. The dataset name, field names, and
   filter keys follow the Realtime TURN analytics docs
   (developers.cloudflare.com/realtime/turn/analytics) and are defined as
