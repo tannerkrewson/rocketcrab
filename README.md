@@ -128,9 +128,10 @@ excluded from formatting and lint via `.oxfmtrc.json` / `.oxlintrc.json`.
 
 Dependency updates are handled by Dependabot (`.github/dependabot.yml`).
 
-The `bundle:size` script reports built asset sizes; the Nova main JS bundle has
-a documented warning threshold of 400 kB (configurable via
-`NOVA_BUNDLE_LIMIT_KB`). The threshold is a warning, not a CI gate.
+The `bundle:size` script reports raw and gzipped built asset sizes. The Nova
+initial JS bundle has a documented gzip budget of 220 kB (baseline 175 kB on
+2026-10-24; configurable via `NOVA_BUNDLE_LIMIT_GZIP_KB`). Editor-only code is
+route-split into a lazy chunk. The budget is a warning, not a CI gate.
 
 ## Testing
 

@@ -24,7 +24,12 @@
  *     control over game traffic, ADR-0008).
  *
  * Usage:
- *   node scripts/verify-static-deploy.mjs --origin nova|runtime [--runtime-origin <origin>]
+ *   node scripts/verify-static-deploy.mjs --origin nova|runtime [--runtime-origin <origin>] [--pages]
+ *
+ * `--pages` requires the GitHub Pages 404.html fallback. The deploy workflow
+ * creates that byte-copy after `vite build`, so a plain local verification of
+ * `npm run build` output does not fail for its absence; other hosts use their
+ * own rewrite configuration.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -33,6 +38,7 @@ import { fileURLToPath } from "node:url";
 const args = parseArgs(process.argv.slice(2));
 const origin = args.origin;
 const runtimeOrigin = args.runtimeOrigin ?? "";
+const requirePagesFallback = args.pages === true;
 if (origin !== "nova" && origin !== "runtime") {
   fail(`--origin must be "nova" or "runtime" (got "${origin}")`);
 }
@@ -81,9 +87,13 @@ if (origin === "nova") {
   expect("no inline application scripts", inlineScript === null, inlineScript?.[0] ?? "");
   // GitHub Pages SPA fallback: 404.html serves the shell for unknown paths.
   const notFound = readFileOptional(join(DIST, "404.html"));
-  expect("404.html present (GitHub Pages SPA fallback)", notFound !== null);
+  if (requirePagesFallback) {
+    expect("404.html present (GitHub Pages SPA fallback)", notFound !== null);
+  }
   if (notFound !== null) {
     expect("404.html is a byte-copy of index.html", notFound === indexHtml);
+  } else if (!requirePagesFallback) {
+    console.log("note  404.html not present (GitHub Pages workflow adds it with --pages)");
   }
   expect("referrer meta (no-referrer)", isNoReferrerMeta(indexHtml));
 } else {
@@ -158,6 +168,10 @@ function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
+    if (arg === "--pages") {
+      out.pages = true;
+      continue;
+    }
     if (arg === "--origin" || arg === "--runtime-origin") {
       out[arg === "--origin" ? "origin" : "runtimeOrigin"] = argv[i + 1] ?? "";
       i += 1;

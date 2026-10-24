@@ -194,6 +194,29 @@ Deploy:
    (strategy (a)) or nothing (strategy (b) project sites).
 3. Run "Deploy to GitHub Pages" with the input table above.
 
+### Verify the built artifacts locally (no host required)
+
+The 2026-10-24 launch-readiness pass exercised the **built** two-origin output
+this way and all 16 static/runtime Playwright tests passed (SPA deep-link
+fallback, CSP `frame-src` to the runtime origin, invite-fragment secrecy,
+remote dependencies, isolation, lifecycle cleanup):
+
+```sh
+# Distinct local origins (any ports you like; bake them into the builds)
+VITE_RUNTIME_ORIGIN=http://localhost:5174 npm run build --workspace @rocketcrab/nova
+VITE_MAIN_ORIGIN=http://localhost:5173   npm run build --workspace @rocketcrab/runtime
+cp apps/nova/dist/index.html apps/nova/dist/404.html   # Pages-style fallback
+# Serve apps/nova/dist on 5173 with a history fallback and apps/runtime/dist
+# on 5174 as plain static files, then run the Playwright specs with a config
+# whose baseURL is http://localhost:5173 and no webServer entry.
+```
+
+`npm run verify:deploy -- --origin nova --runtime-origin <origin>` checks the
+CSP/scripts; add `--pages` when `404.html` should be required (the GitHub
+Pages workflow does, after creating it). Without `--pages` a plain local build
+verification reports the missing fallback as a note rather than a failure, so
+alternate hosts with their own rewrites can use the same script.
+
 Verify after each deploy:
 
 ```sh
@@ -204,7 +227,7 @@ curl -sI https://runtime.nova.example/    # runtime origin serves its page
 
 Plus `npm run verify:deploy` against local build output (the same checks the
 workflow runs): CSP meta + pinned `frame-src`, no inline scripts, 404.html
-fallback (nova); no CSP meta + no service workers (runtime). "Invite
+fallback (nova; add `--pages` when it must be present); no CSP meta + no service workers (runtime). "Invite
 fragments are not sent in HTTP requests" is covered by
 `e2e/deployment.spec.ts` and the fact that fragments never leave the
 browser.

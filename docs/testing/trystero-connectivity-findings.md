@@ -326,3 +326,74 @@ socket-OPEN ones.
   configuration are untouched (blocked human decision `rocketcrab-iha`); the
   discovery path is unchanged. Relays that drop traffic silently (no NOTICE,
   no OK response) are not yet detected — only observable rejections are.
+
+---
+
+# Launch-readiness re-probe (2026-10-24)
+
+The August relay observations were re-tested from the current developer
+network with a stricter probe (`scripts/probes/probe-trystero-kinds.mjs`).
+This probe fixes two limits of the August runs: it publishes across a spread
+of the kinds Trystero actually derives (`charCodeSum(topic) % 10000 + 20000`,
+i.e. 20000–29999) instead of two fixed kinds, and it bursts 12 events to
+distinguish one-off acceptance from sustained usability.
+
+## Per-relay results (two independent runs)
+
+| Relay                        | Run 1: kinds / burst | Run 2: kinds / burst | Verdict                                                |
+| ---------------------------- | -------------------- | -------------------- | ------------------------------------------------------ |
+| wss://nos.lol                | 9/9, 12/12           | 9/9, 12/12           | healthy — retain                                       |
+| wss://relay.primal.net       | 9/9, 12/12           | 9/9, 12/12           | healthy — retain                                       |
+| wss://nostr.mom              | 9/9, 12/12           | 9/9, 12/12           | healthy — retain                                       |
+| wss://relay.snort.social     | 9/9, 12/12           | 9/9, 12/12           | healthy — retain (ephemeral storage notice only)       |
+| wss://relay.nostr.net        | 9/9, 12/12           | 9/9, 12/12           | healthy — retain                                       |
+| wss://nostr.bitcoiner.social | 9/9, 6/12            | 0/9, 0/12            | web-of-trust throttling — do not add                   |
+| wss://relay.damus.io         | connect failed       | 6/9, 0/12            | unstable/quota-throttled — drop                        |
+| wss://offchain.pub           | 9/9, 6/12            | 0/9, 0/12            | web-of-trust throttling — drop                         |
+| wss://relay.nostr.info       | 0/9, 0/12            | 0/9, 0/12            | hard policy rejection (`blocked: not accepted`) — drop |
+
+The two-run comparison shows the throttling is time-dependent, not a
+network glitch: relays that accept a first burst later reject every event.
+The five-relay set recommended in August is the only set that was fully
+usable in both runs. **The pinned `GOOD_RELAYS` list is still unchanged pending
+owner sign-off**; the optional `VITE_TRYSTERO_RELAYS` build-time override is
+implemented and tested so an approved set can ship without a code change.
+
+## TURN credential lifetime (authoritative behavior)
+
+Cloudflare Realtime documents that expiring credentials keep the allocation
+alive only briefly: billing/analytics stop immediately and **the connection is
+disconnected after a short delay**. The maximum credential lifetime is 48
+hours, and longer allocations require updating credentials. The browser API
+for an active peer is `RTCPeerConnection.setConfiguration()`; refreshing ICE
+for an existing allocation may require `restartIce()` plus renegotiation, which
+Trystero 0.25.3 does not expose per peer (`room.getPeers()` exposes the peer
+connections, but the adapter has no renegotiation path).
+
+Accordingly the client now re-mints at **8 minutes** (600 s TTL minus a
+2-minute safety margin), applies the new `iceServers` to live peers via
+`setConfiguration()`, and preserves non-TURN servers. This is honest
+mitigation, not a guarantee: a party whose allocation has already failed may
+still need the existing reconnect path. A cross-network party longer than ten
+minutes remains a required physical test.
+
+## Automated browser evidence (2026-10-24)
+
+The full Playwright suite ran in the Playwright 1.62.1 container (host network)
+against **Chromium, Firefox, and WebKit**: 60 tests, 60 passed. This covers
+static SPA routing, invite-fragment secrecy, runtime bootstrap and remote
+dependencies, lifecycle/restart cleanup, and cross-origin isolation in all
+three engines. It does **not** cover real iOS Safari behavior, real network
+topology, or multi-device WebRTC; those stay on the physical checklist.
+
+## Still requiring physical devices or a deployment
+
+- Cross-network discovery and gameplay (desktop Wi-Fi ↔ iPhone cellular, two
+  phones on different networks), four mixed peers, a real 5 MiB transfer, and
+  a party longer than ten minutes with a credential refresh.
+- iPhone backgrounding for 1–3 minutes, low-power mode, and airplane-mode
+  recovery; WebKit automation is not a substitute.
+- Live mint → TURN allocation behavior, Worker watchdog/analytics permissions,
+  zone rate-limit enforcement, and spending notifications.
+- Actual hosting security headers (GitHub Pages cannot send custom headers;
+  see `docs/architecture/deployment.md`) and real CDN/caching behavior.

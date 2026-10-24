@@ -2,16 +2,18 @@
 // Bundle-size report for the two static origins.
 //
 // Lists built asset sizes for apps/nova and apps/runtime and prints a
-// warning (exit 0, non-failing) when the Nova main JS bundle exceeds the
-// documented threshold. The threshold is configurable via
-// NOVA_BUNDLE_LIMIT_KB (default 400 kB) and is checked in CI after the
-// production build as a warning, not a gate.
+// warning (exit 0, non-failing) when the Nova initial JS bundle exceeds the
+// documented budget. Gzip is what phones actually download, so it is the
+// budget people care about: NOVA_BUNDLE_LIMIT_GZIP_KB (default 220 kB).
+// Raw (uncompressed) size is reported for context. Values are baseline
+// measurements from the 2026-10-24 launch-readiness build, not hard gates.
 
-import { readdirSync, statSync } from "node:fs";
+import { readdirSync, statSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import { gzipSync } from "node:zlib";
 
-const LIMIT_KB = Number(process.env.NOVA_BUNDLE_LIMIT_KB ?? 400);
-const limitBytes = LIMIT_KB * 1024;
+const GZIP_LIMIT_KB = Number(process.env.NOVA_BUNDLE_LIMIT_GZIP_KB ?? 220);
+const gzipLimitBytes = GZIP_LIMIT_KB * 1024;
 
 const TARGETS = [
   { name: "apps/nova", dist: process.env.NOVA_DIST ?? "apps/nova/dist" },
@@ -32,7 +34,12 @@ function listAssets(dir, prefix = "") {
     if (stat.isDirectory()) {
       out.push(...listAssets(path, join(prefix, entry)));
     } else {
-      out.push({ path: join(prefix, entry), bytes: stat.size });
+      const bytes = stat.size;
+      const gzipBytes =
+        entry.endsWith(".js") || entry.endsWith(".css") || entry.endsWith(".html")
+          ? gzipSync(readFileSync(path)).length
+          : null;
+      out.push({ path: join(prefix, entry), bytes, gzipBytes });
     }
   }
   return out;
@@ -51,16 +58,18 @@ for (const { name, dist } of TARGETS) {
   const total = assets.reduce((sum, a) => sum + a.bytes, 0);
   console.log(`\n${name} (${format(total)} total):`);
   for (const a of assets) {
-    console.log(`  ${format(a.bytes).padStart(9)}  ${a.path}`);
+    const gzip =
+      a.gzipBytes === null ? "".padStart(10) : ` (${format(a.gzipBytes)} gz)`.padStart(22);
+    console.log(`  ${format(a.bytes).padStart(9)}${gzip}  ${a.path}`);
   }
 
   const main = assets.find((a) => /^assets\/index-.*\.js$/.test(a.path));
-  if (main && main.bytes > limitBytes) {
+  if (main && main.gzipBytes !== null && main.gzipBytes > gzipLimitBytes) {
     warned = true;
     console.warn(
-      `\n⚠ ${name} main bundle is ${format(main.bytes)}, ` +
-        `exceeding the documented limit of ${format(limitBytes)} ` +
-        `(NOVA_BUNDLE_LIMIT_KB=${LIMIT_KB}). Investigate the regression.`,
+      `\n⚠ ${name} initial JS is ${format(main.gzipBytes)} gzipped, ` +
+        `exceeding the documented budget of ${format(gzipLimitBytes)} ` +
+        `(NOVA_BUNDLE_LIMIT_GZIP_KB=${GZIP_LIMIT_KB}). Investigate the regression.`,
     );
   }
 }

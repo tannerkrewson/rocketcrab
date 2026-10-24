@@ -5,6 +5,32 @@ records from the project tracker at migration: 13 actionable tasks/decisions and
 9 project/phase tracking epics. The source database contained 224 records total;
 202 were closed. Do not interpret an open phase epic as an unimplemented phase.
 
+## Launch-readiness update (2026-10-24)
+
+Completed without a deployment or physical device:
+
+- Fixed the simulation-mode joiner defect and related mode/source transitions
+  (§10), including hash-correct source replacement.
+- Added TURN credential refresh with `setConfiguration()` (§6) based on
+  Cloudflare's documented expiry behavior.
+- Re-probed discovery relays with a stricter kind-spread/burst probe (§8–§9).
+- Added a tested `VITE_TRYSTERO_RELAYS` build-time override and deploy input
+  (default discovery path unchanged pending sign-off).
+- Added Firefox and WebKit to the Playwright suite; 60/60 tests pass in
+  Chromium, Firefox, and WebKit locally in the Playwright 1.62.1 container.
+- Verified the **built static two-origin artifacts** on distinct local origins
+  (no hosting): 16/16 static/runtime Playwright tests pass, covering SPA deep
+  links, the CSP `frame-src` iframe bootstrap to the second origin, invite
+  fragment secrecy, remote dependencies, isolation, and lifecycle cleanup.
+  `verify:deploy` passes against the built output (`--pages` for the GitHub
+  Pages fallback).
+- Enabled TanStack Router automatic code splitting; the initial JS bundle is
+  **175 kB gzipped** with the editor route lazy-loaded (648 kB raw/210 kB gzip).
+  Documented a 220 kB gzip budget in `scripts/bundle-size.mjs` and the README.
+
+Everything still requiring a human decision, a deployment, or physical devices
+is collected under **Blocked on humans, infrastructure, or hardware** at the end.
+
 The backlog was last updated in August 2026. Revalidate historical observations
 against the current code, providers, networks, and deployed resources before
 acting. Completed implementation is not a substitute for deployment or physical
@@ -135,17 +161,23 @@ of that deployment, not authorization for another deployment path.
       `deploy/turn-creds/README.md`. Use OpenTofu, not a removed Wrangler deploy
       workflow or a placeholder KV ID.
 
-## 6. Mid-party TURN credential lifetime — P2, decision and possible code work
+## 6. Mid-party TURN credential lifetime — refresh implemented; device proof remains
 
-The client mints once at join with a 600-second TTL. Historical notes flag a risk
-to long parties; verify actual provider/allocation behavior and transport APIs.
+Cloudflare documents that an expired credential stops billing immediately and
+the allocation disconnects after a short delay; 48 hours is the maximum TTL.
+Two options were invalidated by evidence: a longer TTL weakens abuse resistance,
+and a session-level refresh cannot rescue an already-failed allocation. Trystero
+exposes peer connections but has no renegotiation/ICE-restart hook.
 
-- [ ] Choose and document one policy: accept/document expiry, refresh around nine
-      minutes/on disconnect, or increase TTL with an explicit abuse tradeoff.
-- [ ] Prefer low-complexity refresh if feasible; verify what Trystero exposes
-      rather than assuming access to `RTCPeerConnection.setConfiguration()`.
-- [ ] If refresh is chosen, add tests and run a cross-network party for longer
-      than ten minutes. Record the decision in the TURN runbook/ADR.
+- [x] Chose: re-mint at **8 minutes** (600 s TTL minus a 2-minute margin), apply
+      to live peers via `RTCPeerConnection.setConfiguration()` while preserving
+      non-TURN servers, refresh on foreground/reconnect against the wall clock,
+      and never reuse a near-expiry credential for a new party. Single-flight,
+      party-scoped, with tests for expiry, refresh, and injected factories.
+- [ ] Run a **cross-network party longer than ten minutes** and record whether
+      the refresh holds the connection; if it fails, add an ICE-restart path in
+      the adapter or document the limitation and shorten the expected session.
+- [ ] Re-test after an iPhone background/foreground cycle spanning the expiry.
 
 ## 7. Independent billing notification — P2, manual dashboard task
 
@@ -160,41 +192,46 @@ independent of the implemented watchdog.
 - [ ] Document the actual threshold and delivery verification in
       `deploy/turn-creds/README.md`.
 
-## 8. Discovery-relay remediation — P2, blocked on owner sign-off
+## 8. Discovery-relay remediation — evidence refreshed; owner sign-off pending
 
-The investigation is complete; changing the public discovery path requires
-approval, not merely an implementation agent's choice.
+Changing the public discovery path still requires owner approval. The current
+pinned list is unchanged.
 
-- [ ] Re-probe candidates from the developer's and ideally the owner's networks.
-      August 15 observations are not a current availability guarantee.
-- [ ] Present the verified set and public-versus-private-relay tradeoffs for
-      approval before changing the production discovery path.
-- [ ] Historical recommendation: `nos.lol`, `relay.primal.net`, `nostr.mom`,
-      `relay.snort.social`, and `relay.nostr.net`; remove `relay.damus.io`,
-      `offchain.pub`, and `relay.nostr.info` if current tests confirm the finding.
-- [ ] Keep nominal redundancy at five unless new evidence recommends otherwise.
-      Verify behavior: pinned URLs historically all participated, so the default
-      redundancy setting did not slice the pinned list.
-- [ ] Consider an optional build-time `VITE_TRYSTERO_RELAYS` override in the
-      transport factory, defaulting to the approved list; no runtime fetch needed.
-- [ ] Apply only the approved remediation, add appropriate tests, and record
-      probe evidence in `docs/testing/trystero-connectivity-findings.md`.
-      Persistent old-relay failures should no longer flood the console.
+- [x] Re-probed on 2026-10-24 from the developer network with a stricter probe
+      (`scripts/probes/probe-trystero-kinds.mjs`): nine kinds across Trystero's
+      derived 20000–29999 range plus 12-event bursts, two runs.
+- [x] Fresh result: `nos.lol`, `relay.primal.net`, `nostr.mom`,
+      `relay.snort.social`, and `relay.nostr.net` accepted 9/9 kinds and 12/12
+      bursts in both runs. `relay.damus.io` was unreachable then quota-limited;
+      `offchain.pub` and `nostr.bitcoiner.social` accepted a first burst then
+      hit web-of-trust rejection; `relay.nostr.info` rejected every event.
+- [x] Implemented and tested the optional `VITE_TRYSTERO_RELAYS` build-time
+      override (validated, deduplicated, invalid entries ignored) plus a deploy
+      workflow input. Defaults are unchanged, so this does not alter signaling
+      without an explicit deploy value.
+- [ ] **Owner decision:** approve replacing the pinned seven with the five
+      verified relays, or keep the current list. With pinned URLs all are used,
+      so nominal redundancy is inert; the five-relay set trades absolute count
+      for relays that actually carry traffic. A fresh probe from the owner's
+      network would strengthen the decision.
+- [ ] If approved, apply the list (or set the deploy input), re-run the browser
+      discovery probe, and confirm the old per-relay console failures stop.
+- [ ] Consider a private relay later; public arbitrary-kind relays are scarce
+      and can change policy without notice.
 
-## 9. Relay-quality observations to reconcile — P2
+## 9. Relay-quality observations reconciled
 
-This is a separate unfinished investigation follow-up, dependent on section 8.
-Do not discard its conflicting evidence when choosing a relay set.
-
-- [ ] Reconcile the live-test observations: damus rate-limited; offchain rejected
-      by policy; nostr.info rejected Trystero kinds 22919/22612; nos.lol and
-      nostr.mom demanded 28-bit proof of work, despite appearing in a later
-      recommended set.
-- [ ] Verify actual Trystero event kinds and sustained bursts, not just socket
-      connectivity. Same-machine success via host/mDNS candidates does not
-      establish cross-network discovery reliability.
-- [ ] Record sustained usability, redundancy, console behavior, and usable versus
-      merely connected relay counts after the approved change.
+- [x] Re-read the conflicting observations: the August proof-of-work notices
+      were relay-wide policy hints, not a per-event rejection for these kinds;
+      the stricter October probe confirms `nos.lol` and `nostr.mom` accept both
+      the sampled kinds and sustained 12-event bursts. `nostr.info` rejected
+      every sampled kind in both October runs, matching the August finding.
+- [x] Verified sustained bursts rather than socket reachability: accept-then-
+      throttle relays (damus, offchain, bitcoiner.social) are distinguishable
+      from healthy relays only under burst load, which the new probe measures.
+- [ ] After any approved relay change, record post-change console behavior and
+      usable-versus-connected counts in the findings doc. Same-machine discovery
+      success still does not prove cross-network reliability.
 
 ## 10. Simulation-mode joiner session bug — P2, unresolved code defect
 
@@ -247,9 +284,16 @@ rewriting completed work blindly.
       support for security headers, SPA deep links, caching, and fragment-only
       invite secrets. A Pages workflow alone is not proof that `_headers` are
       enforced by the selected host. Publish only with owner approval.
-- [ ] From a clean install run format, lint, typecheck, unit/property tests,
-      runtime integration and IndexedDB tests, Chromium/Firefox where applicable,
-      WebKit, production builds, bundle reports, and deploy verification.
+- [x] From a clean install: format, lint, typecheck, all unit/property tests
+      (1,025 total), and production builds pass. Full Playwright suite passes in
+      **Chromium, Firefox, and WebKit** (60/60) in the Playwright 1.62.1
+      container. Firefox and WebKit are now in CI config (not yet observed on a
+      GitHub runner).
+- [x] Documented a gzip-based initial-bundle budget (220 kB; measured 175 kB)
+      and route-level lazy loading of the editor.
+- [x] Validated the built artifacts locally on two distinct origins (see the
+      launch-readiness update and `docs/architecture/deployment.md`); this is
+      not evidence about the eventual host's headers or CDN behavior.
 - [ ] Run and record physical tests with at least two iPhones and a desktop:
       same-Wi-Fi and Wi-Fi/cellular parties, four-letter and QR joins, source
       transfer, state-mode play, authority migration, reconnect, simulation/raw
@@ -267,10 +311,14 @@ rewriting completed work blindly.
       architecture diagrams, prompt docs, security limitations, browser support,
       contributing guidance, and non-goals. Keep media claims experimental where
       evidence requires it; don't promise per-game isolation on a shared origin.
-- [ ] Document performance budgets and measurements: main initial bundle,
-      runtime bootstrap, time to interactive, arena creation, room discovery,
-      HTML transfer, state-action latency, and memory after repeated restarts.
-      Investigate large regressions rather than inventing perfect-number gates.
+- [x] Documented the bundle budgets and measurements above. Historical baseline:
+      runtime bootstrap 30.7 kB gzip; arena discovery ~2 s on loopback; state
+      latency, 5 MiB transfer, and memory-after-restart numbers still need a
+      real-network capture (below).
+- [ ] Measure time to interactive, arena creation, room discovery, HTML
+      transfer, state-action latency, and memory after repeated restarts on a
+      real phone and real network. Investigate large regressions rather than
+      inventing perfect-number gates.
 - [ ] Record release evidence, resolve remaining blockers, and mark Nova ready
       for review. The owner-authorized tracker purge supersedes the old backlog's
       instruction to preserve every historical commit unchanged.
@@ -321,6 +369,39 @@ work unless the owner separately decides to remove or port them:
   Nova implementation; optional reference only, not merge-ready Nova work.
 - Remote `allbadcards`, `liesgame`, and two old Dependabot branches: historical
   game integrations/dependency changes, not unfinished Nova work.
+
+## Blocked on humans, infrastructure, or hardware (2026-10-24)
+
+Cannot be completed from this workstation without one of: an owner decision, a
+real deployment/credentials, or physical devices on real networks.
+
+**Owner decisions**
+
+- Approve (or reject) the five-relay discovery set in §8.
+- Choose the remote OpenTofu state backend, locking, and retention; import
+  policy for the live relay; TURN route versus custom domain and its rate rule;
+  CI apply versus operator apply; TURN key creation/rotation and Worker secrets.
+- Choose the two production origins/host. GitHub Pages cannot send custom HTTP
+  security headers (documented limitation); a header-capable host is preferable
+  if strict headers are a launch requirement.
+- Decide whether a public host name may appear in the four-letter-code advert
+  (§11); the creator-versus-greeter improvement (§12) is optional.
+
+**Deployment / live verification**
+
+- Provision TURN key, KV namespace, Worker, secrets, budget caps, billing alert,
+  and zone rate limit; verify live `/__watchdog`, mint, counters, and headers.
+- Deploy the two static origins and confirm SPA routing, caching, CSP/frame
+  behavior, invite-fragment secrecy, and CDN behavior on the real host.
+
+**Physical devices / real networks**
+
+- Cross-network parties (Wi-Fi ↔ cellular; two phones on different networks),
+  four mixed devices, code and QR joins, a real 5 MiB transfer, and a party
+  longer than ten minutes across the TURN credential refresh.
+- iPhone backgrounding, low-power mode, airplane-mode recovery, audio gesture,
+  camera/mic permission, safe areas, and the full Mobile Safari checklist.
+- A real friend beta without coaching, to catch product and error-message gaps.
 
 ## Source-of-truth documents
 

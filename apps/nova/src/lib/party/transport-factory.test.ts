@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
-import { createTrysteroPartyTransportFactory } from "./transport-factory";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { configuredRelays, createTrysteroPartyTransportFactory } from "./transport-factory";
 
 /**
  * Transport-factory tests (task rocketcrab-23s, P0): the real-party factory
@@ -34,6 +34,28 @@ const TURN_CONFIG = [
 
 beforeEach(() => {
   mocks.constructed.length = 0;
+});
+
+afterEach(() => {
+  vi.unstubAllEnvs();
+});
+
+describe("configuredRelays", () => {
+  it("defaults to no override", () => {
+    expect(configuredRelays()).toEqual([]);
+  });
+
+  it("keeps valid ws/wss URLs, normalizes, dedupes, and ignores invalid entries", () => {
+    vi.stubEnv(
+      "VITE_TRYSTERO_RELAYS",
+      " wss://nos.lol,https://evil.example,wss://nostr.mom,,wss://nos.lol,not a url, ws://localhost:7777 ",
+    );
+    expect(configuredRelays()).toEqual([
+      "wss://nos.lol/",
+      "wss://nostr.mom/",
+      "ws://localhost:7777/",
+    ]);
+  });
 });
 
 describe("createTrysteroPartyTransportFactory", () => {
@@ -77,6 +99,16 @@ describe("createTrysteroPartyTransportFactory", () => {
     factory.createRendezvousTransport({ memberId: "m1b" });
     const [, second] = mocks.constructed as [Record<string, unknown>, Record<string, unknown>];
     expect(second.turnConfig).toBe(TURN_CONFIG);
+  });
+
+  it("applies an explicit relay override to both room transports", () => {
+    const relays = ["wss://relay.example/"];
+    const factory = createTrysteroPartyTransportFactory({ relays });
+    factory.createRendezvousTransport({ memberId: "m1" });
+    factory.createPrivateTransport({ memberId: "m2", password: "pw" });
+    for (const options of mocks.constructed as Array<Record<string, unknown>>) {
+      expect(options.relays).toEqual(relays);
+    }
   });
 
   it("threads an onJoinError observer to BOTH transports (5cl.1)", () => {

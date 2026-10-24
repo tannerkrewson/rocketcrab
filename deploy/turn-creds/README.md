@@ -196,6 +196,15 @@ LAN override is dev-only. For the equivalent in `.dev.vars`:
   lifetime, baked into the worker (`MINT_TTL_SECONDS`). Short enough that an
   extracted credential is worthless, long enough for a full party. The client
   cannot change it (request bodies are ignored).
+- **Client refresh:** the Nova app re-mints at **8 minutes** (a 2-minute safety
+  margin), applies the new servers to live peers with
+  `RTCPeerConnection.setConfiguration()`, and refreshes again on foreground or
+  reconnect if the wall-clock lease has expired. It never reuses near-expiry
+  credentials for a new party. Cloudflare documents that an expiring credential
+  disconnects the allocation shortly after it expires; this mitigation cannot
+  guarantee rescue of an allocation that has already failed, and Trystero has
+  no ICE-restart/renegotiation hook. A cross-network party longer than ten
+  minutes therefore remains a physical-device release test.
 - Cloudflare's `generate-ice-servers` response includes alternate **port-53**
   URLs (`stun:`/`turn:` on port 53), which browsers block — ICE would stall on
   timeouts, and Nova does not use trickle ICE. The worker drops every URL

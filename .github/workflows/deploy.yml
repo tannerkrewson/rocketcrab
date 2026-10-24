@@ -86,6 +86,15 @@ on:
         required: false
         type: string
         default: ""
+      trystero_relays:
+        description: >-
+          (nova only) Optional comma-separated Nostr relay URLs for party
+          discovery, baked in as VITE_TRYSTERO_RELAYS. Leave empty to use the
+          reviewed pinned GOOD_RELAYS. Only set an owner-approved, re-probed
+          set; invalid entries are ignored at build time.
+        required: false
+        type: string
+        default: ""
 
 permissions:
   contents: read
@@ -120,6 +129,7 @@ jobs:
           VITE_RUNTIME_BASE: ${{ inputs.runtime_base }}
           VITE_CLASSIC_RELAY_ORIGIN: ${{ inputs.relay_origin }}
           VITE_TURN_CREDS_ORIGIN: ${{ inputs.turn_creds_origin }}
+          VITE_TRYSTERO_RELAYS: ${{ inputs.trystero_relays }}
 
       - name: Build Runtime origin
         if: inputs.origin == 'runtime'
@@ -136,7 +146,7 @@ jobs:
         run: cp apps/nova/dist/index.html apps/nova/dist/404.html
 
       - name: Verify static deploy output
-        run: node scripts/verify-static-deploy.mjs --origin "${{ inputs.origin }}" --runtime-origin "${{ inputs.runtime_origin }}"
+        run: node scripts/verify-static-deploy.mjs --origin "${{ inputs.origin }}" --runtime-origin "${{ inputs.runtime_origin }}" --pages
 
       - name: Upload Pages artifact (Nova)
         if: inputs.origin == 'nova'
