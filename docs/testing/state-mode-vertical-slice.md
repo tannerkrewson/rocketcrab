@@ -90,7 +90,7 @@ the host on a laptop, guests on phones). Expected results are in bold.
 4. **Save locally.** Back in the editor, save the game. **It appears in the
    library (`/library`) and reopens from there.**
 5. **Create party.** Open the game → _Play with friends_ (or the party
-   route). **The lobby shows a four-letter code and an invite link.**
+   route). **The lobby offers a private invite link and QR code.**
 6. **🔴 MANUAL — Join from at least two physical phones.** Open the invite
    link (or enter the code) on each phone; the creator approves each join
    request. **Both phones show the party lobby with the game title and

@@ -136,7 +136,6 @@ export interface TransportSendOptions {
 
 /** Request to join a session room ({@link NovaTransport.join}). */
 export interface TransportJoinRequest {
-  /** Simulated room / real rendezvous room name. */
   readonly room: string;
   /** Party session ID that will label every message on this connection. */
   readonly sessionId: SessionId;

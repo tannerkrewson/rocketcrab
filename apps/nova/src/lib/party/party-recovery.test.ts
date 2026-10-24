@@ -21,7 +21,6 @@ const SECRET = "A".repeat(43); // valid unpadded base64url session secret
 function input(overrides: Partial<PartyRecoveryInput> = {}): PartyRecoveryInput {
   return {
     role: "joiner",
-    code: "ABCD",
     secret: SECRET,
     memberId: "member-a",
     displayName: "Player A",
@@ -42,7 +41,6 @@ describe("party recovery record", () => {
     expect(record?.version).toBe(PARTY_RECOVERY_VERSION);
     expect(record?.savedAt).toBe(1_700_000_000_000);
     expect(record?.role).toBe("joiner");
-    expect(record?.code).toBe("abcd");
     expect(record?.secret).toBe(SECRET);
     expect(record?.memberId).toBe("member-a");
     expect(record?.game).toEqual({
@@ -53,23 +51,9 @@ describe("party recovery record", () => {
   });
 
   it("supports records without a code (invite-only) and without game info", () => {
-    savePartyRecovery(input({ code: null, game: null }));
+    savePartyRecovery(input({ game: null }));
     const record = readPartyRecovery();
-    expect(record?.code).toBeNull();
     expect(record?.game).toBeNull();
-  });
-
-  it("canonicalizes uppercase recovery codes without changing the secret", () => {
-    const uppercase = JSON.stringify({
-      ...input(),
-      code: "ABCD",
-      secret: SECRET,
-      version: PARTY_RECOVERY_VERSION,
-      savedAt: 1_700_000_000_000,
-    });
-    const record = parsePartyRecovery(uppercase);
-    expect(record?.code).toBe("abcd");
-    expect(record?.secret).toBe(SECRET);
   });
 
   it("clear removes the record", () => {
@@ -84,7 +68,6 @@ describe("party recovery record", () => {
     expect(parsePartyRecovery(JSON.stringify({ ...input(), version: 99 }))).toBeNull();
     expect(parsePartyRecovery(JSON.stringify({ ...input(), role: "admin" }))).toBeNull();
     expect(parsePartyRecovery(JSON.stringify({ ...input(), secret: "not-a-secret" }))).toBeNull();
-    expect(parsePartyRecovery(JSON.stringify({ ...input(), code: 1234 }))).toBeNull();
     expect(parsePartyRecovery(JSON.stringify({ ...input(), memberId: "" }))).toBeNull();
     expect(parsePartyRecovery(JSON.stringify({ ...input(), game: { gameId: 1 } }))).toBeNull();
   });

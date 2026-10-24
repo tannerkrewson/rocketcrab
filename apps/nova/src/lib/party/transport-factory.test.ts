@@ -61,7 +61,7 @@ describe("configuredRelays", () => {
 describe("createTrysteroPartyTransportFactory", () => {
   it("constructs both transports without turnConfig when nothing is baked in", () => {
     const factory = createTrysteroPartyTransportFactory();
-    factory.createRendezvousTransport({ memberId: "m1", displayName: "A" });
+    factory.createPrivateTransport({ memberId: "m1", password: "pw", displayName: "A" });
     factory.createPrivateTransport({ memberId: "m2", displayName: "B", password: "pw" });
 
     expect(mocks.constructed).toHaveLength(2);
@@ -81,7 +81,7 @@ describe("createTrysteroPartyTransportFactory", () => {
 
   it("closes over minted turnConfig for BOTH transports (rendezvous + private)", () => {
     const factory = createTrysteroPartyTransportFactory({ turnConfig: TURN_CONFIG });
-    factory.createRendezvousTransport({ memberId: "m1", displayName: "A" });
+    factory.createPrivateTransport({ memberId: "m1", password: "pw", displayName: "A" });
     factory.createPrivateTransport({ memberId: "m2", displayName: "B", password: "pw" });
 
     expect(mocks.constructed).toHaveLength(2);
@@ -95,8 +95,8 @@ describe("createTrysteroPartyTransportFactory", () => {
 
   it("passes the same closed-over turnConfig array to every transport created", () => {
     const factory = createTrysteroPartyTransportFactory({ turnConfig: TURN_CONFIG });
-    factory.createRendezvousTransport({ memberId: "m1" });
-    factory.createRendezvousTransport({ memberId: "m1b" });
+    factory.createPrivateTransport({ memberId: "m1", password: "pw" });
+    factory.createPrivateTransport({ memberId: "m1b", password: "pw" });
     const [, second] = mocks.constructed as [Record<string, unknown>, Record<string, unknown>];
     expect(second.turnConfig).toBe(TURN_CONFIG);
   });
@@ -104,7 +104,7 @@ describe("createTrysteroPartyTransportFactory", () => {
   it("applies an explicit relay override to both room transports", () => {
     const relays = ["wss://relay.example/"];
     const factory = createTrysteroPartyTransportFactory({ relays });
-    factory.createRendezvousTransport({ memberId: "m1" });
+    factory.createPrivateTransport({ memberId: "m1", password: "pw" });
     factory.createPrivateTransport({ memberId: "m2", password: "pw" });
     for (const options of mocks.constructed as Array<Record<string, unknown>>) {
       expect(options.relays).toEqual(relays);
@@ -114,7 +114,7 @@ describe("createTrysteroPartyTransportFactory", () => {
   it("threads an onJoinError observer to BOTH transports (5cl.1)", () => {
     const onJoinError = vi.fn();
     const factory = createTrysteroPartyTransportFactory({ onJoinError });
-    factory.createRendezvousTransport({ memberId: "m1", displayName: "A" });
+    factory.createPrivateTransport({ memberId: "m1", password: "pw", displayName: "A" });
     factory.createPrivateTransport({ memberId: "m2", displayName: "B", password: "pw" });
 
     const [rendezvous, privateRoom] = mocks.constructed as [

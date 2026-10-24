@@ -6,14 +6,18 @@ saving, and playing user-generated multiplayer browser games.
 A user copies one master prompt into their preferred AI chat service, is
 interviewed by that chatbot about the game they want, receives one complete HTML
 document in one code block, pastes it into Nova, tests several simulated players
-on one page, saves the game in their browser, creates a party with a four-letter
-code, and plays through a Nova-managed peer-to-peer session.
+on one page, saves the game in their browser, creates a private invite party,
+and plays through a Nova-managed peer-to-peer session.
 
-Joining a party works two ways: the short link `https://rocketcrab.com/<code>`
-(four-letter code as a path segment — a public rendezvous namespace, never a
-secret) for typing or voice, or the full secret invite link behind the lobby's
-Copy URL / QR buttons for one-tap direct join. The session secret travels only
-in the URL fragment, never in a path or query (ADR-0011).
+Friends join automatically by opening a private invite link or scanning its QR
+code with their phone camera. The lobby offers native sharing where supported,
+a copy-link fallback, and a displayed QR. The secret travels only in the URL
+fragment, never a path or query (ADR-0011). Anyone with the link can join;
+cooperative removal is not a permanent ban. There are no room codes, accounts,
+or manual approval. A party stays joinable while any participant is connected;
+Nova shell controls pass to a deterministic remaining participant when the creator
+leaves, independently of game authority. External game-provider host roles do not
+generically migrate.
 
 Nova does not generate games itself, and it does not require game creators to
 install tools, understand code, deploy a website, or create a repository.

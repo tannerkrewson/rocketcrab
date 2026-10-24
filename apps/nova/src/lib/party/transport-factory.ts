@@ -1,22 +1,3 @@
-/**
- * Real-party transport factory (P4; ADR-0003/0004/0011).
- *
- * The party layer (P2) is transport-neutral: it drives {@link NovaTransport}
- * through a {@link PartyTransportFactory}. For real parties both transports
- * are {@link TrysteroTransport} instances — the rendezvous room carries no
- * password, the private party room carries the derived session password so
- * room admission stays at the transport level (F8). The appId defaults to
- * the environment-specific `rocketcrab-nova-dev` / `-prod` (never colliding
- * between dev and prod rooms; `app-id.ts`).
- *
- * TURN credentials (P0, task rocketcrab-23s): the factory methods are
- * SYNC (TrysteroTransport construction is synchronous), so the engine mints
- * short-lived credentials ONCE at setup start and closes over them here as
- * `turnConfig` for BOTH transports (the rendezvous and the private room —
- * each room's WebRTC needs the relayed path, and both transports are
- * created fresh per party). Without minted credentials the factory behaves
- * exactly as before: no TURN.
- */
 import type { PartyTransportFactory } from "@rocketcrab/party";
 import { TrysteroTransport, type TrysteroJoinError } from "@rocketcrab/trystero-transport";
 import type { TurnServerConfigLike } from "./turn-creds";
@@ -76,11 +57,7 @@ export function createTrysteroPartyTransportFactory(
   const { onJoinError } = options;
   const relays = options.relays ?? configuredRelays();
   const transports = new Set<TrysteroTransport>();
-  const create = (
-    identity:
-      | Parameters<PartyTransportFactory["createPrivateTransport"]>[0]
-      | Parameters<PartyTransportFactory["createRendezvousTransport"]>[0],
-  ) => {
+  const create = (identity: Parameters<PartyTransportFactory["createPrivateTransport"]>[0]) => {
     const transport = new TrysteroTransport({
       memberId: identity.memberId,
       displayName: identity.displayName,
@@ -99,7 +76,6 @@ export function createTrysteroPartyTransportFactory(
         transport.updateTurnConfig(servers);
       }
     },
-    createRendezvousTransport: create,
     createPrivateTransport: create,
   };
 }

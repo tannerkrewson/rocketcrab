@@ -39,7 +39,7 @@ passes when its expected result holds **on the phone**.
 | A1  | Portrait + landscape           | Open `/party` lobby, the editor + test arena `/editor`, and the editor `/games/:id/edit` in portrait; rotate to landscape and back. | No clipped controls, no horizontal scroll, content reflows; the sticky header and bottom nav stay reachable; nothing is cut off by the URL bar or home indicator.                                                                                                       | WebKit viewport smoke tests (editor/arena layouts) |
 | A2  | Dynamic browser chrome         | Scroll down and up with the URL bar collapsing/expanding while the party lobby and the play shell are on screen.                    | No layout jump that hides the party code, the Start button, or the play-shell controls; fixed fullscreen frame stays fullscreen (no gap at bottom); no control ends up under the home indicator.                                                                        | none (real chrome only)                            |
 | A3  | Safe-area insets               | With the phone in landscape (notch/home indicator side), check the header, bottom nav, play-shell overlay, and editor footer.       | Content is padded inside the notch and home-indicator regions (`pt-safe` / `pb-safe`); buttons are tappable; nothing sits under the indicator.                                                                                                                          | none (real insets only)                            |
-| A4  | On-screen keyboard             | In the editor, tap the code pane and type; in `/join`, type a four-letter code.                                                     | The keyboard pushes/resizes the layout without hiding the focused field or the Run/Stop controls; `100vh`-based panels keep a usable minimum height (the app uses `vh` + `min-h` guards); the page zooms only on deliberate pinch (no iOS auto-zoom on focused inputs). | editor Playwright tests (desktop)                  |
+| A4  | On-screen keyboard             | In the editor, tap the code pane and type; in `/join?edit=name`, edit your name.                                                    | The keyboard pushes/resizes the layout without hiding the focused field or the Run/Stop controls; `100vh`-based panels keep a usable minimum height (the app uses `vh` + `min-h` guards); the page zooms only on deliberate pinch (no iOS auto-zoom on focused inputs). | editor Playwright tests (desktop)                  |
 | A5  | Large touch-only game controls | Play Nova Quiz fully on the phone with no keyboard/pointer.                                                                         | Every button is ≥ ~44 px tall, works on first tap, and the whole game is playable touch-only (no hover, no keyboard, no right-click anywhere in the flow).                                                                                                              | example-game contract tests; arena e2e             |
 
 ## B. Permissions and media (audio gesture, camera/mic)
@@ -71,13 +71,13 @@ passes when its expected result holds **on the phone**.
 
 ## E. Roles and recovery (authority suspension, greeter suspension, reload)
 
-| #   | Scenario                   | Steps (physical iPhone)                                                                                                                                          | Expected result                                                                                                                                                                                           | CI equivalent                                                              |
-| --- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------- |
-| E1  | Authority suspension       | With Nova Quiz in a round, background **the phone holding authority** (the arena shows the Authority badge; in a real party it is the first player).             | Remaining phones keep playing with no error: the round reveals, scores update, the next round starts (S3 election migrates authority; suspended authority is replaceable).                                | S4 e2e (arena authority suspend); S3 election tests; M1 playing-phone test |
-| E2  | Greeter suspension         | Background the **greeter** phone (the party creator with the four-letter code) while another player is mid-party.                                                | The greeter role migrates to the next member; a late joiner can still join by code/invite while the greeter is away; on return the greeter steps down cleanly (no duplicate advertisers, F11).            | rendezvous greeter-migration tests                                         |
-| E3  | Reconnect after reload     | While in a party, reload the phone's page.                                                                                                                       | The recovery banner appears on `/party` or `/join`; one tap rejoins the same party (same memberId); the game re-registers and the current state catches up; the four-letter code still joins new players. | M1 recovery tests; resume-banner route tests                               |
-| E4  | Emergency exit everywhere  | From the reconnect screen and the lobby, use Leave / End-game-for-everyone (the in-game menu has no leave button since 9fv.11.11 — exit happens from the lobby). | Every control works on the phone, always reachable (never inside the game frame), and ends/leaves cleanly for everyone.                                                                                   | P4 play-shell tests; engine cleanup tests                                  |
-| E5  | Reconnect progress visible | Background/offline a phone and watch the reconnect screen.                                                                                                       | The screen shows "Connection lost", the attempt number, auto-retry status, and Reconnect now / Leave party. It never sits silently.                                                                       | M1 reconnect-screen tests                                                  |
+| #   | Scenario                   | Steps (physical iPhone)                                                                                                                                          | Expected result                                                                                                                                                                                              | CI equivalent                                                              |
+| --- | -------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------- |
+| E1  | Authority suspension       | With Nova Quiz in a round, background **the phone holding authority** (the arena shows the Authority badge; in a real party it is the first player).             | Remaining phones keep playing with no error: the round reveals, scores update, the next round starts (S3 election migrates authority; suspended authority is replaceable).                                   | S4 e2e (arena authority suspend); S3 election tests; M1 playing-phone test |
+| E2  | Creator suspension         | Background the creator while another participant remains. Open the same private invite on a third phone.                                                         | Party stays joinable; shell controls pass deterministically. No claim of migrating an external provider's host.                                                                                              | Private-party host/source tests; physical test required                    |
+| E3  | Reconnect after reload     | While in a party, reload the phone's page.                                                                                                                       | The recovery banner appears on `/party` or `/join`; one tap rejoins the same party (same memberId); the game re-registers and the current state catches up; the same private invite still joins new players. | M1 recovery tests; resume-banner route tests                               |
+| E4  | Emergency exit everywhere  | From the reconnect screen and the lobby, use Leave / End-game-for-everyone (the in-game menu has no leave button since 9fv.11.11 — exit happens from the lobby). | Every control works on the phone, always reachable (never inside the game frame), and ends/leaves cleanly for everyone.                                                                                      | P4 play-shell tests; engine cleanup tests                                  |
+| E5  | Reconnect progress visible | Background/offline a phone and watch the reconnect screen.                                                                                                       | The screen shows "Connection lost", the attempt number, auto-retry status, and Reconnect now / Leave party. It never sits silently.                                                                          | M1 reconnect-screen tests                                                  |
 
 ## F. Persistence and multi-frame
 
@@ -91,33 +91,33 @@ passes when its expected result holds **on the phone**.
 
 ## Results table (fill in at M4)
 
-| Scenario                       | Result (PASS/FAIL/N/A) | Notes |
-| ------------------------------ | ---------------------- | ----- |
-| A1 portrait + landscape        |                        |       |
-| A2 dynamic browser chrome      |                        |       |
-| A3 safe-area insets            |                        |       |
-| A4 on-screen keyboard          |                        |       |
-| A5 large touch-only controls   |                        |       |
-| B1 audio after user gesture    |                        |       |
-| B2 audio instructions clear    |                        |       |
-| B3 camera/mic permission       |                        |       |
-| B4 permission denial           |                        |       |
-| C1 device rotation             |                        |       |
-| C2 lock/unlock                 |                        |       |
-| C3 home-screen backgrounding   |                        |       |
-| C4 tab switching               |                        |       |
-| C5 page freeze + restore       |                        |       |
-| C6 low-power mode              |                        |       |
-| D1 Wi-Fi ⇄ cellular            |                        |       |
-| D2 temporary offline           |                        |       |
-| E1 authority suspension        |                        |       |
-| E2 greeter suspension          |                        |       |
-| E3 reconnect after reload      |                        |       |
-| E4 emergency exit              |                        |       |
-| E5 reconnect progress          |                        |       |
-| F1 IndexedDB persistence       |                        |       |
-| F2 several simultaneous frames |                        |       |
-| F3 runtime frame transitions   |                        |       |
+| Scenario                       | Result (PASS/FAIL/N/A) | Notes                                                                                                    |
+| ------------------------------ | ---------------------- | -------------------------------------------------------------------------------------------------------- |
+| A1 portrait + landscape        |                        |                                                                                                          |
+| A2 dynamic browser chrome      |                        |                                                                                                          |
+| A3 safe-area insets            |                        |                                                                                                          |
+| A4 on-screen keyboard          |                        |                                                                                                          |
+| A5 large touch-only controls   |                        |                                                                                                          |
+| B1 audio after user gesture    |                        |                                                                                                          |
+| B2 audio instructions clear    |                        |                                                                                                          |
+| B3 camera/mic permission       |                        |                                                                                                          |
+| B4 permission denial           |                        |                                                                                                          |
+| C1 device rotation             |                        |                                                                                                          |
+| C2 lock/unlock                 |                        |                                                                                                          |
+| C3 home-screen backgrounding   |                        |                                                                                                          |
+| C4 tab switching               |                        |                                                                                                          |
+| C5 page freeze + restore       |                        |                                                                                                          |
+| C6 low-power mode              |                        |                                                                                                          |
+| D1 Wi-Fi ⇄ cellular            |                        |                                                                                                          |
+| D2 temporary offline           |                        |                                                                                                          |
+| E1 authority suspension        |                        |                                                                                                          |
+| E2                             | Creator suspension     | Background the creator while another participant remains. Open the same private invite on a third phone. | Party stays joinable; shell controls pass deterministically. No claim of migrating an external provider's host. | Private-party host/source tests; physical test required |
+| E3 reconnect after reload      |                        |                                                                                                          |
+| E4 emergency exit              |                        |                                                                                                          |
+| E5 reconnect progress          |                        |                                                                                                          |
+| F1 IndexedDB persistence       |                        |                                                                                                          |
+| F2 several simultaneous frames |                        |                                                                                                          |
+| F3 runtime frame transitions   |                        |                                                                                                          |
 
 ## Acceptance-criteria mapping
 

@@ -27,14 +27,11 @@ import {
 import { newMessageId, nowSentAt } from "./messages";
 import {
   createParty,
-  joinPartyByCode,
-  rendezvousRoomName,
-  rendezvousSessionId,
+  joinPartyByInvite,
   type CreatePartyOptions,
-  type JoinByCodeOptions,
+  type JoinByInviteOptions,
   type PartyTransportFactory,
-} from "./rendezvous";
-import { PARTY_CODE_ALPHABET } from "./code";
+} from "./session";
 
 /**
  * Deterministic P3 tests for {@link GameSourceCoordinator}: the full transfer
@@ -1192,7 +1189,7 @@ describe("admission and isolation", () => {
     // see any game-source traffic: the coordinator only rides the private
     // party transport (ADR-0004), so the source never reaches that room.
     const probe = world.hub.createTransport({ memberId: "probe" });
-    await probe.join({ room: rendezvousRoomName("AAAA"), sessionId: rendezvousSessionId("AAAA") });
+    await probe.join({ room: "unrelated-room", sessionId: "unrelated-session" });
     const probeTraffic = captureSourceTraffic(probe);
     await settle(world);
     expect(probeTraffic).toHaveLength(0);
@@ -1292,16 +1289,6 @@ function mockDerive(secret: string) {
   });
 }
 
-/** Index of a code in the 23^4 code space (for injectable codeRngs). */
-function codeIndex(code: string): number {
-  let value = 0;
-  for (let i = 0; i < code.length; i += 1) {
-    const char = code.charAt(i);
-    value += PARTY_CODE_ALPHABET.indexOf(char) * PARTY_CODE_ALPHABET.length ** (3 - i);
-  }
-  return value;
-}
-
 async function makeCreator(
   world: PartyWorld,
   overrides: Partial<CreatePartyOptions> = {},
@@ -1311,14 +1298,6 @@ async function makeCreator(
   const promise = createParty({
     memberId: "creator",
     transportFactory: world.factory,
-    schedule: clock.schedule,
-    collisionListenMs: 1000,
-    collisionRetries: 2,
-    advertIntervalMs: 5000,
-    onJoinRequest: () => true,
-    codeRng: () => codeIndex("aaaa"),
-    partyName: "Party One",
-    gameTitle: "Rocket Rumble",
     derive: mockDerive,
     ...overrides,
   });
@@ -1327,26 +1306,22 @@ async function makeCreator(
     clock.advance(2000);
   }
   const party = await promise;
+  world.secret = party.secret;
   await settle(world);
   return party;
 }
 
 async function makeJoiner(
   world: PartyWorld,
-  overrides: Partial<JoinByCodeOptions> = {},
-): Promise<Awaited<ReturnType<typeof joinPartyByCode>>> {
+  overrides: Partial<JoinByInviteOptions> = {},
+): Promise<Awaited<ReturnType<typeof joinPartyByInvite>>> {
   const clock = world.clock;
   if (clock === undefined) throw new Error("fake clock expected");
-  const promise = joinPartyByCode({
-    code: "AAAA",
+  const promise = joinPartyByInvite({
+    secret: world.secret!,
     memberId: "joiner",
     displayName: "Joiner",
     transportFactory: world.factory,
-    schedule: clock.schedule,
-    discoveryTimeoutMs: 20_000,
-    admissionTimeoutMs: 30_000,
-    advertIntervalMs: 5000,
-    onJoinRequest: () => true,
     derive: mockDerive,
     ...overrides,
   });
@@ -1364,13 +1339,13 @@ async function makeJoiner(
 interface PartyWorld extends World {
   clock: FakeClock;
   factory: PartyTransportFactory;
+  secret?: string;
 }
 
 function makePartyWorld(): PartyWorld {
   const clock = makeFakeClock();
   const hub = new InMemoryTransportHub({ schedule: clock.schedule, now: clock.now });
   const factory: PartyTransportFactory = {
-    createRendezvousTransport: (identity) => hub.createTransport(identity),
     createPrivateTransport: (identity) => hub.createTransport(identity),
   };
   return { clock, hub, factory };
@@ -1409,7 +1384,7 @@ describe("P2 party flow integration (admitted joiner receives the game)", () => 
     probe.on("message:received", (message) => {
       if (message.channel === GAME_SOURCE_CHANNEL) probeTraffic.push(message);
     });
-    await probe.join({ room: rendezvousRoomName("AAAA"), sessionId: rendezvousSessionId("AAAA") });
+    await probe.join({ room: "unrelated-room", sessionId: "unrelated-session" });
     await settle(world);
     expect(probeTraffic).toHaveLength(0);
 

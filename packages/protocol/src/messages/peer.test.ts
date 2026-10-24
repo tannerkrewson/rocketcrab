@@ -4,7 +4,6 @@ import {
   PEER_MESSAGE_TYPES,
   actionAcknowledgementMessageSchema,
   actionDispatchMessageSchema,
-  admissionResponseMessageSchema,
   authorityAnnouncementMessageSchema,
   authorityElectionMessageSchema,
   authorityHeartbeatMessageSchema,
@@ -16,15 +15,12 @@ import {
   gameEndMessageSchema,
   gameSourceCancelMessageSchema,
   gameSourceRequestMessageSchema,
-  joinRequestMessageSchema,
-  partyGreeterMessageSchema,
-  partyIdentityMessageSchema,
+  partyContextMessageSchema,
   partyRenameMessageSchema,
   partyClassicRoomMessageSchema,
   partyClassicRoomRequestMessageSchema,
   partyKickMessageSchema,
   partyReloadAllMessageSchema,
-  partySessionMessageSchema,
   peerCapabilitiesMessageSchema,
   peerMessagesSchema,
   playerIdentityMessageSchema,
@@ -52,17 +48,13 @@ function basePeer(overrides: Record<string, unknown> = {}) {
 describe("peer message schemas", () => {
   it("defines every peer message family with a Zod schema", () => {
     const schemas = [
-      partyIdentityMessageSchema,
-      partySessionMessageSchema,
-      partyGreeterMessageSchema,
+      partyContextMessageSchema,
       partyRenameMessageSchema,
       partyClassicRoomMessageSchema,
       partyClassicRoomRequestMessageSchema,
       partyKickMessageSchema,
       partyReloadAllMessageSchema,
       playerIdentityMessageSchema,
-      joinRequestMessageSchema,
-      admissionResponseMessageSchema,
       connectionStatusMessageSchema,
       peerCapabilitiesMessageSchema,
       actionDispatchMessageSchema,
@@ -93,25 +85,8 @@ describe("peer message schemas", () => {
 
   it("parses a valid example of every peer message", () => {
     const validExamples = [
-      partyIdentityMessageSchema.parse(
-        basePeer({
-          type: "party.identity",
-          partyCode: "ABCD",
-          memberCount: 2,
-        }),
-      ),
-      partySessionMessageSchema.parse(
-        basePeer({
-          type: "party.session",
-          partyCode: "ABCD",
-          secret: "A".repeat(43),
-        }),
-      ),
-      partyGreeterMessageSchema.parse(
-        basePeer({
-          type: "party.greeter",
-          greeterMemberId: "member-2",
-        }),
+      partyContextMessageSchema.parse(
+        basePeer({ type: "party.context", creatorMemberId: "member-1" }),
       ),
       partyRenameMessageSchema.parse(
         basePeer({
@@ -140,20 +115,6 @@ describe("peer message schemas", () => {
           type: "player.identity",
           displayName: "Alex",
           authorityEligible: true,
-        }),
-      ),
-      joinRequestMessageSchema.parse(
-        basePeer({
-          type: "join.request",
-          partyCode: "ABCD",
-          displayName: "Alex",
-        }),
-      ),
-      admissionResponseMessageSchema.parse(
-        basePeer({
-          type: "join.admission",
-          partyCode: "ABCD",
-          decision: "approved",
         }),
       ),
       connectionStatusMessageSchema.parse(
@@ -327,26 +288,10 @@ describe("peer message schemas", () => {
     expect(validExamples).toHaveLength(PEER_MESSAGE_TYPES.length);
   });
 
-  it("accepts uppercase party codes but emits the lowercase canonical form", () => {
-    const parsed = parsePeerMessage(
-      basePeer({
-        type: "party.identity",
-        partyCode: "ABCD",
-        memberCount: 1,
-      }),
-    );
-    expect(parsed).toMatchObject({ ok: true });
-    if (parsed.ok) {
-      expect(parsed.value).toMatchObject({ type: "party.identity", partyCode: "abcd" });
-    }
-  });
-
   it("rejects an invalid example of every peer message", () => {
     const invalidExamples: unknown[] = [
       // Wrong payload types, missing required fields, and bad values.
-      basePeer({ type: "party.identity", partyCode: "ABC", memberCount: 0 }),
-      basePeer({ type: "party.session", partyCode: "ABCD", secret: "nope" }),
-      basePeer({ type: "party.greeter", greeterMemberId: "" }),
+      basePeer({ type: "party.context", creatorMemberId: "" }),
       basePeer({ type: "party.rename", displayName: "" }),
       basePeer({
         type: "party.classicRoom",
@@ -357,8 +302,6 @@ describe("peer message schemas", () => {
       basePeer({ type: "party.kick", targetMemberId: "" }),
       basePeer({ type: "party.reloadAll", sessionId: "" }),
       basePeer({ type: "player.identity", authorityEligible: "yes" }),
-      basePeer({ type: "join.request", partyCode: "ABCD" }),
-      basePeer({ type: "join.admission", partyCode: "ABCD", decision: "maybe" }),
       basePeer({ type: "peer.connectionStatus", status: "connected" }),
       basePeer({ type: "peer.capabilities", protocolVersions: [], gameModes: [] }),
       basePeer({

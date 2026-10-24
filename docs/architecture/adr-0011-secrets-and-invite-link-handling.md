@@ -1,67 +1,34 @@
 # ADR-0011: Secrets and invite-link handling
 
-- **Status:** Accepted
-- **Date:** 2026-08-01
-- **Owner:** Rocketcrab Nova planning (Phase 1)
-- **Related:** ADR-0004 (rendezvous), P2 (implementation), M2 (deployment),
-  U1 (routing), ADR-0008 (runtime origin)
-
-## Context
-
-Parties need private session material (the derived private room ID and Trystero
-password, and the random session secret they come from). These secrets must
-not leak to static hosts, server logs, the runtime frame, or other games.
-Static hosts cannot help keep secrets: anything in a path or query string may
-be logged by the host, CDN, or analytics.
+- **Status:** Accepted; updated for private invites
+- **Owner:** Rocketcrab Nova
+- **Related:** ADR-0004 (private parties), ADR-0008 (runtime isolation), ADR-0010 (trust)
 
 ## Decision
 
-- **Invite secrets are carried in the URL fragment only** — never in path
-  segments or ordinary query parameters. Fragments are not sent to servers,
-  so they never reach the static host (verified in M2 acceptance).
-- The secret is **imported into session memory before rendering the party
-  route**, and visible persistence in browser history is removed or minimized
-  where feasible.
-- **Room codes are not secrets** (ADR-0004); they are public rendezvous
-  namespaces.
-- **Session secrets are generated with Web Crypto** (CSPRNG), and the private
-  room ID and Trystero password are **derived** from that secret (e.g., via
-  HKDF or hash-based derivation implemented with Web Crypto — final scheme in
-  P2).
-- **Party secrets never enter game runtime messages or the game DOM**
-  (plan engineering rules 5, 6): game frames and game source have no access
-  to session material, and the runtime bundle contains no party-secret logic
-  (U3 acceptance).
-- The runtime origin stores no secrets (ADR-0008).
+Generate a 32-byte CSPRNG secret using Web Crypto. Derive the private Trystero
+room ID, password, and session ID via SHA-256 with separate domain labels.
+Invites use `/join#secret=…`: only the fragment contains the capability, never
+paths or queries. Fragments are not sent in HTTP requests. The trusted shell
+imports it and strips it from the address bar/history before opening game frames.
+No application logging, analytics or game messages may contain the secret.
 
-## Alternatives considered
+The main origin stores a small local recovery record (identity, capability,
+last game metadata) to survive Mobile Safari page discard/reload. It stores no
+transferred HTML. Clean leave/dismiss clears the record. Main-origin scripts,
+browser extensions and devtools can access it; runtime-origin game frames cannot.
+This deliberate recovery tradeoff is not a claim of memory-only secrecy.
 
-1. **Query parameters / path segments.** Rejected: sent to the static host,
-   potentially logged (M2 verifies fragments are not sent in HTTP requests).
-2. **Persisting the secret in localStorage/IndexedDB on the main origin.**
-   Rejected as primary storage: the plan wants the secret imported to memory
-   with minimized visible persistence; persistence where strictly needed is
-   an implementation detail of P2 and must be justified.
-3. **Server-mediated invite tokens.** Rejected: requires a backend
-   (ADR-0001).
-4. **Long human-readable passphrases in the room code.** Rejected: ruins the
-   four-letter UX; the code is a rendezvous namespace precisely so entropy
-   lives in the derived private room instead.
+Native sharing, clipboard fallback and QR encode the same private invite.
+Some channels strip fragments: use another sharing channel or the QR, not a
+code/admission fallback. Copy the full link, not the fragment-free address bar.
 
-## Tradeoffs
+## Limitations
 
-- **Fragments vs. shareability.** Invite links work only if the fragment
-  survives copying; some channels strip fragments. The QR invite (P4) and the
-  four-letter path (with admission) are fallbacks.
-- **Memory-only vs. convenience.** Reconnect after reload needs recovery
-  state (M1); Nova balances memory-first secrets with locally saved session
-  recovery information that does not expose the full secret unnecessarily.
+The link is a reusable bearer capability, not a one-time ticket. Anyone holding
+it can forward it and join while a peer remains. Cooperative removal cannot ban
+the holder. Retire a leaked invite by leaving and creating a new party with a
+new secret. There is no backend reservation or history after everyone leaves.
 
-## Consequences
-
-- P2 implements creation/joining, admission, and secret derivation; invite
-  links bypass four-letter discovery.
-- U1 keeps party secrets out of path segments and query parameters in route
-  design.
-- M2 verifies that invite fragments are not sent in HTTP requests.
-- Party secrets never appear in game runtime messages (P2 acceptance).
+Static deployment browser tests assert that invite fragments do not enter HTTP
+paths/queries. The isolated runtime bundle must contain no party-secret logic.

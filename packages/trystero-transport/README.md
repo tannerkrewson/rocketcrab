@@ -45,11 +45,12 @@ behaves identically in the local test arena and over real parties.
 
 ## Upgrade compatibility
 
-Trystero 0.26 changes the action wire format. Nova exchanges `transportVersion: 2`
+Trystero 0.26 changes the action wire format. Nova exchanges `transportVersion: 3`
 in the pre-action identity handshake and rejects missing/different versions with
 an update/reload notice before activating the peer. Existing old builds cannot be
 made to show new wording retroactively; the updated participant sees the notice.
-All participants must reload before joining across this upgrade.
+All participants must reload before joining across this upgrade. Version 3 also
+separates the private-invite party protocol from the former code/admission build.
 
 Upstream [0.26 changelog](https://github.com/dmotz/trystero/blob/0.26.0/CHANGELOG.md)
 includes Nostr subscription/reconnect recovery, offer retries/replayed answers,

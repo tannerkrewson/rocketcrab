@@ -10,7 +10,6 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
-import { Route as CodeRouteImport } from './routes/$code'
 import { Route as AboutRouteImport } from './routes/about'
 import { Route as BrowseRouteImport } from './routes/browse'
 import { Route as BuildRouteImport } from './routes/build'
@@ -20,17 +19,11 @@ import { Route as JoinRouteImport } from './routes/join'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as PartyRouteImport } from './routes/party'
 import { Route as GameGameIdRouteImport } from './routes/game.$gameId'
-import { Route as JoinCodeRouteImport } from './routes/join.$code'
 import { Route as GamesGameIdEditRouteImport } from './routes/games/$gameId/edit'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const CodeRoute = CodeRouteImport.update({
-  id: '/$code',
-  path: '/$code',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AboutRoute = AboutRouteImport.update({
@@ -78,11 +71,6 @@ const GameGameIdRoute = GameGameIdRouteImport.update({
   path: '/game/$gameId',
   getParentRoute: () => rootRouteImport,
 } as any)
-const JoinCodeRoute = JoinCodeRouteImport.update({
-  id: '/$code',
-  path: '/$code',
-  getParentRoute: () => JoinRoute,
-} as any)
 const GamesGameIdEditRoute = GamesGameIdEditRouteImport.update({
   id: '/games/$gameId/edit',
   path: '/games/$gameId/edit',
@@ -91,55 +79,48 @@ const GamesGameIdEditRoute = GamesGameIdEditRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
-  '/$code': typeof CodeRoute
   '/about': typeof AboutRoute
   '/browse': typeof BrowseRoute
   '/build': typeof BuildRoute
   '/editor': typeof EditorRoute
   '/examples': typeof ExamplesRoute
-  '/join': typeof JoinRouteWithChildren
+  '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
   '/party': typeof PartyRoute
   '/game/$gameId': typeof GameGameIdRoute
-  '/join/$code': typeof JoinCodeRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
-  '/$code': typeof CodeRoute
   '/about': typeof AboutRoute
   '/browse': typeof BrowseRoute
   '/build': typeof BuildRoute
   '/editor': typeof EditorRoute
   '/examples': typeof ExamplesRoute
-  '/join': typeof JoinRouteWithChildren
+  '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
   '/party': typeof PartyRoute
   '/game/$gameId': typeof GameGameIdRoute
-  '/join/$code': typeof JoinCodeRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
-  '/$code': typeof CodeRoute
   '/about': typeof AboutRoute
   '/browse': typeof BrowseRoute
   '/build': typeof BuildRoute
   '/editor': typeof EditorRoute
   '/examples': typeof ExamplesRoute
-  '/join': typeof JoinRouteWithChildren
+  '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
   '/party': typeof PartyRoute
   '/game/$gameId': typeof GameGameIdRoute
-  '/join/$code': typeof JoinCodeRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
-    | '/$code'
     | '/about'
     | '/browse'
     | '/build'
@@ -149,12 +130,10 @@ export interface FileRouteTypes {
     | '/library'
     | '/party'
     | '/game/$gameId'
-    | '/join/$code'
     | '/games/$gameId/edit'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
-    | '/$code'
     | '/about'
     | '/browse'
     | '/build'
@@ -164,12 +143,10 @@ export interface FileRouteTypes {
     | '/library'
     | '/party'
     | '/game/$gameId'
-    | '/join/$code'
     | '/games/$gameId/edit'
   id:
     | '__root__'
     | '/'
-    | '/$code'
     | '/about'
     | '/browse'
     | '/build'
@@ -179,19 +156,17 @@ export interface FileRouteTypes {
     | '/library'
     | '/party'
     | '/game/$gameId'
-    | '/join/$code'
     | '/games/$gameId/edit'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
-  CodeRoute: typeof CodeRoute
   AboutRoute: typeof AboutRoute
   BrowseRoute: typeof BrowseRoute
   BuildRoute: typeof BuildRoute
   EditorRoute: typeof EditorRoute
   ExamplesRoute: typeof ExamplesRoute
-  JoinRoute: typeof JoinRouteWithChildren
+  JoinRoute: typeof JoinRoute
   LibraryRoute: typeof LibraryRoute
   PartyRoute: typeof PartyRoute
   GameGameIdRoute: typeof GameGameIdRoute
@@ -205,13 +180,6 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/$code': {
-      id: '/$code'
-      path: '/$code'
-      fullPath: '/$code'
-      preLoaderRoute: typeof CodeRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/about': {
@@ -277,13 +245,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GameGameIdRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/join/$code': {
-      id: '/join/$code'
-      path: '/$code'
-      fullPath: '/join/$code'
-      preLoaderRoute: typeof JoinCodeRouteImport
-      parentRoute: typeof JoinRoute
-    }
     '/games/$gameId/edit': {
       id: '/games/$gameId/edit'
       path: '/games/$gameId/edit'
@@ -294,25 +255,14 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface JoinRouteChildren {
-  JoinCodeRoute: typeof JoinCodeRoute
-}
-
-const JoinRouteChildren: JoinRouteChildren = {
-  JoinCodeRoute: JoinCodeRoute,
-}
-
-const JoinRouteWithChildren = JoinRoute._addFileChildren(JoinRouteChildren)
-
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
-  CodeRoute: CodeRoute,
   AboutRoute: AboutRoute,
   BrowseRoute: BrowseRoute,
   BuildRoute: BuildRoute,
   EditorRoute: EditorRoute,
   ExamplesRoute: ExamplesRoute,
-  JoinRoute: JoinRouteWithChildren,
+  JoinRoute: JoinRoute,
   LibraryRoute: LibraryRoute,
   PartyRoute: PartyRoute,
   GameGameIdRoute: GameGameIdRoute,

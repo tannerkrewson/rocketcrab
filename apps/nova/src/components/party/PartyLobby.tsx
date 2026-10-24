@@ -1,17 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import {
-  Check,
-  Copy,
-  Gamepad2,
-  LogOut,
-  PartyPopper,
-  Pencil,
-  Play,
-  QrCode,
-  Share2,
-  Users,
-  X,
-} from "lucide-react";
+import { Copy, Gamepad2, LogOut, PartyPopper, Pencil, Play, QrCode, Share2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { writeToClipboard } from "../../lib/editor/clipboard";
@@ -22,13 +10,10 @@ import { GameBrowser } from "./GameBrowser";
 import { IdleParticles } from "./IdleParticles";
 import { PartyDiagnosticsPanel } from "./PartyDiagnostics";
 import { PartyInviteQr } from "./PartyInviteQr";
-import { partyPageTitle } from "./PartyShellHeader";
 import { clearBrowseContext } from "../../lib/browse/back-context";
 
 export interface PartyLobbyProps {
   state: PartyEngineState;
-  onApprove: (memberId: string) => void;
-  onReject: (memberId: string) => void;
   onStart: (force: boolean) => void;
   onLeave: () => void;
   onRefreshDiagnostics: () => void;
@@ -61,16 +46,11 @@ function playerBorderColor(index: number): string {
   return PLAYER_BORDER_COLORS[index % PLAYER_BORDER_COLORS.length] ?? "border-primary";
 }
 
-/** Comma-separated role labels for a player tile ("You, Host" style, 10.8).
- *  Users only ever see "host" (rocketcrab-rfk): the greeter IS the host —
- *  the creator is installed as the initial rendezvous greeter — so a host
- *  peer's tile reads "Host", never "Greeter". The greeter concept stays
- *  diagnostic-only (diagnostics panel + engine state). */
 function roleLabels(member: PartyMemberView, isCreator: boolean): string {
   const labels: string[] = [];
   if (member.isSelf) labels.push("You");
   if (member.isSelf && isCreator) labels.push("Host");
-  if (member.isGreeter && !member.isSelf) labels.push("Host");
+  if (member.isHost && !member.isSelf) labels.push("Host");
   return labels.join(", ");
 }
 
@@ -163,8 +143,6 @@ function canNativeShare(url: string | null): boolean {
  */
 export function PartyLobby({
   state,
-  onApprove,
-  onReject,
   onStart,
   onLeave,
   onRefreshDiagnostics,
@@ -186,16 +164,11 @@ export function PartyLobby({
   useEffect(() => {
     onBrowseModeChange?.(browsing);
   }, [browsing, onBrowseModeChange]);
-  // 10.5: the QR code lives behind a modal; the invite URL is never
-  // rendered as text (only the origin + code page title is).
   const [qrOpen, setQrOpen] = useState(false);
-  const greeterName =
-    state.members.find((member) => member.memberId === state.greeterMemberId)?.displayName ??
-    state.greeterMemberId ??
+  const hostNameForDiagnostics =
+    state.members.find((member) => member.memberId === state.hostMemberId)?.displayName ??
+    state.hostMemberId ??
     null;
-  // 10.7: greeter + authority are diagnostic (S3 formalizes authority); the
-  // lobby itself does not show them — they stay accessible in the
-  // diagnostics panel and the engine state.
   const authorityName =
     state.members.find((member) => member.memberId === state.authorityMemberId)?.displayName ??
     state.authorityMemberId ??
@@ -206,29 +179,18 @@ export function PartyLobby({
   // name-editing page as the pencil (/join?edit=name).
   const needsName = getSavedPlayerName() === null;
 
-  // 2t1.9 + 5cl.9: role-aware no-game message — the host must pick a
-  // game, guests wait for the HOST BY NAME. The engine exposes no creator
-  // member id; the creator is installed as the initial rendezvous greeter
-  // (createParty passes its own memberId as initialGreeterMemberId), so
-  // greeterMemberId is the best available signal for who the host is. If
-  // the greeter is somehow not a member, fall back to the generic wording.
   const hostName =
-    state.members.find((member) => member.memberId === state.greeterMemberId)?.displayName ?? null;
+    state.members.find((member) => member.memberId === state.hostMemberId)?.displayName ?? null;
   let noGameMessage = "As the host, you must select a game.";
-  if (state.role !== "creator") {
+  if (!state.amHost) {
     noGameMessage =
       hostName === null
         ? "Waiting for the host to select a game"
         : `Waiting for ${hostName} to select a game`;
   }
 
-  // The lobby page title: origin + four-letter code, e.g. "rocketcrab.com/abcd".
-  // The full invite URL (with the session secret in the fragment) is never
-  // shown on the page (ADR-0011 / 10.5).
-  const pageTitle = state.code === null ? null : partyPageTitle(state.code);
+  const pageTitle = "Nova party";
 
-  // 10.5: the browser tab reads the origin + code page title (never the
-  // invite URL with its fragment secret). Restore on unmount.
   useEffect(() => {
     if (pageTitle === null) return;
     const previous = document.title;
@@ -323,10 +285,7 @@ export function PartyLobby({
           is NOT shown on the page; it opens in a modal. Only the origin +
           code are ever rendered (ADR-0011: the session secret stays in the
           URL fragment, never on the page). */}
-      {/* 11.6: the title (origin + code) lives in the party shell header as
-          ONE string — the invite card never renders it again (the code is
-          never shown separately from the title). The card is the invite
-          ACTION: Copy URL / QR (+ native Share where supported, ucz). */}
+
       <section
         aria-label="Invite your friends"
         className="flex flex-col items-center gap-3 rounded-box border-2 border-base-300 bg-base-100 p-5 text-center"
@@ -360,10 +319,6 @@ export function PartyLobby({
             </Button>
           ) : null}
         </div>
-        {/* 5cl.2: the separate "Copy short link" affordance is gone —
-            copying always copies the LONG secret URL. The short URL still
-            works as an entry point (join-by-code); it just isn't what
-            gets copied. */}
       </section>
       {/* 10.6: the welcome card — the lobby's main heading. A soft ambient
           glow behind the content, then what's selected and whose turn it
@@ -384,13 +339,11 @@ export function PartyLobby({
               <p className="text-sm font-semibold text-base-content/70">
                 {/* rocketcrab-ack: only the host says "You've selected" —
                     guests see the host's name, e.g. "Bob has selected". */}
-                {state.role === "creator"
-                  ? "You've selected"
-                  : `${hostName ?? "The host"} has selected`}
+                {state.amHost ? "You've selected" : `${hostName ?? "The host"} has selected`}
               </p>
               <p className="text-2xl font-black text-primary">{state.game.title}</p>
               <p className="text-sm text-base-content/70">
-                {state.role === "creator"
+                {state.amHost
                   ? "As the host, you have to start the game!"
                   : "Waiting for the host to start the game…"}
               </p>
@@ -428,49 +381,7 @@ export function PartyLobby({
           </Link>
         </section>
       ) : null}
-      {/* 10.7: the greeter and authority role badges are gone from the
-          lobby (diagnostic only) — see the diagnostics panel below. */}
-      {/* Join requests (greeter only). */}
-      {state.amGreeter && state.pendingJoinRequests.length > 0 ? (
-        <section
-          className="flex flex-col gap-2 rounded-box border-2 border-primary/40 bg-base-100 p-4"
-          aria-label="Join requests"
-        >
-          <p className="flex items-center gap-2 text-sm font-black">
-            <Users className="h-4 w-4" aria-hidden="true" />
-            Someone wants to join
-          </p>
-          <ul className="flex flex-col gap-2">
-            {state.pendingJoinRequests.map((request) => (
-              <li key={request.id} className="flex flex-wrap items-center gap-2">
-                <span className="min-w-0 flex-1 truncate font-bold">
-                  {request.displayName || request.memberId}
-                </span>
-                <span className="font-mono text-xs text-base-content/60">{request.memberId}</span>
-                <Button
-                  variant="primary"
-                  size="md"
-                  onClick={() => onApprove(request.memberId)}
-                  title="Admit this player"
-                >
-                  <Check className="h-4 w-4" aria-hidden="true" />
-                  Approve
-                </Button>
-                <Button
-                  variant="danger"
-                  soft
-                  size="md"
-                  onClick={() => onReject(request.memberId)}
-                  title="Refuse this player"
-                >
-                  <X className="h-4 w-4" aria-hidden="true" />
-                  Reject
-                </Button>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+
       {/* 10.7: the action row (Browse games left, Start game right) sits
           ABOVE the players box, horizontally centered — leave is its own
           quiet control at the bottom of the page. rocketcrab-b73: START is
@@ -478,13 +389,13 @@ export function PartyLobby({
           no blocked-reason alert; browsing is host-only too, so a joiner
           has no path to pick or start a game from the lobby. */}
       <section className="flex flex-wrap items-center justify-center gap-2">
-        {state.role === "creator" ? (
+        {state.amHost ? (
           <Button variant="secondary" size="lg" onClick={() => setBrowsing(true)}>
             <Gamepad2 className="h-5 w-5" aria-hidden="true" />
             Browse games
           </Button>
         ) : null}
-        {state.role === "creator" ? (
+        {state.amHost ? (
           <Button
             variant="primary"
             size="lg"
@@ -496,7 +407,7 @@ export function PartyLobby({
             Start game
           </Button>
         ) : null}
-        {state.role === "creator" && state.canForceStart ? (
+        {state.amHost && state.canForceStart ? (
           <Button variant="default" soft size="lg" onClick={() => setForceDialog(true)}>
             <PartyPopper className="h-5 w-5" aria-hidden="true" />
             Start anyway
@@ -508,7 +419,7 @@ export function PartyLobby({
           the welcome card covers the no-game case. The ended case shows
           no alert at all (5cl.9), and joiners never see it (b73 — the
           reason is the host's start gate). */}
-      {state.role === "creator" &&
+      {state.amHost &&
       state.game !== null &&
       state.endedReason === null &&
       !state.canStart &&
@@ -538,7 +449,7 @@ export function PartyLobby({
         <div className="collapse-content">
           <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             {state.members.map((member, index) => {
-              const roleLabel = roleLabels(member, state.role === "creator");
+              const roleLabel = roleLabels(member, state.amHost);
               return (
                 <li
                   key={member.memberId}
@@ -595,7 +506,7 @@ export function PartyLobby({
                         <Pencil className="h-3 w-3" aria-hidden="true" />
                       </Link>
                     ) : null}
-                    {state.role === "creator" && !member.isSelf ? (
+                    {state.amHost && !member.isSelf ? (
                       <button
                         type="button"
                         className="btn btn-xs text-error"
@@ -626,7 +537,7 @@ export function PartyLobby({
       <PartyDiagnosticsPanel
         diagnostics={state.diagnostics}
         onRefresh={onRefreshDiagnostics}
-        greeterName={greeterName}
+        hostNameForDiagnostics={hostNameForDiagnostics}
         authorityName={authorityName}
       />
       {/* 10.7: Leave party is a smaller, centered control at the very
@@ -638,9 +549,7 @@ export function PartyLobby({
           {state.members.length === 1 ? "End party" : "Leave party"}
         </Button>
       </div>
-      {/* The QR invite modal (10.5): the QR lives here, not on the lobby.
-          The full invite URL is encoded in the QR only; the label under it
-          is the safe origin + code form. */}
+
       {qrOpen && state.inviteUrl !== null ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -726,6 +635,9 @@ function PartyKickConfirm({
     >
       <div className="flex w-full max-w-sm flex-col gap-4 rounded-box border-2 border-base-300 bg-base-100 p-5">
         <p className="font-black">Kick {memberName} from the party?</p>
+        <p className="text-sm">
+          This removes them for now, not permanently. They can rejoin with the same private invite.
+        </p>
         <p className="text-sm text-base-content/70">
           {memberName} will be removed from the party and will have to rejoin with the invite link.
         </p>

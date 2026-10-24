@@ -1,97 +1,10 @@
-import { cleanup, render, screen } from "@testing-library/react";
-import userEvent from "@testing-library/user-event";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { render, screen } from "@testing-library/react";
+import { expect, it } from "vitest";
 import { PartyShellHeader } from "./PartyShellHeader";
-
-/**
- * Party shell header tests (7.22 / 11.6): the classic-style header shows
- * the rocket + crab logo, ONE lobby page title — "origin/lowercase-code"
- * (e.g. "localhost/rcrb") styled like the homepage title — and the
- * lowercase phonetic spelling. Tapping the title copies the invite link;
- * the cursor + title attribute hint that it is copyable. The invite
- * details (QR / URL / copy row) live in the lobby's invite card (10.5) —
- * the header stays the classic identity.
- */
-
-const { toastMock } = vi.hoisted(() => ({
-  toastMock: { success: vi.fn(), error: vi.fn() },
-}));
-
-vi.mock("sonner", () => ({ toast: toastMock }));
-
-const INVITE_URL = "http://localhost:5173/join#code=rcrb&secret=invite-secret";
-
-afterEach(() => {
-  cleanup();
-  toastMock.success.mockClear();
-  toastMock.error.mockClear();
-});
-
-describe("PartyShellHeader", () => {
-  it("renders the logo and one origin+code title with lowercase phonetic spelling", () => {
-    render(<PartyShellHeader code="RCRB" inviteUrl={INVITE_URL} />);
-    const title = screen.getByTestId("party-title");
-    // The title is ONE "origin/code" string; the code is lowercase and is
-    // never shown separately from the title.
-    expect(title.textContent).toBe(`${window.location.host}/rcrb`);
-    expect(screen.queryByText("RCRB")).not.toBeInTheDocument();
-    const phonetic = screen.getByText(/romeo charlie romeo bravo/i);
-    expect(phonetic).toBeInTheDocument();
-    // 10.5: the phonetic is lowercase (never ALL CAPS), consistent with the
-    // join page.
-    expect(phonetic.textContent).toBe("(romeo charlie romeo bravo)");
-  });
-
-  it("renders only the logo when no code is known yet", () => {
-    render(<PartyShellHeader />);
-    expect(screen.queryByTestId("party-title")).not.toBeInTheDocument();
-    // The real SVG brand mark (single squarish rocketcrab logo, 5cl.13) —
-    // never the emoji pair.
-    const logo = screen.getByTestId("brand-logo");
-    expect(logo.querySelector('img[src="/rocketcrab-logo.svg"]')).not.toBeNull();
-  });
-
-  it("copies the invite link when the title is tapped", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "clipboard", {
-      value: { writeText },
-      configurable: true,
-    });
-    render(<PartyShellHeader code="RCRB" inviteUrl={INVITE_URL} />);
-    const title = screen.getByTestId("party-title");
-    // Cursor + title attribute hint that the title is copyable.
-    expect(title).toHaveClass("cursor-pointer");
-    expect(title).toHaveAttribute("title", "Copy the invite link");
-    await userEvent.click(title);
-    expect(writeText).toHaveBeenCalledWith(INVITE_URL);
-    // 2z9: the toast says "url", matching the invite URL that was copied.
-    expect(toastMock.success).toHaveBeenCalledWith("Invite url copied.");
-    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
-  });
-
-  it("scales the title down while pressed like the homepage title (0dd)", () => {
-    render(<PartyShellHeader code="RCRB" inviteUrl={INVITE_URL} />);
-    const title = screen.getByTestId("party-title");
-    expect(title).toHaveClass("active:scale-95", "transition-all", "cursor-pointer");
-  });
-
-  it("uses the shared larger lobby mark without changing compact browse sizing", () => {
-    render(<PartyShellHeader code="RCRB" inviteUrl={INVITE_URL} />);
-    expect(screen.getByTestId("brand-logo").querySelector("img")).toHaveStyle({ height: "40px" });
-
-    cleanup();
-    render(<PartyShellHeader code="RCRB" inviteUrl={INVITE_URL} compact />);
-    expect(screen.getByTestId("brand-logo").querySelector("img")).toHaveStyle({ height: "20px" });
-  });
-
-  it("never renders the invite URL text (10.5 / ADR-0011)", () => {
-    render(<PartyShellHeader code="RCRB" inviteUrl={INVITE_URL} />);
-    expect(screen.queryByText(INVITE_URL)).not.toBeInTheDocument();
-    expect(screen.queryByText(/invite-secret/)).not.toBeInTheDocument();
-  });
-
-  it("suppresses the phonetic spelling when disabled (classic join page)", () => {
-    render(<PartyShellHeader code="RCRB" disablePhonetic />);
-    expect(screen.queryByText("(romeo charlie romeo bravo)")).not.toBeInTheDocument();
-  });
+it("shows a safe title, never invite credentials", () => {
+  const { container } = render(
+    <PartyShellHeader inviteUrl={"https://example.com/join#secret=" + "A".repeat(43)} />,
+  );
+  expect(screen.getByText("Nova party")).toBeInTheDocument();
+  expect(container.innerHTML).not.toContain("secret=");
 });

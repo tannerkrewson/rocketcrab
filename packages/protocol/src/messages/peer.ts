@@ -6,8 +6,6 @@ import {
   gameIdSchema,
   memberIdSchema,
   monotonicSequenceSchema,
-  partyCodeSchema,
-  sessionSecretSchema,
   sha256Schema,
   timestampSchema,
   titleSchema,
@@ -23,55 +21,19 @@ import { gameEndReasonSchema, gameModeSchema } from "./shared";
  * message ID, and timestamp. Ordered families (actions, state, authority,
  * simulation) additionally require the per-sender monotonic `seq`.
  *
- * Pre-admission messages (party advert, join request, admission response)
- * travel through the rendezvous room and use the rendezvous session ID as
- * `sessionId` (ADR-0004); the private room session ID is used once admitted.
+ * All peer messages travel only inside the private password-protected party room.
  */
 
-/**
- * Party advert: the minimal party summary advertised through the rendezvous
- * room (ADR-0004). Never carries game source or session secrets.
+/** Shell-control context, shared only inside the private party room.
+ * The original creator is preferred while connected; otherwise the lowest
+ * connected member ID owns shell controls. No secret or admission data.
  */
-export const partyIdentityMessageSchema = z.object({
+export const partyContextMessageSchema = z.object({
   ...peerEnvelopeFields,
-  type: z.literal("party.identity"),
-  partyCode: partyCodeSchema,
-  partyName: z.string().min(1).max(64).optional(),
-  gameTitle: titleSchema.optional(),
-  memberCount: z.number().int().nonnegative(),
-  greeterMemberId: memberIdSchema.optional(),
+  type: z.literal("party.context"),
+  creatorMemberId: memberIdSchema,
 });
-export type PartyIdentityMessage = z.infer<typeof partyIdentityMessageSchema>;
-
-/**
- * Party session handoff: the greeter sends the private session secret to an
- * admitted joiner over the established encrypted peer connection (ADR-0004
- * step 9; ADR-0011). Never advertised, never sent before admission, never a
- * game-plane message. Both sides derive the private room name, Trystero
- * password, and private session ID from the secret with the same Web Crypto
- * derivation (P2). The party code travels along so invite-link joiners can
- * serve as greeter after migration.
- */
-export const partySessionMessageSchema = z.object({
-  ...peerEnvelopeFields,
-  type: z.literal("party.session"),
-  partyCode: partyCodeSchema,
-  secret: sessionSecretSchema,
-});
-export type PartySessionMessage = z.infer<typeof partySessionMessageSchema>;
-
-/**
- * Greeter announcement: broadcast in the private room whenever the
- * rendezvous greeter changes (greeter migration, ADR-0004). Greeter status
- * is separate from game authority (ADR-0007) — the announcement names the
- * greeter only, never a term or authority role.
- */
-export const partyGreeterMessageSchema = z.object({
-  ...peerEnvelopeFields,
-  type: z.literal("party.greeter"),
-  greeterMemberId: memberIdSchema,
-});
-export type PartyGreeterMessage = z.infer<typeof partyGreeterMessageSchema>;
+export type PartyContextMessage = z.infer<typeof partyContextMessageSchema>;
 
 /**
  * Player identity: a member announces or updates their profile to the party
@@ -161,25 +123,6 @@ export const partyReloadAllMessageSchema = z.object({
   type: z.literal("party.reloadAll"),
 });
 export type PartyReloadAllMessage = z.infer<typeof partyReloadAllMessageSchema>;
-
-/** Join request: a joiner asks the greeter for admission (ADR-0004). */
-export const joinRequestMessageSchema = z.object({
-  ...peerEnvelopeFields,
-  type: z.literal("join.request"),
-  partyCode: partyCodeSchema,
-  displayName: displayNameSchema,
-});
-export type JoinRequestMessage = z.infer<typeof joinRequestMessageSchema>;
-
-/** Admission response: the greeter's decision on a join request (ADR-0004). */
-export const admissionResponseMessageSchema = z.object({
-  ...peerEnvelopeFields,
-  type: z.literal("join.admission"),
-  partyCode: partyCodeSchema,
-  decision: z.enum(["approved", "rejected"]),
-  reason: z.enum(["party_full", "greeter_rejected", "timed_out", "invalid_request"]).optional(),
-});
-export type AdmissionResponseMessage = z.infer<typeof admissionResponseMessageSchema>;
 
 /**
  * Connection status: a member's self-reported connectivity. Advisory only —
@@ -510,17 +453,13 @@ export type GameSourceCancelMessage = z.infer<typeof gameSourceCancelMessageSche
 
 /** Every peer-plane message schema, discriminated by `type`. */
 export const peerMessagesSchema = z.discriminatedUnion("type", [
-  partyIdentityMessageSchema,
-  partySessionMessageSchema,
-  partyGreeterMessageSchema,
+  partyContextMessageSchema,
   playerIdentityMessageSchema,
   partyRenameMessageSchema,
   partyClassicRoomMessageSchema,
   partyClassicRoomRequestMessageSchema,
   partyKickMessageSchema,
   partyReloadAllMessageSchema,
-  joinRequestMessageSchema,
-  admissionResponseMessageSchema,
   connectionStatusMessageSchema,
   peerCapabilitiesMessageSchema,
   actionDispatchMessageSchema,

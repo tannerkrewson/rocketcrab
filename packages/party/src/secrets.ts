@@ -7,11 +7,8 @@ import { sessionSecretSchema } from "@rocketcrab/protocol";
  * The creator generates one 32-byte CSPRNG session secret. Everything about
  * the private party room is DERIVED from that secret with Web Crypto
  * (SHA-256 with domain-separated labels), so the secret is the only private
- * material that ever has to move: from creator to admitted joiner over the
- * encrypted peer connection, and inside invite-link fragments (ADR-0011).
- * The four-letter code is never a secret (ADR-0004), and the derived
- * room/password/session never need to be transmitted at all — every side
- * derives them locally from the secret.
+ * material friends share, solely through private invite fragments (ADR-0011).
+ * Every side derives the room/password/session locally.
  *
  * Derivation scheme (P2 decision): for each label L,
  * `material = SHA-256(label || 0x00 || secret)`. The 0x00 separator keeps
@@ -24,7 +21,7 @@ import { sessionSecretSchema } from "@rocketcrab/protocol";
  *                 `party:` + 64 lowercase hex chars (256 bits).
  * - `password`  — the Trystero room password, 32 bytes as unpadded
  *                 base64url (43 chars; F8: wrong password → JoinError).
- * - `sessionId` — the private session ID carried in every post-admission
+ * - `sessionId` — the private session ID carried in every private-party
  *                 peer message, 64 lowercase hex chars.
  */
 
@@ -39,7 +36,7 @@ export interface SessionMaterial {
   readonly roomId: string;
   /** Private Trystero room password (derived; never advertised). */
   readonly password: string;
-  /** Private session ID for post-admission peer messages. */
+  /** Private session ID for private-party peer messages. */
   readonly sessionId: SessionId;
 }
 
@@ -53,7 +50,7 @@ export function generateSessionSecret(): SessionSecret {
 /**
  * Derive the private room material from a session secret. Deterministic:
  * the same secret always derives the same roomId/password/sessionId, so the
- * creator, admitted joiners, and invite-link joiners all converge without
+ * creator and invite-link joiners all converge without
  * ever exchanging the derived values.
  */
 export async function deriveSessionMaterial(secret: SessionSecret): Promise<SessionMaterial> {

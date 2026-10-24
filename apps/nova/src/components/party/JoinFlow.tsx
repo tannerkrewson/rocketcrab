@@ -1,196 +1,76 @@
-import { useNavigate, useSearch } from "@tanstack/react-router";
+import { Link, useNavigate, useSearch } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
-import { normalizePartyCode } from "@rocketcrab/party";
 import { getSavedPlayerName } from "../../lib/party/identity";
 import { importInviteFromLocation } from "../../lib/party/invite-import";
 import { usePartyEngine } from "../../lib/party/use-party";
-import { JoinScreen } from "./JoinScreen";
+import { Button, buttonStyles } from "../ui/Button";
 import { PartyExperience } from "./PartyExperience";
 import { PartyResumeBanner } from "./PartyResumeBanner";
 import { PartyShellHeader } from "./PartyShellHeader";
 
-export interface JoinFlowProps {
-  /** Prefill the code input from the path (short join URLs: /join/:code and
-   *  /:code, 9fv.8). Routes pass the code lowercase-normalized. */
-  readonly initialCode?: string;
-}
-
-/**
- * The join flow (P2/P4), shared by the `/join` route and the short-code
- * routes (`/join/:code`, `/:code` — 9fv.8): four-letter code entry, plus
- * invite-link joining. Invite secrets arrive in the URL fragment
- * (ADR-0011); the fragment is parsed and imported into session memory
- * BEFORE anything else renders, then stripped from the URL so the secret
- * does not linger in history. A full invite URL works even when the code is
- * ALSO in the path (/join/cvvu#secret=…) — the fragment import runs first
- * and the path code is merged in only when the fragment carries no code.
- *
- * 2t1.9: the join is a SINGLE step — the code is submitted straight to the
- * engine with the player's existing (saved or generated) name; the player
- * is only asked for a name once they are in the lobby, via the same
- * name-editing page the lobby's pencil opens (`/join?edit=name`). The
- * code/name state lives HERE (not in JoinScreen) so it survives the
- * joining → error transition: "Try again" keeps the typed code (7.10).
- *
- * 5cl.3: this component SUBSCRIBES to the party engine (usePartyEngine) so
- * phase changes re-render it. Before that, a join (button- or URL-driven)
- * flipped the engine to "joining" but JoinFlow read
- * `partyEngine.getState()` only on its own re-renders — the form stayed
- * put while the join ran (or failed) in the background: no loading screen,
- * and a failed fragment invite never surfaced its error. The subscription
- * makes the "joining"/"creating" phases render the PartyExperience loading
- * screen immediately (before the network round-trip), and a failed URL
- * join re-renders the form with the engine's error inline.
- */
-export function JoinFlow({ initialCode = "" }: JoinFlowProps) {
-  // 2t1.9: `?edit=name` opens the name-editing page (the same name step as
-  // the old two-step join), reached from the lobby's pencil and the
-  // no-name prompt. Read loosely (strict: false) so it works from any of
-  // the join-family routes (/join, /join/:code, /:code).
+/** Invites auto-join with the saved/generated identity; name editing is optional. */
+export function JoinFlow() {
   const search = useSearch({ strict: false }) as { edit?: "name" };
   const navigate = useNavigate();
-  const normalizedInitialCode = normalizePartyCode(initialCode);
-  const [joinError, setJoinError] = useState<string | null>(null);
-  const [code, setCode] = useState(() => normalizedInitialCode);
-  const [name, setName] = useState(() => getSavedPlayerName() ?? "");
-  // rocketcrab-if2: the URL-driven join effect below must run exactly once
-  // per mount — StrictMode's double effect on a dev mount would otherwise
-  // auto-join twice (a fragment visit would then ALSO re-join by path
-  // code). The invite import already guards itself, but the code join
-  // needs its own one-shot guard.
-  const autoJoinTriedRef = useRef(false);
-
-  // 5cl.3: the engine subscription (see the component JSDoc). `state` is
-  // the live snapshot; `engine` is the page singleton.
   const { state, engine } = usePartyEngine();
-
-  // Import the invite fragment (if any) once per page load. Runs FIRST so
-  // a full secret invite always beats the path code (9fv.8: the path code
-  // is a public rendezvous namespace, the fragment secret is the
-  // direct-join capability — the secret must win, ADR-0011).
+  const [name, setName] = useState(() => getSavedPlayerName() ?? "");
+  const tried = useRef(false);
   useEffect(() => {
-    if (autoJoinTriedRef.current) {
-      return;
-    }
-    autoJoinTriedRef.current = true;
-    const invite = importInviteFromLocation({
-      hash: window.location.hash,
-      pathname: window.location.pathname,
-      search: window.location.search,
-    });
-    if (invite !== null) {
-      const normalizedInvite =
-        invite.code === undefined
-          ? invite
-          : { secret: invite.secret, code: normalizePartyCode(invite.code) };
-      // A fragment invite without a code still benefits from the path's
-      // code (it lets this joiner serve as greeter after migration,
-      // ADR-0004) — merge it in when present.
-      const withPathCode =
-        normalizedInvite.code === undefined && normalizedInitialCode !== ""
-          ? { secret: normalizedInvite.secret, code: normalizedInitialCode }
-          : normalizedInvite;
-      // 5cl.3: fire-and-forget is fine — the phase subscription above
-      // flips this flow to the loading screen the moment the engine emits
-      // "joining", and to the form + error on failure.
-      void engine.joinByInvite(withPathCode);
-      return;
-    }
-    // rocketcrab-if2: a bare four-letter code in the path auto-submits the
-    // join on load (mirrors the fragment-invite auto-join above). The
-    // `?edit=name` page is for renaming, never joining — a code in the
-    // path must NOT auto-join there.
-    if (normalizedInitialCode !== "" && search.edit !== "name" && !engine.isActive()) {
-      void engine
-        .joinByCode(normalizedInitialCode)
-        .then(() => {
-          const latest = engine.getState();
-          if (latest.phase === "error" && latest.lastError !== null) {
-            setJoinError(latest.lastError);
-          }
-        })
-        // An already-active party (user wandered back to a /:code URL while
-        // in a party) makes prepareSetup reject — the live party wins.
-        .catch(() => undefined);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  // 2t1.9: joining is code-only — no name prompt up front. The player's
-  // saved (or generated) name goes in as-is; the name is asked later, in
-  // the lobby (see handleSaveName).
-  const handleJoin = (submittedCode: string) => {
-    setJoinError(null);
-    if (submittedCode.length === 0) {
-      return;
-    }
-    void engine.joinByCode(submittedCode).then(() => {
-      const latest = engine.getState();
-      if (latest.phase === "error" && latest.lastError !== null) {
-        setJoinError(latest.lastError);
-      } else {
-        // Joined — next time the form shows (after leaving a party) it
-        // starts again at the code step.
-        setCode("");
-      }
-    });
-  };
-
-  // 2t1.9: save the edited name (identity is persisted, 7.5) and return to
-  // the party — the engine is still active, so /join renders the lobby.
-  const handleSaveName = (submittedName: string) => {
-    if (submittedName.trim().length > 0) {
-      engine.setDisplayName(submittedName);
-    }
-    void navigate({ to: "/join", search: { edit: undefined } });
-  };
-
-  // 2t1.9: the name-editing page — the same name step as the old join
-  // flow, opened from the lobby (pencil / no-name prompt). It renders
-  // whether or not a party is active: saving returns to the lobby.
-  if (search.edit === "name") {
+    if (tried.current) return;
+    tried.current = true;
+    const invite = importInviteFromLocation(window.location);
+    if (invite !== null && !engine.isActive()) void engine.joinByInvite(invite);
+  }, [engine]);
+  if (search.edit === "name")
     return (
-      <div className="mx-auto flex w-full max-w-md flex-col gap-4">
+      <section className="mx-auto flex w-full max-w-md flex-col gap-4">
         <PartyShellHeader />
-        <JoinScreen
-          mode="edit"
-          error={null}
-          joining={false}
-          code={code}
-          onCodeChange={setCode}
-          name={name}
-          onNameChange={setName}
-          onSubmit={(_code, submittedName) => handleSaveName(submittedName)}
-          onBack={() => void navigate({ to: "/join", search: { edit: undefined } })}
-        />
-      </div>
+        <h1 className="text-2xl font-bold">Your name</h1>
+        <form
+          className="flex flex-col gap-4"
+          onSubmit={(event) => {
+            event.preventDefault();
+            if (!name.trim()) return;
+            engine.setDisplayName(name.trim());
+            void navigate({ to: "/join", search: { edit: undefined } });
+          }}
+        >
+          <label htmlFor="player-name">Your player name</label>
+          <input
+            id="player-name"
+            className="input w-full"
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            maxLength={24}
+            autoComplete="nickname"
+          />
+          <Button type="submit" variant="primary" disabled={!name.trim()}>
+            Save
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void navigate({ to: "/join", search: { edit: undefined } })}
+          >
+            Back
+          </Button>
+        </form>
+      </section>
     );
-  }
-
-  if (state.phase === "idle" || state.phase === "error") {
-    // Idle: show the code form (with any join error inline). Error: the
-    // join failed (rejected, not found, timeout) — show the form again so
-    // the player can try another code or an invite link. A saved recovery
-    // record (page reload while in a party, M1) offers a one-tap rejoin
-    // above the form.
+  if (state.phase === "idle")
     return (
-      <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-        {/* Classic party shell (7.22): logo header above the join form. */}
+      <section className="mx-auto flex w-full max-w-md flex-col gap-4">
         <PartyShellHeader />
         <PartyResumeBanner engine={engine} />
-        <JoinScreen
-          error={joinError ?? (state.phase === "error" ? state.lastError : null)}
-          joining={false}
-          code={code}
-          onCodeChange={setCode}
-          name={name}
-          onNameChange={setName}
-          onSubmit={(submittedCode) => handleJoin(submittedCode)}
-          onBack={() => void navigate({ to: "/join", search: { edit: undefined } })}
-        />
-      </div>
+        <h1 className="text-2xl font-bold">Join a private party</h1>
+        <p>
+          Open a friend's invite link or scan their QR code with your phone's camera. You'll join
+          automatically.
+        </p>
+        <Link to="/party" className={buttonStyles("primary")}>
+          Start a party
+        </Link>
+      </section>
     );
-  }
-  // 2t1.9: leaving a joined party returns to the homepage (route "/").
   return <PartyExperience onLeft={() => void navigate({ to: "/" })} />;
 }

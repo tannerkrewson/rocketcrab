@@ -1,91 +1,56 @@
-# ADR-0004: Four-letter rendezvous versus private party room
+# ADR-0004: Private invite parties (supersedes four-letter rendezvous)
 
-- **Status:** Accepted (relay configuration details **Pending** F5)
-- **Date:** 2026-08-01
-- **Owner:** Rocketcrab Nova planning (Phase 1)
-- **Related:** ADR-0011 (secrets), P2 (rendezvous and admission), F5
-  (connectivity spike), ADR-0003 (transport)
-
-## Context
-
-Rocketcrab's signature experience is a short, human-friendly room code. Nova
-must preserve a four-letter code experience **without a central room-code
-server** (ADR-0001). A four-letter code has only ~26^4 combinations — far too
-little entropy to be a private session secret — and codes will collide between
-concurrent parties.
+- **Status:** Accepted; revised by the Nova simplification program
+- **Owner:** Rocketcrab Nova
+- **Related:** ADR-0003 (transport), ADR-0010 (trust), ADR-0011 (secrets), ADR-0007 (game authority)
 
 ## Decision
 
-**A four-letter code identifies a public rendezvous namespace, not the real
-party room.** The alphabet is human-readable, omits easily confused letters,
-and remains alphabetic.
+A party uses one password-protected Trystero room. Creation generates a
+32-byte (256-bit) Web Crypto random secret. SHA-256 with domain-separated labels
+derives room ID, password, and session ID. These derivations are deterministic,
+so the invite secret is the only capability friends need to join.
 
-### Creation flow (P2)
+Share one private `/join#secret=…` link using native sharing, copy, or the displayed
+QR code. Opening it automatically joins with a saved/generated player identity;
+name editing is optional. Import the fragment into the trusted shell and remove
+it from the address bar/history. No secrets in paths, queries, application logs,
+or untrusted game frames. No scanner, accounts, room backend, public adverts,
+room codes, manual approval, collisions, or greeter role.
 
-1. Generate a four-letter code.
-2. Join its rendezvous room.
-3. Listen briefly for an existing party advert.
-4. Regenerate on detected collision where possible.
-5. Generate a cryptographically random session secret (Web Crypto).
-6. Derive the private room ID and Trystero password from that secret.
-7. Advertise a **minimal** party summary through the rendezvous room.
-8. Admit joiners explicitly (Trystero peer-handshake admission).
-9. Send the private secret only after admission.
-10. Join the private room.
+Trystero owns discovery, room passwords, ICE and peer reconnection. Every
+participant remains in the same private room, so any connected participant can
+keep the party joinable and distribute the hash-verified source and game state.
+A stale invite with no remaining peer fails clearly instead of creating a new
+solo lobby. Once everyone leaves, the in-memory party history is gone; the
+random capability is not a server-stored reservation or persistent party.
 
-### Joining flow (P2)
+## Shell controls, not game authority
 
-1. Normalize the entered code.
-2. Join the rendezvous room.
-3. Discover available party adverts.
-4. Let the player select if a collision exposes more than one party.
-5. Send a join request.
-6. Wait for approval.
-7. Receive private session data over the established encrypted peer
-   connection.
-8. Join the private party room.
-9. Leave unnecessary rendezvous connections.
+The creator owns Nova shell controls while connected. If absent, the lowest
+connected member ID owns them. Existing members share the original creator ID in
+a validated private `party.context` message on peer join; no timer or public
+advertisement is needed. Joiners wait for context before offering controls.
+Returning creators regain preference. All connected peers converge with the same
+membership; partitions can temporarily disagree about shell controls. This is
+cooperative UI policy, not consensus or authorization against malicious friends.
+Game authority retains its independent term/revision/history safety protections.
 
-### Greeter migration
+Shell controls include selecting games, asking participants to leave, and
+reloading frames. Classic games' external-provider host roles do **not** migrate
+as a consequence of a Nova shell handoff. A successor can select a new external
+room, but cannot promise continuation of an external game that needs its host.
 
-The original creator is initially the rendezvous **greeter**. If that peer
-leaves, another admitted party member becomes the greeter so the four-letter
-code remains usable for late joiners. **Greeter status is separate from game
-authority** (ADR-0007) — the creator is never permanently privileged.
+## Security and operational limits
 
-### Admission
+Anyone with the invite can join or forward it. Cooperative kick is not a ban;
+the holder can reuse the invite. To exclude a leaked invite, leave and create a
+new party with a new secret and share it only with the intended participants.
+Connected friends can inspect shared shell state; game frames receive only their
+allowed API views. Local recovery stores the capability on the trusted main
+origin to survive Safari tab reload; clean leave/dismiss clears it (ADR-0011).
 
-Trystero's peer-handshake mechanism keeps unapproved peers out of normal party
-events. A pending peer must not receive the game source or the private room
-secret (P3 depends on this).
-
-## Alternatives considered
-
-1. **Code-as-secret (the code IS the room).** Rejected: 4 letters are
-   guessable; anyone guessing a code would join the private room directly.
-   This is the exact attack the two-tier model prevents.
-2. **Fixed public room per code.** Rejected: no admission control, no way to
-   distinguish colliding parties, no private channel for the game.
-3. **Central room-code registry.** Rejected: requires a backend (ADR-0001).
-4. **Long codes.** Rejected: destroys the product's four-letter UX.
-
-## Tradeoffs
-
-- **Two-phase join latency.** Joiners go through rendezvous discovery +
-  admission + private-room join. The public rendezvous advert must be minimal
-  (no game source, no secrets).
-- **Collision handling.** Adverts are namespaced by code; collision detection
-  and a picker add UI complexity (P2, P4) but make collisions safe.
-- **Relay dependence.** Rendezvous depends on Nostr relay availability and
-  behavior; F5 validates and records relay recommendations.
-
-## Consequences
-
-- Guessing a code never admits a peer (acceptance: P2).
-- The private room uses high-entropy material derived from a CSPRNG session
-  secret; invite links bypass four-letter discovery (ADR-0011).
-- Malformed join requests are rejected; end-to-end tests cover creation,
-  approval, rejection, collision, and greeter migration (P2).
-- Party secrets never enter game runtime messages or the game DOM.
-- Default relay configuration, connection timeout, and retry behavior are
-  **Pending** until F5 completes.
+Tests cover private creation/join, creator departure and successor controls,
+late-join verified source delivery, identity recovery, stale invites, malformed
+and spoofed control traffic, and transport cleanup. Cross-network TURN and
+physical iPhone acceptance remain release gates, not proven by in-memory tests.

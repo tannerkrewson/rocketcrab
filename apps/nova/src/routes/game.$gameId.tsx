@@ -78,8 +78,7 @@ export function BrowseGamePage() {
   const [selecting, setSelecting] = useState(false);
   const [editConfirmationOpen, setEditConfirmationOpen] = useState(false);
 
-  const inPartyLobby =
-    (state.phase === "lobby" || state.phase === "starting") && state.role === "creator";
+  const inPartyLobby = (state.phase === "lobby" || state.phase === "starting") && state.amHost;
   const notInParty = state.phase === "idle";
   const inParty = engine.isActive();
   const partyBack = from === "party" || from === "party-browse" || inPartyLobby;
@@ -131,11 +130,7 @@ export function BrowseGamePage() {
   /** 5cl.8: the party shell header replaces the brand row when this page was
    * reached from a party context. */
   const header =
-    partyBack && inParty ? (
-      <PartyShellHeader code={state.code} inviteUrl={state.inviteUrl} />
-    ) : (
-      <BrandHeader />
-    );
+    partyBack && inParty ? <PartyShellHeader inviteUrl={state.inviteUrl} /> : <BrandHeader />;
 
   const navigateToEditor = () => {
     void navigate({ to: "/games/$gameId/edit", params: { gameId } });

@@ -33,7 +33,6 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     joinStage: null,
     reconnectAttempts: 0,
     role: "creator",
-    code: "ABCD",
     memberId: "member-a",
     displayName: "Player A",
     game: { gameId: "game-1", title: "Rocket Rumble", mode: "state" },
@@ -44,7 +43,7 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
         isSelf: true,
         connectionId: "conn-a",
         connected: true,
-        isGreeter: true,
+        isHost: true,
         transferState: "complete",
         transferProgress: 1,
         transferDetail: "You have the game",
@@ -56,19 +55,17 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
         isSelf: false,
         connectionId: "conn-b",
         connected: true,
-        isGreeter: false,
+        isHost: false,
         transferState: "complete",
         transferProgress: 1,
         transferDetail: "You have the game",
         ready: true,
       },
     ],
-    pendingJoinRequests: [],
-    greeterMemberId: "member-a",
-    amGreeter: true,
+    hostMemberId: "member-a",
+    amHost: overrides.amHost ?? overrides.role !== "joiner",
     authorityMemberId: "member-a",
     inviteUrl: "http://localhost:5173/join#code=abcd&secret=invite-secret",
-    shortInviteUrl: "http://localhost:5173/abcd",
     connectionState: "connected",
     canStart: false,
     canForceStart: false,
@@ -134,7 +131,7 @@ async function renderShell(
 describe("PartyPlayShell in-game chrome (7.38)", () => {
   it("shows the centered rocketcrab.com party URL instead of the game name", async () => {
     await renderShell(makeState());
-    expect(screen.getByLabelText("Party link rocketcrab.com/abcd")).toBeInTheDocument();
+    expect(screen.getByLabelText("Party link Nova party")).toBeInTheDocument();
     expect(screen.queryByText("Rocket Rumble")).not.toBeInTheDocument();
     // No connected badge or game-code badge in the top bar anymore.
     expect(screen.queryByText("connected")).not.toBeInTheDocument();
@@ -147,7 +144,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     // Only the floating logo remains; the bar (URL + menu) is gone.
     expect(screen.getByRole("button", { name: /show the top bar/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /menu/i })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Party link rocketcrab.com/abcd")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Party link Nova party")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /show the top bar/i }));
     expect(screen.getByRole("button", { name: /menu/i })).toBeInTheDocument();
   });
@@ -179,7 +176,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
   });
 
   it("hides Reload all from joiners (host-only)", async () => {
-    await renderShell(makeState({ role: "joiner" }));
+    await renderShell(makeState({ role: "joiner", amHost: false }));
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     expect(screen.getByRole("menuitem", { name: /reload my game/i })).toBeInTheDocument();
     expect(screen.queryByRole("menuitem", { name: /reload all/i })).not.toBeInTheDocument();
@@ -265,7 +262,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
   });
 
   it("hides kick and Browse games from joiners", async () => {
-    await renderShell(makeState({ role: "joiner" }));
+    await renderShell(makeState({ role: "joiner", amHost: false }));
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     // Browse games is host-only (picking while playing ends the game for
     // everyone) and no longer lives in the Players popup at all.
@@ -372,7 +369,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
 
   it("scales the party URL down while pressed like the homepage title (0dd)", async () => {
     await renderShell(makeState());
-    const url = screen.getByLabelText("Party link rocketcrab.com/abcd");
+    const url = screen.getByLabelText("Party link Nova party");
     expect(url).toHaveClass("active:scale-95", "transition-transform");
   });
 
@@ -394,7 +391,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
       configurable: true,
     });
     await renderShell(makeState());
-    await userEvent.click(screen.getByLabelText("Party link rocketcrab.com/abcd"));
+    await userEvent.click(screen.getByLabelText("Party link Nova party"));
     expect(writeText).toHaveBeenCalledWith(
       "http://localhost:5173/join#code=abcd&secret=invite-secret",
     );

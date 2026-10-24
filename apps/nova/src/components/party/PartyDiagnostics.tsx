@@ -6,7 +6,7 @@ export interface PartyDiagnosticsPanelProps {
   diagnostics: PartyDiagnostics | null;
   onRefresh: () => void;
   /** Rendezvous greeter display name (kept accessible here, 10.7). */
-  greeterName?: string | null;
+  hostNameForDiagnostics?: string | null;
   /** Current internal authority display name (kept accessible here, 10.7). */
   authorityName?: string | null;
 }
@@ -38,7 +38,7 @@ function connectionLabel(state: string): string {
 export function PartyDiagnosticsPanel({
   diagnostics,
   onRefresh,
-  greeterName,
+  hostNameForDiagnostics,
   authorityName,
 }: PartyDiagnosticsPanelProps) {
   const [open, setOpen] = useState(false);
@@ -93,9 +93,9 @@ export function PartyDiagnosticsPanel({
             <span>No relay socket is open — signaling is down.</span>
           </div>
         ) : null}
-        {greeterName !== undefined || authorityName !== undefined ? (
+        {hostNameForDiagnostics !== undefined || authorityName !== undefined ? (
           <div className="flex flex-wrap gap-x-6 gap-y-1 font-mono text-base-content/70">
-            <span>greeter: {greeterName ?? "—"}</span>
+            <span>party host: {hostNameForDiagnostics ?? "—"}</span>
             <span>authority: {authorityName ?? "—"}</span>
           </div>
         ) : null}

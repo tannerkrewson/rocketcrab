@@ -648,10 +648,6 @@ export class TrysteroTransport implements NovaTransport {
       this.joinErrors.shift();
     }
     this.options.onJoinError?.(error);
-    // Fatal errors while the join is still pending fail it fast (F4: failed
-    // joiners must leave the rendezvous immediately). Errors arriving after
-    // join() resolved (the common case for password mismatch, which Trystero
-    // reports during the slow discovery phase) are delivered to the observer.
     if (this.joinWaiter !== null && this.connectionState === "joining" && error.isFatal) {
       this.failJoin(error);
     }

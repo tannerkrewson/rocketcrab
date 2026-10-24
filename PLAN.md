@@ -23,25 +23,39 @@ and old theme work; keep physical-device and deployment gates explicit.
 
 ### 2. Private invites replace discovery and admission
 
-**Paused for owner clarification:** after the creator leaves, who may select or
-change games, remove a participant, and reload everyone's frames? Current shell
-controls are permanently creator-only (`engine.ts`), independent of both greeter
-and game authority. Options: transfer shell controls to a deterministic remaining
-participant, or allow all participants to manage the party. The latter removes a
-role but changes product permissions. Classic external iframe games also have
-provider-specific host roles that Nova cannot generically migrate; shell-control
-succession must not claim to migrate those external game hosts. No stage-2 code
-has been changed pending this decision.
+**Owner decision:** transfer shell controls to one deterministically selected
+remaining participant when the creator leaves, separately from game authority.
+Classic external iframe provider host roles do not generically migrate. Continue
+without questions unless an urgent blocker requires owner input.
 
-- [ ] Generate one cryptographically secure high-entropy party secret in the
+- [x] Generate one cryptographically secure high-entropy party secret in the
       fragment. Use Trystero room discovery/password; automatic joining, native
       sharing, copy fallback, displayed QR (no scanner, accounts, or approval).
-- [ ] Remove codes, adverts/rendezvous, discovery timers/collisions, greeter and
+- [x] Remove codes, adverts/rendezvous, discovery timers/collisions, greeter and
       migration, manual admission, and obsolete UI/protocol/tests/docs.
-- [ ] Preserve joinability while any participant remains, verified late-join
+- [x] Preserve joinability while any participant remains, verified late-join
       HTML/state, returning identity/state, and end-on-empty. Never expose secrets
       in paths, queries, logs, or game frames. Explain reusable-invite kick limits.
-- [ ] Verify lifecycle/security/integration cases and commit with evidence.
+- [x] Verify lifecycle/security/integration cases and commit with evidence.
+
+Stage 2 evidence: replaced ~1,465-line rendezvous module with one private-room
+session; removed code generation/routes, adverts, admission, greeter, approval UI,
+phonetic/short-link UI and their obsolete tests/schemas. Original creator context
+and current membership determine the shell host; sender/session checks protect
+control routing. Host/authority are separate; classic provider host roles do not
+migrate. All invite holders can rejoin after cooperative removal (UI explains it).
+Fixed received-source caching to retain full metadata/current selection so any
+remaining verified holder serves late joiners. Tests cover creator departure,
+source delivery and successor selection, identity recovery, stale invites, invalid
+and spoofed controls, and cleanup. Updated ADRs/threat model/README/device gates.
+
+Verification: 961 unit/property tests; typecheck, format, production builds and
+bundle check pass; initial JS 168.9 KiB gzip (220 KiB budget unchanged). Real
+Nostr/WebRTC suite 4/4 passes on one machine. App Playwright: 41 host tests passed;
+19 WebKit launch failures were missing Fedora system libraries, not app failures;
+WebKit rerun in the existing Playwright Podman image: 20/20 passed. No deployment
+or physical-device proof. Native-share/copy/QR behavior is unit-tested; full
+multi-hour cross-network/device acceptance remains gated.
 
 ### 3. Thin Trystero adapter and source transfer
 
@@ -378,28 +392,12 @@ surface and an inappropriate `createInitialState` request.
 - [x] Fixed a related source cache defect: match verified content hashes rather
       than treating every version of a game ID as identical.
 
-## 11. Host name on join approval — P2, privacy decision
+## 11–12. Superseded party-admission/greeter decisions
 
-Current wording uses “the host.” Showing a name before admission would require
-putting the greeter's display name in the public four-letter-code advertisement,
-which anyone visiting/guessing the code could read (ADR-0004).
-
-- [ ] Ask the owner whether publicizing the chosen name is acceptable, whether
-      a reduced/first-name field is preferable, or whether to keep generic text.
-- [ ] Implement “Waiting for <host name>'s approval” only with approval; update
-      the public-advert threat/privacy documentation and tests if changed.
-
-## 12. Distinguish creator from migrating greeter — P3, optional improvement
-
-The lobby historically used `greeterMemberId` as the host-name signal. The
-creator starts as greeter, but greeter migration after disconnect can make the
-lobby label a different person as host.
-
-- [ ] Revalidate the current state shape and displayed behavior.
-- [ ] Add a creator member ID to `PartyEngineState` or an equivalent `isCreator`
-      signal, and use the true creator where host/creator identity is intended.
-- [ ] Test creator disconnect and greeter migration. Do not conflate the creator,
-      greeter, and game authority roles.
+Closed by the private-invite program: no public adverts, approval, codes, or
+greeter role. Shell controls use a deterministic successor independently of game
+authority (owner approved). Original creator identity is context, not a public
+advertisement or external game-provider host migration.
 
 ## 13. Release validation and documentation — P0, gated by TURN and deployment
 
@@ -421,7 +419,7 @@ rewriting completed work blindly.
       launch-readiness update and `docs/architecture/deployment.md`); this is
       not evidence about the eventual host's headers or CDN behavior.
 - [ ] Run and record physical tests with at least two iPhones and a desktop:
-      same-Wi-Fi and Wi-Fi/cellular parties, four-letter and QR joins, source
+      same-Wi-Fi and Wi-Fi/cellular parties, private-link and QR joins, source
       transfer, state-mode play, authority migration, reconnect, simulation/raw
       samples, remote dependencies, audio, and camera/microphone to the extent
       supported. WebKit automation does not replace these tests.
@@ -432,7 +430,7 @@ rewriting completed work blindly.
       major AI chat services, producing one pasteable HTML document.
 - [ ] Verify state, simulation, and raw sample games, automatic authority
       migration, byte-identical peer-to-peer source transfer, and backendless
-      four-letter codes. Confirm no obsolete application backend remains in Nova.
+      private invites. Confirm no obsolete application backend remains in Nova.
 - [x] Added `docs/game-author-debugging.md` (authoring loop, diagnostics,
       common failures, party debugging) and indexed it from the README.
 - [ ] Audit README, API reference, game-author/debugging/mobile/deployment guides,
@@ -465,7 +463,7 @@ Close these only after verifying their original outcomes and outstanding work:
       verify phone paste/run, at least six desktop simulated players, IndexedDB
       reload persistence, and launching a tested game into a party.
 - [ ] **Phase 3 — Party system:** implementation children closed; verify two
-      phones create/join/transfer/play, code guessing doesn't bypass admission,
+      phones create/join/transfer/play, invite secrets never enter requests or frames,
       byte-identical HTML/hash verification, and listener/connection cleanup.
 - [ ] **Phase 4 — Multiplayer API:** implementation children closed; verify a
       small game registers simply and behaves across both transports, trivia/card
@@ -512,8 +510,6 @@ real deployment/credentials, or physical devices on real networks.
 - Choose the two production origins/host. GitHub Pages cannot send custom HTTP
   security headers (documented limitation); a header-capable host is preferable
   if strict headers are a launch requirement.
-- Decide whether a public host name may appear in the four-letter-code advert
-  (§11); the creator-versus-greeter improvement (§12) is optional.
 
 **Deployment / live verification**
 
@@ -525,7 +521,7 @@ real deployment/credentials, or physical devices on real networks.
 **Physical devices / real networks**
 
 - Cross-network parties (Wi-Fi ↔ cellular; two phones on different networks),
-  four mixed devices, code and QR joins, a real 5 MiB transfer, and a party
+  four mixed devices, private-link and QR joins, a real 5 MiB transfer, and a party
   longer than ten minutes across the TURN credential refresh.
 - iPhone backgrounding, low-power mode, airplane-mode recovery, audio gesture,
   camera/mic permission, safe areas, and the full Mobile Safari checklist.

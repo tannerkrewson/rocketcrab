@@ -199,9 +199,7 @@ export function PartyExperience({
 
   return (
     <div className="flex flex-col gap-4">
-      {shellShown ? (
-        <PartyShellHeader code={state.code} inviteUrl={state.inviteUrl} compact={browsing} />
-      ) : null}
+      {shellShown ? <PartyShellHeader inviteUrl={state.inviteUrl} compact={browsing} /> : null}
       {frameArea}
       {renderPhase(
         state,
@@ -240,16 +238,8 @@ function renderPhase(
           <p className="font-black">{state.phaseDetail ?? "Working…"}</p>
           <p className="text-sm text-base-content/70">
             {state.phase === "joining"
-              ? // rocketcrab-erx: once the join request is away the host must
-                // approve (ADR-0004 step 6) — say so instead of "searching".
-                state.joinStage === "awaitingApproval"
-                ? "The host needs to approve your join request from their lobby — it can take a moment."
-                : // rocketcrab-5ae: admitted but no peer yet — keep the
-                  // joiner on loading, not a fake empty lobby.
-                  state.joinStage === "connecting"
-                  ? "Waiting for a direct connection with the party. If it never appears, the host and you may be on networks that can't reach each other."
-                  : "Searching the network for the party — this can take a few seconds. If it never appears, double-check the code with your friend."
-              : "Your party is being set up — it takes a few seconds."}
+              ? "Connecting to the private party. Anyone with this invite joins automatically; a friend must still be connected."
+              : "Your private party is being set up."}
           </p>
           <Button variant="default" soft size="md" onClick={() => void handleLeave()}>
             Cancel
@@ -261,8 +251,6 @@ function renderPhase(
       return (
         <PartyLobby
           state={state}
-          onApprove={(memberId) => engine.respondToJoinRequest(memberId, true)}
-          onReject={(memberId) => engine.respondToJoinRequest(memberId, false)}
           onStart={(force) => engine.startGame(force)}
           onLeave={() => void handleLeave()}
           onRefreshDiagnostics={() => void engine.refreshDiagnostics()}

@@ -12,17 +12,6 @@ export interface PartyResumeBannerProps {
   engine: PartyEngine;
 }
 
-/**
- * One-tap rejoin after a page reload (M1; ADR-0012).
- *
- * Mobile Safari can discard and reload a backgrounded tab; the party
- * itself survives (greeter/authority roles migrate while the phone is
- * away), so when this page loads with a saved recovery record the shell
- * offers to rejoin the party exactly as it was — same four-letter code,
- * same invite secret, same player identity. Rejoining goes through the
- * normal invite path (ADR-0011); the P3 coordinator then re-fetches the
- * verified game source from the party. Dismissing clears the record.
- */
 export function PartyResumeBanner({ engine }: PartyResumeBannerProps) {
   const [record, setRecord] = useState<PartyRecoveryRecord | null>(() => readPartyRecovery());
   const [rejoining, setRejoining] = useState(false);
@@ -39,7 +28,6 @@ export function PartyResumeBanner({ engine }: PartyResumeBannerProps) {
     void engine
       .joinByInvite({
         secret: record.secret,
-        ...(record.code !== null ? { code: record.code } : {}),
       })
       .then(() => {
         // Success unmounts the banner (the party experience takes over);
@@ -72,13 +60,7 @@ export function PartyResumeBanner({ engine }: PartyResumeBannerProps) {
             playing <span className="font-bold">“{record.game.title}”</span>
           </>
         ) : null}
-        {record.code !== null ? (
-          <>
-            {" "}
-            (code <span className="font-mono font-bold">{record.code}</span>)
-          </>
-        ) : null}
-        . The party is still open — rejoin where you left off.
+        . Rejoin if a friend is still connected.
       </p>
       <div className="flex flex-wrap items-center gap-2">
         <Button variant="primary" size="md" onClick={handleRejoin} disabled={rejoining}>

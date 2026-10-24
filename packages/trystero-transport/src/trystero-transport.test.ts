@@ -177,7 +177,7 @@ async function simulatePeerJoin(
   await callbacks.onPeerHandshake!(
     peerId,
     async () => undefined,
-    async () => ({ data: { v: 1, transportVersion: 2, ...identity } }),
+    async () => ({ data: { v: 1, transportVersion: 3, ...identity } }),
     false,
   );
   room.onPeerJoin!(peerId);
@@ -392,7 +392,7 @@ describe("TrysteroTransport peer mapping", () => {
       async () => ({
         data: {
           v: 1,
-          transportVersion: 2,
+          transportVersion: 3,
           memberId: "member-b",
           connectionId: "conn-b",
           displayName: "Bea",
@@ -403,7 +403,7 @@ describe("TrysteroTransport peer mapping", () => {
     // we announce our own memberId + connectionId
     expect(sentIdentity).toEqual({
       v: 1,
-      transportVersion: 2,
+      transportVersion: 3,
       memberId: "member-a",
       connectionId: "self-peer-id",
       displayName: "Ada",
@@ -426,7 +426,7 @@ describe("TrysteroTransport peer mapping", () => {
     expect(adapter.peers[0]!.memberId).toBe("member-b");
   });
 
-  it.each([undefined, 1, 3])(
+  it.each([undefined, 1, 2, 4])(
     "rejects incompatible transport version %s before actions",
     async (transportVersion) => {
       const onJoinError = vi.fn();

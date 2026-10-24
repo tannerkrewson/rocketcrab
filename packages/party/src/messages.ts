@@ -1,19 +1,14 @@
 import {
   PROTOCOL_VERSION,
-  admissionResponseMessageSchema,
   assertPeerMessage,
-  joinRequestMessageSchema,
   parsePeerMessage,
-  partyGreeterMessageSchema,
-  partyIdentityMessageSchema,
+  partyContextMessageSchema,
   partyRenameMessageSchema,
-  partySessionMessageSchema,
   partyClassicRoomMessageSchema,
   partyClassicRoomRequestMessageSchema,
   partyKickMessageSchema,
   partyReloadAllMessageSchema,
   type ClassicUrlSpecMessage,
-  type PartyCode,
   type ParseResult,
   type PeerMessage,
 } from "@rocketcrab/protocol";
@@ -21,13 +16,9 @@ import {
 /**
  * Party control message builders and parsing (P2).
  *
- * Pre-admission traffic (advert, join request, admission response, session
- * handoff) travels through the rendezvous room on this channel; post-
- * admission party control traffic (greeter announcements) travels through
- * the private room on the same channel. Every message is built from its Zod
- * schema and validated before it touches the transport (threat model T10;
- * engineering rules 15/21), and every inbound message is validated at the
- * boundary before it is acted on.
+ * Control traffic stays inside the private password-protected party room.
+ * Messages are validated before sending and again against the transport sender
+ * on receipt. The invite secret is never transmitted as a control message.
  *
  * The channel is distinct from `nova.protocol` (S1's game-facing channel),
  * so party control never reaches game code and game protocol messages never
@@ -55,90 +46,16 @@ function envelope(base: PartyControlBase) {
   };
 }
 
-/** Build and validate a `party.identity` advert (ADR-0004 minimal summary). */
-export function buildPartyIdentityMessage(
+/** Build private shell-control context. */
+export function buildPartyContextMessage(
   base: PartyControlBase,
-  input: {
-    partyCode: PartyCode;
-    partyName?: string;
-    gameTitle?: string;
-    memberCount: number;
-    greeterMemberId: string;
-  },
+  input: { creatorMemberId: string },
 ): PeerMessage {
   return assertPeerMessage(
-    partyIdentityMessageSchema.parse({
+    partyContextMessageSchema.parse({
       ...envelope(base),
-      type: "party.identity",
-      partyCode: input.partyCode,
-      ...(input.partyName !== undefined ? { partyName: input.partyName } : {}),
-      ...(input.gameTitle !== undefined ? { gameTitle: input.gameTitle } : {}),
-      memberCount: input.memberCount,
-      greeterMemberId: input.greeterMemberId,
-    }),
-  );
-}
-
-/** Build and validate a `join.request` (joiner → greeter). */
-export function buildJoinRequestMessage(
-  base: PartyControlBase,
-  input: { partyCode: PartyCode; displayName: string },
-): PeerMessage {
-  return assertPeerMessage(
-    joinRequestMessageSchema.parse({
-      ...envelope(base),
-      type: "join.request",
-      partyCode: input.partyCode,
-      displayName: input.displayName,
-    }),
-  );
-}
-
-/** Build and validate a `join.admission` response (greeter → joiner). */
-export function buildAdmissionResponseMessage(
-  base: PartyControlBase,
-  input: {
-    partyCode: PartyCode;
-    decision: "approved" | "rejected";
-    reason?: "party_full" | "greeter_rejected" | "timed_out" | "invalid_request";
-  },
-): PeerMessage {
-  return assertPeerMessage(
-    admissionResponseMessageSchema.parse({
-      ...envelope(base),
-      type: "join.admission",
-      partyCode: input.partyCode,
-      decision: input.decision,
-      ...(input.reason !== undefined ? { reason: input.reason } : {}),
-    }),
-  );
-}
-
-/** Build and validate the post-admission `party.session` handoff. */
-export function buildPartySessionMessage(
-  base: PartyControlBase,
-  input: { partyCode: PartyCode; secret: string },
-): PeerMessage {
-  return assertPeerMessage(
-    partySessionMessageSchema.parse({
-      ...envelope(base),
-      type: "party.session",
-      partyCode: input.partyCode,
-      secret: input.secret,
-    }),
-  );
-}
-
-/** Build and validate a `party.greeter` announcement (private room). */
-export function buildPartyGreeterMessage(
-  base: PartyControlBase,
-  input: { greeterMemberId: string },
-): PeerMessage {
-  return assertPeerMessage(
-    partyGreeterMessageSchema.parse({
-      ...envelope(base),
-      type: "party.greeter",
-      greeterMemberId: input.greeterMemberId,
+      type: "party.context",
+      creatorMemberId: input.creatorMemberId,
     }),
   );
 }
@@ -215,14 +132,6 @@ export function buildPartyReloadAllMessage(base: PartyControlBase): PeerMessage 
 /** Validate an inbound party control payload at the protocol boundary. */
 export function parsePartyControlMessage(payload: unknown): ParseResult<PeerMessage> {
   return parsePeerMessage(payload);
-}
-
-/** True when a raw payload is a `join.request` (malformed ones included). */
-export function looksLikeJoinRequest(payload: unknown): boolean {
-  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
-    return false;
-  }
-  return (payload as Record<string, unknown>)["type"] === "join.request";
 }
 
 // ---------------------------------------------------------------------------

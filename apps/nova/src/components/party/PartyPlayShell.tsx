@@ -20,7 +20,6 @@ import { BrandLogo } from "../layout/BrandLogo";
 import { Button } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
 import { PartyGameDetailsModal } from "./PartyGameDetails";
-import { partyPageTitle } from "./PartyShellHeader";
 
 export interface PartyPlayShellProps {
   state: PartyEngineState;
@@ -117,8 +116,7 @@ export function PartyPlayShell({
 
   // 7.38: the top bar shows the party URL (the code) instead of the game
   // name — classic parity (the code front and center).
-  const roomUrl =
-    state.code !== null ? partyPageTitle(state.code, "rocketcrab.com") : "rocketcrab.com";
+  const roomUrl = "Nova party";
   const menuOpen = panel === "menu";
 
   return (
@@ -195,7 +193,7 @@ export function PartyPlayShell({
               {/* 9fv.11.11: Browse games moved from the Players popup into the
                   menu (host only — picking a game while playing ends it for
                   everyone, so joiners never see it). */}
-              {state.role === "creator" ? (
+              {state.amHost ? (
                 <li>
                   <button
                     type="button"
@@ -252,7 +250,7 @@ export function PartyPlayShell({
                   Reload my game
                 </button>
               </li>
-              {state.role === "creator" ? (
+              {state.amHost ? (
                 <li>
                   <button
                     type="button"
@@ -268,7 +266,7 @@ export function PartyPlayShell({
                   </button>
                 </li>
               ) : null}
-              {state.role === "creator" ? (
+              {state.amHost ? (
                 <li>
                   <button
                     type="button"
@@ -353,7 +351,7 @@ export function PartyPlayShell({
                       ) : (
                         <span className="badge badge-error badge-sm">Disconnected</span>
                       )}
-                      {state.role === "creator" && !member.isSelf ? (
+                      {state.amHost && !member.isSelf ? (
                         <button
                           type="button"
                           className="btn btn-xs text-error"
@@ -623,6 +621,9 @@ function PartyKickConfirm({
     >
       <div className="flex w-full max-w-sm flex-col gap-4 rounded-box border-2 border-base-300 bg-base-100 p-5">
         <p className="font-black">Kick {memberName} from the party?</p>
+        <p className="text-sm">
+          This removes them for now, not permanently. They can rejoin with the same private invite.
+        </p>
         <p className="text-sm text-base-content/70">
           {memberName} will be removed from the party and will have to rejoin with the invite link.
         </p>

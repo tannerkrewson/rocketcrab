@@ -12,10 +12,8 @@ import { parseInviteFragment } from "@rocketcrab/party";
 
 let inviteHandled = false;
 
-/** Imported invite data (secret + optional four-letter code). */
 export interface ImportedInvite {
   readonly secret: string;
-  readonly code?: string;
 }
 
 /** The URL parts the importer needs (decoupled from window for tests). */
@@ -38,7 +36,6 @@ export function importInviteFromLocation(location: InviteImportLocation): Import
     history.replaceState(null, "", location.pathname + location.search);
     return {
       secret: data.secret,
-      ...(data.code !== undefined ? { code: data.code } : {}),
     };
   }
   if (location.hash.length > 0) {

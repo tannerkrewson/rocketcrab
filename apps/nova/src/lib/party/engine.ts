@@ -4,17 +4,13 @@
  *
  * One engine per page (the {@link partyEngine} singleton), so route
  * remounts never kill a party or leak Trystero rooms (engineering rule 22):
- * the engine owns the P2 {@link PartySession} (create / join-by-code /
- * join-by-invite), the P3 {@link GameSourceCoordinator} (game transfer
- * status per player), the S1 {@link NovaSession} attached to the already-
- * joined private transport, the local runtime frame (U3), and the
- * ready → start → end lifecycle. The UI is a pure projection of the state
- * snapshot.
+ * the engine owns the private invite PartySession, verified source distribution,
+ * NovaSession, local runtime, and ready/start/end lifecycle.
+ * The UI projects shell snapshots.
  *
- * Roles (ADR-0004/0007): the party creator, the rendezvous greeter, and the
- * current internal authority are SEPARATE roles. The engine only reports
- * them; S3 formalizes authority. Party secrets (the session secret and the
- * derived room/password) live in {@link PartySession} memory and never
+ * Shell host and game authority are separate roles. The host is selected from
+ * private-room membership; authority reconciliation belongs to nova-api.
+ * Party secrets (including the derived room/password) live in {@link PartySession} memory and never
  * enter game runtime messages (the game plane rides `nova.protocol`; party
  * control rides `nova.party`; game source rides `nova.source`).
  *
@@ -22,19 +18,15 @@
  * {@link TrysteroTransport} in production and over the in-memory hub with
  * injected seams (fake clock, fake runtime bridge) in deterministic tests.
  */
-import type { GameApiEvent, GameMode, MemberId, PartyCode } from "@rocketcrab/protocol";
+import type { GameApiEvent, GameMode, MemberId } from "@rocketcrab/protocol";
 import type { TransportConnectionState } from "@rocketcrab/core";
 import {
   GameSourceCoordinator,
   PartyError,
   buildInviteUrl,
-  buildShortJoinUrl,
   createParty,
-  joinPartyByCode,
   joinPartyByInvite,
-  normalizePartyCode,
   type GameSourceTransferEvent,
-  type JoinRequestInfo,
   type PartyEvent,
   type PartySession,
   type PartyTransportFactory,
@@ -100,7 +92,7 @@ export interface PartyMemberView {
   readonly isSelf: boolean;
   readonly connectionId: string | null;
   readonly connected: boolean;
-  readonly isGreeter: boolean;
+  readonly isHost: boolean;
   /** P3 game-source transfer status (per player). */
   readonly transferState:
     | "none"
@@ -115,11 +107,6 @@ export interface PartyMemberView {
   readonly transferDetail: string | null;
   /** True once the player's game loaded + registered (S1 ready lifecycle). */
   readonly ready: boolean;
-}
-
-/** A pending admission request shown to the greeter for approval. */
-export interface JoinRequestView extends JoinRequestInfo {
-  readonly id: string;
 }
 
 /** One relay socket as surfaced in engine diagnostics (rocketcrab-ont.1). */
@@ -201,7 +188,7 @@ export type PartyPhase =
  * is admitted and waiting for a direct peer connection before the lobby
  * may appear (rocketcrab-5ae). Null outside the joining phase.
  */
-export type JoinStage = "discovering" | "awaitingApproval" | "connecting" | null;
+export type JoinStage = "discovering" | "connecting" | null;
 
 /** The full engine snapshot the UI projects. */
 export interface PartyEngineState {
@@ -213,21 +200,15 @@ export interface PartyEngineState {
   /** Reconnect attempts since the last connected state (reconnect UX). */
   readonly reconnectAttempts: number;
   readonly role: "creator" | "joiner" | null;
-  readonly code: PartyCode | null;
   readonly memberId: MemberId;
   readonly displayName: string;
   readonly game: { gameId: string; title: string; mode: GameMode } | null;
   readonly members: readonly PartyMemberView[];
-  readonly pendingJoinRequests: readonly JoinRequestView[];
-  readonly greeterMemberId: MemberId | null;
-  readonly amGreeter: boolean;
+  readonly hostMemberId: MemberId | null;
+  readonly amHost: boolean;
   /** Current internal authority — DIAGNOSTIC ONLY (S3 formalizes). */
   readonly authorityMemberId: MemberId | null;
   readonly inviteUrl: string | null;
-  /** Short shareable join URL (origin + "/" + code; NO secret — codes are
-   *  public rendezvous namespaces, ADR-0004; the secret stays fragment-only,
-   *  ADR-0011). Secondary invite affordance beside {@link inviteUrl}. */
-  readonly shortInviteUrl: string | null;
   readonly connectionState: TransportConnectionState;
   readonly canStart: boolean;
   readonly canForceStart: boolean;
@@ -273,14 +254,6 @@ export interface PartyEngineConfig {
   lifecycle?: PartyLifecycleSource;
   /** Party-layer secret derivation (deterministic tests). */
   derive?: PartySecretDerivation;
-  /** Forwarded to the party layer (tests/UX tuning). */
-  collisionListenMs?: number;
-  collisionRetries?: number;
-  discoveryTimeoutMs?: number;
-  /** Fail-fast "no party here" window for code joins (default 7 s; 7.10). */
-  earlyMissTimeoutMs?: number;
-  admissionTimeoutMs?: number;
-  advertIntervalMs?: number;
   /**
    * How long an admitted code/invite joiner waits for the first private-room
    * peer before the join fails (default 15 s; rocketcrab-5ae — cross-network
@@ -313,11 +286,6 @@ interface TransferState {
   totalBytes: number;
   state: PartyMemberView["transferState"];
   detail: string | null;
-}
-
-interface PendingApproval {
-  readonly request: JoinRequestInfo;
-  resolve: (approved: boolean) => void;
 }
 
 const MAX_NOTICES = 8;
@@ -371,12 +339,6 @@ interface PartyEngineDefaults {
   turnCreds: () => Promise<TurnCredentialsResult>;
   runtimeOrigin: string;
   seams: PartyRuntimeSeams;
-  collisionListenMs: number;
-  collisionRetries: number;
-  discoveryTimeoutMs: number;
-  earlyMissTimeoutMs: number;
-  admissionTimeoutMs: number;
-  advertIntervalMs: number;
   peerConnectTimeoutMs: number;
 }
 
@@ -405,8 +367,7 @@ function defaultScheduler(callback: () => void, delayMs: number): () => void {
 /** The last setup attempt, so the error screen can retry it (7.10). */
 type LastSetup =
   | { kind: "create"; input: PartySourceSpec | undefined }
-  | { kind: "join-code"; code: string }
-  | { kind: "join-invite"; input: { secret: string; code?: string } };
+  | { kind: "join-invite"; input: { secret: string } };
 
 /** A stable member identity (ADR-0007); defaults to the page identity. */
 interface PartyMemberIdentity {
@@ -563,7 +524,6 @@ export class PartyEngine {
    */
   private lastStateApiEvent: GameApiEvent | null = null;
 
-  private pendingApprovals = new Map<MemberId, PendingApproval>();
   private transfers = new Map<MemberId, TransferState>();
   private game: PartyGame | null = null;
   private selfVerified = false;
@@ -596,12 +556,6 @@ export class PartyEngine {
       turnCreds: config.turnCreds ?? fetchTurnCredentials,
       runtimeOrigin: config.runtimeOrigin ?? defaultRuntimeOrigin(),
       seams: config.seams ?? {},
-      collisionListenMs: config.collisionListenMs ?? 2_000,
-      collisionRetries: config.collisionRetries ?? 4,
-      discoveryTimeoutMs: config.discoveryTimeoutMs ?? 20_000,
-      earlyMissTimeoutMs: config.earlyMissTimeoutMs ?? 7_000,
-      admissionTimeoutMs: config.admissionTimeoutMs ?? 30_000,
-      advertIntervalMs: config.advertIntervalMs ?? 5_000,
       peerConnectTimeoutMs: config.peerConnectTimeoutMs ?? DEFAULT_PEER_CONNECT_TIMEOUT_MS,
     };
     this.identity = config.identity ?? localPartyIdentity();
@@ -677,20 +631,14 @@ export class PartyEngine {
       joinStage: this.joinStage,
       reconnectAttempts: this.reconnectAttempts,
       role: party?.role ?? null,
-      code: party?.code ?? null,
       memberId: identity.memberId,
       displayName: identity.displayName,
       game: this.game,
       members,
-      pendingJoinRequests: [...this.pendingApprovals.values()].map((entry) => ({
-        ...entry.request,
-        id: `join-request-${entry.request.memberId}`,
-      })),
-      greeterMemberId: party?.greeterMemberId ?? null,
-      amGreeter: party?.amGreeter ?? false,
+      hostMemberId: party?.hostMemberId ?? null,
+      amHost: party?.amHost ?? false,
       authorityMemberId: this.computeAuthorityMemberId(members),
       inviteUrl: this.buildInviteUrl(),
-      shortInviteUrl: this.buildShortInviteUrl(),
       connectionState: this.connectionState,
       canStart: inLobby && this.game !== null && !ended && !anyFailed && allVerified && allReady,
       canForceStart:
@@ -770,7 +718,7 @@ export class PartyEngine {
     const identity = this.identity;
     this.lastSetup = { kind: "create", input };
     this.phase = "creating";
-    this.phaseDetail = "Generating your room code…";
+    this.phaseDetail = "Creating your private invite…";
     this.lastError = null;
     this.emit();
     try {
@@ -778,13 +726,6 @@ export class PartyEngine {
         memberId: identity.memberId,
         displayName: identity.displayName,
         transportFactory: await this.resolveTransportFactory(),
-        partyName: "Nova party",
-        gameTitle: input?.title ?? "Nova party",
-        onJoinRequest: (request) => this.queueApproval(request),
-        collisionListenMs: this.defaults.collisionListenMs,
-        collisionRetries: this.defaults.collisionRetries,
-        advertIntervalMs: this.defaults.advertIntervalMs,
-        ...(this.schedule !== undefined ? { schedule: this.schedule } : {}),
         ...(this.derive !== undefined ? { derive: this.derive } : {}),
       });
       // The user cancelled while the room was being created: drop the
@@ -814,92 +755,11 @@ export class PartyEngine {
     }
   }
 
-  /** Join a party by its four-letter code. */
-  async joinByCode(code: string): Promise<void> {
-    this.prepareSetup();
-    const identity = this.identity;
-    const normalizedCode = normalizePartyCode(code);
-    this.lastSetup = { kind: "join-code", code: normalizedCode };
-    this.phase = "joining";
-    this.joinStage = "discovering";
-    this.phaseDetail = `Joining party ${normalizedCode}…`;
-    this.lastError = null;
-    this.emit();
-    try {
-      const party = await joinPartyByCode({
-        code: normalizedCode,
-        memberId: identity.memberId,
-        displayName: identity.displayName,
-        transportFactory: await this.resolveTransportFactory(),
-        // rocketcrab-erx: once the join request is away, the loading
-        // screen flips to "Waiting for the host's approval…" (the host
-        // name isn't carried in the public advert — ADR-0004 keeps it
-        // minimal — so the UI says "the host").
-        onAdmissionPending: () => this.handleAdmissionPending(),
-        onJoinRequest: (request) => this.queueApproval(request),
-        discoveryTimeoutMs: this.defaults.discoveryTimeoutMs,
-        earlyMissTimeoutMs: this.defaults.earlyMissTimeoutMs,
-        admissionTimeoutMs: this.defaults.admissionTimeoutMs,
-        advertIntervalMs: this.defaults.advertIntervalMs,
-        ...(this.schedule !== undefined ? { schedule: this.schedule } : {}),
-        ...(this.derive !== undefined ? { derive: this.derive } : {}),
-      });
-      // The user cancelled while joining: drop the session instead of
-      // resurrecting a party behind their back.
-      if (this.leaving) {
-        await party.leave().catch(() => undefined);
-        return;
-      }
-      await this.establish(party);
-      // rocketcrab-5ae: keep the joiner on the loading screen until the
-      // private room shows a real peer; the lobby must never be a fake
-      // solo room the host never appears in.
-      try {
-        await this.waitForPeerConnect(party);
-      } catch (error) {
-        // Cancelled while waiting: leaveParty already cleaned everything up
-        // (this.party is null) — just stop; never resurrect a lobby behind
-        // the user's back or fail into the error screen.
-        if (this.party === null) {
-          return;
-        }
-        // The join established but no peer ever appeared (dead-end room):
-        // tear the session down so the error screen doesn't sit on a live
-        // but empty party room, and keep the setup record so Retry can
-        // re-run this join (retrySetup depends on lastSetup).
-        const setup = this.lastSetup;
-        await this.leaveParty().catch(() => undefined);
-        this.lastSetup = setup;
-        throw error;
-      }
-      if (this.party === null) {
-        return; // cancelled while waiting — leaveParty already cleaned up
-      }
-      this.phase = "lobby";
-      this.phaseDetail = null;
-      this.joinStage = null;
-      this.lastSetup = null;
-      this.saveRecovery();
-      this.emit();
-      void this.coordinator
-        ?.refresh()
-        .catch((error: unknown) =>
-          this.addNotice("warn", `Could not ask the party for the game: ${errorMessage(error)}`),
-        );
-      this.askForClassicRoom();
-    } catch (error) {
-      this.failSetup(error);
-    }
-  }
-
   /** Join a party from an invite-link secret (ADR-0011). */
-  async joinByInvite(input: { secret: string; code?: string }): Promise<void> {
+  async joinByInvite(input: { secret: string }): Promise<void> {
     this.prepareSetup();
     const identity = this.identity;
-    const normalizedInput =
-      input.code === undefined
-        ? input
-        : { secret: input.secret, code: normalizePartyCode(input.code) };
+    const normalizedInput = input;
     this.lastSetup = { kind: "join-invite", input: normalizedInput };
     this.phase = "joining";
     this.joinStage = "discovering";
@@ -909,13 +769,9 @@ export class PartyEngine {
     try {
       const party = await joinPartyByInvite({
         secret: normalizedInput.secret,
-        ...(normalizedInput.code !== undefined ? { code: normalizedInput.code } : {}),
         memberId: identity.memberId,
         displayName: identity.displayName,
         transportFactory: await this.resolveTransportFactory(),
-        onJoinRequest: (request) => this.queueApproval(request),
-        advertIntervalMs: this.defaults.advertIntervalMs,
-        ...(this.schedule !== undefined ? { schedule: this.schedule } : {}),
         ...(this.derive !== undefined ? { derive: this.derive } : {}),
       });
       // The user cancelled while joining: drop the session instead of
@@ -964,7 +820,7 @@ export class PartyEngine {
    * the host then registers/announces it and boots the local frame.
    */
   async selectGame(input: PartySourceSpec): Promise<void> {
-    if (this.phase !== "lobby" || this.party === null || this.party.role !== "creator") {
+    if (this.phase !== "lobby" || this.party === null || !this.party.amHost) {
       return;
     }
     this.game = { gameId: input.gameId, title: input.title, mode: input.mode };
@@ -986,7 +842,7 @@ export class PartyEngine {
    * is not the creator or the party is not in the lobby.
    */
   async selectClassicGame(gameId: string): Promise<void> {
-    if (this.phase !== "lobby" || this.party === null || this.party?.role !== "creator") {
+    if (this.phase !== "lobby" || this.party === null || !this.party?.amHost) {
       return;
     }
     const game = findClassicGame(gameId);
@@ -1027,7 +883,7 @@ export class PartyEngine {
    * are ignored; every member (including the host) reloads its own frame.
    */
   reloadAllGames(): void {
-    if (this.party?.role !== "creator" || this.party === null) {
+    if (!this.party?.amHost || this.party === null) {
       return;
     }
     void this.party.announceReloadAll().catch(() => undefined);
@@ -1040,11 +896,7 @@ export class PartyEngine {
    * receipt and the others observe its `peer:left`. Non-hosts are ignored.
    */
   kickMember(memberId: string): void {
-    if (
-      this.party?.role !== "creator" ||
-      this.party === null ||
-      memberId === this.identity.memberId
-    ) {
+    if (!this.party?.amHost || this.party === null || memberId === this.identity.memberId) {
       return;
     }
     void this.party
@@ -1087,12 +939,6 @@ export class PartyEngine {
     this.emit();
   }
 
-  /**
-   * Re-run the last setup attempt (create / join-by-code / join-by-invite)
-   * after a failure. Used by the error screen's retry (7.10) — the previous
-   * flow called leave instead, which toasted "you left the party" over the
-   * navbar and left a blank page.
-   */
   retrySetup(): void {
     const last = this.lastSetup;
     if (last === null || this.party !== null) {
@@ -1100,8 +946,6 @@ export class PartyEngine {
     }
     if (last.kind === "create") {
       void this.createParty(last.input);
-    } else if (last.kind === "join-code") {
-      void this.joinByCode(last.code);
     } else {
       void this.joinByInvite(last.input);
     }
@@ -1127,33 +971,13 @@ export class PartyEngine {
   // Lobby controls
   // ------------------------------------------------------------------
 
-  /** The greeter approves or rejects one pending join request. */
-  respondToJoinRequest(memberId: MemberId, approved: boolean): void {
-    const pending = this.pendingApprovals.get(memberId);
-    if (pending === undefined) {
-      return;
-    }
-    this.pendingApprovals.delete(memberId);
-    pending.resolve(approved);
-    // 2z9: same id-name gate as the admission event — a no-name member is
-    // approved silently (the joined/removed notices are gated too).
-    if (this.hasDisplayName(memberId)) {
-      this.addNotice(
-        approved ? "info" : "warn",
-        approved
-          ? `${this.displayNameOf(memberId)} was admitted to the party.`
-          : `${this.displayNameOf(memberId)} was not admitted.`,
-      );
-    }
-    this.emit();
-  }
-
   /**
    * Start the game. All members must be ready; `force` starts once every
    * member has verified the game source even if some are not ready yet
    * (starting is never allowed before the source is verified).
    */
   startGame(force = false): void {
+    if (!this.party?.amHost) return;
     const state = this.getState();
     if (!force && !state.canStart) {
       this.addNotice("warn", state.startBlockedReason ?? "The party is not ready to start.");
@@ -1200,10 +1024,6 @@ export class PartyEngine {
     this.leaving = true;
     this.turnRefreshTimer?.();
     this.turnRefreshTimer = null;
-    for (const pending of this.pendingApprovals.values()) {
-      pending.resolve(false);
-    }
-    this.pendingApprovals.clear();
     this.runtime?.destroy("user_exit");
     this.runtime = null;
     this.frameStarted = false;
@@ -1550,7 +1370,6 @@ export class PartyEngine {
     }
     savePartyRecovery({
       role: party.role,
-      code: party.code,
       secret: party.secret,
       memberId: this.identity.memberId,
       displayName: this.identity.displayName,
@@ -1876,7 +1695,7 @@ export class PartyEngine {
 
   /** Ask the host for the current classic room (late joiners, 7.7.4). */
   private askForClassicRoom(): void {
-    if (this.party?.role === "creator" || this.party === null || this.classic !== null) {
+    if (this.party?.amHost || this.party === null || this.classic !== null) {
       return;
     }
     void this.party.requestClassicRoom().catch(() => undefined);
@@ -1915,36 +1734,11 @@ export class PartyEngine {
       });
   }
 
-  /** Queue a joiner's admission request for the greeter's approval. */
-  private queueApproval(request: JoinRequestInfo): Promise<boolean> {
-    return new Promise<boolean>((resolve) => {
-      this.pendingApprovals.set(request.memberId, { request, resolve });
-      this.emit();
-    });
-  }
-
   private failSetup(error: unknown): void {
     this.lastError = errorMessage(error);
     this.phase = "error";
     this.phaseDetail = null;
     this.joinStage = null;
-    this.emit();
-  }
-
-  /**
-   * The joiner's join request was sent and the greeter must now decide
-   * (ADR-0004 step 6). Flips the loading screen from "searching" to
-   * "waiting for the host's approval" (rocketcrab-erx). The host's display
-   * name is NOT in the public advert (minimal summary, ADR-0004), so the
-   * copy uses a generic "the host"; putting the host's name in the advert
-   * would publicize it to anyone guessing the code.
-   */
-  private handleAdmissionPending(): void {
-    if (this.phase !== "joining") {
-      return;
-    }
-    this.joinStage = "awaitingApproval";
-    this.phaseDetail = "Waiting for the host's approval…";
     this.emit();
   }
 
@@ -1982,7 +1776,7 @@ export class PartyEngine {
         reject(
           new PartyError(
             "peer_unreachable",
-            "Couldn't reach the host. The party may be on a network that can't connect to yours — check the code with your friend, or ask for an invite link.",
+            "Couldn't reach anyone in this party. It may have ended, or your networks may need a TURN relay. Ask a friend to confirm they are still connected and try again.",
           ),
         );
       }, this.defaults.peerConnectTimeoutMs);
@@ -2218,25 +2012,6 @@ export class PartyEngine {
 
   private handlePartyEvent(event: PartyEvent): void {
     switch (event.type) {
-      case "joinRequest":
-        // Already queued by the approval policy; just refresh the UI.
-        this.emit();
-        break;
-      case "admission":
-        // 2z9: a member with no real display name yet (displayNameOf still
-        // returns the generated member-… id) is silently absorbed — no
-        // "member-abc1234 joined the party." noise in the banner or the
-        // membership toasts until they actually have a name.
-        if (event.decision === "approved" && this.hasDisplayName(event.memberId)) {
-          this.addNotice("info", `${this.displayNameOf(event.memberId)} joined the party.`);
-        } else if (event.decision !== "approved") {
-          this.addNotice(
-            "warn",
-            `${this.displayNameOf(event.memberId)} was not admitted (${event.reason ?? "rejected"}).`,
-          );
-        }
-        this.emit();
-        break;
       case "memberJoined":
       case "memberLeft":
         this.emit();
@@ -2249,7 +2024,7 @@ export class PartyEngine {
       case "classicRoom": {
         // The host shared the classic room (7.7.4): joiners build their own
         // per-player URL from the spec and become ready to start.
-        if (this.party?.role === "creator") {
+        if (this.party?.amHost) {
           break;
         }
         const game = findClassicGame(event.gameId);
@@ -2281,7 +2056,7 @@ export class PartyEngine {
       }
       case "classicRoomRequest":
         // A late joiner asked for the current classic room: re-announce it.
-        if (this.party?.role === "creator" && this.classic !== null && this.party !== null) {
+        if (this.party?.amHost && this.classic !== null && this.party !== null) {
           void this.party.announceClassicRoom(this.classicAnnouncement()).catch(() => undefined);
         }
         break;
@@ -2313,18 +2088,9 @@ export class PartyEngine {
         }
         this.emit();
         break;
-      case "greeter":
-        this.addNotice(
-          "info",
-          event.greeterMemberId === this.identity.memberId
-            ? "You are now the party greeter (the four-letter code's host)."
-            : `${this.displayNameOf(event.greeterMemberId)} is now the party greeter.`,
-        );
+      case "host":
         this.emit();
-        break;
-      case "collision":
-        this.addNotice("warn", "Your code collided with another party; a new code was generated.");
-        this.emit();
+        this.askForClassicRoom();
         break;
       case "error": {
         const error = event.error;
@@ -2741,7 +2507,7 @@ export class PartyEngine {
         isSelf,
         connectionId: peer?.connectionId ?? null,
         connected: isSelf ? isConnectedState(this.connectionState) : peer !== undefined,
-        isGreeter: memberId === party?.greeterMemberId,
+        isHost: memberId === party?.hostMemberId,
         transferState,
         transferProgress,
         transferDetail,
@@ -2833,30 +2599,14 @@ export class PartyEngine {
 
   private buildInviteUrl(): string | null {
     const party = this.party;
-    const code = party?.code;
-    if (party === null || code === undefined || code === null) {
+    if (party === null) {
       return null;
     }
     try {
       return buildInviteUrl({
         baseUrl: `${defaultBaseUrl()}/join`,
-        code,
         secret: party.secret,
       });
-    } catch {
-      return null;
-    }
-  }
-
-  /** The short typeable/shareable URL: origin + "/" + lowercase code (no
-   *  secret). Same null-when-no-party rule as {@link buildInviteUrl}. */
-  private buildShortInviteUrl(): string | null {
-    const code = this.party?.code;
-    if (code === undefined || code === null) {
-      return null;
-    }
-    try {
-      return buildShortJoinUrl({ baseUrl: defaultBaseUrl(), code });
     } catch {
       return null;
     }

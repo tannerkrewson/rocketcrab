@@ -112,7 +112,7 @@ import {
 export interface NovaSessionOptions {
   /** The transport-neutral connection this session drives (U5/P1). */
   readonly transport: NovaTransport;
-  /** Simulated room / rendezvous room name to join. */
+
   readonly room: string;
   /** Party session id that labels every message this session sends. */
   readonly sessionId: string;

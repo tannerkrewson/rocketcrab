@@ -266,11 +266,6 @@ function makeWorld(): World {
   const hub = new InMemoryTransportHub({ schedule: clock.schedule, now: clock.now });
   const transports: World["transports"] = [];
   const factory: PartyTransportFactory = {
-    createRendezvousTransport: (identity) => {
-      const transport = hub.createTransport(identity);
-      transports.push(transport);
-      return transport;
-    },
     createPrivateTransport: (identity) => {
       const transport = hub.createTransport(identity);
       transports.push(transport);
@@ -294,11 +289,6 @@ function makePlayer(
     derive: mockDerive,
     seams: harness.seams,
     identity: { memberId, displayName: `Player ${id}` },
-    collisionListenMs: 1_000,
-    collisionRetries: 2,
-    discoveryTimeoutMs: 20_000,
-    admissionTimeoutMs: 30_000,
-    advertIntervalMs: 5_000,
     ...overrides,
   });
   const container = document.createElement("div");
@@ -319,9 +309,9 @@ async function runCreate(
   }
   await settle(world);
   await promise;
-  const code = player.engine.getState().code;
-  expect(code).toMatch(/^[a-z]{4}$/);
-  return code as string;
+  const invite = parseInviteFragment(new URL(player.engine.getState().inviteUrl!).hash)!;
+  expect(invite.secret).toHaveLength(43);
+  return invite.secret;
 }
 
 /** Join by code up to the point the greeter must approve. */
@@ -330,7 +320,7 @@ function startJoin(
   world: World,
   code: string,
 ): { join: Promise<void>; settled: Promise<void> } {
-  const join = player.engine.joinByCode(code);
+  const join = player.engine.joinByInvite({ secret: code });
   const settled = (async () => {
     await flush();
     world.clock.advance(5_000); // the greeter's advert fires
@@ -373,13 +363,7 @@ describe("party engine — two phones end to end", () => {
     expect(creatorState.phase).toBe("lobby");
     expect(creatorState.role).toBe("creator");
     expect(creatorState.members).toHaveLength(1);
-    expect(creatorState.inviteUrl).toContain(`/join#code=${code}&secret=`);
-    // 9fv.8: the short URL is origin + lowercase code — no secret, ever.
-    expect(creatorState.shortInviteUrl).toBe(`${window.location.origin}/${code.toLowerCase()}`);
-    expect(creatorState.shortInviteUrl).not.toContain("secret");
-    expect(creatorState.greeterMemberId).toBe(a.memberId);
-    expect(creatorState.amGreeter).toBe(true);
-
+    expect(creatorState.inviteUrl).toContain(`/join#secret=${code}`);
     // The creator's game boots and registers → ready.
     await registerLocalGame(a, world);
     expect(a.engine.getState().members[0]?.ready).toBe(true);
@@ -387,10 +371,6 @@ describe("party engine — two phones end to end", () => {
     // Joiner: joins by the four-letter code; the creator approves.
     const { join: joinPromise, settled } = startJoin(b, world, code);
     await settled;
-    const pending = a.engine.getState().pendingJoinRequests;
-    expect(pending).toHaveLength(1);
-    expect(pending[0]?.displayName).toBe(b.displayName);
-    a.engine.respondToJoinRequest(pending[0]?.memberId ?? "", true);
     await settle(world);
     await joinPromise;
 
@@ -456,12 +436,10 @@ describe("party engine — two phones end to end", () => {
 
     const joinPromise = b.engine.joinByInvite({
       secret: invite?.secret as string,
-      code: invite?.code,
     });
     await settle(world);
     await joinPromise;
     expect(b.engine.getState().phase).toBe("lobby");
-    expect(b.engine.getState().code).toBe(a.engine.getState().code);
     await settle(world);
     expect(memberOf(b.engine.getState(), b.memberId).transferState).toBe("complete");
   });
@@ -481,7 +459,7 @@ describe("party engine — game mode and source transitions", () => {
     const b = makePlayer(world, "b");
     await runCreate(a, world, { ...GAME, mode: "simulation" });
     const invite = parseInviteFragment(new URL(a.engine.getState().inviteUrl as string).hash)!;
-    const joining = b.engine.joinByInvite({ secret: invite.secret!, code: invite.code });
+    const joining = b.engine.joinByInvite({ secret: invite.secret! });
     await settle(world);
     await joining;
     a.harness.ready();
@@ -510,7 +488,7 @@ describe("party engine — game mode and source transitions", () => {
     const b = makePlayer(world, "b");
     await runCreate(a, world);
     const invite = parseInviteFragment(new URL(a.engine.getState().inviteUrl as string).hash)!;
-    const joining = b.engine.joinByInvite({ secret: invite.secret!, code: invite.code });
+    const joining = b.engine.joinByInvite({ secret: invite.secret! });
     await settle(world);
     await joining;
     await registerLocalGame(a, world);
@@ -550,7 +528,7 @@ describe("party engine — game mode and source transitions", () => {
     const b = makePlayer(world, "b");
     await runCreate(a, world);
     const invite = parseInviteFragment(new URL(a.engine.getState().inviteUrl as string).hash)!;
-    const joining = b.engine.joinByInvite({ secret: invite.secret!, code: invite.code });
+    const joining = b.engine.joinByInvite({ secret: invite.secret! });
     await settle(world);
     await joining;
     await registerLocalGame(a, world);
@@ -591,7 +569,7 @@ describe("party engine — game mode and source transitions", () => {
     const b = makePlayer(world, "b");
     await runCreate(a, world);
     const invite = parseInviteFragment(new URL(a.engine.getState().inviteUrl as string).hash)!;
-    const joining = b.engine.joinByInvite({ secret: invite.secret!, code: invite.code });
+    const joining = b.engine.joinByInvite({ secret: invite.secret! });
     await settle(world);
     await joining;
     await b.engine.selectGame({ ...GAME, gameId: "not-the-hosts-game", mode: "raw" });
@@ -602,39 +580,13 @@ describe("party engine — game mode and source transitions", () => {
 });
 
 describe("party engine — join loading stages (rocketcrab-erx / rocketcrab-5ae)", () => {
-  it("shows 'waiting for approval' while the host must approve, then lands in the lobby (erx)", async () => {
-    const world = makeWorld();
-    const a = makePlayer(world, "a");
-    const b = makePlayer(world, "b");
-    const code = await runCreate(a, world);
-
-    const { join: joinPromise, settled } = startJoin(b, world, code);
-    await settled;
-
-    // The join request is away; the joiner's loading screen now says the
-    // host must approve (the admission exchange exists in the transport:
-    // join.request → join.admission, ADR-0004 steps 5-6).
-    expect(b.engine.getState().phase).toBe("joining");
-    expect(b.engine.getState().joinStage).toBe("awaitingApproval");
-    expect(b.engine.getState().phaseDetail).toMatch(/approval/i);
-
-    a.engine.respondToJoinRequest(b.memberId, true);
-    await settle(world);
-    await joinPromise;
-
-    expect(b.engine.getState().phase).toBe("lobby");
-    expect(b.engine.getState().joinStage).toBeNull();
-    expect(a.engine.getState().members).toHaveLength(2);
-    expect(b.engine.getState().members).toHaveLength(2);
-  });
-
   it("keeps a joiner on loading then errors when no peer can be reached (5ae)", async () => {
     const world = makeWorld();
     // No host at all: an invite join derives a private room nobody is in
     // (the stale-invite / cross-network no-TURN shape). The joiner must sit
     // on the loading screen and then hit a clear error — never a fake lobby.
     const b = makePlayer(world, "b", { peerConnectTimeoutMs: 1_000 });
-    const joinPromise = b.engine.joinByInvite({ secret: "E".repeat(43), code: "ABCD" });
+    const joinPromise = b.engine.joinByInvite({ secret: "E".repeat(43) });
     await settle(world);
     expect(b.engine.getState().phase).toBe("joining");
     expect(b.engine.getState().joinStage).toBe("connecting");
@@ -651,7 +603,7 @@ describe("party engine — join loading stages (rocketcrab-erx / rocketcrab-5ae)
     await settle(world);
     await joinPromise;
     expect(b.engine.getState().phase).toBe("error");
-    expect(b.engine.getState().lastError).toMatch(/couldn't reach the host/i);
+    expect(b.engine.getState().lastError).toMatch(/couldn't reach anyone/i);
     expect(world.hub.roomNames().every((room) => world.hub.membersOf(room).length === 0)).toBe(
       true,
     );
@@ -660,7 +612,7 @@ describe("party engine — join loading stages (rocketcrab-erx / rocketcrab-5ae)
   it("lets a Cancel during the peer wait return to idle without an error (5ae)", async () => {
     const world = makeWorld();
     const b = makePlayer(world, "b", { peerConnectTimeoutMs: 5_000 });
-    const joinPromise = b.engine.joinByInvite({ secret: "F".repeat(43), code: "ABCD" });
+    const joinPromise = b.engine.joinByInvite({ secret: "F".repeat(43) });
     await settle(world);
     expect(b.engine.getState().phase).toBe("joining");
     expect(b.engine.getState().joinStage).toBe("connecting");
@@ -692,7 +644,6 @@ describe("party engine — readiness and start gating", () => {
 
     const { join: joinPromise, settled } = startJoin(b, world, code);
     await settled;
-    a.engine.respondToJoinRequest(b.memberId, true);
     await settle(world);
     await joinPromise;
     await settle(world);
@@ -721,7 +672,6 @@ describe("party engine — readiness and start gating", () => {
 
     const { join: joinPromise, settled } = startJoin(b, world, code);
     await settled;
-    a.engine.respondToJoinRequest(b.memberId, true);
     await settle(world);
     await joinPromise;
     await settle(world);
@@ -741,25 +691,6 @@ describe("party engine — readiness and start gating", () => {
     expect(world.hub.roomNames().every((room) => world.hub.membersOf(room).length === 0)).toBe(
       true,
     );
-  });
-
-  it("rejects a join request; the joiner sees a clear error and can retry", async () => {
-    const world = makeWorld();
-    const a = makePlayer(world, "a");
-    const b = makePlayer(world, "b");
-    const code = await runCreate(a, world);
-
-    const { join: joinPromise, settled } = startJoin(b, world, code);
-    await settled;
-    const pending = a.engine.getState().pendingJoinRequests;
-    expect(pending).toHaveLength(1);
-    a.engine.respondToJoinRequest(pending[0]?.memberId ?? "", false);
-    await settle(world);
-    await expect(joinPromise).resolves.toBeUndefined();
-
-    expect(b.engine.getState().phase).toBe("error");
-    expect(b.engine.getState().lastError).toMatch(/rejected/i);
-    expect(a.engine.getState().members).toHaveLength(1);
   });
 
   it("creates a party without a game; the lobby blocks start until one is picked (7.6)", async () => {
@@ -800,35 +731,6 @@ describe("party engine — readiness and start gating", () => {
     );
   });
 
-  it("a join for a nonexistent code fails fast and can be retried from the error phase (7.10)", async () => {
-    const world = makeWorld();
-    const b = makePlayer(world, "b", { earlyMissTimeoutMs: 1_000 });
-
-    const join = b.engine.joinByCode("ZZZZ");
-    await flush();
-    world.clock.advance(1_000); // the early-miss window closes: no peer at all
-    await settle(world);
-    await join;
-
-    const failed = b.engine.getState();
-    expect(failed.phase).toBe("error");
-    expect(failed.lastError).toMatch(/no party is advertising/i);
-
-    // The old code threw "already active" when retrying from the error
-    // phase; a retry must now start clean and reach the same clear error.
-    const retry = b.engine.joinByCode("ZZZZ");
-    await flush();
-    world.clock.advance(1_000);
-    await settle(world);
-    await retry;
-    expect(b.engine.getState().phase).toBe("error");
-    expect(b.engine.getState().lastError).toMatch(/no party is advertising/i);
-
-    // Dismissing the error returns to the idle entry UI without a toast.
-    b.engine.dismissError();
-    expect(b.engine.getState().phase).toBe("idle");
-  });
-
   it("setDisplayName updates the local display name (7.5)", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
@@ -857,8 +759,6 @@ describe("party engine — restart after exiting to the lobby (2t1.4)", () => {
 
     const { join: joinPromise, settled } = startJoin(b, world, code);
     await settled;
-    const pending = a.engine.getState().pendingJoinRequests;
-    a.engine.respondToJoinRequest(pending[0]?.memberId ?? "", true);
     await settle(world);
     await joinPromise;
     await settle(world);
@@ -941,7 +841,6 @@ describe("party engine — lobby notices", () => {
     const code = await runCreate(a, world);
     const { join: joinPromise, settled } = startJoin(b, world, code);
     await settled;
-    a.engine.respondToJoinRequest(b.memberId, true);
     await settle(world);
     await joinPromise;
     await settle(world);
@@ -972,7 +871,6 @@ describe("party engine — lobby notices", () => {
     const code = await runCreate(a, world);
     const { join: joinPromise, settled } = startJoin(b, world, code);
     await settled;
-    a.engine.respondToJoinRequest(b.memberId, true);
     await settle(world);
     await joinPromise;
     await settle(world);
@@ -990,6 +888,41 @@ describe("party engine — lobby notices", () => {
 });
 
 describe("party engine — roles, reconnect, and cleanup", () => {
+  it("keeps the invite joinable and transfers verified source and shell controls after the creator leaves", async () => {
+    const world = makeWorld();
+    const creator = makePlayer(world, "z");
+    const successor = makePlayer(world, "b");
+    const late = makePlayer(world, "c");
+    const secret = await runCreate(creator, world);
+    const join = successor.engine.joinByInvite({ secret });
+    await settle(world);
+    await join;
+    await settle(world);
+    expect(successor.engine.getState().amHost).toBe(false);
+    expect(successor.engine.getState().hostMemberId).toBe(creator.memberId);
+    await creator.engine.leaveParty();
+    await settle(world);
+    expect(successor.engine.getState().amHost).toBe(true);
+    const lateJoin = late.engine.joinByInvite({ secret });
+    await settle(world);
+    await lateJoin;
+    await settle(world);
+    expect(late.engine.getState().hostMemberId).toBe(successor.memberId);
+    expect(late.engine.getState().game?.gameId).toBe(GAME.gameId);
+    expect(memberOf(late.engine.getState(), late.memberId).transferState).toBe("complete");
+    await successor.engine.selectGame({
+      ...GAME,
+      gameId: "successor-game",
+      source: GAME.source + "<!-- new -->",
+    });
+    await settle(world);
+    expect(late.engine.getState().game?.gameId).toBe("successor-game");
+    await late.engine.leaveParty();
+    await successor.engine.leaveParty();
+    await settle(world);
+    expect(world.transports.every((t) => t.connectionState === "disconnected")).toBe(true);
+  });
+
   it("the creator can leave; the joiner becomes the greeter (migration)", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
@@ -997,7 +930,6 @@ describe("party engine — roles, reconnect, and cleanup", () => {
     const code = await runCreate(a, world);
     const { join: joinPromise, settled } = startJoin(b, world, code);
     await settled;
-    a.engine.respondToJoinRequest(b.memberId, true);
     await settle(world);
     await joinPromise;
     await settle(world);
@@ -1007,8 +939,8 @@ describe("party engine — roles, reconnect, and cleanup", () => {
     await settle(world);
     expect(a.engine.getState().phase).toBe("idle");
     const bState = b.engine.getState();
-    expect(bState.greeterMemberId).toBe(b.memberId);
-    expect(bState.amGreeter).toBe(true);
+    expect(bState.hostMemberId).toBe(b.memberId);
+    expect(bState.amHost).toBe(true);
     await b.engine.leaveParty();
     await settle(world);
     expect(world.hub.roomNames().every((room) => world.hub.membersOf(room).length === 0)).toBe(
@@ -1088,8 +1020,8 @@ describe("the S4 example game over the party flow", () => {
     }
     await settle(world);
     await promise;
-    const code = a.engine.getState().code;
-    expect(code).toMatch(/^[a-z]{4}$/);
+    const code = parseInviteFragment(new URL(a.engine.getState().inviteUrl!).hash)!.secret;
+    expect(code).toHaveLength(43);
     expect(a.engine.getState().game?.title).toBe("Nova Quiz");
 
     // The creator's frame boots and registers the example game.
@@ -1097,7 +1029,7 @@ describe("the S4 example game over the party flow", () => {
     expect(a.engine.getState().members[0]?.ready).toBe(true);
 
     // Joiner joins by code; the creator approves.
-    const join = b.engine.joinByCode(code as string);
+    const join = b.engine.joinByInvite({ secret: code });
     const settled = (async () => {
       await flush();
       world.clock.advance(5_000);
@@ -1106,9 +1038,6 @@ describe("the S4 example game over the party flow", () => {
       await settle(world);
     })();
     await settled;
-    const pending = a.engine.getState().pendingJoinRequests;
-    expect(pending).toHaveLength(1);
-    a.engine.respondToJoinRequest(pending[0]?.memberId ?? "", true);
     await settle(world);
     await join;
 
@@ -1223,7 +1152,6 @@ describe("party engine — M1 lifecycle: backgrounding, resume, and F11 rejoin",
 
     const { join: joinPromise, settled } = startJoin(b, world, code);
     await settled;
-    a.engine.respondToJoinRequest(b.memberId, true);
     await settle(world);
     await joinPromise;
     await settle(world);
@@ -1330,7 +1258,6 @@ describe("party engine — M1 lifecycle: backgrounding, resume, and F11 rejoin",
 
     const { join: joinPromise, settled } = startJoin(b, world, code);
     await settled;
-    a.engine.respondToJoinRequest(b.memberId, true);
     await settle(world);
     await joinPromise;
     await settle(world);
@@ -1379,7 +1306,6 @@ describe("party engine — M1 local recovery record", () => {
     const record = readPartyRecovery();
     expect(record).not.toBeNull();
     expect(record?.role).toBe("creator");
-    expect(record?.code).toBe(a.engine.getState().code);
     expect(record?.game?.gameId).toBe(GAME.gameId);
     expect(record?.memberId).toBe(a.memberId);
 
@@ -1388,32 +1314,28 @@ describe("party engine — M1 local recovery record", () => {
     expect(readPartyRecovery()).toBeNull();
   });
 
-  it("a reloaded page rejoins the live party from the saved record (M1)", async () => {
+  it("a reloaded page recovers its identity from the record while another participant remains", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
-    const code = await runCreate(a, world);
-    const record = readPartyRecovery();
-    expect(record).not.toBeNull();
-
-    // The phone reloaded: a brand-new engine (fresh page) with the SAME
-    // persisted identity reads the record and rejoins by invite.
+    const b = makePlayer(world, "b");
+    const secret = await runCreate(a, world);
+    const joining = b.engine.joinByInvite({ secret });
+    await settle(world);
+    await joining;
+    const record = readPartyRecovery()!;
+    expect(record.memberId).toBe(b.memberId);
+    await b.engine.leaveParty();
+    await settle(world);
     const reloaded = makePlayer(world, "reload", {
-      identity: {
-        memberId: record?.memberId ?? "member-reload",
-        displayName: record?.displayName ?? "Player RELOAD",
-      },
+      identity: { memberId: record.memberId, displayName: record.displayName },
     });
-    const joinPromise = reloaded.engine.joinByInvite({
-      secret: record?.secret ?? "",
-      code: record?.code ?? code,
-    });
+    const rejoining = reloaded.engine.joinByInvite({ secret: record.secret });
     await settle(world);
-    await joinPromise;
-    expect(reloaded.engine.getState().phase).toBe("lobby");
-    expect(reloaded.engine.getState().code).toBe(code);
+    await rejoining;
     await settle(world);
+    expect(reloaded.engine.getState().memberId).toBe(b.memberId);
     expect(a.engine.getState().members).toHaveLength(2);
-
+    expect(reloaded.engine.getState().game?.gameId).toBe(GAME.gameId);
     await reloaded.engine.leaveParty();
     await a.engine.leaveParty();
     await settle(world);
@@ -1454,8 +1376,6 @@ describe("party engine — session events reach game frames (7.26)", () => {
     // Joiner: joins, is approved, receives the game, registers.
     const { join: joinPromise, settled } = startJoin(b, world, code);
     await settled;
-    const pending = a.engine.getState().pendingJoinRequests;
-    a.engine.respondToJoinRequest(pending[0]?.memberId ?? "", true);
     await settle(world);
     await joinPromise;
     await settle(world);
@@ -1571,8 +1491,6 @@ describe("party engine — rename announcements (7.25)", () => {
     await registerLocalGame(a, world);
     const { join: joinPromise, settled } = startJoin(b, world, code);
     await settled;
-    const pending = a.engine.getState().pendingJoinRequests;
-    a.engine.respondToJoinRequest(pending[0]?.memberId ?? "", true);
     await settle(world);
     await joinPromise;
     await settle(world);
@@ -1616,7 +1534,7 @@ describe("party engine — classic games, kick, and reload (7.7.4, 7.29)", () =>
     }
     await settle(world);
     await promise;
-    const code = a.engine.getState().code as string;
+    const code = parseInviteFragment(new URL(a.engine.getState().inviteUrl!).hash)!.secret;
 
     await a.engine.selectClassicGame("protobowl");
     await settle(world);
@@ -1631,8 +1549,6 @@ describe("party engine — classic games, kick, and reload (7.7.4, 7.29)", () =>
     // Joiner joins, asks for the room, and receives the shared spec.
     const { join: joinPromise, settled } = startJoin(b, world, code);
     await settled;
-    const pending = a.engine.getState().pendingJoinRequests;
-    a.engine.respondToJoinRequest(pending[0]?.memberId ?? "", true);
     await settle(world);
     await joinPromise;
     await settle(world);
@@ -1664,8 +1580,6 @@ describe("party engine — classic games, kick, and reload (7.7.4, 7.29)", () =>
     await registerLocalGame(a, world);
     const { join: joinPromise, settled } = startJoin(b, world, code);
     await settled;
-    const pending = a.engine.getState().pendingJoinRequests;
-    a.engine.respondToJoinRequest(pending[0]?.memberId ?? "", true);
     await settle(world);
     await joinPromise;
     await settle(world);
@@ -1696,8 +1610,6 @@ describe("party engine — classic games, kick, and reload (7.7.4, 7.29)", () =>
     await registerLocalGame(a, world);
     const { join: joinPromise, settled } = startJoin(b, world, code);
     await settled;
-    const pending = a.engine.getState().pendingJoinRequests;
-    a.engine.respondToJoinRequest(pending[0]?.memberId ?? "", true);
     await settle(world);
     await joinPromise;
     await registerLocalGame(b, world);

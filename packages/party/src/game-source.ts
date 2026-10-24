@@ -1,65 +1,3 @@
-/**
- * Peer-to-peer game source distribution (P3; ADR-0002, ADR-0004, ADR-0005).
- *
- * Transfers the EXACT saved HTML source from the initiating player to
- * admitted party members, byte-identical, over the established private-party
- * transport (the same transport P2 admission produced — never the rendezvous
- * room). The source lives only in browser-local IndexedDB on the main origin
- * (ADR-0005, engineering rule 4) and is never uploaded to Nova
- * infrastructure: this coordinator only ever moves the HTML string between
- * peers over the transport.
- *
- * Flow (one game per party session):
- * 1. The host registers the game with {@link GameSourceCoordinator.setSource},
- *    which hashes the source with Web Crypto (SHA-256), enforces the F6
- *    source-size limits (`htmlSourceBytes` hard limit — a game too large is
- *    refused with a clear `too_large` error; `htmlSourceWarnBytes` soft limit
- *    emits a warning), and announces `game.source.metadata`.
- * 2. The host re-announces to every newly admitted member (`peer:joined`),
- *    so an admitted joiner learns the game before gameplay starts (P4 wires
- *    launch after the joiner's `received` event).
- * 3. The joiner runs its runtime compatibility check (Nova API version from
- *    the announcement vs. this build's supported versions) and, when
- *    compatible, sends a targeted `game.source.request`.
- * 4. The host streams `game.source.chunk` messages — each carried as a BINARY
- *    transport payload so the transfer uses the transport's binary +
- *    transfer-progress support (U5/P1) — and the coordinator reports
- *    progress on both sides.
- * 5. The joiner reassembles the chunks, verifies the SHA-256 digest and the
- *    source-byte count against the announcement, caches the verified source
- *    in its in-memory session cache, and acknowledges with
- *    `game.source.ack { status: "received" }`.
- * 6. On a failed or mismatched transfer the host retries (bounded by
- *    `maxRetries`); after exhausting retries it sends a terminal failed ack
- *    and emits a `retries_exhausted` error. Either side can cancel an
- *    in-flight transfer with `game.source.cancel`.
- * 7. On reconnect, the joiner's partial receive state is discarded; the host
- *    re-announces to the fresh connection and the transfer restarts only if
- *    the joiner still lacks the verified source (re-transfer after reconnect
- *    *if required* — members who already verified keep their cached copy).
- *
- * Every transfer message is schema-validated at both boundaries (threat
- * model T10; engineering rules 15/21): structured messages go through the
- * transport's validator when one is configured, and the coordinator itself
- * re-validates every inbound message with `parsePeerMessage` — including
- * binary chunk payloads, which it decodes and validates before acting.
- * All transport listeners are detached by {@link GameSourceCoordinator.dispose}
- * (engineering rule 22); in-flight transfers are also aborted on peer leave,
- * connection loss, and cancellation so no partial state or listener outlives
- * the transfer.
- *
- * Blocker Register B4 (remote dependency reliability): the coordinator
- * transfers the HTML source only. Remote dependencies and assets referenced
- * by the HTML are loaded by each player's browser directly; Nova never
- * proxies the web (ADR-0009).
- *
- * The coordinator is transport-neutral: it drives the {@link NovaTransport}
- * interface, so the same flows run over InMemoryTransport in deterministic
- * tests and TrysteroTransport for real parties. Party wiring (P4): create it
- * with `party.privateTransport` (the established private room) and, on the
- * initiating player, call `setSource(...)` with the saved game from the
- * repository (apps/nova `DexieGameRepository`).
- */
 import type { ConnectionId, GameId, GameMode, MemberId, Sha256 } from "@rocketcrab/protocol";
 import {
   PROTOCOL_VERSION,
@@ -286,6 +224,7 @@ interface SendTransfer {
 
 /** One in-flight incoming transfer (joiner side, keyed by game). */
 interface ReceiveTransfer {
+  readonly metadata: GameSourceMetadataInfo;
   readonly gameId: GameId;
   readonly sourceSha256: Sha256;
   readonly sourceSizeBytes: number;
@@ -957,6 +896,7 @@ export class GameSourceCoordinator {
     this.emit({ type: "metadata", metadata: info, fromMemberId: message.senderMemberId });
     const existing = this.sources.get(metadata.gameId);
     if (existing?.metadata.sourceSha256 === metadata.sourceSha256) {
+      this.currentGameId = metadata.gameId;
       return; // Already hold these exact verified bytes, not merely this ID.
     }
     this.cancelledTransfers.delete(metadata.gameId); // a fresh announcement supersedes a cancellation
@@ -999,6 +939,7 @@ export class GameSourceCoordinator {
       return; // already receiving this game
     }
     this.receiveTransfers.set(metadata.gameId, {
+      metadata: info,
       gameId: metadata.gameId,
       sourceSha256: metadata.sourceSha256,
       sourceSizeBytes: metadata.sourceSizeBytes,
@@ -1158,16 +1099,12 @@ export class GameSourceCoordinator {
       return;
     }
     transfer.status = "complete";
-    const metadata = toMetadataInfo({
-      gameId: transfer.gameId,
-      sourceSha256: transfer.sourceSha256,
-      sourceSizeBytes: transfer.sourceSizeBytes,
-      chunkCount: transfer.chunkCount,
-    });
+    const metadata = transfer.metadata;
+    this.currentGameId = transfer.gameId;
     const chunks = chunkStringByUtf8Bytes(source, this.chunkSizeBytes);
     this.sources.set(transfer.gameId, {
       info: {
-        gameId: transfer.gameId,
+        ...metadata,
         source,
         sourceSha256: transfer.sourceSha256,
         sourceSizeBytes: transfer.sourceSizeBytes,

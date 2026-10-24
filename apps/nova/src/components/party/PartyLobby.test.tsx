@@ -41,7 +41,6 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     joinStage: null,
     reconnectAttempts: 0,
     role: "creator",
-    code: "ABCD",
     memberId: "member-a",
     displayName: "Player A",
     game: { gameId: "game-1", title: "Rocket Rumble", mode: "state" },
@@ -52,7 +51,7 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
         isSelf: true,
         connectionId: "conn-a",
         connected: true,
-        isGreeter: true,
+        isHost: true,
         transferState: "complete",
         transferProgress: 1,
         transferDetail: "You have the game",
@@ -64,19 +63,17 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
         isSelf: false,
         connectionId: "conn-b",
         connected: true,
-        isGreeter: false,
+        isHost: false,
         transferState: "transferring",
         transferProgress: 0.5,
         transferDetail: "32 KB of 64 KB",
         ready: false,
       },
     ],
-    pendingJoinRequests: [],
-    greeterMemberId: "member-a",
-    amGreeter: true,
+    hostMemberId: "member-a",
+    amHost: overrides.amHost ?? overrides.role !== "joiner",
     authorityMemberId: "member-a",
     inviteUrl: INVITE_URL,
-    shortInviteUrl: "http://localhost:5173/abcd",
     connectionState: "connected",
     canStart: false,
     canForceStart: false,
@@ -111,8 +108,6 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
   const lobby = (props: PartyLobbyProps) => (
     <PartyLobby
       {...props}
-      onApprove={handlers.onApprove ?? props.onApprove}
-      onReject={handlers.onReject ?? props.onReject}
       onStart={handlers.onStart ?? props.onStart}
       onLeave={handlers.onLeave ?? props.onLeave}
       onRefreshDiagnostics={handlers.onRefreshDiagnostics ?? props.onRefreshDiagnostics}
@@ -188,7 +183,7 @@ describe("PartyLobby", () => {
   });
 
   it("hides the start controls from joiners — start is host-only (rocketcrab-b73)", async () => {
-    const state = makeState({ role: "joiner", canForceStart: true });
+    const state = makeState({ role: "joiner", amHost: false, canForceStart: true });
     await renderLobby(state);
     // A joiner never sees the start buttons or the host's blocked-reason
     // alert (Browse games is host-only too, so there is no pick path).
@@ -214,22 +209,22 @@ describe("PartyLobby", () => {
     const state = makeState({
       role: "joiner",
       members: [
-        { ...makeState().members[0]!, isGreeter: false },
+        { ...makeState().members[0]!, isHost: false },
         {
           memberId: "member-b",
           displayName: "Player B",
           isSelf: false,
           connectionId: "conn-b",
           connected: true,
-          isGreeter: true,
+          isHost: true,
           transferState: "complete",
           transferProgress: 1,
           transferDetail: "Game received",
           ready: true,
         },
       ],
-      greeterMemberId: "member-b",
-      amGreeter: false,
+      hostMemberId: "member-b",
+      amHost: false,
     });
     await renderLobby(state);
     // The joiner's own tile is just "You"; the host peer reads "Host".
@@ -251,7 +246,7 @@ describe("PartyLobby", () => {
           isSelf: false,
           connectionId: "conn-b",
           connected: true,
-          isGreeter: false,
+          isHost: false,
           transferState: "failed",
           transferProgress: null,
           transferDetail: "retries exhausted",
@@ -287,7 +282,7 @@ describe("PartyLobby", () => {
     expect(screen.queryByText(/Authority \(diagnostic\)/)).not.toBeInTheDocument();
     // Still accessible in the diagnostics panel.
     await userEvent.click(screen.getByText("Connection diagnostics"));
-    expect(screen.getByText(/greeter: Player A/)).toBeInTheDocument();
+    expect(screen.getByText(/party host: Player A/)).toBeInTheDocument();
     expect(screen.getByText(/authority: Player A/)).toBeInTheDocument();
   });
 
@@ -500,7 +495,7 @@ describe("PartyLobby", () => {
           isSelf: false,
           connectionId: "conn-b",
           connected: true,
-          isGreeter: false,
+          isHost: false,
           transferState: "complete",
           transferProgress: 1,
           transferDetail: "Game received",
@@ -527,28 +522,6 @@ describe("PartyLobby", () => {
     expect(within(dialog).getByText(/start before everyone is ready/i)).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: "Start anyway" }));
     expect(onStart).toHaveBeenCalledWith(true);
-  });
-
-  it("lets the greeter approve or reject pending join requests", async () => {
-    const state = makeState({
-      pendingJoinRequests: [
-        {
-          memberId: "member-c",
-          displayName: "Player C",
-          connectionId: "conn-c",
-          partyCode: "ABCD",
-          id: "join-request-member-c",
-        },
-      ],
-    });
-    const onApprove = vi.fn();
-    const onReject = vi.fn();
-    await renderLobby(state, { onApprove, onReject });
-    const section = screen.getByLabelText("Join requests");
-    await userEvent.click(within(section).getByRole("button", { name: /^Approve$/ }));
-    expect(onApprove).toHaveBeenCalledWith("member-c");
-    await userEvent.click(within(section).getByRole("button", { name: /^Reject$/ }));
-    expect(onReject).toHaveBeenCalledWith("member-c");
   });
 
   it("calls the leave callback", async () => {
@@ -616,10 +589,10 @@ describe("PartyLobby", () => {
   });
 
   it("tells joiners the party is waiting when it has no game — naming the host (2t1.9/5cl.9)", async () => {
-    const state = makeState({ role: "joiner", game: null });
+    const state = makeState({ role: "joiner", amHost: false, game: null });
     await renderLobby(state);
     // 5cl.9: the message names the HOST — the greeter member (the creator
-    // is installed as the initial greeter, so greeterMemberId is the best
+    // is installed as the initial greeter, so hostMemberId is the best
     // available signal for who the host is).
     expect(screen.getByText("Waiting for Player A to select a game")).toBeInTheDocument();
     expect(screen.queryByText("No game selected yet")).not.toBeInTheDocument();
@@ -692,7 +665,7 @@ describe("PartyLobby", () => {
           isSelf: true,
           connectionId: "conn-a",
           connected: true,
-          isGreeter: true,
+          isHost: true,
           transferState: "complete",
           transferProgress: 1,
           transferDetail: "You have the game",
@@ -704,7 +677,7 @@ describe("PartyLobby", () => {
           isSelf: false,
           connectionId: "conn-b",
           connected: true,
-          isGreeter: false,
+          isHost: false,
           transferState: "complete",
           transferProgress: 1,
           transferDetail: "You have the game",
@@ -735,7 +708,7 @@ describe("PartyLobby", () => {
           isSelf: false,
           connectionId: "conn-a",
           connected: true,
-          isGreeter: false,
+          isHost: false,
           transferState: "complete",
           transferProgress: 1,
           transferDetail: "You have the game",
@@ -747,7 +720,7 @@ describe("PartyLobby", () => {
           isSelf: true,
           connectionId: "conn-b",
           connected: true,
-          isGreeter: true,
+          isHost: true,
           transferState: "complete",
           transferProgress: 1,
           transferDetail: "You have the game",
@@ -843,7 +816,7 @@ describe("PartyLobby", () => {
     await userEvent.click(screen.getByRole("button", { name: /qr code/i }));
     const dialog = screen.getByRole("dialog", { name: "Party QR code" });
     expect(within(dialog).getByLabelText("Party invite QR code")).toBeInTheDocument();
-    expect(within(dialog).getByText(`${window.location.host}/abcd`)).toBeInTheDocument();
+    expect(within(dialog).getByText("Nova party")).toBeInTheDocument();
     // The secret never appears as text anywhere on the page.
     expect(screen.queryByText(/invite-secret/)).not.toBeInTheDocument();
     // Closing the modal hides the QR again.
@@ -869,22 +842,22 @@ describe("PartyLobby", () => {
     const state = makeState({
       role: "joiner",
       members: [
-        { ...makeState().members[0]!, isGreeter: false },
+        { ...makeState().members[0]!, isHost: false },
         {
           memberId: "member-b",
           displayName: "Bob",
           isSelf: false,
           connectionId: "conn-b",
           connected: true,
-          isGreeter: true,
+          isHost: true,
           transferState: "complete",
           transferProgress: 1,
           transferDetail: "Game received",
           ready: true,
         },
       ],
-      greeterMemberId: "member-b",
-      amGreeter: false,
+      hostMemberId: "member-b",
+      amHost: false,
     });
     await renderLobby(state);
     const welcome = screen.getByLabelText("Welcome");

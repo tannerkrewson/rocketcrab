@@ -1,24 +1,5 @@
-/**
- * Local party recovery information (M1; ADR-0012).
- *
- * Mobile Safari can discard and reload a backgrounded page (memory
- * pressure), and a player can close and reopen the tab. The party itself
- * survives — authority and greeter roles migrate while the phone is away
- * (S3 / P2) — so the shell keeps just enough information locally for a
- * one-tap rejoin: the four-letter code and the invite secret (ADR-0011,
- * which deterministically derive the private room, password, and session
- * id), plus who this player is and what the party was playing.
- *
- * The recovery record is deliberately small: it never stores the game
- * source (ADR-0005 — sources stay in IndexedDB / editor memory; a
- * re-joining member re-fetches the verified source from the party via the
- * P3 coordinator refresh). It is written on every successful
- * create/join/metadata update, cleared on a clean leave, and validated
- * strictly on read so corrupted or stale data can never crash the shell.
- */
 import type { GameMode } from "@rocketcrab/protocol";
 import { sessionSecretSchema } from "@rocketcrab/protocol";
-import { isValidPartyCode, normalizePartyCode } from "@rocketcrab/party";
 
 /** localStorage key for the party recovery record. */
 export const PARTY_RECOVERY_KEY = "nova:party:recovery:v1";
@@ -33,7 +14,6 @@ export interface PartyRecoveryRecord {
   /** The role this player held when the record was written. */
   readonly role: "creator" | "joiner";
   /** Four-letter code, when known (invite-only parties may lack it). */
-  readonly code: string | null;
   /** Party session secret (ADR-0011); derives the private room. */
   readonly secret: string;
   /** This player's stable member identity (ADR-0007). */
@@ -63,7 +43,6 @@ export function savePartyRecovery(
       version: PARTY_RECOVERY_VERSION,
       savedAt: now(),
       ...input,
-      code: input.code === null ? null : normalizePartyCode(input.code),
     };
     window.localStorage.setItem(PARTY_RECOVERY_KEY, JSON.stringify(record));
     return true;
@@ -115,13 +94,6 @@ export function parsePartyRecovery(raw: string): PartyRecoveryRecord | null {
   if (record.role !== "creator" && record.role !== "joiner") {
     return null;
   }
-  if (typeof record.code !== "string" && record.code !== null) {
-    return null;
-  }
-  const code = record.code === null ? null : normalizePartyCode(record.code);
-  if (code !== null && !isValidPartyCode(code)) {
-    return null;
-  }
   if (typeof record.secret !== "string" || !sessionSecretSchema.safeParse(record.secret).success) {
     return null;
   }
@@ -151,7 +123,6 @@ export function parsePartyRecovery(raw: string): PartyRecoveryRecord | null {
     version: PARTY_RECOVERY_VERSION,
     savedAt: record.savedAt,
     role: record.role,
-    code,
     secret: record.secret,
     memberId: record.memberId,
     displayName: record.displayName,

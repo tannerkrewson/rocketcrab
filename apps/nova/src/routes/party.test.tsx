@@ -31,17 +31,14 @@ const IDLE_STATE: PartyEngineState = {
   joinStage: null,
   reconnectAttempts: 0,
   role: null,
-  code: null,
   memberId: "member-a",
   displayName: "Player A",
   game: null,
   members: [],
-  pendingJoinRequests: [],
-  greeterMemberId: null,
-  amGreeter: false,
+  hostMemberId: null,
+  amHost: false,
   authorityMemberId: null,
   inviteUrl: null,
-  shortInviteUrl: null,
   connectionState: "idle",
   canStart: false,
   canForceStart: false,
@@ -61,7 +58,6 @@ const ACTIVE_STATE: PartyEngineState = {
   ...IDLE_STATE,
   phase: "lobby",
   role: "creator",
-  code: "RCRB",
   displayName: "Ada",
   members: [
     {
@@ -70,18 +66,17 @@ const ACTIVE_STATE: PartyEngineState = {
       isSelf: true,
       connectionId: "conn-a",
       connected: true,
-      isGreeter: true,
+      isHost: true,
       transferState: "waiting",
       transferProgress: null,
       transferDetail: null,
       ready: false,
     },
   ],
-  greeterMemberId: "member-a",
-  amGreeter: true,
+  hostMemberId: "member-a",
+  amHost: true,
   authorityMemberId: "member-a",
   inviteUrl: "http://localhost:5173/join#code=rcrb&secret=invite-secret",
-  shortInviteUrl: "http://localhost:5173/rcrb",
   connectionState: "connected",
   canStart: false,
   canForceStart: false,
@@ -247,7 +242,6 @@ describe("/party", () => {
     const secret = "B".repeat(43);
     savePartyRecovery({
       role: "joiner",
-      code: "ABCD",
       secret,
       memberId: "member-a",
       displayName: "Player A",
@@ -257,15 +251,12 @@ describe("/party", () => {
     expect(await screen.findByTestId("party-resume-banner")).toBeInTheDocument();
     expect(screen.getByText(/Rocket Rumble/)).toBeInTheDocument();
     fireEvent.click(screen.getByRole("button", { name: /rejoin party/i }));
-    await waitFor(() =>
-      expect(stubEngine.joinByInvite).toHaveBeenCalledWith({ secret, code: "abcd" }),
-    );
+    await waitFor(() => expect(stubEngine.joinByInvite).toHaveBeenCalledWith({ secret }));
   });
 
   it("dismissing the resume banner clears the recovery record", async () => {
     savePartyRecovery({
       role: "joiner",
-      code: "ABCD",
       secret: "C".repeat(43),
       memberId: "member-a",
       displayName: "Player A",
@@ -283,7 +274,7 @@ describe("/party", () => {
       // Start a party from the entry; once the engine is active with a code
       // the address bar must read the party code instead of /party.
       fireEvent.click(await screen.findByRole("button", { name: /start a party/i }));
-      await vi.waitFor(() => expect(router.state.location.pathname).toBe("/rcrb"));
+      await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
       // The rewrite is a REPLACE: the /party entry is gone from history, so
       // there is no back-navigation spam into the party flow.
       expect(router.history.canGoBack()).toBe(false);
@@ -302,7 +293,7 @@ describe("/party", () => {
       // as ?browse=true and validateSearch restores the boolean, so this is
       // the real URL form the app produces; plain ?browse=1 never
       // round-trips to the /party route's boolean.)
-      expect(await screen.findByTestId("party-title")).toBeInTheDocument();
+      expect(await screen.findByText("Nova party")).toBeInTheDocument();
       expect(router.state.location.pathname).toBe("/party");
       expect(router.state.location.searchStr).toBe("?browse=true");
     });

@@ -91,7 +91,7 @@ describe("AppLayout", () => {
 
   it("keeps the same floating bottom-right theme control on party routes", async () => {
     renderAt("/join");
-    await screen.findByRole("heading", { name: "Join a party" });
+    await screen.findByRole("heading", { name: "Join a private party" });
 
     const control = screen.getByTestId("floating-theme-control");
     expect(control.className).toContain("fixed");

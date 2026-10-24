@@ -8,8 +8,7 @@
 
 ## Context
 
-Parties in Nova are formed by friends: a creator generates a four-letter code
-and shares it directly, or shares an invite link containing a session secret.
+Parties in Nova are formed by friends: a creator shares a private invite link containing a high-entropy session secret.
 There are no accounts, no moderation, no public catalog, and no server-side
 game execution. This shapes what Nova can and should defend against.
 
@@ -17,10 +16,9 @@ game execution. This shapes what Nova can and should defend against.
 
 **The threat model is "trusted friends with honest curiosity".** Concretely:
 
-- **Admission is a social gate.** The four-letter code is a rendezvous
-  namespace, and joiners are explicitly admitted by a greeter (ADR-0004).
-  This keeps out strangers who guess codes — but it is not a cryptographic
-  boundary against a determined peer.
+- **The invite is a bearer capability.** Anyone holding it can join while any
+  participant remains connected. Cooperative removal does not permanently ban
+  an invite holder. Start a fresh party to retire a leaked invite (ADR-0004).
 - **Party members may inspect shared state.** In state mode, canonical state
   is replicated to party shells for migration; a technically sophisticated
   peer can read it in developer tools. Nova accepts this and does not attempt
@@ -53,8 +51,8 @@ game execution. This shapes what Nova can and should defend against.
   group of friends playing together; a determined party member can cheat or
   inspect state. The product surfaces this honestly rather than pretending
   otherwise.
-- **Simple vs. strong admission.** Explicit admission adds friction to joining
-  but is what makes code-guessing non-fatal.
+- **Private invites vs. moderation.** Unpredictable capabilities prevent practical
+  guessing, but forwarding an invite grants access; there is no account-based ban.
 
 ## Consequences
 

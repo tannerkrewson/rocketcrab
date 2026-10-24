@@ -28,17 +28,14 @@ const IDLE_STATE: PartyEngineState = {
   joinStage: null,
   reconnectAttempts: 0,
   role: null,
-  code: null,
   memberId: "member-a",
   displayName: "Player A",
   game: null,
   members: [],
-  pendingJoinRequests: [],
-  greeterMemberId: null,
-  amGreeter: false,
+  hostMemberId: null,
+  amHost: false,
   authorityMemberId: null,
   inviteUrl: null,
-  shortInviteUrl: null,
   connectionState: "idle",
   canStart: false,
   canForceStart: false,
@@ -58,7 +55,6 @@ const LOBBY_STATE: PartyEngineState = {
   ...IDLE_STATE,
   phase: "lobby",
   role: "creator",
-  code: "RCRB",
   memberId: "member-a",
   members: [
     {
@@ -67,18 +63,17 @@ const LOBBY_STATE: PartyEngineState = {
       isSelf: true,
       connectionId: "conn-a",
       connected: true,
-      isGreeter: true,
+      isHost: true,
       transferState: "waiting",
       transferProgress: null,
       transferDetail: null,
       ready: false,
     },
   ],
-  greeterMemberId: "member-a",
-  amGreeter: true,
+  hostMemberId: "member-a",
+  amHost: true,
   authorityMemberId: "member-a",
   inviteUrl: "http://localhost:5173/join#code=rcrb&secret=invite-secret",
-  shortInviteUrl: "http://localhost:5173/rcrb",
   connectionState: "connected",
   canStart: false,
   canForceStart: false,
@@ -91,8 +86,8 @@ const GUEST_STATE: PartyEngineState = {
   role: "joiner",
   memberId: "member-b",
   displayName: "Player B",
-  greeterMemberId: null,
-  amGreeter: false,
+  hostMemberId: null,
+  amHost: false,
   authorityMemberId: "member-a",
 };
 
@@ -211,7 +206,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     );
     // Back in the party lobby — the host's address bar now reads the code
     // (rocketcrab-r0f replaces /party with /<code> once a party is active).
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/rcrb"));
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
     expect(screen.queryByRole("button", { name: /select game/i })).not.toBeInTheDocument();
   });
 
@@ -225,7 +220,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     await vi.waitFor(() => expect(stubEngine.selectClassicGame).toHaveBeenCalledWith("drawphone"));
     // Back in the party lobby — the address bar reads the code, not /party
     // (rocketcrab-r0f).
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/rcrb"));
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
   });
 
   it("shares the party shell header (logo + code) while in a lobby (5cl.8)", async () => {
@@ -234,8 +229,8 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
 
     // The lobby's shared header (origin + lowercase code) replaces the
     // standalone brand row on the details page reached from a party.
-    const title = await screen.findByTestId("party-title");
-    expect(title.textContent).toBe(`${window.location.host}/rcrb`);
+    const title = await screen.findByText("Nova party");
+    expect(title.textContent).toBe("Nova party");
     expect(screen.queryByRole("link", { name: /rocketcrab\.com/ })).not.toBeInTheDocument();
     // The back link returns to the party's browse mode (5cl.7: /party?browse=1
     // reopens the lobby browser, which restores the category the host left).
@@ -273,8 +268,8 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     expect(back.getAttribute("href")).toBe("/party");
     await userEvent.click(back);
 
-    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/rcrb"));
-    expect(screen.getByTestId("party-title")).toHaveTextContent(`${window.location.host}/rcrb`);
+    await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
+    expect(screen.getByText("Nova party")).toHaveTextContent("Nova party");
     expect(stubEngine.leaveParty).not.toHaveBeenCalled();
   });
 

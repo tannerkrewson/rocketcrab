@@ -63,7 +63,7 @@ export function buildWireEnvelope(input: WireEnvelopeInput): WireEnvelope {
 }
 
 /** Bump when the underlying action encoding is incompatible (Trystero 0.26). */
-export const TRANSPORT_VERSION = 2;
+export const TRANSPORT_VERSION = 3;
 
 /** Payload exchanged during the peer identity handshake. */
 export interface IdentityPayload {
