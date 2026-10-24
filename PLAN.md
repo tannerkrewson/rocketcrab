@@ -1,5 +1,100 @@
 # Nova remaining-work plan
 
+## Authorized simplification program — active execution plan
+
+Work directly on `nova`, without subagents. Complete the following stages in
+order; commit verified sections, update evidence here, then reread the next
+section before continuing. Stop for owner clarification when necessary. No
+infrastructure deployment or creation of billable resources is authorized.
+Historical backlog below remains release evidence, not a requirement to preserve
+obsolete architecture. This program supersedes four-letter/admission/greeter UI
+and old theme work; keep physical-device and deployment gates explicit.
+
+### 1. Dependency baseline
+
+- [ ] Review Trystero 0.25.3 → latest stable (at least 0.26.0): Nostr,
+      reconnection, ICE, resource handling, transfers, and changed action wire
+      format. Give incompatible clients a clear update/reload outcome.
+- [ ] Update relevant stable dependencies without unrelated complex major
+      migrations; declare actual imports, remove unused Zustand/dependencies,
+      update lockfile. Preserve behavior and prepare for React 19/Tailwind 4.
+- [ ] Run tests, typecheck, production builds, bundle-size checks; record
+      removals/additions, significant deferred upgrades, and remaining risks.
+
+### 2. Private invites replace discovery and admission
+
+- [ ] Generate one cryptographically secure high-entropy party secret in the
+      fragment. Use Trystero room discovery/password; automatic joining, native
+      sharing, copy fallback, displayed QR (no scanner, accounts, or approval).
+- [ ] Remove codes, adverts/rendezvous, discovery timers/collisions, greeter and
+      migration, manual admission, and obsolete UI/protocol/tests/docs.
+- [ ] Preserve joinability while any participant remains, verified late-join
+      HTML/state, returning identity/state, and end-on-empty. Never expose secrets
+      in paths, queries, logs, or game frames. Explain reusable-invite kick limits.
+- [ ] Verify lifecycle/security/integration cases and commit with evidence.
+
+### 3. Thin Trystero adapter and source transfer
+
+- [ ] Replace duplicated chunking/throttling/ACKs/request-response/progress/
+      retries/recovery with Trystero built-ins where simpler; prefer maintained
+      relay defaults unless evidence requires overrides.
+- [ ] Preserve 2 MiB limit, hash verification and verified-acceptance confirmation,
+      validation/resource bounds, action IDs/dedup/revisions/authority ordering,
+      and in-memory/real transport parity. No generic reliability layer.
+- [ ] Test large/rejected/corrupt/slow/disconnected/reconnecting transfers;
+      document custom mechanisms retained and why; commit evidence.
+
+### 4. TURN reliability, security, and cost
+
+- [ ] Recheck Cloudflare documented allocation/expiry behavior; choose lifecycle
+      for multi-hour sessions and reconnects instead of unproven refresh machinery.
+- [ ] Keep server secrets; review native issuance rate limiting, usage visibility,
+      abuse response, budget notifications (not spending caps), and aggregate/raw
+      traffic limits. Issuance limits do not bound already-issued traffic.
+- [ ] Prefer direct ICE, retain appropriate TURN transports including TLS 443;
+      simplify Worker/watchdog without a framework or room backend.
+- [ ] Test failures, document operational risks/runbook changes; do not deploy.
+
+### 5. Multiplayer resilience simplification
+
+- [ ] Review party/state/simulation engines, membership, heartbeat/grace/reconnect
+      timers, reload/Safari recovery, elections/migration, split-brain and errors.
+- [ ] Consolidate redundant mechanisms without weakening serial authority, IDs,
+      dedup, revision/snapshot validity, private views, catch-up, migration,
+      ordered simulation inputs/restoration. Keep game-facing APIs unchanged.
+- [ ] Review term/revision/hash voting conservatively: pause/recover rather than
+      accept conflicting histories; no CRDT/state-machine framework.
+- [ ] Strengthen authority-loss/partition/stale-action/reconnect/Safari/late-join
+      tests; record simplifications and remaining protections; commit.
+
+### 6. HeroUI v3 full replacement
+
+- [ ] Follow current official HeroUI v3 docs (React 19+, Tailwind 4, React/styles
+      packages, CSS setup, no legacy provider/plugin). Use standard components
+      and light/dark styling, not recreation of bespoke Nova visuals.
+- [ ] Migrate party/lobby/game shell, browser/details, editor/arena, navigation,
+      dialogs/menus/popovers/forms/notifications/theme controls. Retain CodeMirror,
+      runtime isolation, emergency leave, responsive/accessibility/Safari behavior.
+- [ ] Remove daisyUI, obsolete theme/config/CSS/custom UI abstractions; no competing
+      UI library. Simplify component composition and custom styling aggressively.
+- [ ] Verify accessibility/mobile behavior, tests/build/bundle. Report material
+      budget tradeoffs rather than silently raising limits; commit evidence.
+
+### 7. Final focused cleanup
+
+- [ ] Review use-party/use-arena/runtime-session subscriptions for
+      useSyncExternalStore with stable subscriptions and immutable cached snapshots.
+- [ ] Review Dexie useLiveQuery for local saved games/cross-tab consistency; retain
+      TanStack Query only where useful. Remove stale dependencies/utilities/docs
+      and infrastructure made obsolete by preceding stages, not another rewrite.
+- [ ] Verify local library/editing, party lifecycle and arena; run final relevant
+      tests/typecheck/build/bundle checks and summarize unresolved release gates.
+
+### Execution evidence
+
+- Initial state: clean working tree on `nova`; existing React 19 and Tailwind 4
+  baseline already satisfies HeroUI prerequisites. Stage 1 inspection started.
+
 This is the standalone work tracker for Nova. It preserves all 22 unfinished
 records from the project tracker at migration: 13 actionable tasks/decisions and
 9 project/phase tracking epics. The source database contained 224 records total;
