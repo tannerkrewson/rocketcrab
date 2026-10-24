@@ -140,11 +140,16 @@ new built-source commit, original/after routing reports and durable job logs/exi
 marker. It removes only its successfully consumed upload archive.
 Preserve the backup metadata/images until explicitly approved for cleanup. Roll back only
 Rocketcrab with app-only commands: `dokku ports:set rocketcrab http:80:5000
-https:443:5000`, then `dokku git:from-image rocketcrab
-dokku/rocketcrab:rollback-<stamp>` (read the exact tag from the release directory's
-`rollback-image.txt`), then repeat health checks. **The old Node20 image restores the CVE exposure**; report that
-clearly. Restoring server source refs is a separate reviewed operation, not needed
-for image rollback. Never force-push the generated Dokku source history.
+https:443:5000`, then `dokku git:from-image rocketcrab <rollback-tag>` (read the
+exact tag from the release directory's `rollback-image.txt`), then repeat health
+checks. Dokku's deploy pipeline drops non-latest `dokku/<app>` tags and prunes
+the previous image, so the remote job stores the rollback tag in the
+`localhost/rocketcrab-rollback:<stamp>` namespace and additionally exports the
+old image to `old-image.tar` in the release directory; verify the tag (or load
+the tar) before relying on it. **The old Node20 image restores the CVE
+exposure**; report that clearly. Restoring server source refs is a separate
+reviewed operation, not needed for image rollback. Never force-push the
+generated Dokku source history.
 
 References:
 - https://nodejs.org/en/blog/vulnerability/october-2026-security-releases

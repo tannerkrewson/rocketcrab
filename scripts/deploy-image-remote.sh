@@ -12,10 +12,16 @@ mem=$(awk '/MemAvailable:/ {print $2}' /proc/meminfo)
 old_container=$(docker ps -q --filter name='^/rocketcrab.web.1$')
 [[ -n $old_container ]]
 old_image=$(docker inspect "$old_container" --format '{{.Image}}')
-rollback="dokku/rocketcrab:rollback-$5"
+# Dokku's deploy pipeline drops non-latest dokku/<app> tags and prunes the
+# previous image, so keep the rollback tag outside that namespace and also
+# export the old image to a file in this directory as a durable fallback.
+rollback="localhost/rocketcrab-rollback:$5"
 docker tag "$old_image" "$rollback"
 [[ $(docker image inspect "$rollback" --format '{{.Id}}') == "$old_image" ]]
 printf '%s\n' "$rollback" > rollback-image.txt
+avail=$(df -Pk . | awk 'NR==2 {print $4}')
+(( avail > 3145728 )) || { echo 'Insufficient disk for old-image backup'; exit 1; }
+docker save -o old-image.tar "$old_image"
 printf '%s\n' "$old_container" > old-container.txt
 git --git-dir=/home/dokku/rocketcrab show-ref --verify refs/heads/master > source-ref.txt
 git --git-dir=/home/dokku/rocketcrab bundle create source-before.bundle --all
