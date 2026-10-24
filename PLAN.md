@@ -203,13 +203,17 @@ Historical report: the party engine constructs the joiner's session in
 fixed, but a simulation-game joiner could still get an inert `nova.simulation.*`
 surface and an inappropriate `createInitialState` request.
 
-- [ ] Reproduce/revalidate against current `apps/nova/src/lib/party/engine.ts`.
-- [ ] Re-create/reconfigure the session when coordinator metadata first supplies
-      a non-state mode; choose a design that safely preserves/cleans up session
-      state and listeners.
-- [ ] Regression-test a real party flow with host and joiner running a simulation
-      game, including correct executor registration. Check mode transitions and
-      raw mode for related assumptions.
+- [x] Revalidated and fixed in `apps/nova/src/lib/party/engine.ts`: replace the
+      immutable-mode session before a joiner's game boots and on host selection.
+      Session/executor listeners are disposed without leaving the party transport.
+- [x] Added deterministic two-peer party integration coverage for simulation
+      registration/start/input delivery, state → simulation, raw messages,
+      returning to cached state games, edited source under the same ID, and
+      rejecting a joiner's attempt to select the host's game. Repeated identical
+      metadata does not discard readiness. These are in-memory integration tests,
+      not physical-device or deployed WebRTC evidence.
+- [x] Fixed a related source cache defect: match verified content hashes rather
+      than treating every version of a game ID as identical.
 
 ## 11. Host name on join approval — P2, privacy decision
 

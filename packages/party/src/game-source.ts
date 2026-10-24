@@ -528,8 +528,12 @@ export class GameSourceCoordinator {
    * verified during this session; it is never persisted and never uploaded
    * anywhere (ADR-0005).
    */
-  getCachedSource(gameId: GameId): string | undefined {
-    return this.sources.get(gameId)?.info.source;
+  getCachedSource(gameId: GameId, sourceSha256?: Sha256): string | undefined {
+    const cached = this.sources.get(gameId);
+    return cached !== undefined &&
+      (sourceSha256 === undefined || cached.metadata.sourceSha256 === sourceSha256)
+      ? cached.info.source
+      : undefined;
   }
 
   /**
@@ -952,8 +956,8 @@ export class GameSourceCoordinator {
     const info = toMetadataInfo(metadata);
     this.emit({ type: "metadata", metadata: info, fromMemberId: message.senderMemberId });
     const existing = this.sources.get(metadata.gameId);
-    if (existing !== undefined) {
-      return; // already hold a verified source for this game (any version)
+    if (existing?.metadata.sourceSha256 === metadata.sourceSha256) {
+      return; // Already hold these exact verified bytes, not merely this ID.
     }
     this.cancelledTransfers.delete(metadata.gameId); // a fresh announcement supersedes a cancellation
     if (metadata.sourceSizeBytes > htmlSourceBytes) {

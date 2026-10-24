@@ -5,7 +5,7 @@ import { parseInviteFragment, type PartyTransportFactory } from "@rocketcrab/par
 import type { NovaTransport, TransportEventMap } from "@rocketcrab/core";
 import { InMemoryTransportHub } from "@rocketcrab/testing";
 import type { ChannelPort } from "../runtime-host";
-import { PartyEngine, type PartyRuntimeSeams } from "./engine";
+import { PartyEngine, type PartyRuntimeSeams, type PartySourceSpec } from "./engine";
 import { createMemoryLifecycleSource } from "./lifecycle";
 import { clearPartyRecovery, readPartyRecovery } from "./party-recovery";
 import type { TurnCredentialsResult } from "./turn-creds";
@@ -137,7 +137,7 @@ interface HostHarness {
   frames: HTMLIFrameElement[];
   port1: FakePort;
   ready(): void;
-  register(title: string): void;
+  register(title: string, mode?: PartySourceSpec["mode"]): void;
   apiCall(method: string, payload: unknown): void;
 }
 
@@ -208,7 +208,7 @@ function createHostHarness(): HostHarness {
         status: "ready",
       });
     },
-    register(title: string) {
+    register(title: string, mode: PartySourceSpec["mode"] = "state") {
       deliver(harness.port1, {
         version: 1,
         runtimeInstanceId: "runtime-1",
@@ -217,7 +217,7 @@ function createHostHarness(): HostHarness {
         type: "game.registration",
         gameId: GAME.gameId,
         title,
-        gameMode: "state",
+        gameMode: mode,
       });
     },
     apiCall(method: string, payload: unknown) {
@@ -306,13 +306,12 @@ function makePlayer(
 }
 
 /** Create a party, advancing through the collision-listen window. */
-async function runCreate(player: Player, world: World): Promise<string> {
-  const promise = player.engine.createParty({
-    gameId: GAME.gameId,
-    title: GAME.title,
-    mode: GAME.mode,
-    source: GAME.source,
-  });
+async function runCreate(
+  player: Player,
+  world: World,
+  game: PartySourceSpec = GAME,
+): Promise<string> {
+  const promise = player.engine.createParty(game);
   for (let i = 0; i < 8; i += 1) {
     await flush();
     world.clock.advance(1_000);
@@ -464,6 +463,140 @@ describe("party engine — two phones end to end", () => {
     expect(b.engine.getState().code).toBe(a.engine.getState().code);
     await settle(world);
     expect(memberOf(b.engine.getState(), b.memberId).transferState).toBe("complete");
+  });
+});
+
+describe("party engine — game mode and source transitions", () => {
+  function events(player: Player, kind: string): unknown[] {
+    return player.harness.port1.sent.filter((message) => {
+      const msg = message as { type?: string; event?: { kind?: string } };
+      return msg.type === "game.apiEvent" && msg.event?.kind === kind;
+    });
+  }
+
+  it("configures simulation for a joiner before registration and delivers inputs on both peers", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    await runCreate(a, world, { ...GAME, mode: "simulation" });
+    const invite = parseInviteFragment(new URL(a.engine.getState().inviteUrl as string).hash)!;
+    const joining = b.engine.joinByInvite({ secret: invite.secret!, code: invite.code });
+    await settle(world);
+    await joining;
+    a.harness.ready();
+    b.harness.ready();
+    a.harness.apiCall("simulation.register", {});
+    b.harness.apiCall("simulation.register", {});
+    a.harness.register(GAME.title, "simulation");
+    b.harness.register(GAME.title, "simulation");
+    await settle(world);
+    a.engine.startGame();
+    await settle(world);
+    expect(b.engine.getState().phase).toBe("playing");
+    b.harness.apiCall("simulation.sendInput", { input: { type: "move", payload: { x: 1 } } });
+    await settle(world);
+    expect(events(a, "simulationInput")).not.toHaveLength(0);
+    expect(events(b, "simulationInput")).not.toHaveLength(0);
+    expect(events(a, "stateRequest")).toHaveLength(0);
+    expect(events(b, "stateRequest")).toHaveLength(0);
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+  });
+
+  it("switches an existing state-mode party to simulation without resetting on repeated metadata", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    await runCreate(a, world);
+    const invite = parseInviteFragment(new URL(a.engine.getState().inviteUrl as string).hash)!;
+    const joining = b.engine.joinByInvite({ secret: invite.secret!, code: invite.code });
+    await settle(world);
+    await joining;
+    await registerLocalGame(a, world);
+    await registerLocalGame(b, world);
+    await a.engine.selectGame({ ...GAME, gameId: "game_simulation", mode: "simulation" });
+    await settle(world);
+    expect(b.engine.getState().game?.gameId).toBe("game_simulation");
+    expect(b.engine.getState().game?.mode).toBe("simulation");
+    a.harness.ready();
+    b.harness.ready();
+    a.harness.apiCall("simulation.register", {});
+    b.harness.apiCall("simulation.register", {});
+    a.harness.register(GAME.title, "simulation");
+    b.harness.register(GAME.title, "simulation");
+    await settle(world);
+    // Re-announcing identical metadata must not discard readiness or handlers.
+    await a.engine.selectGame({ ...GAME, gameId: "game_simulation", mode: "simulation" });
+    await settle(world);
+    expect(memberOf(b.engine.getState(), b.memberId).ready).toBe(true);
+    a.harness.ready();
+    a.harness.apiCall("simulation.register", {});
+    a.harness.register(GAME.title, "simulation");
+    await settle(world);
+    a.engine.startGame();
+    await settle(world);
+    b.harness.apiCall("simulation.sendInput", { input: { type: "move" } });
+    await settle(world);
+    expect(events(a, "simulationInput")).not.toHaveLength(0);
+    expect(events(b, "simulationInput")).not.toHaveLength(0);
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+  });
+
+  it("switches to raw and back to a cached state game, and receives edited source under the same ID", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    await runCreate(a, world);
+    const invite = parseInviteFragment(new URL(a.engine.getState().inviteUrl as string).hash)!;
+    const joining = b.engine.joinByInvite({ secret: invite.secret!, code: invite.code });
+    await settle(world);
+    await joining;
+    await registerLocalGame(a, world);
+    await registerLocalGame(b, world);
+    await a.engine.selectGame({ ...GAME, gameId: "game_raw", mode: "raw" });
+    await settle(world);
+    expect(b.engine.getState().game?.mode).toBe("raw");
+    a.harness.ready();
+    b.harness.ready();
+    a.harness.register(GAME.title, "raw");
+    b.harness.register(GAME.title, "raw");
+    a.harness.apiCall("raw.createChannel", { spec: { name: "chat" } });
+    b.harness.apiCall("raw.createChannel", { spec: { name: "chat" } });
+    await settle(world);
+    b.harness.apiCall("raw.send", { name: "chat", payload: { hello: "raw" } });
+    await settle(world);
+    expect(events(a, "rawMessage")).not.toHaveLength(0);
+    const framesBeforeCache = b.harness.frames.length;
+    await a.engine.selectGame(GAME);
+    await settle(world);
+    expect(b.engine.getState().game?.mode).toBe("state");
+    expect(b.harness.frames.length).toBeGreaterThan(framesBeforeCache);
+    expect(memberOf(b.engine.getState(), b.memberId).transferState).toBe("complete");
+    await registerLocalGame(a, world);
+    await registerLocalGame(b, world);
+    const framesBeforeEdit = b.harness.frames.length;
+    await a.engine.selectGame({ ...GAME, source: GAME.source + "<!-- edited -->" });
+    await settle(world);
+    expect(b.harness.frames.length).toBeGreaterThan(framesBeforeEdit);
+    expect(memberOf(b.engine.getState(), b.memberId).transferState).toBe("complete");
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+  });
+
+  it("does not allow a joiner to replace the party game", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    await runCreate(a, world);
+    const invite = parseInviteFragment(new URL(a.engine.getState().inviteUrl as string).hash)!;
+    const joining = b.engine.joinByInvite({ secret: invite.secret!, code: invite.code });
+    await settle(world);
+    await joining;
+    await b.engine.selectGame({ ...GAME, gameId: "not-the-hosts-game", mode: "raw" });
+    expect(b.engine.getState().game?.gameId).toBe(GAME.gameId);
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
   });
 });
 

@@ -543,6 +543,22 @@ describe("full transfer lifecycle (host → joiner)", () => {
     expect(joiner.getCachedSource("game_2")).toBe("<html>two</html>");
   });
 
+  it("replaces cached bytes when the same game ID announces a new hash", async () => {
+    const world = makeRealWorld();
+    const { host: hostTransport, joiner: joinerTransport } = await makeParty(world);
+    const host = new GameSourceCoordinator({ transport: hostTransport });
+    const joiner = new GameSourceCoordinator({ transport: joinerTransport });
+    const events = collect(joiner);
+    const first = await host.setSource({ gameId: "game_1", source: SAMPLE_SOURCE });
+    await settle(world);
+    const edited = SAMPLE_SOURCE + "<!-- edited -->";
+    const second = await host.setSource({ gameId: "game_1", source: edited });
+    await settle(world);
+    expect(receivedOf(events)).toHaveLength(2);
+    expect(joiner.getCachedSource("game_1", first.sourceSha256)).toBeUndefined();
+    expect(joiner.getCachedSource("game_1", second.sourceSha256)).toBe(edited);
+  });
+
   it("serves a received source to other members from the session cache", async () => {
     const world = makeRealWorld();
     const { host: hostTransport, joiner: joiner1Transport } = await makeParty(world, {

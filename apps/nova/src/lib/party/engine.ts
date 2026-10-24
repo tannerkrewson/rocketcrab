@@ -954,7 +954,7 @@ export class PartyEngine {
    * the host then registers/announces it and boots the local frame.
    */
   async selectGame(input: PartySourceSpec): Promise<void> {
-    if (this.phase !== "lobby" || this.party === null) {
+    if (this.phase !== "lobby" || this.party === null || this.party.role !== "creator") {
       return;
     }
     this.game = { gameId: input.gameId, title: input.title, mode: input.mode };
@@ -963,6 +963,7 @@ export class PartyEngine {
     // the frame.
     this.classic = null;
     this.teardownRuntimeFrame();
+    await this.replaceGameSession(this.party);
     this.emit();
     this.registerSource(input);
   }
@@ -1635,7 +1636,21 @@ export class PartyEngine {
     this.unsubCoordinator = this.coordinator.subscribe((event) =>
       this.handleCoordinatorEvent(event),
     );
-    // 5cl.14: fresh frame executors for this party's session. They forward
+    await this.replaceGameSession(party);
+  }
+
+  /**
+   * A session's mode is immutable. Replace it before booting a newly selected
+   * game, including when a joiner first learns the game from source metadata.
+   * dispose() detaches session listeners without leaving the party transport.
+   */
+  private async replaceGameSession(party: PartySession): Promise<void> {
+    this.unsubSession?.();
+    this.unsubSession = null;
+    this.session?.dispose();
+    this.lastStateApiEvent = null;
+    this.registered = false;
+    // Fresh frame executors for this game's session. They forward
     // the state engine's requests into the CURRENT runtime frame (read at
     // call time, so a rebooted frame is always the target) and correlate
     // the frame's answers (routed in routeApiCall). One pair per session;
@@ -1653,10 +1668,6 @@ export class PartyEngine {
         memberId: this.identity.memberId,
         displayName: this.identity.displayName,
       },
-      // The known game (host with a source) drives the session's mode; a
-      // joiner learns the game later from the coordinator (5cl.14 note:
-      // the session's game is fixed at construction, so a joiner's
-      // simulation-mode game still runs in state mode — tracked in PLAN.md).
       game: {
         gameId: this.game?.gameId ?? "party",
         mode: this.game?.mode ?? "state",
@@ -1704,43 +1715,7 @@ export class PartyEngine {
       if (this.party === null || this.leaving) {
         return;
       }
-      if (this.unsubSession !== null) {
-        this.unsubSession();
-        this.unsubSession = null;
-      }
-      this.session?.dispose();
-      this.session = null;
-      // 5cl.14: a fresh session gets fresh frame executors (stale in-flight
-      // requests from the ended game must never settle into the next one)
-      // and a cleared state-view cache (the rebooted frame starts clean).
-      this.stateExecutor?.dispose();
-      this.simulationExecutor?.dispose();
-      this.stateExecutor = new PartyStateExecutor(() => this.runtime);
-      this.simulationExecutor = new PartySimulationExecutor(() => this.runtime);
-      this.lastStateApiEvent = null;
-      const party = this.party;
-      const session = createNovaSession({
-        transport: party.privateTransport,
-        room: party.material.roomId,
-        sessionId: party.material.sessionId,
-        player: {
-          memberId: this.identity.memberId,
-          displayName: this.identity.displayName,
-        },
-        game: {
-          gameId: this.game?.gameId ?? "party",
-          mode: this.game?.mode ?? "state",
-          ...(this.game?.title !== undefined ? { title: this.game.title } : {}),
-        },
-        stateExecutor: this.stateExecutor,
-        simulationExecutor: this.simulationExecutor,
-      });
-      this.session = session;
-      this.unsubSession = session.onSessionEvent((event) => this.handleSessionEvent(event));
-      // The fresh session has no readiness: the next game's ready gate
-      // re-opens once the rebooted runtime frames re-register.
-      this.registered = false;
-      void session.attach().catch((error: unknown) => {
+      void this.replaceGameSession(this.party).catch((error: unknown) => {
         this.addNotice("error", `The game session could not be reset: ${errorMessage(error)}`);
         this.emit();
       });
@@ -2314,12 +2289,37 @@ export class PartyEngine {
   private handleCoordinatorEvent(event: GameSourceTransferEvent): void {
     switch (event.type) {
       case "metadata": {
-        if (this.game === null) {
-          this.game = {
-            gameId: event.metadata.gameId,
-            title: event.metadata.title ?? "Untitled game",
-            mode: event.metadata.mode ?? "state",
-          };
+        const game = {
+          gameId: event.metadata.gameId,
+          title: event.metadata.title ?? "Untitled game",
+          mode: event.metadata.mode ?? "state",
+        };
+        const changed = this.game?.gameId !== game.gameId || this.game.mode !== game.mode;
+        this.game = game;
+        if (changed && this.party !== null) {
+          this.classic = null;
+          this.selfVerified = false;
+          this.teardownRuntimeFrame();
+          // attach() wires synchronously before resolving, so the following
+          // source/registration events cannot reach the old, state-only session.
+          void this.replaceGameSession(this.party).catch((error: unknown) => {
+            this.addNotice(
+              "error",
+              `The game session could not be configured: ${errorMessage(error)}`,
+            );
+            this.emit();
+          });
+          // Selecting an earlier game reuses only its exact hash-verified
+          // source. The coordinator skips a second transfer of cached bytes.
+          const cached = this.coordinator?.getCachedSource(
+            game.gameId,
+            event.metadata.sourceSha256,
+          );
+          if (cached !== undefined) {
+            this.selfVerified = true;
+            this.pendingSource = { ...game, source: cached };
+            void this.maybeBootFrame();
+          }
         }
         this.saveRecovery();
         this.emit();
@@ -2365,6 +2365,20 @@ export class PartyEngine {
         break;
       }
       case "received": {
+        if (
+          this.pendingSource !== null &&
+          this.pendingSource.source !== event.source &&
+          this.party !== null
+        ) {
+          this.teardownRuntimeFrame();
+          void this.replaceGameSession(this.party).catch((error: unknown) => {
+            this.addNotice(
+              "error",
+              `The updated game session could not be configured: ${errorMessage(error)}`,
+            );
+            this.emit();
+          });
+        }
         this.selfVerified = true;
         this.recordTransfer(this.identity.memberId, {
           state: "complete",
