@@ -9,12 +9,10 @@ import {
   authorityHeartbeatMessageSchema,
   connectionStatusMessageSchema,
   gameSourceMetadataMessageSchema,
-  gameSourceTransferMessageSchema,
   gameReadyMessageSchema,
   gameStartMessageSchema,
   gameEndMessageSchema,
-  gameSourceCancelMessageSchema,
-  gameSourceRequestMessageSchema,
+  gameSourceDiscoverMessageSchema,
   partyContextMessageSchema,
   partyRenameMessageSchema,
   partyClassicRoomMessageSchema,
@@ -30,7 +28,7 @@ import {
   simulationSnapshotMessageSchema,
   stateSnapshotMessageSchema,
   stateViewMessageSchema,
-  transferAcknowledgementMessageSchema,
+  gameSourceAcceptedMessageSchema,
 } from "./peer";
 
 function basePeer(overrides: Record<string, unknown> = {}) {
@@ -72,10 +70,8 @@ describe("peer message schemas", () => {
       rawChannelMetadataMessageSchema,
       rawChannelCloseMessageSchema,
       gameSourceMetadataMessageSchema,
-      gameSourceTransferMessageSchema,
-      transferAcknowledgementMessageSchema,
-      gameSourceRequestMessageSchema,
-      gameSourceCancelMessageSchema,
+      gameSourceAcceptedMessageSchema,
+      gameSourceDiscoverMessageSchema,
     ];
     expect(schemas).toHaveLength(PEER_MESSAGE_TYPES.length);
     for (const schema of schemas) {
@@ -248,40 +244,20 @@ describe("peer message schemas", () => {
           mode: "state",
           sourceSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
           sourceSizeBytes: 2048,
-          chunkCount: 4,
         }),
       ),
-      gameSourceTransferMessageSchema.parse(
+      gameSourceAcceptedMessageSchema.parse(
         basePeer({
-          type: "game.source.chunk",
-          gameId: "game-1",
-          sourceSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-          chunkIndex: 0,
-          chunkCount: 4,
-          chunk: "<html>",
-        }),
-      ),
-      transferAcknowledgementMessageSchema.parse(
-        basePeer({
-          type: "game.source.ack",
-          gameId: "game-1",
-          sourceSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-          status: "received",
-        }),
-      ),
-      gameSourceRequestMessageSchema.parse(
-        basePeer({
-          type: "game.source.request",
+          type: "game.source.accepted",
           gameId: "game-1",
           sourceSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
         }),
       ),
-      gameSourceCancelMessageSchema.parse(
+      gameSourceDiscoverMessageSchema.parse(
         basePeer({
-          type: "game.source.cancel",
+          type: "game.source.discover",
           gameId: "game-1",
           sourceSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-          reason: "leaving",
         }),
       ),
     ];
@@ -352,27 +328,13 @@ describe("peer message schemas", () => {
         gameId: "game-1",
         sourceSha256: "nope",
         sourceSizeBytes: 2048,
-        chunkCount: 4,
       }),
       basePeer({
-        type: "game.source.chunk",
+        type: "game.source.accepted",
         gameId: "game-1",
         sourceSha256: "nope",
-        chunkIndex: 0,
-        chunkCount: 4,
-        chunk: "<html>",
       }),
-      basePeer({
-        type: "game.source.ack",
-        gameId: "game-1",
-        sourceSha256: "nope",
-        status: "received",
-      }),
-      basePeer({ type: "game.source.request", gameId: "" }),
-      basePeer({
-        type: "game.source.request",
-        sourceSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
-      }),
+      basePeer({ type: "game.source.discover", sessionId: "" }),
     ];
     expect(invalidExamples).toHaveLength(PEER_MESSAGE_TYPES.length);
     for (const example of invalidExamples) {

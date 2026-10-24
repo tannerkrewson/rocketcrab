@@ -2307,15 +2307,6 @@ export class PartyEngine {
         this.emit();
         break;
       }
-      case "retry": {
-        this.recordTransfer(this.transferTarget(event), {
-          state: "transferring",
-          fraction: null,
-          detail: `Retrying transfer (attempt ${event.attempt})…`,
-        });
-        this.emit();
-        break;
-      }
       case "warning": {
         this.addNotice("warn", event.message);
         this.emit();
@@ -2342,7 +2333,6 @@ export class PartyEngine {
         return event.progress.direction === "receive" ? self : event.progress.memberId;
       case "transferStart":
       case "complete":
-      case "retry":
       case "cancelled":
         return event.direction === "receive" ? self : event.memberId;
       case "received":

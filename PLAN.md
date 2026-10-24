@@ -59,14 +59,57 @@ multi-hour cross-network/device acceptance remains gated.
 
 ### 3. Thin Trystero adapter and source transfer
 
-- [ ] Replace duplicated chunking/throttling/ACKs/request-response/progress/
+- [x] Replace duplicated chunking/throttling/ACKs/request-response/progress/
       retries/recovery with Trystero built-ins where simpler; prefer maintained
       relay defaults unless evidence requires overrides.
-- [ ] Preserve 2 MiB limit, hash verification and verified-acceptance confirmation,
+- [x] Preserve 2 MiB limit, hash verification and verified-acceptance confirmation,
       validation/resource bounds, action IDs/dedup/revisions/authority ordering,
       and in-memory/real transport parity. No generic reliability layer.
-- [ ] Test large/rejected/corrupt/slow/disconnected/reconnecting transfers;
+- [x] Test large/rejected/corrupt/slow/disconnected/reconnecting transfers;
       document custom mechanisms retained and why; commit evidence.
+
+Stage 3 evidence: replaced Nova's source framing (64 KiB chunk messages,
+chunk indices, per-chunk ACKs, retry counts/backoff, cancel-message protocol,
+recovery bookkeeping) with one Trystero binary request response per source.
+`NovaTransport` gained `request`/`handleRequest`; the adapter maps them to
+Trystero request actions (correlation, fragmentation, backpressure, progress,
+timeout, receive admission, rejection, disconnect, abort) with 8 MiB shared
+receive reservations, a 16 KiB request limit, and per-request 2 MiB response
+admission. The in-memory counterpart reuses the hub's existing fault-injected
+delivery/chunk/progress path and adds no production reliability layer; both run
+the same contract scenarios.
+
+Retained deliberately: 2 MiB hard limit and soft warning, exact UTF-8 byte count
+and SHA-256 verification, bounded eight-document verified cache, runtime
+compatibility checks, envelope/session/member validation, and one
+`game.source.accepted` application decision — transport delivery is not
+verified acceptance, and only validated HTML may open a start gate. Sender UI
+now reports transfer start plus acceptance (Trystero exposes no
+response-send progress callback). Cancellation aborts locally and suppresses
+stale completions; no custom remote-cancel or negative-ACK loop was re-added.
+Metadata/discovery remain small schema-validated shell controls; source traffic
+never reaches game frames. `chunkCount`, the chunk/ack/cancel/request schemas and
+their tests were deleted. `TRANSPORT_VERSION` bumped to 4 so pre-stage-3 clients
+are rejected before acting.
+
+Relays: pinned probe-era `GOOD_RELAYS`/redundancy defaults removed in favour of
+Trystero 0.26 maintained defaults; explicit operator overrides remain. The F5
+pin was stale (its own later re-probe recommended a different list) and the probe
+spec now compares upstream defaults with the previously healthy four.
+
+Verification: 977 unit/property tests; typecheck, format, lint (pre-existing
+warnings only), production builds and bundle check pass; initial JS 167.8 KiB
+gzip (220 KiB budget unchanged). In-memory suite covers 2 MiB byte-exact transfer,
+progress, empty/BOM/multi-byte sources, wrong hash/size/length/encoding/type,
+unavailable and oversized requests, dedup, slow cancellation, disconnect and
+reconnect, cached re-acceptance, late-joiner service after creator departure,
+cache cap, spoofed envelopes, cross-room isolation, and dispose. Real Chromium
+Nostr/WebRTC suite 4/4 passes, including a verified 2 MiB source over public
+relays with maintained defaults. App Playwright: Chromium+Firefox 40/40, WebKit
+20/20 in the Playwright Podman image (one unrelated runtime-diagnostics test was
+flaky once under 3 parallel workers; 3/3 isolated and 20/20 on full rerun).
+Remaining risk: no physical-device, cross-network TURN or multi-hour proof;
+maintained relay defaults were re-validated on this machine only. No deployment.
 
 ### 4. TURN reliability, security, and cost
 

@@ -87,21 +87,21 @@ async function measureDiscovery(browser: Browser, label: string, relays?: string
   return { discoveredMs, failures };
 }
 
-test("discovery probe: ALL7 pinned relays vs HEALTHY4", async ({ browser }) => {
-  console.log("\n===== DEFAULT (ALL7 pinned relays, incl. 3 rejecting) =====");
-  const all7 = await measureDiscovery(browser, "ALL7 (default GOOD_RELAYS)");
+test("discovery probe: upstream defaults vs HEALTHY4", async ({ browser }) => {
+  console.log("\n===== TRYSTERO MAINTAINED DEFAULTS =====");
+  const all7 = await measureDiscovery(browser, "UPSTREAM DEFAULTS");
 
   console.log("\n===== HEALTHY4 (nos.lol, primal, nostr.mom, snort) =====");
   const healthy4 = await measureDiscovery(browser, "HEALTHY4", HEALTHY4);
 
   console.log("\n===== PROBE SUMMARY =====");
   console.log(
-    `  ALL7 discovery:   ${all7.discoveredMs === null ? "TIMEOUT" : `${all7.discoveredMs} ms`}`,
+    `  Default discovery:   ${all7.discoveredMs === null ? "TIMEOUT" : `${all7.discoveredMs} ms`}`,
   );
   console.log(
     `  HEALTHY4 discovery: ${healthy4.discoveredMs === null ? "TIMEOUT" : `${healthy4.discoveredMs} ms`}`,
   );
-  console.log(`  ALL7 relay-failure console lines: ${all7.failures.length}`);
+  console.log(`  Default relay-failure console lines: ${all7.failures.length}`);
   for (const f of all7.failures) console.log(`    ${f}`);
   console.log(`  HEALTHY4 relay-failure console lines: ${healthy4.failures.length}`);
   for (const f of healthy4.failures) console.log(`    ${f}`);

@@ -1,10 +1,11 @@
-import { getRelaySockets, joinRoom, selfId } from "trystero";
+import { defaultRelayUrls, getRelaySockets, joinRoom, selfId } from "trystero";
 import type {
   DataPayload,
   JoinRoomCallbacks,
   JoinRoomConfig,
   JsonValue,
   MessageAction,
+  RequestAction,
   MessageContext,
   Room,
   TurnServerConfig,
@@ -19,12 +20,12 @@ import type {
   TransportMessage,
   TransportPeerInfo,
   TransportSendOptions,
+  TransportRequestOptions,
+  TransportRequestHandler,
 } from "@rocketcrab/core";
 import { currentAppIdEnvironment, resolveAppId, type AppIdEnvironment } from "./app-id";
 import { TrysteroJoinError, toTrysteroJoinError, type TrysteroJoinErrorReport } from "./errors";
 import {
-  DEFAULT_RELAY_REDUNDANCY,
-  GOOD_RELAYS,
   isRelayFailureSignal,
   relayDiagnosticsEqual,
   snapshotRelays,
@@ -52,8 +53,8 @@ import {
  * local test arena and over real parties.
  *
  * Design decisions (see the F5 findings and ADR-0003):
- * - **Nostr strategy** for discovery, relays pinned to the verified
- *   `GOOD_RELAYS` set (F10) with redundancy 5.
+ * - **Nostr strategy** with maintained upstream relay selection/defaults;
+ *   operators may explicitly override URLs or redundancy.
  * - **Environment-specific appId** (`rocketcrab-nova-dev` / `-prod`,
  *   `app-id.ts`) so dev and prod rooms never collide.
  * - **Identity handshake**: peers exchange `{ memberId, connectionId,
@@ -122,6 +123,10 @@ export class TrysteroTransport implements NovaTransport {
 
   private room: Room | null = null;
   private action: MessageAction | null = null;
+  private readonly relayConfig: JoinRoomConfig["relayConfig"];
+  private readonly requestHandlers = new Map<string, TransportRequestHandler>();
+  private readonly requestActions = new Map<string, RequestAction>();
+  private readonly pendingRequests = new Map<string, TransportRequestOptions>();
   private connectionEpoch = 0;
   private joinWaiter: { resolve: () => void; reject: (error: Error) => void } | null = null;
   private joinTimers: Array<() => void> = [];
@@ -137,10 +142,16 @@ export class TrysteroTransport implements NovaTransport {
   private wiredRelaySockets = new WeakSet<object>();
 
   constructor(options: TrysteroTransportOptions) {
+    this.relayConfig =
+      options.relays !== undefined || options.redundancy !== undefined
+        ? {
+            ...(options.relays !== undefined ? { urls: [...options.relays] } : {}),
+            ...(options.redundancy !== undefined ? { redundancy: options.redundancy } : {}),
+          }
+        : undefined;
     this.options = {
       ...options,
-      relays: options.relays ?? GOOD_RELAYS,
-      redundancy: options.redundancy ?? DEFAULT_RELAY_REDUNDANCY,
+      relays: options.relays ?? defaultRelayUrls,
       relayConnectTimeoutMs: options.relayConnectTimeoutMs ?? 15_000,
       joinTimeoutMs: options.joinTimeoutMs ?? LIMITS.handshakeTimeoutMs,
       handshakeTimeoutMs: options.handshakeTimeoutMs ?? LIMITS.handshakeTimeoutMs,
@@ -151,7 +162,7 @@ export class TrysteroTransport implements NovaTransport {
     // first to elapse wins with its own category (F5: distinguish "still
     // connecting" — join_timeout — from "relay unreachable"). Defaults are
     // 15 s vs 30 s so relay failures surface first on the default profile.
-    if (this.options.redundancy < 1) {
+    if (options.redundancy !== undefined && options.redundancy < 1) {
       throw new TrysteroJoinError({
         category: "invalid_state",
         message: "TrysteroTransport: redundancy must be at least 1.",
@@ -168,6 +179,69 @@ export class TrysteroTransport implements NovaTransport {
     this.selfConnectionId = this.selfIdBase;
     this.now = options.now ?? (() => Date.now());
     this.scheduleFn = options.schedule ?? defaultScheduler;
+  }
+
+  handleRequest(channel: string, handler: TransportRequestHandler): () => void {
+    if (this.requestHandlers.has(channel)) throw new Error("Request handler already registered.");
+    this.requestHandlers.set(channel, handler);
+    if (this.room !== null) this.requestAction(channel);
+    return () => {
+      if (this.requestHandlers.get(channel) === handler) this.requestHandlers.delete(channel);
+    };
+  }
+
+  async request(options: TransportRequestOptions): Promise<unknown> {
+    const peerId = this.connectionToPeerId.get(options.targetConnectionId);
+    if (!peerId || !this.room || this.connectionState !== "connected")
+      throw new Error("Peer disconnected.");
+    const key = options.channel + ":" + peerId;
+    if (this.pendingRequests.has(key))
+      throw new Error("A request to this peer/channel is already active.");
+    if (this.pendingRequests.size >= 32) throw new Error("Too many requests.");
+    this.pendingRequests.set(key, options);
+    try {
+      return await this.requestAction(options.channel).request(options.payload as DataPayload, {
+        target: peerId,
+        timeoutMs: options.timeoutMs ?? 120_000,
+        ...(options.signal ? { signal: options.signal } : {}),
+      });
+    } finally {
+      if (this.pendingRequests.get(key) === options) this.pendingRequests.delete(key);
+    }
+  }
+
+  private requestAction(channel: string): RequestAction {
+    const existing = this.requestActions.get(channel);
+    if (existing) return existing;
+    if (!this.room || !/^[a-zA-Z0-9._-]{1,23}$/.test(channel))
+      throw new Error("Invalid request channel.");
+    const action = this.room.makeAction("nova.rpc:" + channel, {
+      kind: "request",
+      onReceive: (context) => {
+        if (!this.identityByPeerId.has(context.peerId)) return false;
+        const limit =
+          context.kind === "response"
+            ? (this.pendingRequests.get(channel + ":" + context.peerId)?.maxResponseBytes ??
+              2 * 1024 * 1024)
+            : 16 * 1024;
+        return context.byteLength <= limit;
+      },
+      onReceiveProgress: (fraction, context) => {
+        this.pendingRequests.get(channel + ":" + context.peerId)?.onProgress?.(fraction);
+      },
+      onRequest: async (data, context) => {
+        const identity = this.identityByPeerId.get(context.peerId);
+        const handler = this.requestHandlers.get(channel);
+        if (!identity || !handler) throw new Error("Request rejected.");
+        return (await handler(data, {
+          senderMemberId: identity.memberId,
+          senderConnectionId: identity.connectionId,
+          signal: context.signal,
+        })) as DataPayload;
+      },
+    });
+    this.requestActions.set(channel, action);
+    return action;
   }
 
   /** Peers currently connected, in join order. */
@@ -476,10 +550,8 @@ export class TrysteroTransport implements NovaTransport {
   private buildConfig(): JoinRoomConfig {
     const config: JoinRoomConfig = {
       appId: this.appId,
-      relayConfig: {
-        urls: [...this.options.relays],
-        redundancy: this.options.redundancy,
-      },
+      maxReceiveBytes: 8 * 1024 * 1024,
+      ...(this.relayConfig !== undefined ? { relayConfig: this.relayConfig } : {}),
     };
     if (this.options.password !== undefined) {
       config.password = this.options.password;
@@ -501,6 +573,7 @@ export class TrysteroTransport implements NovaTransport {
 
   private wireRoom(room: Room): void {
     this.room = room;
+    for (const channel of this.requestHandlers.keys()) this.requestAction(channel);
     const action = room.makeAction(ACTION_NAMESPACE, {
       onMessage: (data, context) => this.handleActionMessage(data, context),
       onReceiveProgress: (percent, context) => this.handleReceiveProgress(percent, context),
@@ -668,7 +741,7 @@ export class TrysteroTransport implements NovaTransport {
       sockets,
       this.now(),
       this.relayFailures,
-      this.options.redundancy,
+      this.relayConfig?.redundancy,
     );
     const changed =
       this.lastRelayDiagnostics === null ||
@@ -737,7 +810,7 @@ export class TrysteroTransport implements NovaTransport {
               message:
                 `No Nostr relay reached an open socket within ` +
                 `${this.options.relayConnectTimeoutMs}ms. Check network connectivity to the ` +
-                `pinned relays (${this.options.relays.join(", ")}).`,
+                `configured relays (${this.options.relays.join(", ")}).`,
             }),
           );
         }, this.options.relayConnectTimeoutMs),
@@ -875,6 +948,13 @@ export class TrysteroTransport implements NovaTransport {
       this.action.onMessage = null;
       this.action.onReceiveProgress = null;
     }
+    for (const action of this.requestActions.values()) {
+      action.onRequest = null;
+      action.onReceive = null;
+      action.onReceiveProgress = null;
+    }
+    this.requestActions.clear();
+    this.pendingRequests.clear();
     this.room = null;
     this.action = null;
     this.stopRelayMonitor();
@@ -934,7 +1014,6 @@ type InternalOptions = Omit<
   | "historyLimit"
 > & {
   relays: readonly string[];
-  redundancy: number;
   relayConnectTimeoutMs: number;
   joinTimeoutMs: number;
   handshakeTimeoutMs: number;
@@ -996,7 +1075,7 @@ export interface TrysteroTransportOptions {
   readonly appId?: string;
   /** Environment flags used to derive the default appId (tests override). */
   readonly env?: AppIdEnvironment;
-  /** Nostr relay URLs to pin (default: verified GOOD_RELAYS, F10). */
+  /** Optional operator override; omitted uses Trystero maintained defaults. */
   readonly relays?: readonly string[];
   /** Relay redundancy (default 5, F5 recommendation). */
   readonly redundancy?: number;

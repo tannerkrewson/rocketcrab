@@ -134,6 +134,25 @@ export interface TransportSendOptions {
   readonly onProgress?: (progress: TransferProgress) => void;
 }
 
+/** One directed request; adapters own correlation, timeout and cancellation. */
+export interface TransportRequestOptions {
+  readonly channel: string;
+  readonly payload: unknown;
+  readonly targetConnectionId: ConnectionId;
+  readonly timeoutMs?: number;
+  readonly maxResponseBytes?: number;
+  readonly signal?: AbortSignal;
+  readonly onProgress?: (fraction: number) => void;
+}
+export type TransportRequestHandler = (
+  payload: unknown,
+  context: {
+    readonly senderMemberId: MemberId;
+    readonly senderConnectionId: ConnectionId;
+    readonly signal: AbortSignal;
+  },
+) => unknown | Promise<unknown>;
+
 /** Request to join a session room ({@link NovaTransport.join}). */
 export interface TransportJoinRequest {
   readonly room: string;

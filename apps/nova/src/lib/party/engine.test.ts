@@ -1124,6 +1124,12 @@ class StalePingTransport implements NovaTransport {
   send(options: Parameters<NovaTransport["send"]>[0]): Promise<void> {
     return this.delegate.send(options);
   }
+  request(options: Parameters<NovaTransport["request"]>[0]): Promise<unknown> {
+    return this.delegate.request(options);
+  }
+  handleRequest(...args: Parameters<NovaTransport["handleRequest"]>): () => void {
+    return this.delegate.handleRequest(...args);
+  }
   /** The lying probe: peers never answer, even though the link looks up. */
   ping(): Promise<number | null> {
     return Promise.resolve(null);

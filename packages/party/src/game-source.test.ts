@@ -1,1394 +1,472 @@
-import { describe, expect, it } from "vitest";
-import type { TransportMessage } from "@rocketcrab/core";
-import {
-  PROTOCOL_VERSION,
-  gameSourceCancelMessageSchema,
-  gameSourceMetadataMessageSchema,
-  gameSourceRequestMessageSchema,
-  gameSourceTransferMessageSchema,
-  htmlSourceBytes,
-  htmlSourceWarnBytes,
-  parsePeerMessage,
-  transferAcknowledgementMessageSchema,
-  type GameSourceMetadataMessage,
-  type GameSourceTransferMessage,
-  type Sha256,
-} from "@rocketcrab/protocol";
+import { afterEach, describe, expect, it, vi } from "vitest";
+import { PROTOCOL_VERSION, htmlSourceBytes, htmlSourceWarnBytes } from "@rocketcrab/protocol";
 import { InMemoryTransportHub, type InMemoryTransport } from "@rocketcrab/testing";
 import {
   GAME_SOURCE_CHANNEL,
   GameSourceCoordinator,
-  chunkStringByUtf8Bytes,
   defaultGameSourceCompatibilityCheck,
   hashSource,
   utf8ByteLength,
+  type GameSourceMetadataInfo,
   type GameSourceTransferEvent,
+  type GameSourceCoordinatorOptions,
 } from "./game-source";
 import { newMessageId, nowSentAt } from "./messages";
-import {
-  createParty,
-  joinPartyByInvite,
-  type CreatePartyOptions,
-  type JoinByInviteOptions,
-  type PartyTransportFactory,
-} from "./session";
 
-/**
- * Deterministic P3 tests for {@link GameSourceCoordinator}: the full transfer
- * lifecycle (metadata announcement → request → binary chunk transfer with
- * progress → SHA-256 verification → acknowledgement), retry on failed or
- * mismatched transfers, cancellation, runtime compatibility, source-size
- * limits, re-transfer after reconnect, in-memory session caching, and
- * listener cleanup. All flows run over the InMemoryTransport hub (U5) with
- * either a real microtask clock (drain + flush) or an injected fake clock
- * (deterministic cancellation/reconnect interleavings) — no network, no
- * real timers in the fake-clock tests, so CI runs are exact.
- */
-
-const PRIVATE_ROOM = "party:test-room";
-const PRIVATE_SESSION = "session-test";
-
-// ---------------------------------------------------------------------------
-// Fake clock (same pattern as rendezvous.test.ts)
-// ---------------------------------------------------------------------------
-
-interface FakeClock {
-  now: () => number;
-  schedule: (callback: () => void, delayMs: number) => () => void;
-  advance: (ms: number) => void;
-}
-
-function makeFakeClock(): FakeClock {
-  let t = 0;
-  let order = 0;
-  const timers: Array<{ at: number; order: number; cb: () => void; active: boolean }> = [];
-  return {
-    now: () => t,
-    schedule: (cb, delayMs) => {
-      const timer = { at: t + delayMs, order: order++, cb, active: true };
-      timers.push(timer);
-      return () => {
-        timer.active = false;
-      };
-    },
-    advance: (ms: number) => {
-      const deadline = t + ms;
-      for (;;) {
-        const due = timers
-          .filter((timer) => timer.active && timer.at <= deadline)
-          .sort((a, b) => a.at - b.at || a.order - b.order)[0];
-        if (due === undefined) {
-          break;
-        }
-        due.active = false;
-        t = Math.max(t, due.at);
-        due.cb();
-      }
-      t = deadline;
-    },
-  };
-}
-
-/** Let real async (crypto derivation, transport joins) make progress. */
-async function flush(): Promise<void> {
-  await new Promise((resolve) => setTimeout(resolve, 0));
-}
-
-/** Drain the hub and flush promise chains a few times (deterministic). */
-async function settle(world: World): Promise<void> {
-  for (let i = 0; i < 8; i += 1) {
-    world.hub.drain();
+const hubs: InMemoryTransportHub[] = [];
+const coordinators: GameSourceCoordinator[] = [];
+afterEach(() => {
+  for (const c of coordinators.splice(0)) c.dispose();
+  for (const h of hubs.splice(0)) h.dispose();
+  vi.restoreAllMocks();
+});
+const flush = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+async function settle(hub: InMemoryTransportHub) {
+  for (let i = 0; i < 20; i++) {
+    hub.drain();
     await flush();
   }
 }
-
-// ---------------------------------------------------------------------------
-// Worlds: real clock (PERFECT_LINK) and fake clock (latency interleavings)
-// ---------------------------------------------------------------------------
-
-interface World {
-  clock?: FakeClock;
-  hub: InMemoryTransportHub;
-}
-
-function makeRealWorld(): World {
-  return { hub: new InMemoryTransportHub() };
-}
-
-function makeClockWorld(): World {
-  const clock = makeFakeClock();
-  const hub = new InMemoryTransportHub({ schedule: clock.schedule, now: clock.now });
-  return { clock, hub };
-}
-
-/** A host + joiner transport joined to the private room. */
-async function makeParty(
-  world: World,
-  options: {
-    hostMemberId?: string;
-    joinerMemberId?: string;
-    hostLatencyMs?: number;
-    joinerFaults?: { latencyMs?: number; dropWhileSuspended?: boolean };
-  } = {},
-): Promise<{ host: InMemoryTransport; joiner: InMemoryTransport }> {
-  const host = world.hub.createTransport({
-    memberId: options.hostMemberId ?? "host",
-    displayName: "Host",
-    faults: options.hostLatencyMs === undefined ? undefined : { latencyMs: options.hostLatencyMs },
-  });
-  const joiner = world.hub.createTransport({
-    memberId: options.joinerMemberId ?? "joiner",
-    displayName: "Joiner",
-    faults: options.joinerFaults,
-  });
-  await host.join({ room: PRIVATE_ROOM, sessionId: PRIVATE_SESSION });
-  await joiner.join({ room: PRIVATE_ROOM, sessionId: PRIVATE_SESSION });
-  return { host, joiner };
-}
-
-function collect(coordinator: GameSourceCoordinator): GameSourceTransferEvent[] {
+function coordinator(
+  transport: InMemoryTransport,
+  options: Omit<GameSourceCoordinatorOptions, "transport"> = {},
+) {
   const events: GameSourceTransferEvent[] = [];
-  coordinator.subscribe((event) => events.push(event));
-  return events;
+  const instance = new GameSourceCoordinator({
+    ...options,
+    transport,
+    onEvent: (event) => events.push(event),
+  });
+  coordinators.push(instance);
+  return { instance, events };
 }
-
-function receivedOf(events: GameSourceTransferEvent[]) {
-  return events.filter((event) => event.type === "received");
+async function world() {
+  const hub = new InMemoryTransportHub();
+  hubs.push(hub);
+  const host = hub.createTransport({ memberId: "host", displayName: "Host" });
+  const joiner = hub.createTransport({ memberId: "joiner", displayName: "Joiner" });
+  await host.join({ room: "private", sessionId: "session" });
+  await joiner.join({ room: "private", sessionId: "session" });
+  return { hub, host, joiner };
 }
-
-function errorsOf(events: GameSourceTransferEvent[]) {
-  return events.filter((event) => event.type === "error");
-}
-
-function cancelledOf(events: GameSourceTransferEvent[]) {
-  return events.filter((event) => event.type === "cancelled");
-}
-
-function progressOf(events: GameSourceTransferEvent[]) {
-  return events.filter((event) => event.type === "progress");
-}
-
-// ---------------------------------------------------------------------------
-// Raw message builders (the tests act as a well-behaved-but-unmanaged peer)
-// ---------------------------------------------------------------------------
-
-interface RawBase {
-  sessionId: string;
-  senderMemberId: string;
-  senderConnectionId: string;
-}
-
-function rawEnvelope(base: RawBase) {
+function envelope(transport: InMemoryTransport, type: string) {
   return {
     version: PROTOCOL_VERSION,
-    sessionId: base.sessionId,
-    senderMemberId: base.senderMemberId,
-    senderConnectionId: base.senderConnectionId,
+    sessionId: transport.sessionId,
+    senderMemberId: transport.selfMemberId,
+    senderConnectionId: transport.selfConnectionId,
     messageId: newMessageId(),
     sentAt: nowSentAt(),
+    type,
   };
 }
-
-function rawMetadata(
-  base: RawBase,
-  input: {
-    gameId: string;
-    sourceSha256: Sha256;
-    sourceSizeBytes: number;
-    chunkCount: number;
-    apiVersion?: number;
-  },
-): GameSourceMetadataMessage {
-  return gameSourceMetadataMessageSchema.parse({
-    ...rawEnvelope(base),
-    type: "game.source.metadata",
-    gameId: input.gameId,
-    ...(input.apiVersion !== undefined ? { apiVersion: input.apiVersion } : {}),
-    sourceSha256: input.sourceSha256,
-    sourceSizeBytes: input.sourceSizeBytes,
-    chunkCount: input.chunkCount,
-  });
-}
-
-function rawChunk(
-  base: RawBase,
-  input: {
-    gameId: string;
-    sourceSha256: Sha256;
-    chunkIndex: number;
-    chunkCount: number;
-    chunk: string;
-  },
-): GameSourceTransferMessage {
-  return gameSourceTransferMessageSchema.parse({
-    ...rawEnvelope(base),
-    type: "game.source.chunk",
-    gameId: input.gameId,
-    sourceSha256: input.sourceSha256,
-    chunkIndex: input.chunkIndex,
-    chunkCount: input.chunkCount,
-    chunk: input.chunk,
-  });
-}
-
-function encodeChunk(message: GameSourceTransferMessage): Uint8Array {
-  return new TextEncoder().encode(JSON.stringify(message));
-}
-
-function decodeChunk(payload: unknown): GameSourceTransferMessage | null {
-  if (!(payload instanceof Uint8Array)) {
-    return null;
-  }
-  try {
-    const parsed = parsePeerMessage(JSON.parse(new TextDecoder().decode(payload)) as unknown);
-    return parsed.ok && parsed.value.type === "game.source.chunk" ? parsed.value : null;
-  } catch {
-    return null;
-  }
-}
-
-function rawRequest(base: RawBase, input: { gameId: string; sourceSha256: Sha256 }) {
-  return gameSourceRequestMessageSchema.parse({
-    ...rawEnvelope(base),
-    type: "game.source.request",
-    gameId: input.gameId,
-    sourceSha256: input.sourceSha256,
-  });
-}
-
-function rawCancel(
-  base: RawBase,
-  input: { gameId: string; sourceSha256: Sha256; reason?: string },
+async function announce(
+  host: InMemoryTransport,
+  metadata: GameSourceMetadataInfo,
+  overrides: object = {},
 ) {
-  return gameSourceCancelMessageSchema.parse({
-    ...rawEnvelope(base),
-    type: "game.source.cancel",
-    gameId: input.gameId,
-    sourceSha256: input.sourceSha256,
-    ...(input.reason !== undefined ? { reason: input.reason } : {}),
+  await host.send({
+    channel: GAME_SOURCE_CHANNEL,
+    payload: { ...envelope(host, "game.source.metadata"), ...metadata, ...overrides },
   });
 }
-
-function rawAck(
-  base: RawBase,
-  input: {
-    gameId: string;
-    sourceSha256: Sha256;
-    status: "received" | "failed";
-    errorMessage?: string;
-  },
-) {
-  return transferAcknowledgementMessageSchema.parse({
-    ...rawEnvelope(base),
-    type: "game.source.ack",
-    gameId: input.gameId,
-    sourceSha256: input.sourceSha256,
-    status: input.status,
-    ...(input.errorMessage !== undefined ? { errorMessage: input.errorMessage } : {}),
-  });
+async function descriptor(source = "<html>🦀</html>"): Promise<GameSourceMetadataInfo> {
+  return {
+    gameId: "game",
+    sourceSha256: await hashSource(source),
+    sourceSizeBytes: utf8ByteLength(source),
+  };
 }
+const received = (events: GameSourceTransferEvent[]) => events.filter((e) => e.type === "received");
+const completed = (events: GameSourceTransferEvent[], direction: "send" | "receive") =>
+  events.filter((e) => e.type === "complete" && e.direction === direction);
 
-/** Capture every message a transport receives on the game-source channel. */
-function captureSourceTraffic(transport: InMemoryTransport): TransportMessage[] {
-  const messages: TransportMessage[] = [];
-  transport.on("message:received", (message) => {
-    if (message.channel === GAME_SOURCE_CHANNEL) {
-      messages.push(message);
-    }
+describe("whole-source requests", () => {
+  it.each([
+    "",
+    "<html>🦀漢字</html>",
+    "\ufeff<html>preserve BOM</html>",
+    "x".repeat(htmlSourceBytes),
+  ])("verifies exact UTF-8 bytes and confirms application acceptance (%#)", async (source) => {
+    const { hub, host, joiner } = await world();
+    const a = coordinator(host);
+    const b = coordinator(joiner);
+    await a.instance.setSource({ gameId: "game", source });
+    await settle(hub);
+    expect(received(b.events)).toMatchObject([{ source, sourceSha256: await hashSource(source) }]);
+    expect(b.instance.getCachedSource("game")).toBe(source);
+    expect(completed(a.events, "send")).toHaveLength(1);
+    expect(completed(b.events, "receive")).toHaveLength(1);
+    expect(b.events.some((e) => e.type === "progress" && e.progress.fraction === 1)).toBe(true);
+    expect(b.events.filter((e) => e.type === "error")).toEqual([]);
   });
-  return messages;
-}
-
-const SAMPLE_SOURCE = "<!doctype html><html><body><h1>rocketcrab</h1></body></html>";
-
-// ---------------------------------------------------------------------------
-// Chunking and hashing helpers
-// ---------------------------------------------------------------------------
-
-describe("source chunking and hashing (P3 primitives)", () => {
-  it("chunks within a UTF-8 byte budget without splitting code points", () => {
-    expect(chunkStringByUtf8Bytes("", 64)).toEqual([]);
-    expect(chunkStringByUtf8Bytes("abc", 64)).toEqual(["abc"]);
-    // Multi-byte content straddling the budget boundary: "a" (1) + 🦀 (4) + "b" (1).
-    const chunks = chunkStringByUtf8Bytes("a🦀b", 4);
-    expect(chunks).toEqual(["a", "🦀", "b"]);
-    for (const chunk of chunks) {
-      expect(utf8ByteLength(chunk)).toBeLessThanOrEqual(4);
-    }
-    expect(chunks.join("")).toBe("a🦀b");
-  });
-
-  it("re-joins any source byte-identically regardless of chunk boundaries", () => {
-    const source = "héllo 🦀 world — 日本語 🎮<script>const s = 'x\\'y';</script>".repeat(50);
-    const chunks = chunkStringByUtf8Bytes(source, 7);
-    expect(chunks.length).toBeGreaterThan(1);
-    expect(chunks.join("")).toBe(source);
-    expect(utf8ByteLength(chunks.join(""))).toBe(utf8ByteLength(source));
-    for (const chunk of chunks) {
-      expect(utf8ByteLength(chunk)).toBeLessThanOrEqual(7);
-    }
-  });
-
-  it("hashes with Web Crypto SHA-256 and counts UTF-8 bytes", async () => {
-    expect(await hashSource("hello")).toBe(
-      "2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
-    );
-    expect(utf8ByteLength("é🦀")).toBe(6);
-  });
-});
-
-describe("default runtime compatibility check", () => {
-  it("accepts games with no declared API version or a supported one", () => {
-    expect(
-      defaultGameSourceCompatibilityCheck(
-        { gameId: "g", sourceSha256: "a".repeat(64), sourceSizeBytes: 1, chunkCount: 1 },
-        [1],
-      ),
-    ).toEqual({ compatible: true });
-    expect(
-      defaultGameSourceCompatibilityCheck(
-        {
-          gameId: "g",
-          apiVersion: 1,
-          sourceSha256: "a".repeat(64),
-          sourceSizeBytes: 1,
-          chunkCount: 1,
-        },
-        [1],
-      ).compatible,
-    ).toBe(true);
-  });
-
-  it("rejects an unsupported Nova API version with a clear reason", () => {
-    const result = defaultGameSourceCompatibilityCheck(
-      {
-        gameId: "g",
-        apiVersion: 2,
-        sourceSha256: "a".repeat(64),
-        sourceSizeBytes: 1,
-        chunkCount: 1,
-      },
-      [1],
-    );
-    expect(result.compatible).toBe(false);
-    expect(result.reason).toContain("API version 2");
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Full transfer lifecycle
-// ---------------------------------------------------------------------------
-
-describe("full transfer lifecycle (host → joiner)", () => {
-  it("announces metadata, transfers binary chunks with progress, verifies, and acknowledges", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport, joiner: joinerTransport } = await makeParty(world);
-    const hostEvents: GameSourceTransferEvent[] = [];
-    const host = new GameSourceCoordinator({
-      transport: hostTransport,
-      onEvent: (event) => hostEvents.push(event),
+  it("uses transport receive progress for a large response", async () => {
+    const { hub, host, joiner } = await world();
+    const a = coordinator(host);
+    const b = coordinator(joiner);
+    await a.instance.setSource({ gameId: "game", source: "🦀".repeat(80_000) });
+    await settle(hub);
+    const progress = b.events.filter((e) => e.type === "progress").map((e) => e.progress);
+    expect(progress.some((p) => p.fraction > 0 && p.fraction < 1)).toBe(true);
+    expect(progress.at(-1)).toMatchObject({
+      fraction: 1,
+      bytesTransferred: 320_000,
+      totalBytes: 320_000,
     });
-    const joiner = new GameSourceCoordinator({ transport: joinerTransport });
-    const joinerEvents = collect(joiner);
-
-    const metadata = await host.setSource({
-      gameId: "game_1",
-      title: "Rocket Rumble",
-      apiVersion: 1,
-      mode: "state",
-      source: SAMPLE_SOURCE,
-    });
-    expect(metadata.sourceSha256).toBe(await hashSource(SAMPLE_SOURCE));
-    expect(metadata.sourceSizeBytes).toBe(utf8ByteLength(SAMPLE_SOURCE));
-    expect(metadata.chunkCount).toBeGreaterThan(0);
-    await settle(world);
-
-    // The joiner received the byte-identical source and cached it.
-    const received = receivedOf(joinerEvents);
-    expect(received).toHaveLength(1);
-    const receivedEvent = received[0];
-    expect(receivedEvent?.type).toBe("received");
-    if (receivedEvent?.type !== "received") throw new Error("unreachable");
-    expect(receivedEvent.source).toBe(SAMPLE_SOURCE);
-    expect(receivedEvent.gameId).toBe("game_1");
-    expect(receivedEvent.sourceSha256).toBe(metadata.sourceSha256);
-    expect(joiner.getCachedSource("game_1")).toBe(SAMPLE_SOURCE);
-    expect(joiner.hasSource("game_1")).toBe(true);
-
-    // The host saw the acknowledgement and marked the transfer complete.
-    expect(
-      hostEvents.some(
-        (event) =>
-          event.type === "complete" && event.direction === "send" && event.memberId === "joiner",
-      ),
-    ).toBe(true);
-    // Both sides reported monotonic progress.
-    for (const progress of progressOf(joinerEvents)) {
-      expect(progress.progress.fraction).toBeGreaterThan(0);
-      expect(progress.progress.fraction).toBeLessThanOrEqual(1);
-    }
-    expect(
-      hostEvents.some((event) => event.type === "progress" && event.progress.direction === "send"),
-    ).toBe(true);
-    expect(
-      joinerEvents.some(
-        (event) => event.type === "progress" && event.progress.direction === "receive",
-      ),
-    ).toBe(true);
-    expect(
-      joinerEvents.some(
-        (event) => event.type === "metadata" && event.metadata.title === "Rocket Rumble",
-      ),
-    ).toBe(true);
   });
-
-  it("transfers chunks as binary transport payloads", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport, joiner: joinerTransport } = await makeParty(world);
-    const traffic = captureSourceTraffic(joinerTransport);
-    const host = new GameSourceCoordinator({ transport: hostTransport });
-    const joiner = new GameSourceCoordinator({ transport: joinerTransport });
-    const joinerEvents = collect(joiner);
-
-    await host.setSource({ gameId: "game_1", source: SAMPLE_SOURCE.repeat(4) });
-    await settle(world);
-
-    const chunkMessages = traffic.filter((message) => message.binary);
-    expect(chunkMessages.length).toBeGreaterThan(0);
-    for (const message of chunkMessages) {
-      expect(message.binary).toBe(true);
-      expect(decodeChunk(message.payload)).not.toBeNull();
-    }
-    expect(receivedOf(joinerEvents)).toHaveLength(1);
-  });
-
-  it("transfers a multi-megabyte test document byte-identically", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport, joiner: joinerTransport } = await makeParty(world);
-    const host = new GameSourceCoordinator({ transport: hostTransport });
-    const joiner = new GameSourceCoordinator({ transport: joinerTransport });
-    const joinerEvents = collect(joiner);
-
-    // 1.25 MiB — a multi-megabyte document under the 2 MiB hard limit.
-    const big = `<!doctype html><html><body>${"🦀".repeat(200)}${"x".repeat(1_250_000)}</body></html>`;
-    expect(utf8ByteLength(big)).toBeGreaterThan(1024 * 1024);
-    await host.setSource({ gameId: "game_big", source: big });
-    await settle(world);
-
-    const received = receivedOf(joinerEvents);
-    expect(received).toHaveLength(1);
-    if (received[0]?.type !== "received") throw new Error("unreachable");
-    expect(received[0].source).toBe(big);
-    expect(await hashSource(received[0].source)).toBe(await hashSource(big));
-  });
-
-  it("serves the current game to a late joiner via the peer:joined announcement", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport, joiner: joiner1Transport } = await makeParty(world, {
-      joinerMemberId: "joiner-1",
-    });
-    const host = new GameSourceCoordinator({ transport: hostTransport });
-    const joiner1 = new GameSourceCoordinator({ transport: joiner1Transport });
-    const joiner1Events = collect(joiner1);
-    await host.setSource({ gameId: "game_1", source: SAMPLE_SOURCE });
-    await settle(world);
-    expect(receivedOf(joiner1Events)).toHaveLength(1);
-
-    // A second admitted member joins the already-running party.
-    const joiner2Transport = world.hub.createTransport({ memberId: "joiner-2" });
-    await joiner2Transport.join({ room: PRIVATE_ROOM, sessionId: PRIVATE_SESSION });
-    const joiner2 = new GameSourceCoordinator({ transport: joiner2Transport });
-    const joiner2Events = collect(joiner2);
-    await settle(world);
-
-    expect(receivedOf(joiner2Events)).toHaveLength(1);
-    expect(joiner2.getCachedSource("game_1")).toBe(SAMPLE_SOURCE);
-  });
-
-  it("recovers a missed announcement with refresh()", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport, joiner: joinerTransport } = await makeParty(world);
-    const host = new GameSourceCoordinator({ transport: hostTransport });
-    await host.setSource({ gameId: "game_1", source: SAMPLE_SOURCE });
-    await settle(world);
-
-    // A coordinator attached late (e.g. a shell created after the party)
-    // missed the announcement entirely.
-    const lateJoiner = new GameSourceCoordinator({ transport: joinerTransport });
-    const lateEvents = collect(lateJoiner);
-    await lateJoiner.refresh();
-    await settle(world);
-
-    expect(receivedOf(lateEvents)).toHaveLength(1);
-    expect(lateJoiner.getCachedSource("game_1")).toBe(SAMPLE_SOURCE);
-  });
-
-  it("supports several games per session and re-announces on setSource", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport, joiner: joinerTransport } = await makeParty(world);
-    const host = new GameSourceCoordinator({ transport: hostTransport });
-    const joiner = new GameSourceCoordinator({ transport: joinerTransport });
-    const joinerEvents = collect(joiner);
-
-    await host.setSource({ gameId: "game_1", source: "<html>one</html>" });
-    await settle(world);
-    await host.setSource({ gameId: "game_2", source: "<html>two</html>" });
-    await settle(world);
-
-    expect(receivedOf(joinerEvents)).toHaveLength(2);
-    expect(joiner.getCachedSource("game_1")).toBe("<html>one</html>");
-    expect(joiner.getCachedSource("game_2")).toBe("<html>two</html>");
-  });
-
-  it("replaces cached bytes when the same game ID announces a new hash", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport, joiner: joinerTransport } = await makeParty(world);
-    const host = new GameSourceCoordinator({ transport: hostTransport });
-    const joiner = new GameSourceCoordinator({ transport: joinerTransport });
-    const events = collect(joiner);
-    const first = await host.setSource({ gameId: "game_1", source: SAMPLE_SOURCE });
-    await settle(world);
-    const edited = SAMPLE_SOURCE + "<!-- edited -->";
-    const second = await host.setSource({ gameId: "game_1", source: edited });
-    await settle(world);
-    expect(receivedOf(events)).toHaveLength(2);
-    expect(joiner.getCachedSource("game_1", first.sourceSha256)).toBeUndefined();
-    expect(joiner.getCachedSource("game_1", second.sourceSha256)).toBe(edited);
-  });
-
-  it("serves a received source to other members from the session cache", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport, joiner: joiner1Transport } = await makeParty(world, {
-      joinerMemberId: "joiner-1",
-    });
-    const host = new GameSourceCoordinator({ transport: hostTransport });
-    const joiner1 = new GameSourceCoordinator({ transport: joiner1Transport });
-    await host.setSource({ gameId: "game_1", source: SAMPLE_SOURCE });
-    await settle(world);
-    expect(joiner1.hasSource("game_1")).toBe(true);
-
-    // A third member joins and the ORIGINAL host leaves: joiner1 serves the
-    // cached copy from its in-memory session cache.
-    const joiner2Transport = world.hub.createTransport({ memberId: "joiner-2" });
-    await joiner2Transport.join({ room: PRIVATE_ROOM, sessionId: PRIVATE_SESSION });
-    const joiner2 = new GameSourceCoordinator({ transport: joiner2Transport });
-    const joiner2Events = collect(joiner2);
-    await settle(world);
-    await joiner1Transport.leave();
-    await host.dispose();
-    await settle(world);
-
-    // joiner2 already received it (joiner1 + host both announced on join).
-    expect(receivedOf(joiner2Events)).toHaveLength(1);
-    expect(joiner2.getCachedSource("game_1")).toBe(SAMPLE_SOURCE);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Verification and retry
-// ---------------------------------------------------------------------------
-
-describe("hash verification and retry", () => {
-  it("refuses a corrupted transfer, then accepts the corrected retry", async () => {
-    const world = makeRealWorld();
-    const { joiner: joinerTransport } = await makeParty(world);
-    const joiner = new GameSourceCoordinator({ transport: joinerTransport });
-    const joinerEvents = collect(joiner);
-
-    // An unmanaged holder (raw transport) drives the transfer by hand.
-    const rawHost = world.hub.createTransport({ memberId: "raw-host" });
-    await rawHost.join({ room: PRIVATE_ROOM, sessionId: PRIVATE_SESSION });
-    const rawHostTraffic = captureSourceTraffic(rawHost);
-    const base: RawBase = {
-      sessionId: PRIVATE_SESSION,
-      senderMemberId: rawHost.selfMemberId,
-      senderConnectionId: rawHost.selfConnectionId,
-    };
-    const sourceHash = await hashSource(SAMPLE_SOURCE);
-    const chunks = chunkStringByUtf8Bytes(SAMPLE_SOURCE, 64);
-
-    await rawHost.send({
+  it("does not call transport send completion verified acceptance", async () => {
+    const { host, joiner } = await world();
+    const a = coordinator(host);
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await joiner.request({
       channel: GAME_SOURCE_CHANNEL,
-      payload: rawMetadata(base, {
-        gameId: "game_1",
-        sourceSha256: sourceHash,
-        sourceSizeBytes: utf8ByteLength(SAMPLE_SOURCE),
-        chunkCount: chunks.length,
-      }),
+      targetConnectionId: host.selfConnectionId,
+      payload: { gameId: "game", sourceSha256: await hashSource("hello") },
     });
-    await settle(world);
-    // The joiner requested the transfer.
-    const request = rawHostTraffic.find((message) => {
-      const parsed = parsePeerMessage(message.payload);
-      return parsed.ok && parsed.value.type === "game.source.request";
-    });
-    expect(request).toBeDefined();
-
-    // First attempt: chunk 0 is corrupted (same byte count, wrong content) so
-    // verification must fail without tripping the receive-side size guard.
-    const corruptedFirst = `${(chunks[0] ?? "").replace("r", "X")}`;
-    for (let i = 0; i < chunks.length; i += 1) {
-      const chunk = i === 0 ? corruptedFirst : (chunks[i] ?? "");
-      await rawHost.send({
+    expect(completed(a.events, "send")).toEqual([]);
+  });
+  it("rejects unavailable/wrong-hash requests without exposing another source", async () => {
+    const { host, joiner } = await world();
+    const a = coordinator(host);
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await expect(
+      joiner.request({
         channel: GAME_SOURCE_CHANNEL,
-        payload: encodeChunk(
-          rawChunk(base, {
-            gameId: "game_1",
-            sourceSha256: sourceHash,
-            chunkIndex: i,
-            chunkCount: chunks.length,
-            chunk,
-          }),
-        ),
-        binary: true,
-      });
-    }
-    await settle(world);
-    expect(joinerEvents.some((event) => event.type === "verificationFailed")).toBe(true);
-    expect(receivedOf(joinerEvents)).toHaveLength(0);
-    const failedAck = rawHostTraffic.find((message) => {
-      const parsed = parsePeerMessage(message.payload);
-      return (
-        parsed.ok &&
-        parsed.value.type === "game.source.ack" &&
-        parsed.value.status === "failed" &&
-        parsed.value.errorMessage === "hash_mismatch"
+        targetConnectionId: host.selfConnectionId,
+        payload: { gameId: "game", sourceSha256: "0".repeat(64) },
+      }),
+    ).rejects.toThrow();
+    expect(completed(a.events, "send")).toEqual([]);
+  });
+  it.each(["corrupt", "short", "long", "invalid UTF-8", "not binary"])(
+    "rejects %s responses without caching or acceptance",
+    async (variant) => {
+      const { hub, host, joiner } = await world();
+      const b = coordinator(joiner);
+      const metadata = await descriptor("1234");
+      host.handleRequest(GAME_SOURCE_CHANNEL, () =>
+        variant === "corrupt"
+          ? new TextEncoder().encode("4321")
+          : variant === "short"
+            ? new Uint8Array(3)
+            : variant === "long"
+              ? new Uint8Array(5)
+              : variant === "invalid UTF-8"
+                ? new Uint8Array([255, 255, 255, 255])
+                : "1234",
       );
-    });
-    expect(failedAck).toBeDefined();
-
-    // Retry with the correct chunks: the joiner resets and verifies.
-    for (let i = 0; i < chunks.length; i += 1) {
-      await rawHost.send({
-        channel: GAME_SOURCE_CHANNEL,
-        payload: encodeChunk(
-          rawChunk(base, {
-            gameId: "game_1",
-            sourceSha256: sourceHash,
-            chunkIndex: i,
-            chunkCount: chunks.length,
-            chunk: chunks[i] ?? "",
-          }),
-        ),
-        binary: true,
-      });
-    }
-    await settle(world);
-    const received = receivedOf(joinerEvents);
-    expect(received).toHaveLength(1);
-    if (received[0]?.type !== "received") throw new Error("unreachable");
-    expect(received[0].source).toBe(SAMPLE_SOURCE);
-    expect(joiner.getCachedSource("game_1")).toBe(SAMPLE_SOURCE);
+      const messages: unknown[] = [];
+      host.on("message:received", (m) => messages.push(m.payload));
+      await announce(host, metadata);
+      await settle(hub);
+      expect(received(b.events)).toEqual([]);
+      expect(b.instance.hasSource("game")).toBe(false);
+      expect(b.events.some((e) => e.type === "error")).toBe(true);
+      expect(messages.some((m) => (m as { type?: string }).type === "game.source.accepted")).toBe(
+        false,
+      );
+    },
+  );
+  it("does not automatically retry rejected responses; explicit refresh recovers", async () => {
+    const { hub, host, joiner } = await world();
+    const a = coordinator(host);
+    const b = coordinator(joiner);
+    const request = vi
+      .spyOn(joiner, "request")
+      .mockRejectedValueOnce(new Error("receive rejected"));
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(received(b.events)).toEqual([]);
+    await b.instance.refresh();
+    await settle(hub);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(received(b.events)).toHaveLength(1);
   });
-
-  it("retries a failed transfer on the host side and completes on a received ack", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport } = await makeParty(world);
-    const hostEvents: GameSourceTransferEvent[] = [];
-    const host = new GameSourceCoordinator({
-      transport: hostTransport,
-      onEvent: (event) => hostEvents.push(event),
-    });
-    const sourceHash = await hashSource(SAMPLE_SOURCE);
-    await host.setSource({ gameId: "game_1", source: SAMPLE_SOURCE });
-    await settle(world);
-
-    // An unmanaged receiver requests the transfer, collects the chunks, then
-    // reports a failed verification → the host retries; a received ack
-    // completes the transfer.
-    const rawJoiner = world.hub.createTransport({ memberId: "raw-joiner" });
-    await rawJoiner.join({ room: PRIVATE_ROOM, sessionId: PRIVATE_SESSION });
-    const rawTraffic = captureSourceTraffic(rawJoiner);
-    const base: RawBase = {
-      sessionId: PRIVATE_SESSION,
-      senderMemberId: rawJoiner.selfMemberId,
-      senderConnectionId: rawJoiner.selfConnectionId,
-    };
-    await rawJoiner.send({
-      channel: GAME_SOURCE_CHANNEL,
-      payload: rawRequest(base, { gameId: "game_1", sourceSha256: sourceHash }),
-    });
-    await settle(world);
-    const firstDelivery = rawTraffic.filter((message) => message.binary).length;
-    expect(firstDelivery).toBeGreaterThan(0);
-
-    await rawJoiner.send({
-      channel: GAME_SOURCE_CHANNEL,
-      payload: rawAck(base, {
-        gameId: "game_1",
-        sourceSha256: sourceHash,
-        status: "failed",
-        errorMessage: "hash_mismatch",
-      }),
-    });
-    await settle(world);
-    expect(hostEvents.some((event) => event.type === "retry" && event.attempt === 2)).toBe(true);
-    const retriedDelivery = rawTraffic.filter((message) => message.binary).length;
-    expect(retriedDelivery).toBeGreaterThan(firstDelivery);
-
-    await rawJoiner.send({
-      channel: GAME_SOURCE_CHANNEL,
-      payload: rawAck(base, { gameId: "game_1", sourceSha256: sourceHash, status: "received" }),
-    });
-    await settle(world);
-    expect(
-      hostEvents.some(
-        (event) =>
-          event.type === "complete" &&
-          event.direction === "send" &&
-          event.memberId === "raw-joiner",
-      ),
-    ).toBe(true);
-  });
-
-  it("gives up after retries are exhausted and tells the joiner", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport, joiner: joinerTransport } = await makeParty(world);
-    const hostEvents: GameSourceTransferEvent[] = [];
-    const host = new GameSourceCoordinator({
-      transport: hostTransport,
-      maxRetries: 1, // initial attempt + 1 retry
-      onEvent: (event) => hostEvents.push(event),
-    });
-    const joiner = new GameSourceCoordinator({ transport: joinerTransport });
-    const joinerEvents = collect(joiner);
-
-    // A hash that can never verify: the announced digest disagrees with the
-    // actual source, so every attempt fails verification.
-    const wrongHash = "0".repeat(64);
-    await host.setSource({ gameId: "game_1", source: SAMPLE_SOURCE, sourceSha256: wrongHash });
-    await settle(world);
-
-    const retries = hostEvents.filter((event) => event.type === "retry");
-    expect(retries).toHaveLength(1); // exactly one retry after the first attempt
-    expect(
-      hostEvents.some(
-        (event) => event.type === "error" && event.error.code === "retries_exhausted",
-      ),
-    ).toBe(true);
-    // The joiner was told and aborted instead of waiting forever.
-    expect(
-      joinerEvents.some(
-        (event) => event.type === "error" && event.error.code === "retries_exhausted",
-      ),
-    ).toBe(true);
-    expect(cancelledOf(joinerEvents).length).toBeGreaterThan(0);
-    expect(receivedOf(joinerEvents)).toHaveLength(0);
-    expect(joiner.getCachedSource("game_1")).toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Cancellation
-// ---------------------------------------------------------------------------
-
-describe("transfer cancellation", () => {
-  it("aborts locally, sends game.source.cancel, and drops stale chunks", async () => {
-    const world = makeRealWorld();
-    const { joiner: joinerTransport } = await makeParty(world);
-    const joiner = new GameSourceCoordinator({ transport: joinerTransport });
-    const joinerEvents = collect(joiner);
-
-    const rawHost = world.hub.createTransport({ memberId: "raw-host" });
-    await rawHost.join({ room: PRIVATE_ROOM, sessionId: PRIVATE_SESSION });
-    const rawTraffic = captureSourceTraffic(rawHost);
-    const base: RawBase = {
-      sessionId: PRIVATE_SESSION,
-      senderMemberId: rawHost.selfMemberId,
-      senderConnectionId: rawHost.selfConnectionId,
-    };
-    // A multi-chunk source so the transfer is still in flight at cancel time.
-    const source = SAMPLE_SOURCE.repeat(10);
-    const sourceHash = await hashSource(source);
-    const chunks = chunkStringByUtf8Bytes(source, 64);
-    expect(chunks.length).toBeGreaterThan(1);
-
-    await rawHost.send({
-      channel: GAME_SOURCE_CHANNEL,
-      payload: rawMetadata(base, {
-        gameId: "game_1",
-        sourceSha256: sourceHash,
-        sourceSizeBytes: utf8ByteLength(source),
-        chunkCount: chunks.length,
-      }),
-    });
-    await settle(world);
-    await rawHost.send({
-      channel: GAME_SOURCE_CHANNEL,
-      payload: encodeChunk(
-        rawChunk(base, {
-          gameId: "game_1",
-          sourceSha256: sourceHash,
-          chunkIndex: 0,
-          chunkCount: chunks.length,
-          chunk: chunks[0] ?? "",
+  it("deduplicates concurrent metadata and requests", async () => {
+    const { hub, host, joiner } = await world();
+    const b = coordinator(joiner);
+    const metadata = await descriptor();
+    let resolve!: (value: Uint8Array) => void;
+    host.handleRequest(
+      GAME_SOURCE_CHANNEL,
+      () =>
+        new Promise<Uint8Array>((r) => {
+          resolve = r;
         }),
-      ),
-      binary: true,
-    });
-    await settle(world);
-    expect(progressOf(joinerEvents).length).toBeGreaterThan(0);
-
-    joiner.cancelTransfer("game_1", sourceHash, "user_cancelled");
-    await settle(world);
-
-    const cancelled = cancelledOf(joinerEvents);
-    expect(
-      cancelled.some((event) => event.direction === "receive" && event.reason === "user_cancelled"),
-    ).toBe(true);
-    const wireCancel = rawTraffic.find((message) => {
-      const parsed = parsePeerMessage(message.payload);
-      return (
-        parsed.ok &&
-        parsed.value.type === "game.source.cancel" &&
-        parsed.value.reason === "user_cancelled"
-      );
-    });
-    expect(wireCancel).toBeDefined();
-    expect(joiner.getCachedSource("game_1")).toBeUndefined();
-
-    // Stale chunks already in flight are dropped silently — no completion,
-    // no spurious errors.
-    for (let i = 1; i < chunks.length; i += 1) {
-      await rawHost.send({
-        channel: GAME_SOURCE_CHANNEL,
-        payload: encodeChunk(
-          rawChunk(base, {
-            gameId: "game_1",
-            sourceSha256: sourceHash,
-            chunkIndex: i,
-            chunkCount: chunks.length,
-            chunk: chunks[i] ?? "",
-          }),
-        ),
-        binary: true,
-      });
-    }
-    await settle(world);
-    expect(receivedOf(joinerEvents)).toHaveLength(0);
-    expect(errorsOf(joinerEvents)).toHaveLength(0);
+    );
+    const request = vi.spyOn(joiner, "request");
+    await announce(host, metadata);
+    await settle(hub);
+    await announce(host, metadata);
+    await announce(host, metadata);
+    await settle(hub);
+    expect(request).toHaveBeenCalledTimes(1);
+    resolve(new TextEncoder().encode("<html>🦀</html>"));
+    await settle(hub);
+    expect(received(b.events)).toHaveLength(1);
   });
-
-  it("aborts a host send transfer when a cancel arrives", async () => {
-    const world = makeClockWorld();
-    const clock = world.clock;
-    if (clock === undefined) throw new Error("fake clock expected");
-    const { host: hostTransport } = await makeParty(world, { hostLatencyMs: 10 });
-    const hostEvents: GameSourceTransferEvent[] = [];
-    const host = new GameSourceCoordinator({
-      transport: hostTransport,
-      onEvent: (event) => hostEvents.push(event),
-    });
-    const sourceHash = await hashSource(SAMPLE_SOURCE);
-
-    await host.setSource({ gameId: "game_1", source: SAMPLE_SOURCE });
-    const rawJoiner = world.hub.createTransport({ memberId: "raw-joiner" });
-    await rawJoiner.join({ room: PRIVATE_ROOM, sessionId: PRIVATE_SESSION });
-    const base: RawBase = {
-      sessionId: PRIVATE_SESSION,
-      senderMemberId: rawJoiner.selfMemberId,
-      senderConnectionId: rawJoiner.selfConnectionId,
-    };
-    clock.advance(10); // deliver the peer:joined metadata announcement
-    await flush();
-    await rawJoiner.send({
-      channel: GAME_SOURCE_CHANNEL,
-      payload: rawRequest(base, { gameId: "game_1", sourceSha256: sourceHash }),
-    });
-    clock.advance(10); // deliver the request; the host schedules + sends chunks
-    await rawJoiner.send({
-      channel: GAME_SOURCE_CHANNEL,
-      payload: rawCancel(base, {
-        gameId: "game_1",
-        sourceSha256: sourceHash,
-        reason: "test_cancel",
-      }),
-    });
-    clock.advance(10); // deliver the cancel: the host aborts the send transfer
-    await flush();
-
-    expect(
-      hostEvents.some(
-        (event) =>
-          event.type === "cancelled" &&
-          event.direction === "send" &&
-          event.reason === "test_cancel",
-      ),
-    ).toBe(true);
-    // The aborted transfer is gone: a late acknowledgement changes nothing.
-    await rawJoiner.send({
-      channel: GAME_SOURCE_CHANNEL,
-      payload: rawAck(base, { gameId: "game_1", sourceSha256: sourceHash, status: "received" }),
-    });
-    clock.advance(10);
-    await flush();
-    expect(hostEvents.some((event) => event.type === "complete")).toBe(false);
-    expect(hostEvents.some((event) => event.type === "retry")).toBe(false);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Source-size limits
-// ---------------------------------------------------------------------------
-
-describe("source-size limits (F6)", () => {
-  it("refuses a game too large to transfer with a clear error", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport } = await makeParty(world);
-    const host = new GameSourceCoordinator({ transport: hostTransport });
-    const tooBig = "x".repeat(htmlSourceBytes + 1);
-    await expect(host.setSource({ gameId: "game_huge", source: tooBig })).rejects.toMatchObject({
-      code: "too_large",
-    });
-    expect(host.hasSource("game_huge")).toBe(false);
-  });
-
-  it("emits a soft-limit warning before the hard limit", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport } = await makeParty(world);
-    const events: GameSourceTransferEvent[] = [];
-    const host = new GameSourceCoordinator({
-      transport: hostTransport,
-      onEvent: (e) => events.push(e),
-    });
-    const big = "x".repeat(htmlSourceWarnBytes);
-    await host.setSource({ gameId: "game_big", source: big });
-    const warnings = events.filter((event) => event.type === "warning");
-    expect(warnings).toHaveLength(1);
-    if (warnings[0]?.type !== "warning") throw new Error("unreachable");
-    expect(warnings[0].gameId).toBe("game_big");
-    expect(warnings[0].sourceSizeBytes).toBe(htmlSourceWarnBytes);
-  });
-
-  it("refuses an oversized announcement on the receiver side too", async () => {
-    const world = makeRealWorld();
-    const { joiner: joinerTransport } = await makeParty(world);
-    const joiner = new GameSourceCoordinator({ transport: joinerTransport });
-    const joinerEvents = collect(joiner);
-    const rawHost = world.hub.createTransport({ memberId: "raw-host" });
-    await rawHost.join({ room: PRIVATE_ROOM, sessionId: PRIVATE_SESSION });
-    const rawTraffic = captureSourceTraffic(rawHost);
-    const base: RawBase = {
-      sessionId: PRIVATE_SESSION,
-      senderMemberId: rawHost.selfMemberId,
-      senderConnectionId: rawHost.selfConnectionId,
-    };
-    await rawHost.send({
-      channel: GAME_SOURCE_CHANNEL,
-      payload: rawMetadata(base, {
-        gameId: "game_huge",
-        sourceSha256: "a".repeat(64),
-        sourceSizeBytes: htmlSourceBytes + 1,
-        chunkCount: 1,
-      }),
-    });
-    await settle(world);
-    expect(
-      joinerEvents.some((event) => event.type === "error" && event.error.code === "too_large"),
-    ).toBe(true);
-    const failedAck = rawTraffic.find((message) => {
-      const parsed = parsePeerMessage(message.payload);
-      return (
-        parsed.ok &&
-        parsed.value.type === "game.source.ack" &&
-        parsed.value.status === "failed" &&
-        parsed.value.errorMessage === "too_large"
-      );
-    });
-    expect(failedAck).toBeDefined();
-    expect(joiner.getCachedSource("game_huge")).toBeUndefined();
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Runtime compatibility
-// ---------------------------------------------------------------------------
-
-describe("runtime compatibility check", () => {
-  it("refuses a game targeting an unsupported Nova API version", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport, joiner: joinerTransport } = await makeParty(world);
-    const hostEvents: GameSourceTransferEvent[] = [];
-    const host = new GameSourceCoordinator({
-      transport: hostTransport,
-      onEvent: (e) => hostEvents.push(e),
-    });
-    const joiner = new GameSourceCoordinator({ transport: joinerTransport });
-    const joinerEvents = collect(joiner);
-
-    await host.setSource({ gameId: "game_1", apiVersion: 2, source: SAMPLE_SOURCE });
-    await settle(world);
-
-    expect(
-      joinerEvents.some((event) => event.type === "incompatible" && event.gameId === "game_1"),
-    ).toBe(true);
-    expect(receivedOf(joinerEvents)).toHaveLength(0);
-    // The host learned why the joiner declined.
-    expect(
-      hostEvents.some((event) => event.type === "error" && event.error.code === "incompatible"),
-    ).toBe(true);
-  });
-
-  it("accepts a game when the joiner supports the declared API version", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport, joiner: joinerTransport } = await makeParty(world);
-    const host = new GameSourceCoordinator({ transport: hostTransport });
-    const joiner = new GameSourceCoordinator({
-      transport: joinerTransport,
-      supportedApiVersions: [1, 2],
-    });
-    const joinerEvents = collect(joiner);
-
-    await host.setSource({ gameId: "game_1", apiVersion: 2, source: SAMPLE_SOURCE });
-    await settle(world);
-    expect(receivedOf(joinerEvents)).toHaveLength(1);
-  });
-
-  it("honors an injected compatibility check", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport, joiner: joinerTransport } = await makeParty(world);
-    const host = new GameSourceCoordinator({ transport: hostTransport });
-    const joiner = new GameSourceCoordinator({
-      transport: joinerTransport,
-      compatibilityCheck: () => ({ compatible: false, reason: "custom policy" }),
-    });
-    const joinerEvents = collect(joiner);
-
-    await host.setSource({ gameId: "game_1", source: SAMPLE_SOURCE });
-    await settle(world);
-    expect(
-      joinerEvents.some(
-        (event) => event.type === "incompatible" && event.reason === "custom policy",
-      ),
-    ).toBe(true);
-    expect(receivedOf(joinerEvents)).toHaveLength(0);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// Reconnect (re-transfer after reconnect if required)
-// ---------------------------------------------------------------------------
-
-describe("reconnect and re-transfer", () => {
-  it("re-transfers after a mid-transfer disconnect only if required", async () => {
-    const world = makeClockWorld();
-    const clock = world.clock;
-    if (clock === undefined) throw new Error("fake clock expected");
-    const { host: hostTransport, joiner: joinerTransport } = await makeParty(world, {
-      hostLatencyMs: 10,
-      joinerFaults: { dropWhileSuspended: true },
-    });
-    const hostEvents: GameSourceTransferEvent[] = [];
-    const host = new GameSourceCoordinator({
-      transport: hostTransport,
-      onEvent: (e) => hostEvents.push(e),
-    });
-    const joiner = new GameSourceCoordinator({ transport: joinerTransport });
-    const joinerEvents = collect(joiner);
-
-    await host.setSource({ gameId: "game_1", source: SAMPLE_SOURCE });
-    clock.advance(10); // deliver metadata (the joiner's handler suspends on its await)
-    await flush(); // the joiner sends its request
-    clock.advance(10); // deliver the request; the host schedules chunks at t+10
-    // The transfer is now in flight: requested, chunks scheduled, none delivered.
-    expect(
-      joinerEvents.some((event) => event.type === "transferStart" && event.direction === "receive"),
-    ).toBe(true);
-
-    // The joiner's connection drops mid-transfer (Mobile Safari backgrounding).
-    await joinerTransport.suspend();
-    expect(cancelledOf(joinerEvents).some((event) => event.reason === "connection_lost")).toBe(
+  it("cancels a slow request and ignores its stale response", async () => {
+    const { hub, host, joiner } = await world();
+    const b = coordinator(joiner);
+    const metadata = await descriptor();
+    let resolve!: (value: Uint8Array) => void;
+    host.handleRequest(
+      GAME_SOURCE_CHANNEL,
+      () =>
+        new Promise<Uint8Array>((r) => {
+          resolve = r;
+        }),
+    );
+    await announce(host, metadata);
+    await settle(hub);
+    b.instance.cancelTransfer(metadata.gameId, metadata.sourceSha256, "user_cancelled");
+    resolve(new TextEncoder().encode("<html>🦀</html>"));
+    await settle(hub);
+    expect(received(b.events)).toEqual([]);
+    expect(b.events.some((e) => e.type === "cancelled" && e.reason === "user_cancelled")).toBe(
       true,
     );
-    expect(
-      hostEvents.some((event) => event.type === "cancelled" && event.reason === "peer_left"),
-    ).toBe(true);
-
-    // Reconnect: the host re-announces to the fresh connection and the
-    // joiner re-requests because it still lacks the verified source.
-    await joinerTransport.resume();
-    clock.advance(10); // the stale in-flight chunk (dropped) + the fresh announcement
-    await flush(); // the joiner re-requests
-    clock.advance(10); // deliver the fresh request; chunks scheduled
-    clock.advance(10); // deliver the chunks; verification runs
-    await flush(); // verification completes; ack scheduled
-    clock.advance(10); // deliver the ack; the host completes
-    await flush();
-
-    const received = receivedOf(joinerEvents);
-    expect(received).toHaveLength(1);
-    if (received[0]?.type !== "received") throw new Error("unreachable");
-    expect(received[0].source).toBe(SAMPLE_SOURCE);
-    expect(
-      hostEvents.some(
-        (event) =>
-          event.type === "complete" && event.direction === "send" && event.memberId === "joiner",
-      ),
-    ).toBe(true);
-    expect(joiner.getCachedSource("game_1")).toBe(SAMPLE_SOURCE);
   });
-
-  it("keeps the cached copy after a reconnect without re-requesting", async () => {
-    const world = makeClockWorld();
-    const clock = world.clock;
-    if (clock === undefined) throw new Error("fake clock expected");
-    const { host: hostTransport, joiner: joinerTransport } = await makeParty(world, {
-      hostLatencyMs: 10,
-    });
-    const hostEvents: GameSourceTransferEvent[] = [];
-    const host = new GameSourceCoordinator({
-      transport: hostTransport,
-      onEvent: (e) => hostEvents.push(e),
-    });
-    const joiner = new GameSourceCoordinator({ transport: joinerTransport });
-    const joinerEvents = collect(joiner);
-
-    await host.setSource({ gameId: "game_1", source: SAMPLE_SOURCE });
-    clock.advance(10); // deliver metadata
-    await flush(); // the joiner sends its request
-    clock.advance(10); // deliver the request; chunks scheduled
-    clock.advance(10); // deliver the chunks; verification runs
-    await flush(); // verification completes; ack scheduled
-    clock.advance(10); // deliver the ack; the host completes
-    expect(receivedOf(joinerEvents)).toHaveLength(1);
-    expect(
-      hostEvents.some(
-        (event) =>
-          event.type === "complete" && event.direction === "send" && event.memberId === "joiner",
-      ),
-    ).toBe(true);
-
-    // Reconnect AFTER a completed transfer: no re-request, cache intact.
-    const transferStartsBefore = joinerEvents.filter((e) => e.type === "transferStart").length;
-    await joinerTransport.suspend();
-    await joinerTransport.resume();
-    clock.advance(30);
-    await flush();
-
-    expect(receivedOf(joinerEvents)).toHaveLength(1);
-    expect(joinerEvents.filter((e) => e.type === "transferStart").length).toBe(
-      transferStartsBefore,
+  it("aborts on disconnect and reconnects with a fresh whole request", async () => {
+    const { hub, host, joiner } = await world();
+    const a = coordinator(host);
+    const b = coordinator(joiner);
+    vi.spyOn(joiner, "request").mockImplementationOnce(
+      (options) =>
+        new Promise((_resolve, reject) =>
+          options.signal?.addEventListener("abort", () => reject(new Error("aborted")), {
+            once: true,
+          }),
+        ),
     );
-    expect(joiner.getCachedSource("game_1")).toBe(SAMPLE_SOURCE);
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    await joiner.reconnect();
+    await settle(hub);
+    expect(b.events.some((e) => e.type === "cancelled")).toBe(true);
+    expect(received(b.events)).toMatchObject([{ source: "hello" }]);
+  });
+  it("recovers by cached acceptance after reconnect without transferring HTML again", async () => {
+    const { hub, host, joiner } = await world();
+    const a = coordinator(host);
+    const b = coordinator(joiner);
+    const request = vi.spyOn(joiner, "request");
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    await joiner.reconnect();
+    await settle(hub);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(received(b.events)).toHaveLength(1);
+    expect(completed(a.events, "send")).toHaveLength(2);
+  });
+  it("retains full received metadata and serves a late joiner after creator departure", async () => {
+    const { hub, host, joiner } = await world();
+    const a = coordinator(host);
+    const b = coordinator(joiner);
+    await a.instance.setSource({
+      gameId: "game",
+      source: "hello",
+      title: "Game",
+      apiVersion: 1,
+      mode: "raw",
+    });
+    await settle(hub);
+    await host.leave();
+    a.instance.dispose();
+    const late = hub.createTransport({ memberId: "late", displayName: "Late" });
+    await late.join({ room: "private", sessionId: "session" });
+    const c = coordinator(late);
+    await settle(hub);
+    expect(received(c.events)).toMatchObject([{ source: "hello" }]);
+    expect(c.events.find((e) => e.type === "metadata")).toMatchObject({
+      metadata: { gameId: "game", title: "Game", apiVersion: 1, mode: "raw" },
+    });
+    expect(completed(b.events, "send")).toHaveLength(1);
+  });
+  it("does not reuse cached bytes for a different source hash under the same game ID", async () => {
+    const { hub, host, joiner } = await world();
+    const a = coordinator(host);
+    const b = coordinator(joiner);
+    await a.instance.setSource({ gameId: "game", source: "first" });
+    await settle(hub);
+    await a.instance.setSource({ gameId: "game", source: "second" });
+    await settle(hub);
+    expect(received(b.events).map((e) => e.source)).toEqual(["first", "second"]);
+    expect(b.instance.getCachedSource("game", await hashSource("first"))).toBeUndefined();
+  });
+  it("caps the session source cache at eight documents", async () => {
+    const { host } = await world();
+    const a = coordinator(host);
+    for (let i = 0; i < 10; i++)
+      await a.instance.setSource({ gameId: `game${i}`, source: String(i) });
+    expect(a.instance.hasSource("game0")).toBe(false);
+    expect(a.instance.hasSource("game1")).toBe(false);
+    expect(a.instance.hasSource("game2")).toBe(true);
+    expect(a.instance.hasSource("game9")).toBe(true);
   });
 });
 
-// ---------------------------------------------------------------------------
-// Admission and isolation
-// ---------------------------------------------------------------------------
-
-describe("admission and isolation", () => {
-  it("never sends the source to rendezvous peers who were not admitted", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport } = await makeParty(world);
-    const host = new GameSourceCoordinator({ transport: hostTransport });
-    await host.setSource({ gameId: "game_1", source: SAMPLE_SOURCE });
-    await settle(world);
-
-    // A raw peer in the PUBLIC rendezvous room (never admitted) must not
-    // see any game-source traffic: the coordinator only rides the private
-    // party transport (ADR-0004), so the source never reaches that room.
-    const probe = world.hub.createTransport({ memberId: "probe" });
-    await probe.join({ room: "unrelated-room", sessionId: "unrelated-session" });
-    const probeTraffic = captureSourceTraffic(probe);
-    await settle(world);
-    expect(probeTraffic).toHaveLength(0);
+describe("validation, compatibility and cleanup", () => {
+  it("enforces the 2 MiB limit using actual bytes, not caller-provided counts", async () => {
+    const { host } = await world();
+    const a = coordinator(host);
+    await expect(
+      a.instance.setSource({
+        gameId: "game",
+        source: "x".repeat(htmlSourceBytes + 1),
+        sourceSizeBytes: 1,
+      }),
+    ).rejects.toMatchObject({ code: "too_large" });
   });
-
-  it("drops malformed structured messages at the protocol boundary", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport } = await makeParty(world);
-    const hostEvents: GameSourceTransferEvent[] = [];
-    const _host = new GameSourceCoordinator({
-      transport: hostTransport,
-      onEvent: (e) => hostEvents.push(e),
+  it.each([{ sourceSizeBytes: 1 }, { sourceSha256: "0".repeat(64) }])(
+    "rejects incorrect precomputed metadata %j",
+    async (metadata) => {
+      const { host } = await world();
+      const a = coordinator(host);
+      await expect(
+        a.instance.setSource({ gameId: "game", source: "hello", ...metadata }),
+      ).rejects.toMatchObject({ code: "hash_mismatch" });
+    },
+  );
+  it("warns at the soft limit and rejects oversized incoming descriptors before requesting bytes", async () => {
+    const { hub, host, joiner } = await world();
+    const a = coordinator(host);
+    const b = coordinator(joiner);
+    await a.instance.setSource({ gameId: "game", source: "x".repeat(htmlSourceWarnBytes) });
+    await settle(hub);
+    expect(a.events.some((e) => e.type === "warning")).toBe(true);
+    const request = vi.spyOn(joiner, "request");
+    await announce(host, { ...(await descriptor()), sourceSizeBytes: htmlSourceBytes + 1 });
+    await settle(hub);
+    expect(request).not.toHaveBeenCalled();
+    expect(b.events.some((e) => e.type === "error" && e.error.code === "too_large")).toBe(true);
+  });
+  it("rejects unsupported API versions before requesting", async () => {
+    const { hub, host, joiner } = await world();
+    const a = coordinator(host);
+    const b = coordinator(joiner);
+    const request = vi.spyOn(joiner, "request");
+    await a.instance.setSource({ gameId: "game", source: "hello", apiVersion: 999 });
+    await settle(hub);
+    expect(request).not.toHaveBeenCalled();
+    expect(b.events.some((e) => e.type === "incompatible")).toBe(true);
+    expect(completed(a.events, "send")).toEqual([]);
+  });
+  it("honors the compatibility policy and supported API override", async () => {
+    expect(
+      defaultGameSourceCompatibilityCheck({ ...(await descriptor()), apiVersion: 999 }, [999])
+        .compatible,
+    ).toBe(true);
+    const { hub, host, joiner } = await world();
+    const a = coordinator(host);
+    const b = coordinator(joiner, {
+      compatibilityCheck: () => ({ compatible: false, reason: "Policy refused" }),
     });
-    const raw = world.hub.createTransport({ memberId: "raw" });
-    await raw.join({ room: PRIVATE_ROOM, sessionId: PRIVATE_SESSION });
-
-    await raw.send({
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    expect(b.events).toContainEqual(
+      expect.objectContaining({ type: "incompatible", reason: "Policy refused" }),
+    );
+  });
+  it("ignores an obsolete async compatibility result after a new selection", async () => {
+    const { hub, host, joiner } = await world();
+    let finish!: (value: { compatible: boolean }) => void;
+    const b = coordinator(joiner, {
+      compatibilityCheck: (metadata) =>
+        metadata.gameId === "old"
+          ? new Promise((r) => {
+              finish = r;
+            })
+          : { compatible: true },
+    });
+    host.handleRequest(GAME_SOURCE_CHANNEL, () => new TextEncoder().encode("new"));
+    await announce(host, { ...(await descriptor("old")), gameId: "old" });
+    await settle(hub);
+    await announce(host, { ...(await descriptor("new")), gameId: "new" });
+    await settle(hub);
+    finish({ compatible: true });
+    await settle(hub);
+    expect(received(b.events)).toMatchObject([{ gameId: "new", source: "new" }]);
+    expect(b.events.filter((e) => e.type === "metadata").map((e) => e.metadata.gameId)).toEqual([
+      "new",
+    ]);
+  });
+  it.each([
+    { senderMemberId: "impostor" },
+    { senderConnectionId: "stale" },
+    { sessionId: "other" },
+  ])("rejects spoofed/mismatched control envelopes %j", async (override) => {
+    const { hub, host, joiner } = await world();
+    const b = coordinator(joiner);
+    const request = vi.spyOn(joiner, "request");
+    await announce(host, await descriptor(), override);
+    await settle(hub);
+    expect(request).not.toHaveBeenCalled();
+    expect(received(b.events)).toEqual([]);
+  });
+  it("ignores unsolicited or wrong-hash acceptance messages", async () => {
+    const { hub, host, joiner } = await world();
+    const a = coordinator(host);
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await joiner.send({
       channel: GAME_SOURCE_CHANNEL,
       payload: {
-        version: 1,
-        sessionId: PRIVATE_SESSION,
-        senderMemberId: raw.selfMemberId,
-        senderConnectionId: raw.selfConnectionId,
-        messageId: "malformed-1",
-        sentAt: 1,
-        type: "game.source.chunk", // missing every required field
+        ...envelope(joiner, "game.source.accepted"),
+        gameId: "game",
+        sourceSha256: "0".repeat(64),
       },
     });
-    await settle(world);
-    expect(
-      hostEvents.some((event) => event.type === "error" && event.error.code === "invalid_message"),
-    ).toBe(true);
+    await settle(hub);
+    expect(completed(a.events, "send")).toEqual([]);
   });
-
-  it("drops undecodable binary payloads at the protocol boundary", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport } = await makeParty(world);
-    const hostEvents: GameSourceTransferEvent[] = [];
-    const _host = new GameSourceCoordinator({
-      transport: hostTransport,
-      onEvent: (e) => hostEvents.push(e),
-    });
-    const raw = world.hub.createTransport({ memberId: "raw" });
-    await raw.join({ room: PRIVATE_ROOM, sessionId: PRIVATE_SESSION });
-
-    await raw.send({
+  it("drops malformed source control and binary messages", async () => {
+    const { hub, host, joiner } = await world();
+    const b = coordinator(joiner);
+    await host.send({ channel: GAME_SOURCE_CHANNEL, payload: { type: "bogus" } });
+    await host.send({
       channel: GAME_SOURCE_CHANNEL,
-      payload: new TextEncoder().encode("this is not json {{{"),
       binary: true,
+      payload: new Uint8Array([1, 2]),
     });
-    await settle(world);
-    expect(
-      hostEvents.some((event) => event.type === "error" && event.error.code === "invalid_message"),
-    ).toBe(true);
+    await settle(hub);
+    expect(received(b.events)).toEqual([]);
+    expect(b.events.filter((e) => e.type === "error")).toHaveLength(2);
   });
-});
-
-// ---------------------------------------------------------------------------
-// Cleanup (engineering rule 22)
-// ---------------------------------------------------------------------------
-
-describe("listener cleanup (rule 22)", () => {
-  it("detaches all listeners on dispose and stays inert afterwards", async () => {
-    const world = makeRealWorld();
-    const { host: hostTransport, joiner: joinerTransport } = await makeParty(world);
-    const host = new GameSourceCoordinator({ transport: hostTransport });
-    const joiner = new GameSourceCoordinator({ transport: joinerTransport });
-    const joinerEvents = collect(joiner);
-
-    await host.setSource({ gameId: "game_1", source: SAMPLE_SOURCE });
-    await settle(world);
-    expect(receivedOf(joinerEvents)).toHaveLength(1);
-
-    joiner.dispose();
-    joiner.dispose(); // idempotent
-    const before = joinerEvents.length;
-    await host.setSource({ gameId: "game_2", source: "<html>two</html>" });
-    await settle(world);
-    await host.refresh();
-    await settle(world);
-    expect(joinerEvents.length).toBe(before); // no events after dispose
-    await expect(joiner.refresh()).rejects.toMatchObject({ code: "invalid_state" });
+  it("does not transfer across private rooms", async () => {
+    const { hub, host } = await world();
+    const a = coordinator(host);
+    const outsider = hub.createTransport({ memberId: "outside", displayName: "Outside" });
+    await outsider.join({ room: "other", sessionId: "session" });
+    const b = coordinator(outsider);
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await b.instance.refresh();
+    await settle(hub);
+    expect(received(b.events)).toEqual([]);
+    await expect(
+      outsider.request({
+        channel: GAME_SOURCE_CHANNEL,
+        targetConnectionId: host.selfConnectionId,
+        payload: {},
+      }),
+    ).rejects.toThrow();
   });
-});
-
-// ---------------------------------------------------------------------------
-// Full P2 integration: admitted joiners receive the game over the party flow
-// ---------------------------------------------------------------------------
-
-/** Deterministic (microtask-only) derivation so flows never wait on crypto. */
-function mockDerive(secret: string) {
-  return Promise.resolve({
-    secret,
-    roomId: `party:test:${secret.slice(0, 12)}`,
-    password: `pwd-${secret.slice(0, 16)}`,
-    sessionId: `session-${secret.slice(0, 12)}`,
-  });
-}
-
-async function makeCreator(
-  world: PartyWorld,
-  overrides: Partial<CreatePartyOptions> = {},
-): Promise<Awaited<ReturnType<typeof createParty>>> {
-  const clock = world.clock;
-  if (clock === undefined) throw new Error("fake clock expected");
-  const promise = createParty({
-    memberId: "creator",
-    transportFactory: world.factory,
-    derive: mockDerive,
-    ...overrides,
-  });
-  for (let i = 0; i < 6; i += 1) {
-    await flush();
-    clock.advance(2000);
-  }
-  const party = await promise;
-  world.secret = party.secret;
-  await settle(world);
-  return party;
-}
-
-async function makeJoiner(
-  world: PartyWorld,
-  overrides: Partial<JoinByInviteOptions> = {},
-): Promise<Awaited<ReturnType<typeof joinPartyByInvite>>> {
-  const clock = world.clock;
-  if (clock === undefined) throw new Error("fake clock expected");
-  const promise = joinPartyByInvite({
-    secret: world.secret!,
-    memberId: "joiner",
-    displayName: "Joiner",
-    transportFactory: world.factory,
-    derive: mockDerive,
-    ...overrides,
-  });
-  await flush();
-  clock.advance(5000);
-  await settle(world);
-  clock.advance(2000);
-  await settle(world);
-  await settle(world);
-  const party = await promise;
-  await settle(world);
-  return party;
-}
-
-interface PartyWorld extends World {
-  clock: FakeClock;
-  factory: PartyTransportFactory;
-  secret?: string;
-}
-
-function makePartyWorld(): PartyWorld {
-  const clock = makeFakeClock();
-  const hub = new InMemoryTransportHub({ schedule: clock.schedule, now: clock.now });
-  const factory: PartyTransportFactory = {
-    createPrivateTransport: (identity) => hub.createTransport(identity),
-  };
-  return { clock, hub, factory };
-}
-
-describe("P2 party flow integration (admitted joiner receives the game)", () => {
-  it("delivers the byte-identical source to an admitted joiner over the private room", async () => {
-    const world = makePartyWorld();
-    const creator = await makeCreator(world);
-    const host = new GameSourceCoordinator({ transport: creator.privateTransport });
-    await host.setSource({
-      gameId: "game_1",
-      title: "Rocket Rumble",
-      apiVersion: 1,
-      mode: "state",
-      source: SAMPLE_SOURCE,
-    });
-
-    const joiner = await makeJoiner(world);
-    const joinerCoordinator = new GameSourceCoordinator({ transport: joiner.privateTransport });
-    const joinerEvents = collect(joinerCoordinator);
-    // The joiner's coordinator attached after the host's peer:joined
-    // announcement; refresh recovers it (shells wire this before launch).
-    await joinerCoordinator.refresh();
-    await settle(world);
-
-    const received = receivedOf(joinerEvents);
-    expect(received).toHaveLength(1);
-    if (received[0]?.type !== "received") throw new Error("unreachable");
-    expect(received[0].source).toBe(SAMPLE_SOURCE);
-    expect(joinerCoordinator.getCachedSource("game_1")).toBe(SAMPLE_SOURCE);
-
-    // The source never entered the public rendezvous room.
-    const probeTraffic: TransportMessage[] = [];
-    const probe = world.hub.createTransport({ memberId: "probe" });
-    probe.on("message:received", (message) => {
-      if (message.channel === GAME_SOURCE_CHANNEL) probeTraffic.push(message);
-    });
-    await probe.join({ room: "unrelated-room", sessionId: "unrelated-session" });
-    await settle(world);
-    expect(probeTraffic).toHaveLength(0);
-
-    joinerCoordinator.dispose();
-    host.dispose();
+  it("detaches handlers, clears cache and suppresses async completions on dispose", async () => {
+    const { hub, host, joiner } = await world();
+    const a = coordinator(host);
+    const b = coordinator(joiner);
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    b.instance.dispose();
+    const count = b.events.length;
+    await a.instance.setSource({ gameId: "game", source: "changed" });
+    await settle(hub);
+    expect(b.events).toHaveLength(count);
+    expect(b.instance.hasSource("game")).toBe(false);
+    await expect(b.instance.refresh()).rejects.toMatchObject({ code: "invalid_state" });
+    const replacement = coordinator(joiner);
+    await replacement.instance.refresh();
+    await settle(hub);
+    expect(received(replacement.events)).toMatchObject([{ source: "changed" }]);
   });
 });

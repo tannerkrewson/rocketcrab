@@ -7,6 +7,7 @@ import type {
 } from "@rocketcrab/core";
 import { InMemoryTransportHub } from "@rocketcrab/testing";
 import type { InMemoryTransport } from "@rocketcrab/testing";
+import type { DataPayload, RequestAction, RequestOptions } from "trystero";
 import { TrysteroTransport } from "./trystero-transport";
 
 /**
@@ -167,6 +168,12 @@ interface FakeRoom {
   leave: ReturnType<typeof vi.fn>;
   makeAction: ReturnType<typeof vi.fn>;
   action: FakeAction;
+  requests: Map<string, RequestAction>;
+  dispatchRequest: (
+    namespace: string,
+    data: DataPayload,
+    options: RequestOptions,
+  ) => Promise<DataPayload>;
 }
 
 function makeFakeRoom(): FakeRoom {
@@ -175,14 +182,22 @@ function makeFakeRoom(): FakeRoom {
     onReceiveProgress: null,
     send: vi.fn(async () => undefined),
   };
-  return {
+  const requests = new Map<string, RequestAction>();
+  const room: FakeRoom = {
+    requests,
+    dispatchRequest: async () => {
+      throw new Error("No request router.");
+    },
     onPeerJoin: null,
     onPeerLeave: null,
     leave: vi.fn(async () => undefined),
     makeAction: vi.fn(
       (
-        _namespace: string,
+        namespace: string,
         config?: {
+          kind?: "request";
+          onRequest?: RequestAction["onRequest"];
+          onReceive?: RequestAction["onReceive"];
           onMessage?: (data: unknown, context: { peerId: string; metadata?: unknown }) => void;
           onReceiveProgress?: (
             percent: number,
@@ -190,6 +205,18 @@ function makeFakeRoom(): FakeRoom {
           ) => void;
         },
       ) => {
+        if (config?.kind === "request") {
+          const requestAction = {
+            onRequest: config.onRequest ?? null,
+            onReceive: config.onReceive ?? null,
+            onReceiveProgress: config.onReceiveProgress ?? null,
+            request: (data: DataPayload, options: RequestOptions) =>
+              room.dispatchRequest(namespace, data, options),
+            requestMany: async () => [],
+          } as RequestAction;
+          requests.set(namespace, requestAction);
+          return requestAction;
+        }
         if (config?.onMessage !== undefined) {
           action.onMessage = config.onMessage;
         }
@@ -201,6 +228,7 @@ function makeFakeRoom(): FakeRoom {
     ),
     action,
   };
+  return room;
 }
 
 class TrysteroClientImpl implements Client {
@@ -223,6 +251,45 @@ class TrysteroClientImpl implements Client {
       schedule: clock.schedule,
     });
     this.room = makeFakeRoom();
+    // Mock only the upstream request boundary; actual chunking runs in browsers.
+    this.room.dispatchRequest = async (namespace, data, options) => {
+      const peer = [...this.peerIds].find(([, id]) => id === options.target)?.[0] as
+        | TrysteroClientImpl
+        | undefined;
+      const senderPeerId = peer?.peerIds.get(this);
+      const action = peer?.room.requests.get(namespace);
+      const receiver = this.room.requests.get(namespace);
+      if (!peer || !senderPeerId || !action?.onRequest || !receiver)
+        throw new Error("Request rejected.");
+      const signal = options.signal ?? new AbortController().signal;
+      const bytes = (value: DataPayload) =>
+        value instanceof Uint8Array
+          ? value.byteLength
+          : new TextEncoder().encode(JSON.stringify(value)).byteLength;
+      if (
+        action.onReceive &&
+        !(await action.onReceive({
+          peerId: senderPeerId,
+          byteLength: bytes(data),
+          kind: "request",
+          signal,
+        }))
+      )
+        throw new Error("Request rejected.");
+      const response = await action.onRequest(data, { peerId: senderPeerId, signal });
+      if (
+        receiver.onReceive &&
+        !(await receiver.onReceive({
+          peerId: options.target,
+          byteLength: bytes(response),
+          kind: "response",
+          signal,
+        }))
+      )
+        throw new Error("Response rejected.");
+      receiver.onReceiveProgress?.(1, { peerId: options.target });
+      return structuredClone(response);
+    };
   }
 
   get transport(): NovaTransport {
@@ -267,7 +334,7 @@ class TrysteroClientImpl implements Client {
       async () => ({
         data: {
           v: 1,
-          transportVersion: 3,
+          transportVersion: 4,
           memberId: other.adapter.selfMemberId,
           connectionId: other.adapter.selfConnectionId,
           displayName: other.adapter.displayName,
@@ -384,6 +451,44 @@ for (const createWorld of worlds) {
   describe(`contract suite: ${createWorld().name}`, () => {
     let world: World;
 
+    it("directed binary requests preserve bytes, identity and receive progress", async () => {
+      const { a, b } = await joinPair(world);
+      b.transport.handleRequest("source", (payload, context) => {
+        expect(payload).toEqual({ game: "test" });
+        expect(context.senderMemberId).toBe(a.transport.selfMemberId);
+        expect(context.senderConnectionId).toBe(a.transport.selfConnectionId);
+        return new Uint8Array([0, 128, 255]);
+      });
+      const progress = vi.fn();
+      const response = await a.transport.request({
+        channel: "source",
+        payload: { game: "test" },
+        targetConnectionId: b.transport.selfConnectionId,
+        onProgress: progress,
+        maxResponseBytes: 3,
+      });
+      expect(response).toEqual(new Uint8Array([0, 128, 255]));
+      expect(progress).toHaveBeenCalledWith(1);
+    });
+    it("rejects an oversized response or removed handler", async () => {
+      const { a, b } = await joinPair(world);
+      const unsubscribe = b.transport.handleRequest("source", () => new Uint8Array(10));
+      const options = {
+        channel: "source",
+        payload: {},
+        targetConnectionId: b.transport.selfConnectionId,
+        maxResponseBytes: 9,
+      };
+      await expect(a.transport.request(options)).rejects.toThrow();
+      unsubscribe();
+      await expect(a.transport.request(options)).rejects.toThrow();
+    });
+    it("rejects requests to unknown connections", async () => {
+      const { a } = await joinPair(world);
+      await expect(
+        a.transport.request({ channel: "source", payload: {}, targetConnectionId: "unknown" }),
+      ).rejects.toThrow();
+    });
     beforeEach(() => {
       world = createWorld();
       mocks.joinRoom.mockReset();

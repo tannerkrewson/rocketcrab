@@ -31,6 +31,12 @@ class MockTransport implements NovaTransport {
   async suspend(): Promise<void> {}
   async resume(): Promise<void> {}
   async send(_options: TransportSendOptions): Promise<void> {}
+  async request(): Promise<unknown> {
+    return null;
+  }
+  handleRequest(): () => void {
+    return () => undefined;
+  }
 }
 
 describe("NovaTransport contract", () => {

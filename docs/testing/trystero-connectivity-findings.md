@@ -1,5 +1,11 @@
 # F5 Findings — Backendless Trystero Connectivity (Rocketcrab Nova)
 
+> Historical spike/probe evidence. Simplification stage 3 now uses Trystero 0.26
+> maintained relay defaults and native source request actions; the old pinned
+> URLs/redundancy recommendations below are superseded. Same-machine Chromium
+> smoke tests pass with defaults (including a verified 2 MiB source). Physical
+> iPhone, cross-network TURN and multi-hour reliability remain release gates.
+
 Status: **COMPLETE (2026-08-01)** — automated same-machine results +
 cross-device human pass (desktop + Mac + iPhone). TURN verdict:
 **cross-network connectivity requires TURN** (S3 FAIL) — P0 TURN issue

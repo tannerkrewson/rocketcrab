@@ -11,7 +11,7 @@ import type {
 import type { JoinRoomCallbacks } from "trystero";
 import { TrysteroTransport } from "./trystero-transport";
 import type { TrysteroTransportOptions } from "./trystero-transport";
-import { GOOD_RELAYS, RELAY_FAILURE_WINDOW_MS } from "./relays";
+import { RELAY_FAILURE_WINDOW_MS } from "./relays";
 import type { RelayDiagnostics } from "./relays";
 import type { TrysteroJoinError } from "./errors";
 
@@ -36,7 +36,7 @@ vi.mock("trystero", () => ({
   joinRoom: mocks.joinRoom,
   getRelaySockets: () => mocks.relaySockets,
   selfId: mocks.selfId,
-  defaultRelayUrls: ["wss://default.example"],
+  defaultRelayUrls: ["wss://relay.damus.io"],
 }));
 
 /** Deterministic fake clock: timers only run when the test advances time. */
@@ -177,7 +177,7 @@ async function simulatePeerJoin(
   await callbacks.onPeerHandshake!(
     peerId,
     async () => undefined,
-    async () => ({ data: { v: 1, transportVersion: 3, ...identity } }),
+    async () => ({ data: { v: 1, transportVersion: 4, ...identity } }),
     false,
   );
   room.onPeerJoin!(peerId);
@@ -220,29 +220,17 @@ describe("TrysteroTransport construction", () => {
 });
 
 describe("TrysteroTransport join", () => {
-  it("joins a room with pinned GOOD_RELAYS and redundancy 5", async () => {
+  it("joins with maintained upstream relay defaults rather than a pinned list", async () => {
     const { adapter, clock } = setup();
     mocks.relaySockets[RELAY] = { readyState: 0 };
     const room = makeFakeRoom();
     mocks.joinRoom.mockReturnValue(room);
-    console.log(
-      "DBG2 after set: impl=",
-      typeof mocks.joinRoom.getMockImplementation?.(),
-      "room?",
-      room !== undefined,
-    );
     const states: TransportConnectionState[] = [];
     adapter.on("connection:state", (state) => {
       states.push(state);
     });
 
     const promise = adapter.join({ room: "ROOM", sessionId: "session-1" });
-    console.log(
-      "DBG calls:",
-      mocks.joinRoom.mock.calls.length,
-      "returned:",
-      JSON.stringify(mocks.joinRoom.mock.results[0]?.value ?? "none"),
-    );
     expect(adapter.connectionState).toBe("joining");
     mocks.relaySockets[RELAY] = { readyState: 1 };
     clock.advance(1000);
@@ -256,7 +244,8 @@ describe("TrysteroTransport join", () => {
     const [config, roomName] = mocks.joinRoom.mock.calls[0]!;
     expect(roomName).toBe("ROOM");
     expect(config.appId).toBe("rocketcrab-nova-dev");
-    expect(config.relayConfig).toEqual({ urls: [...GOOD_RELAYS], redundancy: 5 });
+    expect(config.relayConfig).toBeUndefined();
+    expect(config.maxReceiveBytes).toBe(8 * 1024 * 1024);
   });
 
   it("rejects a second join while connected", async () => {
@@ -392,7 +381,7 @@ describe("TrysteroTransport peer mapping", () => {
       async () => ({
         data: {
           v: 1,
-          transportVersion: 3,
+          transportVersion: 4,
           memberId: "member-b",
           connectionId: "conn-b",
           displayName: "Bea",
@@ -403,7 +392,7 @@ describe("TrysteroTransport peer mapping", () => {
     // we announce our own memberId + connectionId
     expect(sentIdentity).toEqual({
       v: 1,
-      transportVersion: 3,
+      transportVersion: 4,
       memberId: "member-a",
       connectionId: "self-peer-id",
       displayName: "Ada",
@@ -426,7 +415,7 @@ describe("TrysteroTransport peer mapping", () => {
     expect(adapter.peers[0]!.memberId).toBe("member-b");
   });
 
-  it.each([undefined, 1, 2, 4])(
+  it.each([undefined, 1, 2, 3, 5])(
     "rejects incompatible transport version %s before actions",
     async (transportVersion) => {
       const onJoinError = vi.fn();
@@ -520,6 +509,87 @@ describe("TrysteroTransport send", () => {
     });
     return { adapter, clock, room };
   }
+
+  it("delegates whole requests, limits, progress, timeout and abort to Trystero", async () => {
+    const { adapter, room } = await joinedWithPeer();
+    let config!: import("trystero").RequestActionConfig;
+    const rpc = { request: vi.fn(), onRequest: null, onReceive: null, onReceiveProgress: null };
+    room.makeAction.mockImplementationOnce((_namespace, options) => {
+      config = options;
+      Object.assign(rpc, options);
+      return rpc;
+    });
+    const handler = vi.fn(() => new Uint8Array([1, 2]));
+    const unsubscribe = adapter.handleRequest("source", handler);
+    const controller = new AbortController();
+    const progress = vi.fn();
+    rpc.request.mockImplementation(async () => {
+      expect(
+        config.onReceive?.({
+          peerId: "peer-1",
+          byteLength: 2,
+          kind: "response",
+          signal: controller.signal,
+        }),
+      ).toBe(true);
+      expect(
+        config.onReceive?.({
+          peerId: "peer-1",
+          byteLength: 3,
+          kind: "response",
+          signal: controller.signal,
+        }),
+      ).toBe(false);
+      expect(
+        config.onReceive?.({
+          peerId: "stranger",
+          byteLength: 1,
+          kind: "response",
+          signal: controller.signal,
+        }),
+      ).toBe(false);
+      expect(
+        config.onReceive?.({
+          peerId: "peer-1",
+          byteLength: 16385,
+          kind: "request",
+          signal: controller.signal,
+        }),
+      ).toBe(false);
+      config.onReceiveProgress?.(0.5, { peerId: "peer-1" });
+      return new Uint8Array([1, 2]);
+    });
+    const options = {
+      channel: "source",
+      payload: { game: "g" },
+      targetConnectionId: "conn-b",
+      timeoutMs: 1234,
+      maxResponseBytes: 2,
+      signal: controller.signal,
+      onProgress: progress,
+    };
+    const pending = adapter.request(options);
+    await expect(adapter.request(options)).rejects.toThrow("already active");
+    await expect(pending).resolves.toEqual(new Uint8Array([1, 2]));
+    expect(rpc.request).toHaveBeenCalledWith(
+      { game: "g" },
+      { target: "peer-1", timeoutMs: 1234, signal: controller.signal },
+    );
+    expect(progress).toHaveBeenCalledWith(0.5);
+    await config.onRequest?.({}, { peerId: "peer-1", signal: controller.signal });
+    expect(handler).toHaveBeenCalledWith(
+      {},
+      { senderMemberId: "member-b", senderConnectionId: "conn-b", signal: controller.signal },
+    );
+    unsubscribe();
+    await expect(
+      config.onRequest?.({}, { peerId: "peer-1", signal: controller.signal }),
+    ).rejects.toThrow();
+    await adapter.leave();
+    expect(rpc.onRequest).toBeNull();
+    expect(rpc.onReceive).toBeNull();
+    expect(rpc.onReceiveProgress).toBeNull();
+  });
 
   it("broadcasts to every peer (target null)", async () => {
     const { adapter, room } = await joinedWithPeer();

@@ -8,8 +8,11 @@ import type {
   TransportPeerInfo,
   TransportReconnectEvent,
   TransportSendOptions,
+  TransportRequestOptions,
+  TransportRequestHandler,
 } from "@rocketcrab/core";
 import type { ChunkRecord, InMemoryPeer, InMemoryTransportHub } from "./hub";
+import { MemoryRequests } from "./requests";
 import type { RequiredFaultProfile } from "./faults";
 
 /**
@@ -48,6 +51,7 @@ export class InMemoryTransport implements NovaTransport, InMemoryPeer {
   private suspendedBuffer: Array<TransportMessage | ChunkRecord> = [];
   private lifecycle: { resolve: () => void; reject: (error: unknown) => void } | null = null;
   private disposed = false;
+  private readonly requests: MemoryRequests;
 
   constructor(
     hub: InMemoryTransportHub,
@@ -63,6 +67,7 @@ export class InMemoryTransport implements NovaTransport, InMemoryPeer {
     this.selfConnectionId = identity.connectionId;
     this.displayName = identity.displayName;
     this.faultProfile = identity.profile;
+    this.requests = new MemoryRequests(this);
   }
 
   /** True while the transport is in background-suspension simulation. */
@@ -117,6 +122,13 @@ export class InMemoryTransport implements NovaTransport, InMemoryPeer {
   async send(options: TransportSendOptions): Promise<void> {
     this.assertAlive();
     await this.hub.send(this, options);
+  }
+
+  request(options: TransportRequestOptions): Promise<unknown> {
+    return this.requests.request(options);
+  }
+  handleRequest(channel: string, handler: TransportRequestHandler): () => void {
+    return this.requests.handle(channel, handler);
   }
 
   // ------------------------------------------------------------------
@@ -231,6 +243,7 @@ export class InMemoryTransport implements NovaTransport, InMemoryPeer {
       return;
     }
     this.disposed = true;
+    this.requests.dispose();
     this.lifecycle?.reject(new Error("InMemoryTransport: disposed during a lifecycle operation."));
     this.lifecycle = null;
     this.listeners.clear();

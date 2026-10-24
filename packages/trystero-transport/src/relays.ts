@@ -1,42 +1,11 @@
-/**
- * Nostr relay configuration and relay-state diagnostics (P1 deliverables;
- * F5 findings F10 / F5).
- *
- * Trystero's `defaultRelayUrls` include dead/flaky community relays (F10:
- * e.g. `strfry.openhoofd.nl` fails TLS), so the adapter pins the verified
- * `GOOD_RELAYS` set probed during the F5 spike (2026-08-01, 100–370 ms) with
- * redundancy 5, exactly as the spike driver does. Relay URLs stay
- * configurable via the adapter options.
- *
- * Relay-state diagnostics are produced by polling `getRelaySockets()`
- * (raw WebSocket readyStates — the only observables Trystero exposes for
- * relay health; F5 finding F5). The adapter uses the same snapshot both for
- * diagnostics and for its own join-time relay-reachability check.
- */
+/** Nostr relay diagnostics. Selection/redundancy belongs to Trystero unless an
+ * operator supplies overrides. The old probe-era pinned relay list is gone. */
 
 /** WebSocket readyState values (same as the DOM constants). */
 export const WS_CONNECTING = 0;
 export const WS_OPEN = 1;
 export const WS_CLOSING = 2;
 export const WS_CLOSED = 3;
-
-/**
- * Verified-reachable public Nostr relays (probed 2026-08-01 during the F5
- * spike from the dev machine's network; see the spike driver's GOOD_RELAYS
- * and `docs/testing/trystero-connectivity-findings.md` F10).
- */
-export const GOOD_RELAYS: readonly string[] = [
-  "wss://relay.damus.io",
-  "wss://nos.lol",
-  "wss://relay.primal.net",
-  "wss://nostr.mom",
-  "wss://relay.snort.social",
-  "wss://offchain.pub",
-  "wss://relay.nostr.info",
-];
-
-/** Relay redundancy used for Nostr room creation (F5 recommendation). */
-export const DEFAULT_RELAY_REDUNDANCY = 5;
 
 /** One relay's socket state as observed by the adapter. */
 export interface RelayState {

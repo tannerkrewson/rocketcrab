@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  GOOD_RELAYS,
   RELAY_FAILURE_WINDOW_MS,
   WS_CLOSED,
   WS_CONNECTING,
@@ -159,12 +158,5 @@ describe("relayDiagnosticsEqual", () => {
     );
     expect(relayDiagnosticsEqual(healthy, rejecting)).toBe(false);
     expect(relayDiagnosticsEqual(rejecting, rejecting)).toBe(true);
-  });
-
-  it("keeps GOOD_RELAYS verified-reachable (F10 pinning)", () => {
-    expect(GOOD_RELAYS.length).toBeGreaterThanOrEqual(5);
-    for (const url of GOOD_RELAYS) {
-      expect(url).toMatch(/^wss:\/\//);
-    }
   });
 });

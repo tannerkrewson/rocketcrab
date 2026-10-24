@@ -103,9 +103,9 @@ values is expected after real play-testing (P3, S3, M1).
 
 - Schemas are **pure data + Zod**: no `.transform()`, `.refine()`,
   `.superRefine()`, or custom callbacks are embedded. Cross-field invariants
-  that cannot be expressed declaratively (for example
-  `chunkIndex < chunkCount` on `game.source.chunk`) are documented on the
-  schema and enforced by receiver logic.
+  that cannot be expressed declaratively are documented on the schema and
+  enforced by receiver logic (for example a source response must match its
+  announced byte count and SHA-256 before acceptance).
 - No `any` at protocol boundaries: `parsePeerMessage` / `parseRuntimeMessage`
   take `unknown` and return typed values or a structured `ProtocolError`
   (`ParseResult`).

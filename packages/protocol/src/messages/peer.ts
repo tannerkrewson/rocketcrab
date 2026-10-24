@@ -10,7 +10,6 @@ import {
   timestampSchema,
   titleSchema,
 } from "../ids";
-import { messageBytesBeforeChunking } from "../limits";
 import { gameEndReasonSchema, gameModeSchema } from "./shared";
 
 /**
@@ -377,79 +376,25 @@ export const gameSourceMetadataMessageSchema = z.object({
   mode: gameModeSchema.optional(),
   sourceSha256: sha256Schema,
   sourceSizeBytes: z.number().int().nonnegative(),
-  chunkCount: z.number().int().min(1),
 });
 export type GameSourceMetadataMessage = z.infer<typeof gameSourceMetadataMessageSchema>;
 
-/**
- * Game source transfer: one chunk of the exact HTML source string, verified
- * by SHA-256 so all players run byte-identical documents (ADR-0002, P3).
- * Each chunk is bounded by `messageBytesBeforeChunking`; receivers enforce
- * `chunkIndex < chunkCount` and total-size limits.
- */
-export const gameSourceTransferMessageSchema = z.object({
+/** Application acceptance after exact-size and SHA-256 validation, not a
+ * transport ACK. No retry follows a rejection. */
+export const gameSourceAcceptedMessageSchema = z.object({
   ...peerEnvelopeFields,
-  type: z.literal("game.source.chunk"),
+  type: z.literal("game.source.accepted"),
   gameId: gameIdSchema,
   sourceSha256: sha256Schema,
-  chunkIndex: z.number().int().nonnegative(),
-  chunkCount: z.number().int().min(1),
-  chunk: z.string().max(messageBytesBeforeChunking),
 });
-export type GameSourceTransferMessage = z.infer<typeof gameSourceTransferMessageSchema>;
+export type GameSourceAcceptedMessage = z.infer<typeof gameSourceAcceptedMessageSchema>;
 
-/** Transfer acknowledgement: receiver result for a source transfer (P3). */
-export const transferAcknowledgementMessageSchema = z.object({
+/** Ask connected holders to reannounce the current descriptor. */
+export const gameSourceDiscoverMessageSchema = z.object({
   ...peerEnvelopeFields,
-  type: z.literal("game.source.ack"),
-  gameId: gameIdSchema,
-  sourceSha256: sha256Schema,
-  status: z.enum(["received", "failed"]),
-  errorMessage: z.string().max(256).optional(),
+  type: z.literal("game.source.discover"),
 });
-export type TransferAcknowledgementMessage = z.infer<typeof transferAcknowledgementMessageSchema>;
-
-/**
- * Game source request: a joiner asks a source holder for the game document
- * (P3). Requests travel on the private-party transport only, so only admitted
- * members can ask (ADR-0004, ADR-0010). A request without `gameId` asks every
- * holder to announce the current game (refresh after a missed announcement);
- * a request with `gameId` (and its SHA-256) asks one holder to start the
- * transfer. `sourceSha256` is only meaningful with `gameId`, so the schema
- * rejects that combination.
- */
-export const gameSourceRequestMessageSchema = z
-  .object({
-    ...peerEnvelopeFields,
-    type: z.literal("game.source.request"),
-    gameId: gameIdSchema.optional(),
-    sourceSha256: sha256Schema.optional(),
-  })
-  .superRefine((value, ctx) => {
-    if (value.sourceSha256 !== undefined && value.gameId === undefined) {
-      ctx.addIssue({
-        code: z.ZodIssueCode.custom,
-        path: ["sourceSha256"],
-        message: "sourceSha256 requires a gameId.",
-      });
-    }
-  });
-export type GameSourceRequestMessage = z.infer<typeof gameSourceRequestMessageSchema>;
-
-/**
- * Game source cancellation: either side aborts an in-flight source transfer
- * (P3). The sender stops sending remaining chunks; the receiver discards the
- * partial source and clears its transfer state (engineering rule 22 — no
- * orphaned listeners or partial state after an abort).
- */
-export const gameSourceCancelMessageSchema = z.object({
-  ...peerEnvelopeFields,
-  type: z.literal("game.source.cancel"),
-  gameId: gameIdSchema,
-  sourceSha256: sha256Schema,
-  reason: z.string().max(256).optional(),
-});
-export type GameSourceCancelMessage = z.infer<typeof gameSourceCancelMessageSchema>;
+export type GameSourceDiscoverMessage = z.infer<typeof gameSourceDiscoverMessageSchema>;
 
 /** Every peer-plane message schema, discriminated by `type`. */
 export const peerMessagesSchema = z.discriminatedUnion("type", [
@@ -477,10 +422,8 @@ export const peerMessagesSchema = z.discriminatedUnion("type", [
   rawChannelMetadataMessageSchema,
   rawChannelCloseMessageSchema,
   gameSourceMetadataMessageSchema,
-  gameSourceTransferMessageSchema,
-  transferAcknowledgementMessageSchema,
-  gameSourceRequestMessageSchema,
-  gameSourceCancelMessageSchema,
+  gameSourceAcceptedMessageSchema,
+  gameSourceDiscoverMessageSchema,
 ]);
 
 /** All peer-plane message type strings, for useful unknown-type errors. */

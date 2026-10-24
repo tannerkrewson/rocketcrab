@@ -2,7 +2,7 @@
 //
 // Runs the GameSourceCoordinator between two real browser pages over the real
 // Trystero transport (Nostr relays + WebRTC): the host registers a game
-// source, the joiner requests it, the coordinator transfers the chunks as
+// source, the joiner requests it, Trystero transfers the binary response as
 // binary payloads with progress, the joiner verifies the SHA-256 digest and
 // byte count, and both sides acknowledge. Like the P1 specs, this is NOT
 // part of the default CI smoke — run with `npm run test:e2e:trystero`, and
@@ -100,19 +100,20 @@ async function waitForReceived(page: Page, timeout = 120_000): Promise<void> {
   );
 }
 
-/** A multi-chunk source: several 64 KiB protocol chunks, multi-byte content. */
+/** Exact UTF-8 byte budget, including multi-byte content and HTML wrapper. */
 function buildGameSource(size: number): string {
   const filler = "🦀 rocketcrab rules ".repeat(2000);
-  const pad = "x".repeat(Math.max(0, size - filler.length));
-  return `<!doctype html><html><body><h1>E2E Game</h1><script>window.__game = "rocketcrab";</script>${filler}${pad}</body></html>`;
+  const document = `<!doctype html><html><body><h1>E2E Game</h1><script>window.__game = "rocketcrab";</script>${filler}</body></html>`;
+  return document + "x".repeat(Math.max(0, size - new TextEncoder().encode(document).byteLength));
 }
 
-test("host transfers the game source to an admitted joiner, byte-identical and verified", async ({
+test("host transfers the full 2 MiB source by Trystero request, byte-identical and verified", async ({
   browser,
 }) => {
   const room = randRoom();
   const gameId = "game_e2e_1";
-  const source = buildGameSource(250 * 1024); // ~4 chunks at the 64 KiB protocol chunk size
+  const source = buildGameSource(2 * 1024 * 1024);
+  expect(new TextEncoder().encode(source).byteLength).toBe(2 * 1024 * 1024);
   const p1 = await openHarness(browser);
   const p2 = await openHarness(browser);
 
@@ -144,9 +145,8 @@ test("host transfers the game source to an admitted joiner, byte-identical and v
   expect(joinerSource.events).toContain("received");
   expect(joinerSource.events).toContain("progress");
 
-  // The host observed the acknowledgement.
-  const hostAfter = await sourceStateOf(p1);
-  expect(hostAfter.events).toContain("complete");
+  // Transport completion is not enough: wait for verified application acceptance.
+  await expect.poll(async () => (await sourceStateOf(p1)).events).toContain("complete");
 
   await p1.evaluate(() => (window as unknown as HarnessWindow).__harness.leave());
   await p2.evaluate(() => (window as unknown as HarnessWindow).__harness.leave());

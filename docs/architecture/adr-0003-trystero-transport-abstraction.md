@@ -4,7 +4,7 @@
 - **Date:** 2026-08-01
 - **Owner:** Rocketcrab Nova planning (Phase 1)
 - **Related:** U5 (InMemoryTransport), P1 (TrysteroTransport), S1 (Nova API),
-  ADR-0004 (rendezvous), F5 (connectivity spike), M3 (TURN decision),
+  ADR-0004 (private invites), F5 (connectivity spike), M3 (TURN decision),
   P0 `rocketcrab-23s` (TURN implementation)
 
 ## Context
@@ -40,11 +40,36 @@ rule, per ADR-0013). `packages/core` does not depend on Trystero.
     run the arena.
   - `TrysteroTransport` — real parties (P1), Nostr strategy initially, with
     join-error mapping, relay-state diagnostics, ping/quality sampling, a TURN
-    configuration hook, and retry/timeout policy.
+    configuration hook, and native request/timeout delegation.
 - **The game-facing API behaves the same over both transports.** The adapter
   must pass the same contract suite as `InMemoryTransport` (P1 acceptance).
 - Trystero remains replaceable _behind_ the interface, but the plan forbids
   silently replacing Trystero itself; F5/M3 own any TURN or relay changes.
+
+## Simplification addendum: native source requests
+
+The source coordinator uses one native binary request response (maximum 2 MiB)
+with Trystero's fragmentation/backpressure, response correlation, progress,
+receive admission, timeouts and disconnect handling. Nova removed its source
+chunk framing, ACK-driven retransmits, retry counts and cancel-message protocol.
+The adapter has an 8 MiB shared receive reservation budget, 16 KiB request limit,
+and per-request response admission. The source cache retains at most eight
+verified documents. In-memory request parity is exercised through the existing
+fault-injected hub; the real adapter adds no custom reliability protocol.
+
+Nova deliberately retains metadata/compatibility checks, SHA-256 and exact-size
+verification, and the positive `game.source.accepted` application decision.
+Transport delivery alone cannot establish that a game was verified/accepted.
+State/action IDs, deduplication, revisions and authority ordering are untouched.
+Explicit refresh/reconnect retries a failed source; there is no automatic source
+retry loop. The selected source remains available from surviving verified peers.
+
+Nostr uses maintained Trystero defaults, not the F5 spike-era pinned relay list.
+Operator overrides remain possible. Historical probe results below/in F5 do not
+establish current cross-network reliability. A real two-page 2 MiB source transfer
+passes on this machine; multi-hour and Mobile Safari cross-network proof remains
+required before release. See the party/transport package READMEs for retained
+mechanisms and browser test commands.
 
 ## Alternatives considered
 

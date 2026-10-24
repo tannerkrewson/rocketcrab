@@ -11,8 +11,9 @@ behaves identically in the local test arena and over real parties.
 
 ## Design summary
 
-- **Room creation**: `joinRoom` with the Nostr strategy, relays pinned to the
-  F5-verified `GOOD_RELAYS` set (F10) and redundancy 5.
+- **Room creation**: Nostr with Trystero-maintained relay selection and
+  redundancy. Explicit operator URL/redundancy overrides remain available;
+  probe-era pinned URLs are no longer production defaults.
 - **App ID**: environment-specific — `rocketcrab-nova-dev` by default,
   `rocketcrab-nova-prod` for production builds (`vite build`). Every peer in
   a party must share the appId; override via options for e2e.
@@ -25,6 +26,16 @@ behaves identically in the local test arena and over real parties.
   and targeted (`targetConnectionId`) sends; structured and binary payloads;
   Trystero's reliable-ordered channel (unreliable/unordered requests degrade
   to reliable/ordered — documented, not silent).
+- **Whole requests**: `request` / `handleRequest` delegate to Trystero
+  request actions, including correlation, chunking, backpressure, timeout,
+  rejection, disconnect and abort. One active request per peer/channel maps
+  upstream response progress without introducing application request IDs.
+  Receive admission rejects unrecognized peers, requests above 16 KiB, and
+  responses above the caller's byte budget (2 MiB by default) before allocation.
+  Trystero's shared receive budget is explicitly 8 MiB; its bounded queues and
+  transfer timeouts remain in charge. The in-memory counterpart uses the hub's
+  existing fault-injected delivery, binary chunking and progress path, not a
+  production reliability layer.
 - **Progress**: Trystero reports progress as a fraction in [0, 1]; the
   adapter maps it to `TransferProgress` on both sides with byte counts.
 - **Join errors**: categorized (`password_mismatch`, `rejected`,
@@ -45,19 +56,21 @@ behaves identically in the local test arena and over real parties.
 
 ## Upgrade compatibility
 
-Trystero 0.26 changes the action wire format. Nova exchanges `transportVersion: 3`
+Trystero 0.26 changes the action wire format. Nova exchanges `transportVersion: 4`
 in the pre-action identity handshake and rejects missing/different versions with
 an update/reload notice before activating the peer. Existing old builds cannot be
 made to show new wording retroactively; the updated participant sees the notice.
-All participants must reload before joining across this upgrade. Version 3 also
-separates the private-invite party protocol from the former code/admission build.
+All participants must reload before joining across this upgrade. Version 3 separated private invites from the former code/admission build;
+version 4 replaces source chunks/retries with binary request responses.
 
 Upstream [0.26 changelog](https://github.com/dmotz/trystero/blob/0.26.0/CHANGELOG.md)
 includes Nostr subscription/reconnect recovery, offer retries/replayed answers,
 ICE validation and renegotiation fixes, stale-peer cleanup, on-demand offers,
 receive admission and bounded transfer queues. The 0.25.4 changes reduce signaling
-traffic and back off rate-limited relays. Relay defaults and duplicated transfer
-machinery are reviewed separately in simplification stage 3.
+traffic and back off rate-limited relays. Stage 3 adopted the maintained relay
+defaults and native request actions. The old F5 relay probe is historical evidence,
+not a reason to retain the old pins. Same-machine smoke tests pass with defaults;
+cross-network and physical-device reliability remain release gates.
 
 ## Testing
 

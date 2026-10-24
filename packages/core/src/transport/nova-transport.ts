@@ -5,6 +5,8 @@ import type {
   TransportJoinRequest,
   TransportPeerInfo,
   TransportSendOptions,
+  TransportRequestOptions,
+  TransportRequestHandler,
 } from "./transport-types";
 
 /**
@@ -82,4 +84,12 @@ export interface NovaTransport {
    * transport is not connected or the payload fails validation.
    */
   send(options: TransportSendOptions): Promise<void>;
+  /** Directed request with a bounded response. One active request per peer /
+   * channel (so upstream receive progress can be associated without custom IDs).
+   * Rejects on timeout, disconnect, cancellation or receiver refusal. No retries.
+   * Trystero supplies the production request protocol; the in-memory adapter
+   * exercises its fault-injected counterpart. Not exposed to game frames. */
+  request(options: TransportRequestOptions): Promise<unknown>;
+  /** Register one private-shell responder; returns an idempotent unsubscribe. */
+  handleRequest(channel: string, handler: TransportRequestHandler): () => void;
 }
