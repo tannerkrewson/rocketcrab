@@ -3,6 +3,11 @@
 Working rules for this repository (Rocketcrab Nova — a party-games web app;
 React + TanStack Router + daisyUI in apps/nova).
 
+## Work tracking
+
+- Use root `PLAN.md` for remaining work, owner decisions, and release gates.
+- Update its checklists and evidence when work is completed or new blockers appear.
+
 ## UI rules
 
 - **Never use the daisyUI `btn-ghost` class** (ghost buttons). Use the shared
