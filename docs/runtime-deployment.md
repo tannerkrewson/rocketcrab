@@ -15,7 +15,8 @@ existing production digest; there is no host/global builder upgrade.
 Before this patch, local `dev`, `origin/prod`, the Dokku `master` ref, and Dokku's
 recorded deployment all matched `5ad9ca69910acb75c140323624603a3d8c966a37`.
 The former GitHub workflow checked out `prod` and git-pushed to Dokku. That workflow
-is now **manual build/artifact only**, with no push-triggered deployment, to avoid
+is now **build/artifact only** on `prod` pushes or manual dispatch, with no
+push-triggered deployment, to avoid
 compiling Next on the shared 1CPU/2GB host or deploying twice.
 
 `git:from-image` replaces the app's Dokku deploy-branch source with a generated
@@ -23,12 +24,13 @@ FROM-only Dockerfile. The application source remains in GitHub and the image's
 OCI revision label; the generated Dokku commit is not the application source SHA.
 The admin script protects the old image and bundles the original server Git refs
 before this change. Do not later git-push source to Dokku expecting this off-host
-pipeline: that would trigger an on-host build again.
+pipeline: that would trigger an on-host build again. GitHub `prod` pushes now
+build artifacts only and do not SSH to Dokku.
 
 ## Off-host build and validation
 
 Requirements: Linux amd64, Bash, Git, Podman, util-linux `flock`, sufficient local
-RAM/disk, and outbound access to GitHub, npm, Docker Hub and Node downloads.
+RAM/disk (at least 4GiB available RAM; build capped at 3GiB/2 CPUs), and outbound access to GitHub, npm, Docker Hub and Node downloads.
 Node for host tests is installed via `mise install`; use `mise exec -- npm ...`.
 Build only committed source (local `.env`, secrets, node_modules and user artifacts
 are excluded by `git archive`). No production build secrets are required.
@@ -36,7 +38,9 @@ are excluded by `git archive`). No production build secrets are required.
 ```sh
 bash scripts/build-image.sh HEAD
 # The command prints the unique image name and archive path and writes
-# <archive>.sha256 and <archive>.image-id.
+# <archive>.sha256, <archive>.image-id and <archive>.source-commit.
+# Default artifact/source working directory: ~/.cache/rocketcrab-cve-build
+# (disk-backed; RAM-backed archive destinations are rejected).
 podman run -d --name rocketcrab-check -e PORT=5000 \
   -p 127.0.0.1:43188:5000 localhost/rocketcrab:node22-<source-sha-prefix>
 mise exec -- node scripts/smoke-runtime.mjs http://127.0.0.1:43188
@@ -48,7 +52,11 @@ podman rm rocketcrab-check
 ```
 
 The build script serializes heavy local builds with the shared
-`/tmp/dokku-cve-offhost-build.lock`. Final metadata is `/start web`, port 5000,
+`/tmp/dokku-cve-offhost-build.lock`. Interrupt/termination traps remove only the
+owned build container, holding the lock through cleanup. Allow long enough for
+lock waiting plus the entire build/archive save; do not use short harness timeouts
+that may leave a container running after its client is killed. If interrupted,
+reconcile that owned container before launching another build. Final metadata is `/start web`, port 5000,
 with herokuish `/start`, `/exec` and generated `/app/Procfile` retained. Dokku
 continues supplying runtime environment/config; none is copied from production.
 
@@ -69,15 +77,19 @@ SSH requires existing administrative access, a trusted known_hosts entry, and
 permission for Docker/Dokku/Git commands; no new credentials or registry needed.
 
 ```sh
-ROCKETCRAB_DEPLOY_APPROVED=yes bash scripts/deploy-image.sh \
-  /tmp/rocketcrab-<source-prefix>.tar \
-  localhost/rocketcrab:node22-<source-prefix> <expected-image-id>
+ROCKETCRAB_DEPLOY_APPROVED=yes mise exec -- bash scripts/deploy-image.sh \
+  "$HOME/.cache/rocketcrab-cve-build/rocketcrab-<source-prefix>.tar" \
+  localhost/rocketcrab:node22-<source-prefix> <expected-image-id> <built-source-commit>
 ```
 
 The script checks disk/RAM headroom, uploads the archive, verifies its SHA256,
 locks deployment, tags the current image for rollback, verifies a Git source
 bundle, imports without compilation, checks exact image ID/entrypoint/command,
-and calls `dokku git:from-image rocketcrab <unique-tag>`. It does not change Dokku
+and calls `dokku git:from-image rocketcrab <unique-tag>`. It verifies the loaded
+image's source revision label, the running Node/npm versions, an internal HTTP
+check, and external HTTP/assets/party/WebSocket smoke checks. Failures trigger
+rollback to the protected old image, explicitly restoring the old CVE exposure.
+SSH is batch-only with strict host-key verification. It does not change Dokku
 config, restart other apps, prune, or upgrade the host. The tiny FROM-only Docker
 build is expected; an application compilation is not.
 
@@ -92,8 +104,9 @@ Rocketcrab in-memory parties are lost during the authorized restart.
 
 If a deploy fails, inspect whether the existing container still serves traffic;
 do not repeat builds blindly. The admin script leaves its root-only release
-directory containing `rollback-image.txt`, `source-before.bundle` and the imported
-archive. Preserve these until explicitly approved for cleanup. Roll back only
+directory containing `rollback-image.txt`, `source-before.bundle`, source ref and
+new built-source commit. It removes only its successfully consumed upload archive.
+Preserve the backup metadata/images until explicitly approved for cleanup. Roll back only
 Rocketcrab with `dokku git:from-image rocketcrab <preserved-rollback-tag>` and repeat
 health checks. **The old Node20 image restores the CVE exposure**; report that
 clearly. Restoring server source refs is a separate reviewed operation, not needed

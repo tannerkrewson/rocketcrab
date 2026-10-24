@@ -1,8 +1,11 @@
 name: Build deployment image (off-host)
 
-# Deliberately no push trigger: the shared host must not compile Next or receive
-# duplicate deployments. A reviewed admin import is a separate, serialized step.
+# Pushes build an artifact only: the shared host never compiles Next here.
+# A reviewed admin import is a separate, serialized step.
 on:
+    push:
+        branches:
+            - prod
     workflow_dispatch:
         inputs:
             ref:
@@ -23,7 +26,7 @@ jobs:
         steps:
             - uses: actions/checkout@v4
               with:
-                  ref: ${{ inputs.ref }}
+                  ref: ${{ inputs.ref || github.ref }}
                   fetch-depth: 0
             - name: Build committed source with Podman
               run: bash scripts/build-image.sh HEAD localhost/rocketcrab:ci-${{ github.run_id }} "$RUNNER_TEMP/rocketcrab.tar"
@@ -34,4 +37,5 @@ jobs:
                       ${{ runner.temp }}/rocketcrab.tar
                       ${{ runner.temp }}/rocketcrab.tar.sha256
                       ${{ runner.temp }}/rocketcrab.tar.image-id
+                      ${{ runner.temp }}/rocketcrab.tar.source-commit
                   retention-days: 7
