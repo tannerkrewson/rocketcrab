@@ -18,6 +18,12 @@ base='docker.io/gliderlabs/herokuish@sha256:475ba6ea9eaa02934eb694d842c61adcdd49
 command -v podman >/dev/null
 exec 9>/tmp/dokku-cve-offhost-build.lock
 flock 9
+# A client killed while attached can leave its container building after the lock
+# fd closes. Refuse to overlap with any such orphan; reconcile it explicitly.
+if podman ps --filter name='^/rocketcrab-build-' --format '{{.Names}}' | grep -q .; then
+    echo 'An existing Rocketcrab build container is still running; reconcile it first' >&2
+    exit 1
+fi
 source_dir=$(mktemp -d "$artifact_dir/source.XXXXXX")
 container="rocketcrab-build-${revision:0:12}-$$"
 cleanup() {

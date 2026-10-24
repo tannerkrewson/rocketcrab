@@ -23,7 +23,12 @@ compiling Next on the shared 1CPU/2GB host or deploying twice.
 FROM-only Dockerfile. The application source remains in GitHub and the image's
 OCI revision label; the generated Dokku commit is not the application source SHA.
 The admin script protects the old image and bundles the original server Git refs
-before this change. Do not later git-push source to Dokku expecting this off-host
+before this change. Read-only preparation confirmed Rocketcrab's effective original
+routing is `http:80:5000 https:443:5000`, inferred rather than explicitly set.
+The remote job re-reads the effective app mappings at deployment time, records
+them privately, explicitly preserves them with app-only `dokku ports:set` before
+import, and compares them immediately after switching. EXPOSE must not replace
+public 80/443 mappings with inferred port-5000 mappings. Do not later git-push source to Dokku expecting this off-host
 pipeline: that would trigger an on-host build again. GitHub `prod` pushes now
 build artifacts only and do not SSH to Dokku.
 
@@ -52,16 +57,19 @@ podman rm rocketcrab-check
 ```
 
 The build script serializes heavy local builds with the shared
-`/tmp/dokku-cve-offhost-build.lock`. Interrupt/termination traps remove only the
-owned build container, holding the lock through cleanup. Allow long enough for
+`/tmp/dokku-cve-offhost-build.lock`. It also refuses to start while any
+`rocketcrab-build-*` container is still running, because a killed client can
+leave its container building after the lock fd closes. Interrupt/termination
+traps remove only the owned build container, holding the lock through cleanup. Allow long enough for
 lock waiting plus the entire build/archive save; do not use short harness timeouts
 that may leave a container running after its client is killed. If interrupted,
 reconcile that owned container before launching another build. Final metadata is `/start web`, port 5000,
 with herokuish `/start`, `/exec` and generated `/app/Procfile` retained. Dokku
 continues supplying runtime environment/config; none is copied from production.
 
-The GitHub workflow offers the same build as a downloadable archive with checksum
-and image ID. It requires only GitHub `contents: read`, artifact storage and a
+Pushing the non-deploy `security/node22-brotli` branch triggers only CI tests;
+pushing `prod` triggers only the artifact build. The GitHub workflow offers the
+same build as a downloadable archive with checksum, image ID and source commit. It requires only GitHub `contents: read`, artifact storage and a
 runner with Podman; it uses no production SSH secret. A workflow_dispatch workflow
 must be present on the default branch before GitHub exposes its manual trigger.
 Until this change reaches default `dev`, use the local script above. Dispatch only
@@ -82,33 +90,59 @@ ROCKETCRAB_DEPLOY_APPROVED=yes mise exec -- bash scripts/deploy-image.sh \
   localhost/rocketcrab:node22-<source-prefix> <expected-image-id> <built-source-commit>
 ```
 
-The script checks disk/RAM headroom, uploads the archive, verifies its SHA256,
+The launcher refuses an archive on RAM-backed tmpfs, checks disk/RAM headroom,
+uploads the archive and reviewed
+`deploy-image-remote.sh` plus smoke script, then starts a **durable nohup remote
+job** with a private `deploy.log`, `deploy.pid`, and final `exit-status` marker.
+The launcher returns after dispatch, **not after successful deployment**. The
+whole import/check/rollback sequence survives SSH/harness disconnects. Monitor
+the printed release directory, checking for the marker before reading its value;
+never blindly retry a timed-out command. Use generous transfer timeouts or a
+disk-logged durable local launcher as well. Only exit-status `0`, independent
+health/runtime checks, and old-container retirement establish success.
+
+The remote job verifies SHA256,
 locks deployment, tags the current image for rollback, verifies a Git source
 bundle, imports without compilation, checks exact image ID/entrypoint/command,
 and calls `dokku git:from-image rocketcrab <unique-tag>`. It verifies the loaded
-image's source revision label, the running Node/npm versions, an internal HTTP
-check, and external HTTP/assets/party/WebSocket smoke checks. Failures trigger
+image's source revision label and metadata, the running Node/npm versions, a full
+HTTP/assets/party/WebSocket smoke inside the actual running container on its own
+port, host-side public routing/assets GETs through nginx (including the kids
+domain), and that the container stays running with no restart and its startup
+log captured.
+Failures trigger
 rollback to the protected old image, explicitly restoring the old CVE exposure.
-SSH is batch-only with strict host-key verification. It does not change Dokku
-config, restart other apps, prune, or upgrade the host. The tiny FROM-only Docker
-build is expected; an application compilation is not.
+SSH is batch-only with strict host-key verification. It changes only this app's
+preserved port mappings; it does not alter unrelated or global Dokku config,
+restart other apps, prune, or upgrade the host. The tiny FROM-only Docker build
+is expected; an application compilation is not.
 
-After switching, verify the **actual running web container**, not `dokku run`:
+The remote job also waits for old-container retirement before exit `0`. Exit `2`
+means the new app passed checks but retirement remains pending: keep the slot held
+and reconcile state, do not roll back or repeat the import blindly.
+
+After switching (and after the job exits), independently verify the **actual
+running web container**, not `dokku run`:
 Node v22.23.4, npm10.x, no startup errors/OOM/restart loop; then run
 `mise exec -- node scripts/smoke-runtime.mjs https://rocketcrab.com` and review
-`https://kids.rocketcrab.com` lightly. The smoke test creates one in-memory party.
-Check other apps' container state only; do not create games on them. Existing
-Rocketcrab in-memory parties are lost during the authorized restart.
+`https://kids.rocketcrab.com` lightly. The external smoke test creates one in-memory
+party and checks the public WebSocket path; if it fails, roll back rather than
+leaving a bad deployment. Check other apps' container state only; do not create
+games on them. Existing Rocketcrab in-memory parties are lost during the authorized
+restart.
 
 ## Failure containment and rollback
 
 If a deploy fails, inspect whether the existing container still serves traffic;
 do not repeat builds blindly. The admin script leaves its root-only release
 directory containing `rollback-image.txt`, `source-before.bundle`, source ref and
-new built-source commit. It removes only its successfully consumed upload archive.
+new built-source commit, original/after routing reports and durable job logs/exit
+marker. It removes only its successfully consumed upload archive.
 Preserve the backup metadata/images until explicitly approved for cleanup. Roll back only
-Rocketcrab with `dokku git:from-image rocketcrab <preserved-rollback-tag>` and repeat
-health checks. **The old Node20 image restores the CVE exposure**; report that
+Rocketcrab with app-only commands: `dokku ports:set rocketcrab http:80:5000
+https:443:5000`, then `dokku git:from-image rocketcrab
+dokku/rocketcrab:rollback-<stamp>` (read the exact tag from the release directory's
+`rollback-image.txt`), then repeat health checks. **The old Node20 image restores the CVE exposure**; report that
 clearly. Restoring server source refs is a separate reviewed operation, not needed
 for image rollback. Never force-push the generated Dokku source history.
 
