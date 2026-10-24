@@ -5,6 +5,30 @@ import "fake-indexeddb/auto";
 // Router scrolls on route changes); override it to keep test output clean.
 window.scrollTo = () => undefined;
 
+// Node 26 exposes an experimental `localStorage` global that is undefined
+// unless --localstorage-file is passed, and Vitest then leaves jsdom's storage
+// unreachable from tests. Install a small in-memory Storage implementation when
+// the environment provides none, so bare `localStorage`/`window.localStorage`
+// behave identically on every supported Node version (CI pins 24).
+function installMemoryStorage(key: "localStorage" | "sessionStorage"): void {
+  if (typeof globalThis[key]?.getItem === "function") return;
+  const area = new Map<string, string>();
+  const storage: Storage = {
+    get length() {
+      return area.size;
+    },
+    clear: () => area.clear(),
+    getItem: (name) => area.get(String(name)) ?? null,
+    key: (index) => [...area.keys()][index] ?? null,
+    removeItem: (name) => void area.delete(String(name)),
+    setItem: (name, value) => void area.set(String(name), String(value)),
+  };
+  Object.defineProperty(globalThis, key, { value: storage, configurable: true, writable: true });
+  Object.defineProperty(window, key, { value: storage, configurable: true, writable: true });
+}
+installMemoryStorage("localStorage");
+installMemoryStorage("sessionStorage");
+
 // ---------------------------------------------------------------------------
 // Realm-safe TextEncoder (P3/P4 binary chunk path).
 //
