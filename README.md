@@ -79,6 +79,8 @@ canonical index or an ADR:
   (`threat-model.md`), and the deployment guide (`deployment.md`).
 - `docs/api/nova-api.md` — the full game-developer API reference; the
   condensed, prompt-embedded version is `docs/api/nova-api-ai-reference.md`.
+- `docs/game-author-debugging.md` — the authoring loop, editor diagnostics,
+  common failure messages, and how to debug a real party.
 - `docs/testing/` — milestone findings and checklists, each linked from its
   owning ADR (e.g. the S4 state-mode vertical slice from ADR-0006).
 - `docs/editor-cohesion-design.md` — the editor third-pass UI blueprint

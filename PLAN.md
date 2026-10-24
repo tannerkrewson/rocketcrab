@@ -197,6 +197,9 @@ independent of the implemented watchdog.
 Changing the public discovery path still requires owner approval. The current
 pinned list is unchanged.
 
+- [x] Ran the real adapter end-to-end on one machine through public Nostr
+      relays and WebRTC (`npm run test:e2e:trystero`): 4/4 passed, including a
+      game-source transfer and relay diagnostics. Same-machine only.
 - [x] Re-probed on 2026-10-24 from the developer network with a stricter probe
       (`scripts/probes/probe-trystero-kinds.mjs`): nine kinds across Trystero's
       derived 20000–29999 range plus 12-event bursts, two runs.
@@ -307,6 +310,8 @@ rewriting completed work blindly.
 - [ ] Verify state, simulation, and raw sample games, automatic authority
       migration, byte-identical peer-to-peer source transfer, and backendless
       four-letter codes. Confirm no obsolete application backend remains in Nova.
+- [x] Added `docs/game-author-debugging.md` (authoring loop, diagnostics,
+      common failures, party debugging) and indexed it from the README.
 - [ ] Audit README, API reference, game-author/debugging/mobile/deployment guides,
       architecture diagrams, prompt docs, security limitations, browser support,
       contributing guidance, and non-goals. Keep media claims experimental where

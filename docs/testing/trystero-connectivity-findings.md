@@ -377,6 +377,18 @@ mitigation, not a guarantee: a party whose allocation has already failed may
 still need the existing reconnect path. A cross-network party longer than ten
 minutes remains a required physical test.
 
+## Real signaling + WebRTC on one machine (2026-10-24)
+
+`npm run test:e2e:trystero` ran in the Playwright container with host
+networking: 4/4 passed. Two Chromium pages joined through public Nostr relays
+and the real adapter, exchanged structured and binary messages, transferred a
+1 MiB payload with progress, pinged, left cleanly, and reported diagnostics.
+The discovery probe measured **2,034 ms** with the pinned seven relays
+(including the rejecting ones) vs **2,031 ms** with a healthy four-relay set;
+the pinned set produced two relay-failure console lines and the healthy set
+produced none. This covers real public signaling and loopback WebRTC, **not**
+NAT traversal between networks.
+
 ## Automated browser evidence (2026-10-24)
 
 The full Playwright suite ran in the Playwright 1.62.1 container (host network)
