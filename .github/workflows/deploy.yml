@@ -1,24 +1,37 @@
-name: deploy
+name: Build deployment image (off-host)
 
+# Deliberately no push trigger: the shared host must not compile Next or receive
+# duplicate deployments. A reviewed admin import is a separate, serialized step.
 on:
-    push:
-        branches:
-            - prod
+    workflow_dispatch:
+        inputs:
+            ref:
+                description: Source ref to build (does not deploy)
+                required: true
+                default: prod
+
+permissions:
+    contents: read
+
+concurrency:
+    group: rocketcrab-image-build
+    cancel-in-progress: false
 
 jobs:
     build:
         runs-on: ubuntu-latest
-
         steps:
             - uses: actions/checkout@v4
               with:
-                  ref: "prod"
-                  fetch-depth: "0"
-
-            - name: Dokku deploy
-              uses: vitalyliber/dokku-github-action@v7.1
-              env:
-                  PRIVATE_KEY: ${{ secrets.PRIVATE_KEY }}
-                  HOST: 134.209.222.77
-                  PROJECT: rocketcrab
-                  BRANCH: prod
+                  ref: ${{ inputs.ref }}
+                  fetch-depth: 0
+            - name: Build committed source with Podman
+              run: bash scripts/build-image.sh HEAD localhost/rocketcrab:ci-${{ github.run_id }} "$RUNNER_TEMP/rocketcrab.tar"
+            - uses: actions/upload-artifact@v4
+              with:
+                  name: rocketcrab-image-${{ github.run_id }}
+                  path: |
+                      ${{ runner.temp }}/rocketcrab.tar
+                      ${{ runner.temp }}/rocketcrab.tar.sha256
+                      ${{ runner.temp }}/rocketcrab.tar.image-id
+                  retention-days: 7

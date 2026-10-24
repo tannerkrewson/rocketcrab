@@ -99,7 +99,7 @@
     },
     "homepage": "https://rocketcrab.com/",
     "engines": {
-        "node": "20.x",
+        "node": "22.23.4",
         "npm": "10.x"
     }
 }
