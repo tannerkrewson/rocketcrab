@@ -110,7 +110,11 @@ function cspMetaPlugin(): Plugin {
 // from route-tree generation via the ignore pattern.
 export default defineConfig(({ mode }) => ({
   plugins: [
-    TanStackRouterVite({ target: "react", routeFileIgnorePattern: ".*\\.test\\.tsx$" }),
+    TanStackRouterVite({
+      target: "react",
+      autoCodeSplitting: true,
+      routeFileIgnorePattern: ".*\\.test\\.tsx$",
+    }),
     react(),
     tailwindcss(),
     cspMetaPlugin(),

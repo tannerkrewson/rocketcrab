@@ -98,6 +98,7 @@ interface FakeRoom {
   onPeerLeave: ((peerId: string) => void) | null;
   leave: ReturnType<typeof vi.fn>;
   ping: ReturnType<typeof vi.fn>;
+  getPeers: ReturnType<typeof vi.fn>;
   makeAction: ReturnType<typeof vi.fn>;
   action: FakeAction;
 }
@@ -109,6 +110,7 @@ function makeFakeRoom(): FakeRoom {
     onPeerLeave: null,
     leave: vi.fn(async () => undefined),
     ping: vi.fn(async (_peerId: string) => 1),
+    getPeers: vi.fn(() => ({})),
     makeAction: vi.fn(
       (
         _namespace: string,
@@ -331,6 +333,44 @@ describe("TrysteroTransport join", () => {
     void clock;
     const [config] = mocks.joinRoom.mock.calls[0]!;
     expect(config.turnConfig).toEqual(turnConfig);
+  });
+
+  it("refreshes TURN credentials on active peers and preserves non-TURN servers", async () => {
+    const initial = [{ urls: "turn:old.example:3478", username: "old", credential: "old" }];
+    const updated = [{ urls: "turns:new.example:5349", username: "new", credential: "new" }];
+    const { adapter, clock } = setup({ turnConfig: initial });
+    const room = makeFakeRoom();
+    const setConfiguration = vi.fn();
+    const peer = {
+      getConfiguration: () => ({
+        bundlePolicy: "max-bundle",
+        iceServers: [
+          { urls: "stun:stun.example:3478" },
+          {
+            urls: ["stun:mixed.example:3478", "turn:old.example:3478"],
+            username: "old",
+            credential: "old",
+          },
+        ],
+      }),
+      setConfiguration,
+    };
+    room.getPeers.mockReturnValue({ p2: peer });
+    mocks.joinRoom.mockReturnValue(room);
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    await joinConnected(adapter, clock);
+
+    adapter.updateTurnConfig(updated);
+    expect(setConfiguration).toHaveBeenCalledOnce();
+    expect(setConfiguration.mock.calls[0]?.[0]).toEqual({
+      bundlePolicy: "max-bundle",
+      iceServers: [
+        { urls: "stun:stun.example:3478" },
+        { urls: ["stun:mixed.example:3478"], username: "old", credential: "old" },
+        ...updated,
+      ],
+    });
+    expect(room.getPeers.mock.results[0]?.value).toBeDefined();
   });
 });
 

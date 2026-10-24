@@ -290,6 +290,7 @@ function makePlayer(
   const engine = new PartyEngine({
     transportFactory: world.factory,
     schedule: world.clock.schedule,
+    now: world.clock.now,
     derive: mockDerive,
     seams: harness.seams,
     identity: { memberId, displayName: `Player ${id}` },
@@ -1843,6 +1844,41 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
       onJoinError: expect.any(Function),
       turnConfig,
     });
+  });
+
+  it("refreshes before the 600s expiry and applies credentials to both live transports", async () => {
+    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", "https://turn-creds.example.workers.dev");
+    const world = makeWorld();
+    const updateTurnConfig = vi.fn();
+    const factory = { ...world.factory, updateTurnConfig };
+    transportFactoryMocks.createTrysteroPartyTransportFactory.mockReturnValue(factory);
+    const first = [{ urls: "turn:one", username: "u1", credential: "c1" }];
+    const second = [{ urls: "turn:two", username: "u2", credential: "c2" }];
+    const turnCreds = vi
+      .fn<() => Promise<TurnCredentialsResult>>()
+      .mockResolvedValueOnce({ ok: true, turnConfig: first })
+      .mockResolvedValueOnce({ ok: true, turnConfig: second });
+    const player = makePlayer(world, "host", { transportFactory: undefined, turnCreds });
+    await runCreate(player, world);
+    expect(updateTurnConfig).not.toHaveBeenCalled();
+    world.clock.advance(480_000);
+    await settle(world);
+    expect(turnCreds).toHaveBeenCalledTimes(2);
+    expect(updateTurnConfig).toHaveBeenCalledWith(second);
+    expect(player.engine.getState().diagnostics?.turn).toBe("configured");
+    await player.engine.leaveParty();
+  });
+
+  it("does not mint when the transport factory is injected (tests/embedders)", async () => {
+    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", "https://turn-creds.example.workers.dev");
+    const world = makeWorld();
+    const turnCreds = vi.fn(
+      async (): Promise<TurnCredentialsResult> => ({ ok: true, turnConfig: [] }),
+    );
+    const player = makePlayer(world, "host", { turnCreds });
+    await runCreate(player, world);
+    expect(turnCreds).not.toHaveBeenCalled();
+    await player.engine.leaveParty();
   });
 });
 

@@ -127,15 +127,24 @@ describe("fetchTurnCredentials", () => {
     });
   });
 
-  it("returns ok with an empty turnConfig when every entry is STUN-only", async () => {
+  it("reports unavailability instead of falsely configured TURN for a STUN-only response", async () => {
     vi.stubEnv("VITE_TURN_CREDS_ORIGIN", MINT_ORIGIN);
     vi.stubGlobal(
       "fetch",
       responseMock(200, { iceServers: [{ urls: "stun:stun.example.com:19302" }] }),
     );
     const result = await fetchTurnCredentials();
-    expect(result).toEqual({ ok: true, turnConfig: [] });
+    expect(result).toEqual({ ok: false, reason: "the mint returned no usable TURN servers." });
   });
+
+  it.each([null, false, 42, "not-an-object"])(
+    "degrades on a primitive JSON body: %j",
+    async (body) => {
+      vi.stubEnv("VITE_TURN_CREDS_ORIGIN", MINT_ORIGIN);
+      vi.stubGlobal("fetch", responseMock(200, body));
+      await expect(fetchTurnCredentials()).resolves.toMatchObject({ ok: false });
+    },
+  );
 
   it("degrades on a non-2xx response (403 origin / 5xx mint outage)", async () => {
     vi.stubEnv("VITE_TURN_CREDS_ORIGIN", MINT_ORIGIN);

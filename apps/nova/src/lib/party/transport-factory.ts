@@ -37,28 +37,40 @@ export interface TrysteroPartyTransportFactoryOptions {
   readonly onJoinError?: (error: TrysteroJoinError) => void;
 }
 
+export interface RefreshablePartyTransportFactory extends PartyTransportFactory {
+  updateTurnConfig(servers: readonly TurnServerConfigLike[]): void;
+}
+
 /** The transport factory real parties run over (dev/prod appId by env). */
 export function createTrysteroPartyTransportFactory(
   options: TrysteroPartyTransportFactoryOptions = {},
-): PartyTransportFactory {
-  const { turnConfig, onJoinError } = options;
+): RefreshablePartyTransportFactory {
+  let turnConfig = options.turnConfig;
+  const { onJoinError } = options;
+  const transports = new Set<TrysteroTransport>();
+  const create = (
+    identity:
+      | Parameters<PartyTransportFactory["createPrivateTransport"]>[0]
+      | Parameters<PartyTransportFactory["createRendezvousTransport"]>[0],
+  ) => {
+    const transport = new TrysteroTransport({
+      memberId: identity.memberId,
+      displayName: identity.displayName,
+      ...("password" in identity ? { password: identity.password } : {}),
+      ...(turnConfig !== undefined ? { turnConfig } : {}),
+      ...(onJoinError !== undefined ? { onJoinError } : {}),
+    });
+    transports.add(transport);
+    return transport;
+  };
   return {
-    createRendezvousTransport(identity) {
-      return new TrysteroTransport({
-        memberId: identity.memberId,
-        displayName: identity.displayName,
-        ...(turnConfig !== undefined ? { turnConfig } : {}),
-        ...(onJoinError !== undefined ? { onJoinError } : {}),
-      });
+    updateTurnConfig(servers) {
+      turnConfig = servers;
+      for (const transport of transports) {
+        transport.updateTurnConfig(servers);
+      }
     },
-    createPrivateTransport(identity) {
-      return new TrysteroTransport({
-        memberId: identity.memberId,
-        displayName: identity.displayName,
-        password: identity.password,
-        ...(turnConfig !== undefined ? { turnConfig } : {}),
-        ...(onJoinError !== undefined ? { onJoinError } : {}),
-      });
-    },
+    createRendezvousTransport: create,
+    createPrivateTransport: create,
   };
 }

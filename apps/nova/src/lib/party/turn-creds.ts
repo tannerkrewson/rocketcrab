@@ -64,6 +64,10 @@ export type TurnCredentialsResult =
  * setup meaningfully; the timeout aborts the fetch and degrades to no-TURN.
  */
 export const TURN_CREDS_FETCH_TIMEOUT_MS = 4_000;
+/** Must match the mint Worker's fixed 600-second TTL. */
+export const TURN_CREDS_TTL_MS = 600_000;
+/** Refresh with two minutes left; never extend credential TTL to hide expiry. */
+export const TURN_CREDS_REFRESH_MS = 480_000;
 
 /** Injectable fetch + timeout (tests pass a stub fetch / short timeout). */
 export interface TurnCredsFetchOptions {
@@ -167,7 +171,10 @@ export async function fetchTurnCredentials(
     } catch {
       return { ok: false, reason: "the mint returned a non-JSON response." };
     }
-    const iceServers = (body as { iceServers?: unknown }).iceServers;
+    const iceServers =
+      typeof body === "object" && body !== null
+        ? (body as { iceServers?: unknown }).iceServers
+        : undefined;
     if (!Array.isArray(iceServers)) {
       return { ok: false, reason: "the mint returned an unexpected response shape." };
     }
@@ -176,6 +183,15 @@ export async function fetchTurnCredentials(
       username: server.username,
       credential: server.credential,
     }));
+    if (
+      !turnConfig.some((server) =>
+        (Array.isArray(server.urls) ? server.urls : [server.urls]).some((url) =>
+          /^turns?:/i.test(url),
+        ),
+      )
+    ) {
+      return { ok: false, reason: "the mint returned no usable TURN servers." };
+    }
     return { ok: true, turnConfig };
   } finally {
     clearTimeout(timer);

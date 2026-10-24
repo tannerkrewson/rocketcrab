@@ -99,6 +99,9 @@ export class TrysteroTransport implements NovaTransport {
   roomName = "";
 
   private readonly options: InternalOptions;
+  // Keep this array stable: Trystero 0.25.3's offer pool closes over the
+  // initial room config, including when allocating peers for later rooms.
+  private readonly turnServers: TurnServerConfig[];
   private readonly now: () => number;
   private readonly scheduleFn: (callback: () => void, delayMs: number) => () => void;
   /** Page-level Trystero peer ID, captured once (per-module constant). */
@@ -153,6 +156,7 @@ export class TrysteroTransport implements NovaTransport {
         message: "TrysteroTransport: redundancy must be at least 1.",
       });
     }
+    this.turnServers = [...(options.turnConfig ?? [])];
     this.selfMemberId = options.memberId;
     this.displayName = options.displayName;
     const env: AppIdEnvironment = options.env ?? currentAppIdEnvironment();
@@ -382,6 +386,31 @@ export class TrysteroTransport implements NovaTransport {
   // Diagnostics (adapter-specific; not part of the NovaTransport surface)
   // ------------------------------------------------------------------
 
+  /**
+   * Refresh ephemeral credentials without leaving the party. Preserve STUN and
+   * other RTC options; mutate the retained room config for future offers too.
+   * Cloudflare documents setConfiguration() for active credential refresh.
+   * This does not force an ICE restart or claim to repair a failed allocation.
+   */
+  updateTurnConfig(servers: readonly TurnServerConfig[]): void {
+    this.turnServers.splice(0, this.turnServers.length, ...servers);
+    this.applyTurnConfigToPeers();
+  }
+
+  private applyTurnConfigToPeers(): void {
+    for (const pc of Object.values(this.room?.getPeers() ?? {})) {
+      const current = pc.getConfiguration();
+      const nonTurn = (current.iceServers ?? []).flatMap((server) => {
+        if (typeof server.urls === "string") {
+          return /^turns?:/i.test(server.urls) ? [] : [server];
+        }
+        const urls = server.urls.filter((url) => !/^turns?:/i.test(url));
+        return urls.length === 0 ? [] : [{ ...server, urls }];
+      });
+      pc.setConfiguration({ ...current, iceServers: [...nonTurn, ...this.turnServers] });
+    }
+  }
+
   /** Latest relay socket snapshot, or null before the first poll. */
   getRelayDiagnostics(): RelayDiagnostics | null {
     return this.lastRelayDiagnostics;
@@ -454,9 +483,7 @@ export class TrysteroTransport implements NovaTransport {
     if (this.options.password !== undefined) {
       config.password = this.options.password;
     }
-    if (this.options.turnConfig !== undefined && this.options.turnConfig.length > 0) {
-      config.turnConfig = [...this.options.turnConfig];
-    }
+    config.turnConfig = this.turnServers;
     if (this.options.rtcConfig !== undefined) {
       config.rtcConfig = this.options.rtcConfig;
     }
@@ -514,6 +541,19 @@ export class TrysteroTransport implements NovaTransport {
   }
 
   private handlePeerJoin(peerId: string): void {
+    // A pending offer can predate the latest mint; update it on activation.
+    if (this.turnServers.length > 0) {
+      try {
+        this.applyTurnConfigToPeers();
+      } catch (error) {
+        this.handleJoinError({
+          error: `TURN credential refresh failed: ${String(error)}`,
+          appId: this.appId,
+          roomId: this.roomName,
+          peerId,
+        });
+      }
+    }
     const identity = this.identityForPeer(peerId);
     if (!this.peersList.some((peer) => peer.connectionId === identity.connectionId)) {
       const joinedAt = this.now();
