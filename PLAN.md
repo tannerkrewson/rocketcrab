@@ -23,6 +23,16 @@ and old theme work; keep physical-device and deployment gates explicit.
 
 ### 2. Private invites replace discovery and admission
 
+**Paused for owner clarification:** after the creator leaves, who may select or
+change games, remove a participant, and reload everyone's frames? Current shell
+controls are permanently creator-only (`engine.ts`), independent of both greeter
+and game authority. Options: transfer shell controls to a deterministic remaining
+participant, or allow all participants to manage the party. The latter removes a
+role but changes product permissions. Classic external iframe games also have
+provider-specific host roles that Nova cannot generically migrate; shell-control
+succession must not claim to migrate those external game hosts. No stage-2 code
+has been changed pending this decision.
+
 - [ ] Generate one cryptographically secure high-entropy party secret in the
       fragment. Use Trystero room discovery/password; automatic joining, native
       sharing, copy fallback, displayed QR (no scanner, accounts, or approval).
