@@ -65,6 +65,11 @@ Packages are consumed as TypeScript source by the apps (via the npm workspace
 protocol); Vite handles transpilation at build time. A package's `build` script
 type-checks its source; apps produce real static bundles with `vite build`.
 
+## Remaining work
+
+See [`PLAN.md`](PLAN.md) for the complete remaining-work backlog, owner decisions,
+deployment gates, and release-validation checklist.
+
 ## Documentation
 
 The docs tree is the single source of truth; every file is owned by a
