@@ -138,17 +138,22 @@ repo's Pages settings).
 
 Inputs:
 
-| Input            | Used for | Meaning                                                                                                                      |
-| ---------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `origin`         | both     | `nova` (main app) or `runtime` (runtime origin)                                                                              |
-| `base`           | both     | Vite base of THIS site: `/` for user/org sites and custom domains; `/<repo>/` for project sites                              |
-| `runtime_origin` | nova     | The runtime origin, e.g. `https://runtime.nova.example` — REQUIRED; baked into the iframe URL and CSP `frame-src`            |
-| `runtime_base`   | nova     | Base path of the runtime site when it is a project site, e.g. `/runtime/` (default `/`)                                      |
-| `main_origin`    | runtime  | The main origin for the exact-origin bootstrap check; derived (strip `runtime.`) unless the deployment is not on a subdomain |
+| Input               | Used for | Meaning                                                                                                                          |
+| ------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------- |
+| `origin`            | both     | `nova` (main app) or `runtime` (runtime origin)                                                                                  |
+| `base`              | both     | Vite base of THIS site: `/` for user/org sites and custom domains; `/<repo>/` for project sites                                  |
+| `runtime_origin`    | nova     | The runtime origin, e.g. `https://runtime.nova.example` — REQUIRED; baked into the iframe URL and CSP `frame-src`                |
+| `runtime_base`      | nova     | Base path of the runtime site when it is a project site, e.g. `/runtime/` (default `/`)                                          |
+| `main_origin`       | runtime  | The main origin for the exact-origin bootstrap check; derived (strip `runtime.`) unless the deployment is not on a subdomain     |
+| `relay_origin`      | nova     | Optional classic-game CORS relay origin, baked in as `VITE_CLASSIC_RELAY_ORIGIN` and allowed in CSP `connect-src`                |
+| `turn_creds_origin` | nova     | Optional TURN credential mint origin, baked in as `VITE_TURN_CREDS_ORIGIN` and allowed in CSP `connect-src`; empty disables TURN |
+| `trystero_relays`   | nova     | Optional comma-separated, owner-approved Nostr relay URLs (`VITE_TRYSTERO_RELAYS`); empty uses the reviewed pinned set           |
 
 Build-time pins (also documented in `apps/nova/.env.example` and
 `apps/runtime/.env.example`): `VITE_RUNTIME_ORIGIN`, `VITE_RUNTIME_BASE`
-(nova); `VITE_MAIN_ORIGIN` (runtime).
+(nova); `VITE_MAIN_ORIGIN` (runtime). Optional nova pins:
+`VITE_CLASSIC_RELAY_ORIGIN`, `VITE_TURN_CREDS_ORIGIN`, and
+`VITE_TRYSTERO_RELAYS` (see the workflow inputs).
 
 ### Cloudflare runtime boundary
 
