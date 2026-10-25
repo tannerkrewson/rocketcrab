@@ -37,4 +37,5 @@ node_modules
 *.tfstate.*
 *.tfvars
 !*.tfvars.example
+deploy/opentofu/backend.hcl
 deploy/opentofu/.build/

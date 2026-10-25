@@ -74,16 +74,47 @@ with a dummy account ID. It never runs `tofu apply` or a Wrangler deployment.
 A plan with real credentials remains an explicit operator command until the
 state and secret decisions below are resolved.
 
-## State and import strategy
+## State, locking, and backups (R2)
 
-There is deliberately no backend block yet. The coordinator must answer which
-encrypted remote backend, locking mechanism, retention policy, and CI identity
-are approved before a shared state file is used. Local state is for an
-operator's private migration rehearsal only; `*.tfstate*` is ignored and no
-state is committed.
+State lives in a private Cloudflare R2 bucket, not in Git and not on a laptop.
+`backend.tf` is a partial S3-compatible backend; bucket and endpoint come from
+an ignored `backend.hcl` (copy `backend.hcl.example`). Credentials come from
+`AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` for a bucket-scoped R2 token with
+Object Read & Write. The provider token remains `CLOUDFLARE_API_TOKEN`.
 
-The relay is already live but has never been represented by OpenTofu. Do not
-apply this root until the relay has been imported and its plan reviewed:
+One-time bootstrap (no OpenTofu apply; creates a billable R2 bucket only after
+owner approval):
+
+```sh
+wrangler r2 bucket create rocketcrab-tofu-state
+# R2 dashboard/API: create a bucket-scoped Object Read & Write token.
+cp deploy/opentofu/backend.hcl.example deploy/opentofu/backend.hcl
+# replace the account ID in backend.hcl
+export AWS_ACCESS_KEY_ID=...
+export AWS_SECRET_ACCESS_KEY=...
+tofu -chdir=deploy/opentofu init -backend-config=backend.hcl
+```
+
+`use_lockfile = true` uses S3-compatible conditional writes for locking (R2
+supports them; confirm on first use). If the bucket does not exist, init fails
+loudly — do not fall back to a committed or shared local state.
+
+Before any approved apply, take a backup:
+
+```sh
+tofu -chdir=deploy/opentofu state pull > "state-$(date -u +%Y%m%dT%H%M%SZ).json"
+```
+
+Keep the backup outside the repo. Restore only with an explicitly reviewed
+`tofu state push <file>` after confirming the target workspace. Never hand-edit
+state. The repository ignores `*.tfstate*`, `*.tfvars`, `backend.hcl`, and
+`.terraform/`.
+
+## Ownership and import strategy
+
+The relay Worker is live; the TURN route, KV namespace, custom route/domain and
+rate rule are not. Import the live relay before any write; do not import or
+create the rest until the owner approves provisioning.
 
 ```sh
 tofu -chdir=deploy/opentofu import \
@@ -94,32 +125,28 @@ tofu -chdir=deploy/opentofu import \
   "<CLOUDFLARE_ACCOUNT_ID>/rocketcrab-cors-relay"
 ```
 
-That command is documented for the future migration only and was not run for
-this bead. Both provider import IDs are `<account_id>/<script_name>`. The
-bundle hash, bindings, and workers.dev setting must be compared with the live
-resources before any write. `prevent_destroy` is set on the relay and every
-managed persistent resource so a mismatch cannot silently become a
-delete/recreate operation.
+Both import IDs are `<account_id>/<script_name>`. Compare the live bundle hash,
+bindings, and workers.dev setting with the plan before applying;
+`prevent_destroy` is set on the Worker and every persistent resource so a
+mismatch cannot silently become delete/recreate. If the KV namespace or optional
+route/domain appears before adoption, stop and record their IDs instead of
+letting the plan create duplicates.
 
-The TURN route and KV namespace are not live according to the inventory in
-`deploy/cloudflare.md`; they should not be imported. If a human creates them
-before the migration, stop and record their IDs, then use the provider's
-documented import formats instead of allowing duplicate resources:
+## Secrets (outside state)
+
+Worker secret values never enter Git or OpenTofu state. OpenTofu preserves
+existing `secret_text` bindings with `keep_bindings`. After an approved apply,
+set or rotate them against the edge Worker and verify the names exist:
 
 ```sh
-tofu -chdir=deploy/opentofu import cloudflare_workers_kv_namespace.turn_budget \
-  "<CLOUDFLARE_ACCOUNT_ID>/<NAMESPACE_ID>"
-tofu -chdir=deploy/opentofu import 'cloudflare_workers_route.turn[0]' \
-  "<CLOUDFLARE_ZONE_ID>/<ROUTE_ID>"
-tofu -chdir=deploy/opentofu import 'cloudflare_workers_custom_domain.turn[0]' \
-  "<CLOUDFLARE_ACCOUNT_ID>/<DOMAIN_ID>"
-tofu -chdir=deploy/opentofu import 'cloudflare_ruleset.turn_rate_limit[0]' \
-  "zones/<CLOUDFLARE_ZONE_ID>/<RULESET_ID>"
+wrangler secret put TURN_KEY_ID --config deploy/edge/wrangler.toml
+wrangler secret put TURN_KEY_API_TOKEN --config deploy/edge/wrangler.toml
+wrangler secret list --config deploy/edge/wrangler.toml
 ```
 
-The route, custom domain, and ruleset addresses exist only when their matching
-variables are configured. The provider documents the ruleset import prefix as
-`zones/<zone_id>` or `accounts/<account_id>`.
+Create/rotate the Cloudflare Realtime TURN key in the Realtime dashboard or API;
+revoke credentials at Cloudflare if issuance is abused. See
+`deploy/cloudflare.md` for the full emergency procedure.
 
 ## Explicit gaps and human decisions
 

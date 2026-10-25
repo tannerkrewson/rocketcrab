@@ -1,0 +1,4 @@
+# Copy to deploy/opentofu/backend.hcl (ignored) and replace the account ID.
+# The R2 bucket is private and holds only OpenTofu state.
+bucket    = "rocketcrab-tofu-state"
+endpoints = { s3 = "https://REPLACE_WITH_CLOUDFLARE_ACCOUNT_ID.r2.cloudflarestorage.com" }

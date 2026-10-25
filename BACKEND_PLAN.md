@@ -64,19 +64,34 @@ later.
 
 ## Stage 2 — Reproducible OpenTofu state and ownership
 
-- [ ] Add R2 S3-compatible backend configuration as a documented partial
+- [x] Add R2 S3-compatible backend configuration as a documented partial
       configuration (`-backend-config`) so the repo can use private remote state
       without committing credentials or requiring a bucket at validate time.
-- [ ] Document bucket bootstrap, state locking (`use_lockfile`), encryption,
+- [x] Document bucket bootstrap, state locking (`use_lockfile`), encryption,
       backup/restore, and recovery.
-- [ ] Audit existing resources: relay may be live; TURN/KV never deployed.
+- [x] Audit existing resources: relay may be live; TURN/KV never deployed.
       Document import-before-apply and “do not replace live resources”.
-- [ ] Keep Worker secrets out of state; document TURN key bootstrap, secret
+- [x] Keep Worker secrets out of state; document TURN key bootstrap, secret
       set/verify/rotate/revoke as a short reproducible command sequence.
-- [ ] Add ignore rules for local state/plan/backups and verify no state or
+- [x] Add ignore rules for local state/plan/backups and verify no state or
       credentials are tracked.
 
 Do not create the R2 bucket or apply anything.
+
+Evidence: `deploy/opentofu/backend.tf` is a partial S3-compatible backend with
+`use_path_style`, `use_lockfile`, R2 skip checks, key `nova/terraform.tfstate`;
+bucket/endpoint come from ignored `backend.hcl` (example committed). R2 token
+credentials use `AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`; Cloudflare API token
+stays `CLOUDFLARE_API_TOKEN`. The OpenTofu README now covers one-time bucket and
+scoped-token bootstrap, `init -backend-config`, state pull backups and reviewed
+`state push` recovery, import-before-apply for the live relay, and secret
+set/list/rotate commands. `.gitignore` covers `backend.hcl`, state/backups,
+tfvars, `.terraform/`, and bundles. `tofu fmt -check`, `init -backend=false`,
+and `validate` pass locally with OpenTofu 1.13.2.
+
+Not verified live: R2 backend init/locking needs the private bucket and token,
+which were not created. `use_lockfile` with R2 is documented by OpenTofu but must
+be confirmed on first bootstrap. No resource was created or imported.
 
 ## Stage 3 — One deployment path
 
