@@ -54,25 +54,30 @@ Use the absolute `$PWD/...` output path: with some Wrangler versions a relative
 `worker.js`. OpenTofu supplies the real `TURN_BUDGET` binding after the
 namespace exists. Do not commit any generated bundle.
 
-Then validate and plan without applying:
+Then validate without touching state:
 
 ```sh
+tofu -chdir=deploy/opentofu init -backend=false
 tofu -chdir=deploy/opentofu validate
-tofu -chdir=deploy/opentofu plan -refresh=false
 ```
 
-`CLOUDFLARE_API_TOKEN` is read from the environment by the provider. Supply
-the required account ID with an ignored tfvars file or `-var`; never put an
-API token, Worker secret, state file, `.terraform` directory, or bundle in git.
-`-refresh=false` is useful for a local shape/content review, but a real review
-of imported state should use the normal refresh-enabled plan after import.
+`CLOUDFLARE_API_TOKEN` is read from the environment by the provider; supply the
+account ID with an ignored tfvars file or `-var`. Never commit an API token,
+Worker secret, state file, `.terraform` directory, backend config or bundle.
 
-The repository workflow `.github/workflows/infrastructure-plan.yml` builds
-both bundles with Wrangler `--dry-run`, then runs non-mutating `fmt`, provider
-initialization with `-backend=false`, `validate`, and a `-refresh=false` plan
-with a dummy account ID. It never runs `tofu apply` or a Wrangler deployment.
-A plan with real credentials remains an explicit operator command until the
-state and secret decisions below are resolved.
+**Planning requires the remote backend.** After the R2 bootstrap below,
+initialize with `-backend-config=backend.hcl` and run a refresh-enabled plan:
+
+```sh
+tofu -chdir=deploy/opentofu init -backend-config=backend.hcl
+tofu -chdir=deploy/opentofu plan
+```
+
+The repository workflow builds the edge bundle with Wrangler `--dry-run`, then
+runs non-mutating `fmt`, `init -backend=false`, and `validate`. It deliberately
+does **not** plan: a backend-blocked configuration cannot plan without state,
+and CI has no R2 credentials. Planning is an explicit operator step with real
+state. CI never runs `tofu apply` or a Wrangler deployment.
 
 ## State, locking, and backups (R2)
 
