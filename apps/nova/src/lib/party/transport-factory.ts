@@ -45,18 +45,13 @@ export interface TrysteroPartyTransportFactoryOptions {
   readonly onJoinError?: (error: TrysteroJoinError) => void;
 }
 
-export interface RefreshablePartyTransportFactory extends PartyTransportFactory {
-  updateTurnConfig(servers: readonly TurnServerConfigLike[]): void;
-}
-
 /** The transport factory real parties run over (dev/prod appId by env). */
 export function createTrysteroPartyTransportFactory(
   options: TrysteroPartyTransportFactoryOptions = {},
-): RefreshablePartyTransportFactory {
-  let turnConfig = options.turnConfig;
+): PartyTransportFactory {
+  const turnConfig = options.turnConfig;
   const { onJoinError } = options;
   const relays = options.relays ?? configuredRelays();
-  const transports = new Set<TrysteroTransport>();
   const create = (identity: Parameters<PartyTransportFactory["createPrivateTransport"]>[0]) => {
     const transport = new TrysteroTransport({
       memberId: identity.memberId,
@@ -66,16 +61,7 @@ export function createTrysteroPartyTransportFactory(
       ...(turnConfig !== undefined ? { turnConfig } : {}),
       ...(onJoinError !== undefined ? { onJoinError } : {}),
     });
-    transports.add(transport);
     return transport;
   };
-  return {
-    updateTurnConfig(servers) {
-      turnConfig = servers;
-      for (const transport of transports) {
-        transport.updateTurnConfig(servers);
-      }
-    },
-    createPrivateTransport: create,
-  };
+  return { createPrivateTransport: create };
 }

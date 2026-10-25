@@ -1752,7 +1752,7 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     expect(turnCreds).toHaveBeenCalledTimes(1);
 
     // Leave and create a second party on the same engine (the page
-    // singleton semantics): the cached minted config is reused.
+    // singleton semantics): the cached 24 h mint is reused.
     await player.engine.leaveParty();
     await runCreate(player, world);
     expect(turnCreds).toHaveBeenCalledTimes(1);
@@ -1762,27 +1762,26 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     });
   });
 
-  it("refreshes before the 600s expiry and applies credentials to both live transports", async () => {
+  it("mints again only after the 24 h lease expires, never mutating live peers", async () => {
     vi.stubEnv("VITE_TURN_CREDS_ORIGIN", "https://turn-creds.example.workers.dev");
     const world = makeWorld();
-    const updateTurnConfig = vi.fn();
-    const factory = { ...world.factory, updateTurnConfig };
-    transportFactoryMocks.createTrysteroPartyTransportFactory.mockReturnValue(factory);
-    const first = [{ urls: "turn:one", username: "u1", credential: "c1" }];
-    const second = [{ urls: "turn:two", username: "u2", credential: "c2" }];
-    const turnCreds = vi
-      .fn<() => Promise<TurnCredentialsResult>>()
-      .mockResolvedValueOnce({ ok: true, turnConfig: first })
-      .mockResolvedValueOnce({ ok: true, turnConfig: second });
-    const player = makePlayer(world, "host", { transportFactory: undefined, turnCreds });
+    const turnConfig = [{ urls: "turn:one", username: "u1", credential: "c1" }];
+    const turnCreds = vi.fn(async (): Promise<TurnCredentialsResult> => ({ ok: true, turnConfig }));
+    const player = makeDefaultFactoryPlayer(world, { turnCreds });
     await runCreate(player, world);
-    expect(updateTurnConfig).not.toHaveBeenCalled();
-    world.clock.advance(480_000);
-    await settle(world);
-    expect(turnCreds).toHaveBeenCalledTimes(2);
-    expect(updateTurnConfig).toHaveBeenCalledWith(second);
-    expect(player.engine.getState().diagnostics?.turn).toBe("configured");
+    expect(turnCreds).toHaveBeenCalledTimes(1);
     await player.engine.leaveParty();
+    world.clock.advance(23 * 60 * 60 * 1000);
+    await runCreate(player, world);
+    expect(turnCreds).toHaveBeenCalledTimes(1);
+    await player.engine.leaveParty();
+    world.clock.advance(2 * 60 * 60 * 1000);
+    await runCreate(player, world);
+    expect(turnCreds).toHaveBeenCalledTimes(2);
+    expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenLastCalledWith({
+      onJoinError: expect.any(Function),
+      turnConfig,
+    });
   });
 
   it("does not mint when the transport factory is injected (tests/embedders)", async () => {

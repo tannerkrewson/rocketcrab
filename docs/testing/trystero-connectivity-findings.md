@@ -376,12 +376,19 @@ for an existing allocation may require `restartIce()` plus renegotiation, which
 Trystero 0.25.3 does not expose per peer (`room.getPeers()` exposes the peer
 connections, but the adapter has no renegotiation path).
 
-Accordingly the client now re-mints at **8 minutes** (600 s TTL minus a
-2-minute safety margin), applies the new `iceServers` to live peers via
-`setConfiguration()`, and preserves non-TURN servers. This is honest
-mitigation, not a guarantee: a party whose allocation has already failed may
-still need the existing reconnect path. A cross-network party longer than ten
-minutes remains a required physical test.
+Stage 4 revisited this with the current FAQ: Cloudflare sets **no maximum
+TURN allocation duration** (the client keeps the allocation alive with
+authenticated TURN Refresh requests) and allows credentials up to **48 hours**.
+The earlier 600 s TTL plus 8-minute `setConfiguration()` re-mint was therefore
+unnecessary machinery that Nova could not validate on physical devices. The
+worker now mints one **24-hour** credential per party, the client mints once
+and never refreshes, and the custom GraphQL watchdog was removed in favour of
+native Cloudflare budget alerts and Billable Usage notifications. A leaked
+credential can relay for up to 24 hours; mint caps/rate limits bound issuance,
+not issued traffic, and Cloudflare's per-allocation limits bound a single
+allocation. A cross-network party longer than 24 hours (or one that outlives
+its credential) still requires reconnect + fresh mint, and physical-device
+proof remains a release gate.
 
 ## Real signaling + WebRTC on one machine (2026-10-24)
 

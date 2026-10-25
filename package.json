@@ -17,6 +17,7 @@
     "lint": "oxlint .",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present",
+    "test:deploy": "vitest run --root deploy",
     "test:watch": "concurrently -k -n nova,runtime -c blue,magenta \"npm run test:watch --workspace @rocketcrab/nova\" \"npm run test:watch --workspace @rocketcrab/runtime\"",
     "test:e2e": "playwright test",
     "test:e2e:trystero": "playwright test -c e2e-trystero/playwright.config.ts",

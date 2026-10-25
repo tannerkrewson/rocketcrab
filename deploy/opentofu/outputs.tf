@@ -23,11 +23,6 @@ output "turn_budget_namespace_id" {
   value       = cloudflare_workers_kv_namespace.turn_budget.id
 }
 
-output "turn_watchdog_cron" {
-  description = "UTC schedule attached to the TURN watchdog handler."
-  value       = "0 9 * * *"
-}
-
 output "turn_custom_route_id" {
   description = "Optional custom route ID, or null until a route is configured."
   value       = try(cloudflare_workers_route.turn[0].id, null)

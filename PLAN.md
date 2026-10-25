@@ -113,14 +113,56 @@ maintained relay defaults were re-validated on this machine only. No deployment.
 
 ### 4. TURN reliability, security, and cost
 
-- [ ] Recheck Cloudflare documented allocation/expiry behavior; choose lifecycle
+- [x] Recheck Cloudflare documented allocation/expiry behavior; choose lifecycle
       for multi-hour sessions and reconnects instead of unproven refresh machinery.
-- [ ] Keep server secrets; review native issuance rate limiting, usage visibility,
+- [x] Keep server secrets; review native issuance rate limiting, usage visibility,
       abuse response, budget notifications (not spending caps), and aggregate/raw
       traffic limits. Issuance limits do not bound already-issued traffic.
-- [ ] Prefer direct ICE, retain appropriate TURN transports including TLS 443;
+- [x] Prefer direct ICE, retain appropriate TURN transports including TLS 443;
       simplify Worker/watchdog without a framework or room backend.
-- [ ] Test failures, document operational risks/runbook changes; do not deploy.
+- [x] Test failures, document operational risks/runbook changes; do not deploy.
+
+Stage 4 evidence: Cloudflare's current FAQ documents **no maximum TURN
+allocation duration** (the client keeps the allocation alive with authenticated
+TURN Refresh requests) and a **48-hour maximum credential expiry**. Billing and
+analytics stop immediately when credentials expire; the connection disconnects
+shortly after. Nova therefore replaces the 600 s TTL + 8-minute
+`setConfiguration()` re-mint path (which could not be validated on devices and
+which Trystero cannot pair with an ICE restart) with **one 24-hour credential
+per party**: the worker always requests `ttl: 86400` (request bodies ignored),
+the client mints once per party lease and never refreshes or mutates live peer
+connections, and the adapter lost `updateTurnConfig`/peer-config mutation and
+token-copy refresh helpers. Reconnects reuse the cached lease; a new party after
+lease expiry mints again. Credentials remain memory-only; a leaked credential
+can relay for up to 24 hours, which is the explicit trade for removing
+unverifiable machinery.
+
+Cost/abuse changes: deleted the custom GraphQL watchdog, its daily cron, three
+Worker secrets (`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`,
+`ALERT_WEBHOOK_URL`), its KV alert watermarks and the `WATCHDOG_GB_BUDGET`
+input — native Cloudflare **budget alerts** and **Billable Usage
+notifications/metrics** now provide spend visibility, while Workers Logs keep
+per-mint `turn_cred_mint` records. The origin allowlist, in-worker per-IP rate
+limit, zone rate rule, KV issuance caps (daily/total) and port-53 filtering
+remain; the runbook now states explicitly that mint caps bound **issuance**, not
+traffic from issued credentials, and documents the manual credential-revoke API,
+Cloudflare's per-allocation limits (~5–10 kpps, 50–100 Mbps, >5 new
+destination IPs/sec) and $0.05/GB egress. Cloudflare's native Workers
+rate-limiting binding was reviewed and rejected for the issuance counter
+(per-location approximate, still issuance-only, extra provider binding).
+TURN keeps the full documented URL set including `turns:…:5349|443`; direct
+ICE remains preferred by candidate priority.
+
+Verification: 977 unit/property tests plus **87 infrastructure worker tests**
+(now run in CI via `npm run test:deploy`: relay 37 + turn-creds 50); typecheck,
+format, lint, production build and bundle check pass; initial JS 167.2 KiB gzip
+(220 KiB budget unchanged). New tests cover the fixed 24 h TTL (and its 48 h
+ceiling), lease reuse across leave/recreate, re-mint only after lease expiry, and
+no live-peer mutation API. Wrangler `deploy --dry-run` bundles the worker
+(3.82 KiB gzip) with only the KV binding. Chromium app Playwright 20/20 and real
+Nostr/WebRTC 4/4 pass. OpenTofu was not installed here, so HCL changes
+(resource/output/cron removal) are unvalidated locally; CI validates them. No
+deployment, no live mint, and no physical-device/cross-network TURN proof.
 
 ### 5. Multiplayer resilience simplification
 
@@ -333,15 +375,23 @@ Depends on approved provisioning/deployment in sections 1–4. This is verificat
 of that deployment, not authorization for another deployment path.
 
 - [ ] Verify live `TURN_BUDGET` KV binding and the turn-creds Worker.
-- [ ] Verify `/__watchdog` returns `ok: true`, confirming live GraphQL analytics
-      schema and Account Analytics permissions.
+- [ ] Confirm native Cloudflare budget alerts / Billable Usage notifications are
+      configured, and that Workers Logs shows `turn_cred_mint` entries.
 - [ ] Mint once with an allowlisted Origin; verify usable `iceServers` and
       incrementing budget counters.
 - [ ] Record results/fixes in `deploy/cloudflare.md` and
       `deploy/turn-creds/README.md`. Use OpenTofu, not a removed Wrangler deploy
       workflow or a placeholder KV ID.
 
-## 6. Mid-party TURN credential lifetime — refresh implemented; device proof remains
+## 6. Mid-party TURN credential lifetime — superseded by simplification stage 4
+
+**Superseded:** the 600 s TTL and 8-minute `setConfiguration()` refresh described
+below were removed. Cloudflare's current FAQ documents no maximum allocation
+duration (the client keeps it alive with authenticated TURN refreshes) and a
+48-hour credential maximum, so the worker now mints one 24-hour credential per
+party and the client never refreshes. The custom GraphQL watchdog was also
+removed in favour of native budget alerts / Billable Usage notifications. The
+checks below remain historical evidence of the old design.
 
 Cloudflare documents that an expired credential stops billing immediately and
 the allocation disconnects after a short delay; 48 hours is the maximum TTL.
@@ -354,15 +404,15 @@ exposes peer connections but has no renegotiation/ICE-restart hook.
       non-TURN servers, refresh on foreground/reconnect against the wall clock,
       and never reuse a near-expiry credential for a new party. Single-flight,
       party-scoped, with tests for expiry, refresh, and injected factories.
-- [ ] Run a **cross-network party longer than ten minutes** and record whether
-      the refresh holds the connection; if it fails, add an ICE-restart path in
-      the adapter or document the limitation and shorten the expected session.
-- [ ] Re-test after an iPhone background/foreground cycle spanning the expiry.
+- [ ] Run a **cross-network party longer than the old ten-minute credential**
+      and confirm it survives on one 24 h credential without re-minting.
+- [ ] Re-test after an iPhone background/foreground cycle; a reconnect mints a
+      fresh credential only when the cached lease has actually expired.
 
 ## 7. Independent billing notification — P2, manual dashboard task
 
-Depends on approval for account configuration in section 1. This tripwire is
-independent of the implemented watchdog.
+Depends on approval for account configuration in section 1. This is now the
+primary usage-visibility mechanism (the custom watchdog was removed).
 
 - [ ] Configure Cloudflare Notifications → Billing → Usage Based Billing for
       Realtime TURN (and SFU if used). The historical suggestion was about
@@ -557,15 +607,15 @@ real deployment/credentials, or physical devices on real networks.
 **Deployment / live verification**
 
 - Provision TURN key, KV namespace, Worker, secrets, budget caps, billing alert,
-  and zone rate limit; verify live `/__watchdog`, mint, counters, and headers.
+  and zone rate limit; verify a live mint, counters, headers and budget alerts.
 - Deploy the two static origins and confirm SPA routing, caching, CSP/frame
   behavior, invite-fragment secrecy, and CDN behavior on the real host.
 
 **Physical devices / real networks**
 
 - Cross-network parties (Wi-Fi ↔ cellular; two phones on different networks),
-  four mixed devices, private-link and QR joins, a real 5 MiB transfer, and a party
-  longer than ten minutes across the TURN credential refresh.
+  four mixed devices, private-link and QR joins, and a real 5 MiB transfer. A
+  multi-hour party should confirm one 24 h credential survives without refresh.
 - iPhone backgrounding, low-power mode, airplane-mode recovery, audio gesture,
   camera/mic permission, safe areas, and the full Mobile Safari checklist.
 - A real friend beta without coaching, to catch product and error-message gaps.

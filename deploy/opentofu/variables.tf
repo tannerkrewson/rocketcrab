@@ -57,9 +57,8 @@ variable "relay_worker_variables" {
 variable "turn_worker_variables" {
   description = <<-EOT
     Non-secret plain-text bindings for rocketcrab-turn-creds. Secret names
-    used by the Worker are deliberately not part of this map. In particular,
-    ALERT_WEBHOOK_URL is a secret because webhook URLs commonly contain a
-    bearer token.
+    used by the Worker are deliberately not part of this map; TURN key material
+    stays in Worker secrets.
   EOT
   type        = map(string)
   default = {
@@ -67,17 +66,13 @@ variable "turn_worker_variables" {
     MINT_TOTAL_CAP     = "50000"
     ORIGIN_ALLOWLIST   = "https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173"
     RATE_LIMIT_PER_MIN = "10"
-    WATCHDOG_GB_BUDGET = "200"
   }
 
   validation {
     condition = alltrue([
       for name in [
-        "ALERT_WEBHOOK_URL",
         "TURN_KEY_ID",
         "TURN_KEY_API_TOKEN",
-        "CLOUDFLARE_ACCOUNT_ID",
-        "CLOUDFLARE_API_TOKEN",
       ] : !contains(keys(var.turn_worker_variables), name)
     ])
     error_message = "Secret Worker bindings must not be included in turn_worker_variables; set them through the Workers Secrets API or dashboard."

@@ -64,10 +64,15 @@ export type TurnCredentialsResult =
  * setup meaningfully; the timeout aborts the fetch and degrades to no-TURN.
  */
 export const TURN_CREDS_FETCH_TIMEOUT_MS = 4_000;
-/** Must match the mint Worker's fixed 600-second TTL. */
-export const TURN_CREDS_TTL_MS = 600_000;
-/** Refresh with two minutes left; never extend credential TTL to hide expiry. */
-export const TURN_CREDS_REFRESH_MS = 480_000;
+/**
+ * Must match the mint Worker's fixed TTL (24 h). Cloudflare allows at most 48 h
+ * per credential; the TURN allocation itself has no maximum duration while the
+ * client keeps it alive with authenticated refreshes. One long-lived credential
+ * per party removes the old 8-minute re-mint/\`setConfiguration\` machinery,
+ * which Nova cannot validate on physical devices and which Cloudflare only
+ * supports as best-effort for live connections.
+ */
+export const TURN_CREDS_TTL_MS = 86_400_000;
 
 /** Injectable fetch + timeout (tests pass a stub fetch / short timeout). */
 export interface TurnCredsFetchOptions {

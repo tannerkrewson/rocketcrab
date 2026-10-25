@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchTurnCredentials,
+  TURN_CREDS_TTL_MS,
   turnCredsBaseUrl,
   turnCredsConfigured,
   type TurnCredentialsResult,
@@ -32,7 +33,7 @@ const MINTED_BODY = {
     // Plain STUN entries (no credentials) must be dropped — see the module doc.
     { urls: "stun:stun.example.com:19302" },
   ],
-  ttl: 600,
+  ttl: 86_400,
 };
 
 function responseMock(status: number, body: unknown) {
@@ -42,6 +43,11 @@ function responseMock(status: number, body: unknown) {
     json: async () => body,
   }));
 }
+
+it("keeps one party credential inside Cloudflare's 48-hour maximum", () => {
+  expect(TURN_CREDS_TTL_MS).toBe(86_400_000);
+  expect(TURN_CREDS_TTL_MS).toBeLessThanOrEqual(48 * 60 * 60 * 1000);
+});
 
 describe("turnCredsBaseUrl / turnCredsConfigured", () => {
   afterEach(() => {

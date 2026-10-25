@@ -6,7 +6,7 @@
  *
  *   POST https://rtc.live.cloudflare.com/v1/turn/keys/<TURN_KEY_ID>/credentials/generate-ice-servers
  *   Authorization: Bearer <TURN_KEY_API_TOKEN>
- *   body: { "ttl": 600 }
+ *   body: { "ttl": 86400 }
  *   -> { "iceServers": [ { "urls": [...], "username": "...", "credential": "..." }, ... ] }
  *
  * SAFETY (defense in depth, in request order):
@@ -14,9 +14,12 @@
  *      is missing or not in ORIGIN_ALLOWLIST gets 403 BEFORE the upstream
  *      API is called. Missing Origin (curl, non-browser clients) is rejected
  *      too — the endpoint is browser-only by design.
- *   2. Short TTL (rocketcrab-23s.2): upstream is always called with
- *      { "ttl": 600 } (10 min) and the response's port-53 URLs are dropped
- *      (browsers block port 53 / DNS traffic; ICE would hang on timeouts).
+ *   2. One party-lifetime credential (rocketcrab-23s.2): upstream is always
+ *      called with { "ttl": 86400 } (24 h; Cloudflare's maximum is 48 h) and
+ *      the response's port-53 URLs are dropped (browsers block port 53 / DNS
+ *      traffic; ICE would hang on timeouts). There is no allocation-duration
+ *      cap, so one credential covers a whole party; the client does not
+ *      re-mint or mutate live peer connections.
  *   3. Per-IP rate limiting (rocketcrab-23s.3): in-worker fixed-window
  *      counter (fast-fail backstop) + a durable Cloudflare route-level
  *      rate rule (see README.md for the Rulesets curl).
@@ -28,26 +31,24 @@
  *      mints over-count — SAFE for a kill-switch that errs on the safe
  *      side. KV unavailable (e.g. binding missing in dev) FAILS OPEN.
  *
- * A separate scheduled handler (cron, 09:00 UTC, rocketcrab-23s.5) runs the
- * usage watchdog from watchdog.ts (same TURN_BUDGET namespace): it queries
- * the Realtime TURN analytics GraphQL dataset and alerts near the monthly
- * budget. Manual trigger: GET /__watchdog.
+ * Usage/cost visibility uses native Cloudflare controls instead of a custom
+ * watchdog: account budget alerts (email threshold crossing; informational, not
+ * a spending cap) and Billable Usage notifications/metrics. Mint counters here
+ * bound issuance only — an already-issued credential can relay until it expires,
+ * and Cloudflare documents no allocation-duration cap, only per-allocation
+ * throughput limits. Credentials can be revoked upstream if abuse is observed.
  *
  * The TURN key (TURN_KEY_ID + TURN_KEY_API_TOKEN) is a long-term secret and
  * lives ONLY as a Worker secret — never in code, config, or public JS. The
  * endpoint executes NO game code and keeps NO room-state database
  * (stateless).
  *
- * Self-contained on purpose (zero EXTERNAL dependencies): worker.ts plus the
- * local watchdog.ts module (no imports beyond each other) drop into any
- * Workers-compatible runtime; wrangler bundles them into one script. Logic
- * lives in pure exported functions (parse allowlist, port-53 filter,
- * rate-limit window, budget counters, upstream request builder) with a thin
- * fetch handler; see worker.test.ts and watchdog.test.ts.
+ * Self-contained on purpose (zero dependencies): worker.ts drops into any
+ * Workers-compatible runtime; wrangler bundles it into one script. Logic lives
+ * in pure exported functions (parse allowlist, port-53 filter, rate-limit
+ * window, budget counters, upstream request builder) with a thin fetch handler;
+ * see worker.test.ts.
  */
-
-import { runWatchdog } from "./watchdog";
-import type { WatchdogEnv } from "./watchdog";
 
 /** Production origin + local dev origins used when ORIGIN_ALLOWLIST is unset. */
 export const DEFAULT_ORIGIN_ALLOWLIST = [
@@ -63,7 +64,7 @@ export const TURN_CREDS_API_BASE = "https://rtc.live.cloudflare.com";
 /** Upstream path prefix; the TURN key id is interpolated between these. */
 export const TURN_CREDS_API_PATH_PREFIX = "/v1/turn/keys/";
 /** Credential lifetime requested from Cloudflare (seconds). */
-export const MINT_TTL_SECONDS = 600;
+export const MINT_TTL_SECONDS = 86_400; // 24 h; Cloudflare allows at most 48 h.
 
 /** Fixed rate-limit window length (milliseconds). */
 export const RATE_LIMIT_WINDOW_MS = 60_000;
@@ -81,9 +82,6 @@ export const DEFAULT_MINT_DAILY_CAP = 5000;
 export const DEFAULT_MINT_TOTAL_CAP = 50000;
 /** Daily counter keys self-expire after 2 days (stale day keys never linger). */
 export const DAILY_COUNTER_TTL_SECONDS = 2 * 24 * 60 * 60;
-
-/** Path that manually triggers a watchdog run (the cron drives it in prod). */
-export const WATCHDOG_TRIGGER_PATH = "/__watchdog";
 
 /**
  * Cap on tracked rate-limit keys; past it, expired windows are pruned so a
@@ -320,7 +318,8 @@ function warnKvMissing(): void {
  * Read both mint counters. Returns null when the KV binding is missing or
  * the read fails — the budget check FAILS OPEN in that case. Fail-open is
  * fine for dev; in prod the binding must exist, and even with it down,
- * abuse stays bounded by the per-IP rate limiter and the watchdog.
+ * abuse stays bounded by the per-IP rate limiter meanwhile; usage is monitored
+ * through native Cloudflare budget alerts and Billable Usage metrics.
  */
 export async function readBudgetCounters(
   kv: KvStore | undefined,
@@ -373,7 +372,7 @@ export async function incrementBudgetCounters(kv: KvStore | undefined, now: numb
 }
 
 /**
- * Log one successful mint for Workers analytics / the watchdog (IP, origin,
+ * Log one successful mint for Workers analytics / usage review (IP, origin,
  * ttl, timestamp). No PII beyond the client IP the edge already sees.
  */
 export function logMint(request: Request, ttlSeconds: number, now: number): void {
@@ -597,7 +596,7 @@ export async function handleTurnCredsRequest(
 
   // Count every SUCCESSFUL mint: increment both KV counters (kill-switch
   // bookkeeping, rocketcrab-23s.4) and log the mint for Workers analytics
-  // / the watchdog (IP, origin, ttl, timestamp). Both are best-effort — the
+  // / usage review (IP, origin, ttl, timestamp). Both are best-effort — the
   // credentials are already minted and must not be lost to a KV hiccup.
   await incrementBudgetCounters(env.TURN_BUDGET, now);
   logMint(request, MINT_TTL_SECONDS, now);
@@ -605,43 +604,7 @@ export async function handleTurnCredsRequest(
   return jsonResponse(200, filterPort53IceServers(body), cors);
 }
 
-/**
- * Manual watchdog trigger (GET /__watchdog): runs one watchdog pass and
- * returns its summary. Used for dev smoke tests and on-demand checks; the
- * daily cron drives the same code via the scheduled handler.
- */
-export async function handleWatchdogRequest(request: Request, env: WatchdogEnv): Promise<Response> {
-  void request;
-  const summary = await runWatchdog(env, Date.now());
-  return new Response(JSON.stringify(summary), {
-    status: summary.ok ? 200 : 502,
-    headers: { ...JSON_HEADERS, "Cache-Control": "no-store" },
-  });
-}
-
-/**
- * Cron-driven watchdog (rocketcrab-23s.5): wrangler cron triggers fire the
- * scheduled handler (never fetch), so the watchdog is a scheduled handler
- * here. Runs in the background via ctx.waitUntil; failures are logged.
- */
-function handleScheduled(
-  _controller: unknown,
-  env: TurnCredsEnv & WatchdogEnv,
-  ctx: { waitUntil(promise: Promise<unknown>): void },
-): void {
-  ctx.waitUntil(
-    runWatchdog(env, Date.now()).catch((err: unknown) => {
-      console.log(`turn-creds: watchdog scheduled run failed: ${String(err)}`);
-    }),
-  );
-}
-
 export default {
-  fetch: (request: Request, env: TurnCredsEnv & WatchdogEnv): Promise<Response> => {
-    if (new URL(request.url).pathname === WATCHDOG_TRIGGER_PATH) {
-      return handleWatchdogRequest(request, env);
-    }
-    return handleTurnCredsRequest(request, env);
-  },
-  scheduled: handleScheduled,
+  fetch: (request: Request, env: TurnCredsEnv): Promise<Response> =>
+    handleTurnCredsRequest(request, env),
 };

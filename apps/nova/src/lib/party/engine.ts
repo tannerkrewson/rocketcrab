@@ -65,7 +65,7 @@ import { createTrysteroPartyTransportFactory } from "./transport-factory";
 import {
   fetchTurnCredentials,
   turnCredsConfigured,
-  TURN_CREDS_REFRESH_MS,
+  TURN_CREDS_TTL_MS,
   type TurnCredentialsResult,
   type TurnServerConfigLike,
 } from "./turn-creds";
@@ -475,13 +475,11 @@ export class PartyEngine {
   private readonly lifecycle: PartyLifecycleSource;
   private readonly lifecycleUnsubscribers: Array<() => void> = [];
 
-  /** Page-local lease; never reuse credentials near expiry for a new party. */
+  /** Page-local mint result; reused while its 24 h lease is valid. */
   private turnCredsCache: {
     readonly turnConfig: readonly TurnServerConfigLike[];
-    readonly refreshAt: number;
+    readonly expiresAt: number;
   } | null = null;
-  private turnRefreshTimer: (() => void) | null = null;
-  private turnRefreshInFlight: Promise<void> | null = null;
   private readonly now: () => number;
   /** Latest TURN credential outcome, surfaced in engine diagnostics. */
   private turnStatus: "configured" | "unavailable" | "disabled" | null = null;
@@ -1022,8 +1020,6 @@ export class PartyEngine {
       return;
     }
     this.leaving = true;
-    this.turnRefreshTimer?.();
-    this.turnRefreshTimer = null;
     this.runtime?.destroy("user_exit");
     this.runtime = null;
     this.frameStarted = false;
@@ -1098,10 +1094,6 @@ export class PartyEngine {
       return;
     }
     try {
-      if (this.turnCredsCache === null || this.now() >= this.turnCredsCache.refreshAt) {
-        await this.refreshTurnCredentials();
-      }
-      if (this.party !== party || this.leaving) return;
       if (transport.connectionState === "connected") {
         // A link that looks alive but whose peers stopped answering (the
         // backgrounded-phone case): force a fresh connection id (F11).
@@ -1185,8 +1177,6 @@ export class PartyEngine {
     // Timers are unreliable while hidden (B6): cancel any pending retry so
     // a reconnect burst never fires on resume; the resume probe re-decides.
     this.cancelReconnectRetry();
-    this.turnRefreshTimer?.();
-    this.turnRefreshTimer = null;
   }
 
   /**
@@ -1204,9 +1194,7 @@ export class PartyEngine {
       return;
     }
     this.recoverRuntimeAfterResume();
-    // Foregrounding can follow hours of suspended timers. Refresh against the
-    // wall clock before health-probe reconnects, not a missed timer count.
-    void this.refreshTurnCredentials().then(() => this.checkPartyConnectionAfterResume());
+    this.checkPartyConnectionAfterResume();
   }
 
   /** The browser reports the network went away (`offline`). */
@@ -1458,9 +1446,9 @@ export class PartyEngine {
     }
   }
 
-  /** Cache only within the lease, measured from request start (conservative). */
+  /** Cache only inside the minted lease, measured from request start. */
   private async fetchTurnCredentialsOnce(): Promise<TurnCredentialsResult> {
-    if (this.turnCredsCache !== null && this.now() < this.turnCredsCache.refreshAt) {
+    if (this.turnCredsCache !== null && this.now() < this.turnCredsCache.expiresAt) {
       return { ok: true, turnConfig: this.turnCredsCache.turnConfig };
     }
     const requestedAt = this.now();
@@ -1468,80 +1456,10 @@ export class PartyEngine {
     if (result.ok) {
       this.turnCredsCache = {
         turnConfig: result.turnConfig,
-        refreshAt: requestedAt + TURN_CREDS_REFRESH_MS,
+        expiresAt: requestedAt + TURN_CREDS_TTL_MS,
       };
     }
     return result;
-  }
-
-  private scheduleTurnRefresh(delayMs?: number): void {
-    this.turnRefreshTimer?.();
-    this.turnRefreshTimer = null;
-    if (
-      this.party === null ||
-      this.leaving ||
-      this.pageWasHidden ||
-      this.defaults.transportFactory !== null ||
-      !turnCredsConfigured()
-    )
-      return;
-    const delay =
-      delayMs ?? Math.max(0, (this.turnCredsCache?.refreshAt ?? this.now()) - this.now());
-    this.turnRefreshTimer = this.scheduleFn(() => {
-      this.turnRefreshTimer = null;
-      void this.refreshTurnCredentials();
-    }, delay);
-  }
-
-  /** Single-flight, party-scoped refresh; no stale fetch may update a new party. */
-  private refreshTurnCredentials(): Promise<void> {
-    if (this.turnRefreshInFlight !== null) return this.turnRefreshInFlight;
-    const party = this.party;
-    if (
-      party === null ||
-      this.leaving ||
-      this.defaults.transportFactory !== null ||
-      !turnCredsConfigured()
-    )
-      return Promise.resolve();
-    if (this.turnCredsCache !== null && this.now() < this.turnCredsCache.refreshAt) {
-      this.scheduleTurnRefresh();
-      return Promise.resolve();
-    }
-    const requestedAt = this.now();
-    this.turnRefreshInFlight = (async () => {
-      try {
-        const result = await this.defaults.turnCreds();
-        if (this.party !== party || this.leaving) return;
-        if (!result.ok) throw new Error(result.reason);
-        const factory = party.factory as PartyTransportFactory & {
-          updateTurnConfig?: (servers: readonly TurnServerConfigLike[]) => void;
-        };
-        if (factory.updateTurnConfig === undefined)
-          throw new Error("The transport factory cannot refresh TURN credentials.");
-        factory.updateTurnConfig(result.turnConfig);
-        this.turnCredsCache = {
-          turnConfig: result.turnConfig,
-          refreshAt: requestedAt + TURN_CREDS_REFRESH_MS,
-        };
-        this.turnStatus = "configured";
-        this.scheduleTurnRefresh();
-      } catch (error) {
-        if (this.party !== party || this.leaving) return;
-        if (this.turnStatus !== "unavailable") {
-          this.addNotice(
-            "warn",
-            `TURN credential refresh failed (${errorMessage(error)}). Cross-network connections may fail when the current credentials expire.`,
-          );
-        }
-        this.turnStatus = "unavailable";
-        this.scheduleTurnRefresh(30_000);
-      } finally {
-        this.turnRefreshInFlight = null;
-        if (this.party === party) this.emit();
-      }
-    })();
-    return this.turnRefreshInFlight;
   }
 
   /** Wire the party session, coordinator, S1 session, and transport events. */
@@ -1560,7 +1478,6 @@ export class PartyEngine {
       this.handleCoordinatorEvent(event),
     );
     await this.replaceGameSession(party);
-    this.scheduleTurnRefresh();
   }
 
   /**

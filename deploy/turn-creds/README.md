@@ -9,7 +9,7 @@ The endpoint proxies Cloudflare Realtime's credentials API:
 ```
 POST https://rtc.live.cloudflare.com/v1/turn/keys/<TURN_KEY_ID>/credentials/generate-ice-servers
 Authorization: Bearer <TURN_KEY_API_TOKEN>
-body: { "ttl": 600 }
+body: { "ttl": 86400 }
 ```
 
 and returns the standard `iceServers` array (STUN + TURN entries) with CORS
@@ -24,10 +24,12 @@ headers so the browser can read it.
 - **Origin allowlist** (`ORIGIN_ALLOWLIST`, rocketcrab-23s.1): requests whose
   `Origin` is missing or not allowlisted get `403` **before** any upstream
   call. The endpoint is browser-only by design.
-- **Short credential TTL** (rocketcrab-23s.2): upstream is always called with
-  `{"ttl": 600}` (10 minutes) — extracted credentials self-expire and cannot
-  be stockpiled — and port-53 URLs are stripped from the response (browsers
-  block port 53; ICE would hang on timeouts).
+- **One long party credential** (rocketcrab-23s.2): upstream is always called
+  with `{"ttl": 86400}` (24 h; Cloudflare allows at most 48 h). The client mints
+  once per party and never refreshes, because Cloudflare documents no maximum
+  TURN allocation duration (the client keeps it alive with authenticated TURN
+  refreshes) and only best-effort live credential replacement. Port-53 URLs are
+  stripped (browsers block port 53; ICE would hang on timeouts).
 - **Per-IP rate limiting** (rocketcrab-23s.3): an in-worker fixed-window
   fast-fail check plus a durable Cloudflare route-level rate rule (see
   "Rate limiting" below).
@@ -35,10 +37,10 @@ headers so the browser can read it.
   credentials can be minted per day and since the counters were last
   re-armed; when a cap is hit the worker answers `429 budget_exceeded`
   **before** any upstream call (see "Budget kill-switch" below).
-- **Usage watchdog** (rocketcrab-23s.5): a daily cron queries the Realtime
-  TURN analytics GraphQL dataset and alerts at 10% / 50% / 90% of the
-  monthly egress budget (see "Watchdog" below). The kill-switch stays the
-  hard stop; the watchdog is the early warning.
+- **Usage visibility** (rocketcrab-23s.5): native Cloudflare account budget
+  alerts and Billable Usage notifications replace the former custom GraphQL
+  watchdog (see "Usage visibility and abuse response" below). Mint caps bound
+  issuance only; they cannot bound traffic from credentials already issued.
 - **Secrets stay secret**: `TURN_KEY_ID` / `TURN_KEY_API_TOKEN` are set as
   Worker secrets only — never in code, `wrangler.toml`, or the client build.
 
@@ -50,7 +52,6 @@ headers so the browser can read it.
 | `RATE_LIMIT_PER_MIN` | `10`                                                                                                               | Requests per minute per client IP allowed by the in-worker fast-fail counter (60s fixed window).                                                                                                    |
 | `MINT_DAILY_CAP`     | `5000`                                                                                                             | Maximum successful mints per UTC calendar day (kill-switch; see below). A new day starts a fresh counter automatically.                                                                             |
 | `MINT_TOTAL_CAP`     | `50000`                                                                                                            | Maximum successful mints since the counters were last re-armed (kill-switch; see below). Re-arm by deleting the counters (see "Re-arming the counters").                                            |
-| `WATCHDOG_GB_BUDGET` | `200`                                                                                                              | Monthly TURN egress budget in GiB (1024^3 bytes) that the watchdog alerts against (see "Watchdog").                                                                                                 |
 
 A single-variable env override (unset = the default above). The OpenTofu root
 represents these values as `plain_text` bindings; do not use a separate
@@ -62,13 +63,11 @@ turn_worker_variables = {
   MINT_TOTAL_CAP     = "50000"
   ORIGIN_ALLOWLIST   = "https://rocketcrab.com,https://staging.rocketcrab.com"
   RATE_LIMIT_PER_MIN = "10"
-  WATCHDOG_GB_BUDGET = "200"
 }
 ```
 
-(`ORIGIN_ALLOWLIST`, `MINT_DAILY_CAP`, `MINT_TOTAL_CAP`, and
-`WATCHDOG_GB_BUDGET` are not sensitive. `ALERT_WEBHOOK_URL` is a Worker
-secret because webhook URLs commonly contain bearer tokens.)
+(`ORIGIN_ALLOWLIST`, `RATE_LIMIT_PER_MIN`, `MINT_DAILY_CAP`, and
+`MINT_TOTAL_CAP` are not sensitive.)
 
 ## Worker secrets
 
@@ -78,9 +77,6 @@ secret):
 ```sh
 wrangler secret put TURN_KEY_ID          # e.g. the Cloudflare Realtime key token id
 wrangler secret put TURN_KEY_API_TOKEN   # the matching API token
-wrangler secret put CLOUDFLARE_ACCOUNT_ID    # watchdog: Cloudflare account id (GraphQL accountTag)
-wrangler secret put CLOUDFLARE_API_TOKEN     # watchdog: API token with the "Account Analytics" permission
-wrangler secret put ALERT_WEBHOOK_URL       # optional watchdog alert webhook
 ```
 
 Local dev: create a gitignored `deploy/turn-creds/.dev.vars` with the same
@@ -102,16 +98,13 @@ tofu -chdir=deploy/opentofu apply
 The command above is intentionally not part of this migration task. Review
 the plan, state backend, and resource ownership first. In dev, `wrangler dev`
 uses a local KV simulator keyed by binding name, so the placeholder id is fine
-locally. The same namespace holds the watchdog's alert watermarks
-(`last-alerted:<pct>`, rocketcrab-23s.5) — re-arming the mint counters deletes
-only `mints:*` keys, so watermarks survive (each threshold still fires exactly
-once per month).
+locally. It holds only the two mint counters; delete the `mints:*` keys to
+re-arm them.
 
 ## Infrastructure management
 
 The planned Worker is modeled by `cloudflare_workers_script.turn` in
-`deploy/opentofu/`, with its cron trigger, workers.dev subdomain, and
-`TURN_BUDGET` binding. Its optional custom domain/route and zone rate rule are
+`deploy/opentofu/`, with its workers.dev subdomain and `TURN_BUDGET` binding. Its optional custom domain/route and zone rate rule are
 also modeled there. Wrangler is used only for local development and the
 dry-run JavaScript bundle consumed by OpenTofu. No deploy workflow remains in
 this repository.
@@ -125,9 +118,6 @@ commands. Their values must never be committed or passed as OpenTofu
 cd deploy/turn-creds
 wrangler secret put TURN_KEY_ID
 wrangler secret put TURN_KEY_API_TOKEN
-wrangler secret put CLOUDFLARE_ACCOUNT_ID
-wrangler secret put CLOUDFLARE_API_TOKEN
-wrangler secret put ALERT_WEBHOOK_URL
 ```
 
 The worker appears at
@@ -150,14 +140,6 @@ deploy, check the counters moved:
 
 ```sh
 wrangler kv key list --binding TURN_BUDGET
-```
-
-Smoke-test the watchdog without waiting for the cron (runs one pass and
-returns the JSON summary; no Origin needed — this route is outside the mint
-flow):
-
-```sh
-curl -s https://rocketcrab-turn-creds.<your-account-subdomain>.workers.dev/__watchdog
 ```
 
 ## Origin allowlist and CORS (rocketcrab-23s.1)
@@ -192,19 +174,26 @@ LAN override is dev-only. For the equivalent in `.dev.vars`:
 
 ## Credential TTL and port-53 URLs (rocketcrab-23s.2)
 
-- The upstream call always requests `{"ttl": 600}` — a **10-minute** credential
-  lifetime, baked into the worker (`MINT_TTL_SECONDS`). Short enough that an
-  extracted credential is worthless, long enough for a full party. The client
-  cannot change it (request bodies are ignored).
-- **Client refresh:** the Nova app re-mints at **8 minutes** (a 2-minute safety
-  margin), applies the new servers to live peers with
-  `RTCPeerConnection.setConfiguration()`, and refreshes again on foreground or
-  reconnect if the wall-clock lease has expired. It never reuses near-expiry
-  credentials for a new party. Cloudflare documents that an expiring credential
-  disconnects the allocation shortly after it expires; this mitigation cannot
-  guarantee rescue of an allocation that has already failed, and Trystero has
-  no ICE-restart/renegotiation hook. A cross-network party longer than ten
-  minutes therefore remains a physical-device release test.
+- The upstream call always requests `{"ttl": 86400}` — a **24-hour** credential
+  lifetime, baked into the worker (`MINT_TTL_SECONDS`). The client cannot change
+  it (request bodies are ignored). Cloudflare documents a **48-hour maximum**
+  credential expiry and **no maximum TURN allocation duration**: the WebRTC
+  stack keeps the allocation alive with authenticated TURN Refresh requests, so
+  a party longer than the credential lifetime needs new credentials, not a new
+  allocation. 24 hours covers any plausible party, including overnight sessions.
+- **No client refresh machinery.** The app mints once per party (cached for the
+  lease on the page) and uses that configuration for every peer it creates,
+  including reconnects. The previous 8-minute re-mint and live
+  `RTCPeerConnection.setConfiguration()` path was removed: it was unproven on
+  physical devices, Cloudflare only documents it as short-lived-credential
+  replacement for an active session, and Trystero has no ICE-restart hook. If
+  credentials do expire, Cloudflare stops billing/analytics immediately and
+  disconnects the allocation shortly after; a party that reconnects afterwards
+  mints fresh credentials.
+- **Cost implication:** a leaked credential is usable for up to 24 hours. That
+  is the deliberate trade for removing refresh machinery; the origin allowlist,
+  mint caps, per-IP rate limit and native budget alerts are the compensating
+  controls. Credentials live only in page memory and are never persisted.
 - Cloudflare's `generate-ice-servers` response includes alternate **port-53**
   URLs (`stun:`/`turn:` on port 53), which browsers block — ICE would stall on
   timeouts, and Nova does not use trickle ICE. The worker drops every URL
@@ -321,8 +310,7 @@ accumulate.
 
 **Mint logging**: every successful mint is logged to the Workers logs as a
 JSON line (`event: "turn_cred_mint"`, `ip`, `origin`, `ttl`, `ts`) via
-`console.log` — free Workers analytics that feeds the usage watchdog and
-makes post-mortems easy.
+`console.log` — free Workers analytics for usage review and post-mortems.
 
 ### Re-arming the counters
 
@@ -339,54 +327,46 @@ or delete everything at once from the dashboard (Workers -> KV ->
 `TURN_BUDGET`). Daily keys roll over on their own, so only `mints:total`
 strictly needs the manual re-arm.
 
-## Watchdog (rocketcrab-23s.5)
+## Usage visibility and abuse response (rocketcrab-23s.5)
 
-A daily cron (09:00 UTC, `triggers.crons` in `wrangler.toml`) runs an
-**alerting watchdog** for the account's TURN egress — the early warning that
-sits _in front of_ the kill-switch. It queries the Cloudflare Realtime TURN
-analytics dataset via the standard GraphQL Analytics API
-(`https://api.cloudflare.com/client/v4/graphql`, `Authorization: Bearer
-<CLOUDFLARE_API_TOKEN>`, requires the **Account Analytics** permission),
-sums `egressBytes` (the direction Cloudflare bills for) for the current
-calendar month, and alerts when usage crosses **10% / 50% / 90%** of
-`WATCHDOG_GB_BUDGET` (default **200 GiB**). Each threshold fires **exactly
-once per month**: a KV watermark (`last-alerted:10`, `last-alerted:50`,
-`last-alerted:90` in the same `TURN_BUDGET` namespace, value = `YYYY-MM`)
-records the month it fired, so the next day's run does not re-alert.
+Cloudflare's native controls replace the former custom GraphQL watchdog
+(removed with its cron trigger, three Worker secrets and alert-watermark KV
+state):
 
-- **Alert delivery**: `POST` JSON to `ALERT_WEBHOOK_URL` (e.g. a Slack /
-  PagerDuty / Discord hook):
-  `{"alert":"turn_budget","month":"2026-08","thresholdPct":50,"egressBytes":…,"egressGiB":…,"budgetGiB":200,"usagePct":52.3,"ts":"…"}`.
-  `ALERT_WEBHOOK_URL` unset → alerts go to `console.log` (Workers logs) only.
-- **Graceful failure**: analytics unreachable / non-2xx / invalid response →
-  log and skip the run, **no alert**. The watchdog is a warning system; the
-  **kill-switch remains the hard stop** and does not depend on analytics.
-- **Manual trigger**: `GET /__watchdog` on the worker runs one pass and
-  returns the JSON summary (`200`, or `502` with `error` on failure) — handy
-  for dev and smoke tests, since wrangler cron triggers only fire the
-  `scheduled` handler and do not run in `wrangler dev` (use
-  `wrangler dev --test-scheduled` or the `__watchdog` route). The route is
-  outside the mint
-  flow (no Origin check) and harmless to expose: watermarks dedupe alerts.
-- **GraphQL query**: the worker queries `viewer.accounts(filter: {accountTag})
-  { callsTurnUsageAdaptiveGroups(limit: 10000, filter: { date_geq,
-  date_leq }) { dimensions { datetime } sum { egressBytes } } }` with
-  `date_geq`/`date_leq` = `YYYY-MM-DD`. The dataset name, field names, and
-  filter keys follow the Realtime TURN analytics docs
-  (developers.cloudflare.com/realtime/turn/analytics) and are defined as
-  clearly-named constants at the top of `deploy/turn-creds/watchdog.ts` —
-  **verify them against the live GraphQL schema at deploy time** (e.g. via
-  schema introspection in GraphiQL) in case Cloudflare renames anything.
-- **Secrets**: `CLOUDFLARE_ACCOUNT_ID` + `CLOUDFLARE_API_TOKEN` (Worker
-  secrets, "Account Analytics" permission). They never leave the Worker.
+- **Account budget alerts** (Manage Account → Billing → Billable Usage →
+  Budget alerts) email a threshold crossing for combined usage-based spend.
+  They are informational and do **not** cap or stop usage, so they are a
+  warning, not a hard stop.
+- **Billable Usage / product usage notifications** (Notifications → Add →
+  Billable Usage) show and can alert on Realtime usage. TURN and SFU share one
+  Realtime free allowance (1,000 GB/month) and one bill line.
+- **Per-mint logs** (`turn_cred_mint`) remain in Workers Logs for volume review
+  and incident reconstruction; OpenTofu keeps Workers observability enabled.
+- **Abuse response:** Cloudflare's credentials API can revoke a short-lived
+  credential before its TTL (`POST /v1/turn/keys/<key>/credentials/<username>/revoke`).
+  That is a manual operator action; Nova does not ship a revoke route. Revoking
+  `mints:total`/daily keys and lowering `MINT_DAILY_CAP` are the other levers.
+
+### What these controls do and do not bound
+
+- Mint caps and the per-IP rate limit bound **issuance**. They cannot bound
+  traffic from an already-issued credential: TURN relays whatever the holder
+  sends until expiry. With the 24 h TTL, assume a leaked credential can relay
+  for up to 24 hours.
+- Cloudflare documents **per-allocation** limits (roughly 5–10 kpps and
+  50–100 Mbps, plus >5 new destination IPs/sec) and bills **$0.05/GB** of
+  egress. There is no account-wide TURN packet/bandwidth cap in Nova's control;
+  the account budget alert is the detection path.
+- Physical-device cross-network tests (later release gates) should measure
+  whether direct ICE succeeds, so TURN egress stays rare.
 
 ### Why not HMAC refresh tickets / an external rate-limit library?
 
 Deliberately NOT doing: HMAC refresh tickets, per-room quotas, or external
-rate-limit libraries. Complexity > value here: the credential TTL (10 min)
-means extracted credentials self-expire, the in-worker counter stops
-per-IP farming at the source, the zone rule survives isolate restarts, and
-the budget kill-switch caps the account-wide worst case. Those layers bound
-farming tightly enough for a party app — adding a third-party library or a
-refresh-ticket scheme would add attack surface and operational complexity
-for no measurable gain.
+rate-limit libraries. Complexity > value here: the 24 h credential covers a
+whole party with one mint, the in-worker counter stops per-IP farming at the
+source, the zone rule survives isolate restarts, the mint caps bound
+account-wide issuance, and native budget alerts cover spend visibility.
+Cloudflare's native Workers rate-limiting binding was considered for the
+in-worker counter, but it is per-location approximate, is also an issuance
+control, and would add a provider binding for no traffic-bound benefit.

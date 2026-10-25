@@ -45,6 +45,9 @@ jobs:
       - name: Unit tests
         run: npm run test
 
+      - name: Infrastructure worker tests
+        run: npm run test:deploy
+
       - name: Build
         run: npm run build
 

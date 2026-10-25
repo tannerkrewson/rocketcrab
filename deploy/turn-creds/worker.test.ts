@@ -25,7 +25,6 @@ import {
   type KvStore,
   type TurnCredsEnv,
 } from "./worker";
-import { TURN_ANALYTICS_ENDPOINT } from "./watchdog";
 
 /**
  * TURN credential mint worker tests (task rocketcrab-23s). The worker
@@ -145,7 +144,9 @@ describe("buildMintRequest", () => {
     );
   });
 
-  it("always requests the short 600s TTL and sends the bearer token", () => {
+  it("always requests the fixed 24 h TTL and sends the bearer token", () => {
+    expect(MINT_TTL_SECONDS).toBe(86_400);
+    expect(MINT_TTL_SECONDS).toBeLessThanOrEqual(48 * 60 * 60);
     const req = buildMintRequest(makeEnv());
     const init = req!.init;
     expect(init.method).toBe("POST");
@@ -188,7 +189,7 @@ describe("isPort53IceUrl / filterPort53IceServers (rocketcrab-23s.2)", () => {
           credential: "c1",
         },
       ],
-      ttl: 600,
+      ttl: 86_400,
     };
     const filtered = filterPort53IceServers(body);
     expect(filtered).toEqual({
@@ -204,7 +205,7 @@ describe("isPort53IceUrl / filterPort53IceServers (rocketcrab-23s.2)", () => {
           credential: "c1",
         },
       ],
-      ttl: 600,
+      ttl: 86_400,
     });
     expect(
       filtered.iceServers?.flatMap((s) => (Array.isArray(s.urls) ? s.urls : [s.urls])),
@@ -295,7 +296,7 @@ describe("handleTurnCredsRequest (rocketcrab-23s.1: origin allowlist + CORS)", (
   beforeEach(() => {
     resetRateLimiter();
     fetchMock = vi.fn(
-      async () => new Response(JSON.stringify({ iceServers: [], ttl: 600 }), { status: 200 }),
+      async () => new Response(JSON.stringify({ iceServers: [], ttl: 86_400 }), { status: 200 }),
     );
     vi.stubGlobal("fetch", fetchMock);
   });
@@ -359,12 +360,12 @@ describe("handleTurnCredsRequest (rocketcrab-23s.1: origin allowlist + CORS)", (
     expect(upstreamCalled(fetchMock)).toBe(false);
   });
 
-  it("mints successfully for an allowlisted origin: forwards ttl=600, returns the body with CORS", async () => {
+  it("mints successfully for an allowlisted origin: always forwards the fixed 24 h ttl, returns the body with CORS", async () => {
     const upstreamBody = {
       iceServers: [
         { urls: ["turn:turn.cloudflare.com:3478?transport=udp"], username: "u1", credential: "c1" },
       ],
-      ttl: 600,
+      ttl: 86_400,
     };
     fetchMock.mockImplementation(
       async () => new Response(JSON.stringify(upstreamBody), { status: 200 }),
@@ -379,7 +380,8 @@ describe("handleTurnCredsRequest (rocketcrab-23s.1: origin allowlist + CORS)", (
     expect(String(url)).toBe(
       `https://rtc.live.cloudflare.com/v1/turn/keys/${TEST_KEY_ID}/credentials/generate-ice-servers`,
     );
-    expect(JSON.parse(String(init?.body))).toEqual({ ttl: MINT_TTL_SECONDS });
+    expect(JSON.parse(String(init?.body))).toEqual({ ttl: 86_400 });
+    expect(MINT_TTL_SECONDS).toBe(86_400);
   });
 
   it("strips port-53 URLs end to end while keeping the primary set and shape", async () => {
@@ -398,7 +400,7 @@ describe("handleTurnCredsRequest (rocketcrab-23s.1: origin allowlist + CORS)", (
                 credential: "c1",
               },
             ],
-            ttl: 600,
+            ttl: 86_400,
           }),
           { status: 200 },
         ),
@@ -476,7 +478,7 @@ describe("handleTurnCredsRequest (rocketcrab-23s.3: per-IP rate limiting)", () =
   beforeEach(() => {
     resetRateLimiter();
     fetchMock = vi.fn(
-      async () => new Response(JSON.stringify({ iceServers: [], ttl: 600 }), { status: 200 }),
+      async () => new Response(JSON.stringify({ iceServers: [], ttl: 86_400 }), { status: 200 }),
     );
     vi.stubGlobal("fetch", fetchMock);
   });
@@ -579,7 +581,7 @@ describe("budget kill-switch via KV counters (rocketcrab-23s.4)", () => {
   beforeEach(() => {
     resetRateLimiter();
     fetchMock = vi.fn(
-      async () => new Response(JSON.stringify({ iceServers: [], ttl: 600 }), { status: 200 }),
+      async () => new Response(JSON.stringify({ iceServers: [], ttl: 86_400 }), { status: 200 }),
     );
     vi.stubGlobal("fetch", fetchMock);
   });
@@ -704,32 +706,5 @@ describe("budget kill-switch via KV counters (rocketcrab-23s.4)", () => {
       makeEnv({ TURN_BUDGET: kv2 }),
     );
     expect(res2.status).toBe(200);
-  });
-
-  it("GET /__watchdog runs one watchdog pass and returns its summary (manual cron trigger)", async () => {
-    fetchMock.mockImplementation(async (url: string | URL) => {
-      if (String(url) === TURN_ANALYTICS_ENDPOINT) {
-        return new Response(
-          JSON.stringify({
-            data: {
-              viewer: {
-                accounts: [{ callsTurnUsageAdaptiveGroups: [{ sum: { egressBytes: 1000 } }] }],
-              },
-            },
-          }),
-          { status: 200 },
-        );
-      }
-      return new Response("unexpected fetch", { status: 500 });
-    });
-
-    const res = await handleWatchdogRequest(
-      new Request("https://turn-creds.example.net/__watchdog"),
-      { CLOUDFLARE_ACCOUNT_ID: "test-account", CLOUDFLARE_API_TOKEN: "test-token" },
-    );
-    expect(res.status).toBe(200);
-    const summary = (await res.json()) as { ok: boolean; egressBytes: number; error?: string };
-    expect(summary.ok).toBe(true);
-    expect(summary.egressBytes).toBe(1000);
   });
 });

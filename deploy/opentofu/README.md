@@ -14,9 +14,9 @@ imports, deletes, or deploys anything automatically.
 - `cloudflare_workers_script.turn` manages the planned
   `rocketcrab-turn-creds` Worker, all non-secret variables, and the
   `TURN_BUDGET` KV binding. Its `worker.ts` bundle includes the local
-  `watchdog.ts` module.
-- `cloudflare_workers_cron_trigger.turn_watchdog` manages the `0 9 * * *`
+
   UTC schedule for the Worker `scheduled` handler.
+
 - `cloudflare_workers_script_subdomain.relay` and `.turn` enable the two
   per-Worker workers.dev hostnames. The account-level workers.dev subdomain is
   an account setting and remains a human prerequisite.
@@ -29,8 +29,8 @@ imports, deletes, or deploys anything automatically.
   `RATE_LIMIT_PER_MIN` default.
 
 The Worker source of truth remains the existing TypeScript files:
-`deploy/relay/worker.ts` and `deploy/turn-creds/worker.ts` plus
-`deploy/turn-creds/watchdog.ts`. Cloudflare does not transpile TypeScript on
+`deploy/relay/worker.ts` and `deploy/turn-creds/worker.ts`. Cloudflare does
+not transpile TypeScript on
 upload, so OpenTofu consumes the generated JavaScript bundles rather than
 pretending that raw TypeScript is deployable.
 
@@ -110,8 +110,6 @@ documented import formats instead of allowing duplicate resources:
 ```sh
 tofu -chdir=deploy/opentofu import cloudflare_workers_kv_namespace.turn_budget \
   "<CLOUDFLARE_ACCOUNT_ID>/<NAMESPACE_ID>"
-tofu -chdir=deploy/opentofu import cloudflare_workers_cron_trigger.turn_watchdog \
-  "<CLOUDFLARE_ACCOUNT_ID>/rocketcrab-turn-creds"
 tofu -chdir=deploy/opentofu import 'cloudflare_workers_route.turn[0]' \
   "<CLOUDFLARE_ZONE_ID>/<ROUTE_ID>"
 tofu -chdir=deploy/opentofu import 'cloudflare_workers_custom_domain.turn[0]' \

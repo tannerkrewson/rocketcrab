@@ -43,8 +43,8 @@ resource "cloudflare_workers_script" "turn" {
   account_id  = var.cloudflare_account_id
   script_name = local.turn_worker_name
 
-  # The bundle includes worker.ts and its local watchdog.ts import. The KV
-  # binding and plain-text variables are attached by OpenTofu below.
+  # The bundle is worker.ts only. The KV binding and plain-text variables are
+  # attached by OpenTofu below.
   main_module        = "worker.js"
   content_file       = local.turn_bundle_file
   content_sha256     = fileexists(local.turn_bundle_file) ? filesha256(local.turn_bundle_file) : null
@@ -60,16 +60,6 @@ resource "cloudflare_workers_script" "turn" {
       condition     = fileexists(local.turn_bundle_file)
       error_message = "The TURN bundle is missing. Run the Wrangler deploy --dry-run command in deploy/opentofu/README.md before planning or applying."
     }
-  }
-}
-
-resource "cloudflare_workers_cron_trigger" "turn_watchdog" {
-  account_id  = var.cloudflare_account_id
-  script_name = cloudflare_workers_script.turn.script_name
-  schedules   = [{ cron = "0 9 * * *" }]
-
-  lifecycle {
-    prevent_destroy = true
   }
 }
 
