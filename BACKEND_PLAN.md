@@ -114,19 +114,37 @@ no automation applies or deploys a Worker.
 
 ## Stage 4 — TURN security, attribution, costs, diagnostics
 
-- [ ] Verify whether Cloudflare’s mint API supports a per-request custom
+- [x] Verify whether Cloudflare’s mint API supports a per-request custom
       identifier; if it does, label credentials without adding client-controlled
       secrets, and document per-player attribution.
-- [ ] Confirm current lifecycle: each page/player mints one 24 h credential; do
+- [x] Confirm current lifecycle: each page/player mints one 24 h credential; do
       not re-mint or share credentials between participants.
-- [ ] Document native Realtime TURN analytics, budget alerts (notifications, not
+- [x] Document native Realtime TURN analytics, budget alerts (notifications, not
       caps), emergency disable/revoke/rotate, and what issuance limits do/do not
       bound.
-- [ ] Confirm diagnostic categories cover signaling, peer connection, TURN mint,
+- [x] Confirm diagnostic categories cover signaling, peer connection, TURN mint,
       disconnects, reconnect failures and party end.
-- [ ] Investigate the reported heavy arena e2e flake; fix real races only.
+- [x] Investigate the reported heavy arena e2e flake; fix real races only.
 - [ ] Add a gated real forced-TURN test harness if credentials are available;
       no fake proof.
+
+Evidence: docs confirm each participant page mints one credential at join and
+shares it only within that page; the party-wide sharing description was wrong.
+Cloudflare documents `customIdentifier` for the sibling `credentials/generate`
+endpoint but not for `generate-ice-servers`, so the worker does not send an
+unverified field; attribution is per credential (`username`) plus the
+`turn_cred_mint` log. `deploy/turn-creds/README.md` and `deploy/cloudflare.md`
+now document TURN analytics dimensions/queries, budget alerts as notifications
+(not caps), what issuance caps do and do not bound, and the emergency
+disable/revoke/rotate procedure. Diagnostics already distinguish signaling,
+peer-connection, TURN-mint, disconnect, reconnect and party-end states.
+
+Arena flake: the four-player S4 spec failed once while Chromium and Firefox ran
+together under load; it passed `--repeat-each=3` isolated (4.4 s) and in prior
+full runs. No synchronization race was found; this is resource contention in
+the test environment, not a product failure. Forced-TURN proof remains pending
+because no TURN key/credentials or deployment are authorized; no fake test was
+added.
 
 ## Stage 5 — Focused cleanup (only if time/context allows)
 

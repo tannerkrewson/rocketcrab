@@ -137,6 +137,29 @@ Recommended repo-token scope for the CI token: **Workers Scripts → Edit**
 **Zone → Config → Rulesets → Edit** (rate rule). The edge Worker needs no analytics permission; spend visibility is configured in the Cloudflare
 dashboard (budget alerts / Billable Usage notifications).
 
+## 4b. TURN operations
+
+- **Lifecycle:** each participant page mints one 24-hour credential per party
+  join and never refreshes it. Cloudflare's 48-hour credential maximum is not
+  binding; the TURN allocation itself has no maximum duration while the client
+  keeps it alive with authenticated refreshes. A reconnect reuses the cached
+  lease; a party started after expiry mints again.
+- **Attribution:** one credential per participant (`username` dimension) plus
+  the edge `turn_cred_mint` log line. `customIdentifier` is documented for the
+  sibling `generate` endpoint, not `generate-ice-servers`, so it is not sent.
+- **Cost visibility:** account budget alerts and Billable Usage notifications
+  (dashboard; informational, not caps). TURN egress is $0.05/GB with a shared
+  Realtime free allowance; per-allocation Cloudflare limits bound a single
+  credential, not the account.
+- **Emergency controls:** lower/remove `MINT_DAILY_CAP` or the TURN secrets to
+  stop issuance; revoke a credential at Cloudflare
+  (`POST /v1/turn/keys/<key>/credentials/<username>/revoke`); rotate the TURN
+  key in the Realtime dashboard and update Worker secrets. Investigate spikes
+  with the GraphQL analytics queries in `deploy/turn-creds/README.md`.
+- **Diagnostics:** the app surfaces signaling failure, peer-connection failure,
+  TURN-mint failure, disconnect, reconnect attempts/failure and party end as
+  distinct notices/states; Worker logs cover mints and upstream failures.
+
 ## 5. Live-state verification (as of 2026-08-14)
 
 Queried the Cloudflare API directly (not just this repo's files):

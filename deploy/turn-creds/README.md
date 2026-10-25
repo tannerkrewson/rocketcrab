@@ -306,6 +306,36 @@ wrangler kv key delete mints:2026-08-13 --binding TURN_BUDGET --config deploy/ed
 (`event: "turn_cred_mint"`, `ip`, `origin`, `ttl`, `ts`) in Workers Logs for
 usage review and post-mortems.
 
+### Credential attribution
+
+Each participant's page mints **its own** credential once at party join and
+reuses it for that page's peer connections; there is no credential shared
+between participants and no client refresh. Cloudflare TURN analytics exposes
+`keyId`, `username`, and `customIdentifier` dimensions. `customIdentifier` is
+documented for the sibling `credentials/generate` endpoint, not for
+`credentials/generate-ice-servers`, so Nova does not send an unverified field.
+Current attribution is therefore per credential (`username`) plus the
+`turn_cred_mint` log line (`ip`, `origin`, `ts`). Revisit custom identifiers
+after a live API check; do not add a client-supplied identifier without
+validation.
+
+### TURN analytics queries
+
+Use the Cloudflare GraphQL analytics API with an Account Analytics token. Start
+from the current TURN dataset in the dashboard/GraphiQL and filter the desired
+window, then:
+
+- **Total traffic:** sum `ingressBytes` and `egressBytes` for the account.
+- **Top credentials/keys:** group by `username` and `keyId`, ordered by
+  `sum_egressBytes_DESC`, when investigating an unexpected spike.
+- **Issuance failures:** Workers Logs for the edge Worker plus the
+  `turn_cred_mint` lines show successful mints only; alert on budget thresholds
+  separately.
+
+Cloudflare budget alerts and Billable Usage notifications are dashboard
+settings and are **notifications, not hard spending caps**. See
+`deploy/cloudflare.md` for the emergency procedure.
+
 ## Usage visibility and abuse response (rocketcrab-23s.5)
 
 Cloudflare's native controls replace the former custom GraphQL watchdog
