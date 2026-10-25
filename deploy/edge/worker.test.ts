@@ -44,6 +44,17 @@ describe("edge Worker dispatch", () => {
     expect(await unknown.json()).toMatchObject({ error: { code: "unknown_endpoint" } });
   });
 
+  it("returns 404 for unknown paths instead of routing them to the relay", async () => {
+    for (const path of ["/turn/extra", "/anything"]) {
+      const response = await edgeWorker.fetch(
+        request(path, { method: "POST", body: JSON.stringify({ endpoint: "drawphone-new" }) }),
+        {},
+      );
+      expect(response.status).toBe(404);
+      expect(await response.json()).toMatchObject({ error: { code: "not_found" } });
+    }
+  });
+
   it("rejects a missing Origin on both endpoints before any work", async () => {
     for (const path of ["/", "/turn"]) {
       const response = await edgeWorker.fetch(

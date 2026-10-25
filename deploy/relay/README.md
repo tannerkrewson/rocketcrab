@@ -36,8 +36,8 @@ TURN credential endpoint (`rocketcrab-23s`).
 - The upstream method is fixed per endpoint (clients cannot change it),
   and interpolated path params (netgames.io game ids) are validated
   against a strict `[A-Za-z0-9-]` charset.
-- **Per-IP rate limiting** (`RATE_LIMIT_PER_MIN`, `rocketcrab-9fv.3.5`): an
-  in-worker fixed-window fast-fail check answers `429` + `Retry-After`
+- **Per-IP rate limiting** (`RATE_LIMIT_PER_MIN`, `rocketcrab-9fv.3.5`): the
+  Cloudflare Workers Rate Limiting binding answers `429` + `Retry-After`
   before any forwarding (see "Rate limiting" below).
 - Stateless: no room-state database, no game code execution — the relay
   only forwards the room-creation request and returns the JSON.
@@ -47,7 +47,7 @@ TURN credential endpoint (`rocketcrab-23s`).
 | Variable             | Default                                                                                                            | Meaning                                                                                                                                                                                    |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `ORIGIN_ALLOWLIST`   | `https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173` | Comma-separated origins allowed to use the relay. Each entry may be a full origin (`scheme://host[:port]`); a trailing slash is tolerated. Matching against the request `Origin` is exact. |
-| `RATE_LIMIT_PER_MIN` | `20`                                                                                                               | Requests per minute per client IP allowed by the in-worker fast-fail counter (60s fixed window).                                                                                           |
+| `RATE_LIMIT_PER_MIN` | `20`                                                                                                               | Requests per minute per client IP for the Workers Rate Limiting binding (60s window).                                                                                                      |
 
 A single-variable env override (unset = the default above). Neither variable
 is sensitive. The OpenTofu root represents these values as `plain_text`
@@ -88,18 +88,18 @@ production.
 
 ## Rate limiting (`rocketcrab-9fv.3.5`)
 
-An in-worker **fixed-window counter keyed by client IP** (`CF-Connecting-IP`,
-edge-set and not client-spoofable). Over the limit, the worker answers `429`
-with a `Retry-After` header **before any forwarding**. The window is 60s; the
-limit is `RATE_LIMIT_PER_MIN` (default **20/min**). In-memory per-isolate
-state is fine here: this is a fast-fail backstop, and over-counting under
-concurrency is SAFE (it only ever rejects more aggressively, never less).
-`OPTIONS` preflights are answered before the rate-limit check, so they never
-consume the budget.
+The primary control is the Cloudflare Workers Rate Limiting binding
+(`RATE_LIMITER`), keyed by `relay:<client-ip>` for this route. Over the limit,
+the worker answers `429` with `Retry-After` **before any forwarding**. The
+window is 60s; the limit is `RATE_LIMIT_PER_MIN` (default **20/min**). The
+binding is approximate and counted per Cloudflare location, but it survives
+isolate restarts; the in-memory fixed-window counter is only a local-dev/test
+fallback when the binding is absent or throws. `OPTIONS` preflights are
+answered before the rate-limit check, so they never consume the budget.
 
-The same edge Worker also serves `/turn`. The optional zone-level rate rule
-(`deploy/cloudflare.md`) applies to the proxied origin; the in-worker counter is
-the current backstop on workers.dev.
+The same edge Worker also serves `/turn` with a separate rate-limit key. The
+optional zone-level rate rule (`deploy/cloudflare.md`) applies only to a proxied
+custom hostname and is off by default.
 
 ## Client wiring
 

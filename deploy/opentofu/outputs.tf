@@ -8,11 +8,6 @@ output "edge_workers_dev_url" {
   value       = var.workers_dev_subdomain == null ? null : "https://${local.edge_worker_name}.${var.workers_dev_subdomain}.workers.dev"
 }
 
-output "turn_budget_namespace_id" {
-  description = "TURN_BUDGET KV namespace ID. This is not a secret."
-  value       = cloudflare_workers_kv_namespace.turn_budget.id
-}
-
 output "turn_custom_route_id" {
   description = "Optional custom route ID, or null until a route is configured."
   value       = try(cloudflare_workers_route.turn[0].id, null)

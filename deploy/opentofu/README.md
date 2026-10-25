@@ -9,18 +9,16 @@ imports, deletes, or deploys anything automatically.
 
 - `cloudflare_workers_script.relay` manages the single deployed edge Worker
   (`rocketcrab-cors-relay`: Classic CORS relay + `/turn` TURN mint), its
-  non-secret variables, and the `TURN_BUDGET` KV binding. The bundle entry point
-  is `deploy/edge/worker.ts`, which imports the relay and TURN handler modules.
-- `cloudflare_workers_kv_namespace.turn_budget` creates the `TURN_BUDGET`
-  namespace holding the daily mint counter.
+  non-secret variables, and the Workers Rate Limiting binding (`RATE_LIMITER`).
+  The bundle entry point is `deploy/edge/worker.ts`, which imports the relay and
+  TURN handler modules. There is no KV, database, or Durable Object binding.
 - `cloudflare_workers_script_subdomain.relay` enables the Worker's workers.dev
   hostname. The account-level workers.dev subdomain is a human prerequisite.
 - `cloudflare_workers_route.turn` and
   `cloudflare_workers_custom_domain.turn` are mutually exclusive optional
   endpoint choices for the same edge Worker. `cloudflare_ruleset.turn_rate_limit`
-  is optional and uses the provider-supported `http_ratelimit` phase, `ip.src`
-  characteristic, 60-second period, and the configured `RATE_LIMIT_PER_MIN`
-  default.
+  is optional, off by default, and uses the `http_ratelimit` phase with
+  `ip.src`. Enable it only on a WAF plan that supports source-IP rate rules.
 - Worker secrets (`TURN_KEY_ID`, `TURN_KEY_API_TOKEN`) are set outside
   OpenTofu. The root preserves existing `secret_text` bindings but never creates
   or rotates their values.
@@ -51,8 +49,7 @@ npx --yes wrangler@4.127.1 deploy deploy/edge/worker.ts \
 
 Use the absolute `$PWD/...` output path: with some Wrangler versions a relative
 `--outdir` under the ignored `.build` directory writes only the README and no
-`worker.js`. OpenTofu supplies the real `TURN_BUDGET` binding after the
-namespace exists. Do not commit any generated bundle.
+`worker.js`. Do not commit any generated bundle.
 
 Then validate without touching state:
 
@@ -117,9 +114,9 @@ state. The repository ignores `*.tfstate*`, `*.tfvars`, `backend.hcl`, and
 
 ## Ownership and import strategy
 
-The relay Worker is live; the TURN route, KV namespace, custom route/domain and
-rate rule are not. Import the live relay before any write; do not import or
-create the rest until the owner approves provisioning.
+The relay Worker is live; the TURN route, custom route/domain and optional rate
+rule are not. Import the live relay and its workers.dev subdomain before any
+write; do not import or create the rest until the owner approves provisioning.
 
 ```sh
 tofu -chdir=deploy/opentofu import \
@@ -131,17 +128,24 @@ tofu -chdir=deploy/opentofu import \
 ```
 
 Both import IDs are `<account_id>/<script_name>`. Compare the live bundle hash,
-bindings, and workers.dev setting with the plan before applying;
+bindings, secrets and workers.dev setting with the plan before applying.
 `prevent_destroy` is set on the Worker and every persistent resource so a
-mismatch cannot silently become delete/recreate. If the KV namespace or optional
-route/domain appears before adoption, stop and record their IDs instead of
-letting the plan create duplicates.
+mismatch cannot silently become delete/recreate. If a custom route/domain or
+rate rule already exists, import it with the IDs below instead of letting the
+plan duplicate it:
+
+```sh
+# Route:      <zone_id>/<route_id>
+# Domain:     <account_id>/<domain_id>
+# Ruleset:    zones/<zone_id>/<ruleset_id>
+```
 
 ## Secrets (outside state)
 
-Worker secret values never enter Git or OpenTofu state. OpenTofu preserves
-existing `secret_text` bindings with `keep_bindings`. After an approved apply,
-set or rotate them against the edge Worker and verify the names exist:
+Worker secret values never enter Git or OpenTofu state. The script resource sets
+`keep_bindings = ["secret_text"]`, so an upload preserves existing secrets
+instead of deleting them. After an approved apply, set or rotate them against
+the edge Worker and verify the names exist:
 
 ```sh
 wrangler secret put TURN_KEY_ID --config deploy/edge/wrangler.toml
@@ -161,10 +165,9 @@ revoke credentials at Cloudflare if issuance is abused. See
   or Secrets Store. Passing secret values to a script binding would put them in
   OpenTofu state. `keep_bindings = ["secret_text"]` preserves existing Worker
   secrets when the script is uploaded, but does not create or rotate them.
-  `TURN_KEY_ID`, `TURN_KEY_API_TOKEN`, `CLOUDFLARE_ACCOUNT_ID`,
-  `CLOUDFLARE_API_TOKEN`, and `ALERT_WEBHOOK_URL` therefore remain
-  human-managed Worker secrets until the coordinator chooses a safe Secrets
-  Store/API handoff.
+  Only `TURN_KEY_ID` and `TURN_KEY_API_TOKEN` are Worker secrets, set with
+  `wrangler secret put`. `CLOUDFLARE_API_TOKEN` is a local operator credential
+  and `CLOUDFLARE_ACCOUNT_ID` is a tfvars value; neither belongs in the Worker.
 - **Cloudflare Realtime TURN key:** provider v5.24.0 exposes
   `cloudflare_calls_turn_app`, which can create a TURN key but does not support
   import and returns its bearer key as sensitive state. That is not a safe
@@ -185,26 +188,23 @@ revoke credentials at Cloudflare if issuance is abused. See
   verified in the Cloudflare inventory, but the provider resources here do not
   own that account setting. The value is an optional output-only input; the
   per-Worker subdomain resources only enable each script under it.
-- **State backend:** no backend or shared locking choice is assumed. This must
-  be settled before CI is allowed to read or write shared state.
+- **State backend:** the R2 bucket is chosen but must be created and initialized
+  interactively; locking is `use_lockfile = true`. CI does not read or write
+  state and never plans/applies.
 
-Questions for the coordinator/review bead are: which remote backend and lock
-policy should be used; should TURN use `turn_custom_route` or
-`turn_custom_domain`; what exact hostname, zone, DNS/proxy arrangement, and
-Rules language expression should protect TURN POST requests; and which
-approved mechanism will create/rotate the TURN key and populate Worker
-Secrets without storing its bearer token in OpenTofu state?
+Open decisions before the first apply: whether to use a custom domain (stable
+origin) or stay on workers.dev; the DNS/zone details if a custom domain is
+chosen; whether the WAF plan supports an `ip.src` zone rate rule (off by
+default); and the Cloudflare Realtime TURN key ID/token, which are created in
+the dashboard/API and set as Worker secrets outside state.
 
 ## Provider references
 
 The schemas were checked against the pinned Cloudflare provider v5.24.0:
 
 - [Workers script](https://registry.terraform.io/providers/cloudflare/cloudflare/5.24.0/docs/resources/workers_script)
-- [Workers KV namespace](https://registry.terraform.io/providers/cloudflare/cloudflare/5.24.0/docs/resources/workers_kv_namespace)
-- [Worker cron trigger](https://registry.terraform.io/providers/cloudflare/cloudflare/5.24.0/docs/resources/workers_cron_trigger)
 - [Workers script subdomain](https://registry.terraform.io/providers/cloudflare/cloudflare/5.24.0/docs/resources/workers_script_subdomain)
 - [Workers route](https://registry.terraform.io/providers/cloudflare/cloudflare/5.24.0/docs/resources/workers_route)
 - [Workers custom domain](https://registry.terraform.io/providers/cloudflare/cloudflare/5.24.0/docs/resources/workers_custom_domain)
 - [Ruleset](https://registry.terraform.io/providers/cloudflare/cloudflare/5.24.0/docs/resources/ruleset)
-- [TURN app](https://registry.terraform.io/providers/cloudflare/cloudflare/5.24.0/docs/resources/calls_turn_app)
 - [Cloudflare Workers IaC and bundling guidance](https://developers.cloudflare.com/workers/platform/infrastructure-as-code/)

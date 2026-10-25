@@ -158,14 +158,14 @@ Build-time pins (also documented in `apps/nova/.env.example` and
 ### Cloudflare runtime boundary
 
 GitHub Actions Pages deployment remains the only publisher for the static Nova
-and runtime origins. Cloudflare Workers and KV are separate infrastructure:
+and runtime origins. The Cloudflare edge Worker is separate infrastructure:
 their supported resources are modeled in [`deploy/opentofu/`](../../deploy/opentofu/),
 while [`deploy/cloudflare.md`](../../deploy/cloudflare.md) records live state
 and the human-only account, state, and secret decisions. The infrastructure
 workflow is validation-only and never applies OpenTofu or deploys with
 Wrangler. The Classic CORS relay is already live; the same single edge Worker
-gains the TURN-mint route, `TURN_BUDGET` namespace and optional rate rule only
-after the owner approves the migration plan. Wrangler is used only to compile
+gains the TURN-mint route and platform rate-limit binding only after the owner
+approves the migration plan. Wrangler is used only to compile
 the dry-run bundle and to set/rotate Worker secrets — never to deploy the
 production Worker.
 
@@ -209,8 +209,7 @@ Cloudflare infrastructure deploys through one manual, approved path:
    `tofu plan` (requires the R2 remote state). CI validates
    formatting/configuration only; it never plans, applies, or deploys a Worker.
 3. The owner approves and an operator runs `tofu apply`. This is the only
-   mechanism that changes the Worker, its bindings, KV, route, domain or rate
-   rule.
+   mechanism that changes the Worker, its bindings, route, domain or rate rule.
 4. Set/rotate Worker secrets with `wrangler secret put` (values never in Git or
    state).
 5. **Order matters for `/turn`:** apply the Worker first and verify `/turn`,

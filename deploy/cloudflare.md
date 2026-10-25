@@ -1,6 +1,7 @@
 # Cloudflare infrastructure - state and reproduction runbook
 
-- **Status:** Live state verified against the Cloudflare API 2026-08-14.
+- **Status:** Live state last verified against the Cloudflare API 2026-08-14;
+  re-verify before any import or apply.
 - **Purpose:** the inventory and operator runbook for every Cloudflare resource
   Rocketcrab Nova uses. Supported resources are moving to the dedicated
   OpenTofu root at `deploy/opentofu/`; this file remains the live-state record
@@ -41,10 +42,11 @@ CORS relay; the same script gains the `/turn` TURN-mint route on apply.
   - `POST /turn` — mints one 24 h Cloudflare Realtime TURN credential per
     party join by proxying the credentials API (task `rocketcrab-23s`; F5
     verdict "TURN required", ADR-0003 M3 addendum). Holds the TURN key secret.
-  - every other path — the scoped Classic CORS relay: 16 of the 22 prebuilt
-    classic games create rooms through third-party endpoints that send no
+  - `POST /` — the scoped Classic CORS relay: 16 of the 22 prebuilt classic
+    games create rooms through third-party endpoints that send no
     `Access-Control-Allow-Origin` headers, so the relay forwards only
     allowlisted room-creation requests and echoes the allowlisted Origin.
+  - any other path — `404` JSON; nothing is forwarded.
   - Neither endpoint is an open proxy, executes game code, or stores rooms.
 - **Live URL:** `https://rocketcrab-cors-relay.tannerkrewson.workers.dev`
   (relay verified 2026-08-14; `/turn` appears after the next approved apply).
@@ -61,23 +63,19 @@ CORS relay; the same script gains the `/turn` TURN-mint route on apply.
   | -------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
   | `ORIGIN_ALLOWLIST`   | `https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173` | Origins allowed to call either endpoint               |
   | `RATE_LIMIT_PER_MIN` | `20`                                                                                                               | In-worker per-IP fixed-window limit for each endpoint |
-  | `MINT_DAILY_CAP`     | `5000`                                                                                                             | Daily TURN-mint cap (KV-backed, fails open)           |
 
 - **Worker secrets:** `TURN_KEY_ID` + `TURN_KEY_API_TOKEN` (never committed;
   set out of band). The OpenTofu root preserves existing secret bindings but
   does not create or rotate their values. Local dev uses a gitignored
   `deploy/edge/.dev.vars`.
-- **KV namespace:** `TURN_BUDGET` holds only `mints:YYYY-MM-DD`. It is the
-  account-wide daily issuance stop the per-IP limiter cannot replace; it bounds
-  issuance, not already-issued traffic. The OpenTofu resource
-  `cloudflare_workers_kv_namespace.turn_budget` owns it.
-- **Rate limiting:** the in-worker fast-fail counter plus the optional
-  provider-managed **zone-level Rulesets rate rule** (per-IP, block) when a
-  proxied custom route or Custom Domain is supplied. A `workers.dev` host has
-  no zone for that rule.
+- **Rate limiting:** the Cloudflare Workers Rate Limiting binding
+  (`RATE_LIMITER`) is primary; the in-memory counter is only a local-dev/test
+  fallback. An optional provider-managed **zone-level Rulesets rate rule**
+  (per-IP, block) can be added when a proxied custom route or Custom Domain is
+  supplied and the WAF plan supports `ip.src` (not Free).
 - **Deployment state (verified via API 2026-08-14):** the relay script exists;
-  the `TURN_BUDGET` KV namespace **does not** exist, so the TURN route has never
-  been live. The TURN key also does not exist yet.
+  no KV namespace exists, and the `/turn` route plus TURN key have never been
+  live. Re-check the inventory before importing.
 - **How to manage:** `cloudflare_workers_script.relay` +
   `cloudflare_workers_script_subdomain.relay` model the live Worker and its
   workers.dev hostname. Import both before any write. OpenTofu consumes the
@@ -97,45 +95,40 @@ CORS relay; the same script gains the `/turn` TURN-mint route on apply.
    every `<name>.tannerkrewson.workers.dev` URL. OpenTofu separately enables
    each managed script's workers.dev hostname through
    `cloudflare_workers_script_subdomain`.
-2. **Create the KV namespace:** the OpenTofu resource
-   `cloudflare_workers_kv_namespace.turn_budget` owns `TURN_BUDGET`; do not
-   paste an ID into the Wrangler config. No namespace exists in the verified
-   inventory.
-3. **Create or choose the TURN key:** provider v5.24.0 has a
+2. **Create or choose the TURN key:** provider v5.24.0 has a
    `cloudflare_calls_turn_app` resource, but it cannot import an existing key
    and exposes the bearer key as sensitive state. Until the coordinator
    chooses that state tradeoff, create/rotate the key in Realtime dashboard or
    API and keep its ID/token as human-managed Worker secrets.
-4. **Set the repo CI secrets** (§4): `CLOUDFLARE_API_TOKEN` (scoped:
-   Workers Scripts edit + KV + Zone Rulesets) and
-   `CLOUDFLARE_ACCOUNT_ID`, under GitHub repo Settings → Secrets and
-   variables → Actions.
-5. **Choose the edge endpoint and rate-limit policy:** by default the edge
-   Worker stays on its workers.dev origin. If you want a stable origin and a
-   zone-level rate rule, select either a proxied `turn_custom_route` or
-   `turn_custom_domain` plus the real zone ID. A custom domain provisions its
-   DNS record and certificate through Cloudflare; a route requires the chosen
-   hostname to be proxied. Supply the exact expression through
+3. **Choose the edge endpoint and optional rate policy:** by default the edge
+   Worker stays on its workers.dev origin. If you want a stable origin, select
+   either a proxied `turn_custom_route` or `turn_custom_domain` plus the real
+   zone ID. A custom domain provisions its DNS record and certificate through
+   Cloudflare; a route requires the chosen hostname to be proxied. The Worker's
+   `RATE_LIMITER` binding is independent of this choice. A zone-level
+   `ip.src` rate rule additionally needs a WAF plan that supports it (not Free)
+   and is off by default; supply the exact expression through
    `rate_limit_expression` on a route or `turn_rate_limit_expression` for a
-   custom domain. A workers.dev host cannot carry this zone rule.
-6. **Apply only after review:** import the live relay into OpenTofu first,
-   then review the plan. The same script gains `/turn`; its KV/key/secrets and
-   optional route must be approved first. This migration task does not apply,
-   import, or deploy anything.
+   custom domain.
+4. **Apply only after review:** import the live relay into OpenTofu first,
+   then review the plan. The same script gains `/turn`; its key/secrets and
+   optional route must be approved first. This runbook does not apply, import,
+   or deploy anything.
 
 ## 4. Secrets table
 
-| Secret                  | Scope     | Where set                                              | Needed by                                        |
-| ----------------------- | --------- | ------------------------------------------------------ | ------------------------------------------------ |
-| `CLOUDFLARE_API_TOKEN`  | Operator  | Local environment (never committed)                    | OpenTofu refresh-enabled plan/apply              |
-| `CLOUDFLARE_ACCOUNT_ID` | Repo (CI) | GitHub → Settings → Secrets and variables → Actions    | OpenTofu variable or operator plan input         |
-| `TURN_KEY_ID`           | Worker    | `wrangler secret put TURN_KEY_ID` (edge Worker)        | TURN mint: Realtime credentials API path segment |
-| `TURN_KEY_API_TOKEN`    | Worker    | `wrangler secret put TURN_KEY_API_TOKEN` (edge Worker) | TURN mint: `Authorization: Bearer` header        |
+| Secret                  | Scope    | Where set                                              | Needed by                                        |
+| ----------------------- | -------- | ------------------------------------------------------ | ------------------------------------------------ |
+| `CLOUDFLARE_API_TOKEN`  | Operator | Local environment (never committed)                    | OpenTofu refresh-enabled plan/apply              |
+| `CLOUDFLARE_ACCOUNT_ID` | Operator | Ignored `terraform.tfvars` or `-var`                   | OpenTofu account variable                        |
+| `TURN_KEY_ID`           | Worker   | `wrangler secret put TURN_KEY_ID` (edge Worker)        | TURN mint: Realtime credentials API path segment |
+| `TURN_KEY_API_TOKEN`    | Worker   | `wrangler secret put TURN_KEY_API_TOKEN` (edge Worker) | TURN mint: `Authorization: Bearer` header        |
 
-Recommended repo-token scope for the CI token: **Workers Scripts → Edit**
-(plan/import/apply), **Workers KV Storage → Edit** (KV namespace create/verify),
-**Zone → Config → Rulesets → Edit** (rate rule). The edge Worker needs no analytics permission; spend visibility is configured in the Cloudflare
-dashboard (budget alerts / Billable Usage notifications).
+Recommended operator API token scope: **Workers Scripts → Edit**
+(plan/import/apply) and **Zone → Config → Rulesets → Edit** (rate rule). The
+state bucket uses a separate R2 S3 token. The edge Worker needs no analytics
+permission; spend visibility is configured in the Cloudflare dashboard (budget
+alerts / Billable Usage notifications). CI does not hold a Cloudflare token.
 
 ## 4b. TURN operations
 
@@ -151,8 +144,8 @@ dashboard (budget alerts / Billable Usage notifications).
   (dashboard; informational, not caps). TURN egress is $0.05/GB with a shared
   Realtime free allowance; per-allocation Cloudflare limits bound a single
   credential, not the account.
-- **Emergency controls:** lower/remove `MINT_DAILY_CAP` or the TURN secrets to
-  stop issuance; revoke a credential at Cloudflare
+- **Emergency controls:** remove/rotate the TURN secrets to stop issuance;
+  revoke a credential at Cloudflare
   (`POST /v1/turn/keys/<key>/credentials/<username>/revoke`); rotate the TURN
   key in the Realtime dashboard and update Worker secrets. Investigate spikes
   with the GraphQL analytics queries in `deploy/turn-creds/README.md`.
@@ -168,15 +161,15 @@ Queried the Cloudflare API directly (not just this repo's files):
   2026-08-13) and `curly-dream-16c4` (modified 2024-08-22 — a pre-existing
   account worker from before Nova; **not a repo resource**, listed so a
   future operator does not mistake it for ours).
-- KV namespaces on the account: **none** (no `TURN_BUDGET`, so the `/turn`
-  route is not live yet).
+- KV namespaces on the account: **none** (Nova no longer uses KV; the old
+  daily-counter design was removed because KV cannot enforce it atomically).
 - Custom domains bound to Workers: **none** (both workers are
-  workers.dev-only; the rate rule needs a custom domain or a proxied custom
-  route before it can be applied).
+  workers.dev-only; the optional zone rate rule would need a custom domain or
+  proxied route, but the Worker's platform rate-limit binding does not).
 - Relay reachable at
   `https://rocketcrab-cors-relay.tannerkrewson.workers.dev`
-  (405 `method not allowed` on `/` and structured `missing endpoint` errors
-  on unknown paths = alive; it is a POST-only endpoint).
+  (`403` without an allowlisted `Origin`, `405` on a GET with one, and `404`
+  JSON on unknown paths = alive; it is a POST-only endpoint).
 
 Re-verify any time with:
 
@@ -190,9 +183,9 @@ curl -s https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/storage/kv/na
 ## 6. Drift convention
 
 - **OpenTofu is the intended source of truth for supported Cloudflare
-  resources.** `deploy/opentofu/` models the single edge Worker, the
-  TURN_BUDGET KV namespace, its workers.dev subdomain, and optional custom
-  domain/zone route/rate-limit resources.
+  resources.** `deploy/opentofu/` models the single edge Worker, its
+  workers.dev subdomain, and optional custom domain/zone route/rate-limit
+  resources.
   `.github/workflows/infrastructure-plan.yml` builds the edge bundle with
   Wrangler `--dry-run`, then runs formatting, initialization without a backend,
   and validation. It never plans (that needs remote state), applies, or deploys
@@ -203,12 +196,11 @@ curl -s https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/storage/kv/na
   The old relay deployment workflow was removed rather than left as a second
   infrastructure authority.
 - **Anything changed in the dashboard or via MCP must be recorded here**:
-  new Workers, KV namespaces, env vars, secrets, rate rules,
-  custom domains/workers.dev subdomain changes. If a change is made outside
-  CI (dashboard edit, `wrangler var set`, manual KV delete, rate-rule
-  tweak), update this file in the same change.
-- **Deletions:** removing a Cloudflare resource (e.g. an undeployed worker,
-  a dead KV namespace) also removes it from this inventory.
+  new Workers, env vars, secrets, rate rules, custom domains/workers.dev
+  subdomain changes. If a change is made outside CI (dashboard edit,
+  `wrangler var set`, rate-rule tweak), update this file in the same change.
+- **Deletions:** removing a Cloudflare resource (e.g. an undeployed worker)
+  also removes it from this inventory.
 
 The OpenTofu migration details, import commands, state-backend questions, and
 provider limitations are maintained in `deploy/opentofu/README.md`.

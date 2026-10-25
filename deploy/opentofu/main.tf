@@ -9,6 +9,9 @@ resource "cloudflare_workers_script" "relay" {
   content_sha256     = fileexists(local.edge_bundle_file) ? filesha256(local.edge_bundle_file) : null
   compatibility_date = "2025-01-01"
   bindings           = local.edge_bindings
+  # Secret bindings are managed out of band (wrangler secret put). Without
+  # this, a script upload would delete the TURN key secrets.
+  keep_bindings = ["secret_text"]
 
   lifecycle {
     prevent_destroy = true
@@ -17,15 +20,6 @@ resource "cloudflare_workers_script" "relay" {
       condition     = fileexists(local.edge_bundle_file)
       error_message = "The edge Worker bundle is missing. Run the Wrangler deploy --dry-run command in deploy/opentofu/README.md before planning or applying."
     }
-  }
-}
-
-resource "cloudflare_workers_kv_namespace" "turn_budget" {
-  account_id = var.cloudflare_account_id
-  title      = var.turn_budget_title
-
-  lifecycle {
-    prevent_destroy = true
   }
 }
 

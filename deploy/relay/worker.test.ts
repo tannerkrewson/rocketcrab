@@ -417,6 +417,21 @@ describe("handleRelayRequest (per-IP rate limiting)", () => {
     );
   }
 
+  it("uses the platform Rate Limiting binding keyed by route + IP", async () => {
+    const limit = vi.fn(async () => ({ success: false }));
+    const res = await handleRelayRequest(
+      new Request("https://relay.example.net/", {
+        method: "POST",
+        headers: { Origin: ALLOWED_ORIGIN, "CF-Connecting-IP": "203.0.113.9" },
+        body: JSON.stringify({ endpoint: "drawphone-new", body: {} }),
+      }),
+      makeEnv({ RATE_LIMITER: { limit } }),
+    );
+    expect(res.status).toBe(429);
+    expect(limit).toHaveBeenCalledWith({ key: "relay:203.0.113.9" });
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
   it("returns 429 with Retry-After once a single IP exceeds the limit, no forwarding", async () => {
     expect((await relayFromIp("203.0.113.9")).status).toBe(200);
     expect((await relayFromIp("203.0.113.9")).status).toBe(200);

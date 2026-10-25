@@ -58,6 +58,7 @@ import {
 } from "../arena/state-executor";
 import { runtimeOriginForMainOrigin } from "../runtime-origin";
 import { findClassicGame, type ClassicGameConnectResult } from "../classic";
+import { connectionErrorMessage } from "./connection-errors";
 import { localPartyIdentity, updatePartyDisplayName } from "./identity";
 import { browserLifecycleSource, type PartyLifecycleSource } from "./lifecycle";
 import { clearPartyRecovery, savePartyRecovery } from "./party-recovery";
@@ -1452,9 +1453,15 @@ export class PartyEngine {
         return;
       }
       this.joinErrorNoticesShown.add(category);
+      const detail =
+        this.turnStatus === "configured"
+          ? "Their network may be blocking peer-to-peer connections; ask them to retry on a different network."
+          : this.turnStatus === "unavailable"
+            ? "TURN relay credentials were unavailable, so only direct connections were possible."
+            : "TURN is not configured for this build, so only direct connections are possible.";
       this.addNotice(
         "warn",
-        "A player couldn't be reached directly over the network (no TURN relay available). They may not appear in the lobby until TURN is configured.",
+        `A player couldn't connect directly. ${detail} They may not appear in the lobby.`,
       );
       this.emit();
     }
@@ -1666,7 +1673,7 @@ export class PartyEngine {
   }
 
   private failSetup(error: unknown): void {
-    this.lastError = errorMessage(error);
+    this.lastError = connectionErrorMessage(error);
     this.phase = "error";
     this.phaseDetail = null;
     this.joinStage = null;

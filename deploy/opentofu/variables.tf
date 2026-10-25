@@ -1,5 +1,5 @@
 variable "cloudflare_account_id" {
-  description = "Cloudflare account ID that owns the Workers and KV namespace."
+  description = "Cloudflare account ID that owns the edge Worker."
   type        = string
 
   validation {
@@ -36,9 +36,9 @@ variable "workers_dev_subdomain" {
 
 variable "worker_bundle_dir" {
   description = <<-EOT
-    Directory containing the two Wrangler dry-run bundles. The default is the
+    Directory containing the Wrangler dry-run edge bundle. The default is the
     ignored .build directory under this OpenTofu root. Run the documented
-    dry-run bundle commands before planning or applying.
+    dry-run bundle command before planning or applying.
   EOT
   type        = string
   default     = null
@@ -53,7 +53,6 @@ variable "edge_worker_variables" {
   EOT
   type        = map(string)
   default = {
-    MINT_DAILY_CAP     = "5000"
     ORIGIN_ALLOWLIST   = "https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173"
     RATE_LIMIT_PER_MIN = "20"
   }
@@ -78,20 +77,15 @@ variable "edge_worker_variables" {
   }
 }
 
-variable "turn_budget_title" {
-  description = "Human-readable title for the TURN_BUDGET KV namespace."
-  type        = string
-  default     = "TURN_BUDGET"
-}
-
 variable "turn_zone_rate_limit_enabled" {
   description = <<-EOT
-    Enable the supported zone-level rate-limit ruleset when a custom route or
-    custom domain is supplied. Keep this true unless the coordinator
-    explicitly chooses to rely only on the Worker's in-memory backstop.
+    Enable the optional zone-level rate-limit ruleset when a custom route or
+    custom domain is supplied. The Worker always has the Workers Rate Limiting
+    binding; this extra rule is for plans whose WAF supports ip.src rate rules.
+    Off by default because Cloudflare's Free plan does not offer ip.src.
   EOT
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "turn_custom_route" {

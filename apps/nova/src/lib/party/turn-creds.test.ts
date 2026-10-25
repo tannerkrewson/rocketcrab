@@ -65,8 +65,8 @@ describe("turnCredsBaseUrl / turnCredsConfigured", () => {
     expect(turnCredsConfigured()).toBe(true);
   });
 
-  it("trims whitespace from the pinned origin", () => {
-    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", `  ${MINT_ORIGIN}  `);
+  it("trims whitespace and trailing slashes from the pinned origin", () => {
+    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", `  ${MINT_ORIGIN}/  `);
     expect(turnCredsBaseUrl()).toBe(MINT_ORIGIN);
   });
 });

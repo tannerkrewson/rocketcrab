@@ -18,9 +18,13 @@ locals {
       }
     ],
     [{
-      name         = "TURN_BUDGET"
-      namespace_id = cloudflare_workers_kv_namespace.turn_budget.id
-      type         = "kv_namespace"
+      name         = "RATE_LIMITER"
+      type         = "ratelimit"
+      namespace_id = "1001"
+      simple = {
+        limit  = local.turn_rate_limit_per_min
+        period = 60
+      }
     }],
   )
 

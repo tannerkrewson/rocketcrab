@@ -23,14 +23,12 @@
  *      unknown endpoints get 404. The upstream method is fixed per
  *      endpoint (clients cannot change it), and interpolated path params
  *      (netgames.io game ids) are validated against a strict charset.
- *   3. Per-IP rate limiting (rocketcrab-9fv.3.5): in-worker fixed-window
- *      counter (RATE_LIMIT_PER_MIN, default 20/min), rejecting with
- *      429 + Retry-After BEFORE any forwarding. Per-isolate state is the
- *      fast-fail backstop; over-counting under concurrency is safe (it
- *      only ever rejects more aggressively).
+ *   3. Per-IP rate limiting (rocketcrab-9fv.3.5): the Cloudflare Workers Rate
+ *      Limiting binding (RATE_LIMIT_PER_MIN, default 20/min), rejecting with
+ *      429 + Retry-After BEFORE any forwarding. The in-memory fixed-window
+ *      counter is only a local-dev/test fallback.
  *
- * Self-contained on purpose (zero imports): drop this single file into any
- * Workers-compatible runtime (Cloudflare Workers, Deno Deploy, ...). Keep
+ * No npm dependencies: the only import is the shared rate-limit helper. Keep
  * the endpoint keys in sync with RELAY_ENDPOINT_KEYS in
  * apps/nova/src/lib/classic/relay.ts (a sync test enforces it).
  *
@@ -40,6 +38,8 @@
  * local dry-run bundle. See
  * deploy/relay/README.md.
  */
+
+import { limitWithBinding, type RateLimitBinding } from "../shared/rate-limit";
 
 /** One allowlisted classic room-creation endpoint. */
 export interface RelayEndpoint {
@@ -124,6 +124,8 @@ export interface RelayEnv {
   ORIGIN_ALLOWLIST?: string;
   /** Requests per minute per client IP. Unset -> 20. */
   RATE_LIMIT_PER_MIN?: string;
+  /** Cloudflare Workers Rate Limiting binding (absent in local dev/tests). */
+  RATE_LIMITER?: RateLimitBinding;
 }
 
 /** Charset allowed for interpolated path params (e.g. netgames.io game ids). */
@@ -225,9 +227,8 @@ export function clientIp(request: Request): string {
 }
 
 /**
- * In-memory fixed-window rate limiter keyed by client IP. Per-isolate state
- * is fine: this is the fast-fail backstop, and over-counting under
- * concurrency is SAFE (it only ever rejects more aggressively).
+ * In-memory fixed-window rate limiter keyed by client IP. Used only when the
+ * Cloudflare Rate Limiting binding is absent (local dev/tests) or throws.
  */
 export class RateLimiter {
   private readonly windows = new Map<string, { start: number; count: number }>();
@@ -266,7 +267,7 @@ export class RateLimiter {
   }
 }
 
-// Module-level per-isolate limiter (the worker's fast-fail backstop).
+// Module-level limiter: only used when the platform binding is unavailable.
 let limiter: RateLimiter | undefined;
 
 function getLimiter(): RateLimiter {
@@ -328,14 +329,18 @@ export async function handleRelayRequest(request: Request, env: RelayEnv = {}): 
     return jsonError(405, "method_not_allowed", `method ${request.method} is not allowed`, cors);
   }
 
-  // 3. Per-IP rate limit (fast-fail backstop): reject BEFORE any forwarding.
-  // Over-counting under concurrency is safe.
+  // 3. Per-IP rate limit: reject BEFORE any forwarding. The platform binding
+  // is primary; the in-memory check is a local-dev/test fallback.
   const rateLimit = parseRateLimit(env.RATE_LIMIT_PER_MIN);
-  const { allowed, retryAfterSeconds } = getLimiter().check(
-    clientIp(request),
-    rateLimit,
-    Date.now(),
-  );
+  const ip = clientIp(request);
+  const bindingDecision = await limitWithBinding(env.RATE_LIMITER, `relay:${ip}`);
+  const { allowed, retryAfterSeconds } =
+    bindingDecision === null
+      ? getLimiter().check(ip, rateLimit, Date.now())
+      : {
+          allowed: bindingDecision,
+          retryAfterSeconds: bindingDecision ? 0 : RATE_LIMIT_WINDOW_MS / 1000,
+        };
   if (!allowed) {
     return jsonError(
       429,

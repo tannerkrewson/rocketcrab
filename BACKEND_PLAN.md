@@ -31,8 +31,11 @@ later; that decision is recorded as deferred, not silently applied.
       cumulative counter and its manual re-arm); retain the daily cap as the
       documented “longer-term restriction” exception to zero KV, because it is
       the only account-wide issuance stop the per-IP limiter cannot replace.
+      **Superseded by the pre-deployment hardening below:** the KV cap could not
+      be enforced reliably and was removed.
 - [x] Update OpenTofu to one Worker script/subdomain, one KV namespace (daily
       cap), one optional route/domain/rate-rule target, one bundle path.
+      **Superseded:** the KV namespace was removed in hardening.
 - [x] Merge/redirect operator docs into one edge-worker runbook; update
       `deploy/cloudflare.md`, CI bundle steps, env examples and tests.
 - [x] Verify worker/relay/TURN/client tests, typecheck, build, and the
@@ -42,10 +45,11 @@ Evidence: `deploy/edge/worker.ts` is the single deployed entry point
 (`/turn` → TURN mint, everything else → the unchanged relay root protocol).
 `deploy/edge/wrangler.toml` holds the local/dry-run config; the historical
 script name `rocketcrab-cors-relay` is kept so the live resource is not
-replaced. TURN budget is now one KV key (`mints:YYYY-MM-DD`) and one
-`MINT_DAILY_CAP`; the cumulative counter, re-arm path and `MINT_TOTAL_CAP` are
-deleted. OpenTofu models one script/subdomain with the KV binding and optional
-route/domain/rate rule; the second script and its subdomain are removed.
+replaced. TURN budget was initially reduced to one KV key (`mints:YYYY-MM-DD`) and one
+`MINT_DAILY_CAP`; that design was later removed (see hardening) because KV
+cannot enforce a cap atomically. OpenTofu models one script/subdomain with a
+platform rate-limit binding and optional route/domain/rate rule; the second
+script and its subdomain are removed.
 The TURN client posts to `${origin}/turn`; the relay client is unchanged.
 Manuals: `deploy/edge/README.md` is the operator entry point; Cloudflare
 runbook and OpenTofu README updated. CI builds only the edge bundle.
@@ -181,8 +185,9 @@ GamePlane abstraction, authority rewrite or arena rebuild was attempted.
 Private-beta gates (all require explicit owner approval; none run here):
 
 1. Provision/import infrastructure: R2 state bucket + scoped token, import the
-   live relay, review plan, approve `tofu apply` (adds `/turn`, KV, secrets),
-   set TURN key secrets, optionally configure a custom route/rate rule.
+   live relay, review plan, approve `tofu apply` (adds `/turn`, rate-limit
+   binding, secrets), set TURN key secrets, optionally configure a custom
+   route/domain/rate rule.
 2. Deploy the static origins with the edge origin in `VITE_TURN_CREDS_ORIGIN`
    and `VITE_CLASSIC_RELAY_ORIGIN` after the Worker is verified.
 3. Verify forced TURN over `turns:` TLS 443 (direct paths blocked), signaling
@@ -193,6 +198,34 @@ Private-beta gates (all require explicit owner approval; none run here):
    owner before any broader release.
 
 No deployment, import, bucket, key, or paid resource was created.
+
+## Pre-deployment hardening (before first apply)
+
+- [x] Audit the daily TURN counter. KV has no atomic increment and allows one
+      write/second/key; concurrent joins both read below the cap, mint, and
+      overwrite each other's increment (last write wins), so the cap can be
+      bypassed under load and writes can fail silently. Removed the counter,
+      KV namespace, binding, `MINT_DAILY_CAP`, and all KV tests/docs instead of
+      adding a Durable Object.
+- [x] Replace the per-isolate in-memory rate limiter as the primary control with
+      the Cloudflare Workers Rate Limiting binding (`RATE_LIMITER`, per route +
+      IP); keep in-memory only as a local-dev/test fallback. The optional zone
+      rule is off by default because Cloudflare Free lacks `ip.src`.
+- [x] Keep one Worker, but restrict the relay to `POST /` and return `404` for
+      every other path, so new TURN/API paths cannot inherit relay behavior.
+- [x] Add `keep_bindings = ["secret_text"]` to the Worker resource so an
+      OpenTofu upload cannot delete the TURN secrets.
+- [x] Map transport join categories to clear player messages and make the
+      no-direct-connection notice depend on actual TURN state. Trim trailing
+      slashes from the mint origin.
+- [x] Add Playwright assertion/navigation timeouts for the cold-Vite parallel
+      flake; no product race was found.
+- [x] Re-audit dependencies on this branch (`npm audit`: zero).
+- [x] Clean obsolete KV/OpenTofu docs and config; align OpenTofu with OpenTofu
+      1.13.2, the platform rate-limit binding, and import IDs.
+- [x] Verify infrastructure tests, typecheck, build, bundle, OpenTofu
+      fmt/validate, a local no-refresh plan with a dummy account, and browser
+      tests. No deployment, import, bucket, key, or paid resource is created.
 
 ## Final verification (this branch)
 

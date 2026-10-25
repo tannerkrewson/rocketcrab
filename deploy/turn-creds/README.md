@@ -32,13 +32,13 @@ headers so the browser can read it.
   TURN allocation duration (the client keeps it alive with authenticated TURN
   refreshes) and only best-effort live credential replacement. Port-53 URLs are
   stripped (browsers block port 53; ICE would hang on timeouts).
-- **Per-IP rate limiting** (rocketcrab-23s.3): an in-worker fixed-window
-  fast-fail check plus a durable Cloudflare route-level rate rule (see
-  "Rate limiting" below).
-- **Daily issuance cap** (rocketcrab-23s.4): one KV counter caps how many
-  credentials can be minted per UTC day; at the cap the worker answers
-  `429 budget_exceeded` **before** any upstream call (see "Daily issuance cap"
-  below).
+- **Per-IP rate limiting** (rocketcrab-23s.3): the Cloudflare Workers Rate
+  Limiting binding, with an in-memory local-dev fallback and an optional
+  zone-level rule (see "Rate limiting" below).
+- **No global daily cap** (rocketcrab-23s.4): Cloudflare KV cannot implement
+  one reliably (no atomic increment, one write/second/key), so the old counter
+  was deleted instead of pretending to cap issuance. See "No global daily cap"
+  below.
 - **Usage visibility** (rocketcrab-23s.5): native Cloudflare account budget
   alerts and Billable Usage notifications replace the former custom GraphQL
   watchdog (see "Usage visibility and abuse response" below). Mint caps bound
@@ -51,8 +51,7 @@ headers so the browser can read it.
 | Variable             | Default                                                                                                            | Meaning                                                                                                                                                                                             |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ORIGIN_ALLOWLIST`   | `https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173` | Comma-separated origins allowed to call the mint endpoint. Each entry may be a full origin (`scheme://host[:port]`); a trailing slash is tolerated. Matching against the request `Origin` is exact. |
-| `RATE_LIMIT_PER_MIN` | `20`                                                                                                               | Requests per minute per client IP allowed by the in-worker fast-fail counter (60s fixed window).                                                                                                    |
-| `MINT_DAILY_CAP`     | `5000`                                                                                                             | Maximum successful mints per UTC calendar day (see below). A new day starts a fresh counter automatically.                                                                                          |
+| `RATE_LIMIT_PER_MIN` | `20`                                                                                                               | Requests per minute per client IP for the Workers Rate Limiting binding (60s window).                                                                                                               |
 
 A single-variable env override (unset = the default above). The OpenTofu root
 represents these values as `plain_text` bindings; do not use a separate
@@ -60,14 +59,12 @@ Wrangler variable deployment path. For example:
 
 ```hcl
 edge_worker_variables = {
-  MINT_DAILY_CAP     = "5000"
   ORIGIN_ALLOWLIST   = "https://rocketcrab.com,https://staging.rocketcrab.com"
   RATE_LIMIT_PER_MIN = "20"
 }
 ```
 
-(`ORIGIN_ALLOWLIST`, `RATE_LIMIT_PER_MIN`, and `MINT_DAILY_CAP` are not
-sensitive.)
+(`ORIGIN_ALLOWLIST` and `RATE_LIMIT_PER_MIN` are not sensitive.)
 
 ## Worker secrets
 
@@ -83,30 +80,13 @@ Local dev: create a gitignored `deploy/edge/.dev.vars` with the same names
 (`wrangler dev` reads it). The repo `.gitignore` now excludes
 `.dev.vars` — never commit it.
 
-## KV namespace (TURN_BUDGET)
-
-The daily cap counts successful mints in a KV namespace bound as
-`TURN_BUDGET`. The OpenTofu resource
-`cloudflare_workers_kv_namespace.turn_budget` owns the namespace. The
-placeholder in `deploy/edge/wrangler.toml` is for local development and
-bundling only; do not paste a production ID into that file.
-
-```sh
-tofu -chdir=deploy/opentofu apply
-```
-
-The command above is intentionally not part of this migration task. Review
-the plan, state backend, and resource ownership first. In dev, `wrangler dev`
-uses a local KV simulator keyed by binding name, so the placeholder id is fine
-locally. It holds only `mints:YYYY-MM-DD`; a new UTC day starts a fresh key.
-
 ## Infrastructure management
 
 The edge Worker is modeled by `cloudflare_workers_script.relay` in
-`deploy/opentofu/`, with its workers.dev subdomain, `TURN_BUDGET` binding, and
-optional custom domain/route and zone rate rule. Wrangler is used only for local development and the
-dry-run JavaScript bundle consumed by OpenTofu. No deploy workflow remains in
-this repository.
+`deploy/opentofu/`, with its workers.dev subdomain and optional custom
+domain/route and zone rate rule. Wrangler is used only for local development
+and the dry-run JavaScript bundle consumed by OpenTofu. No deploy workflow
+remains in this repository.
 
 After a coordinator-approved OpenTofu apply, set the Worker secrets through
 the approved Workers Secrets API or the following human-managed Wrangler
@@ -133,12 +113,7 @@ curl -si https://rocketcrab-cors-relay.<your-account-subdomain>.workers.dev/turn
 ```
 
 Expect `200` with `access-control-allow-origin: https://rocketcrab.com` and
-an `iceServers` array. A request without `Origin` returns `403`. After
-deploy, check the counters moved:
-
-```sh
-wrangler kv key list --binding TURN_BUDGET
-```
+an `iceServers` array. A request without `Origin` returns `403`.
 
 ## Origin allowlist and CORS (rocketcrab-23s.1)
 
@@ -213,98 +188,50 @@ LAN override is dev-only. For the equivalent in `.dev.vars`:
 
 ## Rate limiting (rocketcrab-23s.3)
 
-Two cheap layers (no external library — Cloudflare platform primitives only):
+### 1. Workers Rate Limiting binding (primary)
 
-### 1. In-worker fast-fail check (code-level backstop)
+OpenTofu provisions a `RATE_LIMITER` binding (`type = "ratelimit"`,
+`namespace_id = "1001"`, `simple = { limit = RATE_LIMIT_PER_MIN, period = 60 }`).
+Each request calls `limit({ key: "turn:<client-ip>" })` before any upstream
+call. The binding is approximate and counts separately per Cloudflare location,
+but it survives isolate restarts and is shared by instances in a location —
+unlike a module-global `Map`.
 
-A simple **fixed-window counter keyed by client IP** (`CF-Connecting-IP`,
-edge-set and not client-spoofable) in the worker itself. Over the limit, the
-worker answers `429` with a `Retry-After` header **before any upstream call**.
-The window is 60s; the limit is `RATE_LIMIT_PER_MIN` (default **20/min**).
-In-memory per-isolate state is fine here: this is a fast-fail backstop, and
-over-counting under concurrency is SAFE (it only ever rejects more
-aggressively, never less).
+The in-memory fixed-window counter remains only as a fallback when the binding
+is absent (`wrangler dev`, unit tests) or throws. That fallback is per-isolate
+and must not be treated as a durable limit.
 
-### 2. Cloudflare route-level rate rule (durable backstop)
+### 2. Optional zone rate rule
 
-The worker's own counter resets when an isolate restarts; the durable
-backstop is a **Cloudflare rate-limiting rule** on the mint route (zone level,
-per IP) via the provider-supported Rulesets resource. It needs a proxied zone
-hostname (a custom domain or custom route); the workers.dev host has no zone to
-hang a rule on. Choose one endpoint form in the OpenTofu variables, supply the
-exact POST expression, and review the plan. The following API call is only a
-future manual recovery path if OpenTofu is not used; it was not run:
+A Cloudflare rate-limiting rule on the mint route adds an edge-level per-IP
+backstop, but requires a proxied zone hostname (custom domain/route) and a WAF
+plan that supports `ip.src` characteristics. Cloudflare's Free plan does not
+offer `ip.src` rate rules, so `turn_zone_rate_limit_enabled` defaults to
+**false**. Enable it only after checking the plan; the exact Rules expression is
+a human-supplied input. The same rule can be configured in the dashboard under
+Security -> WAF -> Rate limiting rules; if configured manually, record it in
+`deploy/cloudflare.md`.
 
-```sh
-# 10 requests/min per IP on the mint route (action: block, 60s window)
-curl -X PUT \
-  "https://api.cloudflare.com/client/v4/zones/<ZONE_ID>/rulesets/phases/http_ratelimit/entrypoint" \
-  -H "Authorization: Bearer <API_TOKEN>" \
-  -H "Content-Type: application/json" \
-  --data '{
-    "rules": [
-      {
-        "expression": "(http.request.method eq \"POST\") and (http.request.uri.path starts_with \"/\")",
-        "description": "rocketcrab-turn-creds: 10 requests/min per IP",
-        "action": "block",
-        "ratelimit": {
-          "characteristics": ["ip.src"],
-          "period": 60,
-          "requests_per_period": 10,
-          "mitigation_timeout": 60
-        }
-      }
-    ]
-  }'
-```
+## No global daily cap (rocketcrab-23s.4)
 
-(`<ZONE_ID>` and `<API_TOKEN>` come from the zone and an API token with
-Zone > Config > Rulesets edit permission.) The same rule is configurable in
-the Cloudflare dashboard under Security -> WAF -> Rate limiting rules. Keep
-`RATE_LIMIT_PER_MIN` and the rule's `requests_per_period` in sync — both
-default to 20/min.
+The previous implementation kept `mints:YYYY-MM-DD` in KV and did a
+read-before-mint / increment-after-success. That cannot enforce a cap:
 
-## Daily issuance cap (rocketcrab-23s.4)
+- KV allows only **one write per second per key**, with no atomic increment.
+- Two simultaneous joins both read the same count, both mint, then their
+  read-modify-write updates overwrite each other (last write wins). The counter
+  under-counts, so the cap is bypassed precisely under load.
+- Concurrent writes can also be rejected by the KV write limit. The worker
+  caught that and continued, so the counter silently stopped moving.
 
-Nova users author their own games, so the mint route needs a long-term
-issuance stop. One KV counter is checked before every upstream call:
-
-| Counter     | Key                | Reset                               |
-| ----------- | ------------------ | ----------------------------------- |
-| Daily mints | `mints:YYYY-MM-DD` | Automatic at UTC midnight (new key) |
-
-On every **successful** mint the worker increments the counter
-(read-modify-write; KV has **no atomic increment**, so concurrent mints can
-over-count — safe: it errs on the safe side and can only trip _early_). At
-`MINT_DAILY_CAP` (default **5000**) the worker answers:
-
-```json
-{
-  "error": {
-    "code": "budget_exceeded",
-    "message": "mint budget exhausted: daily cap (5000) reached for 2026-08-13",
-    "cap": "daily",
-    "limit": 5000
-  }
-}
-```
-
-with HTTP `429`, **no upstream call**, and CORS headers. Failed mints never
-touch the counter.
-
-The cap bounds **issuance**, not traffic from credentials already issued. If
-KV is missing (dev) or unreachable, the check fails open; the per-IP limiter
-and budget alerts remain. Daily keys self-expire after two days.
-
-To re-arm early (after an abuse incident or a cap change), delete today's key:
-
-```sh
-wrangler kv key delete mints:2026-08-13 --binding TURN_BUDGET --config deploy/edge/wrangler.toml
-```
-
-**Mint logging**: every successful mint is logged as JSON
-(`event: "turn_cred_mint"`, `ip`, `origin`, `ttl`, `ts`) in Workers Logs for
-usage review and post-mortems.
+A Durable Object would make the counter atomic, but adds persistent state,
+billing, migrations, and a second failure mode for a control that only bounds
+issuance. The counter was therefore **removed**, along with the KV namespace
+binding and `MINT_DAILY_CAP`. Issuance is bounded by the origin allowlist and
+rate limits; spend is visible through native Cloudflare budget alerts and
+Billable Usage (notifications, not hard caps). If abuse occurs, remove/rotate
+the TURN secrets and revoke credentials; see "Usage visibility and abuse
+response" below.
 
 ### Credential attribution
 
@@ -353,15 +280,15 @@ state):
   and incident reconstruction; OpenTofu keeps Workers observability enabled.
 - **Abuse response:** Cloudflare's credentials API can revoke a short-lived
   credential before its TTL (`POST /v1/turn/keys/<key>/credentials/<username>/revoke`).
-  That is a manual operator action; Nova does not ship a revoke route. Deleting
-  today's `mints:` key and lowering `MINT_DAILY_CAP` are the other levers.
+  That is a manual operator action; Nova does not ship a revoke route. Remove
+  or rotate the TURN secrets, or tighten rate limits, as the other levers.
 
 ### What these controls do and do not bound
 
-- Mint caps and the per-IP rate limit bound **issuance**. They cannot bound
-  traffic from an already-issued credential: TURN relays whatever the holder
-  sends until expiry. With the 24 h TTL, assume a leaked credential can relay
-  for up to 24 hours.
+- The per-IP rate limits bound **issuance**. They cannot bound traffic from an
+  already-issued credential: TURN relays whatever the holder sends until
+  expiry. With the 24 h TTL, assume a leaked credential can relay for up to 24
+  hours. There is deliberately no global daily cap (see above).
 - Cloudflare documents **per-allocation** limits (roughly 5–10 kpps and
   50–100 Mbps, plus >5 new destination IPs/sec) and bills **$0.05/GB** of
   egress. There is no account-wide TURN packet/bandwidth cap in Nova's control;
@@ -371,11 +298,9 @@ state):
 
 ### Why not HMAC refresh tickets / an external rate-limit library?
 
-Deliberately NOT doing: HMAC refresh tickets, per-room quotas, or external
-rate-limit libraries. Complexity > value here: the 24 h credential covers a
-whole party with one mint, the in-worker counter stops per-IP farming at the
-source, the zone rule survives isolate restarts, the mint caps bound
-account-wide issuance, and native budget alerts cover spend visibility.
-Cloudflare's native Workers rate-limiting binding was considered for the
-in-worker counter, but it is per-location approximate, is also an issuance
-control, and would add a provider binding for no traffic-bound benefit.
+Deliberately NOT doing: HMAC refresh tickets, per-room quotas, a Durable
+Object counter, or external rate-limit libraries. Complexity > value here: the
+24 h credential covers a whole party with one mint, the native Workers rate
+limiting binding stops per-IP farming at the source without extra state, the
+optional zone rule adds a WAF-level backstop where the plan supports it, and
+native budget alerts cover spend visibility.

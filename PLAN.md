@@ -147,10 +147,11 @@ Worker secrets (`CLOUDFLARE_ACCOUNT_ID`, `CLOUDFLARE_API_TOKEN`,
 `ALERT_WEBHOOK_URL`), its KV alert watermarks and the `WATCHDOG_GB_BUDGET`
 input — native Cloudflare **budget alerts** and **Billable Usage
 notifications/metrics** now provide spend visibility, while Workers Logs keep
-per-mint `turn_cred_mint` records. The origin allowlist, in-worker per-IP rate
-limit, zone rate rule, KV issuance caps (daily/total) and port-53 filtering
-remain; the runbook now states explicitly that mint caps bound **issuance**, not
-traffic from issued credentials, and documents the manual credential-revoke API,
+per-mint `turn_cred_mint` records. The origin allowlist, rate limiting and
+port-53 filtering remain; the KV issuance caps were later removed in the
+pre-deployment hardening because KV cannot enforce them atomically. The runbook
+states explicitly that issuance controls cannot bound traffic from issued
+credentials, and documents the manual credential-revoke API,
 Cloudflare's per-allocation limits (~5–10 kpps, 50–100 Mbps, >5 new
 destination IPs/sec) and $0.05/GB egress. Cloudflare's native Workers
 rate-limiting binding was reviewed and rejected for the issuance counter
@@ -491,14 +492,14 @@ protection needs an approved custom route/domain, not workers.dev alone.
 Depends on approved provisioning/deployment in sections 1–4. This is verification
 of that deployment, not authorization for another deployment path.
 
-- [ ] Verify live `TURN_BUDGET` KV binding and the turn-creds Worker.
+- [ ] Verify the live edge Worker, its `RATE_LIMITER` binding, and `/turn`.
 - [ ] Confirm native Cloudflare budget alerts / Billable Usage notifications are
       configured, and that Workers Logs shows `turn_cred_mint` entries.
-- [ ] Mint once with an allowlisted Origin; verify usable `iceServers` and
-      incrementing budget counters.
+- [ ] Mint once with an allowlisted Origin and verify usable `iceServers`; verify
+      that more than the configured requests per minute from one IP is rejected.
 - [ ] Record results/fixes in `deploy/cloudflare.md` and
       `deploy/turn-creds/README.md`. Use OpenTofu, not a removed Wrangler deploy
-      workflow or a placeholder KV ID.
+      workflow.
 
 ## 6. Mid-party TURN credential lifetime — superseded by simplification stage 4
 
@@ -723,8 +724,8 @@ real deployment/credentials, or physical devices on real networks.
 
 **Deployment / live verification**
 
-- Provision TURN key, KV namespace, Worker, secrets, budget caps, billing alert,
-  and zone rate limit; verify a live mint, counters, headers and budget alerts.
+- Provision the TURN key, Worker, secrets, billing alerts, and optional zone
+  rate limit; verify a live mint, rate limiting, headers and budget alerts.
 - Deploy the two static origins and confirm SPA routing, caching, CSP/frame
   behavior, invite-fragment secrecy, and CDN behavior on the real host.
 

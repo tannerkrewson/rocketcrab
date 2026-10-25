@@ -20,36 +20,37 @@
  *      traffic; ICE would hang on timeouts). There is no allocation-duration
  *      cap, so one credential covers a whole party; the client does not
  *      re-mint or mutate live peer connections.
- *   3. Per-IP rate limiting (rocketcrab-23s.3): in-worker fixed-window
- *      counter (fast-fail backstop) + a durable Cloudflare route-level
- *      rate rule (see README.md for the Rulesets curl).
- *   4. Daily issuance cap (rocketcrab-23s.4): one KV counter in the
- *      TURN_BUDGET namespace (mints:YYYY-MM-DD) is checked BEFORE any
- *      upstream call; at MINT_DAILY_CAP the worker answers 429
- *      budget_exceeded. It is incremented only on successful mints. KV has
- *      no atomic increment, so concurrent mints can over-count — SAFE for a
- *      cap that errs on the safe side. KV unavailable (e.g. binding missing
- *      in dev) FAILS OPEN. This is the only account-wide issuance stop the
- *      per-IP limiter cannot replace; it bounds issuance, not traffic.
+ *   3. Per-IP rate limiting (rocketcrab-23s.3): the Cloudflare Workers Rate
+ *      Limiting binding (primary), an in-memory fallback for local dev/tests,
+ *      and an optional zone-level rate rule (see README.md).
+ *   4. No KV / no account-wide daily counter (rocketcrab-23s.4). Cloudflare
+ *      KV has no atomic increment and allows only one write per second per
+ *      key, so a read-modify-write cap both under-counts under concurrent
+ *      joins (last write wins) and can fail writes outright. A cap that can
+ *      silently be bypassed is worse than no cap, so the KV counter was
+ *      deleted rather than replaced with a Durable Object. Issuance is
+ *      bounded by the origin allowlist + the two rate limits; spend is
+ *      monitored with native Cloudflare budget alerts (informational) and
+ *      Billable Usage. An already-issued credential can relay until it
+ *      expires; revoke credentials upstream if abuse is observed.
  *
  * Usage/cost visibility uses native Cloudflare controls instead of a custom
  * watchdog: account budget alerts (email threshold crossing; informational, not
- * a spending cap) and Billable Usage notifications/metrics. Mint counters here
- * bound issuance only — an already-issued credential can relay until it expires,
- * and Cloudflare documents no allocation-duration cap, only per-allocation
- * throughput limits. Credentials can be revoked upstream if abuse is observed.
+ * a spending cap) and Billable Usage notifications/metrics. Credentials can be
+ * revoked upstream if abuse is observed.
  *
  * The TURN key (TURN_KEY_ID + TURN_KEY_API_TOKEN) is a long-term secret and
  * lives ONLY as a Worker secret — never in code, config, or public JS. The
  * endpoint executes NO game code and keeps NO room-state database
  * (stateless).
  *
- * Self-contained on purpose (zero dependencies): worker.ts drops into any
- * Workers-compatible runtime; wrangler bundles it into one script. Logic lives
- * in pure exported functions (parse allowlist, port-53 filter, rate-limit
- * window, budget counters, upstream request builder) with a thin fetch handler;
- * see worker.test.ts.
+ * No npm dependencies: worker.ts imports only the shared rate-limit helper and
+ * bundles into the single edge Worker. Logic lives in pure exported functions
+ * (parse allowlist, port-53 filter, rate-limit window, upstream request
+ * builder) with a thin fetch handler; see worker.test.ts.
  */
+
+import { limitWithBinding, type RateLimitBinding } from "../shared/rate-limit";
 
 /** Production origin + local dev origins used when ORIGIN_ALLOWLIST is unset. */
 export const DEFAULT_ORIGIN_ALLOWLIST = [
@@ -73,13 +74,6 @@ export const RATE_LIMIT_WINDOW_MS = 60_000;
 /** Requests per minute per IP when RATE_LIMIT_PER_MIN is unset. */
 export const DEFAULT_RATE_LIMIT_PER_MIN = 10;
 
-/** KV key prefix for the daily mint counter (full key: `mints:YYYY-MM-DD`). */
-export const MINT_DAILY_KEY_PREFIX = "mints:";
-/** Daily mint cap when MINT_DAILY_CAP is unset (rocketcrab-23s.4). */
-export const DEFAULT_MINT_DAILY_CAP = 5000;
-/** Daily counter keys self-expire after 2 days (stale day keys never linger). */
-export const DAILY_COUNTER_TTL_SECONDS = 2 * 24 * 60 * 60;
-
 /**
  * Cap on tracked rate-limit keys; past it, expired windows are pruned so a
  * long-lived isolate cannot accumulate unbounded state.
@@ -96,20 +90,8 @@ export interface TurnCredsEnv {
   TURN_KEY_ID?: string;
   /** Cloudflare Realtime TURN key API token (Worker secret). */
   TURN_KEY_API_TOKEN?: string;
-  /** Daily mint cap. Unset -> 5000. */
-  MINT_DAILY_CAP?: string;
-  /** KV namespace binding (TURN_BUDGET) holding the mint counters. */
-  TURN_BUDGET?: KvStore;
-}
-
-/**
- * The KV binding surface this worker uses (structural subset of Cloudflare's
- * KVNamespace). Declared locally so the worker and its tests do not depend on
- * @cloudflare/workers-types.
- */
-export interface KvStore {
-  get(key: string): Promise<string | null>;
-  put(key: string, value: string, options?: { expirationTtl?: number }): Promise<void>;
+  /** Cloudflare Workers Rate Limiting binding (absent in local dev/tests). */
+  RATE_LIMITER?: RateLimitBinding;
 }
 
 /** One ICE server entry in Cloudflare's documented response shape. */
@@ -255,90 +237,6 @@ export function clientIp(request: Request): string {
   return request.headers.get("CF-Connecting-IP") ?? "unknown";
 }
 
-/** UTC calendar date (YYYY-MM-DD) for a timestamp: the daily counter suffix. */
-export function utcDateKey(now: number): string {
-  return new Date(now).toISOString().slice(0, 10);
-}
-
-/** KV key of the daily mint counter for `now`. */
-export function dailyCounterKey(now: number): string {
-  return `${MINT_DAILY_KEY_PREFIX}${utcDateKey(now)}`;
-}
-
-/** Parse MINT_DAILY_CAP: a positive integer, or `fallback` when unset/invalid. */
-export function parseCap(raw: string | undefined, fallback: number): number {
-  if (raw === undefined) return fallback;
-  const parsed = Number.parseInt(raw, 10);
-  return Number.isNaN(parsed) || parsed < 1 ? fallback : parsed;
-}
-
-/** Next counter value: parse the stored string (0 when absent/unparseable) + 1. */
-export function nextCounterValue(stored: string | null): number {
-  const current = stored === null ? 0 : Number.parseInt(stored, 10);
-  return (Number.isNaN(current) ? 0 : current) + 1;
-}
-
-/** True when today's mint count has reached the daily cap. */
-export function dailyCapExceeded(daily: number, dailyCap: number): boolean {
-  return daily >= dailyCap;
-}
-
-// The KV-unavailable warning is logged once per isolate (it would fire on
-// every request in dev where the binding is missing).
-let warnedKvMissing = false;
-
-function warnKvMissing(): void {
-  if (warnedKvMissing) return;
-  warnedKvMissing = true;
-  console.log(
-    "turn-creds: TURN_BUDGET KV binding missing — daily mint cap disabled (fail-open; create the namespace in prod, see README)",
-  );
-}
-
-/**
- * Read today's mint count. Returns null when the KV binding is missing or the
- * read fails — the cap FAILS OPEN. Fail-open is fine for dev; in prod the
- * binding must exist, and even with it down abuse stays bounded by the per-IP
- * rate limiter while native budget alerts cover spend visibility.
- */
-export async function readDailyMints(kv: KvStore | undefined, now: number): Promise<number | null> {
-  if (kv === undefined) {
-    warnKvMissing();
-    return null;
-  }
-  try {
-    const stored = await kv.get(dailyCounterKey(now));
-    return Number.parseInt(stored ?? "0", 10) || 0;
-  } catch (err) {
-    console.log(`turn-creds: mint counter read failed, failing open: ${String(err)}`);
-    return null;
-  }
-}
-
-/**
- * Increment today's mint counter after a SUCCESSFUL mint (KV
- * read-modify-write; KV has NO atomic increment). Concurrent mints can
- * over-count, which is SAFE here: the cap errs on the safe side. Fails open:
- * a failed write is logged, the mint has already happened.
- */
-export async function incrementDailyMints(kv: KvStore | undefined, now: number): Promise<void> {
-  if (kv === undefined) {
-    warnKvMissing();
-    return;
-  }
-  const dailyKey = dailyCounterKey(now);
-  try {
-    const daily = await kv.get(dailyKey);
-    await kv.put(dailyKey, String(nextCounterValue(daily)), {
-      expirationTtl: DAILY_COUNTER_TTL_SECONDS,
-    });
-  } catch (err) {
-    console.log(
-      `turn-creds: mint counter increment failed (mint already succeeded): ${String(err)}`,
-    );
-  }
-}
-
 /**
  * Log one successful mint for Workers analytics / usage review (IP, origin,
  * ttl, timestamp). No PII beyond the client IP the edge already sees.
@@ -356,11 +254,8 @@ export function logMint(request: Request, ttlSeconds: number, now: number): void
 }
 
 /**
- * In-memory fixed-window rate limiter keyed by client IP
- * (rocketcrab-23s.3). Per-isolate state is fine: this is the fast-fail
- * backstop, and over-counting under concurrency is SAFE (it only ever
- * rejects more aggressively). The durable backstop is a Cloudflare
- * route-level rate rule (README).
+ * In-memory fixed-window rate limiter keyed by client IP. Used only when the
+ * Cloudflare Rate Limiting binding is absent (local dev/tests) or throws.
  */
 export class RateLimiter {
   private readonly windows = new Map<string, { start: number; count: number }>();
@@ -399,7 +294,7 @@ export class RateLimiter {
   }
 }
 
-// Module-level per-isolate limiter (the worker's fast-fail backstop).
+// Module-level limiter: only used when the platform binding is unavailable.
 let limiter: RateLimiter | undefined;
 
 function getLimiter(): RateLimiter {
@@ -466,14 +361,18 @@ export async function handleTurnCredsRequest(
     return jsonError(405, "method_not_allowed", `method ${request.method} is not allowed`, cors);
   }
 
-  // 3. Per-IP rate limit (fast-fail backstop, rocketcrab-23s.3): reject
-  // BEFORE any upstream call. Over-counting under concurrency is safe.
+  // 3. Per-IP rate limit (rocketcrab-23s.3): reject BEFORE any upstream call.
+  // The platform binding is primary; the in-memory check is a dev fallback.
   const rateLimit = parseRateLimit(env.RATE_LIMIT_PER_MIN);
-  const { allowed, retryAfterSeconds } = getLimiter().check(
-    clientIp(request),
-    rateLimit,
-    Date.now(),
-  );
+  const ip = clientIp(request);
+  const bindingDecision = await limitWithBinding(env.RATE_LIMITER, `turn:${ip}`);
+  const { allowed, retryAfterSeconds } =
+    bindingDecision === null
+      ? getLimiter().check(ip, rateLimit, Date.now())
+      : {
+          allowed: bindingDecision,
+          retryAfterSeconds: bindingDecision ? 0 : RATE_LIMIT_WINDOW_MS / 1000,
+        };
   if (!allowed) {
     return jsonError(
       429,
@@ -484,26 +383,7 @@ export async function handleTurnCredsRequest(
     );
   }
 
-  // 4. Daily issuance cap (rocketcrab-23s.4): the counter is read BEFORE any
-  // upstream call. At the cap the worker answers 429. KV unavailable (dev /
-  // outage) FAILS OPEN — the check degrades to a no-op with a log.
-  const now = Date.now();
-  const dailyMints = await readDailyMints(env.TURN_BUDGET, now);
-  if (dailyMints !== null) {
-    const limit = parseCap(env.MINT_DAILY_CAP, DEFAULT_MINT_DAILY_CAP);
-    if (dailyCapExceeded(dailyMints, limit)) {
-      return jsonError(
-        429,
-        "budget_exceeded",
-        `mint budget exhausted: daily cap (${limit}) reached for ${utcDateKey(now)}`,
-        cors,
-        undefined,
-        { cap: "daily", limit },
-      );
-    }
-  }
-
-  // 5. Mint: proxy to the Cloudflare Realtime credentials API with a fixed
+  // 4. Mint: proxy to the Cloudflare Realtime credentials API with a fixed
   // short TTL (rocketcrab-23s.2), then drop port-53 URLs from the response
   // (browsers block port 53). Never leak the API token in any response.
   const upstream = buildMintRequest(env);
@@ -556,12 +436,9 @@ export async function handleTurnCredsRequest(
     );
   }
 
-  // Count every SUCCESSFUL mint: increment both KV counters (kill-switch
-  // bookkeeping, rocketcrab-23s.4) and log the mint for Workers analytics
-  // / usage review (IP, origin, ttl, timestamp). Both are best-effort — the
-  // credentials are already minted and must not be lost to a KV hiccup.
-  await incrementDailyMints(env.TURN_BUDGET, now);
-  logMint(request, MINT_TTL_SECONDS, now);
+  // Log the mint for Workers analytics / usage review (IP, origin, ttl,
+  // timestamp). Credentials are never logged.
+  logMint(request, MINT_TTL_SECONDS, Date.now());
 
   return jsonResponse(200, filterPort53IceServers(body), cors);
 }

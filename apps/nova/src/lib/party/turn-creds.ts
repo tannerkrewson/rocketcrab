@@ -85,7 +85,8 @@ export interface TurnCredsFetchOptions {
 /** Base origin of the TURN credential mint; "" when the build pins none. */
 export function turnCredsBaseUrl(): string {
   const raw = import.meta.env.VITE_TURN_CREDS_ORIGIN;
-  return typeof raw === "string" ? raw.trim() : "";
+  // Treat the value as an origin: a trailing slash would produce `//turn`.
+  return typeof raw === "string" ? raw.trim().replace(/\/+$/, "") : "";
 }
 
 /** True when the mint origin is configured (build-time env). */
