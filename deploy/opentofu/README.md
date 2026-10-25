@@ -35,7 +35,7 @@ Cloudflare does not transpile TypeScript on upload, so OpenTofu consumes the
 generated JavaScript bundle rather than pretending that raw TypeScript is
 deployable.
 
-## Safe validation and planning
+## Safe validation (no state)
 
 From the repository root, use Wrangler only for a local compile dry run. The
 `--dry-run` flag compiles and writes files without uploading or changing

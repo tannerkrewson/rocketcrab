@@ -6,7 +6,7 @@
   OpenTofu root at `deploy/opentofu/`; this file remains the live-state record
   and documents provider gaps and one-time account decisions.
 - **Drift convention:** see §6. OpenTofu is the intended source of truth for
-  supported resources. The validation workflow is plan/validate-only; no
+  supported resources. The validation workflow is format/validate-only; no
   Wrangler deployment workflow is retained.
 
 ## 1. Account facts
@@ -193,10 +193,10 @@ curl -s https://api.cloudflare.com/client/v4/accounts/<ACCOUNT_ID>/storage/kv/na
   resources.** `deploy/opentofu/` models the single edge Worker, the
   TURN_BUDGET KV namespace, its workers.dev subdomain, and optional custom
   domain/zone route/rate-limit resources.
-  `.github/workflows/infrastructure-plan.yml` builds bundles with Wrangler
-  `--dry-run`, then runs formatting, initialization without a backend,
-  validation, and a static `-refresh=false` plan. It never runs `tofu apply` or
-  a Wrangler deployment.
+  `.github/workflows/infrastructure-plan.yml` builds the edge bundle with
+  Wrangler `--dry-run`, then runs formatting, initialization without a backend,
+  and validation. It never plans (that needs remote state), applies, or deploys
+  with Wrangler.
 - **Wrangler is a build input only.** Its committed edge Worker config and
   source files are used for a local `deploy --dry-run` bundle before an
   OpenTofu plan.

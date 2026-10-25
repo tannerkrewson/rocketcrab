@@ -109,8 +109,8 @@ manual path: dry-run bundle → `init -backend-config` → reviewed plan → own
 approval/`tofu apply` → `wrangler secret put` → frontend rebuild. It documents
 the `/turn` release order (Worker first, then the static app with the edge
 origin), rollback for both layers, and points emergency TURN controls at
-`deploy/edge/README.md` / `deploy/cloudflare.md`. CI remains validation/plan-only;
-no automation applies or deploys a Worker.
+`deploy/edge/README.md` / `deploy/cloudflare.md`. CI remains format/validate-only (planning needs remote state); no automation
+plans, applies, or deploys a Worker.
 
 ## Stage 4 — TURN security, attribution, costs, diagnostics
 

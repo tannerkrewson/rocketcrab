@@ -42,8 +42,3 @@ jobs:
 
       - name: Validate configuration
         run: tofu -chdir=deploy/opentofu validate
-
-      - name: Generate static no-refresh plan
-        run: >-
-          tofu -chdir=deploy/opentofu plan -refresh=false -input=false
-          -var=cloudflare_account_id=00000000000000000000000000000000

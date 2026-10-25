@@ -206,8 +206,8 @@ Cloudflare infrastructure deploys through one manual, approved path:
 1. Build the edge bundle with the documented Wrangler `--dry-run` command
    (absolute output path).
 2. `tofu init -backend-config=backend.hcl`, then review a refreshed
-   `tofu plan`. CI validates formatting/configuration and publishes a
-   non-mutating plan; it never applies.
+   `tofu plan` (requires the R2 remote state). CI validates
+   formatting/configuration only; it never plans, applies, or deploys a Worker.
 3. The owner approves and an operator runs `tofu apply`. This is the only
    mechanism that changes the Worker, its bindings, KV, route, domain or rate
    rule.
