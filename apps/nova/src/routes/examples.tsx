@@ -1,7 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Badge } from "../components/ui/Badge";
 import { ArrowLeft, Code2, Play } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
+import { toast } from "../lib/toast";
 import { Button, buttonStyles } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { storeDraftSource } from "../lib/editor/draft-handoff";
@@ -29,7 +30,7 @@ export function ExamplesPage() {
       storeDraftSource(source);
       await navigate({ to: "/editor" });
     } catch {
-      toast.error("Couldn't load this example game.");
+      toast.danger("Couldn't load this example game.");
       setOpeningId(null);
     }
   };
@@ -42,7 +43,7 @@ export function ExamplesPage() {
           Back to home
         </Link>
         <h1 className="text-3xl font-black">Example games</h1>
-        <p className="max-w-2xl text-base-content/70">
+        <p className="max-w-2xl text-foreground/70">
           Complete, single-file games that run on Nova — one per mode. Open any of them in the
           editor as a new draft to run it, read the code, and change it into your own game.
         </p>
@@ -55,9 +56,9 @@ export function ExamplesPage() {
             title={
               <span className="flex flex-wrap items-center gap-2">
                 {game.title}
-                <span className="badge badge-accent badge-outline font-bold">
+                <Badge color="accent" variant="secondary">
                   {exampleModeLabel[game.mode]}
-                </span>
+                </Badge>
               </span>
             }
             description={game.description}
@@ -72,7 +73,7 @@ export function ExamplesPage() {
               </Button>
             }
           >
-            <p className="flex items-center gap-1.5 text-xs font-semibold text-base-content/50">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-foreground/50">
               <Code2 className="h-3.5 w-3.5" aria-hidden="true" />
               examples/games/{game.id}.html
             </p>

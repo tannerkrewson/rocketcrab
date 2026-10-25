@@ -158,7 +158,7 @@ async function authorityPlayerId(page: Page): Promise<string | null> {
   const cards = page.locator('[data-testid="arena-grid"] section[data-testid^="arena-player-"]');
   for (let index = 0; index < (await cards.count()); index += 1) {
     const card = cards.nth(index);
-    if ((await card.locator(".badge-accent").count()) > 0) {
+    if ((await card.getByText("Authority", { exact: true }).count()) > 0) {
       return (await card.getAttribute("data-testid"))?.replace("arena-player-", "") ?? null;
     }
   }

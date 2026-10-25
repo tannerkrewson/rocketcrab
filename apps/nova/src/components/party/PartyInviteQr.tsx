@@ -28,10 +28,10 @@ export function PartyInviteQr({ inviteUrl, size = 176, className, label }: Party
         value={inviteUrl}
         size={size}
         aria-label="Party invite QR code"
-        className="rounded-box bg-base-100 p-2"
+        className="rounded-2xl bg-surface p-2"
       />
       {label !== undefined ? (
-        <p className="mt-2 break-all text-center text-xs font-semibold text-base-content/60">
+        <p className="mt-2 break-all text-center text-xs font-semibold text-foreground/60">
           {label}
         </p>
       ) : null}

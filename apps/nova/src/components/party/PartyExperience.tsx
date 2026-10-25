@@ -1,6 +1,6 @@
 import { Loader2, PartyPopper } from "lucide-react";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "../../lib/toast";
 import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
 import { cn } from "../../lib/cn";
 import { usePartyEngine } from "../../lib/party/use-party";
@@ -67,7 +67,7 @@ export function PartyExperience({
         apiVersion: PROTOCOL_VERSION,
       });
     } catch (error) {
-      toast.error(`Couldn't load that game: ${errorMessage(error)}`);
+      toast.danger(`Couldn't load that game: ${errorMessage(error)}`);
     }
   };
 
@@ -151,7 +151,7 @@ export function PartyExperience({
               referrerPolicy="no-referrer"
             />
           ) : (
-            <div className="flex h-full items-center justify-center p-4 text-center text-sm font-semibold text-base-content/60">
+            <div className="flex h-full items-center justify-center p-4 text-center text-sm font-semibold text-foreground/60">
               Waiting for the host&apos;s room…
             </div>
           )}
@@ -236,7 +236,7 @@ function renderPhase(
         <div className="mx-auto flex w-full max-w-md flex-col items-center gap-3 py-10 text-center">
           <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden="true" />
           <p className="font-black">{state.phaseDetail ?? "Working…"}</p>
-          <p className="text-sm text-base-content/70">
+          <p className="text-sm text-foreground/70">
             {state.phase === "joining"
               ? "Connecting to the private party. Anyone with this invite joins automatically; a friend must still be connected."
               : "Your private party is being set up."}

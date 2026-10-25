@@ -25,7 +25,8 @@ import {
   type KeyboardEvent as ReactKeyboardEvent,
   type PointerEvent as ReactPointerEvent,
 } from "react";
-import { toast } from "sonner";
+import { Alert } from "@heroui/react";
+import { toast } from "../../lib/toast";
 import { Button, buttonStyles } from "../ui/Button";
 import { BrandLogo } from "../layout/BrandLogo";
 import { Dialog } from "../ui/Dialog";
@@ -338,7 +339,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       setMobileTab("code");
       toast.success("Pasted into the editor. Run it to see it live.");
     } catch {
-      toast.error(
+      toast.danger(
         "Couldn't read the clipboard. Your browser may need clipboard permission — use Cmd/Ctrl+V in the editor instead.",
       );
     }
@@ -352,7 +353,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
   const handlePlayWithFriends = useCallback(() => {
     const errors = validateSource(source).filter((issue) => issue.severity === "error");
     if (errors.length > 0) {
-      toast.error("Fix the validation errors before starting a party.");
+      toast.danger("Fix the validation errors before starting a party.");
       return;
     }
     const id = game?.id ?? draftGameId();
@@ -401,7 +402,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         });
       }
     } catch (error) {
-      toast.error(errorMessage(error));
+      toast.danger(errorMessage(error));
     } finally {
       savingRef.current = false;
     }
@@ -425,7 +426,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         ignoreBlocker: true,
       });
     } catch (error) {
-      toast.error(errorMessage(error));
+      toast.danger(errorMessage(error));
     } finally {
       savingRef.current = false;
     }
@@ -505,7 +506,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     if (ok) {
       toast.success("Diagnostic report copied to your clipboard.");
     } else {
-      toast.error("Couldn't copy the report — select the text above and copy manually.");
+      toast.danger("Couldn't copy the report — select the text above and copy manually.");
     }
   }, [consoleEntries, diagnostics, game, runInfo, runStatus, source, sourceHash, title]);
 
@@ -604,7 +605,11 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
   );
 
   const tabs = (
-    <div className="tabs tabs-box" role="tablist" aria-label="Editor views">
+    <div
+      className="flex gap-1 rounded-xl bg-surface-secondary p-1"
+      role="tablist"
+      aria-label="Editor views"
+    >
       {(
         [
           { id: "code", label: "Code" },
@@ -622,7 +627,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
           role="tab"
           type="button"
           aria-selected={mobileTab === tab.id}
-          className={`tab tab-sm ${mobileTab === tab.id ? "tab-active" : ""}`}
+          className={`rounded-lg px-3 py-1.5 text-sm font-bold ${mobileTab === tab.id ? "bg-surface text-foreground shadow-sm" : "text-muted"}`}
           onClick={() => setMobileTab(tab.id)}
         >
           {tab.label}
@@ -647,16 +652,16 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       {/* Phone-size prompt (below sm: — not tablets): editing and testing a
           game needs a real screen. */}
       <div className="sm:hidden" data-testid="phone-prompt">
-        <div role="alert" className="alert alert-warning alert-outline">
+        <Alert status="warning">
           <MonitorSmartphone className="h-6 w-6 shrink-0" aria-hidden="true" />
-          <div>
-            <h2 className="font-black">The editor works best on a computer</h2>
-            <p className="text-sm text-base-content/80">
+          <Alert.Content>
+            <Alert.Title>The editor works best on a computer</Alert.Title>
+            <Alert.Description>
               Writing and testing a game needs a big screen. Open Rocketcrab Nova on a laptop or
               desktop to use the editor and test arena.
-            </p>
-          </div>
-        </div>
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
       </div>
 
       {/* Chrome row (Task 2): identity (logo mark, no text), orientation
@@ -691,25 +696,25 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
               onBlur={commitTitle}
               aria-label="Game title"
               maxLength={64}
-              className="input input-bordered w-full max-w-md text-lg font-black"
+              className="input input--primary w-full max-w-md text-lg font-black"
             />
           ) : (
             <button
               type="button"
               onClick={startEditingTitle}
-              className="group inline-flex max-w-full items-center gap-2 rounded-md px-1 py-0.5 -mx-1 hover:bg-base-200/60"
+              className="group inline-flex max-w-full items-center gap-2 rounded-md px-1 py-0.5 -mx-1 hover:bg-surface-secondary/60"
               title="Click to edit the game title"
             >
               <h1 className="truncate text-xl font-black">{displayTitle}</h1>
               <Pencil
-                className="h-4 w-4 shrink-0 text-base-content/40 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
+                className="h-4 w-4 shrink-0 text-foreground/40 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
                 aria-hidden="true"
               />
             </button>
           )}
         </div>
         {dirty ? (
-          <span className="text-xs font-semibold text-base-content/60">· unsaved changes</span>
+          <span className="text-xs font-semibold text-foreground/60">· unsaved changes</span>
         ) : null}
       </header>
 
@@ -723,7 +728,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
               editor uses wide screens instead of leaving dead space. */}
           <div className="grid h-full grid-cols-2 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
             <section
-              className="min-h-0 overflow-hidden rounded-box border-2 border-base-300 bg-base-100"
+              className="min-h-0 overflow-hidden rounded-2xl border-2 border-border bg-surface"
               aria-label="Editor"
             >
               <div className="h-full">
@@ -749,7 +754,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         <div
           role="separator"
           aria-label="Resize the code editor"
-          className="flex h-3 cursor-ns-resize select-none items-center justify-center rounded-md border border-base-content/30 bg-base-200 text-base-content/60 transition-colors hover:bg-base-300 hover:text-base-content/90"
+          className="flex h-3 cursor-ns-resize select-none items-center justify-center rounded-md border border-foreground/30 bg-surface-secondary text-foreground/60 transition-colors hover:bg-surface-tertiary hover:text-foreground/90"
           onPointerDown={handleEditorResize}
           title="Drag to resize the code editor"
         >
@@ -761,7 +766,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       <div className="flex flex-col gap-3 md:hidden" data-testid="mobile-layout">
         {tabs}
         {mobileTab === "code" ? (
-          <div className="overflow-hidden rounded-box border-2 border-base-300 bg-base-100">
+          <div className="overflow-hidden rounded-2xl border-2 border-border bg-surface">
             <div className="h-[50vh] min-h-72">
               <CodeEditor value={source} onChange={setSource} ariaLabel="Game HTML source" />
             </div>
@@ -787,7 +792,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       {arenaSection}
 
       <div
-        className="sticky bottom-0 z-20 -mx-4 flex items-center gap-2 overflow-x-auto border-t-2 border-base-300 bg-base-100 py-2 pb-safe pl-4 pr-[9.5rem] md:hidden"
+        className="sticky bottom-0 z-20 -mx-4 flex items-center gap-2 overflow-x-auto border-t-2 border-border bg-surface py-2 pb-safe pl-4 pr-[9.5rem] md:hidden"
         data-testid="mobile-actions-bar"
       >
         <Button

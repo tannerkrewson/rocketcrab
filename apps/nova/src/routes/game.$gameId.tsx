@@ -1,7 +1,9 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Tabs } from "@heroui/react";
+import { toast } from "../lib/toast";
+import { Badge } from "../components/ui/Badge";
 import { ArrowLeft, BookOpen, ExternalLink, PartyPopper, Pencil } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
 import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
 import { Button, buttonStyles } from "../components/ui/Button";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
@@ -35,8 +37,8 @@ function isGameDetailOrigin(value: unknown): value is GameDetailOrigin {
 }
 
 function CategoryBadge({ label }: { label: string }) {
-  // l41: badges use daisyUI's soft style (was badge-ghost).
-  return <span className="badge badge-soft badge-sm font-bold">{label}</span>;
+  // l41: category badges use the soft HeroUI chip style.
+  return <Badge>{label}</Badge>;
 }
 
 function errorMessage(error: unknown): string {
@@ -151,7 +153,7 @@ export function BrowseGamePage() {
       setEditConfirmationOpen(false);
       navigateToEditor();
     } catch (error) {
-      toast.error(`Couldn't leave the party: ${errorMessage(error)}`);
+      toast.danger(`Couldn't leave the party: ${errorMessage(error)}`);
     }
   };
 
@@ -169,7 +171,7 @@ export function BrowseGamePage() {
         search: { gameId: undefined, mode: undefined, title: undefined },
       });
     } catch (error) {
-      toast.error(`Couldn't select that game: ${errorMessage(error)}`);
+      toast.danger(`Couldn't select that game: ${errorMessage(error)}`);
       setSelecting(false);
     }
   };
@@ -212,9 +214,7 @@ export function BrowseGamePage() {
         <header className="flex flex-col gap-2">
           <div className="flex flex-wrap items-center gap-2">
             <h1 className="text-3xl font-black">{saved.title}</h1>
-            <span className="badge badge-info badge-soft font-bold">
-              {NOVA_MODE_LABELS[saved.mode ?? "state"]} · saved
-            </span>
+            <Badge color="accent">{NOVA_MODE_LABELS[saved.mode ?? "state"]} · saved</Badge>
           </div>
           <div className="flex flex-wrap gap-2">
             {inParty ? (
@@ -234,7 +234,7 @@ export function BrowseGamePage() {
             )}
           </div>
         </header>
-        <p className="whitespace-pre-line text-base-content/80">
+        <p className="whitespace-pre-line text-foreground/80">
           {saved.description ?? "No description yet — open it in the editor to learn more."}
         </p>
         <div className="flex flex-wrap items-center justify-center gap-3">
@@ -291,26 +291,26 @@ export function BrowseGamePage() {
       <header className="flex flex-col gap-2">
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-3xl font-black">{prebuilt.name}</h1>
-          <span className="badge badge-error badge-soft font-bold">classic</span>
+          <Badge color="danger">classic</Badge>
           {/* l41: all badges sit at the top — the category badges live next
               to the classic badge instead of inside the Info tab. */}
           {prebuilt.category.map((category) => (
             <CategoryBadge key={category} label={category} />
           ))}
         </div>
-        <p className="font-semibold text-base-content/50">by {prebuilt.author}</p>
+        <p className="font-semibold text-foreground/50">by {prebuilt.author}</p>
         {prebuilt.players ? (
-          <p className="text-sm font-semibold text-base-content/60">{prebuilt.players} players</p>
+          <p className="text-sm font-semibold text-foreground/60">{prebuilt.players} players</p>
         ) : null}
         {/* l41: the game link + donation link moved up from the bottom of the
             Info tab to sit right under the player count. */}
-        <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm font-semibold text-base-content/60">
+        <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm font-semibold text-foreground/60">
           {prebuilt.displayUrlHref ? (
             <a
               href={prebuilt.displayUrlHref}
               target="_blank"
               rel="noreferrer"
-              className="link inline-flex items-center gap-1"
+              className="inline-flex items-center gap-1 font-semibold text-link underline-offset-4 hover:underline"
             >
               <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
               {prebuilt.displayUrlText ?? prebuilt.displayUrlHref}
@@ -330,28 +330,16 @@ export function BrowseGamePage() {
         </div>
       </header>
 
-      <div role="tablist" aria-label="Game details" className="tabs tabs-box w-fit">
-        <button
-          type="button"
-          role="tab"
-          aria-selected={tab === "info"}
-          onClick={() => setTab("info")}
-          className={cn("tab font-bold", tab === "info" && "tab-active")}
-        >
-          Info
-        </button>
-        {prebuilt.guideUrl ? (
-          <button
-            type="button"
-            role="tab"
-            aria-selected={tab === "guide"}
-            onClick={() => setTab("guide")}
-            className={cn("tab font-bold", tab === "guide" && "tab-active")}
-          >
-            Guide
-          </button>
-        ) : null}
-      </div>
+      <Tabs
+        selectedKey={tab}
+        onSelectionChange={(key) => setTab(key === "guide" ? "guide" : "info")}
+        aria-label="Game details"
+      >
+        <Tabs.List>
+          <Tabs.Tab id="info">Info</Tabs.Tab>
+          {prebuilt.guideUrl ? <Tabs.Tab id="guide">Guide</Tabs.Tab> : null}
+        </Tabs.List>
+      </Tabs>
 
       {tab === "info" ? (
         <section aria-label="Info" className="flex flex-col gap-4">
@@ -359,11 +347,11 @@ export function BrowseGamePage() {
             <ScreenshotCarousel images={prebuilt.pictures} gameName={prebuilt.name} />
           ) : null}
 
-          <p className="whitespace-pre-line text-base-content/80">{prebuilt.description}</p>
+          <p className="whitespace-pre-line text-foreground/80">{prebuilt.description}</p>
         </section>
       ) : (
         <section aria-label="Guide" className="flex flex-col gap-3">
-          <p className="text-base-content/70">
+          <p className="text-foreground/70">
             {prebuilt.name} is hosted by its author. The official rules are linked below.
           </p>
           <a

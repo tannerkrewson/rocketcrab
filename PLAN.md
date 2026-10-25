@@ -228,16 +228,52 @@ Remaining risk unchanged: no physical-device multi-hour proof.
 
 ### 6. HeroUI v3 full replacement
 
-- [ ] Follow current official HeroUI v3 docs (React 19+, Tailwind 4, React/styles
+- [x] Follow current official HeroUI v3 docs (React 19+, Tailwind 4, React/styles
       packages, CSS setup, no legacy provider/plugin). Use standard components
       and light/dark styling, not recreation of bespoke Nova visuals.
-- [ ] Migrate party/lobby/game shell, browser/details, editor/arena, navigation,
+- [x] Migrate party/lobby/game shell, browser/details, editor/arena, navigation,
       dialogs/menus/popovers/forms/notifications/theme controls. Retain CodeMirror,
       runtime isolation, emergency leave, responsive/accessibility/Safari behavior.
-- [ ] Remove daisyUI, obsolete theme/config/CSS/custom UI abstractions; no competing
+- [x] Remove daisyUI, obsolete theme/config/CSS/custom UI abstractions; no competing
       UI library. Simplify component composition and custom styling aggressively.
-- [ ] Verify accessibility/mobile behavior, tests/build/bundle. Report material
+- [x] Verify accessibility/mobile behavior, tests/build/bundle. Report material
       budget tradeoffs rather than silently raising limits; commit evidence.
+
+Stage 6 evidence: installed **HeroUI v3.2.6** (`@heroui/react`,
+`@heroui/styles`, `tailwind-variants`) and removed **daisyUI 5.7.9** and
+**sonner 2.0.8**. `styles.css` now imports Tailwind then HeroUI, keeps only Nova
+brand tokens (rocket red, signal blue, fonts) and the app's own utilities; the
+daisyUI plugin, its 35-theme catalogue and all `--color-base-*` theming are gone.
+`lib/theme.ts` is now light/dark/system (`.dark` + `data-theme`), and the theme
+control is three accessible icon buttons instead of the light/dark/dice
+selector.
+
+Migrated components: shared `Button` (HeroUI variants; `buttonStyles` emits the
+same BEM classes for router links), `Card`, `Dialog` (React Aria modal with focus
+trap/Escape/backdrop dismissal), `ErrorPanel`/status banners (`Alert`), `Badge`
+(`Chip`), `Tabs` (game details), `Spinner`, and HeroUI toast (`Toast.Provider`)
+through a single `lib/toast.ts` seam. Native inputs/selects/ranges use HeroUI's
+field classes/tokens; menus, collapsible panels and tab bars use HeroUI tokens
+plus Tailwind utilities. No daisyUI class names, `@plugin`, theme catalogue,
+sonner, or competing component library remain in `apps/nova/src`.
+
+Verification: **485 nova app tests** (968 unit/property total) and **87
+infrastructure worker tests** pass; typecheck, format, lint, production build and
+bundle check pass; `npm audit` reports 0 vulnerabilities. Playwright app suite
+**20/20 in Chromium, Firefox and WebKit** (WebKit in the Playwright Podman image).
+One stale Vite dep-optimizer cache produced misleading browser failures locally;
+restarting the dev server cleared it. CodeMirror still receives the theme through
+its own extension now mapped to `--surface`/`--foreground`.
+
+Budget tradeoff (reported, not silently raised): initial JS rose from **167.3 to
+205.9 KiB gzip** (+38.6, +23%) and CSS from 31.0 to **45.9 KiB gzip** because
+HeroUI ships React Aria + component CSS. The documented **220 KiB initial-JS
+budget is unchanged** and still passes with 14.1 KiB headroom; the editor chunk
+is 212.0 KiB gzip. If headroom becomes a problem, the next lever is importing
+only the HeroUI components used (tree-shaking is already in effect) before any
+budget change. Remaining risk: no physical-device Mobile Safari pass this stage;
+keyboard focus traps and icon-button labels are covered by tests and React Aria,
+but the full device checklist is still a release gate.
 
 ### 7. Final focused cleanup
 

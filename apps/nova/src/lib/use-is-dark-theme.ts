@@ -1,21 +1,19 @@
 import { useEffect, useState } from "react";
-import { currentThemeMode } from "./theme";
+import { resolvedTheme } from "./theme";
 
 /**
- * True when the effective app theme is dark (Task 4: dark code editor).
+ * True when the effective app theme is dark (dark code editor).
  *
- * Uses `currentThemeMode()` (the persisted theme's mode, or the OS
- * preference) on mount, then stays live through BOTH the system
- * `prefers-color-scheme` media query and a MutationObserver on
- * `document.documentElement`'s `data-theme` attribute — the footer theme
- * picker flips the attribute without reloading, so the editor re-themes
- * automatically.
+ * The initial value resolves the persisted preference or the OS; the hook then
+ * stays live through the system `prefers-color-scheme` query and a
+ * MutationObserver on <html>'s class/data-theme (the theme control flips it
+ * without a reload).
  */
 export function useIsDarkTheme(): boolean {
-  const [isDark, setIsDark] = useState<boolean>(() => currentThemeMode() === "dark");
+  const [isDark, setIsDark] = useState<boolean>(() => resolvedTheme() === "dark");
 
   useEffect(() => {
-    const update = () => setIsDark(currentThemeMode() === "dark");
+    const update = () => setIsDark(resolvedTheme() === "dark");
 
     const media = window.matchMedia?.("(prefers-color-scheme: dark)");
     media?.addEventListener("change", update);
@@ -23,7 +21,7 @@ export function useIsDarkTheme(): boolean {
     const observer = new MutationObserver(update);
     observer.observe(document.documentElement, {
       attributes: true,
-      attributeFilter: ["data-theme"],
+      attributeFilter: ["data-theme", "class"],
     });
 
     return () => {

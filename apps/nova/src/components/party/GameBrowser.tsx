@@ -1,4 +1,5 @@
 import type { SavedGame } from "@rocketcrab/core";
+import { Badge } from "../ui/Badge";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Search } from "lucide-react";
 import { useMemo, useState } from "react";
@@ -75,12 +76,9 @@ function isBrowseView(value: string | null | undefined): value is BrowseView {
  * (5cl.10: Nova's example games were removed; the Nova badge is gone). */
 function KindBadge() {
   return (
-    <span
-      className="badge badge-error badge-outline font-bold"
-      title="External iframe game from classic Rocketcrab"
-    >
+    <Badge color="danger" variant="secondary" title="External iframe game from classic Rocketcrab">
       classic
-    </span>
+    </Badge>
   );
 }
 
@@ -115,10 +113,10 @@ function GameCard({
           <span className="font-black">{game.name}</span>
           <KindBadge />
         </span>
-        <span className="text-sm font-medium text-base-content/50">by {game.author}</span>
+        <span className="text-sm font-medium text-foreground/50">by {game.author}</span>
       </span>
       <ArrowRight
-        className="h-5 w-5 shrink-0 text-base-content/40 transition-transform group-hover:translate-x-1 group-hover:text-primary"
+        className="h-5 w-5 shrink-0 text-foreground/40 transition-transform group-hover:translate-x-1 group-hover:text-primary"
         aria-hidden="true"
       />
     </>
@@ -130,7 +128,7 @@ function GameCard({
         key={game.id}
         type="button"
         onClick={() => onPick(game)}
-        className="group flex w-full items-center justify-between gap-3 rounded-box border-2 border-base-300 bg-base-100 px-4 py-3 text-left transition-colors hover:border-primary"
+        className="group flex w-full items-center justify-between gap-3 rounded-2xl border-2 border-border bg-surface px-4 py-3 text-left transition-colors hover:border-primary"
       >
         {body}
       </button>
@@ -143,7 +141,7 @@ function GameCard({
       params={{ gameId: game.id }}
       search={detailOrigin === undefined ? undefined : { from: detailOrigin }}
       onClick={onOpen}
-      className="group flex items-center justify-between gap-3 rounded-box border-2 border-base-300 bg-base-100 px-4 py-3 transition-colors hover:border-primary"
+      className="group flex items-center justify-between gap-3 rounded-2xl border-2 border-border bg-surface px-4 py-3 transition-colors hover:border-primary"
     >
       {body}
     </Link>
@@ -167,11 +165,13 @@ function SavedGameRow({
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="flex flex-wrap items-center gap-2">
           <span className="truncate font-black">{game.title}</span>
-          <span className="badge badge-info badge-outline font-bold">{game.mode ?? "state"}</span>
+          <Badge color="accent" variant="secondary">
+            {game.mode ?? "state"}
+          </Badge>
         </span>
       </span>
       <ArrowRight
-        className="h-5 w-5 shrink-0 text-base-content/40 transition-transform group-hover:translate-x-1 group-hover:text-primary"
+        className="h-5 w-5 shrink-0 text-foreground/40 transition-transform group-hover:translate-x-1 group-hover:text-primary"
         aria-hidden="true"
       />
     </>
@@ -183,7 +183,7 @@ function SavedGameRow({
         key={game.id}
         type="button"
         onClick={() => onPickSaved(game.id)}
-        className="group flex w-full items-center justify-between gap-3 rounded-box border-2 border-base-300 bg-base-100 px-4 py-3 text-left transition-colors hover:border-primary"
+        className="group flex w-full items-center justify-between gap-3 rounded-2xl border-2 border-border bg-surface px-4 py-3 text-left transition-colors hover:border-primary"
       >
         {body}
       </button>
@@ -192,7 +192,7 @@ function SavedGameRow({
   return (
     <div
       key={game.id}
-      className="group flex items-center justify-between gap-2 rounded-box border-2 border-base-300 bg-base-100 px-4 py-3 transition-colors hover:border-primary"
+      className="group flex items-center justify-between gap-2 rounded-2xl border-2 border-border bg-surface px-4 py-3 transition-colors hover:border-primary"
     >
       <Link
         to="/game/$gameId"
@@ -229,7 +229,7 @@ function CategoryCard({
   href?: string;
 }) {
   const classes =
-    "group flex items-center gap-3 rounded-box border-2 border-base-300 bg-base-100 p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-lg hover:shadow-primary/10";
+    "group flex items-center gap-3 rounded-2xl border-2 border-border bg-surface p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-lg hover:shadow-primary/10";
   const body = (
     <>
       <span className="shrink-0 text-2xl" aria-hidden="true">
@@ -237,7 +237,7 @@ function CategoryCard({
       </span>
       <span className="flex min-w-0 flex-col gap-0.5">
         <span className="text-base font-black leading-tight sm:text-lg">{label}</span>
-        <span className="text-xs font-semibold text-base-content/50">
+        <span className="text-xs font-semibold text-foreground/50">
           {count === null ? "…" : `${count} ${count === 1 ? "game" : "games"}`}
         </span>
       </span>
@@ -379,7 +379,7 @@ export function GameBrowser({
         </button>
         <div className="relative min-w-0 flex-1 basis-56">
           <Search
-            className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-base-content/40"
+            className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-foreground/40"
             aria-hidden="true"
           />
           <input
@@ -388,7 +388,7 @@ export function GameBrowser({
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Search games…"
             aria-label="Search games"
-            className="input input-bordered w-full pl-10"
+            className="input input--primary w-full pl-10"
           />
         </div>
       </div>
@@ -442,7 +442,7 @@ export function GameBrowser({
               detailOrigin={compact ? "party-browse" : undefined}
             />
           ) : prebuiltGames.length === 0 ? (
-            <p className="rounded-box border-2 border-base-300 bg-base-100 p-6 text-center text-base-content/70">
+            <p className="rounded-2xl border-2 border-border bg-surface p-6 text-center text-foreground/70">
               No games match{query !== "" ? ` “${query}”` : ""}.
             </p>
           ) : (
@@ -469,9 +469,9 @@ export function GameBrowser({
           aria-modal="true"
           aria-label="Leave the party?"
         >
-          <div className="flex w-full max-w-sm flex-col gap-4 rounded-box border-2 border-base-300 bg-base-100 p-5">
+          <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border-2 border-border bg-surface p-5">
             <p className="font-black">Leave the party?</p>
-            <p className="text-sm text-base-content/70">
+            <p className="text-sm text-foreground/70">
               To open the game builder, you&apos;ll leave this party first. You can always start or
               join another one later.
             </p>
@@ -521,8 +521,8 @@ function SavedGamesList({
   }
   if (games.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-box border-2 border-dashed border-base-300 bg-base-100 p-6 text-center">
-        <p className="text-sm text-base-content/70">
+      <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-border bg-surface p-6 text-center">
+        <p className="text-sm text-foreground/70">
           {query !== ""
             ? `No saved games match “${query}”.`
             : "No saved games yet — create one in the editor first."}

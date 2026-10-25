@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Badge } from "../components/ui/Badge";
 import {
   ArrowLeft,
   Bot,
@@ -10,7 +11,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "../lib/toast";
 import { Button, buttonStyles } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { BrandLogo } from "../components/layout/BrandLogo";
@@ -50,7 +51,7 @@ const NOVA_API_REFERENCE_URL =
  */
 const ORBS = [
   {
-    className: "h-40 w-72 bg-info/40 blur-2xl",
+    className: "h-40 w-72 bg-accent/40 blur-2xl",
     left: "5%",
     top: "6%",
     breathe: "7s",
@@ -71,7 +72,7 @@ const ORBS = [
     delay: "0.9s",
   },
   {
-    className: "h-36 w-64 bg-info/35 blur-2xl",
+    className: "h-36 w-64 bg-accent/35 blur-2xl",
     left: "72%",
     top: "22%",
     breathe: "10s",
@@ -85,7 +86,7 @@ const ORBS = [
     delay: "1.6s",
   },
   {
-    className: "h-24 w-44 bg-info/30 blur-xl",
+    className: "h-24 w-44 bg-accent/30 blur-xl",
     left: "44%",
     top: "34%",
     breathe: "11s",
@@ -106,7 +107,7 @@ const ORBS = [
     delay: "1.4s",
   },
   {
-    className: "h-24 w-44 bg-info/30 blur-xl",
+    className: "h-24 w-44 bg-accent/30 blur-xl",
     left: "38%",
     top: "64%",
     breathe: "8s",
@@ -120,7 +121,7 @@ const ORBS = [
     delay: "2.3s",
   },
   {
-    className: "h-28 w-52 bg-info/25 blur-2xl",
+    className: "h-28 w-52 bg-accent/25 blur-2xl",
     left: "22%",
     top: "82%",
     breathe: "7s",
@@ -159,7 +160,7 @@ function BuildHeroPage() {
 
       {/* 7th pass: ONE hero card with the non-glow rocketcrab mark above the
           "Introducing Nova" line (Nova in the info color — the homepage
-          alert uses the same daisyUI info, NOT primary), a short warm
+          alert uses the same accent status, NOT primary), a short warm
           tagline, and the nova-colored Get started CTA (with the brand
           info aura) stepping to the prompt page. No nova-colored outline
           on the card (kqo) — a plain neutral border; the breathing orbs
@@ -169,7 +170,7 @@ function BuildHeroPage() {
       <section
         aria-labelledby="build-hero-heading"
         data-testid="build-hero"
-        className="relative w-full overflow-hidden rounded-box border-2 border-base-300 bg-base-100 shadow-sm"
+        className="relative w-full overflow-hidden rounded-2xl border-2 border-border bg-surface shadow-sm"
       >
         <div className="rc-build-glow" aria-hidden="true">
           {ORBS.map((orb, index) => (
@@ -214,11 +215,11 @@ function BuildHeroPage() {
           <BrandLogo variant="no-glow" size={80} responsive aria-hidden />
           <h1
             id="build-hero-heading"
-            className="text-glow-info text-4xl font-black text-base-content sm:text-5xl"
+            className="text-glow-info text-4xl font-black text-foreground sm:text-5xl"
           >
-            Introducing <span className="text-info">Nova</span>
+            Introducing <span className="text-accent">Nova</span>
           </h1>
-          <p className="max-w-md text-lg leading-relaxed text-base-content/70">
+          <p className="max-w-md text-lg leading-relaxed text-foreground/70">
             Turn any idea into a game your friends can play.
           </p>
           {/* gmo: the nova-colored hero CTA steps to the prompt page. The
@@ -243,43 +244,43 @@ function BuildHeroPage() {
         aria-label="How to build a game"
         className="flex w-full flex-col gap-4 sm:grid sm:grid-cols-3 sm:gap-4"
       >
-        <li className="card flex flex-col items-center gap-2.5 bg-base-100 p-6 text-center shadow-sm">
+        <li className="flex flex-col items-center gap-2.5 rounded-2xl border border-border bg-surface p-6 text-center shadow-sm">
           <span
-            className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-base-300 text-base-content"
+            className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-border text-foreground"
             aria-hidden="true"
           >
             <Sparkles className="h-5 w-5" />
           </span>
-          <p className="text-xs font-black text-base-content/50">Step 1</p>
+          <p className="text-xs font-black text-foreground/50">Step 1</p>
           <p className="text-lg font-black leading-tight">Get the prompt</p>
-          <p className="text-sm leading-relaxed text-base-content/70">
+          <p className="text-sm leading-relaxed text-foreground/70">
             One copyable prompt that turns any AI chatbot into a Nova game maker.
           </p>
         </li>
-        <li className="card flex flex-col items-center gap-2.5 bg-base-100 p-6 text-center shadow-sm">
+        <li className="flex flex-col items-center gap-2.5 rounded-2xl border border-border bg-surface p-6 text-center shadow-sm">
           <span
-            className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-base-300 text-base-content"
+            className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-border text-foreground"
             aria-hidden="true"
           >
             <Bot className="h-5 w-5" />
           </span>
-          <p className="text-xs font-black text-base-content/50">Step 2</p>
+          <p className="text-xs font-black text-foreground/50">Step 2</p>
           <p className="text-lg font-black leading-tight">Describe your game</p>
-          <p className="text-sm leading-relaxed text-base-content/70">
+          <p className="text-sm leading-relaxed text-foreground/70">
             Paste the prompt into ChatGPT, Claude, or Gemini. The AI interviews you, then writes
             your game.
           </p>
         </li>
-        <li className="card flex flex-col items-center gap-2.5 bg-base-100 p-6 text-center shadow-sm">
+        <li className="flex flex-col items-center gap-2.5 rounded-2xl border border-border bg-surface p-6 text-center shadow-sm">
           <span
-            className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-base-300 text-base-content"
+            className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-border text-foreground"
             aria-hidden="true"
           >
             <ClipboardPaste className="h-5 w-5" />
           </span>
-          <p className="text-xs font-black text-base-content/50">Step 3</p>
+          <p className="text-xs font-black text-foreground/50">Step 3</p>
           <p className="text-lg font-black leading-tight">Paste it in the editor</p>
-          <p className="text-sm leading-relaxed text-base-content/70">
+          <p className="text-sm leading-relaxed text-foreground/70">
             The AI returns one complete HTML file. Paste it in the editor, run it, and make it
             yours.
           </p>
@@ -303,7 +304,7 @@ function BuildPromptPage() {
       setCopied(true);
       toast.success("Master prompt copied to your clipboard.");
     } else {
-      toast.error("Couldn't copy the prompt — expand it below and copy manually.");
+      toast.danger("Couldn't copy the prompt — expand it below and copy manually.");
     }
   };
 
@@ -318,7 +319,7 @@ function BuildPromptPage() {
       storeDraftSource(source);
       await navigate({ to: "/editor" });
     } catch {
-      toast.error("Couldn't load this example game.");
+      toast.danger("Couldn't load this example game.");
       setOpeningId(null);
     }
   };
@@ -331,10 +332,10 @@ function BuildPromptPage() {
       </Link>
 
       <header className="flex flex-col items-center gap-3">
-        <h1 className="text-3xl font-black text-base-content sm:text-4xl">
-          Get the <span className="text-info">master prompt</span>
+        <h1 className="text-3xl font-black text-foreground sm:text-4xl">
+          Get the <span className="text-accent">master prompt</span>
         </h1>
-        <p className="max-w-xl text-lg leading-relaxed text-base-content/70">
+        <p className="max-w-xl text-lg leading-relaxed text-foreground/70">
           One prompt that works in every AI chat service. Copy it, tell the AI about your idea, and
           it writes your game — one complete HTML file ready to paste into the editor.
         </p>
@@ -344,22 +345,22 @@ function BuildPromptPage() {
           overwhelming). */}
       <ol
         aria-label="What to do with the prompt"
-        className="flex w-full flex-wrap items-center justify-center gap-2 text-sm font-semibold text-base-content/70"
+        className="flex w-full flex-wrap items-center justify-center gap-2 text-sm font-semibold text-foreground/70"
       >
-        <li className="flex items-center gap-2 rounded-full border-2 border-base-300 bg-base-100 px-4 py-2">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-info/20 font-black text-info">
+        <li className="flex items-center gap-2 rounded-full border-2 border-border bg-surface px-4 py-2">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent/20 font-black text-accent">
             1
           </span>
           Copy the prompt
         </li>
-        <li className="flex items-center gap-2 rounded-full border-2 border-base-300 bg-base-100 px-4 py-2">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-info/20 font-black text-info">
+        <li className="flex items-center gap-2 rounded-full border-2 border-border bg-surface px-4 py-2">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent/20 font-black text-accent">
             2
           </span>
           Chat about your idea
         </li>
-        <li className="flex items-center gap-2 rounded-full border-2 border-base-300 bg-base-100 px-4 py-2">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-info/20 font-black text-info">
+        <li className="flex items-center gap-2 rounded-full border-2 border-border bg-surface px-4 py-2">
+          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent/20 font-black text-accent">
             3
           </span>
           Paste the game in the editor
@@ -393,11 +394,11 @@ function BuildPromptPage() {
                 Show the full prompt ({prompt.length.toLocaleString()} characters)
               </span>
             </summary>
-            <pre className="mt-3 max-h-96 overflow-auto rounded-box border-2 border-base-300 bg-base-200 p-4 text-xs leading-relaxed whitespace-pre-wrap">
+            <pre className="mt-3 max-h-96 overflow-auto rounded-2xl border-2 border-border bg-surface-secondary p-4 text-xs leading-relaxed whitespace-pre-wrap">
               {prompt}
             </pre>
           </details>
-          <p className="text-sm text-base-content/70">
+          <p className="text-sm text-foreground/70">
             Reading the API reference? It's on GitHub:{" "}
             <a
               href={NOVA_API_REFERENCE_URL}
@@ -418,7 +419,7 @@ function BuildPromptPage() {
         <h2 id="example-games-heading" className="text-xl font-black">
           Or start from a Nova example
         </h2>
-        <p className="mt-1 text-sm leading-relaxed text-base-content/70">
+        <p className="mt-1 text-sm leading-relaxed text-foreground/70">
           No prompt needed — open a complete game in the editor as a new draft, run it, and make it
           yours.
         </p>
@@ -429,9 +430,9 @@ function BuildPromptPage() {
               title={
                 <span className="flex flex-wrap items-center gap-2">
                   {game.title}
-                  <span className="badge badge-accent badge-outline font-bold">
+                  <Badge color="accent" variant="secondary">
                     {exampleModeLabel[game.mode]}
-                  </span>
+                  </Badge>
                 </span>
               }
               description={game.description}

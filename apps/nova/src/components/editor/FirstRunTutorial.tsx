@@ -32,7 +32,7 @@ export function FirstRunTutorial() {
 
   return (
     <div
-      className="flex flex-col gap-3 rounded-box border-2 border-primary/40 bg-base-100 p-4"
+      className="flex flex-col gap-3 rounded-2xl border-2 border-primary/40 bg-surface p-4"
       data-testid="first-run-tutorial"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -41,7 +41,7 @@ export function FirstRunTutorial() {
             <GraduationCap className="h-5 w-5 text-primary" aria-hidden="true" />
             New to Nova? Here's how the editor works
           </h2>
-          <ol className="list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-base-content/80">
+          <ol className="list-decimal space-y-1.5 pl-5 text-sm leading-relaxed text-foreground/80">
             <li>
               Write your game's HTML here — or copy the <b>master prompt</b> on the Build page and
               let an AI write the first draft.

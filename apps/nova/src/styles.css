@@ -1,120 +1,28 @@
 @import "tailwindcss";
-@plugin 'daisyui' {
-  /* All 35 default daisyUI themes, selectable via [data-theme=...] by the
-   * theme picker (rocketcrab-9fv.7.3). None carry --default/--prefersdark
-   * flags, so they never override the Nova themes below: the app still
-   * defaults to "nova" (pure white) and follows the OS in dark mode. */
-  themes:
-    light, dark, cupcake, bumblebee, emerald, corporate, synthwave, retro, cyberpunk, valentine,
-    halloween, garden, forest, aqua, lofi, pastel, fantasy, wireframe, black, luxury, dracula, cmyk,
-    autumn, business, acid, lemonade, night, coffee, winter, dim, nord, sunset, caramellatte, abyss,
-    silk;
-}
+@import "@heroui/styles";
 
 /*
- * Nova themes — playful rocket/crab identity on classic pure white/black.
- * Semantic tokens via daisyUI color variables; bright but coherent,
- * high contrast, chunky rounded shapes.
+ * Nova brand tokens on top of HeroUI v3.
  *
- * Theme strategy (selector-ready, per rocketcrab-9fv.7.2):
- *  - "nova" (light): the default theme, pure white surfaces. Applied at
- *    :where(:root), so it is the fallback everywhere.
- *  - "nova-dark": the system-dark variant (prefersdark), deep blacks.
- *    daisyUI emits it under @media (prefers-color-scheme: dark) for
- *    :root:not([data-theme]), so it follows the OS preference whenever no
- *    explicit data-theme override is set — and both themes stay reachable
- *    via [data-theme="nova"|"nova-dark"] for the theme selector
- *    (rocketcrab-9fv.7.3).
+ * HeroUI owns every component's visuals and the light/dark surface, text,
+ * border, accent and status tokens. Nova keeps only its two brand colors
+ * (rocket red + signal blue) and the font choices. `.dark` on <html> switches
+ * HeroUI's dark theme (applied by lib/theme.ts).
  */
-@plugin "daisyui/theme" {
-  name: "nova";
-  default: true;
-  prefersdark: false;
-  color-scheme: light;
-
-  --color-base-100: oklch(100% 0 0);
-  --color-base-200: oklch(96.5% 0 0);
-  --color-base-300: oklch(91% 0 0);
-  --color-base-content: oklch(20% 0 0);
+@theme {
+  --font-sans: "Mukta", ui-sans-serif, system-ui, sans-serif;
+  --font-title: "Inconsolata Variable", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
   --color-primary: oklch(62% 0.21 22);
-  --color-primary-content: oklch(99% 0 0);
-
+  --color-primary-foreground: oklch(99% 0 0);
   --color-secondary: oklch(58% 0.17 250);
-  --color-secondary-content: oklch(99% 0 0);
-
-  --color-accent: oklch(84% 0.17 88);
-  --color-accent-content: oklch(30% 0.06 80);
-
-  --color-neutral: oklch(28% 0.02 262);
-  --color-neutral-content: oklch(96% 0.01 90);
-
-  /* 2t1.3: nova IS the info color — the brand cyan glow (glow-info /
-     text-glow-info use oklch(72% 0.11 225)); slightly brighter here so
-     info elements pop on the pure-white surface. */
-  --color-info: oklch(74% 0.11 225);
-  --color-info-content: oklch(26% 0.05 225);
+  --color-secondary-foreground: oklch(99% 0 0);
 }
 
-@plugin "daisyui/theme" {
-  name: "nova-dark";
-  default: false;
-  prefersdark: true;
-  color-scheme: dark;
-
-  --color-base-100: oklch(19% 0 0);
-  --color-base-200: oklch(14% 0 0);
-  --color-base-300: oklch(10% 0 0);
-  --color-base-content: oklch(97% 0 0);
-
+/* Darken the brand red slightly for readable text on dark surfaces. */
+.dark {
   --color-primary: oklch(65% 0.21 25);
-  --color-primary-content: oklch(99% 0 0);
-
   --color-secondary: oklch(60% 0.17 250);
-  --color-secondary-content: oklch(99% 0 0);
-
-  --color-accent: oklch(86% 0.17 88);
-  --color-accent-content: oklch(28% 0.05 80);
-
-  --color-neutral: oklch(35% 0.02 262);
-  --color-neutral-content: oklch(97% 0.01 90);
-
-  --color-info: oklch(72% 0.11 225);
-  --color-info-content: oklch(98% 0 0);
-
-  --color-success: oklch(72% 0.15 150);
-  --color-success-content: oklch(98% 0 0);
-
-  --color-warning: oklch(84% 0.16 85);
-  --color-warning-content: oklch(28% 0.05 60);
-
-  --color-error: oklch(65% 0.2 25);
-  --color-error-content: oklch(99% 0 0);
-
-  --radius-selector: 0.5rem;
-  --radius-field: 0.75rem;
-  --radius-box: 1.25rem;
-
-  --size-selector: 0.25rem;
-  --size-field: 0.25rem;
-
-  --border: 2px;
-  --depth: 0;
-  --noise: 0;
-}
-
-@theme {
-  /* Mukta is the single UI font (rocketcrab-9fv.10.2): overriding Tailwind's
-   * default sans stack means html/body, every daisyUI component, and the
-   * homepage title all inherit it. Weights 400-800 are loaded in main.tsx
-   * and cover the app's font-medium/semibold/bold/black usage (Mukta tops
-   * out at 800, so font-black (900) renders at its heaviest weight). */
-  --font-sans: "Mukta", ui-sans-serif, system-ui, sans-serif;
-
-  /* Monospace brand font for the rocketcrab.com homepage title only
-   * (rocketcrab-9fv.11.5). Inconsolata Variable (200-900) is loaded in
-   * main.tsx; everything else keeps Mukta. */
-  --font-title: "Inconsolata Variable", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 }
 
 @layer base {
@@ -123,9 +31,14 @@
     -webkit-text-size-adjust: 100%;
   }
 
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+
   /* Visible, consistent keyboard focus everywhere. */
   :focus-visible {
-    outline: 3px solid var(--color-primary);
+    outline: 3px solid var(--focus);
     outline-offset: 2px;
     border-radius: 4px;
   }
@@ -217,13 +130,12 @@
 }
 
 @utility pt-safe {
-  /* 9fv.11.11: never flush with the top edge — at least 0.5rem even when
-     the browser reports no notch inset (desktop). */
+  /* Never flush with the top edge — at least 0.5rem even without a notch. */
   padding-top: max(0.5rem, env(safe-area-inset-top));
 }
 
-/* Nova brand glow (2t1.7): the build page's hero uses the info color's
-   soft halo, matching the rocket/crab logo drop-shadow glow. */
+/* Nova brand glow: the build page's hero uses the brand color's soft halo,
+   matching the rocket/crab logo drop-shadow glow. */
 @utility glow-info {
   box-shadow: 0 0 26px -6px oklch(72% 0.11 225 / 0.6);
 }
@@ -232,13 +144,7 @@
   text-shadow: 0 0 20px oklch(72% 0.11 225 / 0.55);
 }
 
-/* 2t1.9: the lobby's invisible runtime frame (PartyExperience) must never
-   take vertical space. While a game is selected the game boots inside this
-   hidden container, and the booted game iframe's default height would
-   otherwise inflate it — leaving a weird gap between the party header and
-   the lobby exactly when a game IS selected (no gap when nothing is
-   selected, because no iframe exists yet). Height is restored once the
-   game starts (the `invisible` class drops then). */
+/* The lobby's invisible runtime frame must never take vertical space. */
 [data-testid="party-frame"].invisible {
   height: 0;
 }

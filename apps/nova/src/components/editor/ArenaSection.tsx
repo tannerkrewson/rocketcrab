@@ -16,6 +16,7 @@
  * background suspension), and every player's console/errors land in its own
  * log panel.
  */
+import { Badge } from "../ui/Badge";
 import type { SavedGame } from "@rocketcrab/core";
 import { Link } from "@tanstack/react-router";
 import {
@@ -106,20 +107,20 @@ function connectionBadge(player: ArenaPlayer): ReactNode {
           : state === "disconnected"
             ? "Disconnected"
             : "Offline";
-  const className =
+  const color =
     state === "connected"
-      ? "badge badge-success badge-sm"
+      ? "success"
       : state === "joining"
-        ? "badge badge-info badge-sm"
+        ? "accent"
         : state === "suspended"
-          ? "badge badge-warning badge-sm"
+          ? "warning"
           : state === "disconnected"
-            ? "badge badge-error badge-sm"
-            : "badge badge-ghost badge-sm";
+            ? "danger"
+            : "default";
   return (
-    <span className={className} title={`Connection state: ${state}`}>
+    <Badge color={color} title={`Connection state: ${state}`}>
       {label}
-    </span>
+    </Badge>
   );
 }
 
@@ -318,7 +319,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
             placeholder="Player name"
             aria-label="New player name"
             maxLength={32}
-            className="input input-bordered input-sm w-36"
+            className="input input--primary input--sm w-36"
           />
           <Button
             variant="secondary"
@@ -344,8 +345,8 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
         {debugOpen ? (
           <>
             <div className="flex items-center gap-2">
-              <Gauge className="h-4 w-4 text-base-content/60" aria-hidden="true" />
-              <label htmlFor={latencyId} className="text-xs font-semibold text-base-content/60">
+              <Gauge className="h-4 w-4 text-foreground/60" aria-hidden="true" />
+              <label htmlFor={latencyId} className="text-xs font-semibold text-foreground/60">
                 Latency {state.latencyMs}ms
               </label>
               <input
@@ -356,7 +357,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
                 step={25}
                 value={state.latencyMs}
                 onChange={(event) => actions.setLatency(Number(event.target.value))}
-                className="range range-xs w-32"
+                className="w-32 accent-primary"
                 aria-label="Artificial latency"
               />
               <Button
@@ -407,21 +408,17 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
   };
 
   const summaryBar = (
-    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-base-content/70">
-      {summary.failed > 0 ? (
-        <span className="badge badge-error badge-sm">{summary.failed} failed</span>
-      ) : null}
+    <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-foreground/70">
+      {summary.failed > 0 ? <Badge color="danger">{summary.failed} failed</Badge> : null}
       {debugOpen && state.stateDiagnostics !== null ? (
-        <span className="badge badge-ghost badge-sm font-mono" title="State-mode diagnostics">
+        <Badge className="font-mono" title="State-mode diagnostics">
           state rev {state.stateDiagnostics.revision} · {state.stateDiagnostics.stateSizeBytes} B ·{" "}
           {state.stateDiagnostics.actionRatePerSecond.toFixed(1)} act/s
-        </span>
+        </Badge>
       ) : null}
-      <span
-        className={summary.success ? "badge badge-success badge-sm" : "badge badge-ghost badge-sm"}
-      >
+      <Badge color={summary.success ? "success" : "default"}>
         {summary.success ? "Test passed" : "Testing…"}
-      </span>
+      </Badge>
       {game?.lastTestedAt !== undefined ? (
         <span>
           Last passed: {formatDate(game.lastTestedAt)}
@@ -436,7 +433,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
     <section
       key={player.id}
       data-testid={`arena-player-${player.id}`}
-      className="flex flex-col gap-2 rounded-box border-2 border-base-300 bg-base-100 p-3"
+      className="flex flex-col gap-2 rounded-2xl border-2 border-border bg-surface p-3"
       style={frameWidthPx !== null ? { width: `${frameWidthPx}px` } : undefined}
       aria-label={`Player ${player.name}`}
     >
@@ -450,12 +447,12 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
           {player.name}
         </button>
         {authority === player.id ? (
-          <span className="badge badge-accent badge-sm" title="Simulated authority player">
+          <Badge color="accent" title="Simulated authority player">
             Authority
-          </span>
+          </Badge>
         ) : null}
         {connectionBadge(player)}
-        <span className="badge badge-ghost badge-sm">{runStateLabel(player)}</span>
+        <Badge>{runStateLabel(player)}</Badge>
         <div className="flex-1" />
         {player.sessionStatus === "disconnected" ? (
           <Button
@@ -516,14 +513,14 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
           <Trash2 className="h-4 w-4" aria-hidden="true" />
         </Button>
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-base-content/60">
+      <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-foreground/60">
         <span className="font-mono">{player.memberId}</span>
         {player.registered ? (
           <span>
             “{player.registered.title}” · {player.registered.gameMode} mode
           </span>
         ) : player.loadError !== null ? (
-          <span className="text-error">Startup failed: {player.loadError}</span>
+          <span className="text-danger">Startup failed: {player.loadError}</span>
         ) : (
           <Activity className="h-3 w-3" aria-hidden="true" />
         )}
@@ -534,7 +531,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
       </div>
       <div className="flex items-stretch gap-1">
         <div
-          className="min-w-0 flex-1 overflow-hidden rounded-md border border-base-300 bg-black"
+          className="min-w-0 flex-1 overflow-hidden rounded-md border border-border bg-black"
           style={{ height: `${frameHeightPx}px` }}
           data-testid={`arena-frame-${player.id}`}
         >
@@ -543,7 +540,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
         <div
           role="separator"
           aria-label={`Resize ${player.name}'s game frame width`}
-          className="flex w-3 cursor-ew-resize select-none items-center justify-center rounded-md border border-base-content/30 bg-base-200 text-base-content/60 transition-colors hover:bg-base-300 hover:text-base-content/90"
+          className="flex w-3 cursor-ew-resize select-none items-center justify-center rounded-md border border-foreground/30 bg-surface-secondary text-foreground/60 transition-colors hover:bg-surface-tertiary hover:text-foreground/90"
           onPointerDown={handleFrameWidthResize}
           title="Drag to resize width"
         >
@@ -553,31 +550,31 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
       <div
         role="separator"
         aria-label={`Resize ${player.name}'s game frame`}
-        className="flex h-3 cursor-ns-resize select-none items-center justify-center rounded-md border border-base-content/30 bg-base-200 text-base-content/60 transition-colors hover:bg-base-300 hover:text-base-content/90"
+        className="flex h-3 cursor-ns-resize select-none items-center justify-center rounded-md border border-foreground/30 bg-surface-secondary text-foreground/60 transition-colors hover:bg-surface-tertiary hover:text-foreground/90"
         onPointerDown={handleFrameResize}
         title="Drag to resize"
       >
         <GripHorizontal className="h-3 w-3" aria-hidden="true" />
       </div>
       <div
-        className="max-h-32 min-h-16 overflow-y-auto rounded-box border border-base-300 bg-base-200 p-2 font-mono text-[11px] leading-relaxed"
+        className="max-h-32 min-h-16 overflow-y-auto rounded-2xl border border-border bg-surface-secondary p-2 font-mono text-[11px] leading-relaxed"
         data-testid={`arena-logs-${player.id}`}
         aria-label={`Logs for ${player.name}`}
       >
         {player.logs.length === 0 ? (
-          <span className="text-base-content/40">No log entries yet.</span>
+          <span className="text-foreground/40">No log entries yet.</span>
         ) : (
           player.logs.map((entry) => (
             <div
               key={entry.id}
               className={
                 entry.level === "error"
-                  ? "text-error"
+                  ? "text-danger"
                   : entry.level === "warn"
                     ? "text-warning"
                     : entry.level === "info"
-                      ? "text-info"
-                      : "text-base-content/80"
+                      ? "text-accent"
+                      : "text-foreground/80"
               }
             >
               <span className="opacity-60">[{formatTime(entry.timestamp)}]</span> {entry.message}
@@ -599,12 +596,9 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
       {stale || game !== undefined ? (
         <div className="flex flex-wrap items-center gap-3">
           {stale ? (
-            <span
-              className="badge badge-warning badge-md"
-              title="The editor changed since this test run"
-            >
+            <Badge color="warning" size="md" title="The editor changed since this test run">
               Editor changed — press Run to re-test
-            </span>
+            </Badge>
           ) : null}
           <div className="flex-1" />
           {game !== undefined ? (
@@ -625,7 +619,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
 
       {/* Desktop: shared toolbar above the player grid. */}
       <div className="hidden flex-col gap-3 md:flex" data-testid="arena-desktop">
-        <div className="flex flex-wrap items-center gap-2 rounded-box border-2 border-base-300 bg-base-100 p-3">
+        <div className="flex flex-wrap items-center gap-2 rounded-2xl border-2 border-border bg-surface p-3">
           {toolbar("desktop")}
         </div>
       </div>
@@ -636,7 +630,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
         <div
           role="tablist"
           aria-label="Simulated players"
-          className="tabs tabs-box overflow-x-auto"
+          className="flex gap-1 overflow-x-auto rounded-xl bg-surface-secondary p-1"
         >
           {state.players.map((player) => (
             <button
@@ -644,16 +638,18 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
               role="tab"
               type="button"
               aria-selected={activePlayerId === player.id}
-              className={`tab tab-sm whitespace-nowrap ${activePlayerId === player.id ? "tab-active" : ""}`}
+              className={`whitespace-nowrap rounded-lg px-3 py-1.5 text-sm font-bold ${activePlayerId === player.id ? "bg-surface text-foreground shadow-sm" : "text-muted"}`}
               onClick={() => setActivePlayerId(player.id)}
             >
               {player.name}
             </button>
           ))}
         </div>
-        <details className="collapse collapse-arrow border-2 border-base-300 bg-base-100">
-          <summary className="collapse-title text-sm font-bold">Simulation controls</summary>
-          <div className="collapse-content">{toolbar("mobile")}</div>
+        <details className="rounded-2xl border-2 border-border bg-surface">
+          <summary className="cursor-pointer list-none p-4 text-sm font-bold">
+            Simulation controls
+          </summary>
+          <div className="p-4 pt-0">{toolbar("mobile")}</div>
         </details>
       </div>
 
@@ -693,7 +689,7 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
               defaultValue={renameTarget.name}
               maxLength={32}
               aria-label="Player name"
-              className="input input-bordered"
+              className="input input--primary"
               onKeyDown={(event) => {
                 if (event.key === "Enter") handleRename();
               }}

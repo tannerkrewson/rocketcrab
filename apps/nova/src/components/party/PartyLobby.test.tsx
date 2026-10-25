@@ -30,7 +30,7 @@ const { toastMock } = vi.hoisted(() => ({
   toastMock: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
 }));
 
-vi.mock("sonner", () => ({ toast: toastMock }));
+vi.mock("../../lib/toast", () => ({ toast: toastMock }));
 
 const INVITE_URL = "http://localhost:5173/join#code=abcd&secret=invite-secret";
 
@@ -326,7 +326,7 @@ describe("PartyLobby", () => {
     const alerts = screen.getAllByRole("alert");
     const warning = alerts.find((alert) => within(alert).queryByText(/Signaling degraded/));
     expect(warning).toBeDefined();
-    expect(warning).toHaveClass("alert-warning");
+    expect(warning).toHaveClass("alert--warning");
     expect(
       within(warning as HTMLElement).getByText(/Signaling degraded: 1 of 4 relays usable/),
     ).toBeInTheDocument();
@@ -379,9 +379,8 @@ describe("PartyLobby", () => {
     });
     await renderLobby(state);
     const alert = screen.getByRole("alert");
-    // Colored alerts in the lobby are outline-styled, never solid (9fv.11.3).
-    expect(alert).toHaveClass("alert-outline");
-    expect(alert).toHaveClass("alert-warning");
+    // Warning status maps to HeroUI's warning alert variant.
+    expect(alert).toHaveClass("alert--warning");
     expect(within(alert).getByText(/waiting for every player/i)).toBeInTheDocument();
   });
 

@@ -32,7 +32,7 @@ export function BrandHeader({
   const inner = (
     <>
       <BrandLogo size={size} />
-      <span className="font-title shrink-0 text-xl font-black text-base-content">
+      <span className="font-title shrink-0 text-xl font-black text-foreground">
         rocketcrab<span className="text-primary">.com</span>
       </span>
     </>

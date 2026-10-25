@@ -57,7 +57,7 @@ const { toastMock, partyStub } = vi.hoisted(() => {
   };
 });
 
-vi.mock("sonner", () => ({ toast: toastMock }));
+vi.mock("../lib/toast", () => ({ toast: toastMock }));
 // 8z9: the homepage guard leaves any active party — control the engine
 // through the stub instead of the real (idle) singleton.
 vi.mock("../lib/party/use-party", () => ({
@@ -100,12 +100,13 @@ describe("/", () => {
     expect(screen.queryByText("🚀")).not.toBeInTheDocument();
     expect(screen.getByText("party games for phones")).toBeInTheDocument();
     const alert = screen.getByRole("link", { name: /Introducing Nova/ });
-    // rocketcrab-5cl.6: the daisyUI aura wrapper, glowing orb, and twinkling
-    // stars are gone — the alert keeps just its dotted outline and text.
+    // No aura wrapper, glowing orb, or twinkling stars remain.
     expect(alert.parentElement).not.toHaveClass("aura");
     expect(document.querySelector(".rc-alert-orb, .rc-alert-star")).toBeNull();
-    // rocketcrab-2t1.8: the Nova alert is a dotted outline (not solid).
-    expect(alert).toHaveClass("alert-outline", "border-dotted");
+    // The Nova promo is a dotted HeroUI accent alert around the link.
+    const alertBox = alert.closest('[data-slot="alert-root"]');
+    expect(alertBox).not.toBeNull();
+    expect(alertBox).toHaveClass("alert--accent", "border-dotted");
     expect(within(alert).getByText("Introducing Nova")).toBeInTheDocument();
     expect(
       within(alert).getByText("Build your own games and play them with friends, instantly."),
@@ -158,12 +159,12 @@ describe("/", () => {
     renderHome();
     const primaryRow = await screen.findByRole("region", { name: "Start or join a party" });
     for (const link of within(primaryRow).getAllByRole("link")) {
-      expect(link).toHaveClass("btn-primary", "btn-soft");
+      expect(link).toHaveClass("button--secondary");
     }
     const more = await screen.findByRole("region", { name: "More" });
     for (const link of within(more).getAllByRole("link")) {
-      expect(link).toHaveClass("btn-soft");
-      expect(link).not.toHaveClass("btn-neutral");
+      expect(link).toHaveClass("button--tertiary");
+      expect(link).not.toHaveClass("button--danger");
     }
   });
 

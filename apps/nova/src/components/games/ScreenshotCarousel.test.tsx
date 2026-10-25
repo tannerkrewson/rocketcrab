@@ -59,7 +59,7 @@ describe("ScreenshotCarousel", () => {
 
     // The whole swiper (not each screenshot) is wrapped in the single card.
     const swiper = container.querySelector(".swiper.nova-screenshots");
-    expect(swiper?.parentElement).toHaveClass("rounded-box", "bg-base-100", "p-4");
+    expect(swiper?.parentElement).toHaveClass("rounded-2xl", "bg-surface", "p-4");
     // The old per-slide frame (padding / border / rounded card) is gone.
     for (const img of container.querySelectorAll<HTMLImageElement>(".swiper-slide img")) {
       expect(img).not.toHaveClass("p-2", "rounded-2xl", "border", "shadow-sm");

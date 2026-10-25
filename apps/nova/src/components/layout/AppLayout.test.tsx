@@ -72,7 +72,7 @@ describe("AppLayout", () => {
     // Icon-only theme/color controls: labels are accessible, no visible text.
     expect(screen.getByRole("button", { name: "Light theme" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Random theme" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "System theme" })).toBeInTheDocument();
     expect(screen.queryByText("Light")).not.toBeInTheDocument();
     expect(screen.queryByText("Dark")).not.toBeInTheDocument();
   });
@@ -99,7 +99,7 @@ describe("AppLayout", () => {
     expect(control.className).toContain("right");
     expect(screen.getByRole("button", { name: "Light theme" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Random theme" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "System theme" })).toBeInTheDocument();
     // Party routes keep their own classic shell chrome (PartyShellHeader), but
     // there is no app-level wordmark bar and no footer anywhere.
     expect(screen.queryByRole("link", { name: /Rocketcrab home/ })).not.toBeInTheDocument();

@@ -1,6 +1,7 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type AnimationEvent } from "react";
-import { toast } from "sonner";
+import { Alert } from "@heroui/react";
+import { toast } from "../lib/toast";
 import { BrandLogo } from "../components/layout/BrandLogo";
 import { Button, buttonStyles } from "../components/ui/Button";
 import { writeToClipboard } from "../lib/editor/clipboard";
@@ -72,7 +73,7 @@ function HomeComponent() {
     if (ok) {
       toast.success("Copied rocketcrab.com to your clipboard.");
     } else {
-      toast.error("Couldn't copy rocketcrab.com — copy it manually.");
+      toast.danger("Couldn't copy rocketcrab.com — copy it manually.");
     }
   };
 
@@ -118,7 +119,7 @@ function HomeComponent() {
           </span>
         </Button>
         <h1
-          className="font-title cursor-pointer text-[2.5rem] font-black leading-none text-base-content transition-transform active:scale-95 sm:text-5xl"
+          className="font-title cursor-pointer text-[2.5rem] font-black leading-none text-foreground transition-transform active:scale-95 sm:text-5xl"
           title="Copy rocketcrab.com to your clipboard"
           tabIndex={0}
           onClick={() => void handleCopyTitle()}
@@ -131,21 +132,24 @@ function HomeComponent() {
         >
           rocketcrab<span className="text-primary">.com</span>
         </h1>
-        <p className="text-lg text-base-content/70">party games for phones</p>
+        <p className="text-lg text-foreground/70">party games for phones</p>
         {/* rocketcrab-2t1.8: dotted info alert below the tagline
-            (rocketcrab-5cl.6: the daisyUI aura, the glowing orb, and the
+            (rocketcrab-5cl.6: the aura, the glowing orb, and the
             twinkling stars are gone — just the dotted outline and text). */}
-        <Link
-          to="/build"
-          className="alert alert-info alert-outline mt-4 -mb-1 w-fit max-w-[calc(100vw-2rem)] cursor-pointer border-dotted transition-colors hover:bg-info/20 motion-reduce:transition-none"
+        <Alert
+          status="accent"
+          role="alert"
+          className="mt-4 -mb-1 w-fit max-w-[calc(100vw-2rem)] cursor-pointer border-dotted transition-colors hover:bg-accent/20 motion-reduce:transition-none"
         >
-          <div className="min-w-0 text-center">
-            <p className="text-base font-black">Introducing Nova</p>
-            <p className="text-sm opacity-80">
-              Build your own games and play them with friends, instantly.
-            </p>
-          </div>
-        </Link>
+          <Alert.Content>
+            <Link to="/build" className="block min-w-0 text-center">
+              <span className="block text-base font-black">Introducing Nova</span>
+              <span className="block text-sm opacity-80">
+                Build your own games and play them with friends, instantly.
+              </span>
+            </Link>
+          </Alert.Content>
+        </Alert>
       </section>
 
       {/* rocketcrab-5cl.5: on phones the two CTAs stack full-width so their

@@ -3,15 +3,11 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { THEME_STORAGE_KEY } from "./theme";
 import { useIsDarkTheme } from "./use-is-dark-theme";
 
-/**
- * useIsDarkTheme (Task 4): the dark-code-editor switch must follow the
- * effective app theme — the persisted theme's mode, or the OS preference —
- * and stay live when the footer theme picker flips `data-theme` on <html>
- * without a reload.
- */
+/** The dark-code-editor switch follows the effective app mode. */
 describe("useIsDarkTheme", () => {
   beforeEach(() => {
     window.localStorage.clear();
+    document.documentElement.classList.remove("dark");
     document.documentElement.removeAttribute("data-theme");
   });
 
@@ -20,35 +16,34 @@ describe("useIsDarkTheme", () => {
     expect(result.current).toBe(false);
   });
 
-  it("follows a persisted dark theme", () => {
-    window.localStorage.setItem(THEME_STORAGE_KEY, "night");
+  it("follows a persisted dark preference", () => {
+    window.localStorage.setItem(THEME_STORAGE_KEY, "dark");
+    document.documentElement.classList.add("dark");
     const { result } = renderHook(() => useIsDarkTheme());
     expect(result.current).toBe(true);
   });
 
-  it("follows a persisted light theme", () => {
-    window.localStorage.setItem(THEME_STORAGE_KEY, "nova");
+  it("follows a persisted light preference", () => {
+    window.localStorage.setItem(THEME_STORAGE_KEY, "light");
     const { result } = renderHook(() => useIsDarkTheme());
     expect(result.current).toBe(false);
   });
 
-  it("flips live when the theme picker changes data-theme (dark, dim, night, dracula)", async () => {
+  it("flips live when the theme control changes the root class", async () => {
     const { result } = renderHook(() => useIsDarkTheme());
     expect(result.current).toBe(false);
 
-    // The picker persists the choice AND sets the attribute; the
-    // MutationObserver on data-theme is what re-evaluates the hook.
-    for (const darkTheme of ["dark", "dim", "night", "dracula"]) {
-      act(() => {
-        window.localStorage.setItem(THEME_STORAGE_KEY, darkTheme);
-        document.documentElement.setAttribute("data-theme", darkTheme);
-      });
-      await waitFor(() => expect(result.current).toBe(true));
-    }
+    act(() => {
+      window.localStorage.setItem(THEME_STORAGE_KEY, "dark");
+      document.documentElement.classList.add("dark");
+      document.documentElement.setAttribute("data-theme", "dark");
+    });
+    await waitFor(() => expect(result.current).toBe(true));
 
     act(() => {
-      window.localStorage.setItem(THEME_STORAGE_KEY, "nova");
-      document.documentElement.setAttribute("data-theme", "nova");
+      window.localStorage.setItem(THEME_STORAGE_KEY, "light");
+      document.documentElement.classList.remove("dark");
+      document.documentElement.setAttribute("data-theme", "light");
     });
     await waitFor(() => expect(result.current).toBe(false));
   });
@@ -57,7 +52,8 @@ describe("useIsDarkTheme", () => {
     const { result, unmount } = renderHook(() => useIsDarkTheme());
     unmount();
     act(() => {
-      document.documentElement.setAttribute("data-theme", "dracula");
+      document.documentElement.classList.add("dark");
+      document.documentElement.setAttribute("data-theme", "dark");
     });
     await new Promise((resolve) => setTimeout(resolve, 0));
     expect(result.current).toBe(false);

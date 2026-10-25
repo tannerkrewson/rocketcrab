@@ -1,4 +1,5 @@
 import { Link } from "@tanstack/react-router";
+import { Badge } from "../ui/Badge";
 import { Copy, PartyPopper, Pencil, Trash2 } from "lucide-react";
 import type { SavedGame } from "@rocketcrab/core";
 import { Button, buttonStyles } from "../ui/Button";
@@ -24,16 +25,12 @@ function formatDate(timestamp: number): string {
 /** Test-status badge for a saved game. */
 function TestStatusBadge({ game }: { game: SavedGame }) {
   if (game.lastTestedAt === undefined) {
-    return <span className="badge badge-ghost badge-sm">Not tested</span>;
+    return <Badge>Not tested</Badge>;
   }
   return (
-    <span
-      className={
-        game.lastTestSucceeded ? "badge badge-success badge-sm" : "badge badge-error badge-sm"
-      }
-    >
+    <Badge color={game.lastTestSucceeded ? "success" : "danger"}>
       {game.lastTestSucceeded ? "Tests passed" : "Tests failed"} · {formatDate(game.lastTestedAt)}
-    </span>
+    </Badge>
   );
 }
 
@@ -78,10 +75,10 @@ export function GameCard({ game, onDuplicate, onDelete, busy = false }: GameCard
         </>
       }
     >
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-base-content/60">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-foreground/60">
         <span>Updated {formatDate(game.updatedAt)}</span>
         <span>{formatBytes(game.sourceBytes)}</span>
-        {game.mode ? <span className="badge badge-ghost badge-sm">{game.mode} mode</span> : null}
+        {game.mode ? <Badge>{game.mode} mode</Badge> : null}
         <TestStatusBadge game={game} />
         <span className="font-mono" title={`Source SHA-256: ${game.sourceHash}`}>
           {game.sourceHash.slice(0, 12)}…

@@ -1,6 +1,7 @@
-import type { ButtonHTMLAttributes } from "react";
+import { Button as HeroButton, type ButtonProps as HeroButtonProps } from "@heroui/react";
 import { cn } from "../../lib/cn";
 
+/** Nova button intents, mapped onto HeroUI's semantic variants. */
 export type ButtonVariant =
   | "primary"
   | "secondary"
@@ -8,40 +9,72 @@ export type ButtonVariant =
   | "outline"
   | "danger"
   | "default"
-  | "info";
-export type ButtonSize = "md" | "lg";
+  | "info"
+  | "tertiary";
+export type ButtonSize = "sm" | "md" | "lg";
 
-const variantClasses: Record<ButtonVariant, string> = {
-  primary: "btn-primary",
-  secondary: "btn-secondary",
-  accent: "btn-accent",
-  outline: "btn-outline",
-  danger: "btn-error",
-  // 5cl.5: the plain daisyUI `btn` is the default button — the neutral
-  // variant (btn-neutral) is gone; everywhere it was used now uses
-  // "default" (with the same soft/plain treatment as before).
-  default: "",
-  // 7th pass: the build hero CTA uses the Nova brand color — daisyUI
-  // `btn-info` (nova IS the info color, 2t1.3).
-  info: "btn-info",
-};
+type HeroVariant = NonNullable<HeroButtonProps["variant"]>;
 
-const sizeClasses: Record<ButtonSize, string> = {
-  md: "btn-md",
-  lg: "btn-lg",
-};
+function heroVariant(variant: ButtonVariant, soft: boolean): HeroVariant {
+  switch (variant) {
+    case "primary":
+    case "info":
+      return soft ? "secondary" : "primary";
+    case "accent":
+      return "primary";
+    case "secondary":
+      return "secondary";
+    case "outline":
+      return "outline";
+    case "danger":
+      return soft ? "danger-soft" : "danger";
+    case "default":
+      return soft ? "tertiary" : "secondary";
+    case "tertiary":
+      return "tertiary";
+  }
+}
 
-export interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+export interface ButtonProps extends Omit<
+  HeroButtonProps,
+  "variant" | "size" | "className" | "children"
+> {
   variant?: ButtonVariant;
   size?: ButtonSize;
-  /** Soft (tinted) style — appends `btn-soft` (rocketcrab-2t1.8). */
-  soft?: boolean;
+  className?: string;
+  children?: React.ReactNode;
+  /** Native tooltip text (HeroUI forwards it to the button element). */
+  title?: string;
+  /** Compatibility alias for HeroUI's `isDisabled`. */
+  disabled?: boolean;
 }
 
 /**
- * Shared button styling for both `<button>` and router `<Link>` elements.
- * Links should use `className={buttonStyles(...)}` to keep the same look and
- * touch-target size while preserving type-safe route props.
+ * Shared HeroUI button. `variant`/`size` keep Nova's intent vocabulary while
+ * HeroUI owns the visuals; `soft` maps to the nearest tinted HeroUI variant.
+ */
+export function Button({
+  variant = "primary",
+  size = "md",
+  soft = false,
+  className,
+  disabled,
+  ...props
+}: ButtonProps & { soft?: boolean }) {
+  return (
+    <HeroButton
+      variant={heroVariant(variant, soft)}
+      size={size}
+      isDisabled={disabled ?? props.isDisabled}
+      className={cn("font-bold", className)}
+      {...props}
+    />
+  );
+}
+
+/**
+ * The same button styling for router `<Link>` elements, which must keep
+ * type-safe route props instead of rendering a <button>.
  */
 export function buttonStyles(
   variant: ButtonVariant = "primary",
@@ -49,23 +82,11 @@ export function buttonStyles(
   className?: string,
   soft = false,
 ) {
+  const hero = heroVariant(variant, soft);
   return cn(
-    "btn font-bold",
-    variantClasses[variant],
-    sizeClasses[size],
-    soft && "btn-soft",
+    "button font-bold",
+    size === "lg" ? "button--lg" : size === "sm" ? "button--sm" : "button--md",
+    `button--${hero}`,
     className,
-  );
-}
-
-export function Button({
-  variant = "primary",
-  size = "md",
-  soft = false,
-  className,
-  ...props
-}: ButtonProps) {
-  return (
-    <button type="button" className={buttonStyles(variant, size, className, soft)} {...props} />
   );
 }

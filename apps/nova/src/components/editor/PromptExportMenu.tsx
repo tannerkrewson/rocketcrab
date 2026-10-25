@@ -1,6 +1,6 @@
 import { ScrollText } from "lucide-react";
 import { useRef } from "react";
-import { toast } from "sonner";
+import { toast } from "../../lib/toast";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import { buildMasterPrompt, buildMasterPromptWithGame } from "../../lib/prompt/master-prompt";
 import { buttonStyles } from "../ui/Button";
@@ -25,14 +25,14 @@ export function PromptExportMenu({ source, title }: PromptExportMenuProps) {
     if (ok) {
       toast.success(successMessage);
     } else {
-      toast.error("Couldn't copy the prompt — your browser may need clipboard permission.");
+      toast.danger("Couldn't copy the prompt — your browser may need clipboard permission.");
     }
     // Close the dropdown after the action.
     detailsRef.current?.removeAttribute("open");
   };
 
   return (
-    <details ref={detailsRef} className="dropdown dropdown-end" data-testid="prompt-export-menu">
+    <details ref={detailsRef} className="relative" data-testid="prompt-export-menu">
       <summary
         className={buttonStyles("default", "md", undefined, true)}
         title="Copy the master prompt, or the prompt plus your current game code"
@@ -40,10 +40,11 @@ export function PromptExportMenu({ source, title }: PromptExportMenuProps) {
         <ScrollText className="h-4 w-4" aria-hidden="true" />
         Copy prompt
       </summary>
-      <ul className="dropdown-content menu z-50 w-64 rounded-box border-2 border-base-300 bg-base-100 p-2 shadow-lg">
+      <ul className="absolute right-0 z-50 mt-1 flex w-64 list-none flex-col gap-1 rounded-2xl border-2 border-border bg-overlay p-2 shadow-lg">
         <li>
           <button
             type="button"
+            className="w-full rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-surface-secondary"
             onClick={() =>
               void copy(buildMasterPrompt(), "Master prompt copied to your clipboard.")
             }
@@ -54,6 +55,7 @@ export function PromptExportMenu({ source, title }: PromptExportMenuProps) {
         <li>
           <button
             type="button"
+            className="w-full rounded-lg px-3 py-2 text-left text-sm font-bold hover:bg-surface-secondary"
             onClick={() =>
               void copy(
                 buildMasterPromptWithGame(source, title),

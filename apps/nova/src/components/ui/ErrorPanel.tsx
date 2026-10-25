@@ -1,4 +1,4 @@
-import { AlertTriangle } from "lucide-react";
+import { Alert } from "@heroui/react";
 import { Button } from "./Button";
 import { cn } from "../../lib/cn";
 
@@ -9,7 +9,7 @@ export interface ErrorPanelProps {
   className?: string;
 }
 
-/** Error alert used across the app for failed operations and route errors. */
+/** HeroUI danger alert for failed operations and route errors. */
 export function ErrorPanel({
   title = "Something went wrong",
   message,
@@ -17,25 +17,19 @@ export function ErrorPanel({
   className,
 }: ErrorPanelProps) {
   return (
-    <div
-      role="alert"
-      className={cn(
-        "flex flex-col gap-3 rounded-box border-2 border-error/40 bg-error/10 p-5",
-        className,
-      )}
-    >
-      <div className="flex items-center gap-3">
-        <AlertTriangle className="h-6 w-6 shrink-0 text-error" aria-hidden="true" />
-        <p className="font-black text-error">{title}</p>
-      </div>
-      {message ? <p className="text-base-content/80">{message}</p> : null}
-      {onRetry ? (
-        <div className="mt-1">
-          <Button variant="default" soft onClick={onRetry}>
-            Try again
-          </Button>
-        </div>
-      ) : null}
-    </div>
+    <Alert status="danger" role="alert" className={cn("flex flex-col gap-2", className)}>
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Title>{title}</Alert.Title>
+        {message ? <Alert.Description>{message}</Alert.Description> : null}
+        {onRetry ? (
+          <div className="mt-2">
+            <Button variant="default" soft onPress={onRetry}>
+              Try again
+            </Button>
+          </div>
+        ) : null}
+      </Alert.Content>
+    </Alert>
   );
 }

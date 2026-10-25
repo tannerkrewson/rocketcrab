@@ -1,6 +1,7 @@
 import { Copy, Hash, Ruler } from "lucide-react";
 import type { ConsoleEntry, Diagnostic } from "../../lib/editor/diagnostics";
 import { formatBytes, type SourceIssue } from "../../lib/editor/validation";
+import { Badge, type BadgeColor } from "../ui/Badge";
 import { Button } from "../ui/Button";
 
 export interface DiagnosticsPanelProps {
@@ -14,23 +15,23 @@ export interface DiagnosticsPanelProps {
 }
 
 function SeverityBadge({ severity }: { severity: Diagnostic["severity"] }) {
-  const classes: Record<Diagnostic["severity"], string> = {
-    error: "badge-error",
-    warning: "badge-warning",
-    info: "badge-info",
+  const colors: Record<Diagnostic["severity"], BadgeColor> = {
+    error: "danger",
+    warning: "warning",
+    info: "accent",
   };
-  return <span className={`badge badge-sm ${classes[severity]}`}>{severity}</span>;
+  return <Badge color={colors[severity]}>{severity}</Badge>;
 }
 
 function ConsoleBadge({ level }: { level: ConsoleEntry["level"] }) {
-  const classes: Record<ConsoleEntry["level"], string> = {
-    debug: "badge-ghost",
-    log: "badge-ghost",
-    info: "badge-info",
-    warn: "badge-warning",
-    error: "badge-error",
+  const colors: Record<ConsoleEntry["level"], BadgeColor> = {
+    debug: "default",
+    log: "default",
+    info: "accent",
+    warn: "warning",
+    error: "danger",
   };
-  return <span className={`badge badge-sm ${classes[level]}`}>{level}</span>;
+  return <Badge color={colors[level]}>{level}</Badge>;
 }
 
 /**
@@ -59,7 +60,7 @@ export function DiagnosticsPanel({
         </Button>
       </header>
 
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-base-content/60">
+      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs font-semibold text-foreground/60">
         <span className="inline-flex items-center gap-1">
           <Ruler className="h-3.5 w-3.5" aria-hidden="true" />
           {formatBytes(sourceBytes)}
@@ -73,10 +74,10 @@ export function DiagnosticsPanel({
         </span>
       </div>
 
-      <div className="flex flex-col gap-2 rounded-box border-2 border-base-300 bg-base-100 p-3">
-        <h3 className="text-xs font-black text-base-content/60">Validation</h3>
+      <div className="flex flex-col gap-2 rounded-2xl border-2 border-border bg-surface p-3">
+        <h3 className="text-xs font-black text-foreground/60">Validation</h3>
         {validationIssues.length === 0 ? (
-          <p className="text-sm text-base-content/60">Looks like a complete HTML document.</p>
+          <p className="text-sm text-foreground/60">Looks like a complete HTML document.</p>
         ) : (
           <ul className="flex flex-col gap-1.5">
             {validationIssues.map((issue) => (
@@ -89,10 +90,10 @@ export function DiagnosticsPanel({
         )}
       </div>
 
-      <div className="flex flex-col gap-2 rounded-box border-2 border-base-300 bg-base-100 p-3">
-        <h3 className="text-xs font-black text-base-content/60">Runtime errors</h3>
+      <div className="flex flex-col gap-2 rounded-2xl border-2 border-border bg-surface p-3">
+        <h3 className="text-xs font-black text-foreground/60">Runtime errors</h3>
         {diagnostics.length === 0 ? (
-          <p className="text-sm text-base-content/60">No runtime errors from the last run.</p>
+          <p className="text-sm text-foreground/60">No runtime errors from the last run.</p>
         ) : (
           <ul className="flex flex-col gap-2">
             {diagnostics.map((diagnostic) => (
@@ -104,7 +105,7 @@ export function DiagnosticsPanel({
                   </span>
                 </span>
                 {diagnostic.detail ? (
-                  <pre className="ml-9 whitespace-pre-wrap rounded-box bg-base-200 p-2 text-xs text-base-content/80">
+                  <pre className="ml-9 whitespace-pre-wrap rounded-2xl bg-surface-secondary p-2 text-xs text-foreground/80">
                     {diagnostic.detail}
                   </pre>
                 ) : null}
@@ -114,16 +115,16 @@ export function DiagnosticsPanel({
         )}
       </div>
 
-      <div className="flex flex-col gap-2 rounded-box border-2 border-base-300 bg-base-100 p-3">
-        <h3 className="text-xs font-black text-base-content/60">Console</h3>
+      <div className="flex flex-col gap-2 rounded-2xl border-2 border-border bg-surface p-3">
+        <h3 className="text-xs font-black text-foreground/60">Console</h3>
         {consoleEntries.length === 0 ? (
-          <p className="text-sm text-base-content/60">No console output from the last run.</p>
+          <p className="text-sm text-foreground/60">No console output from the last run.</p>
         ) : (
           <ul className="flex max-h-48 flex-col gap-1 overflow-y-auto font-mono text-xs">
             {consoleEntries.map((entry) => (
               <li key={entry.id} className="flex items-start gap-2">
                 <ConsoleBadge level={entry.level} />
-                <span className="break-all text-base-content/80">
+                <span className="break-all text-foreground/80">
                   {entry.message}
                   {entry.dropped ? (
                     <span className="text-warning"> ({entry.dropped} dropped)</span>

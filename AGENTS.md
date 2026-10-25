@@ -1,7 +1,7 @@
 # AGENTS.md — instructions for AI coding agents
 
 Working rules for this repository (Rocketcrab Nova — a party-games web app;
-React + TanStack Router + daisyUI in apps/nova).
+React + TanStack Router + HeroUI v3 in apps/nova).
 
 ## Work tracking
 
@@ -10,12 +10,15 @@ React + TanStack Router + daisyUI in apps/nova).
 
 ## UI rules
 
-- **Never use the daisyUI `btn-ghost` class** (ghost buttons). Use the shared
-  `Button` component's variants instead: `primary`, `secondary`, `accent`,
-  `outline`, `danger`. This includes raw `className="btn btn-ghost ..."` markup
-  and `variant="ghost"` — the class is banned project-wide and no automated
-  check catches it, so review your own diffs. (`variant="ghost"` is also a
-  compile error: the variant doesn't exist in `Button.tsx`.)
+- **Never use HeroUI's `ghost` button variant** (ghost buttons). Use the shared
+  `Button` component's variants instead: `primary`, `secondary`, `tertiary`,
+  `accent`, `outline`, `danger`. This includes raw HeroUI `button--ghost`
+  classes and any `variant="ghost"` — the variant is banned project-wide and no
+  automated check catches it, so review your own diffs. (`variant="ghost"` is
+  also a compile error: the variant doesn't exist in `Button.tsx`.)
+- Prefer HeroUI components (`Button`, `Card`, `Alert`, `Badge`, `Modal`,
+  `Tabs`, `Toast`, `Spinner`) over raw markup; Tailwind utilities are fine for
+  layout. Never add a second component library.
 - Prefer the shared `Button` component over raw `btn` classes. For router
   `Link` elements, use `buttonStyles(...)` to keep the same look and
   touch-target size while preserving type-safe route props.

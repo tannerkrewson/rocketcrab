@@ -38,7 +38,7 @@ export function ScreenshotCarousel({ images, gameName }: ScreenshotCarouselProps
   }
   return (
     // c08: ONE card around the whole swiper; the per-slide frames are gone.
-    <div className="rounded-box border-2 border-base-300 bg-base-100 p-4">
+    <div className="rounded-2xl border-2 border-border bg-surface p-4">
       <Swiper
         modules={[A11y, Pagination]}
         slidesPerView={2.5}

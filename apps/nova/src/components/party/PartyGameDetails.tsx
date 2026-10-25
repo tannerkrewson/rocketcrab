@@ -1,3 +1,4 @@
+import { Badge } from "../ui/Badge";
 import type { GameMode } from "@rocketcrab/protocol";
 import { BookOpen, X } from "lucide-react";
 import { findBrowseGame } from "../../lib/browse";
@@ -33,7 +34,7 @@ export function PartyGameDetailsModal({ game, onClose }: PartyGameDetailsModalPr
       aria-modal="true"
       aria-label={`About ${game.title}`}
     >
-      <div className="flex max-h-[80vh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-box border-2 border-base-300 bg-base-100 p-5">
+      <div className="flex max-h-[80vh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-2xl border-2 border-border bg-surface p-5">
         <div className="flex items-start justify-between gap-2">
           <h2 className="text-xl font-black">{game.title}</h2>
           <Button
@@ -62,15 +63,13 @@ function PrebuiltDetails({ game }: { game: NonNullable<ReturnType<typeof findBro
       {game.category.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
           {game.category.map((category) => (
-            <span key={category} className="badge badge-ghost badge-sm font-bold">
-              {category}
-            </span>
+            <Badge key={category}>{category}</Badge>
           ))}
         </div>
       ) : null}
-      <p className="whitespace-pre-line text-sm text-base-content/80">{game.description}</p>
+      <p className="whitespace-pre-line text-sm text-foreground/80">{game.description}</p>
       {game.players !== undefined ? (
-        <p className="text-sm font-semibold text-base-content/60">{game.players} players</p>
+        <p className="text-sm font-semibold text-foreground/60">{game.players} players</p>
       ) : null}
       {game.guideUrl !== undefined ? (
         <div className="flex flex-col gap-1">
@@ -98,17 +97,17 @@ function SavedGameDetails({ gameId }: { gameId: string }) {
   const saved = savedQuery.data;
   if (savedQuery.isError || saved === undefined) {
     return (
-      <p className="text-sm text-base-content/70">
+      <p className="text-sm text-foreground/70">
         Couldn't load this game's details from this browser's saved games.
       </p>
     );
   }
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm font-semibold text-base-content/60">
+      <p className="text-sm font-semibold text-foreground/60">
         {NOVA_MODE_LABELS[saved.mode ?? "state"]}
       </p>
-      <p className="whitespace-pre-line text-sm text-base-content/80">
+      <p className="whitespace-pre-line text-sm text-foreground/80">
         {saved.description ?? "No description yet — open it in the editor to learn more."}
       </p>
     </div>

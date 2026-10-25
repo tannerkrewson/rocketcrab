@@ -17,7 +17,7 @@ export function AppLayout() {
     // `isolate` gives the shell its own stacking context. The starfield is a
     // normal positive layer inside it so the shell background cannot paint
     // over the stars; the page content and controls sit above that layer.
-    <div className="isolate flex min-h-screen flex-col bg-base-200 text-base-content">
+    <div className="isolate flex min-h-screen flex-col bg-surface-secondary text-foreground">
       {/* Starfield: always mounted across the whole app so the site
           consistently has stars — hidden only while a party is actively
           playing a game (rocketcrab-22n; no more homepage-only fade). */}
@@ -30,7 +30,7 @@ export function AppLayout() {
         {/* Keep this control in the same shell stacking context as the play
             view so the play shell's z-40 chrome remains above it. */}
         <div
-          className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-3 z-30 rounded-box border-2 border-base-300 bg-base-100 p-1 shadow-md"
+          className="fixed bottom-[max(0.75rem,env(safe-area-inset-bottom))] right-3 z-30 rounded-2xl border-2 border-border bg-surface p-1 shadow-md"
           data-testid="floating-theme-control"
         >
           <ThemeSelector />

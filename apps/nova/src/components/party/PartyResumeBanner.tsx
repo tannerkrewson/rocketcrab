@@ -44,7 +44,7 @@ export function PartyResumeBanner({ engine }: PartyResumeBannerProps) {
 
   return (
     <section
-      className="flex flex-col gap-3 rounded-box border-2 border-primary/40 bg-base-100 p-4"
+      className="flex flex-col gap-3 rounded-2xl border-2 border-primary/40 bg-surface p-4"
       aria-label="Return to your party"
       data-testid="party-resume-banner"
     >
@@ -52,7 +52,7 @@ export function PartyResumeBanner({ engine }: PartyResumeBannerProps) {
         <PartyPopper className="h-5 w-5 text-primary" aria-hidden="true" />
         <h2 className="text-lg font-black">Return to your party</h2>
       </div>
-      <p className="text-sm text-base-content/70">
+      <p className="text-sm text-foreground/70">
         This page reloaded while you were in a party
         {record.game !== null ? (
           <>

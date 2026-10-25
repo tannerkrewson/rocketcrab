@@ -177,7 +177,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     expect(edit.getAttribute("href")).toBe(`/games/${game.id}/edit`);
     // The back link is a compact soft button, not a full-width bar.
     const back = screen.getByRole("link", { name: "Back to games" });
-    expect(back.className).toContain("btn-soft");
+    expect(back.className).toContain("button--tertiary");
     expect(back.className).toContain("self-start");
     // The brand row stays visible on the details page (2t1.1).
     expect(screen.getByRole("link", { name: /rocketcrab\.com/ })).toBeInTheDocument();
@@ -239,8 +239,8 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     expect(back.className).toContain("self-start");
     // The host can still select this classic game for the party.
     const select = screen.getByRole("button", { name: /select game/i });
-    expect(select.className).toContain("btn-lg");
-    expect(select.className).toContain("btn-primary");
+    expect(select.className).toContain("button--lg");
+    expect(select.className).toContain("button--primary");
   });
 
   it("shows no CTA to a guest in a party — the host picks (2t1.10)", async () => {
@@ -295,8 +295,8 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     renderAt("/game/drawphone");
 
     const start = await screen.findByRole("link", { name: "Start party" });
-    expect(start.className).toContain("btn-primary");
-    expect(start.className).toContain("btn-lg");
+    expect(start.className).toContain("button--primary");
+    expect(start.className).toContain("button--lg");
     // Classic games can't be preselected over the URL — plain /party entry.
     expect(start.getAttribute("href")).toBe("/party");
     // And the old standalone play-game view is gone.

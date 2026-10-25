@@ -41,10 +41,11 @@ re-litigates the workspace shape.
     TanStack Router `1.170.18` + `@tanstack/router-plugin` `1.168.23`
     (registered **before** the React plugin in `apps/nova/vite.config.ts`),
     TanStack Query `5.101.4`, Trystero `0.25.3`.
-  - UI: Tailwind CSS `4.3.3` + `@tailwindcss/vite`, daisyUI `5.7.9` (loaded
-    from CSS via `@plugin 'daisyui'`), `clsx` `2.1.1`, `tailwind-merge`
-    `3.6.0` (single `cn(...)` helper), `lucide-react` `1.28.0`, `sonner`
-    `2.0.7`, `qrcode.react` `4.2.0`.
+  - UI: Tailwind CSS `4.3.3` + `@tailwindcss/vite`, HeroUI v3 (`@heroui/react`
+    - `@heroui/styles`, loaded from CSS via `@import "@heroui/styles"`),
+      `tailwind-variants`, `clsx` `2.1.1`, `tailwind-merge`
+      `3.6.0` (single `cn(...)` helper), `lucide-react` `1.28.0`, `sonner`
+      `2.0.7`, `qrcode.react` `4.2.0`.
   - Data/validation: `zod` `4.4.3`, `dexie` `4.4.4`, `zustand` `5.0.14`,
     `immer` `11.1.15`, `nanoid` `6.0.0`, Web Crypto (platform, no package).
   - Editor: `@uiw/react-codemirror` `4.25.11`, `@codemirror/lang-html`

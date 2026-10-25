@@ -1,7 +1,8 @@
 import { Link } from "@tanstack/react-router";
 import { Copy, Gamepad2, LogOut, PartyPopper, Pencil, Play, QrCode, Share2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { toast } from "sonner";
+import { Alert } from "@heroui/react";
+import { toast } from "../../lib/toast";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState, PartyMemberView, PartyNotice } from "../../lib/party/engine";
 import { getSavedPlayerName } from "../../lib/party/identity";
@@ -36,10 +37,10 @@ const PLAYER_BORDER_COLORS = [
   "border-primary",
   "border-secondary",
   "border-accent",
-  "border-info",
+  "border-accent",
   "border-success",
   "border-warning",
-  "border-error",
+  "border-danger",
 ] as const;
 
 function playerBorderColor(index: number): string {
@@ -68,17 +69,24 @@ function transferIndicator(member: PartyMemberView) {
   switch (member.transferState) {
     case "transferring":
       return (
-        <progress
-          className="progress progress-info h-1.5 w-16"
-          value={member.transferProgress ?? 0}
-          max={1}
+        <div
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={Math.round((member.transferProgress ?? 0) * 100)}
           aria-label={`Game transfer progress for ${member.displayName}`}
-        />
+          className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-tertiary"
+        >
+          <div
+            className="h-full bg-accent transition-[width]"
+            style={{ width: `${Math.round((member.transferProgress ?? 0) * 100)}%` }}
+          />
+        </div>
       );
     case "failed":
-      return <span className="text-[10px] font-bold text-error">Failed</span>;
+      return <span className="text-[10px] font-bold text-danger">Failed</span>;
     case "incompatible":
-      return <span className="text-[10px] font-bold text-error">Incompatible</span>;
+      return <span className="text-[10px] font-bold text-danger">Incompatible</span>;
     case "waiting":
     case "none":
       // 5cl.9: no status text while waiting — the connection dot carries
@@ -103,11 +111,11 @@ function isMembershipNotice(message: string): boolean {
   return message.endsWith("joined the party.") || message.endsWith("was removed from the party.");
 }
 
-/** Alert level classes for lobby notices (outline-styled per 9fv.11.3). */
-const NOTICE_ALERT_LEVELS: Record<PartyNotice["level"], string> = {
-  error: "alert-error",
-  warn: "alert-warning",
-  info: "alert-info",
+/** Notice level -> HeroUI alert status. */
+const NOTICE_ALERT_STATUS: Record<PartyNotice["level"], "danger" | "warning" | "accent"> = {
+  error: "danger",
+  warn: "warning",
+  info: "accent",
 };
 
 /** True when the platform's native share sheet can take the invite URL
@@ -227,7 +235,7 @@ export function PartyLobby({
       if (!isMembershipNotice(notice.message)) continue;
       toastedNoticeIds.current = [...toastedNoticeIds.current, notice.id];
       if (notice.level === "error") {
-        toast.error(notice.message);
+        toast.danger(notice.message);
       } else if (notice.level === "warn") {
         toast.warning(notice.message);
       } else {
@@ -242,7 +250,7 @@ export function PartyLobby({
     if (ok) {
       toast.success("Invite link copied.");
     } else {
-      toast.error("Couldn't copy the link — try again.");
+      toast.danger("Couldn't copy the link — try again.");
     }
   };
 
@@ -288,7 +296,7 @@ export function PartyLobby({
 
       <section
         aria-label="Invite your friends"
-        className="flex flex-col items-center gap-3 rounded-box border-2 border-base-300 bg-base-100 p-5 text-center"
+        className="flex flex-col items-center gap-3 rounded-2xl border-2 border-border bg-surface p-5 text-center"
       >
         <h2 className="text-lg font-black">Get your friends to join!</h2>
         <div className="flex items-center justify-center gap-2">
@@ -326,7 +334,7 @@ export function PartyLobby({
           selected the card says so with a role-aware message (2t1.9). */}
       <section
         aria-label="Welcome"
-        className="relative flex flex-col items-center gap-3 overflow-hidden rounded-box border-2 border-base-300 bg-base-100 p-5 text-center"
+        className="relative flex flex-col items-center gap-3 overflow-hidden rounded-2xl border-2 border-border bg-surface p-5 text-center"
       >
         {/* 2t1.9: the idle glow is a wide ambient background BEHIND the
             card content (absolute, clipped by the card); the text sits on
@@ -336,13 +344,13 @@ export function PartyLobby({
           <h2 className="text-xl font-black">Welcome to rocketcrab!</h2>
           {state.game !== null ? (
             <>
-              <p className="text-sm font-semibold text-base-content/70">
+              <p className="text-sm font-semibold text-foreground/70">
                 {/* rocketcrab-ack: only the host says "You've selected" —
                     guests see the host's name, e.g. "Bob has selected". */}
                 {state.amHost ? "You've selected" : `${hostName ?? "The host"} has selected`}
               </p>
               <p className="text-2xl font-black text-primary">{state.game.title}</p>
-              <p className="text-sm text-base-content/70">
+              <p className="text-sm text-foreground/70">
                 {state.amHost
                   ? "As the host, you have to start the game!"
                   : "Waiting for the host to start the game…"}
@@ -358,7 +366,7 @@ export function PartyLobby({
               </Link>
             </>
           ) : (
-            <p className="text-sm font-semibold text-base-content/70">{noGameMessage}</p>
+            <p className="text-sm font-semibold text-foreground/70">{noGameMessage}</p>
           )}
         </div>
       </section>
@@ -369,7 +377,7 @@ export function PartyLobby({
       {needsName ? (
         <section
           aria-label="Set your name"
-          className="flex flex-wrap items-center justify-center gap-3 rounded-box border-2 border-primary/40 bg-base-100 p-4"
+          className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border-2 border-primary/40 bg-surface p-4"
         >
           <p className="text-sm font-semibold">
             You haven&apos;t set a name yet — friends see you as{" "}
@@ -425,9 +433,14 @@ export function PartyLobby({
       !state.canStart &&
       !state.canForceStart &&
       state.startBlockedReason !== null ? (
-        <div role="alert" className="alert alert-outline alert-warning mx-auto w-fit">
-          <span className="text-sm font-semibold">{state.startBlockedReason}</span>
-        </div>
+        <Alert status="warning" role="alert" className="mx-auto w-fit">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description className="text-sm font-semibold">
+              {state.startBlockedReason}
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
       ) : null}
       {/* 10.8 / 11.9, redesigned 2t1.9 + 5cl.9: the player grid — compact
           rows that use the tile width instead of stacking everything
@@ -439,14 +452,11 @@ export function PartyLobby({
           game" gap is gone. The pencil is a LINK to the shared
           name-editing page (/join?edit=name) — the in-tile edit form is
           gone (2t1.9). */}
-      <details
-        className="collapse collapse-arrow rounded-box border-2 border-base-300 bg-base-100"
-        open
-      >
-        <summary className="collapse-title flex items-center gap-2 text-sm font-black text-base-content/60">
+      <details className="group rounded-2xl border-2 border-border bg-surface" open>
+        <summary className="flex cursor-pointer list-none items-center gap-2 p-4 text-sm font-black text-foreground/60">
           Players ({state.members.length})
         </summary>
-        <div className="collapse-content">
+        <div className="p-4 pt-0">
           <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             {state.members.map((member, index) => {
               const roleLabel = roleLabels(member, state.amHost);
@@ -454,7 +464,7 @@ export function PartyLobby({
                 <li
                   key={member.memberId}
                   data-testid={`party-member-${member.memberId}`}
-                  className={`flex min-w-0 items-center gap-3 rounded-box border-2 bg-base-100 p-3.5 ${playerBorderColor(index)}`}
+                  className={`flex min-w-0 items-center gap-3 rounded-2xl border-2 bg-surface p-3.5 ${playerBorderColor(index)}`}
                 >
                   {/* Presence + identity on the left. */}
                   <div className="flex min-w-0 flex-1 items-center gap-2.5">
@@ -467,7 +477,7 @@ export function PartyLobby({
                     ) : (
                       <span
                         title="Disconnected"
-                        className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-error"
+                        className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-danger"
                         aria-hidden="true"
                       />
                     )}
@@ -476,13 +486,13 @@ export function PartyLobby({
                         {member.displayName}
                       </p>
                       {roleLabel !== "" ? (
-                        <p className="truncate text-xs font-semibold text-base-content/60">
+                        <p className="truncate text-xs font-semibold text-foreground/60">
                           {roleLabel}
                         </p>
                       ) : null}
                       {member.transferDetail !== null && member.transferState !== "complete" ? (
                         <p
-                          className="truncate text-xs leading-tight text-base-content/50"
+                          className="truncate text-xs leading-tight text-foreground/50"
                           title={member.transferDetail}
                         >
                           {member.transferDetail}
@@ -499,7 +509,7 @@ export function PartyLobby({
                       <Link
                         to="/join"
                         search={{ edit: "name" }}
-                        className={buttonStyles("default", "md", "btn-xs", true)}
+                        className={buttonStyles("default", "sm", undefined, true)}
                         aria-label="Edit your name"
                         title="Edit your name"
                       >
@@ -509,7 +519,7 @@ export function PartyLobby({
                     {state.amHost && !member.isSelf ? (
                       <button
                         type="button"
-                        className="btn btn-xs text-error"
+                        className={buttonStyles("danger", "sm", undefined, true)}
                         onClick={() => setKickPending(member.memberId)}
                         aria-label={`Kick ${member.displayName}`}
                       >
@@ -527,12 +537,18 @@ export function PartyLobby({
           relevant notice instead of a growing list of identical alerts.
           Colored alerts are outline-styled, never solid (9fv.11.3). */}
       {latestNotice !== null ? (
-        <div
+        <Alert
+          status={NOTICE_ALERT_STATUS[latestNotice.level]}
           role="alert"
-          className={`alert alert-outline ${NOTICE_ALERT_LEVELS[latestNotice.level]} mx-auto w-fit`}
+          className="mx-auto w-fit"
         >
-          <span className="text-sm font-semibold">{latestNotice.message}</span>
-        </div>
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description className="text-sm font-semibold">
+              {latestNotice.message}
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
       ) : null}
       <PartyDiagnosticsPanel
         diagnostics={state.diagnostics}
@@ -557,7 +573,7 @@ export function PartyLobby({
           aria-modal="true"
           aria-label="Party QR code"
         >
-          <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-box border-2 border-base-300 bg-base-100 p-5">
+          <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl border-2 border-border bg-surface p-5">
             <p className="font-black">Scan to join the party</p>
             <PartyInviteQr inviteUrl={state.inviteUrl} size={200} label={pageTitle ?? undefined} />
             <Button variant="default" soft onClick={() => setQrOpen(false)}>
@@ -573,9 +589,9 @@ export function PartyLobby({
           aria-modal="true"
           aria-label="Start before everyone is ready"
         >
-          <div className="flex w-full max-w-sm flex-col gap-4 rounded-box border-2 border-base-300 bg-base-100 p-5">
+          <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border-2 border-border bg-surface p-5">
             <p className="font-black">Start before everyone is ready?</p>
-            <p className="text-sm text-base-content/70">
+            <p className="text-sm text-foreground/70">
               Every player has the game, but not everyone has reported ready. Starting now means
               some players may miss the start signal. They can still rejoin.
             </p>
@@ -633,12 +649,12 @@ function PartyKickConfirm({
       aria-modal="true"
       aria-label="Kick a player from the party"
     >
-      <div className="flex w-full max-w-sm flex-col gap-4 rounded-box border-2 border-base-300 bg-base-100 p-5">
+      <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border-2 border-border bg-surface p-5">
         <p className="font-black">Kick {memberName} from the party?</p>
         <p className="text-sm">
           This removes them for now, not permanently. They can rejoin with the same private invite.
         </p>
-        <p className="text-sm text-base-content/70">
+        <p className="text-sm text-foreground/70">
           {memberName} will be removed from the party and will have to rejoin with the invite link.
         </p>
         <div className="flex justify-end gap-2">

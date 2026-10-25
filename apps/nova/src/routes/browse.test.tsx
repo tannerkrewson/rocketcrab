@@ -86,7 +86,7 @@ describe("/browse", () => {
     const classicBadges = screen.getAllByText("classic");
     expect(classicBadges.length).toBeGreaterThan(0);
     for (const badge of classicBadges) {
-      expect(badge.className).toContain("badge-error");
+      expect(badge.closest(".chip")).toHaveClass("chip--danger");
     }
   });
 
@@ -200,7 +200,7 @@ describe("/game/:gameId", () => {
       screen.getByText("drawing"),
       screen.getByText("easy"),
     ]) {
-      expect(badge.className).toContain("badge-soft");
+      expect(badge.closest(".chip")).toHaveClass("chip--soft");
     }
     // The game link + donation link sit right under the player count —
     // both before the Info/Guide tabs and the description body.

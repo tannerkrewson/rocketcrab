@@ -35,10 +35,12 @@ export function JoinFlow() {
             void navigate({ to: "/join", search: { edit: undefined } });
           }}
         >
-          <label htmlFor="player-name">Your player name</label>
+          <label htmlFor="player-name" className="text-sm font-bold">
+            Your player name
+          </label>
           <input
             id="player-name"
-            className="input w-full"
+            className="input input--primary w-full"
             value={name}
             onChange={(event) => setName(event.target.value)}
             maxLength={24}

@@ -353,7 +353,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(screen.queryByRole("dialog", { name: "About Drawphone" })).not.toBeInTheDocument();
   });
 
-  it("moves the dark/light/dice theme control into the Menu (i47)", async () => {
+  it("moves the light/dark/system theme control into the Menu (i47)", async () => {
     await renderShell(makeState());
     // No floating bottom-right control in the in-game shell anymore.
     expect(screen.queryByTestId("floating-theme-control")).not.toBeInTheDocument();
@@ -363,7 +363,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     // The theme control lives INSIDE the menu, below the menu items.
     expect(within(menu).getByRole("button", { name: "Light theme" })).toBeInTheDocument();
     expect(within(menu).getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
-    expect(within(menu).getByRole("button", { name: "Random theme" })).toBeInTheDocument();
+    expect(within(menu).getByRole("button", { name: "System theme" })).toBeInTheDocument();
     expect(screen.queryByTestId("floating-theme-control")).not.toBeInTheDocument();
   });
 

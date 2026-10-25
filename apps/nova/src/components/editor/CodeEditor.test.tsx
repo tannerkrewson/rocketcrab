@@ -39,30 +39,31 @@ describe("CodeEditor", () => {
     expect(editor?.parentElement).toHaveClass("h-full");
   });
 
-  it("maps CodeMirror surfaces to daisyUI variables and follows the app theme (Task 4)", async () => {
+  it("maps CodeMirror surfaces to HeroUI variables and follows the app theme", async () => {
     // Light default (no stored theme, jsdom has no dark preference).
     const { unmount } = render(
       <CodeEditor value="" onChange={() => {}} ariaLabel="Game HTML source" />,
     );
     await waitFor(() => expect(document.querySelector(".cm-theme-light")).not.toBeNull());
     const lightStyles = injectedStyles();
-    expect(lightStyles).toContain("var(--color-base-100)");
-    expect(lightStyles).toContain("var(--color-base-content)");
-    expect(lightStyles).toContain("var(--color-base-200)");
+    expect(lightStyles).toContain("var(--surface)");
+    expect(lightStyles).toContain("var(--foreground)");
+    expect(lightStyles).toContain("var(--surface-secondary)");
     unmount();
 
-    // Dark themes (daisyUI dark/dim/night/dracula + nova-dark): the editor
-    // switches to the dark base and the same CSS-variable mapping applies.
-    for (const darkTheme of ["dark", "dim", "night", "dracula", "nova-dark"]) {
+    // Dark mode: the editor switches to the dark base and the same
+    // CSS-variable mapping applies.
+    for (const darkTheme of ["dark"]) {
       window.localStorage.setItem(THEME_STORAGE_KEY, darkTheme);
+      document.documentElement.classList.add("dark");
       document.documentElement.setAttribute("data-theme", darkTheme);
       const { unmount: unmountDark } = render(
         <CodeEditor value="" onChange={() => {}} ariaLabel="Game HTML source" />,
       );
       await waitFor(() => expect(document.querySelector(".cm-theme-dark")).not.toBeNull());
-      expect(injectedStyles()).toContain("var(--color-base-100)");
-      expect(injectedStyles()).toContain("var(--color-base-content)");
-      expect(injectedStyles()).toContain("var(--color-base-200)");
+      expect(injectedStyles()).toContain("var(--surface)");
+      expect(injectedStyles()).toContain("var(--foreground)");
+      expect(injectedStyles()).toContain("var(--surface-secondary)");
       unmountDark();
     }
   });

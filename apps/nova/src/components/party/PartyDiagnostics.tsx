@@ -1,4 +1,7 @@
+import { Alert } from "@heroui/react";
 import { Activity, RefreshCw, Wifi } from "lucide-react";
+import { Badge } from "../ui/Badge";
+import { Button } from "../ui/Button";
 import { useState } from "react";
 import type { PartyDiagnostics } from "../../lib/party/engine";
 
@@ -53,18 +56,15 @@ export function PartyDiagnosticsPanel({
 
   return (
     <details
-      className="collapse collapse-arrow border-2 border-base-300 bg-base-100"
+      className="group rounded-2xl border-2 border-border bg-surface"
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >
-      <summary className="collapse-title flex items-center gap-2 text-sm font-bold">
+      <summary className="flex cursor-pointer list-none items-center gap-2 p-4 text-sm font-bold">
         <Activity className="h-4 w-4" aria-hidden="true" />
         Connection diagnostics
-        <span className="badge badge-ghost badge-sm">
-          {connectionLabel(diagnostics.connectionState)}
-        </span>
-        <span
-          className="badge badge-ghost badge-sm"
+        <Badge>{connectionLabel(diagnostics.connectionState)}</Badge>
+        <Badge
           title={
             relayCount === 0
               ? "No relay sockets observed yet"
@@ -72,34 +72,40 @@ export function PartyDiagnosticsPanel({
           }
         >
           {relayCount === 0 ? "0 relays" : `${usableRelays}/${relayCount} relays`}
-        </span>
+        </Badge>
         {relayHealth !== null && relayHealth.degraded ? (
-          <span className="badge badge-warning badge-sm" title="Usable relays below redundancy">
+          <Badge color="warning" title="Usable relays below redundancy">
             degraded
-          </span>
+          </Badge>
         ) : null}
       </summary>
-      <div className="collapse-content flex flex-col gap-2 text-xs">
+      <div className="flex flex-col gap-2 p-4 pt-0 text-xs">
         {relayHealth !== null && relayHealth.degraded ? (
-          <div role="alert" className="alert alert-outline alert-warning mx-auto w-fit text-xs">
-            <span>
-              Signaling degraded: {relayHealth.usable} of {relayHealth.total} relays usable —
-              connected relays are rejecting or throttling party messages.
-            </span>
-          </div>
+          <Alert status="warning" role="alert" className="mx-auto w-fit text-xs">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Description>
+                Signaling degraded: {relayHealth.usable} of {relayHealth.total} relays usable —
+                connected relays are rejecting or throttling party messages.
+              </Alert.Description>
+            </Alert.Content>
+          </Alert>
         ) : null}
         {relayHealth !== null && relayHealth.signalingDown ? (
-          <div role="alert" className="alert alert-outline alert-error mx-auto w-fit text-xs">
-            <span>No relay socket is open — signaling is down.</span>
-          </div>
+          <Alert status="danger" role="alert" className="mx-auto w-fit text-xs">
+            <Alert.Indicator />
+            <Alert.Content>
+              <Alert.Description>No relay socket is open — signaling is down.</Alert.Description>
+            </Alert.Content>
+          </Alert>
         ) : null}
         {hostNameForDiagnostics !== undefined || authorityName !== undefined ? (
-          <div className="flex flex-wrap gap-x-6 gap-y-1 font-mono text-base-content/70">
+          <div className="flex flex-wrap gap-x-6 gap-y-1 font-mono text-foreground/70">
             <span>party host: {hostNameForDiagnostics ?? "—"}</span>
             <span>authority: {authorityName ?? "—"}</span>
           </div>
         ) : null}
-        <div className="flex flex-wrap gap-x-6 gap-y-1 font-mono text-base-content/70">
+        <div className="flex flex-wrap gap-x-6 gap-y-1 font-mono text-foreground/70">
           <span>connection: {diagnostics.connectionState}</span>
           <span>connectionId: {diagnostics.selfConnectionId}</span>
           <span>room: {diagnostics.room}</span>
@@ -108,10 +114,10 @@ export function PartyDiagnosticsPanel({
         </div>
         {diagnostics.relays !== null ? (
           <div className="flex flex-col gap-1">
-            <span className="font-bold text-base-content/70">Relay sockets</span>
+            <span className="font-bold text-foreground/70">Relay sockets</span>
             <ul className="flex flex-col gap-1">
               {diagnostics.relays.length === 0 ? (
-                <li className="text-base-content/50">No relay sockets observed yet.</li>
+                <li className="text-foreground/50">No relay sockets observed yet.</li>
               ) : (
                 diagnostics.relays.map((relay) => (
                   <li key={relay.url} className="flex items-center gap-2">
@@ -124,14 +130,14 @@ export function PartyDiagnosticsPanel({
                         <Wifi className="h-3 w-3 text-warning" aria-hidden="true" />
                       </span>
                     ) : (
-                      <Wifi className="h-3 w-3 text-error" aria-hidden="true" />
+                      <Wifi className="h-3 w-3 text-danger" aria-hidden="true" />
                     )}
                     <span className="break-all">{relay.url}</span>
                     <span
                       className={`ml-auto whitespace-nowrap ${
                         relay.connected && relay.degraded
                           ? "font-bold text-warning"
-                          : "text-base-content/50"
+                          : "text-foreground/50"
                       }`}
                     >
                       {relay.connected && !relay.degraded
@@ -148,8 +154,8 @@ export function PartyDiagnosticsPanel({
         ) : null}
         {diagnostics.joinErrors !== null && diagnostics.joinErrors.length > 0 ? (
           <div className="flex flex-col gap-1">
-            <span className="font-bold text-base-content/70">Join errors</span>
-            <ul className="flex flex-col gap-1 text-error">
+            <span className="font-bold text-foreground/70">Join errors</span>
+            <ul className="flex flex-col gap-1 text-danger">
               {diagnostics.joinErrors.map((error, index) => (
                 <li key={`${error.category}-${index}`}>
                   {error.category}: {error.message}
@@ -160,7 +166,7 @@ export function PartyDiagnosticsPanel({
         ) : null}
         {diagnostics.lastQuality.length > 0 ? (
           <div className="flex flex-col gap-1">
-            <span className="font-bold text-base-content/70">Peer latency (last sample)</span>
+            <span className="font-bold text-foreground/70">Peer latency (last sample)</span>
             <ul className="flex flex-col gap-1">
               {diagnostics.lastQuality.map((sample) => (
                 <li key={`${sample.memberId}-${sample.sampledAt}`}>
@@ -171,15 +177,16 @@ export function PartyDiagnosticsPanel({
           </div>
         ) : null}
         <div className="mt-1">
-          <button
-            type="button"
-            className="btn btn-soft btn-xs font-bold"
+          <Button
+            size="sm"
+            variant="default"
+            soft
             onClick={onRefresh}
             title="Re-sample connection quality and relay state"
           >
             <RefreshCw className="h-3 w-3" aria-hidden="true" />
             Refresh
-          </button>
+          </Button>
         </div>
       </div>
     </details>

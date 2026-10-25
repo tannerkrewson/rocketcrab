@@ -1,13 +1,5 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import {
-  DARK_THEME_IDS,
-  DEFAULT_DARK_THEME_ID,
-  DEFAULT_LIGHT_THEME_ID,
-  LIGHT_THEME_IDS,
-  isDarkTheme,
-  isLightTheme,
-} from "../../lib/theme";
 import { ThemeSelector } from "./ThemeSelector";
 
 /** jsdom has no matchMedia; stub it so systemPrefersDark() is testable. */
@@ -24,99 +16,61 @@ function mockSystemDark(dark: boolean) {
   })) as typeof window.matchMedia;
 }
 
-describe("ThemeSelector (rocketcrab-9fv.7.45)", () => {
+describe("ThemeSelector (HeroUI light/dark/system)", () => {
   beforeEach(() => {
+    document.documentElement.classList.remove("dark");
     document.documentElement.removeAttribute("data-theme");
     window.localStorage.clear();
     vi.restoreAllMocks();
     mockSystemDark(false);
   });
 
-  it("defaults to light (system) with no stored theme and no override applied", () => {
+  it("shows three accessible icon-only controls", () => {
     render(<ThemeSelector />);
-    expect(screen.getByRole("button", { name: "Light theme" })).toHaveAttribute(
+    for (const name of ["Light theme", "Dark theme", "System theme"]) {
+      expect(screen.getByRole("button", { name })).toHaveAttribute("aria-pressed");
+    }
+  });
+
+  it("marks the system option as pressed by default", () => {
+    render(<ThemeSelector />);
+    expect(screen.getByRole("button", { name: "System theme" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    expect(screen.getByRole("button", { name: "Dark theme" })).toHaveAttribute(
-      "aria-pressed",
-      "false",
-    );
-    expect(document.documentElement.hasAttribute("data-theme")).toBe(false);
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
   });
 
-  it("is icon-only with no visible Light/Dark labels (7.47)", () => {
-    render(<ThemeSelector />);
-    expect(screen.queryByText("Light")).not.toBeInTheDocument();
-    expect(screen.queryByText("Dark")).not.toBeInTheDocument();
-    // The controls stay keyboard- and screen-reader accessible via labels.
-    expect(screen.getByRole("button", { name: "Light theme" })).toHaveAttribute(
-      "title",
-      "Light theme",
-    );
-    expect(screen.getByRole("button", { name: "Dark theme" })).toHaveAttribute(
-      "title",
-      "Dark theme",
-    );
-    expect(screen.getByRole("button", { name: "Random theme" })).toBeInTheDocument();
-  });
-
-  it("defaults to dark when the system prefers dark and nothing is stored", () => {
-    mockSystemDark(true);
-    render(<ThemeSelector />);
-    expect(screen.getByRole("button", { name: "Dark theme" })).toHaveAttribute(
-      "aria-pressed",
-      "true",
-    );
-  });
-
-  it("applies and persists Nova's dark theme when Dark is picked", () => {
+  it("applies and persists dark mode", () => {
     render(<ThemeSelector />);
     fireEvent.click(screen.getByRole("button", { name: "Dark theme" }));
-    expect(document.documentElement.getAttribute("data-theme")).toBe(DEFAULT_DARK_THEME_ID);
-    expect(window.localStorage.getItem("nova.theme")).toBe(DEFAULT_DARK_THEME_ID);
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
+    expect(window.localStorage.getItem("nova.theme")).toBe("dark");
   });
 
-  it("applies and persists Nova's light theme when Light is picked", () => {
-    window.localStorage.setItem("nova.theme", "dracula");
+  it("applies and persists light mode", () => {
+    window.localStorage.setItem("nova.theme", "dark");
     render(<ThemeSelector />);
     fireEvent.click(screen.getByRole("button", { name: "Light theme" }));
-    expect(document.documentElement.getAttribute("data-theme")).toBe(DEFAULT_LIGHT_THEME_ID);
-    expect(window.localStorage.getItem("nova.theme")).toBe(DEFAULT_LIGHT_THEME_ID);
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
+    expect(window.localStorage.getItem("nova.theme")).toBe("light");
   });
 
-  it("rolls a random light theme matching the light mode and persists it", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
+  it("system removes the stored override", () => {
+    window.localStorage.setItem("nova.theme", "dark");
     render(<ThemeSelector />);
-    fireEvent.click(screen.getByRole("button", { name: "Random theme" }));
-    const applied = document.documentElement.getAttribute("data-theme");
-    expect(applied).not.toBeNull();
-    expect(applied).toBe(window.localStorage.getItem("nova.theme"));
-    expect(isLightTheme(applied ?? "")).toBe(true);
-    expect(applied).not.toBe(DEFAULT_LIGHT_THEME_ID);
-    expect(LIGHT_THEME_IDS).toContain(applied);
+    fireEvent.click(screen.getByRole("button", { name: "System theme" }));
+    expect(window.localStorage.getItem("nova.theme")).toBeNull();
+    expect(document.documentElement.classList.contains("dark")).toBe(false);
   });
 
-  it("rolls a random dark theme matching the dark mode and persists it", () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.5);
-    render(<ThemeSelector />);
-    fireEvent.click(screen.getByRole("button", { name: "Dark theme" }));
-    fireEvent.click(screen.getByRole("button", { name: "Random theme" }));
-    const applied = document.documentElement.getAttribute("data-theme");
-    expect(applied).not.toBeNull();
-    expect(applied).toBe(window.localStorage.getItem("nova.theme"));
-    expect(isDarkTheme(applied ?? "")).toBe(true);
-    expect(applied).not.toBe(DEFAULT_DARK_THEME_ID);
-    expect(DARK_THEME_IDS).toContain(applied);
-  });
-
-  it("reflects a persisted random theme on mount", () => {
-    window.localStorage.setItem("nova.theme", "synthwave");
+  it("reflects a persisted dark preference on mount", () => {
+    window.localStorage.setItem("nova.theme", "dark");
     render(<ThemeSelector />);
     expect(screen.getByRole("button", { name: "Dark theme" })).toHaveAttribute(
       "aria-pressed",
       "true",
     );
-    expect(document.documentElement.getAttribute("data-theme")).toBe("synthwave");
+    expect(document.documentElement.classList.contains("dark")).toBe(true);
   });
 });

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { toast } from "sonner";
+import { toast } from "../lib/toast";
 import { ArrowLeft, Gamepad2, PlusCircle, Search } from "lucide-react";
 import { gameMatchesQuery, type SavedGame } from "@rocketcrab/core";
 import { GameCard } from "../components/games/GameCard";
@@ -47,7 +47,7 @@ export function LibraryPage() {
       { id },
       {
         onSuccess: (game) => toast.success(`Duplicated as “${game.title}”.`),
-        onError: (error) => toast.error(errorMessage(error)),
+        onError: (error) => toast.danger(errorMessage(error)),
       },
     );
   };
@@ -58,7 +58,7 @@ export function LibraryPage() {
     setPendingDelete(null);
     deleteGame.mutate(game.id, {
       onSuccess: () => toast.success(`Deleted “${game.title}”.`),
-      onError: (error) => toast.error(errorMessage(error)),
+      onError: (error) => toast.danger(errorMessage(error)),
     });
   };
 
@@ -81,7 +81,7 @@ export function LibraryPage() {
 
       <div className="relative">
         <Search
-          className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-base-content/40"
+          className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-foreground/40"
           aria-hidden="true"
         />
         <input
@@ -90,7 +90,7 @@ export function LibraryPage() {
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search your games…"
           aria-label="Search your games"
-          className="input input-bordered w-full pl-10"
+          className="input input--primary w-full pl-10"
         />
       </div>
 

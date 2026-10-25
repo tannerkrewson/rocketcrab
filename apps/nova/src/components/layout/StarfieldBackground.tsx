@@ -84,7 +84,7 @@ export function StarfieldBackground({ engine }: { engine?: PartyEngine }) {
         className="pointer-events-none fixed inset-0 z-0"
       >
         {STARS.map((star, index) => (
-          <span key={index} className="rc-star bg-base-content" style={star} />
+          <span key={index} className="rc-star bg-foreground" style={star} />
         ))}
       </div>
     </>

@@ -12,8 +12,8 @@ import { routeTree } from "../routeTree.gen";
  * Build-page gateway tests (rocketcrab-9fv.10.11 / 2t1.7, hero redesigned
  * 5cl.16, split into two pages gmo): /build opens with ONE hero card — the
  * non-glow rocketcrab mark over the "Introducing Nova" headline (Nova in
- * the info color) with the nova-colored "Get started" CTA (btn-info +
- * glow) — then introduces the flow in three steps. ?page=prompt shows the
+ * the brand color) with the boosted "Get started" CTA — then introduces the
+ * flow in three steps. ?page=prompt shows the
  * master-prompt step: the copyable master prompt, the Nova example games
  * (wks), and the Open the editor entry point (7.44).
  */
@@ -55,10 +55,10 @@ describe("/build — page 1 (hero)", () => {
     renderBuild();
 
     const hero = await screen.findByTestId("build-hero");
-    expect(hero.className).toContain("rounded-box");
+    expect(hero.className).toContain("rounded-2xl");
     // kqo: no nova-colored outline on the card — a plain neutral border.
-    expect(hero.className).toContain("border-base-300");
-    expect(hero.className).not.toContain("border-info");
+    expect(hero.className).toContain("border-border");
+    expect(hero.className).not.toContain("border-accent");
 
     // The non-glow rocketcrab mark sits above the headline.
     const logo = hero.querySelector("img");
@@ -71,7 +71,7 @@ describe("/build — page 1 (hero)", () => {
       await within(hero).findByRole("heading", { name: "Introducing Nova" }),
     ).toBeInTheDocument();
     // Nova is colored with the brand/info color, not primary.
-    expect(within(hero).getByText("Nova").className).toContain("text-info");
+    expect(within(hero).getByText("Nova").className).toContain("text-accent");
 
     expect(
       screen.getByText("Turn any idea into a game your friends can play."),
@@ -80,7 +80,7 @@ describe("/build — page 1 (hero)", () => {
     // gmo: the nova-colored Get started CTA steps to the prompt page.
     const cta = within(hero).getByRole("link", { name: "Get started" });
     expect(cta.getAttribute("href")).toBe("/build?page=prompt");
-    expect(cta.className).toContain("btn-info");
+    expect(cta.className).toContain("button--primary");
     expect(cta.className).toContain("drop-shadow");
 
     // The brand row no longer tops this page (5cl.16) and the intro page
@@ -156,7 +156,7 @@ describe("/build?page=prompt — the master-prompt step", () => {
 
     const editor = screen.getByRole("link", { name: "Open the editor" });
     expect(editor.getAttribute("href")).toBe("/editor");
-    expect(editor.className).toContain("btn-info");
+    expect(editor.className).toContain("button--primary");
 
     // No paste box on the build page — the editor is the paste target.
     expect(screen.queryByRole("textbox", { name: "Paste game HTML" })).not.toBeInTheDocument();

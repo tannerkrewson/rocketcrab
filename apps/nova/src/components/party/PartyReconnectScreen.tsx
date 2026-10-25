@@ -24,9 +24,9 @@ export function PartyReconnectScreen({ state, onReconnect, onLeave }: PartyRecon
     <div className="mx-auto flex w-full max-w-md flex-col items-center gap-4 py-10 text-center">
       <WifiOff className="h-12 w-12 text-warning" aria-hidden="true" />
       <h1 className="text-2xl font-black">Connection lost</h1>
-      <p className="text-base-content/70">{state.phaseDetail}</p>
+      <p className="text-foreground/70">{state.phaseDetail}</p>
       {attempts > 0 ? (
-        <p className="text-sm font-semibold text-base-content/60" aria-live="polite">
+        <p className="text-sm font-semibold text-foreground/60" aria-live="polite">
           {attempts === 1 ? "First reconnect attempt…" : `Reconnect attempt ${attempts}`}
           {" · "}
           <span className="text-warning">retrying automatically</span>
@@ -56,7 +56,7 @@ export function PartyReconnectScreen({ state, onReconnect, onLeave }: PartyRecon
           Leave party
         </Button>
       </div>
-      <p className="text-xs text-base-content/50">
+      <p className="text-xs text-foreground/50">
         {state.connectionState === "suspended"
           ? "Your connection was suspended (phone backgrounding or a network switch). Rejoining with a fresh connection."
           : "Backgrounding a phone can drop the connection; the party stays open while you reconnect."}

@@ -1,3 +1,4 @@
+import { Spinner } from "@heroui/react";
 import { cn } from "../../lib/cn";
 
 export interface LoadingStateProps {
@@ -5,18 +6,15 @@ export interface LoadingStateProps {
   className?: string;
 }
 
-/** Simple loading placeholder with a spinner and optional label. */
+/** HeroUI spinner with an optional label. */
 export function LoadingState({ label = "Loading…", className }: LoadingStateProps) {
   return (
     <div
       role="status"
       aria-live="polite"
-      className={cn(
-        "flex flex-col items-center justify-center gap-3 p-8 text-base-content/70",
-        className,
-      )}
+      className={cn("flex flex-col items-center justify-center gap-3 p-8 text-muted", className)}
     >
-      <span className="loading loading-spinner loading-lg text-primary" aria-hidden="true" />
+      <Spinner aria-hidden="true" />
       <p className="text-sm font-semibold">{label}</p>
       <span className="sr-only">Loading</span>
     </div>

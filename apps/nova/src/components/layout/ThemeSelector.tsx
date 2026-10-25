@@ -1,84 +1,58 @@
-import { Dices, Moon, Sun } from "lucide-react";
+import { Monitor, Moon, Sun } from "lucide-react";
 import { useEffect, useState } from "react";
-import { cn } from "../../lib/cn";
+import { Button } from "../ui/Button";
 import {
-  DEFAULT_DARK_THEME_ID,
-  DEFAULT_LIGHT_THEME_ID,
   applyTheme,
-  currentThemeMode,
   getStoredTheme,
   initTheme,
-  randomThemeForMode,
+  resolvedTheme,
   setTheme,
-  type ThemeMode,
+  type ThemePreference,
 } from "../../lib/theme";
 
 // Apply the persisted theme before first paint (see lib/theme.ts).
 initTheme();
 
+const options: { preference: ThemePreference; label: string; icon: typeof Sun }[] = [
+  { preference: "light", label: "Light theme", icon: Sun },
+  { preference: "dark", label: "Dark theme", icon: Moon },
+  { preference: "system", label: "System theme", icon: Monitor },
+];
+
 /**
- * Theme picker (rocketcrab-9fv.7.45, icon-only since 7.47): a light/dark
- * toggle plus a dice that rolls a random theme from the pool matching the
- * current mode. The toggle applies Nova's default theme for the mode; both
- * choices persist via lib/theme.ts, so they survive reloads. Buttons are
- * icon-only (aria-labels/titles keep them accessible) so the control stays
- * compact in the top bar.
+ * Light/dark/system theme switcher (HeroUI controls the visuals; no theme
+ * catalogue is bundled). Icon-only controls stay compact in the top bar while
+ * keeping accessible labels.
  */
 export function ThemeSelector() {
-  const [mode, setMode] = useState<ThemeMode>(() => currentThemeMode());
+  const [preference, setPreference] = useState<ThemePreference>(() => getStoredTheme());
 
-  // Re-apply the persisted theme on mount so the selector is self-contained
-  // even when initTheme ran before the persisted value existed (tests, hot
-  // reload).
+  // Re-apply on mount so the selector is self-contained even when initTheme
+  // ran before the persisted value existed (tests, hot reload).
   useEffect(() => {
-    applyTheme(getStoredTheme());
-  }, []);
+    applyTheme(resolvedTheme(preference));
+  }, [preference]);
 
-  const selectMode = (next: ThemeMode) => {
-    setMode(next);
-    setTheme(next === "dark" ? DEFAULT_DARK_THEME_ID : DEFAULT_LIGHT_THEME_ID);
+  const select = (next: ThemePreference) => {
+    setPreference(next);
+    setTheme(next);
   };
-
-  const rollDice = () => {
-    // The dice pool always matches `mode`, so the mode itself doesn't change.
-    setTheme(randomThemeForMode(mode));
-  };
-
-  const isDark = mode === "dark";
 
   return (
-    <div className="flex items-center gap-2" role="group" aria-label="Theme">
-      <div className="join">
-        <button
-          type="button"
-          aria-pressed={!isDark}
-          aria-label="Light theme"
-          title="Light theme"
-          onClick={() => selectMode("light")}
-          className={cn("btn btn-sm join-item", !isDark && "btn-primary")}
+    <div className="flex items-center gap-1" role="group" aria-label="Theme">
+      {options.map(({ preference: value, label, icon: Icon }) => (
+        <Button
+          key={value}
+          size="sm"
+          variant={preference === value ? "secondary" : "tertiary"}
+          isIconOnly
+          aria-pressed={preference === value}
+          aria-label={label}
+          onPress={() => select(value)}
         >
-          <Sun className="h-4 w-4" aria-hidden="true" />
-        </button>
-        <button
-          type="button"
-          aria-pressed={isDark}
-          aria-label="Dark theme"
-          title="Dark theme"
-          onClick={() => selectMode("dark")}
-          className={cn("btn btn-sm join-item", isDark && "btn-primary")}
-        >
-          <Moon className="h-4 w-4" aria-hidden="true" />
-        </button>
-      </div>
-      <button
-        type="button"
-        onClick={rollDice}
-        aria-label="Random theme"
-        title="Random theme"
-        className="btn btn-sm btn-circle border-2 border-base-300"
-      >
-        <Dices className="h-4 w-4" aria-hidden="true" />
-      </button>
+          <Icon className="h-4 w-4" aria-hidden="true" />
+        </Button>
+      ))}
     </div>
   );
 }

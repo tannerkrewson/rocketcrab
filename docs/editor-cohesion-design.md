@@ -1,7 +1,10 @@
 # Editor cohesion design — third-pass polish
 
-Status: design for implementation (task 9fv.10.12). Read `AGENTS.md` first (no
-`btn-ghost`; use `Button`/`buttonStyles` for links).
+Status: historical design record (task 9fv.10.12). **Superseded styling:** the
+UI now uses HeroUI v3 instead of daisyUI (simplification stage 6), so the
+daisyUI class names and 35-theme references below describe the original
+implementation, not current code. Read `AGENTS.md` first (no ghost buttons;
+use `Button`/`buttonStyles` for links).
 
 ## OPEN QUESTIONS
 

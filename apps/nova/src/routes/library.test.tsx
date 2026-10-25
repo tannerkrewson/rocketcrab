@@ -58,15 +58,15 @@ describe("/library", () => {
     expect(backs).toHaveLength(1);
     const back = backs[0];
     expect(back!.getAttribute("href")).toBe("/");
-    expect(back!.className).toContain("btn-soft");
+    expect(back!.className).toContain("button--tertiary");
     expect(back!.className).toContain("self-start");
     expect(screen.queryByRole("link", { name: /Browse games/ })).not.toBeInTheDocument();
 
     // The header action is "New game" (renamed from "Build a game").
     const build = screen.getByRole("link", { name: "New game" });
     expect(build.getAttribute("href")).toBe("/build");
-    expect(build.className).toContain("btn-primary");
-    expect(build.className).toContain("btn-lg");
+    expect(build.className).toContain("button--primary");
+    expect(build.className).toContain("button--lg");
   });
 
   it("lists saved games with their metadata", async () => {

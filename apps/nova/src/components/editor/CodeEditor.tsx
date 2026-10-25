@@ -10,7 +10,7 @@ export interface CodeEditorProps {
 }
 
 /**
- * EditorView.theme mapping CodeMirror surfaces to daisyUI CSS variables so
+ * EditorView.theme mapping CodeMirror surfaces to HeroUI CSS variables so
  * the editor blends with whichever of the app's themes is active: the root
  * uses the page background/text, and gutters + the active line use the
  * slightly-lighter base-200 surface. The variables live on `:root` under
@@ -20,14 +20,14 @@ export interface CodeEditorProps {
  */
 const themeSpec = {
   "&": {
-    backgroundColor: "var(--color-base-100)",
-    color: "var(--color-base-content)",
+    backgroundColor: "var(--surface)",
+    color: "var(--foreground)",
   },
   ".cm-gutters": {
-    backgroundColor: "var(--color-base-200)",
+    backgroundColor: "var(--surface-secondary)",
   },
   ".cm-activeLine": {
-    backgroundColor: "var(--color-base-200)",
+    backgroundColor: "var(--surface-secondary)",
   },
 };
 

@@ -9,7 +9,7 @@ export interface PagePlaceholderProps {
   className?: string;
 }
 
-/** Temporary styled placeholder for routes built out by later issues. */
+/** Styled placeholder for routes still being built out. */
 export function PagePlaceholder({
   title,
   description,
@@ -20,7 +20,7 @@ export function PagePlaceholder({
   return (
     <section
       className={cn(
-        "flex flex-col items-center justify-center gap-3 rounded-box border-2 border-base-300 bg-base-100 px-6 py-14 text-center",
+        "flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-border bg-surface px-6 py-14 text-center",
         className,
       )}
     >
@@ -30,7 +30,7 @@ export function PagePlaceholder({
         </div>
       ) : null}
       <h1 className="text-2xl font-black">{title}</h1>
-      {description ? <p className="max-w-md text-base-content/70">{description}</p> : null}
+      {description ? <p className="max-w-md text-muted">{description}</p> : null}
       {children}
     </section>
   );

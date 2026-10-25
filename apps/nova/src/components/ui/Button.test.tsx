@@ -3,44 +3,57 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import { Button, buttonStyles } from "./Button";
 
-describe("Button", () => {
-  it("renders with default variant and fires onClick", async () => {
+describe("Button (HeroUI)", () => {
+  it("renders and fires onClick", async () => {
     const user = userEvent.setup();
     const onClick = vi.fn();
     render(<Button onClick={onClick}>Launch</Button>);
-
     const button = screen.getByRole("button", { name: "Launch" });
-    expect(button).toBeInTheDocument();
-    expect(button).toHaveClass("btn", "btn-primary", "btn-md");
-
+    expect(button).toHaveClass("button", "button--primary", "button--md");
     await user.click(button);
     expect(onClick).toHaveBeenCalledTimes(1);
   });
 
-  it("applies variant and size classes", () => {
+  it("maps intent and size to HeroUI variants", () => {
     render(
       <Button variant="secondary" size="lg">
         Big
       </Button>,
     );
-    expect(screen.getByRole("button", { name: "Big" })).toHaveClass("btn-secondary", "btn-lg");
+    expect(screen.getByRole("button", { name: "Big" })).toHaveClass(
+      "button--secondary",
+      "button--lg",
+    );
   });
 
-  it("applies the default variant (plain btn; the old neutral is gone, 5cl.5)", () => {
+  it("maps default to the neutral secondary variant", () => {
     render(<Button variant="default">Default</Button>);
-    expect(screen.getByRole("button", { name: "Default" })).toHaveClass("btn");
-    expect(screen.getByRole("button", { name: "Default" })).not.toHaveClass("btn-neutral");
+    expect(screen.getByRole("button", { name: "Default" })).toHaveClass("button--secondary");
   });
 
-  it("applies the soft style when soft is set (2t1.8)", () => {
+  it("maps soft intents to tinted HeroUI variants", () => {
     render(<Button soft>Soft</Button>);
-    expect(screen.getByRole("button", { name: "Soft" })).toHaveClass("btn-soft");
-    expect(screen.getByRole("button", { name: "Soft" })).toHaveClass("btn-primary");
+    expect(screen.getByRole("button", { name: "Soft" })).toHaveClass("button--secondary");
+    render(
+      <Button variant="danger" soft>
+        Remove
+      </Button>,
+    );
+    expect(screen.getByRole("button", { name: "Remove" })).toHaveClass("button--danger-soft");
   });
 
-  it("keeps the solid look when soft is unset (backward compatible)", () => {
-    render(<Button variant="default">Solid</Button>);
-    expect(screen.getByRole("button", { name: "Solid" })).not.toHaveClass("btn-soft");
+  it("accepts disabled as an alias for isDisabled", async () => {
+    const user = userEvent.setup();
+    const onClick = vi.fn();
+    render(
+      <Button disabled onClick={onClick}>
+        Disabled
+      </Button>,
+    );
+    const button = screen.getByRole("button", { name: "Disabled" });
+    expect(button).toBeDisabled();
+    await user.click(button);
+    expect(onClick).not.toHaveBeenCalled();
   });
 
   it("merges a custom className", () => {
@@ -48,18 +61,10 @@ describe("Button", () => {
     expect(screen.getByRole("button", { name: "Wide" })).toHaveClass("w-full");
   });
 
-  it("buttonStyles returns mergeable class string for links", () => {
-    expect(buttonStyles("primary", "lg", "px-8")).toContain("btn-primary");
-    expect(buttonStyles("primary", "lg", "px-8")).toContain("btn-lg");
+  it("buttonStyles returns the same classes for router links", () => {
+    expect(buttonStyles("primary", "lg", "px-8")).toContain("button--primary");
+    expect(buttonStyles("primary", "lg", "px-8")).toContain("button--lg");
     expect(buttonStyles("primary", "lg", "px-8")).toContain("px-8");
-  });
-
-  it("buttonStyles appends btn-soft for the soft flag (2t1.8)", () => {
-    expect(buttonStyles("default", "lg", undefined, true)).toContain("btn-soft");
-    expect(buttonStyles("default", "lg", undefined, true)).not.toContain("btn-neutral");
-    expect(buttonStyles("primary", "lg", "px-8", true)).toContain("btn-primary");
-    expect(buttonStyles("primary", "lg", "px-8", true)).toContain("btn-soft");
-    expect(buttonStyles("primary", "lg", "px-8", true)).toContain("px-8");
-    expect(buttonStyles("primary", "lg", "px-8")).not.toContain("btn-soft");
+    expect(buttonStyles("danger", "sm", undefined, true)).toContain("button--danger-soft");
   });
 });

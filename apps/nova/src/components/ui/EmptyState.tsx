@@ -14,7 +14,7 @@ export function EmptyState({ icon, title, description, action, className }: Empt
   return (
     <div
       className={cn(
-        "flex flex-col items-center justify-center gap-3 rounded-box border-2 border-dashed border-base-300 bg-base-100 p-8 text-center",
+        "flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-dashed border-border bg-surface p-8 text-center",
         className,
       )}
     >
@@ -24,7 +24,7 @@ export function EmptyState({ icon, title, description, action, className }: Empt
         </div>
       ) : null}
       <p className="text-lg font-bold">{title}</p>
-      {description ? <p className="max-w-sm text-base-content/70">{description}</p> : null}
+      {description ? <p className="max-w-sm text-muted">{description}</p> : null}
       {action ? <div className="mt-2">{action}</div> : null}
     </div>
   );

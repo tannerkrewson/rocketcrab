@@ -9,8 +9,9 @@ import {
   Terminal,
   Users,
 } from "lucide-react";
+import { Badge } from "../ui/Badge";
 import { useEffect, useState, type ReactNode } from "react";
-import { toast } from "sonner";
+import { toast } from "../../lib/toast";
 import type { BrowseEntry } from "../../lib/browse";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import { cn } from "../../lib/cn";
@@ -56,7 +57,7 @@ type PlayShellPanel = "menu" | "players" | "browse" | "logs" | null;
  * The menu (9fv.11.11) holds Browse games (host only — picking a game
  * while playing ends it for everyone) and About this game (the party's
  * in-game details overlay), and since i47
- * the dark/light/dice theme control lives at the bottom of the same menu
+ * the light/dark/system theme control lives at the bottom of the same menu
  * (the in-game shell no longer has a floating copy); leaving the
  * party happens back in the lobby. ch6: the in-game mark is the
  * non-glowing brand logo, sized up without growing the bar. Minimal
@@ -110,7 +111,7 @@ export function PartyPlayShell({
     if (ok) {
       toast.success("Invite link copied.");
     } else {
-      toast.error("Couldn't copy the invite link.");
+      toast.danger("Couldn't copy the invite link.");
     }
   };
 
@@ -122,7 +123,7 @@ export function PartyPlayShell({
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-black" data-testid="party-play-view">
       {!barHidden ? (
-        <header className="relative z-50 flex items-center gap-2 border-b-2 border-base-300 bg-base-100 px-3 pb-2 pt-safe">
+        <header className="relative z-50 flex items-center gap-2 border-b-2 border-border bg-surface px-3 pb-2 pt-safe">
           {/* 5cl.14: while the navbar is showing, the logo sits bare on the
               bar — no btn background/border/shadow (that chrome only
               returns on the floating collapsed-mode logo below). hover/
@@ -130,22 +131,23 @@ export function PartyPlayShell({
               tappable. ch6: the in-game mark is the non-glowing brand
               logo, sized up without growing the bar (the btn-sm box
               already fixes the bar row's height). */}
-          <button
-            type="button"
-            className="btn btn-sm shrink-0 border-transparent bg-transparent shadow-none hover:bg-base-200 active:bg-base-300"
+          <Button
+            size="sm"
+            variant="tertiary"
+            className="shrink-0"
             onClick={() => setBarHidden(true)}
             aria-label="Hide the top bar"
             title="Hide the top bar"
           >
             <BrandLogo variant="no-glow" size={26} className="shrink-0" />
-          </button>
+          </Button>
 
           <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <button
               type="button"
               // 0dd: the URL gets the same press feedback as the homepage
               // title (rocketcrab-2t1.8) — scale down while pressed.
-              className="font-title whitespace-nowrap text-lg font-black text-base-content transition-transform active:scale-95 md:text-xl"
+              className="font-title whitespace-nowrap text-lg font-black text-foreground transition-transform active:scale-95 md:text-xl"
               onClick={() => void copyInvite()}
               disabled={state.inviteUrl === null}
               title={state.inviteUrl === null ? roomUrl : "Copy the invite link"}
@@ -161,21 +163,22 @@ export function PartyPlayShell({
               in every theme — btn-outline draws a base-content border and
               label (the default btn fill is base-200, near-invisible on
               dark themes like the default one). */}
-          <button
-            type="button"
-            className="btn btn-sm btn-outline shrink-0"
+          <Button
+            size="sm"
+            variant="outline"
+            className="shrink-0"
             aria-expanded={menuOpen}
             onClick={() => setPanel(menuOpen ? null : "menu")}
           >
             <Menu className="h-4 w-4" aria-hidden="true" />
             Menu
-          </button>
+          </Button>
 
           {/* 7.38: the menu is a compact dropdown directly under the Menu
               button, sized to its content and flush with the top bar. */}
           {menuOpen ? (
             <ul
-              className="absolute right-0 top-full z-50 flex w-max min-w-56 flex-col rounded-b-box border-2 border-t-0 border-base-300 bg-base-100 p-1.5 shadow-lg"
+              className="absolute right-0 top-full z-50 flex w-max min-w-56 flex-col rounded-b-box border-2 border-t-0 border-border bg-surface p-1.5 shadow-lg"
               role="menu"
               aria-label="Game menu"
             >
@@ -183,7 +186,7 @@ export function PartyPlayShell({
                 <button
                   type="button"
                   role="menuitem"
-                  className="flex w-full items-center gap-2 rounded-box px-3 py-2 text-sm font-bold hover:bg-base-200"
+                  className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold hover:bg-surface-secondary"
                   onClick={() => setPanel("players")}
                 >
                   <Users className="h-4 w-4" aria-hidden="true" />
@@ -198,7 +201,7 @@ export function PartyPlayShell({
                   <button
                     type="button"
                     role="menuitem"
-                    className="flex w-full items-center gap-2 rounded-box px-3 py-2 text-sm font-bold hover:bg-base-200"
+                    className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold hover:bg-surface-secondary"
                     onClick={() => setPanel("browse")}
                   >
                     <Gamepad2 className="h-4 w-4" aria-hidden="true" />
@@ -210,7 +213,7 @@ export function PartyPlayShell({
                 <button
                   type="button"
                   role="menuitem"
-                  className="flex w-full items-center gap-2 rounded-box px-3 py-2 text-sm font-bold hover:bg-base-200"
+                  className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold hover:bg-surface-secondary"
                   onClick={() => {
                     setPanel(null);
                     setDetailsOpen(true);
@@ -228,7 +231,7 @@ export function PartyPlayShell({
                   <button
                     type="button"
                     role="menuitem"
-                    className="flex w-full items-center gap-2 rounded-box px-3 py-2 text-sm font-bold hover:bg-base-200"
+                    className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold hover:bg-surface-secondary"
                     onClick={() => setPanel("logs")}
                   >
                     <Terminal className="h-4 w-4" aria-hidden="true" />
@@ -240,7 +243,7 @@ export function PartyPlayShell({
                 <button
                   type="button"
                   role="menuitem"
-                  className="flex w-full items-center gap-2 rounded-box px-3 py-2 text-sm font-bold hover:bg-base-200"
+                  className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold hover:bg-surface-secondary"
                   onClick={() => {
                     setPanel(null);
                     onReloadMyGame();
@@ -255,7 +258,7 @@ export function PartyPlayShell({
                   <button
                     type="button"
                     role="menuitem"
-                    className="flex w-full items-center gap-2 rounded-box px-3 py-2 text-sm font-bold text-error hover:bg-base-200"
+                    className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold text-danger hover:bg-surface-secondary"
                     onClick={() => {
                       setPanel(null);
                       setConfirmReloadAll(true);
@@ -271,7 +274,7 @@ export function PartyPlayShell({
                   <button
                     type="button"
                     role="menuitem"
-                    className="flex w-full items-center gap-2 rounded-box px-3 py-2 text-sm font-bold text-error hover:bg-base-200"
+                    className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold text-danger hover:bg-surface-secondary"
                     onClick={() => {
                       setPanel(null);
                       setConfirmEnd(true);
@@ -282,10 +285,10 @@ export function PartyPlayShell({
                   </button>
                 </li>
               ) : null}
-              {/* i47: the dark/light/dice theme control lives INSIDE the
+              {/* i47: the light/dark/system theme control lives INSIDE the
                   menu now (below every menu item) — the in-game shell's
                   old floating bottom-right control is gone. */}
-              <li role="separator" aria-hidden="true" className="my-1 border-t-2 border-base-300" />
+              <li role="separator" aria-hidden="true" className="my-1 border-t-2 border-border" />
               <li>
                 <div className="flex items-center justify-center px-3 py-1.5">
                   <ThemeSelector />
@@ -316,20 +319,20 @@ export function PartyPlayShell({
               data-testid="players-popup-backdrop"
             />
             <div
-              className="absolute left-1/2 top-3 z-50 flex max-h-[calc(100%-1.5rem)] w-[min(28rem,calc(100%-1.5rem))] -translate-x-1/2 flex-col overflow-hidden rounded-box border-2 border-base-300 bg-base-100 shadow-xl"
+              className="absolute left-1/2 top-3 z-50 flex max-h-[calc(100%-1.5rem)] w-[min(28rem,calc(100%-1.5rem))] -translate-x-1/2 flex-col overflow-hidden rounded-2xl border-2 border-border bg-surface shadow-xl"
               role="dialog"
               aria-label="Players"
             >
-              <div className="flex items-center gap-2 border-b-2 border-base-300 px-3 py-2">
-                <button
-                  type="button"
-                  className="btn btn-sm"
+              <div className="flex items-center gap-2 border-b-2 border-border px-3 py-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
                   onClick={() => setPanel(null)}
                   aria-label="Back to the game"
                 >
                   <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                   Back
-                </button>
+                </Button>
                 <p className="font-black">Players ({state.members.length})</p>
                 <div className="min-w-0 flex-1" />
               </div>
@@ -338,28 +341,27 @@ export function PartyPlayShell({
                   {state.members.map((member) => (
                     <li
                       key={member.memberId}
-                      className="flex items-center gap-2 rounded-box border-2 border-base-300 bg-base-100 px-3 py-2 text-sm"
+                      className="flex items-center gap-2 rounded-2xl border-2 border-border bg-surface px-3 py-2 text-sm"
                     >
                       <span className="min-w-0 flex-1 truncate font-bold">
                         {member.displayName}
-                        {member.isSelf ? (
-                          <span className="text-base-content/50"> (you)</span>
-                        ) : null}
+                        {member.isSelf ? <span className="text-foreground/50"> (you)</span> : null}
                       </span>
                       {member.connected ? (
-                        <span className="badge badge-success badge-sm">Connected</span>
+                        <Badge color="success">Connected</Badge>
                       ) : (
-                        <span className="badge badge-error badge-sm">Disconnected</span>
+                        <Badge color="danger">Disconnected</Badge>
                       )}
                       {state.amHost && !member.isSelf ? (
-                        <button
-                          type="button"
-                          className="btn btn-xs text-error"
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          soft
                           onClick={() => setConfirmKickMemberId(member.memberId)}
                           title={`Remove ${member.displayName} from the party`}
                         >
                           Kick
-                        </button>
+                        </Button>
                       ) : null}
                     </li>
                   ))}
@@ -381,36 +383,36 @@ export function PartyPlayShell({
               data-testid="logs-panel-backdrop"
             />
             <div
-              className="absolute left-1/2 top-3 z-50 flex max-h-[calc(100%-1.5rem)] w-[min(32rem,calc(100%-1.5rem))] -translate-x-1/2 flex-col overflow-hidden rounded-box border-2 border-base-300 bg-base-100 shadow-xl"
+              className="absolute left-1/2 top-3 z-50 flex max-h-[calc(100%-1.5rem)] w-[min(32rem,calc(100%-1.5rem))] -translate-x-1/2 flex-col overflow-hidden rounded-2xl border-2 border-border bg-surface shadow-xl"
               role="dialog"
               aria-label="Logs"
             >
-              <div className="flex items-center gap-2 border-b-2 border-base-300 px-3 py-2">
-                <button
-                  type="button"
-                  className="btn btn-sm"
+              <div className="flex items-center gap-2 border-b-2 border-border px-3 py-2">
+                <Button
+                  size="sm"
+                  variant="secondary"
                   onClick={() => setPanel(null)}
                   aria-label="Back to the game"
                 >
                   <ArrowLeft className="h-4 w-4" aria-hidden="true" />
                   Back
-                </button>
+                </Button>
                 <p className="font-black">Logs</p>
                 <div className="min-w-0 flex-1" />
-                <button
-                  type="button"
-                  className="btn btn-sm btn-outline"
+                <Button
+                  size="sm"
+                  variant="outline"
                   onClick={() => onClearLogs?.()}
                   disabled={state.runtimeLogs.length === 0}
                   title="Clear these logs"
                 >
                   <Eraser className="h-4 w-4" aria-hidden="true" />
                   Clear
-                </button>
+                </Button>
               </div>
               <div className="min-h-0 overflow-y-auto p-3">
                 {state.runtimeLogs.length === 0 ? (
-                  <p className="rounded-box border-2 border-dashed border-base-300 p-6 text-center text-sm text-base-content/60">
+                  <p className="rounded-2xl border-2 border-dashed border-border p-6 text-center text-sm text-foreground/60">
                     No logs yet — the game&apos;s console output will appear here.
                   </p>
                 ) : (
@@ -419,12 +421,12 @@ export function PartyPlayShell({
                       <li
                         key={entry.id}
                         className={cn(
-                          "break-words rounded-box border-2 border-base-300 bg-base-200/50 px-2.5 py-1.5",
-                          entry.level === "error" && "border-error/40 text-error",
+                          "break-words rounded-2xl border-2 border-border bg-surface-secondary/50 px-2.5 py-1.5",
+                          entry.level === "error" && "border-danger/40 text-danger",
                           entry.level === "warn" && "border-warning/40 text-warning",
                         )}
                       >
-                        <span className="mr-2 text-base-content/40">
+                        <span className="mr-2 text-foreground/40">
                           {new Date(entry.timestamp).toLocaleTimeString([], {
                             hour12: false,
                             hour: "2-digit",
@@ -435,7 +437,7 @@ export function PartyPlayShell({
                         <span className="font-bold">{entry.level}</span>
                         <span className="ml-2">{entry.message}</span>
                         {entry.details !== undefined ? (
-                          <pre className="mt-1 whitespace-pre-wrap text-[10px] text-base-content/60">
+                          <pre className="mt-1 whitespace-pre-wrap text-[10px] text-foreground/60">
                             {entry.details}
                           </pre>
                         ) : null}
@@ -462,11 +464,11 @@ export function PartyPlayShell({
               data-testid="browse-panel-backdrop"
             />
             <div
-              className="absolute left-1/2 top-3 z-50 flex max-h-[calc(100%-1.5rem)] w-[min(42rem,calc(100%-1.5rem))] -translate-x-1/2 flex-col overflow-hidden rounded-box border-2 border-base-300 bg-base-100 shadow-xl"
+              className="absolute left-1/2 top-3 z-50 flex max-h-[calc(100%-1.5rem)] w-[min(42rem,calc(100%-1.5rem))] -translate-x-1/2 flex-col overflow-hidden rounded-2xl border-2 border-border bg-surface shadow-xl"
               role="dialog"
               aria-label="Pick a game"
             >
-              <div className="flex items-center gap-2 border-b-2 border-base-300 px-3 py-2">
+              <div className="flex items-center gap-2 border-b-2 border-border px-3 py-2">
                 <Button
                   variant="default"
                   size="md"
@@ -504,15 +506,16 @@ export function PartyPlayShell({
           non-glowing logo, larger (fits comfortably in the btn-sm tap
           target). */}
       {barHidden ? (
-        <button
-          type="button"
-          className="btn btn-sm absolute left-[max(0.5rem,env(safe-area-inset-left))] top-[max(0.5rem,env(safe-area-inset-top))] z-50 opacity-80 hover:opacity-100"
+        <Button
+          size="sm"
+          variant="secondary"
+          className="absolute left-[max(0.5rem,env(safe-area-inset-left))] top-[max(0.5rem,env(safe-area-inset-top))] z-50 opacity-80 hover:opacity-100"
           onClick={() => setBarHidden(false)}
           aria-label="Show the top bar"
           title="Show the top bar"
         >
           <BrandLogo variant="no-glow" size={28} />
-        </button>
+        </Button>
       ) : null}
 
       {/* 9fv.11.11: About this game opens the in-game details overlay (title /
@@ -528,9 +531,9 @@ export function PartyPlayShell({
           aria-modal="true"
           aria-label="End the game for everyone"
         >
-          <div className="flex w-full max-w-sm flex-col gap-4 rounded-box border-2 border-base-300 bg-base-100 p-5">
+          <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border-2 border-border bg-surface p-5">
             <p className="font-black">Exit to the lobby?</p>
-            <p className="text-sm text-base-content/70">
+            <p className="text-sm text-foreground/70">
               Every player&apos;s game will end and the party will return to the lobby. This is the
               emergency stop — game code cannot disable it.
             </p>
@@ -559,9 +562,9 @@ export function PartyPlayShell({
           aria-modal="true"
           aria-label="Reload every player's game"
         >
-          <div className="flex w-full max-w-sm flex-col gap-4 rounded-box border-2 border-base-300 bg-base-100 p-5">
+          <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border-2 border-border bg-surface p-5">
             <p className="font-black">Reload every player&apos;s game?</p>
-            <p className="text-sm text-base-content/70">
+            <p className="text-sm text-foreground/70">
               Every player&apos;s game will reload, and any unsaved progress in the running games
               will be lost. Are you sure?
             </p>
@@ -619,12 +622,12 @@ function PartyKickConfirm({
       aria-modal="true"
       aria-label="Kick a player from the party"
     >
-      <div className="flex w-full max-w-sm flex-col gap-4 rounded-box border-2 border-base-300 bg-base-100 p-5">
+      <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border-2 border-border bg-surface p-5">
         <p className="font-black">Kick {memberName} from the party?</p>
         <p className="text-sm">
           This removes them for now, not permanently. They can rejoin with the same private invite.
         </p>
-        <p className="text-sm text-base-content/70">
+        <p className="text-sm text-foreground/70">
           {memberName} will be removed from the party and will have to rejoin with the invite link.
         </p>
         <div className="flex justify-end gap-2">
