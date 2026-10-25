@@ -95,13 +95,22 @@ be confirmed on first bootstrap. No resource was created or imported.
 
 ## Stage 3 — One deployment path
 
-- [ ] Make it explicit that OpenTofu is the only production deployment of the
+- [x] Make it explicit that OpenTofu is the only production deployment of the
       Worker and its non-secret bindings; Wrangler only builds/validates/secrets.
-- [ ] Keep CI validation + plan; manual approved `tofu apply`; no competing
+- [x] Keep CI validation + plan; manual approved `tofu apply`; no competing
       deploy workflow.
-- [ ] Document the coordinated frontend/Worker release order for the new
+- [x] Document the coordinated frontend/Worker release order for the new
       `/turn` path (Worker first, then frontend env/build).
-- [ ] Document rollback/secret rotation and emergency disable.
+- [x] Document rollback/secret rotation and emergency disable.
+
+Evidence: `docs/architecture/deployment.md` now separates the two publishers
+(GitHub Actions for static origins, OpenTofu for Cloudflare) and gives the
+manual path: dry-run bundle → `init -backend-config` → reviewed plan → owner
+approval/`tofu apply` → `wrangler secret put` → frontend rebuild. It documents
+the `/turn` release order (Worker first, then the static app with the edge
+origin), rollback for both layers, and points emergency TURN controls at
+`deploy/edge/README.md` / `deploy/cloudflare.md`. CI remains validation/plan-only;
+no automation applies or deploys a Worker.
 
 ## Stage 4 — TURN security, attribution, costs, diagnostics
 

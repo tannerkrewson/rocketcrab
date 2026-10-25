@@ -163,9 +163,11 @@ their supported resources are modeled in [`deploy/opentofu/`](../../deploy/opent
 while [`deploy/cloudflare.md`](../../deploy/cloudflare.md) records live state
 and the human-only account, state, and secret decisions. The infrastructure
 workflow is validation-only and never applies OpenTofu or deploys with
-Wrangler. The relay Worker is already live; the TURN credential Worker and its
-`TURN_BUDGET` namespace remain planned until the migration decisions are
-approved.
+Wrangler. The Classic CORS relay is already live; the same single edge Worker
+gains the TURN-mint route, `TURN_BUDGET` namespace and optional rate rule only
+after the owner approves the migration plan. Wrangler is used only to compile
+the dry-run bundle and to set/rotate Worker secrets — never to deploy the
+production Worker.
 
 ## 7. Local HTTPS development (both origins)
 
@@ -192,12 +194,33 @@ copy was removed in release cleanup.)
 
 ## 8. Deployment, verification, rollback
 
-Deploy:
+Static origins deploy through GitHub Actions Pages only:
 
 1. Choose a strategy and own the domain(s) (the pending user decision).
 2. Repo per origin; set Pages source to "GitHub Actions"; set custom domains
    (strategy (a)) or nothing (strategy (b) project sites).
 3. Run "Deploy to GitHub Pages" with the input table above.
+
+Cloudflare infrastructure deploys through one manual, approved path:
+
+1. Build the edge bundle with the documented Wrangler `--dry-run` command
+   (absolute output path).
+2. `tofu init -backend-config=backend.hcl`, then review a refreshed
+   `tofu plan`. CI validates formatting/configuration and publishes a
+   non-mutating plan; it never applies.
+3. The owner approves and an operator runs `tofu apply`. This is the only
+   mechanism that changes the Worker, its bindings, KV, route, domain or rate
+   rule.
+4. Set/rotate Worker secrets with `wrangler secret put` (values never in Git or
+   state).
+5. **Order matters for `/turn`:** apply the Worker first and verify `/turn`,
+   then rebuild/redeploy the static app with the edge origin in
+   `VITE_TURN_CREDS_ORIGIN` (the client appends `/turn`). Classic relay builds
+   keep using the same origin root.
+6. Roll back the Worker by applying the previous reviewed commit; roll back the
+   static origins by re-running Pages on the previous commit. Emergency TURN
+   controls (disable issuance, revoke credentials, rotate the TURN key) are in
+   `deploy/edge/README.md` and `deploy/cloudflare.md`.
 
 ### Verify the built artifacts locally (no host required)
 
