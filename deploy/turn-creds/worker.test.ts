@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   DEFAULT_MINT_DAILY_CAP,
-  DEFAULT_MINT_TOTAL_CAP,
   DEFAULT_ORIGIN_ALLOWLIST,
   MINT_TTL_SECONDS,
   RATE_LIMIT_WINDOW_MS,
@@ -9,7 +8,7 @@ import {
   buildMintRequest,
   clientIp,
   dailyCounterKey,
-  exceededCap,
+  dailyCapExceeded,
   filterPort53IceServers,
   handleTurnCredsRequest,
   isPort53IceUrl,
@@ -542,7 +541,6 @@ describe("handleTurnCredsRequest (rocketcrab-23s.3: per-IP rate limiting)", () =
 describe("budget kill-switch pure functions (rocketcrab-23s.4)", () => {
   it("parses cap env vars with the documented defaults", () => {
     expect(parseCap(undefined, DEFAULT_MINT_DAILY_CAP)).toBe(DEFAULT_MINT_DAILY_CAP);
-    expect(parseCap(undefined, DEFAULT_MINT_TOTAL_CAP)).toBe(DEFAULT_MINT_TOTAL_CAP);
     expect(parseCap("100", 5000)).toBe(100);
     expect(parseCap("  7 ", 5000)).toBe(7);
   });
@@ -566,11 +564,10 @@ describe("budget kill-switch pure functions (rocketcrab-23s.4)", () => {
     expect(nextCounterValue("garbage")).toBe(1);
   });
 
-  it("exceededCap names the offending cap, daily first", () => {
-    expect(exceededCap(4999, 0, 5000, 50000)).toBeNull();
-    expect(exceededCap(5000, 100, 5000, 50000)).toEqual({ cap: "daily" });
-    expect(exceededCap(10, 50000, 5000, 50000)).toEqual({ cap: "total" });
-    expect(exceededCap(5000, 50000, 5000, 50000)).toEqual({ cap: "daily" });
+  it("dailyCapExceeded trips at the cap", () => {
+    expect(dailyCapExceeded(4999, 5000)).toBe(false);
+    expect(dailyCapExceeded(5000, 5000)).toBe(true);
+    expect(dailyCapExceeded(5001, 5000)).toBe(true);
   });
 });
 
@@ -591,7 +588,7 @@ describe("budget kill-switch via KV counters (rocketcrab-23s.4)", () => {
     resetRateLimiter();
   });
 
-  it("a successful mint increments both counters (daily key + total)", async () => {
+  it("a successful mint increments the daily counter", async () => {
     const kv = new MemoryKv();
     const res = await handleTurnCredsRequest(
       mintRequest(ALLOWED_ORIGIN),
@@ -600,10 +597,9 @@ describe("budget kill-switch via KV counters (rocketcrab-23s.4)", () => {
     expect(res.status).toBe(200);
     const today = new Date().toISOString().slice(0, 10);
     expect(kv.entries().get(`mints:${today}`)).toBe("1");
-    expect(kv.entries().get("mints:total")).toBe("1");
   });
 
-  it("counters accumulate across mints; the daily counter rolls over at UTC midnight", async () => {
+  it("the daily counter accumulates and rolls over at UTC midnight", async () => {
     const kv = new MemoryKv();
     const nowSpy = vi.spyOn(Date, "now").mockReturnValue(Date.UTC(2026, 7, 13, 12, 0, 0));
     const env = makeEnv({ TURN_BUDGET: kv });
@@ -611,13 +607,11 @@ describe("budget kill-switch via KV counters (rocketcrab-23s.4)", () => {
     await handleTurnCredsRequest(mintRequest(ALLOWED_ORIGIN), env);
     await handleTurnCredsRequest(mintRequest(ALLOWED_ORIGIN), env);
     expect(kv.entries().get("mints:2026-08-13")).toBe("2");
-    expect(kv.entries().get("mints:total")).toBe("2");
 
-    // Next UTC day: fresh daily counter, total keeps counting.
+    // Next UTC day: a fresh counter.
     nowSpy.mockReturnValue(Date.UTC(2026, 7, 14, 0, 0, 1));
     await handleTurnCredsRequest(mintRequest(ALLOWED_ORIGIN), env);
     expect(kv.entries().get("mints:2026-08-14")).toBe("1");
-    expect(kv.entries().get("mints:total")).toBe("3");
   });
 
   it("a failed mint (upstream error) does not increment counters", async () => {
@@ -653,31 +647,12 @@ describe("budget kill-switch via KV counters (rocketcrab-23s.4)", () => {
     expect(upstreamCalled(fetchMock)).toBe(false);
   });
 
-  it("rejects with 429 budget_exceeded once the total cap is reached", async () => {
-    const kv = new MemoryKv();
-    kv.entries().set("mints:total", String(DEFAULT_MINT_TOTAL_CAP));
-
-    const res = await handleTurnCredsRequest(
-      mintRequest(ALLOWED_ORIGIN),
-      makeEnv({ TURN_BUDGET: kv }),
-    );
-    expect(res.status).toBe(429);
-    const data = (await res.json()) as {
-      error?: { code?: string; message?: string; cap?: string };
-    };
-    expect(data.error?.code).toBe("budget_exceeded");
-    expect(data.error?.message).toContain("total");
-    expect(data.error?.cap).toBe("total");
-    expect(upstreamCalled(fetchMock)).toBe(false);
-  });
-
   it("enforces custom caps from env (MINT_DAILY_CAP), allowing exactly the cap's worth of mints", async () => {
     const kv = new MemoryKv();
     const env = makeEnv({ TURN_BUDGET: kv, MINT_DAILY_CAP: "2" });
     expect((await handleTurnCredsRequest(mintRequest(ALLOWED_ORIGIN), env)).status).toBe(200);
     expect((await handleTurnCredsRequest(mintRequest(ALLOWED_ORIGIN), env)).status).toBe(200);
     expect((await handleTurnCredsRequest(mintRequest(ALLOWED_ORIGIN), env)).status).toBe(429);
-    expect(kv.entries().get("mints:total")).toBe("2");
     expect(fetchMock.mock.calls).toHaveLength(2);
   });
 

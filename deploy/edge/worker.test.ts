@@ -1,0 +1,57 @@
+import { describe, expect, it } from "vitest";
+import edgeWorker from "./worker";
+
+const ORIGIN = "https://rocketcrab.com";
+
+function request(path: string, init: RequestInit = {}): Request {
+  return new Request(`https://edge.example${path}`, {
+    ...init,
+    headers: { Origin: ORIGIN, "Content-Type": "application/json", ...init.headers },
+  });
+}
+
+describe("edge Worker dispatch", () => {
+  it("routes /turn to the TURN mint (misconfigured without secrets)", async () => {
+    const response = await edgeWorker.fetch(request("/turn", { method: "POST", body: "{}" }), {});
+    expect(response.status).toBe(500);
+    expect(await response.json()).toMatchObject({ error: { code: "worker_misconfigured" } });
+    expect(response.headers.get("access-control-allow-origin")).toBe(ORIGIN);
+  });
+
+  it("accepts a trailing slash on the TURN path", async () => {
+    const response = await edgeWorker.fetch(request("/turn/", { method: "POST", body: "{}" }), {});
+    expect(response.status).toBe(500);
+  });
+
+  it("answers TURN CORS preflight without touching upstream", async () => {
+    const response = await edgeWorker.fetch(request("/turn", { method: "OPTIONS" }), {});
+    expect(response.status).toBe(204);
+  });
+
+  it("routes every other path to the scoped relay", async () => {
+    const invalidJson = await edgeWorker.fetch(
+      request("/", { method: "POST", body: "not json" }),
+      {},
+    );
+    expect(invalidJson.status).toBe(400);
+    expect(await invalidJson.json()).toMatchObject({ error: { code: "invalid_json" } });
+
+    const unknown = await edgeWorker.fetch(
+      request("/", { method: "POST", body: JSON.stringify({ endpoint: "nope" }) }),
+      {},
+    );
+    expect(unknown.status).toBe(404);
+    expect(await unknown.json()).toMatchObject({ error: { code: "unknown_endpoint" } });
+  });
+
+  it("rejects a missing Origin on both endpoints before any work", async () => {
+    for (const path of ["/", "/turn"]) {
+      const response = await edgeWorker.fetch(
+        new Request(`https://edge.example${path}`, { method: "POST", body: "{}" }),
+        {},
+      );
+      expect(response.status).toBe(403);
+      expect(await response.json()).toMatchObject({ error: { code: "origin_not_allowed" } });
+    }
+  });
+});

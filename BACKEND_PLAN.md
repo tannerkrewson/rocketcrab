@@ -1,0 +1,123 @@
+# Nova backend simplification — execution plan
+
+Owner direction: one tiny stateless edge Worker, no application database, one
+reproducible OpenTofu configuration, static frontend on GitHub Pages, Trystero
+for multiplayer, and Cloudflare's managed TURN for hard networks. Secrets and
+billing settings stay outside infrastructure state. No deployment, resource
+deletion, or paid-resource creation is authorized in this program.
+
+This plan supersedes the backend/infrastructure portions of `PLAN.md` where they
+overlap (relay/TURN worker deployment, KV, OpenTofu state, operational docs).
+The seven-stage product simplification in `PLAN.md` remains historical evidence.
+
+## Stage 1 — One edge Worker, smaller state surface
+
+**Decision on Classic + CORS relay.** Classic is not backend: it is 22 prebuilt
+external iframe games, a visible “Browse games” entry, party room sharing, and
+16 of the 22 need the scoped CORS relay to create rooms. Removing it would be a
+product deletion, not an infrastructure cleanup, and would still leave the AI
+game workflow intact only by dropping shipped content. Instead, this stage
+consolidates the relay and TURN mint into **one deployed Worker** (one script,
+one subdomain, one bundle, one OpenTofu resource), preserving Classic and
+turning two stateless backends into one. The owner can still remove Classic
+later; that decision is recorded as deferred, not silently applied.
+
+- [x] Add a single Worker entry point dispatching `/turn` to the TURN mint and
+      every other path to the existing scoped relay; keep the live relay's root
+      protocol unchanged so the Classic client needs no migration.
+- [x] Move the TURN client to the edge origin’s `/turn` path; keep the relay
+      client at the edge origin root.
+- [x] Simplify the TURN KV budget to one daily issuance counter (drop the
+      cumulative counter and its manual re-arm); retain the daily cap as the
+      documented “longer-term restriction” exception to zero KV, because it is
+      the only account-wide issuance stop the per-IP limiter cannot replace.
+- [x] Update OpenTofu to one Worker script/subdomain, one KV namespace (daily
+      cap), one optional route/domain/rate-rule target, one bundle path.
+- [x] Merge/redirect operator docs into one edge-worker runbook; update
+      `deploy/cloudflare.md`, CI bundle steps, env examples and tests.
+- [x] Verify worker/relay/TURN/client tests, typecheck, build, and the
+      infrastructure plan validation.
+
+Evidence: `deploy/edge/worker.ts` is the single deployed entry point
+(`/turn` → TURN mint, everything else → the unchanged relay root protocol).
+`deploy/edge/wrangler.toml` holds the local/dry-run config; the historical
+script name `rocketcrab-cors-relay` is kept so the live resource is not
+replaced. TURN budget is now one KV key (`mints:YYYY-MM-DD`) and one
+`MINT_DAILY_CAP`; the cumulative counter, re-arm path and `MINT_TOTAL_CAP` are
+deleted. OpenTofu models one script/subdomain with the KV binding and optional
+route/domain/rate rule; the second script and its subdomain are removed.
+The TURN client posts to `${origin}/turn`; the relay client is unchanged.
+Manuals: `deploy/edge/README.md` is the operator entry point; Cloudflare
+runbook and OpenTofu README updated. CI builds only the edge bundle.
+
+Verification: 91 infrastructure worker tests (edge 5, relay 37, TURN 49),
+typecheck and OpenTofu `fmt -check` + `init -backend=false` + `validate` pass.
+Found and fixed a real reproducibility bug: a relative Wrangler `--outdir`
+under the ignored `.build` directory wrote only `README.md` and no `worker.js`;
+CI/docs now use an absolute `$PWD/...` path. No deployment or resource change.
+
+**Decision recorded:** Classic compatibility is retained. Removing it would
+delete 22 curated games, the Browse entry and party room sharing — a product
+change, not a backend cleanup — and would not remove the need for the AI-game
+workflow. One Worker is achieved instead; the owner may still retire Classic
+later.
+
+## Stage 2 — Reproducible OpenTofu state and ownership
+
+- [ ] Add R2 S3-compatible backend configuration as a documented partial
+      configuration (`-backend-config`) so the repo can use private remote state
+      without committing credentials or requiring a bucket at validate time.
+- [ ] Document bucket bootstrap, state locking (`use_lockfile`), encryption,
+      backup/restore, and recovery.
+- [ ] Audit existing resources: relay may be live; TURN/KV never deployed.
+      Document import-before-apply and “do not replace live resources”.
+- [ ] Keep Worker secrets out of state; document TURN key bootstrap, secret
+      set/verify/rotate/revoke as a short reproducible command sequence.
+- [ ] Add ignore rules for local state/plan/backups and verify no state or
+      credentials are tracked.
+
+Do not create the R2 bucket or apply anything.
+
+## Stage 3 — One deployment path
+
+- [ ] Make it explicit that OpenTofu is the only production deployment of the
+      Worker and its non-secret bindings; Wrangler only builds/validates/secrets.
+- [ ] Keep CI validation + plan; manual approved `tofu apply`; no competing
+      deploy workflow.
+- [ ] Document the coordinated frontend/Worker release order for the new
+      `/turn` path (Worker first, then frontend env/build).
+- [ ] Document rollback/secret rotation and emergency disable.
+
+## Stage 4 — TURN security, attribution, costs, diagnostics
+
+- [ ] Verify whether Cloudflare’s mint API supports a per-request custom
+      identifier; if it does, label credentials without adding client-controlled
+      secrets, and document per-player attribution.
+- [ ] Confirm current lifecycle: each page/player mints one 24 h credential; do
+      not re-mint or share credentials between participants.
+- [ ] Document native Realtime TURN analytics, budget alerts (notifications, not
+      caps), emergency disable/revoke/rotate, and what issuance limits do/do not
+      bound.
+- [ ] Confirm diagnostic categories cover signaling, peer connection, TURN mint,
+      disconnects, reconnect failures and party end.
+- [ ] Investigate the reported heavy arena e2e flake; fix real races only.
+- [ ] Add a gated real forced-TURN test harness if credentials are available;
+      no fake proof.
+
+## Stage 5 — Focused cleanup (only if time/context allows)
+
+- [ ] Merge `schedule`/`scheduleFn` injection.
+- [ ] Use HeroUI’s `buttonVariants` instead of the hand-written BEM map.
+- [ ] Remove obsolete probe scripts and archive historical docs; keep `PLAN.md`
+      focused and linked.
+- [ ] Consolidate obvious test duplication; remove dead deps/docs.
+- [ ] Do not split PartyEngine, add a GamePlane abstraction, rewrite authority,
+      or rebuild the arena.
+
+## Stage 6 — Beta gates (no deployment here)
+
+- [ ] Record the private-beta checklist and required approvals: deploy Worker,
+      then frontend; test real TURN/TLS 443, signaling failure, Mobile Safari,
+      authority migration, late join/source transfer, network switch; measure
+      join success, direct-vs-relay, recovery and TURN cost.
+- [ ] Leave all deployment / billable-resource actions pending owner approval.

@@ -9,6 +9,7 @@ on:
       - deploy/opentofu/**
       - deploy/relay/**
       - deploy/turn-creds/**
+      - deploy/edge/**
       - .github/workflows/infrastructure-plan.yml
   workflow_dispatch:
 
@@ -27,14 +28,11 @@ jobs:
         with:
           tofu_version: 1.12.0
 
-      - name: Build Worker bundles without upload
+      - name: Build the edge Worker bundle without upload
         run: |
-          npx --yes wrangler@4.127.1 deploy deploy/relay/worker.ts \
-            --config deploy/relay/wrangler.toml \
-            --dry-run --outdir deploy/opentofu/.build/relay
-          npx --yes wrangler@4.127.1 deploy deploy/turn-creds/worker.ts \
-            --config deploy/turn-creds/wrangler.toml \
-            --dry-run --outdir deploy/opentofu/.build/turn-creds
+          npx --yes wrangler@4.127.1 deploy deploy/edge/worker.ts \
+            --config deploy/edge/wrangler.toml \
+            --dry-run --outdir "$PWD/deploy/opentofu/.build/edge"
 
       - name: Check OpenTofu formatting
         run: tofu -chdir=deploy/opentofu fmt -check -diff

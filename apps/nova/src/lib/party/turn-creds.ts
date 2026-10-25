@@ -10,7 +10,7 @@
  * allowlists it in connect-src. Builds without the env var never fetch —
  * parties work exactly as they do today, without TURN.
  *
- * The mint is browser-only by design: `POST {VITE_TURN_CREDS_ORIGIN}/`
+ * The mint is browser-only by design: `POST {VITE_TURN_CREDS_ORIGIN}/turn`
  * from the app sends the page's Origin automatically (no credentials, no
  * secrets in the request), and the worker 403s any missing/non-allowlisted
  * Origin before it would mint. The response is Cloudflare's standard
@@ -154,7 +154,7 @@ export async function fetchTurnCredentials(
   try {
     let response: Response;
     try {
-      response = await fetchImpl(`${base}/`, {
+      response = await fetchImpl(`${base}/turn`, {
         method: "POST",
         body: "{}",
         signal: controller.signal,

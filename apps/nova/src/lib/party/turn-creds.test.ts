@@ -16,7 +16,7 @@ import {
  * build pins no origin — then no fetch happens at all.
  */
 
-const MINT_ORIGIN = "https://turn-creds.example.workers.dev";
+const MINT_ORIGIN = "https://edge.example.workers.dev";
 
 /** A 200 mint response body in Cloudflare's standard shape. */
 const MINTED_BODY = {
@@ -110,7 +110,7 @@ describe("fetchTurnCredentials", () => {
     }
 
     const [url, init] = fetchMock.mock.calls[0]!;
-    expect(url).toBe(`${MINT_ORIGIN}/`);
+    expect(url).toBe(`${MINT_ORIGIN}/turn`);
     expect(init?.method).toBe("POST");
   });
 

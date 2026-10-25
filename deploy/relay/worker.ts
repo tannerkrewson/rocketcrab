@@ -10,7 +10,7 @@
  * origin — the same one-tiny-serverless-endpoint pattern as the TURN
  * credential endpoint (rocketcrab-23s).
  *
- * SAFETY (defense in depth, mirroring deploy/turn-creds/worker.ts):
+ * SAFETY (defense in depth; the same edge Worker serves /turn):
  *   1. Origin allowlist + CORS (rocketcrab-9fv.3.5): any request whose
  *      Origin is missing or not in ORIGIN_ALLOWLIST gets 403 BEFORE any
  *      forwarding. Missing Origin (curl, non-browser clients) is rejected

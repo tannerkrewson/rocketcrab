@@ -1,8 +1,10 @@
-# Rocketcrab TURN credential mint endpoint
+# TURN mint module (`/turn`)
 
-One tiny Cloudflare Worker that mints **short-lived TURN credentials** at
-party-join time for Rocketcrab Nova's cross-network WebRTC (P0, task
-`rocketcrab-23s`; F5 verdict "TURN required", ADR-0003 M3 addendum).
+The TURN half of Nova's single edge Worker (`deploy/edge/README.md`). It mints
+**short-lived TURN credentials** at party-join time for cross-network WebRTC
+(P0, task `rocketcrab-23s`; F5 verdict "TURN required", ADR-0003 M3 addendum).
+The Worker entry point dispatches `/turn` here; this file documents the mint
+module and its operator details.
 
 The endpoint proxies Cloudflare Realtime's credentials API:
 
@@ -33,10 +35,10 @@ headers so the browser can read it.
 - **Per-IP rate limiting** (rocketcrab-23s.3): an in-worker fixed-window
   fast-fail check plus a durable Cloudflare route-level rate rule (see
   "Rate limiting" below).
-- **Budget kill-switch** (rocketcrab-23s.4): KV counters cap how many
-  credentials can be minted per day and since the counters were last
-  re-armed; when a cap is hit the worker answers `429 budget_exceeded`
-  **before** any upstream call (see "Budget kill-switch" below).
+- **Daily issuance cap** (rocketcrab-23s.4): one KV counter caps how many
+  credentials can be minted per UTC day; at the cap the worker answers
+  `429 budget_exceeded` **before** any upstream call (see "Daily issuance cap"
+  below).
 - **Usage visibility** (rocketcrab-23s.5): native Cloudflare account budget
   alerts and Billable Usage notifications replace the former custom GraphQL
   watchdog (see "Usage visibility and abuse response" below). Mint caps bound
@@ -49,47 +51,45 @@ headers so the browser can read it.
 | Variable             | Default                                                                                                            | Meaning                                                                                                                                                                                             |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ORIGIN_ALLOWLIST`   | `https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173` | Comma-separated origins allowed to call the mint endpoint. Each entry may be a full origin (`scheme://host[:port]`); a trailing slash is tolerated. Matching against the request `Origin` is exact. |
-| `RATE_LIMIT_PER_MIN` | `10`                                                                                                               | Requests per minute per client IP allowed by the in-worker fast-fail counter (60s fixed window).                                                                                                    |
-| `MINT_DAILY_CAP`     | `5000`                                                                                                             | Maximum successful mints per UTC calendar day (kill-switch; see below). A new day starts a fresh counter automatically.                                                                             |
-| `MINT_TOTAL_CAP`     | `50000`                                                                                                            | Maximum successful mints since the counters were last re-armed (kill-switch; see below). Re-arm by deleting the counters (see "Re-arming the counters").                                            |
+| `RATE_LIMIT_PER_MIN` | `20`                                                                                                               | Requests per minute per client IP allowed by the in-worker fast-fail counter (60s fixed window).                                                                                                    |
+| `MINT_DAILY_CAP`     | `5000`                                                                                                             | Maximum successful mints per UTC calendar day (see below). A new day starts a fresh counter automatically.                                                                                          |
 
 A single-variable env override (unset = the default above). The OpenTofu root
 represents these values as `plain_text` bindings; do not use a separate
 Wrangler variable deployment path. For example:
 
 ```hcl
-turn_worker_variables = {
+edge_worker_variables = {
   MINT_DAILY_CAP     = "5000"
-  MINT_TOTAL_CAP     = "50000"
   ORIGIN_ALLOWLIST   = "https://rocketcrab.com,https://staging.rocketcrab.com"
-  RATE_LIMIT_PER_MIN = "10"
+  RATE_LIMIT_PER_MIN = "20"
 }
 ```
 
-(`ORIGIN_ALLOWLIST`, `RATE_LIMIT_PER_MIN`, `MINT_DAILY_CAP`, and
-`MINT_TOTAL_CAP` are not sensitive.)
+(`ORIGIN_ALLOWLIST`, `RATE_LIMIT_PER_MIN`, and `MINT_DAILY_CAP` are not
+sensitive.)
 
 ## Worker secrets
 
-Set after the Worker exists (never commit these; the TURN key is a long-term
-secret):
+Set after the edge Worker exists (never commit these; the TURN key is a
+long-term secret):
 
 ```sh
-wrangler secret put TURN_KEY_ID          # e.g. the Cloudflare Realtime key token id
-wrangler secret put TURN_KEY_API_TOKEN   # the matching API token
+wrangler secret put TURN_KEY_ID --config deploy/edge/wrangler.toml
+wrangler secret put TURN_KEY_API_TOKEN --config deploy/edge/wrangler.toml
 ```
 
-Local dev: create a gitignored `deploy/turn-creds/.dev.vars` with the same
-names (`wrangler dev` reads it). The repo `.gitignore` now excludes
+Local dev: create a gitignored `deploy/edge/.dev.vars` with the same names
+(`wrangler dev` reads it). The repo `.gitignore` now excludes
 `.dev.vars` — never commit it.
 
 ## KV namespace (TURN_BUDGET)
 
-The budget kill-switch counts successful mints in a KV namespace bound as
+The daily cap counts successful mints in a KV namespace bound as
 `TURN_BUDGET`. The OpenTofu resource
 `cloudflare_workers_kv_namespace.turn_budget` owns the namespace. The
-placeholder in the legacy `wrangler.toml` is retained for local development
-and bundling only; do not paste a production ID into that file.
+placeholder in `deploy/edge/wrangler.toml` is for local development and
+bundling only; do not paste a production ID into that file.
 
 ```sh
 tofu -chdir=deploy/opentofu apply
@@ -98,14 +98,13 @@ tofu -chdir=deploy/opentofu apply
 The command above is intentionally not part of this migration task. Review
 the plan, state backend, and resource ownership first. In dev, `wrangler dev`
 uses a local KV simulator keyed by binding name, so the placeholder id is fine
-locally. It holds only the two mint counters; delete the `mints:*` keys to
-re-arm them.
+locally. It holds only `mints:YYYY-MM-DD`; a new UTC day starts a fresh key.
 
 ## Infrastructure management
 
-The planned Worker is modeled by `cloudflare_workers_script.turn` in
-`deploy/opentofu/`, with its workers.dev subdomain and `TURN_BUDGET` binding. Its optional custom domain/route and zone rate rule are
-also modeled there. Wrangler is used only for local development and the
+The edge Worker is modeled by `cloudflare_workers_script.relay` in
+`deploy/opentofu/`, with its workers.dev subdomain, `TURN_BUDGET` binding, and
+optional custom domain/route and zone rate rule. Wrangler is used only for local development and the
 dry-run JavaScript bundle consumed by OpenTofu. No deploy workflow remains in
 this repository.
 
@@ -115,21 +114,20 @@ commands. Their values must never be committed or passed as OpenTofu
 `secret_text` bindings:
 
 ```sh
-cd deploy/turn-creds
-wrangler secret put TURN_KEY_ID
-wrangler secret put TURN_KEY_API_TOKEN
+wrangler secret put TURN_KEY_ID --config deploy/edge/wrangler.toml
+wrangler secret put TURN_KEY_API_TOKEN --config deploy/edge/wrangler.toml
 ```
 
-The worker appears at
-`https://rocketcrab-turn-creds.<your-account-subdomain>.workers.dev` when the
-account workers.dev subdomain is enabled. The validation-only workflow is
+The mint appears at
+`https://rocketcrab-cors-relay.<your-account-subdomain>.workers.dev/turn` when
+the account workers.dev subdomain is enabled. The validation-only workflow is
 `.github/workflows/infrastructure-plan.yml`.
 
 Smoke test (the mint endpoint rejects missing origins by design, so send
 one — any allowlisted origin works):
 
 ```sh
-curl -si https://rocketcrab-turn-creds.<your-account-subdomain>.workers.dev/ \
+curl -si https://rocketcrab-cors-relay.<your-account-subdomain>.workers.dev/turn \
   -H "Origin: https://rocketcrab.com" \
   -H "Content-Type: application/json" -d '{}'
 ```
@@ -222,7 +220,7 @@ Two cheap layers (no external library — Cloudflare platform primitives only):
 A simple **fixed-window counter keyed by client IP** (`CF-Connecting-IP`,
 edge-set and not client-spoofable) in the worker itself. Over the limit, the
 worker answers `429` with a `Retry-After` header **before any upstream call**.
-The window is 60s; the limit is `RATE_LIMIT_PER_MIN` (default **10/min**).
+The window is 60s; the limit is `RATE_LIMIT_PER_MIN` (default **20/min**).
 In-memory per-isolate state is fine here: this is a fast-fail backstop, and
 over-counting under concurrency is SAFE (it only ever rejects more
 aggressively, never less).
@@ -264,26 +262,21 @@ curl -X PUT \
 Zone > Config > Rulesets edit permission.) The same rule is configurable in
 the Cloudflare dashboard under Security -> WAF -> Rate limiting rules. Keep
 `RATE_LIMIT_PER_MIN` and the rule's `requests_per_period` in sync — both
-default to 10/min.
+default to 20/min.
 
-## Budget kill-switch (rocketcrab-23s.4)
+## Daily issuance cap (rocketcrab-23s.4)
 
-Nova users author their own games, so the mint endpoint must never be
-abusable enough to blow the account's TURN allowance. The kill-switch is the
-**hard stop**: two KV counters, checked on every mint **before any upstream
-call**:
+Nova users author their own games, so the mint route needs a long-term
+issuance stop. One KV counter is checked before every upstream call:
 
-| Counter          | Key                | Reset                                    |
-| ---------------- | ------------------ | ---------------------------------------- |
-| Daily mints      | `mints:YYYY-MM-DD` | Automatic at UTC midnight (new key)      |
-| Cumulative mints | `mints:total`      | Manual, by deleting the counters (below) |
+| Counter     | Key                | Reset                               |
+| ----------- | ------------------ | ----------------------------------- |
+| Daily mints | `mints:YYYY-MM-DD` | Automatic at UTC midnight (new key) |
 
-On every **successful** mint the worker increments both counters
+On every **successful** mint the worker increments the counter
 (read-modify-write; KV has **no atomic increment**, so concurrent mints can
-over-count — that is SAFE and correct for a kill-switch: it errs on the safe
-side and can only ever trip _early_, never late). When either counter reaches
-its cap (`MINT_DAILY_CAP` default **5000**, `MINT_TOTAL_CAP` default
-**50000**), the worker answers:
+over-count — safe: it errs on the safe side and can only trip _early_). At
+`MINT_DAILY_CAP` (default **5000**) the worker answers:
 
 ```json
 {
@@ -296,36 +289,22 @@ its cap (`MINT_DAILY_CAP` default **5000**, `MINT_TOTAL_CAP` default
 }
 ```
 
-with HTTP `429`, **no upstream call**, and the usual CORS headers so the
-browser can read it. Failed mints (upstream `502`s, bad origins, rate-limit
-`429`s) never touch the counters — only credentials that were actually
-minted cost allowance.
+with HTTP `429`, **no upstream call**, and CORS headers. Failed mints never
+touch the counter.
 
-**Fail-open behavior**: if the `TURN_BUDGET` binding is missing (dev) or KV
-is unreachable, the worker logs and **proceeds with the mint**. That is fine
-for dev and correct under an outage — abuse stays bounded by the per-IP rate
-limiter meanwhile. In prod the binding **must** exist and is supplied by
-OpenTofu. Daily counter keys self-expire after 2 days, so stale day keys never
-accumulate.
+The cap bounds **issuance**, not traffic from credentials already issued. If
+KV is missing (dev) or unreachable, the check fails open; the per-IP limiter
+and budget alerts remain. Daily keys self-expire after two days.
 
-**Mint logging**: every successful mint is logged to the Workers logs as a
-JSON line (`event: "turn_cred_mint"`, `ip`, `origin`, `ttl`, `ts`) via
-`console.log` — free Workers analytics for usage review and post-mortems.
-
-### Re-arming the counters
-
-The cumulative counter (`mints:total`) only resets when you delete it —
-deliberate, so a re-arm is a conscious operator action. To reset the budget
-(after, say, raising `MINT_TOTAL_CAP` or fixing an abuse incident):
+To re-arm early (after an abuse incident or a cap change), delete today's key:
 
 ```sh
-wrangler kv key delete mints:total --binding TURN_BUDGET
-wrangler kv key delete mints:2026-08-13 --binding TURN_BUDGET   # the daily key for today
+wrangler kv key delete mints:2026-08-13 --binding TURN_BUDGET --config deploy/edge/wrangler.toml
 ```
 
-or delete everything at once from the dashboard (Workers -> KV ->
-`TURN_BUDGET`). Daily keys roll over on their own, so only `mints:total`
-strictly needs the manual re-arm.
+**Mint logging**: every successful mint is logged as JSON
+(`event: "turn_cred_mint"`, `ip`, `origin`, `ttl`, `ts`) in Workers Logs for
+usage review and post-mortems.
 
 ## Usage visibility and abuse response (rocketcrab-23s.5)
 
@@ -344,8 +323,8 @@ state):
   and incident reconstruction; OpenTofu keeps Workers observability enabled.
 - **Abuse response:** Cloudflare's credentials API can revoke a short-lived
   credential before its TTL (`POST /v1/turn/keys/<key>/credentials/<username>/revoke`).
-  That is a manual operator action; Nova does not ship a revoke route. Revoking
-  `mints:total`/daily keys and lowering `MINT_DAILY_CAP` are the other levers.
+  That is a manual operator action; Nova does not ship a revoke route. Deleting
+  today's `mints:` key and lowering `MINT_DAILY_CAP` are the other levers.
 
 ### What these controls do and do not bound
 

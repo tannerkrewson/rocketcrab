@@ -1,8 +1,10 @@
-# Rocketcrab CORS relay (classic room creation)
+# Classic CORS relay module
 
 Scoped CORS relay for classic rocketcrab room-creation endpoints
 (task `rocketcrab-9fv.7.7.5`, deployed 2026-08-13 as `7.33`; hardened
 2026-08 with origin allowlist + per-IP rate limiting, `rocketcrab-9fv.3.5`).
+It now runs inside Nova's single edge Worker (`deploy/edge/README.md`) at the
+origin root; this file documents the relay handler itself.
 
 **Current deployment:** Cloudflare Worker `rocketcrab-cors-relay`, live at
 `https://rocketcrab-cors-relay.tannerkrewson.workers.dev` (workers.dev
@@ -22,7 +24,7 @@ TURN credential endpoint (`rocketcrab-23s`).
 
 ## Safety
 
-**Abuse-controlled, defense in depth (mirrors `deploy/turn-creds/worker.ts`):**
+**Abuse-controlled, defense in depth (same edge Worker as `/turn`):**
 
 - **Origin allowlist** (`ORIGIN_ALLOWLIST`, `rocketcrab-9fv.3.5`): requests
   whose `Origin` is missing or not allowlisted get `403` **before** any
@@ -52,7 +54,7 @@ is sensitive. The OpenTofu root represents these values as `plain_text`
 bindings; do not use a separate Wrangler variable deployment path.
 
 ```hcl
-relay_worker_variables = {
+edge_worker_variables = {
   ORIGIN_ALLOWLIST   = "https://rocketcrab.com,https://staging.rocketcrab.com"
   RATE_LIMIT_PER_MIN = "20"
 }
@@ -95,17 +97,16 @@ concurrency is SAFE (it only ever rejects more aggressively, never less).
 `OPTIONS` preflights are answered before the rate-limit check, so they never
 consume the budget.
 
-The same Cloudflare route-level rate rule pattern as the TURN mint
-(deploy/turn-creds/README.md, "Rate limiting") can be added if the relay
-ever moves to a proxied custom route; the in-worker counter alone is the
-current backstop.
+The same edge Worker also serves `/turn`. The optional zone-level rate rule
+(`deploy/cloudflare.md`) applies to the proxied origin; the in-worker counter is
+the current backstop on workers.dev.
 
 ## Client wiring
 
 - `apps/nova/src/lib/classic/relay.ts` — client helper. When
   `VITE_CLASSIC_RELAY_ORIGIN` is set at build time (same pattern as
   `VITE_RUNTIME_ORIGIN`, M2), CORS-blocked games create rooms through the
-  relay; until then they keep the direct fetch and the "room creation
+  edge Worker root; until then they keep the direct fetch and the "room creation
   blocked" browse badge stays accurate.
 - `apps/nova/vite.config.ts` — the strict CSP adds the relay origin to
   `connect-src` when `VITE_CLASSIC_RELAY_ORIGIN` is set.
@@ -117,7 +118,7 @@ current backstop.
 ## Infrastructure management
 
 The former Wrangler deployment workflow was removed. OpenTofu in
-`deploy/opentofu/` is the intended source of truth for this Worker and its
+`deploy/opentofu/` is the intended source of truth for the edge Worker and its
 workers.dev subdomain. Before any write, import both
 `cloudflare_workers_script.relay` and
 `cloudflare_workers_script_subdomain.relay`, then review the refresh-enabled

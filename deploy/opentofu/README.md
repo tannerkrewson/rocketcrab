@@ -7,32 +7,33 @@ imports, deletes, or deploys anything automatically.
 
 ## Managed resources
 
-- `cloudflare_workers_script.relay` manages the deployed
-  `rocketcrab-cors-relay` Worker and its two non-secret plain-text bindings.
-- `cloudflare_workers_kv_namespace.turn_budget` creates the planned
-  `TURN_BUDGET` namespace.
-- `cloudflare_workers_script.turn` manages the planned
-  `rocketcrab-turn-creds` Worker, all non-secret variables, and the
-  `TURN_BUDGET` KV binding. Its `worker.ts` bundle includes the local
-
-  UTC schedule for the Worker `scheduled` handler.
-
-- `cloudflare_workers_script_subdomain.relay` and `.turn` enable the two
-  per-Worker workers.dev hostnames. The account-level workers.dev subdomain is
-  an account setting and remains a human prerequisite.
+- `cloudflare_workers_script.relay` manages the single deployed edge Worker
+  (`rocketcrab-cors-relay`: Classic CORS relay + `/turn` TURN mint), its
+  non-secret variables, and the `TURN_BUDGET` KV binding. The bundle entry point
+  is `deploy/edge/worker.ts`, which imports the relay and TURN handler modules.
+- `cloudflare_workers_kv_namespace.turn_budget` creates the `TURN_BUDGET`
+  namespace holding the daily mint counter.
+- `cloudflare_workers_script_subdomain.relay` enables the Worker's workers.dev
+  hostname. The account-level workers.dev subdomain is a human prerequisite.
 - `cloudflare_workers_route.turn` and
   `cloudflare_workers_custom_domain.turn` are mutually exclusive optional
-  TURN endpoint choices. They are enabled only after a real zone ID and a
-  coordinator-selected hostname are supplied. `cloudflare_ruleset.turn_rate_limit`
-  is also optional and uses the provider-supported `http_ratelimit` phase,
-  `ip.src` characteristic, 60-second period, and the configured
-  `RATE_LIMIT_PER_MIN` default.
+  endpoint choices for the same edge Worker. `cloudflare_ruleset.turn_rate_limit`
+  is optional and uses the provider-supported `http_ratelimit` phase, `ip.src`
+  characteristic, 60-second period, and the configured `RATE_LIMIT_PER_MIN`
+  default.
+- Worker secrets (`TURN_KEY_ID`, `TURN_KEY_API_TOKEN`) are set outside
+  OpenTofu. The root preserves existing `secret_text` bindings but never creates
+  or rotates their values.
 
-The Worker source of truth remains the existing TypeScript files:
-`deploy/relay/worker.ts` and `deploy/turn-creds/worker.ts`. Cloudflare does
-not transpile TypeScript on
-upload, so OpenTofu consumes the generated JavaScript bundles rather than
-pretending that raw TypeScript is deployable.
+There is no second Worker and no application database. The historical script
+name `rocketcrab-cors-relay` is kept so the live resource is not replaced; a
+rename would be a separate approved migration.
+
+The Worker source of truth remains TypeScript: `deploy/edge/worker.ts` plus the
+handler modules `deploy/relay/worker.ts` and `deploy/turn-creds/worker.ts`.
+Cloudflare does not transpile TypeScript on upload, so OpenTofu consumes the
+generated JavaScript bundle rather than pretending that raw TypeScript is
+deployable.
 
 ## Safe validation and planning
 
@@ -43,17 +44,15 @@ These commands must run before `tofu plan` because the bundles are ignored
 build output:
 
 ```sh
-npx --yes wrangler@4.127.1 deploy deploy/relay/worker.ts \
-  --config deploy/relay/wrangler.toml \
-  --dry-run --outdir deploy/opentofu/.build/relay
-npx --yes wrangler@4.127.1 deploy deploy/turn-creds/worker.ts \
-  --config deploy/turn-creds/wrangler.toml \
-  --dry-run --outdir deploy/opentofu/.build/turn-creds
+npx --yes wrangler@4.127.1 deploy deploy/edge/worker.ts \
+  --config deploy/edge/wrangler.toml \
+  --dry-run --outdir "$PWD/deploy/opentofu/.build/edge"
 ```
 
-The TURN dry run currently accepts the intentionally unresolved KV ID in the
-legacy Wrangler config for bundling. OpenTofu supplies the real `TURN_BUDGET`
-binding after the namespace exists. Do not commit any generated bundle.
+Use the absolute `$PWD/...` output path: with some Wrangler versions a relative
+`--outdir` under the ignored `.build` directory writes only the README and no
+`worker.js`. OpenTofu supplies the real `TURN_BUDGET` binding after the
+namespace exists. Do not commit any generated bundle.
 
 Then validate and plan without applying:
 
@@ -102,7 +101,7 @@ resources before any write. `prevent_destroy` is set on the relay and every
 managed persistent resource so a mismatch cannot silently become a
 delete/recreate operation.
 
-The TURN Worker and KV namespace are not live according to the inventory in
+The TURN route and KV namespace are not live according to the inventory in
 `deploy/cloudflare.md`; they should not be imported. If a human creates them
 before the migration, stop and record their IDs, then use the provider's
 documented import formats instead of allowing duplicate resources:

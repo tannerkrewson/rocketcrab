@@ -1,0 +1,11 @@
+# The single Nova edge Worker (TURN mint + Classic CORS relay).
+# OpenTofu deploys this bundle and owns the real KV/binding IDs; this file is
+# for local `wrangler dev` and the dry-run bundle OpenTofu consumes.
+name = "rocketcrab-cors-relay"
+main = "worker.ts"
+compatibility_date = "2025-01-01"
+workers_dev = true
+
+# Daily TURN mint counter. The placeholder makes `wrangler dev` use local KV
+# simulation; OpenTofu supplies the real namespace after it exists.
+kv_namespaces = [{ binding = "TURN_BUDGET", id = "REPLACE_WITH_KV_NAMESPACE_ID" }]

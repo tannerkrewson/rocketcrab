@@ -45,27 +45,17 @@ variable "worker_bundle_dir" {
   nullable    = true
 }
 
-variable "relay_worker_variables" {
-  description = "Non-secret plain-text bindings for rocketcrab-cors-relay."
-  type        = map(string)
-  default = {
-    ORIGIN_ALLOWLIST   = "https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173"
-    RATE_LIMIT_PER_MIN = "20"
-  }
-}
-
-variable "turn_worker_variables" {
+variable "edge_worker_variables" {
   description = <<-EOT
-    Non-secret plain-text bindings for rocketcrab-turn-creds. Secret names
-    used by the Worker are deliberately not part of this map; TURN key material
-    stays in Worker secrets.
+    Non-secret plain-text bindings for the single Nova edge Worker (Classic
+    CORS relay + TURN mint). Secret names used by the Worker are deliberately
+    not part of this map; TURN key material stays in Worker secrets.
   EOT
   type        = map(string)
   default = {
     MINT_DAILY_CAP     = "5000"
-    MINT_TOTAL_CAP     = "50000"
     ORIGIN_ALLOWLIST   = "https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173"
-    RATE_LIMIT_PER_MIN = "10"
+    RATE_LIMIT_PER_MIN = "20"
   }
 
   validation {
@@ -73,18 +63,18 @@ variable "turn_worker_variables" {
       for name in [
         "TURN_KEY_ID",
         "TURN_KEY_API_TOKEN",
-      ] : !contains(keys(var.turn_worker_variables), name)
+      ] : !contains(keys(var.edge_worker_variables), name)
     ])
-    error_message = "Secret Worker bindings must not be included in turn_worker_variables; set them through the Workers Secrets API or dashboard."
+    error_message = "Secret Worker bindings must not be included in edge_worker_variables; set them through the Workers Secrets API or dashboard."
   }
 
   validation {
     condition = (
-      can(tonumber(lookup(var.turn_worker_variables, "RATE_LIMIT_PER_MIN", "10"))) &&
-      tonumber(lookup(var.turn_worker_variables, "RATE_LIMIT_PER_MIN", "10")) >= 1 &&
-      tonumber(lookup(var.turn_worker_variables, "RATE_LIMIT_PER_MIN", "10")) == floor(tonumber(lookup(var.turn_worker_variables, "RATE_LIMIT_PER_MIN", "10")))
+      can(tonumber(lookup(var.edge_worker_variables, "RATE_LIMIT_PER_MIN", "20"))) &&
+      tonumber(lookup(var.edge_worker_variables, "RATE_LIMIT_PER_MIN", "20")) >= 1 &&
+      tonumber(lookup(var.edge_worker_variables, "RATE_LIMIT_PER_MIN", "20")) == floor(tonumber(lookup(var.edge_worker_variables, "RATE_LIMIT_PER_MIN", "20")))
     )
-    error_message = "turn_worker_variables.RATE_LIMIT_PER_MIN must be a positive whole number when supplied."
+    error_message = "edge_worker_variables.RATE_LIMIT_PER_MIN must be a positive whole number when supplied."
   }
 }
 

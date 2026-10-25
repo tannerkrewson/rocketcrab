@@ -1,5 +1,10 @@
 # Nova remaining-work plan
 
+Backend/infrastructure work is tracked separately in
+[`BACKEND_PLAN.md`](BACKEND_PLAN.md) (single edge Worker, reproducible
+OpenTofu, one deployment path, TURN operations, beta gates). The program below
+is the completed product simplification record.
+
 ## Authorized simplification program — active execution plan
 
 Work directly on `nova`, without subagents. Complete the following stages in

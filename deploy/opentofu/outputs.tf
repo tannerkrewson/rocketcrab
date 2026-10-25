@@ -1,21 +1,11 @@
-output "relay_worker_name" {
-  description = "Managed relay Worker script name."
+output "edge_worker_name" {
+  description = "Managed edge Worker script name (relay + TURN mint)."
   value       = cloudflare_workers_script.relay.script_name
 }
 
-output "turn_worker_name" {
-  description = "Managed TURN credential Worker script name."
-  value       = cloudflare_workers_script.turn.script_name
-}
-
-output "relay_workers_dev_url" {
-  description = "Relay workers.dev URL when the account subdomain is supplied."
-  value       = var.workers_dev_subdomain == null ? null : "https://${local.relay_worker_name}.${var.workers_dev_subdomain}.workers.dev"
-}
-
-output "turn_workers_dev_url" {
-  description = "TURN workers.dev URL when the account subdomain is supplied."
-  value       = var.workers_dev_subdomain == null ? null : "https://${local.turn_worker_name}.${var.workers_dev_subdomain}.workers.dev"
+output "edge_workers_dev_url" {
+  description = "Edge workers.dev origin when the account subdomain is supplied (TURN lives at /turn)."
+  value       = var.workers_dev_subdomain == null ? null : "https://${local.edge_worker_name}.${var.workers_dev_subdomain}.workers.dev"
 }
 
 output "turn_budget_namespace_id" {
@@ -38,13 +28,10 @@ output "turn_rate_limit_ruleset_id" {
   value       = try(cloudflare_ruleset.turn_rate_limit[0].id, null)
 }
 
-output "turn_worker_secret_names" {
+output "edge_worker_secret_names" {
   description = "Secret names that must be supplied outside OpenTofu. Values are never output or stored here."
   value = [
     "TURN_KEY_ID",
     "TURN_KEY_API_TOKEN",
-    "CLOUDFLARE_ACCOUNT_ID",
-    "CLOUDFLARE_API_TOKEN",
-    "ALERT_WEBHOOK_URL",
   ]
 }
