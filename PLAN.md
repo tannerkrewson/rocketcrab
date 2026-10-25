@@ -214,7 +214,7 @@ re-send on authority change, ordered simulation inputs/restoration, bounded
 snapshots and action payloads, private views and catch-up, and the reload/Safari
 recovery path.
 
-Verification: 990 unit/property tests (496 nova app, 146 nova-api, plus packages),
+Verification: 979 unit/property tests (496 nova app, 146 nova-api, plus packages),
 87 infrastructure worker tests; typecheck, format, lint, production build and
 bundle check pass; initial JS 167.3 KiB gzip (220 KiB budget unchanged). New
 tests assert the single reconnect primitive is used for a silent link, concurrent
