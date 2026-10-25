@@ -193,3 +193,20 @@ Private-beta gates (all require explicit owner approval; none run here):
    owner before any broader release.
 
 No deployment, import, bucket, key, or paid resource was created.
+
+## Final verification (this branch)
+
+- 970 unit/property tests + 91 infrastructure Worker tests pass.
+- Format, lint, typecheck, production build and bundle check pass; initial JS
+  205.9 KiB gzip against the unchanged 220 KiB budget.
+- `tofu fmt -check`, `init -backend=false`, and `validate` pass (OpenTofu
+  1.13.2). The remote R2 backend and live applies were not exercised.
+- Playwright: Chromium/Firefox 39/40 in one parallel run (one static reload spec
+  flaked under load and passed isolated), WebKit 20/20. The earlier four-player
+  arena flake also passed three isolated repeats.
+- `npm audit`: 0 vulnerabilities.
+
+Not done (require owner approval or live credentials): R2 bucket creation and
+remote-state init, relay import/apply, TURN key creation and Worker secrets,
+deployment of Worker or frontend, forced-TURN/TLS-443 proof, physical-device
+Mobile Safari and multi-hour cross-network tests, private beta.

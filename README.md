@@ -24,8 +24,10 @@ install tools, understand code, deploy a website, or create a repository.
 
 ## Architecture at a glance
 
-- **Fully static application.** No Nova application backend. Production is
-  static assets at two HTTPS origins:
+- **Fully static application.** Production is static assets at two HTTPS
+  origins; there is no room server, database, or persistent application
+  process. One stateless Cloudflare edge Worker handles the optional TURN
+  credential mint (`/turn`) and the scoped Classic room-creation relay:
   - `https://nova.example` — the Nova application.
   - `https://runtime.nova.example` — an intentionally isolated execution origin
     for pasted game HTML.
