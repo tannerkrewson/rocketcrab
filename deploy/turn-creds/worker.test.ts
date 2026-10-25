@@ -12,7 +12,6 @@ import {
   exceededCap,
   filterPort53IceServers,
   handleTurnCredsRequest,
-  handleWatchdogRequest,
   isPort53IceUrl,
   nextCounterValue,
   normalizeOrigin,
