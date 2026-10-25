@@ -12,6 +12,12 @@ import { gameRepository } from "./instance";
  * Query state here covers saved-game resources only; live peer-to-peer game
  * state must never live in TanStack Query (plan engineering rule 8) — it is
  * owned by the party engines (packages/core) and the shell.
+ *
+ * Cross-tab consistency: IndexedDB is the shared source of truth and every
+ * mutation invalidates these queries in its own tab. TanStack Query's default
+ * `refetchOnWindowFocus` refreshes a backgrounded tab when the user returns,
+ * which covers another tab's edits without adding a `dexie-react-hooks`
+ * subscription layer. Mutations remain the only write path in this app.
  */
 
 /** Query key for the full saved-game list. */

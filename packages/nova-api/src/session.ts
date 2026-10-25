@@ -91,7 +91,6 @@ import type {
   NovaPlayer,
   NovaRawChannelSpec,
   NovaRawDiagnostics,
-  NovaRawProgress,
   NovaRawSendOptions,
   NovaSimulationDiagnostics,
   NovaSimulationHandlers,

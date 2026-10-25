@@ -17,7 +17,6 @@ import { readBrowseContext } from "../lib/browse/back-context";
 import { NOVA_MODE_LABELS } from "../lib/browse/nova-games";
 import { useSavedGame } from "../lib/games/queries";
 import { usePartyEngine } from "../lib/party/use-party";
-import { cn } from "../lib/cn";
 
 export const Route = createFileRoute("/game/$gameId")({
   validateSearch: (search: Record<string, unknown>): GameDetailSearch => ({

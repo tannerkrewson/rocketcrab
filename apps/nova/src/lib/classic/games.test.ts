@@ -78,12 +78,6 @@ describe("CLASSIC_GAMES data", () => {
 });
 
 describe("classic room-creation flows (client-side connectToGame)", () => {
-  const jsonResponse = (value: unknown) => ({
-    ok: true,
-    status: 200,
-    json: async () => value,
-  });
-
   afterEach(() => {
     vi.unstubAllGlobals();
     vi.unstubAllEnvs();

@@ -28,15 +28,15 @@ instability, and strict audio/user-gesture rules.
   supported, file input, clipboard, camera, microphone, device orientation,
   suspend/resume, reload, destroy). M1 runs the lifecycle scenarios (portrait/
   landscape, keyboard, rotation, lock/unlock, backgrounding, tab switching,
-  freeze/restore, network switches, offline, low-power, authority/greeter
-  suspension, reconnect after reload).
+  freeze/restore, network switches, offline, low-power, authority and
+  shell-host suspension, reconnect after reload).
 - **Playwright WebKit is a CI supplement, never a substitute** for
   physical-device testing (plan engineering rule 17). CI runs WebKit
   automation; physical-device results are recorded manually (M4 release
   matrix).
 - **Lifecycle reality:** timers and connections cannot be assumed to run while
-  backgrounded (Blocker Register B6). Authority and greeter roles must
-  migrate (ADR-0007, ADR-0004). The shell uses `pagehide`/`pageshow`,
+  backgrounded (Blocker Register B6). Game authority must migrate (ADR-0007);
+  party shell controls pass to a remaining participant (ADR-0004). The shell uses `pagehide`/`pageshow`,
   visibility, and network events, saves session recovery information locally,
   treats suspended authority as replaceable, and preserves an emergency exit.
   (M1 implementation: the party engine reacts to those events, probes a

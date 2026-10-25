@@ -1,13 +1,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { RuntimeBootstrapMessage } from "@rocketcrab/protocol";
 import { RuntimeInstance } from "./runtime-instance";
-import {
-  createFakeFrameFactory,
-  createFakePort,
-  receiveOnPort,
-  type FakeFrameHost,
-  type FakePort,
-} from "./test/fakes";
+import { createFakeFrameFactory, createFakePort, receiveOnPort, type FakePort } from "./test/fakes";
 
 function bootstrapMessage(overrides: Record<string, unknown> = {}): RuntimeBootstrapMessage {
   return {
@@ -156,7 +150,7 @@ describe("RuntimeInstance heartbeat and lifecycle", () => {
   });
 
   it("destroy removes the frame, deletes the hook, closes the port, and emits destroyed", () => {
-    const { instance, port, frameHost } = setup();
+    const { port, frameHost } = setup();
     receiveOnPort(port, {
       version: 1,
       runtimeInstanceId: "runtime-1",
@@ -312,7 +306,7 @@ describe("RuntimeInstance error forwarding", () => {
     const error = runtimeMessage(port, "runtime.error");
     expect(error?.category).toBe("runtime");
     expect(error?.message).toBe("boom");
-    expect((error?.details as Record<string, unknown>).filename).toBe("game.html");
+    expect((error?.details as Record<string, unknown> | undefined)?.filename).toBe("game.html");
   });
 
   it("classifies SyntaxError as syntax", () => {
@@ -326,7 +320,7 @@ describe("RuntimeInstance error forwarding", () => {
     hook().report("error", { message: "Failed to load resource", tag: "IMG" });
     const error = runtimeMessage(port, "runtime.error");
     expect(error?.category).toBe("remote_load");
-    expect((error?.details as Record<string, unknown>).resource).toBe("IMG");
+    expect((error?.details as Record<string, unknown> | undefined)?.resource).toBe("IMG");
   });
 
   it("forwards unhandled rejections", () => {

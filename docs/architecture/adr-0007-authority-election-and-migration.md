@@ -5,7 +5,7 @@
 - **Date:** 2026-08-01
 - **Owner:** Rocketcrab Nova planning (Phase 1)
 - **Related:** S3 (implementation), ADR-0006 (modes), B3 (split-brain),
-  B6 (mobile suspension), P2 (greeter migration)
+  B6 (mobile suspension), P2 (private invites and shell-host succession)
 
 ## Context
 
@@ -163,5 +163,7 @@ application, and run in CI.
 - A state-mode game continues after the authority closes its tab; no action
   commits twice after migration; a temporary partition converges (S3
   acceptance).
-- Greeter migration (P2) is separate from authority migration — greeter status
-  and game authority are different roles.
+- Shell-host succession (P2) is separate from authority migration — party
+  shell controls and game authority are different roles. The original creator
+  keeps shell controls while connected; otherwise the lowest connected member
+  hosts. Classic external-game provider hosts are not claimed to migrate.

@@ -61,7 +61,7 @@ function errorMessage(error: unknown): string {
 function PartyPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const { state, engine } = usePartyEngine();
+  const { engine } = usePartyEngine();
   const startedRef = useRef(false);
   const [attempt, setAttempt] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);

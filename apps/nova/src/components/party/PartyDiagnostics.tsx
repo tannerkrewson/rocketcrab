@@ -8,7 +8,7 @@ import type { PartyDiagnostics } from "../../lib/party/engine";
 export interface PartyDiagnosticsPanelProps {
   diagnostics: PartyDiagnostics | null;
   onRefresh: () => void;
-  /** Rendezvous greeter display name (kept accessible here, 10.7). */
+  /** Party shell host display name (kept accessible here, 10.7). */
   hostNameForDiagnostics?: string | null;
   /** Current internal authority display name (kept accessible here, 10.7). */
   authorityName?: string | null;
@@ -34,9 +34,9 @@ function connectionLabel(state: string): string {
 /**
  * Connection diagnostics for the party (P4): relay sockets, join errors,
  * peer latency samples, and the transport's identity — the same telemetry
- * the P1 adapter exposes. Purely informational. The greeter/authority role
- * summary (10.7) lives here too: those roles are diagnostic until S3
- * formalizes authority, so the lobby itself no longer shows them.
+ * the P1 adapter exposes. Purely informational. The shell-host/authority
+ * summary (10.7) lives here too: those roles are diagnostic, so the lobby
+ * itself does not show them.
  */
 export function PartyDiagnosticsPanel({
   diagnostics,

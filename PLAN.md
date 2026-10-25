@@ -277,13 +277,55 @@ but the full device checklist is still a release gate.
 
 ### 7. Final focused cleanup
 
-- [ ] Review use-party/use-arena/runtime-session subscriptions for
+- [x] Review use-party/use-arena/runtime-session subscriptions for
       useSyncExternalStore with stable subscriptions and immutable cached snapshots.
-- [ ] Review Dexie useLiveQuery for local saved games/cross-tab consistency; retain
+- [x] Review Dexie useLiveQuery for local saved games/cross-tab consistency; retain
       TanStack Query only where useful. Remove stale dependencies/utilities/docs
       and infrastructure made obsolete by preceding stages, not another rewrite.
-- [ ] Verify local library/editing, party lifecycle and arena; run final relevant
+- [x] Verify local library/editing, party lifecycle and arena; run final relevant
       tests/typecheck/build/bundle checks and summarize unresolved release gates.
+
+Stage 7 evidence: `usePartyEngine` now uses **`useSyncExternalStore`** with a
+stable subscribe callback and a snapshot ref updated only by engine emissions,
+so repeated renders reuse the same state object (new test asserts stable
+identity, one subscription, and update propagation). `PartyEngine` keeps its
+`onState` API for tests/non-React consumers; no engine internals changed. The
+arena hook intentionally keeps its effect-scoped `useState` subscription: its
+engine is created and disposed per mount, so there is no stable store to hand to
+`useSyncExternalStore` without restructuring the mount lifecycle; runtime-frame
+events are already colocated in that engine. No redundant global store was added.
+
+Local saved games stay on **TanStack Query** over the Dexie repository. Every
+mutation invalidates the list/detail queries and the browser default
+`refetchOnWindowFocus` refreshes a tab after another tab edits, so a
+`dexie-react-hooks` dependency and a second cache layer were not added; this
+decision and its cross-tab limitation are documented beside the hooks.
+
+Cleanup: removed an unused `cn` import and all remaining lint warnings (unused
+runtime protocol type imports, an unused test variable, unused classic test
+helper, an unnecessary spread in the in-memory peer sync, unused raw-progress
+type). Updated remaining stale “greeter” documentation to shell-host
+succession (ADR-0007, ADR-0012, Mobile Safari checklist, diagnostics comments)
+and marked the old editor-cohesion design doc as historical. No source modules
+are unused; probe scripts remain as historical evidence tooling, not shipped
+code.
+
+Final verification: **970 unit/property tests** (487 app, 146 nova-api, plus
+packages) and **87 infrastructure worker tests** pass; format, lint, typecheck,
+production build and bundle check pass; `npm audit` 0 vulnerabilities. Initial
+JS **205.9 KiB gzip** (unchanged 220 KiB budget), editor 212.0 KiB, CSS 45.9
+KiB. Playwright: Chromium + Firefox 40/40, WebKit 20/20 (Playwright Podman
+image). The heavy four-player arena S4 spec flaked once while Chromium and
+Firefox ran together under load and passed isolated (3.7 s); it also passed in
+the stage-6 full runs.
+
+Unresolved release gates (unchanged): physical-device Mobile Safari pass and
+the full device checklist; cross-network TURN with the deployed mint; a
+multi-hour party on one 24 h credential; human friend beta; deployment and live
+infrastructure verification (no deployment or billable resource was created).
+The HeroUI migration adds ~38.6 KiB gzip to the initial JS versus stage 5; it
+stays under the existing budget, and reducing imported HeroUI components is the
+first lever if headroom is needed later.
 
 ### Execution evidence
 

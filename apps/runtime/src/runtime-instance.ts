@@ -17,10 +17,8 @@
  * message (threat model T10; engineering rules 15/21).
  */
 import {
-  PROTOCOL_VERSION,
   parseRuntimeMessage,
   type GameApiEventMessage,
-  type GameLifecycleEventMessage,
   type GameMode,
   type RuntimeBootstrapMessage,
   type RuntimeErrorMessage,

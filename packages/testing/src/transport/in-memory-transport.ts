@@ -194,7 +194,7 @@ export class InMemoryTransport implements NovaTransport, InMemoryPeer {
    */
   syncPeers(peers: readonly TransportPeerInfo[]): void {
     const incoming = new Map(peers.map((peer) => [peer.connectionId, peer]));
-    for (const existing of [...this.peersList]) {
+    for (const existing of this.peersList) {
       if (!incoming.has(existing.connectionId)) {
         this.notifyPeerLeft(existing);
       }
