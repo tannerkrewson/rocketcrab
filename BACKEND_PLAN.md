@@ -229,15 +229,16 @@ No deployment, import, bucket, key, or paid resource was created.
 
 ## Final verification (this branch)
 
-- 970 unit/property tests + 91 infrastructure Worker tests pass.
-- Format, lint, typecheck, production build and bundle check pass; initial JS
-  205.9 KiB gzip against the unchanged 220 KiB budget.
+- 983 unit/property tests + 83 infrastructure Worker tests pass.
+- Format (warning-free), lint, typecheck, production build and bundle check
+  pass; initial JS 206.4 KiB gzip against the unchanged 220 KiB budget.
 - `tofu fmt -check`, `init -backend=false`, and `validate` pass (OpenTofu
-  1.13.2). The remote R2 backend and live applies were not exercised.
-- Playwright: Chromium/Firefox 39/40 in one parallel run (one static reload spec
-  flaked under load and passed isolated), WebKit 20/20. The earlier four-player
-  arena flake also passed three isolated repeats.
-- `npm audit`: 0 vulnerabilities.
+  1.13.2). A local `plan -refresh=false` with a dummy account ID produced the
+  expected two resources (Worker + workers.dev subdomain) and the
+  `RATE_LIMITER` binding. The remote R2 backend and live applies were not
+  exercised.
+- Playwright: Chromium/Firefox 40/40 twice under parallel load; WebKit 20/20.
+- `npm audit`: 0 vulnerabilities on this branch.
 
 Not done (require owner approval or live credentials): R2 bucket creation and
 remote-state init, relay import/apply, TURN key creation and Worker secrets,

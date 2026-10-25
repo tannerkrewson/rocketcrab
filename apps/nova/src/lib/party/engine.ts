@@ -1126,7 +1126,7 @@ export class PartyEngine {
       }
       // The transport "connection:state" handler settles the phase.
     } catch (error) {
-      this.addNotice("error", `Reconnect failed: ${errorMessage(error)}`);
+      this.addNotice("error", `Reconnect failed: ${connectionErrorMessage(error)}`);
       this.phaseDetail = `Reconnect failed (attempt ${this.reconnectAttempts}) — will retry automatically.`;
       this.emit();
       this.scheduleReconnectRetry();
