@@ -1171,6 +1171,12 @@ describe("party engine — M1 lifecycle: backgrounding, resume, and F11 rejoin",
     // connection id instead of sitting on the stale handle.
     lifecycle.hide();
     expect(b.engine.getState().connectionState).toBe("connected");
+    const reconnectSpy = vi.spyOn(
+      world.transports.find(
+        (t) => t.selfMemberId === b.memberId && t.connectionState === "connected",
+      )!,
+      "reconnect",
+    );
     lifecycle.show();
     await settle(world);
 
@@ -1181,6 +1187,9 @@ describe("party engine — M1 lifecycle: backgrounding, resume, and F11 rejoin",
     expect(bState.members).toHaveLength(2);
     // The other phone observed the leave + clean rejoin (F11: no stale peer).
     expect(a.engine.getState().members).toHaveLength(2);
+    // A live-but-silent link uses the transport's single reconnect primitive
+    // (fresh connection id), not a bespoke suspend/resume pair.
+    expect(reconnectSpy).toHaveBeenCalledTimes(1);
   });
 
   it("going offline enters the reconnect flow; coming back online reconnects automatically", async () => {
@@ -1215,6 +1224,19 @@ describe("party engine — M1 lifecycle: backgrounding, resume, and F11 rejoin",
     await settle(world);
     expect(a.engine.getState().phase).toBe("lobby");
     expect(a.engine.getState().reconnectAttempts).toBe(0);
+  });
+
+  it("shares one in-flight attempt across concurrent reconnect calls", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    await runCreate(a, world);
+    const privateTransport = world.transports.find((t) => t.selfMemberId === a.memberId)!;
+    await privateTransport.suspend();
+    await settle(world);
+    const resume = vi.spyOn(privateTransport, "resume");
+    await Promise.all([a.engine.reconnect(), a.engine.reconnect(), a.engine.reconnect()]);
+    expect(resume).toHaveBeenCalledTimes(1);
+    expect(a.engine.getState().phase).toBe("lobby");
   });
 
   it("reconnect() reports attempts while reconnecting and resets on success", async () => {
@@ -1285,17 +1307,6 @@ describe("party engine — M1 lifecycle: backgrounding, resume, and F11 rejoin",
 
     lifecycle.show();
     await settle(world);
-    const bAfter = b.engine.getState();
-    console.log(
-      "B after resume:",
-      JSON.stringify({
-        phase: bAfter.phase,
-        conn: bAfter.connectionState,
-        attempts: bAfter.reconnectAttempts,
-        notices: bAfter.notices.map((n) => n.message),
-        detail: bAfter.phaseDetail,
-      }),
-    );
     expect(b.engine.getState().phase).toBe("playing");
     expect(b.engine.getState().connectionState).toBe("connected");
     // The other phone kept playing through the backgrounding.

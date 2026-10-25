@@ -262,6 +262,43 @@ describe(
       expect(host.elections[0]?.term).toBe(2);
     });
 
+    it("ignores heartbeat and election claims from disconnected members or stale terms", async () => {
+      const { engine, host } = makeEngine("member-b");
+      await seedFollower(engine, 1, { count: 0 });
+      engine.handleAnnounce({ term: 1, authorityMemberId: "member-a", stateRevision: 1 });
+      expect(engine.getAuthorityMemberId()).toBe("member-a");
+
+      // Disconnected claimants are not evidence, whatever the term says.
+      host.connected.delete("member-c");
+      engine.handleHeartbeat({
+        term: 5,
+        authorityMemberId: "member-c",
+        stateRevision: 1,
+        heartbeatSeq: 1,
+      });
+      engine.handleElection({
+        term: 6,
+        candidateMemberId: "member-c",
+        observed: [{ memberId: "member-c", revision: 9 }],
+      });
+      expect(engine.getTerm()).toBe(1);
+      expect(engine.getAuthorityMemberId()).toBe("member-a");
+
+      // A connected higher-term claim still adopts.
+      engine.handleHeartbeat({
+        term: 2,
+        authorityMemberId: "member-b",
+        stateRevision: 1,
+        heartbeatSeq: 1,
+      });
+      expect(engine.getAuthorityMemberId()).toBe("member-b");
+      expect(engine.getTerm()).toBe(2);
+
+      // Stale terms never win.
+      engine.handleAnnounce({ term: 1, authorityMemberId: "member-a", stateRevision: 99 });
+      expect(engine.getAuthorityMemberId()).toBe("member-b");
+    });
+
     it("a higher-term heartbeat adopts the new authority (stale authority steps down)", async () => {
       const { engine } = makeEngine("member-b");
       engine.handleAnnounce({ term: 1, authorityMemberId: "member-a", stateRevision: 1 });

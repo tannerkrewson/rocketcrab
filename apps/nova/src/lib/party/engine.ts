@@ -544,8 +544,9 @@ export class PartyEngine {
 
   // M1 lifecycle bookkeeping (ADR-0012/B6).
   private pageWasHidden = false;
-  private offline = false;
   private reconnectAttempts = 0;
+  private reconnectInFlight: Promise<void> | null = null;
+  private resumeCheckInFlight = false;
   private reconnectRetryTimer: (() => void) | null = null;
 
   constructor(config: PartyEngineConfig = {}) {
@@ -1065,7 +1066,6 @@ export class PartyEngine {
     this.joinStage = null;
     this.gameStarted = false;
     this.reconnectAttempts = 0;
-    this.offline = false;
     this.pageWasHidden = false;
     this.cancelReconnectRetry();
     clearPartyRecovery();
@@ -1077,10 +1077,20 @@ export class PartyEngine {
    * Reconnect after the party connection dropped (reconnect screen, M1).
    * Also handles the F11 case: a backgrounded phone whose WebRTC link iOS
    * killed silently — the transport still reports "connected", so the
-   * engine forces a fresh connection (suspend + resume) to rejoin cleanly
-   * instead of sitting on a stale handle.
+   * engine asks the transport for a fresh connection instead of sitting on a
+   * stale handle. Single-flight: duplicate lifecycle events, retry timers and
+   * user actions share one attempt.
    */
-  async reconnect(): Promise<void> {
+  reconnect(): Promise<void> {
+    if (this.reconnectInFlight !== null) return this.reconnectInFlight;
+    const attempt = this.runReconnect().finally(() => {
+      if (this.reconnectInFlight === attempt) this.reconnectInFlight = null;
+    });
+    this.reconnectInFlight = attempt;
+    return attempt;
+  }
+
+  private async runReconnect(): Promise<void> {
     const transport = this.party?.privateTransport;
     if (transport === undefined || this.leaving) {
       return;
@@ -1095,11 +1105,10 @@ export class PartyEngine {
     }
     try {
       if (transport.connectionState === "connected") {
-        // A link that looks alive but whose peers stopped answering (the
-        // backgrounded-phone case): force a fresh connection id (F11).
-        await transport.suspend();
-      }
-      if (transport.connectionState === "suspended") {
+        // One primitive for a fresh connection id, including the F11 case
+        // where the link looks alive but the peers stopped answering.
+        await transport.reconnect();
+      } else if (transport.connectionState === "suspended") {
         await transport.resume();
       } else if (
         transport.connectionState === "idle" ||
@@ -1202,7 +1211,6 @@ export class PartyEngine {
     if (this.leaving || !this.isInPartyPhase(this.phase)) {
       return;
     }
-    this.offline = true;
     if (this.phase === "reconnecting") {
       this.scheduleReconnectRetry();
     } else {
@@ -1212,7 +1220,6 @@ export class PartyEngine {
 
   /** The network came back (`online`): retry immediately. */
   private handleOnline(): void {
-    this.offline = false;
     if (this.leaving || this.phase !== "reconnecting") {
       return;
     }
@@ -1258,7 +1265,16 @@ export class PartyEngine {
    * whose peers stopped answering (F11 — iOS killed the WebRTC link while
    * backgrounded) get a fresh connection.
    */
-  private async checkPartyConnectionAfterResume(): Promise<void> {
+  private checkPartyConnectionAfterResume(): void {
+    // visibilitychange + pageshow both fire on resume; one probe is enough.
+    if (this.resumeCheckInFlight) return;
+    this.resumeCheckInFlight = true;
+    void this.runResumeCheck().finally(() => {
+      this.resumeCheckInFlight = false;
+    });
+  }
+
+  private async runResumeCheck(): Promise<void> {
     const transport = this.party?.privateTransport;
     if (transport === undefined || this.leaving) {
       return;
@@ -2044,7 +2060,6 @@ export class PartyEngine {
         return;
       }
       this.reconnectAttempts = 0;
-      this.offline = false;
       this.cancelReconnectRetry();
       // gameStarted (not session.isStarted()) decides the phase: followers
       // never broadcast start themselves, so isStarted() is false for them

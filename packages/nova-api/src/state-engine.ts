@@ -773,22 +773,14 @@ export class NovaStateEngine {
     stateHash?: string;
     eligibleMemberIds?: readonly string[];
   }): void {
-    if (this.disposed) return;
-    if (
-      message.authorityMemberId !== this.selfMemberId &&
-      !this.host.isConnected(message.authorityMemberId)
-    ) {
-      return; // stale announcement from a member that is no longer connected
-    }
-    if (message.term < this.term) return; // stale term
+    if (!this.acceptsAuthorityClaim(message.term, message.authorityMemberId)) return;
     this.recordObservation(
       message.authorityMemberId,
       message.stateRevision,
       message.stateHash ?? null,
     );
-    if (message.term > this.term) {
-      this.adoptTerm(message.term, message.authorityMemberId);
-      this.authorityStateRevision = Math.max(this.authorityStateRevision, message.stateRevision);
+    if (this.adoptHigherTerm(message.term, message.authorityMemberId, message.stateRevision)) {
+      // adopted
     } else if (message.authorityMemberId === this.authorityMemberId) {
       // The current authority re-announced (reconnect / revision bump).
       this.authorityStateRevision = Math.max(this.authorityStateRevision, message.stateRevision);
@@ -820,17 +812,8 @@ export class NovaStateEngine {
     stateRevision: number;
     heartbeatSeq: number;
   }): void {
-    if (this.disposed) return;
-    if (message.term < this.term) return; // stale term
-    if (
-      message.authorityMemberId !== this.selfMemberId &&
-      !this.host.isConnected(message.authorityMemberId)
-    ) {
-      return;
-    }
-    if (message.term > this.term) {
-      this.adoptTerm(message.term, message.authorityMemberId);
-      this.authorityStateRevision = Math.max(this.authorityStateRevision, message.stateRevision);
+    if (!this.acceptsAuthorityClaim(message.term, message.authorityMemberId)) return;
+    if (this.adoptHigherTerm(message.term, message.authorityMemberId, message.stateRevision)) {
       this.lastHeartbeatAt = this.now();
     } else if (message.authorityMemberId === this.authorityMemberId) {
       this.authorityStateRevision = Math.max(this.authorityStateRevision, message.stateRevision);
@@ -851,14 +834,7 @@ export class NovaStateEngine {
     candidateMemberId: string;
     observed: readonly { memberId: string; revision: number; stateHash?: string }[];
   }): void {
-    if (this.disposed) return;
-    if (message.term < this.term) return; // stale term
-    if (
-      message.candidateMemberId !== this.selfMemberId &&
-      !this.host.isConnected(message.candidateMemberId)
-    ) {
-      return; // stale campaign from a member that is no longer connected
-    }
+    if (!this.acceptsAuthorityClaim(message.term, message.candidateMemberId)) return;
     for (const observation of message.observed) {
       this.recordObservation(
         observation.memberId,
@@ -1074,6 +1050,24 @@ export class NovaStateEngine {
   }
 
   /** Adopt `authorityMemberId` as the authority for `term` (monotonic). */
+  /**
+   * Shared gate for term/authority claims (announce, heartbeat, election):
+   * stale terms are ignored, and a claim from a currently disconnected member
+   * that is not this shell is not evidence (a reconnect re-announces).
+   */
+  private acceptsAuthorityClaim(term: number, memberId: string): boolean {
+    if (this.disposed || term < this.term) return false;
+    return memberId === this.selfMemberId || this.host.isConnected(memberId);
+  }
+
+  /** Adopt a strictly higher term (single place that bumps the observed revision). */
+  private adoptHigherTerm(term: number, memberId: string, stateRevision: number): boolean {
+    if (term <= this.term) return false;
+    this.adoptTerm(term, memberId);
+    this.authorityStateRevision = Math.max(this.authorityStateRevision, stateRevision);
+    return true;
+  }
+
   private adoptTerm(term: number, authorityMemberId: string): void {
     if (term < this.term) return;
     const wasAuthority = this.authorityMemberId === this.selfMemberId;

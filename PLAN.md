@@ -166,15 +166,65 @@ deployment, no live mint, and no physical-device/cross-network TURN proof.
 
 ### 5. Multiplayer resilience simplification
 
-- [ ] Review party/state/simulation engines, membership, heartbeat/grace/reconnect
+- [x] Review party/state/simulation engines, membership, heartbeat/grace/reconnect
       timers, reload/Safari recovery, elections/migration, split-brain and errors.
-- [ ] Consolidate redundant mechanisms without weakening serial authority, IDs,
+- [x] Consolidate redundant mechanisms without weakening serial authority, IDs,
       dedup, revision/snapshot validity, private views, catch-up, migration,
       ordered simulation inputs/restoration. Keep game-facing APIs unchanged.
-- [ ] Review term/revision/hash voting conservatively: pause/recover rather than
+- [x] Review term/revision/hash voting conservatively: pause/recover rather than
       accept conflicting histories; no CRDT/state-machine framework.
-- [ ] Strengthen authority-loss/partition/stale-action/reconnect/Safari/late-join
+- [x] Strengthen authority-loss/partition/stale-action/reconnect/Safari/late-join
       tests; record simplifications and remaining protections; commit.
+
+Stage 5 evidence: reviewed the party shell (`apps/nova/src/lib/party/engine.ts`),
+the authoritative state engine (`packages/nova-api/src/state-engine.ts`), the
+simulation engine, session dispatch/restore buffering, and the arena harness
+against the existing authority-loss/partition/migration suites. The protocol
+already keeps each protection distinct (history dedup + queued-redelivery dedup +
+per-actor `seq`; term gates; revision/hash conflict votes; restore window;
+action buffering and re-send after migration), so nothing was removed there.
+
+Consolidations:
+
+- **One reconnect primitive.** The shell's reconnect path called
+  `suspend()` then `resume()` for a live-but-silent link (F11). It now calls the
+  transport's contracted `reconnect()` (fresh connection id, peers observe
+  leave+join), keeping `resume()` only for an already-suspended transport and
+  `join()` for a torn-down room. Covers both real and in-memory transports.
+- **Single-flight reconnect.** Duplicate lifecycle events, retry timers and user
+  taps used to start overlapping attempts. `reconnect()` now shares one
+  in-flight promise and the attempt counter increments once.
+- **Single-flight resume probe.** `visibilitychange` and `pageshow` both fire on
+  resume; the F11 health probe ran twice and issued two reconnects. A
+  `resumeCheckInFlight` guard runs one probe per resume.
+- **Dead state removed.** The party engine's `offline` flag was written in four
+  places and never read; removed.
+- **One authority-claim gate.** `handleAnnounce`, `handleHeartbeat`,
+  `handleElection` and snapshots repeated the same stale-term/disconnected-claim
+  checks and `adoptTerm` + `authorityStateRevision` update. Extracted
+  `acceptsAuthorityClaim`/`adoptHigherTerm` used by announce, heartbeat and
+  election; snapshot-specific adoption semantics are unchanged.
+
+Retained deliberately (no CRDT/state-machine framework, no game-facing API
+change): serial authority with term/revision ordering, deterministic lowest-member
+election, grace/heartbeat/restore/winner-wait timers, same-revision hash voting
+that keeps local state and converges by snapshot push, `authorityStateRevision`,
+processed-action history and ack replay, dispatch buffering during elections and
+re-send on authority change, ordered simulation inputs/restoration, bounded
+snapshots and action payloads, private views and catch-up, and the reload/Safari
+recovery path.
+
+Verification: 990 unit/property tests (496 nova app, 146 nova-api, plus packages),
+87 infrastructure worker tests; typecheck, format, lint, production build and
+bundle check pass; initial JS 167.3 KiB gzip (220 KiB budget unchanged). New
+tests assert the single reconnect primitive is used for a silent link, concurrent
+`reconnect()` calls share one attempt, and disconnected/stale heartbeat,
+election and announce claims are ignored while a connected higher term adopts.
+Existing suites already cover silent partitions converging on one authority,
+authority suspension/rejoin as follower, migration without double commits,
+buffered actions during restore, stale/timed-out/duplicate actions, and Safari
+background/resume. Chromium app Playwright 20/20 and real Nostr/WebRTC 4/4 pass.
+Remaining risk unchanged: no physical-device multi-hour proof.
 
 ### 6. HeroUI v3 full replacement
 
