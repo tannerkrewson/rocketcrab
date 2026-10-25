@@ -51,7 +51,7 @@ headers so the browser can read it.
 | Variable             | Default                                                                                                            | Meaning                                                                                                                                                                                             |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ORIGIN_ALLOWLIST`   | `https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173` | Comma-separated origins allowed to call the mint endpoint. Each entry may be a full origin (`scheme://host[:port]`); a trailing slash is tolerated. Matching against the request `Origin` is exact. |
-| `RATE_LIMIT_PER_MIN` | `20`                                                                                                               | Requests per minute per client IP for the Workers Rate Limiting binding (60s window).                                                                                                               |
+| `RATE_LIMIT_PER_MIN` | `60`                                                                                                               | Requests per minute per client IP for the Workers Rate Limiting binding (60s window).                                                                                                               |
 
 A single-variable env override (unset = the default above). The OpenTofu root
 represents these values as `plain_text` bindings; do not use a separate
@@ -60,7 +60,7 @@ Wrangler variable deployment path. For example:
 ```hcl
 edge_worker_variables = {
   ORIGIN_ALLOWLIST   = "https://rocketcrab.com,https://staging.rocketcrab.com"
-  RATE_LIMIT_PER_MIN = "20"
+  RATE_LIMIT_PER_MIN = "60"
 }
 ```
 
@@ -200,6 +200,13 @@ unlike a module-global `Map`.
 The in-memory fixed-window counter remains only as a fallback when the binding
 is absent (`wrangler dev`, unit tests) or throws. That fallback is per-isolate
 and must not be treated as a durable limit.
+
+**Headroom for carrier NAT:** the default is **60 mints/min per IP per
+location**. A 10-player party sharing one public IP needs 10 mints for
+simultaneous joins; reconnects reuse the page's cached 24 h credential and do
+not mint. Reloads and retries therefore fit comfortably within 60 even when
+several parties share a carrier-NAT address. A dedicated test sends ten
+simultaneous joins from one IP and asserts all succeed.
 
 ### 2. Optional zone rate rule
 

@@ -6,7 +6,7 @@ locals {
 
   bundle_dir                 = var.worker_bundle_dir == null ? "${path.module}/.build" : abspath(var.worker_bundle_dir)
   edge_bundle_file           = "${local.bundle_dir}/edge/worker.js"
-  turn_rate_limit_per_min    = tonumber(lookup(var.edge_worker_variables, "RATE_LIMIT_PER_MIN", "20"))
+  turn_rate_limit_per_min    = tonumber(lookup(var.edge_worker_variables, "RATE_LIMIT_PER_MIN", "60"))
   turn_rate_limit_expression = var.turn_custom_route != null ? var.turn_custom_route.rate_limit_expression : var.turn_rate_limit_expression
 
   edge_bindings = concat(

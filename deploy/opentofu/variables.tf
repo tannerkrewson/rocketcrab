@@ -54,7 +54,7 @@ variable "edge_worker_variables" {
   type        = map(string)
   default = {
     ORIGIN_ALLOWLIST   = "https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173"
-    RATE_LIMIT_PER_MIN = "20"
+    RATE_LIMIT_PER_MIN = "60"
   }
 
   validation {
@@ -69,9 +69,9 @@ variable "edge_worker_variables" {
 
   validation {
     condition = (
-      can(tonumber(lookup(var.edge_worker_variables, "RATE_LIMIT_PER_MIN", "20"))) &&
-      tonumber(lookup(var.edge_worker_variables, "RATE_LIMIT_PER_MIN", "20")) >= 1 &&
-      tonumber(lookup(var.edge_worker_variables, "RATE_LIMIT_PER_MIN", "20")) == floor(tonumber(lookup(var.edge_worker_variables, "RATE_LIMIT_PER_MIN", "20")))
+      can(tonumber(lookup(var.edge_worker_variables, "RATE_LIMIT_PER_MIN", "60"))) &&
+      tonumber(lookup(var.edge_worker_variables, "RATE_LIMIT_PER_MIN", "60")) >= 1 &&
+      tonumber(lookup(var.edge_worker_variables, "RATE_LIMIT_PER_MIN", "60")) == floor(tonumber(lookup(var.edge_worker_variables, "RATE_LIMIT_PER_MIN", "60")))
     )
     error_message = "edge_worker_variables.RATE_LIMIT_PER_MIN must be a positive whole number when supplied."
   }

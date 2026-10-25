@@ -33,6 +33,22 @@ Cloudflare does not transpile TypeScript on upload, so OpenTofu consumes the
 generated JavaScript bundle rather than pretending that raw TypeScript is
 deployable.
 
+## Authentication safety
+
+`wrangler login` uses Cloudflare OAuth and grants this machine a **write-capable**
+session for the account; it is not a read-only token. For the initial inventory,
+run only read commands (`wrangler whoami`, `wrangler deployments list`, `wrangler
+kv namespace list`, `wrangler r2 bucket list`, `wrangler pages project list`) and
+do not run `deploy`, `secret put`, `r2 bucket create/delete`, or any apply until
+the owner explicitly authorizes it. Revoke the Wrangler session in the Cloudflare
+dashboard when finished if desired.
+
+OpenTofu does **not** use the Wrangler OAuth session. It reads a separate scoped
+`CLOUDFLARE_API_TOKEN` from the environment. Create that token only when the
+owner approves provisioning, with Workers Scripts edit (and Zone read/routes/
+ruleset edit if a custom hostname or zone rule is chosen). The R2 state bucket
+uses a separate R2 S3 access key (`AWS_ACCESS_KEY_ID`/`AWS_SECRET_ACCESS_KEY`).
+
 ## Safe validation (no state)
 
 From the repository root, use Wrangler only for a local compile dry run. The

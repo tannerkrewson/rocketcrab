@@ -109,18 +109,18 @@ describe("normalizeOrigin / originAllowed / corsHeaders", () => {
 });
 
 describe("parseRateLimit / clientIp / RateLimiter", () => {
-  it("defaults RATE_LIMIT_PER_MIN to 20 and parses positive integers", () => {
-    expect(DEFAULT_RATE_LIMIT_PER_MIN).toBe(20);
-    expect(parseRateLimit(undefined)).toBe(20);
+  it("defaults RATE_LIMIT_PER_MIN to 60 and parses positive integers", () => {
+    expect(DEFAULT_RATE_LIMIT_PER_MIN).toBe(60);
+    expect(parseRateLimit(undefined)).toBe(60);
     expect(parseRateLimit("25")).toBe(25);
     expect(parseRateLimit("  3 ")).toBe(3);
   });
 
   it("falls back to the default for invalid or non-positive values", () => {
-    expect(parseRateLimit("abc")).toBe(20);
-    expect(parseRateLimit("")).toBe(20);
-    expect(parseRateLimit("0")).toBe(20);
-    expect(parseRateLimit("-5")).toBe(20);
+    expect(parseRateLimit("abc")).toBe(60);
+    expect(parseRateLimit("")).toBe(60);
+    expect(parseRateLimit("0")).toBe(60);
+    expect(parseRateLimit("-5")).toBe(60);
   });
 
   it("reads the client IP from CF-Connecting-IP (edge-set, not spoofable)", () => {

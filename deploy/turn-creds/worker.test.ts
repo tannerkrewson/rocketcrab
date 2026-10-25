@@ -207,17 +207,17 @@ describe("isPort53IceUrl / filterPort53IceServers (rocketcrab-23s.2)", () => {
 });
 
 describe("parseRateLimit / clientIp / RateLimiter (rocketcrab-23s.3)", () => {
-  it("defaults RATE_LIMIT_PER_MIN to 10 and parses positive integers", () => {
-    expect(parseRateLimit(undefined)).toBe(10);
+  it("defaults RATE_LIMIT_PER_MIN to 60 and parses positive integers", () => {
+    expect(parseRateLimit(undefined)).toBe(60);
     expect(parseRateLimit("25")).toBe(25);
     expect(parseRateLimit("  3 ")).toBe(3);
   });
 
   it("falls back to the default for invalid or non-positive values", () => {
-    expect(parseRateLimit("abc")).toBe(10);
-    expect(parseRateLimit("")).toBe(10);
-    expect(parseRateLimit("0")).toBe(10);
-    expect(parseRateLimit("-5")).toBe(10);
+    expect(parseRateLimit("abc")).toBe(60);
+    expect(parseRateLimit("")).toBe(60);
+    expect(parseRateLimit("0")).toBe(60);
+    expect(parseRateLimit("-5")).toBe(60);
   });
 
   it("reads the client IP from CF-Connecting-IP (edge-set, not spoofable)", () => {
@@ -524,6 +524,15 @@ describe("handleTurnCredsRequest (rocketcrab-23s.3: per-IP rate limiting)", () =
     // A different IP is unaffected.
     expect((await mintFromIp("203.0.113.2")).status).toBe(200);
     expect(fetchMock.mock.calls).toHaveLength(3);
+  });
+
+  it("allows ten simultaneous joins from one carrier-NAT IP (party headroom)", async () => {
+    const env = makeEnv({ RATE_LIMIT_PER_MIN: "60" });
+    const responses = await Promise.all(
+      Array.from({ length: 10 }, () => handleTurnCredsRequest(mintRequest(ALLOWED_ORIGIN), env)),
+    );
+    expect(responses.every((res) => res.status === 200)).toBe(true);
+    expect(fetchMock.mock.calls).toHaveLength(10);
   });
 
   it("resets a client's window after 60 seconds", async () => {

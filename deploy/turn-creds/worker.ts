@@ -71,8 +71,15 @@ export const MINT_TTL_SECONDS = 86_400; // 24 h; Cloudflare allows at most 48 h.
 /** Fixed rate-limit window length (milliseconds). */
 export const RATE_LIMIT_WINDOW_MS = 60_000;
 
-/** Requests per minute per IP when RATE_LIMIT_PER_MIN is unset. */
-export const DEFAULT_RATE_LIMIT_PER_MIN = 10;
+/**
+ * Requests per minute per IP when RATE_LIMIT_PER_MIN is unset.
+ *
+ * 60/min leaves headroom for a 10-player party behind one carrier-NAT address
+ * (ten simultaneous joins + reloads/retries) without adding authentication.
+ * Reconnects reuse the cached credential and do not mint. The binding is
+ * per-location and approximate, so this is a backstop, not a hard quota.
+ */
+export const DEFAULT_RATE_LIMIT_PER_MIN = 60;
 
 /**
  * Cap on tracked rate-limit keys; past it, expired windows are pruned so a
@@ -84,7 +91,7 @@ const MAX_RATE_LIMIT_KEYS = 10_000;
 export interface TurnCredsEnv {
   /** Comma-separated origin allowlist. Unset -> DEFAULT_ORIGIN_ALLOWLIST. */
   ORIGIN_ALLOWLIST?: string;
-  /** Requests per minute per client IP. Unset -> 10. */
+  /** Requests per minute per client IP. Unset -> 60. */
   RATE_LIMIT_PER_MIN?: string;
   /** Cloudflare Realtime TURN key id (Worker secret). */
   TURN_KEY_ID?: string;

@@ -22,10 +22,10 @@ with their own tests.
 
 Non-secret variables are OpenTofu `plain_text` bindings:
 
-| Variable             | Default                                                                                                            | Meaning                               |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------- |
-| `ORIGIN_ALLOWLIST`   | `https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173` | Origins allowed to call either route  |
-| `RATE_LIMIT_PER_MIN` | `20`                                                                                                               | In-worker per-IP limit for each route |
+| Variable             | Default                                                                                                            | Meaning                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------ |
+| `ORIGIN_ALLOWLIST`   | `https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173` | Origins allowed to call either route |
+| `RATE_LIMIT_PER_MIN` | `60`                                                                                                               | Platform per-IP limit for each route |
 
 Worker secrets (never in Git or OpenTofu state):
 
@@ -51,11 +51,14 @@ Local development reads the same names from a gitignored
   charset for interpolated path params. Never an open proxy. The relay owns
   only `/`; unknown paths are `404`.
 - **Rate limiting.** The primary limit is the Cloudflare Workers Rate Limiting
-  binding (`RATE_LIMITER`, keyed by client IP and route). It survives isolate
-  restarts and is approximate/per-location. The in-memory fixed-window counter
-  is only a local-dev/test fallback when that binding is absent. A zone-level
-  Cloudflare rate rule is optional (needs a proxied custom route or Custom
-  Domain and a WAF plan that supports `ip.src`); it is off by default.
+  binding (`RATE_LIMITER`, keyed by client IP and route; default **60/min per
+  route per location**). It survives isolate restarts and is
+  approximate/per-location. 60/min covers ten simultaneous joins behind one
+  carrier-NAT IP plus reloads; reconnects do not mint. The in-memory
+  fixed-window counter is only a local-dev/test fallback when that binding is
+  absent. A zone-level Cloudflare rate rule is optional (needs a proxied custom
+  route or Custom Domain and a WAF plan that supports `ip.src`); it is off by
+  default.
 - **Emergency controls.** Disable issuance by removing/rotating the TURN
   secrets, or revoke credentials at Cloudflare:
   `POST /v1/turn/keys/<key>/credentials/<username>/revoke`. Revoke/rotate the

@@ -47,7 +47,7 @@ TURN credential endpoint (`rocketcrab-23s`).
 | Variable             | Default                                                                                                            | Meaning                                                                                                                                                                                    |
 | -------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `ORIGIN_ALLOWLIST`   | `https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173` | Comma-separated origins allowed to use the relay. Each entry may be a full origin (`scheme://host[:port]`); a trailing slash is tolerated. Matching against the request `Origin` is exact. |
-| `RATE_LIMIT_PER_MIN` | `20`                                                                                                               | Requests per minute per client IP for the Workers Rate Limiting binding (60s window).                                                                                                      |
+| `RATE_LIMIT_PER_MIN` | `60`                                                                                                               | Requests per minute per client IP for the Workers Rate Limiting binding (60s window).                                                                                                      |
 
 A single-variable env override (unset = the default above). Neither variable
 is sensitive. The OpenTofu root represents these values as `plain_text`
@@ -56,7 +56,7 @@ bindings; do not use a separate Wrangler variable deployment path.
 ```hcl
 edge_worker_variables = {
   ORIGIN_ALLOWLIST   = "https://rocketcrab.com,https://staging.rocketcrab.com"
-  RATE_LIMIT_PER_MIN = "20"
+  RATE_LIMIT_PER_MIN = "60"
 }
 ```
 
@@ -91,7 +91,7 @@ production.
 The primary control is the Cloudflare Workers Rate Limiting binding
 (`RATE_LIMITER`), keyed by `relay:<client-ip>` for this route. Over the limit,
 the worker answers `429` with `Retry-After` **before any forwarding**. The
-window is 60s; the limit is `RATE_LIMIT_PER_MIN` (default **20/min**). The
+window is 60s; the limit is `RATE_LIMIT_PER_MIN` (default **60/min**). The
 binding is approximate and counted per Cloudflare location, but it survives
 isolate restarts; the in-memory fixed-window counter is only a local-dev/test
 fallback when the binding is absent or throws. `OPTIONS` preflights are

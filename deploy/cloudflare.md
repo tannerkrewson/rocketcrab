@@ -59,10 +59,10 @@ CORS relay; the same script gains the `/turn` TURN-mint route on apply.
   in `deploy/opentofu/`.
 - **Env vars (non-secret; OpenTofu `plain_text` bindings):**
 
-  | Variable             | Default                                                                                                            | Meaning                                               |
-  | -------------------- | ------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
-  | `ORIGIN_ALLOWLIST`   | `https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173` | Origins allowed to call either endpoint               |
-  | `RATE_LIMIT_PER_MIN` | `20`                                                                                                               | In-worker per-IP fixed-window limit for each endpoint |
+  | Variable             | Default                                                                                                            | Meaning                                 |
+  | -------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------- |
+  | `ORIGIN_ALLOWLIST`   | `https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173` | Origins allowed to call either endpoint |
+  | `RATE_LIMIT_PER_MIN` | `60`                                                                                                               | Platform per-IP limit for each endpoint |
 
 - **Worker secrets:** `TURN_KEY_ID` + `TURN_KEY_API_TOKEN` (never committed;
   set out of band). The OpenTofu root preserves existing secret bindings but

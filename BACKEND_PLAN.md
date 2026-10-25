@@ -209,8 +209,11 @@ No deployment, import, bucket, key, or paid resource was created.
       adding a Durable Object.
 - [x] Replace the per-isolate in-memory rate limiter as the primary control with
       the Cloudflare Workers Rate Limiting binding (`RATE_LIMITER`, per route +
-      IP); keep in-memory only as a local-dev/test fallback. The optional zone
-      rule is off by default because Cloudflare Free lacks `ip.src`.
+      IP); keep in-memory only as a local-dev/test fallback. The threshold is
+      **60/min per IP per location**, covering ten simultaneous joins behind a
+      carrier-NAT address plus reloads/retries (reconnects reuse the credential
+      and do not mint). The optional zone rule is off by default because
+      Cloudflare Free lacks `ip.src`.
 - [x] Keep one Worker, but restrict the relay to `POST /` and return `404` for
       every other path, so new TURN/API paths cannot inherit relay behavior.
 - [x] Add `keep_bindings = ["secret_text"]` to the Worker resource so an
@@ -229,7 +232,7 @@ No deployment, import, bucket, key, or paid resource was created.
 
 ## Final verification (this branch)
 
-- 983 unit/property tests + 83 infrastructure Worker tests pass.
+- 983 unit/property tests + 84 infrastructure Worker tests pass.
 - Format (warning-free), lint, typecheck, production build and bundle check
   pass; initial JS 206.4 KiB gzip against the unchanged 220 KiB budget.
 - `tofu fmt -check`, `init -backend=false`, and `validate` pass (OpenTofu

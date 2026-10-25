@@ -24,7 +24,7 @@
  *      endpoint (clients cannot change it), and interpolated path params
  *      (netgames.io game ids) are validated against a strict charset.
  *   3. Per-IP rate limiting (rocketcrab-9fv.3.5): the Cloudflare Workers Rate
- *      Limiting binding (RATE_LIMIT_PER_MIN, default 20/min), rejecting with
+ *      Limiting binding (RATE_LIMIT_PER_MIN, default 60/min), rejecting with
  *      429 + Retry-After BEFORE any forwarding. The in-memory fixed-window
  *      counter is only a local-dev/test fallback.
  *
@@ -109,8 +109,12 @@ export const DEFAULT_ORIGIN_ALLOWLIST = [
 /** Fixed rate-limit window length (milliseconds). */
 export const RATE_LIMIT_WINDOW_MS = 60_000;
 
-/** Requests per minute per IP when RATE_LIMIT_PER_MIN is unset. */
-export const DEFAULT_RATE_LIMIT_PER_MIN = 20;
+/**
+ * Requests per minute per IP when RATE_LIMIT_PER_MIN is unset. The relay and
+ * TURN routes share this binding configuration; 60/min covers a 10-player
+ * carrier-NAT burst while remaining a meaningful abuse backstop.
+ */
+export const DEFAULT_RATE_LIMIT_PER_MIN = 60;
 
 /**
  * Cap on tracked rate-limit keys; past it, expired windows are pruned so a
@@ -122,7 +126,7 @@ const MAX_RATE_LIMIT_KEYS = 10_000;
 export interface RelayEnv {
   /** Comma-separated origin allowlist. Unset -> DEFAULT_ORIGIN_ALLOWLIST. */
   ORIGIN_ALLOWLIST?: string;
-  /** Requests per minute per client IP. Unset -> 20. */
+  /** Requests per minute per client IP. Unset -> 60. */
   RATE_LIMIT_PER_MIN?: string;
   /** Cloudflare Workers Rate Limiting binding (absent in local dev/tests). */
   RATE_LIMITER?: RateLimitBinding;
