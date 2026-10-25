@@ -125,12 +125,12 @@ CORS relay; the same script gains the `/turn` TURN-mint route on apply.
 
 ## 4. Secrets table
 
-| Secret                  | Scope     | Where set                                              | Needed by                                              |
-| ----------------------- | --------- | ------------------------------------------------------ | ------------------------------------------------------ |
-| `CLOUDFLARE_API_TOKEN`  | Repo (CI) | GitHub → Settings → Secrets and variables → Actions    | OpenTofu plan/review credentials (when CI is approved) |
-| `CLOUDFLARE_ACCOUNT_ID` | Repo (CI) | GitHub → Settings → Secrets and variables → Actions    | OpenTofu variable or operator plan input               |
-| `TURN_KEY_ID`           | Worker    | `wrangler secret put TURN_KEY_ID` (edge Worker)        | TURN mint: Realtime credentials API path segment       |
-| `TURN_KEY_API_TOKEN`    | Worker    | `wrangler secret put TURN_KEY_API_TOKEN` (edge Worker) | TURN mint: `Authorization: Bearer` header              |
+| Secret                  | Scope     | Where set                                              | Needed by                                        |
+| ----------------------- | --------- | ------------------------------------------------------ | ------------------------------------------------ |
+| `CLOUDFLARE_API_TOKEN`  | Operator  | Local environment (never committed)                    | OpenTofu refresh-enabled plan/apply              |
+| `CLOUDFLARE_ACCOUNT_ID` | Repo (CI) | GitHub → Settings → Secrets and variables → Actions    | OpenTofu variable or operator plan input         |
+| `TURN_KEY_ID`           | Worker    | `wrangler secret put TURN_KEY_ID` (edge Worker)        | TURN mint: Realtime credentials API path segment |
+| `TURN_KEY_API_TOKEN`    | Worker    | `wrangler secret put TURN_KEY_API_TOKEN` (edge Worker) | TURN mint: `Authorization: Bearer` header        |
 
 Recommended repo-token scope for the CI token: **Workers Scripts → Edit**
 (plan/import/apply), **Workers KV Storage → Edit** (KV namespace create/verify),
