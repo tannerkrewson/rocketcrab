@@ -85,6 +85,7 @@ canonical index or an ADR:
   condensed, prompt-embedded version is `docs/api/nova-api-ai-reference.md`.
 - `docs/game-author-debugging.md` — the authoring loop, editor diagnostics,
   common failure messages, and how to debug a real party.
+- `docs/history/` — archived simplification evidence and superseded runbooks.
 - `docs/testing/` — milestone findings and checklists, each linked from its
   owning ADR (e.g. the S4 state-mode vertical slice from ADR-0006).
 - `docs/editor-cohesion-design.md` — the editor third-pass UI blueprint

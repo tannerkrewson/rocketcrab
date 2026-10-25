@@ -1,4 +1,5 @@
 import { Button as HeroButton, type ButtonProps as HeroButtonProps } from "@heroui/react";
+import { buttonVariants } from "@heroui/styles";
 import { cn } from "../../lib/cn";
 
 /** Nova button intents, mapped onto HeroUI's semantic variants. */
@@ -82,11 +83,5 @@ export function buttonStyles(
   className?: string,
   soft = false,
 ) {
-  const hero = heroVariant(variant, soft);
-  return cn(
-    "button font-bold",
-    size === "lg" ? "button--lg" : size === "sm" ? "button--sm" : "button--md",
-    `button--${hero}`,
-    className,
-  );
+  return cn("font-bold", buttonVariants({ variant: heroVariant(variant, soft), size }), className);
 }

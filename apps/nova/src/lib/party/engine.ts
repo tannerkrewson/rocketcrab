@@ -468,8 +468,7 @@ class PartySimulationExecutor implements NovaSimulationExecutor {
 export class PartyEngine {
   private readonly defaults: PartyEngineDefaults;
   private identity: PartyMemberIdentity;
-  private readonly schedule?: Scheduler;
-  private readonly scheduleFn: Scheduler;
+  private readonly schedule: Scheduler;
   private readonly derive?: PartySecretDerivation;
   private readonly diagnosticsProvider?: () => unknown;
   private readonly lifecycle: PartyLifecycleSource;
@@ -558,8 +557,7 @@ export class PartyEngine {
       peerConnectTimeoutMs: config.peerConnectTimeoutMs ?? DEFAULT_PEER_CONNECT_TIMEOUT_MS,
     };
     this.identity = config.identity ?? localPartyIdentity();
-    this.schedule = config.schedule;
-    this.scheduleFn = config.schedule ?? defaultScheduler;
+    this.schedule = config.schedule ?? defaultScheduler;
     this.now = config.now ?? (() => Date.now());
     this.derive = config.derive;
     this.diagnosticsProvider = config.diagnostics;
@@ -1329,7 +1327,7 @@ export class PartyEngine {
         cancel();
         resolve(alive);
       };
-      const cancel = this.scheduleFn(() => finish(false), PARTY_HEALTH_PROBE_TIMEOUT_MS);
+      const cancel = this.schedule(() => finish(false), PARTY_HEALTH_PROBE_TIMEOUT_MS);
       void Promise.resolve(ping.call(transport, connectionId))
         .then((pingMs) => finish(pingMs !== null))
         .catch(() => finish(false));
@@ -1346,7 +1344,7 @@ export class PartyEngine {
       RECONNECT_RETRY_CAP_MS,
       RECONNECT_RETRY_BASE_MS * 2 ** Math.max(0, this.reconnectAttempts - 1),
     );
-    this.reconnectRetryTimer = this.scheduleFn(() => {
+    this.reconnectRetryTimer = this.schedule(() => {
       this.reconnectRetryTimer = null;
       if (this.leaving || this.phase !== "reconnecting") {
         return;
@@ -1700,7 +1698,7 @@ export class PartyEngine {
         unsubscribe();
         resolve();
       });
-      cancel = this.scheduleFn(() => {
+      cancel = this.schedule(() => {
         if (settled) {
           return;
         }

@@ -218,7 +218,7 @@ Historical tasks: `rocketcrab-ont` (investigation), `rocketcrab-iha` (blocked de
 Re-probed the F10 `GOOD_RELAYS` set after the Nova console began logging
 constant relay failures every few seconds (offchain.pub web-of-trust
 rejection, relay.damus.io rate-limit, relay.nostr.info kind rejection).
-Probe scripts: `scripts/probes/` (`probe-relays.mjs`, `probe-burst.mjs`,
+Probe scripts (removed in the backend cleanup; results archived below):
 `probe-candidates.mjs`, `probe-final-set.mjs`) and the browser-level
 `e2e-trystero/e2e/discovery-probe.spec.ts` (real Trystero 0.25.3 via the
 adapter harness; run with `npm run test:e2e:trystero -- --grep "discovery probe"`).
@@ -338,7 +338,7 @@ socket-OPEN ones.
 # Launch-readiness re-probe (2026-10-24)
 
 The August relay observations were re-tested from the current developer
-network with a stricter probe (`scripts/probes/probe-trystero-kinds.mjs`).
+network with the stricter (now removed) Trystero-kinds probe.
 This probe fixes two limits of the August runs: it publishes across a spread
 of the kinds Trystero actually derives (`charCodeSum(topic) % 10000 + 20000`,
 i.e. 20000–29999) instead of two fixed kinds, and it bursts 12 events to

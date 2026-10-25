@@ -148,18 +148,48 @@ added.
 
 ## Stage 5 — Focused cleanup (only if time/context allows)
 
-- [ ] Merge `schedule`/`scheduleFn` injection.
-- [ ] Use HeroUI’s `buttonVariants` instead of the hand-written BEM map.
-- [ ] Remove obsolete probe scripts and archive historical docs; keep `PLAN.md`
+- [x] Merge `schedule`/`scheduleFn` injection.
+- [x] Use HeroUI’s `buttonVariants` instead of the hand-written BEM map.
+- [x] Remove obsolete probe scripts and archive historical docs; keep `PLAN.md`
       focused and linked.
-- [ ] Consolidate obvious test duplication; remove dead deps/docs.
-- [ ] Do not split PartyEngine, add a GamePlane abstraction, rewrite authority,
+- [x] Consolidate obvious test duplication; remove dead deps/docs.
+- [x] Do not split PartyEngine, add a GamePlane abstraction, rewrite authority,
       or rebuild the arena.
+
+Evidence: the party engine now has one scheduler field (`config.schedule ??
+defaultScheduler`) instead of a dead duplicate `scheduleFn`. `buttonStyles` calls
+HeroUI’s `buttonVariants`, deleting the hand-maintained size/variant BEM map.
+Removed the obsolete `scripts/probes/` directory (its results stay in the
+testing findings), removed the unused direct `tailwind-variants` dependency
+(HeroUI still brings it transitively), and moved the old execution evidence to
+`docs/history/nova-simplification-evidence.md` (linked from `PLAN.md` and the
+README docs index). `PLAN.md` now marks the backlog as historical and points to
+this backend plan. Test-harness duplication was reviewed but not merged across
+packages: the fake clocks/world builders differ between the party, protocol and
+Nova app suites, and forcing a shared helper would couple test packages for
+little deletion; no production code changed for that item. No PartyEngine split,
+GamePlane abstraction, authority rewrite or arena rebuild was attempted.
 
 ## Stage 6 — Beta gates (no deployment here)
 
-- [ ] Record the private-beta checklist and required approvals: deploy Worker,
+- [x] Record the private-beta checklist and required approvals: deploy Worker,
       then frontend; test real TURN/TLS 443, signaling failure, Mobile Safari,
       authority migration, late join/source transfer, network switch; measure
       join success, direct-vs-relay, recovery and TURN cost.
-- [ ] Leave all deployment / billable-resource actions pending owner approval.
+- [x] Leave all deployment / billable-resource actions pending owner approval.
+
+Private-beta gates (all require explicit owner approval; none run here):
+
+1. Provision/import infrastructure: R2 state bucket + scoped token, import the
+   live relay, review plan, approve `tofu apply` (adds `/turn`, KV, secrets),
+   set TURN key secrets, optionally configure a custom route/rate rule.
+2. Deploy the static origins with the edge origin in `VITE_TURN_CREDS_ORIGIN`
+   and `VITE_CLASSIC_RELAY_ORIGIN` after the Worker is verified.
+3. Verify forced TURN over `turns:` TLS 443 (direct paths blocked), signaling
+   relay failure/recovery, Mobile Safari background/resume, authority loss and
+   migration, late join/source transfer, and network switching.
+4. Measure join success, invite-to-connected time, direct-vs-relayed selection,
+   recovery success, TURN bytes/cost, and issuance failures; review with the
+   owner before any broader release.
+
+No deployment, import, bucket, key, or paid resource was created.
