@@ -52,7 +52,9 @@ Local development reads the same names from a gitignored
   only `/`; unknown paths are `404`.
 - **Rate limiting.** The primary limit is the Cloudflare Workers Rate Limiting
   binding (`RATE_LIMITER`, keyed by client IP and route; default **60/min per
-  route per location**). It survives isolate restarts and is
+  route per location**). TURN and the relay use distinct keys
+  (`turn:<ip>` / `relay:<ip>`) inside the binding, so they have independent
+  counters and a TURN join burst cannot consume Classic's budget. It survives isolate restarts and is
   approximate/per-location. 60/min covers ten simultaneous joins behind one
   carrier-NAT IP plus reloads; reconnects do not mint. The in-memory
   fixed-window counter is only a local-dev/test fallback when that binding is

@@ -89,7 +89,9 @@ production.
 ## Rate limiting (`rocketcrab-9fv.3.5`)
 
 The primary control is the Cloudflare Workers Rate Limiting binding
-(`RATE_LIMITER`), keyed by `relay:<client-ip>` for this route. Over the limit,
+(`RATE_LIMITER`), keyed by `relay:<client-ip>` for this route. TURN uses
+`turn:<client-ip>`, so the two routes have independent counters and a TURN
+join burst cannot consume the relay's budget. Over the limit,
 the worker answers `429` with `Retry-After` **before any forwarding**. The
 window is 60s; the limit is `RATE_LIMIT_PER_MIN` (default **60/min**). The
 binding is approximate and counted per Cloudflare location, but it survives

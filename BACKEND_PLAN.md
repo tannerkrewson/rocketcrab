@@ -232,7 +232,7 @@ No deployment, import, bucket, key, or paid resource was created.
 
 ## Final verification (this branch)
 
-- 983 unit/property tests + 84 infrastructure Worker tests pass.
+- 983 unit/property tests + 85 infrastructure Worker tests pass.
 - Format (warning-free), lint, typecheck, production build and bundle check
   pass; initial JS 206.4 KiB gzip against the unchanged 220 KiB budget.
 - `tofu fmt -check`, `init -backend=false`, and `validate` pass (OpenTofu

@@ -201,6 +201,10 @@ The in-memory fixed-window counter remains only as a fallback when the binding
 is absent (`wrangler dev`, unit tests) or throws. That fallback is per-isolate
 and must not be treated as a durable limit.
 
+**Separate from Classic:** TURN uses the `turn:<ip>` key in the shared binding;
+the Classic relay uses `relay:<ip>`, so the two routes have independent
+per-IP counters.
+
 **Headroom for carrier NAT:** the default is **60 mints/min per IP per
 location**. A 10-player party sharing one public IP needs 10 mints for
 simultaneous joins; reconnects reuse the page's cached 24 h credential and do
