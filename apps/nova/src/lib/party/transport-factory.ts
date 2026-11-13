@@ -31,7 +31,7 @@ export function configuredRelays(): string[] {
 export interface TrysteroPartyTransportFactoryOptions {
   /**
    * Minted short-lived TURN servers (Trystero `TurnServerConfig` shape).
-   * Omit for builds without VITE_TURN_CREDS_ORIGIN or after a mint failure
+   * Omit for builds without VITE_EDGE_ORIGIN or after a mint failure
    * (graceful degradation: the party proceeds without TURN).
    */
   readonly turnConfig?: readonly TurnServerConfigLike[];

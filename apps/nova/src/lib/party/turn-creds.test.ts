@@ -2,17 +2,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fetchTurnCredentials,
   TURN_CREDS_TTL_MS,
-  turnCredsBaseUrl,
   turnCredsConfigured,
   type TurnCredentialsResult,
 } from "./turn-creds";
+import { edgeOrigin } from "../edge";
 
 /**
  * TURN credential mint client tests (task rocketcrab-23s, P0). The client
  * (apps/nova/src/lib/party/turn-creds.ts) fetches short-lived credentials
  * from the mint at party-join time; the fetch is mocked (relay.test.ts
- * pattern). The mint origin comes from the VITE_TURN_CREDS_ORIGIN build-time
- * env (same pattern as VITE_CLASSIC_RELAY_ORIGIN) and is empty when the
+ * pattern). The mint origin comes from the VITE_EDGE_ORIGIN build-time
+ * env and is empty when the
  * build pins no origin — then no fetch happens at all.
  */
 
@@ -49,25 +49,25 @@ it("keeps one party credential inside Cloudflare's 48-hour maximum", () => {
   expect(TURN_CREDS_TTL_MS).toBeLessThanOrEqual(48 * 60 * 60 * 1000);
 });
 
-describe("turnCredsBaseUrl / turnCredsConfigured", () => {
+describe("edgeOrigin / turnCredsConfigured", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
   });
 
-  it("defaults to unconfigured (no VITE_TURN_CREDS_ORIGIN)", () => {
-    expect(turnCredsBaseUrl()).toBe("");
+  it("defaults to unconfigured (no VITE_EDGE_ORIGIN)", () => {
+    expect(edgeOrigin()).toBe("");
     expect(turnCredsConfigured()).toBe(false);
   });
 
-  it("honours the VITE_TURN_CREDS_ORIGIN build-time pin", () => {
-    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", MINT_ORIGIN);
-    expect(turnCredsBaseUrl()).toBe(MINT_ORIGIN);
+  it("honours the VITE_EDGE_ORIGIN build-time pin", () => {
+    vi.stubEnv("VITE_EDGE_ORIGIN", MINT_ORIGIN);
+    expect(edgeOrigin()).toBe(MINT_ORIGIN);
     expect(turnCredsConfigured()).toBe(true);
   });
 
   it("trims whitespace and trailing slashes from the pinned origin", () => {
-    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", `  ${MINT_ORIGIN}/  `);
-    expect(turnCredsBaseUrl()).toBe(MINT_ORIGIN);
+    vi.stubEnv("VITE_EDGE_ORIGIN", `  ${MINT_ORIGIN}/  `);
+    expect(edgeOrigin()).toBe(MINT_ORIGIN);
   });
 });
 
@@ -83,13 +83,13 @@ describe("fetchTurnCredentials", () => {
     const result = await fetchTurnCredentials();
     expect(result).toMatchObject({ ok: false });
     if (!result.ok) {
-      expect(result.reason).toMatch(/VITE_TURN_CREDS_ORIGIN/);
+      expect(result.reason).toMatch(/VITE_EDGE_ORIGIN/);
     }
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("POSTs to the mint origin root and returns only credential-bearing entries as turnConfig", async () => {
-    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", MINT_ORIGIN);
+    vi.stubEnv("VITE_EDGE_ORIGIN", MINT_ORIGIN);
     const fetchMock = responseMock(200, MINTED_BODY);
     vi.stubGlobal("fetch", fetchMock);
 
@@ -115,7 +115,7 @@ describe("fetchTurnCredentials", () => {
   });
 
   it("passes through entries whose urls is a single string", async () => {
-    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", MINT_ORIGIN);
+    vi.stubEnv("VITE_EDGE_ORIGIN", MINT_ORIGIN);
     vi.stubGlobal(
       "fetch",
       responseMock(200, {
@@ -134,7 +134,7 @@ describe("fetchTurnCredentials", () => {
   });
 
   it("reports unavailability instead of falsely configured TURN for a STUN-only response", async () => {
-    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", MINT_ORIGIN);
+    vi.stubEnv("VITE_EDGE_ORIGIN", MINT_ORIGIN);
     vi.stubGlobal(
       "fetch",
       responseMock(200, { iceServers: [{ urls: "stun:stun.example.com:19302" }] }),
@@ -146,14 +146,14 @@ describe("fetchTurnCredentials", () => {
   it.each([null, false, 42, "not-an-object"])(
     "degrades on a primitive JSON body: %j",
     async (body) => {
-      vi.stubEnv("VITE_TURN_CREDS_ORIGIN", MINT_ORIGIN);
+      vi.stubEnv("VITE_EDGE_ORIGIN", MINT_ORIGIN);
       vi.stubGlobal("fetch", responseMock(200, body));
       await expect(fetchTurnCredentials()).resolves.toMatchObject({ ok: false });
     },
   );
 
   it("degrades on a non-2xx response (403 origin / 5xx mint outage)", async () => {
-    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", MINT_ORIGIN);
+    vi.stubEnv("VITE_EDGE_ORIGIN", MINT_ORIGIN);
     vi.stubGlobal("fetch", responseMock(403, { error: { code: "origin_not_allowed" } }));
     let result = await fetchTurnCredentials();
     expect(result).toMatchObject({ ok: false });
@@ -170,7 +170,7 @@ describe("fetchTurnCredentials", () => {
   });
 
   it("degrades on a network error", async () => {
-    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", MINT_ORIGIN);
+    vi.stubEnv("VITE_EDGE_ORIGIN", MINT_ORIGIN);
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => {
@@ -185,7 +185,7 @@ describe("fetchTurnCredentials", () => {
   });
 
   it("degrades when the response is not JSON", async () => {
-    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", MINT_ORIGIN);
+    vi.stubEnv("VITE_EDGE_ORIGIN", MINT_ORIGIN);
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({
@@ -204,7 +204,7 @@ describe("fetchTurnCredentials", () => {
   });
 
   it("degrades when the response shape is unexpected (no iceServers array)", async () => {
-    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", MINT_ORIGIN);
+    vi.stubEnv("VITE_EDGE_ORIGIN", MINT_ORIGIN);
     vi.stubGlobal("fetch", responseMock(200, { nope: 1 }));
     const result = await fetchTurnCredentials();
     expect(result).toMatchObject({ ok: false });
@@ -214,7 +214,7 @@ describe("fetchTurnCredentials", () => {
   });
 
   it("degrades on timeout (aborts the fetch and never throws)", async () => {
-    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", MINT_ORIGIN);
+    vi.stubEnv("VITE_EDGE_ORIGIN", MINT_ORIGIN);
     // A fetch that only settles when the abort signal fires: the real
     // timeout aborts it, exactly like a hung mint in production.
     const hangingFetch = vi.fn(
@@ -233,7 +233,7 @@ describe("fetchTurnCredentials", () => {
   });
 
   it("drops malformed entries but still succeeds (per-entry degradation)", async () => {
-    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", MINT_ORIGIN);
+    vi.stubEnv("VITE_EDGE_ORIGIN", MINT_ORIGIN);
     vi.stubGlobal(
       "fetch",
       responseMock(200, {

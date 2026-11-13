@@ -1,5 +1,5 @@
 import type { ClassicGame } from "./types";
-import { relayRequest } from "./relay";
+import { relayRequest, type RelayEndpointKey } from "./relay";
 import { postJson, randomRoomId } from "./url";
 
 /**
@@ -109,11 +109,10 @@ const drawphoneBase: Omit<ClassicGame, "id" | "name" | "frameOrigins" | "connect
 };
 
 const drawphoneConnect =
-  (baseUrl: string, relayEndpoint: string) =>
+  (baseUrl: string, relayEndpoint: RelayEndpointKey) =>
   async (): Promise<{ player: { url: string; customQueryParams: { code: string } } }> => {
     // The room-creation endpoint sends no CORS headers (7.7.3), so the room
-    // is created through the scoped relay (deploy/relay, live at
-    // VITE_CLASSIC_RELAY_ORIGIN, 7.33) instead of a browser-side fetch.
+    // is created through the edge Worker's relay instead of a browser fetch.
     const { gameCode } = await relayRequest<{ gameCode?: string }>(relayEndpoint);
     if (typeof gameCode !== "string") {
       throw new Error("Drawphone didn't return a game code.");

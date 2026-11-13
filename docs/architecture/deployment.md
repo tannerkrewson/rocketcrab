@@ -138,36 +138,29 @@ repo's Pages settings).
 
 Inputs:
 
-| Input               | Used for | Meaning                                                                                                                          |
-| ------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `origin`            | both     | `nova` (main app) or `runtime` (runtime origin)                                                                                  |
-| `base`              | both     | Vite base of THIS site: `/` for user/org sites and custom domains; `/<repo>/` for project sites                                  |
-| `runtime_origin`    | nova     | The runtime origin, e.g. `https://runtime.nova.example` — REQUIRED; baked into the iframe URL and CSP `frame-src`                |
-| `runtime_base`      | nova     | Base path of the runtime site when it is a project site, e.g. `/runtime/` (default `/`)                                          |
-| `main_origin`       | runtime  | The main origin for the exact-origin bootstrap check; derived (strip `runtime.`) unless the deployment is not on a subdomain     |
-| `relay_origin`      | nova     | Optional classic-game CORS relay origin, baked in as `VITE_CLASSIC_RELAY_ORIGIN` and allowed in CSP `connect-src`                |
-| `turn_creds_origin` | nova     | Optional TURN credential mint origin, baked in as `VITE_TURN_CREDS_ORIGIN` and allowed in CSP `connect-src`; empty disables TURN |
-| `trystero_relays`   | nova     | Optional comma-separated, owner-approved Nostr relay URLs (`VITE_TRYSTERO_RELAYS`); empty uses the reviewed pinned set           |
+| Input             | Used for | Meaning                                                                                                                                                           |
+| ----------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `origin`          | both     | `nova` (main app) or `runtime` (runtime origin)                                                                                                                   |
+| `base`            | both     | Vite base of THIS site: `/` for user/org sites and custom domains; `/<repo>/` for project sites                                                                   |
+| `runtime_origin`  | nova     | The runtime origin, e.g. `https://runtime.nova.example` — REQUIRED; baked into the iframe URL and CSP `frame-src`                                                 |
+| `runtime_base`    | nova     | Base path of the runtime site when it is a project site, e.g. `/runtime/` (default `/`)                                                                           |
+| `main_origin`     | runtime  | The main origin for the exact-origin bootstrap check; derived (strip `runtime.`) unless the deployment is not on a subdomain                                      |
+| `edge_origin`     | nova     | Nova edge Worker origin (Classic relay + TURN mint), baked in as `VITE_EDGE_ORIGIN` and allowed in CSP `connect-src`; defaults to production, empty disables both |
+| `trystero_relays` | nova     | Optional comma-separated, owner-approved Nostr relay URLs (`VITE_TRYSTERO_RELAYS`); empty uses the reviewed pinned set                                            |
 
 Build-time pins (also documented in `apps/nova/.env.example` and
 `apps/runtime/.env.example`): `VITE_RUNTIME_ORIGIN`, `VITE_RUNTIME_BASE`
 (nova); `VITE_MAIN_ORIGIN` (runtime). Optional nova pins:
-`VITE_CLASSIC_RELAY_ORIGIN`, `VITE_TURN_CREDS_ORIGIN`, and
+`VITE_EDGE_ORIGIN` and
 `VITE_TRYSTERO_RELAYS` (see the workflow inputs).
 
-### Cloudflare runtime boundary
+### Cloudflare edge Worker
 
-GitHub Actions Pages deployment remains the only publisher for the static Nova
-and runtime origins. The Cloudflare edge Worker is separate infrastructure:
-their supported resources are modeled in [`deploy/opentofu/`](../../deploy/opentofu/),
-while [`deploy/cloudflare.md`](../../deploy/cloudflare.md) records live state
-and the human-only account, state, and secret decisions. The infrastructure
-workflow is validation-only and never applies OpenTofu or deploys with
-Wrangler. The Classic CORS relay is already live; the same single edge Worker
-gains the TURN-mint route and platform rate-limit binding only after the owner
-approves the migration plan. Wrangler is used only to compile
-the dry-run bundle and to set/rotate Worker secrets — never to deploy the
-production Worker.
+GitHub Actions Pages is the only publisher for the static Nova and runtime
+origins. The one piece of server-side code, the Cloudflare edge Worker
+(Classic relay + TURN mint), is configured by `deploy/edge/wrangler.toml` and
+deployed with `npm run edge:deploy`; [`deploy/cloudflare.md`](../../deploy/cloudflare.md)
+is its runbook and live-state record.
 
 ## 7. Local HTTPS development (both origins)
 
@@ -201,25 +194,12 @@ Static origins deploy through GitHub Actions Pages only:
    (strategy (a)) or nothing (strategy (b) project sites).
 3. Run "Deploy to GitHub Pages" with the input table above.
 
-Cloudflare infrastructure deploys through one manual, approved path:
-
-1. Build the edge bundle with the documented Wrangler `--dry-run` command
-   (absolute output path).
-2. `tofu init -backend-config=backend.hcl`, then review a refreshed
-   `tofu plan` (requires the R2 remote state). CI validates
-   formatting/configuration only; it never plans, applies, or deploys a Worker.
-3. The owner approves and an operator runs `tofu apply`. This is the only
-   mechanism that changes the Worker, its bindings, route, domain or rate rule.
-4. Set/rotate Worker secrets with `wrangler secret put` (values never in Git or
-   state).
-5. **Order matters for `/turn`:** apply the Worker first and verify `/turn`,
-   then rebuild/redeploy the static app with the edge origin in
-   `VITE_TURN_CREDS_ORIGIN` (the client appends `/turn`). Classic relay builds
-   keep using the same origin root.
-6. Roll back the Worker by applying the previous reviewed commit; roll back the
-   static origins by re-running Pages on the previous commit. Emergency TURN
-   controls (disable issuance, revoke credentials, rotate the TURN key) are in
-   `deploy/edge/README.md` and `deploy/cloudflare.md`.
+The edge Worker deploys with `npm run edge:deploy` (see
+[`deploy/cloudflare.md`](../../deploy/cloudflare.md)). Deploy it before a
+static build that points `VITE_EDGE_ORIGIN` at it. Roll back the Worker with
+`npx --yes wrangler@4.161.0 rollback --config deploy/edge/wrangler.toml` or by
+redeploying an earlier commit; roll back the static origins by re-running
+Pages on the previous commit.
 
 ### Verify the built artifacts locally (no host required)
 

@@ -32,7 +32,7 @@ React + TanStack Router + HeroUI v3 in apps/nova).
   → the S4 vertical slice).
 - New docs need an owner link at creation time. Unreferenced docs get
   linked or deleted — never orphaned.
-- Cloudflare infrastructure state and the recreate-without-Terraform
-  runbook live in `deploy/cloudflare.md`. Record every infra change there
-  (dashboard/MCP edits included); CI workflows are the deploy source of
-  truth.
+- The only backend is the Cloudflare edge Worker: `deploy/edge/wrangler.toml`
+  is its config source of truth and `npm run edge:deploy` its only deploy
+  path. Its runbook and live state live in `deploy/cloudflare.md`; record
+  every change made outside `wrangler.toml` there (dashboard, secrets).

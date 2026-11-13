@@ -67,25 +67,14 @@ on:
         required: false
         type: string
         default: ""
-      relay_origin:
+      edge_origin:
         description: >-
-          (nova only) Origin of the classic CORS relay worker, e.g.
-          https://rocketcrab-cors-relay.<account>.workers.dev. Baked into the
-          build as VITE_CLASSIC_RELAY_ORIGIN and allowlisted in the app CSP
-          connect-src. Empty disables the relay path.
+          (nova only) Origin of the Nova edge Worker (Classic relay at /,
+          TURN mint at /turn). Baked in as VITE_EDGE_ORIGIN and allowlisted
+          in the CSP connect-src. Clear it to build without relay and TURN.
         required: false
         type: string
-        default: ""
-      turn_creds_origin:
-        description: >-
-          (nova only) Origin of the edge Worker that serves TURN minting at
-          /turn, e.g. https://rocketcrab-cors-relay.<account>.workers.dev.
-          Baked into the build as VITE_TURN_CREDS_ORIGIN and allowlisted in
-          the app CSP connect-src so the join-time mint fetch works. Empty
-          disables TURN entirely (parties work exactly as before).
-        required: false
-        type: string
-        default: ""
+        default: https://rocketcrab-edge.tannerkrewson.workers.dev
       trystero_relays:
         description: >-
           (nova only) Optional comma-separated Nostr relay URLs for party
@@ -127,8 +116,7 @@ jobs:
         env:
           VITE_RUNTIME_ORIGIN: ${{ inputs.runtime_origin }}
           VITE_RUNTIME_BASE: ${{ inputs.runtime_base }}
-          VITE_CLASSIC_RELAY_ORIGIN: ${{ inputs.relay_origin }}
-          VITE_TURN_CREDS_ORIGIN: ${{ inputs.turn_creds_origin }}
+          VITE_EDGE_ORIGIN: ${{ inputs.edge_origin }}
           VITE_TRYSTERO_RELAYS: ${{ inputs.trystero_relays }}
 
       - name: Build Runtime origin

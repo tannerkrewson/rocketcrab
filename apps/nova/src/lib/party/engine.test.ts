@@ -1680,7 +1680,7 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     const world = makeWorld();
     const fetchSpy = vi.fn();
     vi.stubGlobal("fetch", fetchSpy);
-    // No VITE_TURN_CREDS_ORIGIN stub → unconfigured build; the real mint
+    // No VITE_EDGE_ORIGIN stub → unconfigured build; the real mint
     // client short-circuits before touching fetch.
     const player = makeDefaultFactoryPlayer(world);
     await runCreate(player, world);
@@ -1696,7 +1696,7 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
   });
 
   it("mint success → turnConfig baked into the default factory + configured diagnostic", async () => {
-    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", "https://turn-creds.example.workers.dev");
+    vi.stubEnv("VITE_EDGE_ORIGIN", "https://turn-creds.example.workers.dev");
     const world = makeWorld();
     const turnConfig = [
       {
@@ -1721,7 +1721,7 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
   });
 
   it("mint failure (network/403/5xx/timeout) → party still creates WITHOUT TURN + warn notice", async () => {
-    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", "https://turn-creds.example.workers.dev");
+    vi.stubEnv("VITE_EDGE_ORIGIN", "https://turn-creds.example.workers.dev");
     const world = makeWorld();
     const player = makeDefaultFactoryPlayer(world, {
       turnCreds: async (): Promise<TurnCredentialsResult> => ({
@@ -1745,7 +1745,7 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
   });
 
   it("mints ONCE and reuses the cached turnConfig across setup attempts", async () => {
-    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", "https://turn-creds.example.workers.dev");
+    vi.stubEnv("VITE_EDGE_ORIGIN", "https://turn-creds.example.workers.dev");
     const world = makeWorld();
     const turnConfig = [
       {
@@ -1774,7 +1774,7 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
   });
 
   it("mints again only after the 24 h lease expires, never mutating live peers", async () => {
-    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", "https://turn-creds.example.workers.dev");
+    vi.stubEnv("VITE_EDGE_ORIGIN", "https://turn-creds.example.workers.dev");
     const world = makeWorld();
     const turnConfig = [{ urls: "turn:one", username: "u1", credential: "c1" }];
     const turnCreds = vi.fn(async (): Promise<TurnCredentialsResult> => ({ ok: true, turnConfig }));
@@ -1796,7 +1796,7 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
   });
 
   it("does not mint when the transport factory is injected (tests/embedders)", async () => {
-    vi.stubEnv("VITE_TURN_CREDS_ORIGIN", "https://turn-creds.example.workers.dev");
+    vi.stubEnv("VITE_EDGE_ORIGIN", "https://turn-creds.example.workers.dev");
     const world = makeWorld();
     const turnCreds = vi.fn(async (): Promise<TurnCredentialsResult> => ({
       ok: true,

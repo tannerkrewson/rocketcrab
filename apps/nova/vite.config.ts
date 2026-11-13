@@ -63,27 +63,16 @@ function cspMetaPlugin(): Plugin {
         ...(runtimeOrigin === "" ? [] : [runtimeOrigin]),
         ...CLASSIC_FRAME_ORIGINS,
       ];
-      // Scoped CORS relay origin (rocketcrab-9fv.7.7.5): when the deploy
-      // workflow sets VITE_CLASSIC_RELAY_ORIGIN, allow the classic
-      // room-creation relay in connect-src. Empty by default — the classic
-      // games keep their documented direct-fetch behavior until then.
-      const relayOrigin = process.env.VITE_CLASSIC_RELAY_ORIGIN?.trim() ?? "";
-      const relayConnectSrc = relayOrigin === "" ? "" : ` ${new URL(relayOrigin).origin}`;
-      // TURN credential mint origin (P0, rocketcrab-23s): same pattern —
-      // when the deploy workflow sets VITE_TURN_CREDS_ORIGIN, allow the
-      // mint in connect-src so the join-time fetch can read its response
-      // under the strict CSP. Empty by default: builds without the env var
-      // never fetch TURN credentials at all.
-      const turnCredsOrigin = process.env.VITE_TURN_CREDS_ORIGIN?.trim() ?? "";
-      const turnCredsConnectSrc =
-        turnCredsOrigin === "" ? "" : ` ${new URL(turnCredsOrigin).origin}`;
+      // Nova edge Worker (Classic relay + TURN mint), when the build sets one.
+      const edgeOrigin = process.env.VITE_EDGE_ORIGIN?.trim() ?? "";
+      const edgeConnectSrc = edgeOrigin === "" ? "" : ` ${new URL(edgeOrigin).origin}`;
       const csp = [
         "default-src 'self'",
         "script-src 'self'",
         "style-src 'self' 'unsafe-inline'",
         "img-src 'self' data: blob:",
         "font-src 'self' data:",
-        `connect-src 'self' wss: ws:${relayConnectSrc}${turnCredsConnectSrc}`,
+        `connect-src 'self' wss: ws:${edgeConnectSrc}`,
         "media-src 'self' blob:",
         "worker-src 'self' blob:",
         "object-src 'none'",

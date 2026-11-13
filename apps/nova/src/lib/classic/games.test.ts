@@ -93,23 +93,23 @@ describe("classic room-creation flows (client-side connectToGame)", () => {
   });
 
   it("surfaces a readable error when the room-creation relay fails", async () => {
-    vi.stubEnv("VITE_CLASSIC_RELAY_ORIGIN", "https://relay.example.net");
+    vi.stubEnv("VITE_EDGE_ORIGIN", "https://relay.example.net");
     vi.stubGlobal(
       "fetch",
       vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => ({ ok: false, status: 503 })),
     );
     await expect(findClassicGame("drawphone")!.connectToGame()).rejects.toThrow(
-      /CORS relay request failed \(HTTP 503\)/,
+      /relay request failed \(HTTP 503\)/,
     );
   });
 
   // ---- scoped CORS relay path (rocketcrab-9fv.7.7.5) ---------------------
-  // With VITE_CLASSIC_RELAY_ORIGIN set (relay deployed), CORS-blocked games
+  // With VITE_EDGE_ORIGIN set (relay deployed), CORS-blocked games
   // create rooms through the relay instead of the direct (CORS-failing)
   // fetch. Without it they keep the direct path (covered above).
 
   it("drawphone creates the room through the relay when configured", async () => {
-    vi.stubEnv("VITE_CLASSIC_RELAY_ORIGIN", "https://relay.example.net");
+    vi.stubEnv("VITE_EDGE_ORIGIN", "https://relay.example.net");
     const fetchMock = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => ({
       ok: true,
       status: 200,
@@ -123,12 +123,12 @@ describe("classic room-creation flows (client-side connectToGame)", () => {
       customQueryParams: { code: "ABC123" },
     });
     const [url, init] = fetchMock.mock.calls[0]!;
-    expect(url).toBe("https://relay.example.net");
+    expect(url).toBe("https://relay.example.net/");
     expect(JSON.parse(String(init?.body))).toEqual({ endpoint: "drawphone-new" });
   });
 
   it("outofcontext.party routes the game+version payload through the relay", async () => {
-    vi.stubEnv("VITE_CLASSIC_RELAY_ORIGIN", "https://relay.example.net");
+    vi.stubEnv("VITE_EDGE_ORIGIN", "https://relay.example.net");
     const fetchMock = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => ({
       ok: true,
       status: 200,
@@ -139,7 +139,7 @@ describe("classic room-creation flows (client-side connectToGame)", () => {
     const connected = await findClassicGame("ooc-story")!.connectToGame();
     expect(connected.player).toEqual({ url: "https://outofcontext.party/lobby/RC42" });
     const [url, init] = fetchMock.mock.calls[0]!;
-    expect(url).toBe("https://relay.example.net");
+    expect(url).toBe("https://relay.example.net/");
     expect(JSON.parse(String(init?.body))).toEqual({
       endpoint: "ooc-rocketcrab",
       body: { game: "story", version: 1 },
@@ -147,7 +147,7 @@ describe("classic room-creation flows (client-side connectToGame)", () => {
   });
 
   it("netgames.io asks the relay to follow the redirect with the game id", async () => {
-    vi.stubEnv("VITE_CLASSIC_RELAY_ORIGIN", "https://relay.example.net");
+    vi.stubEnv("VITE_EDGE_ORIGIN", "https://relay.example.net");
     const fetchMock = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => ({
       ok: true,
       status: 200,
@@ -158,7 +158,7 @@ describe("classic room-creation flows (client-side connectToGame)", () => {
     const connected = await findClassicGame("netgamesio-avalon")!.connectToGame();
     expect(connected.player).toEqual({ url: "https://netgames.io/games/avalon/ROOM-1" });
     const [url, init] = fetchMock.mock.calls[0]!;
-    expect(url).toBe("https://relay.example.net");
+    expect(url).toBe("https://relay.example.net/");
     expect(JSON.parse(String(init?.body))).toEqual({
       endpoint: "netgamesio-new",
       urlId: "avalon",
@@ -166,7 +166,7 @@ describe("classic room-creation flows (client-side connectToGame)", () => {
   });
 
   it("relay-configured blocked games (spyfall, werewolf, snakeout) keep their URL shapes", async () => {
-    vi.stubEnv("VITE_CLASSIC_RELAY_ORIGIN", "https://relay.example.net");
+    vi.stubEnv("VITE_EDGE_ORIGIN", "https://relay.example.net");
     const fetchMock = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => ({
       ok: true,
       status: 200,

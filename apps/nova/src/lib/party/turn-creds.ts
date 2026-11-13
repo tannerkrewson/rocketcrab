@@ -1,38 +1,17 @@
 /**
- * Client side of the TURN credential mint (task rocketcrab-23s, P0).
+ * Client of the TURN credential mint (deploy/edge/turn.ts, `POST
+ * {VITE_EDGE_ORIGIN}/turn`). The engine mints once per party at join time
+ * and reuses the 24 h credential for reconnects.
  *
- * Nova is backendless, so cross-network WebRTC needs short-lived TURN
- * credentials from the one serverless endpoint the app talks to: the mint
- * (deploy/turn-creds/worker.ts) mints Cloudflare Realtime credentials at
- * party-join time. It is deployed at VITE_TURN_CREDS_ORIGIN (same pattern
- * as VITE_CLASSIC_RELAY_ORIGIN, 7.33): the deploy workflow bakes that
- * origin into the build, and the strict CSP (apps/nova/vite.config.ts)
- * allowlists it in connect-src. Builds without the env var never fetch —
- * parties work exactly as they do today, without TURN.
+ * Never blocks a party: {@link fetchTurnCredentials} never throws, and any
+ * failure (unconfigured build, network, HTTP, timeout, bad body) returns
+ * `{ ok: false, reason }` so the party proceeds without TURN.
  *
- * The mint is browser-only by design: `POST {VITE_TURN_CREDS_ORIGIN}/turn`
- * from the app sends the page's Origin automatically (no credentials, no
- * secrets in the request), and the worker 403s any missing/non-allowlisted
- * Origin before it would mint. The response is Cloudflare's standard
- * `{ iceServers: [{ urls, username, credential }] }` shape (STUN + TURN
- * entries).
- *
- * GRACEFUL DEGRADATION (acceptance criterion): a mint outage (network
- * error, 403, 5xx, timeout — capped at {@link TURN_CREDS_FETCH_TIMEOUT_MS})
- * never blocks a party. {@link fetchTurnCredentials} is TOTAL (never
- * throws): failures come back as `{ ok: false, reason }` and the engine
- * proceeds without TURN, recording a diagnostic/notice.
- *
- * STUN-only entries (no username/credential) are deliberately dropped:
- * Trystero spreads `rtcConfig` over the whole peer config, so
- * `rtcConfig.iceServers` would REPLACE the `turnConfig` entries merged into
- * `iceServers` (and Trystero's default STUN) — passing the mint's plain
- * STUN servers that way would silently disable the TURN we just fetched.
- * The transport already ships default STUN servers, and the minted TURN
- * entries are the point of the endpoint, so only entries carrying
- * short-lived credentials become `turnConfig` (Trystero's
- * `TurnServerConfig` shape: `{ urls, username, credential }`).
+ * Only credential-bearing entries become `turnConfig`: Trystero spreads
+ * `rtcConfig` over the whole peer config, so passing the mint's plain STUN
+ * entries would replace the TURN servers merged into `iceServers`.
  */
+import { edgeOrigin } from "../edge";
 
 /** One ICE server entry in the mint's response (Cloudflare standard shape). */
 export interface TurnCredsIceServer {
@@ -82,16 +61,9 @@ export interface TurnCredsFetchOptions {
   timeoutMs?: number;
 }
 
-/** Base origin of the TURN credential mint; "" when the build pins none. */
-export function turnCredsBaseUrl(): string {
-  const raw = import.meta.env.VITE_TURN_CREDS_ORIGIN;
-  // Treat the value as an origin: a trailing slash would produce `//turn`.
-  return typeof raw === "string" ? raw.trim().replace(/\/+$/, "") : "";
-}
-
 /** True when the mint origin is configured (build-time env). */
 export function turnCredsConfigured(): boolean {
-  return turnCredsBaseUrl() !== "";
+  return edgeOrigin() !== "";
 }
 
 /**
@@ -141,11 +113,11 @@ function isAuthenticatedIceServer(entry: unknown): entry is TurnCredsIceServer {
 export async function fetchTurnCredentials(
   options: TurnCredsFetchOptions = {},
 ): Promise<TurnCredentialsResult> {
-  const base = turnCredsBaseUrl();
+  const base = edgeOrigin();
   if (base === "") {
     return {
       ok: false,
-      reason: "VITE_TURN_CREDS_ORIGIN is not set in this build.",
+      reason: "VITE_EDGE_ORIGIN is not set in this build.",
     };
   }
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;

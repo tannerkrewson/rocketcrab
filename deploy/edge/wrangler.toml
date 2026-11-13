@@ -1,14 +1,29 @@
-# The single Nova edge Worker (TURN mint + Classic CORS relay).
-# OpenTofu deploys this bundle and owns bindings; this file is for local
-# `wrangler dev` and the dry-run bundle OpenTofu consumes.
-name = "rocketcrab-cors-relay"
+# Nova edge Worker: TURN mint (POST /turn) + Classic CORS relay (POST /).
+# This file is the single source of truth for the deployed Worker.
+# Deploy with `npm run edge:deploy`; see deploy/cloudflare.md.
+name = "rocketcrab-edge"
 main = "worker.ts"
-compatibility_date = "2025-01-01"
+compatibility_date = "2026-08-01"
 workers_dev = true
+preview_urls = false
 
-# Platform rate-limit binding (same shape OpenTofu provisions). Local
-# `wrangler dev` simulates it; the in-memory limiter is only a test fallback.
+[vars]
+# Exact origins allowed to call the Worker. Localhost lets `npm run dev`
+# use the deployed Worker; non-browser clients can't be stopped by Origin
+# anyway, so this only keeps other websites from using it.
+ORIGIN_ALLOWLIST = "https://rocketcrab.com,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173"
+
+# Per-IP, per-route limit. 60/min covers a 10-player party behind one
+# carrier-NAT address (10 joins + reloads); reconnects reuse the credential.
+# The counter is approximate and per Cloudflare location — a backstop.
 [[ratelimits]]
 name = "RATE_LIMITER"
 namespace_id = "1001"
 simple = { limit = 60, period = 60 }
+
+# Keep console.log output (including turn_cred_mint lines) in Workers Logs.
+[observability]
+enabled = true
+
+# Secrets (never in this file): TURN_KEY_ID, TURN_KEY_API_TOKEN.
+# Set with `npx wrangler secret put <NAME> --config deploy/edge/wrangler.toml`.

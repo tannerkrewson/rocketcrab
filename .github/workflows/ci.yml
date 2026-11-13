@@ -45,8 +45,10 @@ jobs:
       - name: Unit tests
         run: npm run test
 
-      - name: Infrastructure worker tests
-        run: npm run test:deploy
+      # Bundles the Worker exactly as `npm run edge:deploy` would, without
+      # uploading, so a broken wrangler.toml or import fails CI.
+      - name: Edge Worker bundle check
+        run: npm run edge:check
 
       - name: Build
         run: npm run build
