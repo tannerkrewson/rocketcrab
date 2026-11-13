@@ -100,20 +100,12 @@ class InMemoryWorld implements World {
 
 const mocks = vi.hoisted(() => {
   const relaySockets: Record<string, { readyState: number }> = {};
-  return { relaySockets, joinRoom: vi.fn(), selfId: "contract-self" };
+  return { relaySockets, joinRoom: vi.fn() };
 });
-
-// Per-page Trystero peer IDs: the real selfId is a per-module constant, but
-// every simulated client shares this module, so the mock hands out a fresh
-// peer ID per client (set before construction).
-const selfIdHolder = vi.hoisted(() => ({ value: "contract-self" }));
 
 vi.mock("trystero", () => ({
   joinRoom: mocks.joinRoom,
   getRelaySockets: () => mocks.relaySockets,
-  get selfId() {
-    return selfIdHolder.value;
-  },
   defaultRelayUrls: ["wss://default.example"],
 }));
 
@@ -154,21 +146,30 @@ function makeFakeClock(): FakeClock {
   };
 }
 
+type MessageHandler = (data: unknown, context: { peerId: string; metadata?: unknown }) => void;
+type RequestHandler = Parameters<RequestAction["onRequest"]>[0];
+type ReceiveHandler = Parameters<RequestAction["onReceive"]>[0];
+type ProgressHandler = Parameters<RequestAction["onReceiveProgress"]>[0];
+interface FakeRequest {
+  requestHandler: RequestHandler | null;
+  receiveHandler: ReceiveHandler | null;
+  progressHandler: ProgressHandler | null;
+}
 interface FakeAction {
-  onMessage: ((data: unknown, context: { peerId: string; metadata?: unknown }) => void) | null;
-  onReceiveProgress:
-    | ((percent: number, context: { peerId: string; metadata?: unknown }) => void)
-    | null;
+  messageHandler: MessageHandler | null;
   send: ReturnType<typeof vi.fn>;
 }
-
 interface FakeRoom {
-  onPeerJoin: ((peerId: string) => void) | null;
-  onPeerLeave: ((peerId: string) => void) | null;
+  joinHandler: ((peer: { peerId: string; userId: string }) => void) | null;
+  leaveHandler: ((peer: { peerId: string; userId: string }) => void) | null;
+  peers: Record<string, { userId: string }>;
+  values: Record<string, unknown>;
+  metas: Record<string, { online: boolean; peerId: string; userId: string }>;
   leave: ReturnType<typeof vi.fn>;
   makeAction: ReturnType<typeof vi.fn>;
   action: FakeAction;
-  requests: Map<string, RequestAction>;
+  acknowledgement: FakeAction;
+  requests: Map<string, FakeRequest>;
   dispatchRequest: (
     namespace: string,
     data: DataPayload,
@@ -176,57 +177,98 @@ interface FakeRoom {
   ) => Promise<DataPayload>;
 }
 
-function makeFakeRoom(): FakeRoom {
-  const action: FakeAction = {
-    onMessage: null,
-    onReceiveProgress: null,
-    send: vi.fn(async () => undefined),
+function makeFakeRoom(selfId: string): FakeRoom {
+  const makeAction = (): FakeAction & {
+    onMessage: (handler: MessageHandler) => () => void;
+    onReceiveProgress: (handler: ProgressHandler) => () => void;
+  } => {
+    const action = {
+      messageHandler: null as MessageHandler | null,
+      send: vi.fn(async () => undefined),
+      onMessage(handler: MessageHandler) {
+        action.messageHandler = handler;
+        return () => {
+          action.messageHandler = null;
+        };
+      },
+      onReceiveProgress(_handler: ProgressHandler) {
+        return () => {};
+      },
+    };
+    return action;
   };
-  const requests = new Map<string, RequestAction>();
+  const action = makeAction();
+  const acknowledgement = makeAction();
+  const requests = new Map<string, FakeRequest>();
   const room: FakeRoom = {
     requests,
+    action,
+    acknowledgement,
+    peers: {},
+    values: {},
+    metas: {},
     dispatchRequest: async () => {
       throw new Error("No request router.");
     },
-    onPeerJoin: null,
-    onPeerLeave: null,
+    joinHandler: null,
+    leaveHandler: null,
     leave: vi.fn(async () => undefined),
-    makeAction: vi.fn(
-      (
-        namespace: string,
-        config?: {
-          kind?: "request";
-          onRequest?: RequestAction["onRequest"];
-          onReceive?: RequestAction["onReceive"];
-          onMessage?: (data: unknown, context: { peerId: string; metadata?: unknown }) => void;
-          onReceiveProgress?: (
-            percent: number,
-            context: { peerId: string; metadata?: unknown },
-          ) => void;
-        },
-      ) => {
-        if (config?.kind === "request") {
-          const requestAction = {
-            onRequest: config.onRequest ?? null,
-            onReceive: config.onReceive ?? null,
-            onReceiveProgress: config.onReceiveProgress ?? null,
-            request: (data: DataPayload, options: RequestOptions) =>
-              room.dispatchRequest(namespace, data, options),
-            requestMany: async () => [],
-          } as RequestAction;
-          requests.set(namespace, requestAction);
-          return requestAction;
-        }
-        if (config?.onMessage !== undefined) {
-          action.onMessage = config.onMessage;
-        }
-        if (config?.onReceiveProgress !== undefined) {
-          action.onReceiveProgress = config.onReceiveProgress;
-        }
-        return action;
+    makeAction: vi.fn((namespace: string, config?: { kind?: string }) => {
+      if (config?.kind === "request") {
+        const request: FakeRequest = {
+          requestHandler: null,
+          receiveHandler: null,
+          progressHandler: null,
+        };
+        requests.set(namespace, request);
+        return {
+          request: (data: DataPayload, options: RequestOptions) =>
+            room.dispatchRequest(namespace, data, options),
+          onRequest: (handler: RequestHandler) => {
+            request.requestHandler = handler;
+            return () => {
+              request.requestHandler = null;
+            };
+          },
+          onReceive: (handler: ReceiveHandler) => {
+            request.receiveHandler = handler;
+            return () => {
+              request.receiveHandler = null;
+            };
+          },
+          onReceiveProgress: (handler: ProgressHandler) => {
+            request.progressHandler = handler;
+            return () => {
+              request.progressHandler = null;
+            };
+          },
+        };
+      }
+      return namespace === "nova.identity.ack" ? acknowledgement : action;
+    }),
+    ...{
+      getSelf: async () => ({ peerId: selfId }),
+      getPeers: () => room.peers,
+      onPeerJoin: (handler: FakeRoom["joinHandler"]) => {
+        room.joinHandler = handler;
+        return () => {
+          room.joinHandler = null;
+        };
       },
-    ),
-    action,
+      onPeerLeave: (handler: FakeRoom["leaveHandler"]) => {
+        room.leaveHandler = handler;
+        return () => {
+          room.leaveHandler = null;
+        };
+      },
+      onError: () => () => {},
+      makeUserState: () => ({
+        get: (userId: string) => room.values[userId],
+        getMeta: (userId: string) => room.metas[userId],
+        set: async () => {},
+        onChange: () => () => {},
+      }),
+    },
   };
   return room;
 }
@@ -239,7 +281,6 @@ class TrysteroClientImpl implements Client {
   readonly peerIds = new Map<Client, string>();
   private deliveredSends = 0;
   private readonly clock: FakeClock;
-  private ownCallbacks: Parameters<typeof mocks.joinRoom>[2] | null = null;
 
   constructor(name: string, memberId: string, displayName: string | undefined, clock: FakeClock) {
     this.name = name;
@@ -250,7 +291,7 @@ class TrysteroClientImpl implements Client {
       now: clock.now,
       schedule: clock.schedule,
     });
-    this.room = makeFakeRoom();
+    this.room = makeFakeRoom(`contract-self-${name}`);
     // Mock only the upstream request boundary; actual chunking runs in browsers.
     this.room.dispatchRequest = async (namespace, data, options) => {
       const peer = [...this.peerIds].find(([, id]) => id === options.target)?.[0] as
@@ -259,7 +300,7 @@ class TrysteroClientImpl implements Client {
       const senderPeerId = peer?.peerIds.get(this);
       const action = peer?.room.requests.get(namespace);
       const receiver = this.room.requests.get(namespace);
-      if (!peer || !senderPeerId || !action?.onRequest || !receiver)
+      if (!peer || !senderPeerId || !action?.requestHandler || !receiver)
         throw new Error("Request rejected.");
       const signal = options.signal ?? new AbortController().signal;
       const bytes = (value: DataPayload) =>
@@ -267,8 +308,10 @@ class TrysteroClientImpl implements Client {
           ? value.byteLength
           : new TextEncoder().encode(JSON.stringify(value)).byteLength;
       if (
-        action.onReceive &&
-        !(await action.onReceive({
+        action.receiveHandler &&
+        !(await action.receiveHandler({
+          userId: senderPeerId,
+          roles: [],
           peerId: senderPeerId,
           byteLength: bytes(data),
           kind: "request",
@@ -276,10 +319,17 @@ class TrysteroClientImpl implements Client {
         }))
       )
         throw new Error("Request rejected.");
-      const response = await action.onRequest(data, { peerId: senderPeerId, signal });
+      const response = await action.requestHandler(data, {
+        peerId: senderPeerId,
+        userId: senderPeerId,
+        roles: [],
+        signal,
+      });
       if (
-        receiver.onReceive &&
-        !(await receiver.onReceive({
+        receiver.receiveHandler &&
+        !(await receiver.receiveHandler({
+          userId: options.target,
+          roles: [],
           peerId: options.target,
           byteLength: bytes(response),
           kind: "response",
@@ -287,7 +337,7 @@ class TrysteroClientImpl implements Client {
         }))
       )
         throw new Error("Response rejected.");
-      receiver.onReceiveProgress?.(1, { peerId: options.target });
+      receiver.progressHandler?.(1, { peerId: options.target, userId: options.target });
       return structuredClone(response);
     };
   }
@@ -301,11 +351,6 @@ class TrysteroClientImpl implements Client {
     const promise = this.adapter.join({ room: "ROOM", sessionId: "session-1" });
     this.clock.advance(1000);
     await promise;
-    const call = mocks.joinRoom.mock.calls.at(-1);
-    if (call === undefined) {
-      throw new Error("TrysteroClientImpl: joinRoom was never called");
-    }
-    this.ownCallbacks = call[2];
   }
 
   async leave(): Promise<void> {
@@ -320,30 +365,24 @@ class TrysteroClientImpl implements Client {
     await this.adapter.send({ channel, payload, ...options });
   }
 
-  /** Simulate `peer` completing the identity handshake + join toward us. */
+  /** Simulate state discovery and acknowledgement on a connected peer. */
   async observe(peer: Client): Promise<void> {
     const other = peer as TrysteroClientImpl;
     const peerId = `peer-${other.name}`;
-    const callbacks = this.ownCallbacks;
-    if (callbacks === null) {
-      throw new Error("TrysteroClientImpl.observe: join() first");
-    }
-    await callbacks.onPeerHandshake!(
-      peerId,
-      async () => undefined,
-      async () => ({
-        data: {
-          v: 1,
-          transportVersion: 4,
-          memberId: other.adapter.selfMemberId,
-          connectionId: other.adapter.selfConnectionId,
-          displayName: other.adapter.displayName,
-        },
-      }),
-      false,
-    );
-    this.room.onPeerJoin!(peerId);
+    const userId = `user-${other.name}`;
+    this.room.peers[peerId] = { userId };
+    this.room.values[userId] = {
+      v: 1,
+      transportVersion: 5,
+      memberId: other.adapter.selfMemberId,
+      connectionId: other.adapter.selfConnectionId,
+      displayName: other.adapter.displayName,
+    };
+    this.room.metas[userId] = { online: true, peerId, userId };
     this.peerIds.set(peer, peerId);
+    this.room.joinHandler!({ peerId, userId });
+    this.room.acknowledgement.messageHandler!(this.adapter.selfConnectionId, { peerId });
+    await Promise.resolve();
   }
 
   async flush(): Promise<void> {
@@ -368,7 +407,7 @@ class TrysteroClientImpl implements Client {
         const target = peer as TrysteroClientImpl;
         // the context peerId must be the sender's peerId AS THE TARGET SEES IT
         const senderPeerId = target.peerIds.get(this);
-        target.room.action.onMessage!(data, {
+        target.room.action.messageHandler!(data, {
           peerId: senderPeerId ?? peerId,
           metadata: options.metadata,
         });
@@ -388,8 +427,6 @@ class TrysteroWorld implements World {
   private readonly clients: TrysteroClientImpl[] = [];
 
   async createClient(name: string, memberId: string, displayName?: string): Promise<Client> {
-    // each simulated page gets its own Trystero peer ID (per-page constant)
-    selfIdHolder.value = `contract-self-${name}`;
     const client = new TrysteroClientImpl(name, memberId, displayName, this.clock);
     this.clients.push(client);
     return client;
@@ -399,7 +436,8 @@ class TrysteroWorld implements World {
     const observerImpl = observer as TrysteroClientImpl;
     const peerId = observerImpl.peerIds.get(leaver);
     if (peerId !== undefined) {
-      observerImpl.room.onPeerLeave!(peerId);
+      observerImpl.room.leaveHandler!({ peerId, userId: observerImpl.room.peers[peerId]!.userId });
+      delete observerImpl.room.peers[peerId];
     }
   }
 

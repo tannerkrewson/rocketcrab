@@ -44,7 +44,7 @@
     "ws": "8.23.0"
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22"
   },
   "packageManager": "npm@11.16.0",
   "allowScripts": {

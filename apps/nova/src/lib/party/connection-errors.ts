@@ -6,6 +6,7 @@
  */
 const CATEGORY_MESSAGES: Readonly<Record<string, string>> = {
   password_mismatch: "This invite doesn't match the party. Ask the host for a fresh invite link.",
+  room_full: "This party is full. Ask the host for help joining.",
   incompatible_version:
     "Incompatible Nova version. Everyone should update/reload Nova and rejoin the party.",
   relay_unreachable:

@@ -1,5 +1,28 @@
 import { describe, expect, it } from "vitest";
-import { TrysteroJoinError, categorizeJoinError, toTrysteroJoinError } from "./errors";
+import {
+  TrysteroJoinError,
+  categorizeJoinError,
+  fromRoomError,
+  toTrysteroJoinError,
+} from "./errors";
+
+it("uses structured room codes rather than message wording", () => {
+  const base = { appId: "app", roomId: "room", peerId: "peer", message: "arbitrary text" };
+  expect(fromRoomError({ ...base, code: "room-full" })).toMatchObject({
+    code: "room-full",
+    category: "room_full",
+    isFatal: true,
+  });
+  expect(fromRoomError({ ...base, code: "decrypt-failed", stage: "offer" })).toMatchObject({
+    category: "password_mismatch",
+  });
+  expect(
+    fromRoomError({ ...base, code: "peer-connect-failed", turnConfigured: true }),
+  ).toMatchObject({ category: "peer_connection_failed" });
+  expect(fromRoomError({ ...base, code: "relay-failed" })).toMatchObject({
+    category: "relay_unreachable",
+  });
+});
 
 describe("categorizeJoinError", () => {
   it("maps password errors (F8 phrasing) to password_mismatch", () => {

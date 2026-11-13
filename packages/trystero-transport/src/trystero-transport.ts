@@ -1,12 +1,12 @@
-import { defaultRelayUrls, getRelaySockets, joinRoom, selfId } from "trystero";
+import { defaultRelayUrls, getRelaySockets, joinRoom } from "trystero";
 import type {
   DataPayload,
-  JoinRoomCallbacks,
   JoinRoomConfig,
   JsonValue,
   MessageAction,
   RequestAction,
   MessageContext,
+  ActionProgressContext,
   Room,
   TurnServerConfig,
 } from "trystero";
@@ -24,7 +24,7 @@ import type {
   TransportRequestHandler,
 } from "@rocketcrab/core";
 import { currentAppIdEnvironment, resolveAppId, type AppIdEnvironment } from "./app-id";
-import { TrysteroJoinError, toTrysteroJoinError, type TrysteroJoinErrorReport } from "./errors";
+import { TrysteroJoinError, fromRoomError } from "./errors";
 import {
   isRelayFailureSignal,
   relayDiagnosticsEqual,
@@ -38,14 +38,13 @@ import {
   parseIdentityPayload,
   parseWireEnvelope,
   payloadSize,
-  type IdentityPayload,
   TRANSPORT_VERSION,
 } from "./wire";
 
 /**
  * Trystero transport (P1): the real-party implementation of the
  * transport-neutral {@link NovaTransport} interface (ADR-0003), built on
- * Trystero 0.26.0's Nostr strategy.
+ * Trystero 0.27.0's Nostr strategy.
  *
  * Game-facing code never sees this class (engineering rule 1): it is the
  * production twin of `InMemoryTransport` (U5, @rocketcrab/testing) and must
@@ -57,10 +56,9 @@ import {
  *   operators may explicitly override URLs or redundancy.
  * - **Environment-specific appId** (`rocketcrab-nova-dev` / `-prod`,
  *   `app-id.ts`) so dev and prod rooms never collide.
- * - **Identity handshake**: peers exchange `{ memberId, connectionId,
- *   displayName }` inside Trystero's built-in `onPeerHandshake` (the same
- *   surface F5 used for admission policy). Peers are only activated after
- *   both handshakes complete, so `peer:joined` always carries real identity.
+ * - **Identity admission**: per-room ephemeral Trystero identities carry Nova
+ *   member and connection IDs in validated user state. A bilateral ack gates
+ *   peer publication and early traffic is bounded until admission completes.
  * - **Join errors** are categorized (`errors.ts`). Trystero only reports
  *   handshake-stage failures (F5 finding F5); the adapter detects relay
  *   failure itself (relay socket readyState + join/relay timeouts) and
@@ -82,8 +80,8 @@ import {
  *   `unordered` send options are accepted and degrade to reliable/ordered.
  * - There is no simulated message loss, so `message:lost` never fires; the
  *   optional `validate` hook (when configured) emits `message:invalid`.
- * - `connectionId` is the page's Trystero peer ID (`selfId`), re-suffixed
- *   (`selfId#n`) on reconnect/resume so every connection gets a fresh ID.
+ * - `connectionId` derives from `room.getSelf().peerId`, re-suffixed on
+ *   reconnect/resume so every connection gets a fresh ID.
  */
 export class TrysteroTransport implements NovaTransport {
   readonly kind = "trystero";
@@ -105,14 +103,25 @@ export class TrysteroTransport implements NovaTransport {
   // initial room config, including when allocating peers for later rooms.
   private readonly now: () => number;
   private readonly scheduleFn: (callback: () => void, delayMs: number) => () => void;
-  /** Page-level Trystero peer ID, captured once (per-module constant). */
-  private readonly selfIdBase: string;
+  /** Trystero peer ID once initialized; provisional until room.getSelf(). */
+  private selfIdBase: string;
+  private roomUnsubscribers: Array<() => void> = [];
 
   private readonly listeners = new Map<keyof TransportEventMap, Set<unknown>>();
   private readonly relayStateHandlers = new Set<(diagnostics: RelayDiagnostics) => void>();
   private peersList: TransportPeerInfo[] = [];
   /** trystero peerId → identity announced during the peer handshake. */
   private readonly identityByPeerId = new Map<string, PeerIdentity>();
+  private readonly acknowledgedPeers = new Set<string>();
+  private readonly sentAcknowledgements = new Set<string>();
+  private readonly readyPeers = new Set<string>();
+  private readonly pendingMessages = new Map<
+    string,
+    { items: Array<{ data: unknown; context: MessageContext }>; bytes: number }
+  >();
+  private readonly rejectedPeers = new Set<string>();
+  private readonly readyWaiters = new Map<string, Set<(ready: boolean) => void>>();
+  private readonly admissionTimers = new Map<string, () => void>();
   /** announced connectionId → trystero peerId (targeting). */
   private readonly connectionToPeerId = new Map<ConnectionId, string>();
   private readonly peerJoinedAt = new Map<string, Timestamp>();
@@ -127,6 +136,9 @@ export class TrysteroTransport implements NovaTransport {
   private readonly requestActions = new Map<string, RequestAction>();
   private readonly pendingRequests = new Map<string, TransportRequestOptions>();
   private connectionEpoch = 0;
+  /** Invalidates asynchronous lifecycle continuations after leave or replacement. */
+  private lifecycleGeneration = 0;
+  private suspendPending = false;
   private joinWaiter: { resolve: () => void; reject: (error: Error) => void } | null = null;
   private joinTimers: Array<() => void> = [];
   private relayMonitorTimer: (() => void) | null = null;
@@ -171,9 +183,8 @@ export class TrysteroTransport implements NovaTransport {
     this.displayName = options.displayName;
     const env: AppIdEnvironment = options.env ?? currentAppIdEnvironment();
     this.appId = resolveAppId(options.appId, env);
-    // Trystero's selfId is a per-page constant; capture it once so every
-    // connection of this transport shares the same base peer identity.
-    this.selfIdBase = selfId;
+    // A provisional ID is replaced by room.getSelf() before join resolves.
+    this.selfIdBase = globalThis.crypto.randomUUID();
     this.selfConnectionId = this.selfIdBase;
     this.now = options.now ?? (() => Date.now());
     this.scheduleFn = options.schedule ?? defaultScheduler;
@@ -190,7 +201,12 @@ export class TrysteroTransport implements NovaTransport {
 
   async request(options: TransportRequestOptions): Promise<unknown> {
     const peerId = this.connectionToPeerId.get(options.targetConnectionId);
-    if (!peerId || !this.room || this.connectionState !== "connected")
+    if (
+      !peerId ||
+      !this.readyPeers.has(peerId) ||
+      !this.room ||
+      this.connectionState !== "connected"
+    )
       throw new Error("Peer disconnected.");
     const key = options.channel + ":" + peerId;
     if (this.pendingRequests.has(key))
@@ -213,31 +229,35 @@ export class TrysteroTransport implements NovaTransport {
     if (existing) return existing;
     if (!this.room || !/^[a-zA-Z0-9._-]{1,23}$/.test(channel))
       throw new Error("Invalid request channel.");
-    const action = this.room.makeAction("nova.rpc:" + channel, {
-      kind: "request",
-      onReceive: (context) => {
-        if (!this.identityByPeerId.has(context.peerId)) return false;
+    const action = this.room.makeAction("nova.rpc:" + channel, { kind: "request" });
+    this.roomUnsubscribers.push(
+      action.onReceive((context) => {
+        if (!this.identityByPeerId.has(context.peerId) || this.rejectedPeers.has(context.peerId))
+          return false;
         const limit =
           context.kind === "response"
             ? (this.pendingRequests.get(channel + ":" + context.peerId)?.maxResponseBytes ??
               2 * 1024 * 1024)
             : 16 * 1024;
         return context.byteLength <= limit;
-      },
-      onReceiveProgress: (fraction, context) => {
+      }),
+      action.onReceiveProgress((fraction, context) => {
         this.pendingRequests.get(channel + ":" + context.peerId)?.onProgress?.(fraction);
-      },
-      onRequest: async (data, context) => {
+      }),
+      action.onRequest(async (data, context) => {
+        if (!(await this.waitForPeerReady(context.peerId, context.signal)))
+          throw new Error("Request rejected.");
         const identity = this.identityByPeerId.get(context.peerId);
         const handler = this.requestHandlers.get(channel);
-        if (!identity || !handler) throw new Error("Request rejected.");
+        if (!identity || !this.readyPeers.has(context.peerId) || !handler)
+          throw new Error("Request rejected.");
         return (await handler(data, {
           senderMemberId: identity.memberId,
           senderConnectionId: identity.connectionId,
           signal: context.signal,
         })) as DataPayload;
-      },
-    });
+      }),
+    );
     this.requestActions.set(channel, action);
     return action;
   }
@@ -285,7 +305,7 @@ export class TrysteroTransport implements NovaTransport {
     this.selfConnectionId = this.selfIdBase;
     let room: Room;
     try {
-      room = joinRoom(this.buildConfig(), request.room, this.buildCallbacks());
+      room = joinRoom(this.buildConfig(), request.room);
     } catch (cause) {
       this.connectionState = "idle";
       this.emit("connection:state", "idle");
@@ -297,12 +317,11 @@ export class TrysteroTransport implements NovaTransport {
         cause,
       });
     }
-    this.wireRoom(room);
-    this.startRelayMonitor();
-    await this.waitForJoin();
+    await this.startRoom(room);
   }
 
   async leave(): Promise<void> {
+    this.lifecycleGeneration += 1;
     if (this.connectionState === "idle") {
       return;
     }
@@ -332,20 +351,34 @@ export class TrysteroTransport implements NovaTransport {
         message: `TrysteroTransport.reconnect: not connected (state: ${this.connectionState}).`,
       });
     }
+    const generation = ++this.lifecycleGeneration;
     const oldConnectionId = this.selfConnectionId;
     const roomName = this.roomName;
     const room = this.room;
+    this.connectionState = "joining";
+    this.emit("connection:state", "joining");
     this.teardownRoom(room);
     if (room !== null) {
       await room.leave(); // peers observe peer:left for the old connection
     }
+    if (generation !== this.lifecycleGeneration) {
+      throw new TrysteroJoinError({ category: "cancelled", message: "Reconnect was cancelled." });
+    }
     this.connectionEpoch += 1;
     this.selfConnectionId = `${this.selfIdBase}#${this.connectionEpoch}`;
-    this.connectionState = "joining";
-    this.emit("connection:state", "joining");
-    this.wireRoom(joinRoom(this.buildConfig(), roomName, this.buildCallbacks()));
-    this.startRelayMonitor();
-    await this.waitForJoin();
+    let nextRoom: Room;
+    try {
+      nextRoom = joinRoom(this.buildConfig(), roomName);
+    } catch (cause) {
+      this.connectionState = "disconnected";
+      this.emit("connection:state", "disconnected");
+      throw new TrysteroJoinError({
+        category: "invalid_state",
+        message: "Reconnect failed to create a room.",
+        cause,
+      });
+    }
+    await this.startRoom(nextRoom);
     this.emit("peer:reconnected", {
       memberId: this.selfMemberId,
       oldConnectionId,
@@ -361,32 +394,50 @@ export class TrysteroTransport implements NovaTransport {
         message: `TrysteroTransport.suspend: not connected (state: ${this.connectionState}).`,
       });
     }
+    const generation = ++this.lifecycleGeneration;
     const room = this.room;
-    this.teardownRoom(room);
-    if (room !== null) {
-      await room.leave();
-    }
     this.connectionState = "suspended";
+    this.suspendPending = true;
+    this.teardownRoom(room);
+    try {
+      if (room !== null) await room.leave();
+    } finally {
+      this.suspendPending = false;
+    }
+    if (generation !== this.lifecycleGeneration) {
+      throw new TrysteroJoinError({ category: "cancelled", message: "Suspend was cancelled." });
+    }
     this.emit("connection:state", "suspended");
   }
 
   /** Re-join after {@link TrysteroTransport.suspend} (fresh connection ID). */
   async resume(): Promise<void> {
-    if (this.connectionState !== "suspended") {
+    if (this.connectionState !== "suspended" || this.suspendPending) {
       throw new TrysteroJoinError({
         category: "invalid_state",
         message: `TrysteroTransport.resume: not suspended (state: ${this.connectionState}).`,
       });
     }
+    ++this.lifecycleGeneration;
     const oldConnectionId = this.selfConnectionId;
     const roomName = this.roomName;
     this.connectionEpoch += 1;
     this.selfConnectionId = `${this.selfIdBase}#${this.connectionEpoch}`;
     this.connectionState = "joining";
     this.emit("connection:state", "joining");
-    this.wireRoom(joinRoom(this.buildConfig(), roomName, this.buildCallbacks()));
-    this.startRelayMonitor();
-    await this.waitForJoin();
+    let room: Room;
+    try {
+      room = joinRoom(this.buildConfig(), roomName);
+    } catch (cause) {
+      this.connectionState = "suspended";
+      this.emit("connection:state", "suspended");
+      throw new TrysteroJoinError({
+        category: "invalid_state",
+        message: "Resume failed to create a room.",
+        cause,
+      });
+    }
+    await this.startRoom(room);
     this.emit("peer:reconnected", {
       memberId: this.selfMemberId,
       oldConnectionId,
@@ -523,6 +574,7 @@ export class TrysteroTransport implements NovaTransport {
   private buildConfig(): JoinRoomConfig {
     const config: JoinRoomConfig = {
       appId: this.appId,
+      identity: "none",
       maxReceiveBytes: 8 * 1024 * 1024,
       ...(this.relayConfig !== undefined ? { relayConfig: this.relayConfig } : {}),
     };
@@ -536,68 +588,186 @@ export class TrysteroTransport implements NovaTransport {
     return config;
   }
 
-  private buildCallbacks(): JoinRoomCallbacks {
-    return {
-      onJoinError: (report) => this.handleJoinError(report),
-      onPeerHandshake: (peerId, send, receive) => this.handlePeerHandshake(peerId, send, receive),
-      handshakeTimeoutMs: this.options.handshakeTimeoutMs,
-    };
+  private async startRoom(room: Room): Promise<void> {
+    const joined = this.waitForJoin();
+    void this.wireRoom(room)
+      .then(() => {
+        if (this.room === room && this.connectionState === "joining") this.startRelayMonitor();
+      })
+      .catch((cause: unknown) => {
+        if (this.room === room) {
+          this.failJoin(
+            new TrysteroJoinError({
+              category: "invalid_state",
+              message: "TrysteroTransport: room initialization failed.",
+              cause,
+            }),
+          );
+        }
+      });
+    await joined;
   }
 
-  private wireRoom(room: Room): void {
+  private async wireRoom(room: Room): Promise<void> {
     this.room = room;
     for (const channel of this.requestHandlers.keys()) this.requestAction(channel);
-    const action = room.makeAction(ACTION_NAMESPACE, {
-      onMessage: (data, context) => this.handleActionMessage(data, context),
-      onReceiveProgress: (percent, context) => this.handleReceiveProgress(percent, context),
-    });
+    const action = room.makeAction(ACTION_NAMESPACE);
+    const acknowledgement = room.makeAction("nova.identity.ack");
+    const state = room.makeUserState<JsonValue>("nova.identity", null, { maxBytes: 1024 });
     this.action = action;
-    room.onPeerJoin = (peerId) => this.handlePeerJoin(peerId);
-    room.onPeerLeave = (peerId) => this.handlePeerLeave(peerId);
-  }
-
-  /**
-   * Symmetric identity exchange (F5 handshake pattern). Throwing here fails
-   * the peer with a structured join error; peers are only activated after
-   * both sides complete the handshake.
-   */
-  private async handlePeerHandshake(
-    peerId: string,
-    send: (data: DataPayload) => Promise<void>,
-    receive: () => Promise<{ data: DataPayload }>,
-  ): Promise<void> {
-    const identity: IdentityPayload = {
-      v: 1,
-      memberId: this.selfMemberId,
-      connectionId: this.selfConnectionId,
-      displayName: this.displayName,
+    const maybeReady = (peerId: string): void => {
+      if (
+        this.room === room &&
+        this.identityByPeerId.has(peerId) &&
+        this.acknowledgedPeers.has(peerId) &&
+        this.sentAcknowledgements.has(peerId) &&
+        !this.readyPeers.has(peerId) &&
+        !this.rejectedPeers.has(peerId)
+      ) {
+        this.readyPeers.add(peerId);
+        this.admissionTimers.get(peerId)?.();
+        this.admissionTimers.delete(peerId);
+        this.handlePeerJoin(peerId);
+        this.settlePeerWaiters(peerId, true);
+        const pending = this.pendingMessages.get(peerId);
+        this.pendingMessages.delete(peerId);
+        for (const item of pending?.items ?? []) {
+          if (this.room !== room || !this.readyPeers.has(peerId)) break;
+          this.handleActionMessage(item.data, item.context);
+        }
+      }
     };
-    await send({
+    const rejectIdentity = (peerId: string, incompatible: boolean): void => {
+      this.handlePeerLeave(peerId);
+      this.rejectedPeers.add(peerId);
+      this.recordJoinError(
+        new TrysteroJoinError({
+          category: incompatible ? "incompatible_version" : "rejected",
+          appId: this.appId,
+          roomId: this.roomName,
+          peerId,
+          message: incompatible
+            ? "Incompatible Nova version. Everyone should update/reload Nova and rejoin the party."
+            : "Identity handshake failed: peer sent an invalid identity.",
+        }),
+      );
+    };
+    const accept = (peerId: string, userId: string): void => {
+      if (
+        this.room !== room ||
+        this.rejectedPeers.has(peerId) ||
+        room.getPeers()[peerId]?.userId !== userId
+      )
+        return;
+      const meta = state.getMeta(userId);
+      if (!meta || !meta.online || meta.peerId !== peerId || meta.userId !== userId) return;
+      const identity = parseIdentityPayload(state.get(userId));
+      const previous = this.identityByPeerId.get(peerId);
+      if (previous) {
+        if (
+          !identity ||
+          identity.transportVersion !== TRANSPORT_VERSION ||
+          identity.memberId !== previous.memberId ||
+          identity.connectionId !== previous.connectionId ||
+          identity.displayName !== previous.displayName
+        ) {
+          rejectIdentity(
+            peerId,
+            identity !== null && identity.transportVersion !== TRANSPORT_VERSION,
+          );
+        }
+        return;
+      }
+      if (!identity || identity.transportVersion !== TRANSPORT_VERSION) {
+        rejectIdentity(
+          peerId,
+          identity !== null && identity.transportVersion !== TRANSPORT_VERSION,
+        );
+        return;
+      }
+      if (this.connectionToPeerId.has(identity.connectionId)) {
+        rejectIdentity(peerId, false);
+        return;
+      }
+      this.identityByPeerId.set(peerId, identity);
+      this.connectionToPeerId.set(identity.connectionId, peerId);
+      void acknowledgement
+        .send(identity.connectionId, { target: peerId })
+        .then(() => {
+          if (this.room !== room || this.identityByPeerId.get(peerId) !== identity) return;
+          this.sentAcknowledgements.add(peerId);
+          maybeReady(peerId);
+        })
+        .catch(() => undefined);
+    };
+    this.roomUnsubscribers.push(
+      acknowledgement.onMessage((data, context) => {
+        if (
+          this.room !== room ||
+          data !== this.selfConnectionId ||
+          !room.getPeers()[context.peerId]
+        )
+          return;
+        this.acknowledgedPeers.add(context.peerId);
+        maybeReady(context.peerId);
+      }),
+      action.onMessage((data, context) => this.handleActionMessage(data, context)),
+      action.onReceiveProgress((percent, context) => this.handleReceiveProgress(percent, context)),
+      room.onPeerJoin(({ peerId, userId }) => {
+        if (!this.admissionTimers.has(peerId)) {
+          this.admissionTimers.set(
+            peerId,
+            this.scheduleFn(() => {
+              this.admissionTimers.delete(peerId);
+              if (this.room !== room || this.readyPeers.has(peerId)) return;
+              this.handlePeerLeave(peerId);
+              this.rejectedPeers.add(peerId);
+              this.recordJoinError(
+                new TrysteroJoinError({
+                  category: "handshake_timeout",
+                  message: "Peer identity admission timed out.",
+                  peerId,
+                  appId: this.appId,
+                  roomId: this.roomName,
+                }),
+              );
+            }, this.options.handshakeTimeoutMs),
+          );
+        }
+        accept(peerId, userId);
+      }),
+      room.onPeerLeave(({ peerId }) => this.handlePeerLeave(peerId)),
+      room.onError((error) => this.recordJoinError(fromRoomError(error))),
+      state.onChange((_value, context) => {
+        if (context.self || this.room !== room) return;
+        if (context.removed) {
+          if (this.identityByPeerId.has(context.peerId)) {
+            this.handlePeerLeave(context.peerId);
+            this.rejectedPeers.add(context.peerId);
+          }
+          return;
+        }
+        accept(context.peerId, context.userId);
+      }),
+    );
+    const self = await room.getSelf();
+    if (this.room !== room) throw new Error("Room closed while joining.");
+    this.selfIdBase = self.peerId;
+    this.selfConnectionId =
+      this.connectionEpoch === 0 ? self.peerId : `${self.peerId}#${this.connectionEpoch}`;
+    await state.set({
       v: 1,
       transportVersion: TRANSPORT_VERSION,
-      memberId: identity.memberId,
-      connectionId: identity.connectionId,
-      ...(identity.displayName !== undefined ? { displayName: identity.displayName } : {}),
+      memberId: this.selfMemberId,
+      connectionId: this.selfConnectionId,
+      ...(this.displayName !== undefined ? { displayName: this.displayName } : {}),
     });
-    const { data } = await receive();
-    const remote = parseIdentityPayload(data);
-    if (remote === null) {
-      throw new Error("peer sent an invalid identity handshake");
-    }
-    if (remote.transportVersion !== TRANSPORT_VERSION) {
-      const message =
-        "Incompatible Nova version. Everyone should update/reload Nova and rejoin the party.";
-      // Report locally as well: older peers cannot understand the new actions,
-      // and Trystero may wrap our thrown error as a generic admission failure.
-      this.handleJoinError({ error: message, appId: this.appId, roomId: this.roomName, peerId });
-      throw new Error(message);
-    }
-    this.identityByPeerId.set(peerId, remote);
-    this.connectionToPeerId.set(remote.connectionId, peerId);
+    if (this.room !== room) throw new Error("Room closed while joining.");
   }
 
   private handlePeerJoin(peerId: string): void {
-    const identity = this.identityForPeer(peerId);
+    const identity = this.identityByPeerId.get(peerId);
+    if (!identity) return;
     if (!this.peersList.some((peer) => peer.connectionId === identity.connectionId)) {
       const joinedAt = this.now();
       this.peerJoinedAt.set(identity.connectionId, joinedAt);
@@ -614,7 +784,45 @@ export class TrysteroTransport implements NovaTransport {
     }
   }
 
+  private settlePeerWaiters(peerId: string, ready: boolean): void {
+    const waiters = this.readyWaiters.get(peerId);
+    this.readyWaiters.delete(peerId);
+    for (const settle of waiters ?? []) settle(ready);
+  }
+
+  private waitForPeerReady(peerId: string, signal: AbortSignal): Promise<boolean> {
+    if (this.readyPeers.has(peerId)) return Promise.resolve(true);
+    if (!this.identityByPeerId.has(peerId) || this.rejectedPeers.has(peerId) || signal.aborted)
+      return Promise.resolve(false);
+    const waiters = this.readyWaiters.get(peerId) ?? new Set<(ready: boolean) => void>();
+    if (waiters.size >= 32) return Promise.resolve(false);
+    this.readyWaiters.set(peerId, waiters);
+    return new Promise((resolve) => {
+      const settle = (ready: boolean): void => {
+        cancel();
+        signal.removeEventListener("abort", abort);
+        waiters.delete(settle);
+        if (waiters.size === 0 && this.readyWaiters.get(peerId) === waiters)
+          this.readyWaiters.delete(peerId);
+        resolve(ready);
+      };
+      const abort = (): void => settle(false);
+      const cancel = this.scheduleFn(() => settle(false), this.options.handshakeTimeoutMs);
+      waiters.add(settle);
+      signal.addEventListener("abort", abort, { once: true });
+      if (signal.aborted) settle(false);
+    });
+  }
+
   private handlePeerLeave(peerId: string): void {
+    this.admissionTimers.get(peerId)?.();
+    this.admissionTimers.delete(peerId);
+    this.acknowledgedPeers.delete(peerId);
+    this.sentAcknowledgements.delete(peerId);
+    this.readyPeers.delete(peerId);
+    this.pendingMessages.delete(peerId);
+    this.rejectedPeers.delete(peerId);
+    this.settlePeerWaiters(peerId, false);
     const identity = this.identityByPeerId.get(peerId);
     this.identityByPeerId.delete(peerId);
     this.peerJoinedAt.delete(identity?.connectionId ?? peerId);
@@ -638,7 +846,27 @@ export class TrysteroTransport implements NovaTransport {
     if (envelope === null) {
       return; // malformed metadata: drop (threat model T10)
     }
-    const identity = this.identityForPeer(context.peerId);
+    const identity = this.identityByPeerId.get(context.peerId);
+    if (!identity || this.rejectedPeers.has(context.peerId)) return;
+    if (!this.readyPeers.has(context.peerId)) {
+      let bytes: number;
+      try {
+        bytes = payloadSize(data) + payloadSize(context.metadata);
+      } catch {
+        return;
+      }
+      const pending = this.pendingMessages.get(context.peerId) ?? { items: [], bytes: 0 };
+      if (pending.items.length >= 32 || bytes > 8 * 1024 * 1024 - pending.bytes) {
+        this.pendingMessages.delete(context.peerId);
+        this.rejectedPeers.add(context.peerId);
+        this.settlePeerWaiters(context.peerId, false);
+        return;
+      }
+      pending.items.push({ data, context });
+      pending.bytes += bytes;
+      this.pendingMessages.set(context.peerId, pending);
+      return;
+    }
     const message: TransportMessage = {
       version: envelope.version,
       sessionId: envelope.sessionId,
@@ -657,7 +885,8 @@ export class TrysteroTransport implements NovaTransport {
     this.emit("message:received", message);
   }
 
-  private handleReceiveProgress(progress01: number, context: MessageContext): void {
+  private handleReceiveProgress(progress01: number, context: ActionProgressContext): void {
+    if (!this.readyPeers.has(context.peerId)) return;
     const envelope = parseWireEnvelope(context.metadata);
     if (envelope === null) {
       return;
@@ -674,8 +903,7 @@ export class TrysteroTransport implements NovaTransport {
     });
   }
 
-  private handleJoinError(report: TrysteroJoinErrorReport): void {
-    const error = toTrysteroJoinError(report);
+  private recordJoinError(error: TrysteroJoinError): void {
     this.joinErrors.push(error);
     if (this.joinErrors.length > this.options.historyLimit) {
       this.joinErrors.shift();
@@ -839,22 +1067,12 @@ export class TrysteroTransport implements NovaTransport {
   // Internals
   // ------------------------------------------------------------------
 
-  private identityForPeer(peerId: string): PeerIdentity {
-    return (
-      this.identityByPeerId.get(peerId) ?? {
-        v: 1,
-        memberId: peerId,
-        connectionId: peerId,
-      }
-    );
-  }
-
   private resolveTarget(targetConnectionId: ConnectionId | undefined): string | string[] | null {
     if (targetConnectionId === undefined) {
       return null; // broadcast to every connected peer
     }
     const peerId = this.connectionToPeerId.get(targetConnectionId);
-    if (peerId === undefined) {
+    if (peerId === undefined || !this.readyPeers.has(peerId)) {
       throw new TrysteroJoinError({
         category: "not_connected",
         message: `TrysteroTransport.send: no connected peer with connectionId "${targetConnectionId}".`,
@@ -899,20 +1117,8 @@ export class TrysteroTransport implements NovaTransport {
     return `msg-${this.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   }
 
-  private teardownRoom(room: Room | null): void {
-    if (room !== null) {
-      room.onPeerJoin = null;
-      room.onPeerLeave = null;
-    }
-    if (this.action !== null) {
-      this.action.onMessage = null;
-      this.action.onReceiveProgress = null;
-    }
-    for (const action of this.requestActions.values()) {
-      action.onRequest = null;
-      action.onReceive = null;
-      action.onReceiveProgress = null;
-    }
+  private teardownRoom(_room: Room | null): void {
+    for (const unsubscribe of this.roomUnsubscribers.splice(0)) unsubscribe();
     this.requestActions.clear();
     this.pendingRequests.clear();
     this.room = null;
@@ -920,6 +1126,14 @@ export class TrysteroTransport implements NovaTransport {
     this.stopRelayMonitor();
     this.peersList = [];
     this.identityByPeerId.clear();
+    this.acknowledgedPeers.clear();
+    this.sentAcknowledgements.clear();
+    this.readyPeers.clear();
+    this.pendingMessages.clear();
+    this.rejectedPeers.clear();
+    for (const cancel of this.admissionTimers.values()) cancel();
+    this.admissionTimers.clear();
+    for (const peerId of this.readyWaiters.keys()) this.settlePeerWaiters(peerId, false);
     this.connectionToPeerId.clear();
     this.peerJoinedAt.clear();
     this.deliverySeqCounters.clear();
@@ -1029,7 +1243,7 @@ export interface TrysteroTransportOptions {
   readonly displayName?: string;
   /**
    * Trystero appId override. Defaults to the environment-specific ID
-   * (`rocketcrab-nova-dev` / `-prod`); every peer in a party must use the
+   * (`rocketcrab-nova-v027-dev` / `-prod`); every peer in a party must use the
    * same appId.
    */
   readonly appId?: string;

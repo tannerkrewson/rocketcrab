@@ -150,7 +150,12 @@ Nova is not launched, so no compatibility shim is needed — but bump the
 Nova app IDs in `packages/trystero-transport/src/app-id.ts` so old and new
 clients never share rooms.
 
-1. [ ] Mechanical migration of `packages/trystero-transport` (and any other Trystero imports): `on*()` listener methods returning unsubscribe, `await room.getSelf()` instead of `selfId`, `room.onError` instead of `onJoinError`, `getPeers()` returning `PeerInfo`, `setRelayConnectivity` instead of pause/resume, `joinRoom` throwing on duplicate active joins (leave first), targeted `send` rejecting for disconnected targets. Pin `trystero` and `@trystero-p2p/*` to exact `0.27.0`. All existing tests green, including `npm run test:e2e:trystero`.
+Evidence: `trystero-transport.test.ts` covers reconnect/leave and suspend/leave
+races; `identity-races.test.ts` covers admission ordering. `npm run check`
+passed; `npm run test:e2e` passed 60/60 and `npm run test:e2e:trystero`
+passed 4/4 (Podman Playwright, 2026-11-13).
+
+1. [x] Mechanical migration of `packages/trystero-transport` (and any other Trystero imports): `on*()` listener methods returning unsubscribe, `await room.getSelf()` instead of `selfId`, `room.onError` instead of `onJoinError`, `getPeers()` returning `PeerInfo`, `setRelayConnectivity` instead of pause/resume, `joinRoom` throwing on duplicate active joins (leave first), targeted `send` rejecting for disconnected targets. Pin `trystero` and `@trystero-p2p/*` to exact `0.27.0`. All existing tests green, including `npm run test:e2e:trystero`.
 2. [ ] Replace error-string matching with typed codes. Today `handleJoinErrorNotice` in `apps/nova/src/lib/party/engine.ts` and `apps/nova/src/lib/party/connection-errors.ts` parse messages; switch to `RoomError.code` (`peer-connect-failed`, `relay-failed`, `room-full`, `decrypt-failed`, …).
 3. [ ] Party size: **no cap** (owner wants arbitrarily large parties, 2026-11-12). Do not set `maxUsers`. Still handle `room-full` gracefully in case a cap is added later.
 

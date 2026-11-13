@@ -95,7 +95,7 @@ canonical index or an ADR:
 
 ## Getting started
 
-Requires Node.js >= 20 and npm (see `packageManager`).
+Requires Node.js >= 22 and npm (see `packageManager`).
 
 ```sh
 npm install     # installs workspace, installs lefthook hooks

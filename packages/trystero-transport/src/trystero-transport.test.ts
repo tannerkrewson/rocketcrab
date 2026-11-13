@@ -8,7 +8,7 @@ import type {
   TransportReconnectEvent,
   TransferProgress,
 } from "@rocketcrab/core";
-import type { JoinRoomCallbacks } from "trystero";
+import type { RoomError } from "trystero";
 import { TrysteroTransport } from "./trystero-transport";
 import type { TrysteroTransportOptions } from "./trystero-transport";
 import { RELAY_FAILURE_WINDOW_MS } from "./relays";
@@ -35,7 +35,6 @@ const mocks = vi.hoisted(() => {
 vi.mock("trystero", () => ({
   joinRoom: mocks.joinRoom,
   getRelaySockets: () => mocks.relaySockets,
-  selfId: mocks.selfId,
   defaultRelayUrls: ["wss://relay.damus.io"],
 }));
 
@@ -94,45 +93,98 @@ function makeFakeAction(): FakeAction {
 }
 
 interface FakeRoom {
-  onPeerJoin: ((peerId: string) => void) | null;
-  onPeerLeave: ((peerId: string) => void) | null;
+  joinHandler: ((peer: { peerId: string; userId: string }) => void) | null;
+  leaveHandler: ((peer: { peerId: string; userId: string }) => void) | null;
+  errorHandler: ((error: RoomError) => void) | null;
+  stateHandler:
+    | ((
+        value: unknown,
+        context: { peerId: string; userId: string; self: boolean; removed: boolean },
+      ) => void)
+    | null;
+  peers: Record<string, { userId: string }>;
+  values: Record<string, unknown>;
+  metas: Record<string, { peerId: string; userId: string; online: boolean }>;
+  ownIdentity: unknown;
   leave: ReturnType<typeof vi.fn>;
   ping: ReturnType<typeof vi.fn>;
   getPeers: ReturnType<typeof vi.fn>;
   makeAction: ReturnType<typeof vi.fn>;
   action: FakeAction;
+  acknowledgement: FakeAction;
 }
 
 function makeFakeRoom(): FakeRoom {
   const action = makeFakeAction();
-  return {
-    onPeerJoin: null,
-    onPeerLeave: null,
+  const acknowledgement = makeFakeAction();
+  const wrapAction = (fake: FakeAction) => ({
+    send: fake.send,
+    onMessage: (handler: NonNullable<FakeAction["onMessage"]>) => {
+      fake.onMessage = handler;
+      return () => {
+        fake.onMessage = null;
+      };
+    },
+    onReceiveProgress: (handler: NonNullable<FakeAction["onReceiveProgress"]>) => {
+      fake.onReceiveProgress = handler;
+      return () => {
+        fake.onReceiveProgress = null;
+      };
+    },
+  });
+  const room: FakeRoom = {
+    joinHandler: null,
+    leaveHandler: null,
+    errorHandler: null,
+    stateHandler: null,
+    peers: {},
+    values: {},
+    metas: {},
+    ownIdentity: undefined,
     leave: vi.fn(async () => undefined),
     ping: vi.fn(async (_peerId: string) => 1),
-    getPeers: vi.fn(() => ({})),
-    makeAction: vi.fn(
-      (
-        _namespace: string,
-        config?: {
-          onMessage?: (data: unknown, context: { peerId: string; metadata?: unknown }) => void;
-          onReceiveProgress?: (
-            percent: number,
-            context: { peerId: string; metadata?: unknown },
-          ) => void;
-        },
-      ) => {
-        if (config?.onMessage !== undefined) {
-          action.onMessage = config.onMessage;
-        }
-        if (config?.onReceiveProgress !== undefined) {
-          action.onReceiveProgress = config.onReceiveProgress;
-        }
-        return action;
-      },
+    getPeers: vi.fn(() => room.peers),
+    makeAction: vi.fn((namespace: string) =>
+      wrapAction(namespace === "nova.identity.ack" ? acknowledgement : action),
     ),
     action,
+    acknowledgement,
+    ...{
+      getSelf: async () => ({ peerId: mocks.selfId }),
+      onPeerJoin: (handler: FakeRoom["joinHandler"]) => {
+        room.joinHandler = handler;
+        return () => {
+          room.joinHandler = null;
+        };
+      },
+      onPeerLeave: (handler: FakeRoom["leaveHandler"]) => {
+        room.leaveHandler = handler;
+        return () => {
+          room.leaveHandler = null;
+        };
+      },
+      onError: (handler: FakeRoom["errorHandler"]) => {
+        room.errorHandler = handler;
+        return () => {
+          room.errorHandler = null;
+        };
+      },
+      makeUserState: () => ({
+        get: (userId: string) => room.values[userId],
+        getMeta: (userId: string) => room.metas[userId],
+        set: async (value: unknown) => {
+          room.ownIdentity = value;
+        },
+        onChange: (handler: FakeRoom["stateHandler"]) => {
+          room.stateHandler = handler;
+          return () => {
+            room.stateHandler = null;
+          };
+        },
+      }),
+    },
   };
+  return room;
 }
 
 interface Setup {
@@ -159,28 +211,25 @@ async function joinConnected(adapter: TrysteroTransport, clock: FakeClock): Prom
   await promise;
 }
 
-function capturedCallbacks(): JoinRoomCallbacks {
-  const callbacks = mocks.joinRoom.mock.calls[0]?.[2] as JoinRoomCallbacks | undefined;
-  if (callbacks === undefined) {
-    throw new Error("joinRoom was not called");
-  }
-  return callbacks;
+function capturedCallbacks(): undefined {
+  return undefined;
 }
 
-/** Simulate a remote peer's identity handshake + join on one adapter. */
+/** Deliver a peer's published state and acknowledgement through 0.27 listeners. */
 async function simulatePeerJoin(
-  callbacks: JoinRoomCallbacks,
+  _legacy: undefined,
   room: FakeRoom,
   peerId: string,
   identity: { memberId: MemberId; connectionId: ConnectionId; displayName?: string },
+  selfConnectionId = mocks.selfId,
 ): Promise<void> {
-  await callbacks.onPeerHandshake!(
-    peerId,
-    async () => undefined,
-    async () => ({ data: { v: 1, transportVersion: 4, ...identity } }),
-    false,
-  );
-  room.onPeerJoin!(peerId);
+  const userId = `user-${peerId}`;
+  room.peers[peerId] = { userId };
+  room.values[userId] = { v: 1, transportVersion: 5, ...identity };
+  room.metas[userId] = { peerId, userId, online: true };
+  room.joinHandler!({ peerId, userId });
+  room.acknowledgement.onMessage!(selfConnectionId, { peerId });
+  await Promise.resolve();
 }
 
 beforeEach(() => {
@@ -206,16 +255,16 @@ describe("TrysteroTransport construction", () => {
 
   it("defaults the appId to the environment-specific dev ID", () => {
     const { adapter } = setup();
-    expect(adapter.appId).toBe("rocketcrab-nova-dev");
+    expect(adapter.appId).toBe("rocketcrab-nova-v027-dev");
     const prod = new TrysteroTransport({ memberId: "member-p", env: { PROD: true } });
-    expect(prod.appId).toBe("rocketcrab-nova-prod");
+    expect(prod.appId).toBe("rocketcrab-nova-v027-prod");
     const explicit = new TrysteroTransport({ memberId: "member-x", appId: "rocketcrab-e2e" });
     expect(explicit.appId).toBe("rocketcrab-e2e");
   });
 
-  it("uses the page's Trystero peer ID as the initial connectionId", () => {
+  it("provides a provisional connectionId before room identity is initialized", () => {
     const { adapter } = setup();
-    expect(adapter.selfConnectionId).toBe("self-peer-id");
+    expect(adapter.selfConnectionId).toBeTruthy();
   });
 });
 
@@ -243,7 +292,7 @@ describe("TrysteroTransport join", () => {
     expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
     const [config, roomName] = mocks.joinRoom.mock.calls[0]!;
     expect(roomName).toBe("ROOM");
-    expect(config.appId).toBe("rocketcrab-nova-dev");
+    expect(config.appId).toBe("rocketcrab-nova-v027-dev");
     expect(config.relayConfig).toBeUndefined();
     expect(config.maxReceiveBytes).toBe(8 * 1024 * 1024);
   });
@@ -326,6 +375,33 @@ describe("TrysteroTransport join", () => {
 });
 
 describe("TrysteroTransport peer mapping", () => {
+  it("times out unadmitted peers and cancels admission timers on leave", async () => {
+    const onJoinError = vi.fn();
+    const { adapter, clock } = setup({ onJoinError, handshakeTimeoutMs: 5000 });
+    const room = makeFakeRoom();
+    mocks.joinRoom.mockReturnValue(room);
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    await joinConnected(adapter, clock);
+    room.peers.slow = { userId: "slow-user" };
+    room.joinHandler!({ peerId: "slow", userId: "slow-user" });
+    clock.advance(4999);
+    expect(onJoinError).not.toHaveBeenCalled();
+    clock.advance(1);
+    expect(onJoinError).toHaveBeenCalledOnce();
+    expect(onJoinError).toHaveBeenCalledWith(
+      expect.objectContaining({ category: "handshake_timeout", peerId: "slow" }),
+    );
+    expect(adapter.peers).toEqual([]);
+    room.peers.departed = { userId: "departed-user" };
+    room.joinHandler!({ peerId: "departed", userId: "departed-user" });
+    room.leaveHandler!({ peerId: "departed", userId: "departed-user" });
+    room.peers.closed = { userId: "closed-user" };
+    room.joinHandler!({ peerId: "closed", userId: "closed-user" });
+    await adapter.leave();
+    clock.advance(5000);
+    expect(onJoinError).toHaveBeenCalledOnce();
+  });
+
   it("exchanges identity in the handshake and maps peer:joined", async () => {
     const { adapter, clock } = setup();
     const room = makeFakeRoom();
@@ -333,28 +409,9 @@ describe("TrysteroTransport peer mapping", () => {
     mocks.relaySockets[RELAY] = { readyState: 1 };
     await joinConnected(adapter, clock);
 
-    const callbacks = capturedCallbacks();
-    let sentIdentity: unknown;
-    await callbacks.onPeerHandshake!(
-      "peer-1",
-      async (data) => {
-        sentIdentity = data;
-      },
-      async () => ({
-        data: {
-          v: 1,
-          transportVersion: 4,
-          memberId: "member-b",
-          connectionId: "conn-b",
-          displayName: "Bea",
-        },
-      }),
-      false,
-    );
-    // we announce our own memberId + connectionId
-    expect(sentIdentity).toEqual({
+    expect(room.ownIdentity).toEqual({
       v: 1,
-      transportVersion: 4,
+      transportVersion: 5,
       memberId: "member-a",
       connectionId: "self-peer-id",
       displayName: "Ada",
@@ -364,7 +421,11 @@ describe("TrysteroTransport peer mapping", () => {
     adapter.on("peer:joined", (peer) => {
       joined.push(peer);
     });
-    room.onPeerJoin!("peer-1");
+    await simulatePeerJoin(capturedCallbacks(), room, "peer-1", {
+      memberId: "member-b",
+      connectionId: "conn-b",
+      displayName: "Bea",
+    });
     expect(joined).toEqual([
       {
         memberId: "member-b",
@@ -377,7 +438,7 @@ describe("TrysteroTransport peer mapping", () => {
     expect(adapter.peers[0]!.memberId).toBe("member-b");
   });
 
-  it.each([undefined, 1, 2, 3, 5])(
+  it.each([undefined, 1, 2, 3, 4])(
     "rejects incompatible transport version %s before actions",
     async (transportVersion) => {
       const onJoinError = vi.fn();
@@ -386,21 +447,15 @@ describe("TrysteroTransport peer mapping", () => {
       mocks.joinRoom.mockReturnValue(room);
       mocks.relaySockets[RELAY] = { readyState: 1 };
       await joinConnected(adapter, clock);
-      await expect(
-        capturedCallbacks().onPeerHandshake!(
-          "old-peer",
-          async () => undefined,
-          async () => ({
-            data: {
-              v: 1,
-              memberId: "old",
-              connectionId: "old-conn",
-              ...(transportVersion === undefined ? {} : { transportVersion }),
-            },
-          }),
-          false,
-        ),
-      ).rejects.toThrow(/Everyone should update\/reload/);
+      room.peers["old-peer"] = { userId: "old-user" };
+      room.metas["old-user"] = { peerId: "old-peer", userId: "old-user", online: true };
+      room.values["old-user"] = {
+        v: 1,
+        memberId: "old",
+        connectionId: "old-conn",
+        ...(transportVersion === undefined ? {} : { transportVersion }),
+      };
+      room.joinHandler!({ peerId: "old-peer", userId: "old-user" });
       expect(adapter.peers).toEqual([]);
       expect(onJoinError).toHaveBeenCalledWith(
         expect.objectContaining({ category: "incompatible_version", isFatal: true }),
@@ -409,21 +464,18 @@ describe("TrysteroTransport peer mapping", () => {
   );
 
   it("fails the peer when the identity handshake is malformed (T10)", async () => {
-    const { adapter, clock } = setup();
+    const onJoinError = vi.fn();
+    const { adapter, clock } = setup({ onJoinError });
     const room = makeFakeRoom();
     mocks.joinRoom.mockReturnValue(room);
     mocks.relaySockets[RELAY] = { readyState: 1 };
     await joinConnected(adapter, clock);
-
-    const callbacks = capturedCallbacks();
-    await expect(
-      callbacks.onPeerHandshake!(
-        "peer-1",
-        async () => undefined,
-        async () => ({ data: { v: 1, memberId: 42, connectionId: "" } }),
-        false,
-      ),
-    ).rejects.toThrow(/invalid identity handshake/);
+    room.peers["peer-1"] = { userId: "user-1" };
+    room.metas["user-1"] = { peerId: "peer-1", userId: "user-1", online: true };
+    room.values["user-1"] = { v: 1, memberId: 42, connectionId: "" };
+    room.joinHandler!({ peerId: "peer-1", userId: "user-1" });
+    expect(onJoinError).toHaveBeenCalledWith(expect.objectContaining({ category: "rejected" }));
+    expect(adapter.peers).toEqual([]);
   });
 
   it("maps peer:left and cleans up the identity maps", async () => {
@@ -441,7 +493,7 @@ describe("TrysteroTransport peer mapping", () => {
     adapter.on("peer:left", (peer) => {
       left.push(peer);
     });
-    room.onPeerLeave!("peer-1");
+    room.leaveHandler!({ peerId: "peer-1", userId: "user-peer-1" });
     expect(left).toEqual([
       { memberId: "member-b", connectionId: "conn-b", joinedAt: expect.any(Number) },
     ]);
@@ -474,13 +526,29 @@ describe("TrysteroTransport send", () => {
 
   it("delegates whole requests, limits, progress, timeout and abort to Trystero", async () => {
     const { adapter, room } = await joinedWithPeer();
-    let config!: import("trystero").RequestActionConfig;
-    const rpc = { request: vi.fn(), onRequest: null, onReceive: null, onReceiveProgress: null };
-    room.makeAction.mockImplementationOnce((_namespace, options) => {
-      config = options;
-      Object.assign(rpc, options);
-      return rpc;
-    });
+    const config: Record<string, any> = {};
+    const rpc = {
+      request: vi.fn(),
+      onRequest: (handler: unknown) => {
+        config.onRequest = handler;
+        return () => {
+          config.onRequest = null;
+        };
+      },
+      onReceive: (handler: unknown) => {
+        config.onReceive = handler;
+        return () => {
+          config.onReceive = null;
+        };
+      },
+      onReceiveProgress: (handler: unknown) => {
+        config.onReceiveProgress = handler;
+        return () => {
+          config.onReceiveProgress = null;
+        };
+      },
+    };
+    room.makeAction.mockImplementationOnce(() => rpc);
     const handler = vi.fn(() => new Uint8Array([1, 2]));
     const unsubscribe = adapter.handleRequest("source", handler);
     const controller = new AbortController();
@@ -548,9 +616,9 @@ describe("TrysteroTransport send", () => {
       config.onRequest?.({}, { peerId: "peer-1", signal: controller.signal }),
     ).rejects.toThrow();
     await adapter.leave();
-    expect(rpc.onRequest).toBeNull();
-    expect(rpc.onReceive).toBeNull();
-    expect(rpc.onReceiveProgress).toBeNull();
+    expect(config.onRequest).toBeNull();
+    expect(config.onReceive).toBeNull();
+    expect(config.onReceiveProgress).toBeNull();
   });
 
   it("broadcasts to every peer (target null)", async () => {
@@ -808,9 +876,11 @@ describe("TrysteroTransport join errors", () => {
     mocks.joinRoom.mockReturnValue(room);
     mocks.relaySockets[RELAY] = { readyState: 0 };
     const promise = adapter.join({ room: "ROOM", sessionId: "session-1" });
-    capturedCallbacks().onJoinError!({
-      error: "incorrect room password when decrypting offer",
-      appId: "rocketcrab-nova-dev",
+    room.errorHandler!({
+      code: "decrypt-failed",
+      stage: "offer",
+      message: "decrypt failed",
+      appId: "app",
       roomId: "ROOM",
       peerId: "peer-1",
     });
@@ -822,13 +892,15 @@ describe("TrysteroTransport join errors", () => {
   it("delivers post-join errors to the observer and diagnostics (F5)", async () => {
     const seen: TrysteroJoinError[] = [];
     const { adapter, clock } = setup({ onJoinError: (error) => seen.push(error) });
-    mocks.joinRoom.mockReturnValue(makeFakeRoom());
+    const room = makeFakeRoom();
+    mocks.joinRoom.mockReturnValue(room);
     mocks.relaySockets[RELAY] = { readyState: 1 };
     await joinConnected(adapter, clock);
-    capturedCallbacks().onJoinError!({
-      error:
-        "could not connect to peer p2 after exchanging SDP; configure TURN servers with turnConfig or rtcConfig.iceServers",
-      appId: "rocketcrab-nova-dev",
+    room.errorHandler!({
+      code: "peer-connect-failed",
+      turnConfigured: false,
+      message: "connection failed",
+      appId: "app",
       roomId: "ROOM",
       peerId: "p2",
     });
@@ -851,6 +923,10 @@ describe("TrysteroTransport relay diagnostics", () => {
       changes.push(diagnostics);
     });
     const promise = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    // Identity initialization is asynchronous in 0.27.
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
     // first poll: CONNECTING
     expect(adapter.getRelayDiagnostics()?.signalingDown).toBe(true);
     mocks.relaySockets[RELAY] = { readyState: 1 };
@@ -937,6 +1013,53 @@ describe("TrysteroTransport relay diagnostics", () => {
 });
 
 describe("TrysteroTransport leave / reconnect / suspend", () => {
+  it("does not rejoin after leave races with reconnect's asynchronous room teardown", async () => {
+    const { adapter, clock } = setup();
+    const room = makeFakeRoom();
+    mocks.joinRoom.mockReturnValue(room);
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    await joinConnected(adapter, clock);
+    let finishLeave!: () => void;
+    room.leave.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishLeave = resolve;
+        }),
+    );
+    const reconnecting = adapter.reconnect();
+    void reconnecting.catch(() => undefined);
+    await adapter.leave();
+    finishLeave();
+    await Promise.resolve();
+    await Promise.resolve();
+    const joinCalls = mocks.joinRoom.mock.calls.length;
+    if (adapter.connectionState === "joining") await adapter.leave();
+    expect(joinCalls).toBe(1);
+  });
+
+  it("does not resume or restore suspended state while teardown races with leave", async () => {
+    const { adapter, clock } = setup();
+    const room = makeFakeRoom();
+    mocks.joinRoom.mockReturnValue(room);
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    await joinConnected(adapter, clock);
+    let finishLeave!: () => void;
+    room.leave.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishLeave = resolve;
+        }),
+    );
+    const suspending = adapter.suspend();
+    const rejected = expect(suspending).rejects.toMatchObject({ category: "cancelled" });
+    await expect(adapter.resume()).rejects.toMatchObject({ category: "invalid_state" });
+    await adapter.leave();
+    finishLeave();
+    await rejected;
+    expect(adapter.connectionState).toBe("disconnected");
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
+  });
+
   it("leaves cleanly: releases room handlers and rejects sends", async () => {
     const { adapter, clock } = setup();
     const room = makeFakeRoom();
@@ -950,8 +1073,8 @@ describe("TrysteroTransport leave / reconnect / suspend", () => {
 
     await adapter.leave();
     expect(room.leave).toHaveBeenCalledTimes(1);
-    expect(room.onPeerJoin).toBeNull();
-    expect(room.onPeerLeave).toBeNull();
+    expect(room.joinHandler).toBeNull();
+    expect(room.leaveHandler).toBeNull();
     expect(room.action.onMessage).toBeNull();
     expect(room.action.onReceiveProgress).toBeNull();
     expect(adapter.connectionState).toBe("disconnected");
@@ -1114,6 +1237,10 @@ describe("TrysteroTransport event unsubscription", () => {
     mocks.joinRoom.mockReturnValue(room);
     mocks.relaySockets[RELAY] = { readyState: 1 };
     await joinConnected(adapter, clock);
+    await simulatePeerJoin(capturedCallbacks(), room, "peer-1", {
+      memberId: "member-b",
+      connectionId: "conn-b",
+    });
     const received: TransportMessage[] = [];
     const unsubscribe = adapter.on("message:received", (message) => {
       received.push(message);

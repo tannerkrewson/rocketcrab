@@ -11,10 +11,8 @@
  * action-name limit and matches how the F5 spike carried `sentAt`/`totalBytes`
  * metadata for large transfers.
  *
- * Peer identity (memberId + connectionId + displayName) is exchanged during
- * Trystero's built-in peer handshake, mirroring the F5 spike's admission
- * handshake pattern. The handshake runs before a peer is activated, so
- * `peer:joined` always carries the peer's real identity.
+ * Peer identity (memberId + connectionId + displayName) is exchanged through
+ * per-user state and validated before the adapter publishes a peer.
  */
 
 /** One message envelope serialized into Trystero action metadata. */
@@ -62,10 +60,10 @@ export function buildWireEnvelope(input: WireEnvelopeInput): WireEnvelope {
   };
 }
 
-/** Bump when the underlying action encoding is incompatible (Trystero 0.26). */
-export const TRANSPORT_VERSION = 4;
+/** Bump when the underlying action encoding is incompatible (Trystero 0.27). */
+export const TRANSPORT_VERSION = 5;
 
-/** Payload exchanged during the peer identity handshake. */
+/** Payload exchanged during peer identity admission. */
 export interface IdentityPayload {
   readonly v: 1;
   readonly transportVersion?: number;
@@ -82,8 +80,8 @@ const IDENTITY_VALIDATOR = {
 
 /**
  * Validate an identity payload received from a peer. The adapter never
- * trusts peer input (threat model T10); malformed identities fail the
- * handshake, which fails the peer with a structured join error.
+ * trusts peer input (threat model T10); malformed identities are rejected
+ * and reported as structured join errors.
  */
 export function parseIdentityPayload(value: unknown): IdentityPayload | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
@@ -196,6 +194,9 @@ export function normalizePayload(payload: unknown): unknown {
 
 /** Serialized size of a payload in bytes (progress accounting). */
 export function payloadSize(payload: unknown): number {
+  if (typeof Blob !== "undefined" && payload instanceof Blob) {
+    return payload.size;
+  }
   if (payload instanceof Uint8Array) {
     return payload.byteLength;
   }

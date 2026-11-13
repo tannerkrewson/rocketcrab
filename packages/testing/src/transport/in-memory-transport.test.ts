@@ -290,6 +290,7 @@ describe("InMemoryTransport lifecycle", () => {
   it("applies rejoin latency to reconnect completion", async () => {
     const scheduled: number[] = [];
     const hub = new InMemoryTransportHub({
+      now: () => 0,
       schedule: (callback, delayMs) => {
         scheduled.push(delayMs);
         return () => undefined;

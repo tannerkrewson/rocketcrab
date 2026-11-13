@@ -10,10 +10,14 @@
  * user-actionable category union.
  */
 
+import type { RoomError, RoomErrorCode } from "trystero";
+
 /** User-actionable join failure categories (F5 recommendation table). */
 export type TrysteroJoinErrorCategory =
   /** Wrong room password (F8: structured Trystero error). */
   | "password_mismatch"
+  /** The remote room has reached its configured capacity. */
+  | "room_full"
   /** Incompatible transport/action wire format; all players must reload. */
   | "incompatible_version"
   /** Peer rejected the join/admission or the identity handshake failed. */
@@ -42,6 +46,7 @@ export type TrysteroJoinErrorCategory =
 /** Categories that can never recover without user action (S1 retry UX). */
 const FATAL_CATEGORIES: ReadonlySet<TrysteroJoinErrorCategory> = new Set([
   "password_mismatch",
+  "room_full",
   "incompatible_version",
   "relay_unreachable",
   "join_timeout",
@@ -50,6 +55,7 @@ const FATAL_CATEGORIES: ReadonlySet<TrysteroJoinErrorCategory> = new Set([
 
 export interface TrysteroJoinErrorDetails {
   readonly category: TrysteroJoinErrorCategory;
+  readonly code?: RoomErrorCode;
   readonly message: string;
   /** Trystero peer ID of the failing peer, when Trystero supplied one. */
   readonly peerId?: string;
@@ -61,6 +67,7 @@ export interface TrysteroJoinErrorDetails {
 /** Structured, categorized join error surfaced by the adapter. */
 export class TrysteroJoinError extends Error {
   readonly category: TrysteroJoinErrorCategory;
+  readonly code?: RoomErrorCode;
   readonly peerId?: string;
   readonly appId?: string;
   readonly roomId?: string;
@@ -70,6 +77,7 @@ export class TrysteroJoinError extends Error {
     super(details.message);
     this.name = "TrysteroJoinError";
     this.category = details.category;
+    this.code = details.code;
     this.peerId = details.peerId;
     this.appId = details.appId;
     this.roomId = details.roomId;
@@ -118,6 +126,30 @@ export function categorizeJoinError(message: string): TrysteroJoinErrorCategory 
     return "rejected";
   }
   return "unknown";
+}
+
+/** Map 0.27 room errors by code, never by implementation-specific wording. */
+export function fromRoomError(error: RoomError): TrysteroJoinError {
+  const categories: Record<RoomErrorCode, TrysteroJoinErrorCategory> = {
+    "room-full": "room_full",
+    banned: "rejected",
+    "relay-failed": "relay_unreachable",
+    "identity-failed": "invalid_state",
+    "plugin-failed": "invalid_state",
+    "decrypt-failed": "password_mismatch",
+    "peer-connect-failed": "peer_connection_failed",
+    "handshake-failed": "rejected",
+    "peer-error": "peer_disconnected",
+  };
+  return new TrysteroJoinError({
+    category: categories[error.code],
+    code: error.code,
+    message: error.message,
+    appId: error.appId,
+    roomId: error.roomId,
+    peerId: "peerId" in error ? error.peerId : undefined,
+    cause: error.cause,
+  });
 }
 
 /** Build a categorized error from a Trystero join-error report. */
