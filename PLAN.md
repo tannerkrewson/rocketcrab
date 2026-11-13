@@ -120,53 +120,18 @@ Replace GitHub Pages with two assets-only Workers. Owner accepted that games
 saved on the workers.dev beta address will not carry over to `rocketcrab.com`
 after the cutover (browser storage is per origin).
 
-1. [ ] Create `deploy/nova/wrangler.toml`: `name = "rocketcrab-nova"`,
-       `[assets] directory = "../../apps/nova/dist"`,
-       `not_found_handling = "single-page-application"`, no `main` script,
-       `workers_dev = true`, `preview_urls = false`. Create
-       `deploy/runtime/wrangler.toml` the same way for `rocketcrab-runtime`
-       with `not_found_handling = "404-page"` (the runtime is not an SPA —
-       check how `apps/runtime` routes before choosing).
-2. [ ] Security headers become real HTTP headers. Workers static assets
-       read a `_headers` file from the asset directory (verify in current
-       Cloudflare docs). Make the Vite builds **emit** `dist/_headers` from
-       the same code that builds the CSP, so there is one source of truth: - Nova: extend the `nova-csp-meta` plugin in `apps/nova/vite.config.ts`
-       to also write `_headers` with the identical CSP plus
-       `frame-ancestors 'none'`, the other headers now in
-       `deploy/nova/_headers`, and immutable caching for `/assets/*`.
-       Keep the CSP `<meta>` tag too (harmless, protects file previews). - Runtime: add a small plugin in `apps/runtime/vite.config.ts` that
-       writes the permissive policy from `deploy/runtime/_headers` with
-       `frame-ancestors <main origin>` filled from `VITE_MAIN_ORIGIN`. - Delete the hand-written `deploy/nova/_headers`, `deploy/nova/_redirects`,
-       `deploy/runtime/_headers`, `deploy/runtime/_redirects`.
-3. [ ] Origins: production builds pin `VITE_RUNTIME_ORIGIN`
-       (nova) and `VITE_MAIN_ORIGIN` (runtime) to the addresses in §0.2.
-       Add npm scripts `deploy:nova` and `deploy:runtime` that build with
-       those env vars (plus `VITE_EDGE_ORIGIN` for nova), run
-       `node scripts/verify-static-deploy.mjs`, then `wrangler deploy
-       --config deploy/<name>/wrangler.toml`. Put the production URLs in one
-       place (e.g. a small `deploy/origins.json` read by the scripts) rather
-       than repeating them.
-4. [ ] Delete GitHub Pages machinery: `.github/workflows/deploy.yml`, the
-       404.html copy, `--pages` in `scripts/verify-static-deploy.mjs`, and
-       project-site base-path support (`VITE_RUNTIME_BASE`,
-       `apps/nova/src/lib/basepath.ts`, `runtimeBasePath()` in
-       `apps/nova/src/lib/runtime-origin.ts`, base handling in `main.tsx`
-       and `runtime-host.ts`). Both sites now live at their origin root.
-       Keep the `runtime.` hostname derivation only if something still
-       needs it; otherwise remove it and require the env pin in production.
-5. [ ] Update `scripts/verify-static-deploy.mjs` to check the emitted
-       `_headers` (CSP present, `frame-src` = runtime origin, runtime
-       `frame-ancestors` = main origin) and update `e2e/deployment.spec.ts`.
-6. [ ] Rewrite `docs/architecture/deployment.md` for Cloudflare (it is
-       currently GitHub-Pages-specific). Amend ADR-0001 and ADR-0008: the
-       runtime must be on a different **site** (registrable domain), not just
-       a different origin — the repo's own finding
-       (`docs/testing/runtime-sandbox-findings.md`) is that browser process
-       isolation is per site, so a looping game on a same-site runtime can
-       freeze the app. Record the workers.dev runtime decision.
-7. [ ] With owner approval, first deploy of both Workers; open the app,
-       create a game, run it in the editor (proves the runtime iframe, CSP
-       and `frame-ancestors`), and check response headers with `curl -I`.
+1. [ ] Create `deploy/nova/wrangler.toml`: `name = "rocketcrab-nova"`, `[assets] directory = "../../apps/nova/dist"`, `not_found_handling = "single-page-application"`, no `main` script, `workers_dev = true`, `preview_urls = false`. Create `deploy/runtime/wrangler.toml` the same way for `rocketcrab-runtime` with `not_found_handling = "404-page"` (the runtime is not an SPA — check how `apps/runtime` routes before choosing).
+2. [ ] Security headers become real HTTP headers. Workers static assets read a `_headers` file from the asset directory (verify in current Cloudflare docs). Make the Vite builds **emit** `dist/_headers` from the same code that builds the CSP, so there is one source of truth:
+
+   - Nova: extend the `nova-csp-meta` plugin in `apps/nova/vite.config.ts` to also write `_headers` with the identical CSP plus `frame-ancestors 'none'`, the other headers now in `deploy/nova/_headers`, and immutable caching for `/assets/*`. Keep the CSP `<meta>` tag too (harmless, protects file previews).
+   - Runtime: add a small plugin in `apps/runtime/vite.config.ts` that writes the permissive policy from `deploy/runtime/_headers` with `frame-ancestors <main origin>` filled from `VITE_MAIN_ORIGIN`.
+   - Delete the hand-written `deploy/nova/_headers`, `deploy/nova/_redirects`, `deploy/runtime/_headers`, `deploy/runtime/_redirects`.
+
+3. [ ] Origins: production builds pin `VITE_RUNTIME_ORIGIN` (nova) and `VITE_MAIN_ORIGIN` (runtime) to the addresses in §0.2. Add npm scripts `deploy:nova` and `deploy:runtime` that build with those env vars (plus `VITE_EDGE_ORIGIN` for nova), run `node scripts/verify-static-deploy.mjs`, then `wrangler deploy --config deploy/<name>/wrangler.toml`. Put the production URLs in one place (e.g. a small `deploy/origins.json` read by the scripts) rather than repeating them.
+4. [ ] Delete GitHub Pages machinery: `.github/workflows/deploy.yml`, the 404.html copy, `--pages` in `scripts/verify-static-deploy.mjs`, and project-site base-path support (`VITE_RUNTIME_BASE`, `apps/nova/src/lib/basepath.ts`, `runtimeBasePath()` in `apps/nova/src/lib/runtime-origin.ts`, base handling in `main.tsx` and `runtime-host.ts`). Both sites now live at their origin root. Keep the `runtime.` hostname derivation only if something still needs it; otherwise remove it and require the env pin in production.
+5. [ ] Update `scripts/verify-static-deploy.mjs` to check the emitted `_headers` (CSP present, `frame-src` = runtime origin, runtime `frame-ancestors` = main origin) and update `e2e/deployment.spec.ts`.
+6. [ ] Rewrite `docs/architecture/deployment.md` for Cloudflare (it is currently GitHub-Pages-specific). Amend ADR-0001 and ADR-0008: the runtime must be on a different **site** (registrable domain), not just a different origin — the repo's own finding (`docs/testing/runtime-sandbox-findings.md`) is that browser process isolation is per site, so a looping game on a same-site runtime can freeze the app. Record the workers.dev runtime decision.
+7. [ ] With owner approval, first deploy of both Workers; open the app, create a game, run it in the editor (proves the runtime iframe, CSP and `frame-ancestors`), and check response headers with `curl -I`.
 
 ## 3. Trystero 0.27 migration — P0 (owner approved)
 
@@ -177,46 +142,27 @@ Nova is not launched, so no compatibility shim is needed — but bump the
 Nova app IDs in `packages/trystero-transport/src/app-id.ts` so old and new
 clients never share rooms.
 
-1. [ ] Mechanical migration of `packages/trystero-transport` (and any other
-       Trystero imports): `on*()` listener methods returning unsubscribe,
-       `await room.getSelf()` instead of `selfId`, `room.onError` instead of
-       `onJoinError`, `getPeers()` returning `PeerInfo`,
-       `setRelayConnectivity` instead of pause/resume, `joinRoom` throwing on
-       duplicate active joins (leave first), targeted `send` rejecting for
-       disconnected targets. Pin `trystero` and `@trystero-p2p/*` to exact
-       `0.27.0`. All existing tests green, including `npm run test:e2e:trystero`.
-2. [ ] Replace error-string matching with typed codes. Today
-       `handleJoinErrorNotice` in `apps/nova/src/lib/party/engine.ts` and
-       `apps/nova/src/lib/party/connection-errors.ts` parse messages; switch to
-       `RoomError.code` (`peer-connect-failed`, `relay-failed`, `room-full`,
-       `decrypt-failed`, …).
-3. [ ] Adopt `maxUsers`. **Owner decision needed:** maximum party size
-       (default proposal: 12). Show a friendly "party is full" screen on
-       `room-full`.
-4. [ ] **Feature fit review — write it down before coding.** For each
-       Trystero 0.27 feature below, read its doc in the Trystero repo
-       (`docs/*.md`) and the Nova code it would replace, then record in this
-       file: _adopt_ / _don't adopt_ + one-paragraph reason. Owner rule: if it
-       fits Nova's needs, adopt it and delete Nova's code. Candidates: - `userId` identity (`docs/identity.md`) vs `apps/nova/src/lib/party/identity.ts`. - `makeUserState` (lobby presence: display name, ready) vs the party
-       roster in `packages/party/src/session.ts` / `messages.ts`. - `makeState` (shared party state, e.g. selected game) vs party
-       control messages. - Actions with `onReceiveProgress` for the up-to-2 MiB game source vs
-       `packages/party/src/game-source.ts` (592 lines). - Trystero's authority module (`packages/core/src/authority.ts`,
-       tests `scale-authority-*.spec.ts`) vs Nova's authority election and
-       migration (ADR-0007, `packages/nova-api` session/state engines). - `roles()` / admins / ban vs Nova host controls. Check whether admin
-       rights can pass to a successor when the host leaves (Nova needs a
-       deterministic successor); if not, don't adopt. - `scale()` — see step 6.
-5. [ ] Implement each _adopt_ as its own commit, deleting the replaced Nova
-       code and its tests (port the behavioural assertions to the new code).
-       Keep `packages/nova-api` (the API games call) stable unless the
-       review shows a clear simplification; games must not need changes.
-6. [ ] `scale()` decision: test with 10 browser contexts whether
-       `scale({maxDirectPeers: 11})` keeps a 10-player party on a direct
-       mesh and whether it routes around one deliberately failed pair. It is
-       marked experimental. Because §5 already fixes failed pairs, the
-       default is **don't adopt** unless the owner wants parties larger than
-       ~12. Record the result here.
-7. [ ] Update ADR-0003 (transport abstraction) to describe what Trystero now
-       owns and what Nova still owns.
+1. [ ] Mechanical migration of `packages/trystero-transport` (and any other Trystero imports): `on*()` listener methods returning unsubscribe, `await room.getSelf()` instead of `selfId`, `room.onError` instead of `onJoinError`, `getPeers()` returning `PeerInfo`, `setRelayConnectivity` instead of pause/resume, `joinRoom` throwing on duplicate active joins (leave first), targeted `send` rejecting for disconnected targets. Pin `trystero` and `@trystero-p2p/*` to exact `0.27.0`. All existing tests green, including `npm run test:e2e:trystero`.
+2. [ ] Replace error-string matching with typed codes. Today `handleJoinErrorNotice` in `apps/nova/src/lib/party/engine.ts` and `apps/nova/src/lib/party/connection-errors.ts` parse messages; switch to `RoomError.code` (`peer-connect-failed`, `relay-failed`, `room-full`, `decrypt-failed`, …).
+3. [ ] Party size: **no cap** (owner wants arbitrarily large parties, 2026-11-12). Do not set `maxUsers`. Still handle `room-full` gracefully in case a cap is added later.
+4. [ ] **Feature fit review — write it down before coding.** For each Trystero 0.27 feature below, read its doc in the Trystero repo (`docs/*.md`) and the Nova code it would replace, then record in this file: _adopt_ / _don't adopt_ + one-paragraph reason. Owner rule: if it fits Nova's needs, adopt it and delete Nova's code. Candidates:
+
+   - `userId` identity (`docs/identity.md`) vs `apps/nova/src/lib/party/identity.ts`.
+   - `makeUserState` (lobby presence: display name, ready) vs the party roster in `packages/party/src/session.ts` / `messages.ts`.
+   - `makeState` (shared party state, e.g. selected game) vs party control messages.
+   - Actions with `onReceiveProgress` for the up-to-2 MiB game source vs `packages/party/src/game-source.ts` (592 lines).
+   - Trystero's authority module (`packages/core/src/authority.ts`, tests `scale-authority-*.spec.ts`) vs Nova's authority election and migration (ADR-0007, `packages/nova-api` session/state engines).
+   - `roles()` / admins / ban vs Nova host controls. Check whether admin rights can pass to a successor when the host leaves (Nova needs a deterministic successor); if not, don't adopt.
+   - `scale()` — adopt; see step 6.
+
+5. [ ] Implement each _adopt_ as its own commit, deleting the replaced Nova code and its tests (port the behavioural assertions to the new code). Keep `packages/nova-api` (the API games call) stable unless the review shows a clear simplification; games must not need changes.
+6. [ ] Adopt `scale()` (required for unlimited party size; it is marked experimental, so test it hard). Keep normal parties on a direct mesh by setting `maxDirectPeers` so rooms up to ~10 players stay direct, and let larger rooms form the multi-hop network. Then:
+
+   - Confirm game-source transfer still works for multi-hop peers: Trystero promotes messages over 16 KiB to a direct link, so a peer reachable only via hops may fail the up-to-2 MiB transfer. If it does, fall back to chunks ≤ 16 KiB for that peer.
+   - Load-test large rooms (step 7) before calling this done.
+
+7. [ ] **Large-room load test.** Using headless browser contexts (several machines or CI shards if one machine can't hold them), run parties of 10, 25, 50 and 100 players with a state-mode sample game. Record per size: time until everyone sees everyone, message latency, CPU on the authority player's device (also try a real phone as authority at 25+), and any errors. Known risk to watch: the authority player sends state to everyone, so its upload grows with party size; if it becomes the bottleneck, propose a fix to the owner (e.g. state deltas or fan-out via `scale()` routing) rather than capping parties. Record results in `docs/testing/` and link them from ADR-0003.
+8. [ ] Update ADR-0003 (transport abstraction) to describe what Trystero now owns and what Nova still owns.
 
 ## 4. Own signaling relay — P0 (owner approved)
 
@@ -226,49 +172,17 @@ with Trystero's officially supported self-hosted relay protocol, served by the
 edge Worker. Signaling availability then equals site availability (both on
 Cloudflare).
 
-1. [ ] Read `@trystero-p2p/ws-relay@0.27.0` (`dist/protocol.mjs`,
-       `dist/server.mjs`, ~240 lines). Protocol: client sends JSON
-       `{type: "subscribe"|"unsubscribe", topic}` or
-       `{type: "publish", topic, payload}`; server sends `{topic, payload}`
-       to every _other_ subscriber of the topic. Server limits to copy:
-       topic `^[A-Za-z0-9_-]+$` ≤ 256 chars, ≤ 128 subscriptions per socket,
-       200 msg/s with burst 400 per socket, 256 KiB max frame. Confirm
-       whether the publisher receives its own messages and match exactly.
-2. [ ] Implement it as a Durable Object class `SignalHub` in
-       `deploy/edge/signal.ts` using the **WebSocket Hibernation API**
-       (`state.acceptWebSocket`, `webSocketMessage`, `webSocketClose`) so idle
-       sockets cost nothing. Keep per-socket subscriptions in
-       `ws.serializeAttachment` so they survive hibernation. Store nothing
-       else; signaling messages are transient. - Routing: start with one global instance (`idFromName("global")`).
-       Signaling is low-rate; note in the runbook that sharding is the
-       scale-up path if one instance ever saturates. - Free plan needs SQLite-backed DO classes: add
-       `[[migrations]] tag = "v1" new_sqlite_classes = ["SignalHub"]` and the
-       `[[durable_objects.bindings]]` entry in `deploy/edge/wrangler.toml`.
-3. [ ] Route `GET /signal` (WebSocket upgrade) in `deploy/edge/worker.ts`.
-       The current gate allows only POST; add a WebSocket branch that still
-       enforces the Origin allowlist (browsers send Origin on WebSocket
-       upgrades) and the per-IP rate limit on connection attempts
-       (key `signal:<ip>`), then forwards to the DO. Reject non-upgrade GETs.
-4. [ ] Client: switch `packages/trystero-transport` from the Nostr strategy
-       (`trystero`) to `@trystero-p2p/ws-relay` with
-       `relayConfig.urls = [<edge origin as wss>/signal]`, derived from
-       `VITE_EDGE_ORIGIN` (no new env var). Delete Nostr-specific code:
-       relay health monitor (`relays.ts`), `VITE_TRYSTERO_RELAYS`, the deploy
-       input, relay diagnostics UI that only makes sense for many public
-       relays (keep a single "signaling connected" indicator).
-5. [ ] Local dev and tests: `npm run dev` must also start the edge Worker
-       (`wrangler dev`, port 8787) with `VITE_EDGE_ORIGIN=http://localhost:8787`.
-       Playwright `webServer` (both configs) must start it too. Delete the
-       public-relay discovery probe (`e2e-trystero/e2e/discovery-probe.spec.ts`)
-       and update `e2e-trystero` to use the local relay. Unit-test `SignalHub`
-       (subscribe/publish fan-out, limits, hibernation attachment) in
-       `deploy/edge/worker.test.ts` style.
-6. [ ] Verify DO pricing/limits for the account's plan (Workers Free vs
-       Paid) from current docs and write them in `deploy/cloudflare.md`.
-       **Owner decision:** stay on Free or move to Workers Paid ($5/month)
-       if Free limits are tight for signaling + tunnel (§5) traffic.
-7. [ ] Mark `docs/testing/trystero-connectivity-findings.md` relay sections as
-       historical; update ADR-0003.
+1. [ ] Read `@trystero-p2p/ws-relay@0.27.0` (`dist/protocol.mjs`, `dist/server.mjs`, ~240 lines). Protocol: client sends JSON `{type: "subscribe"|"unsubscribe", topic}` or `{type: "publish", topic, payload}`; server sends `{topic, payload}` to every _other_ subscriber of the topic. Server limits to copy: topic `^[A-Za-z0-9_-]+$` ≤ 256 chars, ≤ 128 subscriptions per socket, 200 msg/s with burst 400 per socket, 256 KiB max frame. Confirm whether the publisher receives its own messages and match exactly.
+2. [ ] Implement it as a Durable Object class `SignalHub` in `deploy/edge/signal.ts` using the **WebSocket Hibernation API** (`state.acceptWebSocket`, `webSocketMessage`, `webSocketClose`) so idle sockets cost nothing. Keep per-socket subscriptions in `ws.serializeAttachment` so they survive hibernation. Store nothing else; signaling messages are transient.
+
+   - Routing: **one Durable Object per room**, never one global instance (a single object can saturate its CPU on a viral day or in a 200-player party). The client connects to `/signal/<roomKey>`, where `roomKey` = hex SHA-256 of the Trystero app id + room id, truncated to 32 chars. Every peer in a room computes the same key, so they meet in the same object, and load spreads across rooms automatically. The Worker maps it with `idFromName(roomKey)`. The room id is secret-derived; only the hash ever reaches the server.
+   - Free plan needs SQLite-backed DO classes: add `[[migrations]] tag = "v1" new_sqlite_classes = ["SignalHub"]` and the `[[durable_objects.bindings]]` entry in `deploy/edge/wrangler.toml`.
+
+3. [ ] Route `GET /signal/:roomKey` (WebSocket upgrade; validate `roomKey` is 32 hex chars) in `deploy/edge/worker.ts`. The current gate allows only POST; add a WebSocket branch that still enforces the Origin allowlist (browsers send Origin on WebSocket upgrades) and the per-IP rate limit on connection attempts (key `signal:<ip>`), then forwards to the DO. Reject non-upgrade GETs.
+4. [ ] Client: switch `packages/trystero-transport` from the Nostr strategy (`trystero`) to `@trystero-p2p/ws-relay` with `relayConfig.urls = [<edge origin as wss>/signal/<roomKey>]` (computed per `joinRoom` call), derived from `VITE_EDGE_ORIGIN` (no new env var). Delete Nostr-specific code: relay health monitor (`relays.ts`), `VITE_TRYSTERO_RELAYS`, the deploy input, relay diagnostics UI that only makes sense for many public relays (keep a single "signaling connected" indicator).
+5. [ ] Local dev and tests: `npm run dev` must also start the edge Worker (`wrangler dev`, port 8787) with `VITE_EDGE_ORIGIN=http://localhost:8787`. Playwright `webServer` (both configs) must start it too. Delete the public-relay discovery probe (`e2e-trystero/e2e/discovery-probe.spec.ts`) and update `e2e-trystero` to use the local relay. Unit-test `SignalHub` (subscribe/publish fan-out, limits, hibernation attachment) in `deploy/edge/worker.test.ts` style.
+6. [ ] Record the plan decision in `deploy/cloudflare.md` with the limits that drive it (research of 2026-11-12, re-verify the numbers from current docs): **stay on Workers Free during development and the workers.dev beta; switch to Workers Paid ($5/month) at the `rocketcrab.com` cutover (§9).** Reason: Free never bills for Workers/Durable Objects but hard-fails at its daily limits (100,000 Durable Object requests/day; incoming WebSocket messages count 20:1) until 00:00 UTC, which would stop all parties; the fallback tunnel alone exceeds Free at roughly 1,000 parties/day. TURN is billed separately on either plan. Also add a Cloudflare usage notification so beta traffic approaching Free limits is visible.
+7. [ ] Mark `docs/testing/trystero-connectivity-findings.md` relay sections as historical; update ADR-0003.
 
 ## 5. Connection fallback via `rtcPolyfill` — P0 (owner approved; prototype first)
 
@@ -300,50 +214,20 @@ Data channel: `onopen`, `onmessage`, `onerror`, `onclose`, `close`,
 `onbufferedamountlow`). Check `createDataChannel` options (ordered/reliable)
 — a WebSocket is reliable and ordered, which must match.
 
-1. [ ] **Prototype (gate).** In `e2e-trystero/`, build the smallest version:
-       two browser contexts, one with WebRTC forced to fail (e.g. its
-       wrapper passes `iceServers: []` and `iceTransportPolicy: "relay"` to the
-       real connection so no candidates exist). Show that Trystero reports the
-       peer joined and actions flow both ways through the tunnel, and that the
-       normal path is unchanged. **Stop and report to the owner** with what
-       worked, what was awkward, and any Trystero behaviour that fought the
-       wrapper. Do not build steps 2–6 until the owner approves.
-2. [ ] Tunnel server: Durable Object class `TunnelPair` in
-       `deploy/edge/tunnel.ts`, route `GET /tunnel/:pairId` (WebSocket, same
-       Origin + rate-limit gate, key `tunnel:<ip>`). It accepts **at most two**
-       sockets per `pairId`, forwards binary frames from one to the other,
-       closes both when either closes, and drops a lone socket after 30 s.
-       Hibernation API; nothing stored. Add to the DO migration.
-3. [ ] `pairId`: both sides compute it without extra signaling as
-       SHA-256 of the two DTLS fingerprints (`a=fingerprint` lines from
-       `localDescription` and `remoteDescription`), sorted, plus the room id.
-4. [ ] Encryption: frames are AES-GCM encrypted with a key derived (HKDF)
-       from the party secret Nova already derives in
-       `packages/party/src/secrets.ts`, so the relay never sees plaintext.
-       Frame = 12-byte IV + ciphertext. Pass the key into the wrapper via a
-       closure when the transport creates the class.
-5. [ ] `FallbackPeerConnection` in
-       `packages/trystero-transport/src/fallback-peer-connection.ts`: - Pass-through mode: delegate every member listed above; forward
-       events. Unknown members fall through to the real connection. - Switch rule: at `FALLBACK_AFTER_MS` without `connected`, or on
-       `failed`, open the tunnel. While switching, **do not** expose
-       `failed`/`disconnected` to Trystero (report `connecting`). Once the
-       tunnel's peer socket is present, report `connected`. - Data channel facade returned from `createDataChannel` and emitted via
-       `ondatachannel` (the answering side must get a synthetic
-       `ondatachannel` in tunnel mode). Implement `send` for string and
-       `ArrayBuffer`/views, `readyState`, `binaryType`, `bufferedAmount`
-       (bytes queued on the WebSocket), `bufferedAmountLowThreshold` +
-       `onbufferedamountlow`, and the open/message/close/error events. - Once on the tunnel, stay on it for that connection's lifetime (no
-       mid-session switching). - Media (`addTrack`) is not tunnelled. Nova's media features must show
-       "audio/video isn't available with this player" for tunnelled pairs.
-6. [ ] Wire it in `packages/trystero-transport` (`rtcPolyfill`). Unit tests
-       with a fake `RTCPeerConnection` and fake WebSocket covering: normal
-       pass-through, timeout switch, `failed` switch, answerer synthetic
-       channel, backpressure events, close propagation, encryption round
-       trip. Playwright e2e (in CI): forced-failure player joins a 3-player
-       party and plays a sample game; this test is what catches breakage on
-       Trystero upgrades.
-7. [ ] Document the design and its upgrade check in ADR-0003 and
-       `deploy/cloudflare.md`.
+1. [ ] **Prototype (gate).** In `e2e-trystero/`, build the smallest version: two browser contexts, one with WebRTC forced to fail (e.g. its wrapper passes `iceServers: []` and `iceTransportPolicy: "relay"` to the real connection so no candidates exist). Show that Trystero reports the peer joined and actions flow both ways through the tunnel, and that the normal path is unchanged. **Stop and report to the owner** with what worked, what was awkward, and any Trystero behaviour that fought the wrapper. Do not build steps 2–6 until the owner approves.
+2. [ ] Tunnel server: Durable Object class `TunnelPair` in `deploy/edge/tunnel.ts`, route `GET /tunnel/:pairId` (WebSocket, same Origin + rate-limit gate, key `tunnel:<ip>`). It accepts **at most two** sockets per `pairId`, forwards binary frames from one to the other, closes both when either closes, and drops a lone socket after 30 s. Hibernation API; nothing stored. Add to the DO migration.
+3. [ ] `pairId`: both sides compute it without extra signaling as SHA-256 of the two DTLS fingerprints (`a=fingerprint` lines from `localDescription` and `remoteDescription`), sorted, plus the room id.
+4. [ ] Encryption: frames are AES-GCM encrypted with a key derived (HKDF) from the party secret Nova already derives in `packages/party/src/secrets.ts`, so the relay never sees plaintext. Frame = 12-byte IV + ciphertext. Pass the key into the wrapper via a closure when the transport creates the class.
+5. [ ] `FallbackPeerConnection` in `packages/trystero-transport/src/fallback-peer-connection.ts`:
+
+   - Pass-through mode: delegate every member listed above; forward events. Unknown members fall through to the real connection.
+   - Switch rule: at `FALLBACK_AFTER_MS` without `connected`, or on `failed`, open the tunnel. While switching, **do not** expose `failed`/`disconnected` to Trystero (report `connecting`). Once the tunnel's peer socket is present, report `connected`.
+   - Data channel facade returned from `createDataChannel` and emitted via `ondatachannel` (the answering side must get a synthetic `ondatachannel` in tunnel mode). Implement `send` for string and `ArrayBuffer`/views, `readyState`, `binaryType`, `bufferedAmount` (bytes queued on the WebSocket), `bufferedAmountLowThreshold` + `onbufferedamountlow`, and the open/message/close/error events.
+   - Once on the tunnel, stay on it for that connection's lifetime (no mid-session switching).
+   - Media (`addTrack`) is not tunnelled. Nova's media features must show "audio/video isn't available with this player" for tunnelled pairs.
+
+6. [ ] Wire it in `packages/trystero-transport` (`rtcPolyfill`). Unit tests with a fake `RTCPeerConnection` and fake WebSocket covering: normal pass-through, timeout switch, `failed` switch, answerer synthetic channel, backpressure events, close propagation, encryption round trip. Playwright e2e (in CI): forced-failure player joins a 3-player party and plays a sample game; this test is what catches breakage on Trystero upgrades.
+7. [ ] Document the design and its upgrade check in ADR-0003 and `deploy/cloudflare.md`.
 
 ## 6. Per-player game bandwidth cap — P1
 
@@ -352,50 +236,31 @@ but raw mode allows 120 msg/s × 1 MiB per player — effectively unlimited
 bandwidth. Over TURN or the tunnel that costs money. Add a byte budget that
 game code cannot bypass.
 
-1. [ ] Add `gameBytesPerSecond = 256 * 1024` and a burst of 1 MiB to
-       `limits.ts`. Enforce with a byte token bucket at the single point
-       where game-originated messages (state actions, simulation inputs, raw
-       messages) leave Nova for the transport. Find it by following
-       `rawRatePerSecond` / `actionRatePerSecond` usage in
-       `packages/nova-api/src/session.ts` and `client.ts`. Nova's own traffic
-       (game-source transfer, control messages) is exempt.
-2. [ ] Over budget: reject the send with the same structured error the
-       existing rate limits use, and surface it in the editor diagnostics
-       (`apps/nova/src/lib/editor/diagnostics.ts`) so game authors see it
-       while testing. Warn at 80 % like the other limits.
-3. [ ] Tests in `packages/nova-api` (contract suite) and a doc line in
-       `docs/api/nova-api.md` + `docs/api/nova-api-ai-reference.md` (the AI
-       prompt must tell models about the budget).
+1. [ ] Add `gameBytesPerSecond = 256 * 1024` and a burst of 1 MiB to `limits.ts`. Enforce with a byte token bucket at the single point where game-originated messages (state actions, simulation inputs, raw messages) leave Nova for the transport. Find it by following `rawRatePerSecond` / `actionRatePerSecond` usage in `packages/nova-api/src/session.ts` and `client.ts`. Nova's own traffic (game-source transfer, control messages) is exempt.
+2. [ ] Over budget: reject the send with the same structured error the existing rate limits use, and surface it in the editor diagnostics (`apps/nova/src/lib/editor/diagnostics.ts`) so game authors see it while testing. Warn at 80 % like the other limits.
+3. [ ] Tests in `packages/nova-api` (contract suite) and a doc line in `docs/api/nova-api.md` + `docs/api/nova-api-ai-reference.md` (the AI prompt must tell models about the budget).
 
 ## 7. Fast, plain failure messages — P1
 
-1. [ ] Define stages with timeouts and one message each, driven by typed
-       Trystero errors (§3.2) and the fallback wrapper (§5): - Signaling not connected within 5 s → "Can't reach Rocketcrab's
-       servers. Check your internet connection." (retry automatically). - A peer seen but not connected → per-player "Connecting to {name}…". - Pair on tunnel → no alarm; optional small "relayed" badge in the
-       diagnostics panel. - Pair failed even after fallback → "Couldn't connect to {name}." with
-       a retry button. - `room-full`, `decrypt-failed` (wrong/old invite) → their own screens.
-2. [ ] Remove the old TURN-status-specific notices in `engine.ts` that the new
-       stages replace. Keep `PartyDiagnostics.tsx` as the detailed view.
-3. [ ] Unit tests per stage with fake timers; one e2e for the signaling-down
-       message (block `/signal` in Playwright).
+1. [ ] Define stages with timeouts and one message each, driven by typed Trystero errors (§3.2) and the fallback wrapper (§5):
+
+   - Signaling not connected within 5 s → "Can't reach Rocketcrab's servers. Check your internet connection." (retry automatically).
+   - A peer seen but not connected → per-player "Connecting to {name}…".
+   - Pair on tunnel → no alarm; optional small "relayed" badge in the diagnostics panel.
+   - Pair failed even after fallback → "Couldn't connect to {name}." with a retry button.
+   - `room-full`, `decrypt-failed` (wrong/old invite) → their own screens.
+
+2. [ ] Remove the old TURN-status-specific notices in `engine.ts` that the new stages replace. Keep `PartyDiagnostics.tsx` as the detailed view.
+3. [ ] Unit tests per stage with fake timers; one e2e for the signaling-down message (block `/signal` in Playwright).
 
 ## 8. Connection logging — P1 (keep it small)
 
-1. [ ] Edge route `POST /log` (same gate; rate-limit key `log:<ip>`) writing
-       one Workers Analytics Engine data point per event to a dataset bound as
-       `CONNECTION_EVENTS` in `deploy/edge/wrangler.toml`. Verify Analytics
-       Engine availability/limits on the account's plan first.
-2. [ ] One event per peer connection attempt, sent by the client with
-       `navigator.sendBeacon`: - `outcome`: `direct` | `turn` | `tunnel` | `failed`
-       (`direct`/`turn` from the real connection's selected candidate pair
-       via `getStats()`; `tunnel` and `failed` from the wrapper), - `error_code` (Trystero `RoomError.code`, or empty), - `ms_to_connect`, - `signaling_ok` (bool), - `browser` (family only, e.g. `safari-ios`, `chrome-android`), - `network` (`navigator.connection.effectiveType`/`type` where
-       available, else `unknown`), - `app_version`.
-       **Never** names, invite/room ids, peer ids or IPs. The Worker must not
-       write the IP into the data point.
-3. [ ] `scripts/connection-stats.mjs`: queries the Analytics Engine SQL API
-       (needs an API token with Account Analytics Read — owner creates it,
-       passed via env var) and prints outcome percentages and median
-       connect time for a date range. Document it in `deploy/cloudflare.md`.
+1. [ ] Edge route `POST /log` (same gate; rate-limit key `log:<ip>`) writing one Workers Analytics Engine data point per event to a dataset bound as `CONNECTION_EVENTS` in `deploy/edge/wrangler.toml`. Verify Analytics Engine availability/limits on the account's plan first.
+2. [ ] One event per peer connection attempt, sent by the client with `navigator.sendBeacon`:
+
+   - `outcome`: `direct` | `turn` | `tunnel` | `failed` (`direct`/`turn` from the real connection's selected candidate pair via `getStats()`; `tunnel` and `failed` from the wrapper), - `error_code` (Trystero `RoomError.code`, or empty), - `ms_to_connect`, - `signaling_ok` (bool), - `browser` (family only, e.g. `safari-ios`, `chrome-android`), - `network` (`navigator.connection.effectiveType`/`type` where available, else `unknown`), - `app_version`. **Never** names, invite/room ids, peer ids or IPs. The Worker must not write the IP into the data point.
+
+3. [ ] `scripts/connection-stats.mjs`: queries the Analytics Engine SQL API (needs an API token with Account Analytics Read — owner creates it, passed via env var) and prints outcome percentages and median connect time for a date range. Document it in `deploy/cloudflare.md`.
 
 ## 9. Real-device verification, then cutover — P0
 
@@ -418,7 +283,7 @@ and `docs/testing/mobile-safari-checklist.md`.
 - [ ] State, simulation and raw sample games; authority migration; private
       link and QR joins.
 - [ ] A friend beta without coaching.
-- [ ] **Owner approval**, then cutover: attach `rocketcrab.com` as a custom
+- [ ] **Owner approval**, then switch the account to **Workers Paid** (§4.6), then cutover: attach `rocketcrab.com` as a custom
       domain to `rocketcrab-nova` (this replaces the legacy site), add it
       to the edge `ORIGIN_ALLOWLIST`, rebuild the runtime with the new
       `VITE_MAIN_ORIGIN`, redeploy all three. Keep the runtime on workers.dev.
@@ -452,6 +317,9 @@ change. One commit per area, `npm run check` + `npm run test:e2e` each time.
 | 2026-11-12 | Migrate to Trystero 0.27; adopt every feature that fits Nova.                              |
 | 2026-11-12 | Own signaling relay replaces public Nostr relays (no Nostr backup).                        |
 | 2026-11-12 | Fallback for WebRTC-blocking networks via `rtcPolyfill` tunnel, per pair; prototype first. |
+| 2026-11-12 | Unlimited party size: adopt `scale()`, no `maxUsers`, load-test large rooms.               |
+| 2026-11-12 | Signaling: one Durable Object per room (`/signal/<roomKey>`); tunnel: one per pair.        |
+| 2026-11-12 | Workers Free through beta; Workers Paid ($5/month) from the `rocketcrab.com` cutover.      |
 | 2026-11-12 | No host-relayed star topology; Trystero mesh (+ tunnel) instead.                           |
 | 2026-11-12 | Do not propose the fallback upstream (maintainer rejected in #173).                        |
 
