@@ -264,6 +264,21 @@ passed 4/4 (Podman Playwright, 2026-11-13).
    in the pinned Playwright container against this worktree's servers. §3.6–3.7
    remain open pending the large-room load tests and phone gate.
 
+   **Owner decision / release blocker (verified 2026-11-13):** pinned
+   `@trystero-p2p/core@0.27.0` `dist/scale/descriptors.mjs` sets
+   `maxTrackedOverlayPeers = 2048`. Its descriptor count includes the local
+   descriptor; for a new non-direct peer at that count, admission evicts an
+   expired non-direct descriptor or refuses the new one if none is eligible.
+   Eviction also disconnects the virtual peer (`scale/manager.mjs`). Direct
+   peers bypass that admission check, so this is not a simple 2,048-user room
+   limit, but it means complete rosters and routes at arbitrary scale cannot be
+   promised, even without `maxUsers`. No boundary load test has been run.
+   Owner must decide how to reconcile the unlimited-party requirement with
+   upstream's bounded overlay (for example, a vetted upstream change/fork or a
+   revised requirement); assess memory, abuse resistance, and other bounded
+   caches before choosing. Do not claim unlimited support or close §3.6 until a
+   solution is approved, implemented and tested.
+
 7. [ ] **Large-room load test.** Using headless browser contexts (several machines or CI shards if one machine can't hold them), run parties of 10, 25, 50 and 100 players with a state-mode sample game. Record per size: time until everyone sees everyone, message latency, CPU on the authority player's device (also try a real phone as authority at 25+), and any errors. Known risk to watch: the authority player sends state to everyone, so its upload grows with party size; if it becomes the bottleneck, propose a fix to the owner (e.g. state deltas or fan-out via `scale()` routing) rather than capping parties. Record results in `docs/testing/` and link them from ADR-0003.
 8. [ ] Update ADR-0003 (transport abstraction) to describe what Trystero now owns and what Nova still owns.
 

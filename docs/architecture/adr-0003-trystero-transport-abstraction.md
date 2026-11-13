@@ -108,6 +108,15 @@ source over a multi-hop route with new signaling blocked. This is not proof of
 arbitrary room size or real-device behavior: the 10/25/50/100 load tests and
 phone gate in `PLAN.md` remain open.
 
+Source review on 2026-11-13 found a further release blocker: pinned Trystero
+0.27.0 `scale/descriptors.mjs` bounds tracked overlay descriptors at 2,048,
+including the local descriptor. When admitting a new non-direct peer at that
+count it evicts an expired non-direct descriptor, or refuses admission if none
+is eligible; direct peers bypass that check. This is not a simple room-size
+cap, but it prevents a claim of arbitrary-size complete rosters and routing.
+The owner must decide how to address the bound and its security/resource
+tradeoffs; see §3.6 in `PLAN.md`. No boundary load test has been performed.
+
 ## Alternatives considered
 
 1. **Direct WebRTC code in the app.** Rejected: re-implements discovery, NAT
