@@ -219,26 +219,49 @@ passed 4/4 (Podman Playwright, 2026-11-13).
      recommendation was premature.** The 0.27 `docs/state.md` and installed
      `@trystero-p2p/core` `dist/state.mjs` describe/implement a signed,
      whole-value LWW slot, relayed even after its author leaves. In `commitEntry`,
-     LWW comparison precedes the application validator. Nova's `session.ts`
-     derives host from creator context and the current roster, and accepts
-     classic room announcements only from the current host; `engine.ts` has the
-     current host answer late-join requests. A validator requiring the current
-     host rejects a legitimate cached selection authored by a departed host;
-     accepting departed authors instead cannot distinguish that selection from
-     a stale/conflicting former-host write during migration. A joiner also
-     needs creator context before it can calculate the host, making validation
-     of that same context circular. Roles do not transfer root authority (see
-     below). Resolving these cases needs a separately designed authority/history
-     protocol or retained catch-up, not deletion of equivalent Nova code.
-     Revisit only with a demonstrated simpler design and tests for concurrent
-     migration, stale/conflicting writes, late join and reconnect; keep game
-     authority, transient commands and source verification unchanged. Reviewed
+     LWW comparison precedes the application validator, but rejected records
+     are not stored. Nova's `session.ts` derives host from creator context and
+     the current roster, and accepts classic room announcements only from the
+     current host; `engine.ts` has the current host answer late-join requests.
+     A validator requiring the current host rejects a legitimate cached
+     selection authored by a departed host; accepting departed authors instead
+     cannot by itself distinguish that selection from a stale/conflicting
+     former-host write during migration. Roles do not transfer root authority
+     (see below). Keep selection catch-up until a safer design is demonstrated.
+
+     **Creator context is a separate candidate**, not inherently circular:
+     `session.ts` accepts the first valid context from any admitted connected
+     peer and retains it. A shape-validated, first-value-immutable slot could
+     match that cooperative trust model. The transport currently publishes
+     peers only after bilateral identity admission (`wireRoom` / `maybeReady`),
+     whereas Trystero shared-state synchronization is gated on Trystero peer
+     readiness, not Nova's acknowledgement (`dist/state.mjs`, `runWhenReady`
+     and `applyIncoming`). The shared record's signed author may also
+     have departed, while Nova's context message authenticates its currently
+     connected forwarder; Nova member IDs are not Trystero user IDs and the
+     adapter uses ephemeral identities (`buildConfig`, `identity: "none"`).
+     A replacement must preserve the admitted-forwarder boundary, first-value
+     behavior on conflicts, and creator persistence across late join and
+     reconnect without depending on a departed author's identity mapping.
+     These are design/test obligations, not proof that a replacement is
+     impossible. A direct signed-record experiment against 0.27's
+     `createStateManager` confirmed that a first-value validator keeps its
+     first value, rejects a conflicting later value without storing it, and
+     permits divergent first values on separate managers. Direct record
+     application does not know Nova admission; this isolated test did not
+     exercise the network or establish ordering relative to Nova's handshake.
+     No creator-context implementation or equivalent end-to-end test has yet
+     been completed. Review with concurrent first values, rejected peers,
+     failed admission, late join, reconnect and identity mapping before deleting
+     existing code. Keep game authority, transient commands and source
+     verification unchanged. Reviewed
      against [upstream `docs/state.md` at tag commit
      `8d3f57e`](https://github.com/dmotz/trystero/blob/8d3f57ef42c3d622840eec479784c99deeeb2d05/docs/state.md)
      and the installed `@trystero-p2p/core@0.27.0` `dist/state.mjs`
      (`compareStateRecords`, `commitEntry`, `makeState`) on 2026-11-13. This is
      a reassessment of the earlier feature-fit recommendation, not a completed
      adoption or a claim that no possible authority protocol can use the slot.
+
    - **Action progress — already adopted for transfer; don't replace the
      coordinator wholesale.** `trystero-transport.ts` uses action request/receive
      progress and `game-source.ts` already delegates chunking, backpressure,
