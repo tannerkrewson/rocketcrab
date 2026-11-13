@@ -641,7 +641,12 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
   // whenever Run is pressed.
   const arenaSection = (
     <ArenaRuntimeSeamsContext.Provider value={seams}>
-      <ArenaSection game={game} source={arenaSource} stale={arenaStale} />
+      <ArenaSection
+        game={game}
+        source={arenaSource}
+        stale={arenaStale}
+        onDiagnostics={appendDiagnostics}
+      />
     </ArenaRuntimeSeamsContext.Provider>
   );
 

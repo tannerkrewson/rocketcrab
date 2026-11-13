@@ -9,19 +9,19 @@
  *
  * The prompt embeds the current Nova API reference (the S1 AI-oriented
  * reference, `docs/api/nova-api-ai-reference.md`) from a VERSIONED fixture
- * (`fixtures/nova-api-reference-v1.md`). The fixture is an exact copy of
+ * (`fixtures/nova-api-reference-v2.md`). The fixture is an exact copy of
  * the docs file; the drift-guard test in master-prompt.test.ts fails until
  * the fixture (and the template version) are updated when the API
  * reference changes — API changes require prompt tests to be updated.
  */
-import novaApiReference from "./fixtures/nova-api-reference-v1.md?raw";
+import novaApiReference from "./fixtures/nova-api-reference-v2.md?raw";
 
 /**
  * Version of the master prompt template itself. Bump whenever the prompt
  * wording or structure changes; the snapshot test pins the exact text at
  * this version.
  */
-export const MASTER_PROMPT_VERSION = 1;
+export const MASTER_PROMPT_VERSION = 2;
 
 /**
  * Build the complete master prompt: the vendor-neutral interview-and-build

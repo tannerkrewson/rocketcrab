@@ -42,6 +42,7 @@ export function toApiEvent(event: NovaSessionEvent): GameApiEvent | null {
         ...(event.ack.errorCode !== undefined ? { errorCode: event.ack.errorCode } : {}),
         ...(event.ack.errorMessage !== undefined ? { errorMessage: event.ack.errorMessage } : {}),
       };
+    case "bandwidthWarning":
     case "stateCommitted":
     case "actionRejected":
     case "actionReceived":

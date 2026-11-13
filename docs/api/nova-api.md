@@ -446,6 +446,8 @@ in `nova.raw.send` the same way.
 
 ### Size, rate, and progress (A2)
 
+Each player shares a 256 KiB/s game-message byte budget with a 1 MiB burst across state actions, simulation inputs, and raw messages. Sends exceeding the available budget are rejected with `rate_limited`; the test arena warns when 80% of the burst is used. Nova control and game-source traffic are exempt.
+
 - **Size**: one raw payload is bounded by the `rawMessageBytes` hard limit
   (1 MiB; 80% warn threshold). Oversized sends are rejected with
   `payload_too_large` and counted in the host diagnostics.

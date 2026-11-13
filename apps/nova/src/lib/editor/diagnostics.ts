@@ -93,6 +93,22 @@ function nextId(prefix: string): string {
   return `${prefix}-${diagnosticSequence}`;
 }
 
+/** Map a game bandwidth warning or rejection from an arena player log. */
+export function diagnosticFromBandwidthLog(entry: {
+  id: string;
+  message: string;
+  timestamp: number;
+}): Diagnostic | null {
+  if (!entry.message.includes("Game bandwidth budget")) return null;
+  return {
+    id: `bandwidth-${entry.id}`,
+    severity: entry.message.includes("exceeded") ? "error" : "warning",
+    category: "game_bandwidth",
+    message: entry.message,
+    timestamp: entry.timestamp,
+  };
+}
+
 /** Map a runtime-plane error message onto a UI diagnostic. */
 export function diagnosticFromRuntimeError(error: RuntimeErrorMessage): Diagnostic {
   const meta = RUNTIME_ERROR_CATEGORIES[error.category];

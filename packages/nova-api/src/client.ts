@@ -88,6 +88,7 @@ export type NovaSessionEvent =
    */
   | { type: "simulationAuthorityChange"; term: number }
   | { type: "error"; error: NovaError }
+  | { type: "bandwidthWarning"; message: string }
   | { type: "actionReceived"; action: NovaAction }
   | { type: "actionAck"; ack: NovaActionAck }
   | {
@@ -318,6 +319,7 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
         break;
       }
       case "stateCommitted":
+      case "bandwidthWarning":
       case "actionRejected":
       case "authorityChanged":
         break; // host-side diagnostics; games observe acks and errors

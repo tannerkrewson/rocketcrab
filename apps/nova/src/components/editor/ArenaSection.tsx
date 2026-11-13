@@ -17,6 +17,7 @@
  * log panel.
  */
 import { Badge } from "../ui/Badge";
+import { diagnosticFromBandwidthLog, type Diagnostic } from "../../lib/editor/diagnostics";
 import type { SavedGame } from "@rocketcrab/core";
 import { Link } from "@tanstack/react-router";
 import {
@@ -151,9 +152,10 @@ export interface ArenaSectionProps {
   source: string;
   /** The editor's current source differs from the source under test. */
   stale: boolean;
+  onDiagnostics?: (diagnostics: Diagnostic[]) => void;
 }
 
-export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
+export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectionProps) {
   const seams = useContext(ArenaRuntimeSeamsContext);
   const recordTestResults = useRecordTestResults();
 
@@ -189,6 +191,23 @@ export function ArenaSection({ game, source, stale }: ArenaSectionProps) {
     seams,
     onRunSucceeded,
   });
+
+  const reportedBandwidthLogs = useRef(new Set<string>());
+  useEffect(() => {
+    const diagnostics: Diagnostic[] = [];
+    for (const player of state?.players ?? []) {
+      for (const entry of player.logs) {
+        const key = `${player.id}:${entry.id}`;
+        if (reportedBandwidthLogs.current.has(key)) continue;
+        const diagnostic = diagnosticFromBandwidthLog({ ...entry, id: key });
+        if (diagnostic !== null) {
+          reportedBandwidthLogs.current.add(key);
+          diagnostics.push(diagnostic);
+        }
+      }
+    }
+    if (diagnostics.length > 0) onDiagnostics?.(diagnostics);
+  }, [state?.players, onDiagnostics]);
 
   // The engine mounts once per arena mount; when the editor re-tests with a
   // new source (a Run press), restart every player with it instead of

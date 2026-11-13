@@ -26,6 +26,9 @@ import type {
 import {
   PROTOCOL_VERSION,
   actionTimeoutMs,
+  gameBytesBurst,
+  gameBytesPerSecond,
+  gameBytesWarn,
   parsePeerMessage,
   rawMessageBytes,
   rawRatePerSecond,
@@ -287,6 +290,9 @@ export class NovaSession implements NovaClientBackend {
     warned: false,
   };
   private readonly rawRate: RawRateWindow = { timestamps: [], rejections: 0 };
+  private gameByteTokens = gameBytesBurst;
+  private gameByteUpdatedAt = performance.now();
+  private gameByteWarned = false;
   private readonly listeners = new Set<(event: NovaSessionEvent) => void>();
   private readonly transportUnsubscribers: Array<() => void> = [];
   private readonly outbox: OutboxEntry[] = [];
@@ -626,7 +632,7 @@ export class NovaSession implements NovaClientBackend {
    * action is accepted for delivery; the game-facing promise resolves on the
    * authority's ack (see the client).
    */
-  dispatch(action: NovaAction, actionId: string): Promise<void> {
+  async dispatch(action: NovaAction, actionId: string): Promise<void> {
     this.assertAlive();
     assertValidSchema(
       novaActionSchema.safeParse(action),
@@ -639,6 +645,7 @@ export class NovaSession implements NovaClientBackend {
     if (this.engine.isEnded()) {
       throw new NovaError("ended", endedMessage("dispatch"));
     }
+    this.consumeGameBytes(rawPayloadBytes(action));
     const baseRevision = action.baseRevision ?? this.engine.getRevision();
     const authority = this.engine.getAuthorityMemberId();
     const entry: BufferedDispatch = {
@@ -783,6 +790,7 @@ export class NovaSession implements NovaClientBackend {
     if (options.to !== undefined && targetConnectionId === undefined) {
       throw new NovaError("not_connected", `Player "${options.to}" is not connected.`);
     }
+    this.consumeGameBytes(Math.max(1, sizeBytes));
     const onProgress =
       options.onProgress === undefined
         ? undefined
@@ -834,6 +842,7 @@ export class NovaSession implements NovaClientBackend {
         "nova.simulation.sendInput exceeded the input rate limit; the input was dropped.",
       );
     }
+    this.consumeGameBytes(rawPayloadBytes(input));
     const seq = (this.nextSeq += 1);
     const inputId = newInputId();
     void this.sendProtocol(
@@ -1651,6 +1660,32 @@ export class NovaSession implements NovaClientBackend {
       type: "error",
       error: error instanceof NovaError ? error : new NovaError("invalid_options", String(error)),
     });
+  }
+
+  private consumeGameBytes(bytes: number): void {
+    const now = performance.now();
+    const elapsed = Math.max(0, now - this.gameByteUpdatedAt);
+    this.gameByteTokens = Math.min(
+      gameBytesBurst,
+      this.gameByteTokens + (elapsed * gameBytesPerSecond) / 1000,
+    );
+    this.gameByteUpdatedAt = now;
+    if (this.gameByteTokens < bytes) {
+      throw new NovaError(
+        "rate_limited",
+        "Game bandwidth budget exceeded (256 KiB/s, 1 MiB burst); the send was dropped.",
+      );
+    }
+    this.gameByteTokens -= bytes;
+    if (gameBytesBurst - this.gameByteTokens >= gameBytesWarn && !this.gameByteWarned) {
+      this.gameByteWarned = true;
+      this.emit({
+        type: "bandwidthWarning",
+        message: "Game bandwidth budget is 80% exhausted (256 KiB/s, 1 MiB burst).",
+      });
+    } else if (gameBytesBurst - this.gameByteTokens < gameBytesWarn) {
+      this.gameByteWarned = false;
+    }
   }
 
   private assertAlive(): void {

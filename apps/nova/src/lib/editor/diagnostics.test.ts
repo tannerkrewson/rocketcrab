@@ -5,6 +5,7 @@ import {
   buildDiagnosticReport,
   consoleEntryFromMessage,
   diagnosticFromRuntimeError,
+  diagnosticFromBandwidthLog,
   diagnosticsFromHostEvent,
 } from "./diagnostics";
 
@@ -51,6 +52,26 @@ describe("diagnosticFromRuntimeError", () => {
       details: { filename: "game.html", lineno: 3 },
     });
     expect(diagnostic.detail).toContain('"lineno":3');
+  });
+});
+
+describe("bandwidth diagnostics", () => {
+  it("maps arena warnings and rejected sends", () => {
+    expect(
+      diagnosticFromBandwidthLog({
+        id: "1",
+        timestamp: 1,
+        message: "Game bandwidth budget is 80% exhausted",
+      })?.severity,
+    ).toBe("warning");
+    expect(
+      diagnosticFromBandwidthLog({
+        id: "2",
+        timestamp: 2,
+        message: "Game bandwidth budget exceeded",
+      })?.severity,
+    ).toBe("error");
+    expect(diagnosticFromBandwidthLog({ id: "3", timestamp: 3, message: "unrelated" })).toBeNull();
   });
 });
 

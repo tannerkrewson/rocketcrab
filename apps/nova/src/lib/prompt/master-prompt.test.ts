@@ -25,7 +25,7 @@ import {
 
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const DOCS_REFERENCE_PATH = join(TEST_DIR, "../../../../../docs/api/nova-api-ai-reference.md");
-const FIXTURE_PATH = join(TEST_DIR, "fixtures/nova-api-reference-v1.md");
+const FIXTURE_PATH = join(TEST_DIR, "fixtures/nova-api-reference-v2.md");
 
 const prompt = buildMasterPrompt();
 // Phrase assertions must survive the prompt's line wrapping: collapse any
@@ -186,7 +186,7 @@ describe("master prompt — acceptance criteria", () => {
     // MASTER_PROMPT_VERSION still pins the snapshot checkpoint in code;
     // the prompt itself carries no "template vX · Nova API vY" badge or
     // version markers (user request: no version info in the prompt).
-    expect(MASTER_PROMPT_VERSION).toBe(1);
+    expect(MASTER_PROMPT_VERSION).toBe(2);
     expect(normalized).not.toContain("template v");
     expect(normalized).not.toContain("Nova API v");
   });

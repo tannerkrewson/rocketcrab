@@ -277,6 +277,32 @@ async function waitForSimulation(
 
 export function runNovaSessionContractTests(harnessFactory: () => NovaTransportHarness): void {
   describe("Nova session contract (transport-neutral)", () => {
+    it("shares a refillable byte budget across raw, actions and simulation inputs", async () => {
+      const { a, b } = await makePair(harnessFactory);
+      a.createRawChannel({ name: "budget" });
+      b.createRawChannel({ name: "budget" });
+      const warnings: string[] = [];
+      a.onSessionEvent((event) => {
+        if (event.type === "bandwidthWarning") warnings.push(event.message);
+      });
+      await a.sendRaw("budget", new Uint8Array(900 * 1024));
+      expect(warnings).toHaveLength(1);
+      await expect(
+        a.dispatch({ type: "large", payload: "x".repeat(150 * 1024) }, "budget-action"),
+      ).rejects.toMatchObject({ code: "rate_limited" });
+      expect(() =>
+        a.sendSimulationInput({ type: "large", payload: "x".repeat(150 * 1024) }),
+      ).toThrowError(expect.objectContaining({ code: "rate_limited" }));
+      await expect(b.sendRaw("budget", new Uint8Array(150 * 1024))).resolves.toBeUndefined();
+      const now = performance.now();
+      const clock = vi.spyOn(performance, "now").mockReturnValue(now + 1000);
+      try {
+        await expect(a.sendRaw("budget", new Uint8Array(150 * 1024))).resolves.toBeUndefined();
+      } finally {
+        clock.mockRestore();
+      }
+    });
+
     it("registers a game and exposes the current player", async () => {
       const { a, b } = await makePair(harnessFactory);
       expect(a.client.player).toEqual({ id: "member-a", name: "Ada" });

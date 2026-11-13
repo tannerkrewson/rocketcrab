@@ -1874,9 +1874,18 @@ export class PartyEngine {
         if (parsed.success) {
           void session
             .dispatch(parsed.data.action as NovaAction, parsed.data.actionId)
-            .catch((error: unknown) =>
-              this.addNotice("error", `nova.dispatch() failed: ${errorMessage(error)}`),
-            );
+            .catch((error: unknown) => {
+              this.addNotice("error", `nova.dispatch() failed: ${errorMessage(error)}`);
+              const code =
+                error instanceof Error && "code" in error ? String(error.code) : "invalid_options";
+              this.runtime?.pushApiEvent({
+                kind: "actionAck",
+                actionId: parsed.data.actionId,
+                status: "rejected",
+                errorCode: code,
+                errorMessage: errorMessage(error),
+              });
+            });
         }
         break;
       }
@@ -1896,9 +1905,12 @@ export class PartyEngine {
         if (parsed.success) {
           void session
             .sendRaw(parsed.data.name, parsed.data.payload, parsed.data.options ?? {})
-            .catch((error: unknown) =>
-              this.addNotice("error", `nova.raw.send() failed: ${errorMessage(error)}`),
-            );
+            .catch((error: unknown) => {
+              this.addNotice("error", `nova.raw.send() failed: ${errorMessage(error)}`);
+              const code =
+                error instanceof Error && "code" in error ? String(error.code) : "invalid_options";
+              this.runtime?.pushApiEvent({ kind: "error", code, message: errorMessage(error) });
+            });
         }
         break;
       }
@@ -1925,6 +1937,9 @@ export class PartyEngine {
             session.sendSimulationInput(parsed.data.input);
           } catch (error) {
             this.addNotice("error", `nova.simulation.sendInput() failed: ${errorMessage(error)}`);
+            const code =
+              error instanceof Error && "code" in error ? String(error.code) : "invalid_options";
+            this.runtime?.pushApiEvent({ kind: "error", code, message: errorMessage(error) });
           }
         }
         break;
@@ -2333,6 +2348,9 @@ export class PartyEngine {
       case "playerJoined":
       case "playerLeft":
         this.emit();
+        break;
+      case "bandwidthWarning":
+        this.addNotice("warn", event.message);
         break;
       case "error":
         this.addNotice("error", `Nova error (${event.error.code}): ${event.error.message}`);

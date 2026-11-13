@@ -602,6 +602,9 @@ export class ArenaEngine {
       case "error":
         this.logPlayer(id, "error", `Nova error (${event.error.code}): ${event.error.message}`);
         break;
+      case "bandwidthWarning":
+        this.logPlayer(id, "warn", event.message);
+        break;
       case "authorityChanged":
         this.logPlayer(
           id,
@@ -690,15 +693,18 @@ export class ArenaEngine {
           );
           return;
         }
-        void session
-          .dispatch(parsed.data.action, parsed.data.actionId)
-          .catch((error: unknown) =>
-            this.logPlayer(
-              runtime.spec.id,
-              "error",
-              `nova.dispatch() failed: ${errorMessage(error)}`,
-            ),
-          );
+        void session.dispatch(parsed.data.action, parsed.data.actionId).catch((error: unknown) => {
+          this.sessionError(runtime.spec.id, error);
+          const code =
+            error instanceof Error && "code" in error ? String(error.code) : "invalid_options";
+          this.pushApiEvent(runtime.spec.id, {
+            kind: "actionAck",
+            actionId: parsed.data.actionId,
+            status: "rejected",
+            errorCode: code,
+            errorMessage: errorMessage(error),
+          });
+        });
         break;
       }
       case "raw.createChannel": {
@@ -789,6 +795,9 @@ export class ArenaEngine {
           // Rate-limit and connectivity rejections surface as Nova errors
           // (the frame observes them through nova.onError).
           this.logPlayer(runtime.spec.id, "error", errorMessage(error));
+          const code =
+            error instanceof Error && "code" in error ? String(error.code) : "invalid_options";
+          this.pushApiEvent(runtime.spec.id, { kind: "error", code, message: errorMessage(error) });
         }
         break;
       }

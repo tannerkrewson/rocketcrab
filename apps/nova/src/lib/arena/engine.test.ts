@@ -298,6 +298,39 @@ describe("ArenaEngine — happy path", () => {
     });
   });
 
+  it("reports exhausted bandwidth to the frame and arena diagnostics", async () => {
+    const harness = createHarness();
+    mountContainers(harness, 2);
+    const engine = createEngine(harness);
+    engine.start();
+    await runToStartWithEngine(engine, harness, 2);
+    const port = harness.channels[0]!.port1;
+    deliver(port, apiCallMessage("raw.createChannel", { spec: { name: "budget" } }));
+    deliver(port, apiCallMessage("raw.send", { name: "budget", payload: "x".repeat(900 * 1024) }));
+    deliver(
+      port,
+      apiCallMessage("dispatch", {
+        action: { type: "large", payload: "x".repeat(150 * 1024) },
+        actionId: "budget-action",
+      }),
+    );
+    await vi.waitFor(() => {
+      expect(apiEventsOf(harness, 0)).toContainEqual(
+        expect.objectContaining({
+          kind: "actionAck",
+          actionId: "budget-action",
+          status: "rejected",
+          errorCode: "rate_limited",
+        }),
+      );
+      expect(
+        engine
+          .getSnapshot()
+          .players[0]?.logs.some((entry) => entry.message.includes("80% exhausted")),
+      ).toBe(true);
+    });
+  });
+
   it("routes raw channel close between players (A2)", async () => {
     const harness = createHarness();
     mountContainers(harness, 2);

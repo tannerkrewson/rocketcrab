@@ -299,9 +299,11 @@ but raw mode allows 120 msg/s × 1 MiB per player — effectively unlimited
 bandwidth. Over TURN or the tunnel that costs money. Add a byte budget that
 game code cannot bypass.
 
-1. [ ] Add `gameBytesPerSecond = 256 * 1024` and a burst of 1 MiB to `limits.ts`. Enforce with a byte token bucket at the single point where game-originated messages (state actions, simulation inputs, raw messages) leave Nova for the transport. Find it by following `rawRatePerSecond` / `actionRatePerSecond` usage in `packages/nova-api/src/session.ts` and `client.ts`. Nova's own traffic (game-source transfer, control messages) is exempt.
-2. [ ] Over budget: reject the send with the same structured error the existing rate limits use, and surface it in the editor diagnostics (`apps/nova/src/lib/editor/diagnostics.ts`) so game authors see it while testing. Warn at 80 % like the other limits.
-3. [ ] Tests in `packages/nova-api` (contract suite) and a doc line in `docs/api/nova-api.md` + `docs/api/nova-api-ai-reference.md` (the AI prompt must tell models about the budget).
+1. [x] Add `gameBytesPerSecond = 256 * 1024` and a burst of 1 MiB to `limits.ts`. Enforce with a byte token bucket at the single point where game-originated messages (state actions, simulation inputs, raw messages) leave Nova for the transport. Find it by following `rawRatePerSecond` / `actionRatePerSecond` usage in `packages/nova-api/src/session.ts` and `client.ts`. Nova's own traffic (game-source transfer, control messages) is exempt.
+2. [x] Over budget: reject the send with the same structured error the existing rate limits use, and surface it in the editor diagnostics (`apps/nova/src/lib/editor/diagnostics.ts`) so game authors see it while testing. Warn at 80 % like the other limits.
+3. [x] Tests in `packages/nova-api` (contract suite) and a doc line in `docs/api/nova-api.md` + `docs/api/nova-api-ai-reference.md` (the AI prompt must tell models about the budget).
+
+Evidence: shared-budget contract and editor diagnostic tests; `npm run check` passed; `npm run test:e2e` passed 60/60 in Playwright 1.62.1 container against this worktree's dev servers.
 
 ## 7. Fast, plain failure messages — P1
 

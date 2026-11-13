@@ -31,6 +31,11 @@ export const stateSnapshotWarnBytes = Math.floor(stateSnapshotBytes * LIMIT_WARN
 export const actionPayloadBytes = 16 * 1024; // 16 KiB
 export const actionPayloadWarnBytes = Math.floor(actionPayloadBytes * LIMIT_WARN_FRACTION);
 
+/** Per-player game-originated payload budget and token bucket capacity. */
+export const gameBytesPerSecond = 256 * 1024;
+export const gameBytesBurst = 1024 * 1024;
+export const gameBytesWarn = Math.floor(gameBytesBurst * LIMIT_WARN_FRACTION);
+
 /** Maximum actions dispatched per second per player. */
 export const actionRatePerSecond = 20;
 export const actionWarnRatePerSecond = Math.floor(actionRatePerSecond * LIMIT_WARN_FRACTION);
@@ -166,6 +171,9 @@ export const LIMITS = {
   actionPayloadWarnBytes,
   actionRatePerSecond,
   actionWarnRatePerSecond,
+  gameBytesPerSecond,
+  gameBytesBurst,
+  gameBytesWarn,
   rawMessageBytes,
   rawMessageWarnBytes,
   rawRatePerSecond,

@@ -119,7 +119,10 @@ nova.onError((error) => {
    `nova.onError` with a stable `code` (`unknown_channel`,
    `payload_too_large`, `rate_limited`, `not_connected`). Simulation inputs
    over the per-second input bound are likewise rejected with
-   `rate_limited` through `nova.onError`.
+   `rate_limited` through `nova.onError`. Each player also shares a byte
+   budget across actions, simulation inputs, and raw sends: 256 KiB/s with
+   a 1 MiB burst. Reduce message size/frequency; budget rejections use
+   `rate_limited`.
 4. **Never call methods this version does not have.** They fail loudly.
 5. **Every payload is plain JSON data.** No functions, no cycles, no BigInt,
    no DOM objects. Binary (`Uint8Array`/`ArrayBuffer`) only on raw channels.
