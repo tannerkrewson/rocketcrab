@@ -145,7 +145,7 @@ clients never share rooms.
 1. [ ] Mechanical migration of `packages/trystero-transport` (and any other Trystero imports): `on*()` listener methods returning unsubscribe, `await room.getSelf()` instead of `selfId`, `room.onError` instead of `onJoinError`, `getPeers()` returning `PeerInfo`, `setRelayConnectivity` instead of pause/resume, `joinRoom` throwing on duplicate active joins (leave first), targeted `send` rejecting for disconnected targets. Pin `trystero` and `@trystero-p2p/*` to exact `0.27.0`. All existing tests green, including `npm run test:e2e:trystero`.
 2. [ ] Replace error-string matching with typed codes. Today `handleJoinErrorNotice` in `apps/nova/src/lib/party/engine.ts` and `apps/nova/src/lib/party/connection-errors.ts` parse messages; switch to `RoomError.code` (`peer-connect-failed`, `relay-failed`, `room-full`, `decrypt-failed`, …).
 3. [ ] Party size: **no cap** (owner wants arbitrarily large parties, 2026-11-12). Do not set `maxUsers`. Still handle `room-full` gracefully in case a cap is added later.
-4. [ ] **Feature fit review — write it down before coding.** For each Trystero 0.27 feature below, read its doc in the Trystero repo (`docs/*.md`) and the Nova code it would replace, then record in this file: _adopt_ / _don't adopt_ + one-paragraph reason. Owner rule: if it fits Nova's needs, adopt it and delete Nova's code. Candidates:
+4. [x] **Feature fit review — write it down before coding.** For each Trystero 0.27 feature below, read its doc in the Trystero repo (`docs/*.md`) and the Nova code it would replace, then record in this file: _adopt_ / _don't adopt_ + one-paragraph reason. Owner rule: if it fits Nova's needs, adopt it and delete Nova's code. Candidates:
 
    - `userId` identity (`docs/identity.md`) vs `apps/nova/src/lib/party/identity.ts`.
    - `makeUserState` (lobby presence: display name, ready) vs the party roster in `packages/party/src/session.ts` / `messages.ts`.
@@ -154,6 +154,64 @@ clients never share rooms.
    - Trystero's authority module (`packages/core/src/authority.ts`, tests `scale-authority-*.spec.ts`) vs Nova's authority election and migration (ADR-0007, `packages/nova-api` session/state engines).
    - `roles()` / admins / ban vs Nova host controls. Check whether admin rights can pass to a successor when the host leaves (Nova needs a deterministic successor); if not, don't adopt.
    - `scale()` — adopt; see step 6.
+
+   **Review evidence (checked 2026-11-13):** Trystero release `0.27.0`, tag
+   commit `8d3f57ef42c3d622840eec479784c99deeeb2d05`; reviewed its
+   `docs/identity.md`, `state.md`, `actions.md`, `roles.md`, `scaling.md`,
+   `packages/core/src/authority.ts` and `test/node/scale-authority-{state,roles}.spec.ts`
+   against Nova's identity, party session/messages, game-source coordinator,
+   transport, ADR-0007 and nova-api session/state/simulation engines. These are
+   design decisions, not implementation or proof of behavior under load.
+
+   - **Identity — adopt**, replacing the generated/stored member ID with the
+     verified persistent Trystero `userId`; keep display-name persistence and
+     reset UX separately. Default identity is IndexedDB per appId, shared across
+     tabs, unlike Nova's localStorage member ID; joining is asynchronous and
+     storage fallback/reset semantics and multiple tabs must be tested. Preserve
+     the stable game-facing player ID contract and handle existing stored IDs
+     deliberately; no assumption that an old ID can be imported as a key.
+   - **`makeUserState` — adopt for presence**, replacing duplicate name/rename
+     propagation and roster bookkeeping where equivalent. Its signed per-user
+     slot and join/leave lifecycle match presence, including late joiners; expose
+     it through the transport rather than couple `packages/party` to Trystero.
+     Multi-tab aggregation differs from peer-level events; preserve reconnect,
+     rename validation and game roster behavior in tests. No ready flag exists
+     in the cited session today, so do not invent one merely to use the API.
+   - **`makeState` — adopt for durable room context/selection**, not transient
+     commands: late joiners receive the latest signed value from remaining peers,
+     which can replace context/selected-game announcement and catch-up code.
+     It is whole-value last-writer-wins, not consensus or an ordered command
+     log; validate shape and current host on writes and test concurrent host
+     migration, stale updates and late joins. Keep kick/reload/start events and
+     application-level source verification; never replace nova-api game state
+     or its authority protocol with LWW state.
+   - **Action progress — already adopted for transfer; don't replace the
+     coordinator wholesale.** `trystero-transport.ts` uses action request/receive
+     progress and `game-source.ts` already delegates chunking, backpressure,
+     correlation, cancellation and timeout to Trystero. Its remaining metadata,
+     source size/UTF-8/SHA-256 checks, bounded cache, compatibility, acceptance
+     and stale-selection handling are Nova requirements, not action features.
+     Migrate listener syntax in §3.1; verify progress and multi-hop promotion in
+     §3.6 rather than deleting those protections.
+   - **Authority module — don't adopt as game authority.** Upstream
+     `authority.ts` implements signed role certificates, root-admin permissions
+     and moderation synchronization, not election of a game executor or
+     reconciliation of state/action history. ADR-0007 and nova-api require
+     heartbeats, deterministic election, buffered/replayed deduplicated actions
+     and snapshot restoration for state and simulation; upstream authority and
+     its scale tests do not replace those semantics.
+   - **`roles()`/ban — don't adopt for host controls.** Root admins are fixed
+     by the invite or configured IDs; `authority.ts` rejects granting `admin`
+     to non-root users and moderation is root-only. Custom roles can be granted
+     but cannot pass root ban/unban powers to a deterministic successor after
+     an unexpected departure. Nova's creator-preferred, sorted-member successor
+     and cooperative kick must continue; a persistent ban would also change the
+     reusable-invite threat model.
+   - **`scale()` — adopt as required in §3.6.** Upstream describes experimental
+     multi-hop routing and promotion of transfers larger than 16 KiB to direct
+     links, not a guarantee of arbitrary-size rooms. Preserve small-room mesh,
+     test direct-promotion failure and chunk fallback with frame overhead, and
+     complete the 10/25/50/100-player and phone gates before claiming scale.
 
 5. [ ] Implement each _adopt_ as its own commit, deleting the replaced Nova code and its tests (port the behavioural assertions to the new code). Keep `packages/nova-api` (the API games call) stable unless the review shows a clear simplification; games must not need changes.
 6. [ ] Adopt `scale()` (required for unlimited party size; it is marked experimental, so test it hard). Keep normal parties on a direct mesh by setting `maxDirectPeers` so rooms up to ~10 players stay direct, and let larger rooms form the multi-hop network. Then:
