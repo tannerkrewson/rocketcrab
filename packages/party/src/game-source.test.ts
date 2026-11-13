@@ -238,6 +238,30 @@ describe("whole-source requests", () => {
     expect(received(b.events)).toMatchObject([{ source: "hello" }]);
     expect(completed(a.events, "send").filter((e) => e.memberId === "joiner")).toHaveLength(1);
   });
+  it("does not replay old announcers when a cancellation listener cancels the selection", async () => {
+    const { hub, host, joiner } = await world();
+    const other = hub.createTransport({ memberId: "other", displayName: "Other" });
+    await other.join({ room: "private", sessionId: "session" });
+    const a = coordinator(other);
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    const b = coordinator(joiner);
+    b.instance.subscribe((event) => {
+      if (event.type === "cancelled" && event.reason === "peer_disconnected")
+        b.instance.cancelAll();
+    });
+    host.handleRequest(GAME_SOURCE_CHANNEL, () => new Promise(() => {}));
+    const request = vi.spyOn(joiner, "request");
+    await announce(host, await descriptor("hello"));
+    await settle(hub);
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    await host.leave();
+    await settle(hub);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(received(b.events)).toEqual([]);
+    expect(b.instance.hasSource("game")).toBe(false);
+  });
   it("continues acknowledgements when the original holder disconnects after verification", async () => {
     const { hub, host, joiner } = await world();
     const other = hub.createTransport({ memberId: "other", displayName: "Other" });

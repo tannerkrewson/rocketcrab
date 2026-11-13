@@ -205,15 +205,21 @@ export class GameSourceCoordinator {
         if (selection.verified) return;
         if (selectionSender !== peer.connectionId) return;
         const remaining = [...selection.announcers.values()];
+        // cancelTransfer invalidates the selection and, if present, the receive.
+        // Both abort and cancellation callbacks can synchronously change state.
+        const expectedGeneration = this.generation + 1 + (this.incoming ? 1 : 0);
         this.cancelTransfer(
           selection.metadata.gameId,
           selection.metadata.sourceSha256,
           "peer_disconnected",
         );
+        if (this.disposed || this.selection || this.generation !== expectedGeneration) return;
         // Replay only previously validated, still-connected announcements. The
         // new selection owns a fresh generation and a fresh compatibility check.
-        for (const message of remaining)
+        for (const [index, message] of remaining.entries()) {
+          if (index > 0 && this.generation !== expectedGeneration + 1) return;
           void this.handleMessage(message).catch((error) => this.emitError(error));
+        }
       }),
       this.transport.on("connection:state", (state) => {
         if (state !== "connected") this.cancelAll("connection_lost");
