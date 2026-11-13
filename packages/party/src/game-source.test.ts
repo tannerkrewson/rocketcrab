@@ -79,7 +79,10 @@ async function descriptor(source = "<html>🦀</html>"): Promise<GameSourceMetad
 }
 const received = (events: GameSourceTransferEvent[]) => events.filter((e) => e.type === "received");
 const completed = (events: GameSourceTransferEvent[], direction: "send" | "receive") =>
-  events.filter((e) => e.type === "complete" && e.direction === direction);
+  events.filter(
+    (e): e is Extract<GameSourceTransferEvent, { type: "transferStart" | "complete" }> =>
+      e.type === "complete" && e.direction === direction,
+  );
 
 describe("whole-source requests", () => {
   it.each([
@@ -182,6 +185,66 @@ describe("whole-source requests", () => {
     await settle(hub);
     expect(request).toHaveBeenCalledTimes(2);
     expect(received(b.events)).toHaveLength(1);
+  });
+  it("acknowledges every matching announcer after a different holder supplies verified bytes", async () => {
+    const { hub, host, joiner } = await world();
+    const holder = hub.createTransport({ memberId: "holder", displayName: "Holder" });
+    await holder.join({ room: "private", sessionId: "session" });
+    const a = coordinator(host);
+    const h = coordinator(holder);
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await h.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    const b = coordinator(joiner);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const original = joiner.request.bind(joiner);
+    const request = vi.spyOn(joiner, "request").mockImplementation(async (options) => {
+      await gate;
+      return original(options);
+    });
+    await h.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    expect(request).toHaveBeenCalledTimes(1);
+    expect(completed(a.events, "send").filter((e) => e.memberId === "joiner")).toEqual([]);
+    release();
+    await settle(hub);
+    expect(received(b.events)).toHaveLength(1);
+    expect(completed(a.events, "send").filter((e) => e.memberId === "joiner")).toHaveLength(1);
+    expect(completed(h.events, "send").filter((e) => e.memberId === "joiner")).toHaveLength(1);
+  });
+  it("never acknowledges any announcer when shared source verification fails", async () => {
+    const { hub, host, joiner } = await world();
+    const other = hub.createTransport({ memberId: "other", displayName: "Other" });
+    await other.join({ room: "private", sessionId: "session" });
+    const b = coordinator(joiner);
+    let release!: (bytes: Uint8Array) => void;
+    host.handleRequest(
+      GAME_SOURCE_CHANNEL,
+      () =>
+        new Promise<Uint8Array>((resolve) => {
+          release = resolve;
+        }),
+    );
+    const messages: unknown[] = [];
+    for (const peer of [host, other])
+      peer.on("message:received", (message) => messages.push(message.payload));
+    const metadata = await descriptor("hello");
+    await announce(host, metadata);
+    await settle(hub);
+    await announce(other, metadata);
+    await settle(hub);
+    release(new TextEncoder().encode("wrong"));
+    await settle(hub);
+    expect(b.instance.hasSource("game")).toBe(false);
+    expect(b.events.some((event) => event.type === "verificationFailed")).toBe(true);
+    expect(
+      messages.filter((message) => (message as { type?: string }).type === "game.source.accepted"),
+    ).toEqual([]);
   });
   it("deduplicates concurrent metadata and requests", async () => {
     const { hub, host, joiner } = await world();

@@ -152,6 +152,13 @@ after the cutover (browser storage is per origin).
 
 ## 3. Trystero 0.27 migration — P0 (owner approved)
 
+- [x] Fix source acceptance when a joiner downloads from one holder while the
+      host also announced the same source. Evidence: `game-source.test.ts`
+      holds the holder response until the host announces, then verifies both
+      holders receive acceptance; corrupt bytes receive no acceptance. The
+      coordinator tracks connected announcers for one exact descriptor and
+      acknowledges only after compatibility and byte/hash verification.
+
 0.27.0 (released 2026-11-11) changes the wire protocol (0.26 and 0.27 peers
 cannot talk) and much of the API. Read the release notes and
 `MIGRATION.md` in the Trystero repo (`gh release view 0.27.0 -R dmotz/trystero`).

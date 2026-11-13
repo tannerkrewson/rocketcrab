@@ -142,6 +142,11 @@ export class GameSourceCoordinator {
   private readonly offered = new Map<ConnectionId, GameSourceMetadataInfo>();
   private readonly unsubscribers: Array<() => void>;
   private incoming: ReceiveTransfer | null = null;
+  // One selection only, with at most one entry per currently connected peer.
+  private selection: {
+    metadata: GameSourceMetadataInfo;
+    announcers: Map<ConnectionId, MemberId>;
+  } | null = null;
   private currentGameId: GameId | null = null;
   private disposed = false;
   // Invalidates async compatibility/hash checks when a newer selection arrives.
@@ -192,7 +197,14 @@ export class GameSourceCoordinator {
       }),
       this.transport.on("peer:left", (peer) => {
         this.offered.delete(peer.connectionId);
-        if (this.incoming?.connectionId === peer.connectionId) this.cancelAll("peer_disconnected");
+        const selectionSender = this.selection?.announcers.keys().next().value;
+        this.selection?.announcers.delete(peer.connectionId);
+        if (
+          this.incoming?.connectionId === peer.connectionId ||
+          selectionSender === peer.connectionId ||
+          (this.selection && this.selection.announcers.size === 0)
+        )
+          this.cancelAll("peer_disconnected");
       }),
       this.transport.on("connection:state", (state) => {
         if (state !== "connected") this.cancelAll("connection_lost");
@@ -252,10 +264,18 @@ export class GameSourceCoordinator {
   }
   cancelTransfer(gameId: GameId, sourceSha256: Sha256, reason = "cancelled"): void {
     if (
+      this.selection?.metadata.gameId === gameId &&
+      this.selection.metadata.sourceSha256 === sourceSha256
+    ) {
+      this.selection = null;
+      this.generation++;
+    }
+    if (
       this.incoming?.metadata.gameId === gameId &&
       this.incoming.metadata.sourceSha256 === sourceSha256
     ) {
       const transfer = this.incoming;
+      this.selection = null;
       this.incoming = null;
       transfer.controller.abort();
       this.generation++;
@@ -272,6 +292,7 @@ export class GameSourceCoordinator {
         this.offered.delete(connectionId);
   }
   cancelAll(reason = "cancelled"): void {
+    this.selection = null;
     this.generation++;
     if (this.incoming)
       this.cancelTransfer(
@@ -336,13 +357,12 @@ export class GameSourceCoordinator {
     const metadata = this.metadata(control);
     if (metadata.sourceSizeBytes > htmlSourceBytes)
       throw new GameSourceError("too_large", "Announced source exceeds the hard limit.");
-    // Duplicate announcements must not restart the same request. Another holder
-    // is tried only on an explicit refresh/reconnect after a failed request.
-    if (
-      this.incoming?.metadata.gameId === metadata.gameId &&
-      this.incoming.metadata.sourceSha256 === metadata.sourceSha256
-    )
+    // Remember matching announcements even while compatibility is pending. Do
+    // not let conflicting descriptors inherit another peer's compatibility check.
+    if (this.selection && sameMetadata(this.selection.metadata, metadata)) {
+      this.selection.announcers.set(message.senderConnectionId, message.senderMemberId);
       return;
+    }
     this.generation++;
     if (this.incoming)
       this.cancelTransfer(
@@ -355,8 +375,19 @@ export class GameSourceCoordinator {
       this.sources.get(metadata.gameId)?.metadata.sourceSha256 !== metadata.sourceSha256
     )
       this.offered.clear();
+    const selection = {
+      metadata,
+      announcers: new Map([[message.senderConnectionId, message.senderMemberId]]),
+    };
+    this.selection = selection;
     const generation = this.generation;
-    const compatible = await this.compatibilityCheck(metadata);
+    let compatible: GameSourceCompatibility;
+    try {
+      compatible = await this.compatibilityCheck(metadata);
+    } catch (error) {
+      if (this.selection === selection) this.selection = null;
+      throw error;
+    }
     if (
       this.disposed ||
       generation !== this.generation ||
@@ -365,6 +396,7 @@ export class GameSourceCoordinator {
       return;
     this.emit({ type: "metadata", metadata, fromMemberId: message.senderMemberId });
     if (!compatible.compatible) {
+      if (this.selection === selection) this.selection = null;
       this.emit({
         type: "incompatible",
         memberId: message.senderMemberId,
@@ -380,7 +412,8 @@ export class GameSourceCoordinator {
     ) {
       this.cache({ ...cached, metadata });
       this.currentGameId = metadata.gameId;
-      await this.accept(metadata, message.senderConnectionId);
+      await this.acceptAnnouncers(selection, generation);
+      if (this.selection === selection) this.selection = null;
       return;
     }
     const transfer: ReceiveTransfer = {
@@ -456,11 +489,13 @@ export class GameSourceCoordinator {
         memberId: transfer.memberId,
         ...identity(metadata),
       });
-      await this.accept(metadata, transfer.connectionId);
+      await this.acceptAnnouncers(selection, generation);
+      if (this.selection === selection) this.selection = null;
       if (this.incoming === transfer) this.incoming = null;
     } catch (error) {
       if (this.incoming !== transfer || transfer.controller.signal.aborted || this.disposed) return;
       this.incoming = null;
+      if (this.selection === selection) this.selection = null;
       if (error instanceof GameSourceError && error.code === "hash_mismatch")
         this.emit({
           type: "verificationFailed",
@@ -512,6 +547,20 @@ export class GameSourceCoordinator {
       }),
       connectionId,
     );
+  }
+  private async acceptAnnouncers(
+    selection: { metadata: GameSourceMetadataInfo; announcers: Map<ConnectionId, MemberId> },
+    generation: number,
+  ): Promise<void> {
+    for (const [connectionId, memberId] of selection.announcers) {
+      if (this.disposed || this.selection !== selection || generation !== this.generation) return;
+      if (!this.isMember(memberId, connectionId)) continue;
+      try {
+        await this.accept(selection.metadata, connectionId);
+      } catch (error) {
+        this.emitError(error);
+      }
+    }
   }
   private async accept(
     metadata: GameSourceMetadataInfo,
@@ -568,6 +617,16 @@ export class GameSourceCoordinator {
     if (this.disposed)
       throw new GameSourceError("invalid_state", "Source coordinator is disposed.");
   }
+}
+function sameMetadata(a: GameSourceMetadataInfo, b: GameSourceMetadataInfo): boolean {
+  return (
+    a.gameId === b.gameId &&
+    a.sourceSha256 === b.sourceSha256 &&
+    a.sourceSizeBytes === b.sourceSizeBytes &&
+    a.title === b.title &&
+    a.apiVersion === b.apiVersion &&
+    a.mode === b.mode
+  );
 }
 function identity(metadata: GameSourceMetadataInfo) {
   return { gameId: metadata.gameId, sourceSha256: metadata.sourceSha256 };
