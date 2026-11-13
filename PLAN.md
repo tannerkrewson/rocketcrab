@@ -331,6 +331,15 @@ passed 4/4 (Podman Playwright, 2026-11-13).
 
    Action payload regression: the peer `action.dispatch` schema accepts an omitted payload, matching the game API and JSON serialization of `undefined`; all other envelope and message validations remain in force. The session contract tests send omitted, explicit `undefined`, `null`, and `{}` from a non-authority via a JSON-round-tripping transport. Protocol version stays 1: existing defined-payload messages remain compatible and new receivers accept old senders; old receivers still reject omitted payloads, so mixed-version parties require updated authorities. Evidence: the protocol regression fails with the original schema; `npm run check` passed, and `npm run test:e2e` (60/60) and `npm run test:e2e:trystero` (5/5) passed in the pinned Playwright container against this worktree's servers. This does not complete the load-test gate.
 
+   Partial evidence: `docs/testing/large-room-load.md` records local headless
+   10/25/50-player state-mode runs and their limitations; 100 and real-phone
+   authority remain open. Creating with a game revealed a source-verification
+   start-gate failure; separately an action with omitted optional payload failed
+   wire validation. After both fixes landed, a 10-player create-with-game,
+   no-payload browser run passed. A 100-player attempt stopped at 78 joined
+   due to the host swap safeguard; it is incomplete, not a product failure.
+   Do not infer unlimited support or close the owner overlay decision in §3.6.
+
 8. [ ] Update ADR-0003 (transport abstraction) to describe what Trystero now owns and what Nova still owns.
 
 ## 4. Own signaling relay — P0 (owner approved)

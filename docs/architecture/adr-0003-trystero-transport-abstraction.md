@@ -31,7 +31,9 @@ Source and local test evidence are in PLAN §4.5 and the
 [edge runbook](../../deploy/cloudflare.md). The code is staged, not evidence of
 a live deployment or successful real-device cross-network operation; release
 verification remains in PLAN §9. Historical public relay observations are
-retained in [F5 findings](../testing/trystero-connectivity-findings.md).
+retained in [F5 findings](../testing/trystero-connectivity-findings.md). The
+[large-room state-mode experiment](../testing/large-room-load.md) records local
+headless measurements and open release gates; it is not phone evidence.
 
 ## Context
 
