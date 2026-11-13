@@ -208,13 +208,54 @@ passed 4/4 (Podman Playwright, 2026-11-13).
      storage fallback/reset semantics and multiple tabs must be tested. Preserve
      the stable game-facing player ID contract and handle existing stored IDs
      deliberately; no assumption that an old ID can be imported as a key.
-   - **`makeUserState` — adopt for presence**, replacing duplicate name/rename
-     propagation and roster bookkeeping where equivalent. Its signed per-user
-     slot and join/leave lifecycle match presence, including late joiners; expose
-     it through the transport rather than couple `packages/party` to Trystero.
-     Multi-tab aggregation differs from peer-level events; preserve reconnect,
-     rename validation and game roster behavior in tests. No ready flag exists
-     in the cited session today, so do not invent one merely to use the API.
+   - **`makeUserState` — defer replacement pending an admission-safe design;
+     the earlier equivalence claim was premature.** Re-reviewed 2026-11-13
+     against [0.27 `docs/state.md`](https://github.com/dmotz/trystero/blob/8d3f57ef42c3d622840eec479784c99deeeb2d05/docs/state.md)
+     and [`state.ts`](https://github.com/dmotz/trystero/blob/8d3f57ef42c3d622840eec479784c99deeeb2d05/packages/core/src/state.ts),
+     `packages/trystero-transport/src/trystero-transport.ts`, and party
+     `session.ts`/`messages.ts`. The transport already uses `makeUserState`
+     for `nova.identity`, with ephemeral `identity: "none"`: a signed user
+     slot is not Nova's stable member ID. It validates the slot against the
+     connected peer, rejects changes to its identity **including displayName**,
+     and exposes peers only after bilateral acknowledgements. State updates and
+     Trystero user presence alone bypass that Nova admission boundary; simply
+     changing the existing slot on rename causes rejection. A separate mutable
+     slot or redesigned identity payload could carry names, but must buffer or
+     discard pre-admission updates and bind each update to an admitted endpoint.
+     `party.rename` validates the session, member and connection envelope and
+     the protocol display-name schema (1–32 characters); `renamedNames`
+     overrides the initial peer name and clears on peer join/leave. Test the
+     existing late-join/reconnect behavior rather than assume a slot preserves
+     it: state coalesces writes and syncs current values, unlike event messages.
+
+     Roster/host are not just presence slots: `members` deduplicates the local
+     member and admitted connections by Nova member ID; host waits for creator
+     context, prefers the connected creator, otherwise sorts member IDs. Peer
+     events, context propagation and game authority/migration remain necessary
+     unless their contracts are independently replaced. A per-user list can
+     contain unadmitted peers or multiple ephemeral users for one member, so
+     cannot directly replace that roster. No ready flag exists today.
+
+     With persistent Trystero IDs shared across tabs, `docs/state.md` specifies
+     one LWW slot per user, shared updates and eviction only after the last tab
+     leaves; `state.ts` keys records by user ID and orders writes by HLC, user,
+     peer and signature. The current `getMeta(userId).peerId === peerId` check
+     and per-connection identity payload cannot admit both tabs reliably when
+     their one slot is overwritten. Choose explicit member-vs-endpoint and
+     simultaneous-name semantics before switching; keep endpoint admission,
+     connection targeting and deterministic host/migration independent of
+     user-slot lifetime. Legacy IDs and recovery need the decision in step 5.
+
+     Required tests before deleting code: pre-admission, rejected and timed-out
+     peers and queued updates; valid/invalid and rapid concurrent renames,
+     late join, disconnect/reconnect and stale updates; duplicate member IDs
+     over distinct connections; creator departure/rejoin, concurrent joins,
+     deterministic host and game migration; persistent same-user tabs joining,
+     renaming and leaving in both orders, including slot writer departure,
+     plus identity reset/storage fallback. Exercise real 0.27 and scaled
+     virtual peers as well as transport fakes. These are obligations, not
+     evidence of equivalence; no presence replacement is implemented.
+
    - **`makeState` — adoption deferred after re-review; previous adoption
      recommendation was premature.** The 0.27 `docs/state.md` and installed
      `@trystero-p2p/core` `dist/state.mjs` describe/implement a signed,
