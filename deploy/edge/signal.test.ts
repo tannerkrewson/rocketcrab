@@ -67,9 +67,14 @@ describe("SignalHub", () => {
     const limited = socket();
     for (let i = 0; i < 129; i++) message(h, limited, { type: "subscribe", topic: `t${i}` });
     expect(limited.close).toHaveBeenCalledWith(1008, "subscription limit exceeded");
-    const rate = socket();
-    for (let i = 0; i < 401; i++) message(h, rate, { type: "unsubscribe", topic: "x" });
-    expect(rate.close).toHaveBeenCalledWith(1008, "rate limit exceeded");
+    const clock = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    try {
+      const rate = socket();
+      for (let i = 0; i < 401; i++) message(h, rate, { type: "unsubscribe", topic: "x" });
+      expect(rate.close).toHaveBeenCalledWith(1008, "rate limit exceeded");
+    } finally {
+      clock.mockRestore();
+    }
   });
 });
 
