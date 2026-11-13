@@ -1,6 +1,14 @@
 # F5 Findings — Backendless Trystero Connectivity (Rocketcrab Nova)
 
-> Historical spike/probe evidence. Simplification stage 3 now uses Trystero 0.26
+> Historical spike/probe evidence. The relay observations, relay lists, operator
+> recommendations, commands and implementation descriptions below refer to the
+> public Nostr strategy tested at the time, not the current signaling design.
+> As of 2026-11-13 the repository uses Trystero 0.27's WebSocket relay strategy
+> with its own room-scoped edge signaling; no public Nostr fallback is configured.
+> These results do not establish current deployment or cross-network reliability.
+> Release device testing remains open in PLAN §9.
+>
+> Previously, simplification stage 3 used Trystero 0.26
 > maintained relay defaults and native source request actions; the old pinned
 > URLs/redundancy recommendations below are superseded. Same-machine Chromium
 > smoke tests pass with defaults (including a verified 2 MiB source). Physical

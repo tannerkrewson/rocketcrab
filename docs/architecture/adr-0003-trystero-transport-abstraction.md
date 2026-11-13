@@ -7,6 +7,32 @@
   ADR-0004 (private invites), F5 (connectivity spike), M3 (TURN decision),
   P0 `rocketcrab-23s` (TURN implementation)
 
+## Amended 2026-11-13: owned room-scoped signaling
+
+The decision and addenda below preserve their historical context; Nostr relay
+selection and older Trystero API descriptions are superseded by this amendment.
+The real-party adapter uses pinned Trystero 0.27.0 and
+`@trystero-p2p/ws-relay`, not public Nostr relays or a Nostr fallback. Trystero
+still owns peer discovery protocol, WebRTC connections and action transport;
+Nova owns the adapter, admission policy, and the signaling service. The local
+arena remains transport-neutral and games do not see Trystero.
+
+The adapter derives a room key from the first 16 bytes of SHA-256 of the
+concatenated app ID and room ID, hex encoded, and connects to
+`/signal/:roomKey` on the configured edge origin (HTTPS becomes WSS). The edge
+routes each key to a separate `SignalHub` Durable Object. It implements the
+Trystero WebSocket relay subscribe/publish protocol, including publisher echo;
+socket subscription attachments survive hibernation and messages are not
+persisted. Origin checks and connection rate limits apply. This is signaling,
+not a WebRTC data fallback; TURN remains the cross-network mechanism, and the
+proposed WebSocket data tunnel remains future work (PLAN §5).
+
+Source and local test evidence are in PLAN §4.5 and the
+[edge runbook](../../deploy/cloudflare.md). The code is staged, not evidence of
+a live deployment or successful real-device cross-network operation; release
+verification remains in PLAN §9. Historical public relay observations are
+retained in [F5 findings](../testing/trystero-connectivity-findings.md).
+
 ## Context
 
 Real parties connect peer-to-peer. Rocketcrab Nova uses **Trystero** for all

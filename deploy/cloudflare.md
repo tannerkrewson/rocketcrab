@@ -34,6 +34,10 @@ Every known route requires an allowlisted Origin. POST routes support CORS
 preflight; signaling requires a WebSocket GET and is rate-limited on connection
 attempts. Both use per-IP rate limiting (`429`, `Retry-After: 60`).
 
+The staged Nova adapter uses Trystero 0.27's WebSocket relay strategy with
+`VITE_EDGE_ORIGIN`, not public Nostr relays. It hashes the app and room IDs to
+select a room-scoped `/signal/:roomKey` URL; the Worker routes each key to a
+separate `SignalHub`. This provides signaling only, not a WebSocket data tunnel.
 Signaling uses WebSocket hibernation and socket attachments; messages are not
 persisted. The published `@trystero-p2p/ws-relay@0.27.0` server echoes to all
 subscribers, including the publisher. We deliberately omit its aggregate 10,000
@@ -203,8 +207,8 @@ and [aggregate functions](https://developers.cloudflare.com/analytics/analytics-
    curl -s  -X POST $E/ -H 'Origin: https://rocketcrab.com' \
      -H 'Content-Type: application/json' -d '{"endpoint":"spyfall-new"}'  # { gameCode }
    ```
-6. **App builds** — the GitHub Pages deploy workflow's `edge_origin` input
-   defaults to the URL above and becomes `VITE_EDGE_ORIGIN`.
+6. **App builds** — `npm run deploy:nova` supplies `VITE_EDGE_ORIGIN` from
+   `deploy/origins.json`; first deployment requires owner approval.
 
 ## Abuse and emergencies
 
