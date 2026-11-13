@@ -161,16 +161,6 @@ passed 4/4 (Podman Playwright, 2026-11-13).
 2. [ ] Replace error-string matching with typed codes. Today `handleJoinErrorNotice` in `apps/nova/src/lib/party/engine.ts` and `apps/nova/src/lib/party/connection-errors.ts` parse messages; switch to `RoomError.code` (`peer-connect-failed`, `relay-failed`, `room-full`, `decrypt-failed`, …).
 3. [ ] Party size: **no cap** (owner wants arbitrarily large parties, 2026-11-12). Do not set `maxUsers`. Still handle `room-full` gracefully in case a cap is added later.
 
-   Migration handoff: uncommitted, incomplete work is isolated in
-   `.worktrees/work-trystero-migration` on `work/trystero-migration`, based on
-   `067bf3a`. The contract suite passed 16 tests and focused identity/error/app-ID
-   tests passed 15, but the 0.26 unit mocks still fail typecheck. Do not integrate
-   it until mocks, identity admission and early message/RPC races are fully
-   reviewed and tested, `npm run check` and both e2e suites pass, and the work is
-   committed. The branch must be reconciled with later `nova` changes. An
-   incomplete unit-mock experiment is also in `.worktrees/work-trystero-mocks`;
-   it is not runnable and must not be treated as finished.
-
 4. [x] **Feature fit review — write it down before coding.** For each Trystero 0.27 feature below, read its doc in the Trystero repo (`docs/*.md`) and the Nova code it would replace, then record in this file: _adopt_ / _don't adopt_ + one-paragraph reason. Owner rule: if it fits Nova's needs, adopt it and delete Nova's code. Candidates:
 
    - `userId` identity (`docs/identity.md`) vs `apps/nova/src/lib/party/identity.ts`.
