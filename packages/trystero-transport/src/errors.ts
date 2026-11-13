@@ -10,7 +10,7 @@
  * user-actionable category union.
  */
 
-import type { RoomError, RoomErrorCode } from "trystero";
+import type { RoomError, RoomErrorCode } from "@trystero-p2p/ws-relay";
 
 /** User-actionable join failure categories (F5 recommendation table). */
 export type TrysteroJoinErrorCategory =

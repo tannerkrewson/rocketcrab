@@ -1,12 +1,4 @@
-// P3 real-browser integration smoke test (external network; resilient).
-//
-// Runs the GameSourceCoordinator between two real browser pages over the real
-// Trystero transport (Nostr relays + WebRTC): the host registers a game
-// source, the joiner requests it, Trystero transfers the binary response as
-// binary payloads with progress, the joiner verifies the SHA-256 digest and
-// byte count, and both sides acknowledge. Like the P1 specs, this is NOT
-// part of the default CI smoke — run with `npm run test:e2e:trystero`, and
-// SKIP (not fail) when the external relays are unreachable.
+// Real-browser game-source transfer through the local signaling relay and WebRTC.
 import { expect, test } from "@playwright/test";
 import type { Browser, Page } from "@playwright/test";
 
@@ -27,7 +19,6 @@ interface SourceState {
 interface JoinOptions {
   room: string;
   appId?: string;
-  relays?: string[];
 }
 
 /** Scoped harness shape (the shared global is declared in trystero.spec.ts). */
@@ -46,8 +37,6 @@ interface HarnessWindow {
 }
 
 const JOINED = "joined";
-const UNREACHABLE = "relay_unreachable";
-const JOIN_TIMEOUT = "join_timeout";
 
 function randRoom(): string {
   return `p3-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
@@ -64,7 +53,7 @@ async function sourceStateOf(page: Page): Promise<SourceState> {
   return page.evaluate(() => (window as unknown as HarnessWindow).__harness.getSourceState());
 }
 
-/** Join a room through the adapter; SKIP the test when relays are unreachable. */
+/** Join a room through the adapter; local signaling failures fail the test. */
 async function enter(page: Page, room: string, join: "create" | "join"): Promise<void> {
   const result = await page.evaluate(
     ([r, mode]) =>
@@ -73,14 +62,6 @@ async function enter(page: Page, room: string, join: "create" | "join"): Promise
         : (window as unknown as HarnessWindow).__harness.joinRoomByCode({ room: r }),
     [room, join] as const,
   );
-  if (result === UNREACHABLE) {
-    test.skip(true, "external Nostr relays unreachable — skipping external-network smoke");
-    return;
-  }
-  if (result === JOIN_TIMEOUT) {
-    test.skip(true, "join timed out (external relays slow/unreachable) — skipping smoke");
-    return;
-  }
   expect(result).toBe(JOINED);
 }
 

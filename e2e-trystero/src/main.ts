@@ -3,7 +3,7 @@
 // Serves the adapter behind a small `window.__harness` (same pattern as the
 // F5 spike) so Playwright can simulate multiple peers on one machine. Uses
 // ONLY the adapter's public surface — never raw Trystero — so this is a true
-// end-to-end test of the P1 adapter over real Nostr relays + WebRTC.
+// end-to-end test of the adapter over the local signaling relay + WebRTC.
 import { TrysteroTransport } from "@rocketcrab/trystero-transport";
 import type { TrysteroTransportDiagnostics } from "@rocketcrab/trystero-transport";
 import { GameSourceCoordinator } from "@rocketcrab/party";
@@ -16,7 +16,7 @@ interface HarnessState {
   connectionState: string;
   room: string | null;
   peers: Array<{ memberId: string; connectionId: string; displayName?: string }>;
-  relays: Array<{ url: string; readyState: number; connected: boolean }> | null;
+  signalingConnected: boolean | null;
   messages: Array<{
     channel: string;
     senderMemberId: string;
@@ -40,7 +40,6 @@ interface HarnessState {
 interface JoinOptions {
   room: string;
   appId?: string;
-  relays?: string[];
   relayConnectTimeoutMs?: number;
   joinTimeoutMs?: number;
 }
@@ -85,7 +84,7 @@ const state: HarnessState = {
   connectionState: "idle",
   room: null,
   peers: [],
-  relays: null,
+  signalingConnected: null,
   messages: [],
   progress: [],
   pings: [],
@@ -108,9 +107,9 @@ async function enterRoom(options: JoinOptions): Promise<string> {
   const sessionId = `${SESSION_PREFIX}${options.room}`;
   const next = new TrysteroTransport({
     memberId: state.selfMemberId,
+    edgeOrigin: "http://localhost:18787",
     displayName: `player-${state.selfMemberId.slice(-4)}`,
     appId: options.appId,
-    relays: options.relays,
     relayConnectTimeoutMs: options.relayConnectTimeoutMs ?? 10_000,
     joinTimeoutMs: options.joinTimeoutMs ?? 45_000,
     onJoinError: (error) => {
@@ -160,20 +159,8 @@ async function enterRoom(options: JoinOptions): Promise<string> {
   state.selfConnectionId = next.selfConnectionId;
   state.appId = next.appId;
   state.room = options.room;
-  state.relays = snapshotRelays(next);
+  state.signalingConnected = next.getSignalingConnected();
   return "joined";
-}
-
-function snapshotRelays(current: TrysteroTransport): HarnessState["relays"] {
-  const diagnostics = current.getRelayDiagnostics();
-  if (diagnostics === null) {
-    return null;
-  }
-  return diagnostics.relays.map((relay) => ({
-    url: relay.url,
-    readyState: relay.readyState,
-    connected: relay.connected,
-  }));
 }
 
 async function leaveRoom(): Promise<void> {
@@ -194,7 +181,7 @@ async function leaveRoom(): Promise<void> {
   state.selfConnectionId = null;
   state.room = null;
   state.peers = [];
-  state.relays = null;
+  state.signalingConnected = null;
   state.messages = [];
   state.progress = [];
 }

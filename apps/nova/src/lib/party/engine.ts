@@ -114,47 +114,14 @@ export interface PartyMemberView {
   readonly ready: boolean;
 }
 
-/** One relay socket as surfaced in engine diagnostics (rocketcrab-ont.1). */
-export interface PartyRelayView {
-  readonly url: string;
-  /** Raw WebSocket readyState (0=CONNECTING, 1=OPEN, 2=CLOSING, 3=CLOSED). */
-  readonly readyState: number;
-  /** True when the socket is OPEN (socket-level signaling available). */
-  readonly connected: boolean;
-  /**
-   * True when this OPEN relay has recently been observed rejecting or
-   * throttling Trystero traffic (OK:false / NOTICE) — connected but NOT
-   * usable (relay.nostr.info rejects every event; damus/offchain.pub
-   * throttle after a few events).
-   */
-  readonly degraded: boolean;
-}
-
-/** Aggregate relay signaling health (null until an adapter snapshot exists). */
-export interface PartyRelayHealth {
-  /** Number of configured relays observed. */
-  readonly total: number;
-  /** Number of relays whose socket is OPEN. */
-  readonly connected: number;
-  /** Number of OPEN relays not observed rejecting/throttling. */
-  readonly usable: number;
-  /** Number of relays with a recent failure observation. */
-  readonly degradedCount: number;
-  /** True when no relay socket is OPEN (no signaling at all). */
-  readonly signalingDown: boolean;
-  /** True when usable relays are below the configured redundancy. */
-  readonly degraded: boolean;
-}
-
 /** Connection diagnostics (adapter-specific when available). */
 export interface PartyDiagnostics {
   readonly connectionState: TransportConnectionState;
   readonly selfConnectionId: string;
   readonly room: string;
   readonly sessionId: string | null;
-  readonly relays: readonly PartyRelayView[] | null;
-  /** Aggregate relay health; null when no adapter relay snapshot yet. */
-  readonly relayHealth: PartyRelayHealth | null;
+  /** Whether the room's signaling socket is open, or null if unknown. */
+  readonly signalingConnected: boolean | null;
   readonly joinErrors: Array<{ category: string; message: string }> | null;
   readonly peers: Array<{ memberId: string; connectionId: string; displayName?: string }>;
   readonly lastQuality: Array<{ memberId: string; pingMs: number | null; sampledAt: number }>;
@@ -2586,68 +2553,17 @@ export class PartyEngine {
       selfConnectionId?: string;
       room?: string;
       sessionId?: string | null;
-      relays?: {
-        relays?: Array<{
-          url: string;
-          readyState: number;
-          connected: boolean;
-          degraded?: boolean;
-        }>;
-        total?: number;
-        connectedCount?: number;
-        usableCount?: number;
-        degradedCount?: number;
-        signalingDown?: boolean;
-        degraded?: boolean;
-      } | null;
+      signalingConnected?: boolean | null;
       joinErrors?: Array<{ category: string; message: string }> | null;
       peers?: Array<{ memberId: string; connectionId: string; displayName?: string }>;
       lastQuality?: Array<{ memberId: string; pingMs: number | null; sampledAt: number }>;
     } | null;
-    const relaySnapshot = adapter?.relays ?? null;
-    // Accept both the adapter snapshot shape ({ relays: [...] , total, ... })
-    // and a plain relay-views array (the engine's own PartyDiagnostics
-    // shape, as an injected provider might supply).
-    const relayViews =
-      relaySnapshot !== null && Array.isArray(relaySnapshot.relays)
-        ? relaySnapshot.relays
-        : Array.isArray(relaySnapshot)
-          ? (relaySnapshot as Array<{
-              url: string;
-              readyState: number;
-              connected: boolean;
-              degraded?: boolean;
-            }>)
-          : null;
-    const relays: PartyDiagnostics["relays"] =
-      relayViews === null
-        ? null
-        : relayViews.map((relay) => ({ ...relay, degraded: relay.degraded ?? false }));
-    const relayHealth: PartyDiagnostics["relayHealth"] =
-      relays === null
-        ? null
-        : {
-            total: relaySnapshot?.total ?? relays.length,
-            connected:
-              relaySnapshot?.connectedCount ?? relays.filter((relay) => relay.connected).length,
-            usable:
-              relaySnapshot?.usableCount ??
-              relays.filter((relay) => relay.connected && !relay.degraded).length,
-            degradedCount:
-              relaySnapshot?.degradedCount ?? relays.filter((relay) => relay.degraded).length,
-            signalingDown:
-              relaySnapshot?.signalingDown ?? relays.every((relay) => !relay.connected),
-            degraded:
-              relaySnapshot?.degraded ??
-              relays.filter((relay) => relay.connected && !relay.degraded).length < relays.length,
-          };
     return {
       connectionState: adapter?.connectionState ?? transport.connectionState,
       selfConnectionId: adapter?.selfConnectionId ?? transport.selfConnectionId,
       room: adapter?.room ?? transportRoom,
       sessionId: adapter?.sessionId ?? transport.sessionId,
-      relays,
-      relayHealth,
+      signalingConnected: adapter?.signalingConnected ?? null,
       joinErrors: adapter?.joinErrors ?? null,
       peers: adapter?.peers ?? transport.peers.map((peer) => ({ ...peer })),
       lastQuality: adapter?.lastQuality ?? [],

@@ -2,7 +2,7 @@
  * @rocketcrab/trystero-transport
  *
  * P1 — the real-party implementation of the transport-neutral NovaTransport
- * interface (ADR-0003) behind Trystero's Nostr strategy. This is the ONLY
+ * interface (ADR-0003) behind Trystero's WebSocket relay strategy. This is the ONLY
  * package allowed to import Trystero (enforced by the root oxlint
  * `no-restricted-imports` rule); generated games never see it (engineering
  * rule 1).
@@ -16,6 +16,5 @@
  */
 export * from "./app-id";
 export * from "./errors";
-export * from "./relays";
 export * from "./wire";
 export * from "./trystero-transport";

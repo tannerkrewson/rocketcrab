@@ -8,7 +8,7 @@
   ],
   "type": "module",
   "scripts": {
-    "dev": "concurrently -k -n nova,runtime -c blue,magenta \"npm run dev --workspace @rocketcrab/nova\" \"npm run dev --workspace @rocketcrab/runtime\"",
+    "dev": "concurrently -k -n nova,runtime,edge -c blue,magenta,green \"VITE_EDGE_ORIGIN=http://localhost:8787 npm run dev --workspace @rocketcrab/nova\" \"npm run dev --workspace @rocketcrab/runtime\" \"npm run edge:dev -- --port 8787\"",
     "gen-certs": "node scripts/gen-certs.mjs",
     "dev:https": "concurrently -k -n nova,runtime -c blue,magenta \"npm run dev:https --workspace @rocketcrab/nova\" \"npm run dev:https --workspace @rocketcrab/runtime\"",
     "build": "npm run build --workspaces --if-present",

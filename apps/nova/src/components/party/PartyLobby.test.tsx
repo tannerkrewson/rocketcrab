@@ -268,8 +268,7 @@ describe("PartyLobby", () => {
         selfConnectionId: "conn-a",
         room: "room-1",
         sessionId: "session-1",
-        relays: null,
-        relayHealth: null,
+        signalingConnected: null,
         joinErrors: null,
         peers: [],
         lastQuality: [],
@@ -286,27 +285,14 @@ describe("PartyLobby", () => {
     expect(screen.getByText(/authority: Player A/)).toBeInTheDocument();
   });
 
-  it("shows usable vs rejecting relays and a degraded warning (rocketcrab-ont.1)", async () => {
+  it("shows connected signaling", async () => {
     const state = makeState({
       diagnostics: {
         connectionState: "connected",
         selfConnectionId: "conn-a",
         room: "room-1",
         sessionId: "session-1",
-        relays: [
-          { url: "wss://nos.lol", readyState: 1, connected: true, degraded: false },
-          { url: "wss://relay.damus.io", readyState: 1, connected: true, degraded: true },
-          { url: "wss://relay.nostr.info", readyState: 1, connected: true, degraded: true },
-          { url: "wss://dead.example", readyState: 3, connected: false, degraded: false },
-        ],
-        relayHealth: {
-          total: 4,
-          connected: 3,
-          usable: 1,
-          degradedCount: 2,
-          signalingDown: false,
-          degraded: true,
-        },
+        signalingConnected: true,
         joinErrors: null,
         peers: [],
         lastQuality: [],
@@ -314,24 +300,7 @@ describe("PartyLobby", () => {
       },
     });
     await renderLobby(state);
-    await userEvent.click(screen.getByText("Connection diagnostics"));
-    // Usable count badge + the per-relay statuses.
-    expect(screen.getByText("1/4 relays")).toBeInTheDocument();
-    expect(screen.getAllByText("usable")).toHaveLength(1);
-    expect(screen.getAllByText("rejecting")).toHaveLength(2);
-    expect(screen.getByText("readyState 3")).toBeInTheDocument();
-    // The degraded warning names the rejecters without blaming the closed one.
-    // (The lobby's start-blocked notice also has role="alert" — scope to the
-    // diagnostics panel's warning.)
-    const alerts = screen.getAllByRole("alert");
-    const warning = alerts.find((alert) => within(alert).queryByText(/Signaling degraded/));
-    expect(warning).toBeDefined();
-    expect(warning).toHaveClass("alert--warning");
-    expect(
-      within(warning as HTMLElement).getByText(/Signaling degraded: 1 of 4 relays usable/),
-    ).toBeInTheDocument();
-    // A degraded badge on the summary row.
-    expect(screen.getByTitle("Usable relays below redundancy")).toHaveTextContent("degraded");
+    expect(screen.getByText("Signaling: connected")).toBeInTheDocument();
   });
 
   it("warns when no relay socket is open (signaling down)", async () => {
@@ -341,15 +310,7 @@ describe("PartyLobby", () => {
         selfConnectionId: "conn-a",
         room: "room-1",
         sessionId: "session-1",
-        relays: [{ url: "wss://nos.lol", readyState: 0, connected: false, degraded: false }],
-        relayHealth: {
-          total: 1,
-          connected: 0,
-          usable: 0,
-          degradedCount: 0,
-          signalingDown: true,
-          degraded: true,
-        },
+        signalingConnected: false,
         joinErrors: null,
         peers: [],
         lastQuality: [],
@@ -359,7 +320,7 @@ describe("PartyLobby", () => {
     await renderLobby(state);
     await userEvent.click(screen.getByText("Connection diagnostics"));
     expect(screen.getByText(/No relay socket is open/)).toBeInTheDocument();
-    expect(screen.getByText(/readyState 0/)).toBeInTheDocument();
+    expect(screen.getByText("Signaling: disconnected")).toBeInTheDocument();
   });
 
   it("does not show the pick-a-game blocker text near the buttons (10.7)", async () => {

@@ -1,4 +1,5 @@
-import { defaultRelayUrls, getRelaySockets, joinRoom } from "trystero";
+import { getRelaySockets, joinRoom } from "@trystero-p2p/ws-relay";
+import { signalUrl } from "./signal-url";
 import type {
   DataPayload,
   JoinRoomConfig,
@@ -9,7 +10,7 @@ import type {
   ActionProgressContext,
   Room,
   TurnServerConfig,
-} from "trystero";
+} from "@trystero-p2p/ws-relay";
 import type { ConnectionId, MemberId, MessageId, SessionId, Timestamp } from "@rocketcrab/protocol";
 import { LIMITS } from "@rocketcrab/protocol";
 import type {
@@ -26,12 +27,6 @@ import type {
 import { currentAppIdEnvironment, resolveAppId, type AppIdEnvironment } from "./app-id";
 import { TrysteroJoinError, fromRoomError } from "./errors";
 import {
-  isRelayFailureSignal,
-  relayDiagnosticsEqual,
-  snapshotRelays,
-  type RelayDiagnostics,
-} from "./relays";
-import {
   buildWireEnvelope,
   isBinaryPayload,
   normalizePayload,
@@ -44,7 +39,7 @@ import {
 /**
  * Trystero transport (P1): the real-party implementation of the
  * transport-neutral {@link NovaTransport} interface (ADR-0003), built on
- * Trystero 0.27.0's Nostr strategy.
+ * Trystero 0.27.0's self-hosted WebSocket relay strategy.
  *
  * Game-facing code never sees this class (engineering rule 1): it is the
  * production twin of `InMemoryTransport` (U5, @rocketcrab/testing) and must
@@ -52,8 +47,7 @@ import {
  * local test arena and over real parties.
  *
  * Design decisions (see the F5 findings and ADR-0003):
- * - **Nostr strategy** with maintained upstream relay selection/defaults;
- *   operators may explicitly override URLs or redundancy.
+ * - **Room-scoped signaling** through the configured edge Worker.
  * - **Environment-specific appId** (`rocketcrab-nova-dev` / `-prod`,
  *   `app-id.ts`) so dev and prod rooms never collide.
  * - **Identity admission**: per-room ephemeral Trystero identities carry Nova
@@ -108,7 +102,7 @@ export class TrysteroTransport implements NovaTransport {
   private roomUnsubscribers: Array<() => void> = [];
 
   private readonly listeners = new Map<keyof TransportEventMap, Set<unknown>>();
-  private readonly relayStateHandlers = new Set<(diagnostics: RelayDiagnostics) => void>();
+  private readonly relayStateHandlers = new Set<(connected: boolean) => void>();
   private peersList: TransportPeerInfo[] = [];
   /** trystero peerId → identity announced during the peer handshake. */
   private readonly identityByPeerId = new Map<string, PeerIdentity>();
@@ -131,7 +125,7 @@ export class TrysteroTransport implements NovaTransport {
 
   private room: Room | null = null;
   private action: MessageAction | null = null;
-  private readonly relayConfig: JoinRoomConfig["relayConfig"];
+  private signalRelayUrl = "";
   private readonly requestHandlers = new Map<string, TransportRequestHandler>();
   private readonly requestActions = new Map<string, RequestAction>();
   private readonly pendingRequests = new Map<string, TransportRequestOptions>();
@@ -144,27 +138,11 @@ export class TrysteroTransport implements NovaTransport {
   private joinWaiter: { resolve: () => void; reject: (error: Error) => void } | null = null;
   private joinTimers: Array<() => void> = [];
   private relayMonitorTimer: (() => void) | null = null;
-  private lastRelayDiagnostics: RelayDiagnostics | null = null;
-  /**
-   * Relay URL → epoch-ms of its most recent failure observation (an OK:false
-   * rejection or a NOTICE on the relay socket). Drives the per-relay
-   * `degraded` flag / `usableCount` in relay diagnostics (rocketcrab-ont.1).
-   */
-  private readonly relayFailures = new Map<string, number>();
-  /** Sockets already wired with a failure-observation listener (dedup). */
-  private wiredRelaySockets = new WeakSet<object>();
+  private signalingConnected: boolean | null = null;
 
   constructor(options: TrysteroTransportOptions) {
-    this.relayConfig =
-      options.relays !== undefined || options.redundancy !== undefined
-        ? {
-            ...(options.relays !== undefined ? { urls: [...options.relays] } : {}),
-            ...(options.redundancy !== undefined ? { redundancy: options.redundancy } : {}),
-          }
-        : undefined;
     this.options = {
       ...options,
-      relays: options.relays ?? defaultRelayUrls,
       relayConnectTimeoutMs: options.relayConnectTimeoutMs ?? 15_000,
       joinTimeoutMs: options.joinTimeoutMs ?? LIMITS.handshakeTimeoutMs,
       handshakeTimeoutMs: options.handshakeTimeoutMs ?? LIMITS.handshakeTimeoutMs,
@@ -175,12 +153,6 @@ export class TrysteroTransport implements NovaTransport {
     // first to elapse wins with its own category (F5: distinguish "still
     // connecting" — join_timeout — from "relay unreachable"). Defaults are
     // 15 s vs 30 s so relay failures surface first on the default profile.
-    if (options.redundancy !== undefined && options.redundancy < 1) {
-      throw new TrysteroJoinError({
-        category: "invalid_state",
-        message: "TrysteroTransport: redundancy must be at least 1.",
-      });
-    }
     this.selfMemberId = options.memberId;
     this.displayName = options.displayName;
     const env: AppIdEnvironment = options.env ?? currentAppIdEnvironment();
@@ -282,10 +254,10 @@ export class TrysteroTransport implements NovaTransport {
   }
 
   /** Subscribe to relay-state diagnostics; immediately replayed when set. */
-  onRelayStateChange(handler: (diagnostics: RelayDiagnostics) => void): () => void {
+  onRelayStateChange(handler: (connected: boolean) => void): () => void {
     this.relayStateHandlers.add(handler);
-    if (this.lastRelayDiagnostics !== null) {
-      handler(this.lastRelayDiagnostics);
+    if (this.signalingConnected !== null) {
+      handler(this.signalingConnected);
     }
     return () => {
       this.relayStateHandlers.delete(handler);
@@ -351,8 +323,17 @@ export class TrysteroTransport implements NovaTransport {
     }
     let room: Room;
     try {
-      room = joinRoom(this.buildConfig(), request.room);
+      const url = await signalUrl(
+        this.options.edgeOrigin ?? "http://localhost:8787",
+        this.appId,
+        request.room,
+      );
+      if (generation !== this.lifecycleGeneration)
+        throw new TrysteroJoinError({ category: "cancelled", message: "Join was cancelled." });
+      this.signalRelayUrl = url;
+      room = joinRoom(this.buildConfig(url), request.room);
     } catch (cause) {
+      if (generation !== this.lifecycleGeneration) throw cause;
       this.connectionState = "idle";
       this.emit("connection:state", "idle");
       this.roomName = "";
@@ -417,8 +398,17 @@ export class TrysteroTransport implements NovaTransport {
     this.selfConnectionId = `${this.selfIdBase}#${this.connectionEpoch}`;
     let nextRoom: Room;
     try {
-      nextRoom = joinRoom(this.buildConfig(), roomName);
+      const url = await signalUrl(
+        this.options.edgeOrigin ?? "http://localhost:8787",
+        this.appId,
+        roomName,
+      );
+      if (generation !== this.lifecycleGeneration)
+        throw new TrysteroJoinError({ category: "cancelled", message: "Reconnect was cancelled." });
+      this.signalRelayUrl = url;
+      nextRoom = joinRoom(this.buildConfig(url), roomName);
     } catch (cause) {
+      if (generation !== this.lifecycleGeneration) throw cause;
       this.connectionState = "disconnected";
       this.emit("connection:state", "disconnected");
       throw new TrysteroJoinError({
@@ -467,7 +457,7 @@ export class TrysteroTransport implements NovaTransport {
         message: `TrysteroTransport.resume: not suspended (state: ${this.connectionState}).`,
       });
     }
-    ++this.lifecycleGeneration;
+    const generation = ++this.lifecycleGeneration;
     const oldConnectionId = this.selfConnectionId;
     const roomName = this.roomName;
     this.connectionEpoch += 1;
@@ -476,8 +466,17 @@ export class TrysteroTransport implements NovaTransport {
     this.emit("connection:state", "joining");
     let room: Room;
     try {
-      room = joinRoom(this.buildConfig(), roomName);
+      const url = await signalUrl(
+        this.options.edgeOrigin ?? "http://localhost:8787",
+        this.appId,
+        roomName,
+      );
+      if (generation !== this.lifecycleGeneration)
+        throw new TrysteroJoinError({ category: "cancelled", message: "Resume was cancelled." });
+      this.signalRelayUrl = url;
+      room = joinRoom(this.buildConfig(url), roomName);
     } catch (cause) {
+      if (generation !== this.lifecycleGeneration) throw cause;
       this.connectionState = "suspended";
       this.emit("connection:state", "suspended");
       throw new TrysteroJoinError({
@@ -583,9 +582,9 @@ export class TrysteroTransport implements NovaTransport {
   // Diagnostics (adapter-specific; not part of the NovaTransport surface)
   // ------------------------------------------------------------------
 
-  /** Latest relay socket snapshot, or null before the first poll. */
-  getRelayDiagnostics(): RelayDiagnostics | null {
-    return this.lastRelayDiagnostics;
+  /** Signaling socket state, or null before the first poll. */
+  getSignalingConnected(): boolean | null {
+    return this.signalingConnected;
   }
 
   /** Aggregated adapter diagnostics (join errors, relays, quality). */
@@ -598,7 +597,7 @@ export class TrysteroTransport implements NovaTransport {
       room: this.roomName,
       sessionId: this.sessionId,
       appId: this.appId,
-      relays: this.lastRelayDiagnostics,
+      signalingConnected: this.signalingConnected,
       peers: [...this.peersList],
       joinErrors: [...this.joinErrors],
       lastQuality: [...this.qualitySamples],
@@ -644,12 +643,12 @@ export class TrysteroTransport implements NovaTransport {
   // Trystero wiring
   // ------------------------------------------------------------------
 
-  private buildConfig(): JoinRoomConfig {
-    const config: JoinRoomConfig = {
+  private buildConfig(url: string): JoinRoomConfig & { relayConfig: { urls: string[] } } {
+    const config: JoinRoomConfig & { relayConfig: { urls: string[] } } = {
       appId: this.appId,
       identity: "none",
       maxReceiveBytes: 8 * 1024 * 1024,
-      ...(this.relayConfig !== undefined ? { relayConfig: this.relayConfig } : {}),
+      relayConfig: { urls: [url] },
     };
     if (this.options.password !== undefined) {
       config.password = this.options.password;
@@ -996,60 +995,18 @@ export class TrysteroTransport implements NovaTransport {
   }
 
   private pollRelays(): void {
-    const sockets = getRelaySockets() as Record<string, { readonly readyState: number }>;
-    this.wireRelayFailureListeners(sockets);
-    const diagnostics = snapshotRelays(
-      sockets,
-      this.now(),
-      this.relayFailures,
-      this.relayConfig?.redundancy,
-    );
-    const changed =
-      this.lastRelayDiagnostics === null ||
-      !relayDiagnosticsEqual(this.lastRelayDiagnostics, diagnostics);
-    if (changed) {
-      this.lastRelayDiagnostics = diagnostics;
-      for (const handler of this.relayStateHandlers) {
-        handler(diagnostics);
-      }
-      this.options.onRelayStateChange?.(diagnostics);
+    const socket = getRelaySockets()[this.signalRelayUrl];
+    const connected = socket?.readyState === 1;
+    if (this.signalingConnected !== connected) {
+      this.signalingConnected = connected;
+      for (const handler of this.relayStateHandlers) handler(connected);
+      this.options.onRelayStateChange?.(connected);
     }
-    if (this.joinWaiter !== null && diagnostics.connectedCount > 0) {
+    if (this.joinWaiter !== null && connected) {
       this.settleJoin();
     }
     if (this.connectionState === "joining" || this.connectionState === "connected") {
       this.relayMonitorTimer = this.scheduleFn(() => this.pollRelays(), this.options.relayPollMs);
-    }
-  }
-
-  /**
-   * Attach a failure-observation listener to each live relay socket
-   * (Trystero exposes no callback for its "relay failure" warnings, but the
-   * sockets from `getRelaySockets()` are real WebSockets, so the adapter
-   * watches their messages directly — the same NOTICE / OK:false signals
-   * Trystero's own handler warns about). Listeners are attached once per
-   * socket object; reconnects surface a new socket and are picked up on the
-   * next poll. Test sockets without `addEventListener` are skipped.
-   */
-  private wireRelayFailureListeners(
-    sockets: Record<string, { readonly readyState: number }>,
-  ): void {
-    for (const [url, socket] of Object.entries(sockets)) {
-      const candidate = socket as { addEventListener?: unknown };
-      if (typeof candidate.addEventListener !== "function" || this.wiredRelaySockets.has(socket)) {
-        continue;
-      }
-      this.wiredRelaySockets.add(socket);
-      const onMessage = (event: { data: unknown }): void => {
-        if (isRelayFailureSignal(event.data)) {
-          this.relayFailures.set(url, this.now());
-        }
-      };
-      (
-        candidate as {
-          addEventListener: (type: string, handler: (event: { data: unknown }) => void) => void;
-        }
-      ).addEventListener("message", onMessage);
     }
   }
 
@@ -1068,10 +1025,7 @@ export class TrysteroTransport implements NovaTransport {
           this.failJoin(
             new TrysteroJoinError({
               category: "relay_unreachable",
-              message:
-                `No Nostr relay reached an open socket within ` +
-                `${this.options.relayConnectTimeoutMs}ms. Check network connectivity to the ` +
-                `configured relays (${this.options.relays.join(", ")}).`,
+              message: `Signaling did not connect within ${this.options.relayConnectTimeoutMs}ms. Check your network connection.`,
             }),
           );
         }, this.options.relayConnectTimeoutMs),
@@ -1217,9 +1171,7 @@ export class TrysteroTransport implements NovaTransport {
     this.connectionToPeerId.clear();
     this.peerJoinedAt.clear();
     this.deliverySeqCounters.clear();
-    this.lastRelayDiagnostics = null;
-    this.relayFailures.clear();
-    this.wiredRelaySockets = new WeakSet();
+    this.signalingConnected = null;
   }
 
   private assertConnected(): void {
@@ -1259,15 +1211,8 @@ interface PeerIdentity {
  */
 type InternalOptions = Omit<
   TrysteroTransportOptions,
-  | "relays"
-  | "redundancy"
-  | "relayConnectTimeoutMs"
-  | "joinTimeoutMs"
-  | "handshakeTimeoutMs"
-  | "relayPollMs"
-  | "historyLimit"
+  "relayConnectTimeoutMs" | "joinTimeoutMs" | "handshakeTimeoutMs" | "relayPollMs" | "historyLimit"
 > & {
-  relays: readonly string[];
   relayConnectTimeoutMs: number;
   joinTimeoutMs: number;
   handshakeTimeoutMs: number;
@@ -1293,7 +1238,7 @@ export interface TrysteroTransportDiagnostics {
   readonly room: string;
   readonly sessionId: SessionId | null;
   readonly appId: string;
-  readonly relays: RelayDiagnostics | null;
+  readonly signalingConnected: boolean | null;
   readonly peers: readonly TransportPeerInfo[];
   readonly joinErrors: readonly TrysteroJoinError[];
   readonly lastQuality: readonly ConnectionQualitySample[];
@@ -1329,10 +1274,8 @@ export interface TrysteroTransportOptions {
   readonly appId?: string;
   /** Environment flags used to derive the default appId (tests override). */
   readonly env?: AppIdEnvironment;
-  /** Optional operator override; omitted uses Trystero maintained defaults. */
-  readonly relays?: readonly string[];
-  /** Relay redundancy (default 5, F5 recommendation). */
-  readonly redundancy?: number;
+  /** Edge Worker origin used for room-scoped signaling. */
+  readonly edgeOrigin?: string;
   /**
    * TURN configuration hook (F5 verdict / P0 rocketcrab-23s). Credentials
    * are owned by M3 and never hardcoded here.
@@ -1359,7 +1302,7 @@ export interface TrysteroTransportOptions {
   /** Join-error observer (post-resolve errors; diagnostics telemetry). */
   readonly onJoinError?: (error: TrysteroJoinError) => void;
   /** Relay-state change observer (signaling-up/down diagnostics). */
-  readonly onRelayStateChange?: (diagnostics: RelayDiagnostics) => void;
+  readonly onRelayStateChange?: (connected: boolean) => void;
   /** Cap on retained join-error history (default 100). */
   readonly historyLimit?: number;
 }

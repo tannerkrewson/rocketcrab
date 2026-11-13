@@ -8,11 +8,9 @@ import type {
   TransportReconnectEvent,
   TransferProgress,
 } from "@rocketcrab/core";
-import type { RoomError } from "trystero";
+import type { RoomError } from "@trystero-p2p/ws-relay";
 import { TrysteroTransport } from "./trystero-transport";
 import type { TrysteroTransportOptions } from "./trystero-transport";
-import { RELAY_FAILURE_WINDOW_MS } from "./relays";
-import type { RelayDiagnostics } from "./relays";
 import type { TrysteroJoinError } from "./errors";
 
 /**
@@ -32,7 +30,8 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock("trystero", () => ({
+vi.mock("./signal-url", () => ({ signalUrl: async () => "wss://relay.damus.io" }));
+vi.mock("@trystero-p2p/ws-relay", () => ({
   joinRoom: mocks.joinRoom,
   getRelaySockets: () => mocks.relaySockets,
   defaultRelayUrls: ["wss://relay.damus.io"],
@@ -269,7 +268,7 @@ describe("TrysteroTransport construction", () => {
 });
 
 describe("TrysteroTransport join", () => {
-  it("joins with maintained upstream relay defaults rather than a pinned list", async () => {
+  it("joins with the room-scoped signaling relay", async () => {
     const { adapter, clock } = setup();
     mocks.relaySockets[RELAY] = { readyState: 0 };
     const room = makeFakeRoom();
@@ -293,7 +292,7 @@ describe("TrysteroTransport join", () => {
     const [config, roomName] = mocks.joinRoom.mock.calls[0]!;
     expect(roomName).toBe("ROOM");
     expect(config.appId).toBe("rocketcrab-nova-v027-dev");
-    expect(config.relayConfig).toBeUndefined();
+    expect(config.relayConfig).toEqual({ urls: [RELAY] });
     expect(config.maxReceiveBytes).toBe(8 * 1024 * 1024);
   });
 
@@ -314,6 +313,7 @@ describe("TrysteroTransport join", () => {
     mocks.relaySockets[RELAY] = { readyState: 0 };
 
     const promise = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    await Promise.resolve();
     clock.advance(5000);
     await expect(promise).rejects.toMatchObject({ category: "relay_unreachable" });
     expect(adapter.connectionState).toBe("idle");
@@ -329,6 +329,7 @@ describe("TrysteroTransport join", () => {
     mocks.relaySockets[RELAY] = { readyState: 0 };
 
     const promise = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    await Promise.resolve();
     clock.advance(10_000);
     await expect(promise).rejects.toMatchObject({ category: "join_timeout" });
     expect(adapter.connectionState).toBe("idle");
@@ -339,6 +340,7 @@ describe("TrysteroTransport join", () => {
     mocks.joinRoom.mockReturnValue(makeFakeRoom());
     mocks.relaySockets[RELAY] = { readyState: 0 };
     const first = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    await Promise.resolve();
     clock.advance(5000);
     await expect(first).rejects.toMatchObject({ category: "relay_unreachable" });
 
@@ -364,6 +366,7 @@ describe("TrysteroTransport join", () => {
     mocks.joinRoom.mockReturnValueOnce(oldRoom).mockReturnValueOnce(newRoom);
     mocks.relaySockets[RELAY] = { readyState: 0 };
     const first = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    await Promise.resolve();
     clock.advance(5000);
     await expect(first).rejects.toMatchObject({ category: "relay_unreachable" });
     mocks.relaySockets[RELAY] = { readyState: 1 };
@@ -389,6 +392,7 @@ describe("TrysteroTransport join", () => {
     mocks.joinRoom.mockReturnValue(room);
     mocks.relaySockets[RELAY] = { readyState: 0 };
     const first = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    await Promise.resolve();
     clock.advance(5000);
     await expect(first).rejects.toMatchObject({ category: "relay_unreachable" });
     const retry = adapter.join({ room: "ROOM", sessionId: "session-1" });
@@ -968,6 +972,7 @@ describe("TrysteroTransport join errors", () => {
     mocks.joinRoom.mockReturnValue(room);
     mocks.relaySockets[RELAY] = { readyState: 0 };
     const promise = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    await Promise.resolve();
     room.errorHandler!({
       code: "decrypt-failed",
       stage: "offer",
@@ -1010,27 +1015,27 @@ describe("TrysteroTransport relay diagnostics", () => {
     const room = makeFakeRoom();
     mocks.joinRoom.mockReturnValue(room);
     mocks.relaySockets[RELAY] = { readyState: 0 };
-    const changes: RelayDiagnostics[] = [];
-    adapter.onRelayStateChange((diagnostics) => {
-      changes.push(diagnostics);
+    const changes: boolean[] = [];
+    adapter.onRelayStateChange((connected) => {
+      changes.push(connected);
     });
     const promise = adapter.join({ room: "ROOM", sessionId: "session-1" });
     // Identity initialization is asynchronous in 0.27.
     await Promise.resolve();
     await Promise.resolve();
     await Promise.resolve();
+    await Promise.resolve();
     // first poll: CONNECTING
-    expect(adapter.getRelayDiagnostics()?.signalingDown).toBe(true);
+    expect(adapter.getSignalingConnected()).toBe(false);
     mocks.relaySockets[RELAY] = { readyState: 1 };
     clock.advance(1000);
     await promise;
-    expect(adapter.getRelayDiagnostics()?.connectedCount).toBe(1);
-    expect(adapter.getRelayDiagnostics()?.signalingDown).toBe(false);
+    expect(adapter.getSignalingConnected()).toBe(true);
 
     mocks.relaySockets[RELAY] = { readyState: 3 };
     clock.advance(1000);
-    expect(adapter.getRelayDiagnostics()?.signalingDown).toBe(true);
-    expect(changes.length).toBeGreaterThanOrEqual(2);
+    expect(adapter.getSignalingConnected()).toBe(false);
+    expect(changes).toEqual([false, true, false]);
   });
 
   it("stops polling after leave (engineering rule 22 cleanup)", async () => {
@@ -1038,69 +1043,25 @@ describe("TrysteroTransport relay diagnostics", () => {
     mocks.joinRoom.mockReturnValue(makeFakeRoom());
     mocks.relaySockets[RELAY] = { readyState: 1 };
     await joinConnected(adapter, clock);
-    expect(adapter.getRelayDiagnostics()).not.toBeNull();
+    expect(adapter.getSignalingConnected()).toBe(true);
     await adapter.leave();
     // advance far past several poll intervals: nothing should blow up and the
     // monitor must not reschedule (no new relay-state events)
     clock.advance(10_000);
-    expect(adapter.getRelayDiagnostics()).toBeNull();
+    expect(adapter.getSignalingConnected()).toBeNull();
   });
 
-  it("marks a rejecting relay degraded and reports usable count (rocketcrab-ont.1)", async () => {
-    const { adapter, clock } = setup({ redundancy: 1 });
-    mocks.joinRoom.mockReturnValue(makeFakeRoom());
-    // A real WebSocket-like relay socket: message listeners wire on poll.
-    const listeners = new Set<(event: { data: unknown }) => void>();
-    const socket = {
-      readyState: 1,
-      addEventListener: (_type: string, handler: (event: { data: unknown }) => void) => {
-        listeners.add(handler);
-      },
-      fire: (data: unknown) => {
-        for (const handler of listeners) {
-          handler({ data });
-        }
-      },
-    };
-    mocks.relaySockets[RELAY] = socket;
-    const changes: RelayDiagnostics[] = [];
-    adapter.onRelayStateChange((diagnostics) => {
-      changes.push(diagnostics);
-    });
+  it("ignores other rooms' sockets when checking signaling", async () => {
+    const { adapter, clock } = setup({ relayConnectTimeoutMs: 5000 });
+    const room = makeFakeRoom();
+    mocks.joinRoom.mockReturnValue(room);
+    mocks.relaySockets[RELAY] = { readyState: 0 };
+    mocks.relaySockets["ws://other-room"] = { readyState: 1 };
     const promise = adapter.join({ room: "ROOM", sessionId: "session-1" });
-    // first poll wires the listener and settles the join (socket OPEN)
-    clock.advance(1000);
-    await promise;
-    expect(adapter.getRelayDiagnostics()?.usableCount).toBe(1);
-
-    // The relay rejects an event submission (the same signal Trystero's
-    // console "relay failure from ..." warning watches).
-    socket.fire(["OK", "event-1", false, "blocked: kind 22774 not permitted"]);
-    clock.advance(1000);
-    const degraded = adapter.getRelayDiagnostics();
-    expect(degraded?.connectedCount).toBe(1);
-    expect(degraded?.usableCount).toBe(0);
-    expect(degraded?.degradedCount).toBe(1);
-    expect(degraded?.relays[0]).toMatchObject({ connected: true, degraded: true });
-    // usable 0 < redundancy 5 → overall degraded
-    expect(degraded?.degraded).toBe(true);
-    // the change was pushed through onRelayStateChange
-    expect(changes.some((entry) => entry.usableCount === 0 && entry.degraded)).toBe(true);
-
-    // NOTICE is a failure signal too.
-    socket.fire(["NOTICE", "sub", "rate limited"]);
-    clock.advance(1000);
-    expect(adapter.getRelayDiagnostics()?.usableCount).toBe(0);
-
-    // An accepted event is NOT a failure; the degraded flag still decays
-    // only after the failure window passes.
-    socket.fire(["OK", "event-2", true, "saved"]);
-    clock.advance(1000);
-    expect(adapter.getRelayDiagnostics()?.usableCount).toBe(0);
-    clock.advance(RELAY_FAILURE_WINDOW_MS);
-    expect(adapter.getRelayDiagnostics()?.usableCount).toBe(1);
-    expect(adapter.getRelayDiagnostics()?.relays[0]?.degraded).toBe(false);
-    expect(adapter.getRelayDiagnostics()?.degraded).toBe(false);
+    await Promise.resolve();
+    clock.advance(5000);
+    await expect(promise).rejects.toMatchObject({ category: "relay_unreachable" });
+    expect(room.leave).toHaveBeenCalled();
   });
 });
 

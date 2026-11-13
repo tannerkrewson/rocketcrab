@@ -1875,20 +1875,7 @@ describe("party engine — relay diagnostics surfacing (rocketcrab-ont.1)", () =
       selfConnectionId: "conn-a",
       room: "room-1",
       sessionId: "session-1",
-      relays: {
-        relays: [
-          { url: "wss://nos.lol", readyState: 1, connected: true, degraded: false },
-          { url: "wss://relay.damus.io", readyState: 1, connected: true, degraded: false },
-          { url: "wss://relay.nostr.info", readyState: 1, connected: true, degraded: false },
-        ],
-        total: 3,
-        connectedCount: 3,
-        usableCount: 3,
-        degradedCount: 0,
-        signalingDown: false,
-        degraded: false,
-        at: 1_000,
-      },
+      signalingConnected: true,
       joinErrors: [],
       peers: [],
       lastQuality: [],
@@ -1908,51 +1895,16 @@ describe("party engine — relay diagnostics surfacing (rocketcrab-ont.1)", () =
 
     const diagnostics = player.engine.getState().diagnostics;
     expect(diagnostics).not.toBeNull();
-    expect(diagnostics?.relays).toEqual([
-      { url: "wss://nos.lol", readyState: 1, connected: true, degraded: false },
-      { url: "wss://relay.damus.io", readyState: 1, connected: true, degraded: false },
-      { url: "wss://relay.nostr.info", readyState: 1, connected: true, degraded: false },
-    ]);
-    expect(diagnostics?.relayHealth).toEqual({
-      total: 3,
-      connected: 3,
-      usable: 3,
-      degradedCount: 0,
-      signalingDown: false,
-      degraded: false,
-    });
+    expect(diagnostics?.signalingConnected).toBe(true);
   });
 
-  it("surfaces degraded (connected-but-rejecting) relays and the usable count", async () => {
+  it("surfaces disconnected signaling", async () => {
     const world = makeWorld();
     const snapshot = makeRelaySnapshot();
-    snapshot.relays.relays[2] = {
-      url: "wss://relay.nostr.info",
-      readyState: 1,
-      connected: true,
-      degraded: true,
-    };
-    snapshot.relays.usableCount = 2;
-    snapshot.relays.degradedCount = 1;
-    snapshot.relays.degraded = true; // usable 2 < redundancy 5
-    world.factory.createPrivateTransport = (identity) => {
-      const transport = world.hub.createTransport(identity);
-      (transport as unknown as { getDiagnostics?: () => unknown }).getDiagnostics = () => snapshot;
-      return transport;
-    };
-    const player = makePlayer(world, "host");
+    snapshot.signalingConnected = false;
+    const player = makePlayer(world, "host", { diagnostics: () => snapshot });
     await runCreate(player, world);
-
-    const diagnostics = player.engine.getState().diagnostics;
-    const nostrInfo = diagnostics?.relays?.find((relay) => relay.url === "wss://relay.nostr.info");
-    expect(nostrInfo).toMatchObject({ connected: true, degraded: true });
-    expect(diagnostics?.relayHealth).toMatchObject({
-      total: 3,
-      connected: 3,
-      usable: 2,
-      degradedCount: 1,
-      degraded: true,
-    });
+    expect(player.engine.getState().diagnostics?.signalingConnected).toBe(false);
   });
 
   it("uses the injected diagnostics provider when present (test/dev path)", async () => {
@@ -1964,13 +1916,7 @@ describe("party engine — relay diagnostics surfacing (rocketcrab-ont.1)", () =
     await runCreate(player, world);
 
     const diagnostics = player.engine.getState().diagnostics;
-    expect(diagnostics?.relays?.[0]).toEqual({
-      url: "wss://nos.lol",
-      readyState: 1,
-      connected: true,
-      degraded: false,
-    });
-    expect(diagnostics?.relayHealth?.usable).toBe(3);
+    expect(diagnostics?.signalingConnected).toBe(true);
   });
 
   it("subscribes to onRelayStateChange and re-emits live relay state", async () => {
@@ -1995,29 +1941,14 @@ describe("party engine — relay diagnostics surfacing (rocketcrab-ont.1)", () =
     };
     const player = makePlayer(world, "host");
     await runCreate(player, world);
-    expect(player.engine.getState().diagnostics?.relays).not.toBeNull();
-
-    // A connected relay starts rejecting; the transport pushes the change.
-    snapshot.relays.relays[2] = {
-      url: "wss://relay.nostr.info",
-      readyState: 1,
-      connected: true,
-      degraded: true,
-    };
-    snapshot.relays.usableCount = 2;
-    snapshot.relays.degradedCount = 1;
-    snapshot.relays.degraded = true;
-
-    const seen: Array<{ usable: number }> = [];
+    expect(player.engine.getState().diagnostics?.signalingConnected).toBe(true);
+    snapshot.signalingConnected = false;
+    const seen: Array<boolean | null> = [];
     player.engine.onState((state) => {
-      seen.push({ usable: state.diagnostics?.relayHealth?.usable ?? -1 });
+      seen.push(state.diagnostics?.signalingConnected ?? null);
     });
     (relayHandler as (() => void) | null)?.();
-    // The engine re-emitted with the degraded relay state (push, not poll).
-    expect(seen.at(-1)?.usable).toBe(2);
-    const nostrInfo = player.engine
-      .getState()
-      .diagnostics?.relays?.find((relay) => relay.url === "wss://relay.nostr.info");
-    expect(nostrInfo?.degraded).toBe(true);
+    expect(seen.at(-1)).toBe(false);
+    expect(player.engine.getState().diagnostics?.signalingConnected).toBe(false);
   });
 });

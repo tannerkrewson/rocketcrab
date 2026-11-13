@@ -1,7 +1,7 @@
 # @rocketcrab/trystero-transport
 
 P1 — the real-party implementation of the transport-neutral `NovaTransport`
-interface (ADR-0003), built on **Trystero 0.26.0** (Nostr strategy). This is
+interface (ADR-0003), built on **Trystero 0.27.0** (WebSocket relay strategy). This is
 the only package allowed to import Trystero (root oxlint
 `no-restricted-imports`); generated games never see it (engineering rule 1).
 
@@ -11,9 +11,8 @@ behaves identically in the local test arena and over real parties.
 
 ## Design summary
 
-- **Room creation**: Nostr with Trystero-maintained relay selection and
-  redundancy. Explicit operator URL/redundancy overrides remain available;
-  probe-era pinned URLs are no longer production defaults.
+- **Room creation**: the edge Worker's room-scoped WebSocket signaling relay,
+  derived from the configured edge origin, app ID and room ID.
 - **App ID**: environment-specific — `rocketcrab-nova-dev` by default,
   `rocketcrab-nova-prod` for production builds (`vite build`). Every peer in
   a party must share the appId; override via options for e2e.
@@ -46,7 +45,7 @@ behaves identically in the local test arena and over real parties.
   `joinTimeoutMs` (30 s). Errors after `join()` resolves (e.g. password
   mismatch during the slow discovery phase) go to the `onJoinError` observer
   and `getDiagnostics()`.
-- **Diagnostics**: `getRelayDiagnostics()`, `onRelayStateChange()`,
+- **Diagnostics**: `getSignalingConnected()`, `onRelayStateChange()`,
   `getDiagnostics()`, `ping(connectionId)`, `sampleQuality()`.
 - **TURN**: `turnConfig` option hook only — never hardcoded credentials
   (owned with M3 / Blocker B2).
@@ -79,5 +78,4 @@ cross-network and physical-device reliability remain release gates.
 - `src/contract.test.ts` — the shared contract suite, run against both
   `InMemoryTransport` and this adapter.
 - `e2e-trystero/` at the repo root — real-browser integration tests over
-  real relays + WebRTC (run `npm run test:e2e:trystero`; skips when the
-  external relays are unreachable).
+  the local edge relay + WebRTC (run `npm run test:e2e:trystero`).

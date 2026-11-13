@@ -1,5 +1,5 @@
 import { Alert } from "@heroui/react";
-import { Activity, RefreshCw, Wifi } from "lucide-react";
+import { Activity, RefreshCw } from "lucide-react";
 import { Badge } from "../ui/Badge";
 import { Button } from "../ui/Button";
 import { useState } from "react";
@@ -48,11 +48,6 @@ export function PartyDiagnosticsPanel({
   if (diagnostics === null) {
     return null;
   }
-  const relayCount = diagnostics.relays?.length ?? 0;
-  const connectedRelays = diagnostics.relays?.filter((relay) => relay.connected).length ?? 0;
-  const usableRelays =
-    diagnostics.relays?.filter((relay) => relay.connected && !relay.degraded).length ?? 0;
-  const relayHealth = diagnostics.relayHealth;
 
   return (
     <details
@@ -64,34 +59,17 @@ export function PartyDiagnosticsPanel({
         <Activity className="h-4 w-4" aria-hidden="true" />
         Connection diagnostics
         <Badge>{connectionLabel(diagnostics.connectionState)}</Badge>
-        <Badge
-          title={
-            relayCount === 0
-              ? "No relay sockets observed yet"
-              : `${usableRelays}/${relayCount} relays usable (open and accepting party traffic); ${connectedRelays} open sockets`
-          }
-        >
-          {relayCount === 0 ? "0 relays" : `${usableRelays}/${relayCount} relays`}
+        <Badge>
+          Signaling:{" "}
+          {diagnostics.signalingConnected === null
+            ? "unknown"
+            : diagnostics.signalingConnected
+              ? "connected"
+              : "disconnected"}
         </Badge>
-        {relayHealth !== null && relayHealth.degraded ? (
-          <Badge color="warning" title="Usable relays below redundancy">
-            degraded
-          </Badge>
-        ) : null}
       </summary>
       <div className="flex flex-col gap-2 p-4 pt-0 text-xs">
-        {relayHealth !== null && relayHealth.degraded ? (
-          <Alert status="warning" role="alert" className="mx-auto w-fit text-xs">
-            <Alert.Indicator />
-            <Alert.Content>
-              <Alert.Description>
-                Signaling degraded: {relayHealth.usable} of {relayHealth.total} relays usable —
-                connected relays are rejecting or throttling party messages.
-              </Alert.Description>
-            </Alert.Content>
-          </Alert>
-        ) : null}
-        {relayHealth !== null && relayHealth.signalingDown ? (
+        {diagnostics.signalingConnected === false ? (
           <Alert status="danger" role="alert" className="mx-auto w-fit text-xs">
             <Alert.Indicator />
             <Alert.Content>
@@ -112,46 +90,6 @@ export function PartyDiagnosticsPanel({
           <span>session: {diagnostics.sessionId ?? "—"}</span>
           <span title="TURN credential state (P0)">turn: {diagnostics.turn ?? "—"}</span>
         </div>
-        {diagnostics.relays !== null ? (
-          <div className="flex flex-col gap-1">
-            <span className="font-bold text-foreground/70">Relay sockets</span>
-            <ul className="flex flex-col gap-1">
-              {diagnostics.relays.length === 0 ? (
-                <li className="text-foreground/50">No relay sockets observed yet.</li>
-              ) : (
-                diagnostics.relays.map((relay) => (
-                  <li key={relay.url} className="flex items-center gap-2">
-                    {relay.connected && !relay.degraded ? (
-                      <span title="Open and accepting party traffic">
-                        <Wifi className="h-3 w-3 text-success" aria-hidden="true" />
-                      </span>
-                    ) : relay.connected && relay.degraded ? (
-                      <span title="Open but rejecting/throttling party traffic">
-                        <Wifi className="h-3 w-3 text-warning" aria-hidden="true" />
-                      </span>
-                    ) : (
-                      <Wifi className="h-3 w-3 text-danger" aria-hidden="true" />
-                    )}
-                    <span className="break-all">{relay.url}</span>
-                    <span
-                      className={`ml-auto whitespace-nowrap ${
-                        relay.connected && relay.degraded
-                          ? "font-bold text-warning"
-                          : "text-foreground/50"
-                      }`}
-                    >
-                      {relay.connected && !relay.degraded
-                        ? "usable"
-                        : relay.connected && relay.degraded
-                          ? "rejecting"
-                          : `readyState ${relay.readyState}`}
-                    </span>
-                  </li>
-                ))
-              )}
-            </ul>
-          </div>
-        ) : null}
         {diagnostics.joinErrors !== null && diagnostics.joinErrors.length > 0 ? (
           <div className="flex flex-col gap-1">
             <span className="font-bold text-foreground/70">Join errors</span>

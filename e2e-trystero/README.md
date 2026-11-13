@@ -1,7 +1,7 @@
 # Trystero transport e2e (P1)
 
 Real-browser integration smoke tests for `@rocketcrab/trystero-transport`.
-External-network tests, deliberately NOT part of the CI smoke run
+Local-relay tests, deliberately NOT part of the CI smoke run
 (`npm run test:e2e`); run them explicitly with:
 
 ```sh
@@ -16,7 +16,7 @@ npm run test:e2e:trystero
 - Two specs, modeled on the F5 spike's Playwright approach (vite dev server,
   multiple pages in one Chromium, HTTPS + `ignoreHTTPSErrors` when locally
   trusted certs are present at `certs/key.pem` + `certs/cert.pem`):
-  1. Two pages discover each other through real Nostr relays, exchange a
+  1. Two pages discover each other through the local edge signaling relay, exchange a
      structured message, a 256 KiB binary payload, and a 1 MiB large string
      with progress events on both sides, ping each other, then leave.
   2. Relay diagnostics + connection quality are observable after joining.
@@ -25,13 +25,10 @@ npm run test:e2e:trystero
      admitted joiner requests and receives it byte-identical, and the
      SHA-256 digest + byte count verify before launch.
 
-## Resiliency
+## Local relay
 
-If the external relays are unreachable, the adapter's `join()` rejects with
-`relay_unreachable` (F5 finding F5 — Trystero gives no structured join error
-for relay failure, so the adapter detects it itself) and the specs SKIP
-instead of failing. Run these when you have network access to public Nostr
-relays; expect discovery to take ~20-25 s (F5 F3).
+Playwright starts the local edge Worker on port 18787. Signaling failures fail
+the tests; they are never skipped when the relay is unreachable.
 
 ## HTTPS
 

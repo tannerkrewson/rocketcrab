@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { configuredRelays, createTrysteroPartyTransportFactory } from "./transport-factory";
+import { createTrysteroPartyTransportFactory } from "./transport-factory";
 
 /**
  * Transport-factory tests (task rocketcrab-23s, P0): the real-party factory
@@ -38,24 +38,6 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs();
-});
-
-describe("configuredRelays", () => {
-  it("defaults to no override", () => {
-    expect(configuredRelays()).toEqual([]);
-  });
-
-  it("keeps valid ws/wss URLs, normalizes, dedupes, and ignores invalid entries", () => {
-    vi.stubEnv(
-      "VITE_TRYSTERO_RELAYS",
-      " wss://nos.lol,https://evil.example,wss://nostr.mom,,wss://nos.lol,not a url, ws://localhost:7777 ",
-    );
-    expect(configuredRelays()).toEqual([
-      "wss://nos.lol/",
-      "wss://nostr.mom/",
-      "ws://localhost:7777/",
-    ]);
-  });
 });
 
 describe("createTrysteroPartyTransportFactory", () => {
@@ -101,13 +83,13 @@ describe("createTrysteroPartyTransportFactory", () => {
     expect(second.turnConfig).toBe(TURN_CONFIG);
   });
 
-  it("applies an explicit relay override to both room transports", () => {
-    const relays = ["wss://relay.example/"];
-    const factory = createTrysteroPartyTransportFactory({ relays });
+  it("passes the configured edge origin to both room transports", () => {
+    vi.stubEnv("VITE_EDGE_ORIGIN", "https://edge.example");
+    const factory = createTrysteroPartyTransportFactory();
     factory.createPrivateTransport({ memberId: "m1", password: "pw" });
     factory.createPrivateTransport({ memberId: "m2", password: "pw" });
     for (const options of mocks.constructed as Array<Record<string, unknown>>) {
-      expect(options.relays).toEqual(relays);
+      expect(options.edgeOrigin).toBe("https://edge.example");
     }
   });
 

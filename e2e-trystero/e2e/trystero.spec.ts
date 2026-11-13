@@ -1,11 +1,4 @@
-// P1 real-browser integration smoke tests (external network; resilient).
-//
-// These run the real TrysteroTransport adapter between pages on one machine
-// through public Nostr relays + WebRTC — the F5 spike's approach (vite dev
-// server, HTTPS + ignoreHTTPSErrors when certs are present, multiple pages
-// in one Chromium). If the external relays are unreachable, the adapter's
-// join fails with `relay_unreachable` (F5 finding F5 — the adapter detects
-// relay failure itself) and the specs SKIP instead of failing.
+// Real-browser integration tests through the local edge relay and WebRTC.
 import { expect, test } from "@playwright/test";
 import type { Browser, Page } from "@playwright/test";
 
@@ -23,7 +16,7 @@ interface HarnessState {
   connectionState: string;
   room: string | null;
   peers: PeerSummary[];
-  relays: Array<{ url: string; readyState: number; connected: boolean }> | null;
+  signalingConnected: boolean | null;
   messages: Array<{ channel: string; senderMemberId: string; kind: string; size: number }>;
   progress: Array<{ dir: string; fraction: number; channel: string }>;
   pings: number[];
@@ -33,7 +26,6 @@ interface HarnessState {
 interface JoinOptions {
   room: string;
   appId?: string;
-  relays?: string[];
   relayConnectTimeoutMs?: number;
   joinTimeoutMs?: number;
 }
@@ -56,8 +48,6 @@ declare global {
 }
 
 const JOINED = "joined";
-const UNREACHABLE = "relay_unreachable";
-const JOIN_TIMEOUT = "join_timeout";
 
 function randRoom(): string {
   return `p1-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
@@ -90,7 +80,7 @@ async function waitMessages(page: Page, count: number, timeout = 30_000): Promis
   );
 }
 
-/** Join a room through the adapter; SKIP the test when relays are unreachable. */
+/** Join a room through the adapter; local signaling failures fail the test. */
 async function enter(page: Page, room: string, join: "create" | "join"): Promise<void> {
   const result = await page.evaluate(
     ([r, mode]) =>
@@ -99,14 +89,6 @@ async function enter(page: Page, room: string, join: "create" | "join"): Promise
         : window.__harness.joinRoomByCode({ room: r }),
     [room, join] as const,
   );
-  if (result === UNREACHABLE) {
-    test.skip(true, "external Nostr relays unreachable — skipping external-network smoke");
-    return;
-  }
-  if (result === JOIN_TIMEOUT) {
-    test.skip(true, "join timed out (external relays slow/unreachable) — skipping smoke");
-    return;
-  }
   expect(result).toBe(JOINED);
 }
 
@@ -120,7 +102,6 @@ test("two pages join through the Trystero adapter, exchange messages, ping, and 
   await enter(p1, room, "create");
   await enter(p2, room, "join");
 
-  // Discovery over real relays takes ~20-25 s (F5 F3); allow generous time.
   await Promise.all([waitPeers(p1, 1, 120_000), waitPeers(p2, 1, 120_000)]);
 
   const s1 = await stateOf(p1);
@@ -198,11 +179,10 @@ test("adapter reports relay diagnostics and connection quality after join", asyn
   await enter(p2, room, "join");
   await Promise.all([waitPeers(p1, 1, 120_000), waitPeers(p2, 1, 120_000)]);
 
-  const relays = await p1.evaluate(() => window.__harness.getState().relays);
-  expect(relays).not.toBeNull();
-  expect(relays!.length).toBeGreaterThanOrEqual(1);
-  // join() only resolves once a relay socket is OPEN, so at least one is up
-  expect(relays!.some((relay) => relay.connected)).toBe(true);
+  const signalingConnected = await p1.evaluate(
+    () => window.__harness.getState().signalingConnected,
+  );
+  expect(signalingConnected).toBe(true);
 
   const ping = await p1.evaluate(() => window.__harness.ping());
   expect(ping).not.toBeNull();

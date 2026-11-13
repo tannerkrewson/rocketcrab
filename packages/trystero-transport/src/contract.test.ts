@@ -7,7 +7,7 @@ import type {
 } from "@rocketcrab/core";
 import { InMemoryTransportHub } from "@rocketcrab/testing";
 import type { InMemoryTransport } from "@rocketcrab/testing";
-import type { DataPayload, RequestAction, RequestOptions } from "trystero";
+import type { DataPayload, RequestAction, RequestOptions } from "@trystero-p2p/ws-relay";
 import { TrysteroTransport } from "./trystero-transport";
 
 /**
@@ -103,7 +103,8 @@ const mocks = vi.hoisted(() => {
   return { relaySockets, joinRoom: vi.fn() };
 });
 
-vi.mock("trystero", () => ({
+vi.mock("./signal-url", () => ({ signalUrl: async () => "wss://relay.damus.io" }));
+vi.mock("@trystero-p2p/ws-relay", () => ({
   joinRoom: mocks.joinRoom,
   getRelaySockets: () => mocks.relaySockets,
   defaultRelayUrls: ["wss://default.example"],
