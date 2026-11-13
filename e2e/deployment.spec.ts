@@ -8,9 +8,8 @@ import { expect, test } from "@playwright/test";
  *    query strings (the join route imports the fragment into memory and
  *    strips it from history — apps/nova/src/lib/party/invite-import.ts).
  * 2. SPA fallback routing: reloading a normal Nova route must render the
- *    app again. In production the deploy workflow ships a byte-copy of
- *    index.html as 404.html, which GitHub Pages serves for unknown paths
- *    (checked on the built output by scripts/verify-static-deploy.mjs).
+ *    app again. Cloudflare's static assets SPA fallback serves the shell
+ *    in production; this test checks client routing on the local server.
  */
 test.describe("static deployment properties", () => {
   test("invite fragment is never sent in any HTTP request", async ({ page }) => {

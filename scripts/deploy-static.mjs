@@ -27,5 +27,7 @@ run("node", [
   target,
   "--runtime-origin",
   origins.runtime,
+  "--main-origin",
+  origins.nova,
 ]);
 run("npx", ["--yes", "wrangler@4.161.0", "deploy", "--config", `deploy/${target}/wrangler.toml`]);

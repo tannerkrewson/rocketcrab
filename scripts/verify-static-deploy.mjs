@@ -39,6 +39,7 @@ const args = parseArgs(process.argv.slice(2));
 const origin = args.origin;
 const runtimeOrigin = args.runtimeOrigin ?? "";
 const requirePagesFallback = args.pages === true;
+const mainOrigin = args.mainOrigin ?? "";
 if (origin !== "nova" && origin !== "runtime") {
   fail(`--origin must be "nova" or "runtime" (got "${origin}")`);
 }
@@ -46,6 +47,8 @@ if (origin !== "nova" && origin !== "runtime") {
 const DIST = fileURLToPath(new URL(`../apps/${origin}/dist`, import.meta.url));
 const indexHtml = readFile(join(DIST, "index.html"), `${origin} index.html`);
 const errors = [];
+const headers = readFile(join(DIST, "_headers"), `${origin} _headers`);
+const headerCsp = /^\s*Content-Security-Policy:\s*(.+)$/im.exec(headers)?.[1] ?? "";
 
 /** Record a check result and remember failures (exit non-zero at the end). */
 function expect(description, condition, detail = "") {
@@ -55,13 +58,19 @@ function expect(description, condition, detail = "") {
   }
 }
 
+expect("CSP response header present", headerCsp !== "");
 if (origin === "nova") {
+  expect("main CSP denies framing", /(?:^|;)\s*frame-ancestors\s+'none'\s*(?:;|$)/.test(headerCsp));
   // Strict main-origin policy: CSP delivered as a build-time meta tag.
   const cspMatch = /<meta[^>]*http-equiv="Content-Security-Policy"[^>]*>/i.exec(indexHtml);
   expect("CSP meta tag present", cspMatch !== null);
   if (cspMatch !== null) {
     const contentMatch = /content="([^"]*)"/i.exec(cspMatch[0]);
     const csp = decodeHtmlEntities(contentMatch?.[1] ?? "");
+    expect(
+      "header CSP matches meta plus frame-ancestors",
+      headerCsp === `${csp}; frame-ancestors 'none'`,
+    );
     if (runtimeOrigin === "") {
       expect(
         "runtime origin supplied for a nova deploy",
@@ -97,7 +106,13 @@ if (origin === "nova") {
   }
   expect("referrer meta (no-referrer)", isNoReferrerMeta(indexHtml));
 } else {
-  // Runtime origin: intentionally permissive — no CSP, no service workers.
+  expect(
+    "runtime CSP permits only the main origin to frame it",
+    mainOrigin !== "" &&
+      /(?:^|;)\s*frame-ancestors\s+([^;]+)/.exec(headerCsp)?.[1].trim() ===
+        new URL(mainOrigin).origin,
+  );
+  // Runtime origin: intentionally permissive — no CSP meta, no service workers.
   expect(
     "runtime has NO CSP meta (permissive by design)",
     !/<meta[^>]*http-equiv="Content-Security-Policy"[^>]*>/i.test(indexHtml),
@@ -172,8 +187,10 @@ function parseArgs(argv) {
       out.pages = true;
       continue;
     }
-    if (arg === "--origin" || arg === "--runtime-origin") {
-      out[arg === "--origin" ? "origin" : "runtimeOrigin"] = argv[i + 1] ?? "";
+    if (arg === "--origin" || arg === "--runtime-origin" || arg === "--main-origin") {
+      const key =
+        arg === "--origin" ? "origin" : arg === "--runtime-origin" ? "runtimeOrigin" : "mainOrigin";
+      out[key] = argv[i + 1] ?? "";
       i += 1;
     }
   }
