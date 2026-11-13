@@ -10,6 +10,10 @@ settings) in this runbook.
 Static assets-only Worker configurations are staged in `deploy/nova/wrangler.toml`
 and `deploy/runtime/wrangler.toml`. They have not been deployed; the app
 uses SPA fallback and the runtime uses 404 handling for unknown paths.
+Vite emits each Worker's `_headers` in its asset directory; Cloudflare's
+[static asset headers documentation](https://developers.cloudflare.com/workers/static-assets/headers/)
+confirms this mechanism (checked 2026-11-12). The runtime blocks all framing
+unless `VITE_MAIN_ORIGIN` is set at build time.
 
 ## What the Worker does
 

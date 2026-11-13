@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig } from "vite";
+import { defineConfig, type Plugin } from "vite";
 
 // Local HTTPS dev certs (scripts/gen-certs.mjs) — same mechanism as the
 // nova app (apps/nova/vite.config.ts). `npm run dev:https` starts the dev
@@ -23,6 +23,22 @@ function httpsServerConfig(mode: string) {
   return { key: KEY, cert: CERT };
 }
 
+function runtimeHeaders(): Plugin {
+  return {
+    name: "runtime-headers",
+    apply: "build",
+    generateBundle() {
+      const rawOrigin = process.env.VITE_MAIN_ORIGIN?.trim() ?? "";
+      const mainOrigin = rawOrigin === "" ? "'none'" : new URL(rawOrigin).origin;
+      this.emitFile({
+        type: "asset",
+        fileName: "_headers",
+        source: `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  Cross-Origin-Opener-Policy: same-origin\n  Permissions-Policy: camera=(self), microphone=(self), clipboard-read=(self), clipboard-write=(self), fullscreen=(self)\n  Content-Security-Policy: default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors ${mainOrigin}; object-src 'none'; base-uri 'self'\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n`,
+      });
+    },
+  };
+}
+
 // Static origin for the isolated game runtime.
 // In production this is deployed to a separate origin (runtime.nova.example).
 // The dev server listens on a distinct port so both origins run locally.
@@ -31,6 +47,7 @@ function httpsServerConfig(mode: string) {
 // separate origin, secret-free content, no service workers, and the strict
 // main-origin policy; docs/architecture/deployment.md).
 export default defineConfig(({ mode }) => ({
+  plugins: [runtimeHeaders()],
   server: {
     port: 5174,
     https: httpsServerConfig(mode),

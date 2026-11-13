@@ -31,8 +31,8 @@ function httpsServerConfig(mode: string) {
 /**
  * Strict SPA CSP baked into the built index.html (M2; ADR-0001, ADR-0008).
  *
- * GitHub Pages cannot send custom response headers, so the main origin's
- * strict policy is delivered as a CSP meta tag produced at build time. The
+ * The main origin's strict policy is emitted as a CSP meta tag and as
+ * a Cloudflare static asset header from the same policy. The
  * runtime iframe is allowed only from the configured runtime origin
  * (`VITE_RUNTIME_ORIGIN`, set by the deploy workflow); without it,
  * `frame-src` falls back to `default-src 'self'` and the runtime frame is
@@ -50,36 +50,7 @@ function cspMetaPlugin(): Plugin {
     name: "nova-csp-meta",
     apply: "build",
     transformIndexHtml(html) {
-      const rawOrigin = process.env.VITE_RUNTIME_ORIGIN?.trim() ?? "";
-      if (rawOrigin === "") {
-        console.warn(
-          "[nova-csp-meta] VITE_RUNTIME_ORIGIN is not set: frame-src is omitted, so the " +
-            "runtime iframe will be blocked by the strict CSP. The deploy workflow sets " +
-            "this for every production deploy (docs/architecture/deployment.md).",
-        );
-      }
-      const runtimeOrigin = rawOrigin === "" ? "" : new URL(rawOrigin).origin;
-      const frameSources = [
-        ...(runtimeOrigin === "" ? [] : [runtimeOrigin]),
-        ...CLASSIC_FRAME_ORIGINS,
-      ];
-      // Nova edge Worker (Classic relay + TURN mint), when the build sets one.
-      const edgeOrigin = process.env.VITE_EDGE_ORIGIN?.trim() ?? "";
-      const edgeConnectSrc = edgeOrigin === "" ? "" : ` ${new URL(edgeOrigin).origin}`;
-      const csp = [
-        "default-src 'self'",
-        "script-src 'self'",
-        "style-src 'self' 'unsafe-inline'",
-        "img-src 'self' data: blob:",
-        "font-src 'self' data:",
-        `connect-src 'self' wss: ws:${edgeConnectSrc}`,
-        "media-src 'self' blob:",
-        "worker-src 'self' blob:",
-        "object-src 'none'",
-        "base-uri 'self'",
-        "form-action 'self'",
-        ...(frameSources.length === 0 ? [] : [`frame-src ${frameSources.join(" ")}`]),
-      ].join("; ");
+      const csp = buildCsp();
       return {
         html,
         tags: [
@@ -91,7 +62,45 @@ function cspMetaPlugin(): Plugin {
         ],
       };
     },
+    generateBundle() {
+      this.emitFile({
+        type: "asset",
+        fileName: "_headers",
+        source: `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  X-Frame-Options: DENY\n  Cross-Origin-Opener-Policy: same-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()\n  Content-Security-Policy: ${buildCsp()}; frame-ancestors 'none'\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n`,
+      });
+    },
   };
+}
+
+function buildCsp(): string {
+  const rawOrigin = process.env.VITE_RUNTIME_ORIGIN?.trim() ?? "";
+  if (rawOrigin === "") {
+    console.warn(
+      "[nova-csp-meta] VITE_RUNTIME_ORIGIN is not set: frame-src is omitted, so the " +
+        "runtime iframe will be blocked by the strict CSP. The deploy workflow sets " +
+        "this for every production deploy (docs/architecture/deployment.md).",
+    );
+  }
+  const runtimeOrigin = rawOrigin === "" ? "" : new URL(rawOrigin).origin;
+  const frameSources = [...(runtimeOrigin === "" ? [] : [runtimeOrigin]), ...CLASSIC_FRAME_ORIGINS];
+  // Nova edge Worker (Classic relay + TURN mint), when the build sets one.
+  const edgeOrigin = process.env.VITE_EDGE_ORIGIN?.trim() ?? "";
+  const edgeConnectSrc = edgeOrigin === "" ? "" : ` ${new URL(edgeOrigin).origin}`;
+  const csp = [
+    "default-src 'self'",
+    "script-src 'self'",
+    "style-src 'self' 'unsafe-inline'",
+    "img-src 'self' data: blob:",
+    "font-src 'self' data:",
+    `connect-src 'self' wss: ws:${edgeConnectSrc}`,
+    "media-src 'self' blob:",
+    "worker-src 'self' blob:",
+    "object-src 'none'",
+    "base-uri 'self'",
+    "form-action 'self'",
+    ...(frameSources.length === 0 ? [] : [`frame-src ${frameSources.join(" ")}`]),
+  ].join("; ");
+  return csp;
 }
 
 // The TanStack Router Vite plugin MUST be registered before the React plugin.
