@@ -4,6 +4,7 @@
  * Browser endpoints:
  *   POST /turn          mint a Cloudflare Realtime TURN credential (turn.ts)
  *   POST /              Classic room-creation CORS relay (relay.ts)
+ *   POST /log           privacy-limited connection analytics (log.ts)
  *   GET /signal/:room   WebSocket signaling through a per-room Durable Object
  *
  * Known routes enforce an Origin allowlist and per-IP rate limiting.
