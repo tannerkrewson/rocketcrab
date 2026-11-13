@@ -363,7 +363,7 @@ export class TrysteroTransport implements NovaTransport {
   }
 
   async leave(): Promise<void> {
-    this.lifecycleGeneration += 1;
+    const generation = ++this.lifecycleGeneration;
     this.cancelSignalDerivation?.();
     const cancelPending = this.cancelPendingTeardownWait;
     this.cancelPendingTeardownWait = null;
@@ -384,13 +384,17 @@ export class TrysteroTransport implements NovaTransport {
       }),
     );
     this.teardownRoom(room);
-    if (room !== null) {
-      await room.leave();
+    try {
+      if (room !== null) await this.releaseRoom(room);
+    } finally {
+      // A later leave or join owns the state if this release settled late.
+      if (generation === this.lifecycleGeneration) {
+        this.sessionId = null;
+        this.roomName = "";
+        this.connectionState = wasJoining ? "idle" : "disconnected";
+        this.emit("connection:state", this.connectionState);
+      }
     }
-    this.sessionId = null;
-    this.roomName = "";
-    this.connectionState = wasJoining ? "idle" : "disconnected";
-    this.emit("connection:state", this.connectionState);
     // A join cancelled while waiting for a failed room's teardown has no
     // current room, but its previous room is still being released.
     await priorTeardown;
@@ -410,9 +414,18 @@ export class TrysteroTransport implements NovaTransport {
     const room = this.room;
     this.connectionState = "joining";
     this.emit("connection:state", "joining");
+    if (generation !== this.lifecycleGeneration) {
+      throw new TrysteroJoinError({ category: "cancelled", message: "Reconnect was cancelled." });
+    }
     this.teardownRoom(room);
-    if (room !== null) {
-      await room.leave(); // peers observe peer:left for the old connection
+    try {
+      if (room !== null) await this.releaseRoom(room); // peers observe peer:left
+    } catch (error) {
+      if (generation === this.lifecycleGeneration) {
+        this.connectionState = "disconnected";
+        this.emit("connection:state", "disconnected");
+      }
+      throw error;
     }
     if (generation !== this.lifecycleGeneration) {
       throw new TrysteroJoinError({ category: "cancelled", message: "Reconnect was cancelled." });
@@ -463,7 +476,7 @@ export class TrysteroTransport implements NovaTransport {
     this.suspendPending = true;
     this.teardownRoom(room);
     try {
-      if (room !== null) await room.leave();
+      if (room !== null) await this.releaseRoom(room);
     } finally {
       this.suspendPending = false;
     }
@@ -475,7 +488,7 @@ export class TrysteroTransport implements NovaTransport {
 
   /** Re-join after {@link TrysteroTransport.suspend} (fresh connection ID). */
   async resume(): Promise<void> {
-    if (this.connectionState !== "suspended" || this.suspendPending) {
+    if (this.connectionState !== "suspended" || this.suspendPending || this.pendingTeardown) {
       throw new TrysteroJoinError({
         category: "invalid_state",
         message: `TrysteroTransport.resume: not suspended (state: ${this.connectionState}).`,
@@ -1127,21 +1140,26 @@ export class TrysteroTransport implements NovaTransport {
     this.cancelJoinTimers();
     const room = this.room;
     this.teardownRoom(room);
-    if (room !== null) {
-      const teardown = room.leave();
-      this.pendingTeardown = teardown;
-      void teardown.then(
-        () => {
-          if (this.pendingTeardown === teardown) this.pendingTeardown = null;
-        },
-        () => undefined,
-      );
-    }
+    if (room !== null) void this.releaseRoom(room).catch(() => undefined);
     this.sessionId = null;
     this.roomName = "";
     this.connectionState = "idle";
     this.emit("connection:state", "idle");
     waiter.reject(error);
+  }
+
+  /** Share the room release across racing lifecycle operations. A rejected
+   * release remains a barrier: callers cannot safely open another room. */
+  private releaseRoom(room: Room): Promise<void> {
+    const teardown = Promise.resolve().then(() => room.leave());
+    this.pendingTeardown = teardown;
+    void teardown.then(
+      () => {
+        if (this.pendingTeardown === teardown) this.pendingTeardown = null;
+      },
+      () => undefined,
+    );
+    return teardown;
   }
 
   private cancelJoinWaiter(error: TrysteroJoinError): void {

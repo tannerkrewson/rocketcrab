@@ -1319,14 +1319,40 @@ describe("TrysteroTransport leave / reconnect / suspend", () => {
         }),
     );
     const reconnecting = adapter.reconnect();
-    void reconnecting.catch(() => undefined);
-    await adapter.leave();
+    const rejected = expect(reconnecting).rejects.toMatchObject({ category: "cancelled" });
+    const leaving = adapter.leave();
+    let released = false;
+    void leaving.then(() => {
+      released = true;
+    });
+    await flushSetup();
+    expect(released).toBe(false);
+    const nextAdapter = setup().adapter;
+    const next = leaving.then(() => nextAdapter.join({ room: "ROOM", sessionId: "session-1" }));
+    await flushSetup();
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
     finishLeave();
-    await Promise.resolve();
-    await Promise.resolve();
-    const joinCalls = mocks.joinRoom.mock.calls.length;
-    if (adapter.connectionState === "joining") await adapter.leave();
-    expect(joinCalls).toBe(1);
+    await leaving;
+    await rejected;
+    await next;
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(2);
+    await nextAdapter.leave();
+  });
+
+  it("does not release a room twice when a joining listener leaves reentrantly", async () => {
+    const { adapter, clock } = setup();
+    const room = makeFakeRoom();
+    mocks.joinRoom.mockReturnValue(room);
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    await joinConnected(adapter, clock);
+    let leaving: Promise<void> | undefined;
+    adapter.on("connection:state", (state) => {
+      if (state === "joining") leaving = adapter.leave();
+    });
+    await expect(adapter.reconnect()).rejects.toMatchObject({ category: "cancelled" });
+    await leaving;
+    expect(room.leave).toHaveBeenCalledTimes(1);
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
   });
 
   it("does not resume or restore suspended state while teardown races with leave", async () => {
@@ -1345,11 +1371,112 @@ describe("TrysteroTransport leave / reconnect / suspend", () => {
     const suspending = adapter.suspend();
     const rejected = expect(suspending).rejects.toMatchObject({ category: "cancelled" });
     await expect(adapter.resume()).rejects.toMatchObject({ category: "invalid_state" });
-    await adapter.leave();
-    finishLeave();
-    await rejected;
-    expect(adapter.connectionState).toBe("disconnected");
+    const leaving = adapter.leave();
+    let released = false;
+    void leaving.then(() => {
+      released = true;
+    });
+    await flushSetup();
+    expect(released).toBe(false);
+    const nextAdapter = setup().adapter;
+    const next = leaving.then(() => nextAdapter.join({ room: "ROOM", sessionId: "session-1" }));
+    await flushSetup();
     expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
+    finishLeave();
+    await leaving;
+    await rejected;
+    await next;
+    expect(adapter.connectionState).toBe("disconnected");
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(2);
+    await nextAdapter.leave();
+  });
+
+  it.each(["reconnect", "suspend"] as const)(
+    "retains a rejected %s teardown for leave and rejoin",
+    async (operation) => {
+      const { adapter, clock } = setup();
+      const room = makeFakeRoom();
+      mocks.joinRoom.mockReturnValue(room);
+      mocks.relaySockets[RELAY] = { readyState: 1 };
+      await joinConnected(adapter, clock);
+      let rejectLeave!: (error: Error) => void;
+      room.leave.mockImplementationOnce(
+        () =>
+          new Promise<void>((_resolve, reject) => {
+            rejectLeave = reject;
+          }),
+      );
+      const lifecycle = adapter[operation]();
+      const lifecycleError = expect(lifecycle).rejects.toThrow("teardown failed");
+      const leaving = adapter.leave();
+      const leaveError = expect(leaving).rejects.toThrow("teardown failed");
+      await flushSetup();
+      rejectLeave(new Error("teardown failed"));
+      await Promise.all([lifecycleError, leaveError]);
+      await expect(adapter.leave()).rejects.toThrow("teardown failed");
+      if (adapter.connectionState === "idle") {
+        await expect(adapter.join({ room: "ROOM", sessionId: "session-1" })).rejects.toMatchObject({
+          category: "invalid_state",
+        });
+      } else {
+        await expect(adapter.resume()).rejects.toMatchObject({ category: "invalid_state" });
+      }
+      expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
+    },
+  );
+
+  it("shares a concurrent normal leave and cleans state if the release rejects", async () => {
+    const { adapter, clock } = setup();
+    const room = makeFakeRoom();
+    mocks.joinRoom.mockReturnValue(room);
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    await joinConnected(adapter, clock);
+    let rejectLeave!: (error: Error) => void;
+    room.leave.mockImplementationOnce(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          rejectLeave = reject;
+        }),
+    );
+    const first = adapter.leave();
+    const second = adapter.leave();
+    const firstError = expect(first).rejects.toThrow("teardown failed");
+    const secondError = expect(second).rejects.toThrow("teardown failed");
+    await flushSetup();
+    expect(room.leave).toHaveBeenCalledTimes(1);
+    rejectLeave(new Error("teardown failed"));
+    await Promise.all([firstError, secondError]);
+    expect(adapter.sessionId).toBeNull();
+    expect(adapter.connectionState).toBe("disconnected");
+    expect(room.joinHandler).toBeNull();
+    await expect(adapter.leave()).rejects.toThrow("teardown failed");
+  });
+
+  it("does not let an older leave clobber a retry waiting on the same release", async () => {
+    const { adapter, clock } = setup();
+    const room = makeFakeRoom();
+    mocks.joinRoom.mockReturnValue(room);
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    await joinConnected(adapter, clock);
+    let finishLeave!: () => void;
+    room.leave.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishLeave = resolve;
+        }),
+    );
+    const reconnect = adapter.reconnect();
+    const reconnectError = expect(reconnect).rejects.toMatchObject({ category: "cancelled" });
+    const firstLeave = adapter.leave();
+    const secondLeave = adapter.leave();
+    const retry = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    await flushSetup();
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
+    finishLeave();
+    await Promise.all([firstLeave, secondLeave, reconnectError, retry]);
+    expect(adapter.connectionState).toBe("connected");
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(2);
+    await adapter.leave();
   });
 
   it("leaves cleanly: releases room handlers and rejects sends", async () => {
