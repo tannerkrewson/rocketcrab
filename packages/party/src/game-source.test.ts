@@ -217,6 +217,95 @@ describe("whole-source requests", () => {
     expect(completed(a.events, "send").filter((e) => e.memberId === "joiner")).toHaveLength(1);
     expect(completed(h.events, "send").filter((e) => e.memberId === "joiner")).toHaveLength(1);
   });
+  it("restarts from a remaining announcer when the source holder disconnects", async () => {
+    const { hub, host, joiner } = await world();
+    const other = hub.createTransport({ memberId: "other", displayName: "Other" });
+    await other.join({ room: "private", sessionId: "session" });
+    const a = coordinator(other);
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    const b = coordinator(joiner);
+    host.handleRequest(GAME_SOURCE_CHANNEL, () => new Promise(() => {}));
+    const request = vi.spyOn(joiner, "request");
+    await announce(host, await descriptor("hello"));
+    await settle(hub);
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    expect(request).toHaveBeenCalledTimes(1);
+    await host.leave();
+    await settle(hub);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(received(b.events)).toMatchObject([{ source: "hello" }]);
+    expect(completed(a.events, "send").filter((e) => e.memberId === "joiner")).toHaveLength(1);
+  });
+  it("continues acknowledgements when the original holder disconnects after verification", async () => {
+    const { hub, host, joiner } = await world();
+    const other = hub.createTransport({ memberId: "other", displayName: "Other" });
+    await other.join({ room: "private", sessionId: "session" });
+    const h = coordinator(host);
+    const a = coordinator(other);
+    await h.instance.setSource({ gameId: "game", source: "hello" });
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    const b = coordinator(joiner);
+    let rejectAck!: (error: Error) => void;
+    const original = joiner.send.bind(joiner);
+    vi.spyOn(joiner, "send").mockImplementation((options) => {
+      if (
+        (options.payload as { type?: string }).type === "game.source.accepted" &&
+        options.targetConnectionId === host.selfConnectionId
+      )
+        return new Promise((_resolve, reject) => {
+          rejectAck = reject;
+        });
+      return original(options);
+    });
+    // Hold the request so the other holder announces before verification.
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const request = joiner.request.bind(joiner);
+    vi.spyOn(joiner, "request").mockImplementation(async (options) => {
+      await gate;
+      return request(options);
+    });
+    await h.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    release();
+    await settle(hub);
+    expect(received(b.events)).toHaveLength(1);
+    await host.leave();
+    rejectAck(new Error("disconnected"));
+    await settle(hub);
+    expect(completed(a.events, "send").filter((e) => e.memberId === "joiner")).toHaveLength(1);
+    expect(b.events.filter((e) => e.type === "error")).toEqual([]);
+  });
+  it("ignores a deferred acknowledgement failure after the selection changes", async () => {
+    const { hub, host, joiner } = await world();
+    const a = coordinator(host);
+    const b = coordinator(joiner);
+    let rejectAck!: (error: Error) => void;
+    const original = joiner.send.bind(joiner);
+    vi.spyOn(joiner, "send").mockImplementation((options) => {
+      if ((options.payload as { type?: string }).type === "game.source.accepted" && !rejectAck)
+        return new Promise((_resolve, reject) => {
+          rejectAck = reject;
+        });
+      return original(options);
+    });
+    await a.instance.setSource({ gameId: "game", source: "first" });
+    await settle(hub);
+    expect(rejectAck).toBeDefined();
+    await a.instance.setSource({ gameId: "game", source: "second" });
+    await settle(hub);
+    rejectAck(new Error("late failure"));
+    await settle(hub);
+    expect(b.instance.getCachedSource("game")).toBe("second");
+    expect(b.events.filter((e) => e.type === "error")).toEqual([]);
+  });
   it("never acknowledges any announcer when shared source verification fails", async () => {
     const { hub, host, joiner } = await world();
     const other = hub.createTransport({ memberId: "other", displayName: "Other" });

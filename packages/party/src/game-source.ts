@@ -145,7 +145,8 @@ export class GameSourceCoordinator {
   // One selection only, with at most one entry per currently connected peer.
   private selection: {
     metadata: GameSourceMetadataInfo;
-    announcers: Map<ConnectionId, MemberId>;
+    announcers: Map<ConnectionId, TransportMessage>;
+    verified: boolean;
   } | null = null;
   private currentGameId: GameId | null = null;
   private disposed = false;
@@ -197,14 +198,22 @@ export class GameSourceCoordinator {
       }),
       this.transport.on("peer:left", (peer) => {
         this.offered.delete(peer.connectionId);
-        const selectionSender = this.selection?.announcers.keys().next().value;
-        this.selection?.announcers.delete(peer.connectionId);
-        if (
-          this.incoming?.connectionId === peer.connectionId ||
-          selectionSender === peer.connectionId ||
-          (this.selection && this.selection.announcers.size === 0)
-        )
-          this.cancelAll("peer_disconnected");
+        const selection = this.selection;
+        if (!selection) return;
+        const selectionSender = selection.announcers.keys().next().value;
+        selection.announcers.delete(peer.connectionId);
+        if (selection.verified) return;
+        if (selectionSender !== peer.connectionId) return;
+        const remaining = [...selection.announcers.values()];
+        this.cancelTransfer(
+          selection.metadata.gameId,
+          selection.metadata.sourceSha256,
+          "peer_disconnected",
+        );
+        // Replay only previously validated, still-connected announcements. The
+        // new selection owns a fresh generation and a fresh compatibility check.
+        for (const message of remaining)
+          void this.handleMessage(message).catch((error) => this.emitError(error));
       }),
       this.transport.on("connection:state", (state) => {
         if (state !== "connected") this.cancelAll("connection_lost");
@@ -360,7 +369,7 @@ export class GameSourceCoordinator {
     // Remember matching announcements even while compatibility is pending. Do
     // not let conflicting descriptors inherit another peer's compatibility check.
     if (this.selection && sameMetadata(this.selection.metadata, metadata)) {
-      this.selection.announcers.set(message.senderConnectionId, message.senderMemberId);
+      this.selection.announcers.set(message.senderConnectionId, message);
       return;
     }
     this.generation++;
@@ -377,7 +386,8 @@ export class GameSourceCoordinator {
       this.offered.clear();
     const selection = {
       metadata,
-      announcers: new Map([[message.senderConnectionId, message.senderMemberId]]),
+      announcers: new Map([[message.senderConnectionId, message]]),
+      verified: false,
     };
     this.selection = selection;
     const generation = this.generation;
@@ -412,6 +422,7 @@ export class GameSourceCoordinator {
     ) {
       this.cache({ ...cached, metadata });
       this.currentGameId = metadata.gameId;
+      selection.verified = true;
       await this.acceptAnnouncers(selection, generation);
       if (this.selection === selection) this.selection = null;
       return;
@@ -477,6 +488,7 @@ export class GameSourceCoordinator {
       if (this.incoming !== transfer || transfer.controller.signal.aborted || this.disposed) return;
       this.cache({ metadata, source, bytes: payload });
       this.currentGameId = metadata.gameId;
+      selection.verified = true;
       this.emit({
         type: "received",
         fromMemberId: transfer.memberId,
@@ -549,16 +561,20 @@ export class GameSourceCoordinator {
     );
   }
   private async acceptAnnouncers(
-    selection: { metadata: GameSourceMetadataInfo; announcers: Map<ConnectionId, MemberId> },
+    selection: {
+      metadata: GameSourceMetadataInfo;
+      announcers: Map<ConnectionId, TransportMessage>;
+    },
     generation: number,
   ): Promise<void> {
-    for (const [connectionId, memberId] of selection.announcers) {
+    for (const [connectionId, message] of selection.announcers) {
       if (this.disposed || this.selection !== selection || generation !== this.generation) return;
-      if (!this.isMember(memberId, connectionId)) continue;
+      if (!this.isMember(message.senderMemberId, connectionId)) continue;
       try {
         await this.accept(selection.metadata, connectionId);
       } catch (error) {
-        this.emitError(error);
+        if (this.disposed || this.selection !== selection || generation !== this.generation) return;
+        if (this.isMember(message.senderMemberId, connectionId)) this.emitError(error);
       }
     }
   }
