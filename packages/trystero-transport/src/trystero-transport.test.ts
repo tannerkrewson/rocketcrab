@@ -274,6 +274,58 @@ describe("TrysteroTransport construction", () => {
 });
 
 describe("deferred signaling derivation", () => {
+  it("preserves a new join started synchronously by an idle listener after derivation failure", async () => {
+    const { adapter } = setup();
+    mocks.joinRoom.mockReturnValue(makeFakeRoom());
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    mocks.signalUrl.mockRejectedValueOnce(new Error("digest failed"));
+    let retry: Promise<void> | undefined;
+    adapter.on("connection:state", (state) => {
+      if (state === "idle" && !retry)
+        retry = adapter.join({ room: "NEW", sessionId: "new-session" });
+    });
+    await expect(adapter.join({ room: "OLD", sessionId: "old-session" })).rejects.toMatchObject({
+      category: "invalid_state",
+    });
+    expect(retry).toBeDefined();
+    await retry;
+    expect(adapter.roomName).toBe("NEW");
+    expect(adapter.sessionId).toBe("new-session");
+    await adapter.leave();
+  });
+
+  it("does not start stale resume derivation after a joining listener leaves and starts a new join", async () => {
+    const { adapter, clock } = setup();
+    mocks.joinRoom.mockReturnValue(makeFakeRoom());
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    await joinConnected(adapter, clock);
+    await adapter.suspend();
+    let finish!: (url: string) => void;
+    mocks.signalUrl.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    let retry: Promise<void> | undefined;
+    let triggered = false;
+    adapter.on("connection:state", (state) => {
+      if (state === "joining" && !triggered) {
+        triggered = true;
+        void adapter.leave();
+        retry = adapter.join({ room: "NEW", sessionId: "new-session" });
+      }
+    });
+    await expect(adapter.resume()).rejects.toMatchObject({ category: "cancelled" });
+    expect(retry).toBeDefined();
+    const cancelled = expect(retry).rejects.toMatchObject({ category: "cancelled" });
+    await adapter.leave();
+    await cancelled;
+    finish(RELAY);
+    await flushSetup();
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
+  });
+
   it("counts derivation time against the overall join deadline", async () => {
     const { adapter, clock } = setup({ joinTimeoutMs: 5000, relayConnectTimeoutMs: 20_000 });
     mocks.joinRoom.mockReturnValue(makeFakeRoom());
@@ -412,6 +464,71 @@ describe("TrysteroTransport join", () => {
     await second;
     expect(adapter.connectionState).toBe("connected");
     expect(mocks.joinRoom).toHaveBeenCalledTimes(2);
+  });
+
+  it("times out waiting for failed teardown and retains the barrier for the next retry", async () => {
+    const { adapter, clock } = setup({ relayConnectTimeoutMs: 1000, joinTimeoutMs: 5000 });
+    const oldRoom = makeFakeRoom();
+    let finishLeave!: () => void;
+    oldRoom.leave.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishLeave = resolve;
+        }),
+    );
+    mocks.joinRoom.mockReturnValueOnce(oldRoom).mockReturnValue(makeFakeRoom());
+    mocks.relaySockets[RELAY] = { readyState: 0 };
+    const first = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    await flushSetup();
+    clock.advance(1000);
+    await expect(first).rejects.toMatchObject({ category: "relay_unreachable" });
+    const retry = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    const timeout = expect(retry).rejects.toMatchObject({ category: "join_timeout" });
+    clock.advance(5000);
+    await timeout;
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    const next = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
+    finishLeave();
+    await next;
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(2);
+    await adapter.leave();
+  });
+
+  it("shares the retry deadline between teardown and digest", async () => {
+    const { adapter, clock } = setup({ relayConnectTimeoutMs: 1000, joinTimeoutMs: 5000 });
+    const oldRoom = makeFakeRoom();
+    let finishLeave!: () => void;
+    oldRoom.leave.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishLeave = resolve;
+        }),
+    );
+    mocks.joinRoom.mockReturnValue(oldRoom);
+    mocks.relaySockets[RELAY] = { readyState: 0 };
+    const first = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    await flushSetup();
+    clock.advance(1000);
+    await expect(first).rejects.toMatchObject({ category: "relay_unreachable" });
+    let finishDigest!: (url: string) => void;
+    mocks.signalUrl.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishDigest = resolve;
+        }),
+    );
+    const retry = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    const timeout = expect(retry).rejects.toMatchObject({ category: "join_timeout" });
+    clock.advance(4000);
+    finishLeave();
+    await flushSetup();
+    clock.advance(1000);
+    await timeout;
+    finishDigest(RELAY);
+    await flushSetup();
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
   });
 
   it("waits for failed room teardown before an immediate retry", async () => {

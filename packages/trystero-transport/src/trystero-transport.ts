@@ -273,6 +273,7 @@ export class TrysteroTransport implements NovaTransport {
       });
     }
     const generation = ++this.lifecycleGeneration;
+    const startedAt = this.now();
     this.connectionState = "joining";
     this.emit("connection:state", "joining");
     if (generation !== this.lifecycleGeneration) {
@@ -284,6 +285,7 @@ export class TrysteroTransport implements NovaTransport {
     this.selfConnectionId = this.selfIdBase;
     if (this.pendingTeardown) {
       const teardown = this.pendingTeardown;
+      let cancelTimeout = () => {};
       const cancellation = new Promise<never>((_resolve, reject) => {
         this.cancelPendingTeardownWait = () =>
           reject(
@@ -292,6 +294,16 @@ export class TrysteroTransport implements NovaTransport {
               message: "Join was cancelled while waiting for room teardown.",
             }),
           );
+        cancelTimeout = this.scheduleFn(
+          () =>
+            reject(
+              new TrysteroJoinError({
+                category: "join_timeout",
+                message: "Join timed out waiting for room teardown.",
+              }),
+            ),
+          Math.max(0, this.options.joinTimeoutMs - (this.now() - startedAt)),
+        );
       });
       try {
         await Promise.race([teardown, cancellation]);
@@ -307,12 +319,14 @@ export class TrysteroTransport implements NovaTransport {
         this.roomName = "";
         this.sessionId = null;
         this.emit("connection:state", "idle");
+        if (cause instanceof TrysteroJoinError) throw cause;
         throw new TrysteroJoinError({
           category: "invalid_state",
           message: "Previous room teardown failed.",
           cause,
         });
       } finally {
+        cancelTimeout();
         if (generation === this.lifecycleGeneration) this.cancelPendingTeardownWait = null;
       }
       if (generation !== this.lifecycleGeneration) {
@@ -323,9 +337,11 @@ export class TrysteroTransport implements NovaTransport {
       }
     }
     let room: Room;
-    const startedAt = this.now();
     try {
-      const url = await this.deriveSignalUrl(request.room);
+      const url = await this.deriveSignalUrl(
+        request.room,
+        Math.max(0, this.options.joinTimeoutMs - (this.now() - startedAt)),
+      );
       if (generation !== this.lifecycleGeneration)
         throw new TrysteroJoinError({ category: "cancelled", message: "Join was cancelled." });
       this.signalRelayUrl = url;
@@ -333,9 +349,9 @@ export class TrysteroTransport implements NovaTransport {
     } catch (cause) {
       if (generation !== this.lifecycleGeneration) throw cause;
       this.connectionState = "idle";
-      this.emit("connection:state", "idle");
       this.roomName = "";
       this.sessionId = null;
+      this.emit("connection:state", "idle");
       if (cause instanceof TrysteroJoinError) throw cause;
       throw new TrysteroJoinError({
         category: "invalid_state",
@@ -465,6 +481,9 @@ export class TrysteroTransport implements NovaTransport {
     this.selfConnectionId = `${this.selfIdBase}#${this.connectionEpoch}`;
     this.connectionState = "joining";
     this.emit("connection:state", "joining");
+    if (generation !== this.lifecycleGeneration) {
+      throw new TrysteroJoinError({ category: "cancelled", message: "Resume was cancelled." });
+    }
     let room: Room;
     const startedAt = this.now();
     try {
@@ -659,7 +678,10 @@ export class TrysteroTransport implements NovaTransport {
     return config;
   }
 
-  private async deriveSignalUrl(roomName: string): Promise<string> {
+  private async deriveSignalUrl(
+    roomName: string,
+    timeoutMs = this.options.joinTimeoutMs,
+  ): Promise<string> {
     let cancelTimeout = () => {};
     let cancel = () => {};
     const interrupted = new Promise<never>((_resolve, reject) => {
@@ -679,7 +701,7 @@ export class TrysteroTransport implements NovaTransport {
               message: `Join did not complete within ${this.options.joinTimeoutMs}ms.`,
             }),
           ),
-        this.options.joinTimeoutMs,
+        timeoutMs,
       );
     });
     try {
