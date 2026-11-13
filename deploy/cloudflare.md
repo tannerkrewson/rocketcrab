@@ -38,6 +38,62 @@ notifications instead (below).
 | workers.dev subdomain | `tannerkrewson`                                                          |
 | Edge Worker URL       | `https://rocketcrab-edge.tannerkrewson.workers.dev`                      |
 
+## Beta plan and pricing evidence
+
+Checked against official Cloudflare documentation on **2026-11-12**; these are
+published rates and limits, not a verification of this account's current plan,
+usage, entitlements, invoice, or alert configuration. Owner decision remains:
+Workers Free during development and workers.dev beta, then Workers Paid at the
+approved cutover. Paid is a **$5/month minimum**, not a spending cap.
+
+- [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)
+  lists Free at 100,000 Worker requests/day and 10 ms CPU per invocation; Paid
+  includes 10 million requests/month and 30 million CPU-ms, then charges for
+  overages. A WebSocket upgrade counts as a Worker request; subsequent messages
+  do not. [Limits](https://developers.cloudflare.com/workers/platform/limits/#daily-requests)
+  say Free resets at 00:00 UTC and exceeding the limit produces error 1027, with
+  route fail-open/fail-closed behavior where applicable.
+- [Durable Objects pricing](https://developers.cloudflare.com/durable-objects/platform/pricing/)
+  lists Free SQLite-backed objects at 100,000 requests and 13,000 GB-s/day;
+  exceeding a Free limit makes further operations of that type fail until the
+  daily reset at 00:00 UTC. Paid includes 1 million requests and 400,000 GB-s
+  per month, then $0.15/million requests and $12.50/million GB-s, rounded up to
+  billable units. Connections count as requests; for compute request billing,
+  20 incoming WebSocket messages count as one request, while outgoing messages
+  and incoming protocol pings are not charged. Metrics show actual messages,
+  not the billing ratio. Hibernation avoids duration charges only while the
+  object is idle and eligible; active handlers and non-hibernatable time count.
+  SQLite storage has separate limits and pricing, even for metadata.
+- A party/day threshold cannot be inferred from these limits alone: traffic,
+  connection attempts, session lengths, message rates, and other account usage
+  matter. For illustration only, 1,000 parties with 2,000 incoming tunnel
+  messages each would consume roughly 100,000 DO request equivalents for
+  messages alone, before connections or other usage; this is not a traffic
+  forecast or measured capacity. Free can interrupt service, so beta usage
+  must be monitored; Paid can still incur overages and other failures.
+- [WebSocket runtime limits](https://developers.cloudflare.com/workers/runtime-apis/websockets/)
+  include a 32 MiB incoming message limit; routine runtime updates can disconnect
+  sockets, so reconnect handling remains necessary.
+- [Realtime pricing](https://developers.cloudflare.com/realtime/sfu/platform/pricing/)
+  lists TURN egress at $0.05/GB after 1,000 GB/month shared with SFU and the
+  WebSocket adapter. This is separate from Workers plan billing, not a hard cap.
+- [Analytics Engine pricing](https://developers.cloudflare.com/analytics/analytics-engine/pricing/)
+  lists Free (100,000 data points and 10,000 queries/day) and Paid (10 million
+  points and 1 million queries/month; published overage rates $0.25 and $1 per
+  additional million respectively). The page says usage is **currently not
+  billed**, with future pricing announced in advance; do not assume it will
+  remain free. [Limits](https://developers.cloudflare.com/analytics/analytics-engine/limits/)
+  include 250 points per Worker invocation and three months' retention.
+
+**Owner/account gates:** confirm the actual Workers plan, Analytics Engine
+access and relevant account usage/allowances in the dashboard before §8.1;
+published plan availability does not prove this account's access. Determine
+whether a useful Free-limit usage notification is offered for this account,
+configure it and verify delivery; the notification type and threshold are not
+yet confirmed. Separately configure and test the Realtime billing alert. No
+notification, account setting, deployment, or other live change was made by
+this research.
+
 ## Everyday commands
 
 All run from the repo root. Wrangler is pinned in `package.json` scripts and
@@ -96,9 +152,8 @@ and [aggregate functions](https://developers.cloudflare.com/analytics/analytics-
    ```
    Secrets survive later deploys; `wrangler.toml` never contains them.
 4. **Billing notification** — Dashboard → Notifications → Add → Billing →
-   Usage Based Billing → Realtime. TURN egress was $0.05/GB after a shared
-   1,000 GB/month Realtime free allowance when last checked; verify current
-   pricing and pick a threshold well under the allowance. This is an alert,
+   Usage Based Billing → Realtime. See dated pricing evidence above; verify
+   current pricing and pick a threshold well under the allowance. This is an alert,
    not a spending cap.
 5. **Smoke test:**
    ```sh
