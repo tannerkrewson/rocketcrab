@@ -1,10 +1,12 @@
 import { Loader2, PartyPopper } from "lucide-react";
+import { Alert } from "@heroui/react";
 import { useMemo, useState } from "react";
 import { toast } from "../../lib/toast";
 import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
 import { cn } from "../../lib/cn";
 import { usePartyEngine } from "../../lib/party/use-party";
 import type { PartyEngineState } from "../../lib/party/engine";
+import { SIGNALING_OUTAGE_MESSAGE } from "../../lib/party/signaling-outage";
 import { buildClassicGameUrl, findClassicGame } from "../../lib/classic";
 import type { BrowseEntry } from "../../lib/browse";
 import { gameRepository } from "../../lib/games/instance";
@@ -192,7 +194,10 @@ export function PartyExperience({
         onPickPrebuilt={(entry) => handlePickFromInGame(() => handlePickPrebuilt(entry))}
         onClearLogs={() => engine.clearRuntimeLogs()}
       >
-        <div className="h-full w-full">{frameArea}</div>
+        <div className="relative h-full w-full">
+          {state.signalingOutage ? <SignalingOutageAlert /> : null}
+          {frameArea}
+        </div>
       </PartyPlayShell>
     );
   }
@@ -200,6 +205,7 @@ export function PartyExperience({
   return (
     <div className="flex flex-col gap-4">
       {shellShown ? <PartyShellHeader inviteUrl={state.inviteUrl} compact={browsing} /> : null}
+      {state.signalingOutage ? <SignalingOutageAlert /> : null}
       {frameArea}
       {renderPhase(
         state,
@@ -214,6 +220,17 @@ export function PartyExperience({
         initialBrowse,
       )}
     </div>
+  );
+}
+
+function SignalingOutageAlert() {
+  return (
+    <Alert status="warning">
+      <Alert.Indicator />
+      <Alert.Content>
+        <Alert.Description>{SIGNALING_OUTAGE_MESSAGE}</Alert.Description>
+      </Alert.Content>
+    </Alert>
   );
 }
 

@@ -67,6 +67,7 @@ import { localPartyIdentity, updatePartyDisplayName } from "./identity";
 import { browserLifecycleSource, type PartyLifecycleSource } from "./lifecycle";
 import { clearPartyRecovery, savePartyRecovery } from "./party-recovery";
 import { createTrysteroPartyTransportFactory } from "./transport-factory";
+import { SignalingOutage } from "./signaling-outage";
 import {
   fetchTurnCredentials,
   turnCredsConfigured,
@@ -204,6 +205,7 @@ export interface PartyEngineState {
    */
   readonly classicFrameEpoch: number;
   readonly diagnostics: PartyDiagnostics | null;
+  readonly signalingOutage?: boolean;
   readonly notices: readonly PartyNotice[];
   readonly lastError: string | null;
   /** Ring-buffer of the game's runtime console output (5cl.11) — the
@@ -457,6 +459,11 @@ export class PartyEngine {
 
   private readonly listeners = new Set<(state: PartyEngineState) => void>();
   private party: PartySession | null = null;
+  private signalingOutageVisible = false;
+  private readonly signalingOutage: SignalingOutage;
+  private unsubscribeSignaling: (() => void) | null = null;
+  private setupAbort: AbortController | null = null;
+  private pendingSetupTransport: { leave(): Promise<void> } | null = null;
   private coordinator: GameSourceCoordinator | null = null;
   private session: ReturnType<typeof createNovaSession> | null = null;
   private unsubSession: (() => void) | null = null;
@@ -530,6 +537,10 @@ export class PartyEngine {
     };
     this.identity = config.identity ?? localPartyIdentity();
     this.schedule = config.schedule ?? defaultScheduler;
+    this.signalingOutage = new SignalingOutage(this.schedule, (visible) => {
+      this.signalingOutageVisible = visible;
+      this.emit();
+    });
     this.now = config.now ?? (() => Date.now());
     this.derive = config.derive;
     this.diagnosticsProvider = config.diagnostics;
@@ -626,6 +637,7 @@ export class PartyEngine {
       classicFrameEpoch: this.classicFrameEpoch,
       runtimeLogs: this.runtimeLogs,
       diagnostics: this.buildDiagnostics(),
+      signalingOutage: this.signalingOutageVisible,
       notices: [...this.notices],
       lastError: this.lastError,
     };
@@ -684,6 +696,7 @@ export class PartyEngine {
    */
   async createParty(input?: PartySourceSpec): Promise<void> {
     this.prepareSetup();
+    const setup = this.setupAbort!;
     const identity = this.identity;
     this.lastSetup = { kind: "create", input };
     this.phase = "creating";
@@ -694,21 +707,23 @@ export class PartyEngine {
       const party = await createParty({
         memberId: identity.memberId,
         displayName: identity.displayName,
-        transportFactory: await this.resolveTransportFactory(),
+        transportFactory: this.observeSignaling(await this.resolveTransportFactory(), setup),
         ...(this.derive !== undefined ? { derive: this.derive } : {}),
       });
       // The user cancelled while the room was being created: drop the
       // session instead of resurrecting a party behind their back.
-      if (this.leaving) {
+      if (setup.signal.aborted) {
         await party.leave().catch(() => undefined);
         return;
       }
+      this.pendingSetupTransport = null;
       // 5cl.14: the host's game is known BEFORE the session attaches so
       // `establish` bakes the real mode into the NovaSession (state vs
       // simulation drives the whole runtime path).
       this.game =
         input === undefined ? null : { gameId: input.gameId, title: input.title, mode: input.mode };
       await this.establish(party);
+      if (setup.signal.aborted) return;
       this.phase = "lobby";
       this.phaseDetail = null;
       this.lastSetup = null;
@@ -720,13 +735,20 @@ export class PartyEngine {
         this.registerSource(input);
       }
     } catch (error) {
-      this.failSetup(error);
+      if (!setup.signal.aborted) {
+        this.pendingSetupTransport = null;
+        this.stopObservingSignaling();
+        this.failSetup(error);
+      }
+    } finally {
+      if (this.setupAbort === setup) this.setupAbort = null;
     }
   }
 
   /** Join a party from an invite-link secret (ADR-0011). */
   async joinByInvite(input: { secret: string }): Promise<void> {
     this.prepareSetup();
+    const setup = this.setupAbort!;
     const identity = this.identity;
     const normalizedInput = input;
     this.lastSetup = { kind: "join-invite", input: normalizedInput };
@@ -740,16 +762,18 @@ export class PartyEngine {
         secret: normalizedInput.secret,
         memberId: identity.memberId,
         displayName: identity.displayName,
-        transportFactory: await this.resolveTransportFactory(),
+        transportFactory: this.observeSignaling(await this.resolveTransportFactory(), setup),
         ...(this.derive !== undefined ? { derive: this.derive } : {}),
       });
       // The user cancelled while joining: drop the session instead of
       // resurrecting a party behind their back.
-      if (this.leaving) {
+      if (setup.signal.aborted) {
         await party.leave().catch(() => undefined);
         return;
       }
+      this.pendingSetupTransport = null;
       await this.establish(party);
+      if (setup.signal.aborted) return;
       // rocketcrab-5ae: same peer gate as the code join — a stale invite
       // (host offline) must never drop the joiner into a fake empty lobby.
       try {
@@ -759,7 +783,7 @@ export class PartyEngine {
           return; // cancelled while waiting — leaveParty already cleaned up
         }
         const setup = this.lastSetup;
-        await this.leaveParty().catch(() => undefined);
+        await this.leaveParty("idle", true).catch(() => undefined);
         this.lastSetup = setup;
         throw error;
       }
@@ -779,7 +803,13 @@ export class PartyEngine {
         );
       this.askForClassicRoom();
     } catch (error) {
-      this.failSetup(error);
+      if (!setup.signal.aborted) {
+        this.pendingSetupTransport = null;
+        this.stopObservingSignaling();
+        this.failSetup(error);
+      }
+    } finally {
+      if (this.setupAbort === setup) this.setupAbort = null;
     }
   }
 
@@ -986,11 +1016,19 @@ export class PartyEngine {
    * to idle; a kicked member leaves into the "removed" phase (7.29) so the
    * UI never flashes the entry screen.
    */
-  async leaveParty(nextPhase: PartyPhase = "idle"): Promise<void> {
+  async leaveParty(nextPhase: PartyPhase = "idle", preserveSetup = false): Promise<void> {
     if (!this.isActive()) {
       return;
     }
     this.leaving = true;
+    if (!preserveSetup) {
+      this.setupAbort?.abort();
+      this.setupAbort = null;
+    }
+    const pendingTransport = this.pendingSetupTransport;
+    this.pendingSetupTransport = null;
+    if (pendingTransport !== null) void pendingTransport.leave().catch(() => undefined);
+    this.stopObservingSignaling();
     this.runtime?.destroy("user_exit");
     this.runtime = null;
     this.frameStarted = false;
@@ -1358,13 +1396,73 @@ export class PartyEngine {
   // Setup internals
   // ------------------------------------------------------------------
 
+  /** Observe the private room before join settles, and retry only relay failures. */
+  private observeSignaling(
+    factory: PartyTransportFactory,
+    setup: AbortController,
+  ): PartyTransportFactory {
+    return {
+      createPrivateTransport: (identity) => {
+        if (setup.signal.aborted) throw new Error("Setup cancelled");
+        const transport = factory.createPrivateTransport(identity);
+        this.pendingSetupTransport = transport;
+        this.unsubscribeSignaling?.();
+        const observable = transport as typeof transport & {
+          onRelayStateChange?: (handler: (connected: boolean) => void) => () => void;
+        };
+        this.unsubscribeSignaling =
+          observable.onRelayStateChange?.((connected) => {
+            if (typeof connected === "boolean") this.signalingOutage.update(connected);
+          }) ?? null;
+        if (observable.onRelayStateChange) {
+          const join = transport.join.bind(transport);
+          transport.join = async (request) => {
+            for (;;) {
+              if (setup.signal.aborted) throw new Error("Setup cancelled");
+              try {
+                await join(request);
+                if (setup.signal.aborted) throw new Error("Setup cancelled");
+                return;
+              } catch (error) {
+                if (
+                  setup.signal.aborted ||
+                  connectionErrorCategory(error) !== "relay_unreachable"
+                ) {
+                  throw error;
+                }
+                await this.waitForSetupRetry(setup.signal);
+              }
+            }
+          };
+        }
+        return transport;
+      },
+    };
+  }
+
+  private waitForSetupRetry(signal: AbortSignal): Promise<void> {
+    return new Promise((resolve) => {
+      const finish = () => {
+        cancel();
+        signal.removeEventListener("abort", finish);
+        resolve();
+      };
+      const cancel = this.schedule(finish, 1_000);
+      signal.addEventListener("abort", finish, { once: true });
+      if (signal.aborted) finish();
+    });
+  }
+
+  private stopObservingSignaling(): void {
+    this.unsubscribeSignaling?.();
+    this.unsubscribeSignaling = null;
+    this.signalingOutage.reset();
+  }
+
   /**
-   * The transport factory for one setup attempt. Injected factories (tests,
-   * embedders) are used as-is and never trigger a mint. The real Trystero
-   * path mints short-lived TURN credentials ONCE (cached on success) and
-   * closes over them for both transports; a mint outage never blocks a
-   * party — the factory degrades to no-TURN and the failure is recorded as
-   * a warn notice + a diagnostics flag (P0 acceptance criterion).
+   * The transport factory for one setup attempt. Injected factories never
+   * trigger a mint. The real Trystero path caches TURN credentials; a mint
+   * outage never blocks a party and is surfaced in notices and diagnostics.
    */
   private async resolveTransportFactory(): Promise<PartyTransportFactory> {
     const injected = this.defaults.transportFactory;
@@ -1403,6 +1501,9 @@ export class PartyEngine {
   private readonly joinErrorNoticesShown = new Set<string>();
   private handleJoinErrorNotice(error: unknown): void {
     const category = connectionErrorCategory(error) ?? "unknown";
+    // Relay outages have a dedicated timed, self-clearing status instead of
+    // a persistent notice that would remain after the socket reconnects.
+    if (category === "relay_unreachable") return;
     if (category === "incompatible_version") {
       if (this.joinErrorNoticesShown.has(category)) return;
       this.joinErrorNoticesShown.add(category);
@@ -2598,6 +2699,9 @@ export class PartyEngine {
   }
 
   private prepareSetup(): void {
+    if (this.setupAbort !== null) {
+      throw new PartyError("invalid_state", "Party setup is already in progress.");
+    }
     // A live party blocks a second setup; a leftover error phase (failed
     // join/create) does NOT — a retry must be able to start cleanly (7.10).
     if (this.party !== null || this.session !== null) {
@@ -2606,6 +2710,8 @@ export class PartyEngine {
         "A party is already active on this page; leave it before starting another.",
       );
     }
+    this.stopObservingSignaling();
+    this.setupAbort = new AbortController();
     this.leaving = false;
     this.lastError = null;
     this.phase = "idle";

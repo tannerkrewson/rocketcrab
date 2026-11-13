@@ -1695,10 +1695,25 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     expect(state.diagnostics?.turn).toBe("disabled");
   });
 
+  it("does not leave a stale relay-failed notice after recovery", async () => {
+    const world = makeWorld();
+    const player = makeDefaultFactoryPlayer(world);
+    await runCreate(player, world);
+    const options = transportFactoryMocks.createTrysteroPartyTransportFactory.mock.calls[0]?.[0];
+    options?.onJoinError?.({
+      code: "relay-failed",
+      category: "relay_unreachable",
+      message: "failed",
+    });
+    expect(
+      player.engine.getState().notices.some((notice) => /signaling relays/i.test(notice.message)),
+    ).toBe(false);
+    await player.engine.leaveParty();
+  });
+
   it.each([
     ["room-full", /party is full/i],
     ["decrypt-failed", /fresh invite/i],
-    ["relay-failed", /signaling relays/i],
     ["banned", /rejected/i],
     ["identity-failed", /unexpected state/i],
     ["plugin-failed", /unexpected state/i],
@@ -1866,6 +1881,168 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
 // These tests drive that plumbing over the in-memory hub with a duck-typed
 // Trystero-shaped diagnostics snapshot.
 // ---------------------------------------------------------------------------
+
+describe("party engine — signaling outage setup", () => {
+  function failingRelay(world: World, category: string) {
+    let attempts = 0;
+    let connected = false;
+    const listeners = new Set<(value: boolean) => void>();
+    world.factory.createPrivateTransport = (identity) => {
+      const transport = world.hub.createTransport(identity);
+      const join = transport.join.bind(transport);
+      transport.join = async (request) => {
+        attempts++;
+        if (!connected) throw Object.assign(new Error(category), { category });
+        await join(request);
+      };
+      const observable = transport as typeof transport & {
+        onRelayStateChange: (handler: (value: boolean) => void) => () => void;
+      };
+      observable.onRelayStateChange = (handler) => {
+        listeners.add(handler);
+        handler(connected);
+        return () => {
+          listeners.delete(handler);
+        };
+      };
+      return transport;
+    };
+    return {
+      attempts: () => attempts,
+      listenerCount: () => listeners.size,
+      connect: () => {
+        connected = true;
+        for (const listener of listeners) listener(true);
+      },
+    };
+  }
+
+  it("warns after five seconds, retries one join at a time, and recovers", async () => {
+    const world = makeWorld();
+    const relay = failingRelay(world, "relay_unreachable");
+    const player = makePlayer(world, "host");
+    const setup = player.engine.createParty();
+    await flush();
+    expect(relay.attempts()).toBe(1);
+    world.clock.advance(4_999);
+    await flush();
+    expect(player.engine.getState().signalingOutage).toBe(false);
+    world.clock.advance(1);
+    await flush();
+    expect(player.engine.getState().signalingOutage).toBe(true);
+    relay.connect();
+    expect(player.engine.getState().signalingOutage).toBe(false);
+    world.clock.advance(1_000);
+    await settle(world);
+    await setup;
+    expect(player.engine.getState().phase).toBe("lobby");
+    await player.engine.leaveParty();
+    expect(relay.listenerCount()).toBe(0);
+  });
+
+  it("cancels retry and ignores late recovery after leaving", async () => {
+    const world = makeWorld();
+    const relay = failingRelay(world, "relay_unreachable");
+    const player = makePlayer(world, "host");
+    const setup = player.engine.createParty();
+    await flush();
+    expect(relay.attempts()).toBe(1);
+    await player.engine.leaveParty();
+    relay.connect();
+    world.clock.advance(20_000);
+    await setup;
+    expect(relay.attempts()).toBe(1);
+    expect(relay.listenerCount()).toBe(0);
+    expect(player.engine.getState().phase).toBe("idle");
+  });
+
+  it("rejects duplicate setups while retrying and leaves only one attempt", async () => {
+    const world = makeWorld();
+    const relay = failingRelay(world, "relay_unreachable");
+    const player = makePlayer(world, "host");
+    const setup = player.engine.createParty();
+    await flush();
+    await expect(player.engine.createParty()).rejects.toThrow(/already in progress/i);
+    expect(relay.attempts()).toBe(1);
+    await player.engine.leaveParty();
+    await setup;
+  });
+
+  it("does not resurrect a setup when a cancelled join resolves late", async () => {
+    const world = makeWorld();
+    let resolveJoin!: () => void;
+    let leaves = 0;
+    world.factory.createPrivateTransport = (identity) => {
+      const transport = world.hub.createTransport(identity);
+      transport.join = () =>
+        new Promise<void>((resolve) => {
+          resolveJoin = resolve;
+        });
+      const leave = transport.leave.bind(transport);
+      transport.leave = async () => {
+        leaves++;
+        await leave();
+      };
+      (
+        transport as typeof transport & {
+          onRelayStateChange: (cb: (connected: boolean) => void) => () => void;
+        }
+      ).onRelayStateChange = (cb) => {
+        cb(false);
+        return () => undefined;
+      };
+      return transport;
+    };
+    const player = makePlayer(world, "host");
+    const setup = player.engine.createParty();
+    await flush();
+    await player.engine.leaveParty();
+    resolveJoin();
+    await setup;
+    expect(leaves).toBeGreaterThan(0);
+    expect(player.engine.getState().phase).toBe("idle");
+    expect(player.engine.getState().inviteUrl).toBeNull();
+  });
+
+  it("does not let an old cancelled join overwrite a new party", async () => {
+    const world = makeWorld();
+    let resolveOld!: () => void;
+    let created = 0;
+    world.factory.createPrivateTransport = (identity) => {
+      const transport = world.hub.createTransport(identity);
+      if (created++ === 0) {
+        transport.join = () =>
+          new Promise<void>((resolve) => {
+            resolveOld = resolve;
+          });
+      }
+      return transport;
+    };
+    const player = makePlayer(world, "host");
+    const old = player.engine.createParty();
+    await flush();
+    await player.engine.leaveParty();
+    const invite = await runCreate(player, world);
+    resolveOld();
+    await old;
+    expect(player.engine.getState().phase).toBe("lobby");
+    expect(parseInviteFragment(new URL(player.engine.getState().inviteUrl!).hash)?.secret).toBe(
+      invite,
+    );
+    await player.engine.leaveParty();
+  });
+
+  it("does not retry other structured errors", async () => {
+    const world = makeWorld();
+    const relay = failingRelay(world, "join_timeout");
+    const player = makePlayer(world, "host");
+    await player.engine.createParty();
+    world.clock.advance(20_000);
+    expect(relay.attempts()).toBe(1);
+    expect(relay.listenerCount()).toBe(0);
+    expect(player.engine.getState().phase).toBe("error");
+  });
+});
 
 describe("party engine — relay diagnostics surfacing (rocketcrab-ont.1)", () => {
   /** A Trystero-shaped diagnostics snapshot (duck-typed by the engine). */

@@ -434,6 +434,8 @@ Evidence: shared-budget contract and editor diagnostic tests; `npm run check` pa
 2. [ ] Remove the old TURN-status-specific notices in `engine.ts` that the new stages replace. Keep `PartyDiagnostics.tsx` as the detailed view.
 3. [ ] Unit tests per stage with fake timers; one e2e for the signaling-down message (block `/signal` in Playwright).
 
+   Partial signaling-down evidence: `signaling-outage.test.ts` and party engine tests cover the five-second delay, recovery, setup retry and cancellation. `e2e/signaling-outage.spec.ts` blocks `/signal` past the initial join deadline and checks automatic recovery. `npm run check` passed; `npm run test:e2e` passed 63/63 in the Playwright 1.62.1 Podman image against this worktree's servers. The host run passed Chromium and Firefox but WebKit could not launch due to missing system libraries. Other stages, fallback-dependent behavior, and removal of their superseded notices remain open.
+
 ## 8. Connection logging — P1 (keep it small)
 
 1. [x] Implement locally: edge route `POST /log` (same gate; rate-limit key `log:<ip>`) writes one Workers Analytics Engine point per validated event to `CONNECTION_EVENTS`. Evidence: `deploy/edge/log.test.ts`; schema and official Free/Paid limits rechecked 2026-11-13 in `deploy/cloudflare.md`. No deploy or live verification; owner must confirm actual account plan and access before deployment.
