@@ -10,7 +10,7 @@
   "scripts": {
     "dev": "concurrently -k -n nova,runtime,edge -c blue,magenta,green \"VITE_EDGE_ORIGIN=http://localhost:8787 npm run dev --workspace @rocketcrab/nova\" \"npm run dev --workspace @rocketcrab/runtime\" \"npm run edge:dev -- --port 8787\"",
     "gen-certs": "node scripts/gen-certs.mjs",
-    "dev:https": "concurrently -k -n nova,runtime -c blue,magenta \"npm run dev:https --workspace @rocketcrab/nova\" \"npm run dev:https --workspace @rocketcrab/runtime\"",
+    "dev:https": "concurrently -k -n nova,runtime,edge -c blue,magenta,green \"VITE_EDGE_ORIGIN=https://localhost:8787 npm run dev:https --workspace @rocketcrab/nova\" \"npm run dev:https --workspace @rocketcrab/runtime\" \"npm run edge:dev -- --port 8787 --local-protocol https --https-key-path .certs/localhost-key.pem --https-cert-path .certs/localhost-cert.pem\"",
     "build": "npm run build --workspaces --if-present",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",

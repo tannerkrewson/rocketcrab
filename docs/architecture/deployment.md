@@ -81,7 +81,9 @@ usual deployment approval rules.
 `npm run dev` serves Nova at `http://localhost:5173` and runtime at
 `http://localhost:5174`; origin derivation is limited to localhost. For
 HTTPS, `npm run gen-certs` followed by `npm run dev:https` uses local
-self-signed certificates. On a LAN hostname or IP, explicitly configure
+self-signed certificates for both apps and the signaling Worker at
+`https://localhost:8787`. Trust the development certificate in the browser
+or operating system before using party signaling. On a LAN hostname or IP, explicitly configure
 `VITE_RUNTIME_ORIGIN` for Nova and `VITE_MAIN_ORIGIN` for runtime to the
 corresponding HTTPS origins; trust the development certificate on the device.
 Local ports alone are not separate sites, so CPU isolation cannot be assumed.

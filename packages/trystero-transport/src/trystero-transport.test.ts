@@ -27,10 +27,11 @@ const mocks = vi.hoisted(() => {
     relaySockets,
     joinRoom: vi.fn(),
     selfId: "self-peer-id",
+    signalUrl: vi.fn(async () => "wss://relay.damus.io"),
   };
 });
 
-vi.mock("./signal-url", () => ({ signalUrl: async () => "wss://relay.damus.io" }));
+vi.mock("./signal-url", () => ({ signalUrl: mocks.signalUrl }));
 vi.mock("@trystero-p2p/ws-relay", () => ({
   joinRoom: mocks.joinRoom,
   getRelaySockets: () => mocks.relaySockets,
@@ -231,7 +232,12 @@ async function simulatePeerJoin(
   await Promise.resolve();
 }
 
+async function flushSetup(): Promise<void> {
+  for (let i = 0; i < 10; i++) await Promise.resolve();
+}
+
 beforeEach(() => {
+  mocks.signalUrl.mockReset().mockResolvedValue(RELAY);
   mocks.joinRoom.mockReset();
   for (const key of Object.keys(mocks.relaySockets)) {
     delete mocks.relaySockets[key];
@@ -265,6 +271,62 @@ describe("TrysteroTransport construction", () => {
     const { adapter } = setup();
     expect(adapter.selfConnectionId).toBeTruthy();
   });
+});
+
+describe("deferred signaling derivation", () => {
+  it("counts derivation time against the overall join deadline", async () => {
+    const { adapter, clock } = setup({ joinTimeoutMs: 5000, relayConnectTimeoutMs: 20_000 });
+    mocks.joinRoom.mockReturnValue(makeFakeRoom());
+    mocks.relaySockets[RELAY] = { readyState: 0 };
+    let finish!: (url: string) => void;
+    mocks.signalUrl.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finish = resolve;
+        }),
+    );
+    const pending = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    const rejected = expect(pending).rejects.toMatchObject({ category: "join_timeout" });
+    clock.advance(4000);
+    finish(RELAY);
+    await flushSetup();
+    clock.advance(1000);
+    await rejected;
+  });
+
+  for (const operation of ["join", "reconnect", "resume"] as const) {
+    for (const outcome of ["cancelled", "join_timeout"] as const) {
+      it(`${operation} settles when derivation is ${outcome}`, async () => {
+        const { adapter, clock } = setup({ joinTimeoutMs: 5000 });
+        mocks.joinRoom.mockReturnValue(makeFakeRoom());
+        mocks.relaySockets[RELAY] = { readyState: 1 };
+        if (operation !== "join") {
+          await joinConnected(adapter, clock);
+          if (operation === "resume") await adapter.suspend();
+        }
+        let finish!: (url: string) => void;
+        mocks.signalUrl.mockImplementationOnce(
+          () =>
+            new Promise((resolve) => {
+              finish = resolve;
+            }),
+        );
+        const pending =
+          operation === "join"
+            ? adapter.join({ room: "ROOM", sessionId: "session-1" })
+            : adapter[operation]();
+        const rejected = expect(pending).rejects.toMatchObject({ category: outcome });
+        await flushSetup();
+        const calls = mocks.joinRoom.mock.calls.length;
+        if (outcome === "cancelled") await adapter.leave();
+        else clock.advance(5000);
+        await rejected;
+        finish(RELAY);
+        await flushSetup();
+        expect(mocks.joinRoom).toHaveBeenCalledTimes(calls);
+      });
+    }
+  }
 });
 
 describe("TrysteroTransport join", () => {
@@ -313,7 +375,7 @@ describe("TrysteroTransport join", () => {
     mocks.relaySockets[RELAY] = { readyState: 0 };
 
     const promise = adapter.join({ room: "ROOM", sessionId: "session-1" });
-    await Promise.resolve();
+    await flushSetup();
     clock.advance(5000);
     await expect(promise).rejects.toMatchObject({ category: "relay_unreachable" });
     expect(adapter.connectionState).toBe("idle");
@@ -329,7 +391,7 @@ describe("TrysteroTransport join", () => {
     mocks.relaySockets[RELAY] = { readyState: 0 };
 
     const promise = adapter.join({ room: "ROOM", sessionId: "session-1" });
-    await Promise.resolve();
+    await flushSetup();
     clock.advance(10_000);
     await expect(promise).rejects.toMatchObject({ category: "join_timeout" });
     expect(adapter.connectionState).toBe("idle");
@@ -340,7 +402,7 @@ describe("TrysteroTransport join", () => {
     mocks.joinRoom.mockReturnValue(makeFakeRoom());
     mocks.relaySockets[RELAY] = { readyState: 0 };
     const first = adapter.join({ room: "ROOM", sessionId: "session-1" });
-    await Promise.resolve();
+    await flushSetup();
     clock.advance(5000);
     await expect(first).rejects.toMatchObject({ category: "relay_unreachable" });
 
@@ -366,7 +428,7 @@ describe("TrysteroTransport join", () => {
     mocks.joinRoom.mockReturnValueOnce(oldRoom).mockReturnValueOnce(newRoom);
     mocks.relaySockets[RELAY] = { readyState: 0 };
     const first = adapter.join({ room: "ROOM", sessionId: "session-1" });
-    await Promise.resolve();
+    await flushSetup();
     clock.advance(5000);
     await expect(first).rejects.toMatchObject({ category: "relay_unreachable" });
     mocks.relaySockets[RELAY] = { readyState: 1 };
@@ -392,7 +454,7 @@ describe("TrysteroTransport join", () => {
     mocks.joinRoom.mockReturnValue(room);
     mocks.relaySockets[RELAY] = { readyState: 0 };
     const first = adapter.join({ room: "ROOM", sessionId: "session-1" });
-    await Promise.resolve();
+    await flushSetup();
     clock.advance(5000);
     await expect(first).rejects.toMatchObject({ category: "relay_unreachable" });
     const retry = adapter.join({ room: "ROOM", sessionId: "session-1" });
@@ -972,7 +1034,7 @@ describe("TrysteroTransport join errors", () => {
     mocks.joinRoom.mockReturnValue(room);
     mocks.relaySockets[RELAY] = { readyState: 0 };
     const promise = adapter.join({ room: "ROOM", sessionId: "session-1" });
-    await Promise.resolve();
+    await flushSetup();
     room.errorHandler!({
       code: "decrypt-failed",
       stage: "offer",
@@ -1020,11 +1082,8 @@ describe("TrysteroTransport relay diagnostics", () => {
       changes.push(connected);
     });
     const promise = adapter.join({ room: "ROOM", sessionId: "session-1" });
-    // Identity initialization is asynchronous in 0.27.
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
-    await Promise.resolve();
+    // Wait for signaling derivation and identity initialization.
+    await flushSetup();
     // first poll: CONNECTING
     expect(adapter.getSignalingConnected()).toBe(false);
     mocks.relaySockets[RELAY] = { readyState: 1 };
@@ -1058,7 +1117,7 @@ describe("TrysteroTransport relay diagnostics", () => {
     mocks.relaySockets[RELAY] = { readyState: 0 };
     mocks.relaySockets["ws://other-room"] = { readyState: 1 };
     const promise = adapter.join({ room: "ROOM", sessionId: "session-1" });
-    await Promise.resolve();
+    await flushSetup();
     clock.advance(5000);
     await expect(promise).rejects.toMatchObject({ category: "relay_unreachable" });
     expect(room.leave).toHaveBeenCalled();

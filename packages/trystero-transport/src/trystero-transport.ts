@@ -134,6 +134,7 @@ export class TrysteroTransport implements NovaTransport {
   private lifecycleGeneration = 0;
   private pendingTeardown: Promise<void> | null = null;
   private cancelPendingTeardownWait: (() => void) | null = null;
+  private cancelSignalDerivation: (() => void) | null = null;
   private suspendPending = false;
   private joinWaiter: { resolve: () => void; reject: (error: Error) => void } | null = null;
   private joinTimers: Array<() => void> = [];
@@ -322,12 +323,9 @@ export class TrysteroTransport implements NovaTransport {
       }
     }
     let room: Room;
+    const startedAt = this.now();
     try {
-      const url = await signalUrl(
-        this.options.edgeOrigin ?? "http://localhost:8787",
-        this.appId,
-        request.room,
-      );
+      const url = await this.deriveSignalUrl(request.room);
       if (generation !== this.lifecycleGeneration)
         throw new TrysteroJoinError({ category: "cancelled", message: "Join was cancelled." });
       this.signalRelayUrl = url;
@@ -338,17 +336,19 @@ export class TrysteroTransport implements NovaTransport {
       this.emit("connection:state", "idle");
       this.roomName = "";
       this.sessionId = null;
+      if (cause instanceof TrysteroJoinError) throw cause;
       throw new TrysteroJoinError({
         category: "invalid_state",
         message: "TrysteroTransport.join: joinRoom failed.",
         cause,
       });
     }
-    await this.startRoom(room);
+    await this.startRoom(room, Math.max(0, this.options.joinTimeoutMs - (this.now() - startedAt)));
   }
 
   async leave(): Promise<void> {
     this.lifecycleGeneration += 1;
+    this.cancelSignalDerivation?.();
     const cancelPending = this.cancelPendingTeardownWait;
     this.cancelPendingTeardownWait = null;
     cancelPending?.();
@@ -397,12 +397,9 @@ export class TrysteroTransport implements NovaTransport {
     this.connectionEpoch += 1;
     this.selfConnectionId = `${this.selfIdBase}#${this.connectionEpoch}`;
     let nextRoom: Room;
+    const startedAt = this.now();
     try {
-      const url = await signalUrl(
-        this.options.edgeOrigin ?? "http://localhost:8787",
-        this.appId,
-        roomName,
-      );
+      const url = await this.deriveSignalUrl(roomName);
       if (generation !== this.lifecycleGeneration)
         throw new TrysteroJoinError({ category: "cancelled", message: "Reconnect was cancelled." });
       this.signalRelayUrl = url;
@@ -411,13 +408,17 @@ export class TrysteroTransport implements NovaTransport {
       if (generation !== this.lifecycleGeneration) throw cause;
       this.connectionState = "disconnected";
       this.emit("connection:state", "disconnected");
+      if (cause instanceof TrysteroJoinError) throw cause;
       throw new TrysteroJoinError({
         category: "invalid_state",
         message: "Reconnect failed to create a room.",
         cause,
       });
     }
-    await this.startRoom(nextRoom);
+    await this.startRoom(
+      nextRoom,
+      Math.max(0, this.options.joinTimeoutMs - (this.now() - startedAt)),
+    );
     this.emit("peer:reconnected", {
       memberId: this.selfMemberId,
       oldConnectionId,
@@ -465,12 +466,9 @@ export class TrysteroTransport implements NovaTransport {
     this.connectionState = "joining";
     this.emit("connection:state", "joining");
     let room: Room;
+    const startedAt = this.now();
     try {
-      const url = await signalUrl(
-        this.options.edgeOrigin ?? "http://localhost:8787",
-        this.appId,
-        roomName,
-      );
+      const url = await this.deriveSignalUrl(roomName);
       if (generation !== this.lifecycleGeneration)
         throw new TrysteroJoinError({ category: "cancelled", message: "Resume was cancelled." });
       this.signalRelayUrl = url;
@@ -479,13 +477,14 @@ export class TrysteroTransport implements NovaTransport {
       if (generation !== this.lifecycleGeneration) throw cause;
       this.connectionState = "suspended";
       this.emit("connection:state", "suspended");
+      if (cause instanceof TrysteroJoinError) throw cause;
       throw new TrysteroJoinError({
         category: "invalid_state",
         message: "Resume failed to create a room.",
         cause,
       });
     }
-    await this.startRoom(room);
+    await this.startRoom(room, Math.max(0, this.options.joinTimeoutMs - (this.now() - startedAt)));
     this.emit("peer:reconnected", {
       memberId: this.selfMemberId,
       oldConnectionId,
@@ -660,8 +659,42 @@ export class TrysteroTransport implements NovaTransport {
     return config;
   }
 
-  private async startRoom(room: Room): Promise<void> {
-    const joined = this.waitForJoin();
+  private async deriveSignalUrl(roomName: string): Promise<string> {
+    let cancelTimeout = () => {};
+    let cancel = () => {};
+    const interrupted = new Promise<never>((_resolve, reject) => {
+      cancel = () =>
+        reject(
+          new TrysteroJoinError({
+            category: "cancelled",
+            message: "Signaling setup was cancelled.",
+          }),
+        );
+      this.cancelSignalDerivation = cancel;
+      cancelTimeout = this.scheduleFn(
+        () =>
+          reject(
+            new TrysteroJoinError({
+              category: "join_timeout",
+              message: `Join did not complete within ${this.options.joinTimeoutMs}ms.`,
+            }),
+          ),
+        this.options.joinTimeoutMs,
+      );
+    });
+    try {
+      return await Promise.race([
+        signalUrl(this.options.edgeOrigin ?? "http://localhost:8787", this.appId, roomName),
+        interrupted,
+      ]);
+    } finally {
+      cancelTimeout();
+      if (this.cancelSignalDerivation === cancel) this.cancelSignalDerivation = null;
+    }
+  }
+
+  private async startRoom(room: Room, timeoutMs: number): Promise<void> {
+    const joined = this.waitForJoin(timeoutMs);
     void this.wireRoom(room)
       .then(() => {
         if (this.room === room && this.connectionState === "joining") this.startRelayMonitor();
@@ -1017,7 +1050,7 @@ export class TrysteroTransport implements NovaTransport {
     }
   }
 
-  private waitForJoin(): Promise<void> {
+  private waitForJoin(timeoutMs: number): Promise<void> {
     return new Promise<void>((resolve, reject) => {
       this.joinWaiter = { resolve, reject };
       this.joinTimers = [
@@ -1036,7 +1069,7 @@ export class TrysteroTransport implements NovaTransport {
               message: `Join did not complete within ${this.options.joinTimeoutMs}ms.`,
             }),
           );
-        }, this.options.joinTimeoutMs),
+        }, timeoutMs),
       ];
     });
   }
