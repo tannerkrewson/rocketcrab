@@ -7,6 +7,7 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig } from "vite";
+import { fallbackServer } from "./fallback-server.mjs";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const keyPath = path.resolve(here, "certs/key.pem");
@@ -14,6 +15,7 @@ const certPath = path.resolve(here, "certs/cert.pem");
 const hasCerts = existsSync(keyPath) && existsSync(certPath);
 
 export default defineConfig({
+  plugins: [fallbackServer()],
   server: {
     port: 5200,
     strictPort: true,
