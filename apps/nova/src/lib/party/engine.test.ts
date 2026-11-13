@@ -623,9 +623,8 @@ describe("party engine — join loading stages (rocketcrab-erx / rocketcrab-5ae)
     await b.engine.leaveParty();
     await settle(world);
     expect(b.engine.getState().phase).toBe("idle");
-    // The join's peer-wait timer still pends; once it fires after the
-    // cancel, the join flow must stop silently instead of failing into the
-    // error screen.
+    // Cancellation removes the peer-wait timer; advancing the clock must
+    // not revive the join or turn the idle screen into an error.
     world.clock.advance(5_500);
     await settle(world);
     await joinPromise;
@@ -2032,6 +2031,169 @@ describe("party engine — signaling outage setup", () => {
     await player.engine.leaveParty();
   });
 
+  it("does not retain the initial retry wrapper for later reconnects", async () => {
+    const world = makeWorld();
+    let connected = true;
+    let joins = 0;
+    let request: Parameters<NovaTransport["join"]>[0] | undefined;
+    world.factory.createPrivateTransport = (identity) => {
+      const transport = world.hub.createTransport(identity);
+      const join = transport.join.bind(transport);
+      transport.join = async (input) => {
+        joins++;
+        request = input;
+        if (!connected)
+          throw Object.assign(new Error("offline"), { category: "relay_unreachable" });
+        await join(input);
+      };
+      transport.reconnect = async () => {
+        await transport.join(request!);
+      };
+      (
+        transport as typeof transport & {
+          onRelayStateChange: (cb: (connected: boolean) => void) => () => void;
+        }
+      ).onRelayStateChange = (cb) => {
+        cb(true);
+        return () => undefined;
+      };
+      return transport;
+    };
+    const player = makePlayer(world, "host");
+    await runCreate(player, world);
+    expect(joins).toBe(1);
+    connected = false;
+    await player.engine.reconnect();
+    expect(joins).toBe(2);
+    await player.engine.leaveParty();
+    connected = true;
+    world.clock.advance(60_000);
+    await settle(world);
+    expect(joins).toBe(2);
+    expect(player.engine.getState().phase).toBe("idle");
+  });
+
+  it("ignores a reconnect failure that settles after leaving", async () => {
+    const world = makeWorld();
+    let rejectReconnect!: (reason: unknown) => void;
+    let reconnects = 0;
+    world.factory.createPrivateTransport = (identity) => {
+      const transport = world.hub.createTransport(identity);
+      transport.reconnect = () => {
+        reconnects++;
+        return new Promise<void>((_resolve, reject) => {
+          rejectReconnect = reject;
+        });
+      };
+      (
+        transport as typeof transport & {
+          onRelayStateChange: (cb: (connected: boolean) => void) => () => void;
+        }
+      ).onRelayStateChange = (cb) => {
+        cb(true);
+        return () => undefined;
+      };
+      return transport;
+    };
+    const player = makePlayer(world, "host");
+    await runCreate(player, world);
+    const reconnect = player.engine.reconnect();
+    await player.engine.leaveParty();
+    rejectReconnect(Object.assign(new Error("offline"), { category: "relay_unreachable" }));
+    await reconnect;
+    world.clock.advance(60_000);
+    await settle(world);
+    expect(reconnects).toBe(1);
+    expect(player.engine.getState().phase).toBe("idle");
+    expect(player.engine.getState().notices).toEqual([]);
+  });
+
+  it("waits for pending transport teardown before an immediate new join", async () => {
+    const world = makeWorld();
+    let created = 0;
+    let finishLeave!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      finishLeave = resolve;
+    });
+    world.factory.createPrivateTransport = (identity) => {
+      const transport = world.hub.createTransport(identity);
+      created++;
+      if (created === 1) {
+        transport.join = async () => {
+          throw Object.assign(new Error("offline"), { category: "relay_unreachable" });
+        };
+        const leave = transport.leave.bind(transport);
+        transport.leave = async () => {
+          await barrier;
+          await leave();
+        };
+        (
+          transport as typeof transport & {
+            onRelayStateChange: (cb: (connected: boolean) => void) => () => void;
+          }
+        ).onRelayStateChange = (cb) => {
+          cb(false);
+          return () => undefined;
+        };
+      }
+      return transport;
+    };
+    const player = makePlayer(world, "host");
+    const first = player.engine.joinByInvite({ secret: "T".repeat(43) });
+    await flush();
+    const leaving = player.engine.leaveParty();
+    const second = player.engine.joinByInvite({ secret: "T".repeat(43) });
+    await flush();
+    expect(created).toBe(1);
+    finishLeave();
+    await leaving;
+    await first;
+    await settle(world);
+    expect(created).toBe(2);
+    await player.engine.leaveParty();
+    await second;
+  });
+
+  it("can cancel a new setup while it is waiting for old teardown", async () => {
+    const world = makeWorld();
+    let created = 0;
+    let finishLeave!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      finishLeave = resolve;
+    });
+    world.factory.createPrivateTransport = (identity) => {
+      const transport = world.hub.createTransport(identity);
+      created++;
+      transport.join = async () => {
+        throw Object.assign(new Error("offline"), { category: "relay_unreachable" });
+      };
+      const leave = transport.leave.bind(transport);
+      transport.leave = async () => {
+        await barrier;
+        await leave();
+      };
+      (
+        transport as typeof transport & {
+          onRelayStateChange: (cb: (connected: boolean) => void) => () => void;
+        }
+      ).onRelayStateChange = (cb) => {
+        cb(false);
+        return () => undefined;
+      };
+      return transport;
+    };
+    const player = makePlayer(world, "host");
+    const first = player.engine.joinByInvite({ secret: "T".repeat(43) });
+    await flush();
+    const leaving = player.engine.leaveParty();
+    const second = player.engine.joinByInvite({ secret: "T".repeat(43) });
+    const cancel = player.engine.leaveParty();
+    finishLeave();
+    await Promise.all([first, second, leaving, cancel]);
+    expect(created).toBe(1);
+    expect(player.engine.getState().phase).toBe("idle");
+  });
+
   it("does not retry other structured errors", async () => {
     const world = makeWorld();
     const relay = failingRelay(world, "join_timeout");
@@ -2041,6 +2203,152 @@ describe("party engine — signaling outage setup", () => {
     expect(relay.attempts()).toBe(1);
     expect(relay.listenerCount()).toBe(0);
     expect(player.engine.getState().phase).toBe("error");
+  });
+});
+
+describe("party engine — signaling while waiting for a peer", () => {
+  it("cancels peer discovery and unsubscribes while signaling is down", async () => {
+    const world = makeWorld();
+    const callbacks = new Set<(connected: boolean) => void>();
+    world.factory.createPrivateTransport = (identity) => {
+      const transport = world.hub.createTransport(identity);
+      (
+        transport as typeof transport & {
+          onRelayStateChange: (cb: (connected: boolean) => void) => () => void;
+        }
+      ).onRelayStateChange = (cb) => {
+        callbacks.add(cb);
+        cb(true);
+        return () => {
+          callbacks.delete(cb);
+        };
+      };
+      return transport;
+    };
+    const player = makePlayer(world, "joiner", { peerConnectTimeoutMs: 5_000 });
+    const joining = player.engine.joinByInvite({ secret: "Q".repeat(43) });
+    await settle(world);
+    for (const callback of callbacks) callback(false);
+    await player.engine.leaveParty();
+    await joining;
+    world.clock.advance(30_000);
+    expect(callbacks.size).toBe(0);
+    expect(player.engine.getState().phase).toBe("idle");
+  });
+
+  it("joins a peer after signaling recovers beyond the discovery deadline", async () => {
+    const world = makeWorld();
+    const callbacks = new Set<(connected: boolean) => void>();
+    world.factory.createPrivateTransport = (identity) => {
+      const transport = world.hub.createTransport(identity);
+      (
+        transport as typeof transport & {
+          onRelayStateChange: (cb: (connected: boolean) => void) => () => void;
+        }
+      ).onRelayStateChange = (cb) => {
+        callbacks.add(cb);
+        cb(true);
+        return () => {
+          callbacks.delete(cb);
+        };
+      };
+      return transport;
+    };
+    const secret = "R".repeat(43);
+    const player = makePlayer(world, "joiner", { peerConnectTimeoutMs: 1_000 });
+    const joining = player.engine.joinByInvite({ secret });
+    await settle(world);
+    expect(player.engine.getState().joinStage).toBe("connecting");
+    for (const callback of callbacks) callback(false);
+    world.clock.advance(10_000);
+    await flush();
+    expect(player.engine.getState().phase).toBe("joining");
+    for (const callback of callbacks) callback(true);
+    const peer = world.hub.createTransport({ memberId: "host", displayName: "Host" });
+    const material = await mockDerive(secret);
+    await peer.join({ room: material.roomId, sessionId: material.sessionId });
+    await settle(world);
+    await joining;
+    expect(player.engine.getState().phase).toBe("lobby");
+    await player.engine.leaveParty();
+    await peer.leave();
+    expect(callbacks.size).toBe(0);
+  });
+
+  it("honors cancellation while a peer-timeout teardown is in progress", async () => {
+    const world = makeWorld();
+    let finishLeave!: () => void;
+    const barrier = new Promise<void>((resolve) => {
+      finishLeave = resolve;
+    });
+    let creates = 0;
+    world.factory.createPrivateTransport = (identity) => {
+      const transport = world.hub.createTransport(identity);
+      creates++;
+      const leave = transport.leave.bind(transport);
+      transport.leave = async () => {
+        await barrier;
+        await leave();
+      };
+      return transport;
+    };
+    const player = makePlayer(world, "joiner", { peerConnectTimeoutMs: 1_000 });
+    const joining = player.engine.joinByInvite({ secret: "S".repeat(43) });
+    await settle(world);
+    world.clock.advance(1_000);
+    await flush();
+    const cancel = player.engine.leaveParty();
+    finishLeave();
+    await cancel;
+    await joining;
+    player.engine.retrySetup();
+    await flush();
+    expect(creates).toBe(1);
+    expect(player.engine.getState().phase).toBe("idle");
+  });
+
+  it("pauses the healthy signaling deadline during an outage and resumes it on recovery", async () => {
+    const world = makeWorld();
+    const callbacks = new Set<(connected: boolean) => void>();
+    const notify = (connected: boolean) => {
+      for (const callback of callbacks) callback(connected);
+    };
+    world.factory.createPrivateTransport = (identity) => {
+      const transport = world.hub.createTransport(identity);
+      (
+        transport as typeof transport & {
+          onRelayStateChange: (cb: (connected: boolean) => void) => () => void;
+        }
+      ).onRelayStateChange = (cb) => {
+        callbacks.add(cb);
+        cb(true);
+        return () => {
+          callbacks.delete(cb);
+        };
+      };
+      return transport;
+    };
+    const player = makePlayer(world, "joiner", { peerConnectTimeoutMs: 5_000 });
+    const joining = player.engine.joinByInvite({ secret: "P".repeat(43) });
+    await settle(world);
+    expect(player.engine.getState().joinStage).toBe("connecting");
+    world.clock.advance(2_000);
+    notify(false);
+    world.clock.advance(20_000);
+    await flush();
+    expect(player.engine.getState().phase).toBe("joining");
+    expect(player.engine.getState().signalingOutage).toBe(true);
+    notify(true);
+    expect(player.engine.getState().signalingOutage).toBe(false);
+    world.clock.advance(2_999);
+    await flush();
+    expect(player.engine.getState().phase).toBe("joining");
+    world.clock.advance(1);
+    await settle(world);
+    await joining;
+    expect(player.engine.getState().phase).toBe("error");
+    expect(player.engine.getState().lastError).toMatch(/couldn't reach anyone/i);
+    expect(callbacks.size).toBe(0);
   });
 });
 

@@ -464,6 +464,10 @@ export class PartyEngine {
   private unsubscribeSignaling: (() => void) | null = null;
   private setupAbort: AbortController | null = null;
   private pendingSetupTransport: { leave(): Promise<void> } | null = null;
+  private leaveInFlight: Promise<void> | null = null;
+  private waitingSetupGeneration = 0;
+  private signalingConnected: boolean | null = null;
+  private readonly signalingListeners = new Set<(connected: boolean) => void>();
   private coordinator: GameSourceCoordinator | null = null;
   private session: ReturnType<typeof createNovaSession> | null = null;
   private unsubSession: (() => void) | null = null;
@@ -695,6 +699,11 @@ export class PartyEngine {
    * pick one later via {@link selectGame} (7.6 — classic start-a-party flow).
    */
   async createParty(input?: PartySourceSpec): Promise<void> {
+    if (this.leaveInFlight !== null) {
+      const generation = ++this.waitingSetupGeneration;
+      await this.leaveInFlight;
+      if (generation !== this.waitingSetupGeneration) return;
+    }
     this.prepareSetup();
     const setup = this.setupAbort!;
     const identity = this.identity;
@@ -747,6 +756,11 @@ export class PartyEngine {
 
   /** Join a party from an invite-link secret (ADR-0011). */
   async joinByInvite(input: { secret: string }): Promise<void> {
+    if (this.leaveInFlight !== null) {
+      const generation = ++this.waitingSetupGeneration;
+      await this.leaveInFlight;
+      if (generation !== this.waitingSetupGeneration) return;
+    }
     this.prepareSetup();
     const setup = this.setupAbort!;
     const identity = this.identity;
@@ -777,14 +791,15 @@ export class PartyEngine {
       // rocketcrab-5ae: same peer gate as the code join — a stale invite
       // (host offline) must never drop the joiner into a fake empty lobby.
       try {
-        await this.waitForPeerConnect(party);
+        await this.waitForPeerConnect(party, setup.signal);
       } catch (error) {
         if (this.party === null) {
           return; // cancelled while waiting — leaveParty already cleaned up
         }
-        const setup = this.lastSetup;
+        const lastSetup = this.lastSetup;
         await this.leaveParty("idle", true).catch(() => undefined);
-        this.lastSetup = setup;
+        if (setup.signal.aborted) return;
+        this.lastSetup = lastSetup;
         throw error;
       }
       if (this.party === null) {
@@ -1016,7 +1031,36 @@ export class PartyEngine {
    * to idle; a kicked member leaves into the "removed" phase (7.29) so the
    * UI never flashes the entry screen.
    */
-  async leaveParty(nextPhase: PartyPhase = "idle", preserveSetup = false): Promise<void> {
+  leaveParty(nextPhase: PartyPhase = "idle", preserveSetup = false): Promise<void> {
+    if (!preserveSetup) this.waitingSetupGeneration++;
+    if (this.leaveInFlight !== null) {
+      if (!preserveSetup) {
+        this.setupAbort?.abort();
+        this.setupAbort = null;
+      }
+      return this.leaveInFlight;
+    }
+    let resolve!: () => void;
+    let reject!: (error: unknown) => void;
+    const promise = new Promise<void>((onResolve, onReject) => {
+      resolve = onResolve;
+      reject = onReject;
+    });
+    this.leaveInFlight = promise;
+    void this.runLeaveParty(nextPhase, preserveSetup).then(
+      () => {
+        if (this.leaveInFlight === promise) this.leaveInFlight = null;
+        resolve();
+      },
+      (error: unknown) => {
+        if (this.leaveInFlight === promise) this.leaveInFlight = null;
+        reject(error);
+      },
+    );
+    return promise;
+  }
+
+  private async runLeaveParty(nextPhase: PartyPhase, preserveSetup: boolean): Promise<void> {
     if (!this.isActive()) {
       return;
     }
@@ -1027,7 +1071,7 @@ export class PartyEngine {
     }
     const pendingTransport = this.pendingSetupTransport;
     this.pendingSetupTransport = null;
-    if (pendingTransport !== null) void pendingTransport.leave().catch(() => undefined);
+    const pendingTeardown = pendingTransport?.leave().catch(() => undefined);
     this.stopObservingSignaling();
     this.runtime?.destroy("user_exit");
     this.runtime = null;
@@ -1054,6 +1098,7 @@ export class PartyEngine {
     if (party !== null) {
       await party.leave().catch(() => undefined);
     }
+    await pendingTeardown;
     // 5cl.14: frame executors are per-party; dispose them with the session.
     this.stateExecutor?.dispose();
     this.stateExecutor = null;
@@ -1075,6 +1120,7 @@ export class PartyEngine {
     this.gameStarted = false;
     this.reconnectAttempts = 0;
     this.pageWasHidden = false;
+    this.reconnectInFlight = null;
     this.cancelReconnectRetry();
     clearPartyRecovery();
     this.leaving = false;
@@ -1135,6 +1181,7 @@ export class PartyEngine {
       }
       // The transport "connection:state" handler settles the phase.
     } catch (error) {
+      if (this.leaving || this.party !== party) return;
       this.addNotice("error", `Reconnect failed: ${connectionErrorMessage(error)}`);
       this.phaseDetail = `Reconnect failed (attempt ${this.reconnectAttempts}) — will retry automatically.`;
       this.emit();
@@ -1412,26 +1459,33 @@ export class PartyEngine {
         };
         this.unsubscribeSignaling =
           observable.onRelayStateChange?.((connected) => {
-            if (typeof connected === "boolean") this.signalingOutage.update(connected);
+            if (typeof connected !== "boolean") return;
+            this.signalingConnected = connected;
+            this.signalingOutage.update(connected);
+            for (const listener of this.signalingListeners) listener(connected);
           }) ?? null;
         if (observable.onRelayStateChange) {
-          const join = transport.join.bind(transport);
+          const join = transport.join;
           transport.join = async (request) => {
-            for (;;) {
-              if (setup.signal.aborted) throw new Error("Setup cancelled");
-              try {
-                await join(request);
+            try {
+              for (;;) {
                 if (setup.signal.aborted) throw new Error("Setup cancelled");
-                return;
-              } catch (error) {
-                if (
-                  setup.signal.aborted ||
-                  connectionErrorCategory(error) !== "relay_unreachable"
-                ) {
-                  throw error;
+                try {
+                  await join.call(transport, request);
+                  if (setup.signal.aborted) throw new Error("Setup cancelled");
+                  return;
+                } catch (error) {
+                  if (
+                    setup.signal.aborted ||
+                    connectionErrorCategory(error) !== "relay_unreachable"
+                  ) {
+                    throw error;
+                  }
+                  await this.waitForSetupRetry(setup.signal);
                 }
-                await this.waitForSetupRetry(setup.signal);
               }
+            } finally {
+              transport.join = join;
             }
           };
         }
@@ -1456,6 +1510,7 @@ export class PartyEngine {
   private stopObservingSignaling(): void {
     this.unsubscribeSignaling?.();
     this.unsubscribeSignaling = null;
+    this.signalingConnected = null;
     this.signalingOutage.reset();
   }
 
@@ -1766,7 +1821,7 @@ export class PartyEngine {
    * until the first peer joins the private room, or fail setup when none
    * ever does. The creator never waits — a solo host lobby is legitimate.
    */
-  private waitForPeerConnect(party: PartySession): Promise<void> {
+  private waitForPeerConnect(party: PartySession, signal: AbortSignal): Promise<void> {
     if (party.role === "creator" || party.privateTransport.peers.length > 0) {
       return Promise.resolve();
     }
@@ -1775,29 +1830,48 @@ export class PartyEngine {
     this.emit();
     return new Promise<void>((resolve, reject) => {
       let settled = false;
-      let cancel: () => void = () => undefined;
-      const unsubscribe = party.privateTransport.on("peer:joined", () => {
-        if (settled) {
-          return;
-        }
-        settled = true;
-        cancel();
+      let remaining = this.defaults.peerConnectTimeoutMs;
+      let startedAt = 0;
+      let cancel: (() => void) | null = null;
+      const cleanup = () => {
+        cancel?.();
+        cancel = null;
         unsubscribe();
-        resolve();
-      });
-      cancel = this.schedule(() => {
-        if (settled) {
-          return;
-        }
+        this.signalingListeners.delete(onSignaling);
+        signal.removeEventListener("abort", onAbort);
+      };
+      const finish = (error?: Error) => {
+        if (settled) return;
         settled = true;
-        unsubscribe();
-        reject(
-          new PartyError(
-            "peer_unreachable",
-            "Couldn't reach anyone in this party. It may have ended, or your networks may need a TURN relay. Ask a friend to confirm they are still connected and try again.",
-          ),
-        );
-      }, this.defaults.peerConnectTimeoutMs);
+        cleanup();
+        if (error) reject(error);
+        else resolve();
+      };
+      const onAbort = () => finish(new Error("Setup cancelled"));
+      const onSignaling = (connected: boolean) => {
+        if (!connected) {
+          if (cancel !== null) {
+            cancel();
+            cancel = null;
+            remaining = Math.max(0, remaining - (this.now() - startedAt));
+          }
+        } else if (cancel === null && !settled) {
+          startedAt = this.now();
+          cancel = this.schedule(() => {
+            finish(
+              new PartyError(
+                "peer_unreachable",
+                "Couldn't reach anyone in this party. It may have ended, or your networks may need a TURN relay. Ask a friend to confirm they are still connected and try again.",
+              ),
+            );
+          }, remaining);
+        }
+      };
+      const unsubscribe = party.privateTransport.on("peer:joined", () => finish());
+      this.signalingListeners.add(onSignaling);
+      signal.addEventListener("abort", onAbort, { once: true });
+      if (signal.aborted) onAbort();
+      else if (this.signalingConnected !== false) onSignaling(true);
     });
   }
 
