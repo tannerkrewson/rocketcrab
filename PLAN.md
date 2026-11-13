@@ -489,9 +489,9 @@ scope (dmotz/trystero#173), so we add it _underneath_ Trystero.
 `RTCPeerConnection` constructor (documented for Node). Nova passes a wrapper
 class, `FallbackPeerConnection`, that delegates everything to the browser's
 real `RTCPeerConnection`. If that pair has not connected within
-`FALLBACK_AFTER_MS` (start at 8000; must be below Trystero's 15 s
-`iceTimeout` in `packages/core/src/peer.ts`), or reports `failed`, the
-wrapper carries the data channel over a WebSocket tunnel through the edge
+`FALLBACK_AFTER_MS` (start at 8000, measured from actual pairing rather than
+constructor time), or reports `failed`, the wrapper carries the data channel
+through a WebSocket tunnel through the edge
 Worker and reports `connected` to Trystero. Trystero and every feature on
 top of it keep working, per pair; other pairs stay peer-to-peer.
 
