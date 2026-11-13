@@ -7,6 +7,14 @@ compatibility_date = "2026-08-01"
 workers_dev = true
 preview_urls = false
 
+[[durable_objects.bindings]]
+name = "SIGNAL_HUB"
+class_name = "SignalHub"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SignalHub"]
+
 [vars]
 # Exact origins allowed to call the Worker. Localhost lets `npm run dev`
 # use the deployed Worker; non-browser clients can't be stopped by Origin

@@ -1,26 +1,33 @@
 # Cloudflare — Nova edge Worker runbook
 
-Nova's only server-side code is one stateless Cloudflare Worker,
-`rocketcrab-edge` (`deploy/edge/`). It has no database, no KV, and no game
-code. `deploy/edge/wrangler.toml` is the single source of truth for its
+Nova's only server-side code is the Cloudflare Worker `rocketcrab-edge`
+(`deploy/edge/`) and its signaling Durable Objects. It stores no game data,
+uses no KV, and runs no game code. `deploy/edge/wrangler.toml` is the single source of truth for its
 configuration, and `npm run edge:deploy` is the single deployment path.
 Record every change made outside that file (dashboard, secrets, account
 settings) in this runbook.
 
 ## What the Worker does
 
-| Route         | File       | Purpose                                                                                                                                                                        |
-| ------------- | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `POST /turn`  | `turn.ts`  | Mints one 24 h Cloudflare Realtime TURN credential per party join so cross-network WebRTC (e.g. Wi-Fi ↔ cellular) works. Holds the TURN key secret; the browser never sees it. |
-| `POST /`      | `relay.ts` | Classic room-creation relay. 16 of the 22 Classic games create rooms on servers without CORS headers; the Worker calls only the 8 fixed endpoints in `RELAY_ENDPOINTS`.        |
-| anything else | —          | `404`                                                                                                                                                                          |
+| Route                  | File        | Purpose                                                                                                                                                                        |
+| ---------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `POST /turn`           | `turn.ts`   | Mints one 24 h Cloudflare Realtime TURN credential per party join so cross-network WebRTC (e.g. Wi-Fi ↔ cellular) works. Holds the TURN key secret; the browser never sees it. |
+| `POST /`               | `relay.ts`  | Classic room-creation relay. 16 of the 22 Classic games create rooms on servers without CORS headers; the Worker calls only the 8 fixed endpoints in `RELAY_ENDPOINTS`.        |
+| `GET /signal/:roomKey` | `signal.ts` | WebSocket signaling, one hibernating Durable Object per 32-character lowercase hex room key.                                                                                   |
+| anything else          | —           | `404`                                                                                                                                                                          |
 
-Every request is gated in `worker.ts`, in order: Origin allowlist (`403`, no
-CORS headers) → preflight (`204`) → POST only (`405`) → per-IP rate limit
-(`429`, `Retry-After: 60`).
+Every known route requires an allowlisted Origin. POST routes support CORS
+preflight; signaling requires a WebSocket GET and is rate-limited on connection
+attempts. Both use per-IP rate limiting (`429`, `Retry-After: 60`).
+
+Signaling uses WebSocket hibernation and socket attachments; messages are not
+persisted. The published `@trystero-p2p/ws-relay@0.27.0` server echoes to all
+subscribers, including the publisher. We deliberately omit its aggregate 10,000
+subscription default to respect the unlimited-party decision; per-socket limits
+remain. See Cloudflare's [WebSocket hibernation documentation](https://developers.cloudflare.com/durable-objects/best-practices/websockets/) and [class migrations](https://developers.cloudflare.com/durable-objects/reference/durable-objects-migrations/).
 
 **Rate limit:** the Workers Rate Limiting binding, 60 requests/min per IP per
-route (`turn:<ip>` and `relay:<ip>` are separate counters). A 10-player party
+route (`turn:<ip>`, `relay:<ip>`, and `signal:<ip>` are separate counters). A 10-player party
 behind one carrier-NAT address uses 10 TURN mints at join; reconnects reuse
 the cached credential. The counter is approximate and per Cloudflare
 location, so it is an abuse backstop, not a quota. If the limiter itself

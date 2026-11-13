@@ -1,18 +1,19 @@
 /**
  * Nova edge Worker — the only server-side code Nova runs.
  *
- * One stateless Cloudflare Worker with two browser-only endpoints:
- *   POST /turn  mint one 24 h Cloudflare Realtime TURN credential (turn.ts)
- *   POST /      Classic room-creation CORS relay (relay.ts)
+ * Browser endpoints:
+ *   POST /turn          mint a Cloudflare Realtime TURN credential (turn.ts)
+ *   POST /              Classic room-creation CORS relay (relay.ts)
+ *   GET /signal/:room   WebSocket signaling through a per-room Durable Object
  *
- * Every request passes the same gate before any work is done:
- * Origin allowlist (403) → CORS preflight (204) → POST only (405) →
- * per-IP rate limit (429). Configuration lives in wrangler.toml; the TURN key
- * is a Worker secret. See deploy/cloudflare.md.
+ * Known routes enforce an Origin allowlist and per-IP rate limiting.
+ * Configuration lives in wrangler.toml; the TURN key is a Worker secret.
+ * See deploy/cloudflare.md.
  */
 import { jsonError } from "./http";
 import { handleRelay } from "./relay";
 import { handleTurn, type TurnEnv } from "./turn";
+export { SignalHub } from "./signal";
 
 export interface RateLimitBinding {
   limit(options: { key: string }): Promise<{ success: boolean }>;
@@ -23,6 +24,10 @@ export interface EdgeEnv extends TurnEnv {
   ORIGIN_ALLOWLIST?: string;
   /** Workers Rate Limiting binding (wrangler.toml `[[ratelimits]]`). */
   RATE_LIMITER?: RateLimitBinding;
+  SIGNAL_HUB?: {
+    idFromName(name: string): unknown;
+    get(id: unknown): { fetch(request: Request): Promise<Response> };
+  };
 }
 
 type Handler = (request: Request, env: EdgeEnv) => Promise<Response>;
@@ -69,7 +74,9 @@ async function withinRateLimit(env: EdgeEnv, key: string): Promise<boolean> {
 async function route(request: Request, env: EdgeEnv): Promise<Response> {
   const path = new URL(request.url).pathname.replace(/(.)\/+$/, "$1");
   const target = ROUTES[path];
-  if (target === undefined) return jsonError(404, "not_found", `no route for ${path}`);
+  const signal = /^\/signal\/([0-9a-f]{32})$/.exec(path);
+  if (target === undefined && signal === null)
+    return jsonError(404, "not_found", `no route for ${path}`);
 
   // No CORS headers on a rejected origin, so other sites cannot read it.
   const origin = request.headers.get("Origin")?.trim().replace(/\/+$/, "") ?? "";
@@ -77,6 +84,20 @@ async function route(request: Request, env: EdgeEnv): Promise<Response> {
     return jsonError(403, "origin_not_allowed", "request Origin is missing or not allowlisted");
   }
   const cors = corsHeaders(origin);
+
+  if (signal !== null) {
+    if (request.method !== "GET") return jsonError(405, "method_not_allowed", "GET required");
+    if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket")
+      return jsonError(426, "upgrade_required", "WebSocket upgrade required");
+    const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+    if (!(await withinRateLimit(env, `signal:${ip}`)))
+      return jsonError(429, "rate_limited", "too many requests; retry in a minute", {
+        "Retry-After": String(RATE_LIMIT_PERIOD_SECONDS),
+      });
+    if (!env.SIGNAL_HUB) return jsonError(503, "unavailable", "signaling unavailable");
+    return env.SIGNAL_HUB.get(env.SIGNAL_HUB.idFromName(signal[1]!)).fetch(request);
+  }
+  if (target === undefined) return jsonError(404, "not_found", `no route for ${path}`);
 
   let response: Response;
   if (request.method === "OPTIONS") {
