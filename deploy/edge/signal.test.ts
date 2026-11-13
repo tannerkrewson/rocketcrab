@@ -52,6 +52,17 @@ describe("SignalHub", () => {
     expect(b.send).toHaveBeenCalledTimes(1);
   });
 
+  it("does not send reserved abnormal close codes", () => {
+    const { socket, hub } = setup();
+    const ws = socket();
+    const h = hub();
+    const typed = ws as unknown as Parameters<SignalHub["webSocketClose"]>[0];
+    for (const code of [1005, 1006, 1015]) h.webSocketClose(typed, code, "");
+    expect(ws.close).not.toHaveBeenCalled();
+    h.webSocketClose(typed, 1000, "done");
+    expect(ws.close).toHaveBeenCalledWith(1000, "done");
+  });
+
   it("enforces topic, message, frame, subscription and token limits", () => {
     const { socket, hub, message } = setup();
     const h = hub();

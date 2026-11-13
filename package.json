@@ -18,6 +18,7 @@
     "typecheck": "npm run typecheck --workspaces --if-present && tsc -p deploy/edge",
     "test": "node --test scripts/*.test.mjs && npm run test --workspaces --if-present && npm run test:edge",
     "test:edge": "vitest run --root deploy/edge",
+    "test:edge:integration": "node --test deploy/edge/signal.integration.mjs",
     "test:watch": "concurrently -k -n nova,runtime -c blue,magenta \"npm run test:watch --workspace @rocketcrab/nova\" \"npm run test:watch --workspace @rocketcrab/runtime\"",
     "test:e2e": "playwright test",
     "test:e2e:trystero": "playwright test -c e2e-trystero/playwright.config.ts",

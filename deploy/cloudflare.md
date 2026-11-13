@@ -51,6 +51,10 @@ There is deliberately no global daily cap: KV cannot count atomically, and a
 cap that can be bypassed is worse than none. Spend is watched with billing
 notifications instead (below).
 
+### Local signaling integration test
+
+Start a local Worker separately with `npx --yes wrangler@4.161.0 dev --config deploy/edge/wrangler.toml --local --port 18987`, then run `npm run test:edge:integration`. The test targets only `http://127.0.0.1:18987` by default; set `SIGNAL_TEST_ORIGIN` to another **local** origin if needed. It checks real WebSocket upgrade and origin rejection, fan-out, sender echo, room isolation, unsubscribe, and delivery after 12 seconds of idleness. The idle check does not establish whether workerd actually evicted the object; the unit test separately exercises restored attachments. Stop the local Worker afterward.
+
 ## Account facts
 
 | Fact                  | Value                                                                    |

@@ -90,6 +90,8 @@ export class SignalHub {
   }
 
   webSocketClose(socket: HibernatingSocket, code: number, reason: string): void {
+    // 1005, 1006 and 1015 are reserved and cannot be sent in a close frame.
+    if (code === 1005 || code === 1006 || code === 1015) return;
     socket.close(code, reason);
   }
 
