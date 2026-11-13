@@ -215,14 +215,30 @@ passed 4/4 (Podman Playwright, 2026-11-13).
      Multi-tab aggregation differs from peer-level events; preserve reconnect,
      rename validation and game roster behavior in tests. No ready flag exists
      in the cited session today, so do not invent one merely to use the API.
-   - **`makeState` — adopt for durable room context/selection**, not transient
-     commands: late joiners receive the latest signed value from remaining peers,
-     which can replace context/selected-game announcement and catch-up code.
-     It is whole-value last-writer-wins, not consensus or an ordered command
-     log; validate shape and current host on writes and test concurrent host
-     migration, stale updates and late joins. Keep kick/reload/start events and
-     application-level source verification; never replace nova-api game state
-     or its authority protocol with LWW state.
+   - **`makeState` — adoption deferred after re-review; previous adoption
+     recommendation was premature.** The 0.27 `docs/state.md` and installed
+     `@trystero-p2p/core` `dist/state.mjs` describe/implement a signed,
+     whole-value LWW slot, relayed even after its author leaves. In `commitEntry`,
+     LWW comparison precedes the application validator. Nova's `session.ts`
+     derives host from creator context and the current roster, and accepts
+     classic room announcements only from the current host; `engine.ts` has the
+     current host answer late-join requests. A validator requiring the current
+     host rejects a legitimate cached selection authored by a departed host;
+     accepting departed authors instead cannot distinguish that selection from
+     a stale/conflicting former-host write during migration. A joiner also
+     needs creator context before it can calculate the host, making validation
+     of that same context circular. Roles do not transfer root authority (see
+     below). Resolving these cases needs a separately designed authority/history
+     protocol or retained catch-up, not deletion of equivalent Nova code.
+     Revisit only with a demonstrated simpler design and tests for concurrent
+     migration, stale/conflicting writes, late join and reconnect; keep game
+     authority, transient commands and source verification unchanged. Reviewed
+     against [upstream `docs/state.md` at tag commit
+     `8d3f57e`](https://github.com/dmotz/trystero/blob/8d3f57ef42c3d622840eec479784c99deeeb2d05/docs/state.md)
+     and the installed `@trystero-p2p/core@0.27.0` `dist/state.mjs`
+     (`compareStateRecords`, `commitEntry`, `makeState`) on 2026-11-13. This is
+     a reassessment of the earlier feature-fit recommendation, not a completed
+     adoption or a claim that no possible authority protocol can use the slot.
    - **Action progress — already adopted for transfer; don't replace the
      coordinator wholesale.** `trystero-transport.ts` uses action request/receive
      progress and `game-source.ts` already delegates chunking, backpressure,
@@ -251,7 +267,7 @@ passed 4/4 (Podman Playwright, 2026-11-13).
      test direct-promotion failure and chunk fallback with frame overhead, and
      complete the 10/25/50/100-player and phone gates before claiming scale.
 
-5. [ ] Implement each _adopt_ as its own commit, deleting the replaced Nova code and its tests (port the behavioural assertions to the new code). Keep `packages/nova-api` (the API games call) stable unless the review shows a clear simplification; games must not need changes.
+5. [ ] Implement each remaining _adopt_ as its own commit, deleting replaced Nova code only after porting its behavioural assertions. `makeState` is deferred pending the authority/late-join design above; do not force it into this step. Keep `packages/nova-api` (the API games call) stable unless the review shows a clear simplification; games must not need changes.
 
    Identity migration decision needed: the installed `@trystero-p2p/core@0.27.0` `dist/identity.mjs` derives a 22-character `userId` from a domain-separated SHA-256 digest of the P-256 public key and validates custom identities against that key. Nova's existing `member-` IDs are independently random (`apps/nova/src/lib/party/identity.ts`), so they cannot simply be imported as Trystero identities. Replacing them changes existing game-facing player IDs; retaining them requires a separate mapping and is not full replacement. Recovery records also contain the old member ID. Ask the owner whether a one-time ID change is acceptable or legacy game-facing IDs must be retained, and specify recovery behavior before implementing. Separately, the current transport's per-user state contains a per-connection ID and admission requires its metadata's peer ID to match (`packages/trystero-transport/src/trystero-transport.ts`); shared identities across tabs need an explicit, tested per-endpoint admission design, not a blind substitution. IndexedDB failures fall back to ephemeral identity in upstream `identity.mjs`; test that and reset races as well. No adoption or migration has been implemented or verified.
 
