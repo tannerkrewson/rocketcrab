@@ -5,7 +5,9 @@ Nova's only server-side code is the Cloudflare Worker `rocketcrab-edge`
 uses no KV, and runs no game code. `deploy/edge/wrangler.toml` is the single source of truth for its
 configuration, and `npm run edge:deploy` is the single deployment path.
 Record every change made outside that file (dashboard, secrets, account
-settings) in this runbook.
+settings) in this runbook. The staged edge allowlist includes the workers.dev
+Nova beta origin, alongside rocketcrab.com and localhost; it has not been
+deployed.
 
 Static assets-only Worker configurations are staged in `deploy/nova/wrangler.toml`
 and `deploy/runtime/wrangler.toml`. They have not been deployed; the app

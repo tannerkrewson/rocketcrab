@@ -102,9 +102,10 @@ currently serves the **legacy** live site — do not touch it before §9.
 - [ ] **Owner:** create a Realtime TURN key (Dashboard → Realtime → TURN
       Server → Create). Give the agent nothing; the owner pastes values into
       `wrangler secret put` prompts.
-- [ ] Add `https://rocketcrab-nova.tannerkrewson.workers.dev` to
+- [x] Add `https://rocketcrab-nova.tannerkrewson.workers.dev` to
       `ORIGIN_ALLOWLIST` in `deploy/edge/wrangler.toml` (keep
       `https://rocketcrab.com` and the localhost entries).
+      Evidence: configuration updated; no deploy or live change performed.
 - [ ] With owner approval: `npm run edge:deploy`, then both
       `secret put` commands from `deploy/cloudflare.md`, then the runbook's
       smoke test (403 without Origin; `iceServers` with one; Classic
