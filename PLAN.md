@@ -346,6 +346,8 @@ Evidence: shared-budget contract and editor diagnostic tests; `npm run check` pa
 
    - `outcome`: `direct` | `turn` | `tunnel` | `failed` (`direct`/`turn` from the real connection's selected candidate pair via `getStats()`; `tunnel` and `failed` from the wrapper), - `error_code` (Trystero `RoomError.code`, or empty), - `ms_to_connect`, - `signaling_ok` (bool), - `browser` (family only, e.g. `safari-ios`, `chrome-android`), - `network` (`navigator.connection.effectiveType`/`type` where available, else `unknown`), - `app_version`. **Never** names, invite/room ids, peer ids or IPs. The Worker must not write the IP into the data point.
 
+   Partial client evidence: `apps/nova/src/lib/connection-log.test.ts` covers the privacy-preserving beacon reporter and validation. Still needed: wire exactly one event per peer attempt into the migrated transport, determine direct/TURN from the selected candidate pair via getStats, obtain tunnel/failed and signaling state from the wrapper, and verify end-to-end ingestion. No transport instrumentation is in place.
+
 3. [x] `scripts/connection-stats.mjs`: queries the Analytics Engine SQL API (needs an API token with Account Analytics Read — owner creates it, passed via env var) and prints outcome percentages and median connect time for a date range. Document it in `deploy/cloudflare.md`.
        Evidence: `node --test scripts/connection-stats.test.mjs`; schema assumes `connection_events` with outcome in `blob1` and successful connect milliseconds in `double1`. The owner must supply a token; live verification is blocked on §8.1–8.2 ingestion. End-to-end logging remains incomplete.
 
