@@ -279,6 +279,31 @@ passed 4/4 (Podman Playwright, 2026-11-13).
    caches before choosing. Do not claim unlimited support or close §3.6 until a
    solution is approved, implemented and tested.
 
+   Additional source inspection (2026-11-13, installed 0.27.0 package): the
+   public `ScaleConfig` in `dist/types.d.mts` exposes only `maxDirectPeers`;
+   `scale/topology.mjs` validates it between 4 and 32, and `scale/index.mjs`
+   passes no supported descriptor-cap override to the manager. Increasing
+   direct peers therefore does not remove the virtual-descriptor bound.
+   `scale/descriptors.mjs` separately applies a 16-peer-per-user admission
+   check for non-direct descriptors. `scale/topology.mjs` also caps derived
+   route hop limits at 64; routes exceeding that limit cannot be used.
+   `scale/seq.mjs` uses a 2,048-origin replay-window eviction target and a
+   4,096-message seen set; `signed-record.mjs` skips eviction when every
+   tracked origin is pinned, so the former is not an absolute memory cap.
+   `scale/data-plane.mjs` bounds its origin-buffer cache to 64 origins, with
+   eight early frames and eight verified broadcasts per origin. These limits
+   have different purposes and should not be
+   misrepresented as one room-size cap; their combined behavior under large
+   rooms or churn has not been measured.
+
+   Potential no-fork directions requiring investigation, not approved fixes:
+   a later upstream release or upstream-supported configurable limits; or
+   partitioning parties across multiple rooms with an application-owned bridge
+   and roster synchronization. The latter changes routing, failure, trust and
+   resource semantics and does not itself prove arbitrary-scale full rosters.
+   Disabling `scale()` instead returns to a direct mesh, not a demonstrated
+   arbitrary-scale solution. No supported 0.27 setting removes the bound.
+
 7. [ ] **Large-room load test.** Using headless browser contexts (several machines or CI shards if one machine can't hold them), run parties of 10, 25, 50 and 100 players with a state-mode sample game. Record per size: time until everyone sees everyone, message latency, CPU on the authority player's device (also try a real phone as authority at 25+), and any errors. Known risk to watch: the authority player sends state to everyone, so its upload grows with party size; if it becomes the bottleneck, propose a fix to the owner (e.g. state deltas or fan-out via `scale()` routing) rather than capping parties. Record results in `docs/testing/` and link them from ADR-0003.
 8. [ ] Update ADR-0003 (transport abstraction) to describe what Trystero now owns and what Nova still owns.
 
