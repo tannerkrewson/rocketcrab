@@ -2188,10 +2188,60 @@ describe("party engine — signaling outage setup", () => {
     const leaving = player.engine.leaveParty();
     const second = player.engine.joinByInvite({ secret: "T".repeat(43) });
     const cancel = player.engine.leaveParty();
+    await second; // cancellation settles before the old teardown is released
+    expect(created).toBe(1);
+    const third = player.engine.joinByInvite({ secret: "T".repeat(43) });
+    await flush();
+    expect(created).toBe(1); // the teardown barrier still gates later attempts
+    const cancelThird = player.engine.leaveParty();
+    await third;
     finishLeave();
-    await Promise.all([first, second, leaving, cancel]);
+    await Promise.all([first, leaving, cancel, cancelThird]);
     expect(created).toBe(1);
     expect(player.engine.getState().phase).toBe("idle");
+  });
+
+  it("fails closed after pending teardown rejects until a fresh engine is created", async () => {
+    const world = makeWorld();
+    let created = 0;
+    world.factory.createPrivateTransport = (identity) => {
+      const transport = world.hub.createTransport(identity);
+      created++;
+      if (created === 1) {
+        transport.join = async () => {
+          throw Object.assign(new Error("offline"), { category: "relay_unreachable" });
+        };
+        transport.leave = async () => {
+          throw new Error("teardown failed");
+        };
+        (
+          transport as typeof transport & {
+            onRelayStateChange: (cb: (connected: boolean) => void) => () => void;
+          }
+        ).onRelayStateChange = (cb) => {
+          cb(false);
+          return () => undefined;
+        };
+      }
+      return transport;
+    };
+    const player = makePlayer(world, "host");
+    const first = player.engine.joinByInvite({ secret: "T".repeat(43) });
+    await flush();
+    const leaving = player.engine.leaveParty();
+    const second = player.engine.joinByInvite({ secret: "T".repeat(43) });
+    await Promise.all([first, leaving, second]);
+    expect(created).toBe(1);
+    expect(player.engine.getState().phase).toBe("error");
+    expect(player.engine.getState().lastError).toMatch(/reload.*before joining/i);
+    player.engine.dismissError();
+    await player.engine.createParty();
+    expect(created).toBe(1);
+    expect(player.engine.getState().phase).toBe("error");
+    const fresh = makePlayer(world, "fresh");
+    await runCreate(fresh, world);
+    expect(created).toBe(2);
+    await fresh.engine.leaveParty();
   });
 
   it("does not retry other structured errors", async () => {

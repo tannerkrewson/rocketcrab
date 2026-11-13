@@ -561,6 +561,59 @@ describe("TrysteroTransport join", () => {
     await adapter.leave();
   });
 
+  it("holds idle leave until a failed room is released before a new adapter joins", async () => {
+    const { adapter, clock } = setup({ relayConnectTimeoutMs: 1000 });
+    const oldRoom = makeFakeRoom();
+    let finishLeave!: () => void;
+    oldRoom.leave.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishLeave = resolve;
+        }),
+    );
+    mocks.joinRoom.mockReturnValueOnce(oldRoom).mockReturnValue(makeFakeRoom());
+    mocks.relaySockets[RELAY] = { readyState: 0 };
+    const first = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    await flushSetup();
+    clock.advance(1000);
+    await expect(first).rejects.toMatchObject({ category: "relay_unreachable" });
+    expect(adapter.connectionState).toBe("idle");
+    let released = false;
+    const leaving = adapter.leave().then(() => {
+      released = true;
+    });
+    await flushSetup();
+    expect(released).toBe(false);
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
+    const nextAdapter = setup().adapter;
+    const rejoin = leaving.then(() => nextAdapter.join({ room: "ROOM", sessionId: "session-1" }));
+    await flushSetup();
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    finishLeave();
+    await rejoin;
+    expect(released).toBe(true);
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(2);
+    await nextAdapter.leave();
+  });
+
+  it("reports a rejected failed-room teardown and does not retry into the room", async () => {
+    const { adapter, clock } = setup({ relayConnectTimeoutMs: 1000 });
+    const room = makeFakeRoom();
+    room.leave.mockRejectedValueOnce(new Error("teardown failed"));
+    mocks.joinRoom.mockReturnValue(room);
+    mocks.relaySockets[RELAY] = { readyState: 0 };
+    const first = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    await flushSetup();
+    clock.advance(1000);
+    await expect(first).rejects.toMatchObject({ category: "relay_unreachable" });
+    await expect(adapter.leave()).rejects.toThrow("teardown failed");
+    await expect(adapter.join({ room: "ROOM", sessionId: "session-1" })).rejects.toMatchObject({
+      category: "invalid_state",
+    });
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
+  });
+
   it("cancels a retry while waiting for failed room teardown", async () => {
     const { adapter, clock } = setup({ relayConnectTimeoutMs: 5000 });
     const room = makeFakeRoom();
@@ -579,13 +632,20 @@ describe("TrysteroTransport join", () => {
     await expect(first).rejects.toMatchObject({ category: "relay_unreachable" });
     const retry = adapter.join({ room: "ROOM", sessionId: "session-1" });
     const cancelled = expect(retry).rejects.toMatchObject({ category: "cancelled" });
-    await adapter.leave();
+    const leaving = adapter.leave();
     await cancelled; // settles while the original teardown is still stalled
+    let leaveSettled = false;
+    void leaving.then(() => {
+      leaveSettled = true;
+    });
+    await flushSetup();
+    expect(leaveSettled).toBe(false);
     expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
     mocks.relaySockets[RELAY] = { readyState: 1 };
     const next = adapter.join({ room: "ROOM", sessionId: "session-1" });
     expect(mocks.joinRoom).toHaveBeenCalledTimes(1); // barrier is retained
     finishLeave();
+    await leaving;
     await next;
     expect(mocks.joinRoom).toHaveBeenCalledTimes(2);
     await adapter.leave();

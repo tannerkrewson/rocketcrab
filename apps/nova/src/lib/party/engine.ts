@@ -263,6 +263,8 @@ interface TransferState {
 }
 
 const MAX_NOTICES = 8;
+const UNSAFE_TEARDOWN_MESSAGE =
+  "Couldn't close the previous party safely. Reload the page before joining another party.";
 /** 5cl.11: cap for the party game's runtime console ring buffer. */
 const MAX_PARTY_LOG_ENTRIES = 200;
 
@@ -465,7 +467,8 @@ export class PartyEngine {
   private setupAbort: AbortController | null = null;
   private pendingSetupTransport: { leave(): Promise<void> } | null = null;
   private leaveInFlight: Promise<void> | null = null;
-  private waitingSetupGeneration = 0;
+  private cancelWaitingSetup: (() => void) | null = null;
+  private teardownFailed = false;
   private signalingConnected: boolean | null = null;
   private readonly signalingListeners = new Set<(connected: boolean) => void>();
   private coordinator: GameSourceCoordinator | null = null;
@@ -699,11 +702,8 @@ export class PartyEngine {
    * pick one later via {@link selectGame} (7.6 — classic start-a-party flow).
    */
   async createParty(input?: PartySourceSpec): Promise<void> {
-    if (this.leaveInFlight !== null) {
-      const generation = ++this.waitingSetupGeneration;
-      await this.leaveInFlight;
-      if (generation !== this.waitingSetupGeneration) return;
-    }
+    if (this.leaveInFlight !== null && !(await this.waitForLeaveBeforeSetup())) return;
+    if (this.rejectUnsafeSetup()) return;
     this.prepareSetup();
     const setup = this.setupAbort!;
     const identity = this.identity;
@@ -744,11 +744,7 @@ export class PartyEngine {
         this.registerSource(input);
       }
     } catch (error) {
-      if (!setup.signal.aborted) {
-        this.pendingSetupTransport = null;
-        this.stopObservingSignaling();
-        this.failSetup(error);
-      }
+      await this.finishFailedSetup(setup, error);
     } finally {
       if (this.setupAbort === setup) this.setupAbort = null;
     }
@@ -756,11 +752,8 @@ export class PartyEngine {
 
   /** Join a party from an invite-link secret (ADR-0011). */
   async joinByInvite(input: { secret: string }): Promise<void> {
-    if (this.leaveInFlight !== null) {
-      const generation = ++this.waitingSetupGeneration;
-      await this.leaveInFlight;
-      if (generation !== this.waitingSetupGeneration) return;
-    }
+    if (this.leaveInFlight !== null && !(await this.waitForLeaveBeforeSetup())) return;
+    if (this.rejectUnsafeSetup()) return;
     this.prepareSetup();
     const setup = this.setupAbort!;
     const identity = this.identity;
@@ -818,11 +811,7 @@ export class PartyEngine {
         );
       this.askForClassicRoom();
     } catch (error) {
-      if (!setup.signal.aborted) {
-        this.pendingSetupTransport = null;
-        this.stopObservingSignaling();
-        this.failSetup(error);
-      }
+      await this.finishFailedSetup(setup, error);
     } finally {
       if (this.setupAbort === setup) this.setupAbort = null;
     }
@@ -1032,7 +1021,7 @@ export class PartyEngine {
    * UI never flashes the entry screen.
    */
   leaveParty(nextPhase: PartyPhase = "idle", preserveSetup = false): Promise<void> {
-    if (!preserveSetup) this.waitingSetupGeneration++;
+    if (!preserveSetup) this.cancelWaitingSetup?.();
     if (this.leaveInFlight !== null) {
       if (!preserveSetup) {
         this.setupAbort?.abort();
@@ -1060,6 +1049,32 @@ export class PartyEngine {
     return promise;
   }
 
+  private waitForLeaveBeforeSetup(): Promise<boolean> {
+    const teardown = this.leaveInFlight;
+    if (teardown === null) return Promise.resolve(true);
+    this.cancelWaitingSetup?.();
+    return new Promise<boolean>((resolve, reject) => {
+      let settled = false;
+      const finish = (proceed: boolean) => {
+        if (settled) return;
+        settled = true;
+        if (this.cancelWaitingSetup === cancel) this.cancelWaitingSetup = null;
+        resolve(proceed);
+      };
+      const cancel = () => finish(false);
+      this.cancelWaitingSetup = cancel;
+      void teardown.then(
+        () => finish(true),
+        (error: unknown) => {
+          if (settled) return;
+          settled = true;
+          if (this.cancelWaitingSetup === cancel) this.cancelWaitingSetup = null;
+          reject(error);
+        },
+      );
+    });
+  }
+
   private async runLeaveParty(nextPhase: PartyPhase, preserveSetup: boolean): Promise<void> {
     if (!this.isActive()) {
       return;
@@ -1071,7 +1086,10 @@ export class PartyEngine {
     }
     const pendingTransport = this.pendingSetupTransport;
     this.pendingSetupTransport = null;
-    const pendingTeardown = pendingTransport?.leave().catch(() => undefined);
+    const pendingTeardown = pendingTransport?.leave().then(
+      () => true,
+      () => false,
+    );
     this.stopObservingSignaling();
     this.runtime?.destroy("user_exit");
     this.runtime = null;
@@ -1098,7 +1116,7 @@ export class PartyEngine {
     if (party !== null) {
       await party.leave().catch(() => undefined);
     }
-    await pendingTeardown;
+    if ((await pendingTeardown) === false) this.teardownFailed = true;
     // 5cl.14: frame executors are per-party; dispose them with the session.
     this.stateExecutor?.dispose();
     this.stateExecutor = null;
@@ -1112,9 +1130,9 @@ export class PartyEngine {
     this.selfVerified = false;
     this.endedReason = null;
     this.notices = [];
-    this.lastError = null;
+    this.lastError = this.teardownFailed ? UNSAFE_TEARDOWN_MESSAGE : null;
     this.lastSetup = null;
-    this.phase = nextPhase;
+    this.phase = this.teardownFailed ? "error" : nextPhase;
     this.phaseDetail = null;
     this.joinStage = null;
     this.gameStarted = false;
@@ -2770,6 +2788,30 @@ export class PartyEngine {
         ? this.notices
         : [...this.notices.slice(0, duplicateIndex), ...this.notices.slice(duplicateIndex + 1)];
     this.notices = [...deduped, makeNotice(level, message)].slice(-MAX_NOTICES);
+  }
+
+  private async finishFailedSetup(setup: AbortController, error: unknown): Promise<void> {
+    if (setup.signal.aborted) return;
+    const transport = this.pendingSetupTransport;
+    if (transport !== null) {
+      try {
+        await transport.leave();
+      } catch {
+        this.teardownFailed = true;
+      }
+    }
+    if (setup.signal.aborted) return;
+    this.pendingSetupTransport = null;
+    this.stopObservingSignaling();
+    if (!this.rejectUnsafeSetup()) this.failSetup(error);
+  }
+
+  private rejectUnsafeSetup(): boolean {
+    if (!this.teardownFailed) return false;
+    this.phase = "error";
+    this.lastError = UNSAFE_TEARDOWN_MESSAGE;
+    this.emit();
+    return true;
   }
 
   private prepareSetup(): void {

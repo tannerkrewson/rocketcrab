@@ -368,7 +368,11 @@ export class TrysteroTransport implements NovaTransport {
     const cancelPending = this.cancelPendingTeardownWait;
     this.cancelPendingTeardownWait = null;
     cancelPending?.();
+    const priorTeardown = this.pendingTeardown;
     if (this.connectionState === "idle") {
+      // A failed join becomes idle before its room.leave() has settled.
+      // Callers use leave() as a teardown barrier across transport instances.
+      await priorTeardown;
       return;
     }
     const wasJoining = this.connectionState === "joining";
@@ -387,6 +391,9 @@ export class TrysteroTransport implements NovaTransport {
     this.roomName = "";
     this.connectionState = wasJoining ? "idle" : "disconnected";
     this.emit("connection:state", this.connectionState);
+    // A join cancelled while waiting for a failed room's teardown has no
+    // current room, but its previous room is still being released.
+    await priorTeardown;
   }
 
   /** Drop the current connection and re-join with a fresh connection ID. */
