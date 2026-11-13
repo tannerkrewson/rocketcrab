@@ -151,8 +151,9 @@ Nova app IDs in `packages/trystero-transport/src/app-id.ts` so old and new
 clients never share rooms.
 
 Evidence: `trystero-transport.test.ts` covers reconnect/leave and suspend/leave
-races and retry serialization; `identity-races.test.ts` covers admission
-ordering and broadcasts are restricted to admitted peers. `npm run check`
+races, retry serialization and cancellation before stalled teardown finishes;
+`identity-races.test.ts` covers admission ordering and broadcasts are restricted
+to admitted peers. `npm run check`
 passed; `npm run test:e2e` passed 60/60 and `npm run test:e2e:trystero`
 passed 4/4 (Podman Playwright, 2026-11-13).
 

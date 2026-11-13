@@ -392,10 +392,30 @@ describe("TrysteroTransport join", () => {
     clock.advance(5000);
     await expect(first).rejects.toMatchObject({ category: "relay_unreachable" });
     const retry = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    const cancelled = expect(retry).rejects.toMatchObject({ category: "cancelled" });
     await adapter.leave();
-    finishLeave();
-    await expect(retry).rejects.toMatchObject({ category: "cancelled" });
+    await cancelled; // settles while the original teardown is still stalled
     expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    const next = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(1); // barrier is retained
+    finishLeave();
+    await next;
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(2);
+    await adapter.leave();
+  });
+
+  it("does not create a room if a joining-state listener immediately leaves", async () => {
+    const { adapter } = setup();
+    mocks.joinRoom.mockReturnValue(makeFakeRoom());
+    adapter.on("connection:state", (state) => {
+      if (state === "joining") void adapter.leave();
+    });
+    await expect(adapter.join({ room: "ROOM", sessionId: "session-1" })).rejects.toMatchObject({
+      category: "cancelled",
+    });
+    expect(mocks.joinRoom).not.toHaveBeenCalled();
+    expect(adapter.connectionState).toBe("idle");
   });
 
   it("cancels a pending join when leave() runs mid-join", async () => {

@@ -139,6 +139,7 @@ export class TrysteroTransport implements NovaTransport {
   /** Invalidates asynchronous lifecycle continuations after leave or replacement. */
   private lifecycleGeneration = 0;
   private pendingTeardown: Promise<void> | null = null;
+  private cancelPendingTeardownWait: (() => void) | null = null;
   private suspendPending = false;
   private joinWaiter: { resolve: () => void; reject: (error: Error) => void } | null = null;
   private joinTimers: Array<() => void> = [];
@@ -301,25 +302,45 @@ export class TrysteroTransport implements NovaTransport {
     const generation = ++this.lifecycleGeneration;
     this.connectionState = "joining";
     this.emit("connection:state", "joining");
+    if (generation !== this.lifecycleGeneration) {
+      throw new TrysteroJoinError({ category: "cancelled", message: "Join was cancelled." });
+    }
     this.roomName = request.room;
     this.sessionId = request.sessionId;
     this.connectionEpoch = 0;
     this.selfConnectionId = this.selfIdBase;
     if (this.pendingTeardown) {
+      const teardown = this.pendingTeardown;
+      const cancellation = new Promise<never>((_resolve, reject) => {
+        this.cancelPendingTeardownWait = () =>
+          reject(
+            new TrysteroJoinError({
+              category: "cancelled",
+              message: "Join was cancelled while waiting for room teardown.",
+            }),
+          );
+      });
       try {
-        await this.pendingTeardown;
+        await Promise.race([teardown, cancellation]);
       } catch (cause) {
-        if (generation === this.lifecycleGeneration) {
-          this.connectionState = "idle";
-          this.roomName = "";
-          this.sessionId = null;
-          this.emit("connection:state", "idle");
+        if (generation !== this.lifecycleGeneration) {
+          throw new TrysteroJoinError({
+            category: "cancelled",
+            message: "Join was cancelled while waiting for room teardown.",
+            cause,
+          });
         }
+        this.connectionState = "idle";
+        this.roomName = "";
+        this.sessionId = null;
+        this.emit("connection:state", "idle");
         throw new TrysteroJoinError({
           category: "invalid_state",
           message: "Previous room teardown failed.",
           cause,
         });
+      } finally {
+        if (generation === this.lifecycleGeneration) this.cancelPendingTeardownWait = null;
       }
       if (generation !== this.lifecycleGeneration) {
         throw new TrysteroJoinError({
@@ -347,6 +368,9 @@ export class TrysteroTransport implements NovaTransport {
 
   async leave(): Promise<void> {
     this.lifecycleGeneration += 1;
+    const cancelPending = this.cancelPendingTeardownWait;
+    this.cancelPendingTeardownWait = null;
+    cancelPending?.();
     if (this.connectionState === "idle") {
       return;
     }
