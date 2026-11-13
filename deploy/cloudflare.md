@@ -54,6 +54,34 @@ npm run edge:deploy                # deploy wrangler.toml + worker code
 For `edge:dev` with real TURN minting, put the two secrets in a gitignored
 `deploy/edge/.dev.vars` (`TURN_KEY_ID=...` / `TURN_KEY_API_TOKEN=...`).
 
+## Connection statistics (planned ingestion)
+
+The independent SQL report assumes dataset **`connection_events`**: `blob1`
+contains `direct`, `turn`, `tunnel`, or `failed`; `double1` is milliseconds to
+connect for successful outcomes. The future §8.1 writer must use this exact
+mapping (and must not record IPs, room IDs, or player IDs). No writer, binding,
+or dataset has been deployed yet; a table appears only after its first event.
+Coordinate changes to this schema with the reporting script.
+
+The owner must create a Cloudflare API token scoped to this account with
+**Account → Account Analytics → Read**, and supply it locally; never commit or
+paste it into the repository. Set `CLOUDFLARE_API_TOKEN` in the environment
+without putting its value in shell history. Set `CLOUDFLARE_ACCOUNT_ID` to the
+account ID above, then run:
+
+```sh
+node scripts/connection-stats.mjs 2026-11-01 2026-11-12
+```
+
+Dates are UTC, start inclusive and end exclusive. Percentages cover all four
+outcomes; the median covers successful connections only. Both use Analytics
+Engine sampling weights, so sampled results are estimates. No events yields
+zero percentages and an unavailable median. The report cannot be validated
+against live data until ingestion and the owner's token exist. See Cloudflare's
+[SQL API](https://developers.cloudflare.com/analytics/analytics-engine/sql-api/)
+and [aggregate functions](https://developers.cloudflare.com/analytics/analytics-engine/sql-reference/aggregate-functions/)
+(checked 2026-11-12). No Cloudflare settings or secrets were changed for this tool.
+
 ## First-time setup (or rebuilding on a fresh account)
 
 1. **TURN key** — Dashboard → Realtime → TURN Server → Create. Copy the

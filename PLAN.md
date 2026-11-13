@@ -321,7 +321,8 @@ game code cannot bypass.
 
    - `outcome`: `direct` | `turn` | `tunnel` | `failed` (`direct`/`turn` from the real connection's selected candidate pair via `getStats()`; `tunnel` and `failed` from the wrapper), - `error_code` (Trystero `RoomError.code`, or empty), - `ms_to_connect`, - `signaling_ok` (bool), - `browser` (family only, e.g. `safari-ios`, `chrome-android`), - `network` (`navigator.connection.effectiveType`/`type` where available, else `unknown`), - `app_version`. **Never** names, invite/room ids, peer ids or IPs. The Worker must not write the IP into the data point.
 
-3. [ ] `scripts/connection-stats.mjs`: queries the Analytics Engine SQL API (needs an API token with Account Analytics Read — owner creates it, passed via env var) and prints outcome percentages and median connect time for a date range. Document it in `deploy/cloudflare.md`.
+3. [x] `scripts/connection-stats.mjs`: queries the Analytics Engine SQL API (needs an API token with Account Analytics Read — owner creates it, passed via env var) and prints outcome percentages and median connect time for a date range. Document it in `deploy/cloudflare.md`.
+       Evidence: `node --test scripts/connection-stats.test.mjs`; schema assumes `connection_events` with outcome in `blob1` and successful connect milliseconds in `double1`. The owner must supply a token; live verification is blocked on §8.1–8.2 ingestion. End-to-end logging remains incomplete.
 
 ## 9. Real-device verification, then cutover — P0
 
