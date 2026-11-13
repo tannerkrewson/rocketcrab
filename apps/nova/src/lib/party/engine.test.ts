@@ -1694,6 +1694,55 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     expect(state.diagnostics?.turn).toBe("disabled");
   });
 
+  it.each(["room-full", "decrypt-failed"] as const)(
+    "reports %s only after the join fails and resets it on retry",
+    async (code) => {
+      const world = makeWorld();
+      const player = makeDefaultFactoryPlayer(world, { peerConnectTimeoutMs: 1_000 });
+      const joining = player.engine.joinByInvite({ secret: "E".repeat(43) });
+      await settle(world);
+      const options = transportFactoryMocks.createTrysteroPartyTransportFactory.mock.calls[0]?.[0];
+      expect(options?.onJoinError).toBeDefined();
+      options?.onJoinError?.({ code, category: "unknown", message: "peer failure" });
+      expect(player.engine.getState().phase).toBe("joining");
+      world.clock.advance(1_000);
+      await settle(world);
+      await joining;
+      expect(player.engine.getState().phase).toBe("error");
+      expect(player.engine.getState().setupFailureCode).toBe(code);
+      player.engine.retrySetup();
+      await settle(world);
+      expect(player.engine.getState().setupFailureCode).toBeNull();
+      // A delayed callback from the previous transport cannot contaminate retry.
+      options?.onJoinError?.({ code, category: "unknown", message: "late report" });
+      world.clock.advance(1_000);
+      await settle(world);
+      expect(player.engine.getState().phase).toBe("error");
+      expect(player.engine.getState().setupFailureCode).toBeNull();
+      expect(player.engine.getState().lastError).toMatch(/couldn't reach anyone/i);
+    },
+  );
+
+  it("keeps peer errors as notices when a player is admitted", async () => {
+    const world = makeWorld();
+    const host = makePlayer(world, "host");
+    const secret = await runCreate(host, world);
+    const player = makeDefaultFactoryPlayer(world);
+    const joining = player.engine.joinByInvite({ secret });
+    await settle(world);
+    await joining;
+    expect(player.engine.getState().phase).toBe("lobby");
+    const options = transportFactoryMocks.createTrysteroPartyTransportFactory.mock.calls[0]?.[0];
+    options?.onJoinError?.({ code: "room-full", category: "unknown", message: "peer rejected" });
+    expect(player.engine.getState().phase).toBe("lobby");
+    expect(player.engine.getState().setupFailureCode).toBeNull();
+    expect(
+      player.engine.getState().notices.some((notice) => /party is full/i.test(notice.message)),
+    ).toBe(true);
+    await player.engine.leaveParty();
+    await host.engine.leaveParty();
+  });
+
   it("does not leave a stale relay-failed notice after recovery", async () => {
     const world = makeWorld();
     const player = makeDefaultFactoryPlayer(world);

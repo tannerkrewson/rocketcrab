@@ -293,7 +293,13 @@ function renderPhase(
       return (
         <div className="mx-auto flex w-full max-w-md flex-col gap-4 py-6">
           <ErrorPanel
-            title="The party couldn't be set up"
+            title={
+              state.setupFailureCode === "room-full"
+                ? "This party is full"
+                : state.setupFailureCode === "decrypt-failed"
+                  ? "This invite couldn't be used"
+                  : "The party couldn't be set up"
+            }
             message={state.lastError ?? "Something went wrong."}
             // 7.10: retry re-runs the failed setup; it must NOT call leave
             // (that toasted "you left the party" over the navbar and left

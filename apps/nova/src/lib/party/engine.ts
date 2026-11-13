@@ -208,6 +208,7 @@ export interface PartyEngineState {
   readonly signalingOutage?: boolean;
   readonly notices: readonly PartyNotice[];
   readonly lastError: string | null;
+  readonly setupFailureCode?: "room-full" | "decrypt-failed" | null;
   /** Ring-buffer of the game's runtime console output (5cl.11) — the
    *  in-game Logs panel shows this for the user's own games. */
   readonly runtimeLogs: readonly ArenaLogEntry[];
@@ -514,6 +515,9 @@ export class PartyEngine {
   private leaving = false;
   private notices: PartyNotice[] = [];
   private lastError: string | null = null;
+  private setupFailureCode: "room-full" | "decrypt-failed" | null = null;
+  private observedJoinFailure: "room-full" | "decrypt-failed" | null = null;
+  private setupPeerAdmitted = false;
   private lastSetup: LastSetup | null = null;
   /** Ring-buffer of the game's runtime console output (5cl.11). */
   private runtimeLogs: ArenaLogEntry[] = [];
@@ -647,6 +651,7 @@ export class PartyEngine {
       signalingOutage: this.signalingOutageVisible,
       notices: [...this.notices],
       lastError: this.lastError,
+      setupFailureCode: this.setupFailureCode,
     };
   }
 
@@ -798,6 +803,7 @@ export class PartyEngine {
       if (this.party === null) {
         return; // cancelled while waiting — leaveParty already cleaned up
       }
+      this.observedJoinFailure = null;
       this.phase = "lobby";
       this.phaseDetail = null;
       this.joinStage = null;
@@ -963,6 +969,8 @@ export class PartyEngine {
       return;
     }
     this.lastError = null;
+    this.setupFailureCode = null;
+    this.observedJoinFailure = null;
     this.phase = "idle";
     this.phaseDetail = null;
     this.joinStage = null;
@@ -1021,7 +1029,11 @@ export class PartyEngine {
    * UI never flashes the entry screen.
    */
   leaveParty(nextPhase: PartyPhase = "idle", preserveSetup = false): Promise<void> {
-    if (!preserveSetup) this.cancelWaitingSetup?.();
+    if (!preserveSetup) {
+      this.observedJoinFailure = null;
+      this.setupFailureCode = null;
+      this.cancelWaitingSetup?.();
+    }
     if (this.leaveInFlight !== null) {
       if (!preserveSetup) {
         this.setupAbort?.abort();
@@ -1546,7 +1558,26 @@ export class PartyEngine {
     if (injected !== null) {
       return injected;
     }
-    const options = { onJoinError: (error: unknown) => this.handleJoinErrorNotice(error) };
+    const setup = this.setupAbort;
+    const options = {
+      onJoinError: (error: unknown) => {
+        if (
+          setup !== null &&
+          this.setupAbort === setup &&
+          !setup.signal.aborted &&
+          this.phase === "joining" &&
+          !this.setupPeerAdmitted &&
+          (this.party === null || this.party.privateTransport.peers.length === 0) &&
+          typeof error === "object" &&
+          error !== null &&
+          "code" in error &&
+          (error.code === "room-full" || error.code === "decrypt-failed")
+        ) {
+          this.observedJoinFailure = error.code;
+        }
+        this.handleJoinErrorNotice(error);
+      },
+    };
     if (!turnCredsConfigured()) {
       this.turnStatus = "disabled";
       return createTrysteroPartyTransportFactory(options);
@@ -1830,7 +1861,21 @@ export class PartyEngine {
   }
 
   private failSetup(error: unknown): void {
-    this.lastError = connectionErrorMessage(error);
+    const directCode =
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      (error.code === "room-full" || error.code === "decrypt-failed")
+        ? error.code
+        : null;
+    this.setupFailureCode =
+      this.lastSetup?.kind === "join-invite" && !this.setupPeerAdmitted
+        ? (directCode ?? this.observedJoinFailure)
+        : null;
+    this.observedJoinFailure = null;
+    this.lastError = connectionErrorMessage(
+      this.setupFailureCode === null ? error : { code: this.setupFailureCode },
+    );
     this.phase = "error";
     this.phaseDetail = null;
     this.joinStage = null;
@@ -1845,6 +1890,8 @@ export class PartyEngine {
    */
   private waitForPeerConnect(party: PartySession, signal: AbortSignal): Promise<void> {
     if (party.role === "creator" || party.privateTransport.peers.length > 0) {
+      this.setupPeerAdmitted = true;
+      this.observedJoinFailure = null;
       return Promise.resolve();
     }
     this.joinStage = "connecting";
@@ -1889,7 +1936,11 @@ export class PartyEngine {
           }, remaining);
         }
       };
-      const unsubscribe = party.privateTransport.on("peer:joined", () => finish());
+      const unsubscribe = party.privateTransport.on("peer:joined", () => {
+        this.setupPeerAdmitted = true;
+        this.observedJoinFailure = null;
+        finish();
+      });
       this.signalingListeners.add(onSignaling);
       signal.addEventListener("abort", onAbort, { once: true });
       if (signal.aborted) onAbort();
@@ -2832,6 +2883,9 @@ export class PartyEngine {
     }
     this.stopObservingSignaling();
     this.setupAbort = new AbortController();
+    this.observedJoinFailure = null;
+    this.setupFailureCode = null;
+    this.setupPeerAdmitted = false;
     this.leaving = false;
     this.lastError = null;
     this.phase = "idle";
