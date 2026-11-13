@@ -1773,7 +1773,7 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     });
   });
 
-  it("mints again only after the 24 h lease expires, never mutating live peers", async () => {
+  it("re-mints once less than half the 24 h lease remains, never mutating live peers", async () => {
     vi.stubEnv("VITE_EDGE_ORIGIN", "https://turn-creds.example.workers.dev");
     const world = makeWorld();
     const turnConfig = [{ urls: "turn:one", username: "u1", credential: "c1" }];
@@ -1782,7 +1782,7 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     await runCreate(player, world);
     expect(turnCreds).toHaveBeenCalledTimes(1);
     await player.engine.leaveParty();
-    world.clock.advance(23 * 60 * 60 * 1000);
+    world.clock.advance(11 * 60 * 60 * 1000);
     await runCreate(player, world);
     expect(turnCreds).toHaveBeenCalledTimes(1);
     await player.engine.leaveParty();

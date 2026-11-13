@@ -90,8 +90,6 @@ canonical index or an ADR:
 - `docs/history/` — archived simplification evidence and superseded runbooks.
 - `docs/testing/` — milestone findings and checklists, each linked from its
   owning ADR (e.g. the S4 state-mode vertical slice from ADR-0006).
-- `docs/editor-cohesion-design.md` — the editor third-pass UI blueprint
-  (implementation tasks; task 9fv.10.12).
 - `deploy/cloudflare.md` — runbook and live state for the one Cloudflare
   edge Worker (Classic relay + TURN mint).
 

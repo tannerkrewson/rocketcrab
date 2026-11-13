@@ -59,12 +59,3 @@ export function readDraftSource(): DraftSourceEntry | null {
     return null;
   }
 }
-
-/** Drop any pending draft handoff (e.g. before opening a blank editor). */
-export function clearDraftSource(): void {
-  try {
-    sessionStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // sessionStorage unavailable (private mode): nothing to clear.
-  }
-}

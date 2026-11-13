@@ -146,7 +146,7 @@ Inputs:
 | `runtime_base`    | nova     | Base path of the runtime site when it is a project site, e.g. `/runtime/` (default `/`)                                                                           |
 | `main_origin`     | runtime  | The main origin for the exact-origin bootstrap check; derived (strip `runtime.`) unless the deployment is not on a subdomain                                      |
 | `edge_origin`     | nova     | Nova edge Worker origin (Classic relay + TURN mint), baked in as `VITE_EDGE_ORIGIN` and allowed in CSP `connect-src`; defaults to production, empty disables both |
-| `trystero_relays` | nova     | Optional comma-separated, owner-approved Nostr relay URLs (`VITE_TRYSTERO_RELAYS`); empty uses the reviewed pinned set                                            |
+| `trystero_relays` | nova     | Optional comma-separated, owner-approved Nostr relay URLs (`VITE_TRYSTERO_RELAYS`); empty uses Trystero's default relays                                          |
 
 Build-time pins (also documented in `apps/nova/.env.example` and
 `apps/runtime/.env.example`): `VITE_RUNTIME_ORIGIN`, `VITE_RUNTIME_BASE`

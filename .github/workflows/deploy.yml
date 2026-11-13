@@ -78,8 +78,8 @@ on:
       trystero_relays:
         description: >-
           (nova only) Optional comma-separated Nostr relay URLs for party
-          discovery, baked in as VITE_TRYSTERO_RELAYS. Leave empty to use the
-          reviewed pinned GOOD_RELAYS. Only set an owner-approved, re-probed
+          discovery, baked in as VITE_TRYSTERO_RELAYS. Leave empty to use
+          Trystero's default relays. Only set an owner-approved, re-probed
           set; invalid entries are ignored at build time.
         required: false
         type: string

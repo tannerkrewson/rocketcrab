@@ -129,8 +129,3 @@ export function parsePartyRecovery(raw: string): PartyRecoveryRecord | null {
     game,
   };
 }
-
-/** Test-only reset so tests start with no recovery record. */
-export function resetPartyRecoveryForTests(): void {
-  clearPartyRecovery();
-}

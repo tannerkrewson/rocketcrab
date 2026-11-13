@@ -1467,9 +1467,16 @@ export class PartyEngine {
     }
   }
 
-  /** Cache only inside the minted lease, measured from request start. */
+  /**
+   * Reuse a minted credential (e.g. across reconnects) only while at least
+   * half its lifetime remains, so a party started late in a long-open tab
+   * never gets a credential that expires mid-party.
+   */
   private async fetchTurnCredentialsOnce(): Promise<TurnCredentialsResult> {
-    if (this.turnCredsCache !== null && this.now() < this.turnCredsCache.expiresAt) {
+    if (
+      this.turnCredsCache !== null &&
+      this.now() < this.turnCredsCache.expiresAt - TURN_CREDS_TTL_MS / 2
+    ) {
       return { ok: true, turnConfig: this.turnCredsCache.turnConfig };
     }
     const requestedAt = this.now();

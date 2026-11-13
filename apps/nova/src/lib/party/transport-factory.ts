@@ -5,7 +5,7 @@ import type { TurnServerConfigLike } from "./turn-creds";
 /**
  * Optional build-time relay override (`VITE_TRYSTERO_RELAYS`, comma-separated).
  * Invalid entries are ignored; an empty/invalid value falls back to the
- * adapter's reviewed pinned set. This changes only signaling discovery, not
+ * Trystero's default Nostr relays. This changes only signaling discovery, not
  * transport semantics; it is not a runtime fetch or a game-facing surface.
  */
 export function configuredRelays(): string[] {
@@ -35,7 +35,7 @@ export interface TrysteroPartyTransportFactoryOptions {
    * (graceful degradation: the party proceeds without TURN).
    */
   readonly turnConfig?: readonly TurnServerConfigLike[];
-  /** Explicit relay list (tests/deploy override); defaults to build env or pinned set. */
+  /** Explicit relay list (tests/deploy override); defaults to build env or Trystero's defaults. */
   readonly relays?: readonly string[];
   /**
    * Join-error observer (5cl.1): both transports report categorized

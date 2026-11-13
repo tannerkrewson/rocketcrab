@@ -32,12 +32,16 @@ OpenTofu was removed in favour of `wrangler.toml` + `npm run edge:deploy`
 
 ## 3. Discovery relays — P1, owner decision
 
-- [ ] **Owner:** approve replacing the seven pinned Nostr relays with the five
-      that passed the 2026-10-24 burst probe (`nos.lol`, `relay.primal.net`,
-      `nostr.mom`, `relay.snort.social`, `relay.nostr.net`), or keep the current
-      list. Evidence: `docs/testing/trystero-connectivity-findings.md`.
-- [ ] If approved, change the pinned list, re-run `npm run test:e2e:trystero`,
-      and record console behaviour in the findings doc.
+Nova currently uses Trystero 0.26's built-in Nostr relay list
+(`defaultRelayUrls`); `VITE_TRYSTERO_RELAYS` / the `trystero_relays` deploy
+input can override it.
+
+- [ ] **Owner:** keep Trystero's defaults, or set the five relays that passed
+      the 2026-10-24 burst probe (`nos.lol`, `relay.primal.net`, `nostr.mom`,
+      `relay.snort.social`, `relay.nostr.net`) as the deploy input. Evidence:
+      `docs/testing/trystero-connectivity-findings.md`.
+- [ ] Re-run `npm run test:e2e:trystero` with the chosen set and record console
+      behaviour in the findings doc.
 
 ## 4. Real-device and real-network verification — P0
 

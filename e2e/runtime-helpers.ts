@@ -8,7 +8,7 @@
  * bootstrap with a dedicated MessageChannel — the same handshake the host
  * bridge (apps/nova/src/lib/runtime-host.ts) performs.
  */
-import { expect, type Frame, type Page } from "@playwright/test";
+import type { Frame, Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -243,13 +243,4 @@ export async function runtimeInternals(page: Page): Promise<Record<string, unkno
       mainOrigin: api.mainOrigin,
     };
   });
-}
-
-/** Assertions shared across runtime specs. */
-export async function expectRuntimeReady(page: Page): Promise<void> {
-  await expect
-    .poll(() =>
-      harnessEvents(page).then((events) => events.some((e) => e.type === "runtime.ready")),
-    )
-    .toBe(true);
 }
