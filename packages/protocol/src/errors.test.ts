@@ -62,6 +62,18 @@ describe("parsePeerMessage", () => {
     }
   });
 
+  it("accepts JSON-omitted action payloads without relaxing the remaining envelope", () => {
+    const wire = JSON.parse(JSON.stringify({ ...validPeerAction, payload: undefined })) as Record<
+      string,
+      unknown
+    >;
+    expect(parsePeerMessage(wire).ok).toBe(true);
+    expect(parsePeerMessage({ ...wire, actionType: "" }).ok).toBe(false);
+    expect(parsePeerMessage({ ...wire, seq: undefined }).ok).toBe(false);
+    expect(parsePeerMessage({ ...wire, version: 99 }).ok).toBe(false);
+    expect(parsePeerMessage({ ...wire, type: "simulation.input" }).ok).toBe(false);
+  });
+
   it("rejects non-object input as an invalid envelope", () => {
     for (const bad of [null, undefined, 42, "hello", []]) {
       const result = parsePeerMessage(bad);

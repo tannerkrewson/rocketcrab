@@ -318,6 +318,9 @@ passed 4/4 (Podman Playwright, 2026-11-13).
    arbitrary-scale solution. No supported 0.27 setting removes the bound.
 
 7. [ ] **Large-room load test.** Using headless browser contexts (several machines or CI shards if one machine can't hold them), run parties of 10, 25, 50 and 100 players with a state-mode sample game. Record per size: time until everyone sees everyone, message latency, CPU on the authority player's device (also try a real phone as authority at 25+), and any errors. Known risk to watch: the authority player sends state to everyone, so its upload grows with party size; if it becomes the bottleneck, propose a fix to the owner (e.g. state deltas or fan-out via `scale()` routing) rather than capping parties. Record results in `docs/testing/` and link them from ADR-0003.
+
+   Action payload regression: the peer `action.dispatch` schema accepts an omitted payload, matching the game API and JSON serialization of `undefined`; all other envelope and message validations remain in force. The session contract tests send omitted, explicit `undefined`, `null`, and `{}` from a non-authority via a JSON-round-tripping transport. Protocol version stays 1: existing defined-payload messages remain compatible and new receivers accept old senders; old receivers still reject omitted payloads, so mixed-version parties require updated authorities. Evidence: the protocol regression fails with the original schema; `npm run check` passed, and `npm run test:e2e` (60/60) and `npm run test:e2e:trystero` (5/5) passed in the pinned Playwright container against this worktree's servers. This does not complete the load-test gate.
+
 8. [ ] Update ADR-0003 (transport abstraction) to describe what Trystero now owns and what Nova still owns.
 
 ## 4. Own signaling relay — P0 (owner approved)

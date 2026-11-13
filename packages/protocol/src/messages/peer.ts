@@ -160,7 +160,8 @@ export const actionDispatchMessageSchema = z.object({
   actionId: z.string().min(1).max(64),
   baseRevision: z.number().int().nonnegative(),
   actionType: z.string().min(1).max(64),
-  payload: z.unknown(),
+  // An omitted game action payload is valid; JSON drops undefined properties.
+  payload: z.unknown().optional(),
   expiresAtMs: timestampSchema.optional(),
 });
 export type ActionDispatchMessage = z.infer<typeof actionDispatchMessageSchema>;

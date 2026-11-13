@@ -485,6 +485,49 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       expect(bChanges[0]).toEqual({ hand: undefined, deckCount: 2 });
     });
 
+    it("round-trips omitted, undefined and null remote action payloads through JSON transport", async () => {
+      const jsonHarness = (): NovaTransportHarness => {
+        const harness = harnessFactory();
+        return {
+          drain: () => harness.drain(),
+          createTransport: (identity) => {
+            const transport = harness.createTransport(identity);
+            const send = transport.send.bind(transport);
+            transport.send = (message) =>
+              send({ ...message, payload: JSON.parse(JSON.stringify(message.payload)) as unknown });
+            return transport;
+          },
+        };
+      };
+      const received: unknown[] = [];
+      const { harness, a, b } = await makePair(jsonHarness, {
+        handlers: {
+          createInitialState: () => ({ count: 0 }),
+          actions: {
+            record(draft: { count: number }, _context, payload) {
+              received.push(payload);
+              draft.count += 1;
+            },
+          },
+        },
+      });
+      await startBoth({ harness, a, b });
+      for (const action of [
+        { type: "record" },
+        { type: "record", payload: undefined },
+        { type: "record", payload: null },
+        { type: "record", payload: {} },
+      ]) {
+        const dispatched = b.client.dispatch(action);
+        await settle(harness);
+        await expect(dispatched).resolves.toBeUndefined();
+      }
+      expect(received).toEqual([undefined, undefined, null, {}]);
+      expect(a.getCanonicalState()?.state).toEqual({ count: 4 });
+      await a.leave();
+      await b.leave();
+    });
+
     it("rejects invalid actions without mutating state", async () => {
       const { harness, a, b } = await makePair(harnessFactory, {
         handlers: contractGameHandlers(),
