@@ -3,6 +3,26 @@ import { connectionErrorMessage } from "./connection-errors";
 
 describe("connectionErrorMessage", () => {
   it.each([
+    ["room-full", /party is full/i],
+    ["banned", /rejected/i],
+    ["relay-failed", /signaling relays/i],
+    ["identity-failed", /unexpected state/i],
+    ["plugin-failed", /unexpected state/i],
+    ["decrypt-failed", /fresh invite/i],
+    ["peer-connect-failed", /direct connection/i],
+    ["handshake-failed", /rejected/i],
+    ["peer-error", /closed while joining/i],
+  ])("maps RoomError code %s regardless of message or category", (code, expected) => {
+    expect(
+      connectionErrorMessage({
+        code,
+        category: "unknown",
+        message: "arbitrary",
+      }),
+    ).toMatch(expected);
+  });
+
+  it.each([
     ["password_mismatch", /fresh invite/i],
     ["incompatible_version", /update\/reload Nova/i],
     ["relay_unreachable", /signaling relays/i],

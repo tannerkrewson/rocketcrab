@@ -58,7 +58,11 @@ import {
 } from "../arena/state-executor";
 import { runtimeOriginForMainOrigin } from "../runtime-origin";
 import { findClassicGame, type ClassicGameConnectResult } from "../classic";
-import { connectionErrorMessage } from "./connection-errors";
+import {
+  connectionErrorCategory,
+  connectionErrorMessage,
+  roomErrorCategory,
+} from "./connection-errors";
 import { localPartyIdentity, updatePartyDisplayName } from "./identity";
 import { browserLifecycleSource, type PartyLifecycleSource } from "./lifecycle";
 import { clearPartyRecovery, savePartyRecovery } from "./party-recovery";
@@ -1431,13 +1435,7 @@ export class PartyEngine {
    */
   private readonly joinErrorNoticesShown = new Set<string>();
   private handleJoinErrorNotice(error: unknown): void {
-    const category =
-      typeof error === "object" &&
-      error !== null &&
-      "category" in error &&
-      typeof (error as { category: unknown }).category === "string"
-        ? ((error as { category: string }).category as string)
-        : "unknown";
+    const category = connectionErrorCategory(error) ?? "unknown";
     if (category === "incompatible_version") {
       if (this.joinErrorNoticesShown.has(category)) return;
       this.joinErrorNoticesShown.add(category);
@@ -1463,6 +1461,13 @@ export class PartyEngine {
         "warn",
         `A player couldn't connect directly. ${detail} They may not appear in the lobby.`,
       );
+      this.emit();
+      return;
+    }
+    if (roomErrorCategory(error) !== null) {
+      if (this.joinErrorNoticesShown.has(category)) return;
+      this.joinErrorNoticesShown.add(category);
+      this.addNotice("warn", connectionErrorMessage(error));
       this.emit();
     }
   }

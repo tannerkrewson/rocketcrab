@@ -1695,6 +1695,54 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     expect(state.diagnostics?.turn).toBe("disabled");
   });
 
+  it.each([
+    ["room-full", /party is full/i],
+    ["decrypt-failed", /fresh invite/i],
+    ["relay-failed", /signaling relays/i],
+    ["banned", /rejected/i],
+    ["identity-failed", /unexpected state/i],
+    ["plugin-failed", /unexpected state/i],
+    ["peer-connect-failed", /couldn't connect directly/i],
+    ["handshake-failed", /rejected/i],
+    ["peer-error", /closed while joining/i],
+  ])("shows and deduplicates a notice for RoomError %s", async (code, expected) => {
+    const world = makeWorld();
+    const player = makeDefaultFactoryPlayer(world);
+    await runCreate(player, world);
+    const options = transportFactoryMocks.createTrysteroPartyTransportFactory.mock.calls[0]?.[0];
+    expect(options?.onJoinError).toBeDefined();
+    options?.onJoinError?.({
+      code,
+      category: "unknown",
+      message: "unrelated wording",
+    });
+    options?.onJoinError?.({
+      code,
+      category: "unknown",
+      message: "different wording",
+    });
+    expect(
+      player.engine.getState().notices.filter((notice) => expected.test(notice.message)),
+    ).toHaveLength(1);
+  });
+
+  it("preserves legacy category notices without parsing error messages", async () => {
+    const world = makeWorld();
+    const player = makeDefaultFactoryPlayer(world);
+    await runCreate(player, world);
+    const options = transportFactoryMocks.createTrysteroPartyTransportFactory.mock.calls[0]?.[0];
+    options?.onJoinError?.({ category: "incompatible_version", message: "anything" });
+    options?.onJoinError?.({ category: "peer_connection_failed", message: "anything" });
+    options?.onJoinError?.(new Error("could not connect to peer"));
+    const notices = player.engine.getState().notices;
+    expect(
+      notices.filter((notice) => /incompatible Nova version/i.test(notice.message)),
+    ).toHaveLength(1);
+    expect(
+      notices.filter((notice) => /couldn't connect directly/i.test(notice.message)),
+    ).toHaveLength(1);
+  });
+
   it("mint success → turnConfig baked into the default factory + configured diagnostic", async () => {
     vi.stubEnv("VITE_EDGE_ORIGIN", "https://turn-creds.example.workers.dev");
     const world = makeWorld();
