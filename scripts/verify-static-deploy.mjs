@@ -3,17 +3,14 @@
  * Static-deploy verification (M2; docs/architecture/deployment.md).
  *
  * Checks a built origin's dist output against the deployment requirements
- * before it is published. Runs in the GitHub Pages deploy workflow after
- * `vite build` and locally via `npm run verify:deploy`. Exit code 0 keeps
+ * before it is published. Runs after `vite build` in the static deploy scripts
+ * and locally via `npm run verify:deploy`. Exit code 0 keeps
  * the deploy going; a non-zero exit aborts it.
  *
  * Nova origin (strict main-origin policy):
- *   - index.html carries the build-time CSP meta tag (GitHub Pages cannot
- *     send custom response headers) with `frame-src` pinned to the
- *     configured runtime origin;
+ *   - index.html carries the build-time CSP meta tag, and _headers carries
+ *     the matching policy with `frame-src` pinned to the runtime origin;
  *   - no inline application scripts (`script-src 'self'` must hold);
- *   - 404.html exists and is byte-identical to index.html (GitHub Pages
- *     SPA fallback — reloading any route works);
  *   - the referrer meta tag is present (no path/query leakage; invite
  *     secrets already live in URL fragments, ADR-0011).
  *
@@ -24,12 +21,7 @@
  *     control over game traffic, ADR-0008).
  *
  * Usage:
- *   node scripts/verify-static-deploy.mjs --origin nova|runtime [--runtime-origin <origin>] [--pages]
- *
- * `--pages` requires the GitHub Pages 404.html fallback. The deploy workflow
- * creates that byte-copy after `vite build`, so a plain local verification of
- * `npm run build` output does not fail for its absence; other hosts use their
- * own rewrite configuration.
+ *   node scripts/verify-static-deploy.mjs --origin nova|runtime --runtime-origin <origin> --main-origin <origin>
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
@@ -38,7 +30,6 @@ import { fileURLToPath } from "node:url";
 const args = parseArgs(process.argv.slice(2));
 const origin = args.origin;
 const runtimeOrigin = args.runtimeOrigin ?? "";
-const requirePagesFallback = args.pages === true;
 const mainOrigin = args.mainOrigin ?? "";
 if (origin !== "nova" && origin !== "runtime") {
   fail(`--origin must be "nova" or "runtime" (got "${origin}")`);
@@ -94,16 +85,6 @@ if (origin === "nova") {
   }
   const inlineScript = /<script(?![^>]*\bsrc=)[^>]*>/i.exec(indexHtml);
   expect("no inline application scripts", inlineScript === null, inlineScript?.[0] ?? "");
-  // GitHub Pages SPA fallback: 404.html serves the shell for unknown paths.
-  const notFound = readFileOptional(join(DIST, "404.html"));
-  if (requirePagesFallback) {
-    expect("404.html present (GitHub Pages SPA fallback)", notFound !== null);
-  }
-  if (notFound !== null) {
-    expect("404.html is a byte-copy of index.html", notFound === indexHtml);
-  } else if (!requirePagesFallback) {
-    console.log("note  404.html not present (GitHub Pages workflow adds it with --pages)");
-  }
   expect("referrer meta (no-referrer)", isNoReferrerMeta(indexHtml));
 } else {
   expect(
@@ -170,10 +151,6 @@ function readFile(file, label) {
   return readFileSync(file, "utf8");
 }
 
-function readFileOptional(file) {
-  return existsSync(file) ? readFileSync(file, "utf8") : null;
-}
-
 function fail(message) {
   console.error(`verify-static-deploy: ${message}`);
   process.exit(1);
@@ -183,10 +160,6 @@ function parseArgs(argv) {
   const out = {};
   for (let i = 0; i < argv.length; i++) {
     const arg = argv[i];
-    if (arg === "--pages") {
-      out.pages = true;
-      continue;
-    }
     if (arg === "--origin" || arg === "--runtime-origin" || arg === "--main-origin") {
       const key =
         arg === "--origin" ? "origin" : arg === "--runtime-origin" ? "runtimeOrigin" : "mainOrigin";

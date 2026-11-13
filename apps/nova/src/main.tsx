@@ -16,18 +16,12 @@ import "@fontsource/mukta/800.css";
 // rocketcrab.com homepage title only (rocketcrab-9fv.11.5); the rest of the
 // UI keeps Mukta. The `font-title` utility in styles.css references it.
 import "@fontsource-variable/inconsolata";
-import { normalizeBasePath } from "./lib/basepath";
 import { routeTree } from "./routeTree.gen";
 import "./styles.css";
 
 const queryClient = new QueryClient();
 
-// Match routes under the deployment base path: "/" normally, "/<repo>/"
-// for GitHub Pages project-site layouts (M2 deployment, normalizeBasePath).
-const router = createRouter({
-  routeTree,
-  basepath: normalizeBasePath(import.meta.env.BASE_URL),
-});
+const router = createRouter({ routeTree });
 
 // Register the router instance for type-safe typed routes.
 declare module "@tanstack/react-router" {

@@ -34,7 +34,7 @@ function httpsServerConfig(mode: string) {
  * The main origin's strict policy is emitted as a CSP meta tag and as
  * a Cloudflare static asset header from the same policy. The
  * runtime iframe is allowed only from the configured runtime origin
- * (`VITE_RUNTIME_ORIGIN`, set by the deploy workflow); without it,
+ * (`VITE_RUNTIME_ORIGIN`, set by the deploy script); without it,
  * `frame-src` falls back to `default-src 'self'` and the runtime frame is
  * blocked — a loud misconfiguration, never a silent loosening. The runtime
  * origin has NO CSP meta on purpose: it must keep ordinary web capabilities
@@ -77,7 +77,7 @@ function buildCsp(): string {
   if (rawOrigin === "") {
     console.warn(
       "[nova-csp-meta] VITE_RUNTIME_ORIGIN is not set: frame-src is omitted, so the " +
-        "runtime iframe will be blocked by the strict CSP. The deploy workflow sets " +
+        "runtime iframe will be blocked by the strict CSP. The deploy script sets " +
         "this for every production deploy (docs/architecture/deployment.md).",
     );
   }

@@ -16,7 +16,8 @@ confirms this mechanism (checked 2026-11-12). The runtime blocks all framing
 unless `VITE_MAIN_ORIGIN` is set at build time. `deploy/origins.json` is the
 source for the build pins used by `npm run deploy:nova` and
 `npm run deploy:runtime`; both verify built assets before calling Wrangler.
-First deploys still require owner approval.
+First deploys still require owner approval. GitHub Pages and project-site
+base paths are no longer deployment targets.
 
 ## What the Worker does
 

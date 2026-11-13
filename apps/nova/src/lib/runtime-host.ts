@@ -40,7 +40,6 @@ import {
   type RuntimeErrorMessage,
   type RuntimeMessage,
 } from "@rocketcrab/protocol";
-import { runtimeBasePath } from "./runtime-origin";
 
 /** Minimal port surface the bridge drives (real MessagePorts satisfy it). */
 export interface ChannelPort {
@@ -380,9 +379,7 @@ export class RuntimeHostClient {
     iframe.style.cssText = "width:100%;height:100%;border:0;display:block";
     this.iframe = iframe;
     this.container.appendChild(iframe);
-    // runtimeBasePath() is "/" by default; project-site runtime layouts
-    // (M2 deployment strategies (b)/(c)) pin it via VITE_RUNTIME_BASE.
-    iframe.src = `${this.runtimeOrigin}${runtimeBasePath()}`;
+    iframe.src = `${this.runtimeOrigin}/`;
     try {
       await this.waitForFrameLoad(iframe);
     } catch (error) {

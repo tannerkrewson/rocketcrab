@@ -104,7 +104,7 @@ npm run check   # format check + lint + typecheck + tests + build
 ```
 
 Local development serves both origins over HTTP by default; the two-origin HTTPS
-setup, the GitHub Pages deploy workflow, and the per-origin security policies
+setup, the Cloudflare deployment scripts, and the per-origin security policies
 are documented in `docs/architecture/deployment.md` (M2 — Configure production
 static deployment; nothing is published yet).
 
