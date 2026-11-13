@@ -23,6 +23,8 @@
     "test:e2e:trystero": "playwright test -c e2e-trystero/playwright.config.ts",
     "bundle:size": "node scripts/bundle-size.mjs",
     "verify:deploy": "node scripts/verify-static-deploy.mjs",
+    "deploy:nova": "node scripts/deploy-static.mjs nova",
+    "deploy:runtime": "node scripts/deploy-static.mjs runtime",
     "edge:dev": "npx --yes wrangler@4.161.0 dev --config deploy/edge/wrangler.toml",
     "edge:check": "npx --yes wrangler@4.161.0 deploy --config deploy/edge/wrangler.toml --dry-run --outdir \"$PWD/deploy/edge/.build\"",
     "edge:deploy": "npx --yes wrangler@4.161.0 deploy --config deploy/edge/wrangler.toml",

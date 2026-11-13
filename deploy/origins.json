@@ -1,0 +1,5 @@
+{
+  "nova": "https://rocketcrab-nova.tannerkrewson.workers.dev",
+  "runtime": "https://rocketcrab-runtime.tannerkrewson.workers.dev",
+  "edge": "https://rocketcrab-edge.tannerkrewson.workers.dev"
+}
