@@ -71,6 +71,7 @@ export class PartySession {
   readonly factory: PartyTransportFactory;
   private creatorMemberId: MemberId | null;
   private disposed = false;
+  private leavePromise: Promise<void> | null = null;
   private readonly listeners = new Set<(event: PartyEvent) => void>();
   private readonly unsubscribers: Array<() => void> = [];
   private readonly renamedNames = new Map<MemberId, string>();
@@ -147,12 +148,13 @@ export class PartySession {
     }
   }
   async leave(): Promise<void> {
-    if (this.disposed) return;
+    if (this.leavePromise !== null) return this.leavePromise;
     this.disposed = true;
     for (const unsubscribe of this.unsubscribers) unsubscribe();
     this.listeners.clear();
     this.renamedNames.clear();
-    await this.privateTransport.leave().catch(() => undefined);
+    this.leavePromise = Promise.resolve().then(() => this.privateTransport.leave());
+    await this.leavePromise;
   }
   private base() {
     return {

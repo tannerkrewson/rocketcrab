@@ -2201,6 +2201,32 @@ describe("party engine — signaling outage setup", () => {
     expect(player.engine.getState().phase).toBe("idle");
   });
 
+  it("fails closed if an established party's transport cannot leave", async () => {
+    const world = makeWorld();
+    let created = 0;
+    world.factory.createPrivateTransport = (identity) => {
+      const transport = world.hub.createTransport(identity);
+      created++;
+      if (created === 1)
+        transport.leave = async () => {
+          throw new Error("teardown failed");
+        };
+      return transport;
+    };
+    const player = makePlayer(world, "host");
+    await runCreate(player, world);
+    const leaving = player.engine.leaveParty();
+    const retry = player.engine.createParty();
+    await Promise.all([leaving, retry]);
+    expect(created).toBe(1);
+    expect(player.engine.getState().phase).toBe("error");
+    expect(player.engine.getState().lastError).toMatch(/reload.*before joining/i);
+    player.engine.dismissError();
+    await player.engine.joinByInvite({ secret: "T".repeat(43) });
+    expect(created).toBe(1);
+    expect(player.engine.getState().phase).toBe("error");
+  });
+
   it("fails closed after pending teardown rejects until a fresh engine is created", async () => {
     const world = makeWorld();
     let created = 0;

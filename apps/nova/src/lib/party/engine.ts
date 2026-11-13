@@ -1114,7 +1114,11 @@ export class PartyEngine {
     const party = this.party;
     this.party = null;
     if (party !== null) {
-      await party.leave().catch(() => undefined);
+      try {
+        await party.leave();
+      } catch {
+        this.teardownFailed = true;
+      }
     }
     if ((await pendingTeardown) === false) this.teardownFailed = true;
     // 5cl.14: frame executors are per-party; dispose them with the session.

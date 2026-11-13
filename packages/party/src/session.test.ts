@@ -134,6 +134,33 @@ describe("private party sessions", () => {
     await a.leave();
     await b.leave();
   });
+  it("shares and preserves a failed transport teardown across leave callers", async () => {
+    const w = world();
+    const party = await createParty({
+      memberId: "a",
+      transportFactory: w.factory,
+      derive: w.derive,
+    });
+    let rejectLeave!: (error: Error) => void;
+    let calls = 0;
+    party.privateTransport.leave = () => {
+      calls++;
+      return new Promise<void>((_resolve, reject) => {
+        rejectLeave = reject;
+      });
+    };
+    const first = party.leave();
+    const second = party.leave();
+    const firstError = expect(first).rejects.toThrow("teardown failed");
+    const secondError = expect(second).rejects.toThrow("teardown failed");
+    await Promise.resolve();
+    expect(calls).toBe(1);
+    rejectLeave(new Error("teardown failed"));
+    await Promise.all([firstError, secondError]);
+    await expect(party.leave()).rejects.toThrow("teardown failed");
+    expect(calls).toBe(1);
+  });
+
   it("rejects malformed invites before allocating resources without echoing secrets", async () => {
     const w = world();
     await expect(
