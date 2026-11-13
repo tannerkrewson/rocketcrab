@@ -344,10 +344,25 @@ describe("four players play full rounds (arena-style)", () => {
     }
     await playToStart(world);
 
-    // Round 1's auto-reveal races across all four frames: the losers are
-    // rejected with stale_revision and the game logs the stable code (S2
-    // acceptance: errors are actionable rather than generic).
+    // Arm every frame's timer against the same question before allowing it to
+    // expire. Hold queued transport messages until after the deadline, so the
+    // winning reveal cannot refresh the other frames before they dispatch.
+    // Without this barrier, timer ordering and hub drains can avoid the race
+    // entirely, making the stale_revision assertion intermittent.
     const a = sessionOf(world, "member-a");
+    const question = await waitForView(world, a, (v) => v.phase === "question");
+    for (const session of world.sessions) {
+      await waitForView(
+        world,
+        session,
+        (v) => v.phase === "question" && v.round === question.round,
+      );
+    }
+    await new Promise((resolve) =>
+      setTimeout(resolve, Math.max(0, question.deadline - Date.now()) + 100),
+    );
+
+    // The losing auto-reveals are rejected with the stable, actionable code.
     await waitForView(world, a, (v) => v.phase === "revealed");
     await settle(world, 300);
     const joined = entries.map((args) => args.join(" ")).join("\n");
