@@ -341,7 +341,7 @@ Evidence: shared-budget contract and editor diagnostic tests; `npm run check` pa
 
 ## 8. Connection logging — P1 (keep it small)
 
-1. [ ] Edge route `POST /log` (same gate; rate-limit key `log:<ip>`) writing one Workers Analytics Engine data point per event to a dataset bound as `CONNECTION_EVENTS` in `deploy/edge/wrangler.toml`. Official Free/Paid availability and limits checked 2026-11-12 in `deploy/cloudflare.md`; owner must confirm the actual account plan and access before implementation.
+1. [x] Implement locally: edge route `POST /log` (same gate; rate-limit key `log:<ip>`) writes one Workers Analytics Engine point per validated event to `CONNECTION_EVENTS`. Evidence: `deploy/edge/log.test.ts`; schema and official Free/Paid limits rechecked 2026-11-13 in `deploy/cloudflare.md`. No deploy or live verification; owner must confirm actual account plan and access before deployment.
 2. [ ] One event per peer connection attempt, sent by the client with `navigator.sendBeacon`:
 
    - `outcome`: `direct` | `turn` | `tunnel` | `failed` (`direct`/`turn` from the real connection's selected candidate pair via `getStats()`; `tunnel` and `failed` from the wrapper), - `error_code` (Trystero `RoomError.code`, or empty), - `ms_to_connect`, - `signaling_ok` (bool), - `browser` (family only, e.g. `safari-ios`, `chrome-android`), - `network` (`navigator.connection.effectiveType`/`type` where available, else `unknown`), - `app_version`. **Never** names, invite/room ids, peer ids or IPs. The Worker must not write the IP into the data point.

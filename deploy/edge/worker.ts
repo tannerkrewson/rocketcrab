@@ -12,6 +12,7 @@
  */
 import { jsonError } from "./http";
 import { handleRelay } from "./relay";
+import { handleLog, type LogEnv } from "./log";
 import { handleTurn, type TurnEnv } from "./turn";
 export { SignalHub } from "./signal";
 
@@ -19,7 +20,7 @@ export interface RateLimitBinding {
   limit(options: { key: string }): Promise<{ success: boolean }>;
 }
 
-export interface EdgeEnv extends TurnEnv {
+export interface EdgeEnv extends TurnEnv, LogEnv {
   /** Comma-separated exact origins allowed to call the Worker. */
   ORIGIN_ALLOWLIST?: string;
   /** Workers Rate Limiting binding (wrangler.toml `[[ratelimits]]`). */
@@ -34,6 +35,7 @@ type Handler = (request: Request, env: EdgeEnv) => Promise<Response>;
 
 const ROUTES: Record<string, { handler: Handler; rateLimitKey: string }> = {
   "/turn": { handler: handleTurn, rateLimitKey: "turn" },
+  "/log": { handler: handleLog, rateLimitKey: "log" },
   "/": { handler: handleRelay, rateLimitKey: "relay" },
 };
 

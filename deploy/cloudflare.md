@@ -110,8 +110,10 @@ approved cutover. Paid is a **$5/month minimum**, not a spending cap.
   remain free. [Limits](https://developers.cloudflare.com/analytics/analytics-engine/limits/)
   include 250 points per Worker invocation and three months' retention.
 
+Analytics Engine pricing and limits above were rechecked against those official pages on 2026-11-13.
+
 **Owner/account gates:** confirm the actual Workers plan, Analytics Engine
-access and relevant account usage/allowances in the dashboard before §8.1;
+access and relevant account usage/allowances in the dashboard before deployment;
 published plan availability does not prove this account's access. Determine
 whether a useful Free-limit usage notification is offered for this account,
 configure it and verify delivery; the notification type and threshold are not
@@ -137,12 +139,25 @@ For `edge:dev` with real TURN minting, put the two secrets in a gitignored
 
 ## Connection statistics (planned ingestion)
 
-The independent SQL report assumes dataset **`connection_events`**: `blob1`
-contains `direct`, `turn`, `tunnel`, or `failed`; `double1` is milliseconds to
-connect for successful outcomes. The future §8.1 writer must use this exact
-mapping (and must not record IPs, room IDs, or player IDs). No writer, binding,
-or dataset has been deployed yet; a table appears only after its first event.
-Coordinate changes to this schema with the reporting script.
+The locally staged `POST /log` accepts one JSON object (including sendBeacon's
+text/plain payload), at most 1024 bytes, with exactly these required fields:
+
+- `outcome`: `direct`, `turn`, `tunnel`, or `failed` (blob1).
+- `error_code`: empty or a Trystero 0.27 RoomError code: `room-full`, `banned`, `relay-failed`, `identity-failed`, `plugin-failed`, `decrypt-failed`, `peer-connect-failed`, `handshake-failed`, `peer-error` (blob2).
+- `ms_to_connect`: integer 0–3600000 milliseconds (double1; report uses successful outcomes only).
+- `signaling_ok`: boolean (blob3, encoded `true` or `false`).
+- `browser`: `unknown`, `safari-ios`, `safari`, `chrome-android`, `chrome`, `firefox`, `edge`, or `other` (blob4).
+- `network`: `unknown`, `slow-2g`, `2g`, `3g`, `4g`, `bluetooth`, `cellular`, `ethernet`, `wifi`, `wimax`, `none`, or `other` (blob5).
+- `app_version`: numeric `major.minor.patch`, each component 0–999 without leading zeros (blob6).
+
+Unknown fields and values are rejected; no names, IPs, room IDs, or player IDs
+are written. The allowlist and `log:<ip>` rate-limit key are shared gate
+mechanisms, but the IP is not stored in the data point. As with other routes,
+the rate limiter fails open on binding failure. A 204 means the write call was
+accepted, not that ingestion was verified. The binding targets dataset
+**`connection_events`**; no writer, binding, or dataset has been deployed yet.
+A table appears only after its first event. Coordinate schema changes with the
+reporting script and future client. Account plan/access remain unverified.
 
 The owner must create a Cloudflare API token scoped to this account with
 **Account → Account Analytics → Read**, and supply it locally; never commit or
