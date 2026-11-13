@@ -84,8 +84,12 @@ const PLAYERS: Array<{ memberId: string; name: string }> = [
 /** Every world created by a test; disposed in afterEach. */
 const worlds: World[] = [];
 
-function makeWorld(): World {
-  const world = { hub: new InMemoryTransportHub(), sessions: [], transports: [] };
+function makeWorld(manualDelivery = false): World {
+  const world = {
+    hub: new InMemoryTransportHub(manualDelivery ? { schedule: () => () => {} } : undefined),
+    sessions: [],
+    transports: [],
+  };
   worlds.push(world);
   return world;
 }
@@ -338,7 +342,9 @@ describe("four players play full rounds (arena-style)", () => {
     vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
       entries.push(args);
     });
-    const world = makeWorld();
+    // Disable the hub's automatic delivery; explicit drain() calls still
+    // deliver real messages through the normal transport and state engine.
+    const world = makeWorld(true);
     for (const player of PLAYERS) {
       addPlayer(world, player);
     }
@@ -366,6 +372,9 @@ describe("four players play full rounds (arena-style)", () => {
     await waitForView(world, a, (v) => v.phase === "revealed");
     await settle(world, 300);
     const joined = entries.map((args) => args.join(" ")).join("\n");
+    expect(joined).toMatch(
+      /Reveal (?:raced another player \( |could not be applied: )stale_revision/u,
+    );
     expect(joined).toContain("stale_revision");
     expect(joined).toContain("Nova Quiz started with 4 player(s)");
     // The game still progressed despite the races.

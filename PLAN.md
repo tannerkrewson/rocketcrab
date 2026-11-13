@@ -94,11 +94,13 @@ currently serves the **legacy** live site — do not touch it before §9.
   Nostr relays.
 - Static hosting is a manual GitHub Pages workflow
   (`.github/workflows/deploy.yml`) that cannot provide two origins or headers.
-- Test reliability: `example-game.test.ts` now waits for all question timers
-  and holds transport delivery through the reveal deadline before asserting
-  `stale_revision`. The original intermittent failure did not reproduce in
-  12 isolated runs; the synchronized test passed 12 isolated runs. This fixes
-  the uncontrolled race setup, not evidence of a product failure. `npm run
+- Test reliability: `example-game.test.ts` uses manual hub delivery, waits for
+  all question timers, and holds messages through the reveal deadline before
+  asserting `stale_revision` from the real state engine. The original intermittent
+  failure did not reproduce in 12 isolated runs; the manual-delivery test passed
+  12 isolated runs. The initial synchronization still allowed automatic hub
+  delivery; manual scheduling closes that gap. This fixes the uncontrolled race
+  setup, not evidence of a product failure. `npm run
   check` passed; `npm run test:e2e` passed all 60 tests using the pinned
   Playwright 1.62.1 Noble Podman image (host WebKit dependencies are missing).
 
