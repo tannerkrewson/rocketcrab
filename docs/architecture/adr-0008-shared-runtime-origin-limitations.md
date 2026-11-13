@@ -6,6 +6,20 @@
 - **Related:** ADR-0001 (origins), F4 (sandbox spike), M2 (deployment),
   B5 (shared origin), A3 (media bridging)
 
+## Amended 2026-11-12: runtime on a separate site
+
+The runtime must be on a different **site** (scheme and registrable domain,
+using the Public Suffix List), not just an origin or sibling subdomain, to
+support browser process isolation from CPU exhaustion. The
+[runtime sandbox findings](../testing/runtime-sandbox-findings.md) observed
+tab-wide freezes with port-only separation; browser process assignment is
+implementation-dependent, so a separate site is not an unconditional
+responsiveness guarantee. The runtime remains at
+`rocketcrab-runtime.tannerkrewson.workers.dev` even after the app moves to
+`rocketcrab.com`. `workers.dev` is a public suffix, making the beta app and
+runtime separate sites. This does not change the shared-runtime per-game
+limitations below. See [deployment](deployment.md).
+
 ## Context
 
 All games run on a **single** runtime origin (`runtime.nova.example`, ADR-0001)

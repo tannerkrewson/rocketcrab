@@ -136,7 +136,8 @@ after the cutover (browser storage is per origin).
        Evidence: removed Pages workflow, 404 fallback handling and base-path machinery; production origins are explicitly pinned and localhost development swaps ports.
 5. [x] Update `scripts/verify-static-deploy.mjs` to check the emitted `_headers` (CSP present, `frame-src` = runtime origin, runtime `frame-ancestors` = main origin) and update `e2e/deployment.spec.ts`.
        Evidence: verifier checks matching Nova meta/header policies and runtime framing origin; deploy script passes both origins.
-6. [ ] Rewrite `docs/architecture/deployment.md` for Cloudflare (it is currently GitHub-Pages-specific). Amend ADR-0001 and ADR-0008: the runtime must be on a different **site** (registrable domain), not just a different origin — the repo's own finding (`docs/testing/runtime-sandbox-findings.md`) is that browser process isolation is per site, so a looping game on a same-site runtime can freeze the app. Record the workers.dev runtime decision.
+6. [x] Rewrite `docs/architecture/deployment.md` for Cloudflare (it is currently GitHub-Pages-specific). Amend ADR-0001 and ADR-0008: the runtime must be on a different **site** (registrable domain), not just a different origin — the repo's own finding (`docs/testing/runtime-sandbox-findings.md`) is that browser process isolation is per site, so a looping game on a same-site runtime can freeze the app. Record the workers.dev runtime decision.
+       Evidence: Cloudflare runbook replaces Pages guidance; ADR-0001 and ADR-0008 amendments require different sites and record the permanent workers.dev runtime.
 7. [ ] With owner approval, first deploy of both Workers; open the app, create a game, run it in the editor (proves the runtime iframe, CSP and `frame-ancestors`), and check response headers with `curl -I`.
 
 ## 3. Trystero 0.27 migration — P0 (owner approved)

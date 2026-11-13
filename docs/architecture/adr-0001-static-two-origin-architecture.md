@@ -5,6 +5,20 @@
 - **Owner:** Rocketcrab Nova planning (Phase 1)
 - **Related:** ADR-0002 (untrusted game model), ADR-0008 (runtime-origin limits), F4 (runtime sandbox validation), M2 (production deployment)
 
+## Amended 2026-11-12: separate sites and Cloudflare hosting
+
+The runtime must be hosted on a different **site** (scheme and registrable
+domain, using the Public Suffix List), not just a different origin or sibling
+subdomain. The [runtime sandbox findings](../testing/runtime-sandbox-findings.md)
+show that port-only isolation can let an infinite game loop freeze the app;
+browser process isolation is site-oriented and remains implementation-dependent.
+The runtime stays on `rocketcrab-runtime.tannerkrewson.workers.dev`; the Nova
+beta uses `rocketcrab-nova.tannerkrewson.workers.dev`. Because `workers.dev`
+is a public suffix, these are different sites; the runtime stays there after
+Nova moves to `rocketcrab.com`. The static Workers and edge Worker are deployed
+through Wrangler; see [deployment](deployment.md). This supersedes the
+same-site example below without rewriting the historical decision.
+
 ## Context
 
 Rocketcrab Nova is a static, mobile-first web application for creating, testing,

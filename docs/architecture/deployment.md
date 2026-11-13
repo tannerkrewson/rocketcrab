@@ -1,252 +1,87 @@
-# Deployment: two static origins on GitHub Pages (M2)
+# Deployment: Cloudflare Workers and two static sites
 
-- **Status:** Config + strategy documented; **nothing is published yet**.
-- **Owner:** M2 (Configure production static deployment)
-- **Related:** ADR-0001 (two static origins), ADR-0008 (shared runtime-origin
-  limitations), ADR-0011 (secrets in URL fragments), B8 (static-host security
-  headers), user decision 2026-08-01 (target = GitHub Pages).
+Nova's app and untrusted runtime are static Vite builds served by separate
+assets-only Cloudflare Workers. The only application backend is the edge
+Worker; its configuration and live-state runbook are in
+[`deploy/cloudflare.md`](../../deploy/cloudflare.md).
 
-## 1. The requirement
+| Component    | Build               | Worker                         | Beta origin                                            |
+| ------------ | ------------------- | ------------------------------ | ------------------------------------------------------ |
+| Nova SPA     | `apps/nova/dist`    | `deploy/nova/wrangler.toml`    | `https://rocketcrab-nova.tannerkrewson.workers.dev`    |
+| Game runtime | `apps/runtime/dist` | `deploy/runtime/wrangler.toml` | `https://rocketcrab-runtime.tannerkrewson.workers.dev` |
+| Edge API     | `deploy/edge/`      | `deploy/edge/wrangler.toml`    | `https://rocketcrab-edge.tannerkrewson.workers.dev`    |
 
-Rocketcrab Nova is fully static (ADR-0001): two HTTPS origins, both built
-with Vite, no application server:
+## Isolation and policies
 
-| Origin  | Built from          | Role                                                               |
-| ------- | ------------------- | ------------------------------------------------------------------ |
-| Main    | `apps/nova/dist`    | The Nova SPA (strict security policy)                              |
-| Runtime | `apps/runtime/dist` | Isolated execution origin for game HTML (intentionally permissive) |
+The runtime must be on a different **site**, not merely a different origin.
+A site is scheme plus registrable domain as determined using the Public
+Suffix List; different ports or sibling subdomains under the same registrable
+domain are not sufficient. `workers.dev` is on the Public Suffix List, so
+the two Worker hostnames are separate sites. Browser process isolation is
+implementation-dependent, but same-site hosting exposed a tab-wedging CPU
+exhaustion failure in [the runtime findings](../testing/runtime-sandbox-findings.md).
+See ADR-0001 and ADR-0008. Keep the runtime on workers.dev when the app moves
+to `rocketcrab.com`.
 
-The origins MUST be distinct (per-site process/CPU-exhaustion isolation, F4
-finding; ADR-0008). The runtime origin is secret-free: no Nova credentials,
-no auth cookies, no service workers.
+The runtime contains no Nova secrets, authentication cookies or service
+worker authority; games share its origin and are not isolated from each
+other. Exact-origin bootstrap and sandboxing remain required. Both sites
+use `Referrer-Policy: no-referrer` and no-referrer meta tags.
 
-## 2. The GitHub Pages constraint
+Nova's Vite plugin emits a strict CSP both in its HTML meta tag and in
+`dist/_headers`, where it adds `frame-ancestors 'none'`. Its `frame-src`
+contains the pinned runtime and the Classic game allowlist. The runtime
+plugin emits its permissive CSP as an HTTP header, including
+`frame-ancestors` pinned to the main origin; absent a pin it denies framing.
+Hashed `/assets/*` are immutable; other assets use Cloudflare defaults.
+Workers apply `_headers` from the built asset directory
+([Cloudflare documentation](https://developers.cloudflare.com/workers/static-assets/headers/),
+checked 2026-11-12). Local Vite development does not serve those headers.
 
-GitHub Pages serves **one site per repo**, and every project site of one
-account shares the `username.github.io` **origin** (only the path differs).
-A single account's project pages therefore CANNOT give the shell and the
-runtime separate origins, which the architecture requires. Three workable
-strategies:
+The app uses Cloudflare's `single-page-application` fallback. The runtime
+uses `404-page` handling; neither site supports a project-site base path.
 
-| Strategy                                                 | Main origin                                       | Runtime origin                                       | Runtime origin derivable?                                         | Notes                                                                                                            |
-| -------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
-| **(a) Custom-domain subdomains (recommended)**           | `nova.<your-domain>` (repo A + CNAME)             | `runtime.<your-domain>` (repo B + CNAME)             | Yes — the app derives `runtime.` + hostname (ADR-0001 derivation) | One GitHub account, two repos, each with its own custom domain → two distinct origins. Requires owning a domain. |
-| **(b) Two GitHub accounts/orgs**                         | `account-a.github.io/nova` (repo A, project site) | `account-b.github.io/runtime` (repo B, project site) | No — pin via `VITE_RUNTIME_ORIGIN` + `VITE_RUNTIME_BASE`          | Two accounts/orgs; base paths needed; free but awkward (origin is shared per account).                           |
-| **(c) Alternate static host (Netlify/Cloudflare Pages)** | `nova-<user>.netlify.app` (or custom domain)      | `runtime-<user>.netlify.app`                         | No — pin via `VITE_RUNTIME_ORIGIN`                                | Subdomains per project; also supports `_headers`/`_redirects` (see §5).                                          |
+## Build and deploy
 
-**Decision needed from the user before publishing: do you own (or will you
-buy) a domain?** Strategy (a) is the clean path — it matches the ADR-0001
-derivation (`nova.example` → `runtime.nova.example`), needs no origin pins,
-and keeps both origins at their site root. Strategies (b)/(c) work with the
-same build via the `VITE_RUNTIME_ORIGIN` / `VITE_MAIN_ORIGIN` /
-`VITE_RUNTIME_BASE` pins (workflow inputs, §6).
-
-Until that decision lands, the deploy workflow is manual-only
-(`workflow_dispatch`) and nothing is published.
-
-## 3. Per-origin policy
-
-### Main origin (strict SPA policy)
-
-- No inline application scripts — the Vite build emits external hashed
-  scripts only; the CSP pins `script-src 'self'`.
-- No arbitrary third-party script execution — `script-src 'self'` only.
-- Runtime iframe allowed ONLY from the configured runtime origin —
-  `frame-src <runtime-origin>`, baked at build time.
-- No sensitive secrets in server-visible URL components — invite secrets
-  live in URL fragments (ADR-0011); both origins ship
-  `Referrer-Policy: no-referrer` so paths/query never leak in Referer.
-- SPA fallback routing — see §4.
-- Caching — hashed assets immutable (long-lived), HTML entry short-lived
-  (see §5 for what each host can do).
-
-GitHub Pages cannot send custom response headers, so the strict policy is
-delivered as a **CSP meta tag injected at build time**
-(`apps/nova/vite.config.ts`, `nova-csp-meta` plugin). The deploy workflow
-passes `VITE_RUNTIME_ORIGIN`; without it the build warns and `frame-src`
-falls back to `default-src 'self'` (runtime frame blocked — a loud
-misconfiguration, never a silent loosening). `scripts/verify-static-deploy.mjs`
-fails the deploy if the built HTML does not pin `frame-src` to the configured
-runtime origin.
-
-### Runtime origin (intentionally permissive, compensated)
-
-Game HTML may need: inline scripts; HTTPS scripts/modules; HTTPS and WSS
-connections; remote images/fonts/audio/video/models; blob URLs; camera/mic
-permission delegation. So the runtime page ships **no restrictive CSP**
-(no CSP meta at all on GitHub Pages). The permissiveness is compensated by:
-
-- hosting on a separate origin (per-site isolation);
-- no Nova secrets, no auth cookies on the origin (ADR-0008);
-- no service workers — `apps/runtime/src/main.ts` sweeps any registration on
-  load, and browsers reject registration from the sandboxed game frame;
-- no top navigation — the game frame sandbox has no `allow-top-navigation`
-  (U3);
-- framing prevented by unrelated origins — via `frame-ancestors` on
-  header-capable hosts (§5); on GitHub Pages the runtime page is secret-free
-  and validates the exact bootstrap origin, so the residual framing risk is
-  documented (threat model; B8 note in §8);
-- the main origin stays strict.
-
-## 4. SPA fallback routing
-
-GitHub Pages has no rewrite rules. The deploy workflow copies
-`apps/nova/dist/index.html` to `404.html` in the artifact: GitHub serves
-404.html's content at any unknown path, the SPA boots at that
-`location.pathname`, and TanStack Router matches it. The router basepath is
-`import.meta.env.BASE_URL` (`apps/nova/src/lib/basepath.ts`), so project-site
-layouts (`/nova/…`) work too. `404.html` is a byte-copy of the built
-index.html — no inline script, so the strict CSP holds. On header-capable
-hosts the same behavior comes from `deploy/nova/_redirects`
-(`/* /index.html 200`).
-
-## 5. Headers and caching per host
-
-| Capability                     | GitHub Pages                                                                                                                    | Netlify / Cloudflare Pages (`deploy/*`)              |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- |
-| Custom headers                 | Not supported                                                                                                                   | `_headers` per origin (see below)                    |
-| CSP                            | Build-time meta tag (main origin; none on runtime)                                                                              | Same meta tag PLUS `_headers` CSP (identical policy) |
-| Frame protection               | Header-only directives impossible; bootstrap-origin validation + secret-free runtime                                            | `frame-ancestors` in `_headers`                      |
-| Referrer                       | `<meta name="referrer" content="no-referrer">` in both `index.html` files                                                       | meta tag (same)                                      |
-| SPA fallback                   | 404.html copy (workflow)                                                                                                        | `_redirects`                                         |
-| Immutable hashed-asset caching | **Not supported** — GitHub Pages serves fixed `Cache-Control: max-age=600`; acceptable for v1 (hashed URLs + ETag revalidation) | `/assets/*` → `max-age=31536000, immutable`          |
-
-Per-origin header files (Netlify/Cloudflare format, substitute YOUR real
-origins in the CSP `frame-src`/`frame-ancestors` before use):
-
-- `deploy/nova/_headers` — strict main-origin policy
-  (`script-src 'self'`, `frame-src <runtime>`, `frame-ancestors 'none'`,
-  no camera/mic permissions, no-referrer).
-- `deploy/runtime/_headers` — permissive runtime policy
-  (`default-src * data: blob: 'unsafe-inline' 'unsafe-eval'`,
-  `frame-ancestors <main>`, camera/mic/clipboard `(self)` for delegation,
-  no-referrer).
-
-The strict meta CSP is generated only on `vite build`; local dev stays
-header-free (Vite dev needs inline scripts).
-
-## 6. The deploy workflow (`.github/workflows/deploy.yml`)
-
-Manual-only (`workflow_dispatch`) — nothing deploys automatically. Run it in
-**each repo whose Pages site is one origin** (strategy (a): two repos with
-the two CNAME custom domains; strategy (b): one repo per account). The
-workflow builds only the selected app, adds the 404.html fallback (nova),
-verifies the output with `scripts/verify-static-deploy.mjs`, and deploys
-with `actions/upload-pages-artifact` + `actions/deploy-pages` (set the
-repo's Pages source to "GitHub Actions", and the custom domain in each
-repo's Pages settings).
-
-Inputs:
-
-| Input             | Used for | Meaning                                                                                                                                                           |
-| ----------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `origin`          | both     | `nova` (main app) or `runtime` (runtime origin)                                                                                                                   |
-| `base`            | both     | Vite base of THIS site: `/` for user/org sites and custom domains; `/<repo>/` for project sites                                                                   |
-| `runtime_origin`  | nova     | The runtime origin, e.g. `https://runtime.nova.example` — REQUIRED; baked into the iframe URL and CSP `frame-src`                                                 |
-| `runtime_base`    | nova     | Base path of the runtime site when it is a project site, e.g. `/runtime/` (default `/`)                                                                           |
-| `main_origin`     | runtime  | The main origin for the exact-origin bootstrap check; derived (strip `runtime.`) unless the deployment is not on a subdomain                                      |
-| `edge_origin`     | nova     | Nova edge Worker origin (Classic relay + TURN mint), baked in as `VITE_EDGE_ORIGIN` and allowed in CSP `connect-src`; defaults to production, empty disables both |
-| `trystero_relays` | nova     | Optional comma-separated, owner-approved Nostr relay URLs (`VITE_TRYSTERO_RELAYS`); empty uses Trystero's default relays                                          |
-
-Build-time pins (also documented in `apps/nova/.env.example` and
-`apps/runtime/.env.example`): `VITE_RUNTIME_ORIGIN`, `VITE_RUNTIME_BASE`
-(nova); `VITE_MAIN_ORIGIN` (runtime). Optional nova pins:
-`VITE_EDGE_ORIGIN` and
-`VITE_TRYSTERO_RELAYS` (see the workflow inputs).
-
-### Cloudflare edge Worker
-
-GitHub Actions Pages is the only publisher for the static Nova and runtime
-origins. The one piece of server-side code, the Cloudflare edge Worker
-(Classic relay + TURN mint), is configured by `deploy/edge/wrangler.toml` and
-deployed with `npm run edge:deploy`; [`deploy/cloudflare.md`](../../deploy/cloudflare.md)
-is its runbook and live-state record.
-
-## 7. Local HTTPS development (both origins)
-
-Production is HTTPS-only, and the runtime iframe requires a distinct origin,
-so local HTTPS matters (self-signed, gitignored — local tooling only):
+`deploy/origins.json` contains the beta origins used by both scripts. Each
+builds with the appropriate origin pins, runs
+`scripts/verify-static-deploy.mjs`, and invokes the pinned Wrangler version:
 
 ```sh
-npm run gen-certs       # generates .certs/ for localhost (idempotent)
-npm run dev:https       # nova on https://localhost:5173, runtime on https://localhost:5174
+npm run deploy:runtime
+npm run deploy:nova
 ```
 
-Accept the self-signed-cert warning once per browser. The origin derivation
-swaps ports in dev, so no hostname editing is needed. For physical-device
-testing on the LAN, include the machine's IP and serve with `--host`:
+**First deployments require owner approval.** Do not deploy to or change
+`rocketcrab.com` before the cutover gate in `PLAN.md`. The current repository
+configuration does not imply either static Worker is live. The edge Worker
+has its own `npm run edge:deploy` path and approval gates in the runbook.
+
+For verification without deployment:
 
 ```sh
-node scripts/gen-certs.mjs 192.168.1.10   # SAN: localhost + that IP
-npm run dev:https
-# devices open https://192.168.1.10:5173 (accept the cert warning)
+VITE_RUNTIME_ORIGIN=https://rocketcrab-runtime.tannerkrewson.workers.dev \
+  VITE_EDGE_ORIGIN=https://rocketcrab-edge.tannerkrewson.workers.dev \
+  npm run build --workspace @rocketcrab/nova
+VITE_MAIN_ORIGIN=https://rocketcrab-nova.tannerkrewson.workers.dev \
+  npm run build --workspace @rocketcrab/runtime
+npm run verify:deploy -- --origin nova --runtime-origin https://rocketcrab-runtime.tannerkrewson.workers.dev
+npm run verify:deploy -- --origin runtime --main-origin https://rocketcrab-nova.tannerkrewson.workers.dev
 ```
 
-(`scripts/gen-certs.mjs` generalises the F4 spike tooling; the spike's own
-copy was removed in release cleanup.)
+The verifier checks CSP headers, Nova's meta policy and pinned frame source,
+script restrictions, no-referrer, and absence of runtime service workers.
+After approved deployment inspect both response headers with `curl -I`, open a
+Nova deep link, and create and run a game to check the iframe handshake and
+policies. Rebuild and redeploy an earlier commit to roll back, subject to the
+usual deployment approval rules.
 
-## 8. Deployment, verification, rollback
+## Local development
 
-Static origins deploy through GitHub Actions Pages only:
-
-1. Choose a strategy and own the domain(s) (the pending user decision).
-2. Repo per origin; set Pages source to "GitHub Actions"; set custom domains
-   (strategy (a)) or nothing (strategy (b) project sites).
-3. Run "Deploy to GitHub Pages" with the input table above.
-
-The edge Worker deploys with `npm run edge:deploy` (see
-[`deploy/cloudflare.md`](../../deploy/cloudflare.md)). Deploy it before a
-static build that points `VITE_EDGE_ORIGIN` at it. Roll back the Worker with
-`npx --yes wrangler@4.161.0 rollback --config deploy/edge/wrangler.toml` or by
-redeploying an earlier commit; roll back the static origins by re-running
-Pages on the previous commit.
-
-### Verify the built artifacts locally (no host required)
-
-The 2026-10-24 launch-readiness pass exercised the **built** two-origin output
-this way and all 16 static/runtime Playwright tests passed (SPA deep-link
-fallback, CSP `frame-src` to the runtime origin, invite-fragment secrecy,
-remote dependencies, isolation, lifecycle cleanup):
-
-```sh
-# Distinct local origins (any ports you like; bake them into the builds)
-VITE_RUNTIME_ORIGIN=http://localhost:5174 npm run build --workspace @rocketcrab/nova
-VITE_MAIN_ORIGIN=http://localhost:5173   npm run build --workspace @rocketcrab/runtime
-cp apps/nova/dist/index.html apps/nova/dist/404.html   # Pages-style fallback
-# Serve apps/nova/dist on 5173 with a history fallback and apps/runtime/dist
-# on 5174 as plain static files, then run the Playwright specs with a config
-# whose baseURL is http://localhost:5173 and no webServer entry.
-```
-
-`npm run verify:deploy -- --origin nova --runtime-origin <origin>` checks the
-CSP/scripts; add `--pages` when `404.html` should be required (the GitHub
-Pages workflow does, after creating it). Without `--pages` a plain local build
-verification reports the missing fallback as a note rather than a failure, so
-alternate hosts with their own rewrites can use the same script.
-
-Verify after each deploy:
-
-```sh
-curl -sI https://nova.example/            # HTTPS, CSP meta tag in the body
-curl -s  https://nova.example/party/ABCD  # 200, app HTML (404.html fallback)
-curl -sI https://runtime.nova.example/    # runtime origin serves its page
-```
-
-Plus `npm run verify:deploy` against local build output (the same checks the
-workflow runs): CSP meta + pinned `frame-src`, no inline scripts, 404.html
-fallback (nova; add `--pages` when it must be present); no CSP meta + no service workers (runtime). "Invite
-fragments are not sent in HTTP requests" is covered by
-`e2e/deployment.spec.ts` and the fact that fragments never leave the
-browser.
-
-Rollback: re-run the workflow on the previous release's commit (Pages keeps
-deployment history; the latest deploy wins). Unpublish: disable the Pages
-environment in the repo settings. On alternate hosts, roll back in the
-host's dashboard/CLI to a previous deployment.
-
-Residual risks (B8 note): GitHub Pages cannot send custom security headers,
-immutable-cache headers, or `frame-ancestors`. Accepted for v1 on strategy
-(a) via the meta CSP + no-referrer + secret-free runtime + strict
-bootstrap-origin validation; strategies (b)/(c) are available if header
-control becomes mandatory. See also ADR-0008 (shared runtime-origin storage
-limitations).
+`npm run dev` serves Nova at `http://localhost:5173` and runtime at
+`http://localhost:5174`; origin derivation is limited to localhost. For
+HTTPS, `npm run gen-certs` followed by `npm run dev:https` uses local
+self-signed certificates. On a LAN hostname or IP, explicitly configure
+`VITE_RUNTIME_ORIGIN` for Nova and `VITE_MAIN_ORIGIN` for runtime to the
+corresponding HTTPS origins; trust the development certificate on the device.
+Local ports alone are not separate sites, so CPU isolation cannot be assumed.
