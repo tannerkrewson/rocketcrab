@@ -1,6 +1,5 @@
 // Raw Trystero proof, deliberately separate from Nova's transport.
-// oxlint-disable-next-line no-restricted-imports
-import { joinRoom, scale } from "@trystero-p2p/ws-relay";
+import { joinRoom, scale } from "../../node_modules/@trystero-p2p/ws-relay/dist/index.mjs";
 
 const errors = [];
 const room = joinRoom(

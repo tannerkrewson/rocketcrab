@@ -259,9 +259,10 @@ passed 4/4 (Podman Playwright, 2026-11-13).
    virtual route. This is a test-only strategy shim and not a large-room load
    test, proof of every failure mode, or phone validation. Existing coordinator
    cancellation and hash tests remain in place. The production setting is 9
-   direct neighbors. Regression evidence: `npm run check` passed;
-   `npm run test:e2e` passed 60/60 and `npm run test:e2e:trystero` passed 6/6
-   in the pinned Playwright container against this worktree's servers. §3.6–3.7
+   direct neighbors. After rebase onto the local-signaling client, both focused
+   proofs passed; `npm run check` passed, `npm run test:e2e` passed 60/60 and
+   `npm run test:e2e:trystero` passed 5/5 in the pinned Playwright container
+   against this worktree's servers. §3.6–3.7
    remain open pending the large-room load tests and phone gate.
 
    **Owner decision / release blocker (verified 2026-11-13):** pinned

@@ -5,7 +5,9 @@ import { WebSocketServer, WebSocket } from "ws";
 // established data channels. This is not the production signaling server.
 export default defineConfig({
   resolve: {
-    alias: { trystero: new URL("./src/scale-transport-shim.js", import.meta.url).pathname },
+    alias: {
+      "@trystero-p2p/ws-relay": new URL("./src/scale-transport-shim.js", import.meta.url).pathname,
+    },
   },
   plugins: [
     {

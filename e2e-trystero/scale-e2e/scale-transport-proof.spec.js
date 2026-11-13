@@ -21,6 +21,7 @@ test("Nova game source reaches a virtual peer with signaling disabled", async ({
           room,
         ),
       ).toBe("joined");
+      expect(await page.evaluate(() => window.adapterPlugins)).toEqual(["scale"]);
       pages.push(page);
     }
     let pair;
