@@ -120,7 +120,8 @@ Replace GitHub Pages with two assets-only Workers. Owner accepted that games
 saved on the workers.dev beta address will not carry over to `rocketcrab.com`
 after the cutover (browser storage is per origin).
 
-1. [ ] Create `deploy/nova/wrangler.toml`: `name = "rocketcrab-nova"`, `[assets] directory = "../../apps/nova/dist"`, `not_found_handling = "single-page-application"`, no `main` script, `workers_dev = true`, `preview_urls = false`. Create `deploy/runtime/wrangler.toml` the same way for `rocketcrab-runtime` with `not_found_handling = "404-page"` (the runtime is not an SPA — check how `apps/runtime` routes before choosing).
+1. [x] Create `deploy/nova/wrangler.toml`: `name = "rocketcrab-nova"`, `[assets] directory = "../../apps/nova/dist"`, `not_found_handling = "single-page-application"`, no `main` script, `workers_dev = true`, `preview_urls = false`. Create `deploy/runtime/wrangler.toml` the same way for `rocketcrab-runtime` with `not_found_handling = "404-page"` (the runtime is not an SPA — check how `apps/runtime` routes before choosing).
+       Evidence: assets-only configs added; runtime has a single `index.html` and uses 404 handling for unknown paths. No deployment performed.
 2. [ ] Security headers become real HTTP headers. Workers static assets read a `_headers` file from the asset directory (verify in current Cloudflare docs). Make the Vite builds **emit** `dist/_headers` from the same code that builds the CSP, so there is one source of truth:
 
    - Nova: extend the `nova-csp-meta` plugin in `apps/nova/vite.config.ts` to also write `_headers` with the identical CSP plus `frame-ancestors 'none'`, the other headers now in `deploy/nova/_headers`, and immutable caching for `/assets/*`. Keep the CSP `<meta>` tag too (harmless, protects file previews).

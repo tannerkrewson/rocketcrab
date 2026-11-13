@@ -7,6 +7,10 @@ configuration, and `npm run edge:deploy` is the single deployment path.
 Record every change made outside that file (dashboard, secrets, account
 settings) in this runbook.
 
+Static assets-only Worker configurations are staged in `deploy/nova/wrangler.toml`
+and `deploy/runtime/wrangler.toml`. They have not been deployed; the app
+uses SPA fallback and the runtime uses 404 handling for unknown paths.
+
 ## What the Worker does
 
 | Route                  | File        | Purpose                                                                                                                                                                        |
