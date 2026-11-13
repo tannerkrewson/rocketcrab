@@ -4,6 +4,7 @@ import EXAMPLE_GAME_SOURCE from "../../../../../examples/games/nova-quiz.html?ra
 import { parseInviteFragment, type PartyTransportFactory } from "@rocketcrab/party";
 import type { NovaTransport, TransportEventMap } from "@rocketcrab/core";
 import { InMemoryTransportHub } from "@rocketcrab/testing";
+import { fromRoomError } from "@rocketcrab/trystero-transport";
 import type { ChannelPort } from "../runtime-host";
 import { PartyEngine, type PartyRuntimeSeams, type PartySourceSpec } from "./engine";
 import { createMemoryLifecycleSource } from "./lifecycle";
@@ -1703,13 +1704,23 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
       await settle(world);
       const options = transportFactoryMocks.createTrysteroPartyTransportFactory.mock.calls[0]?.[0];
       expect(options?.onJoinError).toBeDefined();
-      options?.onJoinError?.({ code, category: "unknown", message: "peer failure" });
+      options?.onJoinError?.(
+        fromRoomError({
+          code,
+          peerId: "unrelated-peer",
+          stage: "offer",
+          appId: "test",
+          roomId: "test",
+          message: "a peer report does not establish why joining fails",
+        }),
+      );
       expect(player.engine.getState().phase).toBe("joining");
       world.clock.advance(1_000);
       await settle(world);
       await joining;
       expect(player.engine.getState().phase).toBe("error");
       expect(player.engine.getState().setupFailureCode).toBe(code);
+      expect(player.engine.getState().lastError).toMatch(/couldn't reach anyone/i);
       player.engine.retrySetup();
       await settle(world);
       expect(player.engine.getState().setupFailureCode).toBeNull();
@@ -1741,6 +1752,30 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     ).toBe(true);
     await player.engine.leaveParty();
     await host.engine.leaveParty();
+  });
+
+  it("ignores callbacks from an old transport after a new party is established", async () => {
+    const world = makeWorld();
+    const player = makeDefaultFactoryPlayer(world);
+    await runCreate(player, world);
+    const old = transportFactoryMocks.createTrysteroPartyTransportFactory.mock.calls[0]?.[0];
+    await player.engine.leaveParty();
+    await runCreate(player, world);
+    expect(player.engine.getState().phase).toBe("lobby");
+    const before = player.engine.getState().notices;
+    old?.onJoinError?.(
+      fromRoomError({
+        code: "decrypt-failed",
+        peerId: "old-peer",
+        stage: "offer",
+        appId: "test",
+        roomId: "old-room",
+        message: "corrupt signal",
+      }),
+    );
+    expect(player.engine.getState().notices).toEqual(before);
+    expect(player.engine.getState().phase).toBe("lobby");
+    await player.engine.leaveParty();
   });
 
   it("does not leave a stale relay-failed notice after recovery", async () => {

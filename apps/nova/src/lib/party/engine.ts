@@ -518,6 +518,7 @@ export class PartyEngine {
   private setupFailureCode: "room-full" | "decrypt-failed" | null = null;
   private observedJoinFailure: "room-full" | "decrypt-failed" | null = null;
   private setupPeerAdmitted = false;
+  private activeErrorScope: object | null = null;
   private lastSetup: LastSetup | null = null;
   /** Ring-buffer of the game's runtime console output (5cl.11). */
   private runtimeLogs: ArenaLogEntry[] = [];
@@ -1029,6 +1030,7 @@ export class PartyEngine {
    * UI never flashes the entry screen.
    */
   leaveParty(nextPhase: PartyPhase = "idle", preserveSetup = false): Promise<void> {
+    this.activeErrorScope = null;
     if (!preserveSetup) {
       this.observedJoinFailure = null;
       this.setupFailureCode = null;
@@ -1559,8 +1561,11 @@ export class PartyEngine {
       return injected;
     }
     const setup = this.setupAbort;
+    const scope = {};
+    this.activeErrorScope = scope;
     const options = {
       onJoinError: (error: unknown) => {
+        if (this.activeErrorScope !== scope || setup?.signal.aborted) return;
         if (
           setup !== null &&
           this.setupAbort === setup &&
@@ -1870,12 +1875,16 @@ export class PartyEngine {
         : null;
     this.setupFailureCode =
       this.lastSetup?.kind === "join-invite" && !this.setupPeerAdmitted
-        ? (directCode ?? this.observedJoinFailure)
+        ? (directCode ??
+          (error instanceof PartyError && error.code === "peer_unreachable"
+            ? this.observedJoinFailure
+            : null))
         : null;
     this.observedJoinFailure = null;
-    this.lastError = connectionErrorMessage(
-      this.setupFailureCode === null ? error : { code: this.setupFailureCode },
-    );
+    this.lastError =
+      directCode === null
+        ? connectionErrorMessage(error)
+        : "Couldn't connect to the party. Try again.";
     this.phase = "error";
     this.phaseDetail = null;
     this.joinStage = null;
@@ -2847,6 +2856,7 @@ export class PartyEngine {
 
   private async finishFailedSetup(setup: AbortController, error: unknown): Promise<void> {
     if (setup.signal.aborted) return;
+    this.activeErrorScope = null;
     const transport = this.pendingSetupTransport;
     if (transport !== null) {
       try {
@@ -2883,6 +2893,7 @@ export class PartyEngine {
     }
     this.stopObservingSignaling();
     this.setupAbort = new AbortController();
+    this.activeErrorScope = null;
     this.observedJoinFailure = null;
     this.setupFailureCode = null;
     this.setupPeerAdmitted = false;
