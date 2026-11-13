@@ -350,6 +350,54 @@ describe("TrysteroTransport join", () => {
     expect(mocks.joinRoom).toHaveBeenCalledTimes(2);
   });
 
+  it("waits for failed room teardown before an immediate retry", async () => {
+    const { adapter, clock } = setup({ relayConnectTimeoutMs: 5000 });
+    const oldRoom = makeFakeRoom();
+    const newRoom = makeFakeRoom();
+    let finishLeave!: () => void;
+    oldRoom.leave.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishLeave = resolve;
+        }),
+    );
+    mocks.joinRoom.mockReturnValueOnce(oldRoom).mockReturnValueOnce(newRoom);
+    mocks.relaySockets[RELAY] = { readyState: 0 };
+    const first = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    clock.advance(5000);
+    await expect(first).rejects.toMatchObject({ category: "relay_unreachable" });
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    const retry = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
+    finishLeave();
+    await retry;
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(2);
+    expect(adapter.connectionState).toBe("connected");
+    await adapter.leave();
+  });
+
+  it("cancels a retry while waiting for failed room teardown", async () => {
+    const { adapter, clock } = setup({ relayConnectTimeoutMs: 5000 });
+    const room = makeFakeRoom();
+    let finishLeave!: () => void;
+    room.leave.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishLeave = resolve;
+        }),
+    );
+    mocks.joinRoom.mockReturnValue(room);
+    mocks.relaySockets[RELAY] = { readyState: 0 };
+    const first = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    clock.advance(5000);
+    await expect(first).rejects.toMatchObject({ category: "relay_unreachable" });
+    const retry = adapter.join({ room: "ROOM", sessionId: "session-1" });
+    await adapter.leave();
+    finishLeave();
+    await expect(retry).rejects.toMatchObject({ category: "cancelled" });
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
+  });
+
   it("cancels a pending join when leave() runs mid-join", async () => {
     const { adapter } = setup();
     void adapter;
@@ -621,13 +669,33 @@ describe("TrysteroTransport send", () => {
     expect(config.onReceiveProgress).toBeNull();
   });
 
-  it("broadcasts to every peer (target null)", async () => {
+  it("broadcasts only to admitted peers, never unadmitted or rejected peers", async () => {
     const { adapter, room } = await joinedWithPeer();
+    room.peers.pending = { userId: "pending-user" };
+    room.peers.rejected = { userId: "rejected-user" };
+    room.metas["rejected-user"] = { peerId: "rejected", userId: "rejected-user", online: true };
+    room.values["rejected-user"] = { v: 1, memberId: 42, connectionId: "" };
+    room.joinHandler!({ peerId: "rejected", userId: "rejected-user" });
     await adapter.send({ channel: "raw", payload: { hello: 1 } });
+    expect(room.action.send).toHaveBeenCalledTimes(1);
     expect(room.action.send).toHaveBeenCalledWith(
       { hello: 1 },
-      expect.objectContaining({ target: null }),
+      expect.objectContaining({ target: "peer-1" }),
     );
+  });
+
+  it("continues a broadcast to other admitted peers when one disconnects", async () => {
+    const { adapter, room } = await joinedWithPeer();
+    await simulatePeerJoin(capturedCallbacks(), room, "peer-2", {
+      memberId: "member-c",
+      connectionId: "conn-c",
+    });
+    room.action.send.mockImplementation(async (_payload, options) => {
+      if (options.target === "peer-1")
+        throw Object.assign(new Error("disconnected"), { kind: "disconnected" });
+    });
+    await expect(adapter.send({ channel: "raw", payload: "hello" })).resolves.toBeUndefined();
+    expect(room.action.send.mock.calls.map((call) => call[1].target)).toEqual(["peer-1", "peer-2"]);
   });
 
   it("targets one connection by connectionId", async () => {
@@ -699,6 +767,10 @@ describe("TrysteroTransport send", () => {
       category: "invalid_state",
     });
     expect(reasons).toEqual(["not a string"]);
+    await simulatePeerJoin(capturedCallbacks(), room, "peer-1", {
+      memberId: "member-b",
+      connectionId: "conn-b",
+    });
     await adapter.send({ channel: "raw", payload: "ok" });
     expect(room.action.send).toHaveBeenCalledTimes(1);
   });

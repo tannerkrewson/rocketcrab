@@ -27,6 +27,7 @@ it("waits for both validated identity and acknowledgement before announcing a pe
         finishAck = resolve;
       }),
   );
+  const dataSend = vi.fn(async () => {});
   const room = {
     getSelf: async () => ({ peerId: "self" }),
     getPeers: () => peers,
@@ -39,7 +40,7 @@ it("waits for both validated identity and acknowledgement before announcing a pe
       onReceiveProgress: subscribe(`${name}.progress`),
       onReceive: subscribe(`${name}.receive`),
       onRequest: subscribe(`${name}.request`),
-      send: name === "nova.identity.ack" ? ackSend : vi.fn(async () => {}),
+      send: name === "nova.identity.ack" ? ackSend : dataSend,
     }),
     makeUserState: () => ({
       get: (user: string) => values[user],
@@ -74,6 +75,8 @@ it("waits for both validated identity and acknowledgement before announcing a pe
   listeners.state!(values.user, { peerId: "remote", userId: "user", self: false, removed: false });
   expect(ackSend).toHaveBeenCalledWith("remote-connection", { target: "remote" });
   expect(joined).not.toHaveBeenCalled();
+  await transport.send({ channel: "game", payload: "before-admission" });
+  expect(dataSend).not.toHaveBeenCalled();
   // The remote may have received our ack even though its send promise is
   // still pending. Its first application message must be queued, not lost.
   listeners.nova!("hello", {
@@ -99,6 +102,11 @@ it("waits for both validated identity and acknowledgement before announcing a pe
   finishAck();
   await Promise.resolve();
   expect(joined).toHaveBeenCalledOnce();
+  await transport.send({ channel: "game", payload: "after-admission" });
+  expect(dataSend).toHaveBeenCalledWith(
+    "after-admission",
+    expect.objectContaining({ target: "remote" }),
+  );
   expect(received).toHaveBeenCalledOnce();
   await expect(request).resolves.toBe("response");
   expect(received.mock.calls[0]?.[0]).toMatchObject({

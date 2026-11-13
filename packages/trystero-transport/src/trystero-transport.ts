@@ -138,6 +138,7 @@ export class TrysteroTransport implements NovaTransport {
   private connectionEpoch = 0;
   /** Invalidates asynchronous lifecycle continuations after leave or replacement. */
   private lifecycleGeneration = 0;
+  private pendingTeardown: Promise<void> | null = null;
   private suspendPending = false;
   private joinWaiter: { resolve: () => void; reject: (error: Error) => void } | null = null;
   private joinTimers: Array<() => void> = [];
@@ -297,12 +298,36 @@ export class TrysteroTransport implements NovaTransport {
         message: `TrysteroTransport.join: already ${this.connectionState}; leave() first.`,
       });
     }
+    const generation = ++this.lifecycleGeneration;
     this.connectionState = "joining";
     this.emit("connection:state", "joining");
     this.roomName = request.room;
     this.sessionId = request.sessionId;
     this.connectionEpoch = 0;
     this.selfConnectionId = this.selfIdBase;
+    if (this.pendingTeardown) {
+      try {
+        await this.pendingTeardown;
+      } catch (cause) {
+        if (generation === this.lifecycleGeneration) {
+          this.connectionState = "idle";
+          this.roomName = "";
+          this.sessionId = null;
+          this.emit("connection:state", "idle");
+        }
+        throw new TrysteroJoinError({
+          category: "invalid_state",
+          message: "Previous room teardown failed.",
+          cause,
+        });
+      }
+      if (generation !== this.lifecycleGeneration) {
+        throw new TrysteroJoinError({
+          category: "cancelled",
+          message: "Join was cancelled while waiting for room teardown.",
+        });
+      }
+    }
     let room: Room;
     try {
       room = joinRoom(this.buildConfig(), request.room);
@@ -484,26 +509,50 @@ export class TrysteroTransport implements NovaTransport {
       deliverySeq,
       binary: binary || undefined,
     });
-    await action.send(options.payload as DataPayload, {
-      target,
-      metadata: metadata as unknown as JsonValue,
-      onProgress:
-        options.onProgress === undefined
-          ? undefined
-          : (fraction01: number) => {
-              // Trystero reports progress as a fraction in [0, 1] (its docs
-              // call it "a percentage value between 0 and 1").
-              const fraction = Math.max(0, Math.min(1, fraction01));
-              options.onProgress?.({
-                direction: "send",
-                messageId,
-                channel: options.channel,
-                bytesTransferred: Math.round(fraction * totalBytes),
-                totalBytes,
-                fraction,
-              });
-            },
-    });
+    const sendTo = (peerId: string) =>
+      action.send(options.payload as DataPayload, {
+        target: peerId,
+        metadata: metadata as unknown as JsonValue,
+        onProgress:
+          options.onProgress === undefined
+            ? undefined
+            : (fraction01: number) => {
+                // Trystero reports progress as a fraction in [0, 1] (its docs
+                // call it "a percentage value between 0 and 1").
+                const fraction = Math.max(0, Math.min(1, fraction01));
+                options.onProgress?.({
+                  direction: "send",
+                  messageId,
+                  channel: options.channel,
+                  bytesTransferred: Math.round(fraction * totalBytes),
+                  totalBytes,
+                  fraction,
+                });
+              },
+      });
+    if (target !== null) {
+      await sendTo(target);
+    } else {
+      // Broadcast only to peers whose identities have been admitted. A peer
+      // disappearing during a broadcast must not prevent delivery to others.
+      await Promise.all(
+        [...this.readyPeers].map(async (peerId) => {
+          try {
+            await sendTo(peerId);
+          } catch (error) {
+            if (
+              !(
+                typeof error === "object" &&
+                error !== null &&
+                "kind" in error &&
+                error.kind === "disconnected"
+              )
+            )
+              throw error;
+          }
+        }),
+      );
+    }
   }
 
   // ------------------------------------------------------------------
@@ -1037,7 +1086,14 @@ export class TrysteroTransport implements NovaTransport {
     const room = this.room;
     this.teardownRoom(room);
     if (room !== null) {
-      void room.leave().catch(() => undefined); // fail fast and leave (F4)
+      const teardown = room.leave();
+      this.pendingTeardown = teardown;
+      void teardown.then(
+        () => {
+          if (this.pendingTeardown === teardown) this.pendingTeardown = null;
+        },
+        () => undefined,
+      );
     }
     this.sessionId = null;
     this.roomName = "";
@@ -1067,9 +1123,9 @@ export class TrysteroTransport implements NovaTransport {
   // Internals
   // ------------------------------------------------------------------
 
-  private resolveTarget(targetConnectionId: ConnectionId | undefined): string | string[] | null {
+  private resolveTarget(targetConnectionId: ConnectionId | undefined): string | null {
     if (targetConnectionId === undefined) {
-      return null; // broadcast to every connected peer
+      return null; // broadcast to admitted peers only
     }
     const peerId = this.connectionToPeerId.get(targetConnectionId);
     if (peerId === undefined || !this.readyPeers.has(peerId)) {
