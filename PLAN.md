@@ -238,6 +238,32 @@ passed 4/4 (Podman Playwright, 2026-11-13).
    - Confirm game-source transfer still works for multi-hop peers: Trystero promotes messages over 16 KiB to a direct link, so a peer reachable only via hops may fail the up-to-2 MiB transfer. If it does, fall back to chunks ≤ 16 KiB for that peer.
    - Load-test large rooms (step 7) before calling this done.
 
+   Investigation (2026-11-13, installed `@trystero-p2p/core@0.27.0`):
+   `scale/topology.mjs` selects the full mesh when `room size - 1 <=
+   maxDirectPeers`, so 9 retains a mesh for 10 players. `action-wire.mjs`
+   selects inline vs bulk using the complete frame size, including its 36-byte
+   header and metadata, not just payload size. `scale/data-plane.mjs` asks
+   for direct promotion for bulk transfer frames while also queuing routed
+   unicast. Whether an interrupted or failed promotion preserves an entire
+   game-source response must be tested on a real multi-hop route. Source transfer
+   is currently a request/response (`packages/party/src/game-source.ts`), so any
+   chunk fallback must coordinate both ends, cancellation, response limits,
+   progress and existing hash/UTF-8 validation; it must not simply retry an
+   already partially delivered response.
+
+   Partial evidence: the scale proof exercises eight Chromium contexts with
+   `maxDirectPeers: 4` and an in-memory WebSocket relay that drops signaling
+   publishes after a virtual route forms. A raw 2 MiB request/response was
+   byte-exact on a two-hop route without direct promotion; the Nova transport
+   and game-source coordinator also received a verified 2 MiB source over a
+   virtual route. This is a test-only strategy shim and not a large-room load
+   test, proof of every failure mode, or phone validation. Existing coordinator
+   cancellation and hash tests remain in place. The production setting is 9
+   direct neighbors. Regression evidence: `npm run check` passed;
+   `npm run test:e2e` passed 60/60 and `npm run test:e2e:trystero` passed 6/6
+   in the pinned Playwright container against this worktree's servers. §3.6–3.7
+   remain open pending the large-room load tests and phone gate.
+
 7. [ ] **Large-room load test.** Using headless browser contexts (several machines or CI shards if one machine can't hold them), run parties of 10, 25, 50 and 100 players with a state-mode sample game. Record per size: time until everyone sees everyone, message latency, CPU on the authority player's device (also try a real phone as authority at 25+), and any errors. Known risk to watch: the authority player sends state to everyone, so its upload grows with party size; if it becomes the bottleneck, propose a fix to the owner (e.g. state deltas or fan-out via `scale()` routing) rather than capping parties. Record results in `docs/testing/` and link them from ADR-0003.
 8. [ ] Update ADR-0003 (transport abstraction) to describe what Trystero now owns and what Nova still owns.
 

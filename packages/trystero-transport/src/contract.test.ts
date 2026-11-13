@@ -105,6 +105,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("./signal-url", () => ({ signalUrl: async () => "wss://relay.damus.io" }));
 vi.mock("@trystero-p2p/ws-relay", () => ({
+  scale: (config: unknown) => ({ name: "scale", config }),
   joinRoom: mocks.joinRoom,
   getRelaySockets: () => mocks.relaySockets,
   defaultRelayUrls: ["wss://default.example"],

@@ -33,6 +33,7 @@ const mocks = vi.hoisted(() => {
 
 vi.mock("./signal-url", () => ({ signalUrl: mocks.signalUrl }));
 vi.mock("@trystero-p2p/ws-relay", () => ({
+  scale: (config: unknown) => ({ name: "scale", config }),
   joinRoom: mocks.joinRoom,
   getRelaySockets: () => mocks.relaySockets,
   defaultRelayUrls: ["wss://relay.damus.io"],
@@ -408,6 +409,8 @@ describe("TrysteroTransport join", () => {
     expect(config.appId).toBe("rocketcrab-nova-v027-dev");
     expect(config.relayConfig).toEqual({ urls: [RELAY] });
     expect(config.maxReceiveBytes).toBe(8 * 1024 * 1024);
+    expect(config.use).toEqual([{ name: "scale", config: { maxDirectPeers: 9 } }]);
+    expect(config.maxUsers).toBeUndefined();
   });
 
   it("rejects a second join while connected", async () => {

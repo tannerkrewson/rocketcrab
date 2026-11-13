@@ -3,6 +3,7 @@ import { expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({ joinRoom: vi.fn() }));
 vi.mock("./signal-url", () => ({ signalUrl: async () => "relay" }));
 vi.mock("@trystero-p2p/ws-relay", () => ({
+  scale: (config: unknown) => ({ name: "scale", config }),
   joinRoom: mocks.joinRoom,
   getRelaySockets: () => ({ relay: { readyState: 1 } }),
   defaultRelayUrls: ["relay"],

@@ -25,6 +25,22 @@ npm run test:e2e:trystero
      admitted joiner requests and receives it byte-identical, and the
      SHA-256 digest + byte count verify before launch.
 
+## Multi-hop scale proof
+
+The isolated scale tests use a test-only local WebSocket relay and force four
+neighbors to create virtual routes. Start their server separately, then run the
+proof (stop the server afterward):
+
+```sh
+(cd e2e-trystero && ../node_modules/.bin/vite --config scale-server.mjs)
+npx playwright test -c e2e-trystero/scale.playwright.config.js
+```
+
+The test-only shim substitutes local signaling and a smaller topology for the
+Nova adapter; it does not exercise the deployed signaling service. The proof
+blocks new signaling and checks a 2 MiB request and verified game source on a
+virtual route. It does not replace load tests or real-device validation.
+
 ## Local relay
 
 Playwright starts the local edge Worker on port 18787. Signaling failures fail

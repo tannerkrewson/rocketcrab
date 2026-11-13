@@ -1,4 +1,4 @@
-import { getRelaySockets, joinRoom } from "@trystero-p2p/ws-relay";
+import { getRelaySockets, joinRoom, scale } from "@trystero-p2p/ws-relay";
 import { signalUrl } from "./signal-url";
 import type {
   DataPayload,
@@ -665,6 +665,8 @@ export class TrysteroTransport implements NovaTransport {
     const config: JoinRoomConfig & { relayConfig: { urls: string[] } } = {
       appId: this.appId,
       identity: "none",
+      // Nine direct neighbors retain a full mesh in rooms of up to ten.
+      use: [scale({ maxDirectPeers: 9 })],
       maxReceiveBytes: 8 * 1024 * 1024,
       relayConfig: { urls: [url] },
     };

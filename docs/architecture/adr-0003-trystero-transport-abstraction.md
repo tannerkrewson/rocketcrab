@@ -97,6 +97,17 @@ passes on this machine; multi-hour and Mobile Safari cross-network proof remains
 required before release. See the party/transport package READMEs for retained
 mechanisms and browser test commands.
 
+## Amended 2026-11-13: experimental scale routing
+
+The Trystero adapter enables the 0.27 `scale()` plugin with nine direct
+neighbors, retaining a full mesh for up to ten peers while allowing virtual
+routes in larger rooms. Trystero owns overlay routing and bulk transfer; Nova
+still owns identity admission, source verification, cancellation and party
+semantics. A test-only eight-browser, four-neighbor setup verifies a 2 MiB
+source over a multi-hop route with new signaling blocked. This is not proof of
+arbitrary room size or real-device behavior: the 10/25/50/100 load tests and
+phone gate in `PLAN.md` remain open.
+
 ## Alternatives considered
 
 1. **Direct WebRTC code in the app.** Rejected: re-implements discovery, NAT
