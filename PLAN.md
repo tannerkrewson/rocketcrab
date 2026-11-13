@@ -220,8 +220,11 @@ passed 4/4 (Podman Playwright, 2026-11-13).
      and exposes peers only after bilateral acknowledgements. State updates and
      Trystero user presence alone bypass that Nova admission boundary; simply
      changing the existing slot on rename causes rejection. A separate mutable
-     slot or redesigned identity payload could carry names, but must buffer or
-     discard pre-admission updates and bind each update to an admitted endpoint.
+     slot or redesigned identity payload could carry names, but must bind each
+     update to an admitted endpoint. On admission, read and validate the latest
+     slot even if earlier callbacks were ignored; dropping callbacks without
+     a current-value read loses the name. Discard rejected-peer values and
+     guard against stale endpoint/room epochs.
      `party.rename` validates the session, member and connection envelope and
      the protocol display-name schema (1–32 characters); `renamedNames`
      overrides the initial peer name and clears on peer join/leave. Test the
@@ -255,6 +258,33 @@ passed 4/4 (Podman Playwright, 2026-11-13).
      plus identity reset/storage fallback. Exercise real 0.27 and scaled
      virtual peers as well as transport fakes. These are obligations, not
      evidence of equivalence; no presence replacement is implemented.
+
+     **Incremental candidate:** retain the existing immutable identity slot,
+     bilateral admission, per-connection peer map, member roster and host
+     election; add a separate mutable user-state name slot under today's
+     ephemeral per-connection identity. This does not depend on adopting
+     persistent identities and might replace only rename messages and the
+     name overlay. It is not a drop-in behavioral match: the upstream slot
+     synchronizes current state to late joiners and coalesces writes, whereas
+     `announceRename` sends an event only to connected peers and does not
+     change the transport's original `displayName`. A temporary in-memory
+     `session.test.ts` experiment (run 2026-11-13; one test passed, then
+     removed) confirmed a current peer sees `New`, but a later joiner sees
+     `Old` from the original identity. It also confirmed that a second
+     connection with the same member ID clears the member's rename overlay;
+     a rename from that connection wins until either connection leaves, which
+     clears the overlay and falls back to the first remaining peer. A direct
+     per-user slot lookup would instead retain separate current endpoint names
+     and change these observations. Retaining an event-style overlay and
+     reproducing its clear/order behavior could preserve more, but reduces the
+     claimed deletion and coalescing still loses intermediate rename events.
+     Decide whether improved late-join convergence and different duplicate-ID
+     behavior are intended before changing the contract; do not imply those
+     differences are required for an incremental slot design. Test event
+     delivery/order and rename failure semantics as well as the cases above
+     using real 0.27; the in-memory experiment tests current Nova behavior only,
+     not the candidate or real transport. No candidate implementation is
+     claimed safe on this evidence.
 
    - **`makeState` — adoption deferred after re-review; previous adoption
      recommendation was premature.** The 0.27 `docs/state.md` and installed
