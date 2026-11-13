@@ -216,9 +216,11 @@ export class GameSourceCoordinator {
         if (this.disposed || this.selection || this.generation !== expectedGeneration) return;
         // Replay only previously validated, still-connected announcements. The
         // new selection owns a fresh generation and a fresh compatibility check.
-        for (const [index, message] of remaining.entries()) {
-          if (index > 0 && this.generation !== expectedGeneration + 1) return;
+        let started = false;
+        for (const message of remaining) {
+          if (this.generation !== expectedGeneration + (started ? 1 : 0)) return;
           void this.handleMessage(message).catch((error) => this.emitError(error));
+          if (this.generation === expectedGeneration + 1) started = true;
         }
       }),
       this.transport.on("connection:state", (state) => {

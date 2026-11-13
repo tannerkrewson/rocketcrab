@@ -238,6 +238,34 @@ describe("whole-source requests", () => {
     expect(received(b.events)).toMatchObject([{ source: "hello" }]);
     expect(completed(a.events, "send").filter((e) => e.memberId === "joiner")).toHaveLength(1);
   });
+  it("skips a reentrantly disconnected announcer and retries a later holder", async () => {
+    const { hub, host, joiner } = await world();
+    const first = hub.createTransport({ memberId: "first", displayName: "First" });
+    const last = hub.createTransport({ memberId: "last", displayName: "Last" });
+    await first.join({ room: "private", sessionId: "session" });
+    await last.join({ room: "private", sessionId: "session" });
+    const holder = coordinator(last);
+    await holder.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    const b = coordinator(joiner);
+    b.instance.subscribe((event) => {
+      if (event.type === "cancelled" && event.reason === "peer_disconnected") void first.leave();
+    });
+    host.handleRequest(GAME_SOURCE_CHANNEL, () => new Promise(() => {}));
+    const request = vi.spyOn(joiner, "request");
+    const metadata = await descriptor("hello");
+    await announce(host, metadata);
+    await settle(hub);
+    await announce(first, metadata);
+    await settle(hub);
+    await holder.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    await host.leave();
+    await settle(hub);
+    expect(request).toHaveBeenCalledTimes(2);
+    expect(received(b.events)).toMatchObject([{ source: "hello", fromMemberId: "last" }]);
+    expect(completed(holder.events, "send").filter((e) => e.memberId === "joiner")).toHaveLength(1);
+  });
   it("does not replay old announcers when a cancellation listener cancels the selection", async () => {
     const { hub, host, joiner } = await world();
     const other = hub.createTransport({ memberId: "other", displayName: "Other" });

@@ -159,8 +159,8 @@ after the cutover (browser storage is per origin).
       coordinator tracks connected announcers for one exact descriptor and
       acknowledges only after compatibility and byte/hash verification. Further
       regression tests cover holder disconnect before and after verification,
-      reentrant cancellation during disconnect, and late acknowledgement
-      failures after a selection change.
+      reentrant cancellation and further holder loss during disconnect, and
+      late acknowledgement failures after a selection change.
 
 0.27.0 (released 2026-11-11) changes the wire protocol (0.26 and 0.27 peers
 cannot talk) and much of the API. Read the release notes and
