@@ -17,4 +17,5 @@
 export * from "./app-id";
 export * from "./errors";
 export * from "./wire";
+export * from "./tunnel-crypto";
 export * from "./trystero-transport";
