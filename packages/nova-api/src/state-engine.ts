@@ -1204,10 +1204,10 @@ export class NovaStateEngine {
       const actual = await this.stateHashImpl(verifiedState);
       if (this.disposed) return;
       if (this.authorityMemberId !== this.selfMemberId) return; // deposed during the hash
-      // A newer snapshot replaced the state during the hash: it wins, and there
-      // is nothing left to verify or revert.
-      if (this.canonical !== verifiedState) return;
-      if (actual !== expectedHash) {
+      // A newer snapshot replaced the state during the hash: it wins, so the
+      // revert is skipped. Restore still completes below, so queued actions
+      // are processed and the authority broadcasts its first full snapshot.
+      if (this.canonical === verifiedState && actual !== expectedHash) {
         const backup = this.restoreBackup;
         this.canonical = backup.canonical;
         this.revision = backup.revision;

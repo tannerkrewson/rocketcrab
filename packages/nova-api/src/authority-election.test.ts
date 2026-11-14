@@ -2233,6 +2233,7 @@ describe(
       expect(engine.getAuthorityMemberId()).toBe("member-b");
 
       // While the restore hash is held, member c pushes a newer state.
+      const before = host.snapshots.length;
       const newer = { count: 9 };
       engine.handleSnapshot({
         revision: 3,
@@ -2245,13 +2246,24 @@ describe(
         senderMemberId: "member-c",
       });
       release();
-      await advance(10);
-      for (let i = 0; i < 10; i += 1) await yieldLoop();
+      // Restore still completes: the first broadcast is the full snapshot of the
+      // newer state, and a dispatch then commits (nothing stays gated).
+      await waitForEngine(() => host.snapshots.length > before, "restore broadcast");
+      expect(host.snapshots[before]?.snapshot.historyMode).toBe("full");
+      expect(host.snapshots[before]?.snapshot.revision).toBe(3);
       expect(engine.getCanonicalState()).toEqual(newer);
       expect(engine.getRevision()).toBe(3);
       expect(host.events).not.toContainEqual(
         expect.objectContaining({ type: "stateError", code: "invalid_snapshot" }),
       );
+      engine.handleLocalAction({
+        actionId: "after-restore",
+        type: "increment",
+        payload: {},
+        baseRevision: 3,
+      });
+      await waitForEngine(() => engine.getRevision() === 4, "post-restore commit");
+      expect(engine.getCanonicalState()).toEqual({ count: 10 });
     });
   },
 );
