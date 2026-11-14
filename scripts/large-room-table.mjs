@@ -13,8 +13,6 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 
-const START = "<!-- large-room-table:start -->";
-const END = "<!-- large-room-table:end -->";
 const SIZES = [10, 25, 50, 100, 200];
 const ACTIONS_PER_SECOND = 5;
 
@@ -102,11 +100,15 @@ function render(before, after) {
 }
 
 function main() {
-  const [beforePath, afterPath, docPath] = process.argv.slice(2);
+  const [beforePath, afterPath, docPath, section = "large-room-table"] = process.argv.slice(2);
   if (!beforePath || !afterPath || !docPath) {
-    process.stderr.write("usage: large-room-table.mjs <before.json> <after.json> <doc.md>\n");
+    process.stderr.write(
+      "usage: large-room-table.mjs <before.json> <after.json> <doc.md> [section]\n",
+    );
     process.exit(2);
   }
+  const START = `<!-- ${section}:start -->`;
+  const END = `<!-- ${section}:end -->`;
   const before = load(beforePath);
   const after = load(afterPath);
   const table = render(before, after);
