@@ -552,21 +552,7 @@ passed 4/4 (Podman Playwright, 2026-11-13).
 
    Partial evidence: `docs/testing/large-room-load.md` records local headless
    10/25/50-player state-mode runs and their limitations; real-phone authority
-   remains open. Its
-   [in-process simulation section](docs/testing/large-room-load.md#in-process-simulation-no-webrtc)
-   ([samples](docs/testing/large-room-sim-2026-11-13.json)) measured authority
-   traffic per action for 10, 25, 50, 100 and 200 players in one process.
-   Authority upload grows with party size, slightly faster than linearly
-   (about 121 KB per action at 10 players and 3.2 MB at 200). Most of each
-   snapshot is the processed-action history, not state. At 5 actions/s that is
-   about 4.8 Mbit/s at 10 players and 129 Mbit/s at 200, against a typical phone
-   uplink of 1–5 Mbit/s. `action.dispatch` is also broadcast to every peer, so a
-   non-authority's upload grows with N too. The doc sets out a proposal for the
-   owner (history-free snapshots, state deltas, targeted dispatch, `scale()`
-   fan-out). No fix or cap is implemented. Still open for this item: real-phone
-   authority CPU and upload at 25+ players (no phone run exists), and the
-   owner's decision on the proposal. The ADR-0003 link to the experiment is in
-   place. Creating with a game revealed a source-verification
+   remains open. Its [in-process simulation section](docs/testing/large-room-load.md#in-process-simulation-no-webrtc) ([samples](docs/testing/large-room-sim-2026-11-13.json)) measured authority traffic per action for 10, 25, 50, 100, 200 players in one process. Authority upload grows with party size, slightly faster than linearly (about 121 KB per action at 10 players and 3.2 MB at 200). Most of each snapshot is the processed-action history, not state (76.0–93.1% of snapshot bytes). At 5 actions/s the projected authority uplink is 4.8 Mbit/s at 10 players and 129.1 Mbit/s at 200, against a typical phone uplink of 1–5 Mbit/s. These Mbit/s figures are projected from JSON-serialized bytes and exclude WebRTC framing. `action.dispatch` is also broadcast to every peer, so a non-authority's upload grows with N too. The doc sets out a proposal for the owner (history-free snapshots, state deltas, targeted dispatch, `scale()` fan-out). No fix or cap is implemented. Still open for this item: real-phone authority CPU and upload at 25+ players (no phone run exists), and the owner's decision on the proposal. The ADR-0003 link to the experiment is in place. Creating with a game revealed a source-verification
    start-gate failure; separately an action with omitted optional payload failed
    wire validation. After both fixes landed, a 10-player create-with-game,
    no-payload browser run passed. A 100-player attempt stopped at 78 joined
