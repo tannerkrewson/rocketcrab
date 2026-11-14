@@ -11,7 +11,7 @@ test("dates and account inputs cannot inject SQL or URLs", async () => {
   await assert.rejects(run({ ...args, accountId: "../bad" }), /account ID/);
 });
 
-test("queries use sampling weights and report outcomes and successful median", async () => {
+test("queries use sampling weights and report outcomes and connect-time median", async () => {
   const calls = [];
   const fetchImpl = async (url, options) => {
     calls.push({ url, options });
@@ -44,7 +44,7 @@ test("empty data and errors do not disclose tokens", async () => {
     ...args,
     fetchImpl: async () => ({ ok: true, json: async () => ({ data: [] }) }),
   });
-  assert.match(empty, /Median successful connect time: n\/a/);
+  assert.match(empty, /Median connect time \(direct, turn, tunnel, unknown\): n\/a/);
   await assert.rejects(
     run({
       ...args,

@@ -87,7 +87,7 @@ export async function run({ start, end, accountId, token, fetchImpl = fetch }) {
   )
     throw new Error("Cloudflare SQL returned invalid median data.");
   lines.push(
-    `Median successful connect time: ${median && Number(median.events) > 0 ? `${Number(median.median_ms)} ms` : "n/a"}`,
+    `Median connect time (direct, turn, tunnel, unknown): ${median && Number(median.events) > 0 ? `${Number(median.median_ms)} ms` : "n/a"}`,
   );
   return lines.join("\n");
 }
