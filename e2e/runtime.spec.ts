@@ -70,9 +70,25 @@ test.describe("runtime diagnostics", () => {
       gameSource: fixture("errors.html"),
     });
 
+    // Error and rejection events arrive independently; wait for both rather
+    // than assuming the first error means all diagnostics have arrived.
     await expect
-      .poll(async () => (await harnessEvents(page)).map((e) => e.type))
-      .toContain("runtime.error");
+      .poll(async () => {
+        const events = await harnessEvents(page);
+        return (
+          events.some(
+            (e) => e.type === "runtime.error" && String(e.message).includes("game exploded"),
+          ) &&
+          events.some(
+            (e) => e.type === "runtime.error" && String(e.message).includes("Unhandled rejection"),
+          ) &&
+          events.some(
+            (e) =>
+              e.type === "runtime.console" && String(e.message).includes("hello from the game"),
+          )
+        );
+      })
+      .toBe(true);
     const events = await harnessEvents(page);
     const messages = events
       .filter((e) => e.type === "runtime.error")
