@@ -1,12 +1,14 @@
 import type { PartyTransportFactory } from "@rocketcrab/party";
 import {
   TrysteroTransport,
+  type ConnectionOutcomeInfo,
   type TerminalFailureInfo,
   type TrysteroJoinError,
   type TunnelStartInfo,
 } from "@rocketcrab/trystero-transport";
 import type { TurnServerConfigLike } from "./turn-creds";
 import { edgeOrigin } from "../edge";
+import { reportConnection } from "../connection-log";
 
 /** Options closed over by the factory at construction time (sync methods). */
 export interface TrysteroPartyTransportFactoryOptions {
@@ -41,6 +43,21 @@ export function forceTunnelForTests(): boolean {
   );
 }
 
+/**
+ * One connection-log beacon per peer connection attempt (PLAN.md §8.2). The
+ * reporter builds the body from allowlisted fields only and is a no-op without
+ * VITE_EDGE_ORIGIN or sendBeacon; it never throws into the transport.
+ * `error_code` stays empty: a peer attempt has no typed room error of its own.
+ */
+function reportAttemptOutcome(info: ConnectionOutcomeInfo): void {
+  reportConnection({
+    outcome: info.outcome,
+    error_code: "",
+    ms_to_connect: info.msToConnect,
+    signaling_ok: true,
+  });
+}
+
 /** The transport factory real parties run over (dev/prod appId by env). */
 export function createTrysteroPartyTransportFactory(
   options: TrysteroPartyTransportFactoryOptions = {},
@@ -59,6 +76,7 @@ export function createTrysteroPartyTransportFactory(
       ...(onJoinError !== undefined ? { onJoinError } : {}),
       ...(onTunnel !== undefined ? { onTunnel } : {}),
       ...(onTunnelFailure !== undefined ? { onTunnelFailure } : {}),
+      onOutcome: reportAttemptOutcome,
     });
     return transport;
   };
