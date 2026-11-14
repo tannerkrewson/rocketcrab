@@ -171,12 +171,12 @@ export interface FallbackPeerConnectionOptions {
    * Called at most once per wrapper instance with its connection outcome. An
    * instance that never gets both descriptions (an unclaimed pooled offer)
    * reports nothing. An attempt that has started and is closed before any
-   * success or failure reports `failed`, unless `isLeaving()` is true at the
-   * close: a close caused by the local user leaving reports nothing.
+   * success or failure reports `failed`, unless `isTearingDown()` is true at the
+   * close: a close caused by a deliberate local teardown reports nothing.
    */
   readonly onOutcome?: (info: ConnectionOutcomeInfo) => void;
-  /** True while the local user is leaving the room (PLAN.md §8.2). Default: false. */
-  readonly isLeaving?: () => boolean;
+  /** True during a deliberate local teardown of the room (PLAN.md §8.2). Default: false. */
+  readonly isTearingDown?: () => boolean;
 }
 
 /** Whether a connection returned by Trystero is running on the tunnel. */
@@ -202,7 +202,7 @@ interface Deps {
   readonly onTunnel: ((info: TunnelStartInfo) => void) | undefined;
   readonly onTerminalFailure: ((info: TerminalFailureInfo) => void) | undefined;
   readonly onOutcome: ((info: ConnectionOutcomeInfo) => void) | undefined;
-  readonly isLeaving: () => boolean;
+  readonly isTearingDown: () => boolean;
 }
 
 /** Event-handler properties and listeners for one target. */
@@ -588,8 +588,8 @@ class Session {
   closeGracefully(): void {
     if (this.closed || this.draining) return;
     // A started attempt closed before any outcome failed, unless the local user
-    // is leaving. Trystero's own TTL destroy of a stuck peer lands here too.
-    if (!this.deps.isLeaving()) this.claimOutcome("failed");
+    // is tearing the room down. Trystero's own TTL destroy of a stuck peer lands here too.
+    if (!this.deps.isTearingDown()) this.claimOutcome("failed");
     if (this.mode !== "tunnel" || !this.ready || !this.socket || this.pendingBytes === 0) {
       this.close();
       return;
@@ -1142,7 +1142,7 @@ export function createFallbackPeerConnectionClass(
     onTunnel: options.onTunnel,
     onTerminalFailure: options.onTerminalFailure,
     onOutcome: options.onOutcome,
-    isLeaving: options.isLeaving ?? (() => false),
+    isTearingDown: options.isTearingDown ?? (() => false),
   };
   return class FallbackPeerConnection {
     constructor(configuration?: RTCConfiguration) {

@@ -180,7 +180,7 @@ describe("tunnel fallback polyfill", () => {
     expect(lastCall[0].onOutcome).toBe(onOutcome);
   });
 
-  it("gives the wrapper isLeaving: false during a join, true from leave() until the next join", async () => {
+  it("gives the wrapper isTearingDown: false during a join, true from leave() until the next join", async () => {
     const adapter = new TrysteroTransport({
       memberId: "member-a",
       edgeOrigin: "https://edge.example",
@@ -193,14 +193,14 @@ describe("tunnel fallback polyfill", () => {
     const first = adapter.join({ room: "ROOM", sessionId: "session-1" }).catch(() => undefined);
     await vi.waitFor(() => expect(mocks.joinRoom).toHaveBeenCalledTimes(1));
     const firstOptions = factory.mock.calls.at(-1)![0];
-    expect(firstOptions.isLeaving?.()).toBe(false);
+    expect(firstOptions.isTearingDown?.()).toBe(false);
     await adapter.leave();
     await first;
-    expect(firstOptions.isLeaving?.()).toBe(true);
+    expect(firstOptions.isTearingDown?.()).toBe(true);
 
     const second = adapter.join({ room: "ROOM", sessionId: "session-2" }).catch(() => undefined);
     await vi.waitFor(() => expect(mocks.joinRoom).toHaveBeenCalledTimes(2));
-    expect(factory.mock.calls.at(-1)![0].isLeaving?.()).toBe(false);
+    expect(factory.mock.calls.at(-1)![0].isTearingDown?.()).toBe(false);
     await adapter.leave();
     await second;
   });

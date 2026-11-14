@@ -1479,11 +1479,11 @@ describe("FallbackPeerConnection connection outcome", () => {
     expect(h.failures).toEqual([]);
   });
 
-  it("reports nothing when the local user leaves while the pair is still connecting", async () => {
-    let leaving = false;
-    const h = harness({ isLeaving: () => leaving });
+  it("reports nothing when the local user tears the room down while the pair is still connecting", async () => {
+    let tearingDown = false;
+    const h = harness({ isTearingDown: () => tearingDown });
     const { a } = await connectPair(h);
-    leaving = true;
+    tearingDown = true;
     a.pc.close();
     h.clock.advance(FALLBACK_AFTER_MS * 3);
     await settle();
@@ -1492,7 +1492,7 @@ describe("FallbackPeerConnection connection outcome", () => {
     expect(h.failures).toEqual([]);
   });
 
-  it("reports failed when closed during tunnel pairing while not leaving", async () => {
+  it("reports failed when closed during tunnel pairing while not tearing down", async () => {
     const h = harness();
     const { a, b } = await connectPair(h);
     // B's channel is open, so B never switches and only A's socket exists.
@@ -1507,15 +1507,15 @@ describe("FallbackPeerConnection connection outcome", () => {
     expect(h.failures).toEqual([]);
   });
 
-  it("reports nothing when closed during tunnel pairing while leaving", async () => {
-    let leaving = false;
-    const h = harness({ isLeaving: () => leaving });
+  it("reports nothing when closed during tunnel pairing while tearing down", async () => {
+    let tearingDown = false;
+    const h = harness({ isTearingDown: () => tearingDown });
     const { a, b } = await connectPair(h);
     deliverNativeChannel(b);
     h.clock.advance(FALLBACK_AFTER_MS);
     await until(() => h.network.sockets.length === 1, "A's unpaired socket");
 
-    leaving = true;
+    tearingDown = true;
     a.pc.close();
     await settle();
 

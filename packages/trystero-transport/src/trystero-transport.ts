@@ -152,10 +152,11 @@ export class TrysteroTransport implements NovaTransport {
   /** Invalidates asynchronous lifecycle continuations after leave or replacement. */
   private lifecycleGeneration = 0;
   /**
-   * True from the start of leave() until the next join. Peer closes during this
-   * window are the local user leaving, so they report no connection outcome.
+   * True from the start of a local teardown (leave(), suspend(), reconnect()'s
+   * teardown) until the next room join begins. Peer closes during this window
+   * are deliberate local teardowns, so they report no connection outcome.
    */
-  private leaving = false;
+  private tearingDown = false;
   private pendingTeardown: Promise<void> | null = null;
   private cancelPendingTeardownWait: (() => void) | null = null;
   private cancelSignalDerivation: (() => void) | null = null;
@@ -296,7 +297,7 @@ export class TrysteroTransport implements NovaTransport {
         message: `TrysteroTransport.join: already ${this.connectionState}; leave() first.`,
       });
     }
-    this.leaving = false;
+    this.tearingDown = false;
     const generation = ++this.lifecycleGeneration;
     const startedAt = this.now();
     this.connectionState = "joining";
@@ -388,7 +389,7 @@ export class TrysteroTransport implements NovaTransport {
   }
 
   async leave(): Promise<void> {
-    this.leaving = true;
+    this.tearingDown = true;
     const generation = ++this.lifecycleGeneration;
     this.cancelSignalDerivation?.();
     const cancelPending = this.cancelPendingTeardownWait;
@@ -443,6 +444,7 @@ export class TrysteroTransport implements NovaTransport {
     if (generation !== this.lifecycleGeneration) {
       throw new TrysteroJoinError({ category: "cancelled", message: "Reconnect was cancelled." });
     }
+    this.tearingDown = true;
     this.teardownRoom(room);
     try {
       if (room !== null) await this.releaseRoom(room); // peers observe peer:left
@@ -465,6 +467,7 @@ export class TrysteroTransport implements NovaTransport {
       if (generation !== this.lifecycleGeneration)
         throw new TrysteroJoinError({ category: "cancelled", message: "Reconnect was cancelled." });
       this.signalRelayUrl = url;
+      this.tearingDown = false;
       nextRoom = joinRoom(this.buildConfig(url, roomName), roomName);
     } catch (cause) {
       if (generation !== this.lifecycleGeneration) throw cause;
@@ -500,6 +503,7 @@ export class TrysteroTransport implements NovaTransport {
     const room = this.room;
     this.connectionState = "suspended";
     this.suspendPending = true;
+    this.tearingDown = true;
     this.teardownRoom(room);
     try {
       if (room !== null) await this.releaseRoom(room);
@@ -525,6 +529,7 @@ export class TrysteroTransport implements NovaTransport {
     const roomName = this.roomName;
     this.connectionEpoch += 1;
     this.selfConnectionId = `${this.selfIdBase}#${this.connectionEpoch}`;
+    this.tearingDown = false;
     this.connectionState = "joining";
     this.emit("connection:state", "joining");
     if (generation !== this.lifecycleGeneration) {
@@ -774,7 +779,7 @@ export class TrysteroTransport implements NovaTransport {
       onTunnel: this.options.onTunnel,
       onTerminalFailure: this.options.onTunnelFailure,
       onOutcome: this.options.onOutcome,
-      isLeaving: () => this.leaving,
+      isTearingDown: () => this.tearingDown,
     });
   }
 

@@ -12,6 +12,7 @@ import type { RoomError } from "@trystero-p2p/ws-relay";
 import { TrysteroTransport } from "./trystero-transport";
 import type { TrysteroTransportOptions } from "./trystero-transport";
 import type { TrysteroJoinError } from "./errors";
+import * as fallback from "./fallback-peer-connection";
 
 /**
  * Deterministic adapter contract tests. The `trystero` module is fully
@@ -32,6 +33,14 @@ const mocks = vi.hoisted(() => {
 });
 
 vi.mock("./signal-url", () => ({ signalUrl: mocks.signalUrl }));
+// Spy on the wrapper factory (behaviour unchanged) to read the teardown gate it is given.
+vi.mock("./fallback-peer-connection", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./fallback-peer-connection")>();
+  return {
+    ...actual,
+    createFallbackPeerConnectionClass: vi.fn(actual.createFallbackPeerConnectionClass),
+  };
+});
 vi.mock("@trystero-p2p/ws-relay", () => ({
   scale: (config: unknown) => ({ name: "scale", config }),
   joinRoom: mocks.joinRoom,
@@ -1907,5 +1916,72 @@ describe("TrysteroTransport event unsubscription", () => {
       },
     );
     expect(received).toHaveLength(1);
+  });
+});
+
+describe("local teardown gates connection outcomes", () => {
+  const SECRET = "A".repeat(43);
+
+  beforeEach(() => {
+    // The wrapper factory is only built when RTC and WebSocket exist.
+    vi.stubGlobal("RTCPeerConnection", class {});
+    vi.stubGlobal("WebSocket", class {});
+  });
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  /** The teardown gate the transport gave the most recent wrapper factory. */
+  function tearingDownGate(): () => boolean {
+    const factory = vi.mocked(fallback.createFallbackPeerConnectionClass);
+    const gate = factory.mock.calls.at(-1)?.[0].isTearingDown;
+    if (gate === undefined) throw new Error("no wrapper factory was created");
+    return gate;
+  }
+
+  it("sets the gate during suspend() and clears it when resume() starts a room", async () => {
+    const { adapter, clock } = setup({ partySecret: SECRET });
+    const room = makeFakeRoom();
+    const seenInLeave: boolean[] = [];
+    room.leave.mockImplementation(async () => {
+      seenInLeave.push(tearingDownGate()());
+    });
+    mocks.joinRoom.mockReturnValueOnce(room).mockReturnValue(makeFakeRoom());
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    await joinConnected(adapter, clock);
+    expect(tearingDownGate()()).toBe(false);
+
+    await adapter.suspend();
+    expect(seenInLeave).toEqual([true]);
+    expect(tearingDownGate()()).toBe(true);
+
+    const resuming = adapter.resume();
+    clock.advance(1000);
+    await resuming;
+    expect(adapter.connectionState).toBe("connected");
+    expect(tearingDownGate()()).toBe(false);
+    await adapter.leave();
+  });
+
+  it("sets the gate during reconnect()'s teardown and clears it before the new room joins", async () => {
+    const { adapter, clock } = setup({ partySecret: SECRET });
+    const oldRoom = makeFakeRoom();
+    const seenInLeave: boolean[] = [];
+    oldRoom.leave.mockImplementation(async () => {
+      seenInLeave.push(tearingDownGate()());
+    });
+    mocks.joinRoom.mockReturnValueOnce(oldRoom).mockReturnValue(makeFakeRoom());
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    await joinConnected(adapter, clock);
+
+    const reconnecting = adapter.reconnect();
+    clock.advance(1000);
+    await reconnecting;
+    expect(seenInLeave).toEqual([true]);
+    expect(mocks.joinRoom).toHaveBeenCalledTimes(2);
+    expect(adapter.connectionState).toBe("connected");
+    expect(tearingDownGate()()).toBe(false);
+    await adapter.leave();
   });
 });
