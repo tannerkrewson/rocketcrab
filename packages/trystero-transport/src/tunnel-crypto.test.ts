@@ -1,14 +1,13 @@
 import { describe, expect, it } from "vitest";
 import {
+  TUNNEL_FRAME_OVERHEAD_BYTES,
   TUNNEL_IV_BYTES,
-  TUNNEL_MIN_FRAME_BYTES,
+  TunnelCipher,
   TunnelFrameError,
-  computeTunnelPairId,
+  computeTunnelPairing,
   decodeTunnelMessage,
-  decryptTunnelFrame,
-  deriveTunnelKey,
+  deriveTunnelKeys,
   encodeTunnelMessage,
-  encryptTunnelFrame,
   extractDtlsFingerprints,
 } from "./tunnel-crypto";
 
@@ -65,6 +64,27 @@ const FIREFOX_REMOTE_SDP = [
   "",
 ].join("\r\n");
 
+const pairIdOf = async (local: string, remote: string, room: string) =>
+  (await computeTunnelPairing(local, remote, room)).pairId;
+
+/** Both ends of one tunnel, built the way each peer would build its own. */
+async function tunnelPair(secret = SECRET_A, room = ROOM) {
+  const chrome = await computeTunnelPairing(CHROME_LOCAL_SDP, FIREFOX_REMOTE_SDP, room);
+  const firefox = await computeTunnelPairing(FIREFOX_REMOTE_SDP, CHROME_LOCAL_SDP, room);
+  return {
+    chrome: new TunnelCipher(await deriveTunnelKeys(secret, chrome.pairId, chrome.localRole)),
+    firefox: new TunnelCipher(await deriveTunnelKeys(secret, firefox.pairId, firefox.localRole)),
+  };
+}
+
+function bytes(length: number, fill = 0x5a): Uint8Array<ArrayBuffer> {
+  return new Uint8Array(length).fill(fill);
+}
+
+function errorCodeOf(error: unknown): unknown {
+  return error instanceof TunnelFrameError ? error.code : error;
+}
+
 describe("extractDtlsFingerprints", () => {
   it("collects session-level and media-level lines from a Chrome-style SDP and dedupes them", () => {
     expect(extractDtlsFingerprints(CHROME_LOCAL_SDP)).toEqual([`sha-256 ${fingerprint(1)}`]);
@@ -94,17 +114,17 @@ describe("extractDtlsFingerprints", () => {
   });
 });
 
-describe("computeTunnelPairId", () => {
-  it("returns 64 lowercase hex characters", async () => {
-    // Known-answer check below locks the exact canonical format.
-    const pairId = await computeTunnelPairId(CHROME_LOCAL_SDP, FIREFOX_REMOTE_SDP, ROOM);
-    expect(pairId).toMatch(/^[0-9a-f]{64}$/u);
+describe("computeTunnelPairing", () => {
+  it("gives both peers the same pairId and opposite roles", async () => {
+    const chrome = await computeTunnelPairing(CHROME_LOCAL_SDP, FIREFOX_REMOTE_SDP, ROOM);
+    const firefox = await computeTunnelPairing(FIREFOX_REMOTE_SDP, CHROME_LOCAL_SDP, ROOM);
+    expect(chrome.pairId).toBe(firefox.pairId);
+    expect(chrome.localRole).not.toBe(firefox.localRole);
+    expect([chrome.localRole, firefox.localRole].sort()).toEqual([0, 1]);
   });
 
-  it("is identical whichever side computes it", async () => {
-    const local = await computeTunnelPairId(CHROME_LOCAL_SDP, FIREFOX_REMOTE_SDP, ROOM);
-    const remote = await computeTunnelPairId(FIREFOX_REMOTE_SDP, CHROME_LOCAL_SDP, ROOM);
-    expect(local).toBe(remote);
+  it("returns a 64-character lowercase hex pairId", async () => {
+    expect(await pairIdOf(CHROME_LOCAL_SDP, FIREFOX_REMOTE_SDP, ROOM)).toMatch(/^[0-9a-f]{64}$/u);
   });
 
   it("matches the documented canonical string", async () => {
@@ -116,27 +136,27 @@ describe("computeTunnelPairId", () => {
     const expected = Array.from(new Uint8Array(digest), (b) =>
       b.toString(16).padStart(2, "0"),
     ).join("");
-    expect(await computeTunnelPairId(CHROME_LOCAL_SDP, FIREFOX_REMOTE_SDP, ROOM)).toBe(expected);
+    expect(await pairIdOf(CHROME_LOCAL_SDP, FIREFOX_REMOTE_SDP, ROOM)).toBe(expected);
   });
 
   it("does not depend on the order of fingerprints within one SDP", async () => {
     const ordered = `a=fingerprint:sha-256 ${fingerprint(8)}\r\na=fingerprint:sha-384 ${fingerprint(9)}\r\n`;
     const reversed = `a=fingerprint:sha-384 ${fingerprint(9)}\r\na=fingerprint:sha-256 ${fingerprint(8)}\r\n`;
-    expect(await computeTunnelPairId(reversed, FIREFOX_REMOTE_SDP, ROOM)).toBe(
-      await computeTunnelPairId(ordered, FIREFOX_REMOTE_SDP, ROOM),
+    expect(await pairIdOf(reversed, FIREFOX_REMOTE_SDP, ROOM)).toBe(
+      await pairIdOf(ordered, FIREFOX_REMOTE_SDP, ROOM),
     );
   });
 
   it("differs per room", async () => {
-    expect(await computeTunnelPairId(CHROME_LOCAL_SDP, FIREFOX_REMOTE_SDP, ROOM)).not.toBe(
-      await computeTunnelPairId(CHROME_LOCAL_SDP, FIREFOX_REMOTE_SDP, OTHER_ROOM),
+    expect(await pairIdOf(CHROME_LOCAL_SDP, FIREFOX_REMOTE_SDP, ROOM)).not.toBe(
+      await pairIdOf(CHROME_LOCAL_SDP, FIREFOX_REMOTE_SDP, OTHER_ROOM),
     );
   });
 
   it("differs when the local fingerprint differs", async () => {
     const changedLocal = CHROME_LOCAL_SDP.replaceAll(fingerprint(1), fingerprint(5));
-    expect(await computeTunnelPairId(changedLocal, FIREFOX_REMOTE_SDP, ROOM)).not.toBe(
-      await computeTunnelPairId(CHROME_LOCAL_SDP, FIREFOX_REMOTE_SDP, ROOM),
+    expect(await pairIdOf(changedLocal, FIREFOX_REMOTE_SDP, ROOM)).not.toBe(
+      await pairIdOf(CHROME_LOCAL_SDP, FIREFOX_REMOTE_SDP, ROOM),
     );
   });
 
@@ -145,143 +165,211 @@ describe("computeTunnelPairId", () => {
       fingerprint(2).toLowerCase(),
       fingerprint(6).toLowerCase(),
     ).replaceAll(fingerprint(2), fingerprint(6));
-    expect(await computeTunnelPairId(CHROME_LOCAL_SDP, changedRemote, ROOM)).not.toBe(
-      await computeTunnelPairId(CHROME_LOCAL_SDP, FIREFOX_REMOTE_SDP, ROOM),
+    expect(await pairIdOf(CHROME_LOCAL_SDP, changedRemote, ROOM)).not.toBe(
+      await pairIdOf(CHROME_LOCAL_SDP, FIREFOX_REMOTE_SDP, ROOM),
+    );
+  });
+
+  it("throws when both sides have identical fingerprints", async () => {
+    await expect(computeTunnelPairing(CHROME_LOCAL_SDP, CHROME_LOCAL_SDP, ROOM)).rejects.toThrow(
+      /identical sides/u,
     );
   });
 
   it("throws a clear error naming the side that has no fingerprint", async () => {
     const noFingerprint = "v=0\r\ns=-\r\n";
-    await expect(computeTunnelPairId(noFingerprint, FIREFOX_REMOTE_SDP, ROOM)).rejects.toThrow(
+    await expect(computeTunnelPairing(noFingerprint, FIREFOX_REMOTE_SDP, ROOM)).rejects.toThrow(
       /DTLS fingerprint in the local SDP/u,
     );
-    await expect(computeTunnelPairId(CHROME_LOCAL_SDP, noFingerprint, ROOM)).rejects.toThrow(
+    await expect(computeTunnelPairing(CHROME_LOCAL_SDP, noFingerprint, ROOM)).rejects.toThrow(
       /DTLS fingerprint in the remote SDP/u,
     );
   });
 
   it("rejects an empty room ID", async () => {
-    await expect(computeTunnelPairId(CHROME_LOCAL_SDP, FIREFOX_REMOTE_SDP, "")).rejects.toThrow(
+    await expect(computeTunnelPairing(CHROME_LOCAL_SDP, FIREFOX_REMOTE_SDP, "")).rejects.toThrow(
       /non-empty room ID/u,
     );
   });
 });
 
-describe("deriveTunnelKey", () => {
-  it("produces a non-extractable AES-GCM-256 key with encrypt and decrypt usages", async () => {
-    const key = await deriveTunnelKey(SECRET_A, PAIR);
-    expect(key.algorithm).toMatchObject({ name: "AES-GCM", length: 256 });
-    expect(key.extractable).toBe(false);
-    expect([...key.usages].sort()).toEqual(["decrypt", "encrypt"]);
-    await expect(crypto.subtle.exportKey("raw", key)).rejects.toThrow();
+describe("deriveTunnelKeys", () => {
+  it("produces non-extractable AES-GCM-256 keys with one usage each", async () => {
+    const { sendKey, receiveKey } = await deriveTunnelKeys(SECRET_A, PAIR, 0);
+    expect(sendKey.algorithm).toMatchObject({ name: "AES-GCM", length: 256 });
+    expect(receiveKey.algorithm).toMatchObject({ name: "AES-GCM", length: 256 });
+    expect(sendKey.extractable).toBe(false);
+    expect(receiveKey.extractable).toBe(false);
+    expect(sendKey.usages).toEqual(["encrypt"]);
+    expect(receiveKey.usages).toEqual(["decrypt"]);
+    await expect(crypto.subtle.exportKey("raw", sendKey)).rejects.toThrow();
+    await expect(crypto.subtle.exportKey("raw", receiveKey)).rejects.toThrow();
   });
 
-  it("derives interoperable keys for both sides from the same secret and pairId", async () => {
-    const sender = await deriveTunnelKey(SECRET_A, PAIR);
-    const receiver = await deriveTunnelKey(SECRET_A, PAIR);
-    const frame = await encryptTunnelFrame(sender, new Uint8Array([1, 2, 3]));
-    expect(await decryptTunnelFrame(receiver, frame)).toEqual(new Uint8Array([1, 2, 3]));
+  it("pairs each peer's send key with the other peer's receive key", async () => {
+    const chrome = await deriveTunnelKeys(SECRET_A, PAIR, 0);
+    const firefox = await deriveTunnelKeys(SECRET_A, PAIR, 1);
+    const cipherChrome = new TunnelCipher(chrome);
+    const cipherFirefox = new TunnelCipher(firefox);
+    const frame = await cipherChrome.seal(bytes(4));
+    expect(await cipherFirefox.open(frame)).toEqual(bytes(4));
+    const back = await cipherFirefox.seal(bytes(4, 0x11));
+    expect(await cipherChrome.open(back)).toEqual(bytes(4, 0x11));
   });
 
-  it("derives a different key for a different pairId or party secret", async () => {
-    const frame = await encryptTunnelFrame(
-      await deriveTunnelKey(SECRET_A, PAIR),
-      new Uint8Array([7]),
+  it("derives keys that do not work across different pairIds or party secrets", async () => {
+    const sealer = new TunnelCipher(await deriveTunnelKeys(SECRET_A, PAIR, 0));
+    const frame = await sealer.seal(bytes(3));
+    const otherPair = new TunnelCipher(await deriveTunnelKeys(SECRET_A, OTHER_PAIR, 1));
+    const otherSecret = new TunnelCipher(await deriveTunnelKeys(SECRET_B, PAIR, 1));
+    await expect(otherPair.open(frame)).rejects.toMatchObject({ code: "auth-failed" });
+    await expect(otherSecret.open(frame)).rejects.toMatchObject({ code: "auth-failed" });
+  });
+
+  it("rejects a malformed party secret, malformed pairId, or invalid role", async () => {
+    await expect(deriveTunnelKeys("not-a-secret", PAIR, 0)).rejects.toThrow(
+      /party session secret/u,
     );
-    await expect(
-      decryptTunnelFrame(await deriveTunnelKey(SECRET_A, OTHER_PAIR), frame),
-    ).rejects.toBeInstanceOf(TunnelFrameError);
-    await expect(
-      decryptTunnelFrame(await deriveTunnelKey(SECRET_B, PAIR), frame),
-    ).rejects.toBeInstanceOf(TunnelFrameError);
-  });
-
-  it("rejects a malformed party secret and a malformed pairId", async () => {
-    await expect(deriveTunnelKey("not-a-secret", PAIR)).rejects.toThrow(/party session secret/u);
-    await expect(deriveTunnelKey(SECRET_A, "ABCD")).rejects.toThrow(/pair ID/u);
-    await expect(deriveTunnelKey(SECRET_A, "E".repeat(64))).rejects.toThrow(/pair ID/u);
+    await expect(deriveTunnelKeys(SECRET_A, "ABCD", 0)).rejects.toThrow(/pair ID/u);
+    await expect(deriveTunnelKeys(SECRET_A, "E".repeat(64), 0)).rejects.toThrow(/pair ID/u);
+    await expect(deriveTunnelKeys(SECRET_A, PAIR, 2 as never)).rejects.toThrow(
+      /role must be 0 or 1/u,
+    );
   });
 });
 
-describe("tunnel frame encryption", () => {
-  const sizes = [
-    ["empty", 0],
-    ["small", 13],
-    ["256 KiB", 256 * 1024],
-  ] as const;
+describe("TunnelCipher", () => {
+  it("opens frames in the order the peer sealed them", async () => {
+    const { chrome, firefox } = await tunnelPair();
+    const payloads = [bytes(0), bytes(13, 1), bytes(256 * 1024, 2), bytes(5, 3)];
+    for (const payload of payloads) {
+      expect(await firefox.open(await chrome.seal(payload))).toEqual(payload);
+    }
+    // And the reverse direction, with its own counter.
+    expect(await chrome.open(await firefox.seal(bytes(7, 9)))).toEqual(bytes(7, 9));
+  });
 
-  for (const [label, size] of sizes) {
-    it(`round-trips a ${label} payload`, async () => {
-      const key = await deriveTunnelKey(SECRET_A, PAIR);
-      const plaintext = new Uint8Array(size);
-      for (let i = 0; i < size; i += 1) {
-        plaintext[i] = i & 0xff;
-      }
-      const frame = await encryptTunnelFrame(key, plaintext);
-      expect(frame.byteLength).toBe(TUNNEL_IV_BYTES + size + 16);
-      expect(await decryptTunnelFrame(key, frame)).toEqual(plaintext);
-    });
-  }
+  it("rejects a frame echoed back to its sender", async () => {
+    const { chrome } = await tunnelPair();
+    const frame = await chrome.seal(bytes(8));
+    await expect(chrome.open(frame)).rejects.toMatchObject({ code: "auth-failed" });
+  });
+
+  it("rejects a replayed frame", async () => {
+    const { chrome, firefox } = await tunnelPair();
+    const frame = await chrome.seal(bytes(8));
+    expect(await firefox.open(frame)).toEqual(bytes(8));
+    await expect(firefox.open(frame)).rejects.toMatchObject({ code: "auth-failed" });
+  });
+
+  it("rejects a reordered frame", async () => {
+    const { chrome, firefox } = await tunnelPair();
+    await chrome.seal(bytes(1));
+    const second = await chrome.seal(bytes(2));
+    await expect(firefox.open(second)).rejects.toMatchObject({ code: "auth-failed" });
+  });
+
+  it("rejects a frame after a skipped frame", async () => {
+    const { chrome, firefox } = await tunnelPair();
+    const first = await chrome.seal(bytes(1));
+    await chrome.seal(bytes(2));
+    const third = await chrome.seal(bytes(3));
+    expect(await firefox.open(first)).toEqual(bytes(1));
+    await expect(firefox.open(third)).rejects.toMatchObject({ code: "auth-failed" });
+  });
+
+  it("stays failed after an earlier failed open, even for a valid frame", async () => {
+    const { chrome, firefox } = await tunnelPair();
+    const first = await chrome.seal(bytes(1));
+    const second = await chrome.seal(bytes(2));
+    const corrupted = first.slice();
+    corrupted[corrupted.length - 1] = (corrupted[corrupted.length - 1] ?? 0) ^ 0x01;
+    await expect(firefox.open(corrupted)).rejects.toMatchObject({ code: "auth-failed" });
+    await expect(firefox.open(first)).rejects.toMatchObject({ code: "auth-failed" });
+    await expect(firefox.open(second)).rejects.toMatchObject({ code: "auth-failed" });
+  });
+
+  it("refuses to seal after an authentication failure", async () => {
+    const { chrome, firefox } = await tunnelPair();
+    await expect(firefox.open(bytes(40))).rejects.toMatchObject({ code: "auth-failed" });
+    await expect(firefox.seal(bytes(1))).rejects.toThrow(/unusable/u);
+    // The send side of the other peer is unaffected by this peer's receive failure.
+    expect(await chrome.seal(bytes(1))).toBeInstanceOf(Uint8Array);
+  });
+
+  it("treats a frame shorter than IV plus tag as auth-failed", async () => {
+    const { firefox } = await tunnelPair();
+    await expect(firefox.open(bytes(27))).rejects.toMatchObject({ code: "auth-failed" });
+  });
 
   it("rejects a frame where any single byte was tampered with", async () => {
-    const key = await deriveTunnelKey(SECRET_A, PAIR);
-    const frame = await encryptTunnelFrame(key, new Uint8Array(32).fill(0x5a));
-    for (let index = 0; index < frame.byteLength; index += 1) {
-      const tampered = frame.slice();
-      tampered[index] = (tampered[index] ?? 0) ^ 0x01;
-      await expect(decryptTunnelFrame(key, tampered)).rejects.toMatchObject({
-        code: "auth-failed",
-      });
+    const payload = bytes(32);
+    const sample = await tunnelPair();
+    const frameLength = (await sample.chrome.seal(payload)).byteLength;
+    for (let index = 0; index < frameLength; index += 1) {
+      const { chrome, firefox } = await tunnelPair();
+      const frame = await chrome.seal(payload);
+      frame[index] = (frame[index] ?? 0) ^ 0x01;
+      await expect(firefox.open(frame)).rejects.toMatchObject({ code: "auth-failed" });
     }
   });
 
-  it("rejects a frame decrypted with the wrong key", async () => {
-    const frame = await encryptTunnelFrame(
-      await deriveTunnelKey(SECRET_A, PAIR),
-      new Uint8Array([1, 2, 3]),
+  it("rejects a frame opened with the wrong secret", async () => {
+    const { chrome } = await tunnelPair(SECRET_A);
+    const { firefox } = await tunnelPair(SECRET_B);
+    await expect(firefox.open(await chrome.seal(bytes(3)))).rejects.toBeInstanceOf(
+      TunnelFrameError,
     );
-    await expect(
-      decryptTunnelFrame(await deriveTunnelKey(SECRET_B, PAIR), frame),
-    ).rejects.toBeInstanceOf(TunnelFrameError);
   });
 
-  it("rejects a frame shorter than IV plus tag as short-frame", async () => {
-    const key = await deriveTunnelKey(SECRET_A, PAIR);
-    for (let length = 0; length < TUNNEL_MIN_FRAME_BYTES; length += 1) {
-      await expect(decryptTunnelFrame(key, new Uint8Array(length))).rejects.toMatchObject({
-        code: "short-frame",
-      });
-    }
-  });
-
-  it("treats a minimum-length frame with garbage as auth-failed, not short", async () => {
-    const key = await deriveTunnelKey(SECRET_A, PAIR);
-    await expect(
-      decryptTunnelFrame(key, new Uint8Array(TUNNEL_MIN_FRAME_BYTES)),
-    ).rejects.toMatchObject({ code: "auth-failed" });
-  });
-
-  it("uses a fresh IV for every call", async () => {
-    const key = await deriveTunnelKey(SECRET_A, PAIR);
-    const plaintext = new Uint8Array([9, 9, 9]);
+  it("uses a fresh IV for every seal", async () => {
+    const { chrome } = await tunnelPair();
     const frames: Uint8Array[] = [];
     for (let i = 0; i < 20; i += 1) {
-      frames.push(await encryptTunnelFrame(key, plaintext));
+      frames.push(await chrome.seal(bytes(3, 9)));
     }
     const ivs = new Set(
       frames.map((frame) => Array.from(frame.subarray(0, TUNNEL_IV_BYTES)).join(",")),
     );
     expect(ivs.size).toBe(frames.length);
-    expect(new Set(frames.map((frame) => Array.from(frame).join(","))).size).toBe(frames.length);
+  });
+
+  it("keeps sequence order for concurrent seals and opens", async () => {
+    const { chrome, firefox } = await tunnelPair();
+    const frames = await Promise.all([chrome.seal(bytes(1, 1)), chrome.seal(bytes(1, 2))]);
+    expect(await firefox.open(frames[0])).toEqual(bytes(1, 1));
+    expect(await firefox.open(frames[1])).toEqual(bytes(1, 2));
+
+    const fresh = await tunnelPair();
+    const replayed = await fresh.chrome.seal(bytes(4));
+    const results = await Promise.allSettled([
+      fresh.firefox.open(replayed),
+      fresh.firefox.open(replayed),
+    ]);
+    expect(results.map((result) => result.status).sort()).toEqual(["fulfilled", "rejected"]);
+  });
+
+  it("puts no sequence number on the wire: a binary payload of N bytes is N + 29", async () => {
+    const { chrome, firefox } = await tunnelPair();
+    const size = 256 * 1024;
+    const frame = await chrome.seal(encodeTunnelMessage(bytes(size)));
+    expect(frame.byteLength).toBe(size + TUNNEL_FRAME_OVERHEAD_BYTES);
+    expect(TUNNEL_FRAME_OVERHEAD_BYTES).toBe(29);
+    const decoded = decodeTunnelMessage(await firefox.open(frame));
+    expect(new Uint8Array(decoded as ArrayBuffer)).toEqual(bytes(size));
   });
 });
 
 describe("tunnel message encoding", () => {
-  it("round-trips a string with emoji and tags it as text", async () => {
+  it("round-trips a string with emoji and tags it as text", () => {
     const text = "héllo 🚀 world 👋🏽";
     const encoded = encodeTunnelMessage(text);
     expect(encoded[0]).toBe(0);
     expect(decodeTunnelMessage(encoded)).toBe(text);
+  });
+
+  it("round-trips an empty string", () => {
+    expect(decodeTunnelMessage(encodeTunnelMessage(""))).toBe("");
   });
 
   it("preserves a leading byte-order mark in a string", () => {
@@ -298,6 +386,17 @@ describe("tunnel message encoding", () => {
     expect(new Uint8Array(decoded as ArrayBuffer)).toEqual(new Uint8Array([0, 1, 2, 254, 255]));
   });
 
+  it("round-trips an empty binary message as a tag-only payload", async () => {
+    const encoded = encodeTunnelMessage(new Uint8Array(0));
+    expect(Array.from(encoded)).toEqual([1]);
+    const { chrome, firefox } = await tunnelPair();
+    const frame = await chrome.seal(encoded);
+    expect(frame.byteLength).toBe(TUNNEL_FRAME_OVERHEAD_BYTES);
+    const decoded = decodeTunnelMessage(await firefox.open(frame));
+    expect(decoded).toBeInstanceOf(ArrayBuffer);
+    expect((decoded as ArrayBuffer).byteLength).toBe(0);
+  });
+
   it("encodes only the bytes of a Uint8Array view with a non-zero byteOffset", () => {
     const backing = new Uint8Array(16);
     for (let i = 0; i < backing.length; i += 1) {
@@ -310,10 +409,10 @@ describe("tunnel message encoding", () => {
     expect(new Uint8Array(decoded as ArrayBuffer)).toEqual(new Uint8Array([4, 5, 6, 7, 8, 9]));
   });
 
-  it("round-trips a message through encode, encrypt, decrypt and decode", async () => {
-    const key = await deriveTunnelKey(SECRET_A, PAIR);
-    const frame = await encryptTunnelFrame(key, encodeTunnelMessage("state 🎲"));
-    expect(decodeTunnelMessage(await decryptTunnelFrame(key, frame))).toBe("state 🎲");
+  it("round-trips a message through encode, seal, open and decode", async () => {
+    const { chrome, firefox } = await tunnelPair();
+    const frame = await chrome.seal(encodeTunnelMessage("state 🎲"));
+    expect(decodeTunnelMessage(await firefox.open(frame))).toBe("state 🎲");
   });
 
   it("rejects an empty message, an unknown tag, and invalid UTF-8 text", () => {
@@ -321,7 +420,7 @@ describe("tunnel message encoding", () => {
       try {
         run();
       } catch (error) {
-        return error instanceof TunnelFrameError ? error.code : error;
+        return errorCodeOf(error);
       }
       return "no error";
     };

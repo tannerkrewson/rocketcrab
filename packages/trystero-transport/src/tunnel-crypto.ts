@@ -1,5 +1,5 @@
 /**
- * Tunnel pair identity, frame encryption and message encoding for the
+ * Tunnel pairing, directional frame encryption and message encoding for the
  * WebSocket fallback (PLAN.md §5.3–§5.4). These are pure helpers: nothing in
  * the transport calls them yet (the wrapper is §5.5 and wiring is §5.6).
  *
@@ -8,32 +8,47 @@
  *
  * - Fingerprint value: `<algorithm lowercased> <hex uppercased>`, e.g.
  *   `sha-256 AB:CD:…`. Deduplicated per SDP.
- * - pairId: each side's fingerprints are sorted and joined with `,`; the two
- *   side strings are sorted and joined with `|`; then `|` + roomId. The UTF-8
- *   bytes are hashed with SHA-256 and rendered as 64 lowercase hex characters.
- * - Tunnel key: HKDF-SHA-256 over the UTF-8 bytes of the party session secret
- *   (the same string `secrets.ts` hashes), with salt = UTF-8 bytes of the
- *   pairId and info = `"rocketcrab tunnel v1"`, producing a non-extractable
- *   AES-GCM-256 key with usages `encrypt` and `decrypt`. The `secrets.ts`
- *   room/password/session labels are SHA-256 with different labels, so the
- *   tunnel derivation is domain-separated from them.
+ * - Side string: the SDP's fingerprint values, sorted and joined with `,`.
+ * - pairId: the two side strings are sorted and joined with `|`, then `|` +
+ *   roomId. The UTF-8 bytes are hashed with SHA-256 and rendered as 64
+ *   lowercase hex characters.
+ * - localRole: the index (0 or 1) of the LOCAL side string in that sorted
+ *   pair. The two peers always get opposite roles. Identical side strings
+ *   have no valid roles and throw.
+ * - Keys: HKDF-SHA-256 over the UTF-8 bytes of the party session secret (the
+ *   string `secrets.ts` hashes), salt = UTF-8 bytes of the pairId, info =
+ *   `"rocketcrab tunnel v1 dir 0"` or `"rocketcrab tunnel v1 dir 1"`, output
+ *   non-extractable AES-GCM-256. A peer's send key is `dir <localRole>` and its
+ *   receive key is `dir <1 - localRole>`, so each direction has its own key.
+ *   Send keys carry only `encrypt` usage and receive keys only `decrypt`.
  * - Frame: 12-byte random IV ‖ AES-GCM ciphertext (which carries the 16-byte
- *   tag). Minimum frame length is 28 bytes.
- * - Message: 1-byte type tag (0 = UTF-8 string, 1 = binary) ‖ payload.
+ *   tag). The IV is random. The sequence number is not on the wire.
+ * - Sequence: each direction counts its frames from 0 as a 64-bit big-endian
+ *   value, which is the AES-GCM additional data (AAD). The receiver expects
+ *   the next number and opens with it, so a replayed, reflected, reordered or
+ *   skipped frame fails. The tunnel is ordered and reliable, so any failure is
+ *   fatal: `TunnelCipher` refuses all further use and the caller must close the
+ *   tunnel.
+ * - Message: 1-byte type tag (0 = UTF-8 string, 1 = binary) ‖ payload. Wire
+ *   overhead for a binary message is `TUNNEL_FRAME_OVERHEAD_BYTES` (29).
  */
 import { sessionSecretSchema, type SessionSecret } from "@rocketcrab/protocol";
 
-/** HKDF `info` for the tunnel key. Domain-separates it from `secrets.ts`. */
-export const TUNNEL_HKDF_INFO = "rocketcrab tunnel v1";
 /** AES-GCM IV length prepended to every frame. */
 export const TUNNEL_IV_BYTES = 12;
 /** AES-GCM authentication tag length (WebCrypto default, 128 bits). */
 export const TUNNEL_TAG_BYTES = 16;
-/** Smallest possible frame: an IV and an empty ciphertext's tag. */
-export const TUNNEL_MIN_FRAME_BYTES = TUNNEL_IV_BYTES + TUNNEL_TAG_BYTES;
+/**
+ * Wire overhead added to a binary payload: 1 message type tag + 12-byte IV +
+ * 16-byte GCM tag. A binary payload of N bytes becomes exactly N + 29 bytes.
+ */
+export const TUNNEL_FRAME_OVERHEAD_BYTES = 1 + TUNNEL_IV_BYTES + TUNNEL_TAG_BYTES;
 
-/** Failure to decode or decrypt a tunnel frame or message. */
-export type TunnelFrameErrorCode = "short-frame" | "auth-failed" | "malformed-message";
+/** Position of a peer in its pairing. The two peers always differ. */
+export type TunnelRole = 0 | 1;
+
+/** Failure to decode or authenticate a tunnel frame or message. */
+export type TunnelFrameErrorCode = "auth-failed" | "malformed-message";
 
 export class TunnelFrameError extends Error {
   readonly code: TunnelFrameErrorCode;
@@ -47,6 +62,7 @@ export class TunnelFrameError extends Error {
 
 const TEXT_TAG = 0;
 const BINARY_TAG = 1;
+const SEQUENCE_MAX = (1n << 64n) - 1n;
 
 const encoder = new TextEncoder();
 
@@ -70,46 +86,58 @@ export function extractDtlsFingerprints(sdp: string): string[] {
 }
 
 /**
- * Compute the tunnel pair ID for one peer connection. Both sides call this
- * with their own local and remote SDP and get the same result, so the pairId
- * needs no signaling. See the module header for the canonical format.
+ * Compute the pair ID and this peer's role. Both sides call this with their
+ * own local and remote SDP. They get the same pairId and opposite localRoles,
+ * with no signaling. See the module header for the canonical format.
  */
-export async function computeTunnelPairId(
+export async function computeTunnelPairing(
   localSdp: string,
   remoteSdp: string,
   roomId: string,
-): Promise<string> {
+): Promise<{ pairId: string; localRole: TunnelRole }> {
   if (roomId.length === 0) {
-    throw new Error("Tunnel pair ID needs a non-empty room ID.");
+    throw new Error("Tunnel pairing needs a non-empty room ID.");
   }
   const local = canonicalFingerprintSide(localSdp, "local");
   const remote = canonicalFingerprintSide(remoteSdp, "remote");
-  const canonical = `${[local, remote].sort().join("|")}|${roomId}`;
+  if (local === remote) {
+    throw new Error(
+      "Tunnel pairing needs distinct local and remote DTLS fingerprints; identical sides cannot be assigned opposite roles.",
+    );
+  }
+  const sides = [local, remote].sort();
+  const localRole: TunnelRole = sides[0] === local ? 0 : 1;
+  const canonical = `${sides.join("|")}|${roomId}`;
   const digest = await crypto.subtle.digest("SHA-256", encoder.encode(canonical));
-  return toHex(new Uint8Array(digest));
+  return { pairId: toHex(new Uint8Array(digest)), localRole };
 }
 
 function canonicalFingerprintSide(sdp: string, side: "local" | "remote"): string {
   const fingerprints = extractDtlsFingerprints(sdp);
   if (fingerprints.length === 0) {
-    throw new Error(`Tunnel pair ID needs a DTLS fingerprint in the ${side} SDP.`);
+    throw new Error(`Tunnel pairing needs a DTLS fingerprint in the ${side} SDP.`);
   }
   return [...fingerprints].sort().join(",");
 }
 
 /**
- * Derive the AES-GCM-256 tunnel key for one pair. The key is non-extractable.
- * Both sides derive the same key from the same party secret and pairId.
+ * Derive the send and receive keys for one peer. The send key is direction
+ * `localRole` and the receive key is direction `1 - localRole`. Both keys are
+ * non-extractable.
  */
-export async function deriveTunnelKey(
+export async function deriveTunnelKeys(
   partySecretMaterial: SessionSecret,
   pairId: string,
-): Promise<CryptoKey> {
+  localRole: TunnelRole,
+): Promise<{ sendKey: CryptoKey; receiveKey: CryptoKey }> {
   if (!sessionSecretSchema.safeParse(partySecretMaterial).success) {
-    throw new Error("Tunnel key needs a well-formed party session secret.");
+    throw new Error("Tunnel keys need a well-formed party session secret.");
   }
   if (!/^[0-9a-f]{64}$/u.test(pairId)) {
-    throw new Error("Tunnel key needs a 64-character lowercase hex pair ID.");
+    throw new Error("Tunnel keys need a 64-character lowercase hex pair ID.");
+  }
+  if (localRole !== 0 && localRole !== 1) {
+    throw new Error("Tunnel role must be 0 or 1.");
   }
   const base = await crypto.subtle.importKey(
     "raw",
@@ -118,58 +146,131 @@ export async function deriveTunnelKey(
     false,
     ["deriveKey"],
   );
+  const remoteRole: TunnelRole = localRole === 0 ? 1 : 0;
+  const [sendKey, receiveKey] = await Promise.all([
+    deriveDirectionalKey(base, pairId, localRole, ["encrypt"]),
+    deriveDirectionalKey(base, pairId, remoteRole, ["decrypt"]),
+  ]);
+  return { sendKey, receiveKey };
+}
+
+function deriveDirectionalKey(
+  base: CryptoKey,
+  pairId: string,
+  direction: TunnelRole,
+  usages: KeyUsage[],
+): Promise<CryptoKey> {
   return crypto.subtle.deriveKey(
     {
       name: "HKDF",
       hash: "SHA-256",
       salt: encoder.encode(pairId),
-      info: encoder.encode(TUNNEL_HKDF_INFO),
+      info: encoder.encode(`rocketcrab tunnel v1 dir ${direction}`),
     },
     base,
     { name: "AES-GCM", length: 256 },
     false,
-    ["encrypt", "decrypt"],
+    usages,
   );
-}
-
-/** Encrypt one plaintext into a frame: 12-byte random IV ‖ ciphertext+tag. */
-export async function encryptTunnelFrame(
-  key: CryptoKey,
-  plaintext: Uint8Array<ArrayBuffer>,
-): Promise<Uint8Array<ArrayBuffer>> {
-  const iv = crypto.getRandomValues(new Uint8Array(TUNNEL_IV_BYTES));
-  const ciphertext = new Uint8Array(
-    await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext),
-  );
-  const frame = new Uint8Array(TUNNEL_IV_BYTES + ciphertext.byteLength);
-  frame.set(iv, 0);
-  frame.set(ciphertext, TUNNEL_IV_BYTES);
-  return frame;
 }
 
 /**
- * Decrypt a frame produced by `encryptTunnelFrame`. Throws `TunnelFrameError`
- * with code `short-frame` when the frame cannot hold an IV and tag, and with
- * code `auth-failed` for any decryption failure (tampering, wrong key, or
- * a key without decrypt usage).
+ * Seals outgoing frames and opens incoming ones for one tunnel. Each
+ * direction has its own sequence counter, which is the AES-GCM AAD. Any
+ * `open` failure makes the cipher unusable, and the caller must close the
+ * tunnel. Instances are not shared between tunnels.
  */
-export async function decryptTunnelFrame(
-  key: CryptoKey,
-  frame: Uint8Array<ArrayBuffer>,
-): Promise<Uint8Array<ArrayBuffer>> {
-  if (frame.byteLength < TUNNEL_MIN_FRAME_BYTES) {
-    throw new TunnelFrameError(
-      "short-frame",
-      `Tunnel frame is ${frame.byteLength} bytes; at least ${TUNNEL_MIN_FRAME_BYTES} are required.`,
+export class TunnelCipher {
+  private readonly sendKey: CryptoKey;
+  private readonly receiveKey: CryptoKey;
+  private sendSequence = 0n;
+  private receiveSequence = 0n;
+  private failed = false;
+
+  constructor(keys: { sendKey: CryptoKey; receiveKey: CryptoKey }) {
+    this.sendKey = keys.sendKey;
+    this.receiveKey = keys.receiveKey;
+  }
+
+  /**
+   * Encrypt one plaintext into a frame: 12-byte random IV ‖ ciphertext+tag.
+   * The sequence number is claimed before the first `await`, so concurrent
+   * calls never share one.
+   */
+  async seal(plaintext: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+    if (this.failed) {
+      throw new Error(
+        "Tunnel cipher is unusable after an authentication failure; close the tunnel.",
+      );
+    }
+    if (this.sendSequence > SEQUENCE_MAX) {
+      throw new Error("Tunnel send sequence is exhausted; close the tunnel.");
+    }
+    const sequence = this.sendSequence;
+    this.sendSequence += 1n;
+    const iv = crypto.getRandomValues(new Uint8Array(TUNNEL_IV_BYTES));
+    const ciphertext = new Uint8Array(
+      await crypto.subtle.encrypt(
+        { name: "AES-GCM", iv, additionalData: sequenceAad(sequence) },
+        this.sendKey,
+        plaintext,
+      ),
     );
+    const frame = new Uint8Array(TUNNEL_IV_BYTES + ciphertext.byteLength);
+    frame.set(iv, 0);
+    frame.set(ciphertext, TUNNEL_IV_BYTES);
+    return frame;
   }
-  const iv = frame.subarray(0, TUNNEL_IV_BYTES);
-  const sealed = frame.subarray(TUNNEL_IV_BYTES);
-  try {
-    return new Uint8Array(await crypto.subtle.decrypt({ name: "AES-GCM", iv }, key, sealed));
-  } catch (cause) {
-    throw new TunnelFrameError("auth-failed", "Tunnel frame failed authentication.", { cause });
+
+  /**
+   * Authenticate and decrypt the next expected incoming frame. Throws
+   * `TunnelFrameError` with code `auth-failed` for any failure, including a
+   * short frame, a replayed, reflected, reordered or skipped frame, or a
+   * frame received after an earlier failure. After a failure every further
+   * call throws.
+   */
+  async open(frame: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+    if (this.failed) {
+      throw authFailed("Tunnel was already closed by an earlier authentication failure.");
+    }
+    const sequence = this.receiveSequence;
+    this.receiveSequence += 1n;
+    try {
+      if (frame.byteLength < TUNNEL_IV_BYTES + TUNNEL_TAG_BYTES) {
+        throw new RangeError(`Tunnel frame is ${frame.byteLength} bytes.`);
+      }
+      const iv = frame.subarray(0, TUNNEL_IV_BYTES);
+      const sealed = frame.subarray(TUNNEL_IV_BYTES);
+      const plaintext = new Uint8Array(
+        await crypto.subtle.decrypt(
+          { name: "AES-GCM", iv, additionalData: sequenceAad(sequence) },
+          this.receiveKey,
+          sealed,
+        ),
+      );
+      if (this.failed) {
+        throw authFailed("Tunnel failed before this frame was checked.");
+      }
+      return plaintext;
+    } catch (cause) {
+      this.failed = true;
+      throw authFailed("Tunnel frame failed authentication; close the tunnel.", cause);
+    }
   }
+}
+
+function authFailed(message: string, cause?: unknown): TunnelFrameError {
+  return new TunnelFrameError("auth-failed", message, cause === undefined ? undefined : { cause });
+}
+
+/** 64-bit big-endian sequence number, used as the AES-GCM additional data. */
+function sequenceAad(sequence: bigint): Uint8Array<ArrayBuffer> {
+  if (sequence < 0n || sequence > SEQUENCE_MAX) {
+    throw new RangeError("Tunnel sequence is out of range.");
+  }
+  const aad = new Uint8Array(8);
+  new DataView(aad.buffer).setBigUint64(0, sequence, false);
+  return aad;
 }
 
 /**
