@@ -763,6 +763,91 @@ describe(
       });
     });
 
+    it("targets dispatches at the authority: non-authority peers receive none", async () => {
+      const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+      const [a, b, c] = trio(sessions);
+      const dispatchesReceived = new Map<string, number>();
+      for (const session of sessions) {
+        dispatchesReceived.set(session.player.id, 0);
+        session.transport.on("message:received", (message) => {
+          const payload = message.payload as { type?: string };
+          if (payload.type === "action.dispatch") {
+            dispatchesReceived.set(
+              session.player.id,
+              (dispatchesReceived.get(session.player.id) ?? 0) + 1,
+            );
+          }
+        });
+      }
+      let settled: "pending" | "accepted" | "rejected" = "pending";
+      const dispatched = c.client.dispatch({ type: "mark", payload: { marker: "targeted" } }).then(
+        () => {
+          settled = "accepted";
+        },
+        () => {
+          settled = "rejected";
+        },
+      );
+      await pumpUntil(
+        hub,
+        () => settled !== "pending" && dispatchesReceived.get("member-a") === 1,
+        "targeted dispatch reaches the authority and is acked",
+      );
+      await dispatched;
+      expect(settled).toBe("accepted");
+      // Only the authority received the dispatch; the bystander (b) and the
+      // sender (c, which never receives its own dispatch) got nothing.
+      expect(dispatchesReceived.get("member-a")).toBe(1);
+      expect(dispatchesReceived.get("member-b")).toBe(0);
+      expect(dispatchesReceived.get("member-c")).toBe(0);
+      expect(a.getCanonicalState()?.state).toMatchObject({ count: 1, markers: ["targeted"] });
+      expect(b.getCanonicalState()?.state).toMatchObject({ count: 1, markers: ["targeted"] });
+    });
+
+    it("retries a dispatch in flight during authority loss to the successor, applied once", async () => {
+      const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+      const [a, b, c] = trio(sessions);
+      let settled: "pending" | "accepted" | "rejected" = "pending";
+      const dispatched = c.client.dispatch({ type: "mark", payload: { marker: "inflight" } }).then(
+        () => {
+          settled = "accepted";
+        },
+        () => {
+          settled = "rejected";
+        },
+      );
+      // Let the client hand the dispatch to the transport while `a` is still
+      // the authority, so it is genuinely in flight (not buffered).
+      for (let i = 0; i < 3; i += 1) await yieldLoop();
+      expect(c.getStateModeDiagnostics().authorityMemberId).toBe("member-a");
+      // The authority's connection drops with the dispatch undelivered: it
+      // never applies or acks it.
+      await a.transport.suspend();
+      expect(a.getCanonicalState()?.state).not.toMatchObject({ markers: ["inflight"] });
+      await pumpUntil(
+        hub,
+        () => b.getStateModeDiagnostics().electionInProgress,
+        "suspicion after the authority drops",
+      );
+      await settleElection(hub);
+
+      await pumpUntil(
+        hub,
+        () =>
+          b.getStateModeDiagnostics().authorityMemberId === "member-b" &&
+          c.getStateModeDiagnostics().authorityMemberId === "member-b" &&
+          (b.getCanonicalState()?.state as { count?: number } | null)?.count === 1 &&
+          settled !== "pending",
+        "in-flight dispatch retried to member-b and acked",
+      );
+      await dispatched;
+      expect(settled).toBe("accepted");
+      // Exactly one commit, on the successor; the retry did not double-apply.
+      expect(b.getCanonicalState()?.state).toEqual({ count: 1, markers: ["inflight"] });
+      expect(c.getCanonicalState()?.state).toEqual({ count: 1, markers: ["inflight"] });
+      expect(b.getStateModeDiagnostics().revision).toBe(2);
+    });
+
     it("converges after a silent partition: simultaneous suspicion, one authority on merge", async () => {
       const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
       const [a, b, c] = trio(sessions);

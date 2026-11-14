@@ -1247,7 +1247,12 @@ export class NovaSession implements NovaClientBackend {
   // Internals
   // ------------------------------------------------------------------
 
-  /** Send one buffered/in-flight dispatch to the current authority. */
+  /**
+   * Send one buffered/in-flight dispatch to the current authority. Only the
+   * authority applies dispatches (`handleInboundAction`), so the message is
+   * targeted at it; a dispatch lost to a stale view is re-sent by
+   * `flushDispatchBuffer` when the authority changes.
+   */
   private sendBufferedDispatch(entry: BufferedDispatch): void {
     const authority = this.engine.getAuthorityMemberId();
     if (authority === this.selfPlayer.id) {
@@ -1272,7 +1277,7 @@ export class NovaSession implements NovaClientBackend {
           payload: entry.payload,
           expiresAtMs: now + actionTimeoutMs,
         }),
-      { seq },
+      { seq, targetMemberId: authority },
     ).catch((error: unknown) => this.emitError(error));
   }
 
