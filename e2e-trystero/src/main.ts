@@ -183,6 +183,9 @@ async function enterRoom(options: JoinOptions): Promise<string> {
         : "error";
     state.errors.push(`${category}: ${error instanceof Error ? error.message : String(error)}`);
     state.connectionState = "idle";
+    // Tear down the failed transport so its relay, peer and tunnel callbacks
+    // stop feeding this page's state; a later join creates a fresh adapter.
+    await next.leave().catch(() => undefined);
     return category;
   }
   transport = next;
