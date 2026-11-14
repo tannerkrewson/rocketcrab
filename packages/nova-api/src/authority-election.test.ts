@@ -24,7 +24,7 @@ import {
   integer as fcInteger,
   record as fcRecord,
 } from "fast-check";
-import { stateResyncMinIntervalMs } from "@rocketcrab/protocol";
+import { actionTimeoutMs, stateResyncMinIntervalMs } from "@rocketcrab/protocol";
 import { InMemoryTransportHub, type InMemoryTransport } from "@rocketcrab/testing";
 import { createNovaSession, type NovaSession } from "./session";
 import { STATE_HISTORY_LIMIT as STATE_WINDOW_LIMIT } from "./state-engine";
@@ -1535,5 +1535,100 @@ describe("incremental action history over the transport", { timeout: 60_000 }, (
     expect(late.getStateModeDiagnostics().processedActionCount).toBe(
       a.getStateModeDiagnostics().processedActionCount,
     );
+  });
+});
+
+describe("buffered dispatch delivery", { timeout: 60_000 }, () => {
+  it("sends a buffered dispatch once after the authority changes", async () => {
+    const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    const inbound = recordInbound(b);
+    await a.leave();
+    await pump(hub);
+    // No authority is known: the dispatch waits in the election buffer.
+    const dispatched = c.client.dispatch({ type: "mark", payload: { marker: "once" } });
+    await settleElection(hub);
+    await pumpUntil(
+      hub,
+      () => b.getStateModeDiagnostics().revision === 2,
+      "buffered dispatch applies",
+    );
+    await dispatched;
+    const sends = inbound.filter(
+      (entry) =>
+        entry.type === "action.dispatch" &&
+        (entry.payload as { actionType?: string }).actionType === "mark",
+    );
+    expect(sends).toHaveLength(1);
+    expect(b.getCanonicalState()?.state).toEqual({ count: 1, markers: ["once"] });
+  });
+});
+
+/** Advance fake time in small steps, delivering queued messages between steps. */
+async function advanceWithPumps(hub: InMemoryTransportHub, ms: number): Promise<void> {
+  for (let elapsed = 0; elapsed < ms; elapsed += 100) {
+    await advance(100);
+    await pump(hub);
+  }
+}
+
+describe("unacknowledged dispatch retry", { timeout: 60_000 }, () => {
+  it("re-sends a dispatch that got no ack within the timeout; the authority applies it once", async () => {
+    const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+    const [a, , c] = trio(sessions);
+    // The first dispatch from c is lost on the wire; the authority never sees it.
+    const send = c.transport.send.bind(c.transport);
+    let dropped = 0;
+    c.transport.send = (options: Parameters<NovaSession["transport"]["send"]>[0]) => {
+      const payload = options.payload as { type?: string };
+      if (dropped === 0 && payload.type === "action.dispatch") {
+        dropped += 1;
+        return Promise.resolve();
+      }
+      return send(options);
+    };
+    let settled: "pending" | "accepted" = "pending";
+    const dispatched = c.client.dispatch({ type: "mark", payload: { marker: "lost" } }).then(() => {
+      settled = "accepted";
+    });
+    await pump(hub);
+    expect(dropped).toBe(1);
+    expect(a.getStateModeDiagnostics().revision).toBe(1);
+
+    await advanceWithPumps(hub, actionTimeoutMs + 200);
+    await pumpUntil(hub, () => settled === "accepted", "retried dispatch acknowledged");
+    await dispatched;
+    expect(a.getCanonicalState()?.state).toEqual({ count: 1, markers: ["lost"] });
+    expect(a.getStateModeDiagnostics().revision).toBe(2);
+  });
+});
+
+describe("silent authority", { timeout: 60_000 }, () => {
+  it("a dispatch in flight to an authority that stopped heartbeating is applied exactly once", async () => {
+    const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    // The authority keeps running but stops heartbeating: followers suspect it,
+    // campaign, and re-adopt it on every new term (authorityChanged fires).
+    const send = a.transport.send.bind(a.transport);
+    a.transport.send = (options: Parameters<NovaSession["transport"]["send"]>[0]) => {
+      const payload = options.payload as { type?: string };
+      if (payload.type === "authority.heartbeat") return Promise.resolve();
+      return send(options);
+    };
+    let settled: "pending" | "accepted" = "pending";
+    const dispatched = c.client
+      .dispatch({ type: "mark", payload: { marker: "silent" } })
+      .then(() => {
+        settled = "accepted";
+      });
+    for (let elapsed = 0; elapsed < 6_000; elapsed += 100) {
+      await advance(100);
+      await pump(hub);
+    }
+    await pumpUntil(hub, () => settled === "accepted", "silent-authority dispatch acknowledged");
+    await dispatched;
+    expect(a.getCanonicalState()?.state).toEqual({ count: 1, markers: ["silent"] });
+    expect(b.getCanonicalState()?.state).toEqual({ count: 1, markers: ["silent"] });
+    expect(a.getStateModeDiagnostics().revision).toBe(2);
   });
 });

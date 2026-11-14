@@ -302,6 +302,8 @@ export class NovaSession implements NovaClientBackend {
   private readonly dispatchBuffer: BufferedDispatch[] = [];
   /** Dispatches sent but not yet acked (re-sent when the authority changes). */
   private readonly inflightDispatches = new Map<string, BufferedDispatch>();
+  /** Ack-timeout re-send timer per in-flight dispatch (cleared on ack). */
+  private readonly dispatchRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private nextSeq = 0;
   private readySent = false;
   private started = false;
@@ -587,6 +589,10 @@ export class NovaSession implements NovaClientBackend {
     this.outbox.length = 0;
     this.dispatchBuffer.length = 0;
     this.inflightDispatches.clear();
+    for (const timer of this.dispatchRetryTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.dispatchRetryTimers.clear();
     this.listeners.clear();
     this.client.dispose();
   }
@@ -663,7 +669,7 @@ export class NovaSession implements NovaClientBackend {
       // is re-sent to the new authority by flushDispatchBuffer and applied
       // exactly once (deduplication on the new authority; ADR-0007). The
       // local ack (any status) removes the entry.
-      this.inflightDispatches.set(actionId, entry);
+      this.trackInflight(entry);
       this.engine.handleLocalAction({
         actionId,
         type: action.type,
@@ -678,7 +684,7 @@ export class NovaSession implements NovaClientBackend {
       this.dispatchBuffer.push(entry);
       return Promise.resolve();
     }
-    this.inflightDispatches.set(actionId, entry);
+    this.trackInflight(entry);
     this.sendBufferedDispatch(entry);
     return Promise.resolve();
   }
@@ -1300,19 +1306,50 @@ export class NovaSession implements NovaClientBackend {
   private flushDispatchBuffer(): void {
     const authority = this.engine.getAuthorityMemberId();
     if (authority === null) return;
-    const buffered = this.dispatchBuffer.splice(0);
-    for (const entry of buffered) {
-      this.inflightDispatches.set(entry.actionId, entry);
-      this.sendBufferedDispatch(entry);
+    // Buffered entries become in-flight here and are sent exactly once: the
+    // second loop covers everything in flight, including them.
+    for (const entry of this.dispatchBuffer.splice(0)) {
+      this.trackInflight(entry);
     }
     for (const entry of this.inflightDispatches.values()) {
       this.sendBufferedDispatch(entry);
     }
   }
 
+  /**
+   * Hold a dispatch as in flight until its ack arrives, and re-send it to the
+   * current authority view if no ack comes within `actionTimeoutMs`. The
+   * authority deduplicates, so a re-send can never apply the action twice.
+   */
+  private trackInflight(entry: BufferedDispatch): void {
+    this.inflightDispatches.set(entry.actionId, entry);
+    this.armDispatchRetry(entry.actionId);
+  }
+
+  private armDispatchRetry(actionId: string): void {
+    this.clearDispatchRetry(actionId);
+    const timer = setTimeout(() => {
+      this.dispatchRetryTimers.delete(actionId);
+      const entry = this.inflightDispatches.get(actionId);
+      if (entry === undefined || this.disposed || this.ended) return;
+      this.sendBufferedDispatch(entry);
+      this.armDispatchRetry(actionId);
+    }, actionTimeoutMs);
+    this.dispatchRetryTimers.set(actionId, timer);
+  }
+
+  private clearDispatchRetry(actionId: string): void {
+    const timer = this.dispatchRetryTimers.get(actionId);
+    if (timer !== undefined) {
+      clearTimeout(timer);
+      this.dispatchRetryTimers.delete(actionId);
+    }
+  }
+
   /** Drop an in-flight dispatch once its ack arrived (any status). */
   private noteActionAck(actionId: string): void {
     this.inflightDispatches.delete(actionId);
+    this.clearDispatchRetry(actionId);
   }
 
   /** The transport-facing half the simulation engine uses to send/emit. */
