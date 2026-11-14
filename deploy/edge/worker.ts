@@ -6,6 +6,7 @@
  *   POST /              Classic room-creation CORS relay (relay.ts)
  *   POST /log           privacy-limited connection analytics (log.ts)
  *   GET /signal/:room   WebSocket signaling through a per-room Durable Object
+ *   GET /tunnel/:pair   WebSocket fallback tunnel between two peers (tunnel.ts)
  *
  * Known routes enforce an Origin allowlist and per-IP rate limiting.
  * Configuration lives in wrangler.toml; the TURN key is a Worker secret.
@@ -16,6 +17,7 @@ import { handleRelay } from "./relay";
 import { handleLog, type LogEnv } from "./log";
 import { handleTurn, type TurnEnv } from "./turn";
 export { SignalHub } from "./signal";
+export { TunnelPair } from "./tunnel";
 
 export interface RateLimitBinding {
   limit(options: { key: string }): Promise<{ success: boolean }>;
@@ -27,6 +29,10 @@ export interface EdgeEnv extends TurnEnv, LogEnv {
   /** Workers Rate Limiting binding (wrangler.toml `[[ratelimits]]`). */
   RATE_LIMITER?: RateLimitBinding;
   SIGNAL_HUB?: {
+    idFromName(name: string): unknown;
+    get(id: unknown): { fetch(request: Request): Promise<Response> };
+  };
+  TUNNEL_PAIR?: {
     idFromName(name: string): unknown;
     get(id: unknown): { fetch(request: Request): Promise<Response> };
   };
@@ -78,7 +84,8 @@ async function route(request: Request, env: EdgeEnv): Promise<Response> {
   const path = new URL(request.url).pathname.replace(/(.)\/+$/, "$1");
   const target = ROUTES[path];
   const signal = /^\/signal\/([0-9a-f]{32})$/.exec(path);
-  if (target === undefined && signal === null)
+  const tunnel = /^\/tunnel\/([0-9a-f]{64})$/.exec(path);
+  if (target === undefined && signal === null && tunnel === null)
     return jsonError(404, "not_found", `no route for ${path}`);
 
   // No CORS headers on a rejected origin, so other sites cannot read it.
@@ -99,6 +106,18 @@ async function route(request: Request, env: EdgeEnv): Promise<Response> {
       });
     if (!env.SIGNAL_HUB) return jsonError(503, "unavailable", "signaling unavailable");
     return env.SIGNAL_HUB.get(env.SIGNAL_HUB.idFromName(signal[1]!)).fetch(request);
+  }
+  if (tunnel !== null) {
+    if (request.method !== "GET") return jsonError(405, "method_not_allowed", "GET required");
+    if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket")
+      return jsonError(426, "upgrade_required", "WebSocket upgrade required");
+    const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
+    if (!(await withinRateLimit(env, `tunnel:${ip}`)))
+      return jsonError(429, "rate_limited", "too many requests; retry in a minute", {
+        "Retry-After": String(RATE_LIMIT_PERIOD_SECONDS),
+      });
+    if (!env.TUNNEL_PAIR) return jsonError(503, "unavailable", "tunnel unavailable");
+    return env.TUNNEL_PAIR.get(env.TUNNEL_PAIR.idFromName(tunnel[1]!)).fetch(request);
   }
   if (target === undefined) return jsonError(404, "not_found", `no route for ${path}`);
 

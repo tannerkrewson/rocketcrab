@@ -23,16 +23,68 @@ base paths are no longer deployment targets.
 
 ## What the Worker does
 
-| Route                  | File        | Purpose                                                                                                                                                                        |
-| ---------------------- | ----------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `POST /turn`           | `turn.ts`   | Mints one 24 h Cloudflare Realtime TURN credential per party join so cross-network WebRTC (e.g. Wi-Fi ↔ cellular) works. Holds the TURN key secret; the browser never sees it. |
-| `POST /`               | `relay.ts`  | Classic room-creation relay. 16 of the 22 Classic games create rooms on servers without CORS headers; the Worker calls only the 8 fixed endpoints in `RELAY_ENDPOINTS`.        |
-| `GET /signal/:roomKey` | `signal.ts` | WebSocket signaling, one hibernating Durable Object per 32-character lowercase hex room key.                                                                                   |
-| anything else          | —           | `404`                                                                                                                                                                          |
+| Route                  | File        | Purpose                                                                                                                                                                           |
+| ---------------------- | ----------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `POST /turn`           | `turn.ts`   | Mints one 24 h Cloudflare Realtime TURN credential per party join so cross-network WebRTC (e.g. Wi-Fi ↔ cellular) works. Holds the TURN key secret; the browser never sees it.    |
+| `POST /`               | `relay.ts`  | Classic room-creation relay. 16 of the 22 Classic games create rooms on servers without CORS headers; the Worker calls only the 8 fixed endpoints in `RELAY_ENDPOINTS`.           |
+| `GET /signal/:roomKey` | `signal.ts` | WebSocket signaling, one hibernating Durable Object per 32-character lowercase hex room key.                                                                                      |
+| `GET /tunnel/:pairId`  | `tunnel.ts` | **Not deployed.** WebSocket fallback tunnel: one hibernating `TunnelPair` Durable Object per 64-character lowercase hex pair ID, at most two sockets, frames forwarded unchanged. |
+| anything else          | —           | `404`                                                                                                                                                                             |
 
 Every known route requires an allowlisted Origin. POST routes support CORS
-preflight; signaling requires a WebSocket GET and is rate-limited on connection
-attempts. Both use per-IP rate limiting (`429`, `Retry-After: 60`).
+preflight; signaling and tunnel routes require a WebSocket GET and are rate-limited on connection
+attempts (`signal:<ip>` and `tunnel:<ip>`). All use per-IP rate limiting (`429`, `Retry-After: 60`).
+
+**Tunnel pair (repo only, not deployed):** the `TUNNEL_PAIR` binding
+(`TunnelPair`, `deploy/edge/tunnel.ts`) is staged in `wrangler.toml` with a
+new `v2` migration (`new_sqlite_classes = ["TunnelPair"]`); the `v1` migration
+for `SignalHub` is unchanged. The object accepts at most two sockets (a third
+gets `409`). When the second socket joins, the server sends the text frame
+`paired` once to each side; the client must wait for it before reporting a
+connection. Data frames are binary and are forwarded unchanged; a frame that
+arrives while the partner is absent is dropped. A client text frame closes
+both sockets with `1003 binary only`, so text never reaches the peer. Nothing
+is stored; the only storage use is a 30-second alarm that closes a lone socket
+with `4408 no partner` and does nothing once the pair is complete. The
+browser client wrapper that would call this route does not exist yet (PLAN.md
+§5 step 5), so no client uses it.
+
+Storage cost per pairing: one `setAlarm` when the first socket joins and one
+`deleteAlarm` when the second joins (or when a lone socket leaves). These are
+Durable Object storage operations and should be treated as billable under the
+SQLite storage pricing. That pricing was checked on 2026-11-12 and was not
+re-checked for alarm operations, so confirm it before cutover. The relay budget
+(below) is kept in memory and copied to the socket attachment at most once per
+second per socket, after every 512 KiB spent, and when a socket closes.
+Attachment writes are not storage operations.
+
+Limits, in the order a frame is checked:
+
+- Client text frame: both sockets closed with `1003 binary only`.
+- Frame over 262,208 bytes (256 KiB plus the client's 29-byte AES-GCM framing,
+  with a 64-byte allowance): both sockets closed with `1009 message too big`.
+- Relay budget, per socket: 512 KiB/s sustained with a 4 MiB burst (named
+  constants `RATE_BYTES_PER_SECOND` and `BURST_BYTES`). Legitimate traffic is the
+  256 KiB/s game budget (PLAN §6) plus up to 2 MiB game-source transfers. A frame
+  the bucket cannot cover closes both sockets with `1008 rate limit`. A missing or
+  NaN bucket field is an empty bucket, so the socket fails closed.
+- Over-credit after a hibernation wake: the wake rebuilds each bucket from the
+  last attachment write. Writes happen at least once per second and after every
+  512 KiB spent, so spending not yet written is under 512 KiB. A woken socket is
+  over-credited by at most 512 KiB, about one second of the sustained rate. A
+  4 MiB burst within one second causes 8 writes.
+- Scope of the budget: it is per socket. The server does not cap the aggregate
+  across pairs. Aggregate abuse is bounded only by the per-IP connection-attempt
+  limit (`tunnel:<ip>`, 60 per minute per Cloudflare location, see above). There
+  is no per-pair or global byte cap.
+- Client contract for `409`: `pair_full` (a third socket) and `pair_closing` (a
+  paired socket's partner is mid-close) are both retryable. A transient `409`
+  can occur while the previous socket is still closing, so the client retries
+  with backoff for up to a few seconds (for example 250 ms doubling, capped at
+  2 s, then gives up). Retries count against the same per-IP limit.
+- Sender's partner missing or not open after pairing: the sender is closed with
+  `1011 partner gone`. Before pairing, frames are dropped rather than buffered.
+- The server never sends `1010`, which RFC 6455 reserves for clients.
 
 The staged Nova adapter uses Trystero 0.27's WebSocket relay strategy with
 `VITE_EDGE_ORIGIN`, not public Nostr relays. It hashes the app and room IDs to
@@ -57,7 +109,7 @@ notifications instead (below).
 
 ### Local signaling integration test
 
-Start a local Worker separately with `npx --yes wrangler@4.161.0 dev --config deploy/edge/wrangler.toml --local --port 18987`, then run `npm run test:edge:integration`. The test targets only `http://127.0.0.1:18987` by default; set `SIGNAL_TEST_ORIGIN` to another **local** origin if needed. It checks real WebSocket upgrade and origin rejection, fan-out, sender echo, room isolation, unsubscribe, and delivery after 12 seconds of idleness. The idle check does not establish whether workerd actually evicted the object; the unit test separately exercises restored attachments. Stop the local Worker afterward.
+Start a local Worker separately with `npx --yes wrangler@4.161.0 dev --config deploy/edge/wrangler.toml --local --port 18987`, then run `npm run test:edge:integration`. The test targets only `http://127.0.0.1:18987` by default; set `SIGNAL_TEST_ORIGIN` to another **local** origin if needed. It checks real WebSocket upgrade and origin rejection, fan-out, sender echo, room isolation, unsubscribe, and delivery after 12 seconds of idleness. The idle check does not establish whether workerd actually evicted the object; the unit test separately exercises restored attachments. It also runs one tunnel pairing (`paired` once per side, binary forwarded, a refused third socket, close propagation, and a text frame closing both sides with `1003`); the 30-second lone-socket alarm is covered only by `tunnel.test.ts`. On local workerd the partner's TCP close event can lag several seconds after its close frame arrives, so the test checks the received frame instead. Stop the local Worker afterward.
 
 ## Account facts
 
@@ -239,6 +291,9 @@ Verified read-only with Wrangler on 2026-11-12:
   nothing in the repo points at it. Delete it once `rocketcrab-edge` is live:
   `npx --yes wrangler@4.161.0 delete --name rocketcrab-cors-relay`.
 - `curly-dream-16c4` — a pre-Nova Worker (2024); not a repo resource.
-- `rocketcrab-edge` — **not deployed yet**.
+- `rocketcrab-edge` — **not deployed yet**. When deployed, its Durable Object
+  bindings will be `SIGNAL_HUB` (`SignalHub`, migration `v1`) and `TUNNEL_PAIR`
+  (`TunnelPair`, migration `v2`, not yet deployed). Neither migration has run on
+  any account.
 - KV namespaces: none. R2 buckets: `prismrestore` only (not Nova's).
 - TURN key: none configured as a Worker secret yet.

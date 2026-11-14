@@ -106,3 +106,166 @@ test(
     }
   },
 );
+
+// One real-workerd tunnel pairing. The server sends `paired` (text) once to
+// each side when the second socket joins; client data must be binary, and a
+// client text frame closes both sides with 1003.
+function collector(socket) {
+  const messages = [];
+  const closes = [];
+  socket.on("message", (data, isBinary) => messages.push({ data, isBinary }));
+  socket.on("close", (code, reason) => closes.push({ code, reason: reason.toString() }));
+  return { messages, closes };
+}
+
+async function waitFor(predicate, label) {
+  const deadline = Date.now() + 3000;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error(`timed out waiting for ${label}`);
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+}
+
+test(
+  "workerd tunnel pairing: paired once per side, binary forwarded, text refused",
+  {
+    timeout: 30000,
+  },
+  async () => {
+    const tunnelUrl = (pairId) => `${wsBase}/tunnel/${pairId}`;
+    assert.equal(await rejected(`${wsBase}/tunnel/${"A".repeat(64)}`, origin), 404);
+
+    // Pair one: paired, binary both ways, third refused, close propagated.
+    const pairOne = tunnelUrl(randomBytes(32).toString("hex"));
+    const a = connect(pairOne),
+      b = connect(pairOne);
+    const sockets = [a, b];
+    try {
+      const aSeen = collector(a),
+        bSeen = collector(b);
+      await Promise.all(sockets.map((socket) => once(socket, "open")));
+      await waitFor(() => aSeen.messages.length >= 1 && bSeen.messages.length >= 1, "paired");
+      await new Promise((resolve) => setTimeout(resolve, 200));
+      for (const seen of [aSeen, bSeen]) {
+        assert.equal(seen.messages.length, 1);
+        assert.equal(seen.messages[0].data.toString(), "paired");
+        assert.equal(seen.messages[0].isBinary, false);
+      }
+
+      const atB = once(b, "message");
+      a.send(Buffer.from([1, 2, 3]), { binary: true });
+      const [bytes, bytesIsBinary] = await atB;
+      assert.equal(bytesIsBinary, true);
+      assert.deepEqual([...bytes], [1, 2, 3]);
+      assert.equal(await rejected(pairOne, origin), 409);
+      a.close(1000, "done");
+      // Checked via the received close frame, as for the text case below.
+      await waitFor(() => b._closeFrameReceived, "partner close frame");
+      assert.equal(b._closeCode, 1000);
+      assert.equal(b._closeMessage.toString(), "partner closed");
+    } finally {
+      for (const socket of sockets) socket.terminate();
+    }
+
+    // Pair two: a client text frame closes both sides with 1003 and forwards nothing.
+    // The sender's close event arrives at once. The partner's close frame is
+    // checked via ws internals (`_closeFrameReceived`, `_closeCode`; ws starts
+    // `_closeCode` at 1006, so only `_closeFrameReceived` marks a real frame).
+    // On local workerd the partner's TCP close event lags, so it can't be awaited.
+    const pairTwo = tunnelUrl(randomBytes(32).toString("hex"));
+    const c = connect(pairTwo),
+      d = connect(pairTwo);
+    const second = [c, d];
+    try {
+      const cSeen = collector(c),
+        dSeen = collector(d);
+      await Promise.all(second.map((socket) => once(socket, "open")));
+      await waitFor(() => cSeen.messages.length >= 1 && dSeen.messages.length >= 1, "paired");
+      c.send("not binary");
+      await waitFor(() => cSeen.closes.length === 1, "sender close");
+      await waitFor(() => d._closeFrameReceived, "partner close frame");
+      assert.equal(cSeen.closes[0].code, 1003);
+      assert.equal(cSeen.closes[0].reason, "binary only");
+      assert.equal(d._closeCode, 1003);
+      for (const seen of [cSeen, dSeen]) assert.equal(seen.messages.length, 1);
+    } finally {
+      for (const socket of second) socket.terminate();
+    }
+  },
+);
+
+// Relay limits over the wire. A frame over the limit closes the pair; the
+// received close frame is checked, as above.
+function closeFrame(socket) {
+  return socket._closeFrameReceived
+    ? { code: socket._closeCode, reason: socket._closeMessage.toString() }
+    : null;
+}
+
+async function openPair() {
+  const url = `${wsBase}/tunnel/${randomBytes(32).toString("hex")}`;
+  const a = connect(url),
+    b = connect(url);
+  // Collect from the start: `paired` arrives right after the upgrade, before `open` resolves.
+  const aSeen = collector(a),
+    bSeen = collector(b);
+  try {
+    await Promise.all([once(a, "open"), once(b, "open")]);
+    await waitFor(() => aSeen.messages.length >= 1 && bSeen.messages.length >= 1, "paired");
+    return { a, b, aSeen, bSeen };
+  } catch (error) {
+    a.terminate();
+    b.terminate();
+    throw error;
+  }
+}
+
+test(
+  "workerd tunnel accepts a frame at the limit, closes both on one byte over with 1009",
+  {
+    timeout: 30000,
+  },
+  async () => {
+    const { a, b, bSeen } = await openPair();
+    try {
+      // 262144 + 29: the largest payload plus the client's AES-GCM framing.
+      const largest = Buffer.alloc(262144 + 29, 1);
+      a.send(largest, { binary: true });
+      await waitFor(() => bSeen.messages.length === 2, "largest frame");
+      assert.equal(bSeen.messages[1].data.length, largest.length);
+      assert.equal(bSeen.messages[1].isBinary, true);
+      // One byte over the server's limit (262144 + 64).
+      a.send(Buffer.alloc(262144 + 64 + 1, 2), { binary: true });
+      await waitFor(() => closeFrame(a) && closeFrame(b), "1009 close frames");
+      assert.equal(closeFrame(a).code, 1009);
+      assert.equal(closeFrame(b).code, 1009);
+    } finally {
+      a.terminate();
+      b.terminate();
+    }
+  },
+);
+
+test(
+  "workerd tunnel closes both with 1008 once a socket exhausts its relay budget",
+  {
+    timeout: 30000,
+  },
+  async () => {
+    const { a, b } = await openPair();
+    try {
+      // 24 frames of 256 KiB is 6 MiB: more than the 4 MiB burst, and far too little
+      // time for the 512 KiB/s refill to cover the difference.
+      const chunk = Buffer.alloc(262144, 3);
+      for (let i = 0; i < 24 && a.readyState === 1; i++) a.send(chunk, { binary: true });
+      await waitFor(() => closeFrame(a) && closeFrame(b), "1008 close frames");
+      assert.equal(closeFrame(a).code, 1008);
+      assert.equal(closeFrame(a).reason, "rate limit");
+      assert.equal(closeFrame(b).code, 1008);
+      assert.equal(closeFrame(b).reason, "rate limit");
+    } finally {
+      a.terminate();
+      b.terminate();
+    }
+  },
+);

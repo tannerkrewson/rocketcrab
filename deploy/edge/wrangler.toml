@@ -15,9 +15,17 @@ dataset = "connection_events"
 name = "SIGNAL_HUB"
 class_name = "SignalHub"
 
+[[durable_objects.bindings]]
+name = "TUNNEL_PAIR"
+class_name = "TunnelPair"
+
 [[migrations]]
 tag = "v1"
 new_sqlite_classes = ["SignalHub"]
+
+[[migrations]]
+tag = "v2"
+new_sqlite_classes = ["TunnelPair"]
 
 [vars]
 # Exact origins allowed to call the Worker. Localhost lets `npm run dev`

@@ -220,3 +220,69 @@ describe("TURN mint", () => {
     expect(dropPort53([{ urls: "stun:h:53" }])).toEqual([]);
   });
 });
+
+describe("tunnel route", () => {
+  const PAIR = "b".repeat(64);
+  const UPGRADE = { method: "GET", headers: { Upgrade: "websocket" } };
+
+  function tunnelEnv(overrides: Partial<EdgeEnv> = {}) {
+    const idFromName = vi.fn((name: string) => name);
+    const fetch = vi.fn(async () => new Response("forwarded"));
+    const limit = vi.fn(async () => ({ success: true }));
+    const env: EdgeEnv = {
+      ...BASE_ENV,
+      TUNNEL_PAIR: { idFromName, get: () => ({ fetch }) },
+      RATE_LIMITER: { limit },
+      ...overrides,
+    };
+    return { env, idFromName, fetch, limit };
+  }
+
+  it("rejects pair IDs that are not 64 lowercase hex characters", async () => {
+    const { env, fetch } = tunnelEnv();
+    for (const id of ["a".repeat(63), "a".repeat(65), "A".repeat(64), "g".repeat(64)]) {
+      expect((await call(`/tunnel/${id}`, UPGRADE, env)).status).toBe(404);
+    }
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("rejects non-GET and non-upgrade requests before reaching the object", async () => {
+    const { env, fetch } = tunnelEnv();
+    expect((await call(`/tunnel/${PAIR}`, { ...UPGRADE, method: "POST" }, env)).status).toBe(405);
+    expect((await call(`/tunnel/${PAIR}`, { method: "GET" }, env)).status).toBe(426);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("requires an allowlisted Origin, and a missing Origin is refused too", async () => {
+    const { env, fetch } = tunnelEnv();
+    const response = await call(
+      `/tunnel/${PAIR}`,
+      { ...UPGRADE, origin: "https://evil.example" },
+      env,
+    );
+    expect(response.status).toBe(403);
+    expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
+    expect((await call(`/tunnel/${PAIR}`, { ...UPGRADE, origin: null }, env)).status).toBe(403);
+    expect(fetch).not.toHaveBeenCalled();
+  });
+
+  it("rate limits per IP with the tunnel key and forwards the rest to the pair object", async () => {
+    const { env, idFromName, fetch, limit } = tunnelEnv();
+    expect(await (await call(`/tunnel/${PAIR}`, UPGRADE, env)).text()).toBe("forwarded");
+    expect(idFromName).toHaveBeenCalledWith(PAIR);
+    expect(limit).toHaveBeenCalledWith({ key: "tunnel:203.0.113.7" });
+
+    limit.mockResolvedValueOnce({ success: false });
+    const limited = await call(`/tunnel/${PAIR}`, UPGRADE, env);
+    expect(limited.status).toBe(429);
+    expect(limited.headers.get("Retry-After")).toBe("60");
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
+
+  it("returns 503 when the Durable Object binding is missing", async () => {
+    const { env } = tunnelEnv({ TUNNEL_PAIR: undefined });
+    const response = await call(`/tunnel/${PAIR}`, UPGRADE, env);
+    expect(response.status).toBe(503);
+    expect(await errorCode(response)).toBe("unavailable");
+  });
+});
