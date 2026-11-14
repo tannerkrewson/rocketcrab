@@ -863,6 +863,44 @@ describe("party engine — restart after exiting to the lobby (2t1.4)", () => {
   });
 });
 
+describe("party engine — a frame rebooted after the game started", () => {
+  it("replays start to a follower's new frame, so its actions are not refused", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    const code = await runCreate(a, world);
+    await registerLocalGame(a, world);
+    const { join: joinPromise, settled } = startJoin(b, world, code);
+    await settled;
+    await settle(world);
+    await joinPromise;
+    await settle(world);
+    await registerLocalGame(b, world);
+    a.engine.startGame();
+    await settle(world);
+    expect(b.engine.getState().phase).toBe("playing");
+
+    // The play view remounts b's container: its frame reboots after start.
+    b.engine.setContainer(null);
+    b.engine.setContainer(b.container);
+    await settle(world);
+    await registerLocalGame(b, world);
+
+    // The rebooted frame must learn that the game started, or the game's
+    // nova.dispatch is refused with not_started for this player.
+    const startReplays = b.harness.port1.sent.filter(
+      (message) =>
+        (message as { type?: string; event?: { kind?: string } }).type === "game.apiEvent" &&
+        (message as { event?: { kind?: string } }).event?.kind === "start",
+    );
+    expect(startReplays.length).toBeGreaterThan(0);
+
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+    await settle(world);
+  });
+});
+
 describe("party engine — lobby notices", () => {
   it("dedupes identical notices instead of piling up alerts (11.8)", async () => {
     const world = makeWorld();

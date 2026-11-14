@@ -2642,7 +2642,10 @@ export class PartyEngine {
     if (this.lastStateApiEvent !== null) {
       runtime.pushApiEvent(this.lastStateApiEvent);
     }
-    if (session.isStarted()) {
+    // gameStarted, not session.isStarted(): a follower's session never sets its
+    // own started flag (only the starter's start() does), so a frame rebooted
+    // after the game began would never receive start and refuse every action.
+    if (this.gameStarted) {
       runtime.pushApiEvent({ kind: "start" });
     }
   }
