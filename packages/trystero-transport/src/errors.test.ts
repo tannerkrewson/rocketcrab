@@ -1,93 +1,56 @@
 import { describe, expect, it } from "vitest";
-import {
-  TrysteroJoinError,
-  categorizeJoinError,
-  fromRoomError,
-  toTrysteroJoinError,
-} from "./errors";
+import type { RoomError } from "@trystero-p2p/ws-relay";
+import { TrysteroJoinError, fromRoomError } from "./errors";
 
-it("uses structured room codes rather than message wording", () => {
+describe("fromRoomError", () => {
   const base = { appId: "app", roomId: "room", peerId: "peer", message: "arbitrary text" };
-  expect(fromRoomError({ ...base, code: "room-full" })).toMatchObject({
-    code: "room-full",
-    category: "room_full",
-    isFatal: true,
-  });
-  expect(fromRoomError({ ...base, code: "decrypt-failed", stage: "offer" })).toMatchObject({
-    category: "password_mismatch",
-  });
-  expect(
-    fromRoomError({ ...base, code: "peer-connect-failed", turnConfigured: true }),
-  ).toMatchObject({ category: "peer_connection_failed" });
-  expect(fromRoomError({ ...base, code: "relay-failed" })).toMatchObject({
-    category: "relay_unreachable",
-  });
-});
-
-describe("categorizeJoinError", () => {
-  it("maps password errors (F8 phrasing) to password_mismatch", () => {
-    expect(categorizeJoinError("incorrect room password when decrypting offer")).toBe(
-      "password_mismatch",
-    );
-    expect(categorizeJoinError("incorrect room password when decrypting answer")).toBe(
-      "password_mismatch",
-    );
-    expect(categorizeJoinError("incorrect password for overlapping room")).toBe(
-      "password_mismatch",
-    );
+  const cases: Array<[RoomError, string, boolean]> = [
+    [{ ...base, code: "room-full" }, "room_full", true],
+    [{ ...base, code: "banned" }, "rejected", false],
+    [{ ...base, code: "relay-failed" }, "relay_unreachable", true],
+    [{ ...base, code: "identity-failed" }, "invalid_state", false],
+    [{ ...base, code: "plugin-failed" }, "invalid_state", false],
+    [{ ...base, code: "decrypt-failed", stage: "offer" }, "password_mismatch", true],
+    [{ ...base, code: "decrypt-failed", stage: "answer" }, "password_mismatch", true],
+    [
+      { ...base, code: "peer-connect-failed", turnConfigured: true },
+      "peer_connection_failed",
+      false,
+    ],
+    [{ ...base, code: "handshake-failed" }, "rejected", false],
+    [{ ...base, code: "peer-error" }, "peer_disconnected", false],
+  ];
+  it.each(cases)("maps $code independently of wording", (input, category, isFatal) => {
+    expect(fromRoomError(input)).toMatchObject({
+      code: input.code,
+      category,
+      isFatal,
+      message: input.message,
+    });
   });
 
-  it("maps handshake timeouts to handshake_timeout", () => {
-    expect(categorizeJoinError("handshake timed out after 30000ms")).toBe("handshake_timeout");
+  it("preserves error fields and cause", () => {
+    const cause = new Error("underlying error");
+    const error = fromRoomError({ ...base, code: "decrypt-failed", stage: "offer", cause });
+    expect(error).toBeInstanceOf(Error);
+    expect(error.name).toBe("TrysteroJoinError");
+    expect(error).toMatchObject({
+      ...base,
+      code: "decrypt-failed",
+      category: "password_mismatch",
+      cause,
+      isFatal: true,
+    });
   });
 
-  it("maps SDP exchange failures (F5 S3) to peer_connection_failed", () => {
+  it("does not infer category from misleading messages", () => {
     expect(
-      categorizeJoinError(
-        "could not connect to peer xyz after exchanging SDP; configure TURN servers with turnConfig or rtcConfig.iceServers",
-      ),
-    ).toBe("peer_connection_failed");
-    expect(
-      categorizeJoinError(
-        "could not connect to peer xyz after exchanging SDP; check that your TURN server URLs and credentials are reachable by both peers",
-      ),
-    ).toBe("peer_connection_failed");
-  });
-
-  it("maps admission/handshake rejections to rejected", () => {
-    expect(categorizeJoinError("admission policy rejected peer")).toBe("rejected");
-    expect(categorizeJoinError("peer rejected admission")).toBe("rejected");
-    expect(categorizeJoinError("handshake failed: peer sent an invalid identity handshake")).toBe(
-      "rejected",
-    );
-  });
-
-  it("maps handshake disconnects to peer_disconnected", () => {
-    expect(categorizeJoinError("peer disconnected during handshake")).toBe("peer_disconnected");
-  });
-
-  it("defaults unknown messages to unknown", () => {
-    expect(categorizeJoinError("something unexpected happened")).toBe("unknown");
+      fromRoomError({ ...base, code: "peer-error", message: "incorrect password" }).category,
+    ).toBe("peer_disconnected");
   });
 });
 
 describe("TrysteroJoinError", () => {
-  it("carries the category and raw fields from a Trystero report", () => {
-    const error = toTrysteroJoinError({
-      error: "incorrect room password when decrypting offer",
-      appId: "rocketcrab-nova-dev",
-      roomId: "ROOM",
-      peerId: "peer-1",
-    });
-    expect(error).toBeInstanceOf(Error);
-    expect(error.name).toBe("TrysteroJoinError");
-    expect(error.category).toBe("password_mismatch");
-    expect(error.peerId).toBe("peer-1");
-    expect(error.appId).toBe("rocketcrab-nova-dev");
-    expect(error.roomId).toBe("ROOM");
-    expect(error.isFatal).toBe(true);
-  });
-
   it("marks non-fatal categories as recoverable", () => {
     const error = new TrysteroJoinError({
       category: "peer_connection_failed",

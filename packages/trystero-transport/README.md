@@ -39,8 +39,8 @@ behaves identically in the local test arena and over real parties.
   adapter maps it to `TransferProgress` on both sides with byte counts.
 - **Join errors**: categorized (`password_mismatch`, `rejected`,
   `handshake_timeout`, `peer_disconnected`, `peer_connection_failed`,
-  `relay_unreachable`, `join_timeout`, …). Trystero gives NO structured error
-  for relay failure (F5/F9), so the adapter detects it itself: relay socket
+  `relay_unreachable`, `join_timeout`, …). Trystero 0.27 room errors are
+  mapped by code; the adapter also detects relay unavailability through socket
   `readyState` monitoring + `relayConnectTimeoutMs` (15 s) and an overall
   `joinTimeoutMs` (30 s). Errors after `join()` resolves (e.g. password
   mismatch during the slow discovery phase) go to the `onJoinError` observer

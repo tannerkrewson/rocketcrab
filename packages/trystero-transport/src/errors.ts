@@ -1,14 +1,4 @@
-/**
- * Join-error mapping (P1 deliverable; F5 finding F5 / S9).
- *
- * Trystero surfaces structured `JoinError`s only for handshake-stage
- * failures (password mismatch, admission rejection, handshake timeout, SDP
- * exchange failure). It does NOT report unreachable relays — the socket stays
- * CLOSED and Trystero silently retries with backoff. The adapter therefore
- * detects relay failures itself (relay `readyState` monitoring + join
- * timeouts, see `trystero-transport.ts`) and reports both sources through one
- * user-actionable category union.
- */
+/** Map Trystero 0.27 typed room errors and adapter failures to actionable categories. */
 
 import type { RoomError, RoomErrorCode } from "@trystero-p2p/ws-relay";
 
@@ -92,42 +82,6 @@ export class TrysteroJoinError extends Error {
   }
 }
 
-/** Raw join error Trystero passes to `onJoinError`. */
-export interface TrysteroJoinErrorReport {
-  readonly error: string;
-  readonly appId: string;
-  readonly roomId: string;
-  readonly peerId: string;
-}
-
-/**
- * Map a Trystero `onJoinError` report (or any error message) to a
- * user-actionable category. Order matters: password errors and SDP exchange
- * failures have very specific phrasing (verified from Trystero 0.25.3
- * sources and the F5/F8 findings).
- */
-export function categorizeJoinError(message: string): TrysteroJoinErrorCategory {
-  if (/incompatible Nova version/i.test(message)) {
-    return "incompatible_version";
-  }
-  if (/password/i.test(message)) {
-    return "password_mismatch";
-  }
-  if (/handshake timed out/i.test(message)) {
-    return "handshake_timeout";
-  }
-  if (/could not connect to peer/i.test(message)) {
-    return "peer_connection_failed";
-  }
-  if (/disconnected during handshake/i.test(message)) {
-    return "peer_disconnected";
-  }
-  if (/admission|rejected|handshake failed/i.test(message)) {
-    return "rejected";
-  }
-  return "unknown";
-}
-
 /** Map 0.27 room errors by code, never by implementation-specific wording. */
 export function fromRoomError(error: RoomError): TrysteroJoinError {
   const categories: Record<RoomErrorCode, TrysteroJoinErrorCategory> = {
@@ -149,16 +103,5 @@ export function fromRoomError(error: RoomError): TrysteroJoinError {
     roomId: error.roomId,
     peerId: "peerId" in error ? error.peerId : undefined,
     cause: error.cause,
-  });
-}
-
-/** Build a categorized error from a Trystero join-error report. */
-export function toTrysteroJoinError(report: TrysteroJoinErrorReport): TrysteroJoinError {
-  return new TrysteroJoinError({
-    category: categorizeJoinError(report.error),
-    message: report.error,
-    peerId: report.peerId,
-    appId: report.appId,
-    roomId: report.roomId,
   });
 }
