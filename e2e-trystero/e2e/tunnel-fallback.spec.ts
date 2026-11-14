@@ -1,0 +1,263 @@
+// Real-browser WebRTC-to-tunnel fallback (PLAN.md §5.6) through the local
+// edge Worker: one page's native WebRTC is forced to fail, so its pair moves
+// onto the /tunnel/:pairId WebSocket. Shares the harness with trystero.spec.ts.
+import { randomBytes } from "node:crypto";
+import { expect, test } from "@playwright/test";
+import type { Browser, Page, WebSocket } from "@playwright/test";
+
+interface PeerSummary {
+  memberId: string;
+  connectionId: string;
+  tunnelled?: boolean;
+}
+
+interface HarnessState {
+  peers: PeerSummary[];
+  messages: Array<{ channel: string; senderMemberId: string }>;
+  tunnel: {
+    starts: Array<{ reason: string; elapsedMs: number }>;
+    failures: string[];
+  };
+  errors: string[];
+}
+
+interface SourceState {
+  received: boolean;
+  receivedLength: number | null;
+  sourceSha256: string | null;
+  events: string[];
+}
+
+interface JoinOptions {
+  room: string;
+  partySecret?: string;
+  forceRelayOnlyNoServers?: boolean;
+}
+
+interface HarnessWindow {
+  __harness: {
+    ready: boolean;
+    createRoom: (options: JoinOptions) => Promise<string>;
+    joinRoomByCode: (options: JoinOptions) => Promise<string>;
+    leave: () => Promise<void>;
+    sendStruct: () => Promise<void>;
+    getState: () => HarnessState;
+    sourceHostStart: (gameId: string, source: string) => Promise<void>;
+    sourceJoinerStart: () => Promise<void>;
+    getSourceState: () => SourceState;
+  };
+}
+
+const JOINED = "joined";
+/** Fallback timer (FALLBACK_AFTER_MS, 8 s) plus margin for the switch and the tunnel. */
+const PAST_FALLBACK_MS = 12_000;
+
+interface Peer {
+  page: Page;
+  tunnelSockets: string[];
+  /** URLs of tunnel sockets that reached the closed state. */
+  closedTunnelSockets: string[];
+}
+
+function randRoom(): string {
+  return `tun-${Date.now().toString(36)}-${Math.floor(Math.random() * 1e9).toString(36)}`;
+}
+
+async function openPeer(browser: Browser): Promise<Peer> {
+  const page = await browser.newPage();
+  const tunnelSockets: string[] = [];
+  const closedTunnelSockets: string[] = [];
+  page.on("websocket", (socket: WebSocket) => {
+    if (!socket.url().includes("/tunnel/")) return;
+    tunnelSockets.push(socket.url());
+    socket.on("close", () => closedTunnelSockets.push(socket.url()));
+  });
+  await page.goto("/");
+  await page.waitForFunction(() => (window as unknown as HarnessWindow).__harness?.ready === true);
+  return { page, tunnelSockets, closedTunnelSockets };
+}
+
+async function enter(
+  peer: Peer,
+  room: string,
+  mode: "create" | "join",
+  options: { secret: string; forced: boolean },
+): Promise<void> {
+  const result = await peer.page.evaluate(
+    ([r, m, o]) => {
+      const harness = (window as unknown as HarnessWindow).__harness;
+      const join = {
+        room: r,
+        partySecret: o.secret,
+        forceRelayOnlyNoServers: o.forced,
+      };
+      return m === "create" ? harness.createRoom(join) : harness.joinRoomByCode(join);
+    },
+    [room, mode, options] as const,
+  );
+  expect(result).toBe(JOINED);
+}
+
+async function state(page: Page): Promise<HarnessState> {
+  return page.evaluate(() => (window as unknown as HarnessWindow).__harness.getState());
+}
+
+async function sourceState(page: Page): Promise<SourceState> {
+  return page.evaluate(() => (window as unknown as HarnessWindow).__harness.getSourceState());
+}
+
+async function waitPeers(page: Page, count: number, timeout = 90_000): Promise<void> {
+  await expect.poll(async () => (await state(page)).peers.length, { timeout }).toBe(count);
+}
+
+/** Two pages joined to one room with the same party secret. */
+async function joinPair(
+  browser: Browser,
+  forcedSecond: boolean,
+): Promise<{ host: Peer; joiner: Peer; room: string; secret: string }> {
+  const room = randRoom();
+  const secret = randomBytes(32).toString("base64url");
+  const host = await openPeer(browser);
+  const joiner = await openPeer(browser);
+  await enter(host, room, "create", { secret, forced: false });
+  await enter(joiner, room, "join", { secret, forced: forcedSecond });
+  await waitPeers(host.page, 1);
+  await waitPeers(joiner.page, 1);
+  return { host, joiner, room, secret };
+}
+
+async function closeAll(...peers: Peer[]): Promise<void> {
+  for (const peer of peers) {
+    await peer.page
+      .evaluate(() => (window as unknown as HarnessWindow).__harness.leave())
+      .catch(() => undefined);
+    await peer.page.close();
+  }
+}
+
+/** Exact UTF-8 byte budget for the game-source payload (same as game-source.spec.ts). */
+function buildGameSource(size: number): string {
+  const filler = "🦀 rocketcrab rules ".repeat(2000);
+  const document = `<!doctype html><html><body><h1>Tunnel Game</h1>${filler}</body></html>`;
+  return document + "x".repeat(Math.max(0, size - new TextEncoder().encode(document).byteLength));
+}
+
+test("a forced player and its normal partner both tunnel once, and actions flow both ways", async ({
+  browser,
+}) => {
+  test.setTimeout(180_000);
+  const { host, joiner } = await joinPair(browser, true);
+  try {
+    // Each page's pair is carried by one tunnel socket: exactly one per side.
+    await expect.poll(() => host.tunnelSockets.length, { timeout: PAST_FALLBACK_MS * 2 }).toBe(1);
+    await expect.poll(() => joiner.tunnelSockets.length, { timeout: 5_000 }).toBe(1);
+
+    // Both report the peer as tunnelled and started exactly one fallback.
+    await expect.poll(async () => (await state(host.page)).peers[0]?.tunnelled).toBe(true);
+    await expect.poll(async () => (await state(joiner.page)).peers[0]?.tunnelled).toBe(true);
+    for (const peer of [host, joiner]) {
+      const current = await state(peer.page);
+      expect(current.tunnel.starts).toHaveLength(1);
+      expect(current.tunnel.failures).toEqual([]);
+      expect(current.errors).toEqual([]);
+    }
+
+    // Actions flow in both directions over the tunnel.
+    await host.page.evaluate(() => (window as unknown as HarnessWindow).__harness.sendStruct());
+    await joiner.page.evaluate(() => (window as unknown as HarnessWindow).__harness.sendStruct());
+    await expect
+      .poll(
+        async () => (await state(joiner.page)).messages.filter((m) => m.channel === "raw").length,
+      )
+      .toBeGreaterThanOrEqual(1);
+    await expect
+      .poll(async () => (await state(host.page)).messages.filter((m) => m.channel === "raw").length)
+      .toBeGreaterThanOrEqual(1);
+  } finally {
+    await closeAll(host, joiner);
+  }
+});
+
+test("healthy pairs stay on native WebRTC and never open a tunnel", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const { host, joiner } = await joinPair(browser, false);
+  try {
+    // Let the fallback timer pass on the healthy pair.
+    await host.page.waitForTimeout(PAST_FALLBACK_MS);
+
+    expect(host.tunnelSockets).toEqual([]);
+    expect(joiner.tunnelSockets).toEqual([]);
+    for (const peer of [host, joiner]) {
+      const current = await state(peer.page);
+      expect(current.peers[0]?.tunnelled).toBe(false);
+      expect(current.tunnel.starts).toEqual([]);
+      expect(current.tunnel.failures).toEqual([]);
+    }
+
+    await host.page.evaluate(() => (window as unknown as HarnessWindow).__harness.sendStruct());
+    await expect
+      .poll(
+        async () => (await state(joiner.page)).messages.filter((m) => m.channel === "raw").length,
+      )
+      .toBeGreaterThanOrEqual(1);
+  } finally {
+    await closeAll(host, joiner);
+  }
+});
+
+test("a 2 MiB game source crosses the tunnel byte-identical and verified", async ({ browser }) => {
+  test.setTimeout(300_000);
+  const gameId = "game_tunnel_1";
+  const source = buildGameSource(2 * 1024 * 1024);
+  const { host, joiner } = await joinPair(browser, true);
+  try {
+    await host.page.evaluate(
+      ([id, src]) => (window as unknown as HarnessWindow).__harness.sourceHostStart(id, src),
+      [gameId, source] as const,
+    );
+    const hostSource = await sourceState(host.page);
+    expect(hostSource.sourceSha256).toMatch(/^[0-9a-f]{64}$/);
+
+    await joiner.page.evaluate(() =>
+      (window as unknown as HarnessWindow).__harness.sourceJoinerStart(),
+    );
+    await expect
+      .poll(async () => (await sourceState(joiner.page)).received, {
+        timeout: 240_000,
+      })
+      .toBe(true);
+    const received = await sourceState(joiner.page);
+    expect(received.sourceSha256).toBe(hostSource.sourceSha256);
+    expect(received.receivedLength).toBe(source.length);
+    expect(received.events).toContain("received");
+
+    // Still tunnelled: the transfer did not fall back to native WebRTC mid-way.
+    expect((await state(joiner.page)).peers[0]?.tunnelled).toBe(true);
+    expect((await state(joiner.page)).tunnel.failures).toEqual([]);
+    expect(joiner.tunnelSockets).toHaveLength(1);
+  } finally {
+    await closeAll(host, joiner);
+  }
+});
+
+test("closing one side tears the tunnelled partner down", async ({ browser }) => {
+  test.setTimeout(180_000);
+  const { host, joiner } = await joinPair(browser, true);
+  try {
+    await expect
+      .poll(async () => (await state(host.page)).peers[0]?.tunnelled, {
+        timeout: PAST_FALLBACK_MS * 2,
+      })
+      .toBe(true);
+
+    await joiner.page.evaluate(() => (window as unknown as HarnessWindow).__harness.leave());
+    await waitPeers(host.page, 0, 60_000);
+
+    // The partner's tunnel socket closes too (the edge closes the pair when
+    // one side leaves). The host may see this as a Trystero peer leave before
+    // its socket closes, so a terminal failure is not required here.
+    await expect.poll(() => host.closedTunnelSockets.length, { timeout: 30_000 }).toBe(1);
+  } finally {
+    await closeAll(host, joiner);
+  }
+});

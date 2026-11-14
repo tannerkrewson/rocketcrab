@@ -5,7 +5,10 @@
 // ONLY the adapter's public surface — never raw Trystero — so this is a true
 // end-to-end test of the adapter over the local signaling relay + WebRTC.
 import { TrysteroTransport } from "@rocketcrab/trystero-transport";
-import type { TrysteroTransportDiagnostics } from "@rocketcrab/trystero-transport";
+import type {
+  TrysteroTransportDiagnostics,
+  TrysteroTransportOptions,
+} from "@rocketcrab/trystero-transport";
 import { GameSourceCoordinator } from "@rocketcrab/party";
 
 interface HarnessState {
@@ -15,8 +18,18 @@ interface HarnessState {
   selfConnectionId: string | null;
   connectionState: string;
   room: string | null;
-  peers: Array<{ memberId: string; connectionId: string; displayName?: string }>;
+  peers: Array<{
+    memberId: string;
+    connectionId: string;
+    displayName?: string;
+    tunnelled?: boolean;
+  }>;
   signalingConnected: boolean | null;
+  /** WebRTC-to-tunnel fallback events for this page's transport (PLAN.md §5). */
+  tunnel: {
+    starts: Array<{ reason: string; elapsedMs: number }>;
+    failures: string[];
+  };
   messages: Array<{
     channel: string;
     senderMemberId: string;
@@ -42,7 +55,13 @@ interface JoinOptions {
   appId?: string;
   relayConnectTimeoutMs?: number;
   joinTimeoutMs?: number;
+  /** Party session secret; enables the tunnel fallback (tunnel keys derive from it). */
+  partySecret?: string;
+  /** Force this page's native WebRTC to fail so its pairs tunnel (test only). */
+  forceRelayOnlyNoServers?: boolean;
 }
+
+type PartySecret = NonNullable<TrysteroTransportOptions["partySecret"]>;
 
 const SESSION_PREFIX = "e2e-session-";
 
@@ -85,6 +104,7 @@ const state: HarnessState = {
   room: null,
   peers: [],
   signalingConnected: null,
+  tunnel: { starts: [], failures: [] },
   messages: [],
   progress: [],
   pings: [],
@@ -112,6 +132,16 @@ async function enterRoom(options: JoinOptions): Promise<string> {
     appId: options.appId,
     relayConnectTimeoutMs: options.relayConnectTimeoutMs ?? 10_000,
     joinTimeoutMs: options.joinTimeoutMs ?? 45_000,
+    ...(options.partySecret !== undefined
+      ? { partySecret: options.partySecret as PartySecret }
+      : {}),
+    forceRelayOnlyNoServers: options.forceRelayOnlyNoServers === true,
+    onTunnel: (info) => {
+      state.tunnel.starts.push({ reason: info.reason, elapsedMs: info.elapsedMs });
+    },
+    onTunnelFailure: (info) => {
+      state.tunnel.failures.push(info.reason);
+    },
     onJoinError: (error) => {
       state.errors.push(`${error.category}: ${error.message}`);
     },
@@ -182,6 +212,7 @@ async function leaveRoom(): Promise<void> {
   state.room = null;
   state.peers = [];
   state.signalingConnected = null;
+  state.tunnel = { starts: [], failures: [] };
   state.messages = [];
   state.progress = [];
 }
@@ -278,6 +309,21 @@ function getSourceState(): HarnessState["source"] {
   return state.source;
 }
 
+/** Harness state with each peer's current tunnel status read from the adapter. */
+function snapshot(): HarnessState {
+  const current = transport;
+  return {
+    ...state,
+    peers: state.peers.map((peer) => ({
+      ...peer,
+      tunnelled:
+        current?.isPeerTunnelled(
+          peer.connectionId as Parameters<TrysteroTransport["isPeerTunnelled"]>[0],
+        ) ?? false,
+    })),
+  };
+}
+
 function getDiagnostics(): TrysteroTransportDiagnostics | null {
   return transport?.getDiagnostics() ?? null;
 }
@@ -312,7 +358,7 @@ window.__harness = {
   sendBinary,
   sendLarge: (size = 256 * 1024) => sendLarge(size),
   ping: pingFirst,
-  getState: () => state,
+  getState: snapshot,
   getDiagnostics,
   sourceHostStart,
   sourceJoinerStart: () => sourceJoinerStart(),
