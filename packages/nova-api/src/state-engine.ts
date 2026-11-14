@@ -1491,7 +1491,6 @@ export class NovaStateEngine {
     }
   }
 
-  /** The state envelope for this shell's current replicated state. */
   /**
    * Send one broadcast. A delta that cannot be sent falls back to the full state,
    * and a failure to send is reported as a diagnostic: a snapshot must never
@@ -1516,6 +1515,24 @@ export class NovaStateEngine {
     }
   }
 
+  /**
+   * The delta from the previous broadcast to the current state, or null when it
+   * cannot be sent or is not smaller than the full state. Never throws: a delta
+   * that fails to compute falls back to the full state, like a failed send.
+   */
+  private smallerDeltaOrNull(previous: unknown, next: unknown): JsonDeltaOp[] | null {
+    try {
+      const candidate = deltaFor(previous, next);
+      return candidate !== null && serializedBytesSync(candidate) < serializedBytesSync(next)
+        ? candidate
+        : null;
+    } catch (error) {
+      this.host.emit({ type: "snapshotFallback", reason: describeError(error) });
+      return null;
+    }
+  }
+
+  /** The state envelope for this shell's current replicated state. */
   private snapshotEnvelope(
     historyMode: "full" | "increment",
     ops: readonly JsonDeltaOp[] | null = null,
@@ -1551,16 +1568,10 @@ export class NovaStateEngine {
       this.pendingHistoryIds.size <= Math.min(this.historyLimit, stateHistoryLimit);
     // A delta is sent only when this broadcast continues the previous one and
     // the diff is smaller than the full state; otherwise the full state goes out.
-    let ops: JsonDeltaOp[] | null = null;
-    if (continuous && this.lastBroadcastCanonical !== null && this.canonical !== null) {
-      const candidate = deltaFor(this.lastBroadcastCanonical, this.canonical);
-      if (
-        candidate !== null &&
-        serializedBytesSync(candidate) < serializedBytesSync(this.canonical)
-      ) {
-        ops = candidate;
-      }
-    }
+    const ops =
+      continuous && this.lastBroadcastCanonical !== null && this.canonical !== null
+        ? this.smallerDeltaOrNull(this.lastBroadcastCanonical, this.canonical)
+        : null;
     this.sendBroadcast(increment ? "increment" : "full", ops);
     this.lastBroadcastRevision = this.revision;
     this.lastBroadcastStateHash = this.stateHash;
