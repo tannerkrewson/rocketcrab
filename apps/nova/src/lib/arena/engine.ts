@@ -612,6 +612,13 @@ export class ArenaEngine {
           `Authority: ${event.authorityMemberId ?? "none"} (term ${event.term}).`,
         );
         break;
+      case "historyIncomplete":
+        this.logPlayer(
+          id,
+          "warn",
+          `Authority ${event.authorityMemberId} has an incomplete action history (term ${event.term}).`,
+        );
+        break;
       case "stateCommitted":
         // S2 diagnostics: state size + action rate are visible in the logs
         // and the arena state snapshot.
