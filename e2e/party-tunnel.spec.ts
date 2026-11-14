@@ -91,6 +91,15 @@ async function frameOf(player: Player): Promise<Frame> {
   return frame!;
 }
 
+/** The quizmaster's "(N/M answered)" hint, as text (empty if absent). */
+async function answeredHint(frame: Frame): Promise<string> {
+  return frame.evaluate(() => {
+    const api = (window as unknown as { __runtimeApi: { getGameWindow(): Window | null } })
+      .__runtimeApi;
+    return api.getGameWindow()?.document.querySelector(".note")?.textContent ?? "";
+  });
+}
+
 /** The answer rows of the revealed list, as text (one per answering player). */
 async function revealedRows(frame: Frame): Promise<string[]> {
   return frame.evaluate(() => {
@@ -104,11 +113,10 @@ async function revealedRows(frame: Frame): Promise<string[]> {
   });
 }
 
-// FIXME (PLAN §5.6): Start game enables now (the lobby re-renders on a peer's
-// readiness), but the host stays in "starting" when it is not the lowest member
-// id: the authority-elect is the lowest eligible id (state-engine.ts
-// lowestEligibleMemberId), and the elect ignores a game.start that is not from
-// its own authority (session.ts case "game.start"). Re-enable once fixed.
+// FIXME (PLAN §5.6): the start now completes for a non-lowest host, and the
+// reveal waits for both answers. The forced player's answer is still refused
+// as not_started (the quiz's silent catch logs "dispatch skipped"), so the
+// round never reaches two answers. Re-enable once that is fixed.
 test.fixme("a 3-player party with one tunnelled player plays a state-mode game", async ({
   browser,
 }) => {
@@ -191,6 +199,11 @@ test.fixme("a 3-player party with one tunnelled player plays a state-mode game",
       }
     }
     expect(quizmaster).not.toBeNull();
+    // Answers travel to the authority over the transport, so wait until the
+    // quizmaster's frame has both answers before revealing.
+    await expect
+      .poll(async () => answeredHint(await frameOf(quizmaster!)), { timeout: 120_000 })
+      .toContain("2/2 answered");
     await clickInGame(await frameOf(quizmaster!), '[data-action="reveal"]');
 
     // Every frame shows the reveal with both other players' answers.

@@ -58,10 +58,19 @@ export async function waitForGameState(
 ): Promise<GameFrameState> {
   const deadline = Date.now() + timeoutMs;
   let last: GameFrameState | null = null;
+  let lastError: unknown = null;
   for (;;) {
-    last = await gameState(frame);
+    try {
+      last = await gameState(frame);
+      lastError = null;
+    } catch (error) {
+      // The runtime frame reboots when the play view mounts; its API is not
+      // there for a moment. Retry until the deadline, then report the error.
+      lastError = error;
+    }
     if (last !== null && predicate(last)) return last;
     if (Date.now() > deadline) {
+      if (lastError !== null) throw lastError;
       throw new Error(
         `Timed out waiting for the game frame (last state: ${JSON.stringify(last)}).`,
       );
