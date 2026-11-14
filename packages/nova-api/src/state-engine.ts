@@ -1527,7 +1527,7 @@ export class NovaStateEngine {
     this.stats.applied += 1;
     this.noteProcessed();
     this.authorityStateRevision = this.revision;
-    this.broadcastSnapshot(false);
+    this.broadcastSnapshot(true);
     const envelope = {
       revision: this.revision,
       stateHash: this.stateHash,

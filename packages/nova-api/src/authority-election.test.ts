@@ -25,8 +25,9 @@ import {
   record as fcRecord,
 } from "fast-check";
 import { stateResyncMinIntervalMs } from "@rocketcrab/protocol";
-import { InMemoryTransportHub } from "@rocketcrab/testing";
+import { InMemoryTransportHub, type InMemoryTransport } from "@rocketcrab/testing";
 import { createNovaSession, type NovaSession } from "./session";
+import { STATE_HISTORY_LIMIT as STATE_WINDOW_LIMIT } from "./state-engine";
 import {
   NovaStateEngine,
   stateHashOf,
@@ -223,6 +224,8 @@ async function yieldLoop(): Promise<void> {
  * genuinely wedged.
  */
 const WAIT_BUDGET_MS = 30_000;
+/** Actions run past the dedup window in the migration test. */
+const STATE_WINDOW_PROBE = STATE_WINDOW_LIMIT + 4;
 
 /**
  * Wait until `condition` holds. Engine async work (sha256 digests) completes
@@ -1349,5 +1352,188 @@ describe("state resync (engine)", () => {
       state: { count: 9 },
     });
     expect(host.resyncs).toHaveLength(2);
+  });
+});
+
+/** Count and record one session's inbound state messages (by type). */
+function recordInbound(session: NovaSession): Array<{ type: string; payload: unknown }> {
+  const log: Array<{ type: string; payload: unknown }> = [];
+  session.transport.on("message:received", (message) => {
+    const payload = message.payload as { type?: string };
+    if (payload.type !== undefined) log.push({ type: payload.type, payload: message.payload });
+  });
+  return log;
+}
+
+/**
+ * Drop the next state broadcast this transport would send (a missed commit
+ * for every follower). Returns a counter of dropped broadcasts.
+ */
+function dropNextBroadcastSnapshot(transport: NovaSession["transport"]): { dropped: number } {
+  const send = transport.send.bind(transport);
+  const counter = { dropped: 0 };
+  transport.send = (options: Parameters<NovaSession["transport"]["send"]>[0]) => {
+    const payload = options.payload as { type?: string };
+    if (
+      counter.dropped === 0 &&
+      payload.type === "state.snapshot" &&
+      options.targetConnectionId === undefined
+    ) {
+      counter.dropped += 1;
+      return Promise.resolve();
+    }
+    return send(options);
+  };
+  return counter;
+}
+
+describe("incremental action history over the transport", { timeout: 60_000 }, () => {
+  it("sends per-commit snapshots that carry only the newly added action IDs", async () => {
+    const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+    const [, b, c] = trio(sessions);
+    const inbound = recordInbound(b);
+    for (const [index, marker] of ["m1", "m2", "m3"].entries()) {
+      const applied = c.client.dispatch({ type: "mark", payload: { marker } });
+      await pumpUntil(hub, () => b.getStateModeDiagnostics().revision === 2 + index, marker);
+      await applied;
+    }
+    const snapshots = inbound
+      .filter((entry) => entry.type === "state.snapshot")
+      .map(
+        (entry) =>
+          entry.payload as { revision: number; historyMode: string; processedActionIds: string[] },
+      );
+    const commits = snapshots.filter((snapshot) => snapshot.revision >= 2);
+    expect(commits.map((snapshot) => snapshot.historyMode)).toEqual([
+      "increment",
+      "increment",
+      "increment",
+    ]);
+    expect(commits.map((snapshot) => snapshot.processedActionIds.length)).toEqual([1, 1, 1]);
+    expect(b.getStateModeDiagnostics().processedActionCount).toBe(3);
+  });
+
+  it("a missed commit triggers one resync per follower and recovers the same history", async () => {
+    const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    const served = recordInbound(a);
+    // The authority's next state broadcast never leaves: b and c miss commit 2.
+    const drop = dropNextBroadcastSnapshot(a.transport);
+    const first = c.client.dispatch({ type: "mark", payload: { marker: "missed" } });
+    await pumpUntil(hub, () => drop.dropped === 1, "commit 2 broadcast dropped");
+    await first;
+    // c still holds revision 1 (it missed commit 2), so a default-based
+    // dispatch would be stale. Base it on the authority's revision instead;
+    // the commit's increment exposes the gap and triggers the resync.
+    const second = c.dispatch(
+      { type: "mark", payload: { marker: "after-gap" }, baseRevision: 2 },
+      "after-gap",
+    );
+    await pumpUntil(
+      hub,
+      () =>
+        b.getStateModeDiagnostics().revision === 3 &&
+        c.getStateModeDiagnostics().revision === 3 &&
+        b.getStateModeDiagnostics().processedActionCount === 2 &&
+        c.getStateModeDiagnostics().processedActionCount === 2,
+      "gapped followers recover",
+    );
+    await second;
+    // Each follower asked exactly once, and the authority answered each in full.
+    const resyncs = served.filter((entry) => entry.type === "state.resync");
+    expect(resyncs).toHaveLength(2);
+    expect(b.getCanonicalState()?.state).toEqual({ count: 2, markers: ["missed", "after-gap"] });
+    expect(c.getCanonicalState()?.state).toEqual({ count: 2, markers: ["missed", "after-gap"] });
+    expect(b.getStateModeDiagnostics().processedActionCount).toBe(
+      a.getStateModeDiagnostics().processedActionCount,
+    );
+  });
+
+  it("after migration the new authority rejects duplicates soon after, and more than 256 actions later", async () => {
+    const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    const dispatchedIds: string[] = [];
+    const sendWithId = (marker: string, id: string): Promise<void> => {
+      dispatchedIds.push(id);
+      return c.dispatch({ type: "mark", payload: { marker } }, id);
+    };
+    await sendWithId("dup", "dup-1");
+    await pumpUntil(hub, () => b.getStateModeDiagnostics().revision === 2, "dup-1 commits");
+
+    await a.leave();
+    await settleElection(hub);
+    await pumpUntil(
+      hub,
+      () =>
+        b.getStateModeDiagnostics().authorityMemberId === "member-b" &&
+        c.getStateModeDiagnostics().authorityMemberId === "member-b",
+      "migration to member-b",
+    );
+
+    // Soon after migration: a re-sent copy of dup-1 must not commit again.
+    const inbound = recordInbound(b);
+    await sendWithId("dup", "dup-1");
+    await pumpUntil(
+      hub,
+      () => inbound.some((entry) => entry.type === "action.dispatch"),
+      "duplicate reaches b",
+    );
+    await pump(hub);
+    expect(b.getStateModeDiagnostics().revision).toBe(2);
+    expect(b.getCanonicalState()?.state).toEqual({ count: 1, markers: ["dup"] });
+
+    // Well after migration: more than the window of new actions, each a
+    // delta, then a duplicate of the most recent one is still rejected.
+    let lastId = "";
+    for (let i = 0; i < STATE_WINDOW_PROBE; i += 1) {
+      lastId = `p${i}`;
+      const marker = `p${i}`;
+      // The sender must hold the current revision, or its base is stale.
+      await pumpUntil(
+        hub,
+        () => c.getStateModeDiagnostics().revision === b.getStateModeDiagnostics().revision,
+        `c at the authority revision before ${marker}`,
+      );
+      await sendWithId(marker, lastId);
+      await pumpUntil(
+        hub,
+        () => b.getStateModeDiagnostics().revision === 3 + i,
+        `commit ${marker}`,
+      );
+    }
+    expect(b.getStateModeDiagnostics().processedActionCount).toBe(256);
+    expect(c.getStateModeDiagnostics().processedActionCount).toBe(256);
+    const before = b.getStateModeDiagnostics().revision;
+    await sendWithId("dup-late", lastId);
+    await pump(hub);
+    expect(b.getStateModeDiagnostics().revision).toBe(before);
+    expect(b.getCanonicalState()?.state).toMatchObject({ markers: expect.arrayContaining(["p0"]) });
+    expect(dispatchedIds.length).toBe(STATE_WINDOW_PROBE + 3);
+  });
+
+  it("a late joiner receives the full processed-action history", async () => {
+    const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+    const [a, , c] = trio(sessions);
+    for (const [index, marker] of ["x1", "x2", "x3"].entries()) {
+      const applied = c.client.dispatch({ type: "mark", payload: { marker } });
+      await pumpUntil(hub, () => a.getStateModeDiagnostics().revision === 2 + index, marker);
+      await applied;
+    }
+    const late = makeSession(hub, "member-d");
+    late.client.defineGame({ title: "S3 Game", mode: "state", ...s3GameHandlers() });
+    const lateInbound = recordInbound(late);
+    await late.join();
+    await pumpUntil(
+      hub,
+      () => late.getStateModeDiagnostics().revision === a.getStateModeDiagnostics().revision,
+      "late joiner catches up",
+    );
+    const catchUp = lateInbound.find((entry) => entry.type === "state.snapshot") as
+      | { payload: { historyMode: string; processedActionIds: string[] } }
+      | undefined;
+    expect(catchUp?.payload.historyMode).toBe("full");
+    expect(late.getStateModeDiagnostics().processedActionCount).toBe(
+      a.getStateModeDiagnostics().processedActionCount,
+    );
   });
 });
