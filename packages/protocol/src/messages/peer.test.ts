@@ -26,6 +26,7 @@ import {
   rawChannelMetadataMessageSchema,
   simulationInputMessageSchema,
   simulationSnapshotMessageSchema,
+  stateResyncMessageSchema,
   stateSnapshotMessageSchema,
   stateViewMessageSchema,
   gameSourceAcceptedMessageSchema,
@@ -58,6 +59,7 @@ describe("peer message schemas", () => {
       actionDispatchMessageSchema,
       actionAcknowledgementMessageSchema,
       stateSnapshotMessageSchema,
+      stateResyncMessageSchema,
       stateViewMessageSchema,
       authorityAnnouncementMessageSchema,
       authorityHeartbeatMessageSchema,
@@ -155,10 +157,12 @@ describe("peer message schemas", () => {
           stateHash: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
           term: 1,
           authorityMemberId: "member-1",
+          historyMode: "full",
           processedActionIds: ["action-1"],
           state: { cards: [] },
         }),
       ),
+      stateResyncMessageSchema.parse(basePeer({ type: "state.resync", seq: 6, knownRevision: 1 })),
       stateViewMessageSchema.parse(
         basePeer({
           type: "state.view",
@@ -289,6 +293,7 @@ describe("peer message schemas", () => {
       }),
       basePeer({ type: "action.ack", seq: 2, actionId: "action-1", status: "unknown" }),
       basePeer({ type: "state.snapshot", seq: 3, revision: 1, term: 1, state: {} }),
+      basePeer({ type: "state.resync", seq: 3, knownRevision: -1 }),
       basePeer({ type: "state.view", seq: 4, revision: 1, view: {} }),
       basePeer({
         type: "authority.announce",
@@ -356,6 +361,33 @@ describe("peer message schemas", () => {
     if (!result.ok) {
       expect(result.error.code).toBe("invalid_message");
     }
+  });
+
+  it("bounds the increment history and resync fields strictly", () => {
+    const snapshot = (overrides: Record<string, unknown>) =>
+      stateSnapshotMessageSchema.safeParse(
+        basePeer({
+          type: "state.snapshot",
+          seq: 3,
+          revision: 2,
+          term: 1,
+          authorityMemberId: "member-1",
+          historyMode: "increment",
+          processedActionIds: ["action-2"],
+          state: {},
+          ...overrides,
+        }),
+      );
+    expect(snapshot({}).success).toBe(true);
+    expect(snapshot({ historyMode: undefined }).success).toBe(false);
+    expect(
+      snapshot({ processedActionIds: Array.from({ length: 257 }, (_, i) => `a${i}`) }).success,
+    ).toBe(false);
+    expect(
+      stateResyncMessageSchema.safeParse(
+        basePeer({ type: "state.resync", seq: 6, knownRevision: 1.5 }),
+      ).success,
+    ).toBe(false);
   });
 
   it("rejects unknown message types with a useful error", () => {

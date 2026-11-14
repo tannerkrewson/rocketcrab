@@ -976,6 +976,7 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
           term: 1,
           authorityMemberId: "member-a",
           processedActionIds: [],
+          historyMode: "full",
           state: { shellOnly: true },
         }),
         version: PROTOCOL_VERSION,

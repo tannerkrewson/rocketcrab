@@ -22,6 +22,7 @@ import {
   rawChannelMetadataMessageSchema,
   simulationInputMessageSchema,
   simulationSnapshotMessageSchema,
+  stateResyncMessageSchema,
   stateSnapshotMessageSchema,
   stateViewMessageSchema,
   type GameEndReason,
@@ -142,6 +143,7 @@ export function buildStateSnapshotMessage(
     stateHash?: string;
     term: number;
     authorityMemberId: string;
+    historyMode: "full" | "increment";
     processedActionIds: readonly string[];
     state: unknown;
   },
@@ -155,8 +157,24 @@ export function buildStateSnapshotMessage(
       ...(input.stateHash !== undefined ? { stateHash: input.stateHash } : {}),
       term: input.term,
       authorityMemberId: input.authorityMemberId,
+      historyMode: input.historyMode,
       processedActionIds: input.processedActionIds,
       state: input.state,
+    }),
+  );
+}
+
+/** Build and validate a `state.resync` request (gap in the snapshot stream). */
+export function buildStateResyncMessage(
+  base: PeerMessageBase,
+  input: { seq: number; knownRevision: number },
+): PeerMessage {
+  return assertPeerMessage(
+    stateResyncMessageSchema.parse({
+      ...envelope(base),
+      seq: input.seq,
+      type: "state.resync",
+      knownRevision: input.knownRevision,
     }),
   );
 }

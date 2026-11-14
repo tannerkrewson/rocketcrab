@@ -85,6 +85,20 @@ export const handshakeTimeoutMs = 30_000;
 export const actionTimeoutMs = 10_000;
 
 /**
+ * Processed action IDs a state snapshot carries (ADR-0007 deduplication
+ * window). Snapshots broadcast only the IDs added since the previous
+ * broadcast; full history travels only for late joiners, restores and resync.
+ */
+export const stateHistoryLimit = 256;
+
+/**
+ * Minimum spacing between state resync requests from one member. A receiver
+ * keeps at most one request outstanding per interval, and the authority
+ * answers at most one per requester per interval.
+ */
+export const stateResyncMinIntervalMs = 1_000;
+
+/**
  * Authority heartbeat interval (ADR-0007 S3). The current authority
  * broadcasts one heartbeat per interval so followers can detect silent loss;
  * missing heartbeats begin the grace period.
@@ -184,6 +198,8 @@ export const LIMITS = {
   errorReportWarnRatePerSecond,
   handshakeTimeoutMs,
   actionTimeoutMs,
+  stateHistoryLimit,
+  stateResyncMinIntervalMs,
   authorityHeartbeatIntervalMs,
   authorityGracePeriodMs,
   simulationTickMs,

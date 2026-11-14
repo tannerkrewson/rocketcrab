@@ -70,6 +70,8 @@ import {
   actionPayloadBytes,
   authorityGracePeriodMs,
   authorityHeartbeatIntervalMs,
+  stateHistoryLimit,
+  stateResyncMinIntervalMs,
   stateSnapshotBytes,
 } from "@rocketcrab/protocol";
 import type { NovaStateExecutor } from "./state-executor";
@@ -83,7 +85,7 @@ import type {
 } from "./types";
 
 /** How many processed action records the engine retains (bounded history). */
-export const STATE_HISTORY_LIMIT = 256;
+export const STATE_HISTORY_LIMIT = stateHistoryLimit;
 
 /** Length of the action-rate sliding window. */
 const RATE_WINDOW_MS = 10_000;
@@ -114,8 +116,15 @@ export interface StateSnapshotEnvelope {
   readonly stateHash: string | null;
   readonly term: number;
   readonly authorityMemberId: string;
+  /** `full`: the whole dedup window. `increment`: only IDs added since revision - 1. */
+  readonly historyMode: "full" | "increment";
   readonly processedActionIds: readonly string[];
   readonly state: unknown;
+}
+
+/** A request for a full snapshot after a gap in the authority's stream (state.resync). */
+export interface StateResyncEnvelope {
+  readonly knownRevision: number;
 }
 
 /** One player's view envelope. */
@@ -173,6 +182,8 @@ export interface StateEngineHost {
   sendSnapshot(snapshot: StateSnapshotEnvelope, targetMemberId?: string): void;
   /** Send one player's selected view (targeted). */
   sendView(targetMemberId: string, view: StateViewEnvelope): void;
+  /** Ask the current authority (targeted) for a full snapshot after a gap. */
+  sendResync(targetMemberId: string, request: StateResyncEnvelope): void;
   /** Announce this session as the authority. */
   sendAnnounce(announcement: AuthorityAnnounceEnvelope): void;
   /** Broadcast an authority heartbeat (S3). */
@@ -326,6 +337,17 @@ export class NovaStateEngine {
   /** revision -> (stateHash -> reporting member ids) for reconciliation. */
   private readonly revisionVotes = new Map<number, Map<string, Set<string>>>();
   private readonly history = new Map<string, ProcessedActionRecord>();
+  /**
+   * Action IDs decided locally since this authority's last broadcast. Only the
+   * sitting authority fills it; the next broadcast drains it.
+   */
+  private pendingHistoryIds: string[] = [];
+  /** Revision of this engine's last broadcast snapshot (authority side). */
+  private lastBroadcastRevision: number | null = null;
+  /** Receiver side: a resync request is in flight until this time (ms). */
+  private resyncOutstandingUntil = 0;
+  /** Authority side: when each requester was last served a resync (ms). */
+  private readonly resyncServedAt = new Map<string, number>();
   private readonly queue: PendingAction[] = [];
   private processing: Promise<void> | null = null;
   private readonly lastSeqByActor = new Map<string, number>();
@@ -673,6 +695,7 @@ export class NovaStateEngine {
     stateHash: string | null;
     term: number;
     authorityMemberId: string;
+    historyMode: "full" | "increment";
     processedActionIds: readonly string[];
     state: unknown;
     /** The transport sender (for targeted convergence re-sends). */
@@ -722,11 +745,15 @@ export class NovaStateEngine {
           message.senderMemberId !== this.selfMemberId &&
           this.canonical !== null
         ) {
-          this.host.sendSnapshot(this.snapshotEnvelope(), message.senderMemberId);
+          this.host.sendSnapshot(this.snapshotEnvelope("full"), message.senderMemberId);
         }
         return;
       }
     }
+    // An increment is continuous only from the revision it was built on
+    // (revision - 1). Any other base means commits were missed, so their
+    // dedup IDs are absent and a full snapshot must be requested.
+    const gap = message.historyMode === "increment" && message.revision !== this.revision + 1;
     this.canonical = message.state;
     this.revision = message.revision;
     this.stateHash = message.stateHash;
@@ -745,7 +772,7 @@ export class NovaStateEngine {
     }
     for (const actionId of message.processedActionIds) {
       if (!this.history.has(actionId)) {
-        this.remember(actionId, {
+        this.storeHistory(actionId, {
           actionId,
           status: "accepted",
           revision: message.revision,
@@ -753,13 +780,58 @@ export class NovaStateEngine {
         });
       }
     }
+    if (message.historyMode === "full") {
+      // A full snapshot answers any outstanding resync request.
+      this.resyncOutstandingUntil = 0;
+    }
+    if (gap) {
+      this.requestResync();
+    }
     if (this.authorityMemberId === this.selfMemberId && this.restoreDone) {
       // The authority adopted a peer's higher state (a restore push that
       // arrived after the window): replicate and re-announce so every shell
       // converges on the adopted state.
-      this.host.sendSnapshot(this.snapshotEnvelope());
+      this.broadcastSnapshot(false);
       this.announce();
     }
+  }
+
+  /**
+   * A `state.resync` request arrived. Only the sitting authority answers, with
+   * the same full snapshot a late joiner gets (state plus full history, and
+   * the requester's view). Repeats from one member inside the rate-limit
+   * window are ignored, so resync traffic per member is bounded.
+   */
+  handleResync(request: { requesterMemberId: string; knownRevision: number }): void {
+    if (this.disposed || this.ended) return;
+    if (this.authorityMemberId !== this.selfMemberId || !this.restoreDone) return;
+    if (this.canonical === null) return;
+    const requester = request.requesterMemberId;
+    if (requester === this.selfMemberId || !this.host.isConnected(requester)) return;
+    if (request.knownRevision > this.revision) return; // impossible: ignore
+    const now = this.now();
+    const servedAt = this.resyncServedAt.get(requester);
+    if (servedAt !== undefined && now - servedAt < stateResyncMinIntervalMs) return;
+    this.resyncServedAt.set(requester, now);
+    this.host.sendSnapshot(this.snapshotEnvelope("full"), requester);
+    const viewer = this.host.players().find((player) => player.id === requester);
+    if (viewer !== undefined) {
+      void this.computeViewFor(viewer);
+    }
+  }
+
+  /**
+   * Receiver side: ask the authority for a full snapshot. At most one request
+   * is outstanding per `stateResyncMinIntervalMs`; a full snapshot clears it.
+   */
+  private requestResync(): void {
+    if (this.disposed || this.ended) return;
+    const now = this.now();
+    if (this.resyncOutstandingUntil > now) return;
+    const authority = this.authorityMemberId;
+    if (authority === null || authority === this.selfMemberId) return;
+    this.resyncOutstandingUntil = now + stateResyncMinIntervalMs;
+    this.host.sendResync(authority, { knownRevision: this.revision });
   }
 
   /**
@@ -979,6 +1051,10 @@ export class NovaStateEngine {
     this.authorityStateRevision = this.revision;
     this.clearGraceTimer();
     this.restoreDone = false;
+    // The first broadcast as authority is full: this engine's cursor from an
+    // earlier term says nothing about what the current shells hold.
+    this.lastBroadcastRevision = null;
+    this.pendingHistoryIds = [];
     this.restoreBackup =
       this.canonical === null
         ? null
@@ -1044,7 +1120,7 @@ export class NovaStateEngine {
     this.restoreBackup = null;
     this.announce();
     if (this.canonical !== null) {
-      this.host.sendSnapshot(this.snapshotEnvelope());
+      this.broadcastSnapshot(false);
     }
     void this.processQueue();
   }
@@ -1172,7 +1248,7 @@ export class NovaStateEngine {
     if (authorityMemberId === this.selfMemberId) return; // we are the authority
     if (this.canonical === null) return;
     if (this.revision > authorityRevision) {
-      this.host.sendSnapshot(this.snapshotEnvelope(), authorityMemberId);
+      this.host.sendSnapshot(this.snapshotEnvelope("full"), authorityMemberId);
       return;
     }
     if (
@@ -1181,20 +1257,37 @@ export class NovaStateEngine {
       this.stateHash !== null &&
       this.stateHash !== authorityHash
     ) {
-      this.host.sendSnapshot(this.snapshotEnvelope(), authorityMemberId);
+      this.host.sendSnapshot(this.snapshotEnvelope("full"), authorityMemberId);
     }
   }
 
   /** The state envelope for this shell's current replicated state. */
-  private snapshotEnvelope(): StateSnapshotEnvelope {
+  private snapshotEnvelope(historyMode: "full" | "increment"): StateSnapshotEnvelope {
     return {
       revision: this.revision,
       stateHash: this.stateHash,
       term: this.term,
       authorityMemberId: this.authorityMemberId ?? this.selfMemberId,
-      processedActionIds: this.processedActionIds(),
+      historyMode,
+      processedActionIds:
+        historyMode === "full" ? this.processedActionIds() : [...this.pendingHistoryIds],
       state: this.canonical,
     };
+  }
+
+  /**
+   * Broadcast the replicated state to every shell. An increment is used only
+   * when it is continuous with this engine's previous broadcast; otherwise
+   * the full history goes out. Either way the pending IDs are drained.
+   */
+  private broadcastSnapshot(allowIncrement: boolean): void {
+    const increment =
+      allowIncrement &&
+      this.lastBroadcastRevision === this.revision - 1 &&
+      this.pendingHistoryIds.length <= Math.min(this.historyLimit, stateHistoryLimit);
+    this.host.sendSnapshot(this.snapshotEnvelope(increment ? "increment" : "full"));
+    this.lastBroadcastRevision = this.revision;
+    this.pendingHistoryIds = [];
   }
 
   private lowestEligibleMemberId(): string | null {
@@ -1434,7 +1527,7 @@ export class NovaStateEngine {
     this.stats.applied += 1;
     this.noteProcessed();
     this.authorityStateRevision = this.revision;
-    this.host.sendSnapshot(this.snapshotEnvelope());
+    this.broadcastSnapshot(false);
     const envelope = {
       revision: this.revision,
       stateHash: this.stateHash,
@@ -1544,11 +1637,22 @@ export class NovaStateEngine {
   }
 
   private ack(targetMemberId: string, ack: NovaActionAck): void {
-    this.remember(ack.actionId, { ...ack, processedAt: this.now() });
+    // The commit already recorded this action as pending; the ack only
+    // refreshes its record.
+    this.storeHistory(ack.actionId, { ...ack, processedAt: this.now() });
     this.host.sendAck(targetMemberId, ack);
   }
 
+  /** Record an action decided locally: it joins the next broadcast's history. */
   private remember(actionId: string, record: ProcessedActionRecord): void {
+    if (!this.pendingHistoryIds.includes(actionId)) {
+      this.pendingHistoryIds.push(actionId);
+    }
+    this.storeHistory(actionId, record);
+  }
+
+  /** Store one history record, evicting the oldest beyond the bound. */
+  private storeHistory(actionId: string, record: ProcessedActionRecord): void {
     this.history.set(actionId, record);
     while (this.history.size > this.historyLimit) {
       const oldest = this.history.keys().next().value;

@@ -62,6 +62,7 @@ import {
   buildRawChannelMessage,
   buildSimulationInputMessage,
   buildSimulationSnapshotMessage,
+  buildStateResyncMessage,
   buildStateSnapshotMessage,
   buildStateViewMessage,
   type PeerMessageBase,
@@ -73,6 +74,7 @@ import {
   type AuthorityHeartbeatEnvelope,
   type StateEngineEvent,
   type StateEngineHost,
+  type StateResyncEnvelope,
   type StateSnapshotEnvelope,
   type StateViewEnvelope,
 } from "./state-engine";
@@ -972,6 +974,7 @@ export class NovaSession implements NovaClientBackend {
         stateHash: snapshot.stateHash,
         term: this.engine.getTerm(),
         authorityMemberId: this.selfPlayer.id,
+        historyMode: "full",
         processedActionIds: this.engine.processedActionIds(),
         state: this.engine.getCanonicalState(),
       },
@@ -1119,6 +1122,7 @@ export class NovaSession implements NovaClientBackend {
           stateHash: peerMessage.stateHash ?? null,
           term: peerMessage.term,
           authorityMemberId: peerMessage.authorityMemberId,
+          historyMode: peerMessage.historyMode,
           processedActionIds: peerMessage.processedActionIds,
           state: peerMessage.state,
           senderMemberId: peerMessage.senderMemberId,
@@ -1129,6 +1133,12 @@ export class NovaSession implements NovaClientBackend {
           this.engine.beginGame();
           this.emit({ type: "start" });
         }
+        break;
+      case "state.resync":
+        this.engine.handleResync({
+          requesterMemberId: peerMessage.senderMemberId,
+          knownRevision: peerMessage.knownRevision,
+        });
         break;
       case "state.view":
         if (peerMessage.forMemberId === this.selfPlayer.id) {
@@ -1380,6 +1390,7 @@ export class NovaSession implements NovaClientBackend {
       sendAck: (targetMemberId, ack) => this.sendEngineAck(targetMemberId, ack),
       sendSnapshot: (snapshot, targetMemberId) => this.sendEngineSnapshot(snapshot, targetMemberId),
       sendView: (targetMemberId, view) => this.sendEngineView(targetMemberId, view),
+      sendResync: (targetMemberId, request) => this.sendEngineResync(targetMemberId, request),
       sendAnnounce: (announcement) => this.sendEngineAnnounce(announcement),
       sendHeartbeat: (heartbeat) => this.sendEngineHeartbeat(heartbeat),
       sendElection: (election) => this.sendEngineElection(election),
@@ -1424,10 +1435,20 @@ export class NovaSession implements NovaClientBackend {
           ...(snapshot.stateHash !== null ? { stateHash: snapshot.stateHash } : {}),
           term: snapshot.term,
           authorityMemberId: snapshot.authorityMemberId,
+          historyMode: snapshot.historyMode,
           processedActionIds: snapshot.processedActionIds,
           state: snapshot.state,
         }),
       options,
+    ).catch((error: unknown) => this.emitError(error));
+  }
+
+  /** Ask the current authority for a full snapshot (state.resync, targeted). */
+  private sendEngineResync(targetMemberId: string, request: StateResyncEnvelope): void {
+    const seq = this.takeSeq();
+    void this.sendProtocol(
+      (base) => buildStateResyncMessage(base, { seq, knownRevision: request.knownRevision }),
+      { seq, targetMemberId },
     ).catch((error: unknown) => this.emitError(error));
   }
 

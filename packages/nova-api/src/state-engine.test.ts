@@ -18,6 +18,7 @@ import {
   type AuthorityHeartbeatEnvelope,
   type StateEngineEvent,
   type StateEngineHost,
+  type StateResyncEnvelope,
   type StateSnapshotEnvelope,
   type StateViewEnvelope,
 } from "./state-engine";
@@ -34,6 +35,7 @@ class RecordingHost implements StateEngineHost {
   readonly acks: Array<{ target: string; ack: NovaActionAck }> = [];
   readonly snapshots: Array<{ target?: string; snapshot: StateSnapshotEnvelope }> = [];
   readonly views: Array<{ target: string; view: StateViewEnvelope }> = [];
+  readonly resyncs: Array<{ target: string; request: StateResyncEnvelope }> = [];
   readonly announces: AuthorityAnnounceEnvelope[] = [];
   readonly heartbeats: AuthorityHeartbeatEnvelope[] = [];
   readonly elections: AuthorityElectionEnvelope[] = [];
@@ -58,6 +60,9 @@ class RecordingHost implements StateEngineHost {
   }
   sendSnapshot(snapshot: StateSnapshotEnvelope, targetMemberId?: string): void {
     this.snapshots.push({ target: targetMemberId, snapshot });
+  }
+  sendResync(targetMemberId: string, request: StateResyncEnvelope): void {
+    this.resyncs.push({ target: targetMemberId, request });
   }
   sendView(targetMemberId: string, view: StateViewEnvelope): void {
     this.views.push({ target: targetMemberId, view });
@@ -517,6 +522,7 @@ describe("NovaStateEngine views and replication", () => {
       term: 1,
       authorityMemberId: "member-a",
       processedActionIds: ["action-1", "action-2"],
+      historyMode: "full",
       state: { count: 7 },
     });
     expect(follower.getCanonicalState()).toEqual({ count: 7 });
@@ -601,6 +607,7 @@ describe("NovaStateEngine views and replication", () => {
       term: 1,
       authorityMemberId: "member-a",
       processedActionIds: [],
+      historyMode: "full",
       state: { count: 0, lastActor: null },
     });
     expect(engine.getAuthorityMemberId()).toBe("member-a");

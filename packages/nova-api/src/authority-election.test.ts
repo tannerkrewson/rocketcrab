@@ -24,6 +24,7 @@ import {
   integer as fcInteger,
   record as fcRecord,
 } from "fast-check";
+import { stateResyncMinIntervalMs } from "@rocketcrab/protocol";
 import { InMemoryTransportHub } from "@rocketcrab/testing";
 import { createNovaSession, type NovaSession } from "./session";
 import {
@@ -34,6 +35,7 @@ import {
   type AuthorityHeartbeatEnvelope,
   type StateEngineEvent,
   type StateEngineHost,
+  type StateResyncEnvelope,
   type StateSnapshotEnvelope,
   type StateViewEnvelope,
 } from "./state-engine";
@@ -51,6 +53,7 @@ class RecordingHost implements StateEngineHost {
   readonly acks: Array<{ target: string; ack: NovaActionAck }> = [];
   readonly snapshots: Array<{ target?: string; snapshot: StateSnapshotEnvelope }> = [];
   readonly views: Array<{ target: string; view: StateViewEnvelope }> = [];
+  readonly resyncs: Array<{ target: string; request: StateResyncEnvelope }> = [];
   readonly announces: AuthorityAnnounceEnvelope[] = [];
   readonly heartbeats: AuthorityHeartbeatEnvelope[] = [];
   readonly elections: AuthorityElectionEnvelope[] = [];
@@ -76,6 +79,9 @@ class RecordingHost implements StateEngineHost {
   }
   sendSnapshot(snapshot: StateSnapshotEnvelope, targetMemberId?: string): void {
     this.snapshots.push({ target: targetMemberId, snapshot });
+  }
+  sendResync(targetMemberId: string, request: StateResyncEnvelope): void {
+    this.resyncs.push({ target: targetMemberId, request });
   }
   sendView(targetMemberId: string, view: StateViewEnvelope): void {
     this.views.push({ target: targetMemberId, view });
@@ -179,6 +185,7 @@ async function seedFollower(
     term: 1,
     authorityMemberId: "member-a",
     processedActionIds: [],
+    historyMode: "full",
     state,
   });
 }
@@ -357,6 +364,7 @@ describe(
         term: 2,
         authorityMemberId: "member-b",
         processedActionIds: ["act-p1", "act-p2"],
+        historyMode: "full",
         state: { count: 3 },
         senderMemberId: "member-c",
       });
@@ -436,6 +444,7 @@ describe(
         term: 1,
         authorityMemberId: "member-a",
         processedActionIds: [],
+        historyMode: "full",
         state: { count: 0 },
       });
       // A local action starts applying; commit stalls on the digest gate.
@@ -504,6 +513,7 @@ describe(
         term: 2,
         authorityMemberId: "member-a",
         processedActionIds: [],
+        historyMode: "full",
         state: { from: "a" },
       });
       // A push from b at the same revision with a conflicting hash (Y): 1-1
@@ -515,6 +525,7 @@ describe(
         term: 2,
         authorityMemberId: "member-a",
         processedActionIds: [],
+        historyMode: "full",
         state: { from: "b" },
         senderMemberId: "member-b",
       });
@@ -533,6 +544,7 @@ describe(
         term: 2,
         authorityMemberId: "member-a",
         processedActionIds: [],
+        historyMode: "full",
         state: { from: "b" },
         senderMemberId: "member-c",
       });
@@ -1255,4 +1267,87 @@ describe("S3 authority election property tests", () => {
       );
     },
   );
+});
+
+describe("state resync (engine)", () => {
+  it("serves a full snapshot to each requester and ignores repeats inside the window", async () => {
+    const { engine, host } = makeEngine("member-a");
+    expect(await engine.initializeAsAuthority()).toBe(true);
+    host.snapshots.length = 0;
+    host.views.length = 0;
+
+    for (let i = 0; i < 30; i += 1) {
+      engine.handleResync({ requesterMemberId: "member-b", knownRevision: 0 });
+    }
+    engine.handleResync({ requesterMemberId: "member-c", knownRevision: 0 });
+    // One full snapshot per requester: b's 29 repeats are dropped, c is served.
+    expect(host.snapshots.map((entry) => entry.target)).toEqual(["member-b", "member-c"]);
+    expect(host.snapshots.every((entry) => entry.snapshot.historyMode === "full")).toBe(true);
+    await yieldLoop();
+    await yieldLoop();
+    expect(host.views.map((entry) => entry.target)).toEqual(["member-b", "member-c"]);
+
+    await advance(stateResyncMinIntervalMs);
+    engine.handleResync({ requesterMemberId: "member-b", knownRevision: 0 });
+    expect(host.snapshots.filter((entry) => entry.target === "member-b")).toHaveLength(2);
+  });
+
+  it("a follower and a non-authority never serve a resync", async () => {
+    const { engine, host } = makeEngine("member-b");
+    await seedFollower(engine, 1, { count: 0 });
+    engine.handleResync({ requesterMemberId: "member-c", knownRevision: 0 });
+    expect(host.snapshots).toHaveLength(0);
+  });
+
+  it("a receiver that sees a gap asks the authority once per window, and a full snapshot clears it", async () => {
+    const { engine, host } = makeEngine("member-b");
+    await seedFollower(engine, 1, { count: 0 });
+    const gapState = { count: 2 };
+    const gapHash = await stateHashOf(gapState);
+    const gapped = {
+      revision: 3,
+      stateHash: gapHash,
+      term: 1,
+      authorityMemberId: "member-a",
+      historyMode: "increment" as const,
+      processedActionIds: ["action-3"],
+      state: gapState,
+      senderMemberId: "member-a",
+    };
+    engine.handleSnapshot(gapped);
+    expect(host.resyncs).toEqual([{ target: "member-a", request: { knownRevision: 3 } }]);
+    // The gapped increment still carries the state; the history is incomplete.
+    expect(engine.getRevision()).toBe(3);
+
+    // Further gaps inside the window send nothing: one request outstanding.
+    const laterState = { count: 5 };
+    engine.handleSnapshot({
+      ...gapped,
+      revision: 6,
+      stateHash: await stateHashOf(laterState),
+      processedActionIds: ["action-6"],
+      state: laterState,
+    });
+    expect(host.resyncs).toHaveLength(1);
+
+    // A full snapshot (the authority's answer) clears the outstanding request.
+    engine.handleSnapshot({
+      revision: 6,
+      stateHash: await stateHashOf(laterState),
+      term: 1,
+      authorityMemberId: "member-a",
+      historyMode: "full",
+      processedActionIds: ["action-3", "action-6"],
+      state: laterState,
+      senderMemberId: "member-a",
+    });
+    engine.handleSnapshot({
+      ...gapped,
+      revision: 9,
+      stateHash: await stateHashOf({ count: 9 }),
+      processedActionIds: ["action-9"],
+      state: { count: 9 },
+    });
+    expect(host.resyncs).toHaveLength(2);
+  });
 });

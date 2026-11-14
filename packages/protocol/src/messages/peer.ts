@@ -10,6 +10,7 @@ import {
   timestampSchema,
   titleSchema,
 } from "../ids";
+import { stateHistoryLimit } from "../limits";
 import { gameEndReasonSchema, gameModeSchema } from "./shared";
 
 /**
@@ -195,10 +196,31 @@ export const stateSnapshotMessageSchema = z.object({
   stateHash: sha256Schema.optional(),
   term: z.number().int().nonnegative(),
   authorityMemberId: memberIdSchema,
-  processedActionIds: z.array(z.string().min(1).max(64)),
+  /**
+   * `full`: `processedActionIds` is the authority's whole dedup window (late
+   * join, restore, resync, migration). `increment`: it lists only the IDs
+   * added since the authority's previous broadcast, which is revision - 1;
+   * a receiver at any other revision has a gap and must request a resync.
+   */
+  historyMode: z.enum(["full", "increment"]),
+  processedActionIds: z.array(z.string().min(1).max(64)).max(stateHistoryLimit),
   state: z.unknown(),
 });
 export type StateSnapshotMessage = z.infer<typeof stateSnapshotMessageSchema>;
+
+/**
+ * State resync request: a member that detected a gap in the authority's
+ * snapshot stream asks the current authority, targeted, for a full snapshot
+ * (state plus full processed-action history). The authority rate-limits
+ * repeats per requester.
+ */
+export const stateResyncMessageSchema = z.object({
+  ...peerEnvelopeFields,
+  seq: monotonicSequenceSchema,
+  type: z.literal("state.resync"),
+  knownRevision: z.number().int().nonnegative(),
+});
+export type StateResyncMessage = z.infer<typeof stateResyncMessageSchema>;
 
 /**
  * State view: the per-player view delivered to a specific member; non-
@@ -411,6 +433,7 @@ export const peerMessagesSchema = z.discriminatedUnion("type", [
   actionDispatchMessageSchema,
   actionAcknowledgementMessageSchema,
   stateSnapshotMessageSchema,
+  stateResyncMessageSchema,
   stateViewMessageSchema,
   authorityAnnouncementMessageSchema,
   authorityHeartbeatMessageSchema,
