@@ -992,6 +992,7 @@ export class NovaSession implements NovaClientBackend {
         authorityMemberId: this.selfPlayer.id,
         historyMode: "full",
         baseStateHash: null,
+        historyComplete: this.engine.isHistoryComplete(),
         processedActionIds: this.engine.processedActionIds(),
         state: this.engine.getCanonicalState(),
       },
@@ -1141,6 +1142,7 @@ export class NovaSession implements NovaClientBackend {
           authorityMemberId: peerMessage.authorityMemberId,
           historyMode: peerMessage.historyMode,
           baseStateHash: peerMessage.baseStateHash ?? null,
+          historyComplete: peerMessage.historyComplete,
           processedActionIds: peerMessage.processedActionIds,
           state: peerMessage.state,
           senderMemberId: peerMessage.senderMemberId,
@@ -1492,6 +1494,7 @@ export class NovaSession implements NovaClientBackend {
           authorityMemberId: snapshot.authorityMemberId,
           historyMode: snapshot.historyMode,
           ...(snapshot.baseStateHash !== null ? { baseStateHash: snapshot.baseStateHash } : {}),
+          historyComplete: snapshot.historyComplete,
           processedActionIds: snapshot.processedActionIds,
           state: snapshot.state,
         }),
@@ -1631,6 +1634,9 @@ export class NovaSession implements NovaClientBackend {
         break;
       case "electionStarted":
         // Host/arena diagnostics only (visible through getStateModeDiagnostics).
+        break;
+      case "historyIncomplete":
+        // Host-side diagnostic: a gapped window does not affect the game.
         break;
     }
   }

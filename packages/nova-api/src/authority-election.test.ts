@@ -1929,3 +1929,203 @@ describe("fan-out review fixes", { timeout: 60_000 }, () => {
     expect(c.getStateModeDiagnostics().processedActionCount).toBe(STATE_WINDOW_LIMIT);
   });
 });
+
+describe(
+  "review follow-ups: lineage, answered resync, merge rule, restore gate",
+  { timeout: 60_000 },
+  () => {
+    it("a same-revision increment that wins a conflict is a gap and requests a resync", async () => {
+      const { engine, host } = makeEngine("member-b");
+      await seedFollower(engine, 1, { count: 0 });
+      const otherState = { count: 9 };
+      const otherHash = await stateHashOf(otherState);
+      // Two members report the other hash, so it outvotes ours at revision 1.
+      engine.handleElection({
+        term: 1,
+        candidateMemberId: "member-c",
+        observed: [
+          { memberId: "member-c", revision: 1, stateHash: otherHash },
+          { memberId: "member-a", revision: 1, stateHash: otherHash },
+        ],
+      });
+      engine.handleSnapshot({
+        revision: 1,
+        stateHash: otherHash,
+        term: 1,
+        authorityMemberId: "member-a",
+        historyMode: "increment",
+        baseStateHash: null,
+        processedActionIds: ["x"],
+        state: otherState,
+        senderMemberId: "member-a",
+      });
+      expect(host.resyncs).toEqual([{ target: "member-a", request: { knownRevision: 1 } }]);
+    });
+
+    it("a persistent same-revision conflict does not cause a full reply per second", async () => {
+      const { engine, host } = makeEngine("member-b");
+      await seedFollower(engine, 1, { count: 0 });
+      const stateThree = { count: 3 };
+      // A gap: revision 3 built on a base we do not hold.
+      engine.handleSnapshot({
+        revision: 3,
+        stateHash: await stateHashOf(stateThree),
+        term: 1,
+        authorityMemberId: "member-a",
+        historyMode: "increment",
+        baseStateHash: "f".repeat(64),
+        processedActionIds: ["g"],
+        state: stateThree,
+        senderMemberId: "member-a",
+      });
+      expect(host.resyncs).toHaveLength(1);
+      // The authority's answer is a full snapshot at revision 3 whose hash loses
+      // the vote, so we keep our own state. The request is still answered.
+      engine.handleSnapshot({
+        revision: 3,
+        stateHash: await stateHashOf({ count: 33 }),
+        term: 1,
+        authorityMemberId: "member-a",
+        historyMode: "full",
+        processedActionIds: ["g"],
+        state: { count: 33 },
+        senderMemberId: "member-a",
+      });
+      // Heartbeats at our revision for five seconds must not ask again. They
+      // arrive every 100 ms (the test timings) so the grace period never lapses.
+      for (let i = 0; i < 50; i += 1) {
+        await advance(100);
+        engine.handleHeartbeat({
+          term: 1,
+          authorityMemberId: "member-a",
+          stateRevision: 3,
+          heartbeatSeq: i,
+        });
+      }
+      expect(engine.getAuthorityMemberId()).toBe("member-a");
+      expect(host.resyncs).toHaveLength(1);
+    });
+
+    it("an incomplete authority's full snapshot merges and does not shrink a complete window", async () => {
+      const { engine, host } = makeEngine("member-b");
+      await seedFollower(engine, 1, { count: 0 });
+      const hash1 = await stateHashOf({ count: 0 });
+      const hash2 = await stateHashOf({ count: 1 });
+      const hash3 = await stateHashOf({ count: 2 });
+      engine.handleSnapshot({
+        revision: 2,
+        stateHash: hash2,
+        term: 1,
+        authorityMemberId: "member-a",
+        historyMode: "increment",
+        baseStateHash: hash1,
+        processedActionIds: ["a"],
+        state: { count: 1 },
+        senderMemberId: "member-a",
+      });
+      engine.handleSnapshot({
+        revision: 3,
+        stateHash: hash3,
+        term: 1,
+        authorityMemberId: "member-a",
+        historyMode: "increment",
+        baseStateHash: hash2,
+        processedActionIds: ["b"],
+        state: { count: 2 },
+        senderMemberId: "member-a",
+      });
+      expect(engine.processedActionIds()).toEqual(["a", "b"]);
+      // The authority's window has a gap, so its full broadcast says so.
+      engine.handleSnapshot({
+        revision: 4,
+        stateHash: await stateHashOf({ count: 3 }),
+        term: 1,
+        authorityMemberId: "member-a",
+        historyMode: "full",
+        historyComplete: false,
+        processedActionIds: ["x"],
+        state: { count: 3 },
+        senderMemberId: "member-a",
+      });
+      expect(engine.processedActionIds()).toEqual(["a", "b", "x"]);
+      expect(engine.isHistoryComplete()).toBe(true);
+      expect(host.resyncs).toHaveLength(0);
+    });
+
+    it("the first broadcast after re-election is full, even with a dispatch during the hash await", async () => {
+      let holdNextHash = false;
+      let release: () => void = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const { engine, host } = makeEngine("member-b", {
+        connected: new Set(["member-b", "member-c"]),
+        stateHash: async (value) => {
+          if (holdNextHash) {
+            holdNextHash = false;
+            await gate;
+          }
+          return stateHashOf(value);
+        },
+      });
+      // Member b leads at term 1, broadcasts a full revision 1, then steps down.
+      expect(await engine.initializeAsAuthority()).toBe(true);
+      await waitForEngine(() => host.snapshots.length > 0, "initial broadcast");
+      host.connected.add("member-a");
+      engine.handleAnnounce({ term: 2, authorityMemberId: "member-a", stateRevision: 1 });
+      expect(engine.getAuthorityMemberId()).toBe("member-a");
+
+      // Member a leaves; b wins the next term and its restore verification is held.
+      const before = host.snapshots.length;
+      holdNextHash = true;
+      host.connected.delete("member-a");
+      engine.notifyAuthorityLeft();
+      await advance(400);
+      expect(engine.getAuthorityMemberId()).toBe("member-b");
+      // A dispatch arrives during the hash await: it must wait for the restore.
+      engine.handleLocalAction({
+        actionId: "during-restore",
+        type: "increment",
+        payload: {},
+        baseRevision: 1,
+      });
+      expect(host.snapshots.length).toBe(before);
+      // Let the dispatch's own state hash complete while the restore is still held.
+      for (let i = 0; i < 5; i += 1) await yieldLoop();
+      expect(host.snapshots.length).toBe(before);
+      release();
+      await waitForEngine(
+        () => host.snapshots.length >= before + 2,
+        "restore and commit broadcasts",
+      );
+      expect(host.snapshots[before]?.snapshot.historyMode).toBe("full");
+      expect(host.snapshots[before + 1]?.snapshot.historyMode).toBe("increment");
+      expect(host.snapshots[before + 1]?.snapshot.processedActionIds).toEqual(["during-restore"]);
+      expect(engine.getRevision()).toBe(2);
+    });
+
+    it("becoming authority with a gapped window emits a host-side diagnostic", async () => {
+      const { engine, host } = makeEngine("member-b");
+      await seedFollower(engine, 1, { count: 0 });
+      // A gap: the window is incomplete when member b takes over.
+      engine.handleSnapshot({
+        revision: 3,
+        stateHash: await stateHashOf({ count: 2 }),
+        term: 1,
+        authorityMemberId: "member-a",
+        historyMode: "increment",
+        baseStateHash: "f".repeat(64),
+        processedActionIds: ["g"],
+        state: { count: 2 },
+        senderMemberId: "member-a",
+      });
+      host.connected.delete("member-a");
+      engine.notifyAuthorityLeft();
+      await advance(400);
+      expect(engine.getAuthorityMemberId()).toBe("member-b");
+      expect(host.events).toContainEqual(
+        expect.objectContaining({ type: "historyIncomplete", authorityMemberId: "member-b" }),
+      );
+    });
+  },
+);

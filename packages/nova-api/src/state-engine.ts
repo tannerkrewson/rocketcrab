@@ -120,6 +120,8 @@ export interface StateSnapshotEnvelope {
   readonly historyMode: "full" | "increment";
   /** For increments: the state hash they apply on top of (null for full). */
   readonly baseStateHash: string | null;
+  /** The sender's window is complete (a full snapshot with false is merged, not replaced). */
+  readonly historyComplete: boolean;
   readonly processedActionIds: readonly string[];
   readonly state: unknown;
 }
@@ -212,7 +214,13 @@ export type StateEngineEvent =
   /** The authority for the current term changed (session flushes buffers). */
   | { type: "authorityChanged"; authorityMemberId: string | null; term: number }
   /** A suspicion started an election (host/arena diagnostics). */
-  | { type: "electionStarted"; term: number };
+  | { type: "electionStarted"; term: number }
+  /**
+   * This node became authority with a gapped window. Host-side diagnostic
+   * only: the game is not affected, and the window repairs on the next full
+   * broadcast from a complete shell.
+   */
+  | { type: "historyIncomplete"; authorityMemberId: string; term: number };
 
 /** Options for {@link NovaStateEngine}. */
 export interface NovaStateEngineOptions {
@@ -354,6 +362,8 @@ export class NovaStateEngine {
    * with an incomplete window asks again on each heartbeat until it is repaired.
    */
   private historyComplete = true;
+  /** Set once a full snapshot answers the outstanding request; cleared on a new gap. */
+  private historyRequestAnswered = false;
   /** Revision of this engine's last broadcast snapshot (authority side). */
   private lastBroadcastRevision: number | null = null;
   /** Receiver side: a resync request is in flight until this time (ms). */
@@ -395,6 +405,11 @@ export class NovaStateEngine {
   // ------------------------------------------------------------------
 
   /** True once the game began (session.start / observed start). */
+  /** False while this shell's action window has a known gap (see state.resync). */
+  isHistoryComplete(): boolean {
+    return this.historyComplete;
+  }
+
   isStarted(): boolean {
     return this.started;
   }
@@ -709,6 +724,8 @@ export class NovaStateEngine {
     authorityMemberId: string;
     historyMode: "full" | "increment";
     baseStateHash?: string | null;
+    /** Absent from older senders, which always sent complete windows. */
+    historyComplete?: boolean;
     processedActionIds: readonly string[];
     state: unknown;
     /** The transport sender (for targeted convergence re-sends). */
@@ -741,6 +758,12 @@ export class NovaStateEngine {
       }
       return; // stale delivery
     }
+    if (message.historyMode === "full") {
+      // A full snapshot from the authority answers an outstanding resync,
+      // even when we keep our own state below (a same-revision conflict).
+      this.resyncOutstandingUntil = 0;
+      this.historyRequestAnswered = true;
+    }
     if (
       message.revision === this.revision &&
       message.stateHash !== null &&
@@ -771,9 +794,10 @@ export class NovaStateEngine {
     // revision, on the same lineage (its base hash is our hash). Anything
     // else means commits were missed or we are on another lineage, so their
     // dedup IDs are absent and a full snapshot must be requested.
+    // A same-revision increment that reached this point is on another lineage
+    // (an equal hash returned above), so it is a gap too.
     const gap =
       incremental &&
-      message.revision > this.revision &&
       (message.revision !== this.revision + 1 ||
         (message.baseStateHash ?? null) !== this.stateHash);
     this.canonical = message.state;
@@ -792,14 +816,13 @@ export class NovaStateEngine {
     ) {
       this.authorityElect = message.authorityMemberId;
     }
-    if (!incremental) {
-      // A full snapshot carries the sender's whole window: it replaces ours.
-      // Keeping IDs the sender does not hold would let an action the sender
-      // discarded still be acknowledged as accepted.
+    if (!incremental && message.historyComplete !== false) {
+      // A complete full snapshot carries the sender's whole window: it
+      // replaces ours, so an ID the sender does not hold is not acknowledged
+      // as accepted here. An incomplete one is merged below, and our own
+      // completeness flag stays as it was, so a complete window is never shrunk.
       this.history.clear();
       this.historyComplete = true;
-      // A full snapshot answers any outstanding resync request.
-      this.resyncOutstandingUntil = 0;
     }
     for (const actionId of message.processedActionIds) {
       if (!this.history.has(actionId)) {
@@ -813,6 +836,7 @@ export class NovaStateEngine {
     }
     if (gap) {
       this.historyComplete = false;
+      this.historyRequestAnswered = false;
       this.requestResync();
     }
     if (this.authorityMemberId === this.selfMemberId && this.restoreDone) {
@@ -863,6 +887,7 @@ export class NovaStateEngine {
     const authority = this.authorityMemberId;
     if (authority === null || authority === this.selfMemberId) return;
     this.resyncOutstandingUntil = now + stateResyncMinIntervalMs;
+    this.historyRequestAnswered = false;
     this.host.sendResync(authority, { knownRevision: this.revision });
   }
 
@@ -929,11 +954,13 @@ export class NovaStateEngine {
     if (
       message.authorityMemberId !== this.selfMemberId &&
       message.authorityMemberId === this.authorityMemberId &&
-      (!this.historyComplete || message.stateRevision > this.revision)
+      ((!this.historyComplete && !this.historyRequestAnswered) ||
+        message.stateRevision > this.revision)
     ) {
       // Heartbeats say how far the authority has got. A follower that is
-      // behind, or whose history has a gap, asks again (one request per window,
-      // so an expired window is the retry after a lost reply).
+      // behind asks again. A gapped follower asks again only while its request
+      // is unanswered (an expired window is the retry after a lost reply), so
+      // a request the authority answered is not repeated every second.
       this.requestResync();
     }
   }
@@ -1099,10 +1126,14 @@ export class NovaStateEngine {
     this.pendingHistoryIds = new Set();
     this.pendingHistoryOverflow = false;
     if (!this.historyComplete) {
-      // The elected authority's window has a gap. It still serves (a full
-      // broadcast repairs the shells that hold a complete window); a follower
-      // that is ahead of it cannot be repaired here.
-      console.warn(`nova: ${this.selfMemberId} became authority with an incomplete action history`);
+      // The elected authority's window has a gap. It still serves: its full
+      // broadcast is merged by complete shells, so their windows are not
+      // shrunk. Diagnostic only; the game is not affected.
+      this.host.emit({
+        type: "historyIncomplete",
+        authorityMemberId: this.selfMemberId,
+        term: this.term,
+      });
     }
     this.restoreBackup =
       this.canonical === null
@@ -1154,10 +1185,12 @@ export class NovaStateEngine {
   private async finishRestore(): Promise<void> {
     if (this.disposed || !this.started || this.ended) return;
     if (this.authorityMemberId !== this.selfMemberId) return; // deposed mid-restore
-    this.restoreDone = true;
+    // Actions stay gated until the restored state is verified and the first
+    // (full) broadcast has gone out, so no commit can precede that broadcast.
     if (this.stateHash !== null && this.canonical !== null && this.restoreBackup !== null) {
       const actual = await this.stateHashImpl(this.canonical);
       if (this.disposed) return;
+      if (this.authorityMemberId !== this.selfMemberId) return; // deposed during the hash
       if (actual !== this.stateHash) {
         const backup = this.restoreBackup;
         this.canonical = backup.canonical;
@@ -1175,6 +1208,7 @@ export class NovaStateEngine {
         });
       }
     }
+    this.restoreDone = true;
     this.restoreBackup = null;
     this.announce();
     if (this.canonical !== null) {
@@ -1328,6 +1362,7 @@ export class NovaStateEngine {
       authorityMemberId: this.authorityMemberId ?? this.selfMemberId,
       historyMode,
       baseStateHash: historyMode === "increment" ? this.lastBroadcastStateHash : null,
+      historyComplete: this.historyComplete,
       processedActionIds:
         historyMode === "full" ? this.processedActionIds() : [...this.pendingHistoryIds],
       state: this.canonical,
