@@ -453,7 +453,8 @@ passed 4/4 (Podman Playwright, 2026-11-13).
    findings; no remote-host proof or orchestration exists yet. Do not infer
    unlimited support or close the owner overlay decision in §3.6.
 
-8. [ ] Update ADR-0003 (transport abstraction) to describe what Trystero now owns and what Nova still owns.
+8. [x] Update ADR-0003 (transport abstraction) to describe what Trystero now owns and what Nova still owns.
+       Evidence: ADR-0003 "Status update 2026-11-13: Trystero 0.27" (ownership table with code locations, and upgrade checklist), checked against source at `b760379`; docs only, no runtime behaviour change.
 
 ## 4. Own signaling relay — P0 (owner approved)
 

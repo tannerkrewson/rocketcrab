@@ -119,6 +119,89 @@ cap, but it prevents a claim of arbitrary-size complete rosters and routing.
 The owner must decide how to address the bound and its security/resource
 tradeoffs; see §3.6 in `PLAN.md`. No boundary load test has been performed.
 
+## Status update 2026-11-13: Trystero 0.27
+
+Checked against the code at base `b760379` on branch `nova`. The table states
+what the code does today. Planned or deferred work appears only where it is
+labelled, with its PLAN section. Where this section disagrees with the Context
+or Decision text above (Nostr strategy, older API names), this section governs;
+the older text is kept as history.
+
+"Trystero owns" means the behaviour is implemented by the pinned
+`@trystero-p2p/ws-relay` 0.27.0 package and its `@trystero-p2p/core` dependency.
+"Nova owns" means Nova code decides the behaviour, even where it calls a
+Trystero API. Code locations are relative to the repository root.
+
+### Ownership split
+
+| **Trystero owns**                                                                                                                                                                                                                                                                                               | **Nova owns**                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                         |
+| --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Signaling client.** Relay WebSocket and the subscribe/publish/echo protocol, via `joinRoom` `relayConfig` (`packages/trystero-transport/src/trystero-transport.ts:684-696`). Socket state is read from `getRelaySockets()` (`:1074-1088`). Trystero implements the wire protocol; Nova supplies only the URL. | **Signaling service.** `SignalHub` Durable Object with per-socket limits and hibernation attachments (`deploy/edge/signal.ts`); `/signal/:roomKey` Origin and rate-limit gate (`deploy/edge/worker.ts:80-101`); room key from SHA-256 of appId plus roomId (`packages/trystero-transport/src/signal-url.ts`). Nova runs the relay, so signaling availability is site availability (PLAN §4).                                                                                                                                                          |
+| **Peer connections and transfer.** WebRTC peer connections, data channels, chunking, backpressure and action progress (`onReceiveProgress`, `trystero-transport.ts:219, 864`).                                                                                                                                  | **Transfer policy.** Receive cap `maxReceiveBytes` of 8 MiB (`:690`); pre-admission buffer of 32 messages and 8 MiB (`:1007-1008`); request limit of 16 KiB and response limit of 2 MiB per request (`:213-216`). Nova sets the limits; Trystero enforces the transfer.                                                                                                                                                                                                                                                                               |
+| **ICE and TURN use.** Applies `turnConfig` entries to the peer connections (`trystero-transport.ts:696`).                                                                                                                                                                                                       | **TURN credentials.** Short-lived credentials minted by `/turn` (`deploy/edge/turn.ts`) and fetched once per party (`apps/nova/src/lib/party/turn-creds.ts`). The long-lived key stays a Worker secret (M3; PLAN §1).                                                                                                                                                                                                                                                                                                                                 |
+| **Source transfer mechanics.** The single binary request: fragmentation, backpressure, correlation, cancellation and timeout (`packages/party/src/game-source.ts:452-457` calls `transport.request`; adapter `requestAction` at `trystero-transport.ts:200-240`).                                               | **Source acceptance.** Metadata and compatibility checks, SHA-256, exact-size and UTF-8 verification, the eight-source cache and the positive `game.source.accepted` decision (`packages/party/src/game-source.ts:18, 426-497, 590-600`). Delivery alone is not acceptance.                                                                                                                                                                                                                                                                           |
+| **Identity transport.** Signed user-state slot `nova.identity` (`makeUserState`, `trystero-transport.ts:765`) under ephemeral `identity: "none"` (`:687`). Trystero user IDs are not Nova identities.                                                                                                           | **Identity and admission.** Stable `member-` IDs (`apps/nova/src/lib/party/identity.ts:12`); payload parsing (`packages/trystero-transport/src/wire.ts:86`); bilateral acknowledgement before a peer is published, admission timeout and duplicate-connection rejection (`trystero-transport.ts:762-900`). Persistent Trystero identity is deferred pending an owner decision (PLAN §3.5).                                                                                                                                                            |
+| **Typed room errors.** `RoomError` reports carrying `code`, `peerId`, `appId` and `roomId`, delivered through `room.onError` (`trystero-transport.ts:889`).                                                                                                                                                     | **Error meaning and notices.** Code-to-category mapping (`packages/trystero-transport/src/errors.ts:86-107`); adapter-detected `relay_unreachable`, `join_timeout` and `handshake_timeout` (`trystero-transport.ts:722, 876, 1104-1112`); attempt-scoped, qualified notices (`apps/nova/src/lib/party/connection-errors.ts`, `engine.ts:518-519, 1579, 1879`). A per-peer `room-full` or `decrypt-failed` does not diagnose the local join.                                                                                                           |
+| —                                                                                                                                                                                                                                                                                                               | **Roster and host.** Members are deduplicated by Nova member ID; host is the connected creator, otherwise the first sorted member ID (`packages/party/src/session.ts:109-124`). `makeUserState` replacement is deferred: a per-user list can include unadmitted peers or several users for one member, and no ready flag exists (PLAN §3.5).                                                                                                                                                                                                          |
+| —                                                                                                                                                                                                                                                                                                               | **Creator context.** The first valid context from an admitted, connected peer is kept (`session.ts:241-244`). `makeState` replacement is deferred: a signed slot can relay a departed author's value, and validation must still bind to the admitted forwarder (PLAN §3.5).                                                                                                                                                                                                                                                                           |
+| —                                                                                                                                                                                                                                                                                                               | **Classic-room selection.** Announcements are accepted only from the current host (`session.ts:260-261`); requests are surfaced without a host check (`:257-258`). A `makeState` replacement would need the same host check, so it stays deferred (PLAN §3.5).                                                                                                                                                                                                                                                                                        |
+| —                                                                                                                                                                                                                                                                                                               | **Authority election and migration.** Heartbeats, deterministic election and snapshot restore in `packages/nova-api/src/state-engine.ts` (`startElection` at `:909`, `finalizeElection` at `:957`) and the simulation engine, per ADR-0007. Trystero's `authority.mjs` is not used: it handles signed roles and moderation, not game-executor election (PLAN §3.4).                                                                                                                                                                                   |
+| **Room lifecycle primitives.** `room.leave()`, and unsubscribe handles returned by room, action and user-state listeners.                                                                                                                                                                                       | **Lifecycle state machine.** Shared teardown barrier: `releaseRoom` keeps a rejected release as the barrier (`trystero-transport.ts:1153-1162`); `join`, `leave`, `reconnect`, `suspend` and `resume` (`:268-530`) rejoin with a fresh connection ID. Suspend tears the room down and resume rejoins; `setRelayConnectivity` is exported by 0.27 but not called. Engine: fail-closed on teardown failure (`engine.ts:267, 1134`) and auto-reconnect with backoff (`engine.ts:326, 1431`).                                                             |
+| **Overlay routing.** `scale()` multi-hop routing, promotion of bulk transfers to direct links, and the upstream 2,048-descriptor bound (`@trystero-p2p/core` `scale/descriptors.mjs`).                                                                                                                          | **Configuration and status.** `scale({ maxDirectPeers: 9 })` (`trystero-transport.ts:689`) gives a full mesh up to ten players. Identity admission, source verification, cancellation and party semantics stay with Nova. Status per PLAN §3.6: adopted in code and marked experimental; a test-only eight-browser, four-neighbour proof passes; 10/25/50-player local headless runs are recorded in [large-room load](../testing/large-room-load.md) and 100 is incomplete; the descriptor bound is an open owner decision. No arbitrary-size claim. |
+| `rtcPolyfill` hook, used only by the prototype.                                                                                                                                                                                                                                                                 | **Prototype only.** `e2e-trystero/src/fallback-proof.js` over the local signaling and tunnel fixture (`e2e-trystero/fallback-server.mjs`, plaintext and unauthenticated). No production `FallbackPeerConnection`, `TunnelPair` or pair encryption exists; `deploy/edge/tunnel.ts` is absent. Building it waits for the owner gate (PLAN §5).                                                                                                                                                                                                          |
+
+### Upgrade checklist
+
+Re-verify every item on each Trystero upgrade. The installed core is under
+`node_modules/@trystero-p2p/ws-relay/node_modules/@trystero-p2p/core/dist/`.
+
+- **Pins and app IDs.** `@trystero-p2p/ws-relay` stays pinned exactly (root and
+  `packages/trystero-transport/package.json`). Bump
+  `packages/trystero-transport/src/app-id.ts` when the wire or identity format
+  changes (PLAN §3.1).
+- **RTCPeerConnection surface** (PLAN §5, `peer.mjs`). Trystero 0.27 uses
+  `setLocalDescription` (implicit), `setRemoteDescription`, `addIceCandidate`,
+  `localDescription`, `remoteDescription`, `signalingState`, `connectionState`,
+  `iceConnectionState`, `onicecandidate`, `onconnectionstatechange`,
+  `onnegotiationneeded`, `addEventListener`, `createDataChannel`,
+  `ondatachannel`, `close`, `addTrack`, `removeTrack`, `getSenders` and
+  `ontrack`. Data channels use `onopen`, `onmessage`, `onerror`, `onclose`,
+  `close`, `binaryType`, `bufferedAmountLowThreshold` and `onbufferedamountlow`
+  (`bufferedAmount` derives from them). Re-check the list. Confirm channels
+  remain ordered and reliable, which the fallback design assumes.
+- **State and identity** (PLAN §3.5, `state.mjs`, `identity.mjs`). User state
+  is still last-writer-wins per user, keyed by user ID and ordered by HLC. A
+  slot is still relayed after its author leaves. A value rejected by the
+  application validator is not stored. `identity.mjs` still derives a
+  22-character `userId` from the P-256 key and falls back to an ephemeral
+  identity when IndexedDB fails. The adapter must still reject any change to
+  the `nova.identity` payload, including `displayName`, and the admission tests
+  must still pass.
+- **Decrypt-failed semantics** (PLAN §7, `signal-handler.mjs`). As of
+  2026-11-13, `decrypt-failed` is reported per peer for an incorrect password or
+  a corrupted signal, deduplicated per peer for 60 seconds. Confirm this still
+  holds. Confirm the `errors.ts` mapping and the qualified notice wording still
+  match it.
+- **Relay protocol** (PLAN §4, `ws-relay` `protocol.mjs` and `server.mjs`).
+  Topics match `^[A-Za-z0-9_-]+$` and are at most 256 characters; 128
+  subscriptions per socket; 200 messages per second with a burst of 400;
+  256 KiB frames; publisher echo. Compare with `deploy/edge/signal.ts`.
+- **Exports the adapter uses.** `joinRoom`, `scale`, `getRelaySockets`,
+  `RoomError` codes, and room methods `makeAction`, `makeUserState`, `onError`,
+  `onPeerJoin`, `onPeerLeave`, `getPeers` and `leave`. Confirm each still exists
+  with the same semantics.
+- **Scale** (PLAN §3.6). Re-check the 2,048 descriptor bound
+  (`scale/descriptors.mjs`), the `maxDirectPeers` range of 4 to 32
+  (`scale/topology.mjs`) and the 64-hop route limit. If upstream now offers a
+  setting that removes the bound, revisit the owner decision before changing
+  the status above.
+- **Tests** (PLAN §3.1, §3.6, §5). Run `npm run check`,
+  `npm run test:e2e:trystero` (`e2e-trystero/playwright.config.ts`),
+  `npx playwright test -c e2e-trystero/scale.playwright.config.js`,
+  `npx playwright test -c e2e-trystero/fallback.playwright.config.js` and
+  `npm run test:edge:integration`. Run the Playwright suites in the pinned
+  Playwright 1.62.1 image. Record results in the matching PLAN evidence.
+
 ## Alternatives considered
 
 1. **Direct WebRTC code in the app.** Rejected: re-implements discovery, NAT
