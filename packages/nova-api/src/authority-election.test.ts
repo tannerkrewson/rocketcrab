@@ -25,7 +25,7 @@ import {
   record as fcRecord,
 } from "fast-check";
 import { actionTimeoutMs, stateResyncMinIntervalMs } from "@rocketcrab/protocol";
-import { InMemoryTransportHub, type InMemoryTransport } from "@rocketcrab/testing";
+import { InMemoryTransportHub } from "@rocketcrab/testing";
 import { createNovaSession, type NovaSession } from "./session";
 import { STATE_HISTORY_LIMIT as STATE_WINDOW_LIMIT } from "./state-engine";
 import {
@@ -1809,7 +1809,7 @@ describe("fan-out review fixes", { timeout: 60_000 }, () => {
         (entry.payload as { senderMemberId?: string }).senderMemberId === "member-b",
     );
     expect(fromB.length).toBeGreaterThan(0);
-    expect((fromB[0]?.payload as { historyMode?: string }).historyMode).toBe("full");
+    expect(fromB[0] && (fromB[0].payload as { historyMode?: string }).historyMode).toBe("full");
   });
 
   it("a full snapshot replaces the window: an ID the sender does not hold is forgotten", async () => {
@@ -2370,7 +2370,7 @@ describe("state deltas over the transport", { timeout: 60_000 }, () => {
     expect(commits.map((payload) => payload.stateMode)).toEqual(["delta", "delta", "delta"]);
     expect(b.getCanonicalState()?.state).toEqual(a.getCanonicalState()?.state);
     expect(c.getCanonicalState()?.state).toEqual(a.getCanonicalState()?.state);
-    expect((a.getCanonicalState()?.state as { count: number }).count).toBe(3);
+    expect((a.getCanonicalState()?.state as { count: number } | null)?.count).toBe(3);
   });
 
   it("a delta with a wrong base triggers a resync and the replica recovers", async () => {
@@ -2429,12 +2429,12 @@ describe("state deltas over the transport", { timeout: 60_000 }, () => {
       "b recovers",
     );
     expect(b.getCanonicalState()?.state).toEqual(a.getCanonicalState()?.state);
-    expect((b.getCanonicalState()?.state as { count: number }).count).toBe(1);
+    expect((b.getCanonicalState()?.state as { count: number } | null)?.count).toBe(1);
   });
 
   it("a large change falls back to a full snapshot", async () => {
     const { hub, sessions } = await makeDeltaParty(["member-a", "member-b", "member-c"]);
-    const [a, b, c] = trio(sessions);
+    const [, b, c] = trio(sessions);
     const inbound = recordInbound(b);
     const applied = c.dispatch({ type: "reset", payload: {} }, "reset-0");
     await pumpUntil(hub, () => b.getStateModeDiagnostics().revision === 2, "reset commits");
@@ -2470,7 +2470,7 @@ describe("state deltas over the transport", { timeout: 60_000 }, () => {
     const after = c.dispatch({ type: "bump", payload: {} }, "post-0");
     await pumpUntil(hub, () => b.getStateModeDiagnostics().revision === 4, "post-migration delta");
     await after;
-    expect((b.getCanonicalState()?.state as { count: number }).count).toBe(3);
+    expect((b.getCanonicalState()?.state as { count: number } | null)?.count).toBe(3);
     expect(c.getCanonicalState()?.state).toEqual(b.getCanonicalState()?.state);
   });
 
