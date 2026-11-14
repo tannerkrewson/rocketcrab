@@ -113,13 +113,9 @@ async function revealedRows(frame: Frame): Promise<string[]> {
   });
 }
 
-// FIXME (PLAN §5.6): the start now completes for a non-lowest host, and the
-// reveal waits for both answers. The forced player's answer is still refused
-// as not_started (the quiz's silent catch logs "dispatch skipped"), so the
-// round never reaches two answers. Re-enable once that is fixed.
-test.fixme("a 3-player party with one tunnelled player plays a state-mode game", async ({
-  browser,
-}) => {
+// Party proof (PLAN §5.6): a 3-player party, one player forced onto the tunnel,
+// plays the sample game; a player's game rebooted after start still gets start.
+test("a 3-player party with one tunnelled player plays a state-mode game", async ({ browser }) => {
   test.setTimeout(300_000);
   const host = await newPlayer(browser, false);
   const joiner = await newPlayer(browser, false);
@@ -189,20 +185,28 @@ test.fixme("a 3-player party with one tunnelled player plays a state-mode game",
     // Every player acts: the quizmaster (the only one with a reveal button)
     // reveals, and the others answer.
     let quizmaster: Player | null = null;
+    const answerers: Player[] = [];
     for (const player of players) {
-      const frame = await frameOf(player);
-      const state = await gameState(frame);
-      if (state?.revealButton) {
-        quizmaster = player;
-      } else {
-        await clickInGame(frame, '[data-choice="1"]');
-      }
+      const state = await gameState(await frameOf(player));
+      if (state?.revealButton) quizmaster = player;
+      else answerers.push(player);
     }
     expect(quizmaster).not.toBeNull();
-    // Answers travel to the authority over the transport, so wait until the
-    // quizmaster's frame has both answers before revealing.
+    // An answer is based on the view the player has. The authority can commit
+    // a newer revision first (the start), and the game then refuses the stale
+    // answer with stale_revision and does not retry it. A player who sees the
+    // rejection clicks again, so keep answering until the quizmaster sees both
+    // answers, then reveal.
     await expect
-      .poll(async () => answeredHint(await frameOf(quizmaster!)), { timeout: 120_000 })
+      .poll(
+        async () => {
+          for (const answerer of answerers) {
+            await clickInGame(await frameOf(answerer), '[data-choice="1"]');
+          }
+          return answeredHint(await frameOf(quizmaster!));
+        },
+        { timeout: 120_000, intervals: [3_000] },
+      )
       .toContain("2/2 answered");
     await clickInGame(await frameOf(quizmaster!), '[data-action="reveal"]');
 
