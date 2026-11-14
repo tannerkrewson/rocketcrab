@@ -619,6 +619,18 @@ change. One commit per area, `npm run check` + `npm run test:e2e` each time.
       many describing history instead of current behaviour — trim those).
 - [ ] `packages/trystero-transport/src/trystero-transport.ts`.
 - [ ] `apps/runtime/src/nova-bridge.ts` and `runtime-instance.ts`.
+
+  Early targeted review: bootstrap player identity was JSON-encoded but not
+  escaped for an HTML script element; a display name containing `</script>`
+  could break the bootstrap and inject markup into that player's runtime game
+  frame. Escape `<` without changing the decoded identity. This is not a
+  demonstrated host-origin escape or cross-player injection. Runtime source
+  inspection found no other JSON embedded in a script element; game HTML is
+  intentionally executable. A regression checks the script boundary and the
+  recovered value; `npm run check` passed, and `npm run test:e2e` passed
+  63/63 in the pinned Playwright container against this worktree's servers.
+  This partial review does not close the area or §10.
+
 - [ ] `packages/nova-api/src/session.ts`, `state-engine.ts`,
       `simulation-engine.ts`.
 - [ ] UI components and e2e tests: lighter pass.

@@ -501,6 +501,19 @@ describe("RuntimeInstance protocol boundary", () => {
     );
   });
 
+  it("escapes player identity for the HTML script context without changing its value", () => {
+    const displayName = "</script><script>x()</script>";
+    const { frameHost } = setup({
+      bootstrap: bootstrapMessage({ player: { memberId: "member-7", displayName } }),
+    });
+    const source = frameHost.frames[0]!.source;
+    const bootstrapScript = source.slice("<script>".length, source.indexOf("</script>"));
+    expect(bootstrapScript).not.toContain("<");
+    const target: { __novaBootstrap?: { player: { displayName: string } } } = {};
+    new Function("window", bootstrapScript)(target);
+    expect(target.__novaBootstrap?.player.displayName).toBe(displayName);
+  });
+
   it("delivers host-pushed session events into the game frame", () => {
     const { instance, port, frameHost } = setup();
     const frame = frameHost.frames[0]!;

@@ -239,10 +239,12 @@ export class RuntimeInstance {
     // script so `window.nova.player` is correct from the first game tick
     // (same-origin forwarding of data the host already validated; the game
     // frame never sees the host origin).
+    // JSON string escaping alone does not stop HTML's script end-tag parser.
+    // Names are player-controlled and may contain </script>.
     const identity = JSON.stringify({
       memberId: this.bootstrap.player.memberId,
       displayName: this.bootstrap.player.displayName,
-    });
+    }).replace(/</g, "\\u003c");
     return `<script>window.__novaBootstrap = { player: ${identity} };</script>\n<script>\n${NOVA_BRIDGE_SCRIPT}\n</script>\n${html}`;
   }
 
