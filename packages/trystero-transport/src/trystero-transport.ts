@@ -1,5 +1,12 @@
 import { getRelaySockets, joinRoom, scale } from "@trystero-p2p/ws-relay";
 import { signalUrl } from "./signal-url";
+import { tunnelUrl } from "./edge-url";
+import {
+  createFallbackPeerConnectionClass,
+  isTunnelledConnection,
+  type TerminalFailureInfo,
+  type TunnelStartInfo,
+} from "./fallback-peer-connection";
 import type {
   DataPayload,
   JoinRoomConfig,
@@ -11,7 +18,14 @@ import type {
   Room,
   TurnServerConfig,
 } from "@trystero-p2p/ws-relay";
-import type { ConnectionId, MemberId, MessageId, SessionId, Timestamp } from "@rocketcrab/protocol";
+import type {
+  ConnectionId,
+  MemberId,
+  MessageId,
+  SessionId,
+  SessionSecret,
+  Timestamp,
+} from "@rocketcrab/protocol";
 import { LIMITS } from "@rocketcrab/protocol";
 import type {
   NovaTransport,
@@ -345,7 +359,7 @@ export class TrysteroTransport implements NovaTransport {
       if (generation !== this.lifecycleGeneration)
         throw new TrysteroJoinError({ category: "cancelled", message: "Join was cancelled." });
       this.signalRelayUrl = url;
-      room = joinRoom(this.buildConfig(url), request.room);
+      room = joinRoom(this.buildConfig(url, request.room), request.room);
     } catch (cause) {
       if (generation !== this.lifecycleGeneration) throw cause;
       this.connectionState = "idle";
@@ -439,7 +453,7 @@ export class TrysteroTransport implements NovaTransport {
       if (generation !== this.lifecycleGeneration)
         throw new TrysteroJoinError({ category: "cancelled", message: "Reconnect was cancelled." });
       this.signalRelayUrl = url;
-      nextRoom = joinRoom(this.buildConfig(url), roomName);
+      nextRoom = joinRoom(this.buildConfig(url, roomName), roomName);
     } catch (cause) {
       if (generation !== this.lifecycleGeneration) throw cause;
       this.connectionState = "disconnected";
@@ -511,7 +525,7 @@ export class TrysteroTransport implements NovaTransport {
       if (generation !== this.lifecycleGeneration)
         throw new TrysteroJoinError({ category: "cancelled", message: "Resume was cancelled." });
       this.signalRelayUrl = url;
-      room = joinRoom(this.buildConfig(url), roomName);
+      room = joinRoom(this.buildConfig(url, roomName), roomName);
     } catch (cause) {
       if (generation !== this.lifecycleGeneration) throw cause;
       this.connectionState = "suspended";
@@ -625,6 +639,18 @@ export class TrysteroTransport implements NovaTransport {
     return this.signalingConnected;
   }
 
+  /**
+   * Whether the WebRTC link to this peer is carried by the edge tunnel rather
+   * than a direct connection (PLAN.md §5). False for unknown peers. Media is
+   * not tunnelled, so UI must hide audio/video for these peers (§7).
+   */
+  isPeerTunnelled(connectionId: ConnectionId): boolean {
+    const peerId = this.connectionToPeerId.get(connectionId);
+    if (peerId === undefined || this.room === null) return false;
+    const connection = this.room.getPeers()[peerId]?.connection;
+    return connection != null && isTunnelledConnection(connection);
+  }
+
   /** Aggregated adapter diagnostics (join errors, relays, quality). */
   getDiagnostics(): TrysteroTransportDiagnostics {
     return {
@@ -681,7 +707,10 @@ export class TrysteroTransport implements NovaTransport {
   // Trystero wiring
   // ------------------------------------------------------------------
 
-  private buildConfig(url: string): JoinRoomConfig & { relayConfig: { urls: string[] } } {
+  private buildConfig(
+    url: string,
+    roomName: string,
+  ): JoinRoomConfig & { relayConfig: { urls: string[] } } {
     const config: JoinRoomConfig & { relayConfig: { urls: string[] } } = {
       appId: this.appId,
       identity: "none",
@@ -697,7 +726,39 @@ export class TrysteroTransport implements NovaTransport {
     if (this.options.rtcConfig !== undefined) {
       config.rtcConfig = this.options.rtcConfig;
     }
+    const rtcPolyfill = this.tunnelFallbackClass(roomName);
+    if (rtcPolyfill !== undefined) {
+      config.rtcPolyfill = rtcPolyfill;
+    }
     return config;
+  }
+
+  /**
+   * The WebRTC-to-tunnel fallback class for one join (PLAN.md §5.6). Null when
+   * the transport has no party secret (the tunnel keys come from it) or when
+   * there is no browser WebRTC, so non-browser callers keep plain Trystero.
+   * Built per join because its options are per room.
+   */
+  private tunnelFallbackClass(roomName: string): typeof RTCPeerConnection | undefined {
+    const secret = this.options.partySecret;
+    if (
+      secret === undefined ||
+      typeof globalThis.RTCPeerConnection !== "function" ||
+      typeof globalThis.WebSocket !== "function"
+    ) {
+      return undefined;
+    }
+    const edgeOrigin = this.options.edgeOrigin ?? DEFAULT_EDGE_ORIGIN;
+    return createFallbackPeerConnectionClass({
+      NativePeerConnection: globalThis.RTCPeerConnection,
+      WebSocketImpl: globalThis.WebSocket,
+      tunnelUrl: (pairId) => tunnelUrl(edgeOrigin, pairId),
+      roomId: roomName,
+      partySecret: secret,
+      forceRelayOnlyNoServers: this.options.forceRelayOnlyNoServers === true,
+      onTunnel: this.options.onTunnel,
+      onTerminalFailure: this.options.onTunnelFailure,
+    });
   }
 
   private async deriveSignalUrl(
@@ -728,7 +789,7 @@ export class TrysteroTransport implements NovaTransport {
     });
     try {
       return await Promise.race([
-        signalUrl(this.options.edgeOrigin ?? "http://localhost:8787", this.appId, roomName),
+        signalUrl(this.options.edgeOrigin ?? DEFAULT_EDGE_ORIGIN, this.appId, roomName),
         interrupted,
       ]);
     } finally {
@@ -1326,6 +1387,9 @@ export interface TrysteroTransportDiagnostics {
   readonly lastQuality: readonly ConnectionQualitySample[];
 }
 
+/** Edge origin when the caller does not configure one (local `npm run dev`). */
+const DEFAULT_EDGE_ORIGIN = "http://localhost:8787";
+
 /** Trystero action namespace (well under Trystero's 32-byte type limit). */
 const ACTION_NAMESPACE = "nova";
 
@@ -1365,6 +1429,21 @@ export interface TrysteroTransportOptions {
   readonly turnConfig?: readonly TurnServerConfig[];
   /** Extra RTC configuration (e.g. STUN servers). */
   readonly rtcConfig?: RTCConfiguration;
+  /**
+   * Party session secret (ADR-0004). Tunnel keys are derived from it (PLAN.md
+   * §5.4). Without it, joins use plain WebRTC with no tunnel fallback.
+   */
+  readonly partySecret?: SessionSecret;
+  /** Fires when a pair moves onto the edge tunnel (PLAN.md §5.5). */
+  readonly onTunnel?: (info: TunnelStartInfo) => void;
+  /** Fires once when a tunnelled pair fails terminally (PLAN.md §5.5). */
+  readonly onTunnelFailure?: (info: TerminalFailureInfo) => void;
+  /**
+   * TEST ONLY: forces every native WebRTC connection of this transport to use
+   * no ICE servers and a relay-only policy, so its pairs tunnel. Callers must
+   * only set this in dev and test builds; production never does.
+   */
+  readonly forceRelayOnlyNoServers?: boolean;
   /** Room password (optional in P1; P2 owns admission on top of it). */
   readonly password?: string;
   /** Timeout before join fails with `relay_unreachable` (default 15 s). */

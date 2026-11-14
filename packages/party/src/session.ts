@@ -19,7 +19,13 @@ export interface PartyIdentity {
   readonly displayName?: string;
 }
 export interface PartyTransportFactory {
-  createPrivateTransport(identity: PartyIdentity & { readonly password: string }): NovaTransport;
+  /**
+   * `secret` is the party session secret. It is passed only to the transport
+   * (tunnel keys are derived from it, PLAN.md §5.4) and never sent to peers.
+   */
+  createPrivateTransport(
+    identity: PartyIdentity & { readonly password: string; readonly secret: SessionSecret },
+  ): NovaTransport;
 }
 export type PartyEvent =
   | { readonly type: "host"; readonly hostMemberId: MemberId | null }
@@ -304,6 +310,7 @@ async function enter(
     memberId: options.memberId,
     displayName: options.displayName,
     password: material.password,
+    secret,
   });
   const session = new PartySession({
     role,

@@ -27,7 +27,8 @@
  * - One data channel per connection. Trystero uses exactly one.
  * - Sends are paced to the edge's per-socket budget (see the pace constants).
  *
- * Nothing in the transport uses this module yet; wiring is PLAN.md §5.6.
+ * The transport wires this in through `rtcPolyfill` (trystero-transport.ts,
+ * PLAN.md §5.6).
  */
 import type { SessionSecret } from "@rocketcrab/protocol";
 import {
@@ -125,6 +126,13 @@ export interface FallbackPeerConnectionOptions {
   readonly roomId: string;
   readonly partySecret: SessionSecret;
   readonly fallbackAfterMs?: number;
+  /**
+   * TEST ONLY. The native connection is created with no ICE servers and
+   * `iceTransportPolicy: "relay"`, so it cannot gather a usable candidate and
+   * the pair falls back to the tunnel (PLAN.md §5.1). The transport exposes
+   * this only to test builds; production never sets it.
+   */
+  readonly forceRelayOnlyNoServers?: boolean;
   readonly now?: () => number;
   readonly setTimeout?: (callback: () => void, ms: number) => unknown;
   readonly clearTimeout?: (handle: unknown) => void;
@@ -148,6 +156,7 @@ interface Deps {
   readonly roomId: string;
   readonly partySecret: SessionSecret;
   readonly fallbackAfterMs: number;
+  readonly forceRelayOnlyNoServers: boolean;
   readonly now: () => number;
   readonly schedule: (callback: () => void, ms: number) => unknown;
   readonly cancel: (handle: unknown) => void;
@@ -1003,6 +1012,7 @@ export function createFallbackPeerConnectionClass(
     roomId: options.roomId,
     partySecret: options.partySecret,
     fallbackAfterMs: options.fallbackAfterMs ?? FALLBACK_AFTER_MS,
+    forceRelayOnlyNoServers: options.forceRelayOnlyNoServers === true,
     now: options.now ?? defaultNow,
     schedule: options.setTimeout ?? ((callback, ms) => globalThis.setTimeout(callback, ms)),
     cancel:
@@ -1013,7 +1023,10 @@ export function createFallbackPeerConnectionClass(
   };
   return class FallbackPeerConnection {
     constructor(configuration?: RTCConfiguration) {
-      return createWrapper(new deps.NativePeerConnection(configuration), deps);
+      const effective: RTCConfiguration = deps.forceRelayOnlyNoServers
+        ? { ...configuration, iceServers: [], iceTransportPolicy: "relay" }
+        : (configuration as RTCConfiguration);
+      return createWrapper(new deps.NativePeerConnection(effective), deps);
     }
   } as unknown as typeof RTCPeerConnection;
 }

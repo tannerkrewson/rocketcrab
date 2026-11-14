@@ -19,6 +19,20 @@ export interface TrysteroPartyTransportFactoryOptions {
   readonly onJoinError?: (error: TrysteroJoinError) => void;
 }
 
+/**
+ * Test-only switch for the WebRTC-to-tunnel fallback (PLAN.md §5.6). A page
+ * sets `window.__NOVA_TEST_FORCE_TUNNEL__ = true` (e2e uses `addInitScript`)
+ * and its native WebRTC can no longer connect, so its pairs tunnel. The flag
+ * is read only in dev and `MODE === "test"` builds; production builds fold
+ * `import.meta.env.DEV` to `false`, so the flag is never read there.
+ */
+export function forceTunnelForTests(): boolean {
+  if (!(import.meta.env.DEV || import.meta.env.MODE === "test")) return false;
+  return (
+    (globalThis as { __NOVA_TEST_FORCE_TUNNEL__?: unknown }).__NOVA_TEST_FORCE_TUNNEL__ === true
+  );
+}
+
 /** The transport factory real parties run over (dev/prod appId by env). */
 export function createTrysteroPartyTransportFactory(
   options: TrysteroPartyTransportFactoryOptions = {},
@@ -31,6 +45,8 @@ export function createTrysteroPartyTransportFactory(
       displayName: identity.displayName,
       edgeOrigin: edgeOrigin(),
       ...("password" in identity ? { password: identity.password } : {}),
+      partySecret: identity.secret,
+      forceRelayOnlyNoServers: forceTunnelForTests(),
       ...(turnConfig !== undefined ? { turnConfig } : {}),
       ...(onJoinError !== undefined ? { onJoinError } : {}),
     });
