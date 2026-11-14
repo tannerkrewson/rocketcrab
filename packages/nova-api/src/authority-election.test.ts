@@ -2368,6 +2368,11 @@ describe("state deltas over the transport", { timeout: 60_000 }, () => {
       .map((entry) => entry.payload as { revision: number; stateMode: string; ops?: unknown[] })
       .filter((payload) => payload.revision >= 2);
     expect(commits.map((payload) => payload.stateMode)).toEqual(["delta", "delta", "delta"]);
+    await pumpUntil(
+      hub,
+      () => c.getStateModeDiagnostics().revision === a.getStateModeDiagnostics().revision,
+      "c converges",
+    );
     expect(b.getCanonicalState()?.state).toEqual(a.getCanonicalState()?.state);
     expect(c.getCanonicalState()?.state).toEqual(a.getCanonicalState()?.state);
     expect((a.getCanonicalState()?.state as { count: number } | null)?.count).toBe(3);
@@ -2469,6 +2474,7 @@ describe("state deltas over the transport", { timeout: 60_000 }, () => {
     );
     const after = c.dispatch({ type: "bump", payload: {} }, "post-0");
     await pumpUntil(hub, () => b.getStateModeDiagnostics().revision === 4, "post-migration delta");
+    await pumpUntil(hub, () => c.getStateModeDiagnostics().revision === 4, "c applies the delta");
     await after;
     expect((b.getCanonicalState()?.state as { count: number } | null)?.count).toBe(3);
     expect(c.getCanonicalState()?.state).toEqual(b.getCanonicalState()?.state);
