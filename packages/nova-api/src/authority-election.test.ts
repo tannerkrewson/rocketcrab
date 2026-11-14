@@ -1482,8 +1482,9 @@ describe("incremental action history over the transport", { timeout: 60_000 }, (
     expect(b.getStateModeDiagnostics().revision).toBe(2);
     expect(b.getCanonicalState()?.state).toEqual({ count: 1, markers: ["dup"] });
 
-    // Well after migration: more than the window of new actions, each a
-    // delta, then a duplicate of the most recent one is still rejected.
+    // Well after migration: more actions than the window, each a delta. The
+    // duplicate checked is the most recent one, which is always still in the
+    // window; the eviction boundary itself is covered separately.
     let lastId = "";
     for (let i = 0; i < STATE_WINDOW_PROBE; i += 1) {
       lastId = `p${i}`;
@@ -1630,5 +1631,301 @@ describe("silent authority", { timeout: 60_000 }, () => {
     expect(a.getCanonicalState()?.state).toEqual({ count: 1, markers: ["silent"] });
     expect(b.getCanonicalState()?.state).toEqual({ count: 1, markers: ["silent"] });
     expect(a.getStateModeDiagnostics().revision).toBe(2);
+  });
+});
+
+/**
+ * Drop the next transport send matching `match` (a lost message). Returns a
+ * counter of dropped sends.
+ */
+function dropNextMatching(
+  transport: NovaSession["transport"],
+  match: (options: Parameters<NovaSession["transport"]["send"]>[0]) => boolean,
+): { dropped: number } {
+  const send = transport.send.bind(transport);
+  const counter = { dropped: 0 };
+  transport.send = (options: Parameters<NovaSession["transport"]["send"]>[0]) => {
+    if (counter.dropped === 0 && match(options)) {
+      counter.dropped += 1;
+      return Promise.resolve();
+    }
+    return send(options);
+  };
+  return counter;
+}
+
+function payloadOf(options: Parameters<NovaSession["transport"]["send"]>[0]): {
+  type?: string;
+  historyMode?: string;
+} {
+  return options.payload as { type?: string; historyMode?: string };
+}
+
+describe("fan-out review fixes", { timeout: 60_000 }, () => {
+  it("a dispatch the game saw time out is never committed by a late copy", async () => {
+    const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+    const [a, , c] = trio(sessions);
+    // The link from c drops every dispatch for 15 s (longer than the deadline).
+    let blackhole = true;
+    const send = c.transport.send.bind(c.transport);
+    c.transport.send = (options: Parameters<NovaSession["transport"]["send"]>[0]) => {
+      if (blackhole && payloadOf(options).type === "action.dispatch") return Promise.resolve();
+      return send(options);
+    };
+    let outcome = "pending";
+    const dispatched = c.client.dispatch({ type: "mark", payload: { marker: "late" } }).then(
+      () => {
+        outcome = "accepted";
+      },
+      (error: unknown) => {
+        outcome = String((error as { code?: string }).code);
+      },
+    );
+    await pump(hub);
+    await advanceWithPumps(hub, 15_000);
+    expect(outcome).toBe("timed_out");
+    await dispatched;
+
+    // The link recovers. No copy may now commit: the deadline has passed.
+    blackhole = false;
+    // Long enough for several retry cycles to come and go after the link recovers.
+    await advanceWithPumps(hub, 15_000);
+    expect(a.getStateModeDiagnostics().revision).toBe(1);
+    expect(a.getCanonicalState()?.state).toEqual({ count: 0, markers: [] });
+  });
+
+  it("a gap with no further commits is repaired by the authority's heartbeat", async () => {
+    const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    // The broadcast of commit 2 never leaves: b and c miss it, and nothing
+    // else commits, so no delta arrives to expose the gap.
+    const drop = dropNextMatching(
+      a.transport,
+      (options) =>
+        payloadOf(options).type === "state.snapshot" && options.targetConnectionId === undefined,
+    );
+    const missed = c.client.dispatch({ type: "mark", payload: { marker: "missed" } });
+    await pumpUntil(hub, () => drop.dropped === 1, "commit 2 broadcast dropped");
+    await missed;
+    await advanceWithPumps(hub, 1_000);
+    await pumpUntil(
+      hub,
+      () =>
+        b.getStateModeDiagnostics().revision === 2 &&
+        c.getStateModeDiagnostics().revision === 2 &&
+        b.getStateModeDiagnostics().processedActionCount === 1 &&
+        c.getStateModeDiagnostics().processedActionCount === 1,
+      "heartbeat-driven repair",
+    );
+    expect(b.getCanonicalState()?.state).toEqual({ count: 1, markers: ["missed"] });
+  });
+
+  it("a lost resync reply is retried after the window, and the history recovers", async () => {
+    const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    const served = recordInbound(a);
+    const dropCommit2 = dropNextMatching(
+      a.transport,
+      (options) =>
+        payloadOf(options).type === "state.snapshot" && options.targetConnectionId === undefined,
+    );
+    const missed = c.client.dispatch({ type: "mark", payload: { marker: "missed" } });
+    await pumpUntil(hub, () => dropCommit2.dropped === 1, "commit 2 dropped");
+    await missed;
+    // The first full snapshot the authority sends b is lost on the way back.
+    const dropReply = dropNextMatching(
+      a.transport,
+      (options) =>
+        payloadOf(options).type === "state.snapshot" &&
+        payloadOf(options).historyMode === "full" &&
+        options.targetConnectionId === b.transport.selfConnectionId,
+    );
+    const after = c.dispatch(
+      { type: "mark", payload: { marker: "after" }, baseRevision: 2 },
+      "after-gap",
+    );
+    await pumpUntil(hub, () => dropReply.dropped === 1, "resync reply to b dropped");
+    await after;
+    // The request is still outstanding; the next heartbeat after the window asks again.
+    await advanceWithPumps(hub, 1_500);
+    await pumpUntil(
+      hub,
+      () =>
+        b.getStateModeDiagnostics().revision === 3 &&
+        b.getStateModeDiagnostics().processedActionCount ===
+          a.getStateModeDiagnostics().processedActionCount,
+      "b recovers after the retried resync",
+    );
+    const fromB = served.filter(
+      (entry) =>
+        entry.type === "state.resync" &&
+        (entry.payload as { senderMemberId?: string }).senderMemberId === "member-b",
+    );
+    expect(fromB.length).toBeGreaterThanOrEqual(2);
+    expect(b.getCanonicalState()?.state).toEqual({ count: 2, markers: ["missed", "after"] });
+  });
+
+  it("after migration a replay with the original base is acknowledged as accepted", async () => {
+    const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    await c.dispatch({ type: "mark", payload: { marker: "dup" }, baseRevision: 1 }, "dup-1");
+    await pumpUntil(hub, () => b.getStateModeDiagnostics().revision === 2, "dup-1 commits");
+    await a.leave();
+    await settleElection(hub);
+    await pumpUntil(
+      hub,
+      () =>
+        b.getStateModeDiagnostics().authorityMemberId === "member-b" &&
+        c.getStateModeDiagnostics().authorityMemberId === "member-b",
+      "migration to member-b",
+    );
+    const acks: string[] = [];
+    c.onSessionEvent((event) => {
+      if (event.type === "actionAck" && event.ack.actionId === "dup-1") acks.push(event.ack.status);
+    });
+    // A retry carries the original base (1), which is stale for the current revision.
+    await c.dispatch({ type: "mark", payload: { marker: "dup" }, baseRevision: 1 }, "dup-1");
+    await pumpUntil(hub, () => acks.length > 0, "replay acknowledged");
+    expect(acks).toEqual(["accepted"]);
+    expect(b.getStateModeDiagnostics().revision).toBe(2);
+  });
+
+  it("the first broadcast after migration is a full snapshot", async () => {
+    const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    const inbound = recordInbound(c);
+    await a.leave();
+    await settleElection(hub);
+    await pumpUntil(
+      hub,
+      () =>
+        b.getStateModeDiagnostics().authorityMemberId === "member-b" &&
+        c.getStateModeDiagnostics().authorityMemberId === "member-b",
+      "migration to member-b",
+    );
+    const fromB = inbound.filter(
+      (entry) =>
+        entry.type === "state.snapshot" &&
+        (entry.payload as { senderMemberId?: string }).senderMemberId === "member-b",
+    );
+    expect(fromB.length).toBeGreaterThan(0);
+    expect((fromB[0]?.payload as { historyMode?: string }).historyMode).toBe("full");
+  });
+
+  it("a full snapshot replaces the window: an ID the sender does not hold is forgotten", async () => {
+    const { engine, host } = makeEngine("member-b");
+    await seedFollower(engine, 1, { count: 0 });
+    const hash1 = await stateHashOf({ count: 0 });
+    engine.handleSnapshot({
+      revision: 2,
+      stateHash: await stateHashOf({ count: 1 }),
+      term: 1,
+      authorityMemberId: "member-a",
+      historyMode: "increment",
+      baseStateHash: hash1,
+      processedActionIds: ["discarded"],
+      state: { count: 1 },
+      senderMemberId: "member-a",
+    });
+    expect(engine.processedActionIds()).toEqual(["discarded"]);
+    engine.handleSnapshot({
+      revision: 3,
+      stateHash: await stateHashOf({ count: 2 }),
+      term: 1,
+      authorityMemberId: "member-a",
+      historyMode: "full",
+      processedActionIds: ["kept"],
+      state: { count: 2 },
+      senderMemberId: "member-a",
+    });
+    expect(engine.processedActionIds()).toEqual(["kept"]);
+    expect(host.resyncs).toHaveLength(0);
+  });
+
+  it("an increment on another lineage is a gap even at the next revision; a same revision is a duplicate", async () => {
+    const { engine, host } = makeEngine("member-b");
+    await seedFollower(engine, 1, { count: 0 });
+    const hash1 = await stateHashOf({ count: 0 });
+    const hash2 = await stateHashOf({ count: 1 });
+    // Same revision, same hash: a duplicate, not a gap.
+    engine.handleSnapshot({
+      revision: 1,
+      stateHash: hash1,
+      term: 1,
+      authorityMemberId: "member-a",
+      historyMode: "increment",
+      baseStateHash: null,
+      processedActionIds: [],
+      state: { count: 0 },
+      senderMemberId: "member-a",
+    });
+    expect(host.resyncs).toHaveLength(0);
+    // Next revision, but built on a state we do not hold: a gap.
+    engine.handleSnapshot({
+      revision: 2,
+      stateHash: hash2,
+      term: 1,
+      authorityMemberId: "member-a",
+      historyMode: "increment",
+      baseStateHash: "f".repeat(64),
+      processedActionIds: ["x"],
+      state: { count: 1 },
+      senderMemberId: "member-a",
+    });
+    expect(host.resyncs).toHaveLength(1);
+  });
+
+  it("the pending-history bound falls back to a full broadcast", async () => {
+    const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    const inbound = recordInbound(b);
+    // Stale dispatches are rejected without a commit, so their IDs pile up
+    // as pending history until the bound is exceeded.
+    for (let i = 0; i < STATE_WINDOW_LIMIT + 5; i += 1) {
+      await c.dispatch(
+        { type: "mark", payload: { marker: `stale-${i}` }, baseRevision: 0 },
+        `stale-${i}`,
+      );
+    }
+    await pump(hub);
+    await c.dispatch({ type: "mark", payload: { marker: "valid" }, baseRevision: 1 }, "valid");
+    await pumpUntil(hub, () => b.getStateModeDiagnostics().revision === 2, "valid commits");
+    const commit = inbound.find(
+      (entry) =>
+        entry.type === "state.snapshot" && (entry.payload as { revision?: number }).revision === 2,
+    );
+    const payload = commit?.payload as { historyMode?: string; processedActionIds?: string[] };
+    expect(payload.historyMode).toBe("full");
+    expect(payload.processedActionIds ?? []).toContain("valid");
+    expect(a.getStateModeDiagnostics().revision).toBe(2);
+  });
+
+  it("the dedup window is exactly the last 256 IDs: the oldest is still recognised, then evicted", async () => {
+    const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    for (let i = 0; i < STATE_WINDOW_LIMIT; i += 1) {
+      await c.dispatch(
+        { type: "mark", payload: { marker: `w${i}` }, baseRevision: i + 1 },
+        `w${i}`,
+      );
+      await pumpUntil(hub, () => b.getStateModeDiagnostics().revision === i + 2, `w${i} commits`);
+    }
+    expect(b.getStateModeDiagnostics().processedActionCount).toBe(STATE_WINDOW_LIMIT);
+    // The oldest ID (w0) is still in the window: its replay is acknowledged, not re-applied.
+    await c.dispatch({ type: "mark", payload: { marker: "w0" }, baseRevision: 1 }, "w0");
+    await pump(hub);
+    expect(a.getStateModeDiagnostics().revision).toBe(STATE_WINDOW_LIMIT + 1);
+    // One more action evicts w0: the window is now exactly the newest 256 IDs.
+    await c.dispatch(
+      { type: "mark", payload: { marker: "w-extra" }, baseRevision: STATE_WINDOW_LIMIT + 1 },
+      "w-extra",
+    );
+    await pumpUntil(
+      hub,
+      () => b.getStateModeDiagnostics().revision === STATE_WINDOW_LIMIT + 2,
+      "extra commits",
+    );
+    expect(b.getStateModeDiagnostics().processedActionCount).toBe(STATE_WINDOW_LIMIT);
+    expect(c.getStateModeDiagnostics().processedActionCount).toBe(STATE_WINDOW_LIMIT);
   });
 });

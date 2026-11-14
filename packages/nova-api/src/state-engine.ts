@@ -118,6 +118,8 @@ export interface StateSnapshotEnvelope {
   readonly authorityMemberId: string;
   /** `full`: the whole dedup window. `increment`: only IDs added since revision - 1. */
   readonly historyMode: "full" | "increment";
+  /** For increments: the state hash they apply on top of (null for full). */
+  readonly baseStateHash: string | null;
   readonly processedActionIds: readonly string[];
   readonly state: unknown;
 }
@@ -263,6 +265,7 @@ interface RestoreBackup {
   readonly canonical: unknown;
   readonly revision: number;
   readonly stateHash: string | null;
+  readonly history: ReadonlyMap<string, ProcessedActionRecord>;
 }
 
 /** Serialize a value and measure its size in bytes (UTF-8). */
@@ -341,7 +344,16 @@ export class NovaStateEngine {
    * Action IDs decided locally since this authority's last broadcast. Only the
    * sitting authority fills it; the next broadcast drains it.
    */
-  private pendingHistoryIds: string[] = [];
+  private pendingHistoryIds = new Set<string>();
+  /** Set when pending IDs exceed the bound: the next broadcast is full. */
+  private pendingHistoryOverflow = false;
+  /** State hash of this engine's last broadcast (the base of the next increment). */
+  private lastBroadcastStateHash: string | null = null;
+  /**
+   * False from a detected gap until a full snapshot is applied. A follower
+   * with an incomplete window asks again on each heartbeat until it is repaired.
+   */
+  private historyComplete = true;
   /** Revision of this engine's last broadcast snapshot (authority side). */
   private lastBroadcastRevision: number | null = null;
   /** Receiver side: a resync request is in flight until this time (ms). */
@@ -696,6 +708,7 @@ export class NovaStateEngine {
     term: number;
     authorityMemberId: string;
     historyMode: "full" | "increment";
+    baseStateHash?: string | null;
     processedActionIds: readonly string[];
     state: unknown;
     /** The transport sender (for targeted convergence re-sends). */
@@ -750,10 +763,19 @@ export class NovaStateEngine {
         return;
       }
     }
-    // An increment is continuous only from the revision it was built on
-    // (revision - 1). Any other base means commits were missed, so their
+    const incremental = message.historyMode === "increment";
+    if (incremental && message.revision === this.revision && message.stateHash === this.stateHash) {
+      return; // a duplicate of the state we hold; its IDs are already recorded
+    }
+    // An increment continues from the state it was built on: the next
+    // revision, on the same lineage (its base hash is our hash). Anything
+    // else means commits were missed or we are on another lineage, so their
     // dedup IDs are absent and a full snapshot must be requested.
-    const gap = message.historyMode === "increment" && message.revision !== this.revision + 1;
+    const gap =
+      incremental &&
+      message.revision > this.revision &&
+      (message.revision !== this.revision + 1 ||
+        (message.baseStateHash ?? null) !== this.stateHash);
     this.canonical = message.state;
     this.revision = message.revision;
     this.stateHash = message.stateHash;
@@ -770,6 +792,15 @@ export class NovaStateEngine {
     ) {
       this.authorityElect = message.authorityMemberId;
     }
+    if (!incremental) {
+      // A full snapshot carries the sender's whole window: it replaces ours.
+      // Keeping IDs the sender does not hold would let an action the sender
+      // discarded still be acknowledged as accepted.
+      this.history.clear();
+      this.historyComplete = true;
+      // A full snapshot answers any outstanding resync request.
+      this.resyncOutstandingUntil = 0;
+    }
     for (const actionId of message.processedActionIds) {
       if (!this.history.has(actionId)) {
         this.storeHistory(actionId, {
@@ -780,11 +811,8 @@ export class NovaStateEngine {
         });
       }
     }
-    if (message.historyMode === "full") {
-      // A full snapshot answers any outstanding resync request.
-      this.resyncOutstandingUntil = 0;
-    }
     if (gap) {
+      this.historyComplete = false;
       this.requestResync();
     }
     if (this.authorityMemberId === this.selfMemberId && this.restoreDone) {
@@ -810,6 +838,10 @@ export class NovaStateEngine {
     if (requester === this.selfMemberId || !this.host.isConnected(requester)) return;
     if (request.knownRevision > this.revision) return; // impossible: ignore
     const now = this.now();
+    // Forget requesters whose window has passed, so the map stays bounded.
+    for (const [member, at] of this.resyncServedAt) {
+      if (now - at >= stateResyncMinIntervalMs) this.resyncServedAt.delete(member);
+    }
     const servedAt = this.resyncServedAt.get(requester);
     if (servedAt !== undefined && now - servedAt < stateResyncMinIntervalMs) return;
     this.resyncServedAt.set(requester, now);
@@ -894,6 +926,16 @@ export class NovaStateEngine {
     }
     // Same term from a different member: the announcement reconciliation
     // decides the authority; the heartbeat is ignored.
+    if (
+      message.authorityMemberId !== this.selfMemberId &&
+      message.authorityMemberId === this.authorityMemberId &&
+      (!this.historyComplete || message.stateRevision > this.revision)
+    ) {
+      // Heartbeats say how far the authority has got. A follower that is
+      // behind, or whose history has a gap, asks again (one request per window,
+      // so an expired window is the retry after a lost reply).
+      this.requestResync();
+    }
   }
 
   /**
@@ -1054,11 +1096,23 @@ export class NovaStateEngine {
     // The first broadcast as authority is full: this engine's cursor from an
     // earlier term says nothing about what the current shells hold.
     this.lastBroadcastRevision = null;
-    this.pendingHistoryIds = [];
+    this.pendingHistoryIds = new Set();
+    this.pendingHistoryOverflow = false;
+    if (!this.historyComplete) {
+      // The elected authority's window has a gap. It still serves (a full
+      // broadcast repairs the shells that hold a complete window); a follower
+      // that is ahead of it cannot be repaired here.
+      console.warn(`nova: ${this.selfMemberId} became authority with an incomplete action history`);
+    }
     this.restoreBackup =
       this.canonical === null
         ? null
-        : { canonical: this.canonical, revision: this.revision, stateHash: this.stateHash };
+        : {
+            canonical: this.canonical,
+            revision: this.revision,
+            stateHash: this.stateHash,
+            history: new Map(this.history),
+          };
     this.host.emit({
       type: "authorityChanged",
       authorityMemberId: this.selfMemberId,
@@ -1109,6 +1163,10 @@ export class NovaStateEngine {
         this.canonical = backup.canonical;
         this.revision = backup.revision;
         this.stateHash = backup.stateHash;
+        this.history.clear();
+        for (const [actionId, record] of backup.history) {
+          this.history.set(actionId, record);
+        }
         this.host.emit({
           type: "stateError",
           code: "invalid_snapshot",
@@ -1269,6 +1327,7 @@ export class NovaStateEngine {
       term: this.term,
       authorityMemberId: this.authorityMemberId ?? this.selfMemberId,
       historyMode,
+      baseStateHash: historyMode === "increment" ? this.lastBroadcastStateHash : null,
       processedActionIds:
         historyMode === "full" ? this.processedActionIds() : [...this.pendingHistoryIds],
       state: this.canonical,
@@ -1284,10 +1343,13 @@ export class NovaStateEngine {
     const increment =
       allowIncrement &&
       this.lastBroadcastRevision === this.revision - 1 &&
-      this.pendingHistoryIds.length <= Math.min(this.historyLimit, stateHistoryLimit);
+      !this.pendingHistoryOverflow &&
+      this.pendingHistoryIds.size <= Math.min(this.historyLimit, stateHistoryLimit);
     this.host.sendSnapshot(this.snapshotEnvelope(increment ? "increment" : "full"));
     this.lastBroadcastRevision = this.revision;
-    this.pendingHistoryIds = [];
+    this.lastBroadcastStateHash = this.stateHash;
+    this.pendingHistoryIds.clear();
+    this.pendingHistoryOverflow = false;
   }
 
   private lowestEligibleMemberId(): string | null {
@@ -1645,8 +1707,13 @@ export class NovaStateEngine {
 
   /** Record an action decided locally: it joins the next broadcast's history. */
   private remember(actionId: string, record: ProcessedActionRecord): void {
-    if (!this.pendingHistoryIds.includes(actionId)) {
-      this.pendingHistoryIds.push(actionId);
+    if (!this.pendingHistoryOverflow) {
+      this.pendingHistoryIds.add(actionId);
+      if (this.pendingHistoryIds.size > this.historyLimit) {
+        // Too many local decisions to ship as an increment: the next broadcast is full.
+        this.pendingHistoryIds.clear();
+        this.pendingHistoryOverflow = true;
+      }
     }
     this.storeHistory(actionId, record);
   }

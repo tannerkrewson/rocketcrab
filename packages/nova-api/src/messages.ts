@@ -144,6 +144,7 @@ export function buildStateSnapshotMessage(
     term: number;
     authorityMemberId: string;
     historyMode: "full" | "increment";
+    baseStateHash?: string;
     processedActionIds: readonly string[];
     state: unknown;
   },
@@ -158,6 +159,7 @@ export function buildStateSnapshotMessage(
       term: input.term,
       authorityMemberId: input.authorityMemberId,
       historyMode: input.historyMode,
+      ...(input.baseStateHash !== undefined ? { baseStateHash: input.baseStateHash } : {}),
       processedActionIds: input.processedActionIds,
       state: input.state,
     }),

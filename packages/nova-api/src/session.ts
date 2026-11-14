@@ -253,7 +253,16 @@ interface BufferedDispatch {
   readonly type: string;
   readonly payload: unknown;
   readonly baseRevision: number;
+  /**
+   * When this dispatch stops being valid, fixed at first dispatch. Every send
+   * carries this same expiry (never a fresh one), so a late copy cannot commit
+   * an action the game was already told timed out.
+   */
+  readonly deadlineMs: number;
 }
+
+/** Interval between re-sends of an unacknowledged dispatch (half its lifetime). */
+const dispatchRetryIntervalMs = actionTimeoutMs / 2;
 
 /** Create a session over a transport and its game-facing client. */
 export function createNovaSession(options: NovaSessionOptions): NovaSession {
@@ -661,6 +670,7 @@ export class NovaSession implements NovaClientBackend {
       type: action.type,
       payload: action.payload,
       baseRevision,
+      deadlineMs: Date.now() + actionTimeoutMs,
     };
     if (authority === this.selfPlayer.id) {
       // Local dispatch on the authority session (no transport round trip).
@@ -981,6 +991,7 @@ export class NovaSession implements NovaClientBackend {
         term: this.engine.getTerm(),
         authorityMemberId: this.selfPlayer.id,
         historyMode: "full",
+        baseStateHash: null,
         processedActionIds: this.engine.processedActionIds(),
         state: this.engine.getCanonicalState(),
       },
@@ -1129,6 +1140,7 @@ export class NovaSession implements NovaClientBackend {
           term: peerMessage.term,
           authorityMemberId: peerMessage.authorityMemberId,
           historyMode: peerMessage.historyMode,
+          baseStateHash: peerMessage.baseStateHash ?? null,
           processedActionIds: peerMessage.processedActionIds,
           state: peerMessage.state,
           senderMemberId: peerMessage.senderMemberId,
@@ -1282,7 +1294,6 @@ export class NovaSession implements NovaClientBackend {
     }
     if (authority === null) return; // still electing; keep buffered
     const seq = this.takeSeq();
-    const now = Date.now();
     void this.sendProtocol(
       (base) =>
         buildActionDispatchMessage(base, {
@@ -1291,7 +1302,7 @@ export class NovaSession implements NovaClientBackend {
           baseRevision: entry.baseRevision,
           actionType: entry.type,
           payload: entry.payload,
-          expiresAtMs: now + actionTimeoutMs,
+          expiresAtMs: entry.deadlineMs,
         }),
       { seq, targetMemberId: authority },
     ).catch((error: unknown) => this.emitError(error));
@@ -1309,7 +1320,7 @@ export class NovaSession implements NovaClientBackend {
     // Buffered entries become in-flight here and are sent exactly once: the
     // second loop covers everything in flight, including them.
     for (const entry of this.dispatchBuffer.splice(0)) {
-      this.trackInflight(entry);
+      if (Date.now() < entry.deadlineMs) this.trackInflight(entry);
     }
     for (const entry of this.inflightDispatches.values()) {
       this.sendBufferedDispatch(entry);
@@ -1317,9 +1328,11 @@ export class NovaSession implements NovaClientBackend {
   }
 
   /**
-   * Hold a dispatch as in flight until its ack arrives, and re-send it to the
-   * current authority view if no ack comes within `actionTimeoutMs`. The
-   * authority deduplicates, so a re-send can never apply the action twice.
+   * Hold a dispatch as in flight until its ack arrives. While it is unacked,
+   * re-send it to the current authority view every `dispatchRetryIntervalMs`,
+   * and stop at its deadline. The authority deduplicates, so a re-send can
+   * never apply the action twice, and the fixed deadline stops a late copy
+   * from committing after the game was told the action timed out.
    */
   private trackInflight(entry: BufferedDispatch): void {
     this.inflightDispatches.set(entry.actionId, entry);
@@ -1332,9 +1345,14 @@ export class NovaSession implements NovaClientBackend {
       this.dispatchRetryTimers.delete(actionId);
       const entry = this.inflightDispatches.get(actionId);
       if (entry === undefined || this.disposed || this.ended) return;
+      if (Date.now() >= entry.deadlineMs) {
+        // Expired: stop, so no copy can be sent (or applied) after the deadline.
+        this.inflightDispatches.delete(actionId);
+        return;
+      }
       this.sendBufferedDispatch(entry);
       this.armDispatchRetry(actionId);
-    }, actionTimeoutMs);
+    }, dispatchRetryIntervalMs);
     this.dispatchRetryTimers.set(actionId, timer);
   }
 
@@ -1473,6 +1491,7 @@ export class NovaSession implements NovaClientBackend {
           term: snapshot.term,
           authorityMemberId: snapshot.authorityMemberId,
           historyMode: snapshot.historyMode,
+          ...(snapshot.baseStateHash !== null ? { baseStateHash: snapshot.baseStateHash } : {}),
           processedActionIds: snapshot.processedActionIds,
           state: snapshot.state,
         }),
