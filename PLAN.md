@@ -397,6 +397,29 @@ passed 4/4 (Podman Playwright, 2026-11-13).
      a reassessment of the earlier feature-fit recommendation, not a completed
      adoption or a claim that no possible authority protocol can use the slot.
 
+     **Real-network proof (2026-11-13).** `e2e-trystero/scale-e2e/context-proof.spec.js`
+     runs only through `e2e-trystero/context.playwright.config.js` (not in the
+     scale config or any default suite) against the test-only scale relay on
+     127.0.0.1:5199. The admitted Nova peer is the real `TrysteroTransport`
+     harness page; the unadmitted writer is a raw Trystero page with
+     `identity: "none"` that never passes Nova admission. Both tests passed in
+     all 3 runs (run 1, 2, 3; 2/2 each time, about 5 s per run). Test 1: the raw
+     page's first `makeState("proof.creator")` write, `"false-creator"`, stuck on
+     the admitted peer's slot even though that peer's roster never admitted the
+     writer; an admitted joiner's later `"real-creator"` write did not replace
+     it. Test 2: a value written by an author that then left reached a peer that
+     stayed in the room, and a late joiner, plus that joiner's leave-and-rejoin,
+     both read it. **Not tested:** mapping to Nova member IDs; concurrent first
+     values over the network (the joiner's own final value was not asserted);
+     survival after every holder has left; true transport drops rather than
+     leave/rejoin; the production signaling service; the content of the victim's
+     error (only a non-empty `errors` list was asserted).
+     **Conclusion:** an unadmitted peer can set the first value of the slot and
+     it sticks on an admitted Nova peer, so the slot bypasses Nova's admission
+     boundary. Adoption for creator context is **not safe without an additional
+     admission check**; the existing code is kept, and no application code
+     changed.
+
    - **Action progress — already adopted for transfer; don't replace the
      coordinator wholesale.** `trystero-transport.ts` uses action request/receive
      progress and `game-source.ts` already delegates chunking, backpressure,
