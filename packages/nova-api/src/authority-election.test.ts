@@ -2267,3 +2267,238 @@ describe(
     });
   },
 );
+
+/**
+ * A game whose state is mostly static (a padded table) with one changing
+ * score per actor, so a delta is far smaller than the full state. `reset`
+ * replaces everything, which a delta cannot beat.
+ */
+function deltaGameHandlers(): NovaStateHandlers {
+  const padKeys = Array.from({ length: 40 }, (_, i) => `pad-${i}`);
+  return {
+    createInitialState: () => ({
+      count: 0,
+      scores: {} as Record<string, number>,
+      table: Object.fromEntries(padKeys.map((key) => [key, "static value that never changes"])),
+    }),
+    actions: {
+      bump(draft: { count: number; scores: Record<string, number> }, context) {
+        const actor = context.actor?.id ?? "unknown";
+        draft.count += 1;
+        draft.scores[actor] = (draft.scores[actor] ?? 0) + 1;
+      },
+      reset(draft: Record<string, unknown>) {
+        for (const key of Object.keys(draft)) delete draft[key];
+        draft.reset = true;
+      },
+    },
+  };
+}
+
+async function startDeltaParty(hub: InMemoryTransportHub, sessions: NovaSession[]): Promise<void> {
+  for (const session of sessions) {
+    session.client.defineGame({ title: "Delta Game", mode: "state", ...deltaGameHandlers() });
+    await session.join();
+  }
+  await pump(hub);
+  for (const session of sessions) {
+    session.start();
+  }
+  await pumpUntil(
+    hub,
+    () =>
+      sessions.every(
+        (session) =>
+          session.isStarted() &&
+          session.getStateModeDiagnostics().authorityMemberId !== null &&
+          session.getStateModeDiagnostics().revision === 1,
+      ),
+    "delta party start",
+  );
+}
+
+async function makeDeltaParty(memberIds: string[]): Promise<{
+  hub: InMemoryTransportHub;
+  sessions: NovaSession[];
+}> {
+  const hub = newTestHub(`delta-${memberIds.join("-")}`);
+  const sessions = memberIds.map((id) => makeSession(hub, id));
+  await startDeltaParty(hub, sessions);
+  return { hub, sessions };
+}
+
+/** Rewrite the next outbound state snapshot with `change` (a corrupted or stale delta). */
+function rewriteNextSnapshot(
+  transport: NovaSession["transport"],
+  change: (payload: Record<string, unknown>) => Record<string, unknown>,
+): { rewritten: number } {
+  const send = transport.send.bind(transport);
+  const counter = { rewritten: 0 };
+  transport.send = (options: Parameters<NovaSession["transport"]["send"]>[0]) => {
+    const payload = options.payload as Record<string, unknown>;
+    if (
+      counter.rewritten === 0 &&
+      payload.type === "state.snapshot" &&
+      payload.stateMode === "delta"
+    ) {
+      counter.rewritten += 1;
+      return send({ ...options, payload: change(payload) as typeof options.payload });
+    }
+    return send(options);
+  };
+  return counter;
+}
+
+describe("state deltas over the transport", { timeout: 60_000 }, () => {
+  it("deltas are applied in order and the replicas converge", async () => {
+    const { hub, sessions } = await makeDeltaParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    const inbound = recordInbound(b);
+    for (const [index] of [0, 1, 2].entries()) {
+      const applied = c.dispatch({ type: "bump", payload: {} }, `bump-${index}`);
+      await pumpUntil(
+        hub,
+        () => b.getStateModeDiagnostics().revision === 2 + index,
+        `bump ${index}`,
+      );
+      await applied;
+    }
+    const commits = inbound
+      .filter((entry) => entry.type === "state.snapshot")
+      .map((entry) => entry.payload as { revision: number; stateMode: string; ops?: unknown[] })
+      .filter((payload) => payload.revision >= 2);
+    expect(commits.map((payload) => payload.stateMode)).toEqual(["delta", "delta", "delta"]);
+    expect(b.getCanonicalState()?.state).toEqual(a.getCanonicalState()?.state);
+    expect(c.getCanonicalState()?.state).toEqual(a.getCanonicalState()?.state);
+    expect((a.getCanonicalState()?.state as { count: number }).count).toBe(3);
+  });
+
+  it("a delta with a wrong base triggers a resync and the replica recovers", async () => {
+    const { hub, sessions } = await makeDeltaParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    const served = recordInbound(a);
+    const corrupt = rewriteNextSnapshot(a.transport, (payload) => ({
+      ...payload,
+      baseStateHash: "f".repeat(64),
+    }));
+    const first = c.dispatch({ type: "bump", payload: {} }, "bump-0");
+    await pumpUntil(hub, () => corrupt.rewritten === 1, "delta rewritten");
+    await first;
+    await pumpUntil(
+      hub,
+      () =>
+        b.getStateModeDiagnostics().revision === 2 && served.some((e) => e.type === "state.resync"),
+      "resync after the wrong base",
+    );
+    await pumpUntil(
+      hub,
+      () =>
+        b.getStateModeDiagnostics().processedActionCount ===
+        a.getStateModeDiagnostics().processedActionCount,
+      "b repaired",
+    );
+    expect(b.getCanonicalState()?.state).toEqual(a.getCanonicalState()?.state);
+  });
+
+  it("a corrupted delta fails the hash check, resyncs, and the replica recovers", async () => {
+    const { hub, sessions } = await makeDeltaParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    const served = recordInbound(a);
+    // The ops are changed but the sender's hash is kept: the receiver must detect it.
+    const corrupt = rewriteNextSnapshot(a.transport, (payload) => ({
+      ...payload,
+      ops: [{ op: "set", path: ["count"], value: 999 }],
+    }));
+    const first = c.dispatch({ type: "bump", payload: {} }, "bump-0");
+    await pumpUntil(hub, () => corrupt.rewritten === 1, "delta corrupted");
+    await first;
+    await pumpUntil(
+      hub,
+      () =>
+        served.some(
+          (e) =>
+            e.type === "state.resync" &&
+            (e.payload as { senderMemberId?: string }).senderMemberId === "member-b",
+        ),
+      "b asks for a repair",
+    );
+    await pumpUntil(
+      hub,
+      () =>
+        b.getStateModeDiagnostics().revision === 2 && b.getCanonicalState()?.state !== undefined,
+      "b recovers",
+    );
+    expect(b.getCanonicalState()?.state).toEqual(a.getCanonicalState()?.state);
+    expect((b.getCanonicalState()?.state as { count: number }).count).toBe(1);
+  });
+
+  it("a large change falls back to a full snapshot", async () => {
+    const { hub, sessions } = await makeDeltaParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    const inbound = recordInbound(b);
+    const applied = c.dispatch({ type: "reset", payload: {} }, "reset-0");
+    await pumpUntil(hub, () => b.getStateModeDiagnostics().revision === 2, "reset commits");
+    await applied;
+    const commit = inbound
+      .map((entry) => entry.payload as { type?: string; revision?: number; stateMode?: string })
+      .find((payload) => payload.type === "state.snapshot" && payload.revision === 2);
+    expect(commit?.stateMode).toBe("full");
+    expect(b.getCanonicalState()?.state).toEqual({ reset: true });
+  });
+
+  it("after migration the replicas stay correct on deltas", async () => {
+    const { hub, sessions } = await makeDeltaParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    for (const [index] of [0, 1].entries()) {
+      const applied = c.dispatch({ type: "bump", payload: {} }, `pre-${index}`);
+      await pumpUntil(
+        hub,
+        () => b.getStateModeDiagnostics().revision === 2 + index,
+        `pre ${index}`,
+      );
+      await applied;
+    }
+    await a.leave();
+    await settleElection(hub);
+    await pumpUntil(
+      hub,
+      () =>
+        b.getStateModeDiagnostics().authorityMemberId === "member-b" &&
+        c.getStateModeDiagnostics().authorityMemberId === "member-b",
+      "migration to member-b",
+    );
+    const after = c.dispatch({ type: "bump", payload: {} }, "post-0");
+    await pumpUntil(hub, () => b.getStateModeDiagnostics().revision === 4, "post-migration delta");
+    await after;
+    expect((b.getCanonicalState()?.state as { count: number }).count).toBe(3);
+    expect(c.getCanonicalState()?.state).toEqual(b.getCanonicalState()?.state);
+  });
+
+  it("a late joiner receives a full state", async () => {
+    const { hub, sessions } = await makeDeltaParty(["member-a", "member-b", "member-c"]);
+    const [a, , c] = trio(sessions);
+    for (const [index] of [0, 1].entries()) {
+      const applied = c.dispatch({ type: "bump", payload: {} }, `late-${index}`);
+      await pumpUntil(
+        hub,
+        () => a.getStateModeDiagnostics().revision === 2 + index,
+        `late ${index}`,
+      );
+      await applied;
+    }
+    const late = makeSession(hub, "member-d");
+    late.client.defineGame({ title: "Delta Game", mode: "state", ...deltaGameHandlers() });
+    const lateInbound = recordInbound(late);
+    await late.join();
+    await pumpUntil(
+      hub,
+      () => late.getStateModeDiagnostics().revision === a.getStateModeDiagnostics().revision,
+      "late joiner catches up",
+    );
+    const catchUp = lateInbound.find((entry) => entry.type === "state.snapshot") as
+      | { payload: { stateMode: string; historyMode: string } }
+      | undefined;
+    expect(catchUp?.payload.stateMode).toBe("full");
+    expect(late.getCanonicalState()?.state).toEqual(a.getCanonicalState()?.state);
+  });
+});

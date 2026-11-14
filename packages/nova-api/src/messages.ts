@@ -146,8 +146,10 @@ export function buildStateSnapshotMessage(
     historyMode: "full" | "increment";
     baseStateHash?: string;
     historyComplete: boolean;
+    stateMode: "full" | "delta";
+    ops?: readonly unknown[];
     processedActionIds: readonly string[];
-    state: unknown;
+    state?: unknown;
   },
 ): PeerMessage {
   return assertPeerMessage(
@@ -162,6 +164,8 @@ export function buildStateSnapshotMessage(
       historyMode: input.historyMode,
       ...(input.baseStateHash !== undefined ? { baseStateHash: input.baseStateHash } : {}),
       historyComplete: input.historyComplete,
+      stateMode: input.stateMode,
+      ...(input.ops !== undefined ? { ops: input.ops } : {}),
       processedActionIds: input.processedActionIds,
       state: input.state,
     }),

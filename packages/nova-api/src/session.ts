@@ -311,6 +311,10 @@ export class NovaSession implements NovaClientBackend {
   private readonly dispatchBuffer: BufferedDispatch[] = [];
   /** Dispatches sent but not yet acked (re-sent when the authority changes). */
   private readonly inflightDispatches = new Map<string, BufferedDispatch>();
+  /** Dispatches waiting for an in-flight state delta to settle. */
+  private readonly deltaWaiters: Array<() => void> = [];
+  /** Protocol messages held while a state delta is being verified, in arrival order. */
+  private readonly deferredProtocolMessages: TransportMessage[] = [];
   /** Ack-timeout re-send timer per in-flight dispatch (cleared on ack). */
   private readonly dispatchRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
   private nextSeq = 0;
@@ -597,6 +601,8 @@ export class NovaSession implements NovaClientBackend {
     this.transportUnsubscribers.length = 0;
     this.outbox.length = 0;
     this.dispatchBuffer.length = 0;
+    this.deferredProtocolMessages.length = 0;
+    for (const resolve of this.deltaWaiters.splice(0)) resolve();
     this.inflightDispatches.clear();
     for (const timer of this.dispatchRetryTimers.values()) {
       clearTimeout(timer);
@@ -661,6 +667,11 @@ export class NovaSession implements NovaClientBackend {
     }
     if (this.engine.isEnded()) {
       throw new NovaError("ended", endedMessage("dispatch"));
+    }
+    if (this.engine.isDeltaPending()) {
+      // The base revision must be the state the game last saw: wait for the
+      // delta in flight to settle, so an action is never stamped with a stale base.
+      await new Promise<void>((resolve) => this.deltaWaiters.push(resolve));
     }
     this.consumeGameBytes(rawPayloadBytes(action));
     const baseRevision = action.baseRevision ?? this.engine.getRevision();
@@ -992,6 +1003,8 @@ export class NovaSession implements NovaClientBackend {
         authorityMemberId: this.selfPlayer.id,
         historyMode: "full",
         baseStateHash: null,
+        stateMode: "full",
+        ops: null,
         historyComplete: this.engine.isHistoryComplete(),
         processedActionIds: this.engine.processedActionIds(),
         state: this.engine.getCanonicalState(),
@@ -1030,6 +1043,12 @@ export class NovaSession implements NovaClientBackend {
   private handleMessage(message: TransportMessage): void {
     if (message.channel !== NOVA_PROTOCOL_CHANNEL) {
       this.handleRawMessage(message);
+      return;
+    }
+    if (this.engine.isDeltaPending()) {
+      // A delta's hash is still being checked: the view and acks that follow
+      // it must not reach the game before the state they belong to.
+      this.deferredProtocolMessages.push(message);
       return;
     }
     const parsed = parsePeerMessage(message.payload);
@@ -1143,6 +1162,8 @@ export class NovaSession implements NovaClientBackend {
           historyMode: peerMessage.historyMode,
           baseStateHash: peerMessage.baseStateHash ?? null,
           historyComplete: peerMessage.historyComplete,
+          stateMode: peerMessage.stateMode,
+          ...(peerMessage.ops !== undefined ? { ops: peerMessage.ops } : {}),
           processedActionIds: peerMessage.processedActionIds,
           state: peerMessage.state,
           senderMemberId: peerMessage.senderMemberId,
@@ -1366,6 +1387,14 @@ export class NovaSession implements NovaClientBackend {
     }
   }
 
+  /** Replay held protocol messages, in order, until another delta is pending. */
+  private drainDeferredProtocolMessages(): void {
+    while (this.deferredProtocolMessages.length > 0 && !this.engine.isDeltaPending()) {
+      const next = this.deferredProtocolMessages.shift();
+      if (next !== undefined) this.handleMessage(next);
+    }
+  }
+
   /** Drop an in-flight dispatch once its ack arrived (any status). */
   private noteActionAck(actionId: string): void {
     this.inflightDispatches.delete(actionId);
@@ -1495,6 +1524,8 @@ export class NovaSession implements NovaClientBackend {
           historyMode: snapshot.historyMode,
           ...(snapshot.baseStateHash !== null ? { baseStateHash: snapshot.baseStateHash } : {}),
           historyComplete: snapshot.historyComplete,
+          stateMode: snapshot.stateMode,
+          ...(snapshot.ops !== null ? { ops: snapshot.ops } : {}),
           processedActionIds: snapshot.processedActionIds,
           state: snapshot.state,
         }),
@@ -1634,6 +1665,11 @@ export class NovaSession implements NovaClientBackend {
         break;
       case "electionStarted":
         // Host/arena diagnostics only (visible through getStateModeDiagnostics).
+        break;
+      case "deltaSettled":
+        // Replay held traffic first, so waiting dispatches see the new revision.
+        this.drainDeferredProtocolMessages();
+        for (const resolve of this.deltaWaiters.splice(0)) resolve();
         break;
       case "historyIncomplete":
         // Host-side diagnostic: a gapped window does not affect the game.

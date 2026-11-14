@@ -70,11 +70,13 @@ import {
   actionPayloadBytes,
   authorityGracePeriodMs,
   authorityHeartbeatIntervalMs,
+  stateDeltaMaxOps,
   stateHistoryLimit,
   stateResyncMinIntervalMs,
   stateSnapshotBytes,
 } from "@rocketcrab/protocol";
 import type { NovaStateExecutor } from "./state-executor";
+import { applyJsonPatch, canonicalJson, diffJson, type JsonDeltaOp } from "./json-delta";
 import { assertStructuredCloneSafe } from "./validation";
 import type {
   NovaActionAck,
@@ -118,8 +120,12 @@ export interface StateSnapshotEnvelope {
   readonly authorityMemberId: string;
   /** `full`: the whole dedup window. `increment`: only IDs added since revision - 1. */
   readonly historyMode: "full" | "increment";
-  /** For increments: the state hash they apply on top of (null for full). */
+  /** For increments and deltas: the state hash they apply on top of (null for full). */
   readonly baseStateHash: string | null;
+  /** `full`: `state` is the whole canonical state. `delta`: `ops` transform the base state. */
+  readonly stateMode: "full" | "delta";
+  /** For deltas: the operations on the base state. Null for full. */
+  readonly ops: readonly JsonDeltaOp[] | null;
   /** The sender's window is complete (a full snapshot with false is merged, not replaced). */
   readonly historyComplete: boolean;
   readonly processedActionIds: readonly string[];
@@ -129,6 +135,26 @@ export interface StateSnapshotEnvelope {
 /** A request for a full snapshot after a gap in the authority's stream (state.resync). */
 export interface StateResyncEnvelope {
   readonly knownRevision: number;
+}
+
+/** One inbound state snapshot, as the session hands it to the engine. */
+export interface InboundSnapshot {
+  readonly revision: number;
+  readonly stateHash: string | null;
+  readonly term: number;
+  readonly authorityMemberId: string;
+  readonly historyMode: "full" | "increment";
+  readonly baseStateHash?: string | null;
+  /** Absent from older senders, which always sent complete windows. */
+  readonly historyComplete?: boolean;
+  /** Absent from older senders, which always sent full states. */
+  readonly stateMode?: "full" | "delta";
+  readonly ops?: readonly JsonDeltaOp[];
+  readonly processedActionIds: readonly string[];
+  /** Present on full snapshots; absent on deltas. */
+  readonly state?: unknown;
+  /** The transport sender (for targeted convergence re-sends). */
+  readonly senderMemberId?: string;
 }
 
 /** One player's view envelope. */
@@ -215,6 +241,8 @@ export type StateEngineEvent =
   | { type: "authorityChanged"; authorityMemberId: string | null; term: number }
   /** A suspicion started an election (host/arena diagnostics). */
   | { type: "electionStarted"; term: number }
+  /** A received delta finished verification (applied or rejected). Host-side: release held traffic. */
+  | { type: "deltaSettled" }
   /**
    * This node became authority with a gapped window. Host-side diagnostic
    * only: the game is not affected, and the window repairs on the next full
@@ -284,7 +312,8 @@ export async function serializedBytes(value: unknown): Promise<number> {
 
 /** SHA-256 hex digest of a value's JSON serialization. */
 export async function stateHashOf(value: unknown): Promise<string> {
-  const bytes = new TextEncoder().encode(JSON.stringify(value));
+  // Canonical encoding: a state rebuilt by patching hashes like the original.
+  const bytes = new TextEncoder().encode(canonicalJson(value));
   const digest = await crypto.subtle.digest("SHA-256", bytes);
   return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
 }
@@ -364,6 +393,10 @@ export class NovaStateEngine {
   private historyComplete = true;
   /** Set once a full snapshot answers the outstanding request; cleared on a new gap. */
   private historyRequestAnswered = false;
+  /** The canonical state of the last broadcast: the base of the next delta. */
+  private lastBroadcastCanonical: unknown = null;
+  /** True while a received delta's hash is being verified (the session holds inbound messages). */
+  private deltaPending = false;
   /** Revision of this engine's last broadcast snapshot (authority side). */
   private lastBroadcastRevision: number | null = null;
   /** Receiver side: a resync request is in flight until this time (ms). */
@@ -718,21 +751,85 @@ export class NovaStateEngine {
    * gated, same-revision conflicts reconciled deterministically, and a
    * deposed/split authority's stale-term state is never adopted).
    */
-  handleSnapshot(message: {
-    revision: number;
-    stateHash: string | null;
-    term: number;
-    authorityMemberId: string;
-    historyMode: "full" | "increment";
-    baseStateHash?: string | null;
-    /** Absent from older senders, which always sent complete windows. */
-    historyComplete?: boolean;
-    processedActionIds: readonly string[];
-    state: unknown;
-    /** The transport sender (for targeted convergence re-sends). */
-    senderMemberId?: string;
-  }): void {
+  handleSnapshot(message: InboundSnapshot): void {
     if (this.disposed) return;
+    if (message.stateMode === "delta") {
+      this.beginDeltaSnapshot(message);
+      return;
+    }
+    this.applySnapshot(message);
+  }
+
+  /**
+   * A delta is applied only on top of the exact state it names (revision and
+   * base hash). The result is hashed and checked against the sender's hash
+   * before anything is adopted. A mismatch, a missing base or an apply error is
+   * a gap: the window is marked incomplete and the existing resync path runs.
+   */
+  private beginDeltaSnapshot(message: InboundSnapshot): void {
+    if (message.term < this.term) return; // a stale term can never win
+    if (message.revision <= this.revision) {
+      // Stale, or a same-revision state we cannot read as a delta: ask for the
+      // full state when it differs from ours.
+      if (message.revision === this.revision && message.stateHash !== this.stateHash) {
+        this.requestRepair();
+      }
+      return;
+    }
+    const base = this.stateHash;
+    if (
+      message.revision !== this.revision + 1 ||
+      message.ops === undefined ||
+      (message.baseStateHash ?? null) !== base ||
+      this.canonical === null
+    ) {
+      this.requestRepair();
+      return;
+    }
+    let next: unknown;
+    try {
+      next = applyJsonPatch(this.canonical, message.ops);
+    } catch {
+      this.requestRepair();
+      return;
+    }
+    const baseRevision = this.revision;
+    this.deltaPending = true;
+    this.stateHashImpl(next).then(
+      (hash) => {
+        this.deltaPending = false;
+        if (!this.disposed) {
+          if (hash !== message.stateHash) {
+            this.requestRepair();
+          } else if (this.revision === baseRevision && this.stateHash === base) {
+            this.applySnapshot({ ...message, state: next, stateMode: "full" });
+          }
+        }
+        this.host.emit({ type: "deltaSettled" });
+      },
+      () => {
+        this.deltaPending = false;
+        this.requestRepair();
+        this.host.emit({ type: "deltaSettled" });
+      },
+    );
+  }
+
+  /** True while a delta is being verified; the host holds other inbound traffic until it settles. */
+  isDeltaPending(): boolean {
+    return this.deltaPending;
+  }
+
+  /** A gap that a delta cannot repair: our window and state are behind. Ask for a full snapshot. */
+  private requestRepair(): void {
+    this.historyComplete = false;
+    this.historyRequestAnswered = false;
+    this.requestResync();
+  }
+
+  private applySnapshot(message: InboundSnapshot): void {
+    if (this.disposed) return;
+    if (message.state === undefined) return; // a full snapshot must carry its state
     if (message.term < this.term) return; // a stale term can never win
     let adoptedAuthority = false;
     if (message.term > this.term) {
@@ -1134,6 +1231,7 @@ export class NovaStateEngine {
     // The first broadcast as authority is full: this engine's cursor from an
     // earlier term says nothing about what the current shells hold.
     this.lastBroadcastRevision = null;
+    this.lastBroadcastCanonical = null;
     this.pendingHistoryIds = new Set();
     this.pendingHistoryOverflow = false;
     if (!this.historyComplete) {
@@ -1370,18 +1468,24 @@ export class NovaStateEngine {
   }
 
   /** The state envelope for this shell's current replicated state. */
-  private snapshotEnvelope(historyMode: "full" | "increment"): StateSnapshotEnvelope {
+  private snapshotEnvelope(
+    historyMode: "full" | "increment",
+    ops: readonly JsonDeltaOp[] | null = null,
+  ): StateSnapshotEnvelope {
+    const delta = ops !== null;
     return {
       revision: this.revision,
       stateHash: this.stateHash,
       term: this.term,
       authorityMemberId: this.authorityMemberId ?? this.selfMemberId,
       historyMode,
-      baseStateHash: historyMode === "increment" ? this.lastBroadcastStateHash : null,
+      baseStateHash: historyMode === "increment" || delta ? this.lastBroadcastStateHash : null,
+      stateMode: delta ? "delta" : "full",
+      ops,
       historyComplete: this.historyComplete,
       processedActionIds:
         historyMode === "full" ? this.processedActionIds() : [...this.pendingHistoryIds],
-      state: this.canonical,
+      state: delta ? null : this.canonical,
     };
   }
 
@@ -1391,14 +1495,27 @@ export class NovaStateEngine {
    * the full history goes out. Either way the pending IDs are drained.
    */
   private broadcastSnapshot(allowIncrement: boolean): void {
+    const continuous = allowIncrement && this.lastBroadcastRevision === this.revision - 1;
     const increment =
-      allowIncrement &&
-      this.lastBroadcastRevision === this.revision - 1 &&
+      continuous &&
       !this.pendingHistoryOverflow &&
       this.pendingHistoryIds.size <= Math.min(this.historyLimit, stateHistoryLimit);
-    this.host.sendSnapshot(this.snapshotEnvelope(increment ? "increment" : "full"));
+    // A delta is sent only when this broadcast continues the previous one and
+    // the diff is smaller than the full state; otherwise the full state goes out.
+    let ops: JsonDeltaOp[] | null = null;
+    if (continuous && this.lastBroadcastCanonical !== null && this.canonical !== null) {
+      const diff = diffJson(this.lastBroadcastCanonical, this.canonical);
+      if (
+        diff.length <= stateDeltaMaxOps &&
+        serializedBytesSync(diff) < serializedBytesSync(this.canonical)
+      ) {
+        ops = diff;
+      }
+    }
+    this.host.sendSnapshot(this.snapshotEnvelope(increment ? "increment" : "full", ops));
     this.lastBroadcastRevision = this.revision;
     this.lastBroadcastStateHash = this.stateHash;
+    this.lastBroadcastCanonical = this.canonical;
     this.pendingHistoryIds.clear();
     this.pendingHistoryOverflow = false;
   }
