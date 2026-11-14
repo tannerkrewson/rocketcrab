@@ -202,7 +202,13 @@ export const stateSnapshotMessageSchema = z.object({
    * added since the authority's previous broadcast, which is revision - 1;
    * a receiver at any other revision has a gap and must request a resync.
    */
-  historyMode: z.enum(["full", "increment"]),
+  historyMode: z.enum(["full", "increment"]).default("full"),
+  /**
+   * For `increment`: the state hash the increment applies on top of (the
+   * authority's previous broadcast). A receiver whose state hash differs is on
+   * another lineage, which is a gap. Absent on full snapshots.
+   */
+  baseStateHash: sha256Schema.optional(),
   processedActionIds: z.array(z.string().min(1).max(64)).max(stateHistoryLimit),
   state: z.unknown(),
 });

@@ -379,7 +379,7 @@ describe("peer message schemas", () => {
         }),
       );
     expect(snapshot({}).success).toBe(true);
-    expect(snapshot({ historyMode: undefined }).success).toBe(false);
+    expect(snapshot({ historyMode: undefined }).success).toBe(true);
     expect(
       snapshot({ processedActionIds: Array.from({ length: 257 }, (_, i) => `a${i}`) }).success,
     ).toBe(false);
@@ -388,6 +388,21 @@ describe("peer message schemas", () => {
         basePeer({ type: "state.resync", seq: 6, knownRevision: 1.5 }),
       ).success,
     ).toBe(false);
+  });
+
+  it("reads a snapshot from an older sender (no historyMode) as a full snapshot", () => {
+    const parsed = stateSnapshotMessageSchema.parse(
+      basePeer({
+        type: "state.snapshot",
+        seq: 3,
+        revision: 1,
+        term: 1,
+        authorityMemberId: "member-1",
+        processedActionIds: ["action-1"],
+        state: {},
+      }),
+    );
+    expect(parsed.historyMode).toBe("full");
   });
 
   it("rejects unknown message types with a useful error", () => {
