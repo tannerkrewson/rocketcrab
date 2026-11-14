@@ -6,7 +6,7 @@ export interface LogEnv {
   };
 }
 
-const outcomes = ["direct", "turn", "tunnel", "failed"];
+const outcomes = ["direct", "turn", "tunnel", "failed", "unknown"];
 const errors = [
   "",
   "room-full",

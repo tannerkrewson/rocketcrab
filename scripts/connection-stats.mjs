@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { pathToFileURL } from "node:url";
 
-const outcomes = ["direct", "turn", "tunnel", "failed"];
+const outcomes = ["direct", "turn", "tunnel", "failed", "unknown"];
 
 function date(value) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value ?? "")) throw new Error("Dates must be YYYY-MM-DD (UTC).");
@@ -18,7 +18,7 @@ export function buildQueries(start, end) {
   const where = `timestamp >= '${start} 00:00:00' AND timestamp < '${end} 00:00:00'`;
   return [
     `SELECT blob1 AS outcome, SUM(_sample_interval) AS events FROM connection_events WHERE ${where} GROUP BY blob1 FORMAT JSON`,
-    `SELECT SUM(_sample_interval) AS events, quantileExactWeighted(0.5)(double1, _sample_interval) AS median_ms FROM connection_events WHERE ${where} AND blob1 IN ('direct', 'turn', 'tunnel') FORMAT JSON`,
+    `SELECT SUM(_sample_interval) AS events, quantileExactWeighted(0.5)(double1, _sample_interval) AS median_ms FROM connection_events WHERE ${where} AND blob1 IN ('direct', 'turn', 'tunnel', 'unknown') FORMAT JSON`,
   ];
 }
 

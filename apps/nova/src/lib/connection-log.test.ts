@@ -52,6 +52,18 @@ describe("connection reporting", () => {
     expect(body).not.toContain("private");
   });
 
+  it("sends the unknown outcome and still rejects unrecognised outcomes", () => {
+    vi.stubEnv("VITE_EDGE_ORIGIN", "https://edge.example");
+    const sendBeacon = vi.fn(() => true);
+    vi.stubGlobal("navigator", { sendBeacon, userAgent: "" });
+    expect(reportConnection({ ...attempt, outcome: "unknown" })).toBe(true);
+    const [, body] = sendBeacon.mock.calls[0] as unknown as [string, string];
+    expect(JSON.parse(body)).toMatchObject({ outcome: "unknown" });
+    for (const outcome of ["Unknown", "unknowns", "", "relay"])
+      expect(reportConnection({ ...attempt, outcome } as unknown as ConnectionAttempt)).toBe(false);
+    expect(sendBeacon).toHaveBeenCalledOnce();
+  });
+
   it("rejects invalid data and handles unavailable or failing beacons", () => {
     vi.stubEnv("VITE_EDGE_ORIGIN", "https://edge.example");
     const sendBeacon = vi.fn(() => false);

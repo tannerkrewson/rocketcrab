@@ -59,3 +59,42 @@ test("empty data and errors do not disclose tokens", async () => {
     /HTTP 403/,
   );
 });
+
+test("unknown outcomes are reported and count as connected for the median", async () => {
+  const calls = [];
+  const fetchImpl = async (url, options) => {
+    calls.push(options.body);
+    return {
+      ok: true,
+      json: async () => ({
+        data:
+          calls.length === 1
+            ? [
+                { outcome: "direct", events: 1 },
+                { outcome: "unknown", events: 1 },
+                { outcome: "failed", events: 2 },
+              ]
+            : [{ events: 2, median_ms: 80 }],
+      }),
+    };
+  };
+  const output = await run({ ...args, fetchImpl });
+  assert.match(output, /Estimated events: 4/);
+  assert.match(output, /unknown: 25.0%/);
+  assert.match(output, /failed: 50.0%/);
+  assert.match(calls[1], /blob1 IN \('direct', 'turn', 'tunnel', 'unknown'\)/);
+  assert.match(output, /80 ms/);
+});
+
+test("unrecognised outcome names are still rejected", async () => {
+  await assert.rejects(
+    run({
+      ...args,
+      fetchImpl: async () => ({
+        ok: true,
+        json: async () => ({ data: [{ outcome: "relay", events: 1 }] }),
+      }),
+    }),
+    /unknown outcome/,
+  );
+});

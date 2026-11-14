@@ -39,6 +39,28 @@ describe("connection events", () => {
       doubles: [123],
     });
   });
+  it("accepts the unknown outcome with validated connect time and writes it", async () => {
+    const writeDataPoint = vi.fn();
+    const env = {
+      ORIGIN_ALLOWLIST: origin,
+      CONNECTION_EVENTS: { writeDataPoint },
+    };
+    const response = await call(JSON.stringify({ ...event, outcome: "unknown" }), env);
+    expect(response.status).toBe(204);
+    expect(writeDataPoint).toHaveBeenCalledExactlyOnceWith({
+      blobs: ["unknown", "", "true", "safari-ios", "4g", "1.2.3"],
+      doubles: [123],
+    });
+    for (const body of [
+      JSON.stringify({ ...event, outcome: "unknown", ms_to_connect: -1 }),
+      JSON.stringify({ ...event, outcome: "unknown", ms_to_connect: 1.5 }),
+      JSON.stringify({ ...event, outcome: "unknowns" }),
+      JSON.stringify({ ...event, outcome: "Unknown" }),
+    ]) {
+      expect((await call(body, env)).status).toBe(400);
+    }
+    expect(writeDataPoint).toHaveBeenCalledOnce();
+  });
   it("rejects invalid, identifying, missing and oversized data", async () => {
     const writeDataPoint = vi.fn();
     const env = {

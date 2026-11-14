@@ -146,9 +146,9 @@ For `edge:dev` with real TURN minting, put the two secrets in a gitignored
 The locally staged `POST /log` accepts one JSON object (including sendBeacon's
 text/plain payload), at most 1024 bytes, with exactly these required fields:
 
-- `outcome`: `direct`, `turn`, `tunnel`, or `failed` (blob1).
+- `outcome`: `direct`, `turn`, `tunnel`, `failed`, or `unknown` (blob1). `unknown` means the connection opened but the browser cannot honestly tell whether it was direct or TURN (e.g. selected-pair stats are missing, ambiguous or rejected, or a scale virtual peer has no native connection).
 - `error_code`: empty or a Trystero 0.27 RoomError code: `room-full`, `banned`, `relay-failed`, `identity-failed`, `plugin-failed`, `decrypt-failed`, `peer-connect-failed`, `handshake-failed`, `peer-error` (blob2).
-- `ms_to_connect`: integer 0–3600000 milliseconds (double1; report uses successful outcomes only).
+- `ms_to_connect`: integer 0–3600000 milliseconds (double1; report uses connected outcomes only).
 - `signaling_ok`: boolean (blob3, encoded `true` or `false`).
 - `browser`: `unknown`, `safari-ios`, `safari`, `chrome-android`, `chrome`, `firefox`, `edge`, or `other` (blob4).
 - `network`: `unknown`, `slow-2g`, `2g`, `3g`, `4g`, `bluetooth`, `cellular`, `ethernet`, `wifi`, `wimax`, `none`, or `other` (blob5).
@@ -173,8 +173,9 @@ account ID above, then run:
 node scripts/connection-stats.mjs 2026-11-01 2026-11-12
 ```
 
-Dates are UTC, start inclusive and end exclusive. Percentages cover all four
-outcomes; the median covers successful connections only. Both use Analytics
+Dates are UTC, start inclusive and end exclusive. Percentages cover all five
+outcomes; the median covers connected outcomes only (`direct`, `turn`, `tunnel`,
+and `unknown`, which opened but could not be classified). Both use Analytics
 Engine sampling weights, so sampled results are estimates. No events yields
 zero percentages and an unavailable median. The report cannot be validated
 against live data until ingestion and the owner's token exist. See Cloudflare's

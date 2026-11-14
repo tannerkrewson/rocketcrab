@@ -1,4 +1,8 @@
-/** Classify only selected native ICE paths; unavailable or ambiguous reports are unknown. */
+/**
+ * Classify only selected native ICE paths; unavailable or ambiguous reports are unknown.
+ * A `null` result means "can't tell": callers must map it to the `unknown` connection-log
+ * outcome, never to `direct` or `failed`.
+ */
 export async function selectedCandidateOutcome(
   connection: Pick<RTCPeerConnection, "getStats">,
 ): Promise<"direct" | "turn" | null> {
