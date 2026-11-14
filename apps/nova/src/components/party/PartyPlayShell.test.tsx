@@ -78,6 +78,7 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     notices: [],
     runtimeLogs: [],
     lastError: null,
+    peerLink: null,
     ...overrides,
   };
 }

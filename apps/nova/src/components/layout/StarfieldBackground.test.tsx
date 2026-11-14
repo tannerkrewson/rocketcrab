@@ -38,6 +38,7 @@ const IDLE_STATE: PartyEngineState = {
   runtimeLogs: [],
   joinStage: null,
   lastError: null,
+  peerLink: null,
 };
 
 /** A party that is actively playing a Nova game (22n in-game signal). */

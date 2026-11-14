@@ -48,6 +48,7 @@ const IDLE_STATE: PartyEngineState = {
   notices: [],
   runtimeLogs: [],
   lastError: null,
+  peerLink: null,
 };
 
 /** A party waiting in its lobby (creator, no game picked yet). */

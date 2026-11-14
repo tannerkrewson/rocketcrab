@@ -6,7 +6,12 @@ import type { NovaTransport, TransportEventMap } from "@rocketcrab/core";
 import { InMemoryTransportHub } from "@rocketcrab/testing";
 import { fromRoomError } from "@rocketcrab/trystero-transport";
 import type { ChannelPort } from "../runtime-host";
-import { PartyEngine, type PartyRuntimeSeams, type PartySourceSpec } from "./engine";
+import {
+  PartyEngine,
+  type PeerLinkStatus,
+  type PartyRuntimeSeams,
+  type PartySourceSpec,
+} from "./engine";
 import { createMemoryLifecycleSource } from "./lifecycle";
 import { clearPartyRecovery, readPartyRecovery } from "./party-recovery";
 import type { TurnCredentialsResult } from "./turn-creds";
@@ -2093,6 +2098,8 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenCalledWith({
       onJoinError: expect.any(Function),
+      onTunnel: expect.any(Function),
+      onTunnelFailure: expect.any(Function),
     });
     const state = player.engine.getState();
     expect(state.phase).toBe("lobby");
@@ -2244,7 +2251,6 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     ["banned", /rejected/i],
     ["identity-failed", /unexpected state/i],
     ["plugin-failed", /unexpected state/i],
-    ["peer-connect-failed", /couldn't connect directly/i],
     ["handshake-failed", /rejected/i],
     ["peer-error", /closed while joining/i],
   ])("shows and deduplicates a notice for RoomError %s", async (code, expected) => {
@@ -2280,9 +2286,8 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     expect(
       notices.filter((notice) => /incompatible Nova version/i.test(notice.message)),
     ).toHaveLength(1);
-    expect(
-      notices.filter((notice) => /couldn't connect directly/i.test(notice.message)),
-    ).toHaveLength(1);
+    // peer-connect-failed is a join-level signal, not a pair outcome: no lobby notice.
+    expect(notices.filter((notice) => /couldn't connect/i.test(notice.message))).toHaveLength(0);
   });
 
   it("mint success → turnConfig baked into the default factory + configured diagnostic", async () => {
@@ -2302,6 +2307,8 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
 
     expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenCalledWith({
       onJoinError: expect.any(Function),
+      onTunnel: expect.any(Function),
+      onTunnelFailure: expect.any(Function),
       turnConfig,
     });
     const state = player.engine.getState();
@@ -2310,7 +2317,7 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     expect(state.notices.some((notice) => notice.message.includes("TURN"))).toBe(false);
   });
 
-  it("mint failure (network/403/5xx/timeout) → party still creates WITHOUT TURN + warn notice", async () => {
+  it("mint failure (network/403/5xx/timeout) → party still creates WITHOUT TURN, TURN state in diagnostics only", async () => {
     vi.stubEnv("VITE_EDGE_ORIGIN", "https://turn-creds.example.workers.dev");
     const world = makeWorld();
     const player = makeDefaultFactoryPlayer(world, {
@@ -2323,15 +2330,13 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
 
     expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenCalledWith({
       onJoinError: expect.any(Function),
+      onTunnel: expect.any(Function),
+      onTunnelFailure: expect.any(Function),
     });
     const state = player.engine.getState();
     expect(state.phase).toBe("lobby");
     expect(state.diagnostics?.turn).toBe("unavailable");
-    expect(
-      state.notices.some((notice) =>
-        notice.message.includes("TURN credentials unavailable (the mint returned HTTP 403.)"),
-      ),
-    ).toBe(true);
+    expect(state.notices.some((notice) => notice.message.includes("TURN"))).toBe(false);
   });
 
   it("mints ONCE and reuses the cached turnConfig across setup attempts", async () => {
@@ -2359,6 +2364,8 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     expect(turnCreds).toHaveBeenCalledTimes(1);
     expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenLastCalledWith({
       onJoinError: expect.any(Function),
+      onTunnel: expect.any(Function),
+      onTunnelFailure: expect.any(Function),
       turnConfig,
     });
   });
@@ -2381,6 +2388,8 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     expect(turnCreds).toHaveBeenCalledTimes(2);
     expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenLastCalledWith({
       onJoinError: expect.any(Function),
+      onTunnel: expect.any(Function),
+      onTunnelFailure: expect.any(Function),
       turnConfig,
     });
   });
@@ -3039,5 +3048,139 @@ describe("party engine — relay diagnostics surfacing (rocketcrab-ont.1)", () =
     (relayHandler as (() => void) | null)?.();
     expect(seen.at(-1)).toBe(false);
     expect(player.engine.getState().diagnostics?.signalingConnected).toBe(false);
+  });
+});
+
+describe("party engine — peer-link alert (PLAN.md §7 stages 2 and 4)", () => {
+  afterEach(() => {
+    transportFactoryMocks.createTrysteroPartyTransportFactory.mockReset();
+  });
+
+  /** A player on the DEFAULT factory path, so the engine's tunnel hooks are captured. */
+  function makeDefaultFactoryPlayer(world: World): Player {
+    transportFactoryMocks.createTrysteroPartyTransportFactory.mockReturnValue(world.factory);
+    return makePlayer(world, "host", { transportFactory: undefined });
+  }
+
+  /** The tunnel hooks the engine handed to the default transport factory. */
+  function capturedHooks(): {
+    onTunnel: (info: { reason: "timeout" | "native-failed"; elapsedMs: number }) => void;
+    onTunnelFailure: (info: { reason: "socket-closed"; closeCode: number }) => void;
+  } {
+    const options = transportFactoryMocks.createTrysteroPartyTransportFactory.mock.calls[0]?.[0];
+    if (options === undefined) throw new Error("the default factory was not called");
+    return options;
+  }
+
+  const SWITCH = { reason: "timeout" as const, elapsedMs: 8_000 };
+  const FAILURE = { reason: "socket-closed" as const, closeCode: 4011 };
+
+  it("coalesces simultaneous switches into one alert and clears it when a peer joins", async () => {
+    const world = makeWorld();
+    const host = makeDefaultFactoryPlayer(world);
+    const secret = await runCreate(host, world);
+    const hooks = capturedHooks();
+    const seen: PeerLinkStatus[] = [];
+    const stop = host.engine.onState((state) => seen.push(state.peerLink));
+
+    hooks.onTunnel(SWITCH);
+    hooks.onTunnel(SWITCH);
+    hooks.onTunnel({ reason: "native-failed", elapsedMs: 0 });
+    expect(host.engine.getState().peerLink).toBe("connecting");
+    // Three switches produce one state change: one alert, not three.
+    expect(seen).toEqual([null, "connecting"]);
+
+    const joiner = makePlayer(world, "joiner");
+    const joining = joiner.engine.joinByInvite({ secret });
+    await settle(world);
+    await joining;
+    expect(host.engine.getState().peerLink).toBeNull();
+    expect(seen.at(-1)).toBeNull();
+    stop();
+  });
+
+  it("expires a switch that closes quietly, and a later switch restarts the window", async () => {
+    const world = makeWorld();
+    const host = makeDefaultFactoryPlayer(world);
+    await runCreate(host, world);
+    const hooks = capturedHooks();
+
+    hooks.onTunnel(SWITCH);
+    world.clock.advance(20_000);
+    hooks.onTunnel(SWITCH); // restarts the 30 s window: now expires at +50 s
+    world.clock.advance(20_000); // +40 s: the first window would already have ended
+    expect(host.engine.getState().peerLink).toBe("connecting");
+    world.clock.advance(10_000); // +50 s
+    expect(host.engine.getState().peerLink).toBeNull();
+  });
+
+  it("turns a terminal tunnel failure into one alert that stays until the user retries", async () => {
+    const world = makeWorld();
+    const host = makeDefaultFactoryPlayer(world);
+    await runCreate(host, world);
+    const hooks = capturedHooks();
+    const seen: PeerLinkStatus[] = [];
+    const stop = host.engine.onState((state) => seen.push(state.peerLink));
+
+    hooks.onTunnel(SWITCH);
+    hooks.onTunnelFailure(FAILURE);
+    hooks.onTunnelFailure(FAILURE); // a second pair failing shows the same alert
+    hooks.onTunnel(SWITCH); // a later switch does not hide the failure
+    expect(host.engine.getState().peerLink).toBe("failed");
+    world.clock.advance(60_000); // well past any connecting window
+    expect(host.engine.getState().peerLink).toBe("failed");
+    expect(seen).toEqual([null, "connecting", "failed"]);
+    stop();
+
+    // Retry runs the existing reconnect path and drops the alert at once.
+    void host.engine.reconnect();
+    expect(host.engine.getState().peerLink).toBeNull();
+    await settle(world);
+    expect(host.engine.getState().phase).toBe("lobby");
+  });
+
+  it("keeps a failure alert when another player joins natively", async () => {
+    const world = makeWorld();
+    const host = makeDefaultFactoryPlayer(world);
+    const secret = await runCreate(host, world);
+    const hooks = capturedHooks();
+    hooks.onTunnel(SWITCH);
+    hooks.onTunnelFailure(FAILURE);
+
+    const joiner = makePlayer(world, "joiner");
+    const joining = joiner.engine.joinByInvite({ secret });
+    await settle(world);
+    await joining;
+    expect(host.engine.getState().peerLink).toBe("failed");
+  });
+
+  it("ignores tunnel callbacks from a party that has been left", async () => {
+    const world = makeWorld();
+    const host = makeDefaultFactoryPlayer(world);
+    await runCreate(host, world);
+    const hooks = capturedHooks();
+
+    await host.engine.leaveParty();
+    hooks.onTunnel(SWITCH);
+    hooks.onTunnelFailure(FAILURE);
+    expect(host.engine.getState().peerLink).toBeNull();
+    expect(host.engine.getState().phase).toBe("idle");
+  });
+
+  it("shows no peer-link alert for a healthy native pair", async () => {
+    const world = makeWorld();
+    const host = makePlayer(world, "host");
+    const secret = await runCreate(host, world);
+    const joiner = makePlayer(world, "joiner");
+    const joining = joiner.engine.joinByInvite({ secret });
+    await settle(world);
+    await joining;
+
+    expect(host.engine.getState().peerLink).toBeNull();
+    expect(joiner.engine.getState().peerLink).toBeNull();
+    expect(joiner.engine.getState().phase).toBe("lobby");
+    expect(host.engine.getState().notices.some((notice) => /connect/i.test(notice.message))).toBe(
+      false,
+    );
   });
 });

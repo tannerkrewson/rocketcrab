@@ -45,6 +45,7 @@ const IDLE_STATE: PartyEngineState = {
   notices: [],
   runtimeLogs: [],
   lastError: null,
+  peerLink: null,
 };
 
 const { stubEngine, stubs } = vi.hoisted(() => {

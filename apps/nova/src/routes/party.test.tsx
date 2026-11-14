@@ -51,6 +51,7 @@ const IDLE_STATE: PartyEngineState = {
   notices: [],
   runtimeLogs: [],
   lastError: null,
+  peerLink: null,
 };
 
 /** A live lobby (game not yet picked), used once `createParty` runs. */
