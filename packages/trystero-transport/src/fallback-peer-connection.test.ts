@@ -3,6 +3,8 @@ import { describe, expect, it } from "vitest";
 import {
   FALLBACK_AFTER_MS,
   OPEN_ATTEMPTS,
+  TUNNEL_PACE_BURST_BYTES,
+  TUNNEL_PACE_BYTES_PER_SECOND,
   TUNNEL_PAIRED_FRAME,
   createFallbackPeerConnectionClass,
   isTunnelledConnection,
@@ -15,6 +17,9 @@ import { TUNNEL_FRAME_OVERHEAD_BYTES } from "./tunnel-crypto";
 const SECRET = "A".repeat(43) as SessionSecret;
 const ROOM = "party:" + "c".repeat(64);
 const MAX_PAYLOAD = 262144 - TUNNEL_FRAME_OVERHEAD_BYTES;
+/** The edge's per-socket budget (deploy/edge/tunnel.ts), simulated in FakeSocket. */
+const SERVER_RATE_BYTES_PER_SECOND = 512 * 1024;
+const SERVER_BURST_BYTES = 4 * 1024 * 1024;
 
 // ---------------------------------------------------------------------------
 // Fakes: injected clock, native RTCPeerConnection, data channel, WebSocket pair
@@ -168,7 +173,11 @@ class FakePeerConnection extends FakeEvents {
   }
 }
 
-/** One fake WebSocket. Frames queue until delivered, so backpressure can be shown. */
+/**
+ * One fake WebSocket. Frames queue until delivered, so backpressure can be
+ * shown. close() throws for codes a browser rejects, and every frame sent is
+ * charged to a simulated server budget (never negative in a passing run).
+ */
 class FakeSocket {
   readyState = 0;
   binaryType: BinaryType = "blob";
@@ -181,12 +190,17 @@ class FakeSocket {
   readonly closeCalls: number[] = [];
   readonly sent: Uint8Array[] = [];
   mangle: ((bytes: Uint8Array) => void) | null = null;
+  /** Simulated server bucket for this socket. */
+  serverTokens = SERVER_BURST_BYTES;
+  minServerTokens = SERVER_BURST_BYTES;
+  private serverRefilledAt: number;
   private outbox: ArrayBuffer[] = [];
 
   constructor(
     readonly url: string,
     private readonly network: FakeNetwork,
   ) {
+    this.serverRefilledAt = network.clock.now;
     network.accept(this);
   }
 
@@ -195,10 +209,20 @@ class FakeSocket {
     const copy = new Uint8Array(data.byteLength);
     copy.set(new Uint8Array(data.buffer, data.byteOffset, data.byteLength));
     this.mangle?.(copy);
+    this.chargeServerBucket(copy.byteLength);
     this.sent.push(copy);
     this.outbox.push(copy.buffer);
     this.bufferedAmount += copy.byteLength;
     if (!this.network.stalled) queueMicrotask(() => this.flush());
+  }
+
+  private chargeServerBucket(bytes: number): void {
+    const now = this.network.clock.now;
+    const refill = ((now - this.serverRefilledAt) * SERVER_RATE_BYTES_PER_SECOND) / 1000;
+    this.serverTokens = Math.min(SERVER_BURST_BYTES, this.serverTokens + refill);
+    this.serverRefilledAt = now;
+    this.serverTokens -= bytes;
+    this.minServerTokens = Math.min(this.minServerTokens, this.serverTokens);
   }
 
   flush(): void {
@@ -211,6 +235,10 @@ class FakeSocket {
 
   close(code = 1000): void {
     this.closeCalls.push(code);
+    // Browsers accept only 1000 or 3000-4999 here (WHATWG WebSocket.close).
+    if (code !== 1000 && (code < 3000 || code > 4999)) {
+      throw new DOMException(`Invalid close code ${code}.`, "InvalidAccessError");
+    }
     if (this.readyState >= 2) return;
     this.readyState = 2;
     const peer = this.peer;
@@ -221,7 +249,7 @@ class FakeSocket {
     });
   }
 
-  /** The edge closes the partner with the same code. */
+  /** The edge closes this socket (or its partner) with the given code. */
   serverClose(code: number): void {
     if (this.readyState >= 2) return;
     this.readyState = 2;
@@ -260,7 +288,7 @@ class FakeNetwork {
   readonly WebSocketImpl: typeof WebSocket;
   private readonly waiting = new Map<string, FakeSocket>();
 
-  constructor() {
+  constructor(readonly clock: FakeClock) {
     this.WebSocketImpl = socketClassFor(this);
   }
 
@@ -319,8 +347,8 @@ interface Harness {
 }
 
 function harness(defaults: Partial<FallbackPeerConnectionOptions> = {}): Harness {
-  const network = new FakeNetwork();
   const clock = new FakeClock();
+  const network = new FakeNetwork(clock);
   const failures: Failure[] = [];
   const tunnels: Tunnelled[] = [];
   return {
@@ -387,6 +415,14 @@ async function connectPair(h: Harness): Promise<{ a: Side; b: Side; chA: RTCData
   return { a, b, chA };
 }
 
+/** A native data channel arriving at `side` (as an answerer gets one), opened. */
+function deliverNativeChannel(side: Side): FakeChannel {
+  const channel = new FakeChannel("data");
+  side.native.fire("datachannel", { channel });
+  channel.open();
+  return channel;
+}
+
 /** Waits for a condition, letting real crypto (and optionally the clock) progress. */
 async function until(cond: () => boolean, label: string, step?: () => void): Promise<void> {
   for (let i = 0; i < 20000; i += 1) {
@@ -401,7 +437,7 @@ function bChannel(b: Side): RTCDataChannel | undefined {
   return b.incoming[0]?.channel;
 }
 
-/** Both sides on the tunnel and paired, A's channel open, B's channel open. */
+/** Both sides switch at the deadline and pair. Returns A's and B's channels. */
 async function pairUp(
   h: Harness,
 ): Promise<{ a: Side; b: Side; chA: RTCDataChannel; chB: RTCDataChannel }> {
@@ -434,12 +470,30 @@ function describeMessage(data: unknown): string {
 // ---------------------------------------------------------------------------
 
 describe("FallbackPeerConnection", () => {
-  it("passes through to native WebRTC when connected before the deadline", async () => {
+  it("passes through to native WebRTC when the channel opens before the deadline", async () => {
     const h = harness();
     const { a, b, chA } = await connectPair(h);
+    const nativeA = a.native.channels[0];
+    if (!nativeA) throw new Error("no native channel");
+
+    const seen: unknown[] = [];
+    const targets: unknown[] = [];
+    chA.onmessage = (event) => {
+      seen.push(event.data);
+      targets.push(event.target);
+    };
+    const listened: unknown[] = [];
+    chA.addEventListener("message", (event) => listened.push(event.data));
+    let opened = 0;
+    chA.onopen = () => {
+      opened += 1;
+    };
+
     h.clock.advance(3000);
     a.native.setStates("connected", "connected");
     b.native.setStates("connected", "connected");
+    nativeA.open();
+    deliverNativeChannel(b);
     h.clock.advance(20000);
 
     expect(h.network.sockets).toHaveLength(0);
@@ -447,24 +501,15 @@ describe("FallbackPeerConnection", () => {
     expect(h.clock.pending).toBe(0);
     expect(isTunnelledConnection(a.pc)).toBe(false);
     expect(a.pc.connectionState).toBe("connected");
-
-    const seen: unknown[] = [];
-    chA.onmessage = (event) => seen.push(event.data);
-    const listened: unknown[] = [];
-    chA.addEventListener("message", (event) => listened.push(event.data));
-    let opened = 0;
-    chA.onopen = () => {
-      opened += 1;
-    };
-    a.native.channels[0]?.open();
     expect(opened).toBe(1);
     expect(chA.readyState).toBe("open");
 
     chA.send("hello");
-    expect(a.native.channels[0]?.sent).toEqual(["hello"]);
-    a.native.channels[0]?.receive("reply");
+    expect(nativeA.sent).toEqual(["hello"]);
+    nativeA.receive("reply");
     expect(seen).toEqual(["reply"]);
     expect(listened).toEqual(["reply"]);
+    expect(targets).toEqual([chA]);
   });
 
   it("does not start the timer while the initiator offer is still pooled", async () => {
@@ -565,16 +610,60 @@ describe("FallbackPeerConnection", () => {
     expect(a.pc.connectionState).toBe("connected");
   });
 
-  it("switches on native iceConnectionState failure alone", async () => {
+  it("switches on native iceConnectionState failure alone, with event targets set", async () => {
     const h = harness();
     const { a } = await connectPair(h);
     const seen: string[] = [];
-    a.pc.addEventListener("connectionstatechange", () => seen.push(a.pc.connectionState));
+    const targets: unknown[] = [];
+    a.pc.addEventListener("connectionstatechange", (event) => {
+      seen.push(a.pc.connectionState);
+      targets.push(event.target);
+    });
     a.native.setStates("connecting", "failed");
     expect(h.tunnels.map((t) => t.info.reason)).toEqual(["native-failed"]);
     expect(a.pc.iceConnectionState).toBe("checking");
     expect(seen).toEqual(["connecting"]);
+    expect(targets).toEqual([a.pc]);
     expect(isTunnelledConnection(a.pc)).toBe(true);
+  });
+
+  it("switches when both peer connections are connected but the channel never opens", async () => {
+    const h = harness();
+    const { a, b, chA } = await connectPair(h);
+    a.native.setStates("connected", "connected");
+    b.native.setStates("connected", "connected");
+    h.clock.advance(FALLBACK_AFTER_MS);
+    await until(
+      () => chA.readyState === "open" && bChannel(b)?.readyState === "open",
+      "pairing after a stalled channel",
+    );
+    expect(h.tunnels.map((t) => [t.side, t.info.reason]).sort()).toEqual([
+      ["a", "timeout"],
+      ["b", "timeout"],
+    ]);
+    expect(h.failures).toEqual([]);
+  });
+
+  it("holds back a channel close before open until the deadline, then switches", async () => {
+    const h = harness();
+    const { a, b, chA } = await connectPair(h);
+    a.native.setStates("connected", "connected");
+    const nativeA = a.native.channels[0];
+    if (!nativeA) throw new Error("no native channel");
+    // Closed before it ever opened, while the peer connection stays connected.
+    nativeA.readyState = "closed";
+    nativeA.fire("close");
+    expect(h.tunnels).toEqual([]);
+
+    h.clock.advance(FALLBACK_AFTER_MS);
+    expect(h.tunnels.filter((t) => t.side === "a")).toEqual([
+      { side: "a", info: { reason: "timeout", elapsedMs: FALLBACK_AFTER_MS } },
+    ]);
+    await until(
+      () => chA.readyState === "open" && bChannel(b)?.readyState === "open",
+      "pairing after a pre-open close",
+    );
+    expect(h.failures).toEqual([]);
   });
 
   it("gives the answering side a synthetic datachannel with an open facade", async () => {
@@ -668,9 +757,60 @@ describe("FallbackPeerConnection", () => {
         expected.push(`text:${"x".repeat(20000)}${i}`);
       }
     }
-    await until(() => received.length === 200, "200 messages");
+    // These sends exceed the pace burst, so the clock must advance for them to finish.
+    await until(
+      () => received.length === 200,
+      "200 messages",
+      () => h.clock.advance(20),
+    );
     expect(received).toEqual(expected);
   });
+
+  it(
+    "paces three back-to-back 2 MiB transfers inside the server budget",
+    { timeout: 60000 },
+    async () => {
+      const h = harness();
+      const { chA, b } = await pairUp(h);
+      const chB = bChannel(b);
+      if (!chB) throw new Error("no answering channel");
+      let count = 0;
+      let lastAt = -1;
+      chB.onmessage = () => {
+        count += 1;
+        lastAt = h.clock.now;
+      };
+
+      const transfers = 3;
+      const chunks = (transfers * 2 * 1024 * 1024) / 65536;
+      const chunk = new ArrayBuffer(65536);
+      const start = h.clock.now;
+      for (let i = 0; i < chunks; i += 1) chA.send(chunk);
+      // Everything is still queued: the pace wait counts toward bufferedAmount.
+      const wireBytes = chunks * (65536 + TUNNEL_FRAME_OVERHEAD_BYTES);
+      expect(chA.bufferedAmount).toBe(wireBytes);
+
+      await until(
+        () => count === chunks,
+        "all transfers",
+        () => h.clock.advance(10),
+      );
+      expect(h.failures).toEqual([]);
+      // The edge would close the pair with 1008 if any bucket went negative.
+      for (const socket of h.network.sockets) {
+        expect(socket.minServerTokens).toBeGreaterThanOrEqual(0);
+      }
+
+      // Throughput converges to the pace rate once the burst is spent.
+      const elapsedMs = lastAt - start;
+      const expectedMs =
+        ((wireBytes - TUNNEL_PACE_BURST_BYTES) * 1000) / TUNNEL_PACE_BYTES_PER_SECOND;
+      expect(elapsedMs).toBeGreaterThan(expectedMs * 0.98);
+      expect(elapsedMs).toBeLessThan(expectedMs * 1.02);
+      expect(TUNNEL_PACE_BYTES_PER_SECOND).toBeLessThan(512 * 1024);
+      expect(TUNNEL_PACE_BURST_BYTES).toBeLessThan(4 * 1024 * 1024);
+    },
+  );
 
   it("tells the peer's channel to close when one side closes, once, and reports the close", async () => {
     const h = harness();
@@ -716,9 +856,9 @@ describe("FallbackPeerConnection", () => {
     expect(() => chA.send("after")).toThrow();
   });
 
-  it("terminates once on a tampered frame with an auth failure", async () => {
+  it("terminates once per side on a tampered frame, and closes both native connections", async () => {
     const h = harness();
-    const { a, chA, chB } = await pairUp(h);
+    const { a, b, chA, chB } = await pairUp(h);
     let bClosed = 0;
     chB.onclose = () => {
       bClosed += 1;
@@ -734,16 +874,18 @@ describe("FallbackPeerConnection", () => {
     expect(countBySide(h.failures)).toEqual({ a: 1, b: 1 });
     const bFailure = h.failures.find((f) => f.side === "b")?.info;
     expect(bFailure).toMatchObject({ reason: "frame-error", code: "auth-failed" });
+    // The failure must still tear down the native connection on both sides.
     expect(a.native.closeCalls).toBe(1);
+    expect(b.native.closeCalls).toBe(1);
     // A's channel was closed by the edge's close, so a later send is refused.
     expect(() => chA.send("after")).toThrow();
     h.clock.advance(1000);
     expect(countBySide(h.failures)).toEqual({ a: 1, b: 1 });
   });
 
-  it("terminates once on a text frame other than paired", async () => {
+  it("terminates once per side on a text frame other than paired, and closes both native connections", async () => {
     const h = harness();
-    const { chA, chB } = await pairUp(h);
+    const { a, b, chA, chB } = await pairUp(h);
     let bClosed = 0;
     chB.onclose = () => {
       bClosed += 1;
@@ -755,6 +897,8 @@ describe("FallbackPeerConnection", () => {
     expect(countBySide(h.failures)).toEqual({ a: 1, b: 1 });
     expect(h.failures.filter((f) => f.info.reason === "protocol-violation")).toHaveLength(1);
     expect(chA.readyState).toBe("closed");
+    expect(a.native.closeCalls).toBe(1);
+    expect(b.native.closeCalls).toBe(1);
   });
 
   it("closes idempotently", async () => {
@@ -771,6 +915,131 @@ describe("FallbackPeerConnection", () => {
     expect(countBySide(h.failures)).toEqual({ b: 1 });
     // Only A's own socket is closed locally; B's is closed by the edge.
     expect(h.network.sockets.map((s) => s.closeCalls.length).sort()).toEqual([0, 1]);
+  });
+
+  it("closes during pairing: the socket closes with 1000, and nothing is reported as a failure", async () => {
+    const h = harness();
+    const { a, b, chA } = await connectPair(h);
+    // B's channel is open, so B never switches and only A's socket exists.
+    deliverNativeChannel(b);
+    h.clock.advance(FALLBACK_AFTER_MS);
+    await until(() => h.network.sockets.length === 1, "A's unpaired socket");
+    const socket = h.network.sockets[0];
+    if (!socket) throw new Error("no socket");
+
+    a.pc.close();
+    await until(() => socket.readyState === 3, "socket closed");
+    expect(socket.closeCalls).toEqual([1000]);
+    expect(h.failures).toEqual([]);
+    expect(a.native.closeCalls).toBe(1);
+    expect(chA.readyState).toBe("closed");
+  });
+
+  it("closes during key derivation: no socket is opened", async () => {
+    const h = harness();
+    const { a, b } = await connectPair(h);
+    deliverNativeChannel(b);
+    h.clock.advance(FALLBACK_AFTER_MS);
+    // A has switched; the key derivation is still in flight.
+    a.pc.close();
+    for (let i = 0; i < 50; i += 1) {
+      await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
+    }
+    expect(h.network.sockets).toHaveLength(0);
+    expect(h.failures).toEqual([]);
+    expect(a.native.closeCalls).toBe(1);
+  });
+
+  it("asymmetric lone socket: the healthy side closes once the lone side tears down", async () => {
+    const h = harness();
+    const { a, b, chA } = await connectPair(h);
+    a.native.setStates("connected", "connected");
+    const nativeA = a.native.channels[0];
+    if (!nativeA) throw new Error("no native channel");
+    nativeA.open();
+    let aClosed = 0;
+    chA.onclose = () => {
+      aClosed += 1;
+    };
+
+    // B never gets a channel and switches; A's channel is open, so A stays native.
+    h.clock.advance(FALLBACK_AFTER_MS);
+    await until(() => h.network.sockets.length === 1, "B's lone socket");
+    expect(h.tunnels.map((t) => t.side)).toEqual(["b"]);
+    expect(b.native.channels).toHaveLength(0);
+
+    // The edge's 30 s lone-socket timeout, then A's channel closing with B's DTLS teardown.
+    const lone = h.network.sockets[0];
+    if (!lone) throw new Error("no lone socket");
+    lone.serverClose(4408);
+    await until(() => h.failures.length === 1, "B's terminal failure");
+    expect(b.native.closeCalls).toBe(1);
+    nativeA.readyState = "closed";
+    nativeA.fire("close");
+
+    expect(h.failures.map((f) => ({ side: f.side, info: f.info }))).toEqual([
+      { side: "b", info: { reason: "socket-closed", closeCode: 4408 } },
+    ]);
+    expect(aClosed).toBe(1);
+    expect(a.native.closeCalls).toBe(1);
+  });
+
+  it("an answerer that fails before pairing reports closed to Trystero", async () => {
+    const h = harness();
+    const { a, b } = await connectPair(h);
+    a.native.setStates("connected", "connected");
+    a.native.channels[0]?.open();
+    const seen: string[] = [];
+    b.pc.addEventListener("connectionstatechange", () => seen.push(b.pc.connectionState));
+
+    h.clock.advance(FALLBACK_AFTER_MS);
+    await until(() => h.network.sockets.length === 1, "B's unpaired socket");
+    h.network.sockets[0]?.serverClose(4408);
+    await until(() => h.failures.length === 1, "B's terminal failure");
+
+    // B has no channel to close, so the state event is what Trystero hears.
+    expect(b.incoming).toEqual([]);
+    expect(seen.at(-1)).toBe("closed");
+    expect(b.native.closeCalls).toBe(1);
+  });
+
+  it("refuses a send before pairing, like a native channel while connecting", async () => {
+    const h = harness();
+    const { chA } = await connectPair(h);
+    h.clock.advance(FALLBACK_AFTER_MS);
+    expect(chA.readyState).toBe("connecting");
+    let error: unknown;
+    try {
+      chA.send("too early");
+    } catch (caught) {
+      error = caught;
+    }
+    expect(error).toBeInstanceOf(DOMException);
+    expect((error as DOMException).name).toBe("InvalidStateError");
+  });
+
+  it("resets bufferedAmount after close", async () => {
+    const h = harness();
+    h.network.stalled = true;
+    const { a, chA } = await pairUp(h);
+    for (let i = 0; i < 3; i += 1) chA.send(new ArrayBuffer(10000));
+    expect(chA.bufferedAmount).toBeGreaterThan(0);
+    a.pc.close();
+    expect(chA.bufferedAmount).toBe(0);
+  });
+
+  it("delivers binary as a Blob when binaryType is blob", async () => {
+    const h = harness();
+    const { chA, b } = await pairUp(h);
+    const chB = bChannel(b);
+    if (!chB) throw new Error("no answering channel");
+    chB.binaryType = "blob";
+    const got: unknown[] = [];
+    chB.onmessage = (event) => got.push(event.data);
+    chA.send(new Uint8Array([9, 8]).buffer);
+    await until(() => got.length === 1, "blob delivery");
+    expect(got[0]).toBeInstanceOf(Blob);
+    expect((got[0] as Blob).size).toBe(2);
   });
 
   it("never switches back to native once tunnelled", async () => {

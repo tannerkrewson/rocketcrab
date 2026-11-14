@@ -2,21 +2,30 @@
  * Connection fallback wrapper for Trystero's `rtcPolyfill` (PLAN.md §5.5).
  *
  * `createFallbackPeerConnectionClass` returns a constructor that delegates to
- * the browser's real RTCPeerConnection. When a pair has not connected within
- * `fallbackAfterMs`, or the native connection reports `failed`, the pair's
- * single data channel moves onto the edge tunnel (`/tunnel/:pairId`, see
- * deploy/edge/tunnel.ts). Trystero keeps the same channel object and sees
- * `connecting` until the tunnel reports `paired`, then `connected`.
+ * the browser's real RTCPeerConnection. When a pair's data channel has not
+ * opened within `fallbackAfterMs` of both descriptions existing, or the native
+ * connection reports `failed`, the pair's single data channel moves onto the
+ * edge tunnel (`/tunnel/:pairId`, see deploy/edge/tunnel.ts). Trystero keeps
+ * the same channel object and sees `connecting` until the tunnel reports
+ * `paired`, then `connected`.
  *
  * Rules that follow from the Trystero 0.27 code (`peer.mjs`, `strategy.mjs`):
+ * - "Healthy" means the data channel has opened, and nothing else. Trystero
+ *   needs an open channel. A peer connection that is connected while the
+ *   channel stays closed (for example SCTP blackholed) must not stall.
  * - The timer starts only once BOTH descriptions exist. Initiator offers are
  *   pooled before a remote description exists (PLAN.md §5.1).
  * - `failed` and `disconnected` are never shown to Trystero while the pair is
- *   switching or tunnelled. Trystero closes a peer on either.
+ *   switching or tunnelled. Trystero closes a peer on either. Mid-session
+ *   `disconnected` after the pair has connected is passed through; there is no
+ *   switch mid-session (PLAN.md §5.5).
+ * - A native channel close before its first open is held back until the
+ *   deadline decides, so it cannot hide a dead peer for longer than that.
  * - The native connection is NOT closed at the switch. Closing it would send a
  *   DTLS close, and a partner still on native WebRTC would tear the peer down.
  * - The switch is one-way for the connection's lifetime.
  * - One data channel per connection. Trystero uses exactly one.
+ * - Sends are paced to the edge's per-socket budget (see the pace constants).
  *
  * Nothing in the transport uses this module yet; wiring is PLAN.md §5.6.
  */
@@ -38,6 +47,15 @@ import {
  * stricter 256 KiB so a frame is never rejected by the server.
  */
 export const TUNNEL_MAX_FRAME_BYTES = 262144;
+/**
+ * Client-side pacing of tunnel frames, in wire bytes (payload + 29). The edge
+ * gives each socket a 512 KiB/s refill and a 4 MiB burst, and closes the pair
+ * with 1008 when its bucket empties (deploy/edge/tunnel.ts RATE_BYTES_PER_SECOND
+ * and BURST_BYTES). These sit below both, so repeated 2 MiB game-source
+ * transfers never empty the server's bucket.
+ */
+export const TUNNEL_PACE_BYTES_PER_SECOND = 448 * 1024;
+export const TUNNEL_PACE_BURST_BYTES = 3.5 * 1024 * 1024;
 /** Delay from both descriptions existing to the tunnel fallback (PLAN.md §5). */
 export const FALLBACK_AFTER_MS = 8000;
 /** Server text frame that marks a completed pair. Any other text is fatal. */
@@ -54,8 +72,9 @@ export const OPEN_ATTEMPTS = 5;
 export const OPEN_RETRY_BASE_MS = 250;
 const WS_CONNECTING = 0;
 const WS_OPEN = 1;
+/** Close codes a browser accepts: 1000, or 3000-4999 (WHATWG WebSocket.close). */
 const CLOSE_NORMAL = 1000;
-const CLOSE_FAILED = 1011;
+const CLOSE_FAILED = 4011;
 
 /** The tunnel never opened within the retry budget. */
 class TunnelOpenError extends Error {
@@ -268,12 +287,16 @@ class ChannelFacade {
   }
 
   send(data: string | ArrayBuffer | ArrayBufferView): void {
-    if (this.closed) throw new Error("Data channel is closed.");
+    // Same errors as a native RTCDataChannel.
+    if (this.closed) throw new DOMException("Data channel is closed.", "InvalidStateError");
     if (this.tunnelled) {
+      if (!this.tunnelReady) {
+        throw new DOMException("Data channel is not open.", "InvalidStateError");
+      }
       this.session.tunnelSend(data);
       return;
     }
-    if (!this.native) throw new Error("Data channel has no native transport.");
+    if (!this.native) throw new DOMException("Data channel is not open.", "InvalidStateError");
     if (typeof data === "string") this.native.send(data);
     else if (data instanceof ArrayBuffer) this.native.send(data);
     // The DOM types want an ArrayBuffer-backed view; a SharedArrayBuffer view
@@ -309,18 +332,20 @@ class ChannelFacade {
     this.tunnelReady = true;
     if (!this.opened) {
       this.opened = true;
-      this.hub.dispatch("open", { type: "open" });
+      this.fire("open");
     }
   }
 
   deliver(data: string | ArrayBuffer): void {
     if (this.closed) return;
-    this.hub.dispatch("message", { type: "message", data });
+    // Honour binaryType: "blob" gets a Blob, anything else the ArrayBuffer.
+    const payload = typeof data !== "string" && this.kind === "blob" ? new Blob([data]) : data;
+    this.fire("message", { data: payload });
   }
 
   dispatchBufferedLow(): void {
     if (this.closed) return;
-    this.hub.dispatch("bufferedamountlow", { type: "bufferedamountlow" });
+    this.fire("bufferedamountlow");
   }
 
   /** Mark closed without an event. The session's own close does this. */
@@ -331,37 +356,43 @@ class ChannelFacade {
   /** Mark closed and tell Trystero, once. */
   emitClose(): void {
     this.closed = true;
-    this.hub.dispatch("close", { type: "close" });
+    this.fire("close");
+  }
+
+  /** Every event carries `type` and `target` (this channel). */
+  private fire(type: string, props: object = {}): void {
+    this.hub.dispatch(type, { type, target: this, ...props });
   }
 
   private attach(native: RTCDataChannel): void {
     this.native = native;
     native.binaryType = this.kind;
-    native.addEventListener("open", (event) => {
+    native.addEventListener("open", () => {
       if (this.tunnelled || this.closed) return;
       this.opened = true;
-      this.hub.dispatch("open", event);
+      this.session.onChannelOpened();
+      this.fire("open");
     });
     native.addEventListener("message", (event) => {
       if (this.tunnelled || this.closed) return;
-      this.hub.dispatch("message", event);
+      this.fire("message", { data: event.data });
     });
     native.addEventListener("error", (event) => {
       if (this.tunnelled || this.closed) return;
-      this.hub.dispatch("error", event);
+      this.fire("error", { error: event.error });
     });
-    native.addEventListener("bufferedamountlow", (event) => {
+    native.addEventListener("bufferedamountlow", () => {
       if (this.tunnelled || this.closed) return;
-      this.hub.dispatch("bufferedamountlow", event);
+      this.fire("bufferedamountlow");
     });
-    native.addEventListener("close", (event) => {
+    native.addEventListener("close", () => {
       if (this.tunnelled || this.closed) return;
       // A close before the first open is the failed native attempt. The
-      // fallback owns that decision, so it is not forwarded (PLAN.md §5.5).
+      // deadline decides (PLAN.md §5.5), so it is not forwarded here.
       if (!this.opened && !this.session.nativeConnectionClosed()) return;
       this.closed = true;
       this.session.close();
-      this.hub.dispatch("close", event);
+      this.fire("close");
     });
   }
 }
@@ -372,6 +403,8 @@ class Session {
   mode: "native" | "tunnel" = "native";
   channel: ChannelFacade | null = null;
   closed = false;
+  /** The wrapper handed to Trystero. Set right after construction. */
+  self: RTCPeerConnection | null = null;
 
   private terminated = false;
   private everConnected = false;
@@ -379,8 +412,8 @@ class Session {
   private timerStartedAt = 0;
   private timer: unknown = undefined;
   private switchedAt = 0;
-  private retryTimer: unknown = undefined;
-  private wakeRetry: (() => void) | undefined = undefined;
+  private pauseTimer: unknown = undefined;
+  private wakePause: (() => void) | undefined = undefined;
 
   private socket: WebSocket | null = null;
   private cipher: TunnelCipher | null = null;
@@ -389,7 +422,10 @@ class Session {
   private openReadyGate: () => void = () => undefined;
   private sendChain: Promise<void> = Promise.resolve();
   private recvChain: Promise<void> = Promise.resolve();
+  /** Wire bytes accepted by send() and not yet handed to the socket. */
   private pendingBytes = 0;
+  private paceTokens = TUNNEL_PACE_BURST_BYTES;
+  private paceRefilledAt: number;
   private lowArmed = false;
   private lowTimer: unknown = undefined;
 
@@ -397,6 +433,7 @@ class Session {
     private readonly native: RTCPeerConnection,
     private readonly deps: Deps,
   ) {
+    this.paceRefilledAt = deps.now();
     this.readyGate = new Promise<void>((resolve) => {
       this.openReadyGate = resolve;
     });
@@ -465,16 +502,25 @@ class Session {
     else this.native.removeEventListener(type, fn);
   }
 
+  /**
+   * Tears everything down: timers, the socket, the native connection and the
+   * channel. Idempotent. Never throws, so a caller's teardown always finishes.
+   */
   close(code = CLOSE_NORMAL, reason = "closed"): void {
     if (this.closed) return;
     this.closed = true;
+    this.pendingBytes = 0;
     this.clearTimer();
     this.clearLowTimer();
-    this.cancelRetryPause();
+    this.cancelPause();
     this.openReadyGate();
     const socket = this.socket;
     if (socket && (socket.readyState === WS_CONNECTING || socket.readyState === WS_OPEN)) {
-      socket.close(code, reason);
+      try {
+        socket.close(code, reason);
+      } catch {
+        // The socket is going away on its own. Teardown must still run.
+      }
     }
     this.native.close();
     this.channel?.markClosed();
@@ -483,7 +529,8 @@ class Session {
   // ---- Switch decision ----
 
   private maybeStartTimer(): void {
-    if (this.timerStarted || this.closed || this.mode !== "native" || this.everConnected) return;
+    if (this.timerStarted || this.closed || this.mode !== "native") return;
+    if (this.channel?.hasOpened()) return;
     if (!this.native.localDescription || !this.native.remoteDescription) return;
     this.timerStarted = true;
     this.timerStartedAt = this.deps.now();
@@ -493,34 +540,36 @@ class Session {
     }, this.deps.fallbackAfterMs);
   }
 
+  /**
+   * The deadline. Switch unless the data channel has opened. A connected peer
+   * connection with a closed channel is stuck, so it switches too.
+   */
   private onTimeout(): void {
     if (this.closed || this.mode !== "native") return;
-    if (this.isHealthy()) return;
+    if (this.channel?.hasOpened()) return;
     this.switchToTunnel("timeout");
+  }
+
+  /** Called by the channel when the native channel opens. The pair is healthy. */
+  onChannelOpened(): void {
+    this.clearTimer();
   }
 
   private onNativeState(): void {
     if (this.closed || this.mode !== "native") return;
-    if (this.isHealthy()) {
-      this.everConnected = true;
-      this.clearTimer();
-    }
     const native = this.native;
+    if (
+      native.connectionState === "connected" ||
+      native.iceConnectionState === "connected" ||
+      native.iceConnectionState === "completed"
+    ) {
+      this.everConnected = true;
+    }
     if (native.connectionState === "failed" || native.iceConnectionState === "failed") {
       this.switchToTunnel("native-failed");
       return;
     }
     this.emitStates();
-  }
-
-  private isHealthy(): boolean {
-    const native = this.native;
-    return (
-      native.connectionState === "connected" ||
-      native.iceConnectionState === "connected" ||
-      native.iceConnectionState === "completed" ||
-      (this.channel?.hasOpened() ?? false)
-    );
   }
 
   private switchToTunnel(reason: FallbackReason): void {
@@ -570,7 +619,7 @@ class Session {
         if (this.closed) throw error;
         if (attempt >= OPEN_ATTEMPTS) throw new TunnelOpenError(attempt);
         if (this.deps.now() + delay > deadline) throw new TunnelOpenError(attempt);
-        await this.pauseRetry(delay);
+        await this.pause(delay);
         if (this.closed) throw error;
         delay *= 2;
       }
@@ -597,24 +646,25 @@ class Session {
     });
   }
 
-  private pauseRetry(ms: number): Promise<void> {
+  /** A cancellable wait. Used by open retries and by send pacing. */
+  private pause(ms: number): Promise<void> {
     return new Promise<void>((resolve) => {
-      this.wakeRetry = resolve;
-      this.retryTimer = this.deps.schedule(() => {
-        this.retryTimer = undefined;
-        this.wakeRetry = undefined;
+      this.wakePause = resolve;
+      this.pauseTimer = this.deps.schedule(() => {
+        this.pauseTimer = undefined;
+        this.wakePause = undefined;
         resolve();
       }, ms);
     });
   }
 
-  private cancelRetryPause(): void {
-    if (this.retryTimer !== undefined) {
-      this.deps.cancel(this.retryTimer);
-      this.retryTimer = undefined;
+  private cancelPause(): void {
+    if (this.pauseTimer !== undefined) {
+      this.deps.cancel(this.pauseTimer);
+      this.pauseTimer = undefined;
     }
-    const wake = this.wakeRetry;
-    this.wakeRetry = undefined;
+    const wake = this.wakePause;
+    this.wakePause = undefined;
     wake?.();
   }
 
@@ -665,36 +715,69 @@ class Session {
       const facade = new ChannelFacade(this, null);
       facade.enterTunnel();
       this.channel = facade;
-      this.pcEvents.dispatch("datachannel", { type: "datachannel", channel: facade });
+      this.firePc("datachannel", { channel: facade });
     }
     this.channel?.tunnelOpened();
   }
 
+  /** Callers check that the tunnel is ready (ChannelFacade.send does). */
   tunnelSend(data: string | ArrayBuffer | ArrayBufferView): void {
-    if (this.closed) throw new Error("Data channel is closed.");
+    if (this.closed) throw new DOMException("Data channel is closed.", "InvalidStateError");
     const encoded = encodeTunnelMessage(data);
     const payloadBytes = encoded.byteLength - 1;
     const limit = TUNNEL_MAX_FRAME_BYTES - TUNNEL_FRAME_OVERHEAD_BYTES;
     if (payloadBytes > limit) {
       throw new RangeError(`Tunnel message is ${payloadBytes} bytes; the limit is ${limit} bytes.`);
     }
-    this.pendingBytes += payloadBytes;
-    // One serial chain: frames are sealed and sent in the order sent.
+    // Wire bytes, the same unit as socket.bufferedAmount and the server's budget.
+    const wireBytes = payloadBytes + TUNNEL_FRAME_OVERHEAD_BYTES;
+    this.pendingBytes += wireBytes;
+    // One serial chain: frames are sealed, paced and sent in the order sent.
     this.sendChain = this.sendChain
       .then(async () => {
         if (!this.ready) await this.readyGate;
         if (this.closed || !this.cipher || !this.socket) return;
         const frame = await this.cipher.seal(encoded);
+        await this.paceFrame(frame.byteLength);
         if (this.closed || !this.socket) return;
         this.socket.send(frame);
-        this.pendingBytes -= payloadBytes;
+        this.pendingBytes -= wireBytes;
         this.checkBufferedLow();
       })
       .catch((error: unknown) => this.failTerminal({ reason: "send-failed", error }));
     this.checkBufferedLow();
   }
 
+  /**
+   * Waits until the pace bucket holds `bytes` wire bytes, then takes them.
+   * The bucket starts full and refills at TUNNEL_PACE_BYTES_PER_SECOND. The
+   * frame's bytes count toward bufferedAmount while this waits.
+   */
+  private async paceFrame(bytes: number): Promise<void> {
+    for (;;) {
+      this.refillPaceTokens();
+      if (this.paceTokens >= bytes) {
+        this.paceTokens -= bytes;
+        return;
+      }
+      const waitMs = Math.ceil(((bytes - this.paceTokens) * 1000) / TUNNEL_PACE_BYTES_PER_SECOND);
+      await this.pause(waitMs);
+      if (this.closed) return;
+    }
+  }
+
+  private refillPaceTokens(): void {
+    const now = this.deps.now();
+    const elapsedMs = now - this.paceRefilledAt;
+    this.paceTokens = Math.min(
+      TUNNEL_PACE_BURST_BYTES,
+      this.paceTokens + (elapsedMs * TUNNEL_PACE_BYTES_PER_SECOND) / 1000,
+    );
+    this.paceRefilledAt = now;
+  }
+
   tunnelBufferedAmount(): number {
+    if (this.closed) return 0;
     return this.pendingBytes + (this.socket?.bufferedAmount ?? 0);
   }
 
@@ -718,14 +801,22 @@ class Session {
     }
   }
 
-  /** Terminal: close everything, tell Trystero once, then report once. */
+  /**
+   * Terminal failure. Teardown always runs (the `finally`). Then Trystero is
+   * told: the channel closes, and the connection state reads "closed" even when
+   * no channel exists yet (an answerer before pairing). Then the report, once.
+   */
   private failTerminal(info: TerminalFailureInfo): void {
     if (this.closed || this.terminated) return;
     this.terminated = true;
     const channel = this.channel;
-    this.close(CLOSE_FAILED, "tunnel failed");
-    channel?.emitClose();
-    invokeCallback(() => this.deps.onTerminalFailure?.(info));
+    try {
+      this.close(CLOSE_FAILED, "tunnel failed");
+    } finally {
+      channel?.emitClose();
+      this.emitStates();
+      invokeCallback(() => this.deps.onTerminalFailure?.(info));
+    }
   }
 
   // ---- Native channel ----
@@ -736,14 +827,19 @@ class Session {
     if (this.closed || this.mode === "tunnel") return;
     const facade = new ChannelFacade(this, native);
     this.channel = facade;
-    this.pcEvents.dispatch("datachannel", { type: "datachannel", channel: facade });
+    this.firePc("datachannel", { channel: facade });
   }
 
   // ---- Helpers ----
 
   private emitStates(): void {
-    this.pcEvents.dispatch("connectionstatechange", { type: "connectionstatechange" });
-    this.pcEvents.dispatch("iceconnectionstatechange", { type: "iceconnectionstatechange" });
+    this.firePc("connectionstatechange");
+    this.firePc("iceconnectionstatechange");
+  }
+
+  /** Every event carries `type` and `target` (the wrapper). */
+  private firePc(type: string, props: object = {}): void {
+    this.pcEvents.dispatch(type, { type, target: this.self, ...props });
   }
 
   private clearTimer(): void {
@@ -778,7 +874,7 @@ function invokeCallback(callback: () => void): void {
 
 function createWrapper(native: RTCPeerConnection, deps: Deps): RTCPeerConnection {
   const session = new Session(native, deps);
-  return new Proxy(native, {
+  const wrapper = new Proxy(native, {
     get(target, prop) {
       const handlerEvent = typeof prop === "string" ? HANDLER_EVENTS.get(prop) : undefined;
       if (handlerEvent !== undefined) return session.pcEvents.handler(handlerEvent);
@@ -820,6 +916,8 @@ function createWrapper(native: RTCPeerConnection, deps: Deps): RTCPeerConnection
       return Reflect.set(target, prop, value, target);
     },
   });
+  session.self = wrapper;
+  return wrapper;
 }
 
 /**
