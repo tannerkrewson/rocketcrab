@@ -176,9 +176,18 @@ function deriveDirectionalKey(
 
 /**
  * Seals outgoing frames and opens incoming ones for one tunnel. Each
- * direction has its own sequence counter, which is the AES-GCM AAD. Any
- * `open` failure makes the cipher unusable, and the caller must close the
- * tunnel. Instances are not shared between tunnels.
+ * direction has its own sequence counter, which is the AES-GCM AAD.
+ *
+ * Operations in each direction run strictly one at a time, in call order. A
+ * later call starts only after the earlier one in its direction has settled,
+ * and the sequence number is claimed when it starts. So the promises resolve
+ * in call order, and `ws.send(await cipher.seal(x))` in call order sends frames
+ * in sequence even when a large frame finishes encrypting after a small one.
+ *
+ * Any failure poisons the whole cipher, including a failed `seal`, whose
+ * sequence number is already consumed. Every operation that starts afterwards
+ * rejects. The caller must close the tunnel. Instances are not shared between
+ * tunnels.
  */
 export class TunnelCipher {
   private readonly sendKey: CryptoKey;
@@ -186,6 +195,8 @@ export class TunnelCipher {
   private sendSequence = 0n;
   private receiveSequence = 0n;
   private failed = false;
+  private sendQueue: Promise<unknown> = Promise.resolve();
+  private receiveQueue: Promise<unknown> = Promise.resolve();
 
   constructor(keys: { sendKey: CryptoKey; receiveKey: CryptoKey }) {
     this.sendKey = keys.sendKey;
@@ -194,10 +205,28 @@ export class TunnelCipher {
 
   /**
    * Encrypt one plaintext into a frame: 12-byte random IV ‖ ciphertext+tag.
-   * The sequence number is claimed before the first `await`, so concurrent
-   * calls never share one.
+   * Resolves in call order with all other `seal` calls.
    */
-  async seal(plaintext: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+  seal(plaintext: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+    const run = this.sendQueue.then(() => this.sealNow(plaintext));
+    this.sendQueue = run.catch(() => undefined);
+    return run;
+  }
+
+  /**
+   * Authenticate and decrypt the next expected incoming frame. Resolves in
+   * call order with all other `open` calls. Throws `TunnelFrameError` with code
+   * `auth-failed` for any failure, including a short frame, a replayed,
+   * reflected, reordered or skipped frame, or a frame that starts after an
+   * earlier failure.
+   */
+  open(frame: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+    const run = this.receiveQueue.then(() => this.openNow(frame));
+    this.receiveQueue = run.catch(() => undefined);
+    return run;
+  }
+
+  private async sealNow(plaintext: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
     if (this.failed) {
       throw new Error(
         "Tunnel cipher is unusable after an authentication failure; close the tunnel.",
@@ -208,28 +237,28 @@ export class TunnelCipher {
     }
     const sequence = this.sendSequence;
     this.sendSequence += 1n;
-    const iv = crypto.getRandomValues(new Uint8Array(TUNNEL_IV_BYTES));
-    const ciphertext = new Uint8Array(
-      await crypto.subtle.encrypt(
-        { name: "AES-GCM", iv, additionalData: sequenceAad(sequence) },
-        this.sendKey,
-        plaintext,
-      ),
-    );
-    const frame = new Uint8Array(TUNNEL_IV_BYTES + ciphertext.byteLength);
-    frame.set(iv, 0);
-    frame.set(ciphertext, TUNNEL_IV_BYTES);
-    return frame;
+    try {
+      const iv = crypto.getRandomValues(new Uint8Array(TUNNEL_IV_BYTES));
+      const ciphertext = new Uint8Array(
+        await crypto.subtle.encrypt(
+          { name: "AES-GCM", iv, additionalData: sequenceAad(sequence) },
+          this.sendKey,
+          plaintext,
+        ),
+      );
+      const frame = new Uint8Array(TUNNEL_IV_BYTES + ciphertext.byteLength);
+      frame.set(iv, 0);
+      frame.set(ciphertext, TUNNEL_IV_BYTES);
+      return frame;
+    } catch (cause) {
+      // The sequence number is spent but no frame went out, so the peer would
+      // see a gap. The tunnel cannot continue.
+      this.failed = true;
+      throw new Error("Tunnel seal failed; close the tunnel.", { cause });
+    }
   }
 
-  /**
-   * Authenticate and decrypt the next expected incoming frame. Throws
-   * `TunnelFrameError` with code `auth-failed` for any failure, including a
-   * short frame, a replayed, reflected, reordered or skipped frame, or a
-   * frame received after an earlier failure. After a failure every further
-   * call throws.
-   */
-  async open(frame: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
+  private async openNow(frame: Uint8Array<ArrayBuffer>): Promise<Uint8Array<ArrayBuffer>> {
     if (this.failed) {
       throw authFailed("Tunnel was already closed by an earlier authentication failure.");
     }
@@ -241,17 +270,13 @@ export class TunnelCipher {
       }
       const iv = frame.subarray(0, TUNNEL_IV_BYTES);
       const sealed = frame.subarray(TUNNEL_IV_BYTES);
-      const plaintext = new Uint8Array(
+      return new Uint8Array(
         await crypto.subtle.decrypt(
           { name: "AES-GCM", iv, additionalData: sequenceAad(sequence) },
           this.receiveKey,
           sealed,
         ),
       );
-      if (this.failed) {
-        throw authFailed("Tunnel failed before this frame was checked.");
-      }
-      return plaintext;
     } catch (cause) {
       this.failed = true;
       throw authFailed("Tunnel frame failed authentication; close the tunnel.", cause);

@@ -360,6 +360,91 @@ describe("TunnelCipher", () => {
   });
 });
 
+describe("TunnelCipher call order", () => {
+  const BIG = 256 * 1024;
+  // WebCrypto finishes a small job before a large one in most trials, so repeat
+  // each scenario so that the old, unserialised code fails reliably.
+  const TRIALS = 10;
+
+  it("resolves seals in call order when a later, smaller seal finishes first", async () => {
+    for (let trial = 0; trial < TRIALS; trial += 1) {
+      const { chrome } = await tunnelPair();
+      const order: string[] = [];
+      const big = chrome.seal(bytes(BIG, 1)).then((frame) => {
+        order.push("big");
+        return frame;
+      });
+      const small = chrome.seal(bytes(16, 2)).then((frame) => {
+        order.push("small");
+        return frame;
+      });
+      await Promise.all([big, small]);
+      expect(order).toEqual(["big", "small"]);
+    }
+  });
+
+  it("resolves opens in call order when a later, smaller frame decrypts first", async () => {
+    for (let trial = 0; trial < TRIALS; trial += 1) {
+      const { chrome, firefox } = await tunnelPair();
+      const bigFrame = await chrome.seal(bytes(BIG, 3));
+      const smallFrame = await chrome.seal(bytes(16, 4));
+      const order: string[] = [];
+      const big = firefox.open(bigFrame).then((plaintext) => {
+        order.push("big");
+        return plaintext;
+      });
+      const small = firefox.open(smallFrame).then((plaintext) => {
+        order.push("small");
+        return plaintext;
+      });
+      const [bigPlaintext, smallPlaintext] = await Promise.all([big, small]);
+      expect(order).toEqual(["big", "small"]);
+      expect(bigPlaintext).toEqual(bytes(BIG, 3));
+      expect(smallPlaintext).toEqual(bytes(16, 4));
+    }
+  });
+
+  it("opens every frame when the wire carries them in resolution order", async () => {
+    for (let trial = 0; trial < TRIALS; trial += 1) {
+      const { chrome, firefox } = await tunnelPair();
+      // The "wire": frames appended in the order their seals resolved, which is
+      // the order a `ws.send(await cipher.seal(x))` loop would transmit them.
+      const wire: { size: number; frame: Uint8Array<ArrayBuffer> }[] = [];
+      await Promise.all([
+        chrome.seal(bytes(BIG, 5)).then((frame) => wire.push({ size: BIG, frame })),
+        chrome.seal(bytes(16, 6)).then((frame) => wire.push({ size: 16, frame })),
+        chrome.seal(bytes(64, 7)).then((frame) => wire.push({ size: 64, frame })),
+      ]);
+      for (const { size, frame } of wire) {
+        const plaintext = await firefox.open(frame);
+        expect(plaintext.byteLength).toBe(size);
+      }
+    }
+  });
+
+  it("rejects opens queued behind a failed open, even a valid frame", async () => {
+    const { chrome, firefox } = await tunnelPair();
+    const first = await chrome.seal(bytes(8));
+    const second = await chrome.seal(bytes(8));
+    const corrupted = first.slice();
+    corrupted[corrupted.length - 1] = (corrupted[corrupted.length - 1] ?? 0) ^ 0x01;
+    const results = await Promise.allSettled([firefox.open(corrupted), firefox.open(second)]);
+    for (const result of results) {
+      expect(result.status).toBe("rejected");
+      expect((result as PromiseRejectedResult).reason).toMatchObject({ code: "auth-failed" });
+    }
+  });
+
+  it("poisons the cipher after a failed seal, so queued seals reject as unusable", async () => {
+    const keys = await deriveTunnelKeys(SECRET_A, PAIR, 0);
+    // A receive-only key cannot encrypt, so the seal itself fails.
+    const cipher = new TunnelCipher({ sendKey: keys.receiveKey, receiveKey: keys.receiveKey });
+    const results = await Promise.allSettled([cipher.seal(bytes(4)), cipher.seal(bytes(4))]);
+    expect((results[0] as PromiseRejectedResult).reason.message).toMatch(/seal failed/u);
+    expect((results[1] as PromiseRejectedResult).reason.message).toMatch(/unusable/u);
+  });
+});
+
 describe("tunnel message encoding", () => {
   it("round-trips a string with emoji and tags it as text", () => {
     const text = "héllo 🚀 world 👋🏽";
