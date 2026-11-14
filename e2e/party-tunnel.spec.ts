@@ -114,6 +114,52 @@ async function revealedRows(frame: Frame): Promise<string[]> {
   });
 }
 
+/**
+ * PLAN.md §7 stages 2–3 in a real lobby: a forced-tunnel pair admits both
+ * players with no alarm (no "Couldn't connect" alert on either side), and the
+ * diagnostics mark the other player "relayed" on each side.
+ */
+test("a tunnelled pair joins with no alarm and shows a relayed badge", async ({ browser }) => {
+  test.setTimeout(240_000);
+  const host = await newPlayer(browser, false);
+  const forced = await newPlayer(browser, true);
+  const players = [host, forced];
+  try {
+    await host.page.goto("/party");
+    await expect(host.page.getByRole("button", { name: "Copy URL" })).toBeEnabled({
+      timeout: 120_000,
+    });
+    await host.page.getByRole("button", { name: "Copy URL" }).click();
+    let invite = "";
+    await expect
+      .poll(async () => {
+        invite = await host.page.evaluate(
+          () => (window as unknown as { __copied: string[] }).__copied.at(-1) ?? "",
+        );
+        return invite;
+      })
+      .toContain("/join#secret=");
+
+    await forced.page.goto(invite);
+    for (const player of players) {
+      await expect(player.page.locator('[data-testid^="party-member-"]')).toHaveCount(2, {
+        timeout: 120_000,
+      });
+    }
+    await expect.poll(() => forced.pairedAt.length, { timeout: 60_000 }).toBe(1);
+
+    for (const player of players) {
+      await expect(player.page.getByText("Couldn't connect to a player.")).toHaveCount(0);
+      await player.page.getByText("Connection diagnostics").click();
+      await expect(player.page.getByText("relayed", { exact: true })).toBeVisible({
+        timeout: 30_000,
+      });
+    }
+  } finally {
+    for (const player of players) await player.context.close();
+  }
+});
+
 // Party proof (PLAN §5.6): a 3-player party, one player forced onto the tunnel,
 // plays the sample game; a player's game rebooted after start still gets start.
 // Runs on every browser, with retries disabled so that a start stall is not
