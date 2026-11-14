@@ -24,6 +24,11 @@ npm run test:e2e:trystero
      real transport — the host registers a multi-chunk game source, the
      admitted joiner requests and receives it byte-identical, and the
      SHA-256 digest + byte count verify before launch.
+  4. Real `room-full` rejection: a test-only raw Trystero page
+     (`room-full.html`, `src/room-full-proof.ts`) joins with `maxUsers: 2`; a
+     third joiner gets a real RoomError mapped by `fromRoomError`, and the first
+     two stay connected. This does not use `TrysteroTransport.join`; production
+     sets no cap.
 
 ## Multi-hop scale proof
 
