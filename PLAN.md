@@ -749,24 +749,28 @@ change. One commit per area, `npm run check` + `npm run test:e2e` each time.
 
 ## Decisions log
 
-| Date       | Decision                                                                                    |
-| ---------- | ------------------------------------------------------------------------------------------- |
-| 2026-11-12 | OpenTofu removed; `wrangler.toml` + `wrangler deploy` is the only path.                     |
-| 2026-11-12 | One `VITE_EDGE_ORIGIN` for relay + TURN (+ signal, tunnel, log).                            |
-| 2026-11-12 | Static hosting moves from GitHub Pages to Cloudflare assets Workers.                        |
-| 2026-11-12 | Runtime stays on workers.dev permanently (separate site = isolation).                       |
-| 2026-11-12 | Beta on workers.dev; saved games not migrated at cutover (accepted).                        |
-| 2026-11-12 | Migrate to Trystero 0.27; adopt every feature that fits Nova.                               |
-| 2026-11-12 | Own signaling relay replaces public Nostr relays (no Nostr backup).                         |
-| 2026-11-12 | Fallback for WebRTC-blocking networks via `rtcPolyfill` tunnel, per pair; prototype first.  |
-| 2026-11-12 | Unlimited party size: adopt `scale()`, no `maxUsers`, load-test large rooms.                |
-| 2026-11-12 | Signaling: one Durable Object per room (`/signal/<roomKey>`); tunnel: one per pair.         |
-| 2026-11-12 | Workers Free through beta; Workers Paid ($5/month) from the `rocketcrab.com` cutover.       |
-| 2026-11-12 | No host-relayed star topology; Trystero mesh (+ tunnel) instead.                            |
-| 2026-11-12 | Do not propose the fallback upstream (maintainer rejected in #173).                         |
-| 2026-11-13 | §7: generic "Connecting to a player…" for unknown peers; no pre-connect discovery protocol. |
-| 2026-11-13 | §8: log an explicit `unknown` outcome when the connection path can't be determined.         |
-| 2026-11-13 | §3.7: no 100-browser runs; browsers ≤ 50 players, larger sizes via in-process simulation.   |
+| Date       | Decision                                                                                       |
+| ---------- | ---------------------------------------------------------------------------------------------- |
+| 2026-11-12 | OpenTofu removed; `wrangler.toml` + `wrangler deploy` is the only path.                        |
+| 2026-11-12 | One `VITE_EDGE_ORIGIN` for relay + TURN (+ signal, tunnel, log).                               |
+| 2026-11-12 | Static hosting moves from GitHub Pages to Cloudflare assets Workers.                           |
+| 2026-11-12 | Runtime stays on workers.dev permanently (separate site = isolation).                          |
+| 2026-11-12 | Beta on workers.dev; saved games not migrated at cutover (accepted).                           |
+| 2026-11-12 | Migrate to Trystero 0.27; adopt every feature that fits Nova.                                  |
+| 2026-11-12 | Own signaling relay replaces public Nostr relays (no Nostr backup).                            |
+| 2026-11-12 | Fallback for WebRTC-blocking networks via `rtcPolyfill` tunnel, per pair; prototype first.     |
+| 2026-11-12 | Unlimited party size: adopt `scale()`, no `maxUsers`, load-test large rooms.                   |
+| 2026-11-12 | Signaling: one Durable Object per room (`/signal/<roomKey>`); tunnel: one per pair.            |
+| 2026-11-12 | Workers Free through beta; Workers Paid ($5/month) from the `rocketcrab.com` cutover.          |
+| 2026-11-12 | No host-relayed star topology; Trystero mesh (+ tunnel) instead.                               |
+| 2026-11-12 | Do not propose the fallback upstream (maintainer rejected in #173).                            |
+| 2026-11-13 | §7: generic "Connecting to a player…" for unknown peers; no pre-connect discovery protocol.    |
+| 2026-11-13 | §8: log an explicit `unknown` outcome when the connection path can't be determined.            |
+| 2026-11-13 | §3.7: no 100-browser runs; browsers ≤ 50 players, larger sizes via in-process simulation.      |
+| 2026-11-13 | §5: owner approved building the production fallback (steps 2–7) after the prototype.           |
+| 2026-11-13 | §3.7: approved fixing authority fan-out (lean snapshots, targeted dispatch, then deltas).      |
+| 2026-11-13 | §3.5: keep Nova member IDs; Trystero persistent identity not adopted (multi-tab/storage risk). |
+| 2026-11-13 | Owner pre-approved remaining gates; prefer simple, robust choices.                             |
 
 ## Legacy branches (no action needed for Nova)
 
