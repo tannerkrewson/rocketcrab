@@ -403,6 +403,7 @@ describe("peer message schemas", () => {
       }),
     );
     expect(parsed.historyMode).toBe("full");
+    expect(parsed.historyComplete).toBe(true);
   });
 
   it("rejects unknown message types with a useful error", () => {

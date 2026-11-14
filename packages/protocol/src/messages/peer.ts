@@ -209,6 +209,12 @@ export const stateSnapshotMessageSchema = z.object({
    * another lineage, which is a gap. Absent on full snapshots.
    */
   baseStateHash: sha256Schema.optional(),
+  /**
+   * False when the sender's window has a known gap. A complete shell merges
+   * such a full snapshot instead of replacing its own window. Absent from
+   * older senders, which always sent complete windows, so it defaults to true.
+   */
+  historyComplete: z.boolean().default(true),
   processedActionIds: z.array(z.string().min(1).max(64)).max(stateHistoryLimit),
   state: z.unknown(),
 });
