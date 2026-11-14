@@ -527,6 +527,19 @@ export class NovaStateEngine {
     this.authorityElect = this.authorityMemberId ?? this.lowestEligibleMemberId();
   }
 
+  /**
+   * Read-only: true when beginGame() would elect this member. The election
+   * is only fixed by beginGame(), so a session that has not started yet asks
+   * this instead of isAuthorityElect(). Mirrors beginGame's rule exactly.
+   */
+  wouldElectSelf(): boolean {
+    return (
+      !this.started &&
+      this.authorityMemberId === null &&
+      this.lowestEligibleMemberId() === this.selfMemberId
+    );
+  }
+
   /** Mark the game as ended (late actions are rejected, timers stop). */
   endGame(): void {
     this.ended = true;

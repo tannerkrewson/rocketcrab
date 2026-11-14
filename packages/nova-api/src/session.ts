@@ -541,7 +541,9 @@ export class NovaSession implements NovaClientBackend {
    * announces, then broadcasts start — so every frame sees state and the
    * authority before `nova.onStart` fires. Followers broadcast start but
    * emit it locally only when the authority's `game.start` (or the catch-up
-   * snapshot, for late joiners) arrives. Idempotent.
+   * snapshot, for late joiners) arrives. Idempotent. A start request from
+   * another member, received by the elected authority before it has started,
+   * also calls this (see the `game.start` case).
    */
   start(): void {
     if (this.started) return;
@@ -1104,6 +1106,22 @@ export class NovaSession implements NovaClientBackend {
             // Every session runs its own local clock from game start.
             this.simulationEngine.begin();
           }
+          break;
+        }
+        // A start request from another admitted member. The lowest eligible
+        // member is the elected authority, and it is the only session that
+        // can start the game as authority. A host that is not the lowest id
+        // (the host's own start() sends game.start as a follower) would
+        // otherwise leave the game stuck in "starting". Trust is cooperative:
+        // any admitted member may request the start; the UI gate stays
+        // host-only. The elected authority honours the request by calling
+        // start(), whose authoritative game.start the others accept above.
+        if (
+          !this.started &&
+          this.engine.wouldElectSelf() &&
+          this.playersMap.has(peerMessage.senderMemberId)
+        ) {
+          this.start();
         }
         break;
       case "game.end":
