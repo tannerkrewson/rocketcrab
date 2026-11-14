@@ -8,7 +8,7 @@
  * same shape the protocol validates (`stateDeltaOpSchema`), so a delta that
  * leaves the sender is one the receiver accepts.
  */
-import { stateDeltaMaxDepth, type StateDeltaOp } from "@rocketcrab/protocol";
+import { stateDeltaMaxDepth, stateDeltaOpsFit, type StateDeltaOp } from "@rocketcrab/protocol";
 
 export type JsonDeltaOp = StateDeltaOp;
 
@@ -57,23 +57,52 @@ function jsonEqual(a: unknown, b: unknown): boolean {
   return canonicalJson(a) === canonicalJson(b);
 }
 
-/** Operations that turn `prev` into `next`. Empty when they are equal. */
+/**
+ * Operations that turn `prev` into `next`. Empty when they are equal. Throws
+ * `JsonDeltaError` when a change would need an operation deeper than
+ * `stateDeltaMaxDepth`. The operations may still contain keys the protocol
+ * rejects: use `deltaFor` to get only a delta that fits.
+ */
 export function diffJson(prev: unknown, next: unknown): JsonDeltaOp[] {
   const ops: JsonDeltaOp[] = [];
   diffInto(prev, next, [], ops);
   return ops;
 }
 
+/**
+ * The delta from `prev` to `next` when it can be sent: every operation passes
+ * the protocol schema and the count bound. Otherwise null, and the caller
+ * sends the full state.
+ */
+export function deltaFor(prev: unknown, next: unknown): JsonDeltaOp[] | null {
+  let ops: JsonDeltaOp[];
+  try {
+    ops = diffJson(prev, next);
+  } catch (error) {
+    if (error instanceof JsonDeltaError) return null;
+    throw error;
+  }
+  return stateDeltaOpsFit(ops) ? ops : null;
+}
+
+/** A child path, refusing any path the protocol cannot carry. */
+function childPath(path: string[], key: string): string[] {
+  if (path.length + 1 > stateDeltaMaxDepth) {
+    throw new JsonDeltaError("change is deeper than the delta limit");
+  }
+  return [...path, key];
+}
+
 function diffInto(prev: unknown, next: unknown, path: string[], ops: JsonDeltaOp[]): void {
   if (isPlainObject(prev) && isPlainObject(next)) {
     for (const key of Object.keys(prev)) {
-      if (!hasOwn(next, key)) ops.push({ op: "del", path: [...path, key] });
+      if (!hasOwn(next, key)) ops.push({ op: "del", path: childPath(path, key) });
     }
     for (const key of Object.keys(next)) {
       if (hasOwn(prev, key)) {
-        diffInto(prev[key], next[key], [...path, key], ops);
+        diffInto(prev[key], next[key], childPath(path, key), ops);
       } else {
-        ops.push({ op: "set", path: [...path, key], value: next[key] });
+        ops.push({ op: "set", path: childPath(path, key), value: next[key] });
       }
     }
     return;

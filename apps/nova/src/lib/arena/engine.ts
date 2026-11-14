@@ -612,6 +612,9 @@ export class ArenaEngine {
           `Authority: ${event.authorityMemberId ?? "none"} (term ${event.term}).`,
         );
         break;
+      case "snapshotFallback":
+        this.logPlayer(id, "warn", `A state update was sent in full (${event.reason}).`);
+        break;
       case "historyIncomplete":
         this.logPlayer(
           id,

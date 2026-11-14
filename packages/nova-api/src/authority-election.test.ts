@@ -2291,6 +2291,14 @@ function deltaGameHandlers(): NovaStateHandlers {
         for (const key of Object.keys(draft)) delete draft[key];
         draft.reset = true;
       },
+      put(draft: Record<string, unknown>, _context, payload: { path: string[]; value: unknown }) {
+        let node: Record<string, unknown> = draft;
+        for (const key of payload.path.slice(0, -1)) {
+          if (typeof node[key] !== "object" || node[key] === null) node[key] = {};
+          node = node[key] as Record<string, unknown>;
+        }
+        node[payload.path[payload.path.length - 1] as string] = payload.value;
+      },
     },
   };
 }
@@ -2506,5 +2514,156 @@ describe("state deltas over the transport", { timeout: 60_000 }, () => {
       | undefined;
     expect(catchUp?.payload.stateMode).toBe("full");
     expect(late.getCanonicalState()?.state).toEqual(a.getCanonicalState()?.state);
+  });
+
+  /** Every key shape the protocol refuses must still converge, through a full snapshot. */
+  it.each([
+    ["a 65-character key", ["k".repeat(65)]],
+    ["an empty key", [""]],
+    ["a constructor key", ["constructor"]],
+  ])("a commit that adds %s is sent in full and every replica converges", async (_label, path) => {
+    const { hub, sessions } = await makeDeltaParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    const inbound = recordInbound(b);
+    // The sender chooses a full state up front, so no send fails and no fallback is raised.
+    const fallbacks: string[] = [];
+    a.onSessionEvent((event) => {
+      if (event.type === "snapshotFallback") fallbacks.push(event.reason);
+    });
+    const applied = c.dispatch({ type: "put", payload: { path, value: 7 } }, "put-0");
+    await pumpUntil(hub, () => b.getStateModeDiagnostics().revision === 2, "put commits");
+    await applied;
+    const commit = inbound
+      .map((entry) => entry.payload as { type?: string; revision?: number; stateMode?: string })
+      .find((payload) => payload.type === "state.snapshot" && payload.revision === 2);
+    expect(commit?.stateMode).toBe("full");
+    await pumpUntil(hub, () => c.getStateModeDiagnostics().revision === 2, "c applies the commit");
+    expect(fallbacks).toEqual([]);
+    expect(b.getCanonicalState()?.state).toEqual(a.getCanonicalState()?.state);
+    expect(c.getCanonicalState()?.state).toEqual(a.getCanonicalState()?.state);
+  });
+
+  it("a change 33 levels deep is sent in full and every replica converges", async () => {
+    const { hub, sessions } = await makeDeltaParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    const path = Array.from({ length: 33 }, (_, index) => `level${index}`);
+    // First the deep structure exists (its own delta is shallow)...
+    const built = c.dispatch({ type: "put", payload: { path, value: 1 } }, "deep-0");
+    await pumpUntil(hub, () => b.getStateModeDiagnostics().revision === 2, "deep structure");
+    await built;
+    // ...then a change to the leaf 33 levels down cannot be addressed by a delta.
+    const inbound = recordInbound(b);
+    const changed = c.dispatch({ type: "put", payload: { path, value: 2 } }, "deep-1");
+    await pumpUntil(hub, () => b.getStateModeDiagnostics().revision === 3, "deep change");
+    await changed;
+    const commit = inbound
+      .map((entry) => entry.payload as { type?: string; revision?: number; stateMode?: string })
+      .find((payload) => payload.type === "state.snapshot" && payload.revision === 3);
+    expect(commit?.stateMode).toBe("full");
+    await pumpUntil(
+      hub,
+      () => c.getStateModeDiagnostics().revision === 3,
+      "c applies the deep change",
+    );
+    expect(b.getCanonicalState()?.state).toEqual(a.getCanonicalState()?.state);
+    expect(c.getCanonicalState()?.state).toEqual(a.getCanonicalState()?.state);
+  });
+});
+
+describe("delta robustness (engine)", { timeout: 60_000 }, () => {
+  it("a full snapshot without its state asks for a repair instead of being dropped", async () => {
+    const { engine, host } = makeEngine("member-b");
+    await seedFollower(engine, 1, { count: 0 });
+    engine.handleSnapshot({
+      revision: 2,
+      stateHash: null,
+      term: 1,
+      authorityMemberId: "member-a",
+      historyMode: "full",
+      processedActionIds: [],
+      state: undefined,
+      senderMemberId: "member-a",
+    });
+    expect(engine.getRevision()).toBe(1);
+    expect(host.resyncs).toEqual([{ target: "member-a", request: { knownRevision: 1 } }]);
+  });
+
+  it("a synchronous hash failure during a delta does not leave the engine holding traffic", async () => {
+    let failHash = false;
+    // A plain (not async) function: the failure is thrown synchronously.
+    const { engine, host } = makeEngine("member-b", {
+      stateHash: (value) => {
+        if (failHash) throw new Error("hash backend unavailable");
+        return stateHashOf(value);
+      },
+    });
+    await seedFollower(engine, 1, { count: 0 });
+    const hash1 = await stateHashOf({ count: 0 });
+    failHash = true;
+    engine.handleSnapshot({
+      revision: 2,
+      stateHash: await stateHashOf({ count: 1 }),
+      term: 1,
+      authorityMemberId: "member-a",
+      historyMode: "increment",
+      baseStateHash: hash1,
+      stateMode: "delta",
+      ops: [{ op: "set", path: ["count"], value: 1 }],
+      processedActionIds: ["x"],
+      senderMemberId: "member-a",
+    });
+    expect(engine.isDeltaPending()).toBe(false);
+    expect(host.resyncs).toHaveLength(1);
+    // The engine is not wedged: a later full snapshot is applied.
+    failHash = false;
+    engine.handleSnapshot({
+      revision: 3,
+      stateHash: await stateHashOf({ count: 5 }),
+      term: 1,
+      authorityMemberId: "member-a",
+      historyMode: "full",
+      processedActionIds: [],
+      state: { count: 5 },
+      senderMemberId: "member-a",
+    });
+    expect(engine.getRevision()).toBe(3);
+  });
+
+  it("a delta that cannot be sent falls back to the full state and reports a diagnostic", async () => {
+    const big = {
+      createInitialState: () => ({
+        count: 0,
+        table: Object.fromEntries(
+          Array.from({ length: 40 }, (_, i) => [`pad-${i}`, "static value that never changes"]),
+        ),
+      }),
+      actions: {
+        bump(draft: { count: number }) {
+          draft.count += 1;
+        },
+      },
+    };
+    const host = new RecordingHost();
+    const sentEnvelopes: Array<{ stateMode: string }> = [];
+    host.sendSnapshot = (snapshot, target) => {
+      sentEnvelopes.push({ stateMode: snapshot.stateMode });
+      if (snapshot.stateMode === "delta") throw new Error("transport refused the delta");
+      host.snapshots.push({ target, snapshot });
+    };
+    const engine = trackEngine(
+      new NovaStateEngine({
+        host,
+        executor: new LocalGameExecutor(big),
+        selfMemberId: "member-a",
+        ...ENGINE_TIMINGS,
+      }),
+    );
+    engine.beginGame();
+    expect(await engine.initializeAsAuthority()).toBe(true);
+    engine.handleLocalAction({ actionId: "bump-1", type: "bump", payload: {}, baseRevision: 1 });
+    await waitForEngine(() => engine.getRevision() === 2, "bump commits");
+    expect(sentEnvelopes.map((entry) => entry.stateMode)).toEqual(["full", "delta", "full"]);
+    expect(host.events).toContainEqual(expect.objectContaining({ type: "snapshotFallback" }));
+    expect(host.snapshots[host.snapshots.length - 1]?.snapshot.revision).toBe(2);
   });
 });

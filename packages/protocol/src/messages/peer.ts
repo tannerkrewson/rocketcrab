@@ -209,6 +209,15 @@ export const stateDeltaOpSchema = z.discriminatedUnion("op", [
 export type StateDeltaOp = z.infer<typeof stateDeltaOpSchema>;
 
 /**
+ * True when `ops` is a valid state delta: every operation passes the schema
+ * and the list is within `stateDeltaMaxOps`. A sender uses this before it
+ * chooses a delta, so a delta it sends is always one receivers accept.
+ */
+export function stateDeltaOpsFit(ops: unknown): boolean {
+  return z.array(stateDeltaOpSchema).max(stateDeltaMaxOps).safeParse(ops).success;
+}
+
+/**
  * State snapshot: canonical replicated state with the conflict-reconciliation
  * envelope fields (ADR-0007: revision, term, authority member ID, state hash,
  * recent processed action IDs). Inspectable by party peers by design

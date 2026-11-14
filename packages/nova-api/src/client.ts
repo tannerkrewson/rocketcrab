@@ -112,6 +112,11 @@ export type NovaSessionEvent =
       type: "historyIncomplete";
       authorityMemberId: string;
       term: number;
+    }
+  | {
+      /** A broadcast fell back to a full state. Host-side only. */
+      type: "snapshotFallback";
+      reason: string;
     };
 
 /**
@@ -329,6 +334,7 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
       case "actionRejected":
       case "authorityChanged":
       case "historyIncomplete":
+      case "snapshotFallback":
         break; // host-side diagnostics; games observe acks and errors
     }
   });

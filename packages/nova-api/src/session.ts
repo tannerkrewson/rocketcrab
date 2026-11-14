@@ -1679,6 +1679,10 @@ export class NovaSession implements NovaClientBackend {
           term: event.term,
         });
         break;
+      case "snapshotFallback":
+        // Host-side diagnostic: a delta fell back to the full state; the game is unaffected.
+        this.emit({ type: "snapshotFallback", reason: event.reason });
+        break;
     }
   }
 

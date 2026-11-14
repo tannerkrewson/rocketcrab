@@ -76,7 +76,7 @@ import {
   stateSnapshotBytes,
 } from "@rocketcrab/protocol";
 import type { NovaStateExecutor } from "./state-executor";
-import { applyJsonPatch, canonicalJson, diffJson, type JsonDeltaOp } from "./json-delta";
+import { applyJsonPatch, canonicalJson, deltaFor, type JsonDeltaOp } from "./json-delta";
 import { assertStructuredCloneSafe } from "./validation";
 import type {
   NovaActionAck,
@@ -135,6 +135,11 @@ export interface StateSnapshotEnvelope {
 /** A request for a full snapshot after a gap in the authority's stream (state.resync). */
 export interface StateResyncEnvelope {
   readonly knownRevision: number;
+}
+
+/** Text for an error caught in a broadcast, for a diagnostic. */
+function describeError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
 }
 
 /** One inbound state snapshot, as the session hands it to the engine. */
@@ -243,6 +248,11 @@ export type StateEngineEvent =
   | { type: "electionStarted"; term: number }
   /** A received delta finished verification (applied or rejected). Host-side: release held traffic. */
   | { type: "deltaSettled" }
+  /**
+   * A broadcast could not be sent as a delta and fell back to the full state, or
+   * could not be sent at all. Host-side diagnostic only.
+   */
+  | { type: "snapshotFallback"; reason: string }
   /**
    * This node became authority with a gapped window. Host-side diagnostic
    * only: the game is not affected, and the window repairs on the next full
@@ -795,7 +805,17 @@ export class NovaStateEngine {
     }
     const baseRevision = this.revision;
     this.deltaPending = true;
-    this.stateHashImpl(next).then(
+    let pending: Promise<string>;
+    try {
+      pending = this.stateHashImpl(next);
+    } catch {
+      // A synchronous failure must not leave deltaPending set (that would hold all traffic).
+      this.deltaPending = false;
+      this.requestRepair();
+      this.host.emit({ type: "deltaSettled" });
+      return;
+    }
+    pending.then(
       (hash) => {
         this.deltaPending = false;
         if (!this.disposed) {
@@ -829,7 +849,11 @@ export class NovaStateEngine {
 
   private applySnapshot(message: InboundSnapshot): void {
     if (this.disposed) return;
-    if (message.state === undefined) return; // a full snapshot must carry its state
+    if (message.state === undefined) {
+      // A full snapshot without its state is malformed: ask for a repair.
+      this.requestRepair();
+      return;
+    }
     if (message.term < this.term) return; // a stale term can never win
     let adoptedAuthority = false;
     if (message.term > this.term) {
@@ -1468,6 +1492,30 @@ export class NovaStateEngine {
   }
 
   /** The state envelope for this shell's current replicated state. */
+  /**
+   * Send one broadcast. A delta that cannot be sent falls back to the full state,
+   * and a failure to send is reported as a diagnostic: a snapshot must never
+   * fail the commit that produced it.
+   */
+  private sendBroadcast(
+    historyMode: "full" | "increment",
+    ops: readonly JsonDeltaOp[] | null,
+  ): void {
+    if (ops !== null) {
+      try {
+        this.host.sendSnapshot(this.snapshotEnvelope(historyMode, ops));
+        return;
+      } catch (error) {
+        this.host.emit({ type: "snapshotFallback", reason: describeError(error) });
+      }
+    }
+    try {
+      this.host.sendSnapshot(this.snapshotEnvelope(historyMode, null));
+    } catch (error) {
+      this.host.emit({ type: "snapshotFallback", reason: describeError(error) });
+    }
+  }
+
   private snapshotEnvelope(
     historyMode: "full" | "increment",
     ops: readonly JsonDeltaOp[] | null = null,
@@ -1485,7 +1533,8 @@ export class NovaStateEngine {
       historyComplete: this.historyComplete,
       processedActionIds:
         historyMode === "full" ? this.processedActionIds() : [...this.pendingHistoryIds],
-      state: delta ? null : this.canonical,
+      // A delta has no state: the key is absent on the wire, not null.
+      state: delta ? undefined : this.canonical,
     };
   }
 
@@ -1504,15 +1553,15 @@ export class NovaStateEngine {
     // the diff is smaller than the full state; otherwise the full state goes out.
     let ops: JsonDeltaOp[] | null = null;
     if (continuous && this.lastBroadcastCanonical !== null && this.canonical !== null) {
-      const diff = diffJson(this.lastBroadcastCanonical, this.canonical);
+      const candidate = deltaFor(this.lastBroadcastCanonical, this.canonical);
       if (
-        diff.length <= stateDeltaMaxOps &&
-        serializedBytesSync(diff) < serializedBytesSync(this.canonical)
+        candidate !== null &&
+        serializedBytesSync(candidate) < serializedBytesSync(this.canonical)
       ) {
-        ops = diff;
+        ops = candidate;
       }
     }
-    this.host.sendSnapshot(this.snapshotEnvelope(increment ? "increment" : "full", ops));
+    this.sendBroadcast(increment ? "increment" : "full", ops);
     this.lastBroadcastRevision = this.revision;
     this.lastBroadcastStateHash = this.stateHash;
     this.lastBroadcastCanonical = this.canonical;

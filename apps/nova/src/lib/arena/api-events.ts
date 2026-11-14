@@ -48,6 +48,7 @@ export function toApiEvent(event: NovaSessionEvent): GameApiEvent | null {
     case "actionReceived":
     case "authorityChanged":
     case "historyIncomplete":
+    case "snapshotFallback":
       return null;
   }
 }

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import * as fc from "fast-check";
-import { stateDeltaMaxDepth } from "@rocketcrab/protocol";
-import { applyJsonPatch, canonicalJson, diffJson, JsonDeltaError } from "./json-delta";
+import { stateDeltaMaxDepth, stateDeltaOpsFit } from "@rocketcrab/protocol";
+import { applyJsonPatch, canonicalJson, deltaFor, diffJson, JsonDeltaError } from "./json-delta";
 
 const safeKey = fc.string({ minLength: 1, maxLength: 4 }).filter((key) => {
   return !["__proto__", "constructor", "prototype"].includes(key);
@@ -90,5 +90,53 @@ describe("json delta", () => {
     expect(() => applyJsonPatch({}, [{ op: "set", path: ["__proto__"], value: 1 }])).toThrow(
       JsonDeltaError,
     );
+  });
+
+  it("a delta is offered only when every op fits the protocol and it applies exactly", () => {
+    // Keys the protocol cannot carry: empty, longer than 64, and prototype names.
+    const weirdKey = fc.oneof(
+      safeKey,
+      fc.constantFrom("", "constructor", "prototype"),
+      fc.string({ minLength: 60, maxLength: 70 }),
+    );
+    const weirdJson = fc.letrec((tie) => ({
+      value: fc.oneof(
+        { weight: 3, arbitrary: leaf },
+        { weight: 1, arbitrary: fc.array(tie("value"), { maxLength: 3 }) },
+        { weight: 2, arbitrary: fc.dictionary(weirdKey, tie("value"), { maxKeys: 4 }) },
+      ),
+    })).value;
+    fc.assert(
+      fc.property(weirdJson, weirdJson, (prev, next) => {
+        const ops = deltaFor(prev, next);
+        if (ops === null) return;
+        expect(stateDeltaOpsFit(ops)).toBe(true);
+        expect(canonicalJson(applyJsonPatch(prev, ops))).toBe(canonicalJson(next));
+      }),
+      { numRuns: 300 },
+    );
+  });
+
+  it("falls back to no delta for a 65-character key, an empty key, a prototype name, or a too-deep change", () => {
+    expect(deltaFor({ count: 1 }, { count: 1, ["k".repeat(65)]: 2 })).toBeNull();
+    expect(deltaFor({ count: 1 }, { count: 1, "": 2 })).toBeNull();
+    expect(deltaFor({ count: 1 }, { count: 1, constructor: 2 })).toBeNull();
+    // A change 33 levels down cannot be addressed by any valid path.
+    const deepPath = Array.from({ length: stateDeltaMaxDepth + 1 }, (_, i) => `l${i}`);
+    const build = (leaf: number): Record<string, unknown> => {
+      const root: Record<string, unknown> = {};
+      let node = root;
+      for (const key of deepPath.slice(0, -1)) {
+        const child: Record<string, unknown> = {};
+        node[key] = child;
+        node = child;
+      }
+      node[deepPath[deepPath.length - 1] as string] = leaf;
+      return root;
+    };
+    expect(() => diffJson(build(1), build(2))).toThrow(JsonDeltaError);
+    expect(deltaFor(build(1), build(2))).toBeNull();
+    // A valid change at the same depth is still offered.
+    expect(deltaFor({ a: { b: 1 } }, { a: { b: 2 } })).not.toBeNull();
   });
 });
