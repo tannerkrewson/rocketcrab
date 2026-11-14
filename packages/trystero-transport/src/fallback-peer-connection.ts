@@ -26,6 +26,8 @@
  * - The switch is one-way for the connection's lifetime.
  * - One data channel per connection. Trystero uses exactly one.
  * - Sends are paced to the edge's per-socket budget (see the pace constants).
+ * - Each instance reports one connection outcome at most (`onOutcome`, PLAN.md
+ *   §8.2). The first success or failure claims it; a later event cannot.
  *
  * The transport wires this in through `rtcPolyfill` (trystero-transport.ts,
  * PLAN.md §5.6).
@@ -41,6 +43,7 @@ import {
   encodeTunnelMessage,
   type TunnelFrameErrorCode,
 } from "./tunnel-crypto";
+import { selectedCandidateOutcome } from "./selected-candidate-outcome";
 
 /**
  * Client-side cap on a whole binary frame. The edge accepts up to 262208
@@ -119,6 +122,26 @@ export type TerminalFailureInfo =
   | { readonly reason: "socket-error" }
   | { readonly reason: "socket-closed"; readonly closeCode: number };
 
+/**
+ * How one physical connection attempt ended (PLAN.md §8.2). `direct` and `turn`
+ * come from the native selected candidate pair; `unknown` is a native open whose
+ * path cannot be read; `tunnel` and `failed` come from the tunnel.
+ */
+export type ConnectionOutcome = "direct" | "turn" | "tunnel" | "failed" | "unknown";
+
+/** The single outcome of one wrapper instance. */
+export interface ConnectionOutcomeInfo {
+  readonly outcome: ConnectionOutcome;
+  /**
+   * Whole milliseconds from both descriptions existing to the success. 0 for
+   * `failed`, which has no success time. Never above MAX_CONNECT_MS.
+   */
+  readonly msToConnect: number;
+}
+
+/** The connection-log schema's ceiling for ms_to_connect (deploy/edge/log.ts). */
+export const MAX_CONNECT_MS = 3600000;
+
 export interface FallbackPeerConnectionOptions {
   readonly NativePeerConnection: typeof RTCPeerConnection;
   readonly WebSocketImpl: typeof WebSocket;
@@ -138,6 +161,12 @@ export interface FallbackPeerConnectionOptions {
   readonly clearTimeout?: (handle: unknown) => void;
   readonly onTunnel?: (info: TunnelStartInfo) => void;
   readonly onTerminalFailure?: (info: TerminalFailureInfo) => void;
+  /**
+   * Called at most once per wrapper instance with its connection outcome. An
+   * instance that never gets both descriptions (an unclaimed pooled offer), or
+   * that closes before any success or failure, reports nothing.
+   */
+  readonly onOutcome?: (info: ConnectionOutcomeInfo) => void;
 }
 
 /** Whether a connection returned by Trystero is running on the tunnel. */
@@ -162,6 +191,7 @@ interface Deps {
   readonly cancel: (handle: unknown) => void;
   readonly onTunnel: ((info: TunnelStartInfo) => void) | undefined;
   readonly onTerminalFailure: ((info: TerminalFailureInfo) => void) | undefined;
+  readonly onOutcome: ((info: ConnectionOutcomeInfo) => void) | undefined;
 }
 
 /** Event-handler properties and listeners for one target. */
@@ -435,6 +465,14 @@ class Session {
   private timerStartedAt = 0;
   private timer: unknown = undefined;
   private switchedAt = 0;
+  /** When both descriptions first existed. Undefined means no physical attempt (PLAN.md §8.2). */
+  private attemptStartedAt: number | undefined = undefined;
+  /**
+   * The attempt's one outcome is claimed synchronously, when its success or
+   * failure happens, so a later event cannot report a second one. A native
+   * open's stats read finishes later; the claim does not wait for it.
+   */
+  private outcomeClaimed = false;
   /** Open retries and send pacing wait in separate slots, so they never share one. */
   private readonly retrySlot: PauseSlot = {};
   private readonly paceSlot: PauseSlot = {};
@@ -585,11 +623,12 @@ class Session {
   // ---- Switch decision ----
 
   private maybeStartTimer(): void {
-    if (this.timerStarted || this.closed || this.mode !== "native") return;
-    if (this.channel?.hasOpened()) return;
+    if (this.closed || this.mode !== "native") return;
     if (!this.native.localDescription || !this.native.remoteDescription) return;
+    this.attemptStartedAt ??= this.deps.now();
+    if (this.timerStarted || this.channel?.hasOpened()) return;
     this.timerStarted = true;
-    this.timerStartedAt = this.deps.now();
+    this.timerStartedAt = this.attemptStartedAt;
     this.timer = this.deps.schedule(() => {
       this.timer = undefined;
       this.onTimeout();
@@ -615,6 +654,38 @@ class Session {
   onChannelOpened(): void {
     this.everConnected = true;
     this.clearTimer();
+    this.claimNativeOpen();
+  }
+
+  /**
+   * The native channel opened: this attempt's success, claimed now. The selected
+   * pair is read from stats afterwards; a null or failed read is `unknown`.
+   */
+  private claimNativeOpen(): void {
+    const startedAt = this.attemptStartedAt;
+    if (this.outcomeClaimed || startedAt === undefined) return;
+    this.outcomeClaimed = true;
+    const msToConnect = this.elapsedSince(startedAt);
+    void selectedCandidateOutcome(this.native)
+      .catch(() => null)
+      .then((path) => this.reportOutcome(path ?? "unknown", msToConnect));
+  }
+
+  /** Claims a synchronous outcome (`tunnel` or `failed`) if no other one was claimed. */
+  private claimOutcome(outcome: "tunnel" | "failed"): void {
+    const startedAt = this.attemptStartedAt;
+    if (this.outcomeClaimed || startedAt === undefined) return;
+    this.outcomeClaimed = true;
+    this.reportOutcome(outcome, outcome === "tunnel" ? this.elapsedSince(startedAt) : 0);
+  }
+
+  private elapsedSince(startedAt: number): number {
+    const ms = Math.round(this.deps.now() - startedAt);
+    return Math.min(MAX_CONNECT_MS, Math.max(0, ms));
+  }
+
+  private reportOutcome(outcome: ConnectionOutcome, msToConnect: number): void {
+    invokeCallback(() => this.deps.onOutcome?.({ outcome, msToConnect }));
   }
 
   private onNativeState(): void {
@@ -776,6 +847,7 @@ class Session {
   private becomeReady(): void {
     if (this.ready || this.closed) return;
     this.ready = true;
+    this.claimOutcome("tunnel");
     this.openReadyGate();
     this.emitStates();
     if (!this.channel) {
@@ -880,6 +952,8 @@ class Session {
   private failTerminal(info: TerminalFailureInfo): void {
     if (this.closed || this.terminated) return;
     this.terminated = true;
+    // A failure after any success (native open or tunnel pairing) claims nothing.
+    this.claimOutcome("failed");
     const channel = this.channel;
     try {
       this.close(CLOSE_FAILED, "tunnel failed");
@@ -1020,6 +1094,7 @@ export function createFallbackPeerConnectionClass(
       ((handle) => globalThis.clearTimeout(handle as ReturnType<typeof globalThis.setTimeout>)),
     onTunnel: options.onTunnel,
     onTerminalFailure: options.onTerminalFailure,
+    onOutcome: options.onOutcome,
   };
   return class FallbackPeerConnection {
     constructor(configuration?: RTCConfiguration) {

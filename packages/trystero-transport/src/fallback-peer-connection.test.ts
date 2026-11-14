@@ -8,6 +8,7 @@ import {
   TUNNEL_PAIRED_FRAME,
   createFallbackPeerConnectionClass,
   isTunnelledConnection,
+  type ConnectionOutcomeInfo,
   type FallbackPeerConnectionOptions,
   type TerminalFailureInfo,
   type TunnelStartInfo,
@@ -131,6 +132,8 @@ class FakePeerConnection extends FakeEvents {
   iceConnectionState: RTCIceConnectionState = "new";
   readonly channels: FakeChannel[] = [];
   closeCalls = 0;
+  /** What getStats resolves to. Tests replace it to choose the path or to fail. */
+  stats: () => Promise<RTCStatsReport> = async () => selectedPath("host", "host");
 
   constructor(_config?: RTCConfiguration) {
     super();
@@ -146,6 +149,10 @@ class FakePeerConnection extends FakeEvents {
 
   async setRemoteDescription(description: RTCSessionDescriptionInit): Promise<void> {
     this.remoteDescription = { type: description.type ?? "", sdp: description.sdp ?? "" };
+  }
+
+  getStats(): Promise<RTCStatsReport> {
+    return this.stats();
   }
 
   createDataChannel(label: string): FakeChannel {
@@ -330,6 +337,21 @@ interface Failure {
   readonly info: TerminalFailureInfo;
 }
 
+interface Outcome {
+  readonly side: string;
+  readonly info: ConnectionOutcomeInfo;
+}
+
+/** A getStats report whose selected pair runs between the two candidate types. */
+function selectedPath(local: string, remote: string): RTCStatsReport {
+  return new Map<string, unknown>([
+    ["t", { id: "t", type: "transport", selectedCandidatePairId: "p" }],
+    ["p", { id: "p", type: "candidate-pair", localCandidateId: "l", remoteCandidateId: "r" }],
+    ["l", { id: "l", type: "local-candidate", candidateType: local }],
+    ["r", { id: "r", type: "remote-candidate", candidateType: remote }],
+  ]) as unknown as RTCStatsReport;
+}
+
 interface Tunnelled {
   readonly side: string;
   readonly info: TunnelStartInfo;
@@ -340,6 +362,7 @@ interface Harness {
   readonly clock: FakeClock;
   readonly failures: Failure[];
   readonly tunnels: Tunnelled[];
+  readonly outcomes: Outcome[];
   classFor(
     side: string,
     overrides?: Partial<FallbackPeerConnectionOptions>,
@@ -351,11 +374,13 @@ function harness(defaults: Partial<FallbackPeerConnectionOptions> = {}): Harness
   const network = new FakeNetwork(clock);
   const failures: Failure[] = [];
   const tunnels: Tunnelled[] = [];
+  const outcomes: Outcome[] = [];
   return {
     network,
     clock,
     failures,
     tunnels,
+    outcomes,
     classFor(side, overrides = {}) {
       return createFallbackPeerConnectionClass({
         NativePeerConnection: FakePeerConnection as unknown as typeof RTCPeerConnection,
@@ -368,6 +393,7 @@ function harness(defaults: Partial<FallbackPeerConnectionOptions> = {}): Harness
         clearTimeout: clock.clearTimeout,
         onTunnel: (info) => tunnels.push({ side, info }),
         onTerminalFailure: (info) => failures.push({ side, info }),
+        onOutcome: (info) => outcomes.push({ side, info }),
         ...defaults,
         ...overrides,
       });
@@ -431,6 +457,13 @@ async function until(cond: () => boolean, label: string, step?: () => void): Pro
     await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
   }
   throw new Error(`Timed out waiting for ${label}.`);
+}
+
+/** Lets queued promises and the stats read finish, so a late report would show. */
+async function settle(): Promise<void> {
+  for (let i = 0; i < 50; i += 1) {
+    await new Promise<void>((resolve) => globalThis.setTimeout(resolve, 0));
+  }
 }
 
 function bChannel(b: Side): RTCDataChannel | undefined {
@@ -1285,5 +1318,179 @@ describe("FallbackPeerConnection", () => {
       { reason: "open-failed", attempts: OPEN_ATTEMPTS },
     ]);
     expect(a.native.closeCalls).toBe(1);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Connection outcome (PLAN.md §8.2): one report per physical attempt
+// ---------------------------------------------------------------------------
+
+function outcomesOf(h: Harness, side: string): ConnectionOutcomeInfo[] {
+  return h.outcomes.filter((o) => o.side === side).map((o) => o.info);
+}
+
+describe("FallbackPeerConnection connection outcome", () => {
+  it("reports a native direct open once per side, timed from the descriptions", async () => {
+    const h = harness();
+    const { a, b } = await connectPair(h);
+    const nativeA = a.native.channels[0];
+    if (!nativeA) throw new Error("no native channel");
+
+    h.clock.advance(1500.4);
+    nativeA.open();
+    deliverNativeChannel(b);
+    await until(() => h.outcomes.length === 2, "both direct outcomes");
+    await settle();
+
+    expect(h.outcomes.map((o) => o.side).sort()).toEqual(["a", "b"]);
+    for (const { info } of h.outcomes) {
+      expect(info).toEqual({ outcome: "direct", msToConnect: 1500 });
+      // Only the schema's two fields: no ids, addresses or SDP.
+      expect(Object.keys(info).sort()).toEqual(["msToConnect", "outcome"]);
+    }
+  });
+
+  it("reports turn when the selected candidate pair relays", async () => {
+    const h = harness();
+    const { a, b } = await connectPair(h);
+    a.native.stats = async () => selectedPath("relay", "srflx");
+    a.native.channels[0]?.open();
+    deliverNativeChannel(b);
+    await until(() => h.outcomes.length === 2, "both outcomes");
+    await settle();
+
+    expect(outcomesOf(h, "a")).toEqual([{ outcome: "turn", msToConnect: 0 }]);
+    expect(outcomesOf(h, "b")).toEqual([{ outcome: "direct", msToConnect: 0 }]);
+  });
+
+  it("reports unknown when the stats read rejects", async () => {
+    const h = harness();
+    const { a, b } = await connectPair(h);
+    a.native.stats = () => Promise.reject(new Error("stats unavailable"));
+    a.native.channels[0]?.open();
+    deliverNativeChannel(b);
+    await until(() => h.outcomes.length === 2, "both outcomes");
+    await settle();
+
+    expect(outcomesOf(h, "a")).toEqual([{ outcome: "unknown", msToConnect: 0 }]);
+  });
+
+  it("reports unknown when the stats cannot say which path was selected", async () => {
+    const h = harness();
+    const { a } = await connectPair(h);
+    a.native.stats = async () => new Map() as unknown as RTCStatsReport;
+    a.native.channels[0]?.open();
+    await until(() => h.outcomes.length === 1, "the outcome");
+    await settle();
+
+    expect(outcomesOf(h, "a")).toEqual([{ outcome: "unknown", msToConnect: 0 }]);
+  });
+
+  it("reports tunnel once per side when the pair switches and pairs", async () => {
+    const h = harness();
+    await pairUp(h);
+    await settle();
+
+    expect(outcomesOf(h, "a")).toEqual([{ outcome: "tunnel", msToConnect: FALLBACK_AFTER_MS }]);
+    expect(outcomesOf(h, "b")).toEqual([{ outcome: "tunnel", msToConnect: FALLBACK_AFTER_MS }]);
+  });
+
+  it("reports failed with msToConnect 0 when the tunnel never opens", async () => {
+    const h = harness();
+    h.network.rejectNext = 1000;
+    const { a } = await connectPair(h);
+    h.clock.advance(FALLBACK_AFTER_MS);
+    const delays = [250, 500, 1000, 2000];
+    for (const [index, delay] of delays.entries()) {
+      await until(() => h.network.sockets.length === 2 * (index + 1), `attempt ${index + 1}`);
+      h.clock.advance(delay);
+    }
+    await until(() => h.failures.length === 2, "both sides exhaust retries");
+    await settle();
+
+    expect(outcomesOf(h, "a")).toEqual([{ outcome: "failed", msToConnect: 0 }]);
+    expect(outcomesOf(h, "b")).toEqual([{ outcome: "failed", msToConnect: 0 }]);
+    expect(a.native.closeCalls).toBe(1);
+  });
+
+  it("reports nothing for a pooled offer that is never claimed", async () => {
+    const h = harness();
+    const a = newSide(h, "a", sdp(1));
+    a.pc.createDataChannel("data");
+    await a.pc.setLocalDescription();
+    h.clock.advance(FALLBACK_AFTER_MS * 3);
+    await settle();
+    a.pc.close();
+    await settle();
+
+    expect(h.outcomes).toEqual([]);
+    expect(h.tunnels).toEqual([]);
+  });
+
+  it("reports nothing when the peer leaves while the pair is still connecting", async () => {
+    const h = harness();
+    const { a } = await connectPair(h);
+    a.pc.close();
+    h.clock.advance(FALLBACK_AFTER_MS * 3);
+    await settle();
+
+    expect(h.outcomes).toEqual([]);
+    expect(h.failures).toEqual([]);
+  });
+
+  it("reports nothing when closed during tunnel pairing, not a failure", async () => {
+    const h = harness();
+    const { a, b } = await connectPair(h);
+    // B's channel is open, so B never switches and only A's socket exists.
+    deliverNativeChannel(b);
+    h.clock.advance(FALLBACK_AFTER_MS);
+    await until(() => h.network.sockets.length === 1, "A's unpaired socket");
+
+    a.pc.close();
+    await settle();
+
+    expect(outcomesOf(h, "a")).toEqual([]);
+    expect(h.failures).toEqual([]);
+  });
+
+  it("reports one direct outcome when a native failure follows an open whose stats are pending", async () => {
+    const h = harness();
+    const { a, b, chA } = await connectPair(h);
+    let release: (report: RTCStatsReport) => void = () => undefined;
+    a.native.stats = () =>
+      new Promise<RTCStatsReport>((resolve) => {
+        release = resolve;
+      });
+    h.clock.advance(1000);
+    a.native.channels[0]?.open();
+    // A's native connection now fails, so A switches to the tunnel. B times out
+    // and switches too, so the pair completes while A's stats read is pending.
+    a.native.setStates("failed", "failed");
+    h.clock.advance(FALLBACK_AFTER_MS);
+    await until(
+      () => chA.readyState === "open" && bChannel(b)?.readyState === "open",
+      "tunnel pairing after the native open",
+    );
+    release(selectedPath("host", "host"));
+    await settle();
+
+    expect(outcomesOf(h, "a")).toEqual([{ outcome: "direct", msToConnect: 1000 }]);
+    // B's deadline is measured from its own descriptions, at clock 0.
+    expect(outcomesOf(h, "b")).toEqual([
+      { outcome: "tunnel", msToConnect: 1000 + FALLBACK_AFTER_MS },
+    ]);
+  });
+
+  it("reports nothing more after a tunnel that paired fails terminally", async () => {
+    const h = harness();
+    const { a } = await pairUp(h);
+    await settle();
+    h.network.sockets[0]?.drop(1011);
+    await until(() => h.failures.length === 2, "both sides fail after the drop");
+    await settle();
+
+    expect(outcomesOf(h, "a")).toEqual([{ outcome: "tunnel", msToConnect: FALLBACK_AFTER_MS }]);
+    expect(a.native.closeCalls).toBe(1);
+    expect(h.outcomes).toHaveLength(2);
   });
 });

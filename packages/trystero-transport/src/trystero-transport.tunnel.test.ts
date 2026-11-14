@@ -166,6 +166,32 @@ describe("tunnel fallback polyfill", () => {
     expect(lastCall[0].roomId).toBe(mocks.joinRoom.mock.calls[0]![1]);
   });
 
+  it("forwards onOutcome to the wrapper of every peer connection it creates", async () => {
+    const onOutcome = vi.fn();
+    const adapter = new TrysteroTransport({
+      memberId: "member-a",
+      edgeOrigin: "https://edge.example",
+      partySecret: SECRET,
+      onOutcome,
+    });
+    await joinAndAbandon(adapter);
+    const factory = vi.mocked(fallback.createFallbackPeerConnectionClass);
+    const lastCall = factory.mock.calls[factory.mock.calls.length - 1]!;
+    expect(lastCall[0].onOutcome).toBe(onOutcome);
+  });
+
+  it("reports no outcomes without a party secret, since there is no wrapper", async () => {
+    const onOutcome = vi.fn();
+    const adapter = new TrysteroTransport({
+      memberId: "member-a",
+      edgeOrigin: "https://e.test",
+      onOutcome,
+    });
+    await joinAndAbandon(adapter);
+    expect(configOfLastJoin()).not.toHaveProperty("rtcPolyfill");
+    expect(onOutcome).not.toHaveBeenCalled();
+  });
+
   it("reports no tunnelled peers for unknown connection IDs", () => {
     const adapter = new TrysteroTransport({
       memberId: "member-a",

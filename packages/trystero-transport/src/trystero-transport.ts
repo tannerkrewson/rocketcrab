@@ -4,6 +4,7 @@ import { tunnelUrl } from "./edge-url";
 import {
   createFallbackPeerConnectionClass,
   isTunnelledConnection,
+  type ConnectionOutcomeInfo,
   type TerminalFailureInfo,
   type TunnelStartInfo,
 } from "./fallback-peer-connection";
@@ -765,6 +766,7 @@ export class TrysteroTransport implements NovaTransport {
       forceRelayOnlyNoServers: this.options.forceRelayOnlyNoServers === true,
       onTunnel: this.options.onTunnel,
       onTerminalFailure: this.options.onTunnelFailure,
+      onOutcome: this.options.onOutcome,
     });
   }
 
@@ -1525,6 +1527,11 @@ export interface TrysteroTransportOptions {
   readonly onTunnel?: (info: TunnelStartInfo) => void;
   /** Fires once when a tunnelled pair fails terminally (PLAN.md §5.5). */
   readonly onTunnelFailure?: (info: TerminalFailureInfo) => void;
+  /**
+   * Fires at most once per peer connection attempt with its outcome (PLAN.md
+   * §8.2). Scale virtual peers have no connection, so they never fire it.
+   */
+  readonly onOutcome?: (info: ConnectionOutcomeInfo) => void;
   /**
    * TEST ONLY: forces every native WebRTC connection of this transport to use
    * no ICE servers and a relay-only policy, so its pairs tunnel. Callers must
