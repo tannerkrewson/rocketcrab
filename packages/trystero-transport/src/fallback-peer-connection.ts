@@ -63,6 +63,18 @@ export const TUNNEL_PAIRED_FRAME = "paired";
 
 const LOW_WATER_POLL_MS = 10;
 /**
+ * A graceful close (Trystero leaving) gets this long to deliver frames that are
+ * already queued. Terminal failures never wait. The flush stays paced, because
+ * an unpaced burst could empty the server's bucket and close the pair with 1008.
+ */
+const GRACEFUL_FLUSH_MS = 2000;
+
+/** A cancellable wait, so teardown can wake a waiter. */
+interface PauseSlot {
+  timer?: unknown;
+  wake?: () => void;
+}
+/**
  * The edge answers 409 while a previous socket on the same pairId is still
  * closing. A browser reports that as a failed open with no status, so it is
  * retried: up to OPEN_ATTEMPTS tries, backing off from OPEN_RETRY_BASE_MS
@@ -307,8 +319,10 @@ class ChannelFacade {
   close(): void {
     if (this.closed) return;
     if (this.tunnelled) {
-      // One channel per connection, so closing it closes the connection.
-      this.session.close();
+      // One channel per connection, so closing it closes the connection. Frames
+      // already queued are flushed first (see Session.closeGracefully).
+      this.closed = true;
+      this.session.closeGracefully();
       return;
     }
     this.closed = true;
@@ -412,8 +426,11 @@ class Session {
   private timerStartedAt = 0;
   private timer: unknown = undefined;
   private switchedAt = 0;
-  private pauseTimer: unknown = undefined;
-  private wakePause: (() => void) | undefined = undefined;
+  /** Open retries and send pacing wait in separate slots, so they never share one. */
+  private readonly retrySlot: PauseSlot = {};
+  private readonly paceSlot: PauseSlot = {};
+  private draining = false;
+  private drainTimer: unknown = undefined;
 
   private socket: WebSocket | null = null;
   private cipher: TunnelCipher | null = null;
@@ -503,6 +520,27 @@ class Session {
   }
 
   /**
+   * Caller's close (Trystero leaving). Frames already queued on a ready tunnel
+   * are sent for up to GRACEFUL_FLUSH_MS, then the socket closes with 1000.
+   * Anything else closes at once. Sends are refused while draining.
+   */
+  closeGracefully(): void {
+    if (this.closed || this.draining) return;
+    if (this.mode !== "tunnel" || !this.ready || !this.socket || this.pendingBytes === 0) {
+      this.close();
+      return;
+    }
+    this.draining = true;
+    this.drainTimer = this.deps.schedule(() => {
+      this.drainTimer = undefined;
+      this.close();
+    }, GRACEFUL_FLUSH_MS);
+    // The chain never rejects (its failures are terminal), so this runs once every
+    // frame queued before the drain has been sent or refused.
+    this.sendChain.then(() => this.close());
+  }
+
+  /**
    * Tears everything down: timers, the socket, the native connection and the
    * channel. Idempotent. Never throws, so a caller's teardown always finishes.
    */
@@ -512,7 +550,9 @@ class Session {
     this.pendingBytes = 0;
     this.clearTimer();
     this.clearLowTimer();
-    this.cancelPause();
+    this.clearDrainTimer();
+    this.cancelPause(this.retrySlot);
+    this.cancelPause(this.paceSlot);
     this.openReadyGate();
     const socket = this.socket;
     if (socket && (socket.readyState === WS_CONNECTING || socket.readyState === WS_OPEN)) {
@@ -524,6 +564,13 @@ class Session {
     }
     this.native.close();
     this.channel?.markClosed();
+  }
+
+  private clearDrainTimer(): void {
+    if (this.drainTimer !== undefined) {
+      this.deps.cancel(this.drainTimer);
+      this.drainTimer = undefined;
+    }
   }
 
   // ---- Switch decision ----
@@ -550,21 +597,20 @@ class Session {
     this.switchToTunnel("timeout");
   }
 
-  /** Called by the channel when the native channel opens. The pair is healthy. */
+  /**
+   * Called by the channel when the native channel opens. The pair is healthy,
+   * so the deadline is no longer needed. Only this marks the pair as connected:
+   * until then a native `disconnected` stays masked, so Trystero's disconnect
+   * grace cannot close the peer before the deadline decides.
+   */
   onChannelOpened(): void {
+    this.everConnected = true;
     this.clearTimer();
   }
 
   private onNativeState(): void {
     if (this.closed || this.mode !== "native") return;
     const native = this.native;
-    if (
-      native.connectionState === "connected" ||
-      native.iceConnectionState === "connected" ||
-      native.iceConnectionState === "completed"
-    ) {
-      this.everConnected = true;
-    }
     if (native.connectionState === "failed" || native.iceConnectionState === "failed") {
       this.switchToTunnel("native-failed");
       return;
@@ -619,11 +665,25 @@ class Session {
         if (this.closed) throw error;
         if (attempt >= OPEN_ATTEMPTS) throw new TunnelOpenError(attempt);
         if (this.deps.now() + delay > deadline) throw new TunnelOpenError(attempt);
-        await this.pause(delay);
+        await this.pause(this.retrySlot, delay);
         if (this.closed) throw error;
         delay *= 2;
       }
     }
+  }
+
+  /**
+   * The partner's socket closed. A clean 1000 close comes after the frames it
+   * sent, which may still be decrypting, so those are delivered first. Any
+   * other close is a failure and stops at once.
+   */
+  private onSocketClosed(code: number): void {
+    if (this.closed) return;
+    if (code !== CLOSE_NORMAL) {
+      this.failTerminal({ reason: "socket-closed", closeCode: code });
+      return;
+    }
+    this.recvChain.then(() => this.failTerminal({ reason: "socket-closed", closeCode: code }));
   }
 
   /** Resolves once the socket is open; rejects if it fails before that. */
@@ -636,8 +696,7 @@ class Session {
       socket.onopen = () => {
         socket.onmessage = (event) => this.onSocketMessage(event);
         socket.onerror = () => this.failTerminal({ reason: "socket-error" });
-        socket.onclose = (event) =>
-          this.failTerminal({ reason: "socket-closed", closeCode: event.code });
+        socket.onclose = (event) => this.onSocketClosed(event.code);
         resolve();
       };
       socket.onerror = () => reject(new Error("Tunnel socket failed to open."));
@@ -646,25 +705,26 @@ class Session {
     });
   }
 
-  /** A cancellable wait. Used by open retries and by send pacing. */
-  private pause(ms: number): Promise<void> {
+  /** A cancellable wait in `slot`. Used by open retries and by send pacing. */
+  private pause(slot: PauseSlot, ms: number): Promise<void> {
     return new Promise<void>((resolve) => {
-      this.wakePause = resolve;
-      this.pauseTimer = this.deps.schedule(() => {
-        this.pauseTimer = undefined;
-        this.wakePause = undefined;
+      slot.wake = resolve;
+      slot.timer = this.deps.schedule(() => {
+        slot.timer = undefined;
+        slot.wake = undefined;
         resolve();
       }, ms);
     });
   }
 
-  private cancelPause(): void {
-    if (this.pauseTimer !== undefined) {
-      this.deps.cancel(this.pauseTimer);
-      this.pauseTimer = undefined;
+  /** Cancels the slot's timer and wakes its waiter, which then sees `closed`. */
+  private cancelPause(slot: PauseSlot): void {
+    if (slot.timer !== undefined) {
+      this.deps.cancel(slot.timer);
+      slot.timer = undefined;
     }
-    const wake = this.wakePause;
-    this.wakePause = undefined;
+    const wake = slot.wake;
+    slot.wake = undefined;
     wake?.();
   }
 
@@ -722,7 +782,9 @@ class Session {
 
   /** Callers check that the tunnel is ready (ChannelFacade.send does). */
   tunnelSend(data: string | ArrayBuffer | ArrayBufferView): void {
-    if (this.closed) throw new DOMException("Data channel is closed.", "InvalidStateError");
+    if (this.closed || this.draining) {
+      throw new DOMException("Data channel is closed.", "InvalidStateError");
+    }
     const encoded = encodeTunnelMessage(data);
     const payloadBytes = encoded.byteLength - 1;
     const limit = TUNNEL_MAX_FRAME_BYTES - TUNNEL_FRAME_OVERHEAD_BYTES;
@@ -761,7 +823,7 @@ class Session {
         return;
       }
       const waitMs = Math.ceil(((bytes - this.paceTokens) * 1000) / TUNNEL_PACE_BYTES_PER_SECOND);
-      await this.pause(waitMs);
+      await this.pause(this.paceSlot, waitMs);
       if (this.closed) return;
     }
   }
@@ -864,6 +926,13 @@ const HANDLER_EVENTS = new Map([
   ["oniceconnectionstatechange", "iceconnectionstatechange"],
 ]);
 
+/** Monotonic where available, so a wall-clock change cannot move the deadline. */
+function defaultNow(): number {
+  return typeof performance !== "undefined" && typeof performance.now === "function"
+    ? performance.now()
+    : Date.now();
+}
+
 function invokeCallback(callback: () => void): void {
   try {
     callback();
@@ -897,7 +966,7 @@ function createWrapper(native: RTCPeerConnection, deps: Deps): RTCPeerConnection
         case "removeEventListener":
           return (type: string, fn: EventFn) => session.removeListener(type, fn);
         case "close":
-          return () => session.close();
+          return () => session.closeGracefully();
         default:
           break;
       }
@@ -934,7 +1003,7 @@ export function createFallbackPeerConnectionClass(
     roomId: options.roomId,
     partySecret: options.partySecret,
     fallbackAfterMs: options.fallbackAfterMs ?? FALLBACK_AFTER_MS,
-    now: options.now ?? (() => Date.now()),
+    now: options.now ?? defaultNow,
     schedule: options.setTimeout ?? ((callback, ms) => globalThis.setTimeout(callback, ms)),
     cancel:
       options.clearTimeout ??

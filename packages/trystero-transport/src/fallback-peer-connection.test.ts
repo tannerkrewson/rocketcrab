@@ -856,6 +856,136 @@ describe("FallbackPeerConnection", () => {
     expect(() => chA.send("after")).toThrow();
   });
 
+  it("keeps masking disconnected until the channel opens, so the grace timer cannot close the peer", async () => {
+    const h = harness();
+    const { a } = await connectPair(h);
+    const seen: string[] = [];
+    a.pc.addEventListener("connectionstatechange", () => seen.push(a.pc.connectionState));
+    a.pc.addEventListener("iceconnectionstatechange", () => seen.push(a.pc.iceConnectionState));
+
+    h.clock.advance(1000);
+    a.native.setStates("connected", "connected");
+    h.clock.advance(1000);
+    a.native.setStates("disconnected", "disconnected");
+    // Trystero would start a 5 s grace timer on "disconnected"; it must not see one.
+    expect(seen).not.toContain("disconnected");
+    expect(a.pc.connectionState).toBe("connecting");
+    expect(a.pc.iceConnectionState).toBe("checking");
+
+    h.clock.advance(FALLBACK_AFTER_MS - 2000 - 1);
+    expect(h.tunnels.filter((t) => t.side === "a")).toEqual([]);
+    h.clock.advance(1);
+    expect(h.tunnels.filter((t) => t.side === "a")).toEqual([
+      { side: "a", info: { reason: "timeout", elapsedMs: FALLBACK_AFTER_MS } },
+    ]);
+    expect(seen).not.toContain("disconnected");
+  });
+
+  it(
+    "flushes frames queued at a graceful close, then closes the socket with 1000",
+    { timeout: 60000 },
+    async () => {
+      const h = harness();
+      const { a, chA, b } = await pairUp(h);
+      const chB = bChannel(b);
+      if (!chB) throw new Error("no answering channel");
+      let received = 0;
+      chB.onmessage = () => {
+        received += 1;
+      };
+
+      // 2 MiB: inside the pace burst, so the flush can send it all at once.
+      const chunk = new ArrayBuffer(65536);
+      for (let i = 0; i < 32; i += 1) chA.send(chunk);
+      a.pc.close();
+      await until(() => countBySide(h.failures).b === 1, "partner closes");
+
+      expect(received).toBe(32);
+      const sender = h.network.sockets.find((s) => s.sent.length === 32);
+      if (!sender) throw new Error("no sending socket");
+      expect(sender.closeCalls).toEqual([1000]);
+      expect(h.failures.map((f) => f.info)).toEqual([{ reason: "socket-closed", closeCode: 1000 }]);
+      expect(a.native.closeCalls).toBe(1);
+      expect(countBySide(h.failures)).toEqual({ b: 1 });
+    },
+  );
+
+  it(
+    "bounds a graceful flush of a 6 MiB backlog, with no 1008 from the server budget",
+    { timeout: 60000 },
+    async () => {
+      const h = harness();
+      const { a, chA, b } = await pairUp(h);
+      const chB = bChannel(b);
+      if (!chB) throw new Error("no answering channel");
+      let received = 0;
+      chB.onmessage = () => {
+        received += 1;
+      };
+
+      const chunk = new ArrayBuffer(65536);
+      for (let i = 0; i < 96; i += 1) chA.send(chunk);
+      const closeAt = h.clock.now;
+      a.pc.close();
+      await until(
+        () => countBySide(h.failures).b === 1,
+        "partner closes after the flush window",
+        () => h.clock.advance(10),
+      );
+
+      // The flush stops at GRACEFUL_FLUSH_MS (2000 ms): the burst, then paced frames.
+      const drainedMs = h.clock.now - closeAt;
+      expect(drainedMs).toBeGreaterThanOrEqual(2000);
+      expect(drainedMs).toBeLessThan(2050);
+      expect(received).toBeGreaterThan(60);
+      expect(received).toBeLessThan(80);
+      const sender = h.network.sockets.find((s) => s.sent.length > 0);
+      if (!sender) throw new Error("no sending socket");
+      expect(sender.closeCalls).toEqual([1000]);
+      for (const socket of h.network.sockets) {
+        expect(socket.minServerTokens).toBeGreaterThanOrEqual(0);
+      }
+      expect(h.failures.map((f) => f.info)).toEqual([{ reason: "socket-closed", closeCode: 1000 }]);
+      expect(countBySide(h.failures)).toEqual({ b: 1 });
+    },
+  );
+
+  it(
+    "fires bufferedamountlow during a paced transfer, before it completes",
+    { timeout: 60000 },
+    async () => {
+      const h = harness();
+      const { chA, b } = await pairUp(h);
+      const chB = bChannel(b);
+      if (!chB) throw new Error("no answering channel");
+      let count = 0;
+      chB.onmessage = () => {
+        count += 1;
+      };
+
+      chA.bufferedAmountLowThreshold = 1024 * 1024;
+      let lowFired = 0;
+      let receivedAtLow = -1;
+      chA.onbufferedamountlow = () => {
+        lowFired += 1;
+        if (receivedAtLow < 0) receivedAtLow = count;
+      };
+
+      const chunk = new ArrayBuffer(65536);
+      for (let i = 0; i < 96; i += 1) chA.send(chunk);
+      await until(
+        () => count === 96,
+        "paced transfer",
+        () => h.clock.advance(10),
+      );
+
+      expect(lowFired).toBeGreaterThanOrEqual(1);
+      // The amount drops below 1 MiB only after the 3.5 MiB burst, so the event fires mid-pacing.
+      expect(receivedAtLow).toBeGreaterThan(55);
+      expect(receivedAtLow).toBeLessThan(96);
+    },
+  );
+
   it("terminates once per side on a tampered frame, and closes both native connections", async () => {
     const h = harness();
     const { a, b, chA, chB } = await pairUp(h);
@@ -1024,7 +1154,13 @@ describe("FallbackPeerConnection", () => {
     const { a, chA } = await pairUp(h);
     for (let i = 0; i < 3; i += 1) chA.send(new ArrayBuffer(10000));
     expect(chA.bufferedAmount).toBeGreaterThan(0);
+    // A close with queued frames drains first (bounded), so wait for the channel to close.
     a.pc.close();
+    await until(
+      () => chA.readyState === "closed",
+      "channel closed after the flush",
+      () => h.clock.advance(100),
+    );
     expect(chA.bufferedAmount).toBe(0);
   });
 
