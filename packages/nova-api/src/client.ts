@@ -101,6 +101,11 @@ export type NovaSessionEvent =
       actionRatePerSecond: number;
     }
   | { type: "actionRejected"; actionId: string; code: string; message: string }
+  /**
+   * A member's game became ready (loaded and registered). Host-side only: the
+   * lobby re-reads readiness on it; games never see it.
+   */
+  | { type: "ready"; memberId: string }
   | {
       /** S3: the authority changed (election/migration). Host-side only. */
       type: "authorityChanged";
@@ -335,6 +340,7 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
       case "authorityChanged":
       case "historyIncomplete":
       case "snapshotFallback":
+      case "ready":
         break; // host-side diagnostics; games observe acks and errors
     }
   });

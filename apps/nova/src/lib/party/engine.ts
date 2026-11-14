@@ -2591,6 +2591,11 @@ export class PartyEngine {
         this.addNotice("error", `Nova error (${event.error.code}): ${event.error.message}`);
         this.emit();
         break;
+      case "ready":
+        // A member's readiness changed: the lobby's snapshot must be rebuilt
+        // (the start gate reads it). The game frame never sees this event.
+        this.emit();
+        break;
       default:
         break; // raw/state/simulation events route to the frame only
     }

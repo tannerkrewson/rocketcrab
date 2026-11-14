@@ -1082,8 +1082,10 @@ export class NovaSession implements NovaClientBackend {
       }
       case "game.ready": {
         const player = this.playersMap.get(peerMessage.senderMemberId);
-        if (player !== undefined) {
+        // Only a change is news: a duplicate game.ready must not re-render.
+        if (player !== undefined && !player.ready) {
           player.ready = true;
+          this.emit({ type: "ready", memberId: player.id });
         }
         break;
       }

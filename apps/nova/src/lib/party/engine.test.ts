@@ -635,6 +635,36 @@ describe("party engine — join loading stages (rocketcrab-erx / rocketcrab-5ae)
 });
 
 describe("party engine — readiness and start gating", () => {
+  it("re-renders the lobby when a peer becomes ready, with no other event", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    const code = await runCreate(a, world);
+    await registerLocalGame(a, world);
+
+    const { join: joinPromise, settled } = startJoin(b, world, code);
+    await settled;
+    await settle(world);
+    await joinPromise;
+    await settle(world);
+
+    // Subscribe after the join settles: the next snapshot must come from
+    // b's readiness alone (the regression: game.ready changed the data but
+    // never emitted, so the start button stayed disabled).
+    const snapshots: ReturnType<PartyEngine["getState"]>[] = [];
+    const stop = a.engine.onState((state) => snapshots.push(state));
+    expect(memberOf(a.engine.getState(), b.memberId).ready).toBe(false);
+
+    await registerLocalGame(b, world);
+    await settle(world);
+    stop();
+
+    const latest = snapshots.at(-1);
+    expect(latest).toBeDefined();
+    expect(memberOf(latest!, b.memberId).ready).toBe(true);
+    expect(latest!.canStart).toBe(true);
+  });
+
   it("prevents starting until every player is ready; force-start works once verified", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
