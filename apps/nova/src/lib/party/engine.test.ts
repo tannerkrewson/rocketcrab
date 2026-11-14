@@ -3057,9 +3057,12 @@ describe("party engine — peer-link alert (PLAN.md §7 stages 2 and 4)", () => 
   });
 
   /** A player on the DEFAULT factory path, so the engine's tunnel hooks are captured. */
-  function makeDefaultFactoryPlayer(world: World): Player {
+  function makeDefaultFactoryPlayer(
+    world: World,
+    overrides: ConstructorParameters<typeof PartyEngine>[0] = {},
+  ): Player {
     transportFactoryMocks.createTrysteroPartyTransportFactory.mockReturnValue(world.factory);
-    return makePlayer(world, "host", { transportFactory: undefined });
+    return makePlayer(world, "host", { transportFactory: undefined, ...overrides });
   }
 
   /** The tunnel hooks the engine handed to the default transport factory. */
@@ -3087,8 +3090,10 @@ describe("party engine — peer-link alert (PLAN.md §7 stages 2 and 4)", () => 
     hooks.onTunnel(SWITCH);
     hooks.onTunnel({ reason: "native-failed", elapsedMs: 0 });
     expect(host.engine.getState().peerLink).toBe("connecting");
-    // Three switches produce one state change: one alert, not three.
-    expect(seen).toEqual([null, "connecting"]);
+    // One alert value, however many switches: every switch emits (so the
+    // diagnostics refresh), but the alert never splits into several.
+    expect(new Set(seen)).toEqual(new Set([null, "connecting"]));
+    expect(seen).toEqual([null, "connecting", "connecting", "connecting"]);
 
     const joiner = makePlayer(world, "joiner");
     const joining = joiner.engine.joinByInvite({ secret });
@@ -3096,6 +3101,20 @@ describe("party engine — peer-link alert (PLAN.md §7 stages 2 and 4)", () => 
     await joining;
     expect(host.engine.getState().peerLink).toBeNull();
     expect(seen.at(-1)).toBeNull();
+    stop();
+  });
+
+  it("emits diagnostics on a switch even while a failure is showing", async () => {
+    const world = makeWorld();
+    const host = makeDefaultFactoryPlayer(world);
+    await runCreate(host, world);
+    const hooks = capturedHooks();
+    hooks.onTunnelFailure(FAILURE);
+    const seen: PeerLinkStatus[] = [];
+    const stop = host.engine.onState((state) => seen.push(state.peerLink));
+    hooks.onTunnel(SWITCH);
+    expect(seen).toEqual(["failed", "failed"]);
+    expect(host.engine.getState().peerLink).toBe("failed");
     stop();
   });
 
@@ -3129,7 +3148,8 @@ describe("party engine — peer-link alert (PLAN.md §7 stages 2 and 4)", () => 
     expect(host.engine.getState().peerLink).toBe("failed");
     world.clock.advance(60_000); // well past any connecting window
     expect(host.engine.getState().peerLink).toBe("failed");
-    expect(seen).toEqual([null, "connecting", "failed"]);
+    // The second failure adds no emit; the later switch emits to refresh diagnostics.
+    expect(seen).toEqual([null, "connecting", "failed", "failed"]);
     stop();
 
     // Retry runs the existing reconnect path and drops the alert at once.
@@ -3139,19 +3159,80 @@ describe("party engine — peer-link alert (PLAN.md §7 stages 2 and 4)", () => 
     expect(host.engine.getState().phase).toBe("lobby");
   });
 
-  it("keeps a failure alert when another player joins natively", async () => {
+  it("an admitted peer clears a failure alert, since Trystero re-attempts the failed pair", async () => {
     const world = makeWorld();
     const host = makeDefaultFactoryPlayer(world);
     const secret = await runCreate(host, world);
     const hooks = capturedHooks();
     hooks.onTunnel(SWITCH);
     hooks.onTunnelFailure(FAILURE);
+    expect(host.engine.getState().peerLink).toBe("failed");
 
     const joiner = makePlayer(world, "joiner");
     const joining = joiner.engine.joinByInvite({ secret });
     await settle(world);
     await joining;
-    expect(host.engine.getState().peerLink).toBe("failed");
+    expect(host.engine.getState().peerLink).toBeNull();
+  });
+
+  it("a tunnel failure during joining still ends in the join-timeout screen, with no stale alert", async () => {
+    const world = makeWorld();
+    const joiner = makeDefaultFactoryPlayer(world, { peerConnectTimeoutMs: 1_000 });
+    const joining = joiner.engine.joinByInvite({ secret: "F".repeat(43) });
+    await settle(world);
+    const hooks = capturedHooks();
+    hooks.onTunnel(SWITCH);
+    hooks.onTunnelFailure(FAILURE);
+    expect(joiner.engine.getState().phase).toBe("joining");
+    expect(joiner.engine.getState().peerLink).toBe("failed");
+    world.clock.advance(1_000);
+    await settle(world);
+    await joining;
+    const state = joiner.engine.getState();
+    expect(state.phase).toBe("error");
+    expect(state.lastError).toMatch(/couldn't reach anyone/i);
+    expect(state.peerLink).toBeNull();
+  });
+
+  it("a silent native drop gets one info notice, and a rejoin clears it", async () => {
+    const world = makeWorld();
+    const host = makePlayer(world, "host");
+    const secret = await runCreate(host, world);
+    const joiner = makePlayer(world, "joiner");
+    const joining = joiner.engine.joinByInvite({ secret });
+    await settle(world);
+    await joining;
+
+    await joiner.engine.leaveParty();
+    await settle(world);
+    const left = host.engine
+      .getState()
+      .notices.filter((notice) => notice.message === "Player joiner left the party.");
+    expect(left).toHaveLength(1);
+    expect(left[0]?.level).toBe("info");
+
+    const rejoining = joiner.engine.joinByInvite({ secret });
+    await settle(world);
+    await rejoining;
+    expect(
+      host.engine.getState().notices.some((notice) => /left the party/.test(notice.message)),
+    ).toBe(false);
+  });
+
+  it("a member removed by a kick is announced as removed, not as having left", async () => {
+    const world = makeWorld();
+    const host = makePlayer(world, "host");
+    const secret = await runCreate(host, world);
+    const joiner = makePlayer(world, "joiner");
+    const joining = joiner.engine.joinByInvite({ secret });
+    await settle(world);
+    await joining;
+
+    host.engine.kickMember(joiner.memberId);
+    await settle(world);
+    const messages = host.engine.getState().notices.map((notice) => notice.message);
+    expect(messages).toContain("Player joiner was removed from the party.");
+    expect(messages.some((message) => /left the party/.test(message))).toBe(false);
   });
 
   it("ignores tunnel callbacks from a party that has been left", async () => {

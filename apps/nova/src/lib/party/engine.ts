@@ -315,6 +315,10 @@ function makeNotice(level: PartyNotice["level"], message: string): PartyNotice {
   return { id: `notice-${noticeCounter}`, level, message };
 }
 
+function leftNoticeMessage(displayName: string): string {
+  return `${displayName} left the party.`;
+}
+
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   return `${(bytes / 1024).toFixed(1)} KB`;
@@ -507,6 +511,8 @@ export class PartyEngine {
   /** Generic peer-link alert (PLAN.md §7); see {@link PeerLinkStatus}. */
   private peerLink: PeerLinkStatus = null;
   private cancelPeerLinkWindow: (() => void) | null = null;
+  /** Members removed by a kick: their leave is already announced, so skip the "left" notice. */
+  private readonly removedMemberIds = new Set<MemberId>();
 
   private readonly listeners = new Set<(state: PartyEngineState) => void>();
   private party: PartySession | null = null;
@@ -977,6 +983,7 @@ export class PartyEngine {
     void this.party
       .kickMember(memberId, "The host removed you from the party.")
       .catch(() => undefined);
+    this.removedMemberIds.add(memberId);
     if (this.hasDisplayName(memberId)) {
       this.addNotice("warn", `${this.displayNameOf(memberId)} was removed from the party.`);
     }
@@ -1325,6 +1332,7 @@ export class PartyEngine {
     this.currentSourceSha256 = null;
     this.endedReason = null;
     this.notices = [];
+    this.removedMemberIds.clear();
     this.clearPeerLink();
     this.lastError = this.teardownFailed ? UNSAFE_TEARDOWN_MESSAGE : null;
     this.lastSetup = null;
@@ -1610,41 +1618,66 @@ export class PartyEngine {
   // Peer-link alert (PLAN.md §7 stages 2 and 4)
   // ------------------------------------------------------------------
 
+  /** Setup and party phases: a peer's link can report while they are live. */
+  private peerLinkPhase(): boolean {
+    return this.phase === "creating" || this.phase === "joining" || this.isInPartyPhase(this.phase);
+  }
+
   /**
    * A peer connection moved onto the edge tunnel. Simultaneous switches share
-   * one "connecting" alert; each switch restarts the expiry window. Ignored
-   * outside the party phases and once a failure is showing.
+   * one "connecting" alert, and each switch restarts the expiry window. A
+   * failure already showing stays. Every switch emits, because the diagnostics'
+   * relayed flags change with each pair.
    */
   private handleTunnelSwitch(): void {
-    if (!this.isInPartyPhase(this.phase) || this.peerLink === "failed") return;
-    this.armPeerLinkWindow();
-    if (this.peerLink === null) {
+    if (!this.peerLinkPhase()) return;
+    if (this.peerLink !== "failed") {
+      this.armPeerLinkWindow();
       this.peerLink = "connecting";
-      this.emit();
     }
+    this.emit();
   }
 
   /** A tunnelled pair failed terminally: one alert with a retry action. */
   private handleTunnelFailure(): void {
-    if (!this.isInPartyPhase(this.phase)) return;
+    if (!this.peerLinkPhase()) return;
     this.cancelPeerLinkWindowTimer();
     if (this.peerLink === "failed") return;
     this.peerLink = "failed";
     this.emit();
   }
 
-  /** A peer was admitted, so a pending switch has paired (stage 2). */
+  /**
+   * An admitted peer clears the alert, whether it was connecting or failed.
+   * Trystero re-attempts a failed pair on re-announce, and the playing phase
+   * has no retry, so a failure must clear when recovery arrives. Trade-off: an
+   * unrelated peer's admission also clears it (the hooks do not identify the pair).
+   */
   private handlePeerJoinedForLink(): void {
-    if (this.peerLink !== "connecting") return;
+    if (this.peerLink === null) return;
     this.cancelPeerLinkWindowTimer();
     this.peerLink = null;
     this.emit();
   }
 
-  /** Drop the alert: on leave, and when a retry starts a fresh attempt. */
+  /** Drop the alert: on leave, on setup failure, and when a retry starts. */
   private clearPeerLink(): void {
     this.cancelPeerLinkWindowTimer();
     this.peerLink = null;
+  }
+
+  /** A member who left without a kick gets one brief info notice (PLAN §7). */
+  private noteMemberLeft(memberId: MemberId, displayName: string | undefined): void {
+    if (this.removedMemberIds.delete(memberId)) return;
+    if (displayName === undefined || displayName === memberId) return;
+    this.addNotice("info", leftNoticeMessage(displayName));
+  }
+
+  /** A rejoining member clears their "left" notice. */
+  private dropLeftNotice(displayName: string | undefined): void {
+    if (displayName === undefined) return;
+    const message = leftNoticeMessage(displayName);
+    this.notices = this.notices.filter((notice) => notice.message !== message);
   }
 
   private armPeerLinkWindow(): void {
@@ -2122,6 +2155,7 @@ export class PartyEngine {
       directCode === null
         ? connectionErrorMessage(error)
         : "Couldn't connect to the party. Try again.";
+    this.clearPeerLink();
     this.phase = "error";
     this.phaseDetail = null;
     this.joinStage = null;
@@ -2442,7 +2476,11 @@ export class PartyEngine {
   private handlePartyEvent(event: PartyEvent): void {
     switch (event.type) {
       case "memberJoined":
+        this.dropLeftNotice(event.displayName);
+        this.emit();
+        break;
       case "memberLeft":
+        this.noteMemberLeft(event.memberId, event.displayName);
         this.emit();
         break;
       case "memberRenamed":
@@ -2500,6 +2538,7 @@ export class PartyEngine {
           this.emit();
           void this.leaveParty("removed");
         } else if (this.hasDisplayName(event.targetMemberId)) {
+          this.removedMemberIds.add(event.targetMemberId);
           this.addNotice(
             "warn",
             `${this.displayNameOf(event.targetMemberId)} was removed from the party.`,
