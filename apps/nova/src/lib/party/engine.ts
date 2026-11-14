@@ -1609,7 +1609,7 @@ export class PartyEngine {
    * see only themselves because the WebRTC data channel never opens. The
    * TURN fix itself is infrastructure (rocketcrab-23s); this notice makes
    * the symptom legible instead of a silent 1-player lobby. Deduped to one
-   * notice per category per engine.
+   * notice per category per setup attempt.
    */
   private readonly joinErrorNoticesShown = new Set<string>();
   private handleJoinErrorNotice(error: unknown): void {
@@ -2898,6 +2898,7 @@ export class PartyEngine {
       );
     }
     this.stopObservingSignaling();
+    this.joinErrorNoticesShown.clear();
     this.setupAbort = new AbortController();
     this.activeErrorScope = null;
     this.observedJoinFailure = null;

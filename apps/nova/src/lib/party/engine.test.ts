@@ -1771,29 +1771,49 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
   });
 
   it.each(["room-full", "decrypt-failed"] as const)(
-    "ignores stale %s callbacks after a new party is established",
+    "deduplicates %s per party without letting stale callbacks suppress it",
     async (code) => {
       const world = makeWorld();
+      const host = makePlayer(world, "host");
+      const secret = await runCreate(host, world);
       const player = makeDefaultFactoryPlayer(world);
-      await runCreate(player, world);
+      const firstJoin = player.engine.joinByInvite({ secret });
+      await settle(world);
+      await firstJoin;
       const old = transportFactoryMocks.createTrysteroPartyTransportFactory.mock.calls[0]?.[0];
+      const report = fromRoomError({
+        code,
+        peerId: "old-peer",
+        stage: "offer",
+        appId: "test",
+        roomId: "old-room",
+        message: "peer report",
+      });
+      expect(old?.onJoinError).toBeDefined();
+      const originalCount = player.engine.getState().notices.length;
+      old?.onJoinError?.(report);
+      old?.onJoinError?.(report);
+      expect(player.engine.getState().notices).toHaveLength(originalCount + 1);
+      const firstMessage = player.engine.getState().notices.at(-1)?.message;
       await player.engine.leaveParty();
-      await runCreate(player, world);
+      const rejoin = player.engine.joinByInvite({ secret });
+      await settle(world);
+      await rejoin;
       expect(player.engine.getState().phase).toBe("lobby");
       const before = player.engine.getState().notices;
-      old?.onJoinError?.(
-        fromRoomError({
-          code,
-          peerId: "old-peer",
-          stage: "offer",
-          appId: "test",
-          roomId: "old-room",
-          message: "corrupt signal",
-        }),
-      );
+      old?.onJoinError?.(report);
       expect(player.engine.getState().notices).toEqual(before);
+      const current = transportFactoryMocks.createTrysteroPartyTransportFactory.mock.calls[1]?.[0];
+      expect(current?.onJoinError).toBeDefined();
+      current?.onJoinError?.(report);
+      current?.onJoinError?.(report);
+      expect(player.engine.getState().notices.map((notice) => notice.message)).toEqual([
+        ...before.map((notice) => notice.message),
+        firstMessage,
+      ]);
       expect(player.engine.getState().phase).toBe("lobby");
       await player.engine.leaveParty();
+      await host.engine.leaveParty();
     },
   );
 
