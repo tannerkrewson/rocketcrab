@@ -549,11 +549,16 @@ describe.skipIf(!process.env.LARGE_ROOM_SIM)("large-room authority fan-out simul
       }
 
       const date = localDateIso(startedAt);
+      // LARGE_ROOM_SIM_LABEL names a variant run (e.g. "lean") so earlier
+      // samples are never overwritten.
+      const label = process.env.LARGE_ROOM_SIM_LABEL;
+      const suffix = label === undefined || label === "" ? "" : `-${label}`;
       const outputPath = fileURLToPath(
-        new URL(`../../../docs/testing/large-room-sim-${date}.json`, import.meta.url),
+        new URL(`../../../docs/testing/large-room-sim-${date}${suffix}.json`, import.meta.url),
       );
       const report = {
         date,
+        label: label ?? null,
         startedAt: startedAt.toISOString(),
         generator: "packages/nova-api/src/large-room-sim.test.ts",
         environment: {
