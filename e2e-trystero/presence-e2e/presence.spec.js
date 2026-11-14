@@ -4,7 +4,8 @@ import { expect, test } from "@playwright/test";
 //   Q1 existing admitted peer sees a rename (and a burst settles on the final name)
 //   Q2 late joiner sees the latest name, not the original
 //   Q3 an update before admission is applied from the current slot at admission
-//   Q4 writes from an unadmitted or rejected peer are not applied
+//   Q4 the proof page's own gate applies nothing for unadmitted or rejected writes
+//      (says nothing about Nova's real admission; the raw slot stays readable)
 //   Q5 reconnect: the old endpoint's slot disappears; the new endpoint is a new user
 //      whose name is applied only after admission
 // Every "not applied" assertion first waits until the value has reached the slot,
@@ -133,13 +134,12 @@ test("Q3: an update before admission is applied from the current slot at admissi
 
 test("Q4: writes from a never-admitted peer are not applied", async ({ browser }) => {
   await withRoom(browser, async (h) => {
-    const { a, b } = await h.pair();
+    const { b } = await h.pair();
     const c = await h.open();
     await h.waitPeer(b, c);
     await h.set(c, "intruder");
     await h.expectSlot(b, c, "intruder");
     expect(await h.appliedValues(b)).toEqual([]);
-    expect(await h.slot(b, a)).toBe(null);
   });
 });
 

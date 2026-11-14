@@ -296,8 +296,8 @@ passed 4/4 (Podman Playwright, 2026-11-13).
      slot's current value. Seven named tests ran three times in the Playwright
      1.62.1 container: 7/7 on every run, no retries, no flakes. Results:
      1. **Existing admitted peer sees a rename: yes.** `Alpha` then `Beta` were
-        applied. A three-write burst delivered only `three` to the admitted peer
-        in every run, so intermediate renames are coalesced.
+        applied. In every run, a three-write burst applied only `three` on the
+        admitted peer, so the intermediate renames were not applied.
      2. **Late joiner sees the latest name: yes.** A joiner after `original` then
         `latest` read `latest`, applied only at admission, and never applied
         `original`. Today's Nova shows late joiners the original name, so this is
@@ -305,20 +305,31 @@ passed 4/4 (Podman Playwright, 2026-11-13).
      3. **Update before admission: read at admission, yes.** The slot held
         `before admission` before admission. Admission applied that current value,
         and a later update applied normally.
-     4. **Unadmitted or rejected writes: not applied by the page, but readable.**
-        The gate worked, but every peer could read the raw slot (`intruder` and
-        `rejected` both appeared in `get()`). The state layer does not enforce
-        admission, so every consumer must gate its reads.
+     4. **Unadmitted or rejected writes: the proof page's own gate applied
+        nothing.** This says nothing about Nova's real admission. Every peer
+        could read the raw slot (`intruder` and `rejected` both appeared in
+        `get()`), so the state layer does not enforce admission and every
+        consumer must gate its reads.
      5. **Reconnect:** a departed endpoint's slot reads `null` after it leaves. A
-        rejoin is a new endpoint with a new user ID (`identity: "none"`), and its
+        rejoin in a fresh browser context received a new user ID; only that case
+        was measured, not identity persistence across reloads or contexts. Its
         name is applied only after re-admission. Reconnect over a relay socket
         drop without a leave was not induced.
 
-     Logs for the three runs were kept outside the repository. Not tested:
-     Nova's real `PartyEngine`/transport bilateral admission (the test calls
-     `admit`/`reject` directly); duplicate Nova member IDs across tabs;
-     Firefox and WebKit; production signaling (only the local Worker, no TURN,
-     no cross-network); more than three peers.
+     Logs for the three runs were kept outside the repository. Reproduce with
+     two servers in Paseo terminals, from the worktree root:
+     `TMPDIR="$HOME/.cache/tmp" npm run edge:dev -- --port 18787 --var ORIGIN_ALLOWLIST:http://localhost:5200,https://localhost:5200,http://127.0.0.1:5200`
+     (`http://127.0.0.1:5200` is a non-default allowlist entry, because the
+     proof page is served from that origin), and inside `e2e-trystero/`:
+     `node ../node_modules/vite/bin/vite.js --port 5200 --strictPort`. Then, from
+     the worktree root:
+     `podman run --rm --network host --userns keep-id -v "$PWD:$PWD:Z" -w "$PWD" mcr.microsoft.com/playwright:v1.62.1-noble npx playwright test -c e2e-trystero/presence.playwright.config.js`.
+     Not tested: Nova's real `PartyEngine`/transport bilateral admission (the
+     test calls `admit`/`reject` directly); duplicate Nova member IDs across
+     tabs; Firefox and WebKit; production signaling (only the local Worker, no
+     TURN, no cross-network); more than three peers; all peers direct (two or
+     three peers in a full mesh), so the scale virtual path was not exercised;
+     the production join's `maxReceiveBytes`, `turnConfig` and `rtcConfig`.
 
      **Recommendation:** the incremental candidate is viable for names only.
      The mechanism works over real 0.27 WebRTC and passes all five checks when
@@ -328,11 +339,13 @@ passed 4/4 (Podman Playwright, 2026-11-13).
      Next step is a candidate test against the real transport's admission path;
      no application code changes until then. The owner would need to accept:
      - late joiners see the current name, not the original;
-     - names of unadmitted peers are readable from room state, which today's
-       bilateral acknowledgement withholds, unless the candidate hides or
-       encrypts that value;
+     - renamed names of unadmitted peers become readable from room state.
+       Today's `nova.identity` already exposes the join-time `displayName`
+       before acknowledgement, and acknowledgement gates only publication to
+       the app; the candidate's new exposure is the mutable name, unless it
+       hides or encrypts that value;
      - a rename made during admission applies once admission completes;
-     - intermediate renames are coalesced, so only the final name is delivered;
+     - intermediate renames are not delivered, so only the final name applies;
      - a departed endpoint's name disappears from the slot immediately on leave;
      - a reconnect is a new endpoint, so the name returns only after re-admission
        and the peer resends it.

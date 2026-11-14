@@ -1,6 +1,7 @@
 // Experimental name-slot projection, not Nova's transport admission protocol.
-// Joins like the production transport (identity "none", scale plugin, room-scoped
-// signal URL from packages/trystero-transport) against the local edge relay on 18787.
+// Uses the production transport's identity mode ("none"), scale plugin and room-scoped
+// signal URL (packages/trystero-transport) against the local edge relay on 18787.
+// Omits the production join's maxReceiveBytes, turnConfig and rtcConfig.
 import { joinRoom, scale } from "../../node_modules/@trystero-p2p/ws-relay/dist/index.mjs";
 import { signalUrl } from "../../packages/trystero-transport/src/signal-url.ts";
 
