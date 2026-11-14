@@ -1,5 +1,10 @@
 import type { PartyTransportFactory } from "@rocketcrab/party";
-import { TrysteroTransport, type TrysteroJoinError } from "@rocketcrab/trystero-transport";
+import {
+  TrysteroTransport,
+  type TerminalFailureInfo,
+  type TrysteroJoinError,
+  type TunnelStartInfo,
+} from "@rocketcrab/trystero-transport";
 import type { TurnServerConfigLike } from "./turn-creds";
 import { edgeOrigin } from "../edge";
 
@@ -13,10 +18,13 @@ export interface TrysteroPartyTransportFactoryOptions {
   readonly turnConfig?: readonly TurnServerConfigLike[];
   /**
    * Join-error observer (5cl.1): both transports report categorized
-   * peer/relay failures here so the shell can surface a friendly notice
-   * (e.g. the no-TURN `peer_connection_failed` signature).
+   * peer/relay failures here so the shell can surface a friendly notice.
    */
   readonly onJoinError?: (error: TrysteroJoinError) => void;
+  /** A peer connection switched to the edge tunnel (PLAN.md §7 stage 2). */
+  readonly onTunnel?: (info: TunnelStartInfo) => void;
+  /** A tunnelled peer connection failed terminally (PLAN.md §7 stage 4). */
+  readonly onTunnelFailure?: (info: TerminalFailureInfo) => void;
 }
 
 /**
@@ -38,7 +46,7 @@ export function createTrysteroPartyTransportFactory(
   options: TrysteroPartyTransportFactoryOptions = {},
 ): PartyTransportFactory {
   const turnConfig = options.turnConfig;
-  const { onJoinError } = options;
+  const { onJoinError, onTunnel, onTunnelFailure } = options;
   const create = (identity: Parameters<PartyTransportFactory["createPrivateTransport"]>[0]) => {
     const transport = new TrysteroTransport({
       memberId: identity.memberId,
@@ -49,6 +57,8 @@ export function createTrysteroPartyTransportFactory(
       forceRelayOnlyNoServers: forceTunnelForTests(),
       ...(turnConfig !== undefined ? { turnConfig } : {}),
       ...(onJoinError !== undefined ? { onJoinError } : {}),
+      ...(onTunnel !== undefined ? { onTunnel } : {}),
+      ...(onTunnelFailure !== undefined ? { onTunnelFailure } : {}),
     });
     return transport;
   };

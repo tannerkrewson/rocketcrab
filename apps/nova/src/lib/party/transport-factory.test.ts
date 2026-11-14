@@ -148,6 +148,14 @@ describe("tunnel fallback wiring", () => {
     expect(mocks.constructed[0]).toMatchObject({ partySecret: SECRET });
   });
 
+  it("passes the tunnel start and failure hooks to each transport", () => {
+    const onTunnel = vi.fn();
+    const onTunnelFailure = vi.fn();
+    const factory = createTrysteroPartyTransportFactory({ onTunnel, onTunnelFailure });
+    factory.createPrivateTransport({ memberId: "m1", password: "pw", secret: SECRET });
+    expect(mocks.constructed[0]).toMatchObject({ onTunnel, onTunnelFailure });
+  });
+
   it("does not force the tunnel by default", () => {
     const factory = createTrysteroPartyTransportFactory();
     factory.createPrivateTransport({ memberId: "m1", password: "pw", secret: SECRET });

@@ -666,7 +666,10 @@ export class TrysteroTransport implements NovaTransport {
       sessionId: this.sessionId,
       appId: this.appId,
       signalingConnected: this.signalingConnected,
-      peers: [...this.peersList],
+      peers: this.peersList.map((peer) => ({
+        ...peer,
+        tunnelled: this.isPeerTunnelled(peer.connectionId),
+      })),
       joinErrors: [...this.joinErrors],
       lastQuality: [...this.qualitySamples],
     };
@@ -1437,7 +1440,8 @@ export interface TrysteroTransportDiagnostics {
   readonly sessionId: SessionId | null;
   readonly appId: string;
   readonly signalingConnected: boolean | null;
-  readonly peers: readonly TransportPeerInfo[];
+  /** Admitted peers; `tunnelled` is true when the pair runs on the edge tunnel. */
+  readonly peers: readonly (TransportPeerInfo & { readonly tunnelled: boolean })[];
   readonly joinErrors: readonly TrysteroJoinError[];
   readonly lastQuality: readonly ConnectionQualitySample[];
 }
