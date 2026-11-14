@@ -170,9 +170,10 @@ export interface FallbackPeerConnectionOptions {
   /**
    * Called at most once per wrapper instance with its connection outcome. An
    * instance that never gets both descriptions (an unclaimed pooled offer)
-   * reports nothing. An attempt that has started and is closed before any
-   * success or failure reports `failed`, unless `isTearingDown()` is true at the
-   * close: a close caused by a deliberate local teardown reports nothing.
+   * reports nothing. A switched attempt (on the tunnel) closed before any success
+   * or failure reports `failed`, unless `isTearingDown()` is true at the close.
+   * A native-mode close before the deadline reports nothing, and so does a close
+   * during a deliberate local teardown.
    */
   readonly onOutcome?: (info: ConnectionOutcomeInfo) => void;
   /** True during a deliberate local teardown of the room (PLAN.md §8.2). Default: false. */
@@ -587,9 +588,11 @@ class Session {
    */
   closeGracefully(): void {
     if (this.closed || this.draining) return;
-    // A started attempt closed before any outcome failed, unless the local user
-    // is tearing the room down. Trystero's own TTL destroy of a stuck peer lands here too.
-    if (!this.deps.isTearingDown()) this.claimOutcome("failed");
+    // A switched attempt closed before any outcome failed, unless a deliberate local
+    // teardown is running. Trystero's TTL destroy of a stuck peer lands here after the
+    // switch. A native-mode close before the deadline is not counted: Trystero
+    // destroys superseded answered offers that way (transitionOutboundToAnswered).
+    if (this.mode === "tunnel" && !this.deps.isTearingDown()) this.claimOutcome("failed");
     if (this.mode !== "tunnel" || !this.ready || !this.socket || this.pendingBytes === 0) {
       this.close();
       return;

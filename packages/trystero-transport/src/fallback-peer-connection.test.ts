@@ -1468,14 +1468,15 @@ describe("FallbackPeerConnection connection outcome", () => {
     expect(h.tunnels).toEqual([]);
   });
 
-  it("reports failed when the peer closes while the pair is still connecting", async () => {
+  it("reports nothing when a native-mode attempt is closed before the deadline, not tearing down", async () => {
+    // Trystero destroys a superseded answered offer this way (transitionOutboundToAnswered).
     const h = harness();
     const { a } = await connectPair(h);
     a.pc.close();
     h.clock.advance(FALLBACK_AFTER_MS * 3);
     await settle();
 
-    expect(outcomesOf(h, "a")).toEqual([{ outcome: "failed", msToConnect: 0 }]);
+    expect(h.outcomes).toEqual([]);
     expect(h.failures).toEqual([]);
   });
 
