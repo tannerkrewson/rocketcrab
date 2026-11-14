@@ -18,6 +18,7 @@ interface HarnessState {
     starts: Array<{ reason: string; elapsedMs: number }>;
     failures: string[];
   };
+  outcomes: Array<{ outcome: string; msToConnect: number }>;
   errors: string[];
 }
 
@@ -191,6 +192,12 @@ test("a forced player and its normal partner both tunnel once, and actions flow 
       expect(current.tunnel.failures).toEqual([]);
       expect(current.errors).toEqual([]);
     }
+    // One connection outcome per side for the forced pair: the tunnel (PLAN.md §8.2).
+    for (const peer of [host, joiner]) {
+      await expect
+        .poll(async () => (await state(peer.page)).outcomes.map((o) => o.outcome))
+        .toEqual(["tunnel"]);
+    }
 
     // Actions flow in both directions over the tunnel. The binary traffic
     // counters must grow across the exchange: this proves the data itself
@@ -248,6 +255,12 @@ test("healthy pairs stay on native WebRTC and never open a tunnel", async ({ bro
       expect(current.peers[0]?.tunnelled).toBe(false);
       expect(current.tunnel.starts).toEqual([]);
       expect(current.tunnel.failures).toEqual([]);
+      // One outcome per side on native WebRTC: direct when the selected pair is
+      // readable, unknown when it is not. Never tunnel or failed (PLAN.md §8.2).
+      await expect
+        .poll(async () => (await state(peer.page)).outcomes.map((o) => o.outcome))
+        .toHaveLength(1);
+      expect(["direct", "unknown"]).toContain((await state(peer.page)).outcomes[0]?.outcome);
     }
 
     await host.page.evaluate(() => (window as unknown as HarnessWindow).__harness.sendStruct());

@@ -30,6 +30,8 @@ interface HarnessState {
     starts: Array<{ reason: string; elapsedMs: number }>;
     failures: string[];
   };
+  /** Connection outcome per peer attempt (PLAN.md §8.2), as the transport reports it. */
+  outcomes: Array<{ outcome: string; msToConnect: number }>;
   messages: Array<{
     channel: string;
     senderMemberId: string;
@@ -105,6 +107,7 @@ const state: HarnessState = {
   peers: [],
   signalingConnected: null,
   tunnel: { starts: [], failures: [] },
+  outcomes: [],
   messages: [],
   progress: [],
   pings: [],
@@ -141,6 +144,9 @@ async function enterRoom(options: JoinOptions): Promise<string> {
     },
     onTunnelFailure: (info) => {
       state.tunnel.failures.push(info.reason);
+    },
+    onOutcome: (info) => {
+      state.outcomes.push({ outcome: info.outcome, msToConnect: info.msToConnect });
     },
     onJoinError: (error) => {
       state.errors.push(`${error.category}: ${error.message}`);
