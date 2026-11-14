@@ -52,11 +52,24 @@ const JOINED = "joined";
 /** Fallback timer (FALLBACK_AFTER_MS, 8 s) plus margin for the switch and the tunnel. */
 const PAST_FALLBACK_MS = 12_000;
 
+/** Binary traffic that crossed this page's tunnel sockets (paired/text excluded). */
+interface TunnelTraffic {
+  framesSent: number;
+  framesReceived: number;
+  bytesSent: number;
+  bytesReceived: number;
+}
+
 interface Peer {
   page: Page;
   tunnelSockets: string[];
   /** URLs of tunnel sockets that reached the closed state. */
   closedTunnelSockets: string[];
+  traffic: TunnelTraffic;
+}
+
+async function trafficOf(peer: Peer): Promise<TunnelTraffic> {
+  return { ...peer.traffic };
 }
 
 function randRoom(): string {
@@ -67,14 +80,31 @@ async function openPeer(browser: Browser): Promise<Peer> {
   const page = await browser.newPage();
   const tunnelSockets: string[] = [];
   const closedTunnelSockets: string[] = [];
+  const traffic: TunnelTraffic = {
+    framesSent: 0,
+    framesReceived: 0,
+    bytesSent: 0,
+    bytesReceived: 0,
+  };
   page.on("websocket", (socket: WebSocket) => {
     if (!socket.url().includes("/tunnel/")) return;
     tunnelSockets.push(socket.url());
     socket.on("close", () => closedTunnelSockets.push(socket.url()));
+    // Only binary frames carry data; the server's text `paired` is excluded.
+    socket.on("framesent", (frame) => {
+      if (typeof frame.payload === "string") return;
+      traffic.framesSent += 1;
+      traffic.bytesSent += frame.payload.byteLength;
+    });
+    socket.on("framereceived", (frame) => {
+      if (typeof frame.payload === "string") return;
+      traffic.framesReceived += 1;
+      traffic.bytesReceived += frame.payload.byteLength;
+    });
   });
   await page.goto("/");
   await page.waitForFunction(() => (window as unknown as HarnessWindow).__harness?.ready === true);
-  return { page, tunnelSockets, closedTunnelSockets };
+  return { page, tunnelSockets, closedTunnelSockets, traffic };
 }
 
 async function enter(
@@ -162,7 +192,11 @@ test("a forced player and its normal partner both tunnel once, and actions flow 
       expect(current.errors).toEqual([]);
     }
 
-    // Actions flow in both directions over the tunnel.
+    // Actions flow in both directions over the tunnel. The binary traffic
+    // counters must grow across the exchange: this proves the data itself
+    // crossed the tunnel, not just that the sockets opened.
+    const hostBefore = await trafficOf(host);
+    const joinerBefore = await trafficOf(joiner);
     await host.page.evaluate(() => (window as unknown as HarnessWindow).__harness.sendStruct());
     await joiner.page.evaluate(() => (window as unknown as HarnessWindow).__harness.sendStruct());
     await expect
@@ -173,6 +207,16 @@ test("a forced player and its normal partner both tunnel once, and actions flow 
     await expect
       .poll(async () => (await state(host.page)).messages.filter((m) => m.channel === "raw").length)
       .toBeGreaterThanOrEqual(1);
+    for (const [peer, before] of [
+      [host, hostBefore],
+      [joiner, joinerBefore],
+    ] as const) {
+      const after = await trafficOf(peer);
+      expect(after.framesSent).toBeGreaterThan(before.framesSent);
+      expect(after.framesReceived).toBeGreaterThan(before.framesReceived);
+      expect(after.bytesSent).toBeGreaterThan(before.bytesSent);
+      expect(after.bytesReceived).toBeGreaterThan(before.bytesReceived);
+    }
   } finally {
     await closeAll(host, joiner);
   }
@@ -187,6 +231,18 @@ test("healthy pairs stay on native WebRTC and never open a tunnel", async ({ bro
 
     expect(host.tunnelSockets).toEqual([]);
     expect(joiner.tunnelSockets).toEqual([]);
+    expect(await trafficOf(host)).toEqual({
+      framesSent: 0,
+      framesReceived: 0,
+      bytesSent: 0,
+      bytesReceived: 0,
+    });
+    expect(await trafficOf(joiner)).toEqual({
+      framesSent: 0,
+      framesReceived: 0,
+      bytesSent: 0,
+      bytesReceived: 0,
+    });
     for (const peer of [host, joiner]) {
       const current = await state(peer.page);
       expect(current.peers[0]?.tunnelled).toBe(false);
@@ -235,6 +291,9 @@ test("a 2 MiB game source crosses the tunnel byte-identical and verified", async
     expect((await state(joiner.page)).peers[0]?.tunnelled).toBe(true);
     expect((await state(joiner.page)).tunnel.failures).toEqual([]);
     expect(joiner.tunnelSockets).toHaveLength(1);
+    // The 2 MiB source (UTF-8 bytes, plus framing) had to cross the tunnel.
+    const sourceBytes = new TextEncoder().encode(source).byteLength;
+    expect((await trafficOf(joiner)).bytesReceived).toBeGreaterThanOrEqual(sourceBytes);
   } finally {
     await closeAll(host, joiner);
   }
