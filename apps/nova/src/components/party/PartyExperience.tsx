@@ -186,7 +186,11 @@ export function PartyExperience({
   // every live party phase beside the signaling outage alert.
   const peerLinkAlert =
     state.peerLink === null ? null : (
-      <PeerLinkAlert status={state.peerLink} onRetry={() => void engine.reconnect()} />
+      <PeerLinkAlert
+        status={state.peerLink}
+        phase={state.phase}
+        onRetry={() => void engine.reconnect()}
+      />
     );
 
   if (playing) {
