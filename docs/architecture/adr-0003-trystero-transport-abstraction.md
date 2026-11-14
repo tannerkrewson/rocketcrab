@@ -33,7 +33,10 @@ a live deployment or successful real-device cross-network operation; release
 verification remains in PLAN §9. Historical public relay observations are
 retained in [F5 findings](../testing/trystero-connectivity-findings.md). The
 [large-room state-mode experiment](../testing/large-room-load.md) records local
-headless measurements and open release gates; it is not phone evidence.
+headless measurements and open release gates; it is not phone evidence. Its
+[in-process authority fan-out simulation](../testing/large-room-load.md#in-process-simulation-no-webrtc)
+measures 10–200-player authority traffic over the in-memory transport, with no
+WebRTC, and is likewise not phone or real-network evidence.
 
 ## Context
 

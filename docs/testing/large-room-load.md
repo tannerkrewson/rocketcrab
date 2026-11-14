@@ -63,8 +63,84 @@ The intended next step is to spread CPU and memory across machines for one 100-p
 - Network/control paths are not evidence of a working WebRTC data plane. Validate actual cross-host ICE candidates, WebRTC connectivity, signaling and any required TURN independently; avoid assuming Playwright network exposure tunnels peer data. Record route/relay conditions without publishing IPs, room secrets, browser endpoints or credentials. Use one coordinator's monotonic timestamps for action-to-all observations to avoid comparing unsynchronized machine clocks, and record controller/network/polling overhead.
 - Before scaling, prove two physical hosts with a small number of isolated contexts, local and remote resource telemetry, all-see-all roster and state convergence, disconnect/guard cleanup, and secure endpoint access. Only then increment the **same room** toward 100 with owner-approved capacity. This requires a worker protocol, configuration, per-host tests, failure handling and operational setup; it is not established by this local proof.
 
+## In-process simulation (no WebRTC)
+
+[Recorded samples](./large-room-sim-2026-11-13.json) and the generator, `packages/nova-api/src/large-room-sim.test.ts`, run N real `NovaSession`s (the real session, protocol and state engine) in **one Node process** over the in-memory transport hub. There are no browsers, WebRTC, Trystero, servers or ports. Reproduce with `npm run sim:large-room` (about 70 s). It runs only with `LARGE_ROOM_SIM=1`, so `npm run check` skips it. Owner decision (2026-11-13): a 100-browser-player test is not reasonable on any machine. Real-browser runs stay at 50 or fewer, and this simulation covers larger rooms.
+
+Method:
+
+- **Hub:** seed `large-room-sim-v1`, one-way link latency 20 ms ± 5 ms (uniform jitter). Session authority timings are the defaults.
+- **Game:** a counter with one score per player. Each player checks in once, so the canonical state holds N scores. Before measuring, the authority's processed-action history is filled to its cap (`STATE_HISTORY_LIMIT` = 256) with no-op actions, because every snapshot ships that history. An earlier attempt without this fill measured a smaller snapshot at small N. Those numbers were discarded.
+- **Batch:** one non-authority player dispatches 20 sequential `increment` actions. Convergence is the wall-clock time until every session shows the new count. Bytes and messages come from wrapping each transport's `send`. A broadcast counts one transmission per recipient, as a WebRTC mesh pays for it.
+- **Bytes** are JSON of an approximate envelope plus payload. They are not wire bytes.
+- **CPU** is `process.cpuUsage()` across the batch. It is **whole-process** CPU, because every simulated player shares the process. It includes the waiting loop, and it is host CPU, not a phone.
+
+Results, one committed run (sanity assertions only: convergence, one authority, and every session saw every action). A repeat run gave identical byte and message counts, convergence within 0.2 ms and CPU within about 15%.
+
+| Players | Authority bytes/action | Authority msgs/action | Avg non-authority bytes/action (per member) | Authority bytes/action ÷ N | Convergence ms (mean / max) | Process CPU ms/action |
+| ------: | ---------------------: | --------------------: | ------------------------------------------: | -------------------------: | --------------------------: | --------------------: |
+|      10 |                120,892 |                 19.45 |                                         658 |                     12,089 |                 46.8 / 51.6 |                   2.6 |
+|      25 |                326,745 |                 50.20 |                                         658 |                     13,070 |                 47.3 / 52.0 |                   3.8 |
+|      50 |                684,986 |                101.45 |                                         658 |                     13,700 |                 48.5 / 52.9 |                   6.1 |
+|     100 |              1,457,566 |                203.95 |                                         657 |                     14,576 |                 50.4 / 56.6 |                  11.1 |
+|     200 |              3,227,527 |                408.95 |                                         657 |                     16,138 |                 52.1 / 58.3 |                  18.6 |
+
+Only the dispatching player sends anything in this workload, so the non-authority average is that one player's bytes divided by N − 1.
+
+Composition and peak memory:
+
+| Players | Snapshot history per copy (B) | Snapshot state body per copy (B) | Dispatcher bytes/action (`action.dispatch`) | Peak process RSS (MiB, cumulative) |
+| ------: | ----------------------------: | -------------------------------: | ------------------------------------------: | ---------------------------------: |
+|      10 |                        11,777 |                              187 |                                       5,922 |                                155 |
+|      25 |                        11,777 |                              412 |                                      15,792 |                                212 |
+|      50 |                        11,777 |                              787 |                                      32,227 |                                312 |
+|     100 |                        11,777 |                            1,537 |                                      65,083 |                                441 |
+|     200 |                        11,777 |                            3,036 |                                     130,803 |                                447 |
+
+Reading the results:
+
+- **Authority bytes grow with N, slightly faster than linearly.** Across 10–200 players, bytes per action rise 26.7× for 20× the players (about N^1.10). Each commit broadcasts a full snapshot to all N − 1 peers, and each player then gets its own `state.view`. Views are about 4% of bytes; snapshots are about 95%. Heartbeats are 0.2% of batch bytes.
+- **Most of each snapshot is the processed-action history, not game state.** The history is 11,777 bytes per copy at its 256-entry cap, which is 76–93% of each snapshot. That term does not depend on N, so it is the largest single cost even at 10 players. The state body grows about 15 bytes per player per copy.
+- **Convergence stays near 47–52 ms (mean).** The hub delivers in parallel and does not model uplink serialization, so this understates what a real phone uplink would take.
+- **Process CPU per action grows from 2.6 ms to 18.6 ms** across the same sizes. It is whole-process, so it is not the authority's CPU on any device.
+- **Memory is well under the limit.** Peak process RSS was 447 MiB at 200 players, against a 4 GiB budget. Heap after setup (32–120 MiB) is noisy because GC was not forced.
+
+Uplink estimate for the authority, from measured bytes per action. These are **projections, not measurements**, and they exclude WebRTC/SCTP/DTLS framing, so real totals are higher. Compare with a typical phone uplink of about 1–5 Mbit/s.
+
+| Players | Authority @ 1 action/s (Mbit/s) | Authority @ 5 actions/s (Mbit/s) | Dispatcher @ 5 actions/s (Mbit/s) |
+| ------: | ------------------------------: | -------------------------------: | --------------------------------: |
+|      10 |                             1.0 |                              4.8 |                              0.24 |
+|      25 |                             2.6 |                             13.1 |                              0.63 |
+|      50 |                             5.5 |                             27.4 |                              1.29 |
+|     100 |                            11.7 |                             58.3 |                              2.60 |
+|     200 |                            25.8 |                            129.1 |                              5.23 |
+
+**Verdict: the authority's upload is a bottleneck for a phone at 25+ players.** At 5 actions/s it is at the top of the phone range already at 10 players, and at 1 action/s it exceeds 5 Mbit/s at about 50 players. Two further findings:
+
+- `action.dispatch` is sent without a target (`sendBufferedDispatch` in `session.ts` passes only `{ seq }`), so the hub delivers every dispatch to every peer. A non-authority player's upload therefore grows with N too: about 5.2 Mbit/s at 200 players and 5 actions/s, from that one player alone.
+- The snapshot history, not the state, dominates the authority's upload at every size measured.
+
+What this does **not** prove:
+
+- real WebRTC/SCTP/DTLS cost, or real network bandwidth;
+- Trystero `scale()` multi-hop routing (the hub is a full mesh);
+- encryption cost;
+- phone CPU, battery or thermal behavior (CPU here is host CPU, whole process);
+- uplink serialization time, which convergence excludes;
+- churn, disconnects, elections under load, or games other than this counter;
+- rates above what the batch measured. The 1 and 5 actions/s figures are projections from measured bytes per action;
+- more than 20 actions per size, or any run longer than about one second of batch time.
+
+**Proposal for owner (not implemented; no cap):** each option below targets a measured cost, and the owner should choose among them:
+
+1. **Stop shipping the full processed-action history on every commit.** Send it only to late joiners and during migration, or send incremental ids. This removes 76–93% of snapshot bytes. Re-verify the dedupe guarantees of [ADR-0007](../architecture/adr-0007-authority-election-and-migration.md) first.
+2. **Send state deltas instead of the full state body per commit.** This matters after item 1, because the state body is only about 15% of a snapshot today. It would also shrink the per-player views.
+3. **Target `action.dispatch` at the current authority.** That cuts a non-authority's upload from (N − 1) × 658 B to one copy per action. Check the migration re-send path first, since it may depend on the broadcast.
+4. **Fan out through `scale()` routing.** This relieves the authority's per-player uplink but adds hops and latency, and the upstream feature is experimental. It needs a multi-hop test before adoption. Trystero promotes messages over 16 KiB to direct links ([PLAN §3.6](../../PLAN.md)). At 200 players a snapshot is about 15.1 KiB per copy, just under that threshold, so the state size at which this matters must be checked.
+5. **Then re-measure:** run `npm run sim:large-room` after any change, and add a real-phone authority run at 25+ players.
+
 ## Open failures and gates
 
 - With the game supplied when the host creates the room (omit `LOAD_SELECT_AFTER_JOIN`), two 10-player runs reached ten connected roster entries everywhere and every local frame registered ready, but the host's `canStart` remained false after 60 s and 15 s respectively, with some peers marked `waiting` for source. Peer notices showed other joiners serving game source. Inspection suggested source acceptance reached only the serving peer. A source-acknowledgment fix has since landed on `nova` (through `4ec4023`); the rebased 10-player browser check above passed. Do not regard the old select-after-join results as resolving it.
 - In a separate 10-player run, dispatching `{type: "increment"}` without `payload` produced `invalid_message` notices and no increment; adding `payload: {}` allowed the run to proceed. The API documents payload as optional; the schema fix has since landed on `nova`, with separate protocol and session regression tests. The older 10/25/50 measured workload explicitly supplied a payload; the rebased 10-player run above exercised the fixed no-payload case.
-- Real-phone authority CPU at 25+ players, multi-machine/CI room scaling, churn, longer and higher-rate workloads, and a complete 100-player run remain unverified. The owner's decision on the upstream overlay descriptor bound remains open (PLAN §3.6). Never close §3.6–3.7 based on these measurements alone.
+- Real-phone authority CPU at 25+ players, multi-machine/CI room scaling, churn, and longer or higher-rate workloads remain unverified. A complete 100-player real-browser run is not planned (owner decision 2026-11-13); the in-process simulation above measures 100- and 200-player authority traffic instead, without phone or WebRTC evidence. The owner's decision on the upstream overlay descriptor bound remains open (PLAN §3.6). Never close §3.6–3.7 based on these measurements alone.

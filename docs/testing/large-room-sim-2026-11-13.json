@@ -1,0 +1,1297 @@
+{
+  "date": "2026-11-13",
+  "startedAt": "2026-11-14T02:55:43.473Z",
+  "generator": "packages/nova-api/src/large-room-sim.test.ts",
+  "environment": {
+    "node": "v26.13.0",
+    "platform": "linux",
+    "logicalCpus": 12,
+    "totalMemoryBytes": 33229254656,
+    "note": "Single Node process; all simulated players share it. CPU is whole-process."
+  },
+  "config": {
+    "partySizes": [10, 25, 50, 100, 200],
+    "actionsPerSize": 20,
+    "hubSeed": "large-room-sim-v1",
+    "link": {
+      "latencyMs": 20,
+      "jitterMs": 5
+    },
+    "setup": "One checkIn per player (state holds one score per player), then touch actions until the authority's processed-action history reaches STATE_HISTORY_LIMIT. Measured batch starts after that.",
+    "historyLimit": 256,
+    "sendAccounting": "Every transport.send is metered. A broadcast counts one transmission per recipient. Bytes are JSON of the approximate envelope plus payload.",
+    "timing": "Convergence is wall clock with real session timers and the modeled link. It is not pure virtual time."
+  },
+  "results": [
+    {
+      "players": 10,
+      "authorityMemberId": "member-001",
+      "rosterConvergedMs": 8.291012999999992,
+      "setupMs": 10859.36951,
+      "stateSizeBytes": 186,
+      "processedActionCountBeforeBatch": 256,
+      "heapUsedBytesAfterSetup": 49974304,
+      "peakRssKiBSoFar": 160440,
+      "actions": [
+        {
+          "action": 1,
+          "convergenceMs": 50.09126499999911,
+          "authorityMessages": 19,
+          "authorityBytes": 120599,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1674,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 2,
+          "convergenceMs": 43.99492400000054,
+          "authorityMessages": 19,
+          "authorityBytes": 120599,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1674,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 3,
+          "convergenceMs": 44.780815000000075,
+          "authorityMessages": 19,
+          "authorityBytes": 120599,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1674,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 4,
+          "convergenceMs": 42.033707999999024,
+          "authorityMessages": 28,
+          "authorityBytes": 126152,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1674,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 5,
+          "convergenceMs": 51.453647000000274,
+          "authorityMessages": 19,
+          "authorityBytes": 120599,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1674,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 6,
+          "convergenceMs": 46.05518800000027,
+          "authorityMessages": 19,
+          "authorityBytes": 120599,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1674,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 7,
+          "convergenceMs": 49.07961400000022,
+          "authorityMessages": 19,
+          "authorityBytes": 120599,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1674,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 8,
+          "convergenceMs": 45.71937699999944,
+          "authorityMessages": 19,
+          "authorityBytes": 120599,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1674,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 9,
+          "convergenceMs": 50.714615999999296,
+          "authorityMessages": 19,
+          "authorityBytes": 120599,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1674,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 10,
+          "convergenceMs": 49.807983999999124,
+          "authorityMessages": 19,
+          "authorityBytes": 120627,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1692,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 11,
+          "convergenceMs": 45.5567460000002,
+          "authorityMessages": 19,
+          "authorityBytes": 120627,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1692,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 12,
+          "convergenceMs": 49.989551999999094,
+          "authorityMessages": 19,
+          "authorityBytes": 120627,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1692,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 13,
+          "convergenceMs": 43.76953399999911,
+          "authorityMessages": 19,
+          "authorityBytes": 120627,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1692,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 14,
+          "convergenceMs": 40.11107699999957,
+          "authorityMessages": 19,
+          "authorityBytes": 120627,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1692,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 15,
+          "convergenceMs": 50.18531500000063,
+          "authorityMessages": 19,
+          "authorityBytes": 120627,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1692,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 16,
+          "convergenceMs": 45.81812600000012,
+          "authorityMessages": 19,
+          "authorityBytes": 120627,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1692,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 17,
+          "convergenceMs": 41.27682299999833,
+          "authorityMessages": 19,
+          "authorityBytes": 120627,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1692,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 18,
+          "convergenceMs": 48.29604699999982,
+          "authorityMessages": 19,
+          "authorityBytes": 120627,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1692,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 19,
+          "convergenceMs": 49.934095999999045,
+          "authorityMessages": 19,
+          "authorityBytes": 120627,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1692,
+          "authoritySnapshotHistoryBytes": 105993
+        },
+        {
+          "action": 20,
+          "convergenceMs": 47.60700199999883,
+          "authorityMessages": 19,
+          "authorityBytes": 120627,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 5922,
+          "authoritySnapshotStateBytes": 1692,
+          "authoritySnapshotHistoryBytes": 105993
+        }
+      ],
+      "summary": {
+        "authorityMessagesPerAction": 19.45,
+        "authorityBytesPerAction": 120892.05,
+        "authorityBytesPerActionPerPlayer": 12089.205,
+        "authoritySnapshotStateBytesPerAction": 1683.9,
+        "authoritySnapshotHistoryBytesPerAction": 105993,
+        "nonAuthorityBytesPerMemberPerAction": 658,
+        "dispatcherBytesPerAction": 5922,
+        "convergenceMsMean": 46.813772799999605,
+        "convergenceMsMax": 51.453647000000274
+      },
+      "batch": {
+        "wallMs": 938.2071570000007,
+        "processCpuMs": 75.505,
+        "processCpuMsPerAction": 3.7752499999999998,
+        "authorityByType": {
+          "state.snapshot": {
+            "messages": 180,
+            "bytes": 2277378,
+            "stateBytes": 33678,
+            "historyBytes": 2119860
+          },
+          "state.view": {
+            "messages": 180,
+            "bytes": 122510,
+            "stateBytes": 0,
+            "historyBytes": 0
+          },
+          "action.ack": {
+            "messages": 20,
+            "bytes": 12400,
+            "stateBytes": 0,
+            "historyBytes": 0
+          },
+          "authority.heartbeat": {
+            "messages": 9,
+            "bytes": 5553,
+            "stateBytes": 0,
+            "historyBytes": 0
+          }
+        }
+      }
+    },
+    {
+      "players": 25,
+      "authorityMemberId": "member-001",
+      "rosterConvergedMs": 11.975798999999824,
+      "setupMs": 11299.435512,
+      "stateSizeBytes": 411,
+      "processedActionCountBeforeBatch": 256,
+      "heapUsedBytesAfterSetup": 53098200,
+      "peakRssKiBSoFar": 179120,
+      "actions": [
+        {
+          "action": 1,
+          "convergenceMs": 48.42194699999891,
+          "authorityMessages": 49,
+          "authorityBytes": 325964,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9864,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 2,
+          "convergenceMs": 48.98701699999947,
+          "authorityMessages": 49,
+          "authorityBytes": 325964,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9864,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 3,
+          "convergenceMs": 43.12027400000079,
+          "authorityMessages": 49,
+          "authorityBytes": 325964,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9864,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 4,
+          "convergenceMs": 49.797575000000506,
+          "authorityMessages": 49,
+          "authorityBytes": 325964,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9864,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 5,
+          "convergenceMs": 47.86808999999994,
+          "authorityMessages": 49,
+          "authorityBytes": 325964,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9864,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 6,
+          "convergenceMs": 49.067370000000665,
+          "authorityMessages": 49,
+          "authorityBytes": 325964,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9864,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 7,
+          "convergenceMs": 49.29891300000236,
+          "authorityMessages": 49,
+          "authorityBytes": 325964,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9864,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 8,
+          "convergenceMs": 45.888780000001134,
+          "authorityMessages": 49,
+          "authorityBytes": 325964,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9864,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 9,
+          "convergenceMs": 53.465329000002384,
+          "authorityMessages": 49,
+          "authorityBytes": 325964,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9864,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 10,
+          "convergenceMs": 49.21516300000076,
+          "authorityMessages": 49,
+          "authorityBytes": 326037,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9912,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 11,
+          "convergenceMs": 47.997887999998056,
+          "authorityMessages": 49,
+          "authorityBytes": 326037,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9912,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 12,
+          "convergenceMs": 50.8003690000005,
+          "authorityMessages": 49,
+          "authorityBytes": 326037,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9912,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 13,
+          "convergenceMs": 49.01255599999786,
+          "authorityMessages": 49,
+          "authorityBytes": 326037,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9912,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 14,
+          "convergenceMs": 46.68510199999946,
+          "authorityMessages": 49,
+          "authorityBytes": 326037,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9912,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 15,
+          "convergenceMs": 44.16018999999869,
+          "authorityMessages": 73,
+          "authorityBytes": 340845,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9912,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 16,
+          "convergenceMs": 45.641358000000764,
+          "authorityMessages": 49,
+          "authorityBytes": 326037,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9912,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 17,
+          "convergenceMs": 43.97163899999941,
+          "authorityMessages": 49,
+          "authorityBytes": 326037,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9912,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 18,
+          "convergenceMs": 46.02567199999976,
+          "authorityMessages": 49,
+          "authorityBytes": 326037,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9912,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 19,
+          "convergenceMs": 50.03497799999968,
+          "authorityMessages": 49,
+          "authorityBytes": 326037,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9912,
+          "authoritySnapshotHistoryBytes": 282648
+        },
+        {
+          "action": 20,
+          "convergenceMs": 42.95941699999821,
+          "authorityMessages": 49,
+          "authorityBytes": 326037,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 15792,
+          "authoritySnapshotStateBytes": 9912,
+          "authoritySnapshotHistoryBytes": 282648
+        }
+      ],
+      "summary": {
+        "authorityMessagesPerAction": 50.2,
+        "authorityBytesPerAction": 326744.55,
+        "authorityBytesPerActionPerPlayer": 13069.782,
+        "authoritySnapshotStateBytesPerAction": 9890.4,
+        "authoritySnapshotHistoryBytesPerAction": 282648,
+        "nonAuthorityBytesPerMemberPerAction": 658,
+        "dispatcherBytesPerAction": 15792,
+        "convergenceMsMean": 47.620981349999965,
+        "convergenceMsMax": 53.465329000002384
+      },
+      "batch": {
+        "wallMs": 953.2394529999983,
+        "processCpuMs": 93.471,
+        "processCpuMsPerAction": 4.6735500000000005,
+        "authorityByType": {
+          "state.snapshot": {
+            "messages": 480,
+            "bytes": 6181008,
+            "stateBytes": 197808,
+            "historyBytes": 5652960
+          },
+          "state.view": {
+            "messages": 480,
+            "bytes": 326675,
+            "stateBytes": 0,
+            "historyBytes": 0
+          },
+          "action.ack": {
+            "messages": 20,
+            "bytes": 12400,
+            "stateBytes": 0,
+            "historyBytes": 0
+          },
+          "authority.heartbeat": {
+            "messages": 24,
+            "bytes": 14808,
+            "stateBytes": 0,
+            "historyBytes": 0
+          }
+        }
+      }
+    },
+    {
+      "players": 50,
+      "authorityMemberId": "member-001",
+      "rosterConvergedMs": 44.190497999999934,
+      "setupMs": 11797.829549999999,
+      "stateSizeBytes": 786,
+      "processedActionCountBeforeBatch": 256,
+      "heapUsedBytesAfterSetup": 41120480,
+      "peakRssKiBSoFar": 280040,
+      "actions": [
+        {
+          "action": 1,
+          "convergenceMs": 50.52374199999758,
+          "authorityMessages": 99,
+          "authorityBytes": 683388,
+          "nonAuthorityBytesPerMember": 656,
+          "dispatcherBytes": 32144,
+          "authoritySnapshotStateBytes": 38514,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 2,
+          "convergenceMs": 52.5316559999992,
+          "authorityMessages": 99,
+          "authorityBytes": 683388,
+          "nonAuthorityBytesPerMember": 656,
+          "dispatcherBytes": 32144,
+          "authoritySnapshotStateBytes": 38514,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 3,
+          "convergenceMs": 50.10007300000143,
+          "authorityMessages": 99,
+          "authorityBytes": 683388,
+          "nonAuthorityBytesPerMember": 656,
+          "dispatcherBytes": 32144,
+          "authoritySnapshotStateBytes": 38514,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 4,
+          "convergenceMs": 47.14794499999698,
+          "authorityMessages": 99,
+          "authorityBytes": 683388,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 32242,
+          "authoritySnapshotStateBytes": 38514,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 5,
+          "convergenceMs": 46.472955999997794,
+          "authorityMessages": 99,
+          "authorityBytes": 683388,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 32242,
+          "authoritySnapshotStateBytes": 38514,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 6,
+          "convergenceMs": 53.667084000000614,
+          "authorityMessages": 148,
+          "authorityBytes": 713719,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 32242,
+          "authoritySnapshotStateBytes": 38514,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 7,
+          "convergenceMs": 46.1638660000026,
+          "authorityMessages": 99,
+          "authorityBytes": 683388,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 32242,
+          "authoritySnapshotStateBytes": 38514,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 8,
+          "convergenceMs": 51.802293000000645,
+          "authorityMessages": 99,
+          "authorityBytes": 683388,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 32242,
+          "authoritySnapshotStateBytes": 38514,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 9,
+          "convergenceMs": 52.594405999996525,
+          "authorityMessages": 99,
+          "authorityBytes": 683388,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 32242,
+          "authoritySnapshotStateBytes": 38514,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 10,
+          "convergenceMs": 49.16215100000409,
+          "authorityMessages": 99,
+          "authorityBytes": 683536,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 32242,
+          "authoritySnapshotStateBytes": 38612,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 11,
+          "convergenceMs": 51.47390599999926,
+          "authorityMessages": 99,
+          "authorityBytes": 683536,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 32242,
+          "authoritySnapshotStateBytes": 38612,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 12,
+          "convergenceMs": 45.58761499999673,
+          "authorityMessages": 99,
+          "authorityBytes": 683536,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 32242,
+          "authoritySnapshotStateBytes": 38612,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 13,
+          "convergenceMs": 46.634154000006674,
+          "authorityMessages": 99,
+          "authorityBytes": 683536,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 32242,
+          "authoritySnapshotStateBytes": 38612,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 14,
+          "convergenceMs": 46.07010699999955,
+          "authorityMessages": 99,
+          "authorityBytes": 683536,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 32242,
+          "authoritySnapshotStateBytes": 38612,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 15,
+          "convergenceMs": 48.22023300000001,
+          "authorityMessages": 99,
+          "authorityBytes": 683536,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 32242,
+          "authoritySnapshotStateBytes": 38612,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 16,
+          "convergenceMs": 49.64723799999774,
+          "authorityMessages": 99,
+          "authorityBytes": 683536,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 32242,
+          "authoritySnapshotStateBytes": 38612,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 17,
+          "convergenceMs": 43.250803000002634,
+          "authorityMessages": 99,
+          "authorityBytes": 683536,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 32242,
+          "authoritySnapshotStateBytes": 38612,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 18,
+          "convergenceMs": 42.785084000002826,
+          "authorityMessages": 99,
+          "authorityBytes": 683536,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 32242,
+          "authoritySnapshotStateBytes": 38612,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 19,
+          "convergenceMs": 49.80239399999846,
+          "authorityMessages": 99,
+          "authorityBytes": 683536,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 32242,
+          "authoritySnapshotStateBytes": 38612,
+          "authoritySnapshotHistoryBytes": 577073
+        },
+        {
+          "action": 20,
+          "convergenceMs": 47.41937399999733,
+          "authorityMessages": 99,
+          "authorityBytes": 683536,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 32242,
+          "authoritySnapshotStateBytes": 38612,
+          "authoritySnapshotHistoryBytes": 577073
+        }
+      ],
+      "summary": {
+        "authorityMessagesPerAction": 101.45,
+        "authorityBytesPerAction": 684985.95,
+        "authorityBytesPerActionPerPlayer": 13699.719,
+        "authoritySnapshotStateBytesPerAction": 38567.9,
+        "authoritySnapshotHistoryBytesPerAction": 577073,
+        "nonAuthorityBytesPerMemberPerAction": 657.7,
+        "dispatcherBytesPerAction": 32227.3,
+        "convergenceMsMean": 48.55285399999993,
+        "convergenceMsMax": 53.667084000000614
+      },
+      "batch": {
+        "wallMs": 973.0150570000042,
+        "processCpuMs": 127.094,
+        "processCpuMsPerAction": 6.354699999999999,
+        "authorityByType": {
+          "state.snapshot": {
+            "messages": 980,
+            "bytes": 12988038,
+            "stateBytes": 771358,
+            "historyBytes": 11541460
+          },
+          "state.view": {
+            "messages": 980,
+            "bytes": 668910,
+            "stateBytes": 0,
+            "historyBytes": 0
+          },
+          "action.ack": {
+            "messages": 20,
+            "bytes": 12440,
+            "stateBytes": 0,
+            "historyBytes": 0
+          },
+          "authority.heartbeat": {
+            "messages": 49,
+            "bytes": 30331,
+            "stateBytes": 0,
+            "historyBytes": 0
+          }
+        }
+      }
+    },
+    {
+      "players": 100,
+      "authorityMemberId": "member-001",
+      "rosterConvergedMs": 149.36834900000395,
+      "setupMs": 12752.936069000003,
+      "stateSizeBytes": 1536,
+      "processedActionCountBeforeBatch": 256,
+      "heapUsedBytesAfterSetup": 145196960,
+      "peakRssKiBSoFar": 404000,
+      "actions": [
+        {
+          "action": 1,
+          "convergenceMs": 48.022525000000314,
+          "authorityMessages": 199,
+          "authorityBytes": 1454338,
+          "nonAuthorityBytesPerMember": 656,
+          "dispatcherBytes": 64944,
+          "authoritySnapshotStateBytes": 152064,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 2,
+          "convergenceMs": 50.5825130000012,
+          "authorityMessages": 199,
+          "authorityBytes": 1454338,
+          "nonAuthorityBytesPerMember": 656,
+          "dispatcherBytes": 64944,
+          "authoritySnapshotStateBytes": 152064,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 3,
+          "convergenceMs": 47.51647800000501,
+          "authorityMessages": 199,
+          "authorityBytes": 1454338,
+          "nonAuthorityBytesPerMember": 656,
+          "dispatcherBytes": 64944,
+          "authoritySnapshotStateBytes": 152064,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 4,
+          "convergenceMs": 53.47951599999942,
+          "authorityMessages": 199,
+          "authorityBytes": 1454338,
+          "nonAuthorityBytesPerMember": 656,
+          "dispatcherBytes": 64944,
+          "authoritySnapshotStateBytes": 152064,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 5,
+          "convergenceMs": 57.370536000002176,
+          "authorityMessages": 199,
+          "authorityBytes": 1454338,
+          "nonAuthorityBytesPerMember": 656,
+          "dispatcherBytes": 64944,
+          "authoritySnapshotStateBytes": 152064,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 6,
+          "convergenceMs": 45.48304500000086,
+          "authorityMessages": 199,
+          "authorityBytes": 1454338,
+          "nonAuthorityBytesPerMember": 656,
+          "dispatcherBytes": 64944,
+          "authoritySnapshotStateBytes": 152064,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 7,
+          "convergenceMs": 52.037091999998665,
+          "authorityMessages": 199,
+          "authorityBytes": 1454338,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 65142,
+          "authoritySnapshotStateBytes": 152064,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 8,
+          "convergenceMs": 48.46242599999823,
+          "authorityMessages": 199,
+          "authorityBytes": 1454338,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 65142,
+          "authoritySnapshotStateBytes": 152064,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 9,
+          "convergenceMs": 49.85742900000332,
+          "authorityMessages": 298,
+          "authorityBytes": 1515619,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 65142,
+          "authoritySnapshotStateBytes": 152064,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 10,
+          "convergenceMs": 54.95170700000017,
+          "authorityMessages": 199,
+          "authorityBytes": 1454636,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 65142,
+          "authoritySnapshotStateBytes": 152262,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 11,
+          "convergenceMs": 56.42276600000332,
+          "authorityMessages": 199,
+          "authorityBytes": 1454636,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 65142,
+          "authoritySnapshotStateBytes": 152262,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 12,
+          "convergenceMs": 47.537578999996185,
+          "authorityMessages": 199,
+          "authorityBytes": 1454636,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 65142,
+          "authoritySnapshotStateBytes": 152262,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 13,
+          "convergenceMs": 45.720059000006586,
+          "authorityMessages": 199,
+          "authorityBytes": 1454636,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 65142,
+          "authoritySnapshotStateBytes": 152262,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 14,
+          "convergenceMs": 46.76242899999488,
+          "authorityMessages": 199,
+          "authorityBytes": 1454636,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 65142,
+          "authoritySnapshotStateBytes": 152262,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 15,
+          "convergenceMs": 52.44521099999838,
+          "authorityMessages": 199,
+          "authorityBytes": 1454636,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 65142,
+          "authoritySnapshotStateBytes": 152262,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 16,
+          "convergenceMs": 47.373326000000816,
+          "authorityMessages": 199,
+          "authorityBytes": 1454636,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 65142,
+          "authoritySnapshotStateBytes": 152262,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 17,
+          "convergenceMs": 52.80292399999598,
+          "authorityMessages": 199,
+          "authorityBytes": 1454636,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 65142,
+          "authoritySnapshotStateBytes": 152262,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 18,
+          "convergenceMs": 54.6337910000002,
+          "authorityMessages": 199,
+          "authorityBytes": 1454636,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 65142,
+          "authoritySnapshotStateBytes": 152262,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 19,
+          "convergenceMs": 48.465752000003704,
+          "authorityMessages": 199,
+          "authorityBytes": 1454636,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 65142,
+          "authoritySnapshotStateBytes": 152262,
+          "authoritySnapshotHistoryBytes": 1165923
+        },
+        {
+          "action": 20,
+          "convergenceMs": 47.29525700000522,
+          "authorityMessages": 199,
+          "authorityBytes": 1454636,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 65142,
+          "authoritySnapshotStateBytes": 152262,
+          "authoritySnapshotHistoryBytes": 1165923
+        }
+      ],
+      "summary": {
+        "authorityMessagesPerAction": 203.95,
+        "authorityBytesPerAction": 1457565.95,
+        "authorityBytesPerActionPerPlayer": 14575.6595,
+        "authoritySnapshotStateBytesPerAction": 152172.9,
+        "authoritySnapshotHistoryBytesPerAction": 1165923,
+        "nonAuthorityBytesPerMemberPerAction": 657.4,
+        "dispatcherBytesPerAction": 65082.6,
+        "convergenceMsMean": 50.361118050000734,
+        "convergenceMsMax": 57.370536000002176
+      },
+      "batch": {
+        "wallMs": 1008.4202580000056,
+        "processCpuMs": 262.959,
+        "processCpuMsPerAction": 13.14795,
+        "authorityByType": {
+          "state.snapshot": {
+            "messages": 1980,
+            "bytes": 27726138,
+            "stateBytes": 3043458,
+            "historyBytes": 23318460
+          },
+          "state.view": {
+            "messages": 1980,
+            "bytes": 1351460,
+            "stateBytes": 0,
+            "historyBytes": 0
+          },
+          "action.ack": {
+            "messages": 20,
+            "bytes": 12440,
+            "stateBytes": 0,
+            "historyBytes": 0
+          },
+          "authority.heartbeat": {
+            "messages": 99,
+            "bytes": 61281,
+            "stateBytes": 0,
+            "historyBytes": 0
+          }
+        }
+      }
+    },
+    {
+      "players": 200,
+      "authorityMemberId": "member-001",
+      "rosterConvergedMs": 579.2288809999955,
+      "setupMs": 14353.244721999996,
+      "stateSizeBytes": 3035,
+      "processedActionCountBeforeBatch": 256,
+      "heapUsedBytesAfterSetup": 129943816,
+      "peakRssKiBSoFar": 481220,
+      "actions": [
+        {
+          "action": 1,
+          "convergenceMs": 51.58517800000118,
+          "authorityMessages": 399,
+          "authorityBytes": 3221039,
+          "nonAuthorityBytesPerMember": 656,
+          "dispatcherBytes": 130544,
+          "authoritySnapshotStateBytes": 603965,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 2,
+          "convergenceMs": 52.96611600000324,
+          "authorityMessages": 399,
+          "authorityBytes": 3221039,
+          "nonAuthorityBytesPerMember": 656,
+          "dispatcherBytes": 130544,
+          "authoritySnapshotStateBytes": 603965,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 3,
+          "convergenceMs": 50.01283699999476,
+          "authorityMessages": 399,
+          "authorityBytes": 3221039,
+          "nonAuthorityBytesPerMember": 656,
+          "dispatcherBytes": 130544,
+          "authoritySnapshotStateBytes": 603965,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 4,
+          "convergenceMs": 48.22273700000369,
+          "authorityMessages": 399,
+          "authorityBytes": 3221039,
+          "nonAuthorityBytesPerMember": 656,
+          "dispatcherBytes": 130544,
+          "authoritySnapshotStateBytes": 603965,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 5,
+          "convergenceMs": 56.3319829999964,
+          "authorityMessages": 598,
+          "authorityBytes": 3344220,
+          "nonAuthorityBytesPerMember": 656,
+          "dispatcherBytes": 130544,
+          "authoritySnapshotStateBytes": 603965,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 6,
+          "convergenceMs": 60.141176000004634,
+          "authorityMessages": 399,
+          "authorityBytes": 3221039,
+          "nonAuthorityBytesPerMember": 656,
+          "dispatcherBytes": 130544,
+          "authoritySnapshotStateBytes": 603965,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 7,
+          "convergenceMs": 56.84482299999945,
+          "authorityMessages": 399,
+          "authorityBytes": 3221039,
+          "nonAuthorityBytesPerMember": 656,
+          "dispatcherBytes": 130544,
+          "authoritySnapshotStateBytes": 603965,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 8,
+          "convergenceMs": 50.06764000000112,
+          "authorityMessages": 399,
+          "authorityBytes": 3221039,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 130942,
+          "authoritySnapshotStateBytes": 603965,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 9,
+          "convergenceMs": 55.584565999990446,
+          "authorityMessages": 399,
+          "authorityBytes": 3221039,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 130942,
+          "authoritySnapshotStateBytes": 603965,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 10,
+          "convergenceMs": 50.463306000005105,
+          "authorityMessages": 399,
+          "authorityBytes": 3221637,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 130942,
+          "authoritySnapshotStateBytes": 604363,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 11,
+          "convergenceMs": 51.40139800000179,
+          "authorityMessages": 399,
+          "authorityBytes": 3221637,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 130942,
+          "authoritySnapshotStateBytes": 604363,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 12,
+          "convergenceMs": 51.084161000006134,
+          "authorityMessages": 399,
+          "authorityBytes": 3221637,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 130942,
+          "authoritySnapshotStateBytes": 604363,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 13,
+          "convergenceMs": 54.54242599999998,
+          "authorityMessages": 399,
+          "authorityBytes": 3221637,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 130942,
+          "authoritySnapshotStateBytes": 604363,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 14,
+          "convergenceMs": 49.48332499999378,
+          "authorityMessages": 399,
+          "authorityBytes": 3221637,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 130942,
+          "authoritySnapshotStateBytes": 604363,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 15,
+          "convergenceMs": 56.80611900000076,
+          "authorityMessages": 399,
+          "authorityBytes": 3221637,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 130942,
+          "authoritySnapshotStateBytes": 604363,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 16,
+          "convergenceMs": 53.906652000005124,
+          "authorityMessages": 399,
+          "authorityBytes": 3221637,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 130942,
+          "authoritySnapshotStateBytes": 604363,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 17,
+          "convergenceMs": 47.92001899999741,
+          "authorityMessages": 399,
+          "authorityBytes": 3221637,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 130942,
+          "authoritySnapshotStateBytes": 604363,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 18,
+          "convergenceMs": 53.97411999999895,
+          "authorityMessages": 399,
+          "authorityBytes": 3221637,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 130942,
+          "authoritySnapshotStateBytes": 604363,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 19,
+          "convergenceMs": 50.93066899999394,
+          "authorityMessages": 399,
+          "authorityBytes": 3221637,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 130942,
+          "authoritySnapshotStateBytes": 604363,
+          "authoritySnapshotHistoryBytes": 2343623
+        },
+        {
+          "action": 20,
+          "convergenceMs": 49.28311200000462,
+          "authorityMessages": 399,
+          "authorityBytes": 3221637,
+          "nonAuthorityBytesPerMember": 658,
+          "dispatcherBytes": 130942,
+          "authoritySnapshotStateBytes": 604363,
+          "authoritySnapshotHistoryBytes": 2343623
+        }
+      ],
+      "summary": {
+        "authorityMessagesPerAction": 408.95,
+        "authorityBytesPerAction": 3227526.95,
+        "authorityBytesPerActionPerPlayer": 16137.634750000001,
+        "authoritySnapshotStateBytesPerAction": 604183.9,
+        "authoritySnapshotHistoryBytesPerAction": 2343623,
+        "nonAuthorityBytesPerMemberPerAction": 657.3,
+        "dispatcherBytesPerAction": 130802.7,
+        "convergenceMsMean": 52.57761815000013,
+        "convergenceMsMax": 60.141176000004634
+      },
+      "batch": {
+        "wallMs": 1052.9387220000062,
+        "processCpuMs": 371.285,
+        "processCpuMsPerAction": 18.56425,
+        "authorityByType": {
+          "state.snapshot": {
+            "messages": 3980,
+            "bytes": 61698358,
+            "stateBytes": 12083678,
+            "historyBytes": 46872460
+          },
+          "state.view": {
+            "messages": 3980,
+            "bytes": 2716560,
+            "stateBytes": 0,
+            "historyBytes": 0
+          },
+          "action.ack": {
+            "messages": 20,
+            "bytes": 12440,
+            "stateBytes": 0,
+            "historyBytes": 0
+          },
+          "authority.heartbeat": {
+            "messages": 199,
+            "bytes": 123181,
+            "stateBytes": 0,
+            "historyBytes": 0
+          }
+        }
+      }
+    }
+  ]
+}

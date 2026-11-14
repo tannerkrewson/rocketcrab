@@ -20,6 +20,7 @@
     "test:edge": "vitest run --root deploy/edge",
     "test:edge:integration": "node --test deploy/edge/signal.integration.mjs",
     "test:watch": "concurrently -k -n nova,runtime -c blue,magenta \"npm run test:watch --workspace @rocketcrab/nova\" \"npm run test:watch --workspace @rocketcrab/runtime\"",
+    "sim:large-room": "LARGE_ROOM_SIM=1 vitest run packages/nova-api/src/large-room-sim.test.ts",
     "test:e2e": "playwright test",
     "test:e2e:trystero": "playwright test -c e2e-trystero/playwright.config.ts",
     "bundle:size": "node scripts/bundle-size.mjs",

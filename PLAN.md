@@ -546,11 +546,27 @@ passed 4/4 (Podman Playwright, 2026-11-13).
 
 7. [ ] **Large-room load test.** Using headless browser contexts (several machines or CI shards if one machine can't hold them), run parties of 10, 25, 50 and 100 players with a state-mode sample game. Record per size: time until everyone sees everyone, message latency, CPU on the authority player's device (also try a real phone as authority at 25+), and any errors. Known risk to watch: the authority player sends state to everyone, so its upload grows with party size; if it becomes the bottleneck, propose a fix to the owner (e.g. state deltas or fan-out via `scale()` routing) rather than capping parties. Record results in `docs/testing/` and link them from ADR-0003.
 
+   **Owner decision (2026-11-13):** a 100-headless-browser test is not reasonable on any machine. Real-browser runs stay at 50 or fewer, and larger rooms are measured by the in-process simulation (`npm run sim:large-room`). That simulation runs the real session and state engine in one Node process over the in-memory transport, with no browsers, WebRTC or servers. It measures authority traffic, convergence and whole-process CPU. It does not measure phone CPU, real WebRTC cost or `scale()` routing.
+
    Action payload regression: the peer `action.dispatch` schema accepts an omitted payload, matching the game API and JSON serialization of `undefined`; all other envelope and message validations remain in force. The session contract tests send omitted, explicit `undefined`, `null`, and `{}` from a non-authority via a JSON-round-tripping transport. Protocol version stays 1: existing defined-payload messages remain compatible and new receivers accept old senders; old receivers still reject omitted payloads, so mixed-version parties require updated authorities. Evidence: the protocol regression fails with the original schema; `npm run check` passed, and `npm run test:e2e` (60/60) and `npm run test:e2e:trystero` (5/5) passed in the pinned Playwright container against this worktree's servers. This does not complete the load-test gate.
 
    Partial evidence: `docs/testing/large-room-load.md` records local headless
-   10/25/50-player state-mode runs and their limitations; 100 and real-phone
-   authority remain open. Creating with a game revealed a source-verification
+   10/25/50-player state-mode runs and their limitations; real-phone authority
+   remains open. Its
+   [in-process simulation section](docs/testing/large-room-load.md#in-process-simulation-no-webrtc)
+   ([samples](docs/testing/large-room-sim-2026-11-13.json)) measured authority
+   traffic per action for 10, 25, 50, 100 and 200 players in one process.
+   Authority upload grows with party size, slightly faster than linearly
+   (about 121 KB per action at 10 players and 3.2 MB at 200). Most of each
+   snapshot is the processed-action history, not state. At 5 actions/s that is
+   about 4.8 Mbit/s at 10 players and 129 Mbit/s at 200, against a typical phone
+   uplink of 1–5 Mbit/s. `action.dispatch` is also broadcast to every peer, so a
+   non-authority's upload grows with N too. The doc sets out a proposal for the
+   owner (history-free snapshots, state deltas, targeted dispatch, `scale()`
+   fan-out). No fix or cap is implemented. Still open for this item: real-phone
+   authority CPU and upload at 25+ players (no phone run exists), and the
+   owner's decision on the proposal. The ADR-0003 link to the experiment is in
+   place. Creating with a game revealed a source-verification
    start-gate failure; separately an action with omitted optional payload failed
    wire validation. After both fixes landed, a 10-player create-with-game,
    no-payload browser run passed. A 100-player attempt stopped at 78 joined
