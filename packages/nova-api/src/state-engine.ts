@@ -70,7 +70,6 @@ import {
   actionPayloadBytes,
   authorityGracePeriodMs,
   authorityHeartbeatIntervalMs,
-  stateDeltaMaxOps,
   stateHistoryLimit,
   stateResyncMinIntervalMs,
   stateSnapshotBytes,
