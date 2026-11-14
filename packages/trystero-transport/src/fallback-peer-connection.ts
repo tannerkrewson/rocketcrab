@@ -86,6 +86,12 @@ interface PauseSlot {
  */
 export const OPEN_ATTEMPTS = 5;
 export const OPEN_RETRY_BASE_MS = 250;
+/**
+ * How long a native open waits for its selected-pair read (`getStats`) before
+ * the outcome is `unknown` (PLAN.md §8.2). The outcome is claimed at open
+ * either way; only the path resolves late.
+ */
+export const STATS_TIMEOUT_MS = 2000;
 const WS_CONNECTING = 0;
 const WS_OPEN = 1;
 /** Close codes a browser accepts: 1000, or 3000-4999 (WHATWG WebSocket.close). */
@@ -163,10 +169,14 @@ export interface FallbackPeerConnectionOptions {
   readonly onTerminalFailure?: (info: TerminalFailureInfo) => void;
   /**
    * Called at most once per wrapper instance with its connection outcome. An
-   * instance that never gets both descriptions (an unclaimed pooled offer), or
-   * that closes before any success or failure, reports nothing.
+   * instance that never gets both descriptions (an unclaimed pooled offer)
+   * reports nothing. An attempt that has started and is closed before any
+   * success or failure reports `failed`, unless `isLeaving()` is true at the
+   * close: a close caused by the local user leaving reports nothing.
    */
   readonly onOutcome?: (info: ConnectionOutcomeInfo) => void;
+  /** True while the local user is leaving the room (PLAN.md §8.2). Default: false. */
+  readonly isLeaving?: () => boolean;
 }
 
 /** Whether a connection returned by Trystero is running on the tunnel. */
@@ -192,6 +202,7 @@ interface Deps {
   readonly onTunnel: ((info: TunnelStartInfo) => void) | undefined;
   readonly onTerminalFailure: ((info: TerminalFailureInfo) => void) | undefined;
   readonly onOutcome: ((info: ConnectionOutcomeInfo) => void) | undefined;
+  readonly isLeaving: () => boolean;
 }
 
 /** Event-handler properties and listeners for one target. */
@@ -473,6 +484,9 @@ class Session {
    * open's stats read finishes later; the claim does not wait for it.
    */
   private outcomeClaimed = false;
+  /** Settles a pending selected-pair read as `unknown`. Set only while one is pending. */
+  private settleStats: (() => void) | undefined = undefined;
+  private statsTimer: unknown = undefined;
   /** Open retries and send pacing wait in separate slots, so they never share one. */
   private readonly retrySlot: PauseSlot = {};
   private readonly paceSlot: PauseSlot = {};
@@ -573,6 +587,9 @@ class Session {
    */
   closeGracefully(): void {
     if (this.closed || this.draining) return;
+    // A started attempt closed before any outcome failed, unless the local user
+    // is leaving. Trystero's own TTL destroy of a stuck peer lands here too.
+    if (!this.deps.isLeaving()) this.claimOutcome("failed");
     if (this.mode !== "tunnel" || !this.ready || !this.socket || this.pendingBytes === 0) {
       this.close();
       return;
@@ -600,6 +617,8 @@ class Session {
     this.clearDrainTimer();
     this.cancelPause(this.retrySlot);
     this.cancelPause(this.paceSlot);
+    // A read still pending when the connection closes reports unknown now.
+    this.settleStats?.();
     this.openReadyGate();
     const socket = this.socket;
     if (socket && (socket.readyState === WS_CONNECTING || socket.readyState === WS_OPEN)) {
@@ -666,9 +685,37 @@ class Session {
     if (this.outcomeClaimed || startedAt === undefined) return;
     this.outcomeClaimed = true;
     const msToConnect = this.elapsedSince(startedAt);
-    void selectedCandidateOutcome(this.native)
-      .catch(() => null)
-      .then((path) => this.reportOutcome(path ?? "unknown", msToConnect));
+    void this.selectedPath().then((path) => this.reportOutcome(path, msToConnect));
+  }
+
+  /**
+   * The native selected path, or `unknown` if the read has not settled within
+   * STATS_TIMEOUT_MS or the connection closes first. Settles once. The timer is
+   * cleared when it settles, so none outlives the read or the connection.
+   */
+  private selectedPath(): Promise<"direct" | "turn" | "unknown"> {
+    return new Promise((resolve) => {
+      let settled = false;
+      const settle = (path: "direct" | "turn" | "unknown"): void => {
+        if (settled) return;
+        settled = true;
+        this.settleStats = undefined;
+        if (this.statsTimer !== undefined) {
+          this.deps.cancel(this.statsTimer);
+          this.statsTimer = undefined;
+        }
+        resolve(path);
+      };
+      this.settleStats = () => settle("unknown");
+      this.statsTimer = this.deps.schedule(() => {
+        this.statsTimer = undefined;
+        settle("unknown");
+      }, STATS_TIMEOUT_MS);
+      selectedCandidateOutcome(this.native).then(
+        (path) => settle(path ?? "unknown"),
+        () => settle("unknown"),
+      );
+    });
   }
 
   /** Claims a synchronous outcome (`tunnel` or `failed`) if no other one was claimed. */
@@ -1095,6 +1142,7 @@ export function createFallbackPeerConnectionClass(
     onTunnel: options.onTunnel,
     onTerminalFailure: options.onTerminalFailure,
     onOutcome: options.onOutcome,
+    isLeaving: options.isLeaving ?? (() => false),
   };
   return class FallbackPeerConnection {
     constructor(configuration?: RTCConfiguration) {

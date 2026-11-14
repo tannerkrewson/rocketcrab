@@ -151,6 +151,11 @@ export class TrysteroTransport implements NovaTransport {
   private connectionEpoch = 0;
   /** Invalidates asynchronous lifecycle continuations after leave or replacement. */
   private lifecycleGeneration = 0;
+  /**
+   * True from the start of leave() until the next join. Peer closes during this
+   * window are the local user leaving, so they report no connection outcome.
+   */
+  private leaving = false;
   private pendingTeardown: Promise<void> | null = null;
   private cancelPendingTeardownWait: (() => void) | null = null;
   private cancelSignalDerivation: (() => void) | null = null;
@@ -291,6 +296,7 @@ export class TrysteroTransport implements NovaTransport {
         message: `TrysteroTransport.join: already ${this.connectionState}; leave() first.`,
       });
     }
+    this.leaving = false;
     const generation = ++this.lifecycleGeneration;
     const startedAt = this.now();
     this.connectionState = "joining";
@@ -382,6 +388,7 @@ export class TrysteroTransport implements NovaTransport {
   }
 
   async leave(): Promise<void> {
+    this.leaving = true;
     const generation = ++this.lifecycleGeneration;
     this.cancelSignalDerivation?.();
     const cancelPending = this.cancelPendingTeardownWait;
@@ -767,6 +774,7 @@ export class TrysteroTransport implements NovaTransport {
       onTunnel: this.options.onTunnel,
       onTerminalFailure: this.options.onTunnelFailure,
       onOutcome: this.options.onOutcome,
+      isLeaving: () => this.leaving,
     });
   }
 

@@ -52,6 +52,12 @@ interface HarnessWindow {
 const JOINED = "joined";
 /** Fallback timer (FALLBACK_AFTER_MS, 8 s) plus margin for the switch and the tunnel. */
 const PAST_FALLBACK_MS = 12_000;
+/**
+ * Once both sides show their outcome, wait this long before counting again: a
+ * late second outcome (a stray close or stats read) would appear only after
+ * the lists first match, so a single check could miss it.
+ */
+const OUTCOME_SETTLE_MS = 1_500;
 
 /** Binary traffic that crossed this page's tunnel sockets (paired/text excluded). */
 interface TunnelTraffic {
@@ -198,6 +204,10 @@ test("a forced player and its normal partner both tunnel once, and actions flow 
         .poll(async () => (await state(peer.page)).outcomes.map((o) => o.outcome))
         .toEqual(["tunnel"]);
     }
+    await host.page.waitForTimeout(OUTCOME_SETTLE_MS);
+    for (const peer of [host, joiner]) {
+      expect((await state(peer.page)).outcomes.map((o) => o.outcome)).toEqual(["tunnel"]);
+    }
 
     // Actions flow in both directions over the tunnel. The binary traffic
     // counters must grow across the exchange: this proves the data itself
@@ -261,6 +271,10 @@ test("healthy pairs stay on native WebRTC and never open a tunnel", async ({ bro
         .poll(async () => (await state(peer.page)).outcomes.map((o) => o.outcome))
         .toHaveLength(1);
       expect(["direct", "unknown"]).toContain((await state(peer.page)).outcomes[0]?.outcome);
+    }
+    await host.page.waitForTimeout(OUTCOME_SETTLE_MS);
+    for (const peer of [host, joiner]) {
+      expect((await state(peer.page)).outcomes).toHaveLength(1);
     }
 
     await host.page.evaluate(() => (window as unknown as HarnessWindow).__harness.sendStruct());

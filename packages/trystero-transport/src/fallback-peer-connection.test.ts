@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   FALLBACK_AFTER_MS,
   OPEN_ATTEMPTS,
+  STATS_TIMEOUT_MS,
   TUNNEL_PACE_BURST_BYTES,
   TUNNEL_PACE_BYTES_PER_SECOND,
   TUNNEL_PAIRED_FRAME,
@@ -1386,6 +1387,46 @@ describe("FallbackPeerConnection connection outcome", () => {
     expect(outcomesOf(h, "a")).toEqual([{ outcome: "unknown", msToConnect: 0 }]);
   });
 
+  it("reports unknown after STATS_TIMEOUT_MS when the stats read never resolves", async () => {
+    const h = harness();
+    const { a, b } = await connectPair(h);
+    a.native.stats = () => new Promise<RTCStatsReport>(() => undefined);
+    h.clock.advance(1000);
+    a.native.channels[0]?.open();
+    deliverNativeChannel(b);
+    await until(() => outcomesOf(h, "b").length === 1, "B's outcome");
+
+    // The outcome is claimed at open; only its path waits for the read.
+    expect(outcomesOf(h, "a")).toEqual([]);
+    h.clock.advance(STATS_TIMEOUT_MS - 1);
+    await settle();
+    expect(outcomesOf(h, "a")).toEqual([]);
+    h.clock.advance(1);
+    await until(() => outcomesOf(h, "a").length === 1, "A's timed-out outcome");
+
+    expect(outcomesOf(h, "a")).toEqual([{ outcome: "unknown", msToConnect: 1000 }]);
+    expect(h.clock.pending).toBe(0);
+  });
+
+  it("reports unknown and leaves no timer when closed while the stats read is pending", async () => {
+    const h = harness();
+    const { a, b } = await connectPair(h);
+    a.native.stats = () => new Promise<RTCStatsReport>(() => undefined);
+    a.native.channels[0]?.open();
+    deliverNativeChannel(b);
+    await until(() => outcomesOf(h, "b").length === 1, "B's outcome");
+    expect(h.clock.pending).toBeGreaterThan(0);
+
+    a.pc.close();
+    await settle();
+    b.pc.close();
+    await settle();
+
+    expect(outcomesOf(h, "a")).toEqual([{ outcome: "unknown", msToConnect: 0 }]);
+    expect(h.clock.pending).toBe(0);
+    expect(h.failures).toEqual([]);
+  });
+
   it("reports tunnel once per side when the pair switches and pairs", async () => {
     const h = harness();
     await pairUp(h);
@@ -1427,9 +1468,22 @@ describe("FallbackPeerConnection connection outcome", () => {
     expect(h.tunnels).toEqual([]);
   });
 
-  it("reports nothing when the peer leaves while the pair is still connecting", async () => {
+  it("reports failed when the peer closes while the pair is still connecting", async () => {
     const h = harness();
     const { a } = await connectPair(h);
+    a.pc.close();
+    h.clock.advance(FALLBACK_AFTER_MS * 3);
+    await settle();
+
+    expect(outcomesOf(h, "a")).toEqual([{ outcome: "failed", msToConnect: 0 }]);
+    expect(h.failures).toEqual([]);
+  });
+
+  it("reports nothing when the local user leaves while the pair is still connecting", async () => {
+    let leaving = false;
+    const h = harness({ isLeaving: () => leaving });
+    const { a } = await connectPair(h);
+    leaving = true;
     a.pc.close();
     h.clock.advance(FALLBACK_AFTER_MS * 3);
     await settle();
@@ -1438,7 +1492,7 @@ describe("FallbackPeerConnection connection outcome", () => {
     expect(h.failures).toEqual([]);
   });
 
-  it("reports nothing when closed during tunnel pairing, not a failure", async () => {
+  it("reports failed when closed during tunnel pairing while not leaving", async () => {
     const h = harness();
     const { a, b } = await connectPair(h);
     // B's channel is open, so B never switches and only A's socket exists.
@@ -1449,11 +1503,47 @@ describe("FallbackPeerConnection connection outcome", () => {
     a.pc.close();
     await settle();
 
+    expect(outcomesOf(h, "a")).toEqual([{ outcome: "failed", msToConnect: 0 }]);
+    expect(h.failures).toEqual([]);
+  });
+
+  it("reports nothing when closed during tunnel pairing while leaving", async () => {
+    let leaving = false;
+    const h = harness({ isLeaving: () => leaving });
+    const { a, b } = await connectPair(h);
+    deliverNativeChannel(b);
+    h.clock.advance(FALLBACK_AFTER_MS);
+    await until(() => h.network.sockets.length === 1, "A's unpaired socket");
+
+    leaving = true;
+    a.pc.close();
+    await settle();
+
     expect(outcomesOf(h, "a")).toEqual([]);
     expect(h.failures).toEqual([]);
   });
 
-  it("reports one direct outcome when a native failure follows an open whose stats are pending", async () => {
+  it("reports failed when Trystero destroys a stuck peer after the switch, before pairing", async () => {
+    const h = harness();
+    const { a, b } = await connectPair(h);
+    deliverNativeChannel(b);
+    // Trystero's ~23 s TTL destroys the peer while the tunnel is still unpaired,
+    // before the tunnel's own 30 s lone timeout.
+    h.clock.advance(FALLBACK_AFTER_MS);
+    await until(() => h.network.sockets.length === 1, "A's unpaired socket");
+    h.clock.advance(15000);
+    const socket = h.network.sockets[0];
+
+    a.pc.close();
+    await until(() => socket?.readyState === 3, "A's socket closed");
+    await settle();
+
+    expect(socket?.closeCalls).toEqual([1000]);
+    expect(outcomesOf(h, "a")).toEqual([{ outcome: "failed", msToConnect: 0 }]);
+    expect(h.failures).toEqual([]);
+  });
+
+  it("reports one unknown outcome when the stats read outlasts its timeout, then ignores the late answer", async () => {
     const h = harness();
     const { a, b, chA } = await connectPair(h);
     let release: (report: RTCStatsReport) => void = () => undefined;
@@ -1474,7 +1564,8 @@ describe("FallbackPeerConnection connection outcome", () => {
     release(selectedPath("host", "host"));
     await settle();
 
-    expect(outcomesOf(h, "a")).toEqual([{ outcome: "direct", msToConnect: 1000 }]);
+    // A's read started at clock 1000 and times out at 3000, before B's switch at 8000.
+    expect(outcomesOf(h, "a")).toEqual([{ outcome: "unknown", msToConnect: 1000 }]);
     // B's deadline is measured from its own descriptions, at clock 0.
     expect(outcomesOf(h, "b")).toEqual([
       { outcome: "tunnel", msToConnect: 1000 + FALLBACK_AFTER_MS },

@@ -180,6 +180,31 @@ describe("tunnel fallback polyfill", () => {
     expect(lastCall[0].onOutcome).toBe(onOutcome);
   });
 
+  it("gives the wrapper isLeaving: false during a join, true from leave() until the next join", async () => {
+    const adapter = new TrysteroTransport({
+      memberId: "member-a",
+      edgeOrigin: "https://edge.example",
+      partySecret: SECRET,
+    });
+    const factory = vi.mocked(fallback.createFallbackPeerConnectionClass);
+    mocks.joinRoom.mockClear();
+    mocks.joinRoom.mockReturnValue({ leave: async () => undefined, getPeers: () => ({}) });
+
+    const first = adapter.join({ room: "ROOM", sessionId: "session-1" }).catch(() => undefined);
+    await vi.waitFor(() => expect(mocks.joinRoom).toHaveBeenCalledTimes(1));
+    const firstOptions = factory.mock.calls.at(-1)![0];
+    expect(firstOptions.isLeaving?.()).toBe(false);
+    await adapter.leave();
+    await first;
+    expect(firstOptions.isLeaving?.()).toBe(true);
+
+    const second = adapter.join({ room: "ROOM", sessionId: "session-2" }).catch(() => undefined);
+    await vi.waitFor(() => expect(mocks.joinRoom).toHaveBeenCalledTimes(2));
+    expect(factory.mock.calls.at(-1)![0].isLeaving?.()).toBe(false);
+    await adapter.leave();
+    await second;
+  });
+
   it("reports no outcomes without a party secret, since there is no wrapper", async () => {
     const onOutcome = vi.fn();
     const adapter = new TrysteroTransport({
