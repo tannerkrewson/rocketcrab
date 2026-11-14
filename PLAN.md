@@ -448,7 +448,10 @@ passed 4/4 (Podman Playwright, 2026-11-13).
    wire validation. After both fixes landed, a 10-player create-with-game,
    no-payload browser run passed. A 100-player attempt stopped at 78 joined
    due to the host swap safeguard; it is incomplete, not a product failure.
-   Do not infer unlimited support or close the owner overlay decision in §3.6.
+   A two-browser-server 10-context local proof and concrete multi-host worker,
+   security and resource-accounting prerequisites are recorded in the same
+   findings; no remote-host proof or orchestration exists yet. Do not infer
+   unlimited support or close the owner overlay decision in §3.6.
 
 8. [ ] Update ADR-0003 (transport abstraction) to describe what Trystero now owns and what Nova still owns.
 

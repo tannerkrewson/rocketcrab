@@ -1,0 +1,31 @@
+{
+  "baseCommit": "275c850",
+  "startedAt": "2026-11-14T01:03:35.446Z",
+  "size": 10,
+  "status": "passed",
+  "selectAfterJoin": false,
+  "omitPayload": true,
+  "twoLocalServers": true,
+  "minAvailableKiB": 6291456,
+  "maxSwapGrowthKiB": 524288,
+  "stages": {
+    "joinMs": 10469.271222000001,
+    "allSeeAllMs": 10480.669205,
+    "readyMs": 11503.353624000001
+  },
+  "errors": [],
+  "authorityIds": ["load-player-0"],
+  "actionToAllMs": [
+    72.47252899999876, 63.33526300000085, 47.868891000000076, 48.634932999999364,
+    48.402399999999034, 48.08728799999881, 48.24375700000019, 48.35336600000119, 48.18635800000084,
+    48.65000300000065
+  ],
+  "authorityBrowserCpuSeconds": 0.1,
+  "guestBrowserCpuSeconds": 0.45,
+  "actionBatchMs": 539.6834240000007,
+  "minObservedAvailableKiB": 16444712,
+  "initialSwapUsedKiB": 2409944,
+  "maxSwapUsedKiB": 2465984,
+  "maxWatchIntervalMs": 1001.048316,
+  "lastRosterCounts": [10, 10, 10, 10, 10, 10, 10, 10, 10, 10]
+}

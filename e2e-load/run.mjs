@@ -11,6 +11,10 @@ const output = process.argv[3] ?? `load-${size}.json`;
 const timeout = Number(process.env.LOAD_TIMEOUT_MS ?? 300_000);
 const selectAfterJoin = process.env.LOAD_SELECT_AFTER_JOIN === "1";
 const omitPayload = process.env.LOAD_OMIT_PAYLOAD === "1";
+// Local-only proof of two independently controlled browser servers. This is
+// not a distributed driver: both servers and the resource guard share a host.
+const twoLocalServers = process.env.LOAD_TWO_LOCAL_SERVERS === "1";
+if (twoLocalServers && size > 10) throw new Error("Two-server proof is limited to 10 contexts");
 const minAvailable = Number(process.env.LOAD_MIN_AVAILABLE_KIB ?? 6 * 1024 * 1024);
 const maxSwapGrowth = Number(process.env.LOAD_MAX_SWAP_GROWTH_KIB ?? 512 * 1024);
 if (!Number.isFinite(timeout) || timeout <= 0) throw new Error("Invalid LOAD_TIMEOUT_MS");
@@ -29,12 +33,13 @@ const result = {
   maxSwapGrowthKiB: maxSwapGrowth,
   selectAfterJoin,
   omitPayload,
+  twoLocalServers,
   stages: {},
   errors: [],
   samples: {},
   status: "running",
 };
-let hostServer, host, guests;
+let hostServer, guestServer, host, guests;
 const pages = [];
 let stopped = false;
 let minObserved = Infinity;
@@ -157,7 +162,16 @@ async function gameCount(page) {
 }
 try {
   hostServer = await guarded(chromium.launchServer({ headless: true }));
-  guests = await guarded(chromium.launch({ headless: true }));
+  if (twoLocalServers) {
+    guestServer = await guarded(chromium.launchServer({ headless: true }));
+    guests = await guarded(
+      chromium.connect(guestServer.wsEndpoint(), {
+        exposeNetwork: "localhost:5273,localhost:5274,localhost:5287",
+      }),
+    );
+  } else {
+    guests = await guarded(chromium.launch({ headless: true }));
+  }
   host = await guarded(chromium.connect(hostServer.wsEndpoint()));
   const hostPage = await guarded(open(host, 0));
   await guarded(
@@ -236,6 +250,7 @@ try {
   const frames = await Promise.all(pages.map(gameFrame));
   if (frames.some((frame) => !frame)) throw new Error("Game frame disappeared");
   const cpuStart = hostIsAuthority ? treeTicks(hostServer.process().pid) : null;
+  const guestCpuStart = guestServer ? treeTicks(guestServer.process().pid) : null;
   const batchStart = performance.now();
   const latencies = [];
   for (let count = 1; count <= 10; count++) {
@@ -266,6 +281,10 @@ try {
   const cpuSeconds = cpuTicks === null || cpuTicks < 0 ? null : cpuTicks / hz;
   result.samples.actionToAllMs = latencies;
   result.samples.authorityBrowserCpuSeconds = cpuSeconds;
+  const guestTicks =
+    guestCpuStart === null ? null : treeTicks(guestServer.process().pid) - guestCpuStart;
+  result.samples.guestBrowserCpuSeconds =
+    guestTicks === null || guestTicks < 0 ? null : guestTicks / hz;
   result.samples.authorityBrowserAverageCores =
     cpuSeconds === null ? null : cpuSeconds / (elapsed / 1000);
   result.samples.actionBatchMs = elapsed;
@@ -312,7 +331,12 @@ try {
   result.samples.initialSwapUsedKiB = initialSwap ?? null;
   result.samples.maxSwapUsedKiB = maxSwap;
   result.samples.maxWatchIntervalMs = maxLoopDelayMs;
-  await Promise.allSettled([host?.close(), guests?.close(), hostServer?.close()]);
+  await Promise.allSettled([
+    host?.close(),
+    guests?.close(),
+    hostServer?.close(),
+    guestServer?.close(),
+  ]);
   await watcher;
   writeFileSync(output, JSON.stringify(result, null, 2) + "\n");
   console.log(JSON.stringify(result, null, 2));
