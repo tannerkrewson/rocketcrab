@@ -474,7 +474,7 @@ passed 4/4 (Podman Playwright, 2026-11-13).
 
 6. [ ] Adopt `scale()` (required for unlimited party size; it is marked experimental, so test it hard). Keep normal parties on a direct mesh by setting `maxDirectPeers` so rooms up to ~10 players stay direct, and let larger rooms form the multi-hop network. Then:
 
-   - Confirm game-source transfer still works for multi-hop peers: Trystero promotes messages over 16 KiB to a direct link, so a peer reachable only via hops may fail the up-to-2 MiB transfer. If it does, fall back to chunks ≤ 16 KiB for that peer.
+   - Confirm game-source transfer still works for multi-hop peers. In installed Trystero 0.27.0 an action is sent inline only when its whole frame (36-byte header + metadata + payload) fits `maxActionFrameBytes` (16,384 bytes); larger actions are sent as offer and chunk frames, and those frames promote the target to a direct link. A peer reachable only via hops may therefore fail the up-to-2 MiB transfer. If it does, fall back to chunks small enough for their whole inline frame to fit (payload ≤ 16,348 bytes with no metadata) for that peer.
    - Load-test large rooms (step 7) before calling this done.
 
    Investigation (2026-11-13, installed `@trystero-p2p/core@0.27.0`):
