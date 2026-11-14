@@ -1194,10 +1194,23 @@
                 });
               }
             } else if (node.hasAttribute("data-choice")) {
-              safeDispatch({
+              var answer = {
                 type: "answer",
                 payload: { choice: Number(node.getAttribute("data-choice")) },
-              }).catch(function (error) {
+              };
+              safeDispatch(answer).catch(function (error) {
+                // The authority committed a newer revision first (stale_revision):
+                // retry once from the latest view, while the question is still open.
+                if (
+                  error.code === "stale_revision" &&
+                  latestView &&
+                  latestView.phase === "question"
+                ) {
+                  safeDispatch(answer).catch(function (retryError) {
+                    nova.log("Answer rejected:", retryError.code, retryError.message);
+                  });
+                  return;
+                }
                 nova.log("Answer rejected:", error.code, error.message);
               });
             }
