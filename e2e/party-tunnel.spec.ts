@@ -125,6 +125,18 @@ test("a tunnelled pair joins with no alarm and shows a relayed badge", async ({ 
   const forced = await newPlayer(browser, true);
   const players = [host, forced];
   try {
+    // Passive observer: did the generic "Connecting to a player…" alert show on
+    // the forced page during the switch? Recorded as an annotation until the
+    // window is measured; it is not asserted yet.
+    await forced.page.addInitScript(() => {
+      const win = window as unknown as { __sawConnecting: boolean };
+      win.__sawConnecting = false;
+      new MutationObserver(() => {
+        if (document.body?.textContent?.includes("Connecting to a player")) {
+          win.__sawConnecting = true;
+        }
+      }).observe(document, { subtree: true, childList: true, characterData: true });
+    });
     await host.page.goto("/party");
     await expect(host.page.getByRole("button", { name: "Copy URL" })).toBeEnabled({
       timeout: 120_000,
@@ -147,6 +159,12 @@ test("a tunnelled pair joins with no alarm and shows a relayed badge", async ({ 
       });
     }
     await expect.poll(() => forced.pairedAt.length, { timeout: 60_000 }).toBe(1);
+    const sawConnecting = await forced.page.evaluate(
+      () => (window as unknown as { __sawConnecting: boolean }).__sawConnecting,
+    );
+    test
+      .info()
+      .annotations.push({ type: "connecting-alert-seen", description: String(sawConnecting) });
 
     for (const player of players) {
       await expect(player.page.getByText("Couldn't connect to a player.")).toHaveCount(0);
