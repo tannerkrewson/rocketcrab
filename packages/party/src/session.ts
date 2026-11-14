@@ -29,7 +29,12 @@ export interface PartyTransportFactory {
 }
 export type PartyEvent =
   | { readonly type: "host"; readonly hostMemberId: MemberId | null }
-  | { readonly type: "memberJoined" | "memberLeft"; readonly memberId: MemberId }
+  | {
+      readonly type: "memberJoined" | "memberLeft";
+      readonly memberId: MemberId;
+      /** The name the member had when the event fired (a leaving peer is no longer resolvable). */
+      readonly displayName?: string;
+    }
   | { readonly type: "memberRenamed"; readonly memberId: MemberId; readonly displayName: string }
   | {
       readonly type: "classicRoom";
@@ -100,13 +105,22 @@ export class PartySession {
     this.unsubscribers.push(
       this.privateTransport.on("peer:joined", (peer) => {
         this.renamedNames.delete(peer.memberId);
-        this.emit({ type: "memberJoined", memberId: peer.memberId });
+        this.emit({
+          type: "memberJoined",
+          memberId: peer.memberId,
+          ...(peer.displayName !== undefined ? { displayName: peer.displayName } : {}),
+        });
         this.emit({ type: "host", hostMemberId: this.hostMemberId });
         void this.announceContext().catch((error) => this.emit({ type: "error", error }));
       }),
       this.privateTransport.on("peer:left", (peer) => {
+        const displayName = this.renamedNames.get(peer.memberId) ?? peer.displayName;
         this.renamedNames.delete(peer.memberId);
-        this.emit({ type: "memberLeft", memberId: peer.memberId });
+        this.emit({
+          type: "memberLeft",
+          memberId: peer.memberId,
+          ...(displayName !== undefined ? { displayName } : {}),
+        });
         this.emit({ type: "host", hostMemberId: this.hostMemberId });
       }),
       this.privateTransport.on("message:received", (message) => this.receive(message)),
