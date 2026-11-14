@@ -23,6 +23,7 @@ test("shared creator candidate real transport admission boundary", async ({ brow
       window.slot = window.testRoom.makeState("proof.creator", null, {
         validate: (v, { prev }) => typeof v === "string" && (prev === null || prev === v),
       });
+      window.marker = window.testRoom.makeState("proof.marker", null);
     });
     const attacker = await page("/context-proof.html");
     await attacker.evaluate(({ room, app }) => window.rawProof.start(room, app, true), {
@@ -30,9 +31,11 @@ test("shared creator candidate real transport admission boundary", async ({ brow
       app,
     });
     await attacker.evaluate(() => window.rawProof.set("false-creator"));
+    // Positive control: the harness rejects the attacker's deliberately invalid
+    // nova.identity payload with this exact category and message.
     await expect
       .poll(() => victim.evaluate(() => window.__harness.getState().errors), { timeout: 30000 })
-      .not.toEqual([]);
+      .toContain("rejected: Identity handshake failed: peer sent an invalid identity.");
     await expect
       .poll(() => victim.evaluate(() => window.slot.get()), { timeout: 30000 })
       .toBe("false-creator");
@@ -49,14 +52,24 @@ test("shared creator candidate real transport admission boundary", async ({ brow
         validate: (v, { prev }) => typeof v === "string" && (prev === null || prev === v),
       });
       await window.slot.set("real-creator");
+      window.marker = window.testRoom.makeState("proof.marker", null);
+      await window.marker.set("sent");
     });
+    // Positive control: the valid writer's own first value is accepted locally.
+    expect(await valid.evaluate(() => window.slot.get())).toBe("real-creator");
     await expect
       .poll(() => victim.evaluate(() => window.__harness.getState().peers.length), {
         timeout: 30000,
       })
       .toBe(1);
-    await new Promise((r) => setTimeout(r, 1500));
+    // Delivery signal: the marker is written after "real-creator" on the same
+    // peer. Its arrival shows the valid-to-victim state path is live; it does not
+    // by itself prove the "real-creator" record arrived and was rejected.
+    await expect
+      .poll(() => victim.evaluate(() => window.marker.get()), { timeout: 30000 })
+      .toBe("sent");
     expect(await victim.evaluate(() => window.slot.get())).toBe("false-creator");
+    expect(await valid.evaluate(() => window.slot.get())).toBe("real-creator");
   } finally {
     await Promise.all(contexts.map((c) => c.close()));
   }

@@ -402,23 +402,43 @@ passed 4/4 (Podman Playwright, 2026-11-13).
      scale config or any default suite) against the test-only scale relay on
      127.0.0.1:5199. The admitted Nova peer is the real `TrysteroTransport`
      harness page; the unadmitted writer is a raw Trystero page with
-     `identity: "none"` that never passes Nova admission. Both tests passed in
-     all 3 runs (run 1, 2, 3; 2/2 each time, about 5 s per run). Test 1: the raw
-     page's first `makeState("proof.creator")` write, `"false-creator"`, stuck on
-     the admitted peer's slot even though that peer's roster never admitted the
-     writer; an admitted joiner's later `"real-creator"` write did not replace
-     it. Test 2: a value written by an author that then left reached a peer that
-     stayed in the room, and a late joiner, plus that joiner's leave-and-rejoin,
-     both read it. **Not tested:** mapping to Nova member IDs; concurrent first
-     values over the network (the joiner's own final value was not asserted);
-     survival after every holder has left; true transport drops rather than
-     leave/rejoin; the production signaling service; the content of the victim's
-     error (only a non-empty `errors` list was asserted).
-     **Conclusion:** an unadmitted peer can set the first value of the slot and
+     `identity: "none"` that never passes Nova admission. Test 1 publishes a
+     deliberately invalid `nova.identity` payload (`{v: 123}`,
+     `e2e-trystero/src/context-proof.js`), which the transport rejects with
+     `rejected: Identity handshake failed: peer sent an invalid identity.`
+     (`trystero-transport.ts`, `rejectIdentity`). That rejection is the mechanism
+     that keeps the writer unadmitted; a bare identity-`none` peer with a valid
+     identity would be admitted, so this result is specific to that setup.
+     Both tests passed in all 3 runs of the tightened spec (run 1, 2, 3; 2/2
+     each time, about 4 s per run). Test 1: the raw page's first
+     `makeState("proof.creator")` write, `"false-creator"`, stuck on the admitted
+     peer's slot (the victim's roster admitted no writer); the valid admitted
+     peer's `"real-creator"` write was accepted on its own page, and the victim
+     kept `false-creator`, so the two admitted pages diverge (`false-creator` vs
+     `real-creator`). The non-replacement check is bounded:
+     after the valid page writes a second `proof.marker` key, the victim sees the
+     marker and then reads `false-creator`. That shows the valid-to-victim state
+     path delivers; it does not directly observe the `real-creator` record being
+     received and rejected. The valid page's write is not gated on the attacker's
+     record: if the attacker's value reached it first, `set` would reject and the
+     test would fail rather than pass. Test 2: a value written by an author that
+     then left reached a peer that stayed in the room, and a late joiner, plus
+     that joiner's leave-and-rejoin, both read it. **Not tested:** mapping to
+     Nova member IDs; concurrent first values over the network beyond the single
+     divergence above; survival after every holder has left; true transport drops
+     rather than leave/rejoin; the production signaling service; a valid identity
+     from a non-Nova peer.
+     **Conclusion:** in this configuration (first-value validator
+     `prev === null`), an unadmitted peer can set the first value of the slot and
      it sticks on an admitted Nova peer, so the slot bypasses Nova's admission
      boundary. Adoption for creator context is **not safe without an additional
      admission check**; the existing code is kept, and no application code
      changed.
+     **Run:** from the worktree root, start the relay in a terminal with
+     `(cd e2e-trystero && ../node_modules/.bin/vite --config scale-server.mjs)`
+     (check `ss -ltnp` shows 127.0.0.1:5199 free first), then run
+     `podman run --rm --network host --userns keep-id -v "$PWD:$PWD:Z" -w "$PWD" mcr.microsoft.com/playwright:v1.62.1-noble npx playwright test -c e2e-trystero/context.playwright.config.js`,
+     and stop the server afterwards.
 
    - **Action progress — already adopted for transfer; don't replace the
      coordinator wholesale.** `trystero-transport.ts` uses action request/receive
