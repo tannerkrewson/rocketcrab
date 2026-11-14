@@ -1648,7 +1648,13 @@ export class PartyEngine {
     if (roomErrorCategory(error) !== null) {
       if (this.joinErrorNoticesShown.has(category)) return;
       this.joinErrorNoticesShown.add(category);
-      this.addNotice("warn", connectionErrorMessage(error));
+      const message =
+        category === "room_full"
+          ? "A player reported the party may be full. This affects a connection to that player and doesn't necessarily mean you can't stay in the party."
+          : category === "password_mismatch"
+            ? "A message from another player couldn't be decrypted. It may be damaged or use a different invite; you may still be connected to the party."
+            : connectionErrorMessage(error);
+      this.addNotice("warn", message);
       this.emit();
     }
   }

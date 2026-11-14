@@ -1734,7 +1734,16 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     },
   );
 
-  it("keeps peer errors as notices when a player is admitted", async () => {
+  it.each([
+    [
+      "room-full",
+      "A player reported the party may be full. This affects a connection to that player and doesn't necessarily mean you can't stay in the party.",
+    ],
+    [
+      "decrypt-failed",
+      "A message from another player couldn't be decrypted. It may be damaged or use a different invite; you may still be connected to the party.",
+    ],
+  ] as const)("qualifies %s as a peer notice in an established party", async (code, expected) => {
     const world = makeWorld();
     const host = makePlayer(world, "host");
     const secret = await runCreate(host, world);
@@ -1744,39 +1753,49 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     await joining;
     expect(player.engine.getState().phase).toBe("lobby");
     const options = transportFactoryMocks.createTrysteroPartyTransportFactory.mock.calls[0]?.[0];
-    options?.onJoinError?.({ code: "room-full", category: "unknown", message: "peer rejected" });
+    options?.onJoinError?.(
+      fromRoomError({
+        code,
+        peerId: "other-peer",
+        stage: "offer",
+        appId: "test",
+        roomId: "test",
+        message: "peer error",
+      }),
+    );
     expect(player.engine.getState().phase).toBe("lobby");
     expect(player.engine.getState().setupFailureCode).toBeNull();
-    expect(
-      player.engine.getState().notices.some((notice) => /party is full/i.test(notice.message)),
-    ).toBe(true);
+    expect(player.engine.getState().notices.map((notice) => notice.message)).toContain(expected);
     await player.engine.leaveParty();
     await host.engine.leaveParty();
   });
 
-  it("ignores callbacks from an old transport after a new party is established", async () => {
-    const world = makeWorld();
-    const player = makeDefaultFactoryPlayer(world);
-    await runCreate(player, world);
-    const old = transportFactoryMocks.createTrysteroPartyTransportFactory.mock.calls[0]?.[0];
-    await player.engine.leaveParty();
-    await runCreate(player, world);
-    expect(player.engine.getState().phase).toBe("lobby");
-    const before = player.engine.getState().notices;
-    old?.onJoinError?.(
-      fromRoomError({
-        code: "decrypt-failed",
-        peerId: "old-peer",
-        stage: "offer",
-        appId: "test",
-        roomId: "old-room",
-        message: "corrupt signal",
-      }),
-    );
-    expect(player.engine.getState().notices).toEqual(before);
-    expect(player.engine.getState().phase).toBe("lobby");
-    await player.engine.leaveParty();
-  });
+  it.each(["room-full", "decrypt-failed"] as const)(
+    "ignores stale %s callbacks after a new party is established",
+    async (code) => {
+      const world = makeWorld();
+      const player = makeDefaultFactoryPlayer(world);
+      await runCreate(player, world);
+      const old = transportFactoryMocks.createTrysteroPartyTransportFactory.mock.calls[0]?.[0];
+      await player.engine.leaveParty();
+      await runCreate(player, world);
+      expect(player.engine.getState().phase).toBe("lobby");
+      const before = player.engine.getState().notices;
+      old?.onJoinError?.(
+        fromRoomError({
+          code,
+          peerId: "old-peer",
+          stage: "offer",
+          appId: "test",
+          roomId: "old-room",
+          message: "corrupt signal",
+        }),
+      );
+      expect(player.engine.getState().notices).toEqual(before);
+      expect(player.engine.getState().phase).toBe("lobby");
+      await player.engine.leaveParty();
+    },
+  );
 
   it("does not leave a stale relay-failed notice after recovery", async () => {
     const world = makeWorld();
@@ -1795,8 +1814,8 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
   });
 
   it.each([
-    ["room-full", /party is full/i],
-    ["decrypt-failed", /fresh invite/i],
+    ["room-full", /player reported the party may be full/i],
+    ["decrypt-failed", /message from another player couldn't be decrypted/i],
     ["banned", /rejected/i],
     ["identity-failed", /unexpected state/i],
     ["plugin-failed", /unexpected state/i],

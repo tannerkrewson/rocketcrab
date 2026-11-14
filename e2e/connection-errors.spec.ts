@@ -51,6 +51,46 @@ for (const [code, message] of [
   });
 }
 
+test("peer errors in a live party are qualified notices, not party failures", async ({ page }) => {
+  await page.route("**/src/lib/party/transport-factory.ts*", async (route) => {
+    const response = await route.fetch();
+    const source = await response.text();
+    expect(source).toContain("return transport;");
+    await route.fulfill({
+      response,
+      body: source.replace(
+        "return transport;",
+        "window.__reportPeerError = onJoinError; return transport;",
+      ),
+    });
+  });
+  await page.goto("/party");
+  await page.getByRole("button", { name: "Start a party" }).click();
+  const lobby = page.getByRole("region", { name: "Invite your friends" });
+  await expect(lobby).toBeVisible();
+  for (const [code, message] of [
+    ["room-full", "A player reported the party may be full"],
+    ["decrypt-failed", "A message from another player couldn't be decrypted"],
+  ] as const) {
+    await page.evaluate((errorCode) => {
+      const report = (window as unknown as { __reportPeerError: (error: object) => void })
+        .__reportPeerError;
+      report({
+        code: errorCode,
+        peerId: "unrelated-peer",
+        category: "unknown",
+        message: "test peer report",
+      });
+    }, code);
+    await expect(page.getByText(message, { exact: false })).toBeVisible();
+    await expect(lobby).toBeVisible();
+  }
+  await expect(page.getByText("This party is full.", { exact: false })).toBeHidden();
+  await expect(
+    page.getByText("This invite doesn't match the party.", { exact: false }),
+  ).toBeHidden();
+});
+
 test("an invite with no room contact stays a generic timeout", async ({ page }) => {
   test.setTimeout(45_000);
   await page.goto(`/join#secret=${randomBytes(32).toString("base64url")}`);
