@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { ConnectionId } from "@rocketcrab/protocol";
 import { TrysteroTransport } from "./trystero-transport";
+import * as fallback from "./fallback-peer-connection";
 
 /**
  * Wiring of the WebRTC-to-tunnel fallback into the adapter (PLAN.md §5.6).
@@ -16,6 +17,14 @@ const mocks = vi.hoisted(() => ({
 }));
 
 vi.mock("./signal-url", () => ({ signalUrl: mocks.signalUrl }));
+// Spy on the wrapper factory (behaviour unchanged) to see the options it gets.
+vi.mock("./fallback-peer-connection", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("./fallback-peer-connection")>();
+  return {
+    ...actual,
+    createFallbackPeerConnectionClass: vi.fn(actual.createFallbackPeerConnectionClass),
+  };
+});
 vi.mock("@trystero-p2p/ws-relay", () => ({
   scale: (config: unknown) => ({ name: "scale", config }),
   joinRoom: mocks.joinRoom,
@@ -142,6 +151,19 @@ describe("tunnel fallback polyfill", () => {
       iceServers: [],
       iceTransportPolicy: "relay",
     });
+  });
+
+  it("gives the polyfill the same room name that was joined", async () => {
+    const adapter = new TrysteroTransport({
+      memberId: "member-a",
+      edgeOrigin: "https://edge.example",
+      partySecret: SECRET,
+    });
+    await joinAndAbandon(adapter, "party:room-under-test");
+    const factory = vi.mocked(fallback.createFallbackPeerConnectionClass);
+    const lastCall = factory.mock.calls[factory.mock.calls.length - 1]!;
+    expect(lastCall[0].roomId).toBe("party:room-under-test");
+    expect(lastCall[0].roomId).toBe(mocks.joinRoom.mock.calls[0]![1]);
   });
 
   it("reports no tunnelled peers for unknown connection IDs", () => {
