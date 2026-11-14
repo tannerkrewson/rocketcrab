@@ -104,11 +104,11 @@ async function revealedRows(frame: Frame): Promise<string[]> {
   });
 }
 
-// FIXME (PLAN §5.6): the lobby's "Start game" never enables, even with three
-// native players (no tunnel), so the flow stops before the game starts. The
-// runtime frames load and emit game.registration; the gap is the session's
-// game.ready propagation between players. Clipboard permissions are also
-// Chromium-only. Re-enable once the start gate opens in an all-native control.
+// FIXME (PLAN §5.6): Start game enables now (the lobby re-renders on a peer's
+// readiness), but the host stays in "starting" when it is not the lowest member
+// id: the authority-elect is the lowest eligible id (state-engine.ts
+// lowestEligibleMemberId), and the elect ignores a game.start that is not from
+// its own authority (session.ts case "game.start"). Re-enable once fixed.
 test.fixme("a 3-player party with one tunnelled player plays a state-mode game", async ({
   browser,
 }) => {
