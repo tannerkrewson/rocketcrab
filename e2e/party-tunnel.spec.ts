@@ -33,25 +33,47 @@ const PARTY_ORIGIN = "http://localhost:5173";
 interface Player {
   context: BrowserContext;
   page: Page;
+  /** Epoch ms of each `paired` frame received on a tunnel socket. */
+  pairedAt: number[];
   /** `/tunnel/` WebSocket URLs this page opened (one per tunnelled pair). */
   tunnelSockets: string[];
 }
 
 async function newPlayer(browser: Browser, forced: boolean): Promise<Player> {
   const context = await browser.newContext({ baseURL: PARTY_ORIGIN });
-  await context.grantPermissions(["clipboard-read", "clipboard-write"], { origin: PARTY_ORIGIN });
-  if (forced) {
-    await context.addInitScript(() => {
-      (window as unknown as { __NOVA_TEST_FORCE_TUNNEL__: boolean }).__NOVA_TEST_FORCE_TUNNEL__ =
-        true;
-    });
-  }
+  await context.addInitScript((forceTunnel: boolean) => {
+    // Record the invite the page copies, instead of reading the clipboard:
+    // Firefox and WebKit do not grant clipboard permissions in Playwright.
+    const win = window as unknown as {
+      __copied: string[];
+      __NOVA_TEST_FORCE_TUNNEL__?: boolean;
+    };
+    win.__copied = [];
+    const writer = (text: string) => {
+      win.__copied.push(String(text));
+      return Promise.resolve();
+    };
+    try {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: { writeText: writer, readText: () => Promise.resolve(win.__copied.at(-1) ?? "") },
+      });
+    } catch {
+      // Keep the page's own clipboard if it cannot be replaced.
+    }
+    if (forceTunnel) win.__NOVA_TEST_FORCE_TUNNEL__ = true;
+  }, forced);
   const page = await context.newPage();
   const tunnelSockets: string[] = [];
+  const pairedAt: number[] = [];
   page.on("websocket", (socket: WebSocket) => {
-    if (socket.url().includes("/tunnel/")) tunnelSockets.push(socket.url());
+    if (!socket.url().includes("/tunnel/")) return;
+    tunnelSockets.push(socket.url());
+    socket.on("framereceived", (frame) => {
+      if (frame.payload === "paired") pairedAt.push(Date.now());
+    });
   });
-  return { context, page, tunnelSockets };
+  return { context, page, tunnelSockets, pairedAt };
 }
 
 /** The game frame inside one player's page (re-resolved after reloads). */
@@ -117,19 +139,31 @@ test.fixme("a 3-player party with one tunnelled player plays a state-mode game",
     let invite = "";
     await expect
       .poll(async () => {
-        invite = await host.page.evaluate(() => navigator.clipboard.readText());
+        invite = await host.page.evaluate(
+          () => (window as unknown as { __copied: string[] }).__copied.at(-1) ?? "",
+        );
         return invite;
       })
       .toContain("/join#secret=");
 
     // Joiners open the invite; the lobby shows all three members everywhere.
     await joiner.page.goto(invite);
+    const forcedJoinStart = Date.now();
     await forced.page.goto(invite);
     for (const player of players) {
       await expect(player.page.locator('[data-testid^="party-member-"]')).toHaveCount(3, {
         timeout: 120_000,
       });
     }
+    // Join-to-paired for the forced player: from its join to each tunnel's
+    // `paired` frame (one tunnel per partner, so two frames).
+    await expect.poll(() => forced.pairedAt.length, { timeout: 60_000 }).toBe(2);
+    const pairedMs = forced.pairedAt.map((at) => at - forcedJoinStart);
+    test.info().annotations.push({
+      type: "join-to-paired-ms",
+      description: pairedMs.join(","),
+    });
+    console.log(`JOIN_TO_PAIRED_MS ${JSON.stringify(pairedMs)}`);
 
     // The host starts once every game is verified and loaded in every player.
     const startButton = host.page.getByRole("button", { name: "Start game" });
