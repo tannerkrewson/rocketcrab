@@ -10,7 +10,7 @@ import {
   timestampSchema,
   titleSchema,
 } from "../ids";
-import { stateHistoryLimit } from "../limits";
+import { stateDeltaMaxDepth, stateDeltaMaxOps, stateHistoryLimit } from "../limits";
 import { gameEndReasonSchema, gameModeSchema } from "./shared";
 
 /**
@@ -181,6 +181,33 @@ export const actionAcknowledgementMessageSchema = z.object({
 });
 export type ActionAcknowledgementMessage = z.infer<typeof actionAcknowledgementMessageSchema>;
 
+/** Keys a state delta may never address: they would reach prototype chains. */
+const forbiddenDeltaKeys = new Set(["__proto__", "constructor", "prototype"]);
+
+const deltaPathSegment = z
+  .string()
+  .min(1)
+  .max(64)
+  .refine((key) => !forbiddenDeltaKeys.has(key), "forbidden state key");
+
+/**
+ * One state delta operation: `set` replaces the value at `path` (an empty path
+ * replaces the whole state), `del` removes the key at `path`. Arrays are always
+ * replaced whole, so paths only name object keys.
+ */
+export const stateDeltaOpSchema = z.discriminatedUnion("op", [
+  z.object({
+    op: z.literal("set"),
+    path: z.array(deltaPathSegment).max(stateDeltaMaxDepth),
+    value: z.unknown(),
+  }),
+  z.object({
+    op: z.literal("del"),
+    path: z.array(deltaPathSegment).min(1).max(stateDeltaMaxDepth),
+  }),
+]);
+export type StateDeltaOp = z.infer<typeof stateDeltaOpSchema>;
+
 /**
  * State snapshot: canonical replicated state with the conflict-reconciliation
  * envelope fields (ADR-0007: revision, term, authority member ID, state hash,
@@ -215,8 +242,16 @@ export const stateSnapshotMessageSchema = z.object({
    * older senders, which always sent complete windows, so it defaults to true.
    */
   historyComplete: z.boolean().default(true),
+  /**
+   * `full`: `state` is the whole canonical state. `delta`: `ops` transform the
+   * receiver's state at `baseStateHash` into this revision's state, and `state`
+   * is absent. Absent from older senders, which always sent full states.
+   */
+  stateMode: z.enum(["full", "delta"]).default("full"),
+  ops: z.array(stateDeltaOpSchema).max(stateDeltaMaxOps).optional(),
   processedActionIds: z.array(z.string().min(1).max(64)).max(stateHistoryLimit),
-  state: z.unknown(),
+  /** Present on full snapshots; absent on deltas. A full snapshot without it is invalid (checked by the engine). */
+  state: z.unknown().optional(),
 });
 export type StateSnapshotMessage = z.infer<typeof stateSnapshotMessageSchema>;
 

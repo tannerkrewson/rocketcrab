@@ -99,6 +99,14 @@ export const stateHistoryLimit = 256;
 export const stateResyncMinIntervalMs = 1_000;
 
 /**
+ * Largest state delta a commit may carry (ADR-0007 state deltas). A commit
+ * whose diff needs more operations, or a deeper path, is sent as a full state.
+ */
+export const stateDeltaMaxOps = 512;
+/** Deepest path a state delta operation may address. */
+export const stateDeltaMaxDepth = 32;
+
+/**
  * Authority heartbeat interval (ADR-0007 S3). The current authority
  * broadcasts one heartbeat per interval so followers can detect silent loss;
  * missing heartbeats begin the grace period.

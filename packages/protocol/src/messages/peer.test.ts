@@ -27,6 +27,7 @@ import {
   simulationInputMessageSchema,
   simulationSnapshotMessageSchema,
   stateResyncMessageSchema,
+  stateDeltaOpSchema,
   stateSnapshotMessageSchema,
   stateViewMessageSchema,
   gameSourceAcceptedMessageSchema,
@@ -404,6 +405,65 @@ describe("peer message schemas", () => {
     );
     expect(parsed.historyMode).toBe("full");
     expect(parsed.historyComplete).toBe(true);
+  });
+
+  it("validates state delta operations strictly and bounds them", () => {
+    expect(stateDeltaOpSchema.safeParse({ op: "set", path: ["count"], value: 3 }).success).toBe(
+      true,
+    );
+    expect(stateDeltaOpSchema.safeParse({ op: "set", path: [], value: { a: 1 } }).success).toBe(
+      true,
+    );
+    expect(stateDeltaOpSchema.safeParse({ op: "del", path: ["scores", "member-a"] }).success).toBe(
+      true,
+    );
+    // Deletes need a key to remove.
+    expect(stateDeltaOpSchema.safeParse({ op: "del", path: [] }).success).toBe(false);
+    // Prototype keys can never be addressed.
+    expect(stateDeltaOpSchema.safeParse({ op: "set", path: ["__proto__"], value: 1 }).success).toBe(
+      false,
+    );
+    expect(stateDeltaOpSchema.safeParse({ op: "del", path: ["constructor"] }).success).toBe(false);
+    // Unknown operations are rejected.
+    expect(stateDeltaOpSchema.safeParse({ op: "move", path: ["a"] }).success).toBe(false);
+    // Depth is bounded.
+    const deep = Array.from({ length: 33 }, () => "k");
+    expect(stateDeltaOpSchema.safeParse({ op: "set", path: deep, value: 1 }).success).toBe(false);
+  });
+
+  it("bounds the number of operations in a snapshot's delta", () => {
+    const ops = Array.from({ length: 513 }, (_, i) => ({ op: "set", path: [`k${i}`], value: i }));
+    const snapshot = (overrides: Record<string, unknown>) =>
+      stateSnapshotMessageSchema.safeParse(
+        basePeer({
+          type: "state.snapshot",
+          seq: 3,
+          revision: 2,
+          term: 1,
+          authorityMemberId: "member-1",
+          historyMode: "increment",
+          stateMode: "delta",
+          baseStateHash: "a".repeat(64),
+          processedActionIds: [],
+          ...overrides,
+        }),
+      );
+    expect(snapshot({ ops: ops.slice(0, 512) }).success).toBe(true);
+    expect(snapshot({ ops }).success).toBe(false);
+    // An older sender sends no stateMode or ops: a full snapshot, as before.
+    const older = stateSnapshotMessageSchema.parse(
+      basePeer({
+        type: "state.snapshot",
+        seq: 3,
+        revision: 1,
+        term: 1,
+        authorityMemberId: "member-1",
+        processedActionIds: [],
+        state: {},
+      }),
+    );
+    expect(older.stateMode).toBe("full");
+    expect(older.ops).toBeUndefined();
   });
 
   it("rejects unknown message types with a useful error", () => {
