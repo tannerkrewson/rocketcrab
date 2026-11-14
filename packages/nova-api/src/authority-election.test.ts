@@ -2129,3 +2129,129 @@ describe(
     });
   },
 );
+
+describe(
+  "review follow-ups 3: fresh joiner, diagnostics, restore revert",
+  { timeout: 60_000 },
+  () => {
+    it("a fresh joiner that merges an incomplete window treats it as gapped and asks for repair", async () => {
+      const { engine, host } = makeEngine("member-b");
+      engine.handleAnnounce({ term: 1, authorityMemberId: "member-a", stateRevision: 4 });
+      engine.handleSnapshot({
+        revision: 4,
+        stateHash: await stateHashOf({ count: 3 }),
+        term: 1,
+        authorityMemberId: "member-a",
+        historyMode: "full",
+        historyComplete: false,
+        processedActionIds: ["x"],
+        state: { count: 3 },
+        senderMemberId: "member-a",
+      });
+      expect(engine.isHistoryComplete()).toBe(false);
+      expect(engine.getDiagnostics().historyComplete).toBe(false);
+      expect(host.resyncs).toEqual([{ target: "member-a", request: { knownRevision: 4 } }]);
+      // A complete full snapshot repairs the window.
+      engine.handleSnapshot({
+        revision: 4,
+        stateHash: await stateHashOf({ count: 3 }),
+        term: 1,
+        authorityMemberId: "member-a",
+        historyMode: "full",
+        processedActionIds: ["x", "y"],
+        state: { count: 3 },
+        senderMemberId: "member-a",
+      });
+      expect(engine.isHistoryComplete()).toBe(true);
+      expect(engine.processedActionIds()).toEqual(["x", "y"]);
+    });
+
+    it("a gapped authority's diagnostic is visible in the diagnostics and forwarded to session listeners", async () => {
+      const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+      const [a, b, c] = trio(sessions);
+      // Commit 2's broadcast never reaches anyone, and b's resync requests are
+      // blackholed, so b stays gapped after commit 3.
+      const dropCommit2 = dropNextMatching(
+        a.transport,
+        (options) =>
+          payloadOf(options).type === "state.snapshot" && options.targetConnectionId === undefined,
+      );
+      const sendB = b.transport.send.bind(b.transport);
+      b.transport.send = (options: Parameters<NovaSession["transport"]["send"]>[0]) =>
+        payloadOf(options).type === "state.resync" ? Promise.resolve() : sendB(options);
+      const events: Array<{ type: string; authorityMemberId?: string }> = [];
+      b.onSessionEvent((event) => {
+        events.push(event as { type: string; authorityMemberId?: string });
+      });
+
+      const missed = c.client.dispatch({ type: "mark", payload: { marker: "missed" } });
+      await pumpUntil(hub, () => dropCommit2.dropped === 1, "commit 2 dropped");
+      await missed;
+      await c.dispatch(
+        { type: "mark", payload: { marker: "after" }, baseRevision: 2 },
+        "after-gap",
+      );
+      await pumpUntil(hub, () => b.getStateModeDiagnostics().revision === 3, "b sees commit 3");
+      expect(b.getStateModeDiagnostics().historyComplete).toBe(false);
+
+      await a.leave();
+      await settleElection(hub);
+      await pumpUntil(
+        hub,
+        () => b.getStateModeDiagnostics().authorityMemberId === "member-b",
+        "b becomes authority",
+      );
+      expect(events).toContainEqual(
+        expect.objectContaining({ type: "historyIncomplete", authorityMemberId: "member-b" }),
+      );
+    });
+
+    it("a newer snapshot that replaces the state during the restore hash is not reverted", async () => {
+      let holdNextHash = false;
+      let release: () => void = () => {};
+      const gate = new Promise<void>((resolve) => {
+        release = resolve;
+      });
+      const { engine, host } = makeEngine("member-b", {
+        connected: new Set(["member-b", "member-c"]),
+        stateHash: async (value) => {
+          if (holdNextHash) {
+            holdNextHash = false;
+            await gate;
+          }
+          return stateHashOf(value);
+        },
+      });
+      expect(await engine.initializeAsAuthority()).toBe(true);
+      await waitForEngine(() => host.snapshots.length > 0, "initial broadcast");
+      host.connected.add("member-a");
+      engine.handleAnnounce({ term: 2, authorityMemberId: "member-a", stateRevision: 1 });
+      host.connected.delete("member-a");
+      holdNextHash = true;
+      engine.notifyAuthorityLeft();
+      await advance(400);
+      expect(engine.getAuthorityMemberId()).toBe("member-b");
+
+      // While the restore hash is held, member c pushes a newer state.
+      const newer = { count: 9 };
+      engine.handleSnapshot({
+        revision: 3,
+        stateHash: await stateHashOf(newer),
+        term: engine.getTerm(),
+        authorityMemberId: "member-b",
+        historyMode: "full",
+        processedActionIds: [],
+        state: newer,
+        senderMemberId: "member-c",
+      });
+      release();
+      await advance(10);
+      for (let i = 0; i < 10; i += 1) await yieldLoop();
+      expect(engine.getCanonicalState()).toEqual(newer);
+      expect(engine.getRevision()).toBe(3);
+      expect(host.events).not.toContainEqual(
+        expect.objectContaining({ type: "stateError", code: "invalid_snapshot" }),
+      );
+    });
+  },
+);

@@ -106,6 +106,12 @@ export type NovaSessionEvent =
       type: "authorityChanged";
       authorityMemberId: string | null;
       term: number;
+    }
+  | {
+      /** This authority's action window has a known gap. Host-side only. */
+      type: "historyIncomplete";
+      authorityMemberId: string;
+      term: number;
     };
 
 /**
@@ -322,6 +328,7 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
       case "bandwidthWarning":
       case "actionRejected":
       case "authorityChanged":
+      case "historyIncomplete":
         break; // host-side diagnostics; games observe acks and errors
     }
   });

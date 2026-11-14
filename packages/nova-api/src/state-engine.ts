@@ -404,12 +404,12 @@ export class NovaStateEngine {
   // Read accessors (session + host)
   // ------------------------------------------------------------------
 
-  /** True once the game began (session.start / observed start). */
   /** False while this shell's action window has a known gap (see state.resync). */
   isHistoryComplete(): boolean {
     return this.historyComplete;
   }
 
+  /** True once the game began (session.start / observed start). */
   isStarted(): boolean {
     return this.started;
   }
@@ -465,6 +465,7 @@ export class NovaStateEngine {
       processedActionCount: this.history.size,
       actionRatePerSecond: this.actionRate(),
       lastCommitAt: this.lastCommitAt,
+      historyComplete: this.historyComplete,
     };
   }
 
@@ -800,6 +801,8 @@ export class NovaStateEngine {
       incremental &&
       (message.revision !== this.revision + 1 ||
         (message.baseStateHash ?? null) !== this.stateHash);
+    // A shell with no state yet has no complete window of its own to keep.
+    const freshJoiner = this.canonical === null;
     this.canonical = message.state;
     this.revision = message.revision;
     this.stateHash = message.stateHash;
@@ -816,6 +819,7 @@ export class NovaStateEngine {
     ) {
       this.authorityElect = message.authorityMemberId;
     }
+    let repairNeeded = false;
     if (!incremental && message.historyComplete !== false) {
       // A complete full snapshot carries the sender's whole window: it
       // replaces ours, so an ID the sender does not hold is not acknowledged
@@ -823,6 +827,11 @@ export class NovaStateEngine {
       // completeness flag stays as it was, so a complete window is never shrunk.
       this.history.clear();
       this.historyComplete = true;
+    } else if (!incremental && freshJoiner) {
+      // A joiner that merges an incomplete window into nothing holds a gapped
+      // window: it must ask for a repair rather than treat the window as complete.
+      this.historyComplete = false;
+      repairNeeded = true;
     }
     for (const actionId of message.processedActionIds) {
       if (!this.history.has(actionId)) {
@@ -837,6 +846,8 @@ export class NovaStateEngine {
     if (gap) {
       this.historyComplete = false;
       this.historyRequestAnswered = false;
+      this.requestResync();
+    } else if (repairNeeded) {
       this.requestResync();
     }
     if (this.authorityMemberId === this.selfMemberId && this.restoreDone) {
@@ -1188,10 +1199,15 @@ export class NovaStateEngine {
     // Actions stay gated until the restored state is verified and the first
     // (full) broadcast has gone out, so no commit can precede that broadcast.
     if (this.stateHash !== null && this.canonical !== null && this.restoreBackup !== null) {
-      const actual = await this.stateHashImpl(this.canonical);
+      const verifiedState = this.canonical;
+      const expectedHash = this.stateHash;
+      const actual = await this.stateHashImpl(verifiedState);
       if (this.disposed) return;
       if (this.authorityMemberId !== this.selfMemberId) return; // deposed during the hash
-      if (actual !== this.stateHash) {
+      // A newer snapshot replaced the state during the hash: it wins, and there
+      // is nothing left to verify or revert.
+      if (this.canonical !== verifiedState) return;
+      if (actual !== expectedHash) {
         const backup = this.restoreBackup;
         this.canonical = backup.canonical;
         this.revision = backup.revision;

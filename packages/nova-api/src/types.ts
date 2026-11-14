@@ -203,6 +203,11 @@ export interface NovaStateDiagnostics {
   readonly actionRatePerSecond: number;
   /** Epoch ms of the last commit, or null before any commit. */
   readonly lastCommitAt: number | null;
+  /**
+   * False while this shell's processed-action window has a known gap, until a
+   * complete full snapshot repairs it. Host-side only.
+   */
+  readonly historyComplete: boolean;
 }
 
 /** How long the authority has to apply an action before it times out. */

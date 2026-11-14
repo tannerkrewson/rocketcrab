@@ -1637,6 +1637,11 @@ export class NovaSession implements NovaClientBackend {
         break;
       case "historyIncomplete":
         // Host-side diagnostic: a gapped window does not affect the game.
+        this.emit({
+          type: "historyIncomplete",
+          authorityMemberId: event.authorityMemberId,
+          term: event.term,
+        });
         break;
     }
   }
