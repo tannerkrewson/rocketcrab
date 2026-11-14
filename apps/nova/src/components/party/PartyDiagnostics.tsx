@@ -102,6 +102,23 @@ export function PartyDiagnosticsPanel({
             </ul>
           </div>
         ) : null}
+        {diagnostics.peers.length > 0 ? (
+          <div className="flex flex-col gap-1">
+            <span className="font-bold text-foreground/70">Peers</span>
+            <ul className="flex flex-col gap-1">
+              {diagnostics.peers.map((peer) => (
+                <li key={peer.connectionId} className="flex flex-wrap items-center gap-2">
+                  <span>{peer.displayName ?? peer.memberId}</span>
+                  {peer.tunnelled ? (
+                    <Badge title="This player's connection is relayed through Rocketcrab's servers, not direct.">
+                      relayed
+                    </Badge>
+                  ) : null}
+                </li>
+              ))}
+            </ul>
+          </div>
+        ) : null}
         {diagnostics.lastQuality.length > 0 ? (
           <div className="flex flex-col gap-1">
             <span className="font-bold text-foreground/70">Peer latency (last sample)</span>

@@ -16,6 +16,7 @@ import { PartyLobby } from "./PartyLobby";
 import { PartyPlayShell } from "./PartyPlayShell";
 import { PartyReconnectScreen } from "./PartyReconnectScreen";
 import { PartyShellHeader } from "./PartyShellHeader";
+import { PeerLinkAlert } from "./PeerLinkAlert";
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
@@ -181,6 +182,13 @@ export function PartyExperience({
 
   const shellShown = state.phase !== "idle" && state.phase !== "error" && state.phase !== "removed";
 
+  // PLAN.md §7: one generic peer-link alert (connecting / failed), shown in
+  // every live party phase beside the signaling outage alert.
+  const peerLinkAlert =
+    state.peerLink === null ? null : (
+      <PeerLinkAlert status={state.peerLink} onRetry={() => void engine.reconnect()} />
+    );
+
   if (playing) {
     return (
       <PartyPlayShell
@@ -196,6 +204,7 @@ export function PartyExperience({
       >
         <div className="relative h-full w-full">
           {state.signalingOutage ? <SignalingOutageAlert /> : null}
+          {peerLinkAlert}
           {frameArea}
         </div>
       </PartyPlayShell>
@@ -206,6 +215,7 @@ export function PartyExperience({
     <div className="flex flex-col gap-4">
       {shellShown ? <PartyShellHeader inviteUrl={state.inviteUrl} compact={browsing} /> : null}
       {state.signalingOutage ? <SignalingOutageAlert /> : null}
+      {peerLinkAlert}
       {frameArea}
       {renderPhase(
         state,
