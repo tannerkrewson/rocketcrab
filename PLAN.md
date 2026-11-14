@@ -119,8 +119,12 @@ currently serves the **legacy** live site — do not touch it before §9.
       `secret put` commands from `deploy/cloudflare.md`, then the runbook's
       smoke test (403 without Origin; `iceServers` with one; Classic
       `spyfall-new` returns a code; the 61st request in a minute returns 429).
-- [ ] **Owner:** add the Realtime usage-based billing notification and
-      confirm a test email arrives. Record the threshold in the runbook.
+- [ ] **Owner:** add the billing notifications and confirm a test email
+      arrives: the Realtime usage-based billing notification (record the
+      threshold in the runbook), and, while on Workers Free, a Workers and
+      Durable Objects limit notification if the dashboard offers one
+      (`deploy/cloudflare.md`, "Beta plan and pricing evidence", owner/account
+      gates). This is the only owner item for usage notifications.
 - [ ] With owner approval, delete `rocketcrab-cors-relay`; update the
       runbook's "Live state" section.
 
@@ -586,7 +590,7 @@ Cloudflare).
 5. [x] Local dev and tests: `npm run dev` must also start the edge Worker (`wrangler dev`, port 8787) with `VITE_EDGE_ORIGIN=http://localhost:8787`. Playwright `webServer` (both configs) must start it too. Delete the public-relay discovery probe (`e2e-trystero/e2e/discovery-probe.spec.ts`) and update `e2e-trystero` to use the local relay. Unit-test `SignalHub` (subscribe/publish fan-out, limits, hibernation attachment) in `deploy/edge/worker.test.ts` style.
        Evidence after rebase onto nova: `npm run check`; local-relay `npm run test:e2e:trystero` 5/5; `npm run test:e2e` 60/60 in Podman Playwright. SignalHub unit and local workerd integration tests cover relay fan-out and limits. Deferred-digest tests cover cancellation and deadline for join/reconnect/resume; retry tests cover stalled teardown, retained barrier and shared deadline, and reentrant state listeners. Two Chromium pages joined over HTTPS dev signaling with the local certificate.
 
-6. [ ] Record the plan decision in `deploy/cloudflare.md` with the limits that drive it (official docs checked 2026-11-12; research recorded there; notification remains outstanding): **stay on Workers Free during development and the workers.dev beta; switch to Workers Paid ($5/month) at the `rocketcrab.com` cutover (§9).** Reason: Free never bills for Workers/Durable Objects but hard-fails at its daily limits (100,000 Durable Object requests/day; incoming WebSocket messages count 20:1) until 00:00 UTC, which would stop all parties; tunnel usage can exhaust Free depending on traffic (the previously stated 1,000 parties/day is not supported without workload assumptions). TURN is billed separately on either plan. Investigate an available Cloudflare usage notification for beta limits; owner must configure and verify it. See the dated evidence and account-specific gates in `deploy/cloudflare.md`.
+6. [x] Record the plan decision in `deploy/cloudflare.md`, with the limits that drive it: **stay on Workers Free during development and the workers.dev beta; switch to Workers Paid ($5/month) at the `rocketcrab.com` cutover (§9).** Reason: Free never bills for Workers/Durable Objects but hard-fails at its daily limits (100,000 Durable Object requests/day; incoming WebSocket messages count 20:1) until 00:00 UTC, which would stop all parties; tunnel usage can exhaust Free depending on traffic (the previously stated 1,000 parties/day is not supported without workload assumptions). TURN is billed separately on either plan. Evidence: `deploy/cloudflare.md`, section "Beta plan and pricing evidence" (the plan-decision paragraph, the dated limits checked 2026-11-12 and 2026-11-13, and the account gates). The owner usage-notification action is not repeated here; it is tracked only in §1's owner billing-notification item.
 7. [x] Mark `docs/testing/trystero-connectivity-findings.md` relay sections as historical; update ADR-0003.
        Evidence: compared the adapter's `signal-url.ts` and WebSocket relay import with `deploy/edge/signal.ts`; dated ADR amendment and edge runbook describe staged room-scoped signaling without asserting deployment or device verification. `npm run check` passed (2026-11-13).
 

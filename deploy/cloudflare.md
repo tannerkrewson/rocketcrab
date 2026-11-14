@@ -71,9 +71,16 @@ Start a local Worker separately with `npx --yes wrangler@4.161.0 dev --config de
 
 Checked against official Cloudflare documentation on **2026-11-12**; these are
 published rates and limits, not a verification of this account's current plan,
-usage, entitlements, invoice, or alert configuration. Owner decision remains:
-Workers Free during development and workers.dev beta, then Workers Paid at the
-approved cutover. Paid is a **$5/month minimum**, not a spending cap.
+usage, entitlements, invoice, or alert configuration.
+
+**Plan decision (owner, 2026-11-12; PLAN decisions log and §4.6):** stay on
+Workers Free during development and the workers.dev beta; switch to Workers
+Paid ($5/month minimum, not a spending cap) at the approved `rocketcrab.com`
+cutover (PLAN §9). Reasons: Free does not bill for Workers or Durable Objects,
+but a Free daily limit fails further requests until the 00:00 UTC reset, which
+would stop every party at once. The earlier "1,000 parties/day" figure is not
+supported without workload assumptions, so no party threshold is claimed. TURN
+is billed separately on either plan. The limits and sources below support this.
 
 - [Workers pricing](https://developers.cloudflare.com/workers/platform/pricing/)
   lists Free at 100,000 Worker requests/day and 10 ms CPU per invocation; Paid
