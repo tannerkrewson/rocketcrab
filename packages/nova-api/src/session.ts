@@ -145,6 +145,14 @@ export interface NovaSessionOptions {
    */
   readonly simulationExecutor?: NovaSimulationExecutor;
   /**
+   * Decides whether a `game.start` request from another member starts the
+   * game. The elected authority asks it for each request; a request it
+   * rejects is ignored and reported as a session error. Omitted means every
+   * admitted member's request is accepted (the arena and tests). The party
+   * engine accepts only the host, once every member has the game source.
+   */
+  readonly acceptStartRequest?: (memberId: string) => boolean;
+  /**
    * Simulation-mode configuration (A1). Defaults follow the protocol
    * limits; values are clamped into the Nova bounds (see
    * `@rocketcrab/protocol` limits) so games can never exceed them.
@@ -288,6 +296,7 @@ export class NovaSession implements NovaClientBackend {
   /** The A1 simulation engine (simulation mode; inert in other modes). */
   private readonly simulationEngine: NovaSimulationEngine;
   private readonly injectedSimulationExecutor: NovaSimulationExecutor | undefined;
+  private readonly acceptStartRequest: (memberId: string) => boolean;
 
   private readonly selfPlayer: PlayerRecord;
   private readonly playersMap = new Map<string, PlayerRecord>();
@@ -332,6 +341,7 @@ export class NovaSession implements NovaClientBackend {
     this.game = options.game;
     this.injectedExecutor = options.stateExecutor;
     this.injectedSimulationExecutor = options.simulationExecutor;
+    this.acceptStartRequest = options.acceptStartRequest ?? (() => true);
     const memberId = options.player.memberId;
     this.selfPlayer = {
       id: memberId,
@@ -1112,16 +1122,25 @@ export class NovaSession implements NovaClientBackend {
         // member is the elected authority, and it is the only session that
         // can start the game as authority. A host that is not the lowest id
         // (the host's own start() sends game.start as a follower) would
-        // otherwise leave the game stuck in "starting". Trust is cooperative:
-        // any admitted member may request the start; the UI gate stays
-        // host-only. The elected authority honours the request by calling
+        // otherwise leave the game stuck in "starting". The elected authority
+        // honours the request only if `acceptStartRequest` allows it (the
+        // party engine: the host, once sources are verified); it then calls
         // start(), whose authoritative game.start the others accept above.
         if (
           !this.started &&
           this.engine.wouldElectSelf() &&
           this.playersMap.has(peerMessage.senderMemberId)
         ) {
-          this.start();
+          if (this.acceptStartRequest(peerMessage.senderMemberId)) {
+            this.start();
+          } else {
+            this.emitError(
+              new NovaError(
+                "invalid_state",
+                `Ignored a start request from ${peerMessage.senderMemberId}: only the host can start the game, once every player has the source.`,
+              ),
+            );
+          }
         }
         break;
       case "game.end":

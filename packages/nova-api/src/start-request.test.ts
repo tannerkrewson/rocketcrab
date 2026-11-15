@@ -16,7 +16,8 @@ function join(
   memberId: string,
   displayName: string,
   mode: "state" | "simulation",
-): { session: NovaSession; starts: number[] } {
+  acceptStartRequest?: (memberId: string) => boolean,
+): { session: NovaSession; starts: number[]; errors: string[] } {
   const transport = harness.createTransport({ memberId, displayName });
   const session = createNovaSession({
     transport,
@@ -24,13 +25,18 @@ function join(
     sessionId: SESSION,
     player: { memberId, displayName },
     game: { gameId: "game-start", mode, title: "Start Game" },
+    ...(acceptStartRequest !== undefined ? { acceptStartRequest } : {}),
   });
   new Function("nova", mode === "simulation" ? SIMULATION_MODE_EXAMPLE : MINIMAL_GAME_EXAMPLE)(
     session.client,
   );
   const starts: number[] = [];
   session.client.onStart(() => starts.push(1));
-  return { session, starts };
+  const errors: string[] = [];
+  session.onSessionEvent((event) => {
+    if (event.type === "error") errors.push(event.error.code);
+  });
+  return { session, starts, errors };
 }
 
 /** Macrotask flush: the state engine's async apply and sha256 need real turns. */
@@ -125,5 +131,68 @@ describe("start requests from a non-elect member", () => {
     expect(late.starts).toHaveLength(1);
     expect(a.starts).toHaveLength(1);
     expect(b.starts).toHaveLength(1);
+  });
+});
+
+describe("start request gate (acceptStartRequest)", () => {
+  it("ignores a start request from a member the gate rejects", async () => {
+    const harness = createInMemoryHarness();
+    // member-a is the elected authority; only member-b (the host) may start.
+    const host = (memberId: string) => memberId === "member-b";
+    const a = join(harness, "member-a", "Ada", "state", host);
+    const c = join(harness, "member-c", "Cy", "state", host);
+    const b = join(harness, "member-b", "Ben", "state", host);
+    for (const player of [a, b, c]) await player.session.join();
+    harness.drain();
+    for (const player of [a, b, c]) player.session.ready();
+    await flush(harness);
+
+    // Only the host may start. A non-host request is rejected and reported.
+    c.session.start();
+    await flush(harness);
+
+    expect(a.starts).toHaveLength(0);
+    expect(a.errors).toEqual(["invalid_state"]);
+  });
+
+  it("ignores the host's request before every source is verified", async () => {
+    const harness = createInMemoryHarness();
+    let verified = false;
+    const gate = (memberId: string) => memberId === "member-b" && verified;
+    const a = join(harness, "member-a", "Ada", "state", gate);
+    const b = join(harness, "member-b", "Ben", "state", gate);
+    await a.session.join();
+    await b.session.join();
+    harness.drain();
+    a.session.ready();
+    b.session.ready();
+    await flush(harness);
+
+    b.session.start();
+    await flush(harness);
+
+    expect(a.starts).toHaveLength(0);
+    expect(a.errors).toEqual(["invalid_state"]);
+  });
+
+  it("starts the game once the host's request passes the gate", async () => {
+    const harness = createInMemoryHarness();
+    let verified = true;
+    const gate = (memberId: string) => memberId === "member-b" && verified;
+    const a = join(harness, "member-a", "Ada", "state", gate);
+    const b = join(harness, "member-b", "Ben", "state", gate);
+    await a.session.join();
+    await b.session.join();
+    harness.drain();
+    a.session.ready();
+    b.session.ready();
+    await flush(harness);
+
+    b.session.start();
+    await flush(harness);
+
+    expect(a.starts).toHaveLength(1);
+    expect(b.starts).toHaveLength(1);
+    expect(a.errors).toEqual([]);
   });
 });
