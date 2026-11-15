@@ -755,7 +755,10 @@ export class NovaSession implements NovaClientBackend {
       // authority is announced (the client promise resolves on its ack).
       // Entries past their deadline can never be applied, so they are dropped
       // here; otherwise a long election grows the buffer without bound.
-      this.dispatchBuffer.push(entry);
+      const now = Date.now();
+      const live = this.dispatchBuffer.filter((held) => held.deadlineMs > now);
+      this.dispatchBuffer.length = 0;
+      this.dispatchBuffer.push(...live, entry);
       return Promise.resolve();
     }
     this.trackInflight(entry);

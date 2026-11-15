@@ -1,6 +1,7 @@
 /**
  * Session lifecycle tests (§10 review): what a session must stop or release
- * when the player leaves.
+ * when the player leaves, and how the dispatch buffer stays bounded while no
+ * authority is known.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NovaTransport } from "@rocketcrab/core";
@@ -33,6 +34,11 @@ function makeSimulationSession(
 /** The protocol messages a session holds while its transport is not connected. */
 function queuedOutbox(session: NovaSession): number {
   return (session as unknown as { outbox: unknown[] }).outbox.length;
+}
+
+/** The dispatches a session holds while no authority is known. */
+function bufferedDispatches(session: NovaSession): number {
+  return (session as unknown as { dispatchBuffer: unknown[] }).dispatchBuffer.length;
 }
 
 const FAKE_TIMERS = {
@@ -84,5 +90,24 @@ describe("NovaSession lifecycle (leave and dispatch buffer)", () => {
     // that can never be delivered.
     expect(ticks.length).toBe(ticksAtLeave);
     expect(queuedOutbox(a)).toBe(outboxAtLeave);
+  });
+
+  it("drops expired buffered dispatches when a new one arrives with no authority known", () => {
+    const hub = new InMemoryTransportHub({ seed: "nova-api-lifecycle-buffer" });
+    const transport = hub.createTransport({ memberId: "member-a", displayName: "Ada" });
+    const session = makeSimulationSession(transport, "member-a", "Ada");
+    for (let index = 0; index < 50; index += 1) {
+      void session.dispatch(
+        { type: "mark", payload: { index }, baseRevision: 0 },
+        `early-${index}`,
+      );
+    }
+    expect(bufferedDispatches(session)).toBe(50);
+
+    // Every early dispatch is past its deadline; none can ever be applied.
+    vi.advanceTimersByTime(60_000);
+    void session.dispatch({ type: "mark", payload: {}, baseRevision: 0 }, "late");
+
+    expect(bufferedDispatches(session)).toBe(1);
   });
 });
