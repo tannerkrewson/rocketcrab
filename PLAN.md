@@ -796,7 +796,23 @@ change. One commit per area, `npm run check` + `npm run test:e2e` each time.
 
 - [ ] `apps/nova/src/lib/party/engine.ts` (~2,700 lines; ~390 comment lines,
       many describing history instead of current behaviour — trim those).
-- [ ] `packages/trystero-transport/src/trystero-transport.ts`.
+- [x] `packages/trystero-transport/src/trystero-transport.ts`. Evidence: four
+      failing-first unit tests were proven and fixed, one commit each: `join()`
+      refused a re-join from `disconnected`, which left the engine's reconnect
+      retry unable to recover after a failed `reconnect()`; an invalid
+      `handleRequest` channel stayed registered and failed every later join; a
+      targeted send that threw still consumed a delivery sequence number; and a
+      targeted send to a peer that left mid-send surfaced a raw Trystero error
+      instead of `not_connected`. The trim commit removed a write-only
+      peer-join map, an unused parameter and a one-line wrapper, and corrected
+      a stale appId in a doc comment (230 adapter tests pass, `npm run check`
+      exit 0). Not done: e2e was not run (the coordinator runs it); the
+      rejoin-with-same-peer-id path is unreachable with Trystero 0.27.0 here,
+      since each room gets a fresh endpoint identity, so it was not changed;
+      the per-sender `deliverySeq` scope differs from the in-memory twin's
+      per-pair scope and is recorded as suspected, not changed, because it
+      touches wire semantics; `fallback-peer-connection.ts` was checked for
+      timer and listener cleanup only and needed no change.
 - [ ] `apps/runtime/src/nova-bridge.ts` and `runtime-instance.ts`.
 
   Early targeted review: bootstrap player identity was JSON-encoded but not
