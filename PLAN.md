@@ -801,12 +801,14 @@ change. One commit per area, `npm run check` + `npm run test:e2e` each time.
       refused a re-join from `disconnected`, which left the engine's reconnect
       retry unable to recover after a failed `reconnect()`; an invalid
       `handleRequest` channel stayed registered and failed every later join; a
-      targeted send that threw still consumed a delivery sequence number; and a
-      targeted send to a peer that left mid-send surfaced a raw Trystero error
-      instead of `not_connected`. The trim commit removed a write-only
-      peer-join map, an unused parameter and a one-line wrapper, and corrected
-      a stale appId in a doc comment (230 adapter tests pass, `npm run check`
-      exit 0). Not done: e2e was not run (the coordinator runs it); the
+      send that threw (unknown target or unserializable payload) still consumed
+      a delivery sequence number; and a targeted send to a peer that left
+      mid-send surfaced a raw Trystero error instead of `not_connected`. A
+      clean leave stays re-joinable, as the in-memory twin defines it, and a
+      test pins that. The trim commit removed a write-only peer-join map, an
+      unused parameter and a one-line wrapper, and corrected a stale appId in a
+      doc comment (233 adapter tests pass, `npm run check` exit 0). Not done:
+      e2e was not run (the coordinator runs it); the
       rejoin-with-same-peer-id path is unreachable with Trystero 0.27.0 here,
       since each room gets a fresh endpoint identity, so it was not changed;
       the per-sender `deliverySeq` scope differs from the in-memory twin's
