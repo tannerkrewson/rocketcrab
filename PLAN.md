@@ -880,7 +880,32 @@ change. One commit per area, `npm run check` + `npm run test:e2e` each time.
       and refilled mid-action (the retry timer heals it). Per-revision state
       observations have no hash cap. `npm run check` passed; `npm run test:e2e`
       was not run here (the coordinator runs it).
-- [ ] UI components and e2e tests: lighter pass.
+- [x] UI components and e2e tests: lighter pass. Proven and fixed, each
+      test failing before its fix: the arena and editor splitters kept window
+      drag listeners attached when unmounted mid-drag (one shared hook,
+      `207041e`), and a source digest that resolved last overwrote the current
+      source's hash (`90367f5`). Also: three raw styled buttons now use the
+      shared `Button` and three icon-only editor buttons got explicit labels
+      (`95246d1`; their `title` already gave them names). Checked and clean:
+      no `ghost` variant or `button--ghost` class and no raw `btn` class in
+      `components/` or `routes/`; every mapped list has a stable key. e2e:
+      the quiz loader and invite recorder are shared (`6c49f7b`), the
+      pagination 800 ms sleep is a bullet visibility wait (`10aa6fd`), and
+      three unused editor constants are unexported (`58cdcda`). Kept on
+      purpose: game-detail's 1500 and 800 ms settle sleeps guard the runaway
+      re-measure regression, which a poll would weaken; the deployment, runtime
+      and signaling-outage sleeps are negative assertions or a required 15 s
+      outage, with no positive signal to wait on. Suspected, not proven: the
+      arena's bandwidth-log key set and the lobby's toast-id array grow for
+      the session (bounded in practice). Not done: the history-comment trim
+      across about 147 ticket-ID comments in the UI; e2e was not run (the
+      coordinator runs it). Follow-ups: the flaky `packages/nova-api`
+      `authority-election.test.ts` case was a test race (it checked the
+      authority flags before member-b's first snapshot existed; the product
+      always sends that snapshot full) and now waits for the snapshot
+      (`a317309`, 50 consecutive passes); the pre-existing
+      `e2e/runtime-helpers.ts` type error is fixed (`23876b8`). `npm run check`
+      does not typecheck `e2e/`.
 - [x] Audit user-facing docs (README, API reference, game-author guide,
       deployment, mobile, security limitations) against shipped behaviour.
       Evidence: each claim was checked against `nova` code (constants, nova-api
