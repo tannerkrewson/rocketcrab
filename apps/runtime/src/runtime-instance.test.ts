@@ -588,3 +588,25 @@ describe("RuntimeInstance protocol boundary", () => {
     expect(messageTypes(port)).not.toContain("game.registration");
   });
 });
+
+describe("RuntimeInstance delivery failures", () => {
+  it("reports a message the channel cannot deliver instead of dropping it silently", () => {
+    const { port } = setup();
+    const deliver = port.postMessage.bind(port);
+    port.postMessage = (message: unknown) => {
+      // Stands in for structured-clone failure on a non-cloneable payload.
+      if ((message as { type?: string }).type === "game.apiCall") {
+        throw new Error("DataCloneError: payload could not be cloned");
+      }
+      deliver(message);
+    };
+    hook().report("dispatch", {
+      action: { type: "move", payload: () => 1 },
+      actionId: "action-1",
+    });
+    const error = lastRuntimeMessage(port, "runtime.error");
+    expect(error).toMatchObject({ category: "runtime" });
+    expect(String(error?.message)).toMatch(/could not be delivered/);
+    expect(String(error?.message)).toMatch(/nova\.dispatch/);
+  });
+});

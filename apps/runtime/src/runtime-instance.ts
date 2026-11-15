@@ -495,12 +495,23 @@ export class RuntimeInstance {
     if (this.destroyed && message.type !== "game.lifecycle") return;
     try {
       this.port.postMessage(message);
-      this.outgoing.push(message);
-      if (this.outgoing.length > OUTGOING_LOG_LIMIT) {
-        this.outgoing.splice(0, this.outgoing.length - OUTGOING_LOG_LIMIT);
+    } catch (error) {
+      // The host never received this message, e.g. a payload the channel
+      // cannot clone. Say so: a silent drop leaves the game waiting on an
+      // answer that will never come. A failed error report is not re-reported.
+      if (message.type !== "runtime.error") {
+        const what = message.type === "game.apiCall" ? `nova.${message.method}()` : message.type;
+        const reason = error instanceof Error ? error.message : String(error);
+        this.sendError(
+          "runtime",
+          `${what} could not be delivered to the host: ${reason.slice(0, 256)}`,
+        );
       }
-    } catch {
-      // Port closed — host is gone.
+      return;
+    }
+    this.outgoing.push(message);
+    if (this.outgoing.length > OUTGOING_LOG_LIMIT) {
+      this.outgoing.splice(0, this.outgoing.length - OUTGOING_LOG_LIMIT);
     }
   }
 }
