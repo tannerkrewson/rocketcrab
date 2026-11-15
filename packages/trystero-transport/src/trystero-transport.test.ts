@@ -785,6 +785,29 @@ describe("TrysteroTransport peer mapping", () => {
       expect(adapter.peers).toHaveLength(1);
     });
 
+    it("answers a peer's retransmitted ack after admitting it, so the peer can be admitted too", async () => {
+      const { adapter, clock } = setup({ handshakeTimeoutMs: 30_000 });
+      const room = makeFakeRoom();
+      mocks.joinRoom.mockReturnValue(room);
+      mocks.relaySockets[RELAY] = { readyState: 1 };
+      await joinConnected(adapter, clock);
+      const joined: TransportPeerInfo[] = [];
+      adapter.on("peer:joined", (peer) => joined.push(peer));
+
+      presentPeer(room, "peer-1", "member-b");
+      await flushSetup();
+      room.acknowledgement.onMessage!(mocks.selfId, { peerId: "peer-1" });
+      await flushSetup();
+      expect(joined.map((peer) => peer.memberId)).toEqual(["member-b"]);
+      const sends = room.acknowledgement.send.mock.calls.length;
+
+      // The peer has not admitted us: its ack is still arriving, so ours must be re-sent.
+      room.acknowledgement.onMessage!(mocks.selfId, { peerId: "peer-1" });
+      await flushSetup();
+      expect(room.acknowledgement.send.mock.calls.length).toBe(sends + 1);
+      expect(joined).toHaveLength(1);
+    });
+
     it("stops retransmitting when we leave", async () => {
       const { adapter, clock } = setup({ handshakeTimeoutMs: 30_000 });
       const room = makeFakeRoom();

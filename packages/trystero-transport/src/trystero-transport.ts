@@ -972,6 +972,13 @@ export class TrysteroTransport implements NovaTransport {
         )
           return;
         this.acknowledgedPeers.add(context.peerId);
+        // A peer re-sends its ack until it is admitted. If we are admitted
+        // already, our ack is the one it is missing, so answer it again.
+        if (this.readyPeers.has(context.peerId)) {
+          const identity = this.identityByPeerId.get(context.peerId);
+          if (identity) sendAck(context.peerId, identity);
+          return;
+        }
         maybeReady(context.peerId);
       }),
       action.onMessage((data, context) => this.handleActionMessage(data, context)),
