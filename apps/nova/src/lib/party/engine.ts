@@ -935,8 +935,12 @@ export class PartyEngine {
       this.emit();
       return;
     }
+    const party = this.party;
     try {
       const connectResult = await game.connectToGame();
+      // The party was left while its room was being created: drop the result
+      // so it cannot reach the next party.
+      if (this.party !== party) return;
       this.classic = { gameId, title: game.name, connectResult };
       this.game = { gameId, title: game.name, mode: "state" };
       this.selfVerified = true;
@@ -948,6 +952,7 @@ export class PartyEngine {
       this.teardownRuntimeFrame();
       await this.party.announceClassicRoom(this.classicAnnouncement());
     } catch (error) {
+      if (this.party !== party) return;
       this.addNotice("error", `Couldn't set up ${game.name}: ${errorMessage(error)}`);
     }
     this.emit();

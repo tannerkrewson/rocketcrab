@@ -19,6 +19,7 @@ import {
 import { createMemoryLifecycleSource } from "./lifecycle";
 import { clearPartyRecovery, readPartyRecovery } from "./party-recovery";
 import type { TurnCredentialsResult } from "./turn-creds";
+import { CLASSIC_GAMES, type ClassicGameConnectResult } from "../classic";
 
 /**
  * The default-factory path is mocked so the TURN acceptance tests can
@@ -3403,5 +3404,30 @@ describe("party engine — §10 review: lifecycle cleanup", () => {
     await settle(world);
     await retry;
     expect(player.engine.getState().phase).toBe("lobby");
+  });
+
+  it("a classic game whose room finishes creating after the party is left does not reach the next party", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    await runCreate(a, world);
+    const classic = CLASSIC_GAMES[0]!;
+    let finishConnect!: (result: ClassicGameConnectResult) => void;
+    const connect = vi.spyOn(classic, "connectToGame").mockImplementation(
+      () =>
+        new Promise<ClassicGameConnectResult>((resolve) => {
+          finishConnect = resolve;
+        }),
+    );
+
+    const pick = a.engine.selectClassicGame(classic.id);
+    await a.engine.leaveParty();
+    finishConnect({ player: { url: "https://classic.example/player" } });
+    await pick;
+    await settle(world);
+    connect.mockRestore();
+
+    expect(a.engine.getState().classicGame).toBeNull();
+    expect(a.engine.getState().game).toBeNull();
+    expect(a.engine.getState().notices.some((n) => n.level === "error")).toBe(false);
   });
 });
