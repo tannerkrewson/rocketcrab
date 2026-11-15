@@ -881,8 +881,25 @@ change. One commit per area, `npm run check` + `npm run test:e2e` each time.
       observations have no hash cap. `npm run check` passed; `npm run test:e2e`
       was not run here (the coordinator runs it).
 - [ ] UI components and e2e tests: lighter pass.
-- [ ] Audit user-facing docs (README, API reference, game-author guide,
+- [x] Audit user-facing docs (README, API reference, game-author guide,
       deployment, mobile, security limitations) against shipped behaviour.
+      Evidence: each claim was checked against `nova` code (constants, nova-api
+      exports and types, edge routes and limits, runtime and lobby strings,
+      package scripts, CI). Fixed in `review/docs` (`a801b08`..`957e222`):
+      game-author messages and diagnostics; API reference milestone text and
+      missing error codes; threat model (party secret in localStorage, TURN
+      bearer tokens, tunnel metadata and member IDs, new T22); Cloudflare
+      runbook (tunnel client status, limiter keys); deployment and mobile LAN
+      origins; mobile checklist (broken E2 row, stale labels); README (edge
+      Worker, layout, scripts, CI); ADR-0008/0012 links. Not changed:
+      `nova-api-ai-reference.md`, which the master prompt embeds as an exact
+      fixture guarded by `master-prompt.test.ts` at `MASTER_PROMPT_VERSION` 2.
+      It still implies raw reliable/ordered options hold on real parties (they
+      degrade) and labels the minimal game "9 lines" (it is 5); changing it
+      changes the shipped prompt, so it needs an owner decision. No orphan
+      docs (ADRs are self-owning; the orphans found were linked). Not verified:
+      physical devices, the live edge (not deployed), and e2e (docs-only; the
+      coordinator runs it). `npm run check` exit 0.
 
 ## Decisions log
 
