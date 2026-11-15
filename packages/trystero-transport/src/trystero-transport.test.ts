@@ -1260,6 +1260,28 @@ describe("TrysteroTransport send", () => {
     expect(room.action.send.mock.calls[0]![1].metadata.deliverySeq).toBe(1);
   });
 
+  it("does not consume a delivery sequence when the payload cannot be serialized", async () => {
+    const { adapter, room } = await joinedWithPeer();
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    await expect(adapter.send({ channel: "raw", payload: circular as never })).rejects.toThrow(
+      TypeError,
+    );
+    expect(room.action.send).not.toHaveBeenCalled();
+    await adapter.send({ channel: "raw", payload: "next" });
+    expect(room.action.send.mock.calls[0]![1].metadata.deliverySeq).toBe(1);
+  });
+
+  it("keeps the delivery sequence of a send that fails after it started", async () => {
+    const { adapter, room } = await joinedWithPeer();
+    room.action.send.mockImplementationOnce(async () => {
+      throw new Error("transfer failed");
+    });
+    await expect(adapter.send({ channel: "raw", payload: "x" })).rejects.toThrow("transfer failed");
+    await adapter.send({ channel: "raw", payload: "next" });
+    expect(room.action.send.mock.calls[1]![1].metadata.deliverySeq).toBe(2);
+  });
+
   it("reports a targeted send to a peer that left mid-send as not_connected", async () => {
     const { adapter, room } = await joinedWithPeer();
     room.action.send.mockImplementationOnce(async () => {

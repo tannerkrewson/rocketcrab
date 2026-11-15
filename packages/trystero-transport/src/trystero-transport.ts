@@ -589,10 +589,12 @@ export class TrysteroTransport implements NovaTransport {
     const messageId = this.nextMessageId();
     const sentAt = this.now();
     const ordered = (options.ordering ?? "ordered") === "ordered";
-    // Resolve first: a send that throws here must not consume a delivery sequence.
     const target = this.resolveTarget(options.targetConnectionId);
-    const deliverySeq = ordered ? this.nextDeliverySeq(options.channel) : undefined;
+    // Everything that can throw runs before the sequence number is taken
+    // (payloadSize serializes the payload and throws on circular or BigInt
+    // values), so a failed send leaves no gap for ordered receivers.
     const totalBytes = payloadSize(options.payload);
+    const deliverySeq = ordered ? this.peekDeliverySeq(options.channel) : undefined;
     const metadata = buildWireEnvelope({
       messageId,
       sentAt,
@@ -604,6 +606,10 @@ export class TrysteroTransport implements NovaTransport {
       deliverySeq,
       binary: binary || undefined,
     });
+    if (deliverySeq !== undefined) this.takeDeliverySeq(options.channel, deliverySeq);
+    // A send that fails after this point keeps its number. A broadcast may
+    // already have reached some peers, and reusing the number would make them
+    // drop the next message as a duplicate.
     const sendTo = (peerId: string) =>
       action.send(options.payload as DataPayload, {
         target: peerId,
@@ -1347,11 +1353,13 @@ export class TrysteroTransport implements NovaTransport {
     };
   }
 
-  private nextDeliverySeq(channel: string): number {
-    const key = `${this.selfConnectionId}:${channel}`;
-    const next = (this.deliverySeqCounters.get(key) ?? 0) + 1;
-    this.deliverySeqCounters.set(key, next);
-    return next;
+  /** The sequence number the next ordered send on this channel would take. */
+  private peekDeliverySeq(channel: string): number {
+    return (this.deliverySeqCounters.get(`${this.selfConnectionId}:${channel}`) ?? 0) + 1;
+  }
+
+  private takeDeliverySeq(channel: string, seq: number): void {
+    this.deliverySeqCounters.set(`${this.selfConnectionId}:${channel}`, seq);
   }
 
   private nextMessageId(): MessageId {
