@@ -2277,6 +2277,9 @@ export class PartyEngine {
         sessionId: this.party?.material.sessionId,
       });
     } catch (error) {
+      // A superseded load (the container was rebound while it waited) must not
+      // clear the frame that replaced it.
+      if (this.runtime !== client) return;
       this.runtime = null;
       this.frameStarted = false;
       this.registered = false;

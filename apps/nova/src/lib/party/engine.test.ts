@@ -3293,4 +3293,36 @@ describe("party engine — §10 review: lifecycle cleanup", () => {
     await settle(world);
     expect(a.engine.getState().phase).toBe("lobby");
   });
+
+  it("a superseded frame load that fails does not clobber the frame that replaced it", async () => {
+    const world = makeWorld();
+    const harness = createHostHarness();
+    // Frame loads stay pending until the test rejects them, like a load whose
+    // iframe was detached by a container rebind and is waiting for a timeout.
+    const pendingLoads: Array<(error: Error) => void> = [];
+    const a = makePlayer(world, "a", {
+      seams: {
+        ...harness.seams,
+        waitForFrameLoad: () =>
+          new Promise<void>((_, reject) => {
+            pendingLoads.push(reject);
+          }),
+      },
+    });
+    await runCreate(a, world);
+    expect(pendingLoads).toHaveLength(1);
+
+    // The lobby -> playing flip rebinds the container while the first load is
+    // still pending: that frame is torn down and a second one boots.
+    a.engine.setContainer(document.createElement("div"));
+    expect(pendingLoads).toHaveLength(2);
+    expect(a.engine.debugSnapshot().frameExists).toBe(true);
+
+    // The superseded load now fails. It must not drop the live frame or report
+    // a boot failure the player never saw.
+    pendingLoads[0]!(new Error("Runtime iframe load timed out."));
+    await settle(world);
+    expect(a.engine.debugSnapshot().frameExists).toBe(true);
+    expect(a.engine.getState().notices.some((n) => /could not start/i.test(n.message))).toBe(false);
+  });
 });
