@@ -25,9 +25,13 @@ install tools, understand code, deploy a website, or create a repository.
 ## Architecture at a glance
 
 - **Fully static application.** Production is static assets at two HTTPS
-  origins; there is no room server, database, or persistent application
-  process. One stateless Cloudflare edge Worker handles the optional TURN
-  credential mint (`/turn`) and the scoped Classic room-creation relay:
+  origins; there is no room server, database, or game-state storage on the
+  server. One Cloudflare edge Worker, which is not deployed yet
+  (`deploy/cloudflare.md`), does the server-side work: it mints optional TURN
+  credentials (`/turn`), relays Classic room creation, carries WebRTC
+  signaling and the encrypted fallback tunnel through two Durable Object
+  classes, and accepts privacy-limited connection statistics (`/log`). The
+  origins below are placeholders; the beta origins are in `deploy/origins.json`.
   - `https://nova.example` — the Nova application.
   - `https://runtime.nova.example` — an intentionally isolated execution origin
     for pasted game HTML.
@@ -38,7 +42,10 @@ install tools, understand code, deploy a website, or create a repository.
   origin. No accounts, no cloud sync, no public catalog.
 - **Trystero for all real peer-to-peer transport.** A transport-neutral interface
   (`InMemoryTransport` for the local test arena, `TrysteroTransport` for real
-  parties) keeps the game-facing API identical everywhere.
+  parties) keeps the game-facing API identical everywhere. Signaling uses
+  Trystero 0.27's WebSocket relay against the edge Worker, not public relays. A
+  WebRTC connection that has not opened directly within 8 seconds falls back to
+  an end-to-end encrypted tunnel through the same Worker.
 - **Three game modes.** `state` (Nova-owned canonical state, actions, authority,
   migration), `simulation` (ordered inputs, shared clock, authoritative
   snapshots), and `raw` (named data channels for specialized games).
@@ -52,14 +59,23 @@ install tools, understand code, deploy a website, or create a repository.
 │   └── runtime/              # Static isolated iframe runner
 ├── packages/
 │   ├── protocol/             # Zod schemas and shared protocol types
-│   ├── core/                 # Party, authority, state and simulation engines
-│   ├── nova-api/             # Game-facing runtime implementation and types
+│   ├── core/                 # Transport interface and local game repository
+│   ├── nova-api/             # Game-facing API client and session engine
+│   ├── party/                # Party session, membership and source transfer
+│   ├── trystero-transport/   # Real-party transport (Trystero 0.27) and tunnel fallback
 │   └── testing/              # In-memory transport and reusable fixtures
+├── deploy/
+│   ├── edge/                 # The one Cloudflare edge Worker (signaling, tunnel, TURN, relay)
+│   ├── nova/, runtime/       # Static-asset Worker configs (not deployed yet)
+│   └── cloudflare.md         # Edge Worker runbook and live state
 ├── examples/
 │   └── games/                # Complete single-HTML sample games
+├── e2e/, e2e-trystero/       # Playwright browser suites
+├── scripts/                  # Build, bundle-size and deploy verification helpers
 ├── docs/
 │   ├── architecture/
 │   ├── api/
+│   ├── history/
 │   └── testing/
 ├── package.json
 ├── lefthook.yml
@@ -87,11 +103,13 @@ canonical index or an ADR:
   condensed, prompt-embedded version is `docs/api/nova-api-ai-reference.md`.
 - `docs/game-author-debugging.md` — the authoring loop, editor diagnostics,
   common failure messages, and how to debug a real party.
-- `docs/history/` — archived simplification evidence and superseded runbooks.
+- `docs/history/nova-simplification-evidence.md` — archived simplification
+  evidence; the only file in `docs/history/`.
 - `docs/testing/` — milestone findings and checklists, each linked from its
   owning ADR (e.g. the S4 state-mode vertical slice from ADR-0006).
 - `deploy/cloudflare.md` — runbook and live state for the one Cloudflare
-  edge Worker (Classic relay + TURN mint).
+  edge Worker (signaling, fallback tunnel, TURN mint, Classic relay, and
+  connection statistics).
 
 ## Getting started
 
@@ -103,34 +121,39 @@ npm run dev     # starts all apps in parallel
 npm run check   # format check + lint + typecheck + tests + build
 ```
 
-Local development serves both origins over HTTP by default; the two-origin HTTPS
-setup, the Cloudflare deployment scripts, and the per-origin security policies
+`npm run dev` serves Nova, the runtime and the edge Worker over HTTP by default;
+the two-origin HTTPS setup, the Cloudflare deployment scripts, and the per-origin security policies
 are documented in `docs/architecture/deployment.md` (M2 — Configure production
 static deployment; nothing is published yet).
 
 ### Root scripts
 
-| Script                                    | Purpose                                                                     |
-| ----------------------------------------- | --------------------------------------------------------------------------- |
-| `npm run dev`                             | Run all apps in watch mode (parallel via concurrently)                      |
-| `npm run dev:https`                       | Run all apps over local HTTPS (run `npm run gen-certs` first)               |
-| `npm run gen-certs`                       | Generate gitignored self-signed certs for local HTTPS (optional LAN IP arg) |
-| `npm run build`                           | Build all apps and packages                                                 |
-| `npm run format` / `npm run format:check` | Write / verify Oxfmt formatting                                             |
-| `npm run lint`                            | Oxlint over the workspace                                                   |
-| `npm run typecheck`                       | `tsc --noEmit` across all apps and packages                                 |
-| `npm test` / `npm run test:watch`         | Vitest unit tests (run / watch)                                             |
-| `npm run test:e2e`                        | Playwright end-to-end tests (run `npx playwright install` first)            |
-| `npm run bundle:size`                     | Print built bundle sizes; warn when the Nova main bundle exceeds the limit  |
-| `npm run verify:deploy`                   | Verify a built origin's dist against the deployment requirements            |
-| `npm run check`                           | Format check + lint + typecheck + tests + build                             |
+| Script                                    | Purpose                                                                                  |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `npm run dev`                             | Run Nova, the runtime and the edge Worker (port 8787) in watch mode                      |
+| `npm run dev:https`                       | Run all apps over local HTTPS (run `npm run gen-certs` first)                            |
+| `npm run gen-certs`                       | Generate gitignored self-signed certs for local HTTPS (optional LAN IP arg)              |
+| `npm run build`                           | Build all apps and packages                                                              |
+| `npm run format` / `npm run format:check` | Write / verify Oxfmt formatting                                                          |
+| `npm run lint`                            | Oxlint over the workspace                                                                |
+| `npm run typecheck`                       | `tsc --noEmit` across all apps and packages                                              |
+| `npm test` / `npm run test:watch`         | Vitest unit tests (run / watch)                                                          |
+| `npm run test:e2e`                        | Playwright end-to-end tests (run `npx playwright install` first)                         |
+| `npm run bundle:size`                     | Print built bundle sizes; warn when the Nova main bundle exceeds the limit               |
+| `npm run verify:deploy`                   | Verify a built origin's dist against the deployment requirements                         |
+| `npm run deploy:nova` / `deploy:runtime`  | Build with the pinned origins, verify, and deploy a static Worker (owner approval first) |
+| `npm run edge:dev`                        | Run the edge Worker locally (`wrangler dev`, port 8787)                                  |
+| `npm run edge:check` / `edge:deploy`      | Bundle the edge Worker without uploading / deploy it (owner approval first)              |
+| `npm run test:edge`                       | Edge Worker unit tests                                                                   |
+| `npm run test:e2e:trystero`               | Playwright suite for the Trystero transport (needs the local edge and fixture servers)   |
+| `npm run check`                           | Format check + lint + typecheck + tests + build                                          |
 
 ## CI and quality gates
 
 GitHub Actions (`.github/workflows/ci.yml`) runs the same checks as `npm run
 check` from a clean checkout using `npm ci` (the committed lockfile), then
-uploads the Nova and Runtime bundles as separate artifacts and runs Playwright
-smoke tests (`e2e/`). Generated files (TanStack Router `routeTree.gen.ts`) are
+uploads the Nova and Runtime bundles as separate artifacts and runs the Playwright
+browser suite (`e2e/`) on Chromium, Firefox and WebKit. Generated files (TanStack Router `routeTree.gen.ts`) are
 excluded from formatting and lint via `.oxfmtrc.json` / `.oxlintrc.json`.
 
 Dependency updates are handled by Dependabot (`.github/dependabot.yml`).
@@ -152,7 +175,10 @@ Generated game HTML is untrusted and runs only in an iframe on the separate
 runtime origin. The runtime has no Nova credentials, no access to main-origin
 storage or DOM, and no service-worker authority over the application. All
 cross-origin and peer messages are validated against versioned Zod schemas.
-See `docs/architecture/` for the full threat model and ADRs.
+A connection that cannot go direct may use an encrypted fallback tunnel through
+the edge Worker; the Worker and Cloudflare see ciphertext and metadata only.
+Nova member IDs are not Trystero identities. See `docs/architecture/` for the
+full threat model and ADRs.
 
 ## Current non-goals
 
