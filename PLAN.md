@@ -815,7 +815,19 @@ change. One commit per area, `npm run check` + `npm run test:e2e` each time.
       per-pair scope and is recorded as suspected, not changed, because it
       touches wire semantics; `fallback-peer-connection.ts` was checked for
       timer and listener cleanup only and needed no change.
-- [ ] `apps/runtime/src/nova-bridge.ts` and `runtime-instance.ts`.
+- [x] `apps/runtime/src/nova-bridge.ts` and `runtime-instance.ts`. Proven by
+      failing-first tests and fixed: bootstrap accepted from any window on the
+      main origin (now requires the embedding page as `event.source`); raw
+      channel and pending-action maps keyed by `constructor`/`__proto__`; a
+      repeated `start` re-ran `onStart` in the frame; one viewer's async
+      `selectView` rejection failed the whole state request; undeliverable
+      messages were dropped silently. Trimmed history comments and unexported
+      dead symbols (no behaviour change). Not verified: e2e (run by the
+      coordinator), stale frame reports after removal (suspected, not proven).
+      Open, outside this area: `apps/nova/src/lib/party/engine.ts` does not
+      re-send `start` to a frame rebooted by `reloadMyGame`/`reloadAll` or a
+      runtime restart (`frameStartDelivered` resets only in `maybeBootFrame`);
+      a throwaway probe test got 0 new start events after reload.
 
   Early targeted review: bootstrap player identity was JSON-encoded but not
   escaped for an HTML script element; a display name containing `</script>`
