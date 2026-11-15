@@ -1,8 +1,20 @@
 /**
- * Quiz frame helpers shared by the arena S4 spec and the real-party tunnel
- * spec. Each reads one runtime frame's game DOM through `__runtimeApi`.
+ * Quiz frame helpers shared by the arena S4 spec, the real-party tunnel spec
+ * and the party lobby spec. Each reads one runtime frame's game DOM through
+ * `__runtimeApi`.
  */
+import { readFileSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
 import type { Frame } from "@playwright/test";
+
+const dirname = path.dirname(fileURLToPath(import.meta.url));
+
+/** The bundled nova-quiz example: the state-mode game the quiz specs play. */
+export const NOVA_QUIZ_HTML = readFileSync(
+  path.join(dirname, "..", "examples", "games", "nova-quiz.html"),
+  "utf8",
+);
 
 export interface GameFrameState {
   roundChip: string | null;

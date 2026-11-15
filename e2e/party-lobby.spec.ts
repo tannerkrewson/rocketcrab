@@ -5,44 +5,18 @@
  * failure here is in the party itself (membership, source transfer, the start
  * gate or its retries) and not in the tunnel. Runs with retries disabled.
  */
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
-import { expectPlayViewOnAll, recordConsole } from "./party-debug";
+import { expectPlayViewOnAll, recordConsole, recordCopiedInvites } from "./party-debug";
+import { NOVA_QUIZ_HTML } from "./quiz-frame-helpers";
 
 test.describe.configure({ retries: 0 });
 
-const dirname = path.dirname(fileURLToPath(import.meta.url));
-const GAME_HTML = readFileSync(
-  path.join(dirname, "..", "examples", "games", "nova-quiz.html"),
-  "utf8",
-);
 const GAME_ID = "game_lobby_quiz";
 const PARTY_ORIGIN = "http://localhost:5173";
 
 async function newPlayer(browser: Browser): Promise<{ context: BrowserContext; page: Page }> {
   const context = await browser.newContext({ baseURL: PARTY_ORIGIN });
-  await context.addInitScript(() => {
-    // Record the invite the host copies, so the test does not need clipboard
-    // permissions (Firefox and WebKit do not grant them in Playwright).
-    const win = window as unknown as { __copied: string[] };
-    win.__copied = [];
-    try {
-      Object.defineProperty(navigator, "clipboard", {
-        configurable: true,
-        value: {
-          writeText: (text: string) => {
-            win.__copied.push(String(text));
-            return Promise.resolve();
-          },
-          readText: () => Promise.resolve(win.__copied.at(-1) ?? ""),
-        },
-      });
-    } catch {
-      // Keep the page's own clipboard if it cannot be replaced.
-    }
-  });
+  await recordCopiedInvites(context);
   return { context, page: await context.newPage() };
 }
 
@@ -65,7 +39,7 @@ test("three players reach the lobby and start the game on every browser", async 
           "nova:party-source:v1",
           JSON.stringify({ gameId, source, updatedAt: Date.now() }),
         ),
-      [GAME_ID, GAME_HTML] as const,
+      [GAME_ID, NOVA_QUIZ_HTML] as const,
     );
     await host.goto(`/party?gameId=${GAME_ID}&mode=state&title=Lobby%20Quiz`);
 

@@ -27,18 +27,12 @@
  * Screenshots for the docs are captured when CAPTURE_S4_SCREENSHOTS=1.
  */
 import { expect, test, type Frame, type Page } from "@playwright/test";
-import { clickInGame, gameState, waitForGameState } from "./quiz-frame-helpers";
+import { clickInGame, gameState, NOVA_QUIZ_HTML, waitForGameState } from "./quiz-frame-helpers";
 import { mkdirSync } from "node:fs";
-import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
-
-const GAME_HTML = readFileSync(
-  path.join(dirname, "..", "examples", "games", "nova-quiz.html"),
-  "utf8",
-);
 
 const PLAYER_IDS = ["player-1", "player-2", "player-3", "player-4"];
 
@@ -106,7 +100,7 @@ async function openArenaWithFourPlayers(page: Page): Promise<void> {
       "nova:draft-source:v1",
       JSON.stringify({ gameId: "draft-s4", source, updatedAt: Date.now() }),
     );
-  }, GAME_HTML);
+  }, NOVA_QUIZ_HTML);
   await page.goto("/editor");
 
   // The test arena is live on load: the draft source seeds it automatically.

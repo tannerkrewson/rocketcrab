@@ -7,9 +7,6 @@
  * Each player has its own browser context, so identities never collide.
  * Needs the root dev stack (nova 5173, runtime 5174, edge 8787).
  */
-import { readFileSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import {
   expect,
   test,
@@ -20,14 +17,9 @@ import {
   type WebSocket,
 } from "@playwright/test";
 import { findRuntimeFrame } from "./runtime-helpers";
-import { expectPlayViewOnAll, recordConsole } from "./party-debug";
-import { clickInGame, gameState, waitForGameState } from "./quiz-frame-helpers";
+import { expectPlayViewOnAll, recordConsole, recordCopiedInvites } from "./party-debug";
+import { clickInGame, gameState, NOVA_QUIZ_HTML, waitForGameState } from "./quiz-frame-helpers";
 
-const dirname = path.dirname(fileURLToPath(import.meta.url));
-const GAME_HTML = readFileSync(
-  path.join(dirname, "..", "examples", "games", "nova-quiz.html"),
-  "utf8",
-);
 const GAME_ID = "game_tunnel_quiz";
 const PARTY_ORIGIN = "http://localhost:5173";
 
@@ -42,27 +34,12 @@ interface Player {
 
 async function newPlayer(browser: Browser, forced: boolean): Promise<Player> {
   const context = await browser.newContext({ baseURL: PARTY_ORIGIN });
+  await recordCopiedInvites(context);
   await context.addInitScript((forceTunnel: boolean) => {
-    // Record the invite the page copies, instead of reading the clipboard:
-    // Firefox and WebKit do not grant clipboard permissions in Playwright.
-    const win = window as unknown as {
-      __copied: string[];
-      __NOVA_TEST_FORCE_TUNNEL__?: boolean;
-    };
-    win.__copied = [];
-    const writer = (text: string) => {
-      win.__copied.push(String(text));
-      return Promise.resolve();
-    };
-    try {
-      Object.defineProperty(navigator, "clipboard", {
-        configurable: true,
-        value: { writeText: writer, readText: () => Promise.resolve(win.__copied.at(-1) ?? "") },
-      });
-    } catch {
-      // Keep the page's own clipboard if it cannot be replaced.
+    if (forceTunnel) {
+      (window as unknown as { __NOVA_TEST_FORCE_TUNNEL__?: boolean }).__NOVA_TEST_FORCE_TUNNEL__ =
+        true;
     }
-    if (forceTunnel) win.__NOVA_TEST_FORCE_TUNNEL__ = true;
   }, forced);
   const page = await context.newPage();
   const tunnelSockets: string[] = [];
@@ -209,7 +186,7 @@ test("a 3-player party with one tunnelled player plays a state-mode game", async
           "nova:party-source:v1",
           JSON.stringify({ gameId, source, updatedAt: Date.now() }),
         ),
-      [GAME_ID, GAME_HTML] as const,
+      [GAME_ID, NOVA_QUIZ_HTML] as const,
     );
     await host.page.goto(`/party?gameId=${GAME_ID}&mode=state&title=Nova%20Quiz`);
 

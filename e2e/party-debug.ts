@@ -6,9 +6,35 @@
  */
 import { appendFileSync, mkdirSync } from "node:fs";
 import path from "node:path";
-import { expect, type Page } from "@playwright/test";
+import { expect, type BrowserContext, type Page } from "@playwright/test";
 
 const TRACE_DIR = process.env.PLAY_TRACE_DIR;
+
+/**
+ * Record the invite each page copies, instead of reading the clipboard:
+ * Firefox and WebKit do not grant clipboard permissions in Playwright. A page
+ * reads its last copied text from `window.__copied`.
+ */
+export async function recordCopiedInvites(context: BrowserContext): Promise<void> {
+  await context.addInitScript(() => {
+    const win = window as unknown as { __copied: string[] };
+    win.__copied = [];
+    try {
+      Object.defineProperty(navigator, "clipboard", {
+        configurable: true,
+        value: {
+          writeText: (text: string) => {
+            win.__copied.push(String(text));
+            return Promise.resolve();
+          },
+          readText: () => Promise.resolve(win.__copied.at(-1) ?? ""),
+        },
+      });
+    } catch {
+      // Keep the page's own clipboard if it cannot be replaced.
+    }
+  });
+}
 
 /** Save every console line of a page to PLAY_TRACE_DIR (when set). */
 export function recordConsole(page: Page, label: string): void {
