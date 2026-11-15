@@ -1334,6 +1334,7 @@ export class PartyEngine {
     this.simulationExecutor = null;
     this.lastStateApiEvent = null;
     this.pendingSource = null;
+    this.runtimeLogs = [];
     this.game = null;
     this.classic = null;
     this.transfers.clear();

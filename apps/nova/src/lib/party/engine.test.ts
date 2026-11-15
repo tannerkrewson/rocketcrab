@@ -3524,4 +3524,18 @@ describe("party engine — §10 review: lifecycle cleanup", () => {
     expect(memberOf(b.engine.getState(), a.memberId).transferState).toBe("waiting");
     expect(b.engine.getState().canStart).toBe(false);
   });
+
+  it("clears the game's console logs when the party is left", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    await runCreate(a, world);
+    (a.engine as unknown as { handleHostEvent(e: unknown): void }).handleHostEvent({
+      type: "console",
+      message: { level: "log", message: "from the first party" },
+    });
+    expect(a.engine.getState().runtimeLogs).toHaveLength(1);
+
+    await a.engine.leaveParty();
+    expect(a.engine.getState().runtimeLogs).toHaveLength(0);
+  });
 });
