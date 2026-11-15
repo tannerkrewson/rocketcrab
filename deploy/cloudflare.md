@@ -297,3 +297,6 @@ Verified read-only with Wrangler on 2026-11-12:
   any account.
 - KV namespaces: none. R2 buckets: `prismrestore` only (not Nova's).
 - TURN key: none configured as a Worker secret yet.
+- 2026-11-15: the first `npm run edge:deploy` failed atomically (API code
+  10089): the account must enable Workers Analytics Engine in the dashboard
+  before the `CONNECTION_EVENTS` binding can be created. Nothing changed live.

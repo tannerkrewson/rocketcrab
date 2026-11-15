@@ -115,6 +115,11 @@ currently serves the **legacy** live site — do not touch it before §9.
       `ORIGIN_ALLOWLIST` in `deploy/edge/wrangler.toml` (keep
       `https://rocketcrab.com` and the localhost entries).
       Evidence: configuration updated; no deploy or live change performed.
+- [ ] **Owner:** enable Workers Analytics Engine for the account
+      (Dashboard → Workers → Analytics Engine). The first
+      `npm run edge:deploy` on 2026-11-15 failed with API code 10089 ("You
+      need to enable Analytics Engine") because of the `CONNECTION_EVENTS`
+      binding; nothing was deployed. Re-run the deploy afterwards.
 - [ ] With owner approval: `npm run edge:deploy`, then both
       `secret put` commands from `deploy/cloudflare.md`, then the runbook's
       smoke test (403 without Origin; `iceServers` with one; Classic
