@@ -368,15 +368,16 @@ export function GameBrowser({
   return (
     <div className={cn("flex flex-col", compact ? "gap-4" : "gap-6")}>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <button
-          type="button"
+        <Button
+          variant="default"
+          soft
+          className="self-start"
           onClick={handleBack}
-          className={buttonStyles("default", "md", "self-start", true)}
           title={compact ? "Back to lobby" : "Back to home"}
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           back
-        </button>
+        </Button>
         <div className="relative min-w-0 flex-1 basis-56">
           <Search
             className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-foreground/40"
@@ -529,13 +530,9 @@ function SavedGamesList({
         </p>
         {/* 8z9: in a party the New-game action asks first. */}
         {inParty && onExitRequest !== undefined ? (
-          <button
-            type="button"
-            onClick={() => onExitRequest()}
-            className={buttonStyles("primary", "md")}
-          >
+          <Button variant="primary" onClick={() => onExitRequest()}>
             New game
-          </button>
+          </Button>
         ) : (
           <Link to="/build" className={buttonStyles("primary", "md")}>
             New game

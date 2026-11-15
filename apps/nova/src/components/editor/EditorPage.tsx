@@ -807,6 +807,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
           soft
           size="md"
           onClick={handlePaste}
+          aria-label="Paste from clipboard (replaces the editor content)"
           title="Paste from clipboard (replaces the editor content)"
         >
           <ClipboardPaste className="h-4 w-4" aria-hidden="true" />
@@ -817,6 +818,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
           size="md"
           onClick={() => setClearAllDialog(true)}
           disabled={source.length === 0}
+          aria-label="Delete every line of code in the editor"
           title="Delete every line of code in the editor"
         >
           <Trash2 className="h-4 w-4" aria-hidden="true" />
@@ -827,6 +829,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
           size="md"
           onClick={() => setDiscardDialog({ onConfirm: confirmReset })}
           disabled={!dirty}
+          aria-label="Reset unsaved changes"
           title="Reset unsaved changes"
         >
           <Eraser className="h-4 w-4" aria-hidden="true" />

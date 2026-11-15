@@ -517,14 +517,15 @@ export function PartyLobby({
                       </Link>
                     ) : null}
                     {state.amHost && !member.isSelf ? (
-                      <button
-                        type="button"
-                        className={buttonStyles("danger", "sm", undefined, true)}
+                      <Button
+                        variant="danger"
+                        size="sm"
+                        soft
                         onClick={() => setKickPending(member.memberId)}
                         aria-label={`Kick ${member.displayName}`}
                       >
                         <X className="h-3 w-3" aria-hidden="true" />
-                      </button>
+                      </Button>
                     ) : null}
                   </div>
                 </li>
