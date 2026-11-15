@@ -1779,6 +1779,22 @@ describe("TrysteroTransport leave / reconnect / suspend", () => {
     ]);
   });
 
+  it("joins again after a failed reconnect leaves the transport disconnected", async () => {
+    const { adapter, clock } = setup();
+    const room = makeFakeRoom();
+    mocks.joinRoom.mockReturnValue(room);
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    await joinConnected(adapter, clock);
+    mocks.signalUrl.mockRejectedValueOnce(new Error("offline"));
+    await expect(adapter.reconnect()).rejects.toMatchObject({ category: "invalid_state" });
+    expect(adapter.connectionState).toBe("disconnected");
+
+    // The engine's reconnect path re-joins from "disconnected"; the in-memory
+    // twin accepts that too, so the adapter must not refuse it.
+    await joinConnected(adapter, clock);
+    expect(adapter.connectionState).toBe("connected");
+  });
+
   it("rejects reconnect when not connected", async () => {
     const { adapter } = setup();
     await expect(adapter.reconnect()).rejects.toMatchObject({ category: "invalid_state" });

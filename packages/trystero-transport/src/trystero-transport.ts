@@ -291,7 +291,9 @@ export class TrysteroTransport implements NovaTransport {
   }
 
   async join(request: TransportJoinRequest): Promise<void> {
-    if (this.connectionState !== "idle") {
+    // "disconnected" joins like "idle": a failed reconnect or a clean leave
+    // leaves no room behind, and the engine re-joins from that state.
+    if (this.connectionState !== "idle" && this.connectionState !== "disconnected") {
       throw new TrysteroJoinError({
         category: "already_joined",
         message: `TrysteroTransport.join: already ${this.connectionState}; leave() first.`,
