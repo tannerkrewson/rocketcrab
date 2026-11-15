@@ -815,7 +815,9 @@ change. One commit per area, `npm run check` + `npm run test:e2e` each time.
       after): `session.leave()` left the simulation clock and snapshot cadence
       running, so a left session kept emitting ticks and queued snapshots in
       its outbox (`37d464b`); the dispatch buffer kept deadline-expired
-      entries during a long election (`f071a41`). Trimmed history comments and
+      entries during a long election (`f071a41`) and had no hard bound, so it
+      now holds at most 256 and refuses overflow with `rate_limited`
+      (`9c9aa66`). Trimmed history comments and
       an unused export (`7a4a74b`). Checked and found correct: in-flight
       dispatches settle once (client map), delta base-hash mismatch repairs
       rather than applies, history is bounded. Gapped increments adopt the
