@@ -53,9 +53,12 @@ test("pagination keeps the selected slide across a page re-render", async ({ pag
   await page.goto("/game/drawphone");
   const carousel = page.locator(".swiper.nova-screenshots");
   await expect(carousel).toBeVisible();
-  await page.waitForTimeout(800);
 
-  await page.getByRole("button", { name: "Go to slide 3" }).click();
+  // Swiper creates its pagination bullets on init, so the bullet exists once
+  // the carousel can be driven.
+  const slideThree = page.getByRole("button", { name: "Go to slide 3" });
+  await expect(slideThree).toBeVisible();
+  await slideThree.click();
   await expect.poll(() => realIndex(carousel), { timeout: 3000 }).toBe(2);
 
   // Re-rendering the whole app (theme toggle) must not reset the carousel
