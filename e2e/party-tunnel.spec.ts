@@ -138,6 +138,8 @@ test("a tunnelled pair joins with no alarm and shows a relayed badge", async ({ 
       }).observe(document, { subtree: true, childList: true, characterData: true });
     });
     await host.page.goto("/party");
+    // With no game preselected, /party shows the entry page: start the party from it.
+    await host.page.getByRole("button", { name: "Start a party" }).click();
     await expect(host.page.getByRole("button", { name: "Copy URL" })).toBeEnabled({
       timeout: 120_000,
     });
