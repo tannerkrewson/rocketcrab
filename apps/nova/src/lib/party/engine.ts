@@ -1565,6 +1565,7 @@ export class PartyEngine {
       this.enterReconnecting(
         "Your connection was suspended while the page was in the background. Reconnecting…",
       );
+      this.cancelReconnectRetry();
       void this.reconnect();
       return;
     }
@@ -1572,6 +1573,7 @@ export class PartyEngine {
       // Idle: a failed attempt tore the room down while hidden, and hiding
       // cancelled its retry timer. Nothing else will retry, so re-decide here.
       if (transport.connectionState === "idle" && this.phase === "reconnecting") {
+        this.cancelReconnectRetry();
         void this.reconnect();
       }
       return; // joining: the state handler settles it
@@ -1597,6 +1599,7 @@ export class PartyEngine {
       "Your phone's connection went quiet in the background — reconnecting with a fresh connection.",
     );
     this.enterReconnecting("Your connection went quiet in the background. Reconnecting…");
+    this.cancelReconnectRetry();
     void this.reconnect();
   }
 
