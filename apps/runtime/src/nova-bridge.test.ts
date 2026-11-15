@@ -337,6 +337,8 @@ function runBridge(): ExecutedFrame {
   return { bridge: win as unknown as ExecutedBridge, reports };
 }
 
+const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
+
 describe("NOVA_BRIDGE_SCRIPT executed in a frame-like context", () => {
   it("delivers raw messages on channels named like Object.prototype keys", () => {
     const { bridge } = runBridge();
@@ -344,5 +346,16 @@ describe("NOVA_BRIDGE_SCRIPT executed in a frame-like context", () => {
     expect(() => bridge.nova.raw.onMessage("constructor", (m) => seen.push(m))).not.toThrow();
     bridge.__novaGameBridge.receive("rawMessage", { channel: "constructor", message: 42 });
     expect(seen).toEqual([42]);
+  });
+
+  it("runs onStart handlers once even when the host delivers start twice", () => {
+    const { bridge } = runBridge();
+    let starts = 0;
+    bridge.nova.onStart(() => {
+      starts += 1;
+    });
+    bridge.__novaGameBridge.receive("start", {});
+    bridge.__novaGameBridge.receive("start", {});
+    expect(starts).toBe(1);
   });
 });

@@ -527,6 +527,8 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
         callHandlers(connectionHandlers, connectionStatus);
         break;
       case 'start':
+        // The host sends start once per frame; a repeat must not re-run onStart.
+        if (started) break;
         started = true;
         callHandlers(startHandlers);
         break;
