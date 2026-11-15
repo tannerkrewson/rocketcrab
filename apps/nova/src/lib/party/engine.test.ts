@@ -1002,9 +1002,18 @@ describe("party engine — start delivery to a frame instance", () => {
     const { a, b } = await playingPair(world);
     const before = frameEvents(b).length;
 
-    // Reloading swaps in a new frame instance that registers again.
+    // Reloading swaps in a new frame instance that registers again. The runtime
+    // reports the reload before the new frame can register.
     b.engine.reloadMyGame();
     await settle(world);
+    deliver(b.harness.port1, {
+      version: 1,
+      runtimeInstanceId: "runtime-1",
+      messageId: "message-reloaded",
+      sentAt: 1_700_000_000_003,
+      type: "game.lifecycle",
+      event: "reloaded",
+    });
     await registerLocalGame(b, world);
     await settle(world);
 
@@ -1022,6 +1031,44 @@ describe("party engine — start delivery to a frame instance", () => {
         .slice(before)
         .filter((event) => event.kind === "start"),
     ).toHaveLength(1);
+
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+    await settle(world);
+  });
+  it("ignores a registration the old frame sent before a reload, so the new frame still gets its start", async () => {
+    const world = makeWorld();
+    const { a, b } = await playingPair(world);
+    const before = frameEvents(b).length;
+
+    b.engine.reloadMyGame();
+    await settle(world);
+    // The old frame's registration was already on the channel before the reload.
+    b.harness.register(GAME.title);
+    await settle(world);
+    expect(
+      frameEvents(b)
+        .slice(before)
+        .filter((event) => event.kind === "start"),
+    ).toHaveLength(0);
+
+    // The runtime reports the reload, then the new frame registers.
+    deliver(b.harness.port1, {
+      version: 1,
+      runtimeInstanceId: "runtime-1",
+      messageId: "message-reloaded",
+      sentAt: 1_700_000_000_003,
+      type: "game.lifecycle",
+      event: "reloaded",
+    });
+    b.harness.register(GAME.title);
+    await settle(world);
+
+    const kinds = frameEvents(b)
+      .slice(before)
+      .map((event) => event.kind);
+    expect(kinds.filter((kind) => kind === "start")).toHaveLength(1);
+    expect(kinds.indexOf("state")).toBeLessThan(kinds.indexOf("start"));
 
     await a.engine.leaveParty();
     await b.engine.leaveParty();

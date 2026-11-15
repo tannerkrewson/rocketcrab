@@ -542,6 +542,12 @@ export class PartyEngine {
    * frame boots, so each frame instance gets `start` exactly once.
    */
   private frameStartDelivered = false;
+  /**
+   * A reload was requested and the runtime has not reported it yet. Until then a
+   * registration comes from the old frame: a reload keeps the same channel and
+   * instance id, so the message itself cannot say which frame sent it.
+   */
+  private reloadPending = false;
 
   /**
    * Frame executors: the NovaSession runs the game's state and simulation
@@ -951,8 +957,7 @@ export class PartyEngine {
       // Classic iframes are remounted by the UI keyed on this epoch.
       this.classicFrameEpoch += 1;
     } else {
-      this.resetFrameInstance();
-      this.runtime?.reload();
+      this.reloadRuntimeFrame();
     }
     this.emit();
   }
@@ -2237,6 +2242,14 @@ export class PartyEngine {
   private resetFrameInstance(): void {
     this.registered = false;
     this.frameStartDelivered = false;
+    this.reloadPending = false;
+  }
+
+  /** Ask the runtime to reload the frame in place; its old registrations are ignored. */
+  private reloadRuntimeFrame(): void {
+    this.resetFrameInstance();
+    this.reloadPending = true;
+    this.runtime?.reload();
   }
 
   private async maybeBootFrame(): Promise<void> {
@@ -2266,8 +2279,7 @@ export class PartyEngine {
     });
     this.runtime = client;
     // A new frame instance: it has not registered and has not seen start.
-    this.registered = false;
-    this.frameStartDelivered = false;
+    this.resetFrameInstance();
     try {
       await client.load({
         gameId: source.gameId,
@@ -2296,6 +2308,8 @@ export class PartyEngine {
   private handleHostEvent(event: RuntimeHostEvent): void {
     switch (event.type) {
       case "registration":
+        // A registration from before a requested reload belongs to the old frame.
+        if (this.reloadPending) break;
         this.registered = true;
         // Ready = the game loaded and registered. The game's own nova.ready()
         // call is also routed (idempotent in the session).
@@ -2339,9 +2353,11 @@ export class PartyEngine {
           });
         }
         break;
+      case "lifecycle":
+        if (event.message.event === "reloaded") this.reloadPending = false;
+        break;
       case "ready":
       case "metadata":
-      case "lifecycle":
         break; // handled by the runtime; not lobby-facing
       case "console": {
         // Capture the game's console output into a bounded ring
@@ -2567,8 +2583,7 @@ export class PartyEngine {
         if (this.classic !== null) {
           this.classicFrameEpoch += 1;
         } else {
-          this.resetFrameInstance();
-          this.runtime?.reload();
+          this.reloadRuntimeFrame();
         }
         this.emit();
         break;
