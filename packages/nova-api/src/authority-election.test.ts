@@ -1803,11 +1803,14 @@ describe("fan-out review fixes", { timeout: 60_000 }, () => {
         c.getStateModeDiagnostics().authorityMemberId === "member-b",
       "migration to member-b",
     );
-    const fromB = inbound.filter(
-      (entry) =>
-        entry.type === "state.snapshot" &&
-        (entry.payload as { senderMemberId?: string }).senderMemberId === "member-b",
-    );
+    const isFromB = (entry: { type: string; payload: unknown }) =>
+      entry.type === "state.snapshot" &&
+      (entry.payload as { senderMemberId?: string }).senderMemberId === "member-b";
+    // The authority flags flip before member-b's post-restore broadcast: that
+    // broadcast waits on its real-async state hash, so wait for the snapshot
+    // itself rather than for the flags.
+    await pumpUntil(hub, () => inbound.some(isFromB), "the first snapshot from member-b");
+    const fromB = inbound.filter(isFromB);
     expect(fromB.length).toBeGreaterThan(0);
     expect(fromB[0] && (fromB[0].payload as { historyMode?: string }).historyMode).toBe("full");
   });
