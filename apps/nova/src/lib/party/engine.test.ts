@@ -1029,6 +1029,28 @@ describe("party engine — host start-request retry", () => {
     await settle(world);
   });
 
+  it("clears the give-up notice when the authority's start arrives late", async () => {
+    const world = makeWorld();
+    const { a, b } = await hostAwaitingStart(world);
+    b.engine.startGame();
+    world.clock.advance(30_000);
+    expect(b.engine.getState().notices.map((notice) => notice.message)).toContain(
+      "Couldn't start the game. Try again.",
+    );
+
+    (b.engine as unknown as { handleSessionEvent(e: unknown): void }).handleSessionEvent({
+      type: "start",
+    });
+    expect(b.engine.getState().notices.map((notice) => notice.message)).not.toContain(
+      "Couldn't start the game. Try again.",
+    );
+    expect(b.engine.getState().phase).toBe("playing");
+
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+    await settle(world);
+  });
+
   it("stops retrying when the authority starts the game", async () => {
     const world = makeWorld();
     const { a, b } = await hostAwaitingStart(world);

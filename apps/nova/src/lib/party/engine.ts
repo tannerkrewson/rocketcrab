@@ -278,6 +278,7 @@ const START_RETRY_INTERVAL_MS = 2_000;
  */
 const SOURCE_RETRANSMIT_INTERVAL_MS = 2_000;
 const START_RETRY_TIMEOUT_MS = 30_000;
+const START_GIVE_UP_MESSAGE = "Couldn't start the game. Try again.";
 const UNSAFE_TEARDOWN_MESSAGE =
   "Couldn't close the previous party safely. Reload the page before joining another party.";
 /** 5cl.11: cap for the party game's runtime console ring buffer. */
@@ -1055,7 +1056,7 @@ export class PartyEngine {
       // The authority never started the game: give up and say so.
       this.phase = "lobby";
       this.phaseDetail = null;
-      this.addNotice("warn", "Couldn't start the game. Try again.");
+      this.addNotice("warn", START_GIVE_UP_MESSAGE);
       this.emit();
       return;
     }
@@ -2659,6 +2660,8 @@ export class PartyEngine {
         break;
       case "start":
         this.stopStartRetry();
+        // A start that arrives after the give-up is a success: drop its notice.
+        this.notices = this.notices.filter((notice) => notice.message !== START_GIVE_UP_MESSAGE);
         this.gameStarted = true;
         this.phase = "playing";
         this.phaseDetail = null;
