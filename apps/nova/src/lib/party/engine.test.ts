@@ -3363,4 +3363,45 @@ describe("party engine — §10 review: lifecycle cleanup", () => {
     expect(a.engine.getState().canForceStart).toBe(false);
     expect(a.engine.getState().canStart).toBe(false);
   });
+
+  it("a setup that fails after the room joined leaves that room, so the player can retry", async () => {
+    const world = makeWorld();
+    let failNext = true;
+    const factory: PartyTransportFactory = {
+      createPrivateTransport: (identity) => {
+        const transport = world.hub.createTransport(identity);
+        world.transports.push(transport);
+        if (failNext) {
+          // The first setup cannot subscribe to the room's connection state.
+          failNext = false;
+          const on = transport.on.bind(transport) as (...args: unknown[]) => unknown;
+          (transport as unknown as { on: unknown }).on = (event: string, ...rest: unknown[]) => {
+            if (event === "connection:state") throw new Error("subscribe failed");
+            return on(event, ...rest);
+          };
+        }
+        return transport;
+      },
+    };
+    const player = makePlayer(world, "a", { transportFactory: factory });
+    const failed = player.engine.createParty(GAME);
+    for (let i = 0; i < 8; i += 1) {
+      await flush();
+      world.clock.advance(1_000);
+    }
+    await settle(world);
+    await failed;
+    expect(player.engine.getState().phase).toBe("error");
+    expect(world.transports[0]!.connectionState).not.toBe("connected");
+
+    player.engine.dismissError();
+    const retry = player.engine.createParty(GAME);
+    for (let i = 0; i < 8; i += 1) {
+      await flush();
+      world.clock.advance(1_000);
+    }
+    await settle(world);
+    await retry;
+    expect(player.engine.getState().phase).toBe("lobby");
+  });
 });

@@ -3260,6 +3260,13 @@ export class PartyEngine {
       }
     }
     if (setup.signal.aborted) return;
+    // A failure after the room joined (establish) leaves the room too. Otherwise
+    // the page keeps a live party and every retry is refused.
+    if (this.party !== null) {
+      const lastSetup = this.lastSetup;
+      await this.leaveParty("idle", true).catch(() => undefined);
+      this.lastSetup = lastSetup;
+    }
     this.pendingSetupTransport = null;
     this.stopObservingSignaling();
     if (!this.rejectUnsafeSetup()) this.failSetup(error);
