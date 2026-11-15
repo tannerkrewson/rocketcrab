@@ -383,7 +383,10 @@ class TrysteroClientImpl implements Client {
     this.room.metas[userId] = { online: true, peerId, userId };
     this.peerIds.set(peer, peerId);
     this.room.joinHandler!({ peerId, userId });
-    this.room.acknowledgement.messageHandler!(this.adapter.selfConnectionId, { peerId });
+    this.room.acknowledgement.messageHandler!(
+      { connectionId: this.adapter.selfConnectionId },
+      { peerId },
+    );
     await Promise.resolve();
   }
 

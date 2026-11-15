@@ -911,10 +911,14 @@ export class TrysteroTransport implements NovaTransport {
       armAckRetransmit(peerId, identity);
     };
     // Our acknowledgement of a peer's identity. It counts as sent only once the
-    // send resolves; a rejected send is retried by armAckRetransmit.
-    const sendAck = (peerId: string, identity: PeerIdentity): void => {
+    // send resolves; a rejected send is retried by armAckRetransmit. A `reply`
+    // answers a peer's re-sent ack; it is never answered in turn.
+    const sendAck = (peerId: string, identity: PeerIdentity, reply = false): void => {
+      const payload: AckPayload = reply
+        ? { connectionId: identity.connectionId, reply: true }
+        : { connectionId: identity.connectionId };
       void acknowledgement
-        .send(identity.connectionId, { target: peerId })
+        .send(payload, { target: peerId })
         .then(() => {
           if (this.room !== room || this.identityByPeerId.get(peerId) !== identity) return;
           this.sentAcknowledgements.add(peerId);
@@ -965,18 +969,22 @@ export class TrysteroTransport implements NovaTransport {
     };
     this.roomUnsubscribers.push(
       acknowledgement.onMessage((data, context) => {
+        const ack = parseAckPayload(data);
         if (
           this.room !== room ||
-          data !== this.selfConnectionId ||
+          ack === null ||
+          ack.connectionId !== this.selfConnectionId ||
           !room.getPeers()[context.peerId]
         )
           return;
         this.acknowledgedPeers.add(context.peerId);
         // A peer re-sends its ack until it is admitted. If we are admitted
-        // already, our ack is the one it is missing, so answer it again.
+        // already, our ack is the one it is missing, so answer it again. A
+        // reply is never answered, which ends the exchange (no ping-pong).
         if (this.readyPeers.has(context.peerId)) {
+          if (ack.reply) return;
           const identity = this.identityByPeerId.get(context.peerId);
-          if (identity) sendAck(context.peerId, identity);
+          if (identity) sendAck(context.peerId, identity, true);
           return;
         }
         maybeReady(context.peerId);
@@ -1432,6 +1440,25 @@ export interface TrysteroTransportDiagnostics {
   readonly peers: readonly TransportPeerInfo[];
   readonly joinErrors: readonly TrysteroJoinError[];
   readonly lastQuality: readonly ConnectionQualitySample[];
+}
+
+/**
+ * Wire payload of `nova.identity.ack`. `connectionId` is the recipient's
+ * connection id (the recipient drops acks meant for someone else). `reply` is
+ * set only on an ack that answers a peer's re-sent ack; it is never answered.
+ */
+type AckPayload = {
+  connectionId: string;
+  reply?: boolean;
+};
+
+/** Validates an incoming ack payload strictly; `null` means malformed. */
+function parseAckPayload(data: unknown): { connectionId: string; reply: boolean } | null {
+  if (typeof data !== "object" || data === null || Array.isArray(data)) return null;
+  const { connectionId, reply } = data as Record<string, unknown>;
+  if (typeof connectionId !== "string") return null;
+  if (reply !== undefined && typeof reply !== "boolean") return null;
+  return { connectionId, reply: reply === true };
 }
 
 /**

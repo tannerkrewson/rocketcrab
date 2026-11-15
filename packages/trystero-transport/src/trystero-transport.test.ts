@@ -229,7 +229,7 @@ async function simulatePeerJoin(
   room.values[userId] = { v: 1, transportVersion: 5, ...identity };
   room.metas[userId] = { peerId, userId, online: true };
   room.joinHandler!({ peerId, userId });
-  room.acknowledgement.onMessage!(selfConnectionId, { peerId });
+  room.acknowledgement.onMessage!({ connectionId: selfConnectionId }, { peerId });
   await Promise.resolve();
 }
 
@@ -754,7 +754,7 @@ describe("TrysteroTransport peer mapping", () => {
       clock.advance(2_000);
       expect(sends()).toBe(2);
       // The peer's ack reaches us: admitted, and retransmission stops.
-      room.acknowledgement.onMessage!(mocks.selfId, { peerId: "peer-1" });
+      room.acknowledgement.onMessage!({ connectionId: mocks.selfId }, { peerId: "peer-1" });
       await flushSetup();
       expect(joined.map((peer) => peer.memberId)).toEqual(["member-b"]);
       clock.advance(10_000);
@@ -774,11 +774,11 @@ describe("TrysteroTransport peer mapping", () => {
       presentPeer(room, "peer-1", "member-b");
       await flushSetup();
       clock.advance(2_000);
-      room.acknowledgement.onMessage!(mocks.selfId, { peerId: "peer-1" });
-      room.acknowledgement.onMessage!(mocks.selfId, { peerId: "peer-1" });
+      room.acknowledgement.onMessage!({ connectionId: mocks.selfId }, { peerId: "peer-1" });
+      room.acknowledgement.onMessage!({ connectionId: mocks.selfId }, { peerId: "peer-1" });
       await flushSetup();
       clock.advance(2_000);
-      room.acknowledgement.onMessage!(mocks.selfId, { peerId: "peer-1" });
+      room.acknowledgement.onMessage!({ connectionId: mocks.selfId }, { peerId: "peer-1" });
       await flushSetup();
 
       expect(joined).toHaveLength(1);
@@ -796,16 +796,130 @@ describe("TrysteroTransport peer mapping", () => {
 
       presentPeer(room, "peer-1", "member-b");
       await flushSetup();
-      room.acknowledgement.onMessage!(mocks.selfId, { peerId: "peer-1" });
+      room.acknowledgement.onMessage!({ connectionId: mocks.selfId }, { peerId: "peer-1" });
       await flushSetup();
       expect(joined.map((peer) => peer.memberId)).toEqual(["member-b"]);
       const sends = room.acknowledgement.send.mock.calls.length;
 
       // The peer has not admitted us: its ack is still arriving, so ours must be re-sent.
-      room.acknowledgement.onMessage!(mocks.selfId, { peerId: "peer-1" });
+      room.acknowledgement.onMessage!({ connectionId: mocks.selfId }, { peerId: "peer-1" });
       await flushSetup();
       expect(room.acknowledgement.send.mock.calls.length).toBe(sends + 1);
       expect(joined).toHaveLength(1);
+    });
+
+    /**
+     * Two adapters wired to each other: each room's acknowledgements are
+     * delivered to the other room, and each room sees the other as a peer.
+     * `dropFromA` lets a test lose A's acknowledgements (sends still resolve,
+     * as Trystero drops a message silently).
+     */
+    async function pairedAdapters(dropFromA: (sendIndex: number) => boolean = () => false) {
+      mocks.relaySockets[RELAY] = { readyState: 1 };
+      const defaultSelfId = mocks.selfId;
+      mocks.selfId = "self-a";
+      const roomA = makeFakeRoom();
+      mocks.joinRoom.mockReturnValue(roomA);
+      const a = setup({ handshakeTimeoutMs: 30_000 });
+      await joinConnected(a.adapter, a.clock);
+      mocks.selfId = "self-b";
+      const roomB = makeFakeRoom();
+      mocks.joinRoom.mockReturnValue(roomB);
+      const b = setup({ handshakeTimeoutMs: 30_000, memberId: "member-b", displayName: "Bea" });
+      await joinConnected(b.adapter, b.clock);
+      mocks.selfId = defaultSelfId;
+
+      const deliver = (
+        from: FakeRoom,
+        to: FakeRoom,
+        fromPeerId: string,
+        drop: (sendIndex: number) => boolean = () => false,
+      ) => {
+        let index = 0;
+        from.acknowledgement.send.mockImplementation(async (data: unknown) => {
+          if (drop(index++)) return;
+          // A macrotask per hop: a ping-pong regression fails the counts
+          // instead of starving the event loop.
+          setTimeout(() => to.acknowledgement.onMessage!(data, { peerId: fromPeerId }), 0);
+        });
+      };
+      deliver(roomA, roomB, "peer-a", dropFromA);
+      deliver(roomB, roomA, "peer-b");
+
+      const introduce = (host: FakeRoom, guest: FakeRoom, peerId: string, userId: string) => {
+        guest.peers[peerId] = { userId };
+        guest.values[userId] = host.ownIdentity;
+        guest.metas[userId] = { peerId, userId, online: true };
+        guest.joinHandler!({ peerId, userId });
+      };
+      introduce(roomA, roomB, "peer-a", "user-a");
+      introduce(roomB, roomA, "peer-b", "user-b");
+      return { a, b, roomA, roomB };
+    }
+
+    /** Let queued deliveries (one macrotask per hop) and admissions run. */
+    async function settlePair(): Promise<void> {
+      for (let i = 0; i < 10; i++) {
+        await new Promise<void>((resolve) => setTimeout(resolve, 0));
+        await flushSetup();
+      }
+    }
+
+    /** The acknowledgements a room has sent that are replies (`reply: true`). */
+    function replies(room: FakeRoom): unknown[] {
+      return room.acknowledgement.send.mock.calls
+        .map((call) => call[0])
+        .filter((payload) => (payload as { reply?: boolean }).reply === true);
+    }
+
+    it("never answers a reply, so an in-flight retransmit causes exactly one reply", async () => {
+      const { a, b, roomA, roomB } = await pairedAdapters();
+      const joinedA: TransportPeerInfo[] = [];
+      const joinedB: TransportPeerInfo[] = [];
+      a.adapter.on("peer:joined", (peer) => joinedA.push(peer));
+      b.adapter.on("peer:joined", (peer) => joinedB.push(peer));
+      await settlePair();
+      expect(a.adapter.peers).toHaveLength(1);
+      expect(b.adapter.peers).toHaveLength(1);
+      const sendsA = roomA.acknowledgement.send.mock.calls.length;
+      const sendsB = roomB.acknowledgement.send.mock.calls.length;
+
+      // A retransmit from A that was in flight arrives after both sides are admitted.
+      roomB.acknowledgement.onMessage!({ connectionId: "self-b" }, { peerId: "peer-a" });
+      await settlePair();
+      // Time passes well beyond every retransmit interval: nothing else is sent.
+      a.clock.advance(60_000);
+      b.clock.advance(60_000);
+      await settlePair();
+
+      expect(roomB.acknowledgement.send.mock.calls.length).toBe(sendsB + 1);
+      expect(roomA.acknowledgement.send.mock.calls.length).toBe(sendsA);
+      expect(replies(roomB)).toEqual([{ connectionId: "self-a", reply: true }]);
+      expect(replies(roomA)).toEqual([]);
+      expect(joinedA.map((peer) => peer.memberId)).toEqual(["member-b"]);
+      expect(joinedB.map((peer) => peer.memberId)).toEqual(["member-a"]);
+    });
+
+    it("recovers a lost first ack through a reply, and the exchange ends after one reply", async () => {
+      // A's first acknowledgement to B is lost on the way.
+      const { a, b, roomA, roomB } = await pairedAdapters((sendIndex) => sendIndex === 0);
+      await settlePair();
+      // A is admitted (B acknowledged it and A's send resolved), so A stops
+      // retransmitting. B is not admitted until it hears from A again, so B
+      // re-sends its ack; A answers it once, and that reply admits B.
+      expect(a.adapter.peers).toHaveLength(1);
+      expect(b.adapter.peers).toHaveLength(0);
+      b.clock.advance(2_000);
+      await settlePair();
+      expect(b.adapter.peers).toHaveLength(1);
+      a.clock.advance(60_000);
+      b.clock.advance(60_000);
+      await settlePair();
+
+      expect(a.adapter.peers).toHaveLength(1);
+      expect(b.adapter.peers).toHaveLength(1);
+      expect(replies(roomA)).toEqual([{ connectionId: "self-b", reply: true }]);
+      expect(replies(roomB)).toEqual([]);
     });
 
     it("stops retransmitting when we leave", async () => {

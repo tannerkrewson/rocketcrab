@@ -68,14 +68,14 @@ it("waits for both validated identity and acknowledgement before announcing a pe
   };
   // An acknowledgement alone cannot admit a peer, and metadata from an old
   // connection with the same user id must not bind to this connection.
-  listeners["nova.identity.ack"]!("self", { peerId: "remote" });
+  listeners["nova.identity.ack"]!({ connectionId: "self" }, { peerId: "remote" });
   metas.user = { online: true, peerId: "stale-peer", userId: "user" };
   listeners.join!({ peerId: "remote", userId: "user" });
   expect(joined).not.toHaveBeenCalled();
   expect(ackSend).not.toHaveBeenCalled();
   metas.user = { online: true, peerId: "remote", userId: "user" };
   listeners.state!(values.user, { peerId: "remote", userId: "user", self: false, removed: false });
-  expect(ackSend).toHaveBeenCalledWith("remote-connection", { target: "remote" });
+  expect(ackSend).toHaveBeenCalledWith({ connectionId: "remote-connection" }, { target: "remote" });
   expect(joined).not.toHaveBeenCalled();
   await transport.send({ channel: "game", payload: "before-admission" });
   expect(dataSend).not.toHaveBeenCalled();
@@ -149,7 +149,7 @@ it("waits for both validated identity and acknowledgement before announcing a pe
   };
   metas["other-user"] = { online: true, peerId: "other", userId: "other-user" };
   listeners.join!({ peerId: "other", userId: "other-user" });
-  listeners["nova.identity.ack"]!("self", { peerId: "other" });
+  listeners["nova.identity.ack"]!({ connectionId: "self" }, { peerId: "other" });
   for (let i = 0; i < 33; i++) {
     listeners.nova!("hello", {
       peerId: "other",
