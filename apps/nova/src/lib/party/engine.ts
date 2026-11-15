@@ -1,11 +1,11 @@
 /**
- * The party engine (P4): the shell-owned state machine behind the lobby and
+ * The party engine: the shell-owned state machine behind the lobby and
  * the game-launch flow.
  *
  * One engine per page (the {@link partyEngine} singleton), so route
- * remounts never kill a party or leak Trystero rooms (engineering rule 22):
- * the engine owns the private invite PartySession, verified source distribution,
- * NovaSession, local runtime, and ready/start/end lifecycle.
+ * remounts never kill a party or leak Trystero rooms. The engine owns the
+ * private invite PartySession, verified source distribution, NovaSession, the
+ * local runtime, and the ready/start/end lifecycle.
  * The UI projects shell snapshots.
  *
  * Shell host and game authority are separate roles. The host is selected from
@@ -77,7 +77,7 @@ import {
   type TurnServerConfigLike,
 } from "./turn-creds";
 
-/** Runtime-bridge test seams (no-op in production; mirror U6's arena). */
+/** Runtime-bridge test seams. */
 export interface PartyRuntimeSeams {
   createChannel?: () => { port1: ChannelPort; port2: unknown };
   waitForFrameLoad?: (iframe: HTMLIFrameElement) => Promise<void>;
@@ -100,7 +100,7 @@ export interface PartyMemberView {
   readonly connectionId: string | null;
   readonly connected: boolean;
   readonly isHost: boolean;
-  /** P3 game-source transfer status (per player). */
+  /** Game-source transfer status (per player). */
   readonly transferState:
     | "none"
     | "waiting"
@@ -112,7 +112,7 @@ export interface PartyMemberView {
   readonly transferProgress: number | null;
   /** Human detail: byte progress or the failure reason. */
   readonly transferDetail: string | null;
-  /** True once the player's game loaded + registered (S1 ready lifecycle). */
+  /** True once the player's game loaded + registered. */
   readonly ready: boolean;
 }
 
@@ -134,7 +134,7 @@ export interface PartyDiagnostics {
   }>;
   readonly lastQuality: Array<{ memberId: string; pingMs: number | null; sampledAt: number }>;
   /**
-   * TURN credential state (P0, rocketcrab-23s): "configured" when minted
+   * TURN credential state: "configured" when minted
    * credentials were baked into the transports, "unavailable" when the mint
    * failed (the party proceeded without TURN), "disabled" when the build
    * pins no mint origin, and null while unknown (no setup attempted yet or
@@ -173,9 +173,9 @@ export type PartyPhase =
 /**
  * Where a code/invite join is inside the "joining" phase. Lets the loading
  * screen say something accurate instead of a generic "searching": the join
- * request is away and the host must approve (rocketcrab-erx), or the joiner
+ * request is away and the host must approve, or the joiner
  * is admitted and waiting for a direct peer connection before the lobby
- * may appear (rocketcrab-5ae). Null outside the joining phase.
+ * may appear. Null outside the joining phase.
  */
 export type JoinStage = "discovering" | "connecting" | null;
 
@@ -195,7 +195,7 @@ export interface PartyEngineState {
   readonly members: readonly PartyMemberView[];
   readonly hostMemberId: MemberId | null;
   readonly amHost: boolean;
-  /** Current internal authority — DIAGNOSTIC ONLY (S3 formalizes). */
+  /** Current internal authority — DIAGNOSTIC ONLY. */
   readonly authorityMemberId: MemberId | null;
   readonly inviteUrl: string | null;
   readonly connectionState: TransportConnectionState;
@@ -205,7 +205,7 @@ export interface PartyEngineState {
   /** Set after the game ended; the lobby returns with this banner. */
   readonly endedReason: string | null;
   /**
-   * Classic external iframe game for the party (7.7.4): the host creates
+   * Classic external iframe game for the party: the host creates
    * the room once and shares the URL spec so every player embeds the same
    * room with their own name. Null for Nova API games.
    */
@@ -214,10 +214,10 @@ export interface PartyEngineState {
     readonly title: string;
     readonly connectResult: ClassicGameConnectResult;
   } | null;
-  /** Non-null when the host removed this member from the party (7.29). */
+  /** Non-null when the host removed this member from the party. */
   readonly removedReason: string | null;
   /**
-   * Bumped to remount the classic iframe (7.29 reload my game / reload all).
+   * Bumped to remount the classic iframe.
    */
   readonly classicFrameEpoch: number;
   readonly diagnostics: PartyDiagnostics | null;
@@ -227,8 +227,7 @@ export interface PartyEngineState {
   readonly setupFailureCode?: "room-full" | "decrypt-failed" | null;
   /** Generic peer-link alert (PLAN.md §7); see {@link PeerLinkStatus}. */
   readonly peerLink: PeerLinkStatus;
-  /** Ring-buffer of the game's runtime console output (5cl.11) — the
-   *  in-game Logs panel shows this for the user's own games. */
+  /** Ring buffer of the game's runtime console output, for the in-game Logs panel. */
   readonly runtimeLogs: readonly ArenaLogEntry[];
 }
 
@@ -249,15 +248,15 @@ export interface PartyEngineConfig {
   derive?: PartySecretDerivation;
   /**
    * How long an admitted code/invite joiner waits for the first private-room
-   * peer before the join fails (default 15 s; rocketcrab-5ae — cross-network
-   * joins signal fine but no data channel opens without TURN, so the joiner
-   * must land on a loading → error path instead of a fake empty lobby).
+   * peer before the join fails (default 15 s). Cross-network joins can signal
+   * fine while no data channel opens without TURN, so the joiner must land on
+   * a loading → error path instead of a fake empty lobby.
    */
   peerConnectTimeoutMs?: number;
   /** Adapter diagnostics (Trystero getDiagnostics); duck-typed when present. */
   diagnostics?: () => unknown;
   /**
-   * TURN credential mint fetch (P0, rocketcrab-23s). Defaults to the real
+   * TURN credential mint fetch. Defaults to the real
    * mint client ({@link fetchTurnCredentials}); tests inject a deterministic
    * stub. Only consulted when no `transportFactory` is injected (the real
    * Trystero path) — injected factories own transport construction.
@@ -299,7 +298,7 @@ const START_RETRY_TIMEOUT_MS = 30_000;
 const START_GIVE_UP_MESSAGE = "Couldn't start the game. Try again.";
 const UNSAFE_TEARDOWN_MESSAGE =
   "Couldn't close the previous party safely. Reload the page before joining another party.";
-/** 5cl.11: cap for the party game's runtime console ring buffer. */
+/** Cap for the party game's runtime console ring buffer. */
 const MAX_PARTY_LOG_ENTRIES = 200;
 
 let partyLogCounter = 0;
@@ -334,7 +333,7 @@ export interface PartySourceSpec {
 }
 
 /**
- * A classic external iframe game selected for the party (7.7.4): the room
+ * A classic external iframe game selected for the party: the room
  * was created once in the host's browser and the URL spec is shared with
  * every member through the party plane.
  */
@@ -344,7 +343,7 @@ interface ClassicSelection {
   readonly connectResult: ClassicGameConnectResult;
 }
 
-/** The party-plane payload for a classic room announcement (7.7.4). */
+/** The party-plane payload for a classic room announcement. */
 type ClassicAnnouncement = Parameters<PartySession["announceClassicRoom"]>[0];
 
 interface PartyEngineDefaults {
@@ -356,17 +355,17 @@ interface PartyEngineDefaults {
   peerConnectTimeoutMs: number;
 }
 
-/** How long the resume health probe waits for one peer's ping (M1). */
+/** How long the resume health probe waits for one peer's ping. */
 const PARTY_HEALTH_PROBE_TIMEOUT_MS = 2_000;
-/** First auto-reconnect retry delay after a failed attempt (M1). */
+/** First auto-reconnect retry delay after a failed attempt. */
 const RECONNECT_RETRY_BASE_MS = 5_000;
-/** Auto-reconnect retry backoff cap (M1). */
+/** Auto-reconnect retry backoff cap. */
 const RECONNECT_RETRY_CAP_MS = 30_000;
 /**
- * How long an admitted joiner waits for a private-room peer before giving up
- * (rocketcrab-5ae). Signaling can connect without any peer data channel ever
- * opening (no TURN across networks): the joiner must NOT see a fake empty
- * lobby — a loading screen, then a clear error, is the honest outcome.
+ * How long an admitted joiner waits for a private-room peer before giving up.
+ * Signaling can connect without any peer data channel ever opening (no TURN
+ * across networks), so the joiner must NOT see a fake empty lobby: a loading
+ * screen, then a clear error, is the honest outcome.
  */
 const DEFAULT_PEER_CONNECT_TIMEOUT_MS = 15_000;
 /**
@@ -384,7 +383,7 @@ function defaultScheduler(callback: () => void, delayMs: number): () => void {
   };
 }
 
-/** The last setup attempt, so the error screen can retry it (7.10). */
+/** The last setup attempt, so the error screen can retry it. */
 type LastSetup =
   | { kind: "create"; input: PartySourceSpec | undefined }
   | { kind: "join-invite"; input: { secret: string } };
@@ -396,16 +395,14 @@ interface PartyMemberIdentity {
 }
 
 /**
- * The party's S2 state executor (5cl.14): the NovaSession runs the game's
- * state handlers IN the runtime frame (U6 parity with the arena) — the
- * engine forwards `stateRequest` apiEvents into the frame and correlates
- * the `stateResponse` apiCalls back. When no Nova runtime frame exists
- * (classic games — their iframe is embedded by the UI directly, 7.7.4 — or
- * a frame that failed to boot), the requests fall back to the same
- * no-op semantics the engine used before (empty `{}` state, no views), so
- * the start flow still completes instead of timing out on the 10 s frame
- * executor. `runtime()` is read at call time so a rebooted frame is always
- * the target.
+ * The party's state executor: the NovaSession runs the game's state handlers
+ * IN the runtime frame. The engine forwards `stateRequest` apiEvents into the
+ * frame and correlates the `stateResponse` apiCalls back. When no runtime frame
+ * exists (classic games, whose iframe the UI embeds directly, or a frame that
+ * failed to boot), requests fall back to no-op semantics (empty `{}` state, no
+ * views) so the start flow still completes instead of timing out on the frame
+ * executor. `runtime()` is read at call time so a rebooted frame is always the
+ * target.
  */
 class PartyStateExecutor implements NovaStateExecutor {
   private readonly frame: FrameStateExecutor;
@@ -452,11 +449,10 @@ class PartyStateExecutor implements NovaStateExecutor {
 }
 
 /**
- * The party's A1 simulation executor (5cl.14): forwards `simulationRequest`
- * apiEvents to the frame (the game's `serializeState` snapshot callback)
- * and correlates `simulationResponse`s; falls back to the no-handler local
- * executor when no Nova runtime frame exists (classic games / boot
- * failure).
+ * The party's simulation executor: forwards `simulationRequest` apiEvents to
+ * the frame (the game's `serializeState` snapshot callback) and correlates
+ * `simulationResponse`s. Falls back to the no-handler local executor when no
+ * runtime frame exists (classic games, or a boot failure).
  */
 class PartySimulationExecutor implements NovaSimulationExecutor {
   private readonly frame: FrameSimulationExecutor;
@@ -548,22 +544,16 @@ export class PartyEngine {
   private frameStartDelivered = false;
 
   /**
-   * S2/A1 frame executors (5cl.14): the party's NovaSession runs the
-   * game's state/simulation handlers IN the runtime frame (U6 parity with
-   * the arena) instead of a local no-op executor. Without them the state
-   * engine ran `LocalGameExecutor(null)` — the game's `createInitialState`
-   * and `actions` never executed, the initial state was `{}`, and a
-   * state-mode game could never render its real view.
+   * Frame executors: the NovaSession runs the game's state and simulation
+   * handlers IN the runtime frame, as the arena does.
    */
   private stateExecutor: PartyStateExecutor | null = null;
   private simulationExecutor: PartySimulationExecutor | null = null;
   /**
-   * The last self state view forwarded to the frame (5cl.14). The lobby →
-   * playing phase flip rebinds the frame container (2t1.6), which disposes
-   * and reboots the runtime frame; the fresh frame misses the initial
-   * `state` event, so its game hangs at its own waiting screen. The view is
-   * replayed by {@link pushSessionSnapshot} when the rebooted frame
-   * registers.
+   * The last self state view forwarded to the frame. The lobby → playing phase
+   * flip rebinds the frame container, which reboots the runtime frame; the
+   * fresh frame misses the initial `state` event, so the view is replayed by
+   * {@link pushSessionSnapshot} when the rebooted frame registers.
    */
   private lastStateApiEvent: GameApiEvent | null = null;
 
@@ -585,21 +575,21 @@ export class PartyEngine {
   private setupPeerAdmitted = false;
   private activeErrorScope: object | null = null;
   private lastSetup: LastSetup | null = null;
-  /** Ring-buffer of the game's runtime console output (5cl.11). */
+  /** Ring-buffer of the game's runtime console output. */
   private runtimeLogs: ArenaLogEntry[] = [];
   private lastDiagnostics: unknown = null;
 
   private phase: PartyPhase = "idle";
   private phaseDetail: string | null = null;
-  /** Join sub-stage while phase === "joining" (rocketcrab-erx / 5ae). */
+  /** Join sub-stage while phase === "joining". */
   private joinStage: JoinStage = null;
   private connectionState: TransportConnectionState = "idle";
-  /** True once this shell's game started (survives reconnects; M1). */
+  /** True once this shell's game started. */
   private gameStarted = false;
   /** The host's start request was given up after START_RETRY_TIMEOUT_MS (diagnostics). */
   private startGaveUp = false;
 
-  // M1 lifecycle bookkeeping (ADR-0012/B6).
+  // Page-lifecycle bookkeeping.
   private pageWasHidden = false;
   private reconnectAttempts = 0;
   private reconnectInFlight: Promise<void> | null = null;
@@ -643,8 +633,8 @@ export class PartyEngine {
     const identity = this.identity;
     const members = this.buildMembers();
     // Classic games have no HTML source to transfer or verify and no
-    // runtime to register: the shared room announcement IS the source
-    // (7.7.4), so the transfer/ready gates don't apply.
+    // runtime to register: the shared room announcement IS the source, so the
+    // transfer and ready gates don't apply.
     const classicActive = this.classic !== null;
     const allReady =
       classicActive || (members.length > 0 && members.every((member) => member.ready));
@@ -657,11 +647,9 @@ export class PartyEngine {
     const ended = this.session?.isEnded() ?? false;
     const inLobby = this.phase === "lobby";
 
-    // rfk-the-bead (b73): "The party is not in the lobby yet." is gone — a
-    // start button the host can't press is hidden (hosts only get the button
-    // in the lobby), never a greyed-out button with that message. Outside the
-    // lobby the remaining gates (no game / ended / transfer problems / not
-    // verified / not ready) still apply.
+    // The start button is only offered in the lobby, so no "not in the lobby"
+    // message is needed. Outside the lobby the remaining gates (no game / ended
+    // / transfer problems / not verified / not ready) still apply.
     let startBlockedReason: string | null = null;
     if (this.game === null) {
       startBlockedReason = "Pick a game before starting the party.";
@@ -745,13 +733,12 @@ export class PartyEngine {
       return;
     }
     // The UI rebinds the frame container on the lobby<->playing phase flip
-    // (PartyExperience renders the SAME frame div inside a different tree,
-    // so React detaches the old ref with null before attaching the new
-    // element). A runtime still bound to the previous container is stale —
-    // its iframe was removed with the old node — so tear it down and reboot
-    // the frame in the new spot whenever a fresh element arrives while a
-    // runtime exists (rocketcrab-2t1.6: black screen, no iframe). A plain
-    // detach (null) leaves the runtime alone; the leave path owns it.
+    // (the same frame div renders inside a different tree, so React detaches
+    // the old ref with null before attaching the new element). A runtime still
+    // bound to the previous container is stale, because its iframe was removed
+    // with the old node. Tear it down and reboot the frame in the new spot when
+    // a fresh element arrives. A plain detach (null) leaves the runtime alone;
+    // the leave path owns it.
     if (element !== null && this.runtime !== null) {
       this.runtime.dispose();
       this.runtime = null;
@@ -774,7 +761,7 @@ export class PartyEngine {
    * Create a party. With a game ({@link PartySourceSpec}) the host registers
    * and announces it immediately (the classic start-from-editor flow);
    * without one the host lands in the lobby with no game selected and can
-   * pick one later via {@link selectGame} (7.6 — classic start-a-party flow).
+   * pick one later via {@link selectGame}.
    */
   async createParty(input?: PartySourceSpec): Promise<void> {
     if (this.leaveInFlight !== null && !(await this.waitForLeaveBeforeSetup())) return;
@@ -801,7 +788,7 @@ export class PartyEngine {
         return;
       }
       this.pendingSetupTransport = null;
-      // 5cl.14: the host's game is known BEFORE the session attaches so
+      // The host's game is known BEFORE the session attaches, so
       // `establish` bakes the real mode into the NovaSession (state vs
       // simulation drives the whole runtime path).
       this.game =
@@ -856,8 +843,8 @@ export class PartyEngine {
       this.pendingSetupTransport = null;
       await this.establish(party);
       if (setup.signal.aborted) return;
-      // rocketcrab-5ae: same peer gate as the code join — a stale invite
-      // (host offline) must never drop the joiner into a fake empty lobby.
+      // Same peer gate as the code join: a stale invite (host offline) must
+      // never drop the joiner into a fake empty lobby.
       try {
         await this.waitForPeerConnect(party, setup.signal);
       } catch (error) {
@@ -894,7 +881,7 @@ export class PartyEngine {
   }
 
   /**
-   * Pick a game for a party that was started without one (7.6). The caller
+   * Pick a game for a party that was started without one. The caller
    * loads the saved game from the repository and passes the source here;
    * the host then registers/announces it and boots the local frame.
    */
@@ -919,7 +906,7 @@ export class PartyEngine {
   }
 
   /**
-   * Host picks a classic external iframe game (7.7.4): the room is created
+   * Host picks a classic external iframe game: the room is created
    * ONCE in the host's browser and the URL spec is shared with the whole
    * party through the party plane, so every player embeds the same room
    * with their own name (classic parity). Rejects silently when the caller
@@ -958,7 +945,7 @@ export class PartyEngine {
     this.emit();
   }
 
-  /** Reload only the local game frame (7.29 classic parity). */
+  /** Reload only the local game frame. */
   reloadMyGame(): void {
     if (this.classic !== null) {
       // Classic iframes are remounted by the UI keyed on this epoch.
@@ -971,7 +958,7 @@ export class PartyEngine {
   }
 
   /**
-   * Host: reload every player's game frame (7.29 classic parity). Non-hosts
+   * Host: reload every player's game frame. Non-hosts
    * are ignored; every member (including the host) reloads its own frame.
    */
   reloadAllGames(): void {
@@ -983,7 +970,7 @@ export class PartyEngine {
   }
 
   /**
-   * Host: remove a member from the party (7.29 classic parity). Cooperative
+   * Host: remove a member from the party. Cooperative
    * in the peer-to-peer transport — the kicked member's client leaves on
    * receipt and the others observe its `peer:left`. Non-hosts are ignored.
    */
@@ -1001,7 +988,7 @@ export class PartyEngine {
     this.emit();
   }
 
-  /** Leave the "you were removed" screen and return to the entry UI (7.29). */
+  /** Leave the "you were removed" screen and return to the entry UI. */
   dismissRemoved(): void {
     this.removedReason = null;
     this.phase = "idle";
@@ -1009,9 +996,9 @@ export class PartyEngine {
   }
 
   /**
-   * Update this player's display name (7.5): persists it for next time,
+   * Update this player's display name: persists it for next time,
    * applies it locally immediately, and announces it to connected peers on
-   * the party control plane (7.25) so their lobbies update without a
+   * the party control plane so their lobbies update without a
    * rejoin. The local frame's `nova.player` is refreshed too.
    */
   setDisplayName(name: string): void {
@@ -1084,7 +1071,7 @@ export class PartyEngine {
       this.emit();
       return;
     }
-    // A fresh start clears the previous game's ended banner (2t1.4).
+    // A fresh start clears the previous game's ended banner.
     this.endedReason = null;
     this.phase = "starting";
     this.phaseDetail = null;
@@ -1201,7 +1188,7 @@ export class PartyEngine {
 
   /**
    * Emergency party teardown: end the game for EVERYONE and return to the
-   * lobby (T6/T21 — the stop control lives outside the game frame).
+   * lobby.
    */
   endGame(reason: "user_exit" | "host_closed" | "error" = "host_closed"): void {
     this.stopStartRetry();
@@ -1215,8 +1202,8 @@ export class PartyEngine {
   /**
    * Leave the party cleanly: destroy the runtime frame, detach every
    * listener, dispose the coordinator and session, and leave BOTH Trystero
-   * rooms (rule 22). Resolves once cleanup completes. `nextPhase` defaults
-   * to idle; a kicked member leaves into the "removed" phase (7.29) so the
+   * rooms. Resolves once cleanup completes. `nextPhase` defaults
+   * to idle; a kicked member leaves into the "removed" phase so the
    * UI never flashes the entry screen.
    */
   leaveParty(nextPhase: PartyPhase = "idle", preserveSetup = false): Promise<void> {
@@ -1327,7 +1314,7 @@ export class PartyEngine {
       }
     }
     if ((await pendingTeardown) === false) this.teardownFailed = true;
-    // 5cl.14: frame executors are per-party; dispose them with the session.
+    // frame executors are per-party; dispose them with the session.
     this.stateExecutor?.dispose();
     this.stateExecutor = null;
     this.simulationExecutor?.dispose();
@@ -1362,10 +1349,9 @@ export class PartyEngine {
   }
 
   /**
-   * Reconnect after the party connection dropped (reconnect screen, M1).
-   * Also handles the F11 case: a backgrounded phone whose WebRTC link iOS
-   * killed silently — the transport still reports "connected", so the
-   * engine asks the transport for a fresh connection instead of sitting on a
+   * Reconnect after the party connection dropped.
+   * Also handles a backgrounded phone whose WebRTC link iOS killed silently:
+   * the transport still reports "connected", so the engine asks the transport for a fresh connection instead of sitting on a
    * stale handle. Single-flight: duplicate lifecycle events, retry timers and
    * user actions share one attempt.
    */
@@ -1394,8 +1380,8 @@ export class PartyEngine {
     }
     try {
       if (transport.connectionState === "connected") {
-        // One primitive for a fresh connection id, including the F11 case
-        // where the link looks alive but the peers stopped answering.
+        // One primitive for a fresh connection id, including a link that looks
+        // alive while the peers have stopped answering.
         await transport.reconnect();
       } else if (transport.connectionState === "suspended") {
         await transport.resume();
@@ -1450,7 +1436,7 @@ export class PartyEngine {
   }
 
   // ------------------------------------------------------------------
-  // M1 lifecycle handling (ADR-0012/B6)
+  // Page lifecycle handling
   // ------------------------------------------------------------------
 
   /** Subscribe to the page-lifecycle events (once per engine). */
@@ -1473,7 +1459,7 @@ export class PartyEngine {
   /** The page went to the background (Mobile Safari suspends it). */
   private handlePageHidden(): void {
     this.pageWasHidden = true;
-    // Timers are unreliable while hidden (B6): cancel any pending retry so
+    // Timers are unreliable while hidden: cancel any pending retry so
     // a reconnect burst never fires on resume; the resume probe re-decides.
     this.cancelReconnectRetry();
   }
@@ -1481,7 +1467,7 @@ export class PartyEngine {
   /**
    * The page came back (foreground / pageshow): re-sync the runtime frame
    * and verify the party connection is actually alive. A backgrounded
-   * phone's WebRTC can die without the transport noticing (F11); the
+   * phone's WebRTC can die without the transport noticing; the
    * health probe detects that and rejoins with a fresh connection.
    */
   private handlePageResumed(): void {
@@ -1553,7 +1539,7 @@ export class PartyEngine {
    * Verify the party connection after a resume. Transports that report
    * suspended/disconnected already entered the reconnect flow via their
    * connection:state handler; transports that still report connected but
-   * whose peers stopped answering (F11 — iOS killed the WebRTC link while
+   * whose peers stopped answering (iOS killed the WebRTC link while
    * backgrounded) get a fresh connection.
    */
   private checkPartyConnectionAfterResume(): void {
@@ -1741,7 +1727,7 @@ export class PartyEngine {
   }
 
   /**
-   * Persist local recovery information (M1): code, invite secret, identity,
+   * Persist local recovery information: code, invite secret, identity,
    * and the game — enough for a one-tap rejoin after a page reload.
    */
   private saveRecovery(): void {
@@ -1886,22 +1872,19 @@ export class PartyEngine {
       this.turnStatus = "configured";
       return createTrysteroPartyTransportFactory({ ...options, turnConfig: result.turnConfig });
     }
-    // Mint failure (network, 403, 5xx, timeout): proceed WITHOUT TURN. No
-    // lobby notice (PLAN §7.2): blocked networks fall back to the tunnel, and
-    // the TURN state is shown in diagnostics.
+    // Mint failure (network, 403, 5xx, timeout): proceed WITHOUT TURN. No lobby
+    // notice: blocked networks fall back to the tunnel, and the TURN state is
+    // shown in diagnostics.
     this.turnStatus = "unavailable";
     return createTrysteroPartyTransportFactory(options);
   }
 
   /**
-   * Surface transport join failures as ONE friendly lobby notice (5cl.1).
-   * The `peer_connection_failed` signature ("could not connect to peer …
-   * configure TURN servers") is the documented no-TURN cross-network
-   * failure (ADR-0003 Outcome B, task rocketcrab-23s): both sides then
-   * see only themselves because the WebRTC data channel never opens. The
-   * TURN fix itself is infrastructure (rocketcrab-23s); this notice makes
-   * the symptom legible instead of a silent 1-player lobby. Deduped to one
-   * notice per category per setup attempt.
+   * Surface transport join failures as one lobby notice, deduped per category
+   * per setup attempt. The `peer_connection_failed` signature is the no-TURN
+   * cross-network failure: both sides see only themselves because the WebRTC
+   * data channel never opens. That case gets no notice here; it shows up as the
+   * peer-link alert or the join-timeout screen instead.
    */
   private readonly joinErrorNoticesShown = new Set<string>();
   private handleJoinErrorNotice(error: unknown): void {
@@ -1920,7 +1903,7 @@ export class PartyEngine {
       return;
     }
     // Trystero's peer-connect-failed is not a reliable terminal signal for a
-    // pair (PLAN §7): a real failure after fallback reaches the peer-link alert
+    // pair: a real failure after fallback reaches the peer-link alert
     // instead, and the raw code stays in diagnostics. No lobby notice.
     if (category === "peer_connection_failed") return;
     if (roomErrorCategory(error) !== null) {
@@ -1960,7 +1943,7 @@ export class PartyEngine {
     return result;
   }
 
-  /** Wire the party session, coordinator, S1 session, and transport events. */
+  /** Wire the party session, coordinator, session, and transport events. */
   private async establish(party: PartySession): Promise<void> {
     this.party = party;
     this.connectionState = party.privateTransport.connectionState;
@@ -1990,12 +1973,11 @@ export class PartyEngine {
     this.session?.dispose();
     this.lastStateApiEvent = null;
     this.registered = false;
-    // Fresh frame executors for this game's session. They forward
-    // the state engine's requests into the CURRENT runtime frame (read at
-    // call time, so a rebooted frame is always the target) and correlate
-    // the frame's answers (routed in routeApiCall). One pair per session;
-    // disposed on leave/reset so in-flight requests never bleed across
-    // parties (rule 22).
+    // Fresh frame executors for this game's session. They forward the state
+    // engine's requests into the CURRENT runtime frame (read at call time, so a
+    // rebooted frame is always the target) and correlate the frame's answers
+    // (routed in routeApiCall). One pair per session, disposed on leave or
+    // reset so in-flight requests never bleed across parties.
     this.stateExecutor?.dispose();
     this.simulationExecutor?.dispose();
     this.stateExecutor = new PartyStateExecutor(() => this.runtime);
@@ -2025,8 +2007,7 @@ export class PartyEngine {
   /**
    * Subscribe to adapter relay-state pushes (the Trystero transport's
    * `onRelayStateChange`) so the diagnostics panel reflects socket and
-   * rejection changes LIVE (rocketcrab-ont.1). Duck-typed: only the
-   * Trystero transport exposes it; the in-memory hub has no relays, and
+   * rejection changes live. Duck-typed: only the Trystero transport exposes it; the in-memory hub has no relays, and
    * injected factories simply yield no subscription. The transport replays
    * the latest snapshot immediately, so the panel populates right after
    * the private room joins.
@@ -2042,10 +2023,9 @@ export class PartyEngine {
   }
 
   /**
-   * Recreate the S1 session after a game ends so the party can start again
-   * (rocketcrab-2t1.4): `NovaSession.start()`/`end()` are one-shot (started
-   * and ended never reset), so an ended session can never broadcast a
-   * second `game.start`. A fresh session attached to the same already-joined
+   * Recreate the session after a game ends so the party can start again.
+   * `NovaSession.start()`/`end()` are one-shot (started and ended never reset),
+   * so an ended session can never broadcast a second `game.start`. A fresh session attached to the same already-joined
    * party transport resets the state engine, simulation engine, readiness,
    * and authority election for the next game. Deferred one microtask so it
    * never disposes the session from inside its own event loop; guarded so a
@@ -2066,7 +2046,7 @@ export class PartyEngine {
 
   /**
    * Destroy the Nova runtime frame (if any) and clear the pending source so
-   * a classic game owns the frame area instead (7.7.4). The party session
+   * a classic game owns the frame area instead. The party session
    * and coordinator are untouched.
    */
   private teardownRuntimeFrame(): void {
@@ -2077,7 +2057,7 @@ export class PartyEngine {
     this.pendingSource = null;
   }
 
-  /** The party-plane payload for the current classic room (7.7.4). */
+  /** The party-plane payload for the current classic room. */
   private classicAnnouncement(): ClassicAnnouncement {
     const classic = this.classic;
     if (classic === null) {
@@ -2110,7 +2090,7 @@ export class PartyEngine {
     };
   }
 
-  /** Ask the host for the current classic room (late joiners, 7.7.4). */
+  /** Ask the host for the current classic room. */
   private askForClassicRoom(): void {
     if (this.party?.amHost || this.party === null || this.classic !== null) {
       return;
@@ -2182,7 +2162,7 @@ export class PartyEngine {
 
   /**
    * The joiner was admitted but no private-room peer has appeared (the
-   * cross-network no-TURN case, rocketcrab-5ae): stay on the loading screen
+   * cross-network, no-TURN case): stay on the loading screen
    * until the first peer joins the private room, or fail setup when none
    * ever does. The creator never waits — a solo host lobby is legitimate.
    */
@@ -2317,12 +2297,12 @@ export class PartyEngine {
     switch (event.type) {
       case "registration":
         this.registered = true;
-        // Ready = the game loaded + registered (P4 deliverable); the game's
-        // own nova.ready() call is also routed (idempotent in the session).
+        // Ready = the game loaded and registered. The game's own nova.ready()
+        // call is also routed (idempotent in the session).
         this.session?.ready();
         // The session attached (and replayed peers/status) before the frame
         // existed, so those events were dropped; replay the snapshot now so
-        // the game sees its identity, connection status, and roster (7.26).
+        // the game sees its identity, connection status, and roster.
         this.pushSessionSnapshot();
         this.emit();
         break;
@@ -2362,9 +2342,9 @@ export class PartyEngine {
       case "ready":
       case "metadata":
       case "lifecycle":
-        break; // handled by the runtime; not lobby-facing in P4
+        break; // handled by the runtime; not lobby-facing
       case "console": {
-        // 5cl.11: capture the game's console output into a bounded ring
+        // Capture the game's console output into a bounded ring
         // buffer so the in-game Logs menu can show it for the user's own
         // games. Mirrors the arena's logPlayer (arena/engine.ts) — same
         // ArenaLogEntry shape, same cap.
@@ -2392,7 +2372,7 @@ export class PartyEngine {
     }
   }
 
-  /** Route the game's Nova API calls into the attached session (U6 parity). */
+  /** Route the game's Nova API calls into the attached session. */
   private routeApiCall(message: { method: string; payload: unknown }): void {
     const session = this.session;
     if (session === null) {
@@ -2481,9 +2461,9 @@ export class PartyEngine {
         break;
       }
       case "stateResponse": {
-        // S2 (5cl.14): the runtime frame's answer to a stateRequest the
-        // frame executor forwarded; correlate it back to the pending engine
-        // request (same path the arena uses).
+        // The runtime frame's answer to a stateRequest the frame executor
+        // forwarded. Correlate it back to the pending engine request (the same
+        // path the arena uses).
         const parsed = arenaApiCallSchemas.stateResponse.safeParse(payload);
         if (parsed.success) {
           this.stateExecutor?.handleResponse(parsed.data as FrameStateResponsePayload);
@@ -2491,8 +2471,8 @@ export class PartyEngine {
         break;
       }
       case "simulationResponse": {
-        // A1 (5cl.14): the authority frame's answer to a simulationRequest
-        // the simulation executor forwarded.
+        // The authority frame's answer to a simulationRequest the simulation
+        // executor forwarded.
         const parsed = arenaApiCallSchemas.simulationResponse.safeParse(payload);
         if (parsed.success) {
           this.simulationExecutor?.handleResponse(parsed.data as FrameSimulationResponsePayload);
@@ -2517,12 +2497,12 @@ export class PartyEngine {
         this.emit();
         break;
       case "memberRenamed":
-        // A connected peer announced a new display name (7.25): re-render
+        // A connected peer announced a new display name: re-render
         // the member view; the name itself comes from the party layer.
         this.emit();
         break;
       case "classicRoom": {
-        // The host shared the classic room (7.7.4): joiners build their own
+        // The host shared the classic room: joiners build their own
         // per-player URL from the spec and become ready to start.
         if (this.party?.amHost) {
           break;
@@ -2564,7 +2544,7 @@ export class PartyEngine {
         break;
       case "kick": {
         if (event.targetMemberId === this.identity.memberId) {
-          // This member was removed by the host (7.29): record the reason
+          // This member was removed by the host: record the reason
           // and tear the party down into the "removed" phase.
           this.removedReason = event.reason ?? "The host removed you from the party.";
           this.addNotice("error", this.removedReason);
@@ -2583,7 +2563,7 @@ export class PartyEngine {
         break;
       }
       case "reloadAll":
-        // The host asked every player to reload its game frame (7.29).
+        // The host asked every player to reload its game frame.
         if (this.classic !== null) {
           this.classicFrameEpoch += 1;
         } else {
@@ -2621,7 +2601,7 @@ export class PartyEngine {
       return;
     }
     if (state === "connected") {
-      // rocketcrab-5ae: while a join is still landing, the explicit join
+      // while a join is still landing, the explicit join
       // path owns the phase (the transport's signaling-level "connected"
       // must never render a lobby with zero peers — Trystero reports
       // "connected" once the relays are up, before any peer data channel
@@ -2634,18 +2614,18 @@ export class PartyEngine {
       this.cancelReconnectRetry();
       // gameStarted (not session.isStarted()) decides the phase: followers
       // never broadcast start themselves, so isStarted() is false for them
-      // even while their game is running (M1 restore-after-reconnect).
+      // even while their game is running.
       this.phase = this.gameStarted ? "playing" : "lobby";
       this.phaseDetail = null;
       this.emit();
       // Re-announce the game after a rejoin so this member's coordinator
-      // has current metadata and can request any missing source (M1).
+      // has current metadata and can request any missing source.
       void this.coordinator
         ?.refresh()
         .catch((error: unknown) =>
           this.addNotice("warn", `Could not ask the party for the game: ${errorMessage(error)}`),
         );
-      // Re-request the classic room after a rejoin (7.7.4).
+      // Re-request the classic room after a rejoin.
       this.askForClassicRoom();
     }
   }
@@ -2907,7 +2887,7 @@ export class PartyEngine {
         // NovaSession start/end are one-shot (started and ended never reset),
         // so an ended session can never broadcast a second game.start. Swap
         // in a fresh session attached to the same party transport so the
-        // host can start the game again after exiting to the lobby (2t1.4).
+        // host can start the game again after exiting to the lobby.
         this.resetSessionForNextGame();
         break;
       case "playerJoined":
@@ -2929,17 +2909,17 @@ export class PartyEngine {
       default:
         break; // raw/state/simulation events route to the frame only
     }
-    // Forward every session event the game can observe into the runtime
-    // frame (U6 parity with the arena; 7.26): connection, start/end, player
-    // joins/leaves, state, raw messages, simulation traffic. Events that
+    // Forward every session event the game can observe into the runtime frame:
+    // connection, start/end, player joins and leaves, state, raw messages,
+    // simulation traffic. Events that
     // arrive before the frame exists are dropped here and replayed by
     // pushSessionSnapshot once the game registers.
     const apiEvent = toApiEvent(event);
     if (apiEvent !== null) {
-      // 5cl.14: retain the last self state view so a rebooted frame (the
-      // lobby → playing container rebind, 2t1.6) can be replayed it via
-      // pushSessionSnapshot — the rebooted game never re-receives the
-      // initial view otherwise and hangs at its own waiting screen.
+      // Retain the last self state view so a rebooted frame (after the lobby →
+      // playing container rebind) can be replayed via pushSessionSnapshot.
+      // Otherwise the rebooted game never re-receives the initial view and hangs
+      // at its own waiting screen.
       if (apiEvent.kind === "state") {
         this.lastStateApiEvent = apiEvent;
       }
@@ -2969,10 +2949,10 @@ export class PartyEngine {
   }
 
   /**
-   * Replay the session snapshot the frame missed (7.26): its identity, the
-   * current connection status, the full roster, and the started flag. The
-   * session attached during `establish()` — before the runtime frame was
-   * created — so its initial connection/playerJoined events went nowhere.
+   * Replay the session snapshot the frame missed: its identity, the current
+   * connection status, the full roster, and the started flag. The session
+   * attached during `establish()`, before the runtime frame existed, so its
+   * initial connection and playerJoined events went nowhere.
    * The game-side client dedups players by id, so re-pushing is safe.
    */
   private pushSessionSnapshot(): void {
@@ -2986,7 +2966,7 @@ export class PartyEngine {
     for (const player of session.players) {
       runtime.pushApiEvent({ kind: "playerJoined", player });
     }
-    // 5cl.14: replay the last self view BEFORE start (the game's onStart
+    // replay the last self view BEFORE start (the game's onStart
     // may dispatch actions against it). A rebooted frame (container rebind
     // on the lobby → playing flip) missed the initial state event; without
     // this replay it hangs at its own waiting screen.
@@ -3018,7 +2998,7 @@ export class PartyEngine {
       let transferDetail: string | null;
       if (this.classic !== null) {
         // Classic games have no HTML source to transfer or register: the
-        // shared room announcement IS the source (7.7.4).
+        // shared room announcement IS the source.
         transferState = "complete";
         transferProgress = 1;
         transferDetail = "Classic game ready";
@@ -3067,20 +3047,21 @@ export class PartyEngine {
       return identity.displayName;
     }
     // The party layer owns member names: handshake names plus any
-    // `party.rename` announcements (7.25).
+    // `party.rename` announcements.
     return this.party?.getMemberName(memberId) ?? memberId;
   }
 
-  /** 2z9: true once a member has a real (player-chosen or generated)
-   *  display name — displayNameOf falls back to the member-… id itself for
-   *  no-name members, and "member-abc123 joined/removed" membership
-   *  messages are noise. */
+  /**
+   * True once a member has a real display name. displayNameOf falls back to the
+   * member id for members without one, and membership messages with a raw id
+   * are noise.
+   */
   private hasDisplayName(memberId: MemberId): boolean {
     return this.displayNameOf(memberId) !== memberId;
   }
 
   /**
-   * Diagnostic-only authority view. After the game starts (S3) the real
+   * Diagnostic-only authority view. After the game starts the real
    * authority comes from the state engine's diagnostics; before that (the
    * lobby) the engine has not announced yet, so fall back to the first ready
    * member — the same deterministic choice the initial election makes.
@@ -3258,10 +3239,9 @@ export class PartyEngine {
   }
 
   private addNotice(level: PartyNotice["level"], message: string): void {
-    // 11.8: identical notices collapse to ONE — a re-broadcast (e.g. a
-    // session end event that fires again) must not pile up duplicate
-    // alerts. A repeat moves to the newest slot so recency ordering stays
-    // honest, and the list is capped so the visible set stays small.
+    // Identical notices collapse to one, so a re-broadcast (such as a session end
+    // event that fires again) cannot pile up duplicate alerts. A repeat moves to
+    // the newest slot so recency ordering stays honest, and the list is capped.
     const duplicateIndex = this.notices.findIndex(
       (notice) => notice.message === message && notice.level === level,
     );
@@ -3308,8 +3288,8 @@ export class PartyEngine {
     if (this.setupAbort !== null) {
       throw new PartyError("invalid_state", "Party setup is already in progress.");
     }
-    // A live party blocks a second setup; a leftover error phase (failed
-    // join/create) does NOT — a retry must be able to start cleanly (7.10).
+    // A live party blocks a second setup. A leftover error phase (failed join or
+    // create) does not, so a retry can start cleanly.
     if (this.party !== null || this.session !== null) {
       throw new PartyError(
         "invalid_state",
