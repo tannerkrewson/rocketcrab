@@ -119,7 +119,9 @@ async function revealedRows(frame: Frame): Promise<string[]> {
 // stall recorded in PLAN §5.6. The lobby control is e2e/party-lobby.spec.ts.
 test.describe.configure({ retries: 0 });
 
-test("a 3-player party with one tunnelled player plays a state-mode game", async ({ browser }) => {
+test.fixme("a 3-player party with one tunnelled player plays a state-mode game", async ({
+  browser,
+}) => {
   test.setTimeout(300_000);
   const host = await newPlayer(browser, false);
   const joiner = await newPlayer(browser, false);

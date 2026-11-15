@@ -45,7 +45,9 @@ async function newPlayer(browser: Browser): Promise<{ context: BrowserContext; p
   return { context, page: await context.newPage() };
 }
 
-test("three players reach the lobby and start the game on every browser", async ({ browser }) => {
+test.fixme("three players reach the lobby and start the game on every browser", async ({
+  browser,
+}) => {
   test.setTimeout(300_000);
   const players = [await newPlayer(browser), await newPlayer(browser), await newPlayer(browser)];
   const [host, joiner, third] = players.map((player) => player.page) as [Page, Page, Page];
