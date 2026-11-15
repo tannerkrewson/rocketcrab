@@ -989,6 +989,106 @@ describe("party engine — start delivery to a frame instance", () => {
   });
 });
 
+describe("party engine — host start-request retry", () => {
+  /** A host (b) whose start request the elected authority (a) has not honoured yet. */
+  async function hostAwaitingStart(world: World) {
+    // The host is "b" and the joiner "a", so the joiner is the elected authority.
+    const b = makePlayer(world, "b");
+    const a = makePlayer(world, "a");
+    const code = await runCreate(b, world);
+    await registerLocalGame(b, world);
+    const { join: joinPromise, settled } = startJoin(a, world, code);
+    await settled;
+    await settle(world);
+    await joinPromise;
+    await settle(world);
+    await registerLocalGame(a, world);
+    return { a, b };
+  }
+
+  function sessionOf(player: Player) {
+    return (player.engine as unknown as { session: { resendStartRequest(): void } }).session;
+  }
+
+  it("re-sends the start request every 2 s while the authority has not started", async () => {
+    const world = makeWorld();
+    const { a, b } = await hostAwaitingStart(world);
+    const resend = vi.spyOn(sessionOf(b), "resendStartRequest");
+    // No drain: the authority never receives the request, so it stays silent.
+    b.engine.startGame();
+    expect(resend).toHaveBeenCalledTimes(0);
+
+    world.clock.advance(2_000);
+    expect(resend).toHaveBeenCalledTimes(1);
+    world.clock.advance(4_000);
+    expect(resend).toHaveBeenCalledTimes(3);
+    expect(b.engine.getState().phase).toBe("starting");
+
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+    await settle(world);
+  });
+
+  it("stops retrying when the authority starts the game", async () => {
+    const world = makeWorld();
+    const { a, b } = await hostAwaitingStart(world);
+    const resend = vi.spyOn(sessionOf(b), "resendStartRequest");
+    b.engine.startGame();
+    world.clock.advance(2_000);
+    expect(resend).toHaveBeenCalledTimes(1);
+
+    // The authority's game.start arrives: the session emits start.
+    (b.engine as unknown as { handleSessionEvent(e: unknown): void }).handleSessionEvent({
+      type: "start",
+    });
+    world.clock.advance(60_000);
+    expect(resend).toHaveBeenCalledTimes(1);
+    expect(b.engine.getState().phase).toBe("playing");
+
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+    await settle(world);
+  });
+
+  it("gives up after 30 s with a notice and returns the host to the lobby", async () => {
+    const world = makeWorld();
+    const { a, b } = await hostAwaitingStart(world);
+    const resend = vi.spyOn(sessionOf(b), "resendStartRequest");
+    b.engine.startGame();
+
+    world.clock.advance(30_000);
+    expect(resend).toHaveBeenCalledTimes(14);
+    const state = b.engine.getState();
+    expect(state.phase).toBe("lobby");
+    expect(state.notices.map((notice) => notice.message)).toContain(
+      "Couldn't start the game. Try again.",
+    );
+    world.clock.advance(60_000);
+    expect(resend).toHaveBeenCalledTimes(14);
+
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+    await settle(world);
+  });
+
+  it("stops retrying when the party is left", async () => {
+    const world = makeWorld();
+    const { a, b } = await hostAwaitingStart(world);
+    const resend = vi.spyOn(sessionOf(b), "resendStartRequest");
+    b.engine.startGame();
+    world.clock.advance(2_000);
+    expect(resend).toHaveBeenCalledTimes(1);
+
+    await b.engine.leaveParty();
+    await settle(world);
+    world.clock.advance(60_000);
+    expect(resend).toHaveBeenCalledTimes(1);
+
+    await a.engine.leaveParty();
+    await settle(world);
+  });
+});
+
 describe("party engine — lobby notices", () => {
   it("dedupes identical notices instead of piling up alerts (11.8)", async () => {
     const world = makeWorld();

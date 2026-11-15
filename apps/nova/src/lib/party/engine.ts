@@ -264,6 +264,14 @@ interface TransferState {
 }
 
 const MAX_NOTICES = 8;
+/**
+ * The host re-sends its start request this often until the authority starts the
+ * game, so a request the authority rejected (its view of source verification can
+ * lag) is retried. After START_RETRY_TIMEOUT_MS the host gives up and returns to
+ * the lobby with a notice.
+ */
+const START_RETRY_INTERVAL_MS = 2_000;
+const START_RETRY_TIMEOUT_MS = 30_000;
 const UNSAFE_TEARDOWN_MESSAGE =
   "Couldn't close the previous party safely. Reload the page before joining another party.";
 /** 5cl.11: cap for the party game's runtime console ring buffer. */
@@ -446,6 +454,10 @@ export class PartyEngine {
   private readonly defaults: PartyEngineDefaults;
   private identity: PartyMemberIdentity;
   private readonly schedule: Scheduler;
+  /** Cancels the pending start-request retry, if any (see startGame). */
+  private cancelStartRetry: (() => void) | null = null;
+  /** Milliseconds of start-request retry left before the host gives up. */
+  private startRetryRemainingMs = 0;
   private readonly derive?: PartySecretDerivation;
   private readonly diagnosticsProvider?: () => unknown;
   private readonly lifecycle: PartyLifecycleSource;
@@ -1007,7 +1019,46 @@ export class PartyEngine {
     this.phaseDetail = null;
     this.emit();
     this.session?.start();
+    this.beginStartRetry();
     // The session's local "start" event flips the phase to playing.
+  }
+
+  /** Host: keep re-sending the start request until the authority starts the game. */
+  private beginStartRetry(): void {
+    this.stopStartRetry();
+    this.startRetryRemainingMs = START_RETRY_TIMEOUT_MS;
+    this.armStartRetry();
+  }
+
+  private armStartRetry(): void {
+    this.cancelStartRetry = this.schedule(() => {
+      this.cancelStartRetry = null;
+      this.onStartRetryTick();
+    }, START_RETRY_INTERVAL_MS);
+  }
+
+  private onStartRetryTick(): void {
+    if (this.phase !== "starting") {
+      this.stopStartRetry();
+      return;
+    }
+    this.startRetryRemainingMs -= START_RETRY_INTERVAL_MS;
+    if (this.startRetryRemainingMs <= 0) {
+      // The authority never started the game: give up and say so.
+      this.phase = "lobby";
+      this.phaseDetail = null;
+      this.addNotice("warn", "Couldn't start the game. Try again.");
+      this.emit();
+      return;
+    }
+    this.session?.resendStartRequest();
+    this.armStartRetry();
+  }
+
+  /** Stop the start-request retry (the game started, ended, or the party is left). */
+  private stopStartRetry(): void {
+    this.cancelStartRetry?.();
+    this.cancelStartRetry = null;
   }
 
   /**
@@ -1015,6 +1066,7 @@ export class PartyEngine {
    * lobby (T6/T21 — the stop control lives outside the game frame).
    */
   endGame(reason: "user_exit" | "host_closed" | "error" = "host_closed"): void {
+    this.stopStartRetry();
     this.session?.end(reason);
     this.runtime?.destroy(reason);
     this.runtime = null;
@@ -1030,6 +1082,7 @@ export class PartyEngine {
    * UI never flashes the entry screen.
    */
   leaveParty(nextPhase: PartyPhase = "idle", preserveSetup = false): Promise<void> {
+    this.stopStartRetry();
     this.activeErrorScope = null;
     if (!preserveSetup) {
       this.observedJoinFailure = null;
@@ -2562,6 +2615,7 @@ export class PartyEngine {
         this.connectionState = "connected";
         break;
       case "start":
+        this.stopStartRetry();
         this.gameStarted = true;
         this.phase = "playing";
         this.phaseDetail = null;
@@ -2569,6 +2623,7 @@ export class PartyEngine {
         this.emit();
         break;
       case "end":
+        this.stopStartRetry();
         this.gameStarted = false;
         this.endedReason = event.reason;
         this.phase = "lobby";

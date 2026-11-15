@@ -195,4 +195,31 @@ describe("start request gate (acceptStartRequest)", () => {
     expect(b.starts).toHaveLength(1);
     expect(a.errors).toEqual([]);
   });
+
+  it("a re-sent request after the gate opens starts the game once everywhere", async () => {
+    const harness = createInMemoryHarness();
+    // The elected authority (a) has not verified the sources yet, so it rejects.
+    let verified = false;
+    const gate = (memberId: string) => memberId === "member-b" && verified;
+    const a = join(harness, "member-a", "Ada", "state", gate);
+    const b = join(harness, "member-b", "Ben", "state", gate);
+    await a.session.join();
+    await b.session.join();
+    harness.drain();
+    a.session.ready();
+    b.session.ready();
+    await flush(harness);
+
+    b.session.start();
+    await flush(harness);
+    expect(a.starts).toHaveLength(0);
+
+    // The sources are verified now; the host re-sends its request.
+    verified = true;
+    b.session.resendStartRequest();
+    await flush(harness);
+
+    expect(a.starts).toHaveLength(1);
+    expect(b.starts).toHaveLength(1);
+  });
 });

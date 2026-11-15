@@ -479,6 +479,19 @@ export class NovaSession implements NovaClientBackend {
     };
   }
 
+  /**
+   * Re-send this session's start request while the authority has not started
+   * the game (a request the authority rejected, for example before every
+   * source was verified). A no-op for the elected authority, which starts the
+   * game itself, and once this session has received the authority's start.
+   */
+  resendStartRequest(): void {
+    if (!this.started || this.startEmitted || this.engine.isAuthorityElect()) return;
+    void this.sendProtocol((base) => buildGameStartMessage(base)).catch((error: unknown) =>
+      this.emitError(error),
+    );
+  }
+
   /** True once this session broadcast game start. */
   isStarted(): boolean {
     return this.started;
