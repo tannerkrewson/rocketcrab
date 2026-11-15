@@ -1783,7 +1783,7 @@ export class NovaStateEngine {
       // post-handler check above. The dispatcher re-sends once the new
       // authority is announced and deduplication applies the action
       // exactly once (ADR-0007). The action was never invalid, so it must
-      // not be acked as invalid_state (rocketcrab-9fv.7.30).
+      // not be acked as invalid_state.
       return true;
     }
     this.ack(item.senderMemberId, {

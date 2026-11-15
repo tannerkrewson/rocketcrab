@@ -14,8 +14,9 @@
  * S1 scope: the ready lifecycle, game start/end, player lists, connection
  * status, dispatch (send side), state subscription (receive side), raw
  * channels, simulation registration and inputs, and logging all function
- * over the transport. Deeper mode semantics (authority election, action
- * application, snapshots, the simulation clock) land with S2/S3/A1.
+ * over the transport. State and simulation modes add authority election,
+ * action application, snapshots and the simulation clock on top (see the
+ * state and simulation engines).
  */
 import type {
   NovaTransport,
@@ -825,8 +826,8 @@ export class NovaSession implements NovaClientBackend {
   async sendRaw(name: string, payload: unknown, options: NovaRawSendOptions = {}): Promise<void> {
     this.assertAlive();
     const channel = this.channels.get(name);
-    // Sending requires THIS session's own declaration (S1 rule: create a
-    // channel before sending on it). Peer declarations are lifecycle
+    // Sending requires this session's own declaration (create the channel
+    // before sending on it). Peer declarations are lifecycle
     // bookkeeping only and never authorize sends.
     if (channel === undefined || !channel.declaredBySelf) {
       throw new NovaError(
@@ -840,7 +841,7 @@ export class NovaSession implements NovaClientBackend {
         `nova.raw.send failed: not connected to the party (status: ${this.status}).`,
       );
     }
-    // A2 size limit (F6 parity): payloads are measured at the send boundary
+    // Size limit: payloads are measured at the send boundary
     // (byte length for binary, UTF-8 serialized size for structured data).
     // Oversized sends are rejected with a clear error so the host can show a
     // diagnostic; the warn threshold is recorded for the diagnostics view.
@@ -988,7 +989,7 @@ export class NovaSession implements NovaClientBackend {
     const existing = this.playersMap.get(peer.memberId);
     if (existing !== undefined) {
       // A reconnect of a known member (peer:left then peer:joined): update
-      // the connection id and treat it as a fresh join (documented S1 rule).
+      // the connection id and treat it as a fresh join.
       existing.connectionId = peer.connectionId;
       existing.name = peer.displayName ?? existing.name;
     } else {
@@ -1127,8 +1128,8 @@ export class NovaSession implements NovaClientBackend {
           player.authorityEligible = peerMessage.authorityEligible;
         }
         // A peer that introduces itself may have attached its session after
-        // our readiness announcement was sent (P4 late-attach race): re-send
-        // our ready state so no member is left thinking we are not ready.
+        // our readiness announcement was sent: re-send our ready state so no
+        // member is left thinking we are not ready.
         if (this.readySent) {
           void this.sendProtocol((base) => buildGameReadyMessage(base), {
             targetMemberId: peerMessage.senderMemberId,
@@ -1929,7 +1930,7 @@ function toNovaSimulationSnapshot(snapshot: RetainedSimulationSnapshot): NovaSim
  * payloads, UTF-8 serialized size for structured data (the same measurement
  * the transports use for chunking and progress).
  */
-export function rawPayloadBytes(payload: unknown): number {
+function rawPayloadBytes(payload: unknown): number {
   if (payload instanceof Uint8Array) {
     return payload.byteLength;
   }

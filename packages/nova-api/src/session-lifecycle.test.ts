@@ -41,13 +41,11 @@ function bufferedDispatches(session: NovaSession): number {
   return (session as unknown as { dispatchBuffer: unknown[] }).dispatchBuffer.length;
 }
 
-const FAKE_TIMERS = {
-  toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"] as const,
-};
-
 describe("NovaSession lifecycle (leave and dispatch buffer)", () => {
   beforeEach(() => {
-    vi.useFakeTimers(FAKE_TIMERS);
+    vi.useFakeTimers({
+      toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+    });
   });
 
   afterEach(() => {
