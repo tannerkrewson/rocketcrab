@@ -3448,4 +3448,50 @@ describe("party engine — §10 review: lifecycle cleanup", () => {
     expect(createChannel).not.toHaveBeenCalled();
     expect(a.engine.debugSnapshot().frameExists).toBe(false);
   });
+
+  it("a holds report for a superseded source hash does not mark the member complete", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    const code = await runCreate(a, world);
+    await registerLocalGame(a, world);
+    const { join, settled } = startJoin(b, world, code);
+    await settled;
+    await settle(world);
+    await join;
+    await settle(world);
+    await registerLocalGame(b, world);
+    await settle(world);
+    expect(memberOf(b.engine.getState(), a.memberId).transferState).toBe("complete");
+
+    const coordinatorEvent = (event: unknown) =>
+      (b.engine as unknown as { handleCoordinatorEvent(e: unknown): void }).handleCoordinatorEvent(
+        event,
+      );
+    // The host edits the game, so the party now announces a new hash.
+    coordinatorEvent({
+      type: "metadata",
+      metadata: {
+        gameId: GAME.gameId,
+        title: GAME.title,
+        mode: GAME.mode,
+        sourceSha256: "edited-hash",
+        sourceSizeBytes: 9,
+      },
+      fromMemberId: a.memberId,
+    });
+    expect(memberOf(b.engine.getState(), a.memberId).transferState).toBe("waiting");
+
+    // A holds report for the superseded hash arrives late.
+    coordinatorEvent({
+      type: "holds",
+      memberId: a.memberId,
+      gameId: GAME.gameId,
+      sourceSha256: "stale-hash",
+    });
+    // A waiting row is what makes the lobby re-request the source; a complete
+    // row with a blocked start would never be asked again.
+    expect(memberOf(b.engine.getState(), a.memberId).transferState).toBe("waiting");
+    expect(b.engine.getState().canStart).toBe(false);
+  });
 });

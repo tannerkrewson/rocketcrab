@@ -3132,6 +3132,9 @@ export class PartyEngine {
 
   /** Mark a member as holding the verified game source for this hash. */
   private markSourceVerified(memberId: MemberId, detail: string, sourceSha256: string): void {
+    // A report for a superseded hash says nothing about the current source. The
+    // member's row was already reset to waiting when the hash changed.
+    if (this.currentSourceSha256 !== null && sourceSha256 !== this.currentSourceSha256) return;
     const previous = this.transfers.get(memberId);
     const existing: TransferState = previous ?? {
       fraction: 1,
