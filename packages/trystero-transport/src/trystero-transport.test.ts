@@ -700,6 +700,11 @@ describe("TrysteroTransport peer mapping", () => {
     room.joinHandler!({ peerId: "slow", userId: "slow-user" });
     clock.advance(4999);
     expect(onJoinError).not.toHaveBeenCalled();
+    // The first deadline restarts the handshake once, because the peer is still present.
+    clock.advance(1);
+    expect(onJoinError).not.toHaveBeenCalled();
+    clock.advance(4999);
+    expect(onJoinError).not.toHaveBeenCalled();
     clock.advance(1);
     expect(onJoinError).toHaveBeenCalledOnce();
     expect(onJoinError).toHaveBeenCalledWith(
@@ -714,6 +719,90 @@ describe("TrysteroTransport peer mapping", () => {
     await adapter.leave();
     clock.advance(5000);
     expect(onJoinError).toHaveBeenCalledOnce();
+  });
+
+  describe("identity acknowledgement retransmission", () => {
+    /** A peer whose identity is in the room, so the adapter acknowledges it. */
+    function presentPeer(room: FakeRoom, peerId: string, memberId: string): void {
+      const userId = `user-${peerId}`;
+      room.peers[peerId] = { userId };
+      room.values[userId] = {
+        v: 1,
+        transportVersion: 5,
+        memberId,
+        connectionId: `conn-${peerId}`,
+        displayName: memberId,
+      };
+      room.metas[userId] = { peerId, userId, online: true };
+      room.joinHandler!({ peerId, userId });
+    }
+
+    it("re-sends the ack, so a dropped first ack is recovered and the peer is admitted once", async () => {
+      const { adapter, clock } = setup({ handshakeTimeoutMs: 30_000 });
+      const room = makeFakeRoom();
+      mocks.joinRoom.mockReturnValue(room);
+      mocks.relaySockets[RELAY] = { readyState: 1 };
+      await joinConnected(adapter, clock);
+      const joined: TransportPeerInfo[] = [];
+      adapter.on("peer:joined", (peer) => joined.push(peer));
+
+      presentPeer(room, "peer-1", "member-b");
+      await flushSetup();
+      const sends = () => room.acknowledgement.send.mock.calls.length;
+      expect(sends()).toBe(1);
+      // Our first ack is lost on the way to the peer; the next retransmit goes out.
+      clock.advance(2_000);
+      expect(sends()).toBe(2);
+      // The peer's ack reaches us: admitted, and retransmission stops.
+      room.acknowledgement.onMessage!(mocks.selfId, { peerId: "peer-1" });
+      await flushSetup();
+      expect(joined.map((peer) => peer.memberId)).toEqual(["member-b"]);
+      clock.advance(10_000);
+      expect(sends()).toBe(2);
+      expect(adapter.peers).toHaveLength(1);
+    });
+
+    it("duplicate acks and retransmits never admit a peer twice", async () => {
+      const { adapter, clock } = setup({ handshakeTimeoutMs: 30_000 });
+      const room = makeFakeRoom();
+      mocks.joinRoom.mockReturnValue(room);
+      mocks.relaySockets[RELAY] = { readyState: 1 };
+      await joinConnected(adapter, clock);
+      const joined: TransportPeerInfo[] = [];
+      adapter.on("peer:joined", (peer) => joined.push(peer));
+
+      presentPeer(room, "peer-1", "member-b");
+      await flushSetup();
+      clock.advance(2_000);
+      room.acknowledgement.onMessage!(mocks.selfId, { peerId: "peer-1" });
+      room.acknowledgement.onMessage!(mocks.selfId, { peerId: "peer-1" });
+      await flushSetup();
+      clock.advance(2_000);
+      room.acknowledgement.onMessage!(mocks.selfId, { peerId: "peer-1" });
+      await flushSetup();
+
+      expect(joined).toHaveLength(1);
+      expect(adapter.peers).toHaveLength(1);
+    });
+
+    it("stops retransmitting when we leave", async () => {
+      const { adapter, clock } = setup({ handshakeTimeoutMs: 30_000 });
+      const room = makeFakeRoom();
+      mocks.joinRoom.mockReturnValue(room);
+      mocks.relaySockets[RELAY] = { readyState: 1 };
+      await joinConnected(adapter, clock);
+
+      presentPeer(room, "peer-1", "member-b");
+      await flushSetup();
+      clock.advance(2_000);
+      const before = room.acknowledgement.send.mock.calls.length;
+      expect(before).toBeGreaterThanOrEqual(2);
+
+      await adapter.leave();
+      await flushSetup();
+      clock.advance(60_000);
+      expect(room.acknowledgement.send.mock.calls.length).toBe(before);
+    });
   });
 
   it("exchanges identity in the handshake and maps peer:joined", async () => {

@@ -130,6 +130,10 @@ export class TrysteroTransport implements NovaTransport {
   private readonly rejectedPeers = new Set<string>();
   private readonly readyWaiters = new Map<string, Set<(ready: boolean) => void>>();
   private readonly admissionTimers = new Map<string, () => void>();
+  /** Cancels the pending identity-ack retransmit per peer (see IDENTITY_ACK_RETRANSMIT_MS). */
+  private readonly ackRetransmits = new Map<string, () => void>();
+  /** Admission restarts used per peer (see ADMISSION_RESTARTS). */
+  private readonly admissionRestarts = new Map<string, number>();
   /** announced connectionId → trystero peerId (targeting). */
   private readonly connectionToPeerId = new Map<ConnectionId, string>();
   private readonly peerJoinedAt = new Map<string, Timestamp>();
@@ -837,6 +841,8 @@ export class TrysteroTransport implements NovaTransport {
         this.readyPeers.add(peerId);
         this.admissionTimers.get(peerId)?.();
         this.admissionTimers.delete(peerId);
+        this.ackRetransmits.get(peerId)?.();
+        this.ackRetransmits.delete(peerId);
         this.handlePeerJoin(peerId);
         this.settlePeerWaiters(peerId, true);
         const pending = this.pendingMessages.get(peerId);
@@ -901,6 +907,12 @@ export class TrysteroTransport implements NovaTransport {
       }
       this.identityByPeerId.set(peerId, identity);
       this.connectionToPeerId.set(identity.connectionId, peerId);
+      sendAck(peerId, identity);
+      armAckRetransmit(peerId, identity);
+    };
+    // Our acknowledgement of a peer's identity. It counts as sent only once the
+    // send resolves; a rejected send is retried by armAckRetransmit.
+    const sendAck = (peerId: string, identity: PeerIdentity): void => {
       void acknowledgement
         .send(identity.connectionId, { target: peerId })
         .then(() => {
@@ -909,6 +921,47 @@ export class TrysteroTransport implements NovaTransport {
           maybeReady(peerId);
         })
         .catch(() => undefined);
+    };
+    // Re-send the acknowledgement until the peer is admitted, leaves, or we leave.
+    const armAckRetransmit = (peerId: string, identity: PeerIdentity): void => {
+      this.ackRetransmits.get(peerId)?.();
+      const cancel = this.scheduleFn(() => {
+        this.ackRetransmits.delete(peerId);
+        if (this.room !== room || this.readyPeers.has(peerId) || this.rejectedPeers.has(peerId))
+          return;
+        if (!room.getPeers()[peerId]) return;
+        sendAck(peerId, identity);
+        armAckRetransmit(peerId, identity);
+      }, IDENTITY_ACK_RETRANSMIT_MS);
+      this.ackRetransmits.set(peerId, cancel);
+    };
+    // The admission deadline. A peer still present gets one more handshake
+    // window (its acknowledgement keeps being re-sent); after that it is rejected.
+    const armAdmissionTimer = (peerId: string): void => {
+      this.admissionTimers.set(
+        peerId,
+        this.scheduleFn(() => {
+          this.admissionTimers.delete(peerId);
+          if (this.room !== room || this.readyPeers.has(peerId)) return;
+          const restarts = this.admissionRestarts.get(peerId) ?? 0;
+          if (restarts < ADMISSION_RESTARTS && room.getPeers()[peerId]) {
+            this.admissionRestarts.set(peerId, restarts + 1);
+            armAdmissionTimer(peerId);
+            return;
+          }
+          this.handlePeerLeave(peerId);
+          this.rejectedPeers.add(peerId);
+          this.recordJoinError(
+            new TrysteroJoinError({
+              category: "handshake_timeout",
+              message: "Peer identity admission timed out.",
+              peerId,
+              appId: this.appId,
+              roomId: this.roomName,
+            }),
+          );
+        }, this.options.handshakeTimeoutMs),
+      );
     };
     this.roomUnsubscribers.push(
       acknowledgement.onMessage((data, context) => {
@@ -924,26 +977,7 @@ export class TrysteroTransport implements NovaTransport {
       action.onMessage((data, context) => this.handleActionMessage(data, context)),
       action.onReceiveProgress((percent, context) => this.handleReceiveProgress(percent, context)),
       room.onPeerJoin(({ peerId, userId }) => {
-        if (!this.admissionTimers.has(peerId)) {
-          this.admissionTimers.set(
-            peerId,
-            this.scheduleFn(() => {
-              this.admissionTimers.delete(peerId);
-              if (this.room !== room || this.readyPeers.has(peerId)) return;
-              this.handlePeerLeave(peerId);
-              this.rejectedPeers.add(peerId);
-              this.recordJoinError(
-                new TrysteroJoinError({
-                  category: "handshake_timeout",
-                  message: "Peer identity admission timed out.",
-                  peerId,
-                  appId: this.appId,
-                  roomId: this.roomName,
-                }),
-              );
-            }, this.options.handshakeTimeoutMs),
-          );
-        }
+        if (!this.admissionTimers.has(peerId)) armAdmissionTimer(peerId);
         accept(peerId, userId);
       }),
       room.onPeerLeave(({ peerId }) => this.handlePeerLeave(peerId)),
@@ -1027,6 +1061,9 @@ export class TrysteroTransport implements NovaTransport {
   private handlePeerLeave(peerId: string): void {
     this.admissionTimers.get(peerId)?.();
     this.admissionTimers.delete(peerId);
+    this.ackRetransmits.get(peerId)?.();
+    this.ackRetransmits.delete(peerId);
+    this.admissionRestarts.delete(peerId);
     this.acknowledgedPeers.delete(peerId);
     this.sentAcknowledgements.delete(peerId);
     this.readyPeers.delete(peerId);
@@ -1310,6 +1347,9 @@ export class TrysteroTransport implements NovaTransport {
     this.rejectedPeers.clear();
     for (const cancel of this.admissionTimers.values()) cancel();
     this.admissionTimers.clear();
+    for (const cancel of this.ackRetransmits.values()) cancel();
+    this.ackRetransmits.clear();
+    this.admissionRestarts.clear();
     for (const peerId of this.readyWaiters.keys()) this.settlePeerWaiters(peerId, false);
     this.connectionToPeerId.clear();
     this.peerJoinedAt.clear();
@@ -1386,6 +1426,15 @@ export interface TrysteroTransportDiagnostics {
   readonly joinErrors: readonly TrysteroJoinError[];
   readonly lastQuality: readonly ConnectionQualitySample[];
 }
+
+/**
+ * The identity acknowledgement is re-sent this often until the peer is admitted.
+ * Trystero drops an action from a peer whose handshake is not active yet and does
+ * not buffer it, so a single ack can be lost; re-sending is idempotent.
+ */
+const IDENTITY_ACK_RETRANSMIT_MS = 2_000;
+/** An admission timeout restarts the handshake this many times, if the peer is still present. */
+const ADMISSION_RESTARTS = 1;
 
 /** Edge origin when the caller does not configure one (local `npm run dev`). */
 const DEFAULT_EDGE_ORIGIN = "http://localhost:8787";
