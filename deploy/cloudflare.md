@@ -1,7 +1,7 @@
 # Cloudflare — Nova edge Worker runbook
 
 Nova's only server-side code is the Cloudflare Worker `rocketcrab-edge`
-(`deploy/edge/`) and its signaling Durable Objects. It stores no game data,
+(`deploy/edge/`) and its signaling and tunnel Durable Objects. It stores no game data,
 uses no KV, and runs no game code. `deploy/edge/wrangler.toml` is the single source of truth for its
 configuration, and `npm run edge:deploy` is the single deployment path.
 Record every change made outside that file (dashboard, secrets, account
@@ -31,6 +31,9 @@ base paths are no longer deployment targets.
 | `GET /tunnel/:pairId`  | `tunnel.ts` | **Not deployed.** WebSocket fallback tunnel: one hibernating `TunnelPair` Durable Object per 64-character lowercase hex pair ID, at most two sockets, frames forwarded unchanged. |
 | anything else          | —           | `404`                                                                                                                                                                             |
 
+The staged `POST /log` route (`deploy/edge/log.ts`, described under Connection
+statistics) is not listed in the table above.
+
 Every known route requires an allowlisted Origin. POST routes support CORS
 preflight; signaling and tunnel routes require a WebSocket GET and are rate-limited on connection
 attempts (`signal:<ip>` and `tunnel:<ip>`). All use per-IP rate limiting (`429`, `Retry-After: 60`).
@@ -46,8 +49,11 @@ arrives while the partner is absent is dropped. A client text frame closes
 both sockets with `1003 binary only`, so text never reaches the peer. Nothing
 is stored; the only storage use is a 30-second alarm that closes a lone socket
 with `4408 no partner` and does nothing once the pair is complete. The
-browser client wrapper that would call this route does not exist yet (PLAN.md
-§5 step 5), so no client uses it.
+app side exists: the transport wraps each pair's WebRTC connection
+(`packages/trystero-transport/src/fallback-peer-connection.ts`) and moves its
+data channel onto this route when the direct channel has not opened 8 seconds
+after both descriptions exist. Nothing reaches the route in production until
+the Worker is deployed.
 
 Storage cost per pairing: one `setAlarm` when the first socket joins and one
 `deleteAlarm` when the second joins (or when a lone socket leaves). These are
@@ -89,7 +95,8 @@ Limits, in the order a frame is checked:
 The staged Nova adapter uses Trystero 0.27's WebSocket relay strategy with
 `VITE_EDGE_ORIGIN`, not public Nostr relays. It hashes the app and room IDs to
 select a room-scoped `/signal/:roomKey` URL; the Worker routes each key to a
-separate `SignalHub`. This provides signaling only, not a WebSocket data tunnel.
+separate `SignalHub`. This provides signaling only. The data fallback is the separate
+`/tunnel/:pairId` route above.
 Signaling uses WebSocket hibernation and socket attachments; messages are not
 persisted. The published `@trystero-p2p/ws-relay@0.27.0` server echoes to all
 subscribers, including the publisher. We deliberately omit its aggregate 10,000
@@ -97,7 +104,7 @@ subscription default to respect the unlimited-party decision; per-socket limits
 remain. See Cloudflare's [WebSocket hibernation documentation](https://developers.cloudflare.com/durable-objects/best-practices/websockets/) and [class migrations](https://developers.cloudflare.com/durable-objects/reference/durable-objects-migrations/).
 
 **Rate limit:** the Workers Rate Limiting binding, 60 requests/min per IP per
-route (`turn:<ip>`, `relay:<ip>`, and `signal:<ip>` are separate counters). A 10-player party
+route (`turn:<ip>`, `relay:<ip>`, `signal:<ip>`, `tunnel:<ip>` and `log:<ip>` are separate counters). A 10-player party
 behind one carrier-NAT address uses 10 TURN mints at join; reconnects reuse
 the cached credential. The counter is approximate and per Cloudflare
 location, so it is an abuse backstop, not a quota. If the limiter itself
