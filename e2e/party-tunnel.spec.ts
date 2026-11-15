@@ -20,6 +20,7 @@ import {
   type WebSocket,
 } from "@playwright/test";
 import { findRuntimeFrame } from "./runtime-helpers";
+import { expectPlayViewOnAll, recordConsole } from "./party-debug";
 import { clickInGame, gameState, waitForGameState } from "./quiz-frame-helpers";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -127,6 +128,13 @@ test.fixme("a 3-player party with one tunnelled player plays a state-mode game",
   const joiner = await newPlayer(browser, false);
   const forced = await newPlayer(browser, true);
   const players = [host, joiner, forced];
+  // A unique run id keeps each repeat's trace files apart (PLAY_TRACE_DIR).
+  const run = Date.now().toString(36);
+  const labels = ["host", "joiner", "forced"].map(
+    (role) => `${browser.browserType().name()}-${role}-${run}`,
+  );
+  players.forEach((player, index) => recordConsole(player.page, labels[index]!));
+  const pages = players.map((player, index) => ({ page: player.page, label: labels[index]! }));
   try {
     // Host starts a party with the sample game; the source is handed over
     // through sessionStorage exactly as the editor does it.
@@ -179,9 +187,7 @@ test.fixme("a 3-player party with one tunnelled player plays a state-mode game",
     const startButton = host.page.getByRole("button", { name: "Start game" });
     await expect(startButton).toBeEnabled({ timeout: 180_000 });
     await startButton.click();
-    for (const player of players) {
-      await expect(player.page.getByTestId("party-play-view")).toBeVisible({ timeout: 120_000 });
-    }
+    await expectPlayViewOnAll(pages);
 
     // Round 1 goes live in every frame.
     for (const player of players) {

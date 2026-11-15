@@ -9,6 +9,7 @@ import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
+import { expectPlayViewOnAll, recordConsole } from "./party-debug";
 
 test.describe.configure({ retries: 0 });
 
@@ -51,6 +52,13 @@ test.fixme("three players reach the lobby and start the game on every browser", 
   test.setTimeout(300_000);
   const players = [await newPlayer(browser), await newPlayer(browser), await newPlayer(browser)];
   const [host, joiner, third] = players.map((player) => player.page) as [Page, Page, Page];
+  // A unique run id keeps each repeat's trace files apart (PLAY_TRACE_DIR).
+  const run = Date.now().toString(36);
+  const labels = ["host", "joiner", "third"].map(
+    (role) => `${browser.browserType().name()}-${role}-${run}`,
+  );
+  players.forEach((player, index) => recordConsole(player.page, labels[index]!));
+  const pages = [host, joiner, third].map((page, index) => ({ page, label: labels[index]! }));
   try {
     await host.goto("/");
     await host.evaluate(
@@ -88,9 +96,7 @@ test.fixme("three players reach the lobby and start the game on every browser", 
     const startButton = host.getByRole("button", { name: "Start game" });
     await expect(startButton).toBeEnabled({ timeout: 180_000 });
     await startButton.click();
-    for (const page of [host, joiner, third]) {
-      await expect(page.getByTestId("party-play-view")).toBeVisible({ timeout: 120_000 });
-    }
+    await expectPlayViewOnAll(pages);
   } finally {
     for (const player of players) await player.context.close();
   }

@@ -279,6 +279,13 @@ const START_RETRY_INTERVAL_MS = 2_000;
 const SOURCE_RETRANSMIT_INTERVAL_MS = 2_000;
 const START_RETRY_TIMEOUT_MS = 30_000;
 const START_GIVE_UP_MESSAGE = "Couldn't start the game. Try again.";
+/**
+ * Diagnostics for stalled parties: `window.__NOVA_PARTY_DEBUG__()` returns
+ * debugSnapshot(). Dev and test builds only; production folds this to false.
+ */
+function partyDebugEnabled(): boolean {
+  return import.meta.env.DEV || import.meta.env.MODE === "test";
+}
 const UNSAFE_TEARDOWN_MESSAGE =
   "Couldn't close the previous party safely. Reload the page before joining another party.";
 /** 5cl.11: cap for the party game's runtime console ring buffer. */
@@ -557,6 +564,8 @@ export class PartyEngine {
   private connectionState: TransportConnectionState = "idle";
   /** True once this shell's game started (survives reconnects; M1). */
   private gameStarted = false;
+  /** The host's start request was given up after START_RETRY_TIMEOUT_MS (diagnostics). */
+  private startGaveUp = false;
 
   // M1 lifecycle bookkeeping (ADR-0012/B6).
   private pageWasHidden = false;
@@ -566,6 +575,10 @@ export class PartyEngine {
   private reconnectRetryTimer: (() => void) | null = null;
 
   constructor(config: PartyEngineConfig = {}) {
+    if (partyDebugEnabled()) {
+      (globalThis as { __NOVA_PARTY_DEBUG__?: () => unknown }).__NOVA_PARTY_DEBUG__ = () =>
+        this.debugSnapshot();
+    }
     this.defaults = {
       transportFactory: config.transportFactory ?? null,
       turnCreds: config.turnCreds ?? fetchTurnCredentials,
@@ -1032,6 +1045,38 @@ export class PartyEngine {
     // The session's local "start" event flips the phase to playing.
   }
 
+  /**
+   * Read-only snapshot of everything a stalled start needs: the phase, the
+   * session's start state and its elected authority, each member's source and
+   * readiness, whether the frame exists and got start, and the start retry.
+   * Dev and test builds only (see window.__NOVA_PARTY_DEBUG__).
+   */
+  debugSnapshot(): Record<string, unknown> {
+    const state = this.getState();
+    return {
+      phase: state.phase,
+      joinStage: state.joinStage,
+      gameStarted: this.gameStarted,
+      registered: this.registered,
+      frameExists: this.runtime !== null,
+      frameStartDelivered: this.frameStartDelivered,
+      startRetryActive: this.cancelStartRetry !== null,
+      startGaveUp: this.startGaveUp,
+      session: this.session?.debugState() ?? null,
+      authority: state.authorityMemberId,
+      canStart: state.canStart,
+      startBlockedReason: state.startBlockedReason,
+      members: state.members.map((member) => ({
+        id: member.memberId,
+        isSelf: member.isSelf,
+        connected: member.connected,
+        transferState: member.transferState,
+        ready: member.ready,
+      })),
+      notices: state.notices.map((notice) => notice.message),
+    };
+  }
+
   /** Host: keep re-sending the start request until the authority starts the game. */
   private beginStartRetry(): void {
     this.stopStartRetry();
@@ -1056,6 +1101,7 @@ export class PartyEngine {
       // The authority never started the game: give up and say so.
       this.phase = "lobby";
       this.phaseDetail = null;
+      this.startGaveUp = true;
       this.addNotice("warn", START_GIVE_UP_MESSAGE);
       this.emit();
       return;
@@ -2662,6 +2708,7 @@ export class PartyEngine {
         this.stopStartRetry();
         // A start that arrives after the give-up is a success: drop its notice.
         this.notices = this.notices.filter((notice) => notice.message !== START_GIVE_UP_MESSAGE);
+        this.startGaveUp = false;
         this.gameStarted = true;
         this.phase = "playing";
         this.phaseDetail = null;

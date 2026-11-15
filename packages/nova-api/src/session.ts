@@ -497,6 +497,25 @@ export class NovaSession implements NovaClientBackend {
     return this.started;
   }
 
+  /**
+   * Read-only diagnostics for stalled starts: whether this session has
+   * requested the start, has emitted it locally, and which member it believes
+   * is the elected authority (null before the game begins).
+   */
+  debugState(): {
+    started: boolean;
+    startEmitted: boolean;
+    isAuthorityElect: boolean;
+    authorityMemberId: string | null;
+  } {
+    return {
+      started: this.started,
+      startEmitted: this.startEmitted,
+      isAuthorityElect: this.engine.isAuthorityElect(),
+      authorityMemberId: this.engine.getAuthorityMemberId(),
+    };
+  }
+
   /** True once this session broadcast (or observed) game end. */
   isEnded(): boolean {
     return this.ended;

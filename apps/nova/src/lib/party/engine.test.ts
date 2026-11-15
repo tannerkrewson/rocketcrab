@@ -1299,6 +1299,30 @@ describe("party engine — roles, reconnect, and cleanup", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Diagnostics: window.__NOVA_PARTY_DEBUG__ (dev and test builds) snapshots the
+// engine state that a stalled 3-player start needs (PLAN §5.6).
+describe("the party debug snapshot", () => {
+  it("reports the engine state on window.__NOVA_PARTY_DEBUG__ before any party exists", () => {
+    const world = makeWorld();
+    makePlayer(world, "a");
+    const debug = (globalThis as { __NOVA_PARTY_DEBUG__?: () => Record<string, unknown> })
+      .__NOVA_PARTY_DEBUG__;
+    expect(debug).toBeTypeOf("function");
+    expect(debug!()).toMatchObject({
+      phase: "idle",
+      gameStarted: false,
+      frameExists: false,
+      frameStartDelivered: false,
+      startRetryActive: false,
+      startGaveUp: false,
+      session: null,
+      authority: null,
+      canStart: false,
+      members: [expect.objectContaining({ isSelf: true, transferState: "waiting" })],
+    });
+  });
+});
+
 // S4: the state-mode vertical-slice example game through the party flow
 // ---------------------------------------------------------------------------
 
