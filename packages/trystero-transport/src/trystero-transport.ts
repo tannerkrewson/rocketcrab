@@ -629,7 +629,16 @@ export class TrysteroTransport implements NovaTransport {
               },
       });
     if (target !== null) {
-      await sendTo(target);
+      try {
+        await sendTo(target);
+      } catch (error) {
+        if (!isPeerDisconnectedError(error)) throw error;
+        throw new TrysteroJoinError({
+          category: "not_connected",
+          message: "TrysteroTransport.send: peer left before the message was delivered.",
+          cause: error,
+        });
+      }
     } else {
       // Broadcast only to peers whose identities have been admitted. A peer
       // disappearing during a broadcast must not prevent delivery to others.
@@ -638,15 +647,7 @@ export class TrysteroTransport implements NovaTransport {
           try {
             await sendTo(peerId);
           } catch (error) {
-            if (
-              !(
-                typeof error === "object" &&
-                error !== null &&
-                "kind" in error &&
-                error.kind === "disconnected"
-              )
-            )
-              throw error;
+            if (!isPeerDisconnectedError(error)) throw error;
           }
         }),
       );
@@ -1503,6 +1504,13 @@ const ACTION_NAMESPACE = "nova";
 
 /** Request channel names: the Trystero action type stays under its 32-byte limit. */
 const REQUEST_CHANNEL_PATTERN = /^[a-zA-Z0-9._-]{1,23}$/;
+
+/** Trystero reports a peer that left mid-action as an error with kind "disconnected". */
+function isPeerDisconnectedError(error: unknown): boolean {
+  return (
+    typeof error === "object" && error !== null && "kind" in error && error.kind === "disconnected"
+  );
+}
 
 /** Optional structured-payload validator (protocol boundary, threat T10). */
 export type PayloadValidator = (payload: unknown) => { ok: true } | { ok: false; error: string };

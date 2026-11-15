@@ -1260,6 +1260,16 @@ describe("TrysteroTransport send", () => {
     expect(room.action.send.mock.calls[0]![1].metadata.deliverySeq).toBe(1);
   });
 
+  it("reports a targeted send to a peer that left mid-send as not_connected", async () => {
+    const { adapter, room } = await joinedWithPeer();
+    room.action.send.mockImplementationOnce(async () => {
+      throw Object.assign(new Error("peer left"), { kind: "disconnected" });
+    });
+    await expect(
+      adapter.send({ channel: "raw", payload: "x", targetConnectionId: "conn-b" }),
+    ).rejects.toMatchObject({ category: "not_connected" });
+  });
+
   it("validates structured payloads when a validator is configured (T10)", async () => {
     const { adapter, clock } = setup({
       validate: (payload: unknown) =>
