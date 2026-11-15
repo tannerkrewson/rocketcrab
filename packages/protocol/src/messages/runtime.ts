@@ -375,6 +375,7 @@ export const runtimeErrorMessageSchema = z.object({
     "oversized_source",
     "syntax",
     "remote_load",
+    "game",
     "runtime",
     "crash",
     "security",

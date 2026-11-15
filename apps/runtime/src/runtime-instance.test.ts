@@ -606,7 +606,7 @@ describe("RuntimeInstance delivery failures", () => {
     });
     const error = lastRuntimeMessage(port, "runtime.error");
     // Non-fatal: the arena fails a player's run on any fatal category.
-    expect(error).toMatchObject({ category: "remote_load" });
+    expect(error).toMatchObject({ category: "game" });
     expect(String(error?.message)).toMatch(/could not be delivered/);
     expect(String(error?.message)).toMatch(/nova\.dispatch/);
   });
@@ -617,7 +617,7 @@ describe("RuntimeInstance view errors", () => {
     const { port } = setup();
     hook().report("viewError", { memberId: "member-b", message: "no view for b" });
     const error = lastRuntimeMessage(port, "runtime.error");
-    expect(error).toMatchObject({ category: "remote_load", details: { memberId: "member-b" } });
+    expect(error).toMatchObject({ category: "game", details: { memberId: "member-b" } });
     expect(String(error?.message)).toMatch(/member-b/);
     expect(String(error?.message)).toMatch(/no view for b/);
   });

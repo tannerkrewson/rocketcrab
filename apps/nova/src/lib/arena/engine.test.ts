@@ -599,7 +599,7 @@ describe("ArenaEngine — player management", () => {
     deliver(
       harness.channels[0]!.port1,
       runtimeErrorMessage(
-        "remote_load",
+        "game",
         "nova.dispatch() could not be delivered to the host: payload could not be cloned",
       ),
     );

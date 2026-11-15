@@ -30,6 +30,7 @@ describe("diagnosticFromRuntimeError", () => {
       ["oversized_source", "Source too large"],
       ["syntax", "Syntax error"],
       ["remote_load", "Remote resource failed"],
+      ["game", "Game error"],
       ["runtime", "Runtime error"],
       ["crash", "Game crashed"],
       ["security", "Security boundary"],

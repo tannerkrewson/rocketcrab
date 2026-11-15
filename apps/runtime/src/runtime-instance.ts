@@ -452,13 +452,13 @@ export class RuntimeInstance {
 
   /**
    * A selectView failure for one viewer. Non-fatal: only that viewer lacks a
-   * view, so the run continues. The category is the closest non-fatal one.
+   * view, so the run continues.
    */
   private handleViewError(payload: unknown): void {
     const p = (payload ?? {}) as { memberId?: unknown; message?: unknown };
     const memberId = typeof p.memberId === "string" ? p.memberId.slice(0, 128) : "unknown";
     const message = typeof p.message === "string" ? p.message.slice(0, 256) : "selectView failed";
-    this.sendError("remote_load", `selectView failed for member ${memberId}: ${message}`, {
+    this.sendError("game", `selectView failed for member ${memberId}: ${message}`, {
       memberId,
     });
   }
@@ -512,10 +512,8 @@ export class RuntimeInstance {
       if (message.type !== "runtime.error") {
         const what = message.type === "game.apiCall" ? `nova.${message.method}()` : message.type;
         const reason = error instanceof Error ? error.message : String(error);
-        // Must be non-fatal: a fatal category fails the player's run. No
-        // category fits this exactly; remote_load (a warning) is the closest.
         this.sendError(
-          "remote_load",
+          "game",
           `${what} could not be delivered to the host: ${reason.slice(0, 256)}`,
         );
       }

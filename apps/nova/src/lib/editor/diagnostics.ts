@@ -64,6 +64,11 @@ export const RUNTIME_ERROR_CATEGORIES: Record<
     severity: "warning",
     hint: "A CDN/asset did not load. Rocketcrab does not proxy the web, so check the URL and your connection.",
   },
+  game: {
+    label: "Game error",
+    severity: "warning",
+    hint: "The game sent something the runtime couldn't deliver, or a view function failed.",
+  },
   runtime: {
     label: "Runtime error",
     severity: "error",
