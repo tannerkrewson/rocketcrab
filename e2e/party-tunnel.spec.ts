@@ -116,13 +116,11 @@ async function revealedRows(frame: Frame): Promise<string[]> {
 
 // Party proof (PLAN §5.6): a 3-player party, one player forced onto the tunnel,
 // plays the sample game; a player's game rebooted after start still gets start.
-// Runs on every browser, with retries disabled: a retry would hide the lobby
-// stall recorded in PLAN §5.6. The lobby control is e2e/party-lobby.spec.ts.
+// Runs on every browser, with retries disabled so that a start stall is not
+// hidden by a retry (PLAN §5.6). The lobby control is e2e/party-lobby.spec.ts.
 test.describe.configure({ retries: 0 });
 
-test.fixme("a 3-player party with one tunnelled player plays a state-mode game", async ({
-  browser,
-}) => {
+test("a 3-player party with one tunnelled player plays a state-mode game", async ({ browser }) => {
   test.setTimeout(300_000);
   const host = await newPlayer(browser, false);
   const joiner = await newPlayer(browser, false);
