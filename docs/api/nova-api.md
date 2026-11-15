@@ -127,8 +127,8 @@ const off2 = nova.onPlayerLeave((player) => {
 ```
 
 - `id` is stable for the whole party (it survives reconnects).
-- A reconnect may surface as a leave followed by a join (S1 semantics; grace
-  periods land with later milestones).
+- A reconnect can surface as a leave followed by a join. Authority election has
+  its own grace period before a silent authority is replaced (ADR-0007).
 - Every subscription returns an unsubscribe function.
 
 ---
@@ -343,9 +343,10 @@ var tick = nova.simulation.getTick();
 
 ### Rate bounds and diagnostics
 
-- Inputs are bounded per player: 60 inputs/second over a 10-second window
-  (F6 parity). Over-limit sends are rejected with a stable `rate_limited`
-  error delivered through `nova.onError`.
+- Inputs are bounded per player: 60 inputs/second on average, enforced over a
+  10-second sliding window (600 inputs per window; F6 parity). Over-limit sends
+  are rejected with a stable `rate_limited` error delivered through
+  `nova.onError`.
 - Snapshot frequency is bounded by Nova (50 ms..10 s, configurable by the
   host within those limits) and each snapshot is capped at 512 KiB.
 - `nova.simulation.getTick()` exposes the local clock; host/arena
@@ -544,6 +545,14 @@ Every API failure is a `NovaError` with a stable `code` and a human message:
 | `invalid_message`         | The host received an invalid protocol message (delivered via `onError`).                                     |
 | `unsupported`             | The operation is not available in this build (reported by the runtime).                                      |
 | `media_unsupported`       | `nova.media.publish` ran in a build/platform where media cannot cross the frame boundary (experimental; A3). |
+| `stale_revision`          | An action was based on an outdated revision; another action applied first. Retry from the latest view.       |
+| `timed_out`               | The authority did not apply a dispatched action within 10 seconds.                                           |
+| `unknown_action`          | `nova.dispatch` named an action that has no handler in `actions`.                                            |
+| `payload_too_large`       | An action payload exceeded 16 KiB, or a raw payload exceeded 1 MiB.                                          |
+| `state_too_large`         | The resulting canonical state exceeded the 512 KiB snapshot limit.                                           |
+| `no_authority`            | No authority is currently available to apply the action.                                                     |
+| `game_ended`              | The game ended before the authority applied the action.                                                      |
+| `no_snapshot_handler`     | A simulation authority has no `serializeState` handler, so it cannot produce snapshots.                      |
 
 Unknown methods fail as `TypeError`s (reported as game errors), never as
 silent no-ops.
@@ -568,8 +577,8 @@ on raw channels.
 - The runtime frame bridge (`apps/runtime`) injects the same surface into
   every game document.
 - The same session code runs over the in-memory transport (the test arena)
-  and — later — over the party transport, so the same game code works in
-  test and party transports (ADR-0003). The transport-neutral contract suite
+  and over the party transport (`TrysteroTransport`), so the same game code
+  works in both (ADR-0003). The transport-neutral contract suite
   (`@rocketcrab/nova-api/contract-suite`) must pass over both.
 
 ---
@@ -637,15 +646,15 @@ supplement, never a substitute.
 
 ---
 
-## 15. Deliberate non-goals (S1/S2)
+## 15. Non-goals and milestone status
 
 - S1 shipped the common surface without mode semantics; S2 shipped the full
   state-mode engine (action application, revisioned snapshots, per-player
   views, deduplication, rejections, late joining, diagnostics).
 - Authority election, heartbeats, buffering during election, and migration
-  arrive with S3. Until then the authority is the lowest connected member at
-  game start and stays fixed for the game; if it leaves, dispatches fail
-  with `no_authority` and every shell keeps the last committed state.
+  shipped with S3 (ADR-0007). The initial authority is the lowest connected
+  eligible member. If the authority is lost, the remaining members elect a new
+  one and restore the latest valid replicated state.
 - Simulation mode shipped with A1: the tick clock, ordered inputs, snapshot
   production/replication, restore after migration, rate bounds, and
   latency/drift diagnostics (see section 9). Rollback netcode and
