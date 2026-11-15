@@ -53,10 +53,10 @@ import { FirstRunTutorial } from "./FirstRunTutorial";
 import { PromptExportMenu } from "./PromptExportMenu";
 
 /** Default title for a new, unnamed game (matches the runtime's fallback). */
-export const DEFAULT_GAME_TITLE = "Untitled game";
+const DEFAULT_GAME_TITLE = "Untitled game";
 
-export const MAX_CONSOLE_ENTRIES = 100;
-export const MAX_DIAGNOSTICS = 50;
+const MAX_CONSOLE_ENTRIES = 100;
+const MAX_DIAGNOSTICS = 50;
 
 /** Test seams forwarded to RuntimeHostClient (no-op in production). */
 export interface EditorRuntimeSeams {
