@@ -908,6 +908,11 @@ export class PartyEngine {
     // the frame.
     this.classic = null;
     this.teardownRuntimeFrame();
+    // Nothing verifies the new source yet: the previous game's verification
+    // must not open the start gate. registerSource re-verifies on success.
+    this.selfVerified = false;
+    this.selfVerifiedSha256 = null;
+    this.currentSourceSha256 = null;
     await this.replaceGameSession(this.party);
     this.emit();
     this.registerSource(input);

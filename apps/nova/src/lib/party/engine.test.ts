@@ -1,7 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 // The complete S4 example game document, verbatim (Vite ?raw import).
 import EXAMPLE_GAME_SOURCE from "../../../../../examples/games/nova-quiz.html?raw";
-import { parseInviteFragment, type PartyTransportFactory } from "@rocketcrab/party";
+import {
+  GameSourceCoordinator,
+  parseInviteFragment,
+  type PartyTransportFactory,
+} from "@rocketcrab/party";
 import type { NovaTransport, TransportEventMap } from "@rocketcrab/core";
 import { InMemoryTransportHub } from "@rocketcrab/testing";
 import { fromRoomError } from "@rocketcrab/trystero-transport";
@@ -3324,5 +3328,39 @@ describe("party engine — §10 review: lifecycle cleanup", () => {
     await settle(world);
     expect(a.engine.debugSnapshot().frameExists).toBe(true);
     expect(a.engine.getState().notices.some((n) => /could not start/i.test(n.message))).toBe(false);
+  });
+
+  it("selectGame does not keep the previous game's verification when the new source fails to register", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    const code = await runCreate(a, world);
+    await registerLocalGame(a, world);
+    const { join, settled } = startJoin(b, world, code);
+    await settled;
+    await settle(world);
+    await join;
+    await settle(world);
+    await registerLocalGame(b, world);
+    await settle(world);
+    expect(a.engine.getState().canStart).toBe(true);
+
+    // The host picks a new game, but its source is rejected by the coordinator.
+    const setSource = vi
+      .spyOn(GameSourceCoordinator.prototype, "setSource")
+      .mockRejectedValueOnce(new Error("source rejected"));
+    await a.engine.selectGame({
+      gameId: "game_other",
+      title: "Other",
+      mode: "state",
+      source: "<html>other</html>",
+    });
+    await settle(world);
+    expect(setSource).toHaveBeenCalledTimes(1);
+    setSource.mockRestore();
+
+    // Nobody holds the new game, so neither start path may open.
+    expect(a.engine.getState().canForceStart).toBe(false);
+    expect(a.engine.getState().canStart).toBe(false);
   });
 });
