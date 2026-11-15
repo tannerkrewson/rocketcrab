@@ -588,6 +588,32 @@ describe("ArenaEngine — player management", () => {
     ).toBe(false);
   });
 
+  it("an undeliverable dispatch (non-fatal runtime error) does not fail the player's run", async () => {
+    const harness = createHarness();
+    mountContainers(harness, 2);
+    const engine = createEngine(harness);
+    engine.start();
+    await runToStartWithEngine(engine, harness, 2);
+
+    // The category the runtime reports when a dispatch cannot reach the host.
+    deliver(
+      harness.channels[0]!.port1,
+      runtimeErrorMessage(
+        "remote_load",
+        "nova.dispatch() could not be delivered to the host: payload could not be cloned",
+      ),
+    );
+    await vi.waitFor(() =>
+      expect(
+        engine
+          .getSnapshot()
+          .players[0]?.logs.some((log) => log.message.includes("could not be delivered")),
+      ).toBe(true),
+    );
+    expect(engine.getSnapshot().players[0]?.runState).not.toBe("failed");
+    expect(engine.getSnapshot().summary.failed).toBe(0);
+  });
+
   it("fatal runtime errors fail the test-result summary", async () => {
     const harness = createHarness();
     mountContainers(harness, 2);

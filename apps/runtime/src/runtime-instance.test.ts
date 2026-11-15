@@ -605,7 +605,8 @@ describe("RuntimeInstance delivery failures", () => {
       actionId: "action-1",
     });
     const error = lastRuntimeMessage(port, "runtime.error");
-    expect(error).toMatchObject({ category: "runtime" });
+    // Non-fatal: the arena fails a player's run on any fatal category.
+    expect(error).toMatchObject({ category: "remote_load" });
     expect(String(error?.message)).toMatch(/could not be delivered/);
     expect(String(error?.message)).toMatch(/nova\.dispatch/);
   });

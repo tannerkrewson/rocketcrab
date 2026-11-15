@@ -496,8 +496,10 @@ export class RuntimeInstance {
       if (message.type !== "runtime.error") {
         const what = message.type === "game.apiCall" ? `nova.${message.method}()` : message.type;
         const reason = error instanceof Error ? error.message : String(error);
+        // Must be non-fatal: a fatal category fails the player's run. No
+        // category fits this exactly; remote_load (a warning) is the closest.
         this.sendError(
-          "runtime",
+          "remote_load",
           `${what} could not be delivered to the host: ${reason.slice(0, 256)}`,
         );
       }
