@@ -1,3 +1,4 @@
+import vm from "node:vm";
 import { describe, expect, it } from "vitest";
 import { NOVA_API_SURFACE } from "@rocketcrab/nova-api";
 import {
@@ -291,5 +292,57 @@ describe("registrationFields", () => {
       declaration: { title: "Sneaky", gameMode: "state" },
     });
     expect(fields.gameId).toBe("game-1");
+  });
+});
+
+/** The slice of `window.nova` and the bridge hook these tests drive. */
+interface ExecutedBridge {
+  nova: {
+    defineGame(options: Record<string, unknown>): void;
+    onStart(fn: () => void): () => void;
+    raw: { onMessage(name: string, fn: (message: unknown) => void): () => void };
+  };
+  __novaGameBridge: { receive(kind: string, payload: unknown): void };
+}
+
+interface ExecutedFrame {
+  bridge: ExecutedBridge;
+  reports: Array<{ kind: string; payload: unknown }>;
+}
+
+/**
+ * Run the real bridge script in a fresh context, the way the game frame does,
+ * with `window.parent` pointing back at the frame's own hook so reports are
+ * captured. The script is executed (not string-matched) so the object shapes
+ * it builds are exercised.
+ */
+function runBridge(): ExecutedFrame {
+  const reports: ExecutedFrame["reports"] = [];
+  const win: Record<string, unknown> = {
+    addEventListener: () => {},
+    __novaRuntime: {
+      report: (kind: string, payload: unknown) => reports.push({ kind, payload }),
+    },
+  };
+  win.parent = win;
+  const silentConsole = { debug() {}, log() {}, info() {}, warn() {}, error() {} };
+  vm.runInNewContext(NOVA_BRIDGE_SCRIPT, {
+    window: win,
+    document: {},
+    console: silentConsole,
+    setTimeout,
+    clearTimeout,
+    structuredClone,
+  });
+  return { bridge: win as unknown as ExecutedBridge, reports };
+}
+
+describe("NOVA_BRIDGE_SCRIPT executed in a frame-like context", () => {
+  it("delivers raw messages on channels named like Object.prototype keys", () => {
+    const { bridge } = runBridge();
+    const seen: unknown[] = [];
+    expect(() => bridge.nova.raw.onMessage("constructor", (m) => seen.push(m))).not.toThrow();
+    bridge.__novaGameBridge.receive("rawMessage", { channel: "constructor", message: 42 });
+    expect(seen).toEqual([42]);
   });
 });

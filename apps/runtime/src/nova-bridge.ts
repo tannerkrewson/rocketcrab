@@ -212,7 +212,9 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
   var stateSelectView = null;
   var stateRender = null;
   var ACTION_TIMEOUT_MS = ${actionTimeoutMs};
-  var pendingDispatches = {};
+  // Null-prototype maps: channel names and action ids are game- or host-chosen
+  // strings, so names like constructor or __proto__ must not hit Object.prototype.
+  var pendingDispatches = Object.create(null);
   try {
     var bootstrapPlayer = window.__novaBootstrap && window.__novaBootstrap.player;
     if (bootstrapPlayer && bootstrapPlayer.memberId) {
@@ -388,7 +390,7 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
   var endHandlers = [];
   var errorHandlers = [];
   var stateHandlers = [];
-  var rawHandlers = {};
+  var rawHandlers = Object.create(null);
   var simulationInputHandler = null;
   var simulationSnapshotHandler = null;
   var simulationTickHandler = null;
