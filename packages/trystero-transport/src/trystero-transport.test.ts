@@ -1828,6 +1828,18 @@ describe("TrysteroTransport leave / reconnect / suspend", () => {
     expect(adapter.connectionState).toBe("connected");
   });
 
+  it("re-joins after a clean leave, as the in-memory twin does", async () => {
+    const { adapter, clock } = setup();
+    const room = makeFakeRoom();
+    mocks.joinRoom.mockReturnValue(room);
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    await joinConnected(adapter, clock);
+    await adapter.leave();
+    expect(adapter.connectionState).toBe("disconnected");
+    await joinConnected(adapter, clock);
+    expect(adapter.connectionState).toBe("connected");
+  });
+
   it("rejects reconnect when not connected", async () => {
     const { adapter } = setup();
     await expect(adapter.reconnect()).rejects.toMatchObject({ category: "invalid_state" });
