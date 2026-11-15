@@ -822,10 +822,8 @@ change. One commit per area, `npm run check` + `npm run test:e2e` each time.
       repeated `start` re-ran `onStart` in the frame; one viewer's async
       `selectView` rejection failed the whole state request, and a failing
       view was dropped silently (now reported per member); undeliverable
-      messages were dropped silently (now a non-fatal `remote_load` error,
-      because no non-fatal author-error category exists and a fatal one fails
-      the arena run; a dedicated category would be a protocol change, left to
-      the owner). Trimmed history comments and unexported
+      messages were dropped silently (now a non-fatal `game` error, a new
+      category added to the unreleased v1 enum; not in the arena's fatal set). Trimmed history comments and unexported
       dead symbols (no behaviour change). Not verified: e2e (run by the
       coordinator), stale frame reports after removal (suspected, not proven).
       Open, outside this area: `apps/nova/src/lib/party/engine.ts` does not
