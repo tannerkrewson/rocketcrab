@@ -42,9 +42,24 @@ function bootstrapMessage(overrides: Record<string, unknown> = {}): RuntimeBoots
   } as RuntimeBootstrapMessage;
 }
 
-function dispatchBootstrap(origin: string, data: unknown, ports: unknown[] = []): void {
+/**
+ * Dispatch a message as if sent by `source`. The default is this page's own
+ * window: in the jsdom top-level test page that is `window.parent`, which is
+ * the embedding page the runtime must accept bootstraps from.
+ */
+function dispatchBootstrap(
+  origin: string,
+  data: unknown,
+  ports: unknown[] = [],
+  source: Window = window,
+): void {
   window.dispatchEvent(
-    new MessageEvent("message", { origin, data, ports: ports as MessagePort[] }),
+    new MessageEvent("message", {
+      origin,
+      data,
+      ports: ports as MessagePort[],
+      source,
+    }),
   );
 }
 
@@ -96,6 +111,19 @@ describe("exact-origin bootstrap handshake", () => {
     dispatchBootstrap(MAIN_ORIGIN, { hello: "world" }, [createFakePort()]);
     dispatchBootstrap(MAIN_ORIGIN, bootstrapMessage({ type: "runtime.ping" }), [createFakePort()]);
     expect(api().activeInstanceCount()).toBe(0);
+  });
+
+  it("rejects a bootstrap from a window other than the embedding page", () => {
+    // Same origin as the main page, but not the window that embedded the
+    // runtime: an allowed origin alone is not enough to take the channel.
+    const other = document.createElement("iframe");
+    document.body.appendChild(other);
+    try {
+      dispatchBootstrap(MAIN_ORIGIN, bootstrapMessage(), [createFakePort()], other.contentWindow!);
+      expect(api().activeInstanceCount()).toBe(0);
+    } finally {
+      other.remove();
+    }
   });
 
   it("rejects a bootstrap without a MessagePort", () => {

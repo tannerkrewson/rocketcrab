@@ -94,6 +94,12 @@ function handleBootstrap(event: MessageEvent): void {
     console.warn(`[runtime] rejected bootstrap from origin ${event.origin}`);
     return;
   }
+  // The embedding page is the only window that may start a session; another
+  // window on the main origin is not the host and must not take the channel.
+  if (event.source !== window.parent) {
+    console.warn("[runtime] rejected bootstrap from a window other than the embedding page");
+    return;
+  }
   const parsed = parseRuntimeMessage(event.data);
   if (!parsed.ok || parsed.value.type !== "runtime.bootstrap") {
     console.warn(
