@@ -820,8 +820,12 @@ change. One commit per area, `npm run check` + `npm run test:e2e` each time.
       main origin (now requires the embedding page as `event.source`); raw
       channel and pending-action maps keyed by `constructor`/`__proto__`; a
       repeated `start` re-ran `onStart` in the frame; one viewer's async
-      `selectView` rejection failed the whole state request; undeliverable
-      messages were dropped silently. Trimmed history comments and unexported
+      `selectView` rejection failed the whole state request, and a failing
+      view was dropped silently (now reported per member); undeliverable
+      messages were dropped silently (now a non-fatal `remote_load` error,
+      because no non-fatal author-error category exists and a fatal one fails
+      the arena run; a dedicated category would be a protocol change, left to
+      the owner). Trimmed history comments and unexported
       dead symbols (no behaviour change). Not verified: e2e (run by the
       coordinator), stale frame reports after removal (suspected, not proven).
       Open, outside this area: `apps/nova/src/lib/party/engine.ts` does not
