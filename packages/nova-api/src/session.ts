@@ -573,6 +573,13 @@ export class NovaSession implements NovaClientBackend {
     this.outbox.length = 0;
     this.dispatchBuffer.length = 0;
     this.inflightDispatches.clear();
+    for (const timer of this.dispatchRetryTimers.values()) {
+      clearTimeout(timer);
+    }
+    this.dispatchRetryTimers.clear();
+    // A left session can deliver nothing, so its clock and snapshot cadence
+    // stop here; otherwise they keep ticking and queue snapshots forever.
+    this.simulationEngine.end();
     await this.transport.leave();
   }
 
@@ -746,6 +753,8 @@ export class NovaSession implements NovaClientBackend {
     if (authority === null) {
       // Election in progress (or authority unknown): buffer until the new
       // authority is announced (the client promise resolves on its ack).
+      // Entries past their deadline can never be applied, so they are dropped
+      // here; otherwise a long election grows the buffer without bound.
       this.dispatchBuffer.push(entry);
       return Promise.resolve();
     }
