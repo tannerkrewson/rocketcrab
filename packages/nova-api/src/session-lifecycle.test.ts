@@ -41,6 +41,20 @@ function bufferedDispatches(session: NovaSession): number {
   return (session as unknown as { dispatchBuffer: unknown[] }).dispatchBuffer.length;
 }
 
+/** Mirrors MAX_BUFFERED_DISPATCHES in session.ts. */
+const BUFFER_CAP = 256;
+
+/** A session with no authority known, holding BUFFER_CAP dispatches. */
+function fillBufferToCap(): NovaSession {
+  const hub = new InMemoryTransportHub({ seed: "nova-api-lifecycle-buffer" });
+  const transport = hub.createTransport({ memberId: "member-a", displayName: "Ada" });
+  const session = makeSimulationSession(transport, "member-a", "Ada");
+  for (let index = 0; index < BUFFER_CAP; index += 1) {
+    void session.dispatch({ type: "mark", payload: { index }, baseRevision: 0 }, `held-${index}`);
+  }
+  return session;
+}
+
 describe("NovaSession lifecycle (leave and dispatch buffer)", () => {
   beforeEach(() => {
     vi.useFakeTimers({
@@ -90,21 +104,23 @@ describe("NovaSession lifecycle (leave and dispatch buffer)", () => {
     expect(queuedOutbox(a)).toBe(outboxAtLeave);
   });
 
-  it("drops expired buffered dispatches when a new one arrives with no authority known", () => {
-    const hub = new InMemoryTransportHub({ seed: "nova-api-lifecycle-buffer" });
-    const transport = hub.createTransport({ memberId: "member-a", displayName: "Ada" });
-    const session = makeSimulationSession(transport, "member-a", "Ada");
-    for (let index = 0; index < 50; index += 1) {
-      void session.dispatch(
-        { type: "mark", payload: { index }, baseRevision: 0 },
-        `early-${index}`,
-      );
-    }
-    expect(bufferedDispatches(session)).toBe(50);
+  it("refuses a dispatch past the buffer cap while no authority is known", async () => {
+    const session = fillBufferToCap();
+    expect(bufferedDispatches(session)).toBe(BUFFER_CAP);
 
-    // Every early dispatch is past its deadline; none can ever be applied.
+    const overflow = session.dispatch({ type: "mark", payload: {}, baseRevision: 0 }, "overflow");
+    await expect(overflow).rejects.toMatchObject({ code: "rate_limited" });
+    expect(bufferedDispatches(session)).toBe(BUFFER_CAP);
+  });
+
+  it("an expired buffered dispatch frees its slot when the cap is reached", async () => {
+    const session = fillBufferToCap();
+
+    // Every held dispatch is past its deadline; none can ever be applied.
     vi.advanceTimersByTime(60_000);
-    void session.dispatch({ type: "mark", payload: {}, baseRevision: 0 }, "late");
+    await expect(
+      session.dispatch({ type: "mark", payload: {}, baseRevision: 0 }, "late"),
+    ).resolves.toBeUndefined();
 
     expect(bufferedDispatches(session)).toBe(1);
   });

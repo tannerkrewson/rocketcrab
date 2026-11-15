@@ -273,6 +273,13 @@ interface BufferedDispatch {
 /** Interval between re-sends of an unacknowledged dispatch (half its lifetime). */
 const dispatchRetryIntervalMs = actionTimeoutMs / 2;
 
+/**
+ * Hard cap on dispatches held while no authority is known. The byte budget
+ * alone does not bound this (many tiny dispatches fit inside it), and an
+ * overflow is refused at once rather than queued.
+ */
+const MAX_BUFFERED_DISPATCHES = 256;
+
 /** Create a session over a transport and its game-facing client. */
 export function createNovaSession(options: NovaSessionOptions): NovaSession {
   return new NovaSession(options);
@@ -754,12 +761,20 @@ export class NovaSession implements NovaClientBackend {
     if (authority === null) {
       // Election in progress (or authority unknown): buffer until the new
       // authority is announced (the client promise resolves on its ack).
-      // Entries past their deadline can never be applied, so they are dropped
-      // here; otherwise a long election grows the buffer without bound.
-      const now = Date.now();
-      const live = this.dispatchBuffer.filter((held) => held.deadlineMs > now);
-      this.dispatchBuffer.length = 0;
-      this.dispatchBuffer.push(...live, entry);
+      if (this.dispatchBuffer.length >= MAX_BUFFERED_DISPATCHES) {
+        // Entries past their deadline can never be applied: free their slots
+        // before refusing anything new.
+        const now = Date.now();
+        const live = this.dispatchBuffer.filter((held) => held.deadlineMs > now);
+        this.dispatchBuffer.splice(0, this.dispatchBuffer.length, ...live);
+        if (this.dispatchBuffer.length >= MAX_BUFFERED_DISPATCHES) {
+          throw new NovaError(
+            "rate_limited",
+            `nova.dispatch was refused: ${MAX_BUFFERED_DISPATCHES} actions are already waiting for an authority.`,
+          );
+        }
+      }
+      this.dispatchBuffer.push(entry);
       return Promise.resolve();
     }
     this.trackInflight(entry);
