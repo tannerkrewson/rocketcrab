@@ -611,3 +611,14 @@ describe("RuntimeInstance delivery failures", () => {
     expect(String(error?.message)).toMatch(/nova\.dispatch/);
   });
 });
+
+describe("RuntimeInstance view errors", () => {
+  it("reports a failed selectView as a non-fatal runtime error naming the member", () => {
+    const { port } = setup();
+    hook().report("viewError", { memberId: "member-b", message: "no view for b" });
+    const error = lastRuntimeMessage(port, "runtime.error");
+    expect(error).toMatchObject({ category: "remote_load", details: { memberId: "member-b" } });
+    expect(String(error?.message)).toMatch(/member-b/);
+    expect(String(error?.message)).toMatch(/no view for b/);
+  });
+});

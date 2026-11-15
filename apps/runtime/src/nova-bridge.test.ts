@@ -359,12 +359,13 @@ describe("NOVA_BRIDGE_SCRIPT executed in a frame-like context", () => {
     expect(starts).toBe(1);
   });
 
-  it("fails only the viewer whose async selectView rejects, not the whole state request", async () => {
+  it("drops only the viewers whose selectView fails, and reports each one by member", async () => {
     const { bridge, reports } = runBridge();
     bridge.nova.defineGame({
       createInitialState: () => ({ n: 1 }),
       selectView: async (state: { n: number }, viewer: { id: string }) => {
         if (viewer.id === "b") throw new Error("no view for b");
+        if (viewer.id === "c") throw new Error("sync failure for c");
         return { n: state.n, for: viewer.id };
       },
     });
@@ -376,6 +377,7 @@ describe("NOVA_BRIDGE_SCRIPT executed in a frame-like context", () => {
         viewers: [
           { id: "a", name: "A" },
           { id: "b", name: "B" },
+          { id: "c", name: "C" },
         ],
       },
     });
@@ -386,5 +388,9 @@ describe("NOVA_BRIDGE_SCRIPT executed in a frame-like context", () => {
     ).result;
     expect(result.ok).toBe(true);
     expect(Object.keys(result.views ?? {})).toEqual(["a"]);
+    const viewErrors = reports
+      .filter((r) => r.kind === "viewError")
+      .map((r) => (r.payload as { memberId: string }).memberId);
+    expect(viewErrors.sort()).toEqual(["b", "c"]);
   });
 });

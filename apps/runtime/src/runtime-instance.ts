@@ -331,6 +331,9 @@ export class RuntimeInstance {
       case "error":
         this.handleGameError(payload);
         break;
+      case "viewError":
+        this.handleViewError(payload);
+        break;
       case "unhandledrejection":
         this.handleRejection(payload);
         break;
@@ -445,6 +448,19 @@ export class RuntimeInstance {
       category = "runtime";
     }
     this.sendError(category, message, details);
+  }
+
+  /**
+   * A selectView failure for one viewer. Non-fatal: only that viewer lacks a
+   * view, so the run continues. The category is the closest non-fatal one.
+   */
+  private handleViewError(payload: unknown): void {
+    const p = (payload ?? {}) as { memberId?: unknown; message?: unknown };
+    const memberId = typeof p.memberId === "string" ? p.memberId.slice(0, 128) : "unknown";
+    const message = typeof p.message === "string" ? p.message.slice(0, 256) : "selectView failed";
+    this.sendError("remote_load", `selectView failed for member ${memberId}: ${message}`, {
+      memberId,
+    });
   }
 
   private handleRejection(payload: unknown): void {

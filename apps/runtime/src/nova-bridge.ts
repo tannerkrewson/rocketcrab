@@ -247,19 +247,26 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
     });
   }
   function computeViews(state, viewers) {
-    // Compute every viewer's selected view; a failing selectView leaves that
-    // viewer without a view (the host surfaces it) without failing the whole
-    // request. Sync and async selectView are both supported.
+    // Compute every viewer's selected view. A failing selectView leaves only
+    // that viewer without a view, and is reported by member so the host can
+    // surface it; the whole request still succeeds. Sync and async selectView
+    // are both supported.
     var views = {};
     var pending = [];
     for (var i = 0; i < viewers.length; i++) {
       (function (viewer) {
+        function viewFailed(err) {
+          report('viewError', {
+            memberId: String(viewer.id),
+            message: String((err && err.message) || err || 'selectView failed').slice(0, 256)
+          });
+        }
         var out;
         try {
           out = stateSelectView ? stateSelectView(state, viewer) : state;
-        } catch (_) { return; }
+        } catch (err) { viewFailed(err); return; }
         if (out && typeof out.then === 'function') {
-          pending.push(out.then(function (resolved) { views[viewer.id] = resolved; }, function () {}));
+          pending.push(out.then(function (resolved) { views[viewer.id] = resolved; }, viewFailed));
         } else {
           views[viewer.id] = out;
         }
