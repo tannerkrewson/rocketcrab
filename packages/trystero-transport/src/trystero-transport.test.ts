@@ -1251,6 +1251,15 @@ describe("TrysteroTransport send", () => {
     expect(room.action.send.mock.calls[2]![1].metadata.deliverySeq).toBe(1);
   });
 
+  it("does not consume a delivery sequence for a targeted send that never reaches the wire", async () => {
+    const { adapter, room } = await joinedWithPeer();
+    await expect(
+      adapter.send({ channel: "raw", payload: "x", targetConnectionId: "ghost" }),
+    ).rejects.toMatchObject({ category: "not_connected" });
+    await adapter.send({ channel: "raw", payload: "next" });
+    expect(room.action.send.mock.calls[0]![1].metadata.deliverySeq).toBe(1);
+  });
+
   it("validates structured payloads when a validator is configured (T10)", async () => {
     const { adapter, clock } = setup({
       validate: (payload: unknown) =>

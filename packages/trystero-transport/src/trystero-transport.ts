@@ -592,8 +592,9 @@ export class TrysteroTransport implements NovaTransport {
     const messageId = this.nextMessageId();
     const sentAt = this.now();
     const ordered = (options.ordering ?? "ordered") === "ordered";
-    const deliverySeq = ordered ? this.nextDeliverySeq(options.channel) : undefined;
+    // Resolve first: a send that throws here must not consume a delivery sequence.
     const target = this.resolveTarget(options.targetConnectionId);
+    const deliverySeq = ordered ? this.nextDeliverySeq(options.channel) : undefined;
     const totalBytes = payloadSize(options.payload);
     const metadata = buildWireEnvelope({
       messageId,
