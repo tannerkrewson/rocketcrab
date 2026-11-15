@@ -997,6 +997,36 @@ describe("party engine — start delivery to a frame instance", () => {
     await b.engine.leaveParty();
     await settle(world);
   });
+  it("gives a frame reloaded after the game started exactly one start, after its state", async () => {
+    const world = makeWorld();
+    const { a, b } = await playingPair(world);
+    const before = frameEvents(b).length;
+
+    // Reloading swaps in a new frame instance that registers again.
+    b.engine.reloadMyGame();
+    await settle(world);
+    await registerLocalGame(b, world);
+    await settle(world);
+
+    const sinceReload = frameEvents(b).slice(before);
+    const kinds = sinceReload.map((event) => event.kind);
+    expect(kinds.filter((kind) => kind === "start")).toHaveLength(1);
+    expect(kinds.indexOf("state")).toBeGreaterThanOrEqual(0);
+    expect(kinds.indexOf("state")).toBeLessThan(kinds.indexOf("start"));
+
+    // The start is once per instance: a repeated session start adds nothing.
+    emitSessionEvent(b, { type: "start" });
+    await settle(world);
+    expect(
+      frameEvents(b)
+        .slice(before)
+        .filter((event) => event.kind === "start"),
+    ).toHaveLength(1);
+
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+    await settle(world);
+  });
 });
 
 describe("party engine — host start-request retry", () => {

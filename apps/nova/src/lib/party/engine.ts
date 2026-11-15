@@ -964,6 +964,7 @@ export class PartyEngine {
       // Classic iframes are remounted by the UI keyed on this epoch.
       this.classicFrameEpoch += 1;
     } else {
+      this.resetFrameInstance();
       this.runtime?.reload();
     }
     this.emit();
@@ -1540,6 +1541,7 @@ export class PartyEngine {
       "Your game's runtime was suspended while the page was away — reloading it.",
     );
     this.emit();
+    this.resetFrameInstance();
     void runtime.restart().catch((error: unknown) => {
       this.addNotice("error", `The game could not be reloaded: ${errorMessage(error)}`);
       this.emit();
@@ -2247,6 +2249,15 @@ export class PartyEngine {
   // Runtime frame
   // ------------------------------------------------------------------
 
+  /**
+   * A reloaded or restarted frame is a new instance: it registers again and
+   * gets its own `start`, exactly once.
+   */
+  private resetFrameInstance(): void {
+    this.registered = false;
+    this.frameStartDelivered = false;
+  }
+
   private async maybeBootFrame(): Promise<void> {
     // Leaving clears the frame before its async teardown ends; a rebind in that
     // window must not boot a frame nobody will tear down.
@@ -2340,6 +2351,7 @@ export class PartyEngine {
         this.addNotice("warn", "Your game's runtime channel closed — reloading it.");
         this.emit();
         if (this.runtime !== null && !this.leaving) {
+          this.resetFrameInstance();
           void this.runtime.restart().catch((error: unknown) => {
             this.addNotice("error", `The game could not be reloaded: ${errorMessage(error)}`);
             this.emit();
@@ -2574,6 +2586,7 @@ export class PartyEngine {
         if (this.classic !== null) {
           this.classicFrameEpoch += 1;
         } else {
+          this.resetFrameInstance();
           this.runtime?.reload();
         }
         this.emit();
