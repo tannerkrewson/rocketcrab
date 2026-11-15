@@ -214,7 +214,9 @@ export async function gameState(page: Page): Promise<Record<string, unknown> | n
       bootCount: (game as unknown as Record<string, unknown>).__bootCount ?? null,
       remoteDep: (game as unknown as Record<string, unknown>).__remoteDep ?? null,
       malicious: (game as unknown as Record<string, unknown>).__malicious ?? null,
-      bridgeVersion: (game as unknown as Record<string, unknown>).__novaGameBridge?.version ?? null,
+      bridgeVersion:
+        (game as unknown as { __novaGameBridge?: { version?: unknown } }).__novaGameBridge
+          ?.version ?? null,
     };
   });
 }
