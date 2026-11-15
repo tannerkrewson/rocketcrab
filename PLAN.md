@@ -796,8 +796,9 @@ change. One commit per area, `npm run check` + `npm run test:e2e` each time.
 
 - [x] `apps/nova/src/lib/party/engine.ts` (~2,700 lines; ~390 comment lines,
       many describing history instead of current behaviour — trim those).
-      Evidence (branch `review/engine`, nine fix commits `76ececc`..`c476af9`,
-      `9e52269`): each bug below has a failing unit test first, then a
+      Evidence (branch `review/engine`, fix commits `76ececc`..`c476af9`,
+      `9e52269`, plus `80a478e` for a stale registration after a reload and
+      `6af5c92`; `1346cd4` pins the joiner-failure and reconnect cases): each bug below has a failing unit test first, then a
       one-commit fix in `engine.test.ts`: resume stalls when the room went idle
       while hidden; a superseded frame load cleared the live frame; `selectGame`
       kept the previous game's verification; a setup failing after join left
@@ -807,7 +808,7 @@ change. One commit per area, `npm run check` + `npm run test:e2e` each time.
       console logs leaked across parties. Trimmed history comments in
       `38de563` (comment lines 624 → 605 by a `//`/`*` grep; mostly tag and
       wording removal, not deletion). No dead code found. `npm run check`
-      exit 0. Not run: e2e (the coordinator runs it after integration). Not
+      exit 0 (re-run after the follow-ups). Not run: e2e (the coordinator runs it after integration). Not
       proven: a start retry dies silently on reconnect (intent unclear, left
       open); the `ping` sync-throw path (unreachable, since the Trystero ping
       is async); `transfers` and `verifiedSha256` are not pruned on member
