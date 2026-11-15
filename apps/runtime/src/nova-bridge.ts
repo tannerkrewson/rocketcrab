@@ -266,7 +266,7 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
           out = stateSelectView ? stateSelectView(state, viewer) : state;
         } catch (_) { return; }
         if (out && typeof out.then === 'function') {
-          pending.push(out.then(function (resolved) { views[viewer.id] = resolved; }));
+          pending.push(out.then(function (resolved) { views[viewer.id] = resolved; }, function () {}));
         } else {
           views[viewer.id] = out;
         }
@@ -280,8 +280,6 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
         requestId: requestId,
         result: { ok: true, kind: 'state', state: state, views: views }
       });
-    }, function (err) {
-      failState(requestId, 'view_error', err);
     });
   }
   function handleStateRequest(requestId, request) {
