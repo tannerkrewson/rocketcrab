@@ -204,10 +204,17 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
 
   // Debounced SHA-256 of the current source for the diagnostics panel.
   useEffect(() => {
+    // A digest for an older source can finish after a newer one; ignore it.
+    let current = true;
     const timer = window.setTimeout(() => {
-      void hashSource(source).then(setSourceHash);
+      void hashSource(source).then((hash) => {
+        if (current) setSourceHash(hash);
+      });
     }, 300);
-    return () => window.clearTimeout(timer);
+    return () => {
+      current = false;
+      window.clearTimeout(timer);
+    };
   }, [source]);
 
   const appendDiagnostics = useCallback((next: Diagnostic[]) => {

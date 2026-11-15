@@ -5,7 +5,7 @@ import {
   createMemoryHistory,
   createRouter,
 } from "@tanstack/react-router";
-import { render, screen, waitFor, within } from "@testing-library/react";
+import { act, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -14,6 +14,14 @@ import { routeTree } from "../../routeTree.gen";
 import type { ChannelPort } from "../../lib/runtime-host";
 import { runToStart } from "../../lib/arena/test-harness";
 import { EditorRuntimeSeamsContext, type EditorRuntimeSeams } from "./EditorPage";
+import { hashSource } from "../../lib/games/hashing";
+import type { Sha256 } from "@rocketcrab/protocol";
+
+// Pass-through spy: tests can hold a digest open to control resolve order.
+vi.mock("../../lib/games/hashing", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../../lib/games/hashing")>();
+  return { ...actual, hashSource: vi.fn(actual.hashSource) };
+});
 
 /**
  * Editor integration tests (U4): the real /editor and /games/:id/edit routes
@@ -676,6 +684,33 @@ describe("diagnostic report", () => {
     expect(report).toContain("Source SHA-256: ");
     expect(report).toContain("syntax");
     expect(report).toContain("Unexpected token");
+  });
+
+  it("keeps the current source's hash when an older digest resolves last", async () => {
+    mockClipboard(PASTED_SOURCE);
+    const resolveDigest: Array<(hash: Sha256) => void> = [];
+    vi.mocked(hashSource)
+      .mockImplementationOnce(() => new Promise((resolve) => resolveDigest.push(resolve)))
+      .mockImplementationOnce(() => new Promise((resolve) => resolveDigest.push(resolve)));
+    const harness = createHostHarness();
+    renderEditor(["/editor"], harness);
+    const desktop = await layout("desktop-layout");
+
+    // Digest 0 hashes the empty starting source; paste starts digest 1.
+    await waitFor(() => expect(resolveDigest).toHaveLength(1));
+    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
+    await waitFor(() => expect(resolveDigest).toHaveLength(2));
+
+    await act(async () => {
+      resolveDigest[1]!("new-hash" as Sha256);
+    });
+    await waitFor(() => expect(desktop.getByTitle("Source SHA-256: new-hash")).toBeInTheDocument());
+
+    // The stale digest finishing afterwards must not overwrite the hash.
+    await act(async () => {
+      resolveDigest[0]!("stale-hash" as Sha256);
+    });
+    expect(desktop.getByTitle("Source SHA-256: new-hash")).toBeInTheDocument();
   });
 });
 
