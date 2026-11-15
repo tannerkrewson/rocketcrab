@@ -487,6 +487,11 @@ export class PartyEngine {
   private removedReason: string | null = null;
   private frameStarted = false;
   private registered = false;
+  /**
+   * Whether the current frame instance has received `start`. Reset when a new
+   * frame boots, so each frame instance gets `start` exactly once.
+   */
+  private frameStartDelivered = false;
 
   /**
    * S2/A1 frame executors (5cl.14): the party's NovaSession runs the
@@ -575,12 +580,7 @@ export class PartyEngine {
     const classicActive = this.classic !== null;
     const allReady =
       classicActive || (members.length > 0 && members.every((member) => member.ready));
-    const allVerified =
-      classicActive ||
-      (members.length > 0 &&
-        members.every((member) =>
-          member.isSelf ? this.selfVerified : this.isSourceVerified(member.memberId),
-        ));
+    const allVerified = this.allSourcesVerified(members, classicActive);
     const anyFailed = classicActive
       ? false
       : members.some(
@@ -1722,6 +1722,7 @@ export class PartyEngine {
     this.stateExecutor = new PartyStateExecutor(() => this.runtime);
     this.simulationExecutor = new PartySimulationExecutor(() => this.runtime);
     const session = createNovaSession({
+      acceptStartRequest: (memberId) => this.acceptStartRequestFrom(memberId),
       transport: party.privateTransport,
       room: party.material.roomId,
       sessionId: party.material.sessionId,
@@ -1991,6 +1992,9 @@ export class PartyEngine {
         : {}),
     });
     this.runtime = client;
+    // A new frame instance: it has not registered and has not seen start.
+    this.registered = false;
+    this.frameStartDelivered = false;
     try {
       await client.load({
         gameId: source.gameId,
@@ -2613,8 +2617,29 @@ export class PartyEngine {
       if (apiEvent.kind === "state") {
         this.lastStateApiEvent = apiEvent;
       }
-      this.runtime?.pushApiEvent(apiEvent);
+      if (apiEvent.kind === "start") {
+        this.deliverStartToFrame();
+      } else {
+        this.runtime?.pushApiEvent(apiEvent);
+        if (apiEvent.kind === "state") this.deliverStartToFrame();
+      }
     }
+  }
+
+  /**
+   * Send `start` to the current frame instance, at most once per instance and
+   * only after it has registered. A state-mode game reads its state in onStart,
+   * so `start` waits for the first state event (the state is replayed first on
+   * a rebooted frame, then start). Every path that can deliver start calls this:
+   * the live session event, a state event, and the snapshot replay.
+   */
+  private deliverStartToFrame(): void {
+    const runtime = this.runtime;
+    if (runtime === null || !this.registered || !this.gameStarted) return;
+    if (this.frameStartDelivered) return;
+    if (this.game?.mode === "state" && this.lastStateApiEvent === null) return;
+    this.frameStartDelivered = true;
+    runtime.pushApiEvent({ kind: "start" });
   }
 
   /**
@@ -2645,9 +2670,7 @@ export class PartyEngine {
     // gameStarted, not session.isStarted(): a follower's session never sets its
     // own started flag (only the starter's start() does), so a frame rebooted
     // after the game began would never receive start and refuse every action.
-    if (this.gameStarted) {
-      runtime.pushApiEvent({ kind: "start" });
-    }
+    this.deliverStartToFrame();
   }
 
   // ------------------------------------------------------------------
@@ -2740,6 +2763,30 @@ export class PartyEngine {
   private computeAuthorityMemberId(members: readonly PartyMemberView[]): MemberId | null {
     const engineAuthority = this.session?.getStateModeDiagnostics().authorityMemberId ?? null;
     return engineAuthority ?? members.find((member) => member.ready)?.memberId ?? null;
+  }
+
+  /**
+   * Every member holds a verified game source (the lobby's start gate). Used
+   * by getState and by the session's start-request gate, so both agree.
+   */
+  private allSourcesVerified(members: readonly PartyMemberView[], classicActive: boolean): boolean {
+    return (
+      classicActive ||
+      (members.length > 0 &&
+        members.every((member) =>
+          member.isSelf ? this.selfVerified : this.isSourceVerified(member.memberId),
+        ))
+    );
+  }
+
+  /**
+   * The session's start-request gate: a `game.start` request counts only from
+   * the party host, and only once every member has the game source. The
+   * session reports a rejected request; the UI gate is the same condition.
+   */
+  private acceptStartRequestFrom(memberId: MemberId): boolean {
+    if (this.party?.hostMemberId !== memberId) return false;
+    return this.allSourcesVerified(this.buildMembers(), this.classic !== null);
   }
 
   private isSourceVerified(memberId: MemberId): boolean {

@@ -901,6 +901,94 @@ describe("party engine — a frame rebooted after the game started", () => {
   });
 });
 
+describe("party engine — start delivery to a frame instance", () => {
+  /** Start a game with a and b both registered, then return b's frame state. */
+  async function playingPair(world: World) {
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    const code = await runCreate(a, world);
+    await registerLocalGame(a, world);
+    const { join: joinPromise, settled } = startJoin(b, world, code);
+    await settled;
+    await settle(world);
+    await joinPromise;
+    await settle(world);
+    await registerLocalGame(b, world);
+    a.engine.startGame();
+    await settle(world);
+    expect(b.engine.getState().phase).toBe("playing");
+    return { a, b };
+  }
+
+  /** Session events are fed straight to the engine, as the session would emit them. */
+  function emitSessionEvent(player: Player, event: unknown): void {
+    (player.engine as unknown as { handleSessionEvent(event: unknown): void }).handleSessionEvent(
+      event,
+    );
+  }
+
+  function frameEvents(player: Player): Array<{ kind: string }> {
+    return player.harness.port1.sent
+      .filter((message) => (message as { type?: string }).type === "game.apiEvent")
+      .map((message) => (message as { event: { kind: string } }).event);
+  }
+
+  it("delivers start to a rebooted frame exactly once, even when a live start follows registration", async () => {
+    const world = makeWorld();
+    const { a, b } = await playingPair(world);
+    b.engine.setContainer(null);
+    b.engine.setContainer(b.container);
+    await settle(world);
+    await registerLocalGame(b, world);
+    expect(frameEvents(b).filter((event) => event.kind === "start")).toHaveLength(1);
+
+    // A session start event arriving now must not send start a second time.
+    emitSessionEvent(b, { type: "start" });
+    await settle(world);
+    expect(frameEvents(b).filter((event) => event.kind === "start")).toHaveLength(1);
+
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+    await settle(world);
+  });
+
+  it("holds start until the rebooted frame has its state, then sends state followed by start", async () => {
+    const world = makeWorld();
+    const { a, b } = await playingPair(world);
+    // The game started, but this player has no state yet.
+    (b.engine as unknown as { lastStateApiEvent: unknown }).lastStateApiEvent = null;
+    b.engine.setContainer(null);
+    b.engine.setContainer(b.container);
+    await settle(world);
+    await registerLocalGame(b, world);
+    expect(frameEvents(b).some((event) => event.kind === "start")).toBe(false);
+
+    emitSessionEvent(b, { type: "state", state: { round: 1 } });
+    await settle(world);
+    const kinds = frameEvents(b).map((event) => event.kind);
+    expect(kinds.filter((kind) => kind === "start")).toHaveLength(1);
+    expect(kinds.indexOf("state")).toBeGreaterThanOrEqual(0);
+    expect(kinds.indexOf("state")).toBeLessThan(kinds.indexOf("start"));
+
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+    await settle(world);
+  });
+
+  it("accepts a start request only from the host", async () => {
+    const world = makeWorld();
+    const { a, b } = await playingPair(world);
+    const gate = (a.engine as unknown as { acceptStartRequestFrom(id: string): boolean })
+      .acceptStartRequestFrom;
+    expect(gate.call(a.engine, a.memberId)).toBe(true);
+    expect(gate.call(a.engine, b.memberId)).toBe(false);
+
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+    await settle(world);
+  });
+});
+
 describe("party engine — lobby notices", () => {
   it("dedupes identical notices instead of piling up alerts (11.8)", async () => {
     const world = makeWorld();
