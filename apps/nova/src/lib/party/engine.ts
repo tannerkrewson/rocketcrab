@@ -537,6 +537,12 @@ export class PartyEngine {
   private transfers = new Map<MemberId, TransferState>();
   private game: PartyGame | null = null;
   private selfVerified = false;
+  /** The source hash `selfVerified` is for (see adoptSourceHash). */
+  private selfVerifiedSha256: string | null = null;
+  /** The source hash the party announces now; any other verification is stale. */
+  private currentSourceSha256: string | null = null;
+  /** The hash each remote member last verified, send- or receive-side. */
+  private verifiedSha256 = new Map<MemberId, string>();
   private endedReason: string | null = null;
   private leaving = false;
   private notices: PartyNotice[] = [];
@@ -895,6 +901,8 @@ export class PartyEngine {
       this.classic = { gameId, title: game.name, connectResult };
       this.game = { gameId, title: game.name, mode: "state" };
       this.selfVerified = true;
+      this.selfVerifiedSha256 = null;
+      this.currentSourceSha256 = null;
       this.registered = true;
       // No Nova runtime frame for classic games — the UI embeds the iframe
       // directly from state.classicGame. Drop any previous Nova source.
@@ -1283,7 +1291,10 @@ export class PartyEngine {
     this.game = null;
     this.classic = null;
     this.transfers.clear();
+    this.verifiedSha256.clear();
     this.selfVerified = false;
+    this.selfVerifiedSha256 = null;
+    this.currentSourceSha256 = null;
     this.endedReason = null;
     this.notices = [];
     this.lastError = this.teardownFailed ? UNSAFE_TEARDOWN_MESSAGE : null;
@@ -1993,8 +2004,10 @@ export class PartyEngine {
         mode: input.mode,
         source: input.source,
       })
-      .then(() => {
+      .then((metadata) => {
+        this.adoptSourceHash(metadata.sourceSha256);
         this.selfVerified = true;
+        this.selfVerifiedSha256 = metadata.sourceSha256;
         this.transfers.set(this.identity.memberId, {
           fraction: 1,
           bytesTransferred: input.source.length,
@@ -2385,6 +2398,8 @@ export class PartyEngine {
           };
           this.game = { gameId: event.gameId, title, mode: "state" };
           this.selfVerified = true;
+          this.selfVerifiedSha256 = null;
+          this.currentSourceSha256 = null;
           this.registered = true;
           this.addNotice("info", `${title} has been selected for the party.`);
         }
@@ -2503,6 +2518,7 @@ export class PartyEngine {
         };
         const changed = this.game?.gameId !== game.gameId || this.game.mode !== game.mode;
         this.game = game;
+        this.adoptSourceHash(event.metadata.sourceSha256);
         if (changed && this.party !== null) {
           this.classic = null;
           this.selfVerified = false;
@@ -2524,6 +2540,7 @@ export class PartyEngine {
           );
           if (cached !== undefined) {
             this.selfVerified = true;
+            this.selfVerifiedSha256 = event.metadata.sourceSha256;
             this.pendingSource = { ...game, source: cached };
             void this.maybeBootFrame();
           }
@@ -2560,7 +2577,10 @@ export class PartyEngine {
         if (event.direction === "receive") {
           // The peer who SENT us the game obviously holds a verified source;
           // mark its row complete so this player's start gate can open.
-          this.markSourceVerified(event.memberId, "Sent you the game");
+          this.markSourceVerified(event.memberId, "Sent you the game", event.sourceSha256);
+        } else {
+          // The peer accepted our copy only after verifying its hash.
+          this.markSourceVerified(event.memberId, "Game received", event.sourceSha256);
         }
         this.addNotice(
           "info",
@@ -2586,14 +2606,16 @@ export class PartyEngine {
             this.emit();
           });
         }
+        this.adoptSourceHash(event.sourceSha256);
         this.selfVerified = true;
+        this.selfVerifiedSha256 = event.sourceSha256;
         this.recordTransfer(this.identity.memberId, {
           state: "complete",
           fraction: 1,
           detail: "Game received",
         });
         // The sender (the host) holds the verified source too.
-        this.markSourceVerified(event.fromMemberId, "Sent you the game");
+        this.markSourceVerified(event.fromMemberId, "Sent you the game", event.sourceSha256);
         // The joiner can now boot its runtime frame with the verified source.
         this.pendingSource = {
           gameId: event.gameId,
@@ -2609,7 +2631,7 @@ export class PartyEngine {
       case "holds": {
         // This player accepted the member's copy of the verified source, so
         // the member holds it: its row completes and the start gate can open.
-        this.markSourceVerified(event.memberId, "Has the game");
+        this.markSourceVerified(event.memberId, "Has the game", event.sourceSha256);
         this.emit();
         break;
       }
@@ -2849,7 +2871,7 @@ export class PartyEngine {
         transferProgress = 1;
         transferDetail = "Classic game ready";
       } else if (isSelf) {
-        if (this.selfVerified) {
+        if (this.isSourceVerified(memberId)) {
           transferState = "complete";
           transferProgress = 1;
           transferDetail = "You have the game";
@@ -2924,10 +2946,7 @@ export class PartyEngine {
   private allSourcesVerified(members: readonly PartyMemberView[], classicActive: boolean): boolean {
     return (
       classicActive ||
-      (members.length > 0 &&
-        members.every((member) =>
-          member.isSelf ? this.selfVerified : this.isSourceVerified(member.memberId),
-        ))
+      (members.length > 0 && members.every((member) => this.isSourceVerified(member.memberId)))
     );
   }
 
@@ -2941,15 +2960,40 @@ export class PartyEngine {
     return this.allSourcesVerified(this.buildMembers(), this.classic !== null);
   }
 
+  /**
+   * The member holds the party's current source. A verification counts only
+   * for the hash the party announces now, so an edited game under the same
+   * id must be verified again.
+   */
   private isSourceVerified(memberId: MemberId): boolean {
     if (memberId === this.identity.memberId) {
-      return this.selfVerified;
+      return this.selfVerified && this.selfVerifiedSha256 === this.currentSourceSha256;
     }
-    return this.transfers.get(memberId)?.state === "complete";
+    return (
+      this.transfers.get(memberId)?.state === "complete" &&
+      this.verifiedSha256.get(memberId) === this.currentSourceSha256
+    );
   }
 
-  /** Mark a member as holding a verified game source. */
-  private markSourceVerified(memberId: MemberId, detail: string): void {
+  /**
+   * Every verification is for one source hash. Adopts the hash the party now
+   * announces. A member or this player verified for another hash goes back to
+   * waiting, so the lobby re-requests the source and the start gate waits.
+   */
+  private adoptSourceHash(sourceSha256: string): void {
+    this.currentSourceSha256 = sourceSha256;
+    for (const [memberId, verified] of this.verifiedSha256) {
+      if (verified === sourceSha256) continue;
+      this.verifiedSha256.delete(memberId);
+      this.recordTransfer(memberId, { state: "waiting", fraction: 0, detail: null });
+    }
+    if (this.selfVerified && this.selfVerifiedSha256 !== sourceSha256) {
+      this.recordTransfer(this.identity.memberId, { state: "waiting", fraction: 0, detail: null });
+    }
+  }
+
+  /** Mark a member as holding the verified game source for this hash. */
+  private markSourceVerified(memberId: MemberId, detail: string, sourceSha256: string): void {
     const previous = this.transfers.get(memberId);
     const existing: TransferState = previous ?? {
       fraction: 1,
@@ -2964,6 +3008,7 @@ export class PartyEngine {
       fraction: 1,
       detail,
     });
+    this.verifiedSha256.set(memberId, sourceSha256);
   }
 
   private recordTransfer(

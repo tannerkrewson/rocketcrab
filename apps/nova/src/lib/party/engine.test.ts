@@ -1299,6 +1299,70 @@ describe("party engine — roles, reconnect, and cleanup", () => {
 });
 
 // ---------------------------------------------------------------------------
+// Source verification is for one source hash: an edited game under the same id
+// must be verified again before the start gate opens.
+describe("source verification is keyed by the source hash", () => {
+  it("a member verified for the old hash waits again when the same game id has a new hash", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    const code = await runCreate(a, world);
+    await registerLocalGame(a, world);
+    const { join, settled } = startJoin(b, world, code);
+    await settled;
+    await settle(world);
+    await join;
+    await settle(world);
+    await registerLocalGame(b, world);
+    await settle(world);
+    expect(memberOf(b.engine.getState(), a.memberId).transferState).toBe("complete");
+    expect(b.engine.getState().canStart).toBe(true);
+
+    // The host edits the game and keeps its id: the new hash is announced.
+    const coordinatorEvent = (event: unknown) =>
+      (b.engine as unknown as { handleCoordinatorEvent(e: unknown): void }).handleCoordinatorEvent(
+        event,
+      );
+    const gameId = GAME.gameId;
+    coordinatorEvent({
+      type: "metadata",
+      metadata: {
+        gameId,
+        title: GAME.title,
+        mode: GAME.mode,
+        sourceSha256: "edited-hash",
+        sourceSizeBytes: 9,
+      },
+      fromMemberId: a.memberId,
+    });
+    expect(memberOf(b.engine.getState(), a.memberId).transferState).toBe("waiting");
+    expect(b.engine.getState().canStart).toBe(false);
+
+    // The edited source arrives and verifies: the gate opens again.
+    coordinatorEvent({
+      type: "received",
+      fromMemberId: a.memberId,
+      gameId,
+      sourceSha256: "edited-hash",
+      source: "<html>edited</html>",
+    });
+    coordinatorEvent({
+      type: "complete",
+      direction: "receive",
+      memberId: a.memberId,
+      gameId,
+      sourceSha256: "edited-hash",
+    });
+    expect(memberOf(b.engine.getState(), a.memberId).transferState).toBe("complete");
+    // The new source reboots this player's frame, which must register again.
+    expect(b.engine.getState().startBlockedReason).toMatch(/load and register/i);
+    await registerLocalGame(b, world);
+    await settle(world);
+    expect(b.engine.getState().canStart).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Diagnostics: window.__NOVA_PARTY_DEBUG__ (dev and test builds) snapshots the
 // engine state that a stalled 3-player start needs (PLAN §5.6).
 describe("the party debug snapshot", () => {
