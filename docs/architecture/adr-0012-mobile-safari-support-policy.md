@@ -78,6 +78,8 @@ instability, and strict audio/user-gesture rules.
 - F4 and M1 own the physical-device matrices; U3/U6/P4/S3/A3 gate on F4 where
   the plan says so (F6, U3, A3, M1 blocked by F4).
 - M4 records physical-device checks as a required release gate; known
-  limitations are visible in the README.
+  limitations are documented in the API reference (section 14.5). The manual
+  pass is tracked in
+  [`docs/testing/mobile-safari-checklist.md`](../testing/mobile-safari-checklist.md).
 - Game authors get clear guidance (A4 prompt, API docs) about capabilities
   that require user gestures and about limitations.

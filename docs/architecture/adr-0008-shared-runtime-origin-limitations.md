@@ -4,7 +4,8 @@
 - **Date:** 2026-08-01
 - **Owner:** Rocketcrab Nova planning (Phase 1)
 - **Related:** ADR-0001 (origins), F4 (sandbox spike), M2 (deployment),
-  B5 (shared origin), A3 (media bridging)
+  B5 (shared origin), A3 (media bridging; evidence in
+  [media bridging findings](../testing/media-bridging-findings.md))
 
 ## Amended 2026-11-12: runtime on a separate site
 
