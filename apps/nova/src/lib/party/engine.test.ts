@@ -3430,4 +3430,22 @@ describe("party engine — §10 review: lifecycle cleanup", () => {
     expect(a.engine.getState().game).toBeNull();
     expect(a.engine.getState().notices.some((n) => n.level === "error")).toBe(false);
   });
+
+  it("does not boot a game frame when the container is rebound while the party is being left", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    await runCreate(a, world);
+    const createChannel = vi.fn(a.harness.seams.createChannel!);
+    a.harness.seams.createChannel = createChannel;
+
+    // Leave is in flight (its transport teardown is awaited) when the page
+    // binds a new container.
+    const leaving = a.engine.leaveParty();
+    a.engine.setContainer(document.createElement("div"));
+    await leaving;
+    await settle(world);
+
+    expect(createChannel).not.toHaveBeenCalled();
+    expect(a.engine.debugSnapshot().frameExists).toBe(false);
+  });
 });

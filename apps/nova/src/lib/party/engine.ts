@@ -2248,7 +2248,9 @@ export class PartyEngine {
   // ------------------------------------------------------------------
 
   private async maybeBootFrame(): Promise<void> {
-    if (this.frameStarted || this.runtime !== null || this.container === null) {
+    // Leaving clears the frame before its async teardown ends; a rebind in that
+    // window must not boot a frame nobody will tear down.
+    if (this.frameStarted || this.runtime !== null || this.container === null || this.leaving) {
       return;
     }
     const source = this.pendingSource;
