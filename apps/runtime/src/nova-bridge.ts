@@ -1,40 +1,33 @@
 /**
- * Nova API bootstrap injection (deliverable: the tiny `window.nova` bridge
- * prepended to every game document).
+ * Nova API bootstrap injection: the `window.nova` bridge prepended to every
+ * game document.
  *
  * The injected script runs inside the game frame BEFORE any game code:
  *
  * - captures window `error` and `unhandledrejection` events (including
  *   resource load failures) and forwards them to the runtime page;
  * - wraps `console.*` so game output is observable by the host (rate-limited
- *   on the runtime page — see `rate-limiter.ts`);
- * - defines `window.nova` with the full game-facing API surface (S1): the
- *   same object shape `createNovaClient` builds in `@rocketcrab/nova-api`.
- *   Registration (`nova.defineGame`) and the forwarded calls (`ready`,
- *   `dispatch`, `raw.*`, `simulation.*`) report to the runtime page, which
- *   schema-validates them before anything reaches the host (never trust game
- *   metadata; threat model T10). The lifecycle is enforced in the frame too,
- *   so calls fail with a clear `NovaError` before readiness (S1 acceptance).
+ *   on the runtime page; see `rate-limiter.ts`);
+ * - defines `window.nova` with the game-facing API surface, the same object
+ *   shape `createNovaClient` builds in `@rocketcrab/nova-api`. Registration and
+ *   forwarded calls report to the runtime page, which schema-validates them
+ *   before anything reaches the host: game metadata is never trusted. The
+ *   lifecycle is also enforced in the frame, so a call before readiness fails
+ *   with a `NovaError`.
  *
- * S1 note: the runtime page validates forwarded calls and — since the host
- * session router landed (U6 arena, P1 party) — forwards them to the host as
- * `game.apiCall` messages, which the host routes into the player's
- * NovaSession over the transport. Host-pushed session events arrive as
- * `game.apiEvent` and are dispatched to the matching handlers by
- * `__novaGameBridge.receive`. The in-frame lifecycle guarantees that
- * everything reachable behaves exactly like the arena client.
+ * Forwarded calls go to the host as `game.apiCall`. Host-pushed session events
+ * come back as `game.apiEvent` and are dispatched by `__novaGameBridge.receive`.
  *
- * The game frame is same-origin with the runtime page (ADR-0008/B5), so the
- * bridge reports through a per-instance hook on the runtime page rather than
- * a second postMessage channel — no extra message listeners, nothing to leak
- * across restarts. The bridge never touches the host origin, never touches
- * Trystero, and contains no Nova secrets.
+ * The game frame is same-origin with the runtime page, so it reports through a
+ * per-instance hook on the runtime page rather than a second postMessage
+ * channel: no extra message listeners, and nothing to leak across restarts.
+ * The bridge never touches the host origin or Trystero, and holds no Nova
+ * secrets.
  *
- * A3: `nova.media` is the experimental media surface (option 5 verdict in
- * `docs/testing/media-bridging-findings.md`). It probes platform support and
- * fails clearly (`media_unsupported`); it never reports media to the runtime
- * because no media transport path exists in this build — the data-only
- * protocol is untouched.
+ * `nova.media` is an experimental surface. Media transport cannot cross the
+ * frame boundary in this build (see docs/testing/media-bridging-findings.md),
+ * so it probes platform support and fails clearly. It never reports to the
+ * runtime, and the data-only protocol is untouched.
  */
 import {
   PROTOCOL_VERSION,
@@ -51,9 +44,9 @@ import { z } from "zod";
 /**
  * Nova API versions this build can execute. The game-facing API version
  * (NOVA_API_VERSION, @rocketcrab/nova-api) is independent of the protocol
- * version (S1 policy). Games declare the API version they target via
- * `nova.defineGame({ apiVersion })`; an unsupported version fails
- * registration with a clear `unsupported` runtime error.
+ * version. Games declare the version they target via
+ * `nova.defineGame({ apiVersion })`; an unsupported version fails registration
+ * with a clear `unsupported` runtime error rather than being guessed at.
  */
 export const SUPPORTED_NOVA_API_VERSIONS: readonly number[] = [NOVA_API_VERSION];
 
@@ -67,9 +60,9 @@ export const gameDeclarationSchema = z.object({
 export type GameDeclaration = z.infer<typeof gameDeclarationSchema>;
 
 /**
- * Bounded payloads the runtime accepts from forwarded Nova API calls (S1).
- * Each schema mirrors the `@rocketcrab/nova-api` validation schemas so the
- * runtime boundary never trusts game-supplied call arguments.
+ * Bounded payloads the runtime accepts from forwarded Nova API calls. Each
+ * schema mirrors the `@rocketcrab/nova-api` validation schemas, so the runtime
+ * boundary never trusts game-supplied call arguments.
  */
 export const novaApiCallSchemas = {
   ready: z.object({}).strict(),
@@ -81,7 +74,7 @@ export const novaApiCallSchemas = {
         baseRevision: z.number().int().nonnegative().optional(),
       }),
       // The frame generates the action id so the host can correlate the
-      // authority's ack back to the dispatch promise (S2).
+      // authority's ack back to the dispatch promise.
       actionId: z.string().min(1).max(64),
     })
     .strict(),
@@ -123,15 +116,15 @@ export const novaApiCallSchemas = {
       }),
     })
     .strict(),
-  // S2: the authority frame's answer to a stateRequest host event.
+  // The authority frame's answer to a stateRequest event.
   stateResponse: z
     .object({
       requestId: z.string().min(1).max(64),
       result: stateResponseSchema,
     })
     .strict(),
-  // A1: the authority frame's answer to a simulationRequest host event
-  // (the game's serializeState callback produced its simulation state).
+  // The authority frame's answer to a simulationRequest event (the game's
+  // serializeState callback produced its simulation state).
   simulationResponse: z
     .object({
       requestId: z.string().min(1).max(64),
@@ -146,7 +139,7 @@ export type NovaApiCallMethod = keyof typeof novaApiCallSchemas;
 export const NOVA_API_CALL_METHODS: readonly string[] = Object.keys(novaApiCallSchemas);
 
 /**
- * JavaScript source injected ahead of the game document (F4 spike shape).
+ * JavaScript source injected ahead of the game document.
  * Kept dependency-free and Trystero-free: it must run in an untrusted frame
  * with no module loading. The surface mirrors `createNovaClient` from
  * `@rocketcrab/nova-api` (parity is asserted in `nova-bridge.test.ts`).
@@ -191,13 +184,13 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
     })(methods[i]);
   }
 
-  // --- Nova API surface (S1). Mirrors createNovaClient in @rocketcrab/nova-api. ---
+  // --- Nova API surface. Mirrors createNovaClient in @rocketcrab/nova-api. ---
   var API_VERSION = ${NOVA_API_VERSION};
   var registered = false;
   var readySent = false;
   var started = false;
   var ended = false;
-  // Session state pushed by the host (U6 session router): this player's
+  // Session state pushed by the host: this player's
   // identity, the player list, the connection status, and canonical state.
   // The identity comes from the validated runtime.bootstrap, injected by the
   // runtime page before the bridge runs.
@@ -205,8 +198,8 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
   var players = [];
   var connectionStatus = 'disconnected';
   var stateValue = null;
-  // S2 state-mode handlers captured at defineGame; they stay in this frame
-  // and never cross to the host (the host only sees plain-data requests).
+  // State-mode handlers captured at defineGame. They stay in this frame and
+  // never cross to the host, which only sees plain-data requests.
   var stateCreateInitialState = null;
   var stateActions = null;
   var stateSelectView = null;
@@ -328,7 +321,7 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
     }
   }
   function handleSimulationRequest(requestId) {
-    // A1: the authority's game serializes its simulation state (snapshot
+    // The authority's game serializes its simulation state (snapshot
     // production). The state is game-defined plain data; Nova only carries
     // and replicates it. Sync and async serializeState are both supported.
     var state;
@@ -449,12 +442,11 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
     }
   };
 
-  // --- Experimental media surface (A3). ---
-  // The A3 spike verdict: media transport cannot cross the frame boundary
-  // in this build (Blocker Register B7; see docs/testing/
-  // media-bridging-findings.md). The surface exists so games can probe the
-  // platform and fail clearly; publish never reports to the runtime because
-  // there is no media transport path (the data-only protocol is untouched).
+  // --- Experimental media surface. ---
+  // Media transport cannot cross the frame boundary in this build (see
+  // docs/testing/media-bridging-findings.md). The surface exists so games can
+  // probe the platform and fail clearly. Publish never reports to the runtime
+  // because there is no media transport path; the data-only protocol is untouched.
   function mediaIsSupported() {
     try {
       if (typeof structuredClone !== 'function') return false;
@@ -617,7 +609,7 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
       if (options != null && typeof options.apiVersion === 'number' && options.apiVersion !== API_VERSION) {
         fail('unsupported_api_version', 'nova.defineGame() targets API version ' + options.apiVersion + ', but this build supports version(s) [' + API_VERSION + '].');
       }
-      // S2: state-mode handler functions stay in this frame (they are never
+      // State-mode handler functions stay in this frame (they are never
       // serialized); only the plain-data declaration reaches the host.
       if (options != null) {
         if (typeof options.createInitialState === 'function') stateCreateInitialState = options.createInitialState;
@@ -649,7 +641,7 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
     dispatch: function (action) {
       requireStarted('dispatch');
       // The frame generates the action id so the authority's ack (pushed
-      // back as an actionAck event) settles this promise (S2).
+      // back as an actionAck event) settles this promise.
       var actionId = novaId('action');
       return new Promise(function (resolve, reject) {
         var timer = setTimeout(function () {
@@ -680,7 +672,7 @@ function truncate(value: string, max: number): string {
   return `${value.slice(0, Math.max(0, max - TRUNCATE_SUFFIX.length))}${TRUNCATE_SUFFIX}`;
 }
 
-function stringifyArg(value: unknown, depth: number): string {
+function stringifyArg(value: unknown): string {
   if (value === null) return "null";
   if (value === undefined) return "undefined";
   const type = typeof value;
@@ -690,7 +682,6 @@ function stringifyArg(value: unknown, depth: number): string {
     const stack = value.stack ? `\n${value.stack}` : "";
     return `Error: ${value.message}${stack}`;
   }
-  if (depth > 2) return String(value);
   try {
     const json = JSON.stringify(value);
     if (json !== undefined) return json;
@@ -700,7 +691,7 @@ function stringifyArg(value: unknown, depth: number): string {
   return String(value);
 }
 
-export interface SerializedConsoleEntry {
+interface SerializedConsoleEntry {
   /** Bounded first-argument string (1..1024 chars). */
   message: string;
   /** Bounded serialization of the remaining arguments (0..4096 chars). */
@@ -712,12 +703,12 @@ export function serializeConsoleArgs(args: readonly unknown[]): SerializedConsol
   let message = "";
   let details = "";
   if (args.length > 0) {
-    message = truncate(stringifyArg(args[0], 0), 1024);
+    message = truncate(stringifyArg(args[0]), 1024);
     if (args.length > 1) {
       details = truncate(
         args
           .slice(1)
-          .map((arg) => stringifyArg(arg, 0))
+          .map((arg) => stringifyArg(arg))
           .join(" "),
         4096,
       );

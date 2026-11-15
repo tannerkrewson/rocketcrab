@@ -9,12 +9,11 @@
  *   reports through (errors, unhandled rejections, console entries, and
  *   `nova.defineGame` declarations);
  * - the game registration timeout;
- * - rate-limited error/console forwarding (F6 limits);
+ * - rate-limited error/console forwarding;
  * - reload and destroy (parent-controlled).
  *
- * Game code must never reach the host origin; everything the game reports is
- * treated as untrusted input and validated here before it becomes a protocol
- * message (threat model T10; engineering rules 15/21).
+ * Game code must never reach the host origin. Everything the game reports is
+ * untrusted input, validated here before it becomes a protocol message.
  */
 import {
   parseRuntimeMessage,
@@ -44,13 +43,13 @@ import {
   type GameDeclaration,
   type NovaApiCallMethod,
 } from "./nova-bridge";
-import { RateLimitedSink, createRuntimeLimiters, type RateLimiter } from "./rate-limiter";
+import { RateLimitedSink, createRuntimeLimiters } from "./rate-limiter";
 
 /** Bounded protocol-message history kept for tests and diagnostics. */
-export const OUTGOING_LOG_LIMIT = 500;
+const OUTGOING_LOG_LIMIT = 500;
 
 /** How long the runtime waits for `nova.defineGame` before reporting. */
-export const REGISTRATION_TIMEOUT_MS = 10_000;
+const REGISTRATION_TIMEOUT_MS = 10_000;
 
 /** A port we can drive from tests (real MessagePorts satisfy this). */
 export interface PortLike {
@@ -61,7 +60,7 @@ export interface PortLike {
 }
 
 /** The sandboxed game frame, as seen by the runtime. */
-export interface GameFrame {
+interface GameFrame {
   readonly window: Window | null;
   destroy(): void;
 }
@@ -71,7 +70,7 @@ export interface FrameFactory {
   create(source: string, allowTokens: readonly string[]): GameFrame;
 }
 
-export interface RuntimeInstanceOptions {
+interface RuntimeInstanceOptions {
   runtimeInstanceId: string;
   bootstrap: RuntimeBootstrapMessage;
   port: PortLike;
@@ -96,8 +95,6 @@ export class RuntimeInstance {
   private readonly gameMode: GameMode;
   private readonly gameTitle: string | undefined;
   private readonly allowTokens: readonly string[];
-  private readonly consoleLimiter: RateLimiter;
-  private readonly errorLimiter: RateLimiter;
   private readonly consoleSink: RateLimitedSink<{
     level: "debug" | "log" | "info" | "warn" | "error";
     message: string;
@@ -125,9 +122,7 @@ export class RuntimeInstance {
     this.gameTitle = options.bootstrap.gameTitle;
     this.allowTokens = options.bootstrap.permissions?.allow ?? [];
     const limiters = createRuntimeLimiters();
-    this.consoleLimiter = limiters.console;
-    this.errorLimiter = limiters.errors;
-    this.consoleSink = new RateLimitedSink(this.consoleLimiter, (entry, dropped) => {
+    this.consoleSink = new RateLimitedSink(limiters.console, (entry, dropped) => {
       this.send(
         buildConsoleMessage(this.runtimeInstanceId, entry.level, entry.message, {
           ...(entry.details.length > 0 ? { details: entry.details } : {}),
@@ -136,7 +131,7 @@ export class RuntimeInstance {
         }),
       );
     });
-    this.errorSink = new RateLimitedSink(this.errorLimiter, (report, dropped) => {
+    this.errorSink = new RateLimitedSink(limiters.errors, (report, dropped) => {
       this.send(
         buildErrorMessage(this.runtimeInstanceId, report.category, report.message, {
           ...(report.details !== undefined ? { details: report.details } : {}),
@@ -193,7 +188,7 @@ export class RuntimeInstance {
     }
   }
 
-  /** Page-visibility pause diagnostic (Mobile Safari backgrounding, B6). */
+  /** Page-visibility pause diagnostic: mobile browsers suspend backgrounded pages. */
   pageVisibilityChanged(hidden: boolean): void {
     if (this.destroyed) return;
     this.send(
@@ -364,9 +359,8 @@ export class RuntimeInstance {
       return;
     }
     const declaration = parsed.data as GameDeclaration;
-    // Unsupported Nova API version fails registration with a clear error
-    // (S1 policy: unknown versions fail rather than being guessed at).
-    // The message keeps the U4 diagnostics prefix for the editor panel.
+    // An unknown API version fails registration with a clear error rather
+    // than being guessed at.
     if (
       declaration.apiVersion !== undefined &&
       !SUPPORTED_NOVA_API_VERSIONS.includes(declaration.apiVersion)
@@ -391,8 +385,8 @@ export class RuntimeInstance {
 
   /**
    * A forwarded Nova API call: validate the payload (never trust game
-   * input), then forward it to the host session router (U6/P1) as a
-   * `game.apiCall` message. The host routes the call into this game's
+   * input), then forward it to the host session router as a `game.apiCall`
+   * message. The host routes the call into this game's
    * NovaSession over the transport; host-pushed events come back as
    * `game.apiEvent`. Never dropped silently.
    */
