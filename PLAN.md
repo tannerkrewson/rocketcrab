@@ -794,8 +794,25 @@ remains. Goals: real bugs first (reconnect, authority migration, listener and
 timer cleanup, races on leave/rejoin), then simplification without behaviour
 change. One commit per area, `npm run check` + `npm run test:e2e` each time.
 
-- [ ] `apps/nova/src/lib/party/engine.ts` (~2,700 lines; ~390 comment lines,
+- [x] `apps/nova/src/lib/party/engine.ts` (~2,700 lines; ~390 comment lines,
       many describing history instead of current behaviour — trim those).
+      Evidence (branch `review/engine`, nine fix commits `76ececc`..`c476af9`,
+      `9e52269`): each bug below has a failing unit test first, then a
+      one-commit fix in `engine.test.ts`: resume stalls when the room went idle
+      while hidden; a superseded frame load cleared the live frame; `selectGame`
+      kept the previous game's verification; a setup failing after join left
+      the room joined; a classic pick resolving after leave leaked into the next
+      party; a frame could boot during leave; a holds report for an old hash
+      marked a member complete; a reloaded or restarted frame never got `start`;
+      console logs leaked across parties. Trimmed history comments in
+      `38de563` (comment lines 624 → 605 by a `//`/`*` grep; mostly tag and
+      wording removal, not deletion). No dead code found. `npm run check`
+      exit 0. Not run: e2e (the coordinator runs it after integration). Not
+      proven: a start retry dies silently on reconnect (intent unclear, left
+      open); the `ping` sync-throw path (unreachable, since the Trystero ping
+      is async); `transfers` and `verifiedSha256` are not pruned on member
+      leave (bounded per party, and pruning would change re-verification); the
+      restart paths have no dedicated test.
 - [x] `packages/trystero-transport/src/trystero-transport.ts`. Evidence: four
       failing-first unit tests were proven and fixed, one commit each: `join()`
       refused a re-join from `disconnected`, which left the engine's reconnect
