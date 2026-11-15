@@ -1023,7 +1023,12 @@ describe("FallbackPeerConnection", () => {
     const socket = h.network.sockets[0];
     if (!socket) throw new Error("no socket");
     socket.injectText("not-paired");
-    await until(() => bClosed === 1, "close after text frame");
+    // A learns of the close through the edge socket, which can land a tick
+    // after B closes, so wait for both sides' failures before asserting.
+    await until(
+      () => bClosed === 1 && h.failures.length === 2,
+      "close and failure on both sides after text frame",
+    );
     expect(countBySide(h.failures)).toEqual({ a: 1, b: 1 });
     expect(h.failures.filter((f) => f.info.reason === "protocol-violation")).toHaveLength(1);
     expect(chA.readyState).toBe("closed");
