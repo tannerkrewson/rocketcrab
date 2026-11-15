@@ -271,6 +271,12 @@ const MAX_NOTICES = 8;
  * the lobby with a notice.
  */
 const START_RETRY_INTERVAL_MS = 2_000;
+/**
+ * While a member's game source is still waiting, the lobby asks the party for it
+ * again this often. A source announcement or accept can be lost on a fresh link,
+ * and asking again makes the members re-announce it.
+ */
+const SOURCE_RETRANSMIT_INTERVAL_MS = 2_000;
 const START_RETRY_TIMEOUT_MS = 30_000;
 const UNSAFE_TEARDOWN_MESSAGE =
   "Couldn't close the previous party safely. Reload the page before joining another party.";
@@ -458,6 +464,8 @@ export class PartyEngine {
   private cancelStartRetry: (() => void) | null = null;
   /** Milliseconds of start-request retry left before the host gives up. */
   private startRetryRemainingMs = 0;
+  /** Cancels the pending source re-request while a member's source is waiting. */
+  private cancelSourceRetransmit: (() => void) | null = null;
   private readonly derive?: PartySecretDerivation;
   private readonly diagnosticsProvider?: () => unknown;
   private readonly lifecycle: PartyLifecycleSource;
@@ -1055,6 +1063,40 @@ export class PartyEngine {
     this.armStartRetry();
   }
 
+  /** Re-ask for a waiting member's source every SOURCE_RETRANSMIT_INTERVAL_MS, in the lobby. */
+  private syncSourceRetransmit(state: PartyEngineState): void {
+    const waiting = state.members.some(
+      (member) => !member.isSelf && member.transferState === "waiting",
+    );
+    if (!waiting || state.phase !== "lobby" || this.party === null) {
+      this.stopSourceRetransmit();
+      return;
+    }
+    if (this.cancelSourceRetransmit === null) this.armSourceRetransmit();
+  }
+
+  private armSourceRetransmit(): void {
+    this.cancelSourceRetransmit = this.schedule(() => {
+      this.cancelSourceRetransmit = null;
+      const state = this.getState();
+      const waiting = state.members.some(
+        (member) => !member.isSelf && member.transferState === "waiting",
+      );
+      if (!waiting || state.phase !== "lobby" || this.party === null) return;
+      void this.coordinator
+        ?.refresh()
+        .catch((error: unknown) =>
+          this.addNotice("warn", `Could not ask the party for the game: ${errorMessage(error)}`),
+        );
+      this.armSourceRetransmit();
+    }, SOURCE_RETRANSMIT_INTERVAL_MS);
+  }
+
+  private stopSourceRetransmit(): void {
+    this.cancelSourceRetransmit?.();
+    this.cancelSourceRetransmit = null;
+  }
+
   /** Stop the start-request retry (the game started, ended, or the party is left). */
   private stopStartRetry(): void {
     this.cancelStartRetry?.();
@@ -1083,6 +1125,7 @@ export class PartyEngine {
    */
   leaveParty(nextPhase: PartyPhase = "idle", preserveSetup = false): Promise<void> {
     this.stopStartRetry();
+    this.stopSourceRetransmit();
     this.activeErrorScope = null;
     if (!preserveSetup) {
       this.observedJoinFailure = null;
@@ -3025,6 +3068,7 @@ export class PartyEngine {
 
   private emit(): void {
     const state = this.getState();
+    this.syncSourceRetransmit(state);
     for (const handler of this.listeners) {
       handler(state);
     }

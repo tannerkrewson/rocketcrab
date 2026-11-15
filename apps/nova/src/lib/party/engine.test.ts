@@ -1089,6 +1089,45 @@ describe("party engine — host start-request retry", () => {
   });
 });
 
+describe("party engine — source re-request while a member's source waits", () => {
+  it("asks the party again every 2 s while a member's source is waiting, and stops once it arrives", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    const code = await runCreate(a, world);
+    await registerLocalGame(a, world);
+    const { join: joinPromise, settled } = startJoin(b, world, code);
+    await settled;
+    await settle(world);
+    await joinPromise;
+    await settle(world);
+
+    const engine = a.engine as unknown as {
+      coordinator: { refresh(): Promise<void> } | null;
+      transfers: Map<string, { state: string; fraction: number; detail: string | null }>;
+      emit(): void;
+    };
+    const refresh = vi.spyOn(engine.coordinator!, "refresh").mockResolvedValue(undefined);
+    // b's source is waiting: the first request (its announcement lost) is re-asked.
+    engine.transfers.delete(b.memberId);
+    engine.emit();
+    world.clock.advance(2_000);
+    expect(refresh).toHaveBeenCalledTimes(1);
+    world.clock.advance(2_000);
+    expect(refresh).toHaveBeenCalledTimes(2);
+
+    // The source arrives: no more re-requests.
+    engine.transfers.set(b.memberId, { state: "complete", fraction: 1, detail: null });
+    engine.emit();
+    world.clock.advance(10_000);
+    expect(refresh).toHaveBeenCalledTimes(2);
+
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+    await settle(world);
+  });
+});
+
 describe("party engine — lobby notices", () => {
   it("dedupes identical notices instead of piling up alerts (11.8)", async () => {
     const world = makeWorld();
