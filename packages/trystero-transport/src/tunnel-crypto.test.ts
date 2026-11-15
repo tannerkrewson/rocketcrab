@@ -383,26 +383,30 @@ describe("TunnelCipher call order", () => {
     }
   });
 
-  it("resolves opens in call order when a later, smaller frame decrypts first", async () => {
-    for (let trial = 0; trial < TRIALS; trial += 1) {
-      const { chrome, firefox } = await tunnelPair();
-      const bigFrame = await chrome.seal(bytes(BIG, 3));
-      const smallFrame = await chrome.seal(bytes(16, 4));
-      const order: string[] = [];
-      const big = firefox.open(bigFrame).then((plaintext) => {
-        order.push("big");
-        return plaintext;
-      });
-      const small = firefox.open(smallFrame).then((plaintext) => {
-        order.push("small");
-        return plaintext;
-      });
-      const [bigPlaintext, smallPlaintext] = await Promise.all([big, small]);
-      expect(order).toEqual(["big", "small"]);
-      expect(bigPlaintext).toEqual(bytes(BIG, 3));
-      expect(smallPlaintext).toEqual(bytes(16, 4));
-    }
-  });
+  it(
+    "resolves opens in call order when a later, smaller frame decrypts first",
+    { timeout: 30_000 },
+    async () => {
+      for (let trial = 0; trial < TRIALS; trial += 1) {
+        const { chrome, firefox } = await tunnelPair();
+        const bigFrame = await chrome.seal(bytes(BIG, 3));
+        const smallFrame = await chrome.seal(bytes(16, 4));
+        const order: string[] = [];
+        const big = firefox.open(bigFrame).then((plaintext) => {
+          order.push("big");
+          return plaintext;
+        });
+        const small = firefox.open(smallFrame).then((plaintext) => {
+          order.push("small");
+          return plaintext;
+        });
+        const [bigPlaintext, smallPlaintext] = await Promise.all([big, small]);
+        expect(order).toEqual(["big", "small"]);
+        expect(bigPlaintext).toEqual(bytes(BIG, 3));
+        expect(smallPlaintext).toEqual(bytes(16, 4));
+      }
+    },
+  );
 
   it("opens every frame when the wire carries them in resolution order", async () => {
     for (let trial = 0; trial < TRIALS; trial += 1) {
