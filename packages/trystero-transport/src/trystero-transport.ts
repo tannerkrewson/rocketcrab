@@ -52,34 +52,33 @@ import {
 } from "./wire";
 
 /**
- * Trystero transport (P1): the real-party implementation of the
- * transport-neutral {@link NovaTransport} interface (ADR-0003), built on
- * Trystero 0.27.0's self-hosted WebSocket relay strategy.
+ * Trystero transport: the real-party implementation of the transport-neutral
+ * {@link NovaTransport} interface (ADR-0003), built on Trystero 0.27.0's
+ * self-hosted WebSocket relay strategy.
  *
  * Game-facing code never sees this class (engineering rule 1): it is the
  * production twin of `InMemoryTransport` (U5, @rocketcrab/testing) and must
  * pass the same contract suite, so the Nova API behaves identically in the
  * local test arena and over real parties.
  *
- * Design decisions (see the F5 findings and ADR-0003):
+ * Design decisions (see ADR-0003):
  * - **Room-scoped signaling** through the configured edge Worker.
- * - **Environment-specific appId** (`rocketcrab-nova-dev` / `-prod`,
+ * - **Environment-specific appId** (`rocketcrab-nova-v027-dev` / `-prod`,
  *   `app-id.ts`) so dev and prod rooms never collide.
  * - **Identity admission**: per-room ephemeral Trystero identities carry Nova
  *   member and connection IDs in validated user state. A bilateral ack gates
  *   peer publication and early traffic is bounded until admission completes.
  * - **Join errors** are categorized (`errors.ts`). Trystero only reports
- *   handshake-stage failures (F5 finding F5); the adapter detects relay
- *   failure itself (relay socket readyState + join/relay timeouts) and
- *   rejects `join()` with `relay_unreachable` / `join_timeout`. Errors that
- *   arrive after `join()` resolved (e.g. password mismatch during the slow
- *   discovery phase) are delivered to the `onJoinError` observer and kept in
- *   `getDiagnostics()`.
+ *   handshake-stage failures; the adapter detects relay failure itself
+ *   (relay socket readyState + join/relay timeouts) and rejects `join()` with
+ *   `relay_unreachable` / `join_timeout`. Errors that arrive after `join()`
+ *   resolved (e.g. password mismatch during the slow discovery phase) are
+ *   delivered to the `onJoinError` observer and kept in `getDiagnostics()`.
  * - **Relay-state diagnostics** come from polling `getRelaySockets()`
  *   (the only relay observables Trystero exposes); the same monitor drives
  *   the join-time relay-reachability check.
- * - **TURN configuration stays a hook** (`turnConfig` option, never
- *   hardcoded credentials; owned with M3 / Blocker B2).
+ * - **TURN configuration stays a hook** (`turnConfig` option; credentials are
+ *   never hardcoded here).
  * - **Every long-running listener has explicit cleanup** (engineering rule
  *   22): `leave()`/`suspend()`/failed joins detach room + action handlers,
  *   stop the relay monitor, and call `room.leave()`.
@@ -137,7 +136,6 @@ export class TrysteroTransport implements NovaTransport {
   private readonly admissionRestarts = new Map<string, number>();
   /** announced connectionId → trystero peerId (targeting). */
   private readonly connectionToPeerId = new Map<ConnectionId, string>();
-  private readonly peerJoinedAt = new Map<string, Timestamp>();
   private readonly deliverySeqCounters = new Map<string, number>();
   private readonly joinErrors: TrysteroJoinError[] = [];
   private qualitySamples: ConnectionQualitySample[] = [];
@@ -176,9 +174,8 @@ export class TrysteroTransport implements NovaTransport {
       historyLimit: options.historyLimit ?? 100,
     };
     // The relay-reachability timeout and the overall join timeout race; the
-    // first to elapse wins with its own category (F5: distinguish "still
-    // connecting" — join_timeout — from "relay unreachable"). Defaults are
-    // 15 s vs 30 s so relay failures surface first on the default profile.
+    // first to elapse wins with its own category (relay_unreachable vs
+    // join_timeout). Defaults are 15 s vs 30 s so relay failures surface first.
     this.selfMemberId = options.memberId;
     this.displayName = options.displayName;
     const env: AppIdEnvironment = options.env ?? currentAppIdEnvironment();
@@ -415,7 +412,7 @@ export class TrysteroTransport implements NovaTransport {
         message: "TrysteroTransport.leave: leave() during join.",
       }),
     );
-    this.teardownRoom(room);
+    this.teardownRoom();
     try {
       if (room !== null) await this.releaseRoom(room);
     } finally {
@@ -450,7 +447,7 @@ export class TrysteroTransport implements NovaTransport {
       throw new TrysteroJoinError({ category: "cancelled", message: "Reconnect was cancelled." });
     }
     this.tearingDown = true;
-    this.teardownRoom(room);
+    this.teardownRoom();
     try {
       if (room !== null) await this.releaseRoom(room); // peers observe peer:left
     } catch (error) {
@@ -509,7 +506,7 @@ export class TrysteroTransport implements NovaTransport {
     this.connectionState = "suspended";
     this.suspendPending = true;
     this.tearingDown = true;
-    this.teardownRoom(room);
+    this.teardownRoom();
     try {
       if (room !== null) await this.releaseRoom(room);
     } finally {
@@ -831,7 +828,7 @@ export class TrysteroTransport implements NovaTransport {
     const joined = this.waitForJoin(timeoutMs);
     void this.wireRoom(room)
       .then(() => {
-        if (this.room === room && this.connectionState === "joining") this.startRelayMonitor();
+        if (this.room === room && this.connectionState === "joining") this.pollRelays();
       })
       .catch((cause: unknown) => {
         if (this.room === room) {
@@ -1054,7 +1051,6 @@ export class TrysteroTransport implements NovaTransport {
     if (!identity) return;
     if (!this.peersList.some((peer) => peer.connectionId === identity.connectionId)) {
       const joinedAt = this.now();
-      this.peerJoinedAt.set(identity.connectionId, joinedAt);
       this.peersList.push({
         memberId: identity.memberId,
         connectionId: identity.connectionId,
@@ -1112,7 +1108,6 @@ export class TrysteroTransport implements NovaTransport {
     this.settlePeerWaiters(peerId, false);
     const identity = this.identityByPeerId.get(peerId);
     this.identityByPeerId.delete(peerId);
-    this.peerJoinedAt.delete(identity?.connectionId ?? peerId);
     for (const [connectionId, mappedPeerId] of this.connectionToPeerId) {
       if (mappedPeerId === peerId) {
         this.connectionToPeerId.delete(connectionId);
@@ -1205,10 +1200,6 @@ export class TrysteroTransport implements NovaTransport {
   // Relay monitor + join settlement
   // ------------------------------------------------------------------
 
-  private startRelayMonitor(): void {
-    this.pollRelays();
-  }
-
   private pollRelays(): void {
     const socket = getRelaySockets()[this.signalRelayUrl];
     const connected = socket?.readyState === 1;
@@ -1277,7 +1268,7 @@ export class TrysteroTransport implements NovaTransport {
     this.joinWaiter = null;
     this.cancelJoinTimers();
     const room = this.room;
-    this.teardownRoom(room);
+    this.teardownRoom();
     if (room !== null) void this.releaseRoom(room).catch(() => undefined);
     this.sessionId = null;
     this.roomName = "";
@@ -1371,7 +1362,7 @@ export class TrysteroTransport implements NovaTransport {
     return `msg-${this.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
   }
 
-  private teardownRoom(_room: Room | null): void {
+  private teardownRoom(): void {
     for (const unsubscribe of this.roomUnsubscribers.splice(0)) unsubscribe();
     this.requestActions.clear();
     this.pendingRequests.clear();
@@ -1392,7 +1383,6 @@ export class TrysteroTransport implements NovaTransport {
     this.admissionRestarts.clear();
     for (const peerId of this.readyWaiters.keys()) this.settlePeerWaiters(peerId, false);
     this.connectionToPeerId.clear();
-    this.peerJoinedAt.clear();
     this.deliverySeqCounters.clear();
     this.signalingConnected = null;
   }
@@ -1452,7 +1442,7 @@ export interface ConnectionQualitySample {
   readonly sampledAt: Timestamp;
 }
 
-/** Aggregate adapter diagnostics (local telemetry; F5 recommendation). */
+/** Aggregate adapter diagnostics (local telemetry only). */
 export interface TrysteroTransportDiagnostics {
   readonly kind: "trystero";
   readonly connectionState: TransportConnectionState;
@@ -1541,10 +1531,7 @@ export interface TrysteroTransportOptions {
   readonly env?: AppIdEnvironment;
   /** Edge Worker origin used for room-scoped signaling. */
   readonly edgeOrigin?: string;
-  /**
-   * TURN configuration hook (F5 verdict / P0 rocketcrab-23s). Credentials
-   * are owned by M3 and never hardcoded here.
-   */
+  /** TURN configuration, passed through to Trystero. Credentials come from the caller. */
   readonly turnConfig?: readonly TurnServerConfig[];
   /** Extra RTC configuration (e.g. STUN servers). */
   readonly rtcConfig?: RTCConfiguration;
@@ -1568,7 +1555,7 @@ export interface TrysteroTransportOptions {
    * only set this in dev and test builds; production never does.
    */
   readonly forceRelayOnlyNoServers?: boolean;
-  /** Room password (optional in P1; P2 owns admission on top of it). */
+  /** Room password, passed to Trystero when set. */
   readonly password?: string;
   /** Timeout before join fails with `relay_unreachable` (default 15 s). */
   readonly relayConnectTimeoutMs?: number;
