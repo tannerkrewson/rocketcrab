@@ -74,6 +74,9 @@ export type GameSourceTransferEvent =
       readonly source: string;
     }
   | ({ readonly type: "verificationFailed"; readonly errorMessage: string } & TransferIdentity)
+  // An announcer's copy matched the verified source held here and was
+  // accepted. No bytes moved, so this is the only signal that it holds the source.
+  | ({ readonly type: "holds"; readonly memberId: MemberId } & TransferIdentity)
   | ({
       readonly type: "cancelled";
       readonly direction: "send" | "receive";
@@ -580,6 +583,12 @@ export class GameSourceCoordinator {
       if (!this.isMember(message.senderMemberId, connectionId)) continue;
       try {
         await this.accept(selection.metadata, connectionId);
+        if (this.disposed || this.selection !== selection || generation !== this.generation) return;
+        this.emit({
+          type: "holds",
+          memberId: message.senderMemberId,
+          ...identity(selection.metadata),
+        });
       } catch (error) {
         if (this.disposed || this.selection !== selection || generation !== this.generation) return;
         if (this.isMember(message.senderMemberId, connectionId)) this.emitError(error);

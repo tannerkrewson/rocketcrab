@@ -217,6 +217,51 @@ describe("whole-source requests", () => {
     expect(completed(a.events, "send").filter((e) => e.memberId === "joiner")).toHaveLength(1);
     expect(completed(h.events, "send").filter((e) => e.memberId === "joiner")).toHaveLength(1);
   });
+  it("reports a second holder as holding the source when its matching announcement is accepted from cache", async () => {
+    const { hub, host, joiner } = await world();
+    const third = hub.createTransport({ memberId: "third", displayName: "Third" });
+    await third.join({ room: "private", sessionId: "session" });
+    const a = coordinator(host);
+    const b = coordinator(joiner);
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    expect(received(b.events)).toHaveLength(1);
+    const request = vi.spyOn(joiner, "request");
+    const c = coordinator(third);
+    await c.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    // The joiner accepts the third's copy without fetching it, so the
+    // acceptance is the only proof the third holds the verified source.
+    expect(request).not.toHaveBeenCalled();
+    expect(b.events.filter((e) => e.type === "holds" && e.memberId === "third")).toHaveLength(1);
+  });
+
+  it("reports a second holder as holding the source when its announcement folds into a pending transfer", async () => {
+    const { hub, host, joiner } = await world();
+    const third = hub.createTransport({ memberId: "third", displayName: "Third" });
+    await third.join({ room: "private", sessionId: "session" });
+    const a = coordinator(host);
+    const b = coordinator(joiner);
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const original = joiner.request.bind(joiner);
+    vi.spyOn(joiner, "request").mockImplementation(async (options) => {
+      await gate;
+      return original(options);
+    });
+    await a.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    const c = coordinator(third);
+    await c.instance.setSource({ gameId: "game", source: "hello" });
+    await settle(hub);
+    release();
+    await settle(hub);
+    expect(received(b.events)).toHaveLength(1);
+    expect(b.events.filter((e) => e.type === "holds" && e.memberId === "third")).toHaveLength(1);
+  });
+
   it("restarts from a remaining announcer when the source holder disconnects", async () => {
     const { hub, host, joiner } = await world();
     const other = hub.createTransport({ memberId: "other", displayName: "Other" });

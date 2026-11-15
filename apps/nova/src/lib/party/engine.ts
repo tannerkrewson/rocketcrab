@@ -2611,6 +2611,13 @@ export class PartyEngine {
         void this.maybeBootFrame();
         break;
       }
+      case "holds": {
+        // This player accepted the member's copy of the verified source, so
+        // the member holds it: its row completes and the start gate can open.
+        this.markSourceVerified(event.memberId, "Has the game");
+        this.emit();
+        break;
+      }
       case "verificationFailed": {
         this.recordTransfer(this.identity.memberId, {
           state: "failed",
@@ -2676,6 +2683,8 @@ export class PartyEngine {
       case "complete":
       case "cancelled":
         return event.direction === "receive" ? self : event.memberId;
+      case "holds":
+        return event.memberId;
       case "received":
       case "verificationFailed":
       case "incompatible":
