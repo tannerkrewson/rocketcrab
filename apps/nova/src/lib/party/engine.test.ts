@@ -3265,3 +3265,32 @@ describe("party engine — peer-link alert (PLAN.md §7 stages 2 and 4)", () => 
     );
   });
 });
+
+describe("party engine — §10 review: lifecycle cleanup", () => {
+  it("re-arms a reconnect on resume when hiding cancelled the retry and the room is idle", async () => {
+    const world = makeWorld();
+    const lifecycle = createMemoryLifecycleSource();
+    const a = makePlayer(world, "a", { lifecycle: lifecycle.source });
+    await runCreate(a, world);
+    const privateTransport = world.transports.find((t) => t.selfMemberId === a.memberId)!;
+
+    await privateTransport.suspend();
+    await settle(world);
+    expect(a.engine.getState().phase).toBe("reconnecting");
+
+    // The page is hidden while the retry is pending, and a failed reconnect
+    // attempt leaves the room idle (trystero-transport: a failed joinRoom sets
+    // "idle"). Hiding cancelled the retry timer, so nothing is scheduled.
+    lifecycle.hide();
+    await privateTransport.leave();
+    privateTransport.connectionState = "idle";
+    await settle(world);
+    lifecycle.show();
+    await settle(world);
+
+    // Nothing else will retry: the resume probe must re-decide.
+    world.clock.advance(60_000);
+    await settle(world);
+    expect(a.engine.getState().phase).toBe("lobby");
+  });
+});

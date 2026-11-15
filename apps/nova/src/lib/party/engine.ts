@@ -1565,6 +1565,11 @@ export class PartyEngine {
       return;
     }
     if (transport.connectionState !== "connected") {
+      // Idle: a failed attempt tore the room down while hidden, and hiding
+      // cancelled its retry timer. Nothing else will retry, so re-decide here.
+      if (transport.connectionState === "idle" && this.phase === "reconnecting") {
+        void this.reconnect();
+      }
       return; // joining: the state handler settles it
     }
     const peers = transport.peers;
