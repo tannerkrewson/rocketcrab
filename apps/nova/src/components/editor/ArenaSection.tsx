@@ -17,6 +17,7 @@
  * log panel.
  */
 import { Badge } from "../ui/Badge";
+import { useWindowPointerDrag } from "../ui/useWindowPointerDrag";
 import { diagnosticFromBandwidthLog, type Diagnostic } from "../../lib/editor/diagnostics";
 import type { SavedGame } from "@rocketcrab/core";
 import { Link } from "@tanstack/react-router";
@@ -241,6 +242,8 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
     setNewPlayerName("");
   }, [actions, newPlayerName]);
 
+  const beginWindowDrag = useWindowPointerDrag();
+
   /** Shared vertical drag: resize every game frame (7.13). */
   const handleFrameResize = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -254,19 +257,11 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
         // Pointer capture unavailable (some test environments); the window
         // listeners below still track the drag.
       }
-      const onMove = (moveEvent: PointerEvent) => {
+      beginWindowDrag((moveEvent) => {
         setFrameHeightPx(clampFrameHeight(startHeight + (moveEvent.clientY - startY)));
-      };
-      const onEnd = () => {
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onEnd);
-        window.removeEventListener("pointercancel", onEnd);
-      };
-      window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onEnd);
-      window.addEventListener("pointercancel", onEnd);
+      });
     },
-    [frameHeightPx],
+    [beginWindowDrag, frameHeightPx],
   );
 
   /** Shared horizontal drag: resize every game frame's width (11.15). */
@@ -286,19 +281,11 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
         // Pointer capture unavailable (some test environments); the window
         // listeners below still track the drag.
       }
-      const onMove = (moveEvent: PointerEvent) => {
+      beginWindowDrag((moveEvent) => {
         setFrameWidthPx(clampFrameWidth(startWidth + (moveEvent.clientX - startX)));
-      };
-      const onEnd = () => {
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onEnd);
-        window.removeEventListener("pointercancel", onEnd);
-      };
-      window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onEnd);
-      window.addEventListener("pointercancel", onEnd);
+      });
     },
-    [frameWidthPx],
+    [beginWindowDrag, frameWidthPx],
   );
 
   const handleRename = useCallback(() => {

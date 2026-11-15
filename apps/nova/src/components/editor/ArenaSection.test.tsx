@@ -172,6 +172,28 @@ describe("ArenaSection — desktop grid", () => {
     });
   });
 
+  it("drops the window drag listeners when the arena unmounts mid-drag", async () => {
+    const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
+    const harness = createHarness();
+    const { unmount } = renderEditor([`/games/${game.id}/edit`], harness);
+    await openArena();
+    const grid = await gridLayout();
+    await runToStart(harness.channels, 2);
+
+    fireEvent.pointerDown(grid.getByRole("separator", { name: /Resize Player 1's game frame$/ }), {
+      clientY: 400,
+      pointerId: 2,
+    });
+    const removeListener = vi.spyOn(window, "removeEventListener");
+    unmount();
+
+    // The pointer never comes up here, so the drag must release its own
+    // window listeners instead of calling setState on an unmounted arena.
+    expect(removeListener).toHaveBeenCalledWith("pointermove", expect.any(Function));
+    expect(removeListener).toHaveBeenCalledWith("pointerup", expect.any(Function));
+    removeListener.mockRestore();
+  });
+
   it("shows per-player connection badges and per-player controls", async () => {
     const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
     const harness = createHarness();

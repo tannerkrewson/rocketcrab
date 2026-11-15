@@ -30,6 +30,7 @@ import { toast } from "../../lib/toast";
 import { Button, buttonStyles } from "../ui/Button";
 import { BrandLogo } from "../layout/BrandLogo";
 import { Dialog } from "../ui/Dialog";
+import { useWindowPointerDrag } from "../ui/useWindowPointerDrag";
 import { useCreateGame, useRecordTestResults, useUpdateGame } from "../../lib/games/queries";
 import { hashSource, sourceByteLength } from "../../lib/games/hashing";
 import type { ChannelPort, RuntimeHostEvent } from "../../lib/runtime-host";
@@ -461,6 +462,8 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     toast.info("Editor cleared.");
   }, [session]);
 
+  const beginWindowDrag = useWindowPointerDrag();
+
   /** Drag the splitter: enlarge/shrink the code editor pane (7.40). */
   const handleEditorResize = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
@@ -474,19 +477,11 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         // Pointer capture unavailable (some test environments); the window
         // listeners below still track the drag.
       }
-      const onMove = (moveEvent: PointerEvent) => {
+      beginWindowDrag((moveEvent) => {
         setEditorHeightPx(clampEditorHeight(startHeight + (moveEvent.clientY - startY)));
-      };
-      const onEnd = () => {
-        window.removeEventListener("pointermove", onMove);
-        window.removeEventListener("pointerup", onEnd);
-        window.removeEventListener("pointercancel", onEnd);
-      };
-      window.addEventListener("pointermove", onMove);
-      window.addEventListener("pointerup", onEnd);
-      window.addEventListener("pointercancel", onEnd);
+      });
     },
-    [editorHeightPx],
+    [beginWindowDrag, editorHeightPx],
   );
 
   const handleCopyReport = useCallback(async () => {
