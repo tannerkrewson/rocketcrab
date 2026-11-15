@@ -3264,8 +3264,9 @@ export class PartyEngine {
       }
     }
     if (setup.signal.aborted) return;
-    // A failure after the room joined (establish) leaves the room too. Otherwise
-    // the page keeps a live party and every retry is refused.
+    // A failure after the room joined (establish) leaves the room too. This runs
+    // only for the setup call that started it, never on reconnect, and a joiner
+    // leaves only its own membership, so the other players keep the party.
     if (this.party !== null) {
       const lastSetup = this.lastSetup;
       await this.leaveParty("idle", true).catch(() => undefined);

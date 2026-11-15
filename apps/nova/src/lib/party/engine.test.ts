@@ -3538,4 +3538,58 @@ describe("party engine — §10 review: lifecycle cleanup", () => {
     await a.engine.leaveParty();
     expect(a.engine.getState().runtimeLogs).toHaveLength(0);
   });
+
+  it("a joiner whose setup fails after admission leaves the room without ending the host's party", async () => {
+    const world = makeWorld();
+    let failJoiner = false;
+    const factory: PartyTransportFactory = {
+      createPrivateTransport: (identity) => {
+        const transport = world.hub.createTransport(identity);
+        world.transports.push(transport);
+        if (failJoiner) {
+          // The joiner cannot subscribe to the room's connection state, after the host has admitted it.
+          failJoiner = false;
+          const on = transport.on.bind(transport) as (...args: unknown[]) => unknown;
+          (transport as unknown as { on: unknown }).on = (event: string, ...rest: unknown[]) => {
+            if (event === "connection:state") throw new Error("subscribe failed");
+            return on(event, ...rest);
+          };
+        }
+        return transport;
+      },
+    };
+    const host = makePlayer(world, "host");
+    const code = await runCreate(host, world);
+    const joiner = makePlayer(world, "joiner", { transportFactory: factory });
+    failJoiner = true;
+    const joining = joiner.engine.joinByInvite({ secret: code });
+    await settle(world);
+    await joining;
+    await settle(world);
+
+    expect(joiner.engine.getState().phase).toBe("error");
+    const joinerRoom = world.transports.find((t) => t.selfMemberId === joiner.memberId)!;
+    expect(joinerRoom.connectionState).not.toBe("connected");
+
+    // The host keeps its party and simply loses the failed joiner.
+    expect(host.engine.getState().phase).toBe("lobby");
+    expect(host.engine.isActive()).toBe(true);
+    expect(host.engine.getState().members.map((m) => m.memberId)).not.toContain(joiner.memberId);
+  });
+
+  it("a failed reconnect attempt keeps the party active, not torn down", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    await runCreate(a, world);
+    const privateTransport = world.transports.find((t) => t.selfMemberId === a.memberId)!;
+    vi.spyOn(privateTransport, "reconnect").mockRejectedValueOnce(new Error("relay unreachable"));
+
+    await a.engine.reconnect();
+    await settle(world);
+
+    expect(a.engine.getState().phase).toBe("reconnecting");
+    expect(a.engine.isActive()).toBe(true);
+    expect(a.engine.getState().members.map((m) => m.memberId)).toContain(a.memberId);
+    expect(privateTransport.connectionState).toBe("connected");
+  });
 });
