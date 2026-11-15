@@ -810,8 +810,24 @@ change. One commit per area, `npm run check` + `npm run test:e2e` each time.
   63/63 in the pinned Playwright container against this worktree's servers.
   This partial review does not close the area or §10.
 
-- [ ] `packages/nova-api/src/session.ts`, `state-engine.ts`,
-      `simulation-engine.ts`.
+- [x] `packages/nova-api/src/session.ts`, `state-engine.ts`,
+      `simulation-engine.ts`. Proven and fixed (tests failed before, pass
+      after): `session.leave()` left the simulation clock and snapshot cadence
+      running, so a left session kept emitting ticks and queued snapshots in
+      its outbox (`37d464b`); the dispatch buffer kept deadline-expired
+      entries during a long election (`f071a41`). Trimmed history comments and
+      an unused export (`7a4a74b`). Checked and found correct: in-flight
+      dispatches settle once (client map), delta base-hash mismatch repairs
+      rather than applies, history is bounded. Gapped increments adopt the
+      state and resync (the existing test documents this design), so not
+      changed. Suspected, not proven: `leave()` does not unsubscribe transport
+      listeners; a leave-then-attach would double-wire them. In-flight
+      dispatches are dropped on leave, so their game promises time out with
+      `timed_out` rather than an ended error. `runQueue` shifts the queue
+      after an await, which can drop the wrong entry if the queue was cleared
+      and refilled mid-action (the retry timer heals it). Per-revision state
+      observations have no hash cap. `npm run check` passed; `npm run test:e2e`
+      was not run here (the coordinator runs it).
 - [ ] UI components and e2e tests: lighter pass.
 - [ ] Audit user-facing docs (README, API reference, game-author guide,
       deployment, mobile, security limitations) against shipped behaviour.
