@@ -1277,6 +1277,20 @@ describe("TrysteroTransport send", () => {
   });
 });
 
+describe("TrysteroTransport request channels", () => {
+  it("rejects an invalid request channel up front so it cannot fail every later join", async () => {
+    const { adapter, clock } = setup();
+    expect(() => adapter.handleRequest("bad channel!", () => undefined)).toThrow(
+      "Invalid request channel.",
+    );
+    const room = makeFakeRoom();
+    mocks.joinRoom.mockReturnValue(room);
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    await joinConnected(adapter, clock);
+    expect(adapter.connectionState).toBe("connected");
+  });
+});
+
 describe("TrysteroTransport message delivery", () => {
   async function joinedWithPeer(): Promise<{
     adapter: TrysteroTransport;

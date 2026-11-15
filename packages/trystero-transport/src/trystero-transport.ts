@@ -192,6 +192,9 @@ export class TrysteroTransport implements NovaTransport {
 
   handleRequest(channel: string, handler: TransportRequestHandler): () => void {
     if (this.requestHandlers.has(channel)) throw new Error("Request handler already registered.");
+    // Validate before registering: wireRoom opens every registered channel on
+    // each join, so a bad name left in the map would fail all later joins.
+    if (!REQUEST_CHANNEL_PATTERN.test(channel)) throw new Error("Invalid request channel.");
     this.requestHandlers.set(channel, handler);
     if (this.room !== null) this.requestAction(channel);
     return () => {
@@ -227,7 +230,7 @@ export class TrysteroTransport implements NovaTransport {
   private requestAction(channel: string): RequestAction {
     const existing = this.requestActions.get(channel);
     if (existing) return existing;
-    if (!this.room || !/^[a-zA-Z0-9._-]{1,23}$/.test(channel))
+    if (!this.room || !REQUEST_CHANNEL_PATTERN.test(channel))
       throw new Error("Invalid request channel.");
     const action = this.room.makeAction("nova.rpc:" + channel, { kind: "request" });
     this.roomUnsubscribers.push(
@@ -1496,6 +1499,9 @@ const DEFAULT_EDGE_ORIGIN = "http://localhost:8787";
 
 /** Trystero action namespace (well under Trystero's 32-byte type limit). */
 const ACTION_NAMESPACE = "nova";
+
+/** Request channel names: the Trystero action type stays under its 32-byte limit. */
+const REQUEST_CHANNEL_PATTERN = /^[a-zA-Z0-9._-]{1,23}$/;
 
 /** Optional structured-payload validator (protocol boundary, threat T10). */
 export type PayloadValidator = (payload: unknown) => { ok: true } | { ok: false; error: string };
