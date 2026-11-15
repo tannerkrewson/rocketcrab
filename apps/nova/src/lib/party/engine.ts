@@ -279,13 +279,6 @@ const START_RETRY_INTERVAL_MS = 2_000;
 const SOURCE_RETRANSMIT_INTERVAL_MS = 2_000;
 const START_RETRY_TIMEOUT_MS = 30_000;
 const START_GIVE_UP_MESSAGE = "Couldn't start the game. Try again.";
-/**
- * Diagnostics for stalled parties: `window.__NOVA_PARTY_DEBUG__()` returns
- * debugSnapshot(). Dev and test builds only; production folds this to false.
- */
-function partyDebugEnabled(): boolean {
-  return import.meta.env.DEV || import.meta.env.MODE === "test";
-}
 const UNSAFE_TEARDOWN_MESSAGE =
   "Couldn't close the previous party safely. Reload the page before joining another party.";
 /** 5cl.11: cap for the party game's runtime console ring buffer. */
@@ -575,7 +568,9 @@ export class PartyEngine {
   private reconnectRetryTimer: (() => void) | null = null;
 
   constructor(config: PartyEngineConfig = {}) {
-    if (partyDebugEnabled()) {
+    // Diagnostics for stalled parties: window.__NOVA_PARTY_DEBUG__() returns
+    // debugSnapshot(). The condition is inline so production builds drop it.
+    if (import.meta.env.DEV || import.meta.env.MODE === "test") {
       (globalThis as { __NOVA_PARTY_DEBUG__?: () => unknown }).__NOVA_PARTY_DEBUG__ = () =>
         this.debugSnapshot();
     }
