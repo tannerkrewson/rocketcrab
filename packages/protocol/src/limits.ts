@@ -1,21 +1,20 @@
 import { z } from "zod";
 
 /**
- * Initial protocol limits (F6; threat-model rows T10/T11).
+ * Protocol limits (threat-model rows T10/T11).
  *
  * Byte-based limits are enforced at serialization boundaries (the host bridge
  * and the transport adapters) because Zod cannot measure the serialized size
  * of `unknown` payloads; string-length limits are enforced directly in the
  * schemas (see `htmlSourceSchema`). A warn threshold sits below every hard
  * limit so senders can degrade gracefully (rate-limit, compress, chunk)
- * before being rejected. Tuning these constants is expected after real
- * play-testing (P3, S3, M1).
+ * before being rejected.
  */
 
 /** Warn when usage reaches this fraction of a hard limit. */
 export const LIMIT_WARN_FRACTION = 0.8;
 
-/** Hard cap on a game's complete HTML source document (ADR-0002, P3). */
+/** Hard cap on a game's complete HTML source document (ADR-0002). */
 export const htmlSourceBytes = 2 * 1024 * 1024; // 2 MiB
 export const htmlSourceWarnBytes = Math.floor(htmlSourceBytes * LIMIT_WARN_FRACTION);
 
@@ -73,8 +72,7 @@ export const errorReportWarnRatePerSecond = Math.floor(
 
 /**
  * Discovery + admission handshake timeout. Trystero can otherwise hang
- * silently (F5 finding F5; recommendation: impose a Nova-level
- * discovery/join timeout of ~20-30 s).
+ * silently without a Nova-level discovery/join timeout.
  */
 export const handshakeTimeoutMs = 30_000;
 
@@ -107,21 +105,21 @@ export const stateDeltaMaxOps = 512;
 export const stateDeltaMaxDepth = 32;
 
 /**
- * Authority heartbeat interval (ADR-0007 S3). The current authority
+ * Authority heartbeat interval (ADR-0007). The current authority
  * broadcasts one heartbeat per interval so followers can detect silent loss;
  * missing heartbeats begin the grace period.
  */
 export const authorityHeartbeatIntervalMs = 1_000;
 
 /**
- * Authority grace period (ADR-0007 S3): how long a follower waits without a
+ * Authority grace period (ADR-0007): how long a follower waits without a
  * heartbeat (or announcement/snapshot from the authority) before suspecting
  * the authority and starting an election.
  */
 export const authorityGracePeriodMs = 5_000;
 
 /**
- * Default simulation tick interval (A1): the Nova-provided time step at
+ * Default simulation tick interval: the Nova-provided time step at
  * which a simulation-mode game advances (10 Hz by default; games may pick a
  * faster or slower cadence within the min/max bounds below).
  */
@@ -134,7 +132,7 @@ export const simulationTickMinMs = 16;
 export const simulationTickMaxMs = 500;
 
 /**
- * Default simulation snapshot interval (A1): how often the authority asks
+ * Default simulation snapshot interval: how often the authority asks
  * the game to serialize its state and broadcasts an authoritative snapshot
  * (1 Hz by default, configurable within the bounds below).
  */
@@ -147,9 +145,9 @@ export const simulationSnapshotMinIntervalMs = 50;
 export const simulationSnapshotMaxIntervalMs = 10_000;
 
 /**
- * Maximum simulation inputs sent per second per player (A1 rate bound, F6
- * parity). Higher than the state-mode action rate because continuous games
- * need more frequent inputs; bursts beyond the bound are rejected with
+ * Maximum simulation inputs sent per second per player. Higher than the
+ * state-mode action rate because continuous games need more frequent inputs;
+ * bursts beyond the bound are rejected with
  * `rate_limited`.
  */
 export const simulationInputRatePerSecond = 60;
@@ -158,7 +156,7 @@ export const simulationInputWarnRatePerSecond = Math.floor(
 );
 
 /**
- * Hard cap on one authoritative simulation snapshot (A1; the same bound as
+ * Hard cap on one authoritative simulation snapshot (the same bound as
  * state-mode canonical snapshots — simulation state is game-defined plain
  * data serialized by the game's snapshot callback).
  */
@@ -169,8 +167,7 @@ export const simulationSnapshotWarnBytes = Math.floor(
 
 /**
  * Input delivery latency (send → local receive) above which the session
- * reports `highLatency` in the simulation diagnostics (A1: report high
- * latency and drift).
+ * reports `highLatency` in the simulation diagnostics.
  */
 export const simulationHighLatencyMs = 500;
 

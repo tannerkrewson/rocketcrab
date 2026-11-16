@@ -53,7 +53,7 @@ describe("protocol limits", () => {
     expect(actionTimeoutMs).toBe(10_000);
     expect(authorityHeartbeatIntervalMs).toBe(1_000);
     expect(authorityGracePeriodMs).toBe(5_000);
-    // A1 simulation bounds.
+    // Simulation bounds.
     expect(simulationTickMs).toBe(100);
     expect(simulationTickMinMs).toBeLessThan(simulationTickMs);
     expect(simulationTickMaxMs).toBeGreaterThan(simulationTickMs);

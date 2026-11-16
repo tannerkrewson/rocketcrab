@@ -416,9 +416,7 @@ describe("peer message schemas", () => {
       false,
     );
     expect(stateDeltaOpSchema.safeParse({ op: "del", path: ["constructor"] }).success).toBe(false);
-    // Unknown operations are rejected.
     expect(stateDeltaOpSchema.safeParse({ op: "move", path: ["a"] }).success).toBe(false);
-    // Depth is bounded.
     const deep = Array.from({ length: 33 }, () => "k");
     expect(stateDeltaOpSchema.safeParse({ op: "set", path: deep, value: 1 }).success).toBe(false);
   });

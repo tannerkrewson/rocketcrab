@@ -2,7 +2,7 @@
  * @rocketcrab/protocol
  *
  * Shared Zod schemas, protocol types, and versioning for all cross-context
- * and peer messages (F6). Consumed by the Nova shell (apps/nova), the runtime
+ * and peer messages. Consumed by the Nova shell (apps/nova), the runtime
  * frame (apps/runtime), and the core engines (packages/core). Dependency-light
  * by design: zod only, no React, pure data + zod (no transforms or custom
  * callbacks embedded in schemas).

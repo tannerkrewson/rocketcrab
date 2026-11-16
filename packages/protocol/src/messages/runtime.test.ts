@@ -175,7 +175,7 @@ describe("runtime message schemas", () => {
       }),
     );
     expect(rawSend.ok).toBe(true);
-    // S2: the authority frame's stateResponse answer parses at the boundary.
+    // The authority frame's stateResponse answer parses at the boundary.
     const stateResponse = parseRuntimeMessage(
       baseRuntime({
         type: "game.apiCall",
@@ -187,7 +187,7 @@ describe("runtime message schemas", () => {
       }),
     );
     expect(stateResponse.ok).toBe(true);
-    // A1: the authority frame's simulationResponse answer parses too.
+    // The authority frame's simulationResponse answer parses too.
     const simulationResponse = parseRuntimeMessage(
       baseRuntime({
         type: "game.apiCall",
@@ -208,7 +208,6 @@ describe("runtime message schemas", () => {
     );
     expect(badStateResponse.ok).toBe(true);
 
-    // Unknown methods and malformed envelopes fail.
     const unknownMethod = parseRuntimeMessage(
       baseRuntime({ type: "game.apiCall", method: "launchMissiles", payload: {} }),
     );
@@ -291,7 +290,6 @@ describe("runtime message schemas", () => {
       const result = parseRuntimeMessage(baseRuntime({ type: "game.apiEvent", event }));
       expect(result.ok, JSON.stringify(event)).toBe(true);
     }
-    // Unknown kinds and missing required fields fail.
     const bad = parseRuntimeMessage(
       baseRuntime({ type: "game.apiEvent", event: { kind: "rawMessage", channel: "x" } }),
     );

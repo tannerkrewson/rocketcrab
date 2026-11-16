@@ -16,12 +16,12 @@ import { protocolVersionSchema } from "./version";
  * Two envelope shapes exist because messages cross two different boundaries:
  *
  * - **Peer envelopes** (party plane): messages between party members over the
- *   transport (U5/P1). Every peer message carries the protocol version,
+ *   transport. Every peer message carries the protocol version,
  *   message type, session ID, sender member ID, sender connection ID, a
  *   unique message ID, a timestamp, and — for ordered message families — a
  *   per-sender monotonic sequence.
  * - **Runtime envelopes** (host ↔ runtime): messages between the Nova shell
- *   and the runtime frame over the dedicated MessageChannel (U3). They carry
+ *   and the runtime frame over the dedicated MessageChannel. They carry
  *   the protocol version, message type, runtime instance ID, message ID, and
  *   a timestamp; `sessionId` is present when the runtime is attached to a
  *   party session.

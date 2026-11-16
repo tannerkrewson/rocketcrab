@@ -25,7 +25,7 @@ export const gameIdSchema = z.string().min(1).max(64);
 
 /**
  * Identifies one runtime frame instance; a new instance gets a new ID on
- * reload or destroy (F4 spike lifecycle).
+ * reload or destroy.
  */
 export const runtimeInstanceIdSchema = z.string().min(1).max(64);
 
@@ -57,7 +57,7 @@ export const titleSchema = z.string().min(1).max(64);
 /** Named raw-mode channel identifier (ADR-0006 raw mode). */
 export const channelNameSchema = z.string().min(1).max(64);
 
-/** SHA-256 digest as 64 lowercase hex characters (ADR-0002, P3). */
+/** SHA-256 digest as 64 lowercase hex characters (ADR-0002). */
 export const sha256Schema = z
   .string()
   .regex(/^[0-9a-f]{64}$/, "Expected a 64-character lowercase hex SHA-256 digest.");

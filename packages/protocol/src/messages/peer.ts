@@ -15,7 +15,7 @@ import { gameEndReasonSchema, gameModeSchema } from "./shared";
 
 /**
  * Peer-plane messages (party plane): messages between party members over the
- * transport (InMemoryTransport U5, TrysteroTransport P1). Every schema
+ * transport (InMemoryTransport, TrysteroTransport). Every schema
  * extends the peer envelope, so each message carries the protocol version,
  * message type, session ID, sender member ID, sender connection ID, unique
  * message ID, and timestamp. Ordered families (actions, state, authority,
@@ -51,7 +51,7 @@ export type PlayerIdentityMessage = z.infer<typeof playerIdentityMessageSchema>;
 
 /**
  * Party rename: a member announces a display-name change to every connected
- * member on the party control plane (7.25). The join handshake remains the
+ * member on the party control plane. The join handshake remains the
  * source of truth for new/reconnecting peers; this message only lets
  * already-connected members update their view of the renamed member
  * promptly, without waiting for a rejoin.
@@ -64,7 +64,7 @@ export const partyRenameMessageSchema = z.object({
 export type PartyRenameMessage = z.infer<typeof partyRenameMessageSchema>;
 
 /**
- * Classic external iframe game URL spec (7.7.4): the embeddable room URL
+ * Classic external iframe game URL spec: the embeddable room URL
  * plus optional per-game query/hash extras (classic `ConnectedGameURL`).
  */
 export const classicUrlSpecMessageSchema = z.object({
@@ -77,7 +77,7 @@ export type ClassicUrlSpecMessage = z.infer<typeof classicUrlSpecMessageSchema>;
 /**
  * Classic room: the host created a room on an external service and shares
  * the URL spec so every player embeds the SAME room with their own
- * rocketcrab/name/ishost params (7.7.4). The optional `host` overrides are
+ * rocketcrab/name/ishost params. The optional `host` overrides are
  * merged only for the host's own frame.
  */
 export const partyClassicRoomMessageSchema = z.object({
@@ -91,7 +91,7 @@ export type PartyClassicRoomMessage = z.infer<typeof partyClassicRoomMessageSche
 
 /**
  * Classic room request: a late joiner (or a reconnecting member) asks the
- * party for the current classic room (7.7.4). The host re-announces the
+ * party for the current classic room. The host re-announces the
  * `party.classicRoom` message in reply.
  */
 export const partyClassicRoomRequestMessageSchema = z.object({
@@ -101,9 +101,9 @@ export const partyClassicRoomRequestMessageSchema = z.object({
 export type PartyClassicRoomRequestMessage = z.infer<typeof partyClassicRoomRequestMessageSchema>;
 
 /**
- * Party kick: the host removes a member from the party (7.29 classic
- * parity). Broadcast so the kicked member sees the reason and the other
- * members can update their view; the kicked member's client leaves.
+ * Party kick: the host removes a member from the party. Broadcast so the
+ * kicked member sees the reason and others can update their view; the
+ * kicked member's client leaves.
  */
 export const partyKickMessageSchema = z.object({
   ...peerEnvelopeFields,
@@ -114,7 +114,7 @@ export const partyKickMessageSchema = z.object({
 export type PartyKickMessage = z.infer<typeof partyKickMessageSchema>;
 
 /**
- * Reload every player's game frame (7.29 classic parity). Sent by the host;
+ * Reload every player's game frame. Sent by the host;
  * each member re-runs its own frame (runtime.reload or a classic iframe
  * remount).
  */
@@ -126,8 +126,8 @@ export type PartyReloadAllMessage = z.infer<typeof partyReloadAllMessageSchema>;
 
 /**
  * Connection status: a member's self-reported connectivity. Advisory only —
- * transport-level join/leave events remain authoritative for local UI (F5:
- * relay state and leave events come from the transport).
+ * transport-level join/leave events remain authoritative for local UI (relay
+ * state and leave events come from the transport).
  */
 export const connectionStatusMessageSchema = z.object({
   ...peerEnvelopeFields,
@@ -375,7 +375,7 @@ export const simulationSnapshotMessageSchema = z.object({
 export type SimulationSnapshotMessage = z.infer<typeof simulationSnapshotMessageSchema>;
 
 /**
- * Player ready announcement (S1 ready lifecycle): the sender's game
+ * Player ready announcement: the sender's game
  * finished loading and is ready to play. The sender's identity comes from
  * the peer envelope; the message carries no payload fields.
  */
@@ -386,7 +386,7 @@ export const gameReadyMessageSchema = z.object({
 export type GameReadyMessage = z.infer<typeof gameReadyMessageSchema>;
 
 /**
- * Game start (S1): announced to every player when the game begins. The
+ * Game start: announced to every player when the game begins. The
  * start policy (who decides when to start) is host/arena policy, not game
  * code — games only observe the start event. Idempotent: a session that is
  * already started ignores further announcements.
@@ -397,7 +397,7 @@ export const gameStartMessageSchema = z.object({
 });
 export type GameStartMessage = z.infer<typeof gameStartMessageSchema>;
 
-/** Game end (S1): announced to every player when the game ends. */
+/** Game end: announced to every player when the game ends. */
 export const gameEndMessageSchema = z.object({
   ...peerEnvelopeFields,
   type: z.literal("game.end"),
@@ -419,8 +419,8 @@ export const rawChannelMetadataMessageSchema = z.object({
 export type RawChannelMetadataMessage = z.infer<typeof rawChannelMetadataMessageSchema>;
 
 /**
- * Raw channel close: the declaring player closed one of its raw channels
- * (A2 channel lifecycle). Receivers drop the channel declaration: local
+ * Raw channel close: the declaring player closed one of its raw channels.
+ * Receivers drop the channel declaration: local
  * sends on it fail with `unknown_channel` unless the receiver declared the
  * channel itself (each player owns its own declarations). The channel name
  * may be re-opened later with a fresh `raw.channel` declaration.
@@ -434,17 +434,16 @@ export type RawChannelCloseMessage = z.infer<typeof rawChannelCloseMessageSchema
 
 /**
  * Game source metadata: the pre-transfer descriptor for a peer-to-peer game
- * source transfer (P3). Receivers can decide to accept before any bytes move.
- * The optional `title`, `apiVersion`, and `mode` fields (P3 additions, F6
- * additive) let the receiver run its runtime compatibility check and show
- * lobby UI before any bytes move.
+ * source transfer. Receivers can decide to accept before any bytes move.
+ * The optional `title`, `apiVersion`, and `mode` fields let the receiver
+ * check runtime compatibility and show lobby UI before any bytes move.
  */
 export const gameSourceMetadataMessageSchema = z.object({
   ...peerEnvelopeFields,
   type: z.literal("game.source.metadata"),
   gameId: gameIdSchema,
   title: titleSchema.optional(),
-  /** Nova API version the game was built against (S1 `nova.defineGame`). */
+  /** Nova API version the game was built against (`nova.defineGame`). */
   apiVersion: z.number().int().min(1).optional(),
   /** Execution mode the host will launch (state / simulation / raw). */
   mode: gameModeSchema.optional(),

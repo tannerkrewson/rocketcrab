@@ -14,9 +14,8 @@ import { gameEndReasonSchema, gameModeSchema } from "./shared";
 /**
  * Runtime-plane message schemas (host ↔ runtime).
  *
- * U6 added the session-router messages that make the local test arena (and,
- * later, a real party) work end-to-end without bypassing the runtime
- * protocol: `game.apiCall` carries a validated Nova API call from the game
+ * Session-router messages connect the test arena and real parties through
+ * the runtime protocol: `game.apiCall` carries a validated Nova API call from the game
  * frame (via the runtime) to the host's session router, and `game.apiEvent`
  * carries a session event from the host back into the frame. Both travel on
  * the same dedicated MessageChannel as every other runtime message and are
@@ -27,7 +26,7 @@ import { gameEndReasonSchema, gameModeSchema } from "./shared";
  * Nova API call methods the runtime forwards to the host (the session
  * router). Mirrors `novaApiCallSchemas` in apps/runtime (the runtime
  * validates before forwarding; the host re-validates at its boundary).
- * `stateResponse` (S2) carries the authority frame's answer to a
+ * `stateResponse` carries the authority frame's answer to a
  * `stateRequest` host event.
  */
 export const NOVA_API_CALL_METHODS = [
@@ -46,8 +45,8 @@ export type NovaApiCallMethod = (typeof NOVA_API_CALL_METHODS)[number];
 
 /**
  * A forwarded Nova API call: the runtime validated the payload already
- * (never trust game input), then forwards it to the host session router
- * (U6/P1). The payload is the same shape the runtime's `novaApiCallSchemas`
+ * (never trust game input), then forwards it to the host session router. The
+ * payload is the same shape the runtime's `novaApiCallSchemas`
  * accepted.
  */
 export const gameApiCallMessageSchema = z
@@ -60,7 +59,7 @@ export const gameApiCallMessageSchema = z
   .strict();
 export type GameApiCallMessage = z.infer<typeof gameApiCallMessageSchema>;
 
-/** Connection status values the arena pushes into a frame (S1 surface). */
+/** Connection status values the arena pushes into a frame. */
 export const novaConnectionStatusSchema = z.enum([
   "connecting",
   "connected",
@@ -70,7 +69,7 @@ export const novaConnectionStatusSchema = z.enum([
 ]);
 export type NovaConnectionStatus = z.infer<typeof novaConnectionStatusSchema>;
 
-/** One player as the host pushes it into a frame (S1 `NovaPlayer` shape). */
+/** One player as the host pushes it into a frame (`NovaPlayer` shape). */
 export const novaPlayerSchema = z.object({
   id: memberIdSchema,
   name: displayNameSchema,
@@ -78,7 +77,7 @@ export const novaPlayerSchema = z.object({
 export type NovaPlayer = z.infer<typeof novaPlayerSchema>;
 
 /**
- * S2 state-mode requests the host sends into the authority's game frame
+ * State-mode requests the host sends into the authority's game frame
  * (`stateRequest` apiEvent): create the initial state, apply one action to
  * the canonical state, or compute one player's view. The game's handler
  * functions live in the frame; only plain data crosses the boundary.
@@ -144,7 +143,7 @@ export const stateResponseSchema = z.discriminatedUnion("kind", [
 export type StateResponse = z.infer<typeof stateResponseSchema>;
 
 /**
- * A1: the frame's answer to a `simulationRequest` — the serialized
+ * The frame's answer to a `simulationRequest` — the serialized
  * simulation state the authority's game produced through its snapshot
  * callback (`nova.simulation.register({ serializeState })`), or a stable
  * rejection.
@@ -169,7 +168,7 @@ export const simulationResponseSchema = z.discriminatedUnion("kind", [
 export type SimulationResponse = z.infer<typeof simulationResponseSchema>;
 
 /**
- * A1: the host asks the authority's game frame to serialize its current
+ * The host asks the authority's game frame to serialize its current
  * simulation state (periodic snapshot production; the state itself is
  * game-defined — Nova only carries and replicates it). The game answers
  * with a `simulationResponse` apiCall.
@@ -183,7 +182,7 @@ export const simulationRequestEventSchema = z
 export type SimulationRequestEvent = z.infer<typeof simulationRequestEventSchema>;
 
 /**
- * S2 action acks pushed into the dispatcher's frame so `nova.dispatch`
+ * Action acks pushed into the dispatcher's frame so `nova.dispatch`
  * promises resolve when the authority applies or rejects the action.
  */
 export const actionAckEventSchema = z
@@ -274,8 +273,8 @@ export type GameApiEventMessage = z.infer<typeof gameApiEventMessageSchema>;
 
 /**
  * Runtime-plane messages (host ↔ runtime): messages between the Nova shell
- * and the runtime frame over the dedicated MessageChannel (U3, F4 spike
- * shape). Every schema extends the runtime envelope, so each message carries
+ * and the runtime frame over the dedicated MessageChannel. Every schema extends
+ * the runtime envelope, so each message carries
  * the protocol version, message type, runtime instance ID, unique message
  * ID, and timestamp. Unlike peer messages there are no member/connection IDs:
  * the runtime frame is not a party member, it is an isolated execution
@@ -284,10 +283,9 @@ export type GameApiEventMessage = z.infer<typeof gameApiEventMessageSchema>;
 
 /**
  * Runtime bootstrap: the host hands a game document to the runtime frame for
- * execution (F4 spike bootstrap shape). Carries the full untrusted HTML
+ * execution. Carries the full untrusted HTML
  * source, bounded by `htmlSourceBytes`, plus the player's identity and any
- * delegated permissions (F4 finding: `allow` must be carried at every iframe
- * hop).
+ * delegated permissions (`allow` must be carried at every iframe hop).
  */
 export const runtimeBootstrapMessageSchema = z.object({
   ...runtimeEnvelopeFields,
@@ -318,7 +316,7 @@ export type RuntimeReadinessMessage = z.infer<typeof runtimeReadinessMessageSche
 
 /**
  * Game registration: the game (via the Nova API bridge) declares itself to
- * the runtime, which forwards the registration to the host (S1, U4).
+ * the runtime, which forwards the registration to the host.
  */
 export const gameRegistrationMessageSchema = z.object({
   ...runtimeEnvelopeFields,
@@ -356,8 +354,8 @@ export const gameMetadataMessageSchema = z.object({
 export type GameMetadataMessage = z.infer<typeof gameMetadataMessageSchema>;
 
 /**
- * Runtime error: an observable failure report from the runtime (U4
- * categories: empty source, missing structure/registration, oversized source,
+ * Runtime error: an observable failure report from the runtime (categories:
+ * empty source, missing structure/registration, oversized source,
  * syntax errors, remote load failures). Rate-limited by
  * `errorReportRatePerSecond`.
  */
@@ -384,8 +382,7 @@ export const runtimeErrorMessageSchema = z.object({
 export type RuntimeErrorMessage = z.infer<typeof runtimeErrorMessageSchema>;
 
 /**
- * Game lifecycle event: state transitions of the game frame (F4 spike
- * lifecycle: load / reload / destroy; M1: suspend / resume / restore).
+ * Game lifecycle event: load / reload / destroy / suspend / resume / restore.
  */
 export const gameLifecycleEventMessageSchema = z.object({
   ...runtimeEnvelopeFields,
@@ -419,7 +416,7 @@ export type EndGameRequestMessage = z.infer<typeof endGameRequestMessageSchema>;
 
 /**
  * Runtime heartbeat ping: the host asks the runtime to confirm liveness
- * (F4 spike heartbeat; threat model T6 — a wedged runtime must be visible
+ * (threat model T6 — a wedged runtime must be visible
  * to the shell).
  */
 export const runtimePingMessageSchema = z
@@ -441,7 +438,7 @@ export type RuntimePongMessage = z.infer<typeof runtimePongMessageSchema>;
 
 /**
  * Reload request: the host asks the runtime to re-run the current game in a
- * completely fresh frame (F4 soft reload — same source, clean state).
+ * completely fresh frame (same source, clean state).
  */
 export const runtimeReloadMessageSchema = z
   .object({
@@ -453,7 +450,7 @@ export type RuntimeReloadMessage = z.infer<typeof runtimeReloadMessageSchema>;
 
 /**
  * Console capture: a rate-limited console entry from the game frame
- * (diagnostics for U4's runtime error panel). Entries are capped by
+ * (runtime error-panel diagnostics). Entries are capped by
  * `runtimeLogRatePerSecond`; the runtime reports how many entries it
  * dropped since the previous forwarded entry.
  */
