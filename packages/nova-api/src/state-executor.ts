@@ -74,7 +74,11 @@ function failure(code: string, error: unknown): { ok: false; code: string; messa
  * executor instead.
  */
 export class LocalGameExecutor implements NovaStateExecutor {
-  constructor(private readonly handlers: NovaStateHandlers | null) {}
+  constructor(
+    private readonly handlers: NovaStateHandlers | null,
+    /** Told when one player's view fails; that player keeps their old view. */
+    private readonly onViewError?: (memberId: string, message: string) => void,
+  ) {}
 
   async createInitialState(input: {
     context: NovaGameContext;
@@ -145,6 +149,8 @@ export class LocalGameExecutor implements NovaStateExecutor {
       const result = await this.computeView({ state, viewer });
       if (result.ok) {
         views[viewer.id] = result.view;
+      } else {
+        this.onViewError?.(viewer.id, result.message);
       }
     }
     return views;

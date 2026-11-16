@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { defineConfig, type Plugin } from "vite";
+import { build, defineConfig, type Plugin, type Rolldown } from "vite";
 
 // Local HTTPS dev certs (scripts/gen-certs.mjs) — same mechanism as the
 // nova app (apps/nova/vite.config.ts). `npm run dev:https` starts the dev
@@ -39,6 +39,39 @@ function runtimeHeaders(): Plugin {
   };
 }
 
+const FRAME_SCRIPT_ID = "virtual:nova-frame-script";
+const FRAME_ENTRY = fileURLToPath(new URL("./src/frame/entry.ts", import.meta.url));
+
+/**
+ * `import script from "virtual:nova-frame-script"` gives the game-frame script
+ * (src/frame/entry.ts and the tested `@rocketcrab/nova-api` client it uses),
+ * bundled to one minified IIFE string that the runtime inlines ahead of each
+ * game. `</script` is escaped so the string is safe inside a script element.
+ */
+export function novaFrameScript(): Plugin {
+  return {
+    name: "nova-frame-script",
+    resolveId: (id) => (id === FRAME_SCRIPT_ID ? `\0${FRAME_SCRIPT_ID}` : undefined),
+    async load(id) {
+      if (id !== `\0${FRAME_SCRIPT_ID}`) return undefined;
+      const result = (await build({
+        configFile: false,
+        logLevel: "silent",
+        define: { "process.env.NODE_ENV": JSON.stringify("production") },
+        build: {
+          write: false,
+          minify: true,
+          lib: { entry: FRAME_ENTRY, formats: ["iife"], name: "novaFrame" },
+        },
+      })) as Rolldown.RolldownOutput[];
+      const chunk = result[0]!.output[0];
+      for (const file of chunk.moduleIds) if (!file.startsWith("\0")) this.addWatchFile(file);
+      const code = chunk.code.replace(/<\/script/gi, "<\\/script");
+      return `export default ${JSON.stringify(code)};`;
+    },
+  };
+}
+
 // Static origin for the isolated game runtime.
 // In production this is deployed to a separate origin (runtime.nova.example).
 // The dev server listens on a distinct port so both origins run locally.
@@ -47,7 +80,7 @@ function runtimeHeaders(): Plugin {
 // separate origin, secret-free content, no service workers, and the strict
 // main-origin policy; docs/architecture/deployment.md).
 export default defineConfig(({ mode }) => ({
-  plugins: [runtimeHeaders()],
+  plugins: [novaFrameScript(), runtimeHeaders()],
   server: {
     port: 5174,
     https: httpsServerConfig(mode),

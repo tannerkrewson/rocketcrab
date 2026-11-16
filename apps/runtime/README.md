@@ -48,11 +48,11 @@ Nova shell (nova.example)  ──postMessage bootstrap──▶  runtime.nova.ex
   is detected (`src/html-source.ts`) and reported, never sanitized: empty
   sources fail with `empty_source`; missing `<!doctype`/`<html>` structure is
   reported as `invalid_html` but still runs.
-- **Nova API bootstrap injection**: the bridge defines `window.nova` with
-  the full game-facing API surface (S1: `defineGame`, `ready`, `log`,
-  players, subscriptions, `dispatch`, `state`, `raw`, `simulation`) inside
-  the game frame — the same object shape `createNovaClient` builds in
-  `@rocketcrab/nova-api`. The lifecycle is enforced in the frame too
+- **Nova API bootstrap injection**: the bridge (`src/frame/entry.ts`,
+  bundled at build time by the `novaFrameScript` Vite plugin) defines
+  `window.nova` with `createNovaClient` from `@rocketcrab/nova-api`, the same
+  client the contract suite tests, and runs state-mode handlers with Immer
+  when the host asks. The lifecycle is enforced in the frame too
   (calls before readiness fail with a clear `NovaError`), and every
   forwarded call is schema-validated here before it reaches the host.
   The host session router (U6 arena / P1 party) then routes the validated

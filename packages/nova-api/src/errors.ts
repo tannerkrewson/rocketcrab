@@ -105,3 +105,10 @@ export function notStartedMessage(method: string): string {
 export function endedMessage(method: string): string {
   return `nova.${method}() is not available after the game ended.`;
 }
+
+/** A known error code, or `invalid_options` for anything unrecognised. */
+export function toErrorCode(code: string | undefined): NovaErrorCode {
+  return code !== undefined && code in NOVA_ERROR_CODES
+    ? (code as NovaErrorCode)
+    : "invalid_options";
+}

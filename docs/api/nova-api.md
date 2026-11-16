@@ -505,8 +505,9 @@ on raw channels.
 - `packages/nova-api` defines the surface (`createNovaClient`) and the
   transport-neutral session engine (`NovaSession`) that drives it over the
   transport interface (`@rocketcrab/core`).
-- The runtime frame bridge (`apps/runtime`) injects the same surface into
-  every game document.
+- Every game frame gets that same `createNovaClient`, bundled into the
+  script the runtime inlines ahead of the game (`apps/runtime/src/frame/`),
+  so the contract suite tests the code games actually run.
 - The same session code runs over the in-memory transport (the test arena)
   and over the party transport (`TrysteroTransport`), so the same game code
   works in both (ADR-0003). The transport-neutral contract suite

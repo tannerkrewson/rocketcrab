@@ -1,6 +1,8 @@
 import { defineConfig } from "vitest/config";
+import { novaFrameScript } from "./vite.config";
 
 export default defineConfig({
+  plugins: [novaFrameScript()],
   test: {
     environment: "jsdom",
     // Run tests as if served from the runtime origin so origin-derivation

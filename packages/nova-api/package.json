@@ -6,6 +6,9 @@
   "exports": {
     ".": "./src/index.ts",
     "./version": "./src/version.ts",
+    "./client": "./src/client.ts",
+    "./state-executor": "./src/state-executor.ts",
+    "./errors": "./src/errors.ts",
     "./contract-suite": "./src/contract-suite.ts"
   },
   "scripts": {

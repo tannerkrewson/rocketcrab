@@ -46,7 +46,7 @@ import {
   type NovaSessionEvent,
 } from "./client";
 import { NOVA_PROTOCOL_CHANNEL } from "./constants";
-import { NOVA_ERROR_CODES, NovaError, endedMessage, type NovaErrorCode } from "./errors";
+import { NovaError, endedMessage, toErrorCode } from "./errors";
 import { NOVA_API_VERSION } from "./version";
 import { newInputId } from "./ids";
 import {
@@ -1920,14 +1920,6 @@ function rawPayloadBytes(payload: unknown): number {
   }
   const json = JSON.stringify(payload);
   return new TextEncoder().encode(json ?? "").length;
-}
-
-/** Map a state-engine error code onto the stable NovaError code set. */
-function toErrorCode(code: string): NovaErrorCode {
-  if (code in NOVA_ERROR_CODES) {
-    return code as NovaErrorCode;
-  }
-  return "invalid_options";
 }
 
 function assertValidSchema(result: { success: boolean }, message: string): void {

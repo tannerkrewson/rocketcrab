@@ -18,13 +18,7 @@
  *   registered by a game never cross the frame, only data does.
  */
 import { isSupportedApiVersion } from "./version";
-import {
-  NOVA_ERROR_CODES,
-  NovaError,
-  endedMessage,
-  notStartedMessage,
-  type NovaErrorCode,
-} from "./errors";
+import { NovaError, endedMessage, notStartedMessage, toErrorCode } from "./errors";
 import { isReservedChannelName } from "./constants";
 import { newActionId } from "./ids";
 import {
@@ -240,6 +234,8 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
         callSafely(connectionHandlers, event.status);
         break;
       case "start":
+        // The host sends start once per frame; a repeat must not re-run onStart.
+        if (started) break;
         started = true;
         // Deliver the initial view (which can precede the start event on the
         // same ordered channel) so games see their state before onStart runs
@@ -638,12 +634,4 @@ function extractStateHandlers(options: NovaGameDeclaration): NovaStateHandlers |
     handlers.actions = options.actions;
   }
   return handlers;
-}
-
-/** Map an ack error code onto the stable NovaError code set. */
-function toErrorCode(code: string | undefined): NovaErrorCode {
-  if (code !== undefined && code in NOVA_ERROR_CODES) {
-    return code as NovaErrorCode;
-  }
-  return "invalid_options";
 }
