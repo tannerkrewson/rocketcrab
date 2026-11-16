@@ -7,6 +7,14 @@
   S4 (state-mode MVP; verification in
   `docs/testing/state-mode-vertical-slice.md`), ADR-0007 (authority)
 
+## Amended 2026-11-15: raw channels are always reliable and ordered
+
+The raw-mode `reliable`, `ordered` and `binary` channel options were removed.
+Real parties only ever had reliable, ordered data channels (and the WebSocket
+tunnel fallback requires them), so the options were promises Nova could not
+keep. Binary payloads are detected per send. The experimental `nova.media`
+surface was removed in the same pass; it always failed.
+
 ## Context
 
 AI-generated games cannot be expected to implement distributed-state logic.

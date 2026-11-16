@@ -500,16 +500,12 @@ describe("ArenaEngine — network controls", () => {
     expect(engine.getSnapshot().summary.success).toBe(true);
   });
 
-  it("applies shared latency and drop-message settings", async () => {
+  it("applies the shared latency setting", async () => {
     const { engine } = await started();
     engine.setLatency(250);
     expect(engine.getSnapshot().latencyMs).toBe(250);
-    engine.setDropMessages(true);
-    expect(engine.getSnapshot().dropMessages).toBe(true);
     engine.setLatency(-10);
     expect(engine.getSnapshot().latencyMs).toBe(0);
-    engine.setDropMessages(false);
-    expect(engine.getSnapshot().dropMessages).toBe(false);
   });
 
   it("clear logs empties every player's log panel", async () => {

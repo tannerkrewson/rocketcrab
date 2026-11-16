@@ -178,8 +178,8 @@ describe("NovaSession raw channels (A2)", () => {
   it("records peer channel declarations and re-announces open channels to mid-game joiners", async () => {
     const { hub, a, b } = await makeRawPair();
     // Ada declares a channel; Ben learns it from the declaration broadcast.
-    a.client.raw.createChannel({ name: "chat", reliable: true, ordered: true });
-    a.client.raw.createChannel({ name: "positions", binary: true });
+    a.client.raw.createChannel({ name: "chat" });
+    a.client.raw.createChannel({ name: "positions" });
     await settle(hub);
     expect(b.getRawDiagnostics().channelCount).toBe(2);
     expect(b.getRawDiagnostics().selfDeclaredChannelCount).toBe(0);

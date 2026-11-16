@@ -292,10 +292,6 @@ export function buildRawChannelMessage(
   base: PeerMessageBase,
   spec: {
     channelName: string;
-    reliability: "reliable" | "unreliable";
-    ordering: "ordered" | "unordered";
-    binaryPayloads: boolean;
-    broadcast: boolean;
   },
 ): PeerMessage {
   return assertPeerMessage(

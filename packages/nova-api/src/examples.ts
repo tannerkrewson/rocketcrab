@@ -121,8 +121,8 @@ export const RAW_MODE_EXAMPLE = `// Raw-mode example: a "chat" channel plus a bi
 nova.defineGame({ title: "Chatter", mode: "raw" });
 
 nova.onStart(function () {
-  nova.raw.createChannel({ name: "chat", reliable: true, ordered: true });
-  nova.raw.createChannel({ name: "positions", binary: true });
+  nova.raw.createChannel({ name: "chat" });
+  nova.raw.createChannel({ name: "positions" });
 
   nova.raw.send("chat", { text: "hello everyone" });
   nova.raw.send("positions", new Uint8Array([1, 2, 3]));

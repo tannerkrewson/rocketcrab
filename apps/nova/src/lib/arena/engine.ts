@@ -146,7 +146,6 @@ export class ArenaEngine {
   private runId = 1;
   private status: ArenaState["status"] = "starting";
   private latencyMs = 0;
-  private dropMessages = false;
   private startedAt: number | null = null;
   private stateDiagnostics: ArenaStateDiagnostics | null = null;
   private source: string;
@@ -176,7 +175,6 @@ export class ArenaEngine {
       players,
       authorityPlayerId: this.computeAuthorityPlayerId(players),
       latencyMs: this.latencyMs,
-      dropMessages: this.dropMessages,
       startedAt: this.startedAt,
       stateDiagnostics: this.stateDiagnostics,
       simulationDiagnostics: this.computeSimulationDiagnostics(players),
@@ -325,18 +323,6 @@ export class ArenaEngine {
     for (const runtime of this.players.values()) {
       if (runtime.transport !== null) {
         runtime.transport.faultProfile.latencyMs = value;
-      }
-    }
-    this.emit();
-  }
-
-  /** Shared message-drop toggle: unreliable sends drop with probability 0.4. */
-  setDropMessages(enabled: boolean): void {
-    if (enabled === this.dropMessages) return;
-    this.dropMessages = enabled;
-    for (const runtime of this.players.values()) {
-      if (runtime.transport !== null) {
-        runtime.transport.faultProfile.lossRate = enabled ? 0.4 : 0;
       }
     }
     this.emit();

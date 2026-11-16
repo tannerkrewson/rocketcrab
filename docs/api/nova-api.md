@@ -380,8 +380,8 @@ var tick = nova.simulation.getTick();
 
 ## 10. Raw mode (`mode: "raw"`)
 
-For specialized protocols. Nova provides named channels with delivery
-choices, binary support, rate/size limits, transfer progress, and channel
+For specialized protocols. Nova provides named channels (always reliable
+and ordered), binary support, rate/size limits, transfer progress, and channel
 lifecycle — but no synchronization, migration, or cheating resistance
 (ADR-0006).
 
@@ -389,8 +389,8 @@ lifecycle — but no synchronization, migration, or cheating resistance
 nova.defineGame({ title: "Chatter", mode: "raw" });
 
 nova.onStart(() => {
-  nova.raw.createChannel({ name: "chat", reliable: true, ordered: true });
-  nova.raw.createChannel({ name: "positions", binary: true });
+  nova.raw.createChannel({ name: "chat" });
+  nova.raw.createChannel({ name: "positions" });
 
   nova.raw.send("chat", { text: "hello everyone" });
   nova.raw.send("positions", new Uint8Array([1, 2, 3]));
@@ -428,22 +428,13 @@ Rules:
 - Payloads are JSON data or binary (`Uint8Array` / `ArrayBuffer`).
 - The channel name `nova.protocol` is reserved.
 
-### Delivery guarantees and the Trystero mapping (A2)
+### Delivery
 
-Every channel declares two delivery choices; defaults are
-`reliable: true, ordered: true`:
-
-| Option     | Meaning over the arena transport (in-memory)                                                       | Over a real party (Trystero)                                                                                                                            |
-| ---------- | -------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `reliable` | Reliable channels never drop; unreliable channels may lose messages (simulated link loss).         | All channels are delivered reliably — Trystero's data channel is always reliable (SCTP), so `reliable: false` is accepted but **degrades to reliable**. |
-| `ordered`  | Ordered channels buffer and reorder by delivery stamp; unordered channels may arrive out of order. | All channels are delivered in order — Trystero's data channel is always ordered, so `ordered: false` is accepted but **degrades to ordered**.           |
-| `binary`   | Binary payloads travel on the transport's binary path and bypass protocol validation.              | Same — binary payloads are supported end to end.                                                                                                        |
-
-Games must therefore **never rely on loss or reordering for correctness**
-over a real party: unreliable/unordered options express intent (and are
-truly honored by the test arena), but the Trystero path only provides
-reliable, ordered channels. Use per-send `{ reliable, ordered }` overrides
-in `nova.raw.send` the same way.
+Every raw channel is **reliable and ordered**: messages from one sender
+arrive once, in the order sent. The party transport (WebRTC data channels
+and the relay fallback) offers nothing else, so there are no delivery
+options. Binary payloads (`Uint8Array`, `ArrayBuffer`) are detected per
+send; `message.binary` tells the receiver which kind arrived.
 
 ### Size, rate, and progress (A2)
 
@@ -470,8 +461,7 @@ Each player shares a 256 KiB/s game-message byte budget with a 1 MiB burst acros
 State mode gives you canonical state, ordered actions, per-player views,
 late joining, and automatic authority migration — Nova owns correctness.
 Raw mode gives you channels and nothing else: **no synchronization, no
-migration, no cheating resistance**, and delivery guarantees are only as
-strong as the transport behind you (see the Trystero mapping above).
+migration, no cheating resistance**; delivery is reliable and ordered.
 Prefer state mode unless the game genuinely needs a lower-level protocol;
 the AI reference (A4) follows the same guidance.
 

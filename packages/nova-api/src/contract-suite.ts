@@ -833,10 +833,10 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       await startBoth({ harness, a, b });
       const aReceived: NovaRawMessage[] = [];
       const bReceived: NovaRawMessage[] = [];
-      a.client.raw.createChannel({ name: "chat", reliable: true, ordered: true });
-      b.client.raw.createChannel({ name: "chat", reliable: true, ordered: true });
-      a.client.raw.createChannel({ name: "positions", binary: true });
-      b.client.raw.createChannel({ name: "positions", binary: true });
+      a.client.raw.createChannel({ name: "chat" });
+      b.client.raw.createChannel({ name: "chat" });
+      a.client.raw.createChannel({ name: "positions" });
+      b.client.raw.createChannel({ name: "positions" });
       a.client.raw.onMessage("chat", (message) => aReceived.push(message));
       b.client.raw.onMessage("chat", (message) => bReceived.push(message));
       a.client.raw.onMessage("positions", (message) => aReceived.push(message));
@@ -861,7 +861,7 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
     it("re-announces open raw channels to a peer joining mid-game (A2)", async () => {
       const { harness, a, b } = await makePair(harnessFactory);
       await startBoth({ harness, a, b });
-      a.client.raw.createChannel({ name: "physics", reliable: false, ordered: false });
+      a.client.raw.createChannel({ name: "physics" });
       await settle(harness);
 
       // Carol joins after the channel exists: she learns it from the

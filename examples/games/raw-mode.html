@@ -41,17 +41,17 @@
         el.scrollTop = el.scrollHeight;
       }
 
-      // Structured chat channel: reliable + ordered delivery.
-      nova.raw.createChannel({ name: "chat", reliable: true, ordered: true });
+      // Structured chat channel (every raw channel is reliable and ordered).
+      nova.raw.createChannel({ name: "chat" });
       // Binary positions channel: Uint8Array payloads.
-      nova.raw.createChannel({ name: "positions", binary: true });
+      nova.raw.createChannel({ name: "positions" });
 
       nova.raw.onMessage("chat", (message) => {
         log(message.from.name + " says: " + message.payload.text);
       });
 
       nova.raw.onMessage("positions", (message) => {
-        const bytes = message.payload; // Uint8Array (binary: true)
+        const bytes = message.payload; // Uint8Array (message.binary is true)
         log(
           message.from.name +
             " position #" +

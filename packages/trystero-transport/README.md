@@ -23,8 +23,8 @@ behaves identically in the local test arena and over real parties.
   envelope (messageId, sentAt, channel, sessionId, seq, deliverySeq, binary,
   totalBytes) rides in Trystero action metadata. Broadcast (`target: null`)
   and targeted (`targetConnectionId`) sends; structured and binary payloads;
-  Trystero's reliable-ordered channel (unreliable/unordered requests degrade
-  to reliable/ordered — documented, not silent).
+  Trystero's reliable-ordered channel (the only kind; Nova's game API offers
+  no other).
 - **Whole requests**: `request` / `handleRequest` delegate to Trystero
   request actions, including correlation, chunking, backpressure, timeout,
   rejection, disconnect and abort. One active request per peer/channel maps

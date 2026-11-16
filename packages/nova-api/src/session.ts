@@ -202,11 +202,8 @@ interface PlayerRecord {
   joinedAt: number;
   authorityEligible: boolean;
 }
-/** Delivery guarantees recorded for one raw channel (S1 raw mode). */
+/** One open raw channel (S1 raw mode). Every raw channel is reliable and ordered. */
 export interface NovaRawChannelState {
-  readonly reliable: boolean;
-  readonly ordered: boolean;
-  readonly binary: boolean;
   /** True when THIS session declared the channel; peer declarations are informational. */
   readonly declaredBySelf: boolean;
 }
@@ -800,21 +797,9 @@ export class NovaSession implements NovaClientBackend {
         `Raw channel "${spec.name}" was already created (nova.raw.createChannel once per channel).`,
       );
     }
-    const state: NovaRawChannelState = {
-      reliable: spec.reliable ?? true,
-      ordered: spec.ordered ?? true,
-      binary: spec.binary ?? false,
-      declaredBySelf: true,
-    };
-    this.channels.set(spec.name, state);
+    this.channels.set(spec.name, { declaredBySelf: true });
     void this.sendProtocol((base) =>
-      buildRawChannelMessage(base, {
-        channelName: spec.name,
-        reliability: state.reliable ? "reliable" : "unreliable",
-        ordering: state.ordered ? "ordered" : "unordered",
-        binaryPayloads: state.binary,
-        broadcast: true,
-      }),
+      buildRawChannelMessage(base, { channelName: spec.name }),
     ).catch((error: unknown) => this.emitError(error));
   }
 
@@ -909,8 +894,8 @@ export class NovaSession implements NovaClientBackend {
       channel: name,
       payload,
       binary: isBinaryPayload(payload),
-      reliability: (options.reliable ?? channel.reliable) ? "reliable" : "unreliable",
-      ordering: (options.ordered ?? channel.ordered) ? "ordered" : "unordered",
+      reliability: "reliable",
+      ordering: "ordered",
       ...(targetConnectionId !== undefined ? { targetConnectionId } : {}),
       ...(onProgress !== undefined ? { onProgress } : {}),
     });
@@ -1038,17 +1023,9 @@ export class NovaSession implements NovaClientBackend {
       if (!state.declaredBySelf) {
         continue;
       }
-      void this.sendProtocol(
-        (base) =>
-          buildRawChannelMessage(base, {
-            channelName,
-            reliability: state.reliable ? "reliable" : "unreliable",
-            ordering: state.ordered ? "ordered" : "unordered",
-            binaryPayloads: state.binary,
-            broadcast: true,
-          }),
-        { targetMemberId: peer.memberId },
-      ).catch((error: unknown) => this.emitError(error));
+      void this.sendProtocol((base) => buildRawChannelMessage(base, { channelName }), {
+        targetMemberId: peer.memberId,
+      }).catch((error: unknown) => this.emitError(error));
     }
     // S2 late join: the authority hands the new shell the current canonical
     // state (migration copy) and computes the new player's selected view.
@@ -1348,16 +1325,9 @@ export class NovaSession implements NovaClientBackend {
         // Peer channel declarations are recorded so channel lifecycle works
         // across the party: the session knows which names are in use, peer
         // closes remove only peer declarations, and this session re-announces
-        // its own declarations when a peer joins mid-game (A2). Guarantees
-        // also travel with each transport message, so recording is purely
-        // lifecycle bookkeeping.
+        // its own declarations when a peer joins mid-game (A2).
         if (!this.channels.has(peerMessage.channelName)) {
-          this.channels.set(peerMessage.channelName, {
-            reliable: peerMessage.reliability === "reliable",
-            ordered: peerMessage.ordering === "ordered",
-            binary: peerMessage.binaryPayloads,
-            declaredBySelf: false,
-          });
+          this.channels.set(peerMessage.channelName, { declaredBySelf: false });
         }
         break;
       case "raw.close": {

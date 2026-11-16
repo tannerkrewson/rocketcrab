@@ -154,7 +154,7 @@ describe("novaApiCallSchemas", () => {
     ).toBe(true);
     expect(
       novaApiCallSchemas["raw.createChannel"].safeParse({
-        spec: { name: "chat", binary: true },
+        spec: { name: "chat" },
       }).success,
     ).toBe(true);
     expect(

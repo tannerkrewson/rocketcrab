@@ -228,10 +228,6 @@ describe("peer message schemas", () => {
         basePeer({
           type: "raw.channel",
           channelName: "chat",
-          reliability: "reliable",
-          ordering: "ordered",
-          binaryPayloads: false,
-          broadcast: true,
         }),
       ),
       rawChannelCloseMessageSchema.parse(
@@ -319,11 +315,7 @@ describe("peer message schemas", () => {
       basePeer({ type: "game.end", reason: "banana" }),
       basePeer({
         type: "raw.channel",
-        channelName: "chat",
-        reliability: "sometimes",
-        ordering: "ordered",
-        binaryPayloads: false,
-        broadcast: true,
+        channelName: "",
       }),
       basePeer({
         type: "raw.close",

@@ -34,9 +34,6 @@ export const novaActionSchema = z.object({
 /** Bounded raw channel spec for `nova.raw.createChannel`. */
 export const novaRawChannelSpecSchema = z.object({
   name: z.string().min(1).max(64),
-  reliable: z.boolean().optional(),
-  ordered: z.boolean().optional(),
-  binary: z.boolean().optional(),
 });
 
 /** Bounded raw channel name for `nova.raw.send` / `onMessage`. */

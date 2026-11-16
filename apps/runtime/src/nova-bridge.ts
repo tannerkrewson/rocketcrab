@@ -77,9 +77,6 @@ export const novaApiCallSchemas = {
     .object({
       spec: z.object({
         name: z.string().min(1).max(64),
-        reliable: z.boolean().optional(),
-        ordered: z.boolean().optional(),
-        binary: z.boolean().optional(),
       }),
     })
     .strict(),
@@ -95,8 +92,6 @@ export const novaApiCallSchemas = {
       options: z
         .object({
           to: z.string().min(1).max(64).optional(),
-          reliable: z.boolean().optional(),
-          ordered: z.boolean().optional(),
         })
         .optional(),
     })

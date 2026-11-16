@@ -294,17 +294,11 @@ describe("ArenaSection — desktop grid", () => {
 
     // Network simulation controls are hidden by default behind the debug menu.
     expect(desktop.queryByLabelText("Artificial latency")).not.toBeInTheDocument();
-    expect(desktop.queryByRole("button", { name: /Drop messages/ })).not.toBeInTheDocument();
     await userEvent.click(desktop.getByRole("button", { name: /^Debug$/ }));
 
     const latency = desktop.getByLabelText("Artificial latency");
     fireEvent.change(latency, { target: { value: "300" } });
     await waitFor(() => expect(desktop.getByText("Latency 300ms")).toBeInTheDocument());
-
-    await userEvent.click(desktop.getByRole("button", { name: /Drop messages/ }));
-    await waitFor(() => expect(desktop.getByText("Dropping")).toBeInTheDocument());
-    await userEvent.click(desktop.getByRole("button", { name: /Dropping/ }));
-    await waitFor(() => expect(desktop.getByText("Drop messages")).toBeInTheDocument());
   });
 
   it("removes a player and stops its frame, staying mounted", async () => {

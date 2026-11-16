@@ -26,7 +26,6 @@ import {
   AlertTriangle,
   ArrowRight,
   Bug,
-  Droplets,
   Gauge,
   GripHorizontal,
   GripVertical,
@@ -366,16 +365,6 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
                 className="w-32 accent-primary"
                 aria-label="Artificial latency"
               />
-              <Button
-                variant={state.dropMessages ? "accent" : "default"}
-                soft={!state.dropMessages}
-                size="md"
-                onClick={() => actions.setDropMessages(!state.dropMessages)}
-                title="Toggle simulated message drops on unreliable channels"
-              >
-                <Droplets className="h-4 w-4" aria-hidden="true" />
-                {state.dropMessages ? "Dropping" : "Drop messages"}
-              </Button>
             </div>
             <Button
               variant="danger"

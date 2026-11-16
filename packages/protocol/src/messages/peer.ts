@@ -406,9 +406,8 @@ export const gameEndMessageSchema = z.object({
 export type GameEndMessage = z.infer<typeof gameEndMessageSchema>;
 
 /**
- * Raw channel metadata: declares a named raw-mode channel and its delivery
- * guarantees (ADR-0006 raw mode: named channels, reliable/unreliable,
- * ordered/unordered, binary, broadcast/targeted). Peers joining mid-game
+ * Raw channel metadata: declares a named raw-mode channel. Every raw channel
+ * is reliable and ordered (the party transport offers nothing else). Peers joining mid-game
  * receive the declarations of every open channel (targeted re-announcement
  * on join), so channel lifecycle survives peer joins.
  */
@@ -416,10 +415,6 @@ export const rawChannelMetadataMessageSchema = z.object({
   ...peerEnvelopeFields,
   type: z.literal("raw.channel"),
   channelName: channelNameSchema,
-  reliability: z.enum(["reliable", "unreliable"]),
-  ordering: z.enum(["ordered", "unordered"]),
-  binaryPayloads: z.boolean(),
-  broadcast: z.boolean(),
 });
 export type RawChannelMetadataMessage = z.infer<typeof rawChannelMetadataMessageSchema>;
 

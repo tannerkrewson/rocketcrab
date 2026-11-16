@@ -92,7 +92,6 @@ export function useArena(options: UseArenaOptions) {
       resumePlayer: (id: string) => void engineRef.current?.resumePlayer(id),
       triggerAuthorityLoss: () => void engineRef.current?.triggerAuthorityLoss(),
       setLatency: (latencyMs: number) => engineRef.current?.setLatency(latencyMs),
-      setDropMessages: (enabled: boolean) => engineRef.current?.setDropMessages(enabled),
       clearLogs: () => engineRef.current?.clearLogs(),
       restartAll: () => engineRef.current?.restartAll(),
       /** Replace the tested source and restart every player (7.40). */

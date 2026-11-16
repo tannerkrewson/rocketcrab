@@ -111,8 +111,6 @@ export interface ArenaState {
   readonly authorityPlayerId: string | null;
   /** Shared artificial one-way latency in ms (0 = none). */
   readonly latencyMs: number;
-  /** Shared message-drop toggle (applies to unreliable sends). */
-  readonly dropMessages: boolean;
   /** Epoch ms when the arena started the game, or null before start. */
   readonly startedAt: number | null;
   /** S2 state diagnostics (last commit), or null before the first commit. */

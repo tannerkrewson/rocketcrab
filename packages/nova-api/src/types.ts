@@ -213,26 +213,16 @@ export interface NovaStateDiagnostics {
 /** How long the authority has to apply an action before it times out. */
 export const NOVA_ACTION_TIMEOUT_MS = actionTimeoutMs;
 
-/** Declares a raw-mode channel (ADR-0006 raw mode). */
+/** Declares a raw-mode channel (ADR-0006 raw mode). Every channel is reliable and ordered. */
 export interface NovaRawChannelSpec {
   /** Channel name, 1..64 characters; cannot be a reserved protocol name. */
   readonly name: string;
-  /** Reliable delivery (default true; unreliable may drop messages). */
-  readonly reliable?: boolean;
-  /** Ordered delivery (default true; unordered may arrive out of order). */
-  readonly ordered?: boolean;
-  /** The game will send binary payloads on this channel (default false). */
-  readonly binary?: boolean;
 }
 
 /** Options for one raw send on a channel. */
 export interface NovaRawSendOptions {
   /** Target one player by id; omit to broadcast to every connected player. */
   readonly to?: string;
-  /** Override the channel's reliable setting for this send. */
-  readonly reliable?: boolean;
-  /** Override the channel's ordered setting for this send. */
-  readonly ordered?: boolean;
   /**
    * Optional sender-side transfer progress for payloads moved in chunks
    * (payloads above ~64 KiB travel as chunked transfers). Called with the
