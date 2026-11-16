@@ -1,6 +1,6 @@
 import { handshakeTimeoutMs } from "@rocketcrab/protocol";
 import type { Scheduler } from "@rocketcrab/party";
-import type { PeerLinkStatus } from "./engine";
+import type { PeerLinkStatus } from "./engine-types";
 
 /** Tracks the generic alert for a peer switching to or failing on a tunnel. */
 export class PeerLinkAlert {
