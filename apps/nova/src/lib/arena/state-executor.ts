@@ -1,20 +1,10 @@
 /**
- * The arena's frame state executor (S2): the host-side half of the
- * authority-runtime seam.
+ * Authority handlers execute in the runtime frame, while the host retains
+ * canonical state (ADR-0006). Forward stateRequest events into the frame
+ * and correlate stateResponse calls with pending engine requests.
  *
- * State-mode games register handler functions in their runtime frame; Nova
- * shells retain the canonical state, so the authority's host session must
- * ask the authority's frame to run them (ADR-0006: the current authority's
- * runtime executes action handlers through Immer). This executor forwards
- * the engine's requests into the frame as `stateRequest` apiEvents
- * (host → runtime → bridge) and correlates the frame's answers, which come
- * back as `stateResponse` apiCalls (bridge → runtime → host) routed here by
- * the arena engine.
- *
- * Every request carries a request id; a late answer to an already-settled
- * request is dropped (rule 22: no orphaned listeners), and a request that
- * outlives the action timeout settles as `execution_timeout` so the state
- * engine can reject the action without ever adopting a partial state.
+ * Drop late responses and fail timed-out requests with execution_timeout
+ * so the engine never adopts partial state.
  */
 import {
   actionTimeoutMs,
@@ -37,13 +27,11 @@ interface PendingRequest {
   timer: ReturnType<typeof setTimeout>;
 }
 
-/** A pending simulation serialization request (A1; distinct response shape). */
 interface SimulationPendingRequest {
   settle: (result: SimulationResponse) => void;
   timer: ReturnType<typeof setTimeout>;
 }
 
-/** A valid `stateResponse` payload as the arena boundary validated it. */
 export interface FrameStateResponsePayload {
   requestId: string;
   result: StateResponse;
@@ -53,7 +41,6 @@ function newRequestId(): string {
   return `state-${crypto.randomUUID()}`;
 }
 
-/** Create a frame executor for one player's runtime frame. */
 export function createFrameStateExecutor(
   pushEvent: (event: GameApiEvent) => void,
   timeoutMs: number = actionTimeoutMs,
@@ -108,12 +95,11 @@ export class FrameStateExecutor implements NovaStateExecutor {
     });
   }
 
-  /** Route a validated `stateResponse` apiCall back to its request. */
   handleResponse(payload: FrameStateResponsePayload): void {
     if (this.disposed) return;
     const request = this.pending.get(payload.requestId);
     if (request === undefined) {
-      return; // late answer to a settled/timed-out request: drop (rule 22)
+      return; // Ignore responses to settled or timed-out requests.
     }
     this.pending.delete(payload.requestId);
     clearTimeout(request.timer);
@@ -176,13 +162,11 @@ export class FrameStateExecutor implements NovaStateExecutor {
   }
 }
 
-/** A valid `simulationResponse` payload as the arena boundary validated it. */
 export interface FrameSimulationResponsePayload {
   requestId: string;
   result: SimulationResponse;
 }
 
-/** Create a frame simulation executor for one player's runtime frame. */
 export function createFrameSimulationExecutor(
   pushEvent: (event: GameApiEvent) => void,
   timeoutMs: number = actionTimeoutMs,
@@ -191,14 +175,9 @@ export function createFrameSimulationExecutor(
 }
 
 /**
- * The arena's frame simulation executor (A1): the host-side half of the
- * authority-runtime seam for simulation-mode snapshots. The host asks the
- * authority's game frame to serialize its simulation state (the game's
- * `serializeState` callback) by pushing a `simulationRequest` apiEvent and
- * correlating the `simulationResponse` apiCall the bridge answers with.
- * A late answer to a settled request is dropped and a request that outlives
- * the timeout settles as `execution_timeout` (rule 22: no orphaned
- * listeners; the simulation engine skips the snapshot and keeps running).
+ * Correlate simulation serialization requests with authority-frame replies.
+ * Drop late replies; a timeout yields execution_timeout so the simulation
+ * engine can skip the snapshot and keep running.
  */
 export class FrameSimulationExecutor implements NovaSimulationExecutor {
   private readonly pending = new Map<string, SimulationPendingRequest>();
@@ -241,12 +220,11 @@ export class FrameSimulationExecutor implements NovaSimulationExecutor {
     return result;
   }
 
-  /** Route a validated `simulationResponse` apiCall back to its request. */
   handleResponse(payload: FrameSimulationResponsePayload): void {
     if (this.disposed) return;
     const request = this.pending.get(payload.requestId);
     if (request === undefined) {
-      return; // late answer to a settled/timed-out request: drop (rule 22)
+      return; // Ignore responses to settled or timed-out requests.
     }
     this.pending.delete(payload.requestId);
     clearTimeout(request.timer);

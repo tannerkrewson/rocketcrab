@@ -1,10 +1,4 @@
-/**
- * Nova example games (7th pass): the shared catalog behind routes/examples
- * and the /build flow's "start from an example" path. Complete games live
- * under examples/games/ and open in the editor as a new local draft —
- * the same handoff the master-prompt paste flow uses (storeDraftSource).
- * Lazy ?raw imports keep the example sources out of the main bundle.
- */
+/** Lazy source imports for the example catalog shared by /examples and /build. */
 export type ExampleGameMode = "state" | "simulation" | "raw";
 
 export interface ExampleGame {

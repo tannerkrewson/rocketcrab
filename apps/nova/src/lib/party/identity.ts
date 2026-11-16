@@ -1,13 +1,4 @@
-/**
- * Page-lifetime party identity (P4; ADR-0007).
- *
- * The shell assigns every player a stable member identity for the party
- * plane. The identity is generated once per browser and reused across page
- * loads (persisted locally): a reconnect/rejoin after a Mobile Safari
- * reload keeps the same memberId, so the party sees the same player come
- * back rather than a stranger (M1; ADR-0012). The display name is a short,
- * distinct player name announced to peers through the transport handshake.
- */
+/** Stable browser identity survives reloads so peers recognize rejoining players (ADR-0007, ADR-0012). */
 
 const MEMBER_PREFIX = "member-";
 const IDENTITY_KEY = "nova:party:identity:v1";
@@ -27,7 +18,6 @@ function generateMemberId(): string {
   return `${MEMBER_PREFIX}${randomHex(8)}`;
 }
 
-/** A party member identity (stable memberId + player-facing display name). */
 export interface PartyIdentity {
   readonly memberId: string;
   readonly displayName: string;
@@ -35,7 +25,6 @@ export interface PartyIdentity {
 
 let cachedIdentity: PartyIdentity | null = null;
 
-/** Read a persisted identity, or null when absent/corrupt. */
 function readStoredIdentity(): PartyIdentity | null {
   try {
     const raw = window.localStorage.getItem(IDENTITY_KEY);
@@ -57,12 +46,7 @@ function readStoredIdentity(): PartyIdentity | null {
   }
 }
 
-/**
- * This page's party identity, generated once per browser and reused across
- * page loads so reconnects/rejoins keep the same memberId (ADR-0007). The
- * display name prefers the player's saved name (7.5); a fresh browser gets
- * a short generated name until the player sets one.
- */
+/** Reuse the persisted member id and prefer a saved name over a generated one (ADR-0007). */
 export function localPartyIdentity(): PartyIdentity {
   if (cachedIdentity === null) {
     cachedIdentity = readStoredIdentity();
@@ -85,7 +69,7 @@ export function localPartyIdentity(): PartyIdentity {
   return identity;
 }
 
-/** The player's saved display name, or null when never set (7.5). */
+/** Saved display name, or null when never set. */
 export function getSavedPlayerName(): string | null {
   try {
     const raw = window.localStorage.getItem(PLAYER_NAME_KEY);
@@ -99,7 +83,6 @@ export function getSavedPlayerName(): string | null {
   }
 }
 
-/** Persist the player's chosen display name (7.5). */
 export function setSavedPlayerName(name: string): void {
   const trimmed = name.trim();
   if (trimmed.length === 0) {

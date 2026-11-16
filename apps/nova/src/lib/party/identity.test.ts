@@ -7,12 +7,7 @@ import {
   updatePartyDisplayName,
 } from "./identity";
 
-/**
- * Party identity tests (P4/M1): the member identity is generated once and
- * persisted locally so a reloaded Mobile Safari tab rejoins the party as
- * the same member (ADR-0007, ADR-0012). The player's chosen name (7.5) is
- * stored separately and preferred over the generated name.
- */
+/** Persist identity across reloads (ADR-0007, ADR-0012), separately from the chosen name. */
 describe("party identity", () => {
   beforeEach(() => {
     resetPartyIdentityForTests();
@@ -57,7 +52,6 @@ describe("party identity", () => {
     expect(updated?.displayName).toBe("Grace");
     expect(getSavedPlayerName()).toBe("Grace");
     expect(localPartyIdentity().displayName).toBe("Grace");
-    // Blank names are rejected.
     expect(updatePartyDisplayName("   ")).toBeNull();
   });
 });

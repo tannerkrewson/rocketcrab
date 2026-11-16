@@ -1,12 +1,10 @@
 /**
- * The master AI prompt (A4): one prompt users copy into any AI chat service to
- * get a playable Nova game. It is short build instructions plus the AI API
- * reference (`docs/api/nova-api-ai-reference.md`), embedded verbatim, so the
- * API rules live in exactly one file. The snapshot test pins the full text.
+ * Copyable game-building instructions plus the API reference embedded
+ * verbatim from docs/api/nova-api-ai-reference.md. Keep API rules in that
+ * single source; the snapshot pins the complete generated prompt.
  */
 import novaApiReference from "../../../../../docs/api/nova-api-ai-reference.md?raw";
 
-/** The complete master prompt, ready to copy into any AI chat service. */
 export function buildMasterPrompt(): string {
   return `# Nova Master Prompt
 

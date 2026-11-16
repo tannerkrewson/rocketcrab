@@ -4,12 +4,6 @@ import { Button } from "../ui/Button";
 
 const STORAGE_KEY = "nova:editor-tutorial-dismissed:v1";
 
-/**
- * First-run tutorial for the consolidated editor (7.44): a dismissible card
- * that walks a brand-new user through the editor's four core actions —
- * write, run, test multiplayer, save. Dismissal is remembered per browser
- * (localStorage), so returning creators never see it again.
- */
 export function FirstRunTutorial() {
   const [visible, setVisible] = useState(() => {
     try {

@@ -12,11 +12,7 @@ export interface PromptExportMenuProps {
   title?: string;
 }
 
-/**
- * The "Copy prompt" dropdown (Task 3): copies either the raw master prompt
- * or the master prompt extended with the current game source, using the
- * same writeToClipboard + toast pattern as the Build page.
- */
+/** Copy either the master prompt alone or the prompt with the current game source. */
 export function PromptExportMenu({ source, title }: PromptExportMenuProps) {
   const detailsRef = useRef<HTMLDetailsElement | null>(null);
 
@@ -27,7 +23,6 @@ export function PromptExportMenu({ source, title }: PromptExportMenuProps) {
     } else {
       toast.danger("Couldn't copy the prompt — your browser may need clipboard permission.");
     }
-    // Close the dropdown after the action.
     detailsRef.current?.removeAttribute("open");
   };
 

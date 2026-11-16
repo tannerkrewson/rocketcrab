@@ -1,8 +1,4 @@
-/**
- * FrameStateExecutor tests (S2): the host-side half of the
- * authority-runtime seam. Verifies request/response correlation, the
- * execution timeout, dropping late responses (rule 22), and dispose.
- */
+/** Frame executor request correlation, timeout, late-response, and disposal tests. */
 import { describe, expect, it, vi } from "vitest";
 import type { GameApiEvent } from "@rocketcrab/protocol";
 import type { NovaPlayer } from "@rocketcrab/nova-api";
@@ -142,7 +138,6 @@ describe("FrameStateExecutor", () => {
       result: { kind: "view", ok: true, view: { hand: "ace" } },
     });
     await expect(promise).resolves.toEqual({ ok: true, view: { hand: "ace" } });
-    // A second response for the same request id is dropped, not settled.
     expect(() =>
       executor.handleResponse({
         requestId: event.requestId,
@@ -216,7 +211,6 @@ describe("FrameSimulationExecutor (A1)", () => {
       const promise = harness.executor.serializeState();
       vi.advanceTimersByTime(51);
       await expect(promise).resolves.toMatchObject({ ok: false, code: "execution_timeout" });
-      // A late answer after the timeout is dropped (rule 22), not settled.
       expect(() => answer(harness, { kind: "state", ok: true, state: {} })).not.toThrow();
     } finally {
       vi.useRealTimers();

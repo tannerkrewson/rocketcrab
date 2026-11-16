@@ -1,9 +1,4 @@
-/**
- * Shared test harness for the U6 arena: a fake runtime host (the same seams
- * RuntimeHostClient exposes) plus drive helpers, so both the engine tests
- * and the ArenaPage UI tests exercise the real runtime protocol without any
- * real iframes or channels.
- */
+/** Fake runtime channels shared by arena engine and UI tests; no real iframes. */
 import { expect, vi } from "vitest";
 import type { GameApiEvent } from "@rocketcrab/protocol";
 import type { ChannelPort } from "../runtime-host";
@@ -159,11 +154,7 @@ export async function runToStart(
   }
 }
 
-/**
- * S2: answer every pending `stateRequest` apiEvent the host pushed into a
- * fake frame with a minimal stateResponse, so the state engine can start
- * and apply actions. Call in a waitFor loop while the run settles.
- */
+/** Answer pending state requests with minimal state; call while waiting for the run to settle. */
 export function answerStateRequests(channels: FakeChannel[], count: number, baseline = 0): void {
   for (let index = 0; index < count; index += 1) {
     const port = channels[baseline + index]!.port1;
@@ -183,12 +174,7 @@ export function answerStateRequests(channels: FakeChannel[], count: number, base
   }
 }
 
-/**
- * A1: answer every pending `simulationRequest` apiEvent the host pushed
- * into a fake frame with a serialized simulation state, so the simulation
- * engine can produce authoritative snapshots. Call in a waitFor loop while
- * the run settles.
- */
+/** Answer pending simulation requests; call while waiting for the run to settle. */
 export function answerSimulationRequests(
   channels: FakeChannel[],
   count: number,

@@ -1,11 +1,7 @@
 /**
- * Host-side validation of forwarded Nova API calls (U6 session router).
- *
- * The runtime already validated these payloads at its boundary
- * (`novaApiCallSchemas` in apps/runtime); the arena re-validates at the host
- * boundary before touching a NovaSession, so malformed game input can never
- * reach the session (defense in depth — never trust game input at any hop).
- * Shapes mirror the runtime schemas by contract; drift is pinned by tests.
+ * Revalidate forwarded API calls before they reach a NovaSession. Runtime
+ * validation is not a trust boundary for the host; these schemas mirror it
+ * by contract, with tests guarding against drift.
  */
 import { z } from "zod";
 import { simulationResponseSchema, stateResponseSchema } from "@rocketcrab/protocol";
@@ -60,15 +56,12 @@ export const arenaApiCallSchemas = {
       }),
     })
     .strict(),
-  // S2: the authority frame's answer to a stateRequest host event.
   stateResponse: z
     .object({
       requestId: z.string().min(1).max(64),
       result: stateResponseSchema,
     })
     .strict(),
-  // A1: the authority frame's answer to a simulationRequest host event
-  // (the game's serializeState callback produced its simulation state).
   simulationResponse: z
     .object({
       requestId: z.string().min(1).max(64),

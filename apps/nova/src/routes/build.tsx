@@ -22,14 +22,12 @@ import { buildMasterPrompt } from "../lib/prompt/master-prompt";
 
 export const Route = createFileRoute("/build")({
   validateSearch: (search: Record<string, unknown>): BuildSearch => ({
-    // ?page=prompt shows the master-prompt step (Page 2) so Back/refresh
-    // land sanely on the two-page build flow (gmo).
+    // Keep the prompt step addressable for browser Back and refresh.
     page: search.page === "prompt" ? "prompt" : undefined,
   }),
   component: BuildPage,
 });
 
-/** /build search params (rocketcrab-gmo: two-page build flow). */
 interface BuildSearch {
   page?: "prompt";
 }
@@ -39,15 +37,9 @@ const NOVA_API_REFERENCE_URL =
   "https://github.com/tannerkrewson/rocketcrab/blob/docs/api/nova-api-ai-reference.md";
 
 /**
- * 7th-pass ORBS (n6o): per-orb config for the hero card's soft "alien"
- * glow — stable hardcoded variety: distinct positions spread EVENLY across
- * the card (a fuller, denser field than 5cl.16: not one centered blob, not
- * sparse gaps), sizes, colors, breathing durations and delays. The info
- * cyan (nova IS the info color, 2t1.3) dominates so the glow matches the
- * brand halo, with a few primary/secondary/accent orbs for the alien mix.
- * Opacities stay low so the headline and actions read on top. The
- * animation uses `backwards` fill mode so every orb holds its 0% keyframe
- * during its delay — no first-render flash of the un-animated state.
+ * Fixed orb positions keep the decorative glow stable across renders.
+ * Low opacity preserves text contrast; backwards fill prevents a flash
+ * before delayed animations begin.
  */
 const ORBS = [
   {
@@ -129,18 +121,7 @@ const ORBS = [
   },
 ];
 
-/**
- * The build-a-game gateway, split into TWO pages (gmo): page one is the
- * "Introducing Nova" hero — the non-glow rocketcrab mark over the brand
- * line (Nova in the info color, matching the homepage alert), a clean
- * tagline, a nova-colored "Get started" CTA (btn-info + glow-info aura)
- * that steps to ?page=prompt, plus the three-step flow summary. Page two
- * (?page=prompt) carries the master prompt itself, the Nova example games
- * (wks) as the "start from something complete" alternative, and the Open
- * the editor entry point (7.44: the editor is the paste target, no paste
- * box here). The generation flow is unchanged — one copyable prompt that
- * works in any AI chat service.
- */
+/** Build flow: introduction, then a copyable prompt and example-game handoff. */
 export function BuildPage() {
   const search = Route.useSearch();
   if (search.page === "prompt") {
@@ -149,7 +130,6 @@ export function BuildPage() {
   return <BuildHeroPage />;
 }
 
-/** Page 1: the hero + the three-step intro. */
 function BuildHeroPage() {
   return (
     <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-10 text-center">
@@ -158,15 +138,6 @@ function BuildHeroPage() {
         back
       </Link>
 
-      {/* 7th pass: ONE hero card with the non-glow rocketcrab mark above the
-          "Introducing Nova" line (Nova in the info color — the homepage
-          alert uses the same accent status, NOT primary), a short warm
-          tagline, and the nova-colored Get started CTA (with the brand
-          info aura) stepping to the prompt page. No nova-colored outline
-          on the card (kqo) — a plain neutral border; the breathing orbs
-          still carry the glow, now fuller and evenly spread (n6o).
-          Purely decorative (aria-hidden), CSS-only, respects
-          prefers-reduced-motion; orbs sit behind the content. */}
       <section
         aria-labelledby="build-hero-heading"
         data-testid="build-hero"
@@ -210,8 +181,6 @@ function BuildHeroPage() {
           }
         `}</style>
         <div className="relative flex flex-col items-center gap-4 px-6 py-12 sm:px-12 sm:py-16">
-          {/* Non-glow rocketcrab mark above the headline (kqo): the
-              flat mark via the BrandLogo no-glow variant. */}
           <BrandLogo variant="no-glow" size={80} responsive aria-hidden />
           <h1
             id="build-hero-heading"
@@ -222,9 +191,6 @@ function BuildHeroPage() {
           <p className="max-w-md text-lg leading-relaxed text-foreground/70">
             Turn any idea into a game your friends can play.
           </p>
-          {/* gmo: the nova-colored hero CTA steps to the prompt page. The
-              btn-info class plus a nova drop-shadow make the aura (the
-              filter rides on top of the button's own depth shadow). */}
           <Link
             to="/build"
             search={{ page: "prompt" }}
@@ -290,8 +256,6 @@ function BuildHeroPage() {
   );
 }
 
-/** Page 2 (?page=prompt): the master prompt, the example games, and the
- *  editor entry — the "do the work" step of the build flow. */
 function BuildPromptPage() {
   const navigate = useNavigate();
   const prompt = useMemo(() => buildMasterPrompt(), []);
@@ -308,7 +272,6 @@ function BuildPromptPage() {
     }
   };
 
-  /** wks: load a Nova example into the editor (same handoff as /examples). */
   const handleOpenExample = async (gameId: string) => {
     if (openingId !== null) return;
     setOpeningId(gameId);
@@ -341,8 +304,6 @@ function BuildPromptPage() {
         </p>
       </header>
 
-      {/* The three moves, spelled out compactly (gmo: legible, not
-          overwhelming). */}
       <ol
         aria-label="What to do with the prompt"
         className="flex w-full flex-wrap items-center justify-center gap-2 text-sm font-semibold text-foreground/70"
@@ -413,8 +374,6 @@ function BuildPromptPage() {
         </Card>
       </section>
 
-      {/* wks: Nova example games are back in the build flow — skip the
-          prompt entirely and start from a complete game. */}
       <section aria-labelledby="example-games-heading" className="w-full text-left">
         <h2 id="example-games-heading" className="text-xl font-black">
           Or start from a Nova example
@@ -451,10 +410,8 @@ function BuildPromptPage() {
         </div>
       </section>
 
-      {/* The editor is the unavoidable next step (7.44): once the AI has
-          written the game, paste it here. The master prompt itself stays on
-          this page (it's an AI prompt, not game HTML, so nothing is handed
-          off to the editor; it opens blank, ready to paste). */}
+      {/* The prompt is instructions for an AI, not game HTML; open a blank
+          editor rather than handing the prompt over as source. */}
       <Link
         to="/editor"
         className={buttonStyles(

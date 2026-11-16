@@ -19,11 +19,7 @@ const options: { preference: ThemePreference; label: string; icon: typeof Sun }[
   { preference: "system", label: "System theme", icon: Monitor },
 ];
 
-/**
- * Light/dark/system theme switcher (HeroUI controls the visuals; no theme
- * catalogue is bundled). Icon-only controls stay compact in the top bar while
- * keeping accessible labels.
- */
+/** Compact, accessible light/dark/system theme controls. */
 export function ThemeSelector() {
   const [preference, setPreference] = useState<ThemePreference>(() => getStoredTheme());
 

@@ -21,7 +21,6 @@ describe("Dialog", () => {
         <p>Are you sure?</p>
       </Dialog>,
     );
-    // A closed modal must not be exposed to assistive technology.
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
   });
 

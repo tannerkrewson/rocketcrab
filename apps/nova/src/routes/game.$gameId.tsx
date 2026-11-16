@@ -36,7 +36,6 @@ function isGameDetailOrigin(value: unknown): value is GameDetailOrigin {
 }
 
 function CategoryBadge({ label }: { label: string }) {
-  // l41: category badges use the soft HeroUI chip style.
   return <Badge>{label}</Badge>;
 }
 
@@ -45,28 +44,9 @@ function errorMessage(error: unknown): string {
 }
 
 /**
- * Game detail page (7.23 / 10.9 / 2t1.10): classic-style Info | Guide tabs
- * for prebuilt games, and metadata (title, description, mode) for the
- * player's own saved games loaded from the IndexedDB repository. The brand
- * row (rocketcrab.com) stays visible (2t1.1) — except inside a party,
- * where the shared party shell header (logo + rocketcrab.com/abcd with the
- * code) takes its place (5cl.8).
- *
- * The call to action is contextual — there is NO standalone "play game"
- * view (2t1.10): when a party is waiting in its lobby and the viewer is the
- * creator, "Select game" hands the game to the party engine (saved games
- * via selectGame, classic games via selectClassicGame) and returns to
- * /party; when the viewer is not in a party, "Start party" creates one with
- * the game preselected (saved games via /party search params + source
- * handoff; classic games can't be preselected over the URL, so the party
- * starts and the lobby's pick-a-game browser shows the classic boxes).
- * Guests in a party get no CTA — the host picks.
- *
- * 5cl.7: the back button returns to where the user came from — the browse
- * category/search they left (the browser records its position in
- * sessionStorage before navigating here), or the party lobby when reached
- * from a party. 5cl.10: the browser is classic-only, so there are no Nova
- * prebuilt branches anymore.
+ * Shared details for classic and saved games. Hosts can select a game for
+ * their waiting party; players outside a party can start one. Guests
+ * cannot change the party's game.
  */
 export function BrowseGamePage() {
   const { gameId } = Route.useParams();
@@ -85,12 +65,7 @@ export function BrowseGamePage() {
   const partyBack = from === "party" || from === "party-browse" || inPartyLobby;
   const partyBrowseBack = from === "party-browse" || (from === undefined && inPartyLobby);
 
-  // 5cl.7: the browser recorded its view + query before navigating here.
-  // In a party the back button returns to /party?browse=1 — the lobby
-  // reopens straight into browse mode and its GameBrowser restores the
-  // stored category on mount (so back lands on the exact category page the
-  // user left). Otherwise the back button returns to the exact
-  // category/search via /browse?view=&q=.
+  // Restore the browser's category and query, including when the lobby remounts.
   const browseBack = readBrowseContext();
   const backTarget =
     browseBack === null || browseBack.view === null
@@ -128,8 +103,6 @@ export function BrowseGamePage() {
     </Link>
   );
 
-  /** 5cl.8: the party shell header replaces the brand row when this page was
-   * reached from a party context. */
   const header =
     partyBack && inParty ? <PartyShellHeader inviteUrl={state.inviteUrl} /> : <BrandHeader />;
 
@@ -156,15 +129,11 @@ export function BrowseGamePage() {
     }
   };
 
-  /** Select the game for the active party, then return to the lobby. */
   const pickForParty = async (pick: () => Promise<void>) => {
     if (selecting) return;
     setSelecting(true);
     try {
       await pick();
-      // The /party route declares search params (EditorPage sets them);
-      // an empty search is the plain "start a party" landing, which the
-      // engine routes back to the active party's lobby.
       await navigate({
         to: "/party",
         search: { gameId: undefined, mode: undefined, title: undefined },
@@ -175,7 +144,6 @@ export function BrowseGamePage() {
     }
   };
 
-  /** The host-only "Select game" action (absent when no party is waiting). */
   const selectForParty = (pick: () => Promise<void>) =>
     inPartyLobby ? (
       <Button
@@ -291,8 +259,6 @@ export function BrowseGamePage() {
         <div className="flex flex-wrap items-center gap-2">
           <h1 className="text-3xl font-black">{prebuilt.name}</h1>
           <Badge color="danger">classic</Badge>
-          {/* l41: all badges sit at the top — the category badges live next
-              to the classic badge instead of inside the Info tab. */}
           {prebuilt.category.map((category) => (
             <CategoryBadge key={category} label={category} />
           ))}
@@ -301,8 +267,6 @@ export function BrowseGamePage() {
         {prebuilt.players ? (
           <p className="text-sm font-semibold text-foreground/60">{prebuilt.players} players</p>
         ) : null}
-        {/* l41: the game link + donation link moved up from the bottom of the
-            Info tab to sit right under the player count. */}
         <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm font-semibold text-foreground/60">
           {prebuilt.displayUrlHref ? (
             <a
@@ -367,9 +331,7 @@ export function BrowseGamePage() {
 
       <div className="flex flex-wrap items-center justify-center gap-3">
         {notInParty ? (
-          // Classic games can't be preselected over the URL (the engine
-          // creates their room in the lobby), so the party starts plain
-          // and the lobby's pick-a-game browser shows the classic boxes.
+          // Classic rooms are created in the lobby, so they cannot be preselected via URL.
           <Link
             to="/party"
             search={{ gameId: undefined, mode: undefined, title: undefined }}

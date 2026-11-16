@@ -7,14 +7,7 @@ import {
 } from "./turn-creds";
 import { edgeOrigin } from "../edge";
 
-/**
- * TURN credential mint client tests (task rocketcrab-23s, P0). The client
- * (apps/nova/src/lib/party/turn-creds.ts) fetches short-lived credentials
- * from the mint at party-join time; the fetch is mocked (relay.test.ts
- * pattern). The mint origin comes from the VITE_EDGE_ORIGIN build-time
- * env and is empty when the
- * build pins no origin — then no fetch happens at all.
- */
+/** TURN mint client tests use mocked fetches; unconfigured builds never fetch. */
 
 const MINT_ORIGIN = "https://edge.example.workers.dev";
 

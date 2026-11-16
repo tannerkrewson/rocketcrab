@@ -1,27 +1,12 @@
 /**
- * Host-side runtime bridge (U3 "bridge" half).
+ * Validated RPC over a dedicated MessageChannel to the separate runtime
+ * origin (ADR-0001). Bootstrap checks the exact origin and transfers a fresh
+ * channel per instance; inbound messages pass parseRuntimeMessage.
  *
- * A small versioned RPC layer over a dedicated MessageChannel (F4 spike
- * shape, F6 schemas) that the Nova shell uses to embed the runtime origin
- * (ADR-0001) and control game execution:
- *
- * - embeds the runtime iframe on the separate runtime origin;
- * - performs the exact-origin postMessage bootstrap, transferring one
- *   dedicated MessageChannel per runtime instance;
- * - sends validated protocol messages (bootstrap / ping / reload / end);
- * - validates every inbound message with `parseRuntimeMessage`;
- * - keeps a heartbeat (missed pongs -> `unresponsive` event) so a wedged
- *   runtime is visible to the shell (threat model T6);
- * - exposes parent-controlled load / reload / destroy / restart and a
- *   composed `diagnose()` for pause/suspend diagnostics (ADR-0012, B6);
- * - never leaks secrets: game HTML and game-declared metadata are forwarded
- *   only through validated protocol messages, and the runtime origin is
- *   never handed main-origin credentials.
- *
- * Comlink was evaluated against this handshake (F4 design note) and not
- * adopted: it has no message validation (it would bypass the protocol
- * boundary), no explicit lifecycle control (destroy/reload/restart), and
- * no restart semantics. See apps/runtime/README.md.
+ * The shell owns frame lifecycle and heartbeat health, including background
+ * suspension (ADR-0012). Parent-controlled teardown remains outside game
+ * code's control. Never pass main-origin credentials to the runtime.
+ * See apps/runtime/README.md for the handshake design.
  */
 import {
   PROTOCOL_VERSION,
@@ -77,7 +62,6 @@ export interface LoadGameInput {
 export interface RuntimeHostOptions {
   /** Full origin of the runtime app (dev: http://localhost:5174). */
   runtimeOrigin: string;
-  /** Element that hosts the runtime iframe. */
   container: HTMLElement;
   /** Event sink for validated runtime-plane events. */
   onEvent: (event: RuntimeHostEvent) => void;
@@ -127,7 +111,7 @@ function buildBootstrapMessage(
     player: game.player,
     ...(game.permissions !== undefined ? { permissions: game.permissions } : {}),
   });
-  assertRuntimeMessage(message); // never emit an unvalidated message
+  assertRuntimeMessage(message);
   return message;
 }
 
@@ -215,10 +199,8 @@ export class RuntimeHostClient {
         const channel = new MessageChannel();
         return { port1: channel.port1, port2: channel.port2 };
       });
-    // Page-visibility awareness (M1, ADR-0012): Mobile Safari suspends
-    // timers while the page is backgrounded, so the heartbeat must not
-    // accumulate missed pongs (or fire at all) while hidden; it pauses and
-    // re-syncs with an immediate ping on return.
+    // Backgrounded Safari suspends timers: pause missed-pong accounting
+    // while hidden and ping immediately on return (ADR-0012).
     if (typeof window !== "undefined") {
       const onVisibility = (): void => this.setPageVisibility(document.hidden);
       const onPageHide = (): void => this.setPageVisibility(true);
@@ -234,13 +216,7 @@ export class RuntimeHostClient {
     }
   }
 
-  /**
-   * Page visibility for the heartbeat (Mobile Safari backgrounding). While
-   * hidden the heartbeat pauses; on return it resets the missed-pong
-   * counter and pings immediately so a stale "unresponsive" state never
-   * survives a background/foreground cycle. Wired to the browser's
-   * visibility/pagehide/pageshow events and exposed publicly for tests.
-   */
+  /** Pause while hidden; reset missed pongs and ping immediately on return. */
   setPageVisibility(hidden: boolean): void {
     this.pageHidden = hidden;
     if (hidden) {
@@ -249,7 +225,6 @@ export class RuntimeHostClient {
     }
     this.missedPongs = 0;
     if (this.ready && this.port && this.runtimeInstanceId !== null) {
-      // Re-sync immediately instead of waiting for the next interval tick.
       this.send(buildPingMessage(this.runtimeInstanceId, this.sessionId));
     }
     this.startHeartbeat();
@@ -261,9 +236,7 @@ export class RuntimeHostClient {
    */
   async load(game: LoadGameInput): Promise<void> {
     this.lastGame = game;
-    // A fresh bootstrap starts a fresh runtime instance on a fresh channel:
-    // establish the channel (and its handler) before the frame handshake so
-    // no runtime reply can be missed.
+    // Install the fresh channel handler before bootstrap so no runtime reply is missed.
     if (this.port) {
       this.port.onmessage = null;
       this.port.onmessageerror = null;
@@ -315,7 +288,7 @@ export class RuntimeHostClient {
     }
   }
 
-  /** Composed pause/suspend diagnostic for the shell (ADR-0012, B6). */
+  /** Composed pause/suspend diagnostics for the shell (ADR-0012). */
   diagnose(): RuntimeDiagnostic {
     return {
       ready: this.ready,
@@ -328,14 +301,7 @@ export class RuntimeHostClient {
     };
   }
 
-  /**
-   * Push one session event into the runtime frame (U6 session router): the
-   * host-side NovaSession emits events (player joins, connection changes,
-   * start/end, raw messages, simulation inputs, errors) and this bridge
-   * forwards them over the instance channel as a validated `game.apiEvent`
-   * message; the runtime delivers them to the game frame's `window.nova`
-   * handlers. No-op when the runtime is not running.
-   */
+  /** Forward validated session events to the runtime; no-op when not running. */
   pushApiEvent(event: GameApiEvent): void {
     if (!this.port || this.runtimeInstanceId === null) {
       return;
@@ -369,9 +335,8 @@ export class RuntimeHostClient {
       return this.iframe;
     }
     const iframe = document.createElement("iframe");
-    // The runtime iframe runs the runtime app (scripts + same-origin with
-    // itself) and must never navigate the parent; permission delegation
-    // carries through to the game frame one hop below (F4 finding).
+    // Allow runtime scripts and same-origin access without parent navigation.
+    // Permission delegation passes through to the nested game frame.
     iframe.setAttribute("sandbox", "allow-scripts allow-same-origin");
     iframe.setAttribute("allow", "camera; microphone; clipboard-read; clipboard-write; fullscreen");
     iframe.allowFullscreen = true;
@@ -472,8 +437,7 @@ export class RuntimeHostClient {
   private startHeartbeat(): void {
     this.stopHeartbeat();
     if (this.pageHidden) {
-      // Timers are unreliable while backgrounded (ADR-0012/B6); the
-      // heartbeat resumes on setPageVisibility(false).
+      // Timers are unreliable while backgrounded; resume on visibility return (ADR-0012).
       return;
     }
     this.heartbeatTimer = window.setInterval(() => {

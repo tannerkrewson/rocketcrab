@@ -6,13 +6,7 @@ export const Route = createFileRoute("/editor")({
   component: EditorRoutePage,
 });
 
-/**
- * The blank game editor (A4): the paste target for the master-prompt flow.
- * When the /build generator handed off a draft source (sessionStorage),
- * this route seeds the editor with it; otherwise the editor starts empty.
- * The component is keyed by the draft id so a new paste always remounts the
- * editor with the new source instead of keeping stale state.
- */
+/** Key by draft id so a new handoff remounts the editor instead of retaining stale state. */
 function EditorRoutePage() {
   const draft = readDraftSource();
   return <EditorPage key={draft?.gameId ?? "blank"} initialSource={draft?.source} />;

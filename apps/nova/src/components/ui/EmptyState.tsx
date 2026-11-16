@@ -9,7 +9,6 @@ export interface EmptyStateProps {
   className?: string;
 }
 
-/** Friendly empty state for lists and sections that have nothing yet. */
 export function EmptyState({ icon, title, description, action, className }: EmptyStateProps) {
   return (
     <div

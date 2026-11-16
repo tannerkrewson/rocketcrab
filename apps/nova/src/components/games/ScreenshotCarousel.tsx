@@ -12,32 +12,15 @@ export interface ScreenshotCarouselProps {
 }
 
 /**
- * App-store style tall portrait screenshot carousel (rocketcrab-9fv.7.46).
- * The games' screenshots are already portrait, so each slide shows the full
- * image tall — swiped horizontally with clickable pagination dots — instead
- * of the old 4:3 thumbnail grid. c08: the carousel is NOT infinite (no
- * `loop` — explicit start and end), and the whole swiper lives in ONE card
- * instead of a phone-like frame around every screenshot.
- *
- * 2t1.3: `slidesPerView` is 2.5 so two and a half screenshots are visible
- * on first load (the centered slide plus the halves peeking in on either
- * side).
- *
- * `w-full` is load-bearing (rocketcrab-9fv.11.12): without a definite width
- * the container's used width follows the wrapper's min-content (the sum of
- * slide widths — swiper's `.swiper-slide` sets `flex-shrink: 0`, so slides
- * never shrink) while swiper sizes each slide as containerWidth /
- * slidesPerView. Any re-measure (image load/error, font swap, re-render,
- * resize) then reads the now-larger container and widens the slides again —
- * a runaway feedback loop that blew the carousel up to ~33.5M px and
- * rendered it off-screen. Do not remove `w-full`.
+ * Portrait screenshot carousel. Keep w-full: without a definite container
+ * width, min-content and Swiper slide sizing can form a growing feedback
+ * loop on each image load, resize, or remeasurement.
  */
 export function ScreenshotCarousel({ images, gameName }: ScreenshotCarouselProps) {
   if (images.length === 0) {
     return null;
   }
   return (
-    // c08: ONE card around the whole swiper; the per-slide frames are gone.
     <div className="rounded-2xl border-2 border-border bg-surface p-4">
       <Swiper
         modules={[A11y, Pagination]}

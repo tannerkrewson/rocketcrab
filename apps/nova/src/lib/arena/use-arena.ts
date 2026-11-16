@@ -1,8 +1,4 @@
-/**
- * React binding for the U6 arena engine: one engine per arena mount, a state
- * snapshot for the UI, stable control callbacks, and a container binder so
- * the UI's per-player divs become the runtime frames' hosts.
- */
+/** One arena engine per mount, with stable controls and per-player container bindings. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { GameMode } from "@rocketcrab/protocol";
 import { ArenaEngine, type ArenaSeams } from "./engine";
@@ -94,7 +90,6 @@ export function useArena(options: UseArenaOptions) {
       setLatency: (latencyMs: number) => engineRef.current?.setLatency(latencyMs),
       clearLogs: () => engineRef.current?.clearLogs(),
       restartAll: () => engineRef.current?.restartAll(),
-      /** Replace the tested source and restart every player (7.40). */
       replaceSource: (source: string) => void engineRef.current?.replaceSource(source),
       stop: () => engineRef.current?.stop(),
     }),

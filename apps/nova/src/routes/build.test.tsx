@@ -8,16 +8,6 @@ import { buildMasterPrompt } from "../lib/prompt/master-prompt";
 import { readDraftSource } from "../lib/editor/draft-handoff";
 import { routeTree } from "../routeTree.gen";
 
-/**
- * Build-page gateway tests (rocketcrab-9fv.10.11 / 2t1.7, hero redesigned
- * 5cl.16, split into two pages gmo): /build opens with ONE hero card — the
- * non-glow rocketcrab mark over the "Introducing Nova" headline (Nova in
- * the brand color) with the boosted "Get started" CTA — then introduces the
- * flow in three steps. ?page=prompt shows the
- * master-prompt step: the copyable master prompt, the Nova example games
- * (wks), and the Open the editor entry point (7.44).
- */
-
 const PROMPT = buildMasterPrompt();
 
 /** GitHub link to the docs, branch-free (GitHub resolves the default branch). */
@@ -56,39 +46,30 @@ describe("/build — page 1 (hero)", () => {
 
     const hero = await screen.findByTestId("build-hero");
     expect(hero.className).toContain("rounded-2xl");
-    // kqo: no nova-colored outline on the card — a plain neutral border.
     expect(hero.className).toContain("border-border");
     expect(hero.className).not.toContain("border-accent");
 
-    // The non-glow rocketcrab mark sits above the headline.
     const logo = hero.querySelector("img");
     expect(logo?.getAttribute("src")).toBe("/rocketcrab-logo-no-glow.svg");
-    // The hero remains larger than shared sub-page branding and uses the
-    // responsive height expression at both phone and desktop widths.
     expect(logo?.style.height).toBe("min(80px, 16vw)");
 
     expect(
       await within(hero).findByRole("heading", { name: "Introducing Nova" }),
     ).toBeInTheDocument();
-    // Nova is colored with the brand/info color, not primary.
     expect(within(hero).getByText("Nova").className).toContain("text-accent");
 
     expect(
       screen.getByText("Turn any idea into a game your friends can play."),
     ).toBeInTheDocument();
 
-    // gmo: the nova-colored Get started CTA steps to the prompt page.
     const cta = within(hero).getByRole("link", { name: "Get started" });
     expect(cta.getAttribute("href")).toBe("/build?page=prompt");
     expect(cta.className).toContain("button--primary");
     expect(cta.className).toContain("drop-shadow");
 
-    // The brand row no longer tops this page (5cl.16) and the intro page
-    // has no paste box (7.44).
     expect(screen.queryByRole("link", { name: /rocketcrab\.com — home/ })).not.toBeInTheDocument();
     expect(screen.queryByTestId("paste-target")).not.toBeInTheDocument();
 
-    // The three-step flow is spelled out in order.
     const steps = screen.getByRole("list", { name: "How to build a game" });
     const items = within(steps).getAllByRole("listitem");
     expect(items).toHaveLength(3);
@@ -117,12 +98,9 @@ describe("/build?page=prompt — the master-prompt step", () => {
   it("presents the generated prompt with the embedded API reference", async () => {
     await openPromptPage("/build?page=prompt");
 
-    // The complete generated prompt is present (inside the expandable panel).
     expect(screen.getByText(new RegExp("Nova Master Prompt"))).toBeInTheDocument();
     expect(screen.getByText(new RegExp("Interview the user first"))).toBeInTheDocument();
-    // The embedded API reference travels with the prompt.
     expect(screen.getByText(new RegExp("Nova API — AI Quick Reference"))).toBeInTheDocument();
-    // The version badge was removed from the generator UI and the prompt.
     expect(screen.queryByText(/template v\d+ · Nova API v\d+/)).not.toBeInTheDocument();
   });
 
@@ -156,7 +134,6 @@ describe("/build?page=prompt — the master-prompt step", () => {
     expect(editor.getAttribute("href")).toBe("/editor");
     expect(editor.className).toContain("button--primary");
 
-    // No paste box on the build page — the editor is the paste target.
     expect(screen.queryByRole("textbox", { name: "Paste game HTML" })).not.toBeInTheDocument();
   });
 
@@ -179,8 +156,7 @@ describe("/build?page=prompt — the master-prompt step", () => {
     expect(openButtons).toHaveLength(3);
     await userEvent.click(openButtons[0] as HTMLElement);
 
-    // The editor route mounts with the example source as an unsaved draft
-    // (scope to the desktop layout: jsdom never hides the phone editor).
+    // jsdom renders both layouts, so scope assertions to the desktop editor.
     const desktop = await screen.findByTestId("desktop-layout");
     const editor = within(desktop).getByRole("textbox", { name: "Game HTML source" });
     expect(editor.textContent).toContain("<!doctype html>");
@@ -197,7 +173,6 @@ describe("/build?page=prompt — the master-prompt step", () => {
 
     expect(screen.queryByTestId("paste-target")).not.toBeInTheDocument();
     expect(screen.queryByRole("textbox", { name: "Paste game HTML" })).not.toBeInTheDocument();
-    // No long descriptive intro paragraph or next-steps card.
     expect(
       screen.queryByText(/Copy the master prompt below into any AI chat service/),
     ).not.toBeInTheDocument();

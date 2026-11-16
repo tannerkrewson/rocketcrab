@@ -7,19 +7,13 @@
       <stop offset="100%" stop-color="#FFC107" />
     </linearGradient>
 
-    <!-- Blur Filter for Expanded Soft Glow. The region is huge relative to
-         the ellipse so no glow is cut off, and the viewBox (200x200, crab
-         art centered with 36px/40px of breathing room) has an opaque
-         background nowhere: every glow pixel is inside the canvas
-         (rocketcrab-5u7: glow was clipped by the old 128x128 viewBox). -->
+    <!-- Oversized filter bounds and viewBox padding keep the blur from clipping. -->
     <filter id="glowBlur" x="-100%" y="-100%" width="300%" height="300%">
       <feGaussianBlur stdDeviation="10" result="blur" />
     </filter>
   </defs>
 
-  <!-- Soft Ambient Glow Aura (Behind Everything). Slightly smaller than the
-       old full-bleed ellipse and at lower opacity/blur so it reads as a
-       gentle halo instead of a maxed-out glow wall (rocketcrab-5u7). -->
+  <!-- Low-opacity halo behind the mark. -->
   <g filter="url(#glowBlur)" opacity="0.6">
     <ellipse cx="64" cy="60" rx="56" ry="62" fill="url(#crabFlameGlow)" />
   </g>

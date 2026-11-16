@@ -44,12 +44,9 @@ export type TurnCredentialsResult =
  */
 export const TURN_CREDS_FETCH_TIMEOUT_MS = 4_000;
 /**
- * Must match the mint Worker's fixed TTL (24 h). Cloudflare allows at most 48 h
- * per credential; the TURN allocation itself has no maximum duration while the
- * client keeps it alive with authenticated refreshes. One long-lived credential
- * per party removes the old 8-minute re-mint/\`setConfiguration\` machinery,
- * which Nova cannot validate on physical devices and which Cloudflare only
- * supports as best-effort for live connections.
+ * Match the mint Worker's fixed 24-hour TTL. TURN allocations can continue
+ * through authenticated refreshes, so retain one credential rather than
+ * replacing ICE configuration on live connections (best-effort upstream).
  */
 export const TURN_CREDS_TTL_MS = 86_400_000;
 
@@ -61,7 +58,6 @@ export interface TurnCredsFetchOptions {
   timeoutMs?: number;
 }
 
-/** True when the mint origin is configured (build-time env). */
 export function turnCredsConfigured(): boolean {
   return edgeOrigin() !== "";
 }
@@ -80,8 +76,6 @@ function isAuthenticatedIceServer(entry: unknown): entry is TurnCredsIceServer {
   if (typeof urls !== "string" && !Array.isArray(urls)) {
     return false;
   }
-  // The mint always mints non-empty credentials; empty strings would be a
-  // broken TURN server, so require usable values.
   if (
     typeof username !== "string" ||
     username === "" ||
@@ -90,8 +84,6 @@ function isAuthenticatedIceServer(entry: unknown): entry is TurnCredsIceServer {
   ) {
     return false;
   }
-  // urls may be a string or an array of strings; keep only well-formed ones
-  // (a malformed mint response degrades per-entry, never fails the party).
   if (Array.isArray(urls)) {
     if (urls.length === 0 || !urls.every((url) => typeof url === "string")) {
       return false;

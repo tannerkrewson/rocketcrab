@@ -14,17 +14,7 @@ import { describe, expect, it, vi } from "vitest";
 import type { PartyEngineState } from "../../lib/party/engine";
 import { PartyPlayShell, type PartyPlayShellProps } from "./PartyPlayShell";
 
-/**
- * In-game play shell tests (7.29 + 7.38 + 7.45): the compact top bar (logo
- * collapse, centered party URL — tap to copy), the mutually-exclusive
- * menu / players / browse panels, the players popup (7.45: a compact
- * overlay anchored below the top bar - never a full-page takeover -
- * dismissed by Back, outside click, or Escape), and the confirmed actions
- * - Reload all is red and asks first, "Exit to lobby" ends the game for
- * everyone. The menu (9fv.11.11) hosts Browse games (host only; it moved
- * out of the players popup) and About this game (the lobby's details
- * overlay, in-game); Leave party was removed from the in-game menu.
- */
+/** Play-shell controls and overlays must keep the running frame mounted. */
 
 function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState {
   return {
@@ -101,8 +91,7 @@ async function renderShell(
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  // The shared GameBrowser renders router Links (e.g. "Build a game"); give
-  // the shell a real router context like the lobby tests do.
+  // GameBrowser renders router links, so the shell needs a real router context.
   const rootRoute = createRootRoute({ component: () => <Outlet /> });
   const buildRoute = createRoute({
     getParentRoute: () => rootRoute,
@@ -123,8 +112,7 @@ async function renderShell(
     <QueryClientProvider client={queryClient}>{node}</QueryClientProvider>
   );
   const result = render(<RouterProvider router={router} />, { wrapper });
-  // The router matches asynchronously; wait for the top bar before
-  // asserting (the same pattern the lobby tests use).
+  // Router matching is asynchronous; wait for the bar before assertions.
   await screen.findByRole("button", { name: /menu/i });
   return { props, ...result };
 }
@@ -134,7 +122,6 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     await renderShell(makeState());
     expect(screen.getByLabelText("Party link Nova party")).toBeInTheDocument();
     expect(screen.queryByText("Rocket Rumble")).not.toBeInTheDocument();
-    // No connected badge or game-code badge in the top bar anymore.
     expect(screen.queryByText("connected")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Party code ABCD")).not.toBeInTheDocument();
   });
@@ -142,7 +129,6 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
   it("collapses the top bar to a floating logo on logo tap and reopens it (7.38)", async () => {
     await renderShell(makeState());
     await userEvent.click(screen.getByRole("button", { name: /hide the top bar/i }));
-    // Only the floating logo remains; the bar (URL + menu) is gone.
     expect(screen.getByRole("button", { name: /show the top bar/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /menu/i })).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Party link Nova party")).not.toBeInTheDocument();
@@ -160,7 +146,6 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
 
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     await userEvent.click(screen.getByRole("menuitem", { name: /reload all/i }));
-    // Reload all warns first (players' games will be lost).
     const dialog = screen.getByRole("dialog", { name: /reload every player/i });
     expect(within(dialog).getByText(/will be lost/i)).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: /^cancel$/i }));
@@ -201,7 +186,6 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
     const players = screen.getByRole("dialog", { name: "Players" });
     const kick = within(players).getByRole("button", { name: /kick/i });
-    // 2z9: kicking asks first — the first tap only opens the confirm.
     await userEvent.click(kick);
     expect(onKickMember).not.toHaveBeenCalled();
     const confirm = screen.getByRole("dialog", { name: /kick a player/i });
@@ -223,7 +207,6 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
       }),
     );
     expect(onKickMember).not.toHaveBeenCalled();
-    // The players popup stays open under the dismissed confirm.
     expect(screen.getByRole("dialog", { name: "Players" })).toBeInTheDocument();
   });
 
@@ -232,11 +215,8 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
     const popup = screen.getByRole("dialog", { name: "Players" });
-    // The popup carries its own title + Back row, so it never relies on the
-    // fixed top bar for its header (no invisible controls under the bar).
     expect(within(popup).getByText(/^Players \(\d+\)$/)).toBeInTheDocument();
     expect(within(popup).getByRole("button", { name: /back to the game/i })).toBeInTheDocument();
-    // The game frame stays mounted underneath and the top bar stays usable.
     expect(screen.getByTestId("game-frame")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /menu/i })).toBeInTheDocument();
   });
@@ -247,16 +227,13 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
       await userEvent.click(screen.getByRole("button", { name: /menu/i }));
       await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
     };
-    // Clicking outside (the invisible backdrop) closes it.
     await openPopup();
     expect(screen.getByRole("dialog", { name: "Players" })).toBeInTheDocument();
     await userEvent.click(screen.getByTestId("players-popup-backdrop"));
     expect(screen.queryByRole("dialog", { name: "Players" })).not.toBeInTheDocument();
-    // Escape closes it.
     await openPopup();
     await userEvent.keyboard("{Escape}");
     expect(screen.queryByRole("dialog", { name: "Players" })).not.toBeInTheDocument();
-    // The Back button closes it.
     await openPopup();
     await userEvent.click(screen.getByRole("button", { name: /back to the game/i }));
     expect(screen.queryByRole("dialog", { name: "Players" })).not.toBeInTheDocument();
@@ -265,8 +242,6 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
   it("hides kick and Browse games from joiners", async () => {
     await renderShell(makeState({ role: "joiner", amHost: false }));
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
-    // Browse games is host-only (picking while playing ends the game for
-    // everyone) and no longer lives in the Players popup at all.
     expect(screen.queryByRole("menuitem", { name: /browse games/i })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
     const players = screen.getByRole("dialog", { name: "Players" });
@@ -278,23 +253,17 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
 
   it("opens only one panel at a time (7.38)", async () => {
     await renderShell(makeState());
-    // Menu opens first.
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     expect(screen.getByRole("menu", { name: /game menu/i })).toBeInTheDocument();
-    // Opening Players closes the menu.
     await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
     expect(screen.queryByRole("menu", { name: /game menu/i })).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Players" })).toBeInTheDocument();
-    // The popup's Back button closes the panel.
     await userEvent.click(screen.getByRole("button", { name: /back to the game/i }));
     expect(screen.queryByRole("dialog", { name: "Players" })).not.toBeInTheDocument();
-    // Browse (host) opens from the menu — never both at once.
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     await userEvent.click(screen.getByRole("menuitem", { name: /browse games/i }));
     expect(screen.queryByRole("menu", { name: /game menu/i })).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Pick a game" })).toBeInTheDocument();
-    // Back returns to the running game (browse no longer sits under the
-    // players popup).
     await userEvent.click(screen.getByRole("button", { name: /back to the game/i }));
     expect(screen.queryByRole("dialog", { name: "Pick a game" })).not.toBeInTheDocument();
   });
@@ -309,21 +278,15 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(browse).toHaveClass("max-h-[calc(100%-1.5rem)]");
     expect(browse).toHaveClass("w-[min(42rem,calc(100%-1.5rem))]");
     expect(screen.getByTestId("browse-panel-backdrop")).toBeInTheDocument();
-    // The bounded panel does not unmount the game or hide the emergency menu.
     expect(screen.getByTestId("game-frame")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /menu/i })).toBeInTheDocument();
-    // The SAME shared browse UI as /browse: search + category cards; the
-    // list only shows once a category opens (10.9).
     expect(within(browse).getByRole("searchbox", { name: "Search games" })).toBeInTheDocument();
-    // No "All games" box (2t1.1): Protobowl lives in the Trivia box.
     await userEvent.click(within(browse).getByRole("button", { name: /Trivia/ }));
     const protobowl = within(browse).getByRole("button", { name: /Protobowl/ });
     await userEvent.click(protobowl);
     expect(onPickPrebuilt).toHaveBeenCalledWith(
       expect.objectContaining({ kind: "classic", id: "protobowl" }),
     );
-    // Back returns to the running game (browse opens from the menu now,
-    // not the players popup).
     await userEvent.click(screen.getByRole("button", { name: /back to the game/i }));
     expect(screen.queryByRole("dialog", { name: "Pick a game" })).not.toBeInTheDocument();
   });
@@ -333,22 +296,17 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     await userEvent.click(screen.getByRole("menuitem", { name: /browse games/i }));
     const browse = screen.getByRole("dialog", { name: "Pick a game" });
-    // The shared GameBrowser's own back button (compact mode) closes the
-    // panel instead of the no-op fallback navigation.
     await userEvent.click(within(browse).getByRole("button", { name: "back" }));
     expect(screen.queryByRole("dialog", { name: "Pick a game" })).not.toBeInTheDocument();
   });
 
   it("opens About this game from the menu (9fv.11.11)", async () => {
-    // Drawphone is a prebuilt classic game with a description + guide; the
-    // in-game overlay keeps the running game mounted underneath.
     const state = makeState({ game: { gameId: "drawphone", title: "Drawphone", mode: "state" } });
     await renderShell(state);
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     await userEvent.click(screen.getByRole("menuitem", { name: /about this game/i }));
     const dialog = screen.getByRole("dialog", { name: "About Drawphone" });
     expect(within(dialog).getByText(/In Drawphone, there are no winners/)).toBeInTheDocument();
-    // The game keeps running underneath; the X closes the overlay.
     expect(screen.getByTestId("game-frame")).toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: /close game details/i }));
     expect(screen.queryByRole("dialog", { name: "About Drawphone" })).not.toBeInTheDocument();
@@ -356,12 +314,10 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
 
   it("moves the light/dark/system theme control into the Menu (i47)", async () => {
     await renderShell(makeState());
-    // No floating bottom-right control in the in-game shell anymore.
     expect(screen.queryByTestId("floating-theme-control")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Dark theme" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     const menu = screen.getByRole("menu", { name: /game menu/i });
-    // The theme control lives INSIDE the menu, below the menu items.
     expect(within(menu).getByRole("button", { name: "Light theme" })).toBeInTheDocument();
     expect(within(menu).getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
     expect(within(menu).getByRole("button", { name: "System theme" })).toBeInTheDocument();

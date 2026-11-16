@@ -1,35 +1,10 @@
 /**
- * A cheap CSS-only idle animation for the lobby welcome card (10.6 / 11.7,
- * redesigned 5cl.6): a soft, ambient "alien" glow BEHIND the card content.
- * Several blurred, saturated gradient orbs breathe slowly from DIFFERENT
- * origins spread across the container, so the glow reads as multiple soft
- * light sources instead of one centered blob.
- *
- * The old decorative spinning dashed ring is gone (2t1.9), and the
- * single-centered glow is gone (5cl.6): each orb gets a stable hardcoded
- * position (left/top percentages), size, color, duration and delay so the
- * layout never reshuffles between renders. The orbs are a wide, low-opacity
- * background layer — the "Welcome to rocketcrab!" text stays readable on
- * top (2t1.9). Purely decorative (aria-hidden) and respects
- * `prefers-reduced-motion` — the orbs render static instead of animating.
- * The parent must be `position: relative` (the lobby welcome card is) and
- * clip with `overflow: hidden` so the blur stays inside.
- *
- * No dependencies, no canvas, no JS animation loop: just keyframes defined
- * in a scoped `<style>` tag so the component is self-contained (a sibling
- * agent applies a similar glow on the build-a-game page — this one lives
- * entirely here).
+ * Decorative CSS-only ambient glow with stable orb placement. The parent
+ * must be positioned and clip overflow to contain the blur. Reduced-motion
+ * preferences leave the orbs static.
  */
 
-/**
- * Per-orb config (5cl.6, rebalanced n6o): stable hardcoded variety —
- * distinct positions spread across the container, sizes, colors, breathing
- * durations and delays. Opacities stay low so the text reads on top. n6o
- * rebalances the vertical spread (the old tops ran 4–72% with three big
- * orbs in the bottom half): the two largest orbs now sit on the middle
- * band next to the headline with two above and two below, so the glow
- * reads centered instead of bottom-heavy.
- */
+/** Fixed orb positions keep the low-opacity glow stable across renders. */
 const ORBS = [
   {
     className: "h-32 w-56 bg-primary/35 blur-2xl",
@@ -117,10 +92,7 @@ export function IdleParticles() {
             style={{
               left: orb.left,
               top: orb.top,
-              // n6o: negative animation-delay starts every orb MID-breath, so
-              // the stagger never repeats as an entry flicker: on first paint
-              // the orbs are already visibly breathing at their steady
-              // mid-range opacity (no dark start, no sequential pop-ins).
+              // Negative delays start mid-breath, avoiding sequential first-paint pop-ins.
               animation: `rc-orb-breathe ${orb.breathe} ease-in-out -${orb.delay} infinite alternate`,
             }}
           />

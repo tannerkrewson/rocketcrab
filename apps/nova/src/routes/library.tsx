@@ -20,16 +20,7 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
 }
 
-/**
- * The local game library (ADR-0005 / 2t1.5): saved games are listed straight
- * from the browser's IndexedDB, searchable, and editable/played/duplicated
- * from here. Deleting always asks for confirmation first.
- *
- * The brand row (rocketcrab.com) stays visible and ONE outline "back"
- * button returns home; the header's only action is "New game" (renamed from
- * "Build a game", 2t1.5) — "Browse games" is gone (the browse page is one
- * tap from home). Cards use the shared GameCard ("Start party" action).
- */
+/** Local game library backed by IndexedDB (ADR-0005). */
 export function LibraryPage() {
   const gamesQuery = useSavedGames();
   const deleteGame = useDeleteGame();

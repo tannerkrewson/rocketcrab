@@ -34,13 +34,7 @@ function ConsoleBadge({ level }: { level: ConsoleEntry["level"] }) {
   return <Badge color={colors[level]}>{level}</Badge>;
 }
 
-/**
- * The editor's diagnostics panel (U4 "runtime error panel" + source-size
- * display + source-hash display + copyable report). Shows live source
- * validation, runtime diagnostics from the current run, a bounded console
- * tail, and a button that copies the whole report for pasting back into an
- * AI chat.
- */
+/** Current-run diagnostics, bounded console output, and an AI-ready copyable report. */
 export function DiagnosticsPanel({
   sourceBytes,
   sourceHash,

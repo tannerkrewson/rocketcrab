@@ -8,22 +8,15 @@ import type {
 import { gameRepository } from "./instance";
 
 /**
- * TanStack Query hooks around the browser-local game repository (ADR-0005).
- * Query state here covers saved-game resources only; live peer-to-peer game
- * state must never live in TanStack Query (plan engineering rule 8) — it is
- * owned by the party engines (packages/core) and the shell.
+ * Browser-local saved-game queries (ADR-0005). Live peer state belongs to
+ * the party engines and shell, never TanStack Query.
  *
- * Cross-tab consistency: IndexedDB is the shared source of truth and every
- * mutation invalidates these queries in its own tab. TanStack Query's default
- * `refetchOnWindowFocus` refreshes a backgrounded tab when the user returns,
- * which covers another tab's edits without adding a `dexie-react-hooks`
- * subscription layer. Mutations remain the only write path in this app.
+ * Mutations invalidate the current tab's queries. Refetch-on-focus picks
+ * up other tabs' IndexedDB edits without another subscription layer.
  */
 
-/** Query key for the full saved-game list. */
 export const gamesQueryKey = ["games"] as const;
 
-/** Query key for one saved game. */
 export const gameQueryKey = (id: string) => ["games", id] as const;
 
 /** All saved games, most recently updated first. */
@@ -34,7 +27,6 @@ export function useSavedGames() {
   });
 }
 
-/** One saved game by id (U4 editor, U6 test arena, P3 distribution). */
 export function useSavedGame(id: string) {
   return useQuery({
     queryKey: gameQueryKey(id),
@@ -43,7 +35,6 @@ export function useSavedGame(id: string) {
   });
 }
 
-/** Create a game and refresh the list cache. */
 export function useCreateGame() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -55,7 +46,6 @@ export function useCreateGame() {
   });
 }
 
-/** Update a game (partial) and refresh the list + single-game caches. */
 export function useUpdateGame() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -68,7 +58,7 @@ export function useUpdateGame() {
   });
 }
 
-/** Delete a game (callers confirm first — U2 acceptance) and drop its cache. */
+/** Callers must confirm deletion before mutating the repository. */
 export function useDeleteGame() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -93,7 +83,7 @@ export function useDuplicateGame() {
   });
 }
 
-/** Record the outcome of the latest test run (U6 test arena). */
+/** Record the latest arena test-run outcome. */
 export function useRecordTestResults() {
   const queryClient = useQueryClient();
   return useMutation({

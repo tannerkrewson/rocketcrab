@@ -15,14 +15,7 @@ afterEach(() => {
   document.documentElement.removeAttribute("data-theme");
 });
 
-/**
- * CodeEditor regression guard (Phase 7.8): @uiw/react-codemirror's wrapper
- * div (`.cm-theme-*`) has no height of its own, so `.cm-editor`'s
- * height:100% collapses to auto and the editor grows to full content height
- * — clipped by the overflow-hidden panel with no way to scroll. The `h-full`
- * class on the wrapper restores the fixed-height chain so the internal
- * `.cm-scroller` scrolls. Assert the class stays applied.
- */
+/** Keep the wrapper's fixed-height chain intact so CodeMirror scrolls internally. */
 describe("CodeEditor", () => {
   it("renders a CodeMirror editor with an accessible name", () => {
     render(<CodeEditor value="<p>hi</p>" onChange={() => {}} ariaLabel="Game HTML source" />);
@@ -33,14 +26,10 @@ describe("CodeEditor", () => {
     render(<CodeEditor value="" onChange={() => {}} ariaLabel="Game HTML source" />);
     const editor = document.querySelector(".cm-editor");
     expect(editor).not.toBeNull();
-    // The wrapper div around `.cm-editor` must carry `h-full` so the
-    // editor's height:100% resolves against a definite parent height and the
-    // scroller can overflow internally instead of being clipped.
     expect(editor?.parentElement).toHaveClass("h-full");
   });
 
   it("maps CodeMirror surfaces to HeroUI variables and follows the app theme", async () => {
-    // Light default (no stored theme, jsdom has no dark preference).
     const { unmount } = render(
       <CodeEditor value="" onChange={() => {}} ariaLabel="Game HTML source" />,
     );
@@ -51,8 +40,6 @@ describe("CodeEditor", () => {
     expect(lightStyles).toContain("var(--surface-secondary)");
     unmount();
 
-    // Dark mode: the editor switches to the dark base and the same
-    // CSS-variable mapping applies.
     for (const darkTheme of ["dark"]) {
       window.localStorage.setItem(THEME_STORAGE_KEY, darkTheme);
       document.documentElement.classList.add("dark");

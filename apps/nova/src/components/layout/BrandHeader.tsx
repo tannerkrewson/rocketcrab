@@ -15,14 +15,7 @@ export interface BrandHeaderProps {
   className?: string;
 }
 
-/**
- * Rocketcrab.com brand row (2t1.1/2t1.7): logo + monospace domain, centered.
- * The homepage keeps the big hero; every sub-page (browse / my
- * games / about / build / game details) reuses this compact row so the
- * brand never disappears after leaving home. Links home by default (mark +
- * text are decorative via BrandLogo; the link carries the accessible
- * label); party contexts pass `noLink` so the row stays inert.
- */
+/** Compact brand link; party contexts use noLink to prevent accidental party exits. */
 export function BrandHeader({
   size = 40,
   dimmed = false,

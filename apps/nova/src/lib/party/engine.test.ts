@@ -1,5 +1,4 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-// The complete S4 example game document, verbatim (Vite ?raw import).
 import EXAMPLE_GAME_SOURCE from "../../../../../examples/games/nova-quiz.html?raw";
 import {
   GameSourceCoordinator,
@@ -35,16 +34,7 @@ vi.mock("./transport-factory", () => ({
   createTrysteroPartyTransportFactory: transportFactoryMocks.createTrysteroPartyTransportFactory,
 }));
 
-/**
- * P4 party-engine integration tests: the complete user-facing party flow
- * over the in-memory transport with a fake clock (deterministic) and fake
- * runtime bridges (the same seams RuntimeHostClient exposes). Covers the
- * acceptance criteria: two players create/join/receive a game and reach the
- * play shell, start is gated on readiness (and on source verification),
- * a failed peer never freezes the lobby, invite joins bypass the code,
- * greeter migration after the creator leaves, reconnect after connection
- * loss, and cleanup removes every transport room and runtime frame.
- */
+/** Party flow integration tests over in-memory transports, fake clocks, and fake runtime bridges. */
 
 const GAME = {
   gameId: "game_rocket_1",
@@ -52,10 +42,6 @@ const GAME = {
   mode: "state" as const,
   source: "<!doctype html><html><body><p>rockets</p></body></html>",
 };
-
-// ---------------------------------------------------------------------------
-// Fake clock + world (same pattern as the party package tests)
-// ---------------------------------------------------------------------------
 
 interface FakeClock {
   now: () => number;
@@ -114,10 +100,6 @@ function mockDerive(secret: string) {
   });
 }
 
-// ---------------------------------------------------------------------------
-// Fake runtime bridge (same pattern as EditorPage.test.tsx)
-// ---------------------------------------------------------------------------
-
 interface FakePort extends ChannelPort {
   sent: unknown[];
   closed: boolean;
@@ -161,12 +143,8 @@ function createHostHarness(): HostHarness {
         const port1 = createFakePort();
         const port2 = createFakePort();
         ports.push(port1);
-        // 5cl.14: auto-answer frame state/simulation requests. The real
-        // runtime's game frame answers these with `stateResponse` /
-        // `simulationResponse` apiCalls; the fake frame answers
-        // deterministically so the state engine's authority start and
-        // action applications resolve instead of timing out (10 s executor
-        // timeout). Delivered synchronously on the same port.
+        // Answer authority-frame requests synchronously so state and simulation
+        // operations resolve deterministically instead of reaching the executor timeout.
         const originalPost = port1.postMessage.bind(port1);
         port1.postMessage = (message: unknown) => {
           originalPost(message);
@@ -245,17 +223,6 @@ function createHostHarness(): HostHarness {
   };
   return harness;
 }
-
-/**
- * 5cl.14: answer every frame stateRequest/simulationRequest the engine
- * pushed into the fake frame (they appear in `port1.sent` as `game.apiEvent`
- * messages). The real runtime's game frame answers these; the fake frame
- * answers deterministically so the state engine's authority start and action
- * applications resolve instead of timing out (10 s executor timeout).
- */
-// ---------------------------------------------------------------------------
-// Player + flow helpers
-// ---------------------------------------------------------------------------
 
 interface Player {
   engine: PartyEngine;
@@ -368,42 +335,35 @@ describe("party engine — two phones end to end", () => {
     const a = makePlayer(world, "a");
     const b = makePlayer(world, "b");
 
-    // Creator: party is live, lobby shows the code + invite.
     const code = await runCreate(a, world);
     const creatorState = a.engine.getState();
     expect(creatorState.phase).toBe("lobby");
     expect(creatorState.role).toBe("creator");
     expect(creatorState.members).toHaveLength(1);
     expect(creatorState.inviteUrl).toContain(`/join#secret=${code}`);
-    // The creator's game boots and registers → ready.
     await registerLocalGame(a, world);
     expect(a.engine.getState().members[0]?.ready).toBe(true);
 
-    // Joiner: joins by the four-letter code; the creator approves.
     const { join: joinPromise, settled } = startJoin(b, world, code);
     await settled;
     await settle(world);
     await joinPromise;
 
-    // Both lobbies show two connected members.
     expect(b.engine.getState().phase).toBe("lobby");
     expect(b.engine.getState().role).toBe("joiner");
     expect(a.engine.getState().members).toHaveLength(2);
     expect(b.engine.getState().members).toHaveLength(2);
 
-    // The game transfers to the joiner (P3) and its frame boots.
     await settle(world);
     expect(memberOf(b.engine.getState(), b.memberId).transferState).toBe("complete");
     await registerLocalGame(b, world);
 
-    // Ready propagates BOTH ways (the late-attach ready race is covered).
     const aReady = memberOf(a.engine.getState(), a.memberId).ready;
     const bReady = memberOf(a.engine.getState(), b.memberId).ready;
     expect(aReady).toBe(true);
     expect(bReady).toBe(true);
     expect(memberOf(b.engine.getState(), a.memberId).ready).toBe(true);
 
-    // Start is enabled on both phones; the creator starts.
     expect(a.engine.getState().canStart).toBe(true);
     expect(b.engine.getState().canStart).toBe(true);
     a.engine.startGame();
@@ -411,7 +371,6 @@ describe("party engine — two phones end to end", () => {
     expect(a.engine.getState().phase).toBe("playing");
     expect(b.engine.getState().phase).toBe("playing");
 
-    // Emergency teardown: the game ends for everyone and returns to lobby.
     a.engine.endGame("host_closed");
     await settle(world);
     expect(a.engine.getState().phase).toBe("lobby");
@@ -419,7 +378,6 @@ describe("party engine — two phones end to end", () => {
     expect(a.engine.getState().endedReason).toBe("host_closed");
     expect(b.engine.getState().endedReason).toBe("host_closed");
 
-    // Cleanup: leaving removes every transport room and destroys frames.
     await a.engine.leaveParty();
     await b.engine.leaveParty();
     await settle(world);
@@ -593,9 +551,7 @@ describe("party engine — game mode and source transitions", () => {
 describe("party engine — join loading stages (rocketcrab-erx / rocketcrab-5ae)", () => {
   it("keeps a joiner on loading then errors when no peer can be reached (5ae)", async () => {
     const world = makeWorld();
-    // No host at all: an invite join derives a private room nobody is in
-    // (the stale-invite / cross-network no-TURN shape). The joiner must sit
-    // on the loading screen and then hit a clear error — never a fake lobby.
+    // An empty private room has no host; signaling alone must not satisfy the peer gate.
     const b = makePlayer(world, "b", { peerConnectTimeoutMs: 1_000 });
     const joinPromise = b.engine.joinByInvite({ secret: "E".repeat(43) });
     await settle(world);
@@ -608,8 +564,6 @@ describe("party engine — join loading stages (rocketcrab-erx / rocketcrab-5ae)
     await settle(world);
     expect(b.engine.getState().phase).toBe("joining");
 
-    // The peer window closes: loading → error, and the dead-end room is
-    // torn down (no rooms left, so nobody else bumps into this joiner).
     world.clock.advance(500);
     await settle(world);
     await joinPromise;
@@ -628,14 +582,9 @@ describe("party engine — join loading stages (rocketcrab-erx / rocketcrab-5ae)
     expect(b.engine.getState().phase).toBe("joining");
     expect(b.engine.getState().joinStage).toBe("connecting");
 
-    // The user presses Cancel on the loading screen: the party is torn
-    // down and the flow returns to the entry UI — no error screen, no
-    // phantom lobby if a peer were to appear later.
     await b.engine.leaveParty();
     await settle(world);
     expect(b.engine.getState().phase).toBe("idle");
-    // Cancellation removes the peer-wait timer; advancing the clock must
-    // not revive the join or turn the idle screen into an error.
     world.clock.advance(5_500);
     await settle(world);
     await joinPromise;
@@ -658,9 +607,7 @@ describe("party engine — readiness and start gating", () => {
     await joinPromise;
     await settle(world);
 
-    // Subscribe after the join settles: the next snapshot must come from
-    // b's readiness alone (the regression: game.ready changed the data but
-    // never emitted, so the start button stayed disabled).
+    // Subscribe after join settles to isolate readiness-triggered notifications.
     const snapshots: ReturnType<PartyEngine["getState"]>[] = [];
     const stop = a.engine.onState((state) => snapshots.push(state));
     expect(memberOf(a.engine.getState(), b.memberId).ready).toBe(false);
@@ -689,14 +636,11 @@ describe("party engine — readiness and start gating", () => {
     await settle(world);
     expect(memberOf(b.engine.getState(), b.memberId).transferState).toBe("complete");
 
-    // The joiner has the game but is NOT ready: start is blocked, but
-    // force-start is available (the source is verified on both sides).
     const blocked = a.engine.getState();
     expect(blocked.canStart).toBe(false);
     expect(blocked.canForceStart).toBe(true);
     expect(blocked.startBlockedReason).toMatch(/load and register/i);
 
-    // Force-start begins the game anyway.
     a.engine.startGame(true);
     await settle(world);
     expect(a.engine.getState().phase).toBe("playing");
@@ -716,9 +660,6 @@ describe("party engine — readiness and start gating", () => {
     await joinPromise;
     await settle(world);
 
-    // The joiner received the game but its runtime never boots (no ready
-    // delivered): the creator's lobby keeps working — members are listed,
-    // start is blocked with a clear reason, and the creator can still leave.
     const state = a.engine.getState();
     expect(state.members).toHaveLength(2);
     expect(state.canStart).toBe(false);
@@ -736,7 +677,7 @@ describe("party engine — readiness and start gating", () => {
   it("creates a party without a game; the lobby blocks start until one is picked (7.6)", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
-    const promise = a.engine.createParty(); // no game preselected
+    const promise = a.engine.createParty();
     for (let i = 0; i < 8; i += 1) {
       await flush();
       world.clock.advance(1_000);
@@ -752,7 +693,6 @@ describe("party engine — readiness and start gating", () => {
     expect(state.canForceStart).toBe(false);
     expect(state.startBlockedReason).toMatch(/pick a game/i);
 
-    // Picking a game from the lobby registers + announces the source.
     await a.engine.selectGame({
       gameId: GAME.gameId,
       title: GAME.title,
@@ -762,7 +702,7 @@ describe("party engine — readiness and start gating", () => {
     await settle(world);
     state = a.engine.getState();
     expect(state.game).toEqual({ gameId: GAME.gameId, title: GAME.title, mode: GAME.mode });
-    expect(a.harness.frames).toHaveLength(1); // the lobby preview frame booted
+    expect(a.harness.frames).toHaveLength(1);
 
     await a.engine.leaveParty();
     await settle(world);
@@ -782,9 +722,6 @@ describe("party engine — readiness and start gating", () => {
 
     await a.engine.leaveParty();
     await settle(world);
-    // The saved name survives a page reload: a fresh engine on the same
-    // localStorage picks it up through the identity module (tested in
-    // identity.test.ts); here we only verify the engine persists it.
     expect(window.localStorage.getItem("nova:player:name:v1")).toBe("Grace");
   });
 });
@@ -811,18 +748,13 @@ describe("party engine — restart after exiting to the lobby (2t1.4)", () => {
     expect(a.engine.getState().phase).toBe("playing");
     expect(b.engine.getState().phase).toBe("playing");
 
-    // Emergency teardown: everyone returns to the lobby with the banner.
     a.engine.endGame("host_closed");
     await settle(world);
     expect(a.engine.getState().phase).toBe("lobby");
     expect(b.engine.getState().phase).toBe("lobby");
     expect(a.engine.getState().endedReason).toBe("host_closed");
 
-    // The ended session is swapped for a fresh one (one-shot start/end):
-    // the ended-state start gate opens again. The lobby re-boots each
-    // player's runtime frame (the phase flip remounts the frame container;
-    // setContainer reboots the runtime), and the frames re-register into
-    // the fresh session so the ready gate re-opens.
+    // Ended sessions are one-shot; emulate container remounts and registration into fresh sessions.
     a.engine.setContainer(null);
     b.engine.setContainer(null);
     a.engine.setContainer(a.container);
@@ -855,10 +787,7 @@ describe("party engine — restart after exiting to the lobby (2t1.4)", () => {
     expect(a.harness.frames).toHaveLength(1);
     expect(a.container.querySelector("iframe")).not.toBeNull();
 
-    // The lobby->playing flip remounts the frame container: React detaches
-    // the old ref (null) before attaching the new element. The stale
-    // runtime must be torn down and a fresh frame booted in the rebound
-    // container, or the area stays black with no iframe.
+    // React detaches the old ref before binding the play container; boot a fresh frame there.
     a.engine.setContainer(null);
     a.engine.setContainer(a.container);
     await settle(world);
@@ -890,7 +819,6 @@ describe("party engine — a frame rebooted after the game started", () => {
     await settle(world);
     expect(b.engine.getState().phase).toBe("playing");
 
-    // The play view remounts b's container: its frame reboots after start.
     b.engine.setContainer(null);
     b.engine.setContainer(b.container);
     await settle(world);
@@ -952,7 +880,6 @@ describe("party engine — start delivery to a frame instance", () => {
     await registerLocalGame(b, world);
     expect(frameEvents(b).filter((event) => event.kind === "start")).toHaveLength(1);
 
-    // A session start event arriving now must not send start a second time.
     emitSessionEvent(b, { type: "start" });
     await settle(world);
     expect(frameEvents(b).filter((event) => event.kind === "start")).toHaveLength(1);
@@ -1023,7 +950,6 @@ describe("party engine — start delivery to a frame instance", () => {
     expect(kinds.indexOf("state")).toBeGreaterThanOrEqual(0);
     expect(kinds.indexOf("state")).toBeLessThan(kinds.indexOf("start"));
 
-    // The start is once per instance: a repeated session start adds nothing.
     emitSessionEvent(b, { type: "start" });
     await settle(world);
     expect(
@@ -1052,7 +978,6 @@ describe("party engine — start delivery to a frame instance", () => {
         .filter((event) => event.kind === "start"),
     ).toHaveLength(0);
 
-    // The runtime reports the reload, then the new frame registers.
     deliver(b.harness.port1, {
       version: 1,
       runtimeInstanceId: "runtime-1",
@@ -1146,7 +1071,6 @@ describe("party engine — host start-request retry", () => {
     world.clock.advance(2_000);
     expect(resend).toHaveBeenCalledTimes(1);
 
-    // The authority's game.start arrives: the session emits start.
     (b.engine as unknown as { handleSessionEvent(e: unknown): void }).handleSessionEvent({
       type: "start",
     });
@@ -1217,7 +1141,6 @@ describe("party engine — source re-request while a member's source waits", () 
       emit(): void;
     };
     const refresh = vi.spyOn(engine.coordinator!, "refresh").mockResolvedValue(undefined);
-    // b's source is waiting: the first request (its announcement lost) is re-asked.
     engine.transfers.delete(b.memberId);
     engine.emit();
     world.clock.advance(2_000);
@@ -1225,7 +1148,6 @@ describe("party engine — source re-request while a member's source waits", () 
     world.clock.advance(2_000);
     expect(refresh).toHaveBeenCalledTimes(2);
 
-    // The source arrives: no more re-requests.
     engine.transfers.set(b.memberId, { state: "complete", fraction: 1, detail: null });
     engine.emit();
     world.clock.advance(10_000);
@@ -1250,9 +1172,6 @@ describe("party engine — lobby notices", () => {
     await settle(world);
     expect(a.engine.getState().members).toHaveLength(2);
 
-    // Two kicks for the same member in quick succession (the production
-    // repro for a repeated event re-adding the same notice) previously
-    // appended two identical notices; dedupe keeps one.
     a.engine.kickMember(b.memberId);
     a.engine.kickMember(b.memberId);
 
@@ -1266,9 +1185,7 @@ describe("party engine — lobby notices", () => {
   it("skips the joined/removed notices while a member still has the id-like name (2z9)", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
-    // A joiner who never set a display name announces the member id itself
-    // (displayNameOf falls back to the id) — "member-b joined the party."
-    // must never surface as a banner alert or a membership toast.
+    // The handshake falls back to member ids for unnamed players; keep those ids out of notices.
     const b = makePlayer(world, "b", {
       identity: { memberId: "member-b", displayName: "member-b" },
     });
@@ -1282,8 +1199,6 @@ describe("party engine — lobby notices", () => {
     const messages = a.engine.getState().notices.map((notice) => notice.message);
     expect(messages.some((message) => message.includes("joined the party"))).toBe(false);
     expect(messages.some((message) => message.includes("was admitted to the party"))).toBe(false);
-    // Kicking them is also silent — no "member-b was removed from the
-    // party." noise.
     a.engine.kickMember(b.memberId);
     await settle(world);
     const afterKick = a.engine.getState().notices.map((notice) => notice.message);
@@ -1338,7 +1253,6 @@ describe("party engine — roles, reconnect, and cleanup", () => {
     await joinPromise;
     await settle(world);
 
-    // The creator leaves; the joiner's party session elects it greeter.
     await a.engine.leaveParty();
     await settle(world);
     expect(a.engine.getState().phase).toBe("idle");
@@ -1385,9 +1299,6 @@ describe("party engine — roles, reconnect, and cleanup", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Source verification is for one source hash: an edited game under the same id
-// must be verified again before the start gate opens.
 describe("source verification is keyed by the source hash", () => {
   it("a member verified for the old hash waits again when the same game id has a new hash", async () => {
     const world = makeWorld();
@@ -1405,7 +1316,6 @@ describe("source verification is keyed by the source hash", () => {
     expect(memberOf(b.engine.getState(), a.memberId).transferState).toBe("complete");
     expect(b.engine.getState().canStart).toBe(true);
 
-    // The host edits the game and keeps its id: the new hash is announced.
     const coordinatorEvent = (event: unknown) =>
       (b.engine as unknown as { handleCoordinatorEvent(e: unknown): void }).handleCoordinatorEvent(
         event,
@@ -1425,7 +1335,6 @@ describe("source verification is keyed by the source hash", () => {
     expect(memberOf(b.engine.getState(), a.memberId).transferState).toBe("waiting");
     expect(b.engine.getState().canStart).toBe(false);
 
-    // The edited source arrives and verifies: the gate opens again.
     coordinatorEvent({
       type: "received",
       fromMemberId: a.memberId,
@@ -1449,9 +1358,6 @@ describe("source verification is keyed by the source hash", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Diagnostics: window.__NOVA_PARTY_DEBUG__ (dev and test builds) snapshots the
-// engine state that a stalled 3-player start needs (PLAN §5.6).
 describe("the party debug snapshot", () => {
   it("reports the engine state on window.__NOVA_PARTY_DEBUG__ before any party exists", () => {
     const world = makeWorld();
@@ -1474,17 +1380,6 @@ describe("the party debug snapshot", () => {
   });
 });
 
-// S4: the state-mode vertical-slice example game through the party flow
-// ---------------------------------------------------------------------------
-
-/**
- * The complete example game document (examples/games/nova-quiz.html) travels
- * the same P4 path as any saved game: the creator registers it with the
- * party, the joiner receives the verified source, both frames boot and
- * register, the game starts, and the emergency teardown returns everyone to
- * the lobby. The example game rides the party's private transport exactly
- * like a real saved game (P3 game-source transfer + S1 session).
- */
 const EXAMPLE_GAME = {
   gameId: "game_nova_quiz_1",
   title: "Nova Quiz",
@@ -1499,7 +1394,6 @@ describe("the S4 example game over the party flow", () => {
     const a = makePlayer(world, "a");
     const b = makePlayer(world, "b");
 
-    // Creator: party is live with the example game as the pending source.
     const promise = a.engine.createParty({
       gameId: EXAMPLE_GAME.gameId,
       title: EXAMPLE_GAME.title,
@@ -1516,11 +1410,9 @@ describe("the S4 example game over the party flow", () => {
     expect(code).toHaveLength(43);
     expect(a.engine.getState().game?.title).toBe("Nova Quiz");
 
-    // The creator's frame boots and registers the example game.
     await registerLocalGame(a, world);
     expect(a.engine.getState().members[0]?.ready).toBe(true);
 
-    // Joiner joins by code; the creator approves.
     const join = b.engine.joinByInvite({ secret: code });
     const settled = (async () => {
       await flush();
@@ -1533,29 +1425,23 @@ describe("the S4 example game over the party flow", () => {
     await settle(world);
     await join;
 
-    // The 40 KB example document transfers byte-identically (P3) and the
-    // joiner's frame boots and registers.
     await settle(world);
     expect(memberOf(b.engine.getState(), b.memberId).transferState).toBe("complete");
     await registerLocalGame(b, world);
     expect(a.engine.getState().canStart).toBe(true);
     expect(b.engine.getState().canStart).toBe(true);
 
-    // Start reaches both phones; the game's own declaration ("state" mode,
-    // title) is what the session runs.
     a.engine.startGame();
     await settle(world);
     expect(a.engine.getState().phase).toBe("playing");
     expect(b.engine.getState().phase).toBe("playing");
 
-    // Emergency teardown: the game ends for everyone and returns to lobby.
     a.engine.endGame("host_closed");
     await settle(world);
     expect(a.engine.getState().phase).toBe("lobby");
     expect(b.engine.getState().phase).toBe("lobby");
     expect(a.engine.getState().endedReason).toBe("host_closed");
 
-    // Cleanup leaves every room empty.
     await a.engine.leaveParty();
     await b.engine.leaveParty();
     await settle(world);
@@ -1565,16 +1451,9 @@ describe("the S4 example game over the party flow", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// M1 — Mobile Safari lifecycle resilience (ADR-0012 / Blocker Register B6)
-// ---------------------------------------------------------------------------
+// Mobile Safari lifecycle resilience (ADR-0012).
 
-/**
- * A transport wrapper that reports the delegate's state but whose pings
- * never answer — the F11 shape: a backgrounded phone whose WebRTC link iOS
- * killed silently, so the local transport still believes it is connected.
- * The engine's resume health probe must detect this and rejoin fresh.
- */
+/** Simulate an iOS-killed WebRTC link: state still says connected, but pings never answer. */
 class StalePingTransport implements NovaTransport {
   readonly kind = "in-memory";
 
@@ -1622,13 +1501,12 @@ class StalePingTransport implements NovaTransport {
   handleRequest(...args: Parameters<NovaTransport["handleRequest"]>): () => void {
     return this.delegate.handleRequest(...args);
   }
-  /** The lying probe: peers never answer, even though the link looks up. */
   ping(): Promise<number | null> {
     return Promise.resolve(null);
   }
 }
 
-/** A world whose named member's private transport lies about pings (F11). */
+/** A world whose named joiner's transport reports connected but never answers pings. */
 function makeWorldWithStaleJoiner(joinerMemberId: string): World {
   const world = makeWorld();
   const baseCreatePrivate = world.factory.createPrivateTransport.bind(world.factory);
@@ -1657,10 +1535,6 @@ describe("party engine — M1 lifecycle: backgrounding, resume, and F11 rejoin",
     await registerLocalGame(b, world);
     expect(a.engine.getState().members).toHaveLength(2);
 
-    // The phone backgrounds; iOS kills the WebRTC link, but the transport
-    // does not notice (it still reports connected). On return, the resume
-    // health probe must catch the dead link and rejoin with a fresh
-    // connection id instead of sitting on the stale handle.
     lifecycle.hide();
     expect(b.engine.getState().connectionState).toBe("connected");
     const reconnectSpy = vi.spyOn(
@@ -1677,10 +1551,7 @@ describe("party engine — M1 lifecycle: backgrounding, resume, and F11 rejoin",
     expect(bState.connectionState).toBe("connected");
     expect(bState.reconnectAttempts).toBe(0);
     expect(bState.members).toHaveLength(2);
-    // The other phone observed the leave + clean rejoin (F11: no stale peer).
     expect(a.engine.getState().members).toHaveLength(2);
-    // A live-but-silent link uses the transport's single reconnect primitive
-    // (fresh connection id), not a bespoke suspend/resume pair.
     expect(reconnectSpy).toHaveBeenCalledTimes(1);
   });
 
@@ -1710,8 +1581,6 @@ describe("party engine — M1 lifecycle: backgrounding, resume, and F11 rejoin",
     await settle(world);
     expect(a.engine.getState().phase).toBe("reconnecting");
 
-    // No manual reconnect: the scheduled auto-retry fires after the base
-    // backoff delay and rejoins.
     world.clock.advance(5_000);
     await settle(world);
     expect(a.engine.getState().phase).toBe("lobby");
@@ -1787,8 +1656,6 @@ describe("party engine — M1 lifecycle: backgrounding, resume, and F11 rejoin",
     expect(a.engine.getState().phase).toBe("playing");
     expect(b.engine.getState().phase).toBe("playing");
 
-    // The phone backgrounded: its transport suspends (iOS kills WebRTC);
-    // the page returns and the shell auto-reconnects.
     lifecycle.hide();
     const bTransport = world.transports.find(
       (t) => t.selfMemberId === b.memberId && t.connectionState === "connected",
@@ -1801,7 +1668,6 @@ describe("party engine — M1 lifecycle: backgrounding, resume, and F11 rejoin",
     await settle(world);
     expect(b.engine.getState().phase).toBe("playing");
     expect(b.engine.getState().connectionState).toBe("connected");
-    // The other phone kept playing through the backgrounding.
     expect(a.engine.getState().phase).toBe("playing");
   });
 });
@@ -1868,9 +1734,8 @@ describe("party engine — session events reach game frames (7.26)", () => {
             >,
         );
 
-    // Creator: party live, game boots + registers. The session attached
-    // BEFORE the frame existed, so the registration replay must deliver
-    // identity + connection + roster to the frame (7.26).
+    // The session attaches before its frame exists, so registration must replay
+    // identity, connection, and roster events.
     const code = await runCreate(a, world);
     await registerLocalGame(a, world);
     await settle(world);
@@ -1882,7 +1747,6 @@ describe("party engine — session events reach game frames (7.26)", () => {
       .map((event) => (event.player as { id: string }).id);
     expect(aJoined).toContain(a.memberId);
 
-    // Joiner: joins, is approved, receives the game, registers.
     const { join: joinPromise, settled } = startJoin(b, world, code);
     await settled;
     await settle(world);
@@ -1891,7 +1755,6 @@ describe("party engine — session events reach game frames (7.26)", () => {
     await registerLocalGame(b, world);
     await settle(world);
 
-    // A's frame saw B join live; B's frame got the full roster replayed.
     const aJoinedAfter = apiEventsOf(a)
       .filter((event) => event.kind === "playerJoined")
       .map((event) => (event.player as { id: string }).id);
@@ -1902,13 +1765,11 @@ describe("party engine — session events reach game frames (7.26)", () => {
     expect(bJoined).toContain(a.memberId);
     expect(bJoined).toContain(b.memberId);
 
-    // Start reaches both frames.
     a.engine.startGame();
     await settle(world);
     expect(apiEventsOf(a).some((event) => event.kind === "start")).toBe(true);
     expect(apiEventsOf(b).some((event) => event.kind === "start")).toBe(true);
 
-    // End reaches both frames.
     a.engine.endGame("host_closed");
     await settle(world);
     expect(
@@ -1951,10 +1812,6 @@ describe("party engine — frame state executor + rebooted-frame replay (5cl.14)
 
     const state = a.engine.getState();
     expect(state.phase).toBe("playing");
-    // The state engine asked the FRAME for the initial state (the frame
-    // executor forwarded a stateRequest apiEvent; the fake frame answered
-    // with a stateResponse). Before 5cl.14 a local no-op executor ran the
-    // game's handlers nowhere and the initial state was always {}.
     const requests = apiEventsOf(a).filter((event) => event.kind === "stateRequest");
     expect(requests.length).toBeGreaterThan(0);
     expect(requests[0]?.request).toMatchObject({ kind: "createInitialState" });
@@ -1969,11 +1826,7 @@ describe("party engine — frame state executor + rebooted-frame replay (5cl.14)
     await settle(world);
     expect(a.engine.getState().phase).toBe("playing");
 
-    // 2t1.6: the lobby → playing phase flip rebinds the frame container —
-    // a fresh element arrives, so the engine disposes the runtime and
-    // reboots the frame. The rebooted frame's registration must replay the
-    // last state view (then start); without the replay it hangs at the
-    // game's own waiting screen.
+    // Rebinding boots a new frame; registration must replay state before start.
     const newContainer = document.createElement("div");
     a.engine.setContainer(newContainer);
     await flush();
@@ -2006,16 +1859,13 @@ describe("party engine — rename announcements (7.25)", () => {
     await registerLocalGame(b, world);
     await settle(world);
 
-    // Baseline: the handshake name is what B sees.
     expect(memberOf(b.engine.getState(), a.memberId).displayName).toBe("Player a");
 
     a.engine.setDisplayName("Alpha Renamed");
     await settle(world);
 
-    // B's member view updates promptly (no rejoin); A's own view is current.
     expect(memberOf(b.engine.getState(), a.memberId).displayName).toBe("Alpha Renamed");
     expect(memberOf(a.engine.getState(), a.memberId).displayName).toBe("Alpha Renamed");
-    // Unaffected members keep their names.
     expect(memberOf(b.engine.getState(), b.memberId).displayName).toBe("Player b");
 
     await a.engine.leaveParty();
@@ -2024,18 +1874,12 @@ describe("party engine — rename announcements (7.25)", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Classic games in parties, kick, and reload (7.7.4, 7.29)
-// ---------------------------------------------------------------------------
-
 describe("party engine — classic games, kick, and reload (7.7.4, 7.29)", () => {
   it("shares a classic room: the host creates it once, the joiner builds the same room", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
     const b = makePlayer(world, "b");
 
-    // Host starts a party with no game (7.6) and picks a classic game; the
-    // room is created in the host's browser (protobowl needs no fetch).
     const promise = a.engine.createParty();
     for (let i = 0; i < 8; i += 1) {
       await flush();
@@ -2052,10 +1896,8 @@ describe("party engine — classic games, kick, and reload (7.7.4, 7.29)", () =>
     expect(aState.classicGame?.gameId).toBe("protobowl");
     expect(aState.classicGame?.connectResult.player.url).toContain("https://protobowl.com/");
     expect(aState.game?.title).toBe("Protobowl");
-    // Classic games bypass the source-transfer/ready gates (7.7.4).
     expect(aState.canStart).toBe(true);
 
-    // Joiner joins, asks for the room, and receives the shared spec.
     const { join: joinPromise, settled } = startJoin(b, world, code);
     await settled;
     await settle(world);
@@ -2070,7 +1912,6 @@ describe("party engine — classic games, kick, and reload (7.7.4, 7.29)", () =>
     );
     expect(bState.canStart).toBe(true);
 
-    // Starting flips BOTH phones to playing without a Nova source transfer.
     a.engine.startGame();
     await settle(world);
     expect(a.engine.getState().phase).toBe("playing");
@@ -2099,11 +1940,9 @@ describe("party engine — classic games, kick, and reload (7.7.4, 7.29)", () =>
     await flush();
     await settle(world);
 
-    // The kicked member sees the removed screen after the teardown settles.
     const bState = b.engine.getState();
     expect(bState.removedReason).toBe("The host removed you from the party.");
     expect(bState.phase).toBe("removed");
-    // The host still has a live lobby.
     expect(a.engine.getState().phase).toBe("lobby");
 
     b.engine.dismissRemoved();
@@ -2124,12 +1963,10 @@ describe("party engine — classic games, kick, and reload (7.7.4, 7.29)", () =>
     await registerLocalGame(b, world);
     await settle(world);
 
-    // Reload my game: the local runtime receives runtime.reload.
     a.engine.reloadMyGame();
     const sentA = a.harness.port1.sent as Array<{ type: string }>;
     expect(sentA.some((message) => message.type === "runtime.reload")).toBe(true);
 
-    // Reload all: the peer's runtime receives runtime.reload too.
     b.harness.port1.sent.length = 0;
     a.engine.reloadAllGames();
     await settle(world);
@@ -2138,16 +1975,7 @@ describe("party engine — classic games, kick, and reload (7.7.4, 7.29)", () =>
   });
 });
 
-// ---------------------------------------------------------------------------
-// TURN credential minting (P0, task rocketcrab-23s)
-//
-// The engine mints short-lived TURN credentials at setup start (once, cached
-// on success) and bakes them into the default Trystero transport factory.
-// A mint outage NEVER blocks a party: it proceeds without TURN and records
-// a warn notice + diagnostics flag. These tests drive the DEFAULT factory
-// path (no injected transportFactory) with the factory mock returning the
-// in-memory world factory, so the whole create flow runs end to end.
-// ---------------------------------------------------------------------------
+// Exercise default-factory TURN setup without opening real Trystero rooms.
 
 describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
   afterEach(() => {
@@ -2162,9 +1990,7 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     overrides: ConstructorParameters<typeof PartyEngine>[0] = {},
   ): Player {
     transportFactoryMocks.createTrysteroPartyTransportFactory.mockReturnValue(world.factory);
-    // NOTE: no transportFactory injected — the engine must resolve the
-    // default factory itself, minting TURN credentials on the way.
-    // (`transportFactory: undefined` neutralizes makePlayer's default.)
+    // Explicit undefined bypasses makePlayer's default transportFactory.
     return makePlayer(world, "host", { transportFactory: undefined, ...overrides });
   }
 
@@ -2439,8 +2265,6 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
     await runCreate(player, world);
     expect(turnCreds).toHaveBeenCalledTimes(1);
 
-    // Leave and create a second party on the same engine (the page
-    // singleton semantics): the cached 24 h mint is reused.
     await player.engine.leaveParty();
     await runCreate(player, world);
     expect(turnCreds).toHaveBeenCalledTimes(1);
@@ -2490,15 +2314,7 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
   });
 });
 
-// ---------------------------------------------------------------------------
-// Relay-health diagnostics surfacing (P2, task rocketcrab-ont.1)
-//
-// The production engine has NO injected diagnostics provider: the lobby
-// panel gets relay state from the private transport's own adapter
-// diagnostics (`getDiagnostics()`), pushed live via `onRelayStateChange`.
-// These tests drive that plumbing over the in-memory hub with a duck-typed
-// Trystero-shaped diagnostics snapshot.
-// ---------------------------------------------------------------------------
+// Exercise transport-owned diagnostics without an injected diagnostics provider.
 
 describe("party engine — signaling outage setup", () => {
   afterEach(() => {
@@ -2557,7 +2373,6 @@ describe("party engine — signaling outage setup", () => {
     world.clock.advance(1);
     await flush();
     expect(player.engine.getState().signalingOutage).toBe(true);
-    // One connection-log event per visible outage, marked signaling_ok: false.
     expect(sendBeacon).toHaveBeenCalledOnce();
     const [, body] = sendBeacon.mock.calls[0] as unknown as [string, string];
     expect(JSON.parse(body)).toMatchObject({
@@ -3189,8 +3004,6 @@ describe("party engine — peer-link alert (PLAN.md §7 stages 2 and 4)", () => 
     hooks.onTunnel(SWITCH);
     hooks.onTunnel({ reason: "native-failed", elapsedMs: 0 });
     expect(host.engine.getState().peerLink).toBe("connecting");
-    // One alert value, however many switches: every switch emits (so the
-    // diagnostics refresh), but the alert never splits into several.
     expect(new Set(seen)).toEqual(new Set([null, "connecting"]));
     expect(seen).toEqual([null, "connecting", "connecting", "connecting"]);
 
@@ -3242,16 +3055,14 @@ describe("party engine — peer-link alert (PLAN.md §7 stages 2 and 4)", () => 
 
     hooks.onTunnel(SWITCH);
     hooks.onTunnelFailure(FAILURE);
-    hooks.onTunnelFailure(FAILURE); // a second pair failing shows the same alert
-    hooks.onTunnel(SWITCH); // a later switch does not hide the failure
+    hooks.onTunnelFailure(FAILURE);
+    hooks.onTunnel(SWITCH);
     expect(host.engine.getState().peerLink).toBe("failed");
-    world.clock.advance(60_000); // well past any connecting window
+    world.clock.advance(60_000);
     expect(host.engine.getState().peerLink).toBe("failed");
-    // The second failure adds no emit; the later switch emits to refresh diagnostics.
     expect(seen).toEqual([null, "connecting", "failed", "failed"]);
     stop();
 
-    // Retry runs the existing reconnect path and drops the alert at once.
     void host.engine.reconnect();
     expect(host.engine.getState().peerLink).toBeNull();
     await settle(world);
@@ -3411,14 +3222,10 @@ describe("party engine — §10 review: lifecycle cleanup", () => {
     await runCreate(a, world);
     expect(pendingLoads).toHaveLength(1);
 
-    // The lobby -> playing flip rebinds the container while the first load is
-    // still pending: that frame is torn down and a second one boots.
     a.engine.setContainer(document.createElement("div"));
     expect(pendingLoads).toHaveLength(2);
     expect(a.engine.debugSnapshot().frameExists).toBe(true);
 
-    // The superseded load now fails. It must not drop the live frame or report
-    // a boot failure the player never saw.
     pendingLoads[0]!(new Error("Runtime iframe load timed out."));
     await settle(world);
     expect(a.engine.debugSnapshot().frameExists).toBe(true);
@@ -3440,7 +3247,6 @@ describe("party engine — §10 review: lifecycle cleanup", () => {
     await settle(world);
     expect(a.engine.getState().canStart).toBe(true);
 
-    // The host picks a new game, but its source is rejected by the coordinator.
     const setSource = vi
       .spyOn(GameSourceCoordinator.prototype, "setSource")
       .mockRejectedValueOnce(new Error("source rejected"));
@@ -3454,7 +3260,6 @@ describe("party engine — §10 review: lifecycle cleanup", () => {
     expect(setSource).toHaveBeenCalledTimes(1);
     setSource.mockRestore();
 
-    // Nobody holds the new game, so neither start path may open.
     expect(a.engine.getState().canForceStart).toBe(false);
     expect(a.engine.getState().canStart).toBe(false);
   });
@@ -3532,8 +3337,6 @@ describe("party engine — §10 review: lifecycle cleanup", () => {
     const createChannel = vi.fn(a.harness.seams.createChannel!);
     a.harness.seams.createChannel = createChannel;
 
-    // Leave is in flight (its transport teardown is awaited) when the page
-    // binds a new container.
     const leaving = a.engine.leaveParty();
     a.engine.setContainer(document.createElement("div"));
     await leaving;
@@ -3562,7 +3365,6 @@ describe("party engine — §10 review: lifecycle cleanup", () => {
       (b.engine as unknown as { handleCoordinatorEvent(e: unknown): void }).handleCoordinatorEvent(
         event,
       );
-    // The host edits the game, so the party now announces a new hash.
     coordinatorEvent({
       type: "metadata",
       metadata: {
@@ -3576,7 +3378,6 @@ describe("party engine — §10 review: lifecycle cleanup", () => {
     });
     expect(memberOf(b.engine.getState(), a.memberId).transferState).toBe("waiting");
 
-    // A holds report for the superseded hash arrives late.
     coordinatorEvent({
       type: "holds",
       memberId: a.memberId,
@@ -3635,7 +3436,6 @@ describe("party engine — §10 review: lifecycle cleanup", () => {
     const joinerRoom = world.transports.find((t) => t.selfMemberId === joiner.memberId)!;
     expect(joinerRoom.connectionState).not.toBe("connected");
 
-    // The host keeps its party and simply loses the failed joiner.
     expect(host.engine.getState().phase).toBe("lobby");
     expect(host.engine.isActive()).toBe(true);
     expect(host.engine.getState().members.map((m) => m.memberId)).not.toContain(joiner.memberId);

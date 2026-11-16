@@ -18,23 +18,17 @@ export interface TrysteroPartyTransportFactoryOptions {
    * (graceful degradation: the party proceeds without TURN).
    */
   readonly turnConfig?: readonly TurnServerConfigLike[];
-  /**
-   * Join-error observer (5cl.1): both transports report categorized
-   * peer/relay failures here so the shell can surface a friendly notice.
-   */
+  /** Both transports report categorized join failures here for player-facing notices. */
   readonly onJoinError?: (error: TrysteroJoinError) => void;
-  /** A peer connection switched to the edge tunnel (PLAN.md §7 stage 2). */
+  /** A peer connection switched to the edge tunnel. */
   readonly onTunnel?: (info: TunnelStartInfo) => void;
-  /** A tunnelled peer connection failed terminally (PLAN.md §7 stage 4). */
+  /** A tunneled peer connection failed terminally. */
   readonly onTunnelFailure?: (info: TerminalFailureInfo) => void;
 }
 
 /**
- * Test-only switch for the WebRTC-to-tunnel fallback (PLAN.md §5.6). A page
- * sets `window.__NOVA_TEST_FORCE_TUNNEL__ = true` (e2e uses `addInitScript`)
- * and its native WebRTC can no longer connect, so its pairs tunnel. The flag
- * is read only in dev and `MODE === "test"` builds; production builds fold
- * `import.meta.env.DEV` to `false`, so the flag is never read there.
+ * Test-only WebRTC failure switch. Read window.__NOVA_TEST_FORCE_TUNNEL__
+ * only in dev/test builds so forced fallback cannot affect production.
  */
 export function forceTunnelForTests(): boolean {
   if (!(import.meta.env.DEV || import.meta.env.MODE === "test")) return false;
@@ -44,10 +38,9 @@ export function forceTunnelForTests(): boolean {
 }
 
 /**
- * One connection-log beacon per peer connection attempt (PLAN.md §8.2). The
- * reporter builds the body from allowlisted fields only and is a no-op without
- * VITE_EDGE_ORIGIN or sendBeacon; it never throws into the transport.
- * `error_code` stays empty: a peer attempt has no typed room error of its own.
+ * Send one allowlisted connection-log beacon per peer attempt. No-op without
+ * the edge origin or sendBeacon; never throw into the transport. error_code
+ * stays empty because peer attempts have no typed room error of their own.
  */
 function reportAttemptOutcome(info: ConnectionOutcomeInfo): void {
   reportConnection({

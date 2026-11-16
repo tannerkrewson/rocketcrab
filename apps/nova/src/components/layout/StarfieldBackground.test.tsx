@@ -3,14 +3,7 @@ import { describe, expect, it } from "vitest";
 import type { PartyEngine, PartyEngineState } from "../../lib/party/engine";
 import { StarfieldBackground } from "./StarfieldBackground";
 
-/**
- * Starfield tests (rocketcrab-22n): the site-wide star layer renders on
- * every page and unmounts only while a party is actively playing a game
- * (`state.phase === "playing"`). A selected game in the lobby is still a
- * non-gameplay route. The in-game signal comes off the shared party
- * engine, so these tests drive an injectable fake engine instead of a real
- * party.
- */
+/** Drive the shared playing-phase signal through an injectable fake party engine. */
 
 const IDLE_STATE: PartyEngineState = {
   phase: "idle",
@@ -41,7 +34,6 @@ const IDLE_STATE: PartyEngineState = {
   peerLink: null,
 };
 
-/** A party that is actively playing a Nova game (22n in-game signal). */
 const IN_GAME_STATE: PartyEngineState = {
   ...IDLE_STATE,
   phase: "playing",

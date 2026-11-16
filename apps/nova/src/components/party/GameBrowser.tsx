@@ -23,11 +23,7 @@ import {
 import { useSavedGames } from "../../lib/games/queries";
 
 export interface GameBrowserProps {
-  /**
-   * Pick mode: prebuilt game cards become pick buttons calling this with
-   * the entry instead of linking to the game detail page (used by the
-   * in-game players panel).
-   */
+  /** Pick mode selects directly instead of opening details; used by the in-game browse panel. */
   onPick?: (entry: BrowseEntry) => void;
   /**
    * Pick mode: clicking a saved game in the "My games" category calls this
@@ -43,37 +39,20 @@ export interface GameBrowserProps {
    * to /party and standalone ones to the homepage.
    */
   onBack?: () => void;
-  /**
-   * The view to open on mount (5cl.7): the standalone /browse route passes
-   * the restored ?view= search param so the game details page's back button
-   * returns to the same category. Without it the browser restores the last
-   * browse position from sessionStorage (the in-lobby case, where the URL
-   * can't carry it).
-   */
+  /** Initial category from route search; otherwise restore sessionStorage for the lobby browser. */
   initialView?: string | null;
   /** The search query to open with on mount (paired with ?q=). */
   initialQuery?: string;
-  /**
-   * True when the browser is rendered inside a live party (the lobby's and
-   * the in-game pick panels). Links that leave the party flow entirely —
-   * the empty-state "New game" action — then ask for a "Leave the party?"
-   * confirmation first and leave the party before navigating
-   * (rocketcrab-8z9), so no ghost party keeps running behind the builder.
-   */
+  /** Confirm and leave before navigating out of the party flow. */
   inParty?: boolean;
 }
 
-/** Which view the browser is showing: the player's own saved games or a
- * prebuilt category box. There is no "all games" box (2t1.1) — the category
- * cards are the entry point. */
 type BrowseView = "mine" | BrowseCategory["id"];
 
 function isBrowseView(value: string | null | undefined): value is BrowseView {
   return value === null || value === "mine" || BROWSE_CATEGORIES.some((box) => box.id === value);
 }
 
-/** The classic badge — every prebuilt game in the browser is classic
- * (5cl.10: Nova's example games were removed; the Nova badge is gone). */
 function KindBadge() {
   return (
     <Badge color="danger" variant="secondary" title="External iframe game from classic Rocketcrab">
@@ -88,13 +67,7 @@ function matchesQuery(game: BrowseEntry, query: string): boolean {
   return haystack.includes(query.toLowerCase());
 }
 
-/**
- * One prebuilt-game card (10.9): a detail-page link in browse mode, or a
- * pick button in pick mode — always with an arrow affordance on the right
- * (the old "Select" badge is gone). `onOpen` records the browser's current
- * position right before navigating (5cl.7), so the details page's back
- * button can return to the same category.
- */
+/** onOpen records the category before details navigation so Back can restore it. */
 function GameCard({
   game,
   onPick,
@@ -148,7 +121,6 @@ function GameCard({
   );
 }
 
-/** One saved-game row (10.9): links to the shared game detail page. */
 function SavedGameRow({
   game,
   onPickSaved,
@@ -207,13 +179,7 @@ function SavedGameRow({
   );
 }
 
-/** One category card (2t1.1 redesign, tightened 1nm): the emoji sits
- * directly LEFT of the label + game count in a horizontal row — the large
- * icon box tile is gone, and the grid is always two columns. A soft lift +
- * primary glow on hover. Classic boxes keep their emoji. The standalone
- * "My games" box is a LINK to /library (5cl.12 — the library is the one
- * full-featured my-games page); in the lobby it stays a button that opens
- * the in-place saved list (leaving the party is wrong mid-party). */
+/** My games links to the library standalone, but opens an inline list inside a party. */
 function CategoryCard({
   emoji,
   label,
@@ -258,23 +224,9 @@ function CategoryCard({
 }
 
 /**
- * The shared prebuilt-game browser (7.7.2 / 7.23 / 10.9 / 2t1.1): classic
- * external iframe games, badged classic. "My games" (the player's own saved
- * games) is a category card: on the standalone /browse page it links to the
- * full-featured library page (5cl.12), and inside a party (compact) it
- * opens an in-place saved list — the host can't leave the party, so the
- * list keeps the shared details links.
- *
- * The game list is NOT shown by default: only the category cards render.
- * Opening a category (or searching) swaps to just the list — the category
- * buttons hide while it's open. The ONE unified "back" button (2t1.1)
- * returns to the category cards while a list is open, and leaves the
- * browser (lobby in a party, home otherwise) at the top level. Selecting a
- * game never sets it directly: in browse mode it ALWAYS opens the game's
- * details page (/game/$gameId — saved games included), where the party pick
- * happens (10.9). The browser records its position before that navigation
- * (5cl.7) and restores it on mount, so the details page's back button
- * returns to the same category — including when the lobby browser remounts.
+ * Shared classic and saved-game browser. Browse mode opens details; pick
+ * mode selects directly. Persist category/query before details navigation
+ * so Back restores the same list even when the lobby browser remounts.
  */
 export function GameBrowser({
   onPick,
@@ -286,11 +238,8 @@ export function GameBrowser({
   inParty = false,
 }: GameBrowserProps) {
   const navigate = useNavigate();
-  // 8z9: used to leave the party when an exit link is confirmed.
   const { engine } = usePartyEngine();
-  // 5cl.7: restore the last browse position — the standalone route's
-  // ?view=/?q= search params win; otherwise the sessionStorage context (the
-  // in-lobby case) is used.
+  // Explicit route search takes precedence over the stored in-lobby position.
   const stored = readBrowseContext();
   const [query, setQuery] = useState(initialQuery ?? stored?.query ?? "");
   const [view, setView] = useState<BrowseView | null>(() => {
@@ -298,7 +247,6 @@ export function GameBrowser({
     if (stored !== null && isBrowseView(stored.view)) return stored.view;
     return null;
   });
-  // 8z9: the builder action awaiting a "Leave the party?" confirmation.
   const [pendingExit, setPendingExit] = useState(false);
   const savedGamesQuery = useSavedGames();
   const savedGames = savedGamesQuery.data ?? [];
@@ -323,13 +271,10 @@ export function GameBrowser({
   const backToCategories = () => {
     setView(null);
     setQuery("");
-    // 5cl.7: the user explicitly returned to the category cards — a fresh
-    // browse starts at the top level next time.
+    // Explicitly returning to categories makes the next browse start at the top level.
     clearBrowseContext();
   };
 
-  /** The one unified back button (2t1.1): while a list is open it returns
-   * to the category cards; at the top level it leaves the browser. */
   const handleBack = () => {
     if (view !== null || query !== "") {
       backToCategories();
@@ -343,11 +288,8 @@ export function GameBrowser({
     void navigate({ to: compact ? "/party" : "/" });
   };
 
-  /** 5cl.7: record the browser position right before a details navigation
-   * so the details page's back button returns to this category/search. */
   const recordPosition = () => saveBrowseContext(view, query);
 
-  /** 8z9: the builder link leaves the party only after confirmation. */
   const requestExit = () => {
     if (!inParty) {
       void navigate({ to: "/build" });
@@ -394,13 +336,8 @@ export function GameBrowser({
         </div>
       </div>
 
-      {/* Category cards: hidden while a category is open or the user is
-          searching — the list takes over (10.9). */}
       {view === null && query === "" ? (
         <section aria-label="Categories" className="grid grid-cols-2 gap-3">
-          {/* 5cl.12: the standalone my-games box links to the full library
-              page (search, start / duplicate / delete / edit); inside a
-              party it opens the in-place saved list instead. */}
           {compact ? (
             <CategoryCard
               emoji="📦"
@@ -460,9 +397,6 @@ export function GameBrowser({
         </section>
       ) : null}
 
-      {/* 8z9: the "Leave the party?" confirmation for the builder link in party
-           mode — mirrors the PlayShell's confirm dialogs (plain controlled
-           overlay; the shared Dialog can't be reused from party panels). */}
       {pendingExit ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -528,7 +462,6 @@ function SavedGamesList({
             ? `No saved games match “${query}”.`
             : "No saved games yet — create one in the editor first."}
         </p>
-        {/* 8z9: in a party the New-game action asks first. */}
         {inParty && onExitRequest !== undefined ? (
           <Button variant="primary" onClick={() => onExitRequest()}>
             New game

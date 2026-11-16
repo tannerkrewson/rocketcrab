@@ -6,7 +6,6 @@ export interface LoadingStateProps {
   className?: string;
 }
 
-/** HeroUI spinner with an optional label. */
 export function LoadingState({ label = "Loading…", className }: LoadingStateProps) {
   return (
     <div

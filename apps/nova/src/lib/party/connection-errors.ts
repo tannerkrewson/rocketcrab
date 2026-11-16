@@ -62,7 +62,6 @@ function errorCategory(error: unknown): string | null {
   return typeof category === "string" ? category : null;
 }
 
-/** Convert a connection/setup error into a clear, actionable message. */
 export function connectionErrorMessage(error: unknown): string {
   const category = connectionErrorCategory(error);
   if (category !== null) {

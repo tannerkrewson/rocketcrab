@@ -7,12 +7,6 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { gameRepository } from "../lib/games/instance";
 import { routeTree } from "../routeTree.gen";
 
-/**
- * Library page integration test (U2): renders the real /library route through
- * the TanStack Router with the repository over fake-indexeddb, covering the
- * list, search, duplicate, and confirm-before-delete flows.
- */
-
 function renderLibrary() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -35,25 +29,18 @@ describe("/library", () => {
   it("shows the empty state with only the header New-game CTA (2t1.5/ini)", async () => {
     renderLibrary();
     expect(await screen.findByText("No saved games yet")).toBeInTheDocument();
-    // ini: the duplicate empty-state "New game" button is gone — the header
-    // action is the only one on the page.
     const ctas = screen.getAllByRole("link", { name: "New game" });
     expect(ctas).toHaveLength(1);
     expect(ctas[0]!.getAttribute("href")).toBe("/build");
-    // ini: the "nothing is uploaded" copy is removed.
     expect(screen.queryByText(/Games are saved right in this browser/)).not.toBeInTheDocument();
   });
 
   it("shows ONE back button and a New-game action in the header (2t1.5)", async () => {
-    // Seed a game so the empty-state CTA (a second "New game" link)
-    // does not collide with the header action under test.
     await gameRepository.create({ title: "Rockets", html: "<p>a</p>" });
     renderLibrary();
 
-    // The brand row (rocketcrab.com) stays visible (2t1.1).
     expect(await screen.findByRole("link", { name: /rocketcrab\.com/ })).toBeInTheDocument();
 
-    // ONE back button (the header duplicate and "Browse games" are gone).
     const backs = screen.getAllByRole("link", { name: "back" });
     expect(backs).toHaveLength(1);
     const back = backs[0];
@@ -62,7 +49,6 @@ describe("/library", () => {
     expect(back!.className).toContain("self-start");
     expect(screen.queryByRole("link", { name: /Browse games/ })).not.toBeInTheDocument();
 
-    // The header action is "New game" (renamed from "Build a game").
     const build = screen.getByRole("link", { name: "New game" });
     expect(build.getAttribute("href")).toBe("/build");
     expect(build.className).toContain("button--primary");
@@ -83,8 +69,6 @@ describe("/library", () => {
     expect(screen.getByText("Card Sharks")).toBeInTheDocument();
     expect(screen.getByText("state mode")).toBeInTheDocument();
     expect(screen.getAllByText("Not tested")).toHaveLength(2);
-    // The card's play action is "Start party" (2t1.5) and links to /party
-    // with the game preselected (one per card).
     const starts = screen.getAllByRole("link", { name: "Start party" });
     expect(starts).toHaveLength(2);
     expect(starts[0]!.getAttribute("href")).toContain("/party?gameId=");
@@ -114,17 +98,14 @@ describe("/library", () => {
     expect(card).not.toBeNull();
     const cardScope = within(card as HTMLElement);
 
-    // Delete opens the confirmation dialog; the game stays listed until confirmed.
     await userEvent.click(cardScope.getByRole("button", { name: /^Delete$/ }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("Doomed")).toBeInTheDocument();
 
-    // Cancel keeps the game.
     await userEvent.click(screen.getByRole("button", { name: "Cancel" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByText("Doomed")).toBeInTheDocument();
 
-    // Confirm deletes it.
     await userEvent.click(cardScope.getByRole("button", { name: /^Delete$/ }));
     await userEvent.click(await screen.findByRole("button", { name: "Delete game" }));
     await waitFor(() => expect(screen.queryByText("Doomed")).not.toBeInTheDocument());

@@ -1,8 +1,4 @@
-/*
- * App-store style screenshot carousel (rocketcrab-9fv.7.46): theme swiper's
- * internals with Nova's tokens. Plain unlayered CSS imported after swiper's
- * styles, so these rules win at equal specificity.
- */
+/* Unlayered CSS loaded after Swiper's styles wins at equal specificity. */
 
 .nova-screenshots .swiper-slide {
   display: flex;

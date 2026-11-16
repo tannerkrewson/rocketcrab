@@ -7,12 +7,6 @@ import { afterEach, beforeEach, describe, expect, it } from "vitest";
 import { readDraftSource } from "../lib/editor/draft-handoff";
 import { routeTree } from "../routeTree.gen";
 
-/**
- * Examples page tests (A4): the /examples route lists one complete game per
- * mode and "Open in the editor" turns an example source into a new local
- * draft (lazy ?raw import + the same handoff the /build paste target uses).
- */
-
 function renderExamples() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -51,15 +45,13 @@ describe("/examples", () => {
   it("opens an example as a new draft in the editor", async () => {
     renderExamples();
 
-    // First card in DOM order is Nova Quiz (state mode).
     const openButtons = await screen.findAllByRole("button", {
       name: /^Open in the editor/,
     });
     expect(openButtons).toHaveLength(3);
     await userEvent.click(openButtons[0] as HTMLElement);
 
-    // The editor route mounts with the example source as an unsaved draft
-    // (scope to the desktop layout: jsdom never hides the phone editor).
+    // jsdom renders both layouts, so scope assertions to the desktop editor.
     const desktop = await screen.findByTestId("desktop-layout");
     const editor = within(desktop).getByRole("textbox", { name: "Game HTML source" });
     // CodeMirror only renders visible lines, so assert the top of the source

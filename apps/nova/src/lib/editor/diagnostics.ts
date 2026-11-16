@@ -2,12 +2,7 @@ import type { RuntimeConsoleMessage, RuntimeErrorMessage } from "@rocketcrab/pro
 import type { RuntimeHostEvent } from "../runtime-host";
 import type { SourceIssue } from "./validation";
 
-/**
- * Diagnostics model for the editor's runtime error panel (U4): runtime-plane
- * events are normalized into a small, stable diagnostic shape the UI and the
- * copyable report share. Nova only reports what is observable — it never
- * statically proves game correctness (ADR-0002).
- */
+/** Normalize observable runtime diagnostics for the UI and report; never prove game correctness (ADR-0002). */
 
 export type DiagnosticSeverity = "error" | "warning" | "info";
 
@@ -29,7 +24,6 @@ export interface ConsoleEntry {
   timestamp: number;
 }
 
-/** Friendly labels for the runtime error categories (U4 validation flow). */
 export const RUNTIME_ERROR_CATEGORIES: Record<
   RuntimeErrorMessage["category"],
   { label: string; severity: DiagnosticSeverity; hint: string }
@@ -98,7 +92,6 @@ function nextId(prefix: string): string {
   return `${prefix}-${diagnosticSequence}`;
 }
 
-/** Map a game bandwidth warning or rejection from an arena player log. */
 export function diagnosticFromBandwidthLog(entry: {
   id: string;
   message: string;
@@ -114,7 +107,6 @@ export function diagnosticFromBandwidthLog(entry: {
   };
 }
 
-/** Map a runtime-plane error message onto a UI diagnostic. */
 export function diagnosticFromRuntimeError(error: RuntimeErrorMessage): Diagnostic {
   const meta = RUNTIME_ERROR_CATEGORIES[error.category];
   const detail = [
@@ -133,7 +125,6 @@ export function diagnosticFromRuntimeError(error: RuntimeErrorMessage): Diagnost
   };
 }
 
-/** Map a host-bridge event onto diagnostics (errors, fatal, unresponsive). */
 export function diagnosticsFromHostEvent(event: RuntimeHostEvent): Diagnostic[] {
   switch (event.type) {
     case "error":
@@ -163,7 +154,6 @@ export function diagnosticsFromHostEvent(event: RuntimeHostEvent): Diagnostic[] 
   }
 }
 
-/** Map a runtime console message onto a console entry for the panel. */
 export function consoleEntryFromMessage(message: RuntimeConsoleMessage): ConsoleEntry {
   return {
     id: nextId("console"),
@@ -176,7 +166,6 @@ export function consoleEntryFromMessage(message: RuntimeConsoleMessage): Console
 
 export interface DiagnosticReportInput {
   title: string;
-  /** False when the game has not been saved yet. */
   saved: boolean;
   sourceHash: string;
   sourceBytes: number;
@@ -188,7 +177,7 @@ export interface DiagnosticReportInput {
   consoleEntries: ConsoleEntry[];
 }
 
-/** Plain-text diagnostic report for pasting back into an AI chat (U4). */
+/** Plain-text diagnostics for pasting back into an AI chat. */
 export function buildDiagnosticReport(input: DiagnosticReportInput): string {
   const lines: string[] = [
     "Rocketcrab Nova — game diagnostic report",

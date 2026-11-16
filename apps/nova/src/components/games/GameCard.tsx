@@ -22,7 +22,6 @@ function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString(undefined, { dateStyle: "medium" });
 }
 
-/** Test-status badge for a saved game. */
 function TestStatusBadge({ game }: { game: SavedGame }) {
   if (game.lastTestedAt === undefined) {
     return <Badge>Not tested</Badge>;
@@ -34,12 +33,7 @@ function TestStatusBadge({ game }: { game: SavedGame }) {
   );
 }
 
-/**
- * Library card for one saved game: metadata plus edit / play / duplicate /
- * delete actions. Edit opens the consolidated editor + test arena (7.40);
- * delete is confirmed by the caller (U2 acceptance: delete requires
- * confirmation).
- */
+/** Saved-game card; the caller must confirm deletion before invoking onDelete. */
 export function GameCard({ game, onDuplicate, onDelete, busy = false }: GameCardProps) {
   return (
     <Card

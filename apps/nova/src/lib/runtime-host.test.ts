@@ -102,7 +102,7 @@ describe("RuntimeHostClient bootstrap", () => {
     expect(bootstrap.type).toBe("runtime.bootstrap");
     expect(bootstrap.gameId).toBe("game-1");
     expect(bootstrap.gameMode).toBe("state");
-    expect(port2.sent).toHaveLength(0); // port2 went to the runtime
+    expect(port2.sent).toHaveLength(0);
 
     deliver(port1, readyMessage());
     await loadPromise;
@@ -126,7 +126,7 @@ describe("RuntimeHostClient bootstrap", () => {
 
     const second = bridge.load({ ...loadGame, gameId: "game-2" });
     await flush();
-    expect(port1.closed).toBe(true); // old channel closed
+    expect(port1.closed).toBe(true);
     await vi.waitFor(() => expect(windowMessages).toHaveLength(2));
     const bootstrap = windowMessages.at(-1)?.data as Record<string, unknown>;
     expect(bootstrap.gameId).toBe("game-2");
@@ -190,7 +190,7 @@ describe("RuntimeHostClient event forwarding", () => {
     expect(types).toContain("error");
     expect(types).toContain("console");
     expect(types).toContain("lifecycle");
-    expect(bridge.diagnose().recentEvents).toHaveLength(5); // ready + 4 events
+    expect(bridge.diagnose().recentEvents).toHaveLength(5);
   });
 
   it("forwards game.apiCall to the session router with the payload intact", async () => {
@@ -217,10 +217,7 @@ describe("RuntimeHostClient event forwarding", () => {
   it("pushApiEvent posts a validated game.apiEvent on the instance channel", async () => {
     const harness = createHarness();
     await started(harness);
-    // Let the bootstrap postMessage reach the fake frame window.
     await flush();
-    // The client generates its own runtime instance id for the bootstrap;
-    // the pushed event must ride the same instance.
     const bootstrap = harness.windowMessages
       .map((m) => m.data as Record<string, unknown>)
       .find((m) => m.type === "runtime.bootstrap");
@@ -237,7 +234,6 @@ describe("RuntimeHostClient event forwarding", () => {
       kind: "playerJoined",
       player: { id: "member-2", name: "Blair" },
     });
-    // Raw channel messages with binary payloads survive the envelope.
     harness.bridge.pushApiEvent({
       kind: "rawMessage",
       channel: "chat",
@@ -251,7 +247,6 @@ describe("RuntimeHostClient event forwarding", () => {
       event: { message: { payload: Uint8Array } };
     };
     expect(raw.event.message.payload).toBeInstanceOf(Uint8Array);
-    // No-op before a load: no port exists yet.
     const idle = createHarness();
     idle.bridge.pushApiEvent({ kind: "start" });
     expect(idle.port1.sent).toHaveLength(0);
@@ -319,7 +314,6 @@ describe("RuntimeHostClient heartbeat", () => {
     deliver(port1, readyMessage());
     await loadPromise;
 
-    // Hidden: the heartbeat stops (no new pings while backgrounded).
     bridge.setPageVisibility(true);
     const pingsBefore = port1.sent.filter(
       (m) => (m as { type: string }).type === "runtime.ping",
@@ -330,7 +324,6 @@ describe("RuntimeHostClient heartbeat", () => {
     ).length;
     expect(pingsAfter).toBe(pingsBefore);
 
-    // Return: an immediate ping re-syncs, then the interval resumes.
     bridge.setPageVisibility(false);
     const last = port1.sent.at(-1) as { type: string };
     expect(last.type).toBe("runtime.ping");

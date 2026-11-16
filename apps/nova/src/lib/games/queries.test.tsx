@@ -13,12 +13,7 @@ import {
   useUpdateGame,
 } from "./queries";
 
-/**
- * TanStack Query hook tests over the real repository backed by
- * fake-indexeddb (ADR-0013 stack). Live peer-to-peer game state is out of
- * scope here by design (plan engineering rule 8); these hooks only manage
- * saved-game resources.
- */
+/** Saved-game query tests over fake-indexeddb (ADR-0013), not live peer state. */
 
 function makeWrapper() {
   const queryClient = new QueryClient({

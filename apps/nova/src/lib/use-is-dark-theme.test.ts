@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it } from "vitest";
 import { THEME_STORAGE_KEY } from "./theme";
 import { useIsDarkTheme } from "./use-is-dark-theme";
 
-/** The dark-code-editor switch follows the effective app mode. */
 describe("useIsDarkTheme", () => {
   beforeEach(() => {
     window.localStorage.clear();

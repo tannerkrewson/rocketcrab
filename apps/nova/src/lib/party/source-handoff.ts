@@ -1,13 +1,7 @@
 /**
- * Editor → party source handoff (P4 "create party from current editor
- * source").
- *
- * The editor's Play-with-friends action stores the CURRENT editor source
- * (which may be unsaved) in sessionStorage before navigating to the party
- * route; the party route picks it up when the stored gameId matches,
- * falling back to the saved game source otherwise. Same pattern (and TTL
- * policy) as the draft-source handoff (7.40: the arena handoff was removed
- * when the arena moved onto the editor page).
+ * Hand the editor's current, possibly unsaved source to /party through
+ * sessionStorage. The route accepts fresh entries matching the game id,
+ * falling back to IndexedDB when no handoff is available.
  */
 const STORAGE_KEY = "nova:party-source:v1";
 export const PARTY_SOURCE_TTL_MS = 30 * 60 * 1000;

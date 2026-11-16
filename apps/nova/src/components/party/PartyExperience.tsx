@@ -23,15 +23,8 @@ function errorMessage(error: unknown): string {
 }
 
 /**
- * The party experience (P4): one component that owns the party engine's
- * lifecycle phases — creating, joining, lobby, playing, reconnecting, and
- * errors — plus the single runtime-frame container that stays mounted for
- * the whole party (a phase change never destroys the game frame).
- *
- * Classic parity (7.38): the lobby has NO game preview (the frame loads
- * invisibly so the ready gate still works), and while playing the top bar
- * sits in flow ABOVE the frame — the frame fills the remaining space and is
- * never a floating overlay.
+ * Party lifecycle view. The lobby boots the runtime invisibly for readiness;
+ * the playing view places controls above the game, outside its frame.
  */
 export function PartyExperience({
   onLeft,
@@ -43,8 +36,7 @@ export function PartyExperience({
   const { state, engine, bindContainer } = usePartyEngine();
 
   const handleLeave = async () => {
-    // 7.10: only toast when there was actually a party to leave; the error
-    // phase has nothing to tear down and must not claim the user "left".
+    // Failed setup has no party to leave, so do not toast that the player left.
     const wasInParty =
       state.phase === "lobby" ||
       state.phase === "starting" ||
@@ -57,8 +49,6 @@ export function PartyExperience({
     onLeft?.();
   };
 
-  // 7.6: the lobby's browse loads a saved game and hands it to the engine,
-  // which registers/announces it for the whole party.
   const handlePickGame = async (gameId: string) => {
     try {
       const game = await gameRepository.read(gameId);
@@ -74,11 +64,7 @@ export function PartyExperience({
     }
   };
 
-  // 7.43: picking a prebuilt game from the shared browse UI. 5cl.10: the
-  // browser is classic-only now (Nova's example games were removed, and
-  // Nova's own games are saved games picked via selectGame), so every
-  // prebuilt pick is a classic external iframe game — the host creates the
-  // room once and the party plane shares it.
+  // Create each classic room once on the host and share its URL through the party plane.
   const handlePickPrebuilt = async (entry: BrowseEntry) => {
     await engine.selectClassicGame(entry.id);
   };
@@ -96,7 +82,6 @@ export function PartyExperience({
     void pick();
   };
 
-  // 7.29: in-game menu + lobby controls (classic parity).
   const handleKickMember = (memberId: string) => {
     engine.kickMember(memberId);
   };
@@ -107,7 +92,6 @@ export function PartyExperience({
     engine.reloadAllGames();
   };
 
-  // 7.5: apply the edited name to the engine identity (persisted there).
   const handleEditName = (name: string) => {
     engine.setDisplayName(name);
     toast.success("Name updated.");
@@ -115,9 +99,6 @@ export function PartyExperience({
 
   const playing = state.phase === "playing";
 
-  // The per-player classic URL: the host merges the host overrides and
-  // passes ishost=true; every other player builds the same room with their
-  // own name and ishost=false.
   const classicUrl = useMemo(() => {
     const classic = state.classicGame;
     if (classic === null) {
@@ -131,12 +112,7 @@ export function PartyExperience({
     );
   }, [state.classicGame, state.displayName, state.role]);
 
-  // The runtime frame container: ONE DOM node for the whole party. In the
-  // lobby it is invisible (7.38: no game preview — classic parity) but
-  // still mounted so the game boots and the ready gate opens; while
-  // playing the SAME node fills the space below the in-flow top bar (never
-  // remounted, never restarted). Classic games embed a plain iframe built
-  // from the shared room URL spec instead of the Nova runtime.
+  // Keep the lobby runtime invisible but mounted so readiness can complete.
   const frameArea =
     state.classicGame !== null ? (
       playing ? (
@@ -169,21 +145,10 @@ export function PartyExperience({
       />
     );
 
-  // 7.22: the classic shell header (logo + big code + phonetic) sits above
-  // every live party phase EXCEPT playing, where the in-flow play shell's
-  // compact top bar takes over (7.38). The invite details (QR/URL/copy)
-  // live in the lobby's invite card (10.5), not the header.
-  // 5cl.8: while the host browses games in the lobby the header STAYS
-  // MOUNTED and animates to a compact, slightly faded state (smaller logo +
-  // title, reduced opacity) so the game browser beneath is the focus — the
-  // browser no longer renders its own brand row. 5cl.7: the details-page
-  // back button can return here already in browse mode (initialBrowse).
   const [browsing, setBrowsing] = useState(initialBrowse);
 
   const shellShown = state.phase !== "idle" && state.phase !== "error" && state.phase !== "removed";
 
-  // PLAN.md §7: one generic peer-link alert (connecting / failed), shown in
-  // every live party phase beside the signaling outage alert.
   const peerLinkAlert =
     state.peerLink === null ? null : (
       <PeerLinkAlert
@@ -292,8 +257,6 @@ function renderPhase(
         />
       );
     case "playing":
-      // The play shell renders the whole playing view (in-flow top bar +
-      // frame); the lobby content is intentionally hidden while playing.
       return null;
     case "reconnecting":
       return (
@@ -320,9 +283,7 @@ function renderPhase(
                   ? " A message from a player couldn't be decrypted. It may have been damaged or the invite may be old; this may not be why you couldn't connect. Ask the host for a fresh invite."
                   : "")
             }
-            // 7.10: retry re-runs the failed setup; it must NOT call leave
-            // (that toasted "you left the party" over the navbar and left
-            // a blank page).
+            // Retry setup rather than leaving the party flow.
             onRetry={() => engine.retrySetup()}
           />
           <div className="flex justify-center">

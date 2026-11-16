@@ -8,15 +8,7 @@ export interface PartyReconnectScreenProps {
   onLeave: () => void;
 }
 
-/**
- * The reconnect screen (P4, M1): the party connection dropped (Mobile
- * Safari backgrounding, relay loss, network switch — threat T15). The
- * party is still open; reconnect with a fresh connection ID, or leave.
- * Shows reconnect progress (attempt count) and auto-retry status so a
- * phone user always knows the shell is working on it (issue requirement:
- * display reconnect progress). The Leave button is the emergency exit and
- * lives outside any game frame.
- */
+/** Reconnect progress and recovery controls, including an exit outside the game frame. */
 export function PartyReconnectScreen({ state, onReconnect, onLeave }: PartyReconnectScreenProps) {
   const reconnecting = state.phaseDetail?.includes("Reconnecting") ?? false;
   const attempts = state.reconnectAttempts;

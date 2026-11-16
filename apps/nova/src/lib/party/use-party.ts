@@ -1,9 +1,4 @@
-/**
- * React binding for the party engine (P4): subscribes the component to the
- * engine's state snapshots and exposes the stable control surface plus the
- * runtime-frame container binder (the same container hosts the lobby preview
- * and the full-screen play shell).
- */
+/** React state subscription and runtime-container binding for the page-scoped party engine. */
 import { useCallback, useRef, useSyncExternalStore } from "react";
 import { partyEngine, type PartyEngine, type PartyEngineState } from "./engine";
 

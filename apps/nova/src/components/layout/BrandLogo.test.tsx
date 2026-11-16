@@ -19,8 +19,7 @@ describe("BrandLogo", () => {
       number,
     ];
 
-    // The claw paths reach above y=0; the old 0 0 128 128 viewport clipped
-    // their tops in the Build hero and other tight brand placements.
+    // Claw paths extend above y=0; the viewport must include their tops.
     expect(minX).toBeLessThanOrEqual(0);
     expect(minY).toBeLessThan(0);
     expect(minX + width).toBeGreaterThanOrEqual(126);

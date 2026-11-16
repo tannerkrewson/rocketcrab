@@ -13,7 +13,6 @@ export interface BadgeProps {
   children?: ReactNode;
 }
 
-/** Small HeroUI chip for statuses, counts, and categories. */
 export function Badge({
   color = "default",
   variant = "soft",

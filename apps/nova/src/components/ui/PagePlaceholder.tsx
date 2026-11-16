@@ -9,7 +9,6 @@ export interface PagePlaceholderProps {
   className?: string;
 }
 
-/** Styled placeholder for routes still being built out. */
 export function PagePlaceholder({
   title,
   description,

@@ -11,7 +11,6 @@ export interface CardProps {
   id?: string;
 }
 
-/** HeroUI card used across Nova pages. */
 export function Card({ title, description, actions, className, children, id }: CardProps) {
   return (
     <HeroCard id={id} className={cn("w-full", className)}>

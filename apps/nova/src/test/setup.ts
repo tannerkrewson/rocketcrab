@@ -29,18 +29,8 @@ function installMemoryStorage(key: "localStorage" | "sessionStorage"): void {
 installMemoryStorage("localStorage");
 installMemoryStorage("sessionStorage");
 
-// ---------------------------------------------------------------------------
-// Realm-safe TextEncoder (P3/P4 binary chunk path).
-//
-// jsdom wraps node's native TextEncoder, whose `encode()` returns typed
-// arrays from node's realm — while the environment's global `Uint8Array`
-// belongs to jsdom's realm. `instanceof Uint8Array` therefore fails for
-// every encoded payload, which breaks the transport's binary-payload
-// detection and the party coordinator's chunk decoding in tests (the same
-// code passes in real browsers and in the package-level test suites).
-// Wrap the encoder so encoded bytes come from the environment's global
-// realm, keeping `instanceof` checks correct everywhere.
-// ---------------------------------------------------------------------------
+// Native TextEncoder returns arrays from Node's realm, but transport binary
+// detection uses jsdom's Uint8Array. Wrap it so instanceof checks succeed.
 const NATIVE_TEXT_ENCODER = globalThis.TextEncoder;
 if (NATIVE_TEXT_ENCODER !== undefined) {
   class RealmSafeTextEncoder {

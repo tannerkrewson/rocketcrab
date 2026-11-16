@@ -56,8 +56,7 @@
   }
 }
 
-/* Homepage logo launch (rocketcrab-aqn.5): the browser owns the motion while
-   React advances only after each animation's lifecycle event. */
+/* CSS owns logo motion; React advances after each animation's lifecycle event. */
 @keyframes rc-logo-shake {
   0%,
   100% {

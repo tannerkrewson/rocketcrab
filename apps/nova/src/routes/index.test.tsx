@@ -29,15 +29,6 @@ vi.hoisted(() => {
   }
 });
 
-/**
- * Home route tests (7.20/7.35/7.47): the brand header — crab logo, the
- * rocketcrab.com title, the "Introducing Nova" alert — side-by-side
- * Join/Start party primaries (Join first), and a content-hugging secondary
- * action column (no recent-games browser since 7.35). Since 9fv.11.4 the
- * title taps to copy the domain; since 9fv.11.5 it renders in the
- * Inconsolata Variable brand font and the stack gains a Browse games link.
- */
-
 const { toastMock, partyStub } = vi.hoisted(() => {
   const party: { active: boolean; phase: string } = { active: false, phase: "lobby" };
   const engine = {
@@ -58,8 +49,7 @@ const { toastMock, partyStub } = vi.hoisted(() => {
 });
 
 vi.mock("../lib/toast", () => ({ toast: toastMock }));
-// 8z9: the homepage guard leaves any active party — control the engine
-// through the stub instead of the real (idle) singleton.
+// Control the active-party guard through the stub rather than the idle singleton.
 vi.mock("../lib/party/use-party", () => ({
   usePartyEngine: partyStub.usePartyEngine,
 }));
@@ -92,18 +82,14 @@ describe("/", () => {
   it("shows the brand header: logo, title, tagline, and the Introducing Nova alert", async () => {
     renderHome();
     expect(await screen.findByRole("heading", { name: "rocketcrab.com" })).toBeInTheDocument();
-    // The brand mark is the real single rocketcrab SVG (5cl.13) — decorative
-    // behind the h1 (aria-hidden), never the 🦀🚀 emoji pair.
     const logo = screen.getByTestId("brand-logo");
     expect(logo.querySelector('img[src="/rocketcrab-logo.svg"]')).not.toBeNull();
     expect(screen.queryByText("🦀")).not.toBeInTheDocument();
     expect(screen.queryByText("🚀")).not.toBeInTheDocument();
     expect(screen.getByText("party games for phones")).toBeInTheDocument();
     const alert = screen.getByRole("link", { name: /Introducing Nova/ });
-    // No aura wrapper, glowing orb, or twinkling stars remain.
     expect(alert.parentElement).not.toHaveClass("aura");
     expect(document.querySelector(".rc-alert-orb, .rc-alert-star")).toBeNull();
-    // The Nova promo is a dotted HeroUI accent alert around the link.
     const alertBox = alert.closest('[data-slot="alert-root"]');
     expect(alertBox).not.toBeNull();
     expect(alertBox).toHaveClass("alert--accent", "border-dotted");
@@ -136,9 +122,6 @@ describe("/", () => {
     renderHome();
     const more = await screen.findByRole("region", { name: "More" });
     const links = within(more).getAllByRole("link");
-    // rocketcrab-2t1.1: My games now sits before Browse games; the
-    // build-a-game button keeps its original position (pending user
-    // clarification on the truncated note).
     expect(links.map((link) => link.textContent)).toEqual([
       "Build a game",
       "My games",
@@ -265,9 +248,6 @@ describe("/", () => {
   });
 
   it("leaves any active party when the homepage is shown (8z9)", async () => {
-    // A party is live (e.g. the user pressed the native back button from
-    // the lobby) — sitting on "/" must tear it down, not keep a ghost
-    // party running.
     partyStub.party.active = true;
     renderHome();
     await screen.findByRole("heading", { name: "rocketcrab.com" });

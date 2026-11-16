@@ -3,17 +3,12 @@ import { relayRequest, type RelayEndpointKey } from "./relay";
 import { postJson, randomRoomId } from "./url";
 
 /**
- * The whole classic Rocketcrab external iframe game list (rocketcrab-9fv.7.7.1),
- * ported from the dev branch `config/games/*`. Each game's room-creation flow
- * (classic's server-side `connectToGame`) is preserved verbatim in spirit,
- * adapted to run client-side in the browser (Nova is backendless).
- *
- * `frameOrigins` feeds the main origin's CSP `frame-src` allowlist (see
- * apps/nova/vite.config.ts) — the strict CSP (ADR-0001) otherwise blocks
- * these external iframes.
+ * Classic external iframe games. Room creation runs in the browser or
+ * through the scoped edge relay when upstream CORS policies require it.
+ * frameOrigins supplies the strict main-origin CSP allowlist (ADR-0001;
+ * apps/nova/vite.config.ts).
  */
 
-/** Unique origins from a display URL plus any extra iframe origins. */
 function origins(displayUrlHref: string, ...extra: string[]): string[] {
   return [...new Set([new URL(displayUrlHref).origin, ...extra])];
 }
@@ -111,8 +106,7 @@ const drawphoneBase: Omit<ClassicGame, "id" | "name" | "frameOrigins" | "connect
 const drawphoneConnect =
   (baseUrl: string, relayEndpoint: RelayEndpointKey) =>
   async (): Promise<{ player: { url: string; customQueryParams: { code: string } } }> => {
-    // The room-creation endpoint sends no CORS headers (7.7.3), so the room
-    // is created through the edge Worker's relay instead of a browser fetch.
+    // The endpoint sends no CORS headers, so create rooms through the edge relay.
     const { gameCode } = await relayRequest<{ gameCode?: string }>(relayEndpoint);
     if (typeof gameCode !== "string") {
       throw new Error("Drawphone didn't return a game code.");
@@ -253,11 +247,7 @@ const longwave: ClassicGame = {
   }),
 };
 
-/**
- * netgames.io games (dev branch `config/games/netgamesio.ts`). Classic
- * fetched the room-creation URL and used the final response URL as the room
- * (the endpoint redirects to the created room).
- */
+/** Room creation redirects to the new room; use the final response URL. */
 function netgamesioGame(
   urlId: string,
   {
@@ -289,9 +279,7 @@ function netgamesioGame(
     ...(guideUrl ? { guideUrl } : {}),
     ...(pictures ? { pictures } : {}),
     frameOrigins: origins("https://netgames.io/"),
-    // netgames.io /new 302-redirects with no Access-Control-Allow-Origin, so
-    // the room-creation fetch is CORS-blocked from the browser (7.7.3); the
-    // scoped relay follows the redirect server-side (7.33).
+    // The redirect has no CORS headers; the scoped relay follows it server-side.
     connectToGame: async () => {
       const { url } = await relayRequest<{ url: string }>("netgamesio-new", { urlId });
       if (typeof url !== "string") {
@@ -459,11 +447,7 @@ const netgamesioGames: ClassicGame[] = [
   }),
 ];
 
-/**
- * outofcontext.party games (dev branch `config/games/outofcontextparty.ts`).
- * A room is created per game via the site's rocketcrab API; every player
- * joins the same lobby URL.
- */
+/** Create one outofcontext.party room per game; all players share its lobby URL. */
 function outOfContextGame(
   game: string,
   {
@@ -495,8 +479,7 @@ function outOfContextGame(
     players,
     ...(pictures ? { pictures } : {}),
     frameOrigins: origins(origin + "/"),
-    // outofcontext.party/api/v1/rocketcrab returns 403 with no CORS headers
-    // (7.7.3); the room is created through the scoped relay (7.33).
+    // The upstream returns no CORS headers, so use the scoped relay.
     connectToGame: async () => {
       const { code } = await relayRequest<{ code?: string }>("ooc-rocketcrab", {
         body: { game, version: 1 },
@@ -633,8 +616,7 @@ const secrethitlerDuc: ClassicGame = {
   minPlayers: 5,
   maxPlayers: 10,
   frameOrigins: origins("https://secret-hitler.com/"),
-  // netlify function returns 200 with no CORS headers (7.7.3); rooms are
-  // created through the scoped relay (7.33).
+  // The Netlify function sends no CORS headers, so use the scoped relay.
   connectToGame: async () => {
     const { gameCode } = await relayRequest<{ gameCode?: string }>("secret-hitler-netlify");
     if (typeof gameCode !== "string") {
@@ -683,8 +665,7 @@ const snakeout: ClassicGame = {
   category: ["medium"],
   players: "5-10",
   frameOrigins: origins("https://snakeout.tannerkrewson.com/"),
-  // snakeout.tannerkrewson.com/new returns 200 with no CORS headers (7.7.3);
-  // rooms are created through the scoped relay (7.33).
+  // Room creation sends no CORS headers, so use the scoped relay.
   connectToGame: async () => {
     const { gameCode } = await relayRequest<{ gameCode?: string }>("snakeout-new");
     if (typeof gameCode !== "string") {
@@ -735,8 +716,7 @@ const tkSpyfall: ClassicGame = {
   maxPlayers: Number.POSITIVE_INFINITY,
   pictures: ["https://i.imgur.com/gAYGUUC.jpg", "https://i.imgur.com/8VMpYns.jpg"],
   frameOrigins: origins("https://spyfall.tannerkrewson.com/"),
-  // spyfall.tannerkrewson.com/new returns 200 with no CORS headers (7.7.3);
-  // rooms are created through the scoped relay (7.33).
+  // Room creation sends no CORS headers, so use the scoped relay.
   connectToGame: async () => {
     const { gameCode } = await relayRequest<{ gameCode?: string }>("spyfall-new");
     if (!gameCode) throw new Error("Failed to create Spyfall game");
@@ -776,8 +756,7 @@ const werewolfnight: ClassicGame = {
   minPlayers: 5,
   maxPlayers: 16,
   frameOrigins: origins("https://werewolf-night.com/"),
-  // werewolf.uber.space/newRoom returns 200 with no CORS headers (7.7.3);
-  // rooms are created through the scoped relay (7.33).
+  // Room creation sends no CORS headers, so use the scoped relay.
   connectToGame: async () => {
     const { gameCode } = await relayRequest<{ gameCode?: string }>("werewolf-newroom");
     if (typeof gameCode !== "string") {
@@ -792,7 +771,6 @@ const werewolfnight: ClassicGame = {
   },
 };
 
-/** The full classic game list, one entry per game on classic rocketcrab. */
 export const CLASSIC_GAMES: readonly ClassicGame[] = [
   protobowl,
   setwithfriends,
@@ -815,7 +793,6 @@ export const CLASSIC_FRAME_ORIGINS: readonly string[] = [
   ...new Set(CLASSIC_GAMES.flatMap((game) => game.frameOrigins)),
 ];
 
-/** Look up a classic game by id; undefined when unknown. */
 export function findClassicGame(id: string): ClassicGame | undefined {
   return CLASSIC_GAMES.find((game) => game.id === id);
 }

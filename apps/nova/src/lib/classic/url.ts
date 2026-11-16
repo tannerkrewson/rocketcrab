@@ -1,19 +1,14 @@
 import type { ClassicGame, ClassicGameConnectResult } from "./types";
 
-/** A player for URL building (classic `Player`). */
 export interface ClassicGamePlayer {
   name: string;
   isHost: boolean;
 }
 
 /**
- * Builds the iframe URL for one player, ported from classic's
- * `useConnectedGame` (dev branch `utils/useConnectedGame.ts`).
- *
- * The automatic query params (`rocketcrab=true`, `name`, `ishost`) are added
- * first, renamed per the game's `renameParams`, then overridden by the
- * connect result's `customQueryParams`, and finally `afterQueryParams` is
- * appended verbatim. The host merges the `host` URL spec over `player`.
+ * Build a player's iframe URL. Automatic parameters are renamed, then
+ * overridden by customQueryParams; afterQueryParams is appended verbatim.
+ * The host URL spec overrides the player spec for the host only.
  */
 export function buildClassicGameUrl(
   connected: ClassicGameConnectResult,
@@ -53,11 +48,7 @@ export function buildClassicGameUrl(
   return url + (query.length > 0 ? `?${query}` : "") + (afterQueryParams ?? "");
 }
 
-/**
- * POSTs JSON and parses the JSON response (classic's `postJson`). Nova
- * surfaces a readable error when the external room-creation endpoint fails
- * instead of failing silently.
- */
+/** POST JSON, surfacing readable room-creation errors on failure. */
 export async function postJson<T = unknown>(url: string, data: unknown = {}): Promise<T> {
   const res = await fetch(url, {
     method: "POST",
@@ -70,7 +61,6 @@ export async function postJson<T = unknown>(url: string, data: unknown = {}): Pr
   return (await res.json()) as T;
 }
 
-/** A random 8-byte room suffix (classic used `crypto.randomBytes(8)`). */
 export function randomRoomId(): string {
   const bytes = new Uint8Array(8);
   crypto.getRandomValues(bytes);

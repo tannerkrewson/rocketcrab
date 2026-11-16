@@ -19,8 +19,6 @@ export const Route = createFileRoute("/party")({
     gameId: typeof search.gameId === "string" ? search.gameId : undefined,
     mode: isGameMode(search.mode) ? search.mode : undefined,
     title: typeof search.title === "string" ? search.title : undefined,
-    // 5cl.7: ?browse=1 reopens the lobby straight into browse mode (the
-    // game-details back button uses it so back returns to the category).
     browse: search.browse === true ? true : undefined,
   }),
   component: PartyPage,
@@ -28,7 +26,6 @@ export const Route = createFileRoute("/party")({
 
 const GAME_MODES: readonly GameMode[] = ["state", "simulation", "raw"];
 
-/** /party search params (all optional; 5cl.7 adds ?browse=1). */
 interface PartySearch {
   gameId?: string;
   mode?: GameMode;
@@ -44,20 +41,6 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
 }
 
-/**
- * The party route (P4): the party lobby. With `gameId` search params it
- * creates a party from a saved game (or the editor's handed-off source);
- * otherwise it shows an entry point, and once a party is active it renders
- * the whole lobby/play experience. Invite links land on /join instead.
- *
- * 7.37: the entry page is a single "Start a party" action (no secondary
- * actions, and rocketcrab-9j3: NO name step — the party just starts with
- * the saved/generated name, and the lobby prompt / /join?edit=name page
- * is the ONLY name-entry page in the app). A returning player with a
- * saved name skips the entry page entirely and lands straight in the
- * party. rocketcrab-5kz: the old placeholder copy about picking a game
- * in the lobby is gone.
- */
 function PartyPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
@@ -72,8 +55,6 @@ function PartyPage() {
     }
     const gameId = search.gameId;
     if (gameId === undefined) {
-      // 7.37: a returning player with a saved name skips the entry page —
-      // apply the name and go straight into the party.
       const savedName = getSavedPlayerName();
       if (savedName === null) {
         return;
@@ -112,19 +93,11 @@ function PartyPage() {
     setAttempt((value) => value + 1);
   };
 
-  // 7.6: start a party with NO game preselected — the host lands in the
-  // lobby and picks a game from there (classic parity). rocketcrab-9j3:
-  // the entry's name-input step is GONE — the party starts with the
-  // saved/generated name and the lobby's name prompt (via /join?edit=name)
-  // is the only name-entry page in the app.
   const handleStartParty = () => {
     void engine.createParty();
   };
 
   if (engine.isActive()) {
-    // A party is being created, joining, in the lobby, playing, or
-    // reconnecting — render the full experience. 5cl.9: leaving the party
-    // returns to the HOMEPAGE (was /library).
     return (
       <PartyExperience
         onLeft={() => void navigate({ to: "/" })}
@@ -152,7 +125,6 @@ function PartyPage() {
   }
   return (
     <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-      {/* Classic party shell (7.22): logo header even before a party exists. */}
       <PartyShellHeader />
       <PartyResumeBanner engine={engine} />
       <Card>

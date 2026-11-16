@@ -8,16 +8,7 @@ import { resetInviteImportForTests } from "../lib/party/invite-import";
 import { clearPartyRecovery, savePartyRecovery } from "../lib/party/party-recovery";
 import { routeTree } from "../routeTree.gen";
 
-/**
- * Join route tests (P4/7.47, reworked 2t1.9): the join is a SINGLE step —
- * enter the room code (tall mono input, Join gated on four letters) and
- * join straight away; the player's name is never asked up front. The
- * phonetic spelling lives in the party shell header (7.22), not the join
- * form (rocketcrab-if2) — the invite-fragment import (ADR-0011) still
- * strips the secret from the URL, and `/join?edit=name` renders the
- * shared name-editing page (the same name step the lobby's pencil /
- * no-name prompt open).
- */
+/** Invite imports strip URL secrets before joining (ADR-0011). */
 
 const IDLE_STATE: PartyEngineState = {
   phase: "idle",
@@ -72,10 +63,6 @@ const { stubEngine, stubs } = vi.hoisted(() => {
       getState: vi.fn((): PartyEngineState =>
         stubs.failedJoin ? ERROR_STATE : stubs.joinCalled ? JOINING_STATE : IDLE_STATE,
       ),
-      // 5cl.3: the stub mirrors the real engine's emit-on-change: it calls
-      // every subscriber at subscribe time and remembers the handlers so
-      // tests can push a fresh snapshot (joining → error) and re-render
-      // all subscribers (JoinFlow + the PartyExperience it renders).
       onState: vi.fn((handler: (state: PartyEngineState) => void) => {
         handlers.push(handler);
         handler(stubEngine.getState());
@@ -135,7 +122,6 @@ const ERROR_STATE: PartyEngineState = {
   lastError: "This party may have ended. Ask a friend for an invite.",
 };
 
-/** 5cl.3: the engine reports the join in flight → the loading screen. */
 const JOINING_STATE: PartyEngineState = {
   ...IDLE_STATE,
   phase: "joining",
@@ -182,7 +168,6 @@ describe("/join", () => {
   it("shows the loading screen for a URL-driven invite join (5cl.3)", async () => {
     window.history.pushState({}, "", `/join#code=ABCD&secret=${VALID_SECRET}`);
     renderJoin();
-    // The fragment import fires joinByInvite → "joining" → loading screen.
     await waitFor(() => expect(stubEngine.joinByInvite).toHaveBeenCalledTimes(1));
     expect(await screen.findByText(/Connecting to the private party/)).toBeInTheDocument();
     expect(screen.queryByLabelText("Four-letter party code")).not.toBeInTheDocument();
@@ -192,13 +177,10 @@ describe("/join", () => {
     window.history.pushState({}, "", `/join#code=ZZZZ&secret=${VALID_SECRET}`);
     renderJoin();
     await waitFor(() => expect(stubEngine.joinByInvite).toHaveBeenCalledTimes(1));
-    // The engine failed the join: the flow returns to the form with the
-    // error inline instead of silently sitting on a dead form.
     stubs.failedJoin = true;
     act(() => stubs.notify());
     stubs.resolveJoin?.();
-    // The code form is back with the engine's error inline (the fragment's
-    // code went to the engine, so the form shows the generic phrasing).
+    // Fragment codes go directly to the engine, so the form uses the generic error.
     expect(await screen.findByText(/This party may have ended/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /try again/i })).toBeInTheDocument();
   });
@@ -239,7 +221,6 @@ describe("/join", () => {
     fireEvent.change(input, { target: { value: "Ada" } });
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
     await waitFor(() => expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada"));
-    // Back on the join page (engine idle → the code form), edit mode off.
     expect(await screen.findByText("Join a private party")).toBeInTheDocument();
     expect(screen.queryByLabelText("Your player name")).not.toBeInTheDocument();
   });

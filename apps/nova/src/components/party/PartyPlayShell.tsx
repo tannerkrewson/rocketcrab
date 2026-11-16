@@ -28,42 +28,24 @@ export interface PartyPlayShellProps {
   children: ReactNode;
   onEndGame: () => void;
   onLeave: () => void;
-  /** Reload only the local game frame (7.29). */
   onReloadMyGame: () => void;
-  /** Host: reload every player's game frame (7.29). */
+  /** Host-only: reload every player's frame. */
   onReloadAllGames: () => void;
-  /** Host: remove a member from the party (7.29). */
+  /** Host-only: remove a member after confirmation. */
   onKickMember: (memberId: string) => void;
-  /** Pick a saved game for the party (7.43 shared browse). */
   onPickGame: (gameId: string) => void;
-  /** Pick a prebuilt classic/nova game for the party (7.43 shared browse). */
+  /** Pick a classic external game for the party. */
   onPickPrebuilt: (entry: BrowseEntry) => void;
-  /** 5cl.11: clear the runtime console ring buffer (Logs panel). */
   onClearLogs?: () => void;
 }
 
-/** Which single panel is open (7.38: the panels are mutually exclusive).
- *  5cl.11: "logs" is the in-game runtime console panel (nova games only). */
+/** Panels are mutually exclusive; logs are available only for Nova games. */
 type PlayShellPanel = "menu" | "players" | "browse" | "logs" | null;
 
 /**
- * The play shell (P4 / 7.4, redesigned for classic parity in 7.38): the
- * in-game chrome sits IN FLOW ABOVE the game frame — a compact top bar
- * (the SVG brand logo collapses to a bare floating logo on tap, a centered
- * rocketcrab.com/CODE URL copies the invite, and a Menu dropdown opens a
- * compact, flush dropdown), plus a Players POPUP (7.45: a compact overlay
- * anchored top-center BELOW the top bar - never a full-page takeover, so
- * the game keeps running underneath) and the shared pick-a-game browser.
- * The menu (9fv.11.11) holds Browse games (host only — picking a game
- * while playing ends it for everyone) and About this game (the party's
- * in-game details overlay), and since i47
- * the light/dark/system theme control lives at the bottom of the same menu
- * (the in-game shell no longer has a floating copy); leaving the
- * party happens back in the lobby. ch6: the in-game mark is the
- * non-glowing brand logo, sized up without growing the bar. Minimal
- * chrome, the code front and center: classic parity. The emergency
- * teardown ("Exit to lobby") lives here, outside the game frame (T6/T21 —
- * game code cannot disable it); game-end returns everyone to the lobby.
+ * In-game controls stay outside the game frame so game code cannot disable
+ * emergency teardown. Overlays keep the game mounted beneath them. Only
+ * the host may browse and replace the game, which ends it for everyone.
  */
 export function PartyPlayShell({
   state,
@@ -76,22 +58,13 @@ export function PartyPlayShell({
   onPickPrebuilt,
   onClearLogs,
 }: PartyPlayShellProps) {
-  // 7.38: the top bar can collapse to just the floating logo (classic's
-  // minimal-chrome mode) so the game gets the whole screen.
   const [barHidden, setBarHidden] = useState(false);
-  // 7.38: only one panel is open at a time (menu / players / browse).
   const [panel, setPanel] = useState<PlayShellPanel>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
-  // 2z9: removing a player exits them from the party — a mis-tap boots
-  // someone out, so the kick buttons ask first (like Reload all / Exit).
   const [confirmKickMemberId, setConfirmKickMemberId] = useState<string | null>(null);
-  // 9fv.11.11: "About this game" opens the in-game details overlay.
   const [detailsOpen, setDetailsOpen] = useState(false);
-  // 7.38: "Reload all" is red and asks first — players' games will be lost.
   const [confirmReloadAll, setConfirmReloadAll] = useState(false);
 
-  // 7.45: Escape closes the open panel (the players popup or the pick-a-
-  // game panel); the top bar and the game keep running while it is open.
   useEffect(() => {
     if (panel === null) {
       return;
@@ -115,8 +88,6 @@ export function PartyPlayShell({
     }
   };
 
-  // 7.38: the top bar shows the party URL (the code) instead of the game
-  // name — classic parity (the code front and center).
   const roomUrl = "Nova party";
   const menuOpen = panel === "menu";
 
@@ -124,13 +95,6 @@ export function PartyPlayShell({
     <div className="fixed inset-0 z-40 flex flex-col bg-black" data-testid="party-play-view">
       {!barHidden ? (
         <header className="relative z-50 flex items-center gap-2 border-b-2 border-border bg-surface px-3 pb-2 pt-safe">
-          {/* 5cl.14: while the navbar is showing, the logo sits bare on the
-              bar — no btn background/border/shadow (that chrome only
-              returns on the floating collapsed-mode logo below). hover/
-              active keep a subtle fill so the tap target still reads as
-              tappable. ch6: the in-game mark is the non-glowing brand
-              logo, sized up without growing the bar (the btn-sm box
-              already fixes the bar row's height). */}
           <Button
             size="sm"
             variant="tertiary"
@@ -145,8 +109,6 @@ export function PartyPlayShell({
           <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
             <button
               type="button"
-              // 0dd: the URL gets the same press feedback as the homepage
-              // title (rocketcrab-2t1.8) — scale down while pressed.
               className="font-title whitespace-nowrap text-lg font-black text-foreground transition-transform active:scale-95 md:text-xl"
               onClick={() => void copyInvite()}
               disabled={state.inviteUrl === null}
@@ -159,10 +121,6 @@ export function PartyPlayShell({
 
           <div className="min-w-0 flex-1" />
 
-          {/* 5cl.14: the menu button needs contrast against the base-100 bar
-              in every theme — btn-outline draws a base-content border and
-              label (the default btn fill is base-200, near-invisible on
-              dark themes like the default one). */}
           <Button
             size="sm"
             variant="outline"
@@ -174,8 +132,6 @@ export function PartyPlayShell({
             Menu
           </Button>
 
-          {/* 7.38: the menu is a compact dropdown directly under the Menu
-              button, sized to its content and flush with the top bar. */}
           {menuOpen ? (
             <ul
               className="absolute right-0 top-full z-50 flex w-max min-w-56 flex-col rounded-b-box border-2 border-t-0 border-border bg-surface p-1.5 shadow-lg"
@@ -193,9 +149,7 @@ export function PartyPlayShell({
                   Players
                 </button>
               </li>
-              {/* 9fv.11.11: Browse games moved from the Players popup into the
-                  menu (host only — picking a game while playing ends it for
-                  everyone, so joiners never see it). */}
+              {/* Host only: replacing the game ends it for every player. */}
               {state.amHost ? (
                 <li>
                   <button
@@ -224,8 +178,7 @@ export function PartyPlayShell({
                   About this game
                 </button>
               </li>
-              {/* 5cl.11: runtime console logs — nova-mode games only (classic
-                  games run in their own iframe and emit nothing here). */}
+              {/* Classic iframes do not emit runtime console logs. */}
               {state.classicGame === null && state.game !== null ? (
                 <li>
                   <button
@@ -285,9 +238,6 @@ export function PartyPlayShell({
                   </button>
                 </li>
               ) : null}
-              {/* i47: the light/dark/system theme control lives INSIDE the
-                  menu now (below every menu item) — the in-game shell's
-                  old floating bottom-right control is gone. */}
               <li role="separator" aria-hidden="true" className="my-1 border-t-2 border-border" />
               <li>
                 <div className="flex items-center justify-center px-3 py-1.5">
@@ -299,17 +249,9 @@ export function PartyPlayShell({
         </header>
       ) : null}
 
-      {/* The game frame fills everything below the top bar (in flow, never
-          floating over the game). The players popup and the pick-a-game
-          panel live INSIDE this area (7.45), so they always start BELOW the
-          fixed top bar - the bar can never overlap their title/back row. */}
       <div className="relative min-h-0 flex-1">
         {children}
 
-        {/* 7.45: the Players POPUP - a compact overlay anchored top-center
-            just below the top bar (never a full-page takeover). The game
-            keeps running underneath; clicking outside, Escape, or Back
-            dismisses it. The invisible backdrop catches outside clicks. */}
         {panel === "players" ? (
           <>
             <div
@@ -371,9 +313,6 @@ export function PartyPlayShell({
           </>
         ) : null}
 
-        {/* 5cl.11: the Logs panel — the game's runtime console output for
-            the user's own (nova-mode) games. Compact overlay like the
-            players popup; the game keeps running underneath. */}
         {panel === "logs" ? (
           <>
             <div
@@ -450,11 +389,8 @@ export function PartyPlayShell({
           </>
         ) : null}
 
-        {/* 7.43: pick a game - the SAME shared browse UI as /browse, in pick
-             mode, so the host can switch the game without leaving the party.
-             7.45 / aqn-ui-party: a bounded overlay keeps the running game
-             mounted underneath and leaves the top bar/emergency controls
-             usable. 9fv.11.11: opened from the menu; Back returns to the game. */}
+        {/* Bound the browser overlay so the running game stays mounted and
+             emergency controls remain usable above it. */}
         {panel === "browse" ? (
           <>
             <div
@@ -485,9 +421,7 @@ export function PartyPlayShell({
                   compact
                   onPick={onPickPrebuilt}
                   onPickSaved={onPickGame}
-                  // 2t1.1 coordination: the unified back button closes the
-                  // in-game browse panel (the fallback navigate would be a
-                  // no-op from the party route).
+                  // Close the panel; fallback navigation to the current party route would be a no-op.
                   onBack={() => setPanel(null)}
                   inParty
                 />
@@ -497,14 +431,6 @@ export function PartyPlayShell({
         ) : null}
       </div>
 
-      {/* i47: the in-game theme control moved INTO the Menu dropdown — the
-          floating bottom-right copy is gone from this shell (the comment
-          below is where it lived, 11.1). */}
-
-      {/* 7.38: collapsed mode — only the floating logo remains; tap to
-          reopen the full top bar. ch6: the collapsed mark is the
-          non-glowing logo, larger (fits comfortably in the btn-sm tap
-          target). */}
       {barHidden ? (
         <Button
           size="sm"
@@ -518,8 +444,6 @@ export function PartyPlayShell({
         </Button>
       ) : null}
 
-      {/* 9fv.11.11: About this game opens the in-game details overlay (title /
-          description / how-to-play); the game keeps running underneath. */}
       {detailsOpen ? (
         <PartyGameDetailsModal game={state.game} onClose={() => setDetailsOpen(false)} />
       ) : null}
@@ -586,8 +510,6 @@ export function PartyPlayShell({
         </div>
       ) : null}
 
-      {/* 2z9: kicking asks first — a mis-tap would boot a player from the
-          party (mirrors the confirmEnd/confirmReloadAll pattern above). */}
       {confirmKickMemberId !== null ? (
         <PartyKickConfirm
           memberName={
@@ -605,7 +527,6 @@ export function PartyPlayShell({
   );
 }
 
-/** 2z9: shared kick-confirmation dialog (host only, in-game + lobby). */
 function PartyKickConfirm({
   memberName,
   onCancel,

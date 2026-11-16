@@ -12,12 +12,6 @@ export const Route = createFileRoute("/examples")({
   component: ExamplesPage,
 });
 
-/**
- * Complete example games (examples/games/, shared with the /build flow):
- * each one opens in the editor as a new local draft so users can run,
- * inspect, and modify a real game for each mode (state, simulation, raw) —
- * the same handoff the /build paste target uses.
- */
 export function ExamplesPage() {
   const navigate = useNavigate();
   const [openingId, setOpeningId] = useState<string | null>(null);

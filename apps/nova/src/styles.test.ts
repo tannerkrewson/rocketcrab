@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import pkg from "../package.json";
 
-/** Guards the HeroUI v3 styling contract (simplification stage 6). */
+/** Guard the HeroUI v3 styling contract. */
 const css = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");
 
 describe("styles.css HeroUI setup", () => {

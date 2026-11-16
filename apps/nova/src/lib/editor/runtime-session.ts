@@ -7,20 +7,14 @@ import {
   type RuntimeHostOptions,
 } from "../runtime-host";
 
-/**
- * React binding around U3's RuntimeHostClient for the U4 editor. Every Run
- * completely destroys and recreates the runtime frame (issue U4: no
- * hot-module replacement): the session tears the previous frame down before
- * bootstrapping the new source, and the underlying bridge always starts a
- * fresh runtime instance on a fresh channel.
- */
+/** Each Run destroys and recreates the runtime frame and its bridge channel; never HMR. */
 
 export type RuntimeStatus = "idle" | "starting" | "running" | "stopped" | "failed";
 
 export interface RuntimeSessionOptions {
   /** Full origin of the runtime app (dev: http://localhost:5174). */
   runtimeOrigin: string;
-  /** Element that hosts the runtime iframe (the preview panel's container). */
+  /** Container for the hidden diagnostics runtime. */
   containerRef: React.RefObject<HTMLDivElement | null>;
   /** Event sink for validated runtime-plane events (diagnostics). */
   onEvent: (event: RuntimeHostEvent) => void;
@@ -38,12 +32,7 @@ export function useRuntimeSession(options: RuntimeSessionOptions) {
   const clientContainerRef = useRef<HTMLElement | null>(null);
   const [status, setStatus] = useState<RuntimeStatus>("idle");
 
-  /**
-   * Create (or reuse) a host client bound to the given container. The editor
-   * has two preview spots (desktop column and the phone preview tab); when
-   * the active spot changes, the old client is disposed so the next run
-   * embeds its frame in the currently visible container.
-   */
+  /** Rebind when the container changes, disposing the previous client and frame. */
   const ensureClient = useCallback((container: HTMLElement) => {
     const existing = clientRef.current;
     if (existing && clientContainerRef.current === container) return existing;
@@ -91,16 +80,13 @@ export function useRuntimeSession(options: RuntimeSessionOptions) {
     [ensureClient],
   );
 
-  /** Stop the current run: destroy the frame and return to idle. */
   const stop = useCallback(() => {
     clientRef.current?.destroy("user_exit");
     setStatus("stopped");
   }, []);
 
-  /** Latest host-bridge diagnostic snapshot (runtime instance id etc.). */
   const diagnose = useCallback(() => clientRef.current?.diagnose() ?? null, []);
 
-  // Never leak a live runtime frame: dispose the bridge on unmount.
   useEffect(() => {
     return () => clientRef.current?.dispose();
   }, []);

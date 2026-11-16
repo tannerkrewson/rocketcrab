@@ -1,13 +1,8 @@
 /**
- * Browse-back context (rocketcrab-5cl.7): GameBrowser records its current
- * view + query right before navigating to a game's details page, so the
- * details page's back button can return to the same category (or search)
- * instead of the browser's top level. The standalone /browse route carries
- * the context in the URL (?view=&q=); the in-lobby browser can't (party.tsx
- * validates a fixed search shape), so GameBrowser also restores the stored
- * context on mount — a remounted lobby browser returns to the category the
- * host left from. The context is cleared when the user explicitly returns
- * to the category cards, so a fresh browse always starts at the top level.
+ * Preserve category and query while visiting game details. Standalone browse
+ * restores via URL parameters; the lobby browser uses sessionStorage because
+ * the party route has a different search shape. Clear on explicit return to
+ * the category cards so the next browse starts at the top level.
  */
 
 const STORAGE_KEY = "nova:browse-back:v1";
@@ -19,7 +14,6 @@ export interface BrowseBackContext {
   query: string;
 }
 
-/** Record the browser's position before opening a game's details page. */
 export function saveBrowseContext(view: string | null, query: string): void {
   try {
     window.sessionStorage.setItem(STORAGE_KEY, JSON.stringify({ view, query }));
@@ -43,11 +37,8 @@ export function readBrowseContext(): BrowseBackContext | null {
   }
 }
 
-/** Forget the stored position (the user returned to the category cards). */
 export function clearBrowseContext(): void {
   try {
     window.sessionStorage.removeItem(STORAGE_KEY);
-  } catch {
-    // Ignore.
-  }
+  } catch {}
 }

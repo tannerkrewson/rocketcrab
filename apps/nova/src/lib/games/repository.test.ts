@@ -6,12 +6,7 @@ import { hashSource } from "./hashing";
 import { DexieGameRepository } from "./repository";
 import { createTestGameRepository } from "./test-db";
 
-/**
- * Integration tests for the Dexie-backed {@link GameRepository} over
- * fake-indexeddb (U2 acceptance: unit + integration tests, games survive
- * reloads, identical sources coexist, deterministic hashes, failed writes
- * never destroy the prior version).
- */
+/** Dexie repository integration tests over fake-indexeddb. */
 
 function utf8Bytes(source: string): number {
   return new TextEncoder().encode(source).byteLength;

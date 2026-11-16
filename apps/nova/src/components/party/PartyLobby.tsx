@@ -18,21 +18,16 @@ export interface PartyLobbyProps {
   onStart: (force: boolean) => void;
   onLeave: () => void;
   onRefreshDiagnostics: () => void;
-  /** Kick a member from the party (host only, 7.29). */
+  /** Host-only removal; callers must confirm first. */
   onKickMember: (memberId: string) => void;
-  /** Retained for PartyExperience compatibility: the lobby no longer edits
-   *  names inline (2t1.9) — the pencil opens /join?edit=name instead. */
+  /** Compatibility callback; name editing routes through /join?edit=name. */
   onEditName: (name: string) => void;
-  /** 2t1.1: notify the shell when the lobby enters/leaves browse mode so
-   *  the full-size party header can hide (GameBrowser owns the compact
-   *  dimmed brand row while browsing). */
+  /** Notify the shell to compact its header while the lobby browser is open. */
   onBrowseModeChange?: (browsing: boolean) => void;
-  /** 5cl.7: open straight into browse mode (details-page back returns
-   *  here via /party?browse=1; GameBrowser restores the category). */
+  /** Restore browse mode when returning from game details. */
   initialBrowsing?: boolean;
 }
 
-/** Per-player tile border colors (10.8): each player gets a distinct color. */
 const PLAYER_BORDER_COLORS = [
   "border-primary",
   "border-secondary",
@@ -55,16 +50,7 @@ function roleLabels(member: PartyMemberView, isCreator: boolean): string {
   return labels.join(", ");
 }
 
-/**
- * Tiny transfer-state indicator inside a player tile (10.8 / 11.9,
- * redesigned 5cl.9): only genuinely operational states show — an
- * in-flight transfer bar, a failure, or an incompatibility. The always-
- * green "Game ready" badge is gone (has-the-game is the default end
- * state, and readiness belongs to the start flow, which the start button
- * + blocked reason already communicate), and the quiet "Waiting for
- * game" gap is gone too (5cl.9): waiting/none tiles render nothing. The
- * connection dot carries presence.
- */
+/** Show active transfers and failures; readiness belongs to the start gate. */
 function transferIndicator(member: PartyMemberView) {
   switch (member.transferState) {
     case "transferring":
@@ -89,39 +75,28 @@ function transferIndicator(member: PartyMemberView) {
       return <span className="text-[10px] font-bold text-danger">Incompatible</span>;
     case "waiting":
     case "none":
-      // 5cl.9: no status text while waiting — the connection dot carries
-      // presence and the transfer bar appears only once it is moving.
       return null;
     case "complete":
       return null;
   }
 }
 
-/** True for engine end notices (5cl.9): the lobby shows NO "game ended"
- *  alert at all — the ended-state banner is gone, and raw ended notices
- *  are filtered out of the notice banner below. */
+/** Filter end notices out of the lobby banner. */
 function isEndedNotice(message: string): boolean {
   return message.startsWith("The game ended");
 }
 
-/** 2z9: membership notices ("X joined the party." / "X was removed from
- *  the party.") are TEMPORARY smart toasts — the same sonner system the
- *  URL copy uses — never persistent banner alerts. */
+/** Membership notices use temporary toasts rather than persistent alerts. */
 function isMembershipNotice(message: string): boolean {
   return message.endsWith("joined the party.") || message.endsWith("was removed from the party.");
 }
 
-/** Notice level -> HeroUI alert status. */
 const NOTICE_ALERT_STATUS: Record<PartyNotice["level"], "danger" | "warning" | "accent"> = {
   error: "danger",
   warn: "warning",
   info: "accent",
 };
 
-/** True when the platform's native share sheet can take the invite URL
- *  (rocketcrab-ucz): both `navigator.share` and `navigator.canShare` must
- *  exist and accept the payload — jsdom and desktop browsers without Web
- *  Share hide the button entirely. */
 function canNativeShare(url: string | null): boolean {
   if (
     url === null ||
@@ -138,17 +113,7 @@ function canNativeShare(url: string | null): boolean {
   }
 }
 
-/**
- * The party lobby (P4): the invite card (Copy URL / QR in a modal), the
- * welcome card with the selected game, the classic 2-column player grid
- * with per-player state, start / force-start / leave controls, and
- * connection diagnostics. Greeter and authority stay diagnostic (10.7) —
- * they live in the diagnostics panel and the engine state, not the lobby.
- *
- * The lobby has no game preview (7.38 — classic parity); the host browses
- * games through the SHARED game browser (7.43) rendered inline in pick
- * mode, instead of the old bespoke picker dialog.
- */
+/** Lobby controls and player state; internal host/authority roles stay in diagnostics. */
 export function PartyLobby({
   state,
   onStart,
@@ -159,16 +124,8 @@ export function PartyLobby({
   initialBrowsing = false,
 }: PartyLobbyProps) {
   const [forceDialog, setForceDialog] = useState(false);
-  // 2z9: kicking removes a player from the party — the X asks first (the
-  // candidate memberId is held here until confirmed).
   const [kickPending, setKickPending] = useState<string | null>(null);
-  // 7.43: "Browse games" swaps the lobby for the shared browse UI (pick
-  // mode) until the host picks a game or goes back. 5cl.7: the details-
-  // page back button can land here already in browse mode (initialBrowsing).
   const [browsing, setBrowsing] = useState(initialBrowsing);
-  // 2t1.1: tell the shell when browse mode toggles so it can hide the
-  // full-size party header (GameBrowser's compact dimmed brand row takes
-  // over while browsing).
   useEffect(() => {
     onBrowseModeChange?.(browsing);
   }, [browsing, onBrowseModeChange]);
@@ -182,9 +139,6 @@ export function PartyLobby({
     state.authorityMemberId ??
     null;
 
-  // 2t1.9: the player is asked for a name only once they're in the lobby
-  // (and only if they never set one) — the prompt opens the same
-  // name-editing page as the pencil (/join?edit=name).
   const needsName = getSavedPlayerName() === null;
 
   const hostName =
@@ -208,12 +162,7 @@ export function PartyLobby({
     };
   }, [pageTitle]);
 
-  // 11.8 / 5cl.9: the notice banner shows the LATEST relevant notice only
-  // (a capped, deduped set from the engine) — never a growing list of
-  // identical alerts. End notices are filtered out (no "game ended" alert
-  // at all, 5cl.9) and once the game ended the notice banner hides
-  // entirely. 2z9: membership notices (joined / removed) are filtered out
-  // too — they toast instead, below.
+  // Keep only the latest relevant notice; membership changes toast separately.
   const latestNotice =
     state.endedReason !== null || state.notices.length === 0
       ? null
@@ -223,11 +172,7 @@ export function PartyLobby({
             (notice) => !isEndedNotice(notice.message) && !isMembershipNotice(notice.message),
           ) ?? null);
 
-  // 2z9: membership notices use the same TEMPORARY smart toast system the
-  // URL copy does (sonner) — one toast per notice, deduped by notice id so
-  // re-renders never re-fire (the engine already collapses identical
-  // repeats). The engine itself skips these while a member still has the
-  // generated member-… id name, so no id-like text ever appears.
+  // Remember toasted ids so local re-renders cannot repeat membership notifications.
   const toastedNoticeIds = useRef<readonly string[]>([]);
   useEffect(() => {
     for (const notice of state.notices) {
@@ -254,8 +199,6 @@ export function PartyLobby({
     }
   };
 
-  // rocketcrab-ucz: native share of the invite URL. Cancelling the share
-  // sheet (AbortError / not-allowed) is not an error — silently ignore it.
   const shareInvite = async () => {
     if (state.inviteUrl === null || typeof navigator.share !== "function") return;
     try {
@@ -266,18 +209,9 @@ export function PartyLobby({
     }
   };
 
-  // rocketcrab-ucz: the native Share button only exists where the platform
-  // supports it (feature-detected — hidden in jsdom and non-Web-Share
-  // browsers); the copy + QR affordances stay for everyone.
   const showShareButton = canNativeShare(state.inviteUrl);
 
   if (browsing) {
-    // 10.9: browse mode — selecting a game ALWAYS opens its details page
-    // (/game/$gameId, saved games included); the pick happens there and
-    // returns to /party. The lobby never sets the game directly.
-    // 2t1.9: the shared GameBrowser owns its own back navigation (its
-    // unified "back" button) — the lobby's redundant "Back to lobby"
-    // button is gone.
     return (
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
         <section aria-label="Pick a game" className="flex flex-col gap-3">
@@ -289,10 +223,8 @@ export function PartyLobby({
 
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
-      {/* 10.5: the invite card — get your friends in via URL or QR. The QR
-          is NOT shown on the page; it opens in a modal. Only the origin +
-          code are ever rendered (ADR-0011: the session secret stays in the
-          URL fragment, never on the page). */}
+      {/* Render only safe invite text; the secret remains in the URL fragment
+          and is encoded by the QR, never printed on the page (ADR-0011). */}
 
       <section
         aria-label="Invite your friends"
@@ -328,25 +260,16 @@ export function PartyLobby({
           ) : null}
         </div>
       </section>
-      {/* 10.6: the welcome card — the lobby's main heading. A soft ambient
-          glow behind the content, then what's selected and whose turn it
-          is to act. Guests see the host-starting copy; when nothing is
-          selected the card says so with a role-aware message (2t1.9). */}
       <section
         aria-label="Welcome"
         className="relative flex flex-col items-center gap-3 overflow-hidden rounded-2xl border-2 border-border bg-surface p-5 text-center"
       >
-        {/* 2t1.9: the idle glow is a wide ambient background BEHIND the
-            card content (absolute, clipped by the card); the text sits on
-            top of it. */}
         <IdleParticles />
         <div className="relative flex flex-col items-center gap-3">
           <h2 className="text-xl font-black">Welcome to rocketcrab!</h2>
           {state.game !== null ? (
             <>
               <p className="text-sm font-semibold text-foreground/70">
-                {/* rocketcrab-ack: only the host says "You've selected" —
-                    guests see the host's name, e.g. "Bob has selected". */}
                 {state.amHost ? "You've selected" : `${hostName ?? "The host"} has selected`}
               </p>
               <p className="text-2xl font-black text-primary">{state.game.title}</p>
@@ -370,10 +293,6 @@ export function PartyLobby({
           )}
         </div>
       </section>
-      {/* 2t1.9: the name prompt — the player is only asked for a name once
-          they are IN the lobby, and only when they never set one (the old
-          join-time name step is gone). Opens the same /join?edit=name page
-          as the pencil. */}
       {needsName ? (
         <section
           aria-label="Set your name"
@@ -390,12 +309,6 @@ export function PartyLobby({
         </section>
       ) : null}
 
-      {/* 10.7: the action row (Browse games left, Start game right) sits
-          ABOVE the players box, horizontally centered — leave is its own
-          quiet control at the bottom of the page. rocketcrab-b73: START is
-          host-only — joiners get no Start game / Start anyway buttons and
-          no blocked-reason alert; browsing is host-only too, so a joiner
-          has no path to pick or start a game from the lobby. */}
       <section className="flex flex-wrap items-center justify-center gap-2">
         {state.amHost ? (
           <Button variant="secondary" size="lg" onClick={() => setBrowsing(true)}>
@@ -422,11 +335,6 @@ export function PartyLobby({
           </Button>
         ) : null}
       </section>
-      {/* The blocked-reason copy (10.7): shown as a styled warning alert;
-          the "Pick a game before starting the party." message is gone —
-          the welcome card covers the no-game case. The ended case shows
-          no alert at all (5cl.9), and joiners never see it (b73 — the
-          reason is the host's start gate). */}
       {state.amHost &&
       state.game !== null &&
       state.endedReason === null &&
@@ -442,16 +350,6 @@ export function PartyLobby({
           </Alert.Content>
         </Alert>
       ) : null}
-      {/* 10.8 / 11.9, redesigned 2t1.9 + 5cl.9: the player grid — compact
-          rows that use the tile width instead of stacking everything
-          vertically: presence dot + name (+ role label / transfer detail)
-          on the left, transfer state + actions (pencil / kick) on the
-          right, a per-player border color, and ONE meaningful status: the
-          connection dot + the transfer state (progress bar / failure). The
-          name is larger with roomier padding (5cl.9) and the "Waiting for
-          game" gap is gone. The pencil is a LINK to the shared
-          name-editing page (/join?edit=name) — the in-tile edit form is
-          gone (2t1.9). */}
       <details className="group rounded-2xl border-2 border-border bg-surface" open>
         <summary className="flex cursor-pointer list-none items-center gap-2 p-4 text-sm font-black text-foreground/60">
           Players ({state.members.length})
@@ -466,7 +364,6 @@ export function PartyLobby({
                   data-testid={`party-member-${member.memberId}`}
                   className={`flex min-w-0 items-center gap-3 rounded-2xl border-2 bg-surface p-3.5 ${playerBorderColor(index)}`}
                 >
-                  {/* Presence + identity on the left. */}
                   <div className="flex min-w-0 flex-1 items-center gap-2.5">
                     {member.connected ? (
                       <span
@@ -500,12 +397,9 @@ export function PartyLobby({
                       ) : null}
                     </div>
                   </div>
-                  {/* Transfer state + actions on the right. */}
                   <div className="flex shrink-0 items-center gap-1.5">
                     {transferIndicator(member)}
                     {member.isSelf ? (
-                      /* 2t1.9: the pencil opens the shared name-editing page
-                         (/join?edit=name) instead of an inline form. */
                       <Link
                         to="/join"
                         search={{ edit: "name" }}
@@ -534,9 +428,6 @@ export function PartyLobby({
           </ul>
         </div>
       </details>
-      {/* Notices (11.8): ONE compact status banner showing the latest
-          relevant notice instead of a growing list of identical alerts.
-          Colored alerts are outline-styled, never solid (9fv.11.3). */}
       {latestNotice !== null ? (
         <Alert
           status={NOTICE_ALERT_STATUS[latestNotice.level]}
@@ -557,9 +448,6 @@ export function PartyLobby({
         hostNameForDiagnostics={hostNameForDiagnostics}
         authorityName={authorityName}
       />
-      {/* 10.7: Leave party is a smaller, centered control at the very
-          bottom of the page. 2t1.9: when the current user is the ONLY
-          player left, leaving ends the party — the button says so. */}
       <div className="flex justify-center">
         <Button variant="danger" size="md" onClick={onLeave}>
           <LogOut className="h-4 w-4" aria-hidden="true" />
@@ -613,8 +501,6 @@ export function PartyLobby({
           </div>
         </div>
       ) : null}
-      {/* 2z9: kicking asks first — a mis-tap would boot a player from the
-          party (same confirm pattern as force-start above). */}
       {kickPending !== null ? (
         <PartyKickConfirm
           memberName={
@@ -632,8 +518,6 @@ export function PartyLobby({
   );
 }
 
-/** 2z9: kick-confirmation dialog (host only) — mirrors the in-game
- *  shell's PartyKickConfirm so kicking always asks first. */
 function PartyKickConfirm({
   memberName,
   onCancel,

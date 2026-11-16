@@ -3,7 +3,6 @@ import { describe, expect, it, vi } from "vitest";
 import type { PartyEngine, PartyEngineState } from "./engine";
 import { usePartyEngine } from "./use-party";
 
-/** useSyncExternalStore binding: one stable subscription, cached snapshots. */
 describe("usePartyEngine", () => {
   it("subscribes once and renders each emitted snapshot", () => {
     const handlers = new Set<(next: PartyEngineState) => void>();
@@ -21,7 +20,6 @@ describe("usePartyEngine", () => {
     const { result, rerender, unmount } = renderHook(() => usePartyEngine(engine));
     expect(result.current.state.phase).toBe("idle");
     rerender();
-    // A re-render must not rebuild the snapshot.
     expect(result.current.state).toBe(snapshot);
 
     const next = { phase: "lobby" } as PartyEngineState;

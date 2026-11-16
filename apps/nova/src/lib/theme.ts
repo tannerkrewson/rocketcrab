@@ -1,11 +1,4 @@
-/**
- * Theme state for Nova (HeroUI v3).
- *
- * HeroUI ships light/dark tokens; Nova keeps only those two plus "system".
- * The resolved mode is applied as the `.dark` class (and `data-theme`) on
- * <html>, which is what HeroUI's theme variables key off. The choice persists
- * in localStorage. No third-party theme list is bundled any more.
- */
+/** Persist light/dark/system preference and apply HeroUI's resolved theme tokens to <html>. */
 
 export const THEME_STORAGE_KEY = "nova.theme";
 
@@ -31,7 +24,6 @@ export function getStoredTheme(): ThemePreference {
   }
 }
 
-/** The mode that should actually render right now. */
 export function resolvedTheme(preference: ThemePreference = getStoredTheme()): ThemeMode {
   if (preference === "light" || preference === "dark") return preference;
   return systemPrefersDark() ? "dark" : "light";

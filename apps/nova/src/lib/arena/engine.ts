@@ -1,23 +1,10 @@
 /**
- * The U6 test arena engine (host side).
+ * Runs simulated players as real runtime frames, each connected to its own
+ * NovaSession over InMemoryTransport. API calls are revalidated here before
+ * reaching sessions; session events return through the runtime bridge.
  *
- * Runs several simulated players on one page: each player is a real runtime
- * frame (U3, driven through RuntimeHostClient) wired to its own NovaSession
- * (S1) over the InMemoryTransport (U5). The runtime protocol is never
- * bypassed: the game's Nova API calls travel from the frame to the runtime
- * page as validated reports, arrive here as `game.apiCall` messages, are
- * re-validated at this boundary, and are routed into the player's session;
- * session events travel back as `game.apiEvent` messages and are dispatched
- * to the frame's `window.nova` handlers by the bridge.
- *
- * The engine owns the simulation state (players, transports, sessions,
- * shared network settings) and emits a fresh {@link ArenaState} after every
- * change; the UI (ArenaPage) is a pure projection. The creator's controls
- * map to transport operations exactly: disconnect = clean leave, reconnect =
- * fresh join, suspend/resume = simulated background suspension (U5),
- * authority loss = forced reconnect of the current authority player (S3:
- * the drop triggers a real election, and the arena displays the migrated
- * authority from the session diagnostics).
+ * Owns player, transport, and session state. UI controls exercise transport
+ * operations, including real authority elections on connection loss.
  */
 import type { GameApiCallMessage, GameApiEvent, GameMode } from "@rocketcrab/protocol";
 import { createNovaSession, type NovaSession, type NovaSessionEvent } from "@rocketcrab/nova-api";
@@ -56,22 +43,18 @@ export interface ArenaSeams {
   bootstrapTimeoutMs?: number;
 }
 
-/** One simulated player's stable identity within the arena. */
 export interface ArenaPlayerSpec {
   /** Arena-local id ("player-1"). */
   readonly id: string;
-  /** Creator-editable display name. */
   readonly name: string;
   /** Distinct protocol member id ("member-1"); never reused. */
   readonly memberId: string;
 }
 
 export interface ArenaEngineOptions {
-  /** The game source every player's runtime frame executes. */
   source: string;
   /** Host-declared game id (saved game id or a draft id). */
   gameId: string;
-  /** Execution mode (state / simulation / raw). */
   gameMode: GameMode;
   gameTitle?: string;
   runtimeOrigin: string;
@@ -88,7 +71,6 @@ export interface ArenaEngineOptions {
   onRunSucceeded?: (outcome: ArenaRunOutcome) => void;
 }
 
-/** Runtime error categories that fail the test run. */
 const FATAL_ERROR_CATEGORIES = new Set([
   "empty_source",
   "missing_registration",
@@ -166,7 +148,6 @@ export class ArenaEngine {
     this.nextMemberNumber = options.initialPlayers.length + 1;
   }
 
-  /** The current state snapshot (tests). */
   getSnapshot(): ArenaState {
     const players = [...this.players.values()].map(toArenaPlayer);
     const summary = computeSummary(players);
@@ -184,7 +165,6 @@ export class ArenaEngine {
     };
   }
 
-  /** Start the arena: load every initial player's runtime frame. */
   start(): void {
     this.status = "starting";
     this.emit();
@@ -223,7 +203,6 @@ export class ArenaEngine {
     void this.loadPending();
   }
 
-  /** Remove a player: destroy its frame, session, and transport. */
   removePlayer(id: string): void {
     const runtime = this.players.get(id);
     if (runtime === undefined) return;
@@ -268,7 +247,7 @@ export class ArenaEngine {
     }
   }
 
-  /** Simulated background suspension (U5): connection drops, peers observe leave. */
+  /** Simulate background suspension: drop the connection so peers observe leave. */
   async suspendPlayer(id: string): Promise<void> {
     const transport = this.players.get(id)?.transport ?? null;
     if (transport === null) return;
@@ -290,12 +269,7 @@ export class ArenaEngine {
     }
   }
 
-  /**
-   * Trigger authority loss: force the current authority player's connection
-   * to drop and rejoin. With S3 the drop is a real loss event: peers suspect
-   * immediately, elect a new authority, and the game continues — the arena
-   * displays the migrated authority from session diagnostics.
-   */
+  /** Drop and rejoin the authority connection to exercise election and migration. */
   async triggerAuthorityLoss(): Promise<void> {
     const authorityId = this.getSnapshot().authorityPlayerId;
     if (authorityId === null) return;
@@ -328,7 +302,6 @@ export class ArenaEngine {
     this.emit();
   }
 
-  /** Clear every player's log panel. */
   clearLogs(): void {
     for (const runtime of this.players.values()) {
       runtime.logs = [];
@@ -369,7 +342,6 @@ export class ArenaEngine {
     void this.loadPending();
   }
 
-  /** Tear everything down (unmount, or a restart's teardown half). */
   stop(): void {
     if (this.disposed) return;
     this.teardownAll();
@@ -377,10 +349,6 @@ export class ArenaEngine {
     this.emit();
     this.disposed = true;
   }
-
-  // ------------------------------------------------------------------
-  // Internals
-  // ------------------------------------------------------------------
 
   private newRuntime(spec: ArenaPlayerSpec): PlayerRuntime {
     return {
@@ -430,7 +398,7 @@ export class ArenaEngine {
         ...(this.options.gameTitle !== undefined ? { gameTitle: this.options.gameTitle } : {}),
         sessionId: this.sessionId,
       });
-      if (this.players.get(runtime.spec.id) !== runtime) return; // removed meanwhile
+      if (this.players.get(runtime.spec.id) !== runtime) return;
       runtime.runtimeInstanceId = client.diagnose().runtimeInstanceId;
       // The game may have already registered while load() was settling;
       // never downgrade past that state.
@@ -468,8 +436,6 @@ export class ArenaEngine {
           "info",
           `Registered as “${event.message.title}” (${event.message.gameMode} mode).`,
         );
-        // The bridge is live now: join the session so the game's forwarded
-        // calls (and this player's connection) reach the transport.
         void this.joinSession(runtime)
           .then(() => {
             if (this.players.get(id) !== runtime) return;
@@ -477,7 +443,6 @@ export class ArenaEngine {
             this.emit();
           })
           .catch(() => {
-            // joinSession already logged the failure; surface it in the UI.
             if (this.players.get(id) !== runtime) return;
             runtime.runState = "failed";
             runtime.lastError = runtime.lastError ?? "Could not join the simulated party.";
@@ -523,14 +488,11 @@ export class ArenaEngine {
       displayName: runtime.spec.name,
     });
     runtime.transport = transport;
-    // S2: the authority's actions run in this player's frame; the frame
-    // executor forwards state requests into the frame and correlates the
-    // bridge's answers.
+    // Authority handlers run in the game frame; correlate its responses with session requests.
     runtime.stateExecutor = createFrameStateExecutor((event) =>
       this.pushApiEvent(runtime.spec.id, event),
     );
-    // A1: simulation snapshots are produced by asking the authority's game
-    // frame to serialize its state (the game's serializeState callback).
+    // Ask the authority frame to serialize its simulation state.
     runtime.simulationExecutor = createFrameSimulationExecutor((event) =>
       this.pushApiEvent(runtime.spec.id, event),
     );
@@ -609,8 +571,6 @@ export class ArenaEngine {
         );
         break;
       case "stateCommitted":
-        // S2 diagnostics: state size + action rate are visible in the logs
-        // and the arena state snapshot.
         this.stateDiagnostics = {
           revision: event.revision,
           stateHash: event.stateHash,
@@ -638,9 +598,8 @@ export class ArenaEngine {
       case "simulationSnapshot":
       case "simulationTick":
       case "actionReceived":
-        break; // routed to the frame only
+        break;
       case "actionAck":
-        // The dispatcher's frame settles its dispatch promise with this ack.
         break;
     }
     const apiEvent = toApiEvent(event);
@@ -797,8 +756,6 @@ export class ArenaEngine {
         break;
       }
       case "stateResponse": {
-        // S2: the authority frame's answer to a stateRequest; the frame
-        // executor correlates it back to the pending engine request.
         const parsed = arenaApiCallSchemas.stateResponse.safeParse(message.payload);
         if (!parsed.success) {
           this.logPlayer(
@@ -812,8 +769,6 @@ export class ArenaEngine {
         break;
       }
       case "simulationResponse": {
-        // A1: the authority frame's answer to a simulationRequest; the
-        // frame executor correlates it back to the simulation engine.
         const parsed = arenaApiCallSchemas.simulationResponse.safeParse(message.payload);
         if (!parsed.success) {
           this.logPlayer(
@@ -867,10 +822,8 @@ export class ArenaEngine {
     const snapshot = this.getSnapshot();
     const players = snapshot.players;
     if (players.length === 0) return;
-    // Players that joined after the game already started are not started
-    // here: they begin from the authority's catch-up snapshot (S2), which
-    // also identifies the authority — starting them would race their
-    // catch-up and risk a second, conflicting authority.
+    // Late joiners start from a catch-up snapshot; starting them here would
+    // race catch-up and risk a second authority.
     if (players.some((player) => player.runState === "started")) return;
     const settled = players.every(
       (player) =>
@@ -887,11 +840,7 @@ export class ArenaEngine {
     }
   }
 
-  /**
-   * A1 simulation diagnostics: read live from the current authority's
-   * session (the arena re-reads on every snapshot, so latency and drift
-   * stay visible as the game runs). Null before any connected session.
-   */
+  /** Read live authority-session diagnostics; null before any session connects. */
   private computeSimulationDiagnostics(
     players: readonly ArenaPlayer[],
   ): ArenaSimulationDiagnostics | null {
@@ -918,11 +867,7 @@ export class ArenaEngine {
   }
 
   private computeAuthorityPlayerId(players: readonly ArenaPlayer[]): string | null {
-    // The authority is the session the state engine tracks (S3: the current
-    // term's elected authority, tracked through elections and migrations).
-    // Only CONNECTED players may hold the seat: a suspended/disconnected
-    // session still reports its stale pre-election belief, which must never
-    // mask the real (connected) authority in the UI.
+    // Disconnected sessions retain stale authority beliefs; only trust connected players.
     for (const runtime of this.players.values()) {
       const session = runtime.session;
       const status = session?.connectionStatus ?? "none";

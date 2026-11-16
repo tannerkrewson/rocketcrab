@@ -9,7 +9,6 @@ export interface ErrorPanelProps {
   className?: string;
 }
 
-/** HeroUI danger alert for failed operations and route errors. */
 export function ErrorPanel({
   title = "Something went wrong",
   message,

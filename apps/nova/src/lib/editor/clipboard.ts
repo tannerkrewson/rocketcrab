@@ -1,9 +1,7 @@
 /**
- * Clipboard helpers for the editor (U4: paste from clipboard, copy
- * diagnostic report). `navigator.clipboard` is unavailable on some Safari
- * versions and in insecure contexts, so writes fall back to a hidden
- * textarea + execCommand. Reads have no synchronous fallback; callers
- * surface the permission error instead of failing silently.
+ * Clipboard writes fall back to a hidden textarea when the asynchronous
+ * API is unavailable or denied. Reads have no synchronous fallback; callers
+ * surface permission errors.
  */
 
 /** Write text to the clipboard; resolves true on success. */

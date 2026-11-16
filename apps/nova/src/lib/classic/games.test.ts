@@ -3,20 +3,11 @@ import { CLASSIC_FRAME_ORIGINS, CLASSIC_GAMES, findClassicGame } from "./games";
 import type { ClassicGameConnectResult } from "./types";
 import { buildClassicGameUrl, randomRoomId } from "./url";
 
-/**
- * Classic game port tests (rocketcrab-9fv.7.7.1): the whole classic game
- * list is present with unique ids, every game is marked "classic", the
- * client-side room-creation flows produce the same URL shapes classic
- * produced on its server, and the URL builder matches classic's
- * `useConnectedGame` behavior.
- */
-
 describe("CLASSIC_GAMES data", () => {
   it("ports the whole classic game list (22 games) with unique ids", () => {
     expect(CLASSIC_GAMES.length).toBe(22);
     const ids = CLASSIC_GAMES.map((game) => game.id);
     expect(new Set(ids).size).toBe(ids.length);
-    // Spot-check a few known ids from the dev branch config/games/*.
     expect(ids).toEqual(
       expect.arrayContaining([
         "protobowl",
@@ -102,11 +93,6 @@ describe("classic room-creation flows (client-side connectToGame)", () => {
       /relay request failed \(HTTP 503\)/,
     );
   });
-
-  // ---- scoped CORS relay path (rocketcrab-9fv.7.7.5) ---------------------
-  // With VITE_EDGE_ORIGIN set (relay deployed), CORS-blocked games
-  // create rooms through the relay instead of the direct (CORS-failing)
-  // fetch. Without it they keep the direct path (covered above).
 
   it("drawphone creates the room through the relay when configured", async () => {
     vi.stubEnv("VITE_EDGE_ORIGIN", "https://relay.example.net");

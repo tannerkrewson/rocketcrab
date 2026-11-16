@@ -2,11 +2,7 @@ import type { CSSProperties } from "react";
 import type { PartyEngine } from "../../lib/party/engine";
 import { usePartyEngine } from "../../lib/party/use-party";
 
-/**
- * Deterministic seeded PRNG (mulberry32) so the same starfield renders on
- * every mount — no flicker between re-renders, no SSR/CSR mismatch
- * (rocketcrab-5cl.4).
- */
+/** Seeded PRNG keeps star placement stable across mounts and server/client renders. */
 function mulberry32(seed: number) {
   return () => {
     seed |= 0;
@@ -20,7 +16,6 @@ function mulberry32(seed: number) {
 /** A few dozen dots keeps it cheap on low-powered devices. */
 const STAR_COUNT = 36;
 
-/** Star placements/sizes/timings, randomized once at module load. */
 const STARS: CSSProperties[] = (() => {
   const rand = mulberry32(0x5c1a4);
   return Array.from({ length: STAR_COUNT }, () => {
@@ -35,23 +30,7 @@ const STARS: CSSProperties[] = (() => {
   });
 })();
 
-/**
- * Subtle full-page twinkling-star background (5cl.4, site-wide 22n): every
- * page gets the stars EXCEPT while a party is actively playing a game —
- * the in-game condition is `state.phase === "playing"` on the shared party
- * engine. A selected game in the lobby is not gameplay, so the stars stay
- * visible there. There is no fade logic: the field is simply present (or
- * unmounted in-game), and the stars twinkle in place. The field sits behind
- * the page content at z-0 inside the shell's `isolate` stacking context,
- * above the shell's own background — and is decorative only
- * (aria-hidden) and pointer-events-none everywhere. No canvas, no JS
- * animation loop: ~36 CSS-only dots driven by one keyframe, mirroring the
- * IdleParticles approach (2t1.9); prefers-reduced-motion keeps the stars
- * static instead of twinkling.
- *
- * The optional `engine` is a test seam matching `usePartyEngine`'s own
- * injectable engine; production always uses the page singleton.
- */
+/** Decorative CSS-only stars; the injected engine is a test seam for the playing-phase signal. */
 export function StarfieldBackground({ engine }: { engine?: PartyEngine }) {
   const { state } = usePartyEngine(engine);
   // A game can be selected before the host starts it. Only the playing phase

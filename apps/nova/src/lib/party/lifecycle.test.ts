@@ -1,12 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { createMemoryLifecycleSource } from "./lifecycle";
 
-/**
- * M1 lifecycle-source tests: the deterministic in-memory source fires the
- * same events the browser source wires to (visibilitychange, pagehide,
- * pageshow, online, offline), and every subscription returns an
- * unsubscribe (engineering rule 22).
- */
+/** Deterministic lifecycle events mirror browser events; subscriptions return cleanup functions. */
 describe("party lifecycle source", () => {
   it("emits hide and show with the visibility flag, in browser order", () => {
     const memory = createMemoryLifecycleSource();

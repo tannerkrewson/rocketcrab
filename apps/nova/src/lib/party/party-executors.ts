@@ -62,7 +62,6 @@ export class PartyStateExecutor implements NovaStateExecutor {
     return this.runtime() !== null ? this.frame.computeView(input) : this.local.computeView(input);
   }
 
-  /** Route a frame `stateResponse` apiCall back to its pending request. */
   handleResponse(payload: FrameStateResponsePayload): void {
     this.frame.handleResponse(payload);
   }
@@ -95,7 +94,6 @@ export class PartySimulationExecutor implements NovaSimulationExecutor {
     return this.runtime() !== null ? this.frame.serializeState() : this.local.serializeState();
   }
 
-  /** Route a frame `simulationResponse` apiCall back to its request. */
   handleResponse(payload: FrameSimulationResponsePayload): void {
     this.frame.handleResponse(payload);
   }

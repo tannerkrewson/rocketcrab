@@ -44,6 +44,5 @@ it("marks only tunnelled admitted peers as relayed in diagnostics", () => {
   render(<PartyDiagnosticsPanel diagnostics={diagnostics} onRefresh={vi.fn()} />);
   expect(screen.getByText("Native")).toBeInTheDocument();
   expect(screen.getByText("Relay")).toBeInTheDocument();
-  // Exactly one "relayed" badge: on the tunnelled peer only.
   expect(screen.getAllByText("relayed")).toHaveLength(1);
 });

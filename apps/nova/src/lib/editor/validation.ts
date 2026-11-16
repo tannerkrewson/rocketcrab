@@ -2,12 +2,9 @@ import { htmlSourceBytes, htmlSourceWarnBytes } from "@rocketcrab/protocol";
 import { sourceByteLength } from "../games/hashing";
 
 /**
- * Host-side HTML-document validation for the editor (U4 "HTML-document
- * validation" + "excessive source size"). These checks mirror what the
- * runtime observes (apps/runtime/src/html-source.ts `classifyHtmlSource`):
- * the editor refuses to start a run for hard errors and surfaces warnings
- * before handing the source to the runtime. Nova never attempts to prove a
- * game is correct (ADR-0002) — only observable failures are detected.
+ * Mirror runtime HTML-source checks before starting a run. Hard failures
+ * block execution; warnings remain visible. Detect observable failures,
+ * not game correctness (ADR-0002; apps/runtime/src/html-source.ts).
  */
 
 export type SourceIssueCode = "empty" | "missing_structure" | "oversized_source" | "source_size";
@@ -20,7 +17,6 @@ export interface SourceIssue {
   message: string;
 }
 
-/** Validate the current editor source before a run. */
 export function validateSource(source: string): SourceIssue[] {
   const issues: SourceIssue[] = [];
   if (source.trim().length === 0) {

@@ -5,15 +5,6 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { routeTree } from "../../routeTree.gen";
 
-/**
- * AppLayout tests (7.47, 11.1): the shared shell has NO navbar, no footer,
- * and no wordmark bar — just the page column plus ONE floating theme/color
- * control pinned to the BOTTOM-RIGHT corner of the screen (safe-area aware)
- * on every page, party routes included. Every content page carries its own
- * way back home (back buttons / home links), since the navbar no longer
- * provides it.
- */
-
 function renderAt(path: string) {
   cleanup();
   const queryClient = new QueryClient({
@@ -63,13 +54,10 @@ describe("AppLayout", () => {
     expect(control.className).toContain("bottom");
     expect(control.className).toContain("right");
 
-    // The positive star layer must be above the shell background, while the
-    // route content sits above the stars. This catches the invisible
-    // negative-z child regression rather than only checking DOM presence.
+    // Check stacking classes, not just DOM presence: negative-z stars can hide behind the shell.
     expect(screen.getByTestId("app-starfield")).toHaveClass("z-0");
     expect(screen.getByRole("main")).toHaveClass("relative", "z-10");
 
-    // Icon-only theme/color controls: labels are accessible, no visible text.
     expect(screen.getByRole("button", { name: "Light theme" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "System theme" })).toBeInTheDocument();
@@ -78,12 +66,10 @@ describe("AppLayout", () => {
   });
 
   it("shows the starfield on every page when no game is live (5cl.4/22n)", async () => {
-    // Homepage keeps its stars…
     renderAt("/");
     await screen.findByRole("heading", { name: "rocketcrab.com" });
     expect(screen.getByTestId("app-starfield")).toBeInTheDocument();
 
-    // …and so does every other page: no more homepage-only fade (22n).
     renderAt("/about");
     await screen.findByRole("heading", { name: "Coming soon" });
     expect(screen.getByTestId("app-starfield")).toBeInTheDocument();
@@ -100,8 +86,6 @@ describe("AppLayout", () => {
     expect(screen.getByRole("button", { name: "Light theme" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "System theme" })).toBeInTheDocument();
-    // Party routes keep their own classic shell chrome (PartyShellHeader), but
-    // there is no app-level wordmark bar and no footer anywhere.
     expect(screen.queryByRole("link", { name: /Rocketcrab home/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("contentinfo")).not.toBeInTheDocument();
   });
@@ -113,21 +97,15 @@ describe("AppLayout", () => {
     expect(screen.getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
     const home = screen.getByRole("link", { name: "back" });
     expect(home.getAttribute("href")).toBe("/");
-    // The header "New game" action (the empty-state CTA shares the label).
     const builds = screen.getAllByRole("link", { name: /New game/ });
     expect(builds.length).toBeGreaterThanOrEqual(1);
     for (const build of builds) {
       expect(build.getAttribute("href")).toBe("/build");
     }
-    // "Browse games" is gone from the header (2t1.5) — the browse page is
-    // one tap from home.
     expect(screen.queryByRole("link", { name: /Browse games/ })).not.toBeInTheDocument();
   });
 
   it("gives every content page an explicit way back home (11.1/2t1.1)", async () => {
-    // Homepage sub-pages carry the brand row (rocketcrab.com → home); the
-    // browse page's own unified back button also navigates home, and
-    // /examples keeps its classic "Back to home" link.
     for (const [path, heading] of [
       ["/browse", "Games"],
       ["/library", "My games"],
@@ -142,8 +120,6 @@ describe("AppLayout", () => {
       });
     }
 
-    // /build (5cl.16, gmo): the tiny rocketcrab.com brand row is gone —
-    // the hero card is the page's identity. Its own "back" link goes home.
     renderAt("/build");
     await screen.findByRole("heading", { name: "Introducing Nova" });
     const buildBack = screen.getByRole("link", { name: "back" });

@@ -13,10 +13,9 @@ import {
 import type { GamesDatabase } from "./db";
 import { hashSource, sourceByteLength } from "./hashing";
 
-/** Prefix for locally generated game ids (nanoid, non-cryptographic). */
+/** Local ids use a non-cryptographic nanoid; they are identifiers, not secrets. */
 export const GAME_ID_PREFIX = "game_";
 
-/** Sort helper: most recently updated first, ties by creation time. */
 function byRecentFirst(a: SavedGame, b: SavedGame): number {
   return b.updatedAt - a.updatedAt || b.createdAt - a.createdAt;
 }

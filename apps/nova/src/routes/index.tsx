@@ -25,21 +25,6 @@ const NEXT_LOGO_PHASE: Record<Exclude<LogoAnimationPhase, "idle">, LogoAnimation
   return: "idle",
 };
 
-/**
- * Home screen (7.20 layout, 7.47 brand header): the crab logo and
- * rocketcrab.com title centered with the "party games for phones" tagline,
- * and the "Introducing Nova" alert below it (rocketcrab-2t1.8 dotted
- * outline; the aura, glowing orb, and twinkling stars were removed in
- * rocketcrab-5cl.6), Join/Start party soft-primary buttons (side by side
- * from sm, stacked full-width on phones — rocketcrab-5cl.5), and a
- * column of soft-default actions below (My games before Browse games since
- * rocketcrab-2t1.1). The stack hugs its content and is vertically centered
- * in the space above the shared footer (no recent-games browser since
- * 7.35). The title renders in the Inconsolata Variable brand font
- * (9fv.11.5), taps to copy the domain to the clipboard (9fv.11.4), and
- * scales down while pressed (rocketcrab-2t1.8). The mark is a separate
- * keyboard-accessible launch control (rocketcrab-aqn.5).
- */
 function HomeComponent() {
   const [logoAnimationPhase, setLogoAnimationPhase] = useState<LogoAnimationPhase>("idle");
 
@@ -67,7 +52,6 @@ function HomeComponent() {
   const logoAnimationClass =
     logoAnimationPhase === "idle" ? undefined : LOGO_ANIMATION_NAMES[logoAnimationPhase];
 
-  /** Tap-to-copy the brand title to the clipboard (rocketcrab-9fv.11.4). */
   const handleCopyTitle = async () => {
     const ok = await writeToClipboard("rocketcrab.com");
     if (ok) {
@@ -77,10 +61,7 @@ function HomeComponent() {
     }
   };
 
-  // rocketcrab-8z9: it must be impossible to sit in a party while on the
-  // homepage. Every route to "/" (the lobby browser's exit links if they
-  // slipped through, the native browser back button, a mid-flow navigate)
-  // tears the party down instead of leaving a ghost party running.
+  // Visiting home must leave any active party, including via the browser Back button.
   const { state, engine } = usePartyEngine();
   const leftRef = useRef(false);
   useEffect(() => {
@@ -133,9 +114,6 @@ function HomeComponent() {
           rocketcrab<span className="text-primary">.com</span>
         </h1>
         <p className="text-lg text-foreground/70">party games for phones</p>
-        {/* rocketcrab-2t1.8: dotted info alert below the tagline
-            (rocketcrab-5cl.6: the aura, the glowing orb, and the
-            twinkling stars are gone — just the dotted outline and text). */}
         <Alert
           status="accent"
           role="alert"
@@ -152,8 +130,6 @@ function HomeComponent() {
         </Alert>
       </section>
 
-      {/* rocketcrab-5cl.5: on phones the two CTAs stack full-width so their
-          labels never wrap; from sm they sit side by side again. */}
       <section
         aria-label="Start or join a party"
         className="flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row"

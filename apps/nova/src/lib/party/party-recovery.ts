@@ -1,19 +1,15 @@
 import type { GameMode } from "@rocketcrab/protocol";
 import { sessionSecretSchema } from "@rocketcrab/protocol";
 
-/** localStorage key for the party recovery record. */
 export const PARTY_RECOVERY_KEY = "nova:party:recovery:v1";
 /** Record schema version; bumping it invalidates old records. */
 export const PARTY_RECOVERY_VERSION = 1;
 
-/** Everything the shell needs to rejoin a party after a page reload. */
 export interface PartyRecoveryRecord {
   readonly version: typeof PARTY_RECOVERY_VERSION;
   /** Epoch-ms time the record was written. */
   readonly savedAt: number;
-  /** The role this player held when the record was written. */
   readonly role: "creator" | "joiner";
-  /** Four-letter code, when known (invite-only parties may lack it). */
   /** Party session secret (ADR-0011); derives the private room. */
   readonly secret: string;
   /** This player's stable member identity (ADR-0007). */
@@ -51,7 +47,6 @@ export function savePartyRecovery(
   }
 }
 
-/** Read and validate the recovery record, or null when absent/invalid. */
 export function readPartyRecovery(): PartyRecoveryRecord | null {
   try {
     const raw = window.localStorage.getItem(PARTY_RECOVERY_KEY);
@@ -64,7 +59,6 @@ export function readPartyRecovery(): PartyRecoveryRecord | null {
   }
 }
 
-/** Remove the recovery record (clean leave / explicit dismiss). */
 export function clearPartyRecovery(): void {
   try {
     window.localStorage.removeItem(PARTY_RECOVERY_KEY);
@@ -73,7 +67,6 @@ export function clearPartyRecovery(): void {
   }
 }
 
-/** Parse + strictly validate a serialized record; null when invalid. */
 export function parsePartyRecovery(raw: string): PartyRecoveryRecord | null {
   let parsed: unknown;
   try {

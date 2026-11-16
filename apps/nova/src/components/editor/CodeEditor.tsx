@@ -9,15 +9,7 @@ export interface CodeEditorProps {
   ariaLabel: string;
 }
 
-/**
- * EditorView.theme mapping CodeMirror surfaces to HeroUI CSS variables so
- * the editor blends with whichever of the app's themes is active: the root
- * uses the page background/text, and gutters + the active line use the
- * slightly-lighter base-200 surface. The variables live on `:root` under
- * `data-theme`, so the editor re-themes automatically on theme switch —
- * no extra state. The dark variant passes `{ dark: true }` so CodeMirror's
- * base contrast (selection, cursor, syntax defaults) flips too.
- */
+/** Use HeroUI variables for surfaces; dark: true also flips CodeMirror's base contrast. */
 const themeSpec = {
   "&": {
     backgroundColor: "var(--surface)",
@@ -34,25 +26,13 @@ const themeSpec = {
 const lightTheme = EditorView.theme(themeSpec);
 const darkTheme = EditorView.theme(themeSpec, { dark: true });
 
-/**
- * CodeMirror 6 HTML editor via the maintained React integration
- * (engineering rule 12: no custom editor). The contenteditable carries an
- * accessible name so tests and screen readers can target it. The built-in
- * `theme` prop flips CodeMirror's base contrast (selection, cursor, syntax
- * defaults) to match the effective app theme (Task 4).
- */
 export function CodeEditor({ value, onChange, ariaLabel }: CodeEditorProps) {
   const isDark = useIsDarkTheme();
   return (
     <CodeMirror
       value={value}
       height="100%"
-      // The wrapper div @uiw/react-codemirror renders (`.cm-theme-*`) has no
-      // height of its own, so `.cm-editor`'s height:100% collapses to auto
-      // and the editor grows to full content height — clipped by the
-      // overflow-hidden panel with no way to scroll (U4 scroll bug). Give the
-      // wrapper the full height of its fixed-height parent so the internal
-      // `.cm-scroller` actually scrolls.
+      // The wrapper needs a definite height for CodeMirror's internal scroller.
       className="h-full"
       theme={isDark ? "dark" : "light"}
       extensions={[

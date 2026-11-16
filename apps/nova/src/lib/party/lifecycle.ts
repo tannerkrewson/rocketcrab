@@ -1,22 +1,10 @@
 /**
- * Party-engine page-lifecycle wiring (M1; ADR-0012, Blocker Register B6).
- *
- * Mobile Safari suspends background pages: timers stop, WebRTC connections
- * die, and the page may be frozen (or, in the extreme, reloaded). The shell
- * must react to the events the browser actually offers — `visibilitychange`,
- * `pagehide`/`pageshow`, and `online`/`offline` — rather than assuming
- * timers or connections survive backgrounding.
- *
- * This module defines the small event surface the party engine subscribes
- * to, plus two implementations:
- * - {@link browserLifecycleSource} — production wiring on `window`/`document`
- *   (every subscription returns an unsubscribe; the engine never leaves
- *   listeners behind, engineering rule 22);
- * - {@link createMemoryLifecycleSource} — a deterministic in-memory source
- *   for unit tests (fake lifecycle events, no timers, no DOM dependence).
+ * Mobile Safari may freeze timers, kill WebRTC, or reload a background page
+ * (ADR-0012). Drive recovery from visibility, page, and network events rather
+ * than assuming connections survive. Browser and in-memory implementations
+ * share an event surface; every subscription returns a cleanup function.
  */
 
-/** The page-lifecycle events the party engine reacts to. */
 export interface PartyLifecycleSource {
   /** The document became hidden/visible (`visibilitychange`). */
   onVisibilityChange(handler: (hidden: boolean) => void): () => void;
@@ -24,13 +12,10 @@ export interface PartyLifecycleSource {
   onPageHide(handler: () => void): () => void;
   /** The page came back (BFCache restore, foreground, or fresh load). */
   onPageShow(handler: () => void): () => void;
-  /** The browser reports the network came back (`online`). */
   onOnline(handler: () => void): () => void;
-  /** The browser reports the network went away (`offline`). */
   onOffline(handler: () => void): () => void;
 }
 
-/** Production lifecycle wiring on the browser's window/document events. */
 export function browserLifecycleSource(): PartyLifecycleSource {
   const visibilityHandlers = new Set<(hidden: boolean) => void>();
   const pageHideHandlers = new Set<() => void>();
@@ -65,9 +50,8 @@ export function browserLifecycleSource(): PartyLifecycleSource {
     }
   };
 
-  // The party engine outlives routes (one per page), so these listeners are
-  // installed once for the page lifetime; each individual subscription still
-  // returns an unsubscribe (rule 22).
+  // The party engine outlives routes, so browser listeners live for the page;
+  // individual engine subscriptions still return cleanup functions.
   if (typeof window !== "undefined") {
     window.addEventListener("visibilitychange", onVisibilityChange);
     window.addEventListener("pagehide", onPageHide);

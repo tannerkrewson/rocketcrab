@@ -87,7 +87,6 @@ function draftGameId(): string {
   return `draft-${Date.now().toString(36)}`;
 }
 
-/** The code editor's default height (~22% of the viewport, "fairly small"). */
 function defaultEditorHeightPx(): number {
   return clampEditorHeight(
     Math.round((typeof window === "undefined" ? 800 : window.innerHeight) * 0.22),
@@ -100,20 +99,10 @@ function clampEditorHeight(value: number): number {
 }
 
 /**
- * The consolidated U4 editor + U6 test arena (7.40): one page holding the
- * CodeMirror editor, the diagnostics panel, and the multiplayer test arena
- * together. The code editor sits at the top, small by default, with a drag
- * handle to enlarge it; the arena is always mounted and live below it,
- * flowing in the normal document flow (Task 1: arena-default-on). The
- * single-player runtime session stays mounted in a hidden container purely
- * as the diagnostics / mode-detection / test-metadata engine. Phones
- * (below the sm: breakpoint — not tablets) get a "use the editor on
- * desktop" prompt above the still-working mobile tabs.
- *
- * Replacing the source and Run always destroys and recreates the runtime
- * frame (no hot-module replacement); unsaved source is never written over
- * the saved version. `initialSource` seeds a new-game draft (A4 generator
- * handoff); the caller keys the component so a new draft remounts it.
+ * Editor with a live multiplayer arena and a hidden single-player runtime
+ * for diagnostics and mode detection. Each Run recreates frames; unsaved
+ * source never overwrites the saved game. A route-level draft key remounts
+ * this component for each new handoff.
  */
 export function EditorPage({ game, initialSource }: { game?: SavedGame; initialSource?: string }) {
   const navigate = useNavigate();
@@ -143,8 +132,6 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
   const [mobileTab, setMobileTab] = useState<"code" | "errors">("code");
   const [titleEditing, setTitleEditing] = useState(false);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
-  // The title shown when not editing: the typed title, else the game's
-  // declared title (nova.defineGame), else the default.
   const displayTitle = title.trim() || registration?.title || DEFAULT_GAME_TITLE;
   // The pre-edit title, so Escape can cancel an in-progress edit.
   const titleDraftRef = useRef(title);
@@ -167,7 +154,6 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     }
   }, []);
 
-  // Swap to an editing input: autofocus and select the whole title.
   useEffect(() => {
     if (!titleEditing) return;
     titleInputRef.current?.focus();
@@ -175,21 +161,15 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
   }, [titleEditing]);
   const [discardDialog, setDiscardDialog] = useState<{ onConfirm: () => void } | null>(null);
   const [clearAllDialog, setClearAllDialog] = useState(false);
-  // The arena's source, seeded with the saved source so the arena is live by
-  // default (Task 1: arena-default-on). Run re-applies the current editor
-  // source, which restarts every simulated player with it.
   const [arenaSource, setArenaSource] = useState<string>(savedSource);
   const [editorHeightPx, setEditorHeightPx] = useState(defaultEditorHeightPx);
-  // The single-player runtime session lives in a hidden container: it stays
-  // mounted purely as the diagnostics / mode-detection / saved-source-test-
-  // metadata engine (DiagnosticsPanel, registration, recordTestResults).
+  // Keep a separate hidden runtime for diagnostics, mode detection, and saved-source test metadata.
   const hiddenRuntimeRef = useRef<HTMLDivElement | null>(null);
 
   const dirty = source !== savedSource || title !== savedTitle;
   const savingRef = useRef(false);
   const lastRunSourceRef = useRef<string | null>(null);
 
-  // Reinitialize when the route's game changes (edit → another edit).
   useEffect(() => {
     setSource(savedSource);
     setTitle(savedTitle);
@@ -202,7 +182,6 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [game?.id]);
 
-  // Debounced SHA-256 of the current source for the diagnostics panel.
   useEffect(() => {
     // A digest for an older source can finish after a newer one; ignore it.
     let current = true;
@@ -231,8 +210,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       switch (event.type) {
         case "registration":
           setRegistration({ gameMode: event.message.gameMode, title: event.message.title });
-          // A successful run of the *saved* source updates the saved-game
-          // test metadata (U4 acceptance: successful tests update metadata).
+          // Only runs of the saved source may update that game's test metadata.
           if (game && lastRunSourceRef.current !== null && lastRunSourceRef.current === game.html) {
             recordTestResults.mutate({
               id: game.id,
@@ -309,11 +287,8 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         player: { memberId: "local-creator", displayName: "You" },
         ...(title.trim().length > 0 ? { gameTitle: title.trim() } : {}),
       });
-      // Run re-applies the current source to the live arena too (Task 1:
-      // one Run means "apply my code to the stage and re-test"). The arena
-      // restarts only once the run actually started, so its restart channels
-      // always follow the runtime's own — and on a startup failure the
-      // stage keeps the last testable state (the stale badge explains).
+      // Restart the arena only after runtime startup succeeds; failures keep the
+      // last testable arena state rather than replacing it with a failed source.
       setArenaSource(source);
       setRunInfo((previous) =>
         previous
@@ -353,11 +328,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     }
   }, []);
 
-  /**
-   * Play with friends (P4): create a REAL party from the CURRENT editor
-   * source (saved or not). The source is handed to the party route via
-   * sessionStorage; unsaved changes are never written to the saved game.
-   */
+  /** Hand the current source to a real party without writing unsaved edits to the saved game. */
   const handlePlayWithFriends = useCallback(() => {
     const errors = validateSource(source).filter((issue) => issue.severity === "error");
     if (errors.length > 0) {
@@ -381,8 +352,6 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     if (savingRef.current) return;
     savingRef.current = true;
     try {
-      // The game may declare its own title via nova.defineGame; honor it
-      // when the creator hasn't typed one.
       const nextTitle = title.trim() || registration?.title || DEFAULT_GAME_TITLE;
       if (game) {
         await updateGame.mutateAsync({
@@ -455,7 +424,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedSource, savedTitle, session]);
 
-  /** Clear all: delete every line of code (saved games keep their saved copy). */
+  /** Clear the draft without deleting the saved copy. */
   const handleClearAll = useCallback(() => {
     setSource("");
     setDiagnostics([]);
@@ -471,7 +440,6 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
 
   const beginWindowDrag = useWindowPointerDrag();
 
-  /** Drag the splitter: enlarge/shrink the code editor pane (7.40). */
   const handleEditorResize = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       event.preventDefault();
@@ -512,8 +480,6 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     }
   }, [consoleEntries, diagnostics, game, runInfo, runStatus, source, sourceHash, title]);
 
-  // Unsaved-change protection (U4): block in-app navigation and tab close
-  // while the draft differs from the saved version, with a custom dialog.
   const shouldBlockNavigation = useCallback(() => dirty, [dirty]);
   const blocker = useBlocker({
     shouldBlockFn: shouldBlockNavigation,
@@ -638,9 +604,6 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     </div>
   );
 
-  // The arena is always mounted and live (Task 1): the stage is what the
-  // creator is making — seeded with the saved source on load, re-applied
-  // whenever Run is pressed.
   const arenaSection = (
     <ArenaRuntimeSeamsContext.Provider value={seams}>
       <ArenaSection
@@ -656,8 +619,6 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     <div className="flex flex-col gap-4">
       <FirstRunTutorial />
 
-      {/* Phone-size prompt (below sm: — not tablets): editing and testing a
-          game needs a real screen. */}
       <div className="sm:hidden" data-testid="phone-prompt">
         <Alert status="warning">
           <MonitorSmartphone className="h-6 w-6 shrink-0" aria-hidden="true" />
@@ -671,9 +632,6 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         </Alert>
       </div>
 
-      {/* Chrome row (Task 2): identity (logo mark, no text), orientation
-          (back to the library), the click-to-edit title, and the
-          unsaved-changes indicator. */}
       <header className="flex flex-wrap items-center gap-3">
         <Link
           to="/"
@@ -725,14 +683,9 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         ) : null}
       </header>
 
-      {/* Desktop: actions, small resizable editor, then the arena flows in
-          the normal document flow below (7.40). */}
       <div className="hidden flex-col gap-4 md:flex" data-testid="desktop-layout">
         <div className="flex flex-wrap items-center gap-2">{actions}</div>
         <div style={{ height: `${editorHeightPx}px` }}>
-          {/* 5cl.15: on xl+ the code editor takes the extra width and the
-              diagnostics panel stays a comfortable fixed column, so the
-              editor uses wide screens instead of leaving dead space. */}
           <div className="grid h-full grid-cols-2 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
             <section
               className="min-h-0 overflow-hidden rounded-2xl border-2 border-border bg-surface"
@@ -769,7 +722,6 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         </div>
       </div>
 
-      {/* Phone: segmented Code / Preview / Errors tabs with a sticky bar. */}
       <div className="flex flex-col gap-3 md:hidden" data-testid="mobile-layout">
         {tabs}
         {mobileTab === "code" ? (
@@ -792,10 +744,6 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         ) : null}
       </div>
 
-      {/* The test arena: one shared rendering for both layouts. It flows in
-          the normal document flow (the page scrolls like every other Nova
-          page); on phones it sits between the editor tabs and the sticky
-          bar. */}
       {arenaSection}
 
       <div
@@ -922,10 +870,6 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         </div>
       </Dialog>
 
-      {/* The single-player runtime stays mounted in a hidden container: it
-          is the diagnostics / mode-detection / saved-source-test-metadata
-          engine (registration + recordTestResults) — its frame is never
-          visible. */}
       <div className="hidden" data-testid="hidden-runtime-container" aria-hidden="true">
         <div ref={hiddenRuntimeRef} />
       </div>

@@ -1,13 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTrysteroPartyTransportFactory, forceTunnelForTests } from "./transport-factory";
 
-/**
- * Transport-factory tests (task rocketcrab-23s, P0): the real-party factory
- * closes over minted TURN credentials (the sync factory methods pass them to
- * BOTH transports). `@rocketcrab/trystero-transport` is mocked so the tests
- * can assert exactly what options each constructed transport receives
- * without building real Trystero rooms.
- */
+/** Assert factory options through a transport mock without opening real Trystero rooms. */
 
 const mocks = vi.hoisted(() => ({
   constructed: [] as unknown[],

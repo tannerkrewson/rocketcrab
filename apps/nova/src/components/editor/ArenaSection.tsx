@@ -1,20 +1,8 @@
 /**
- * The U6 multi-player test arena, embedded in the consolidated editor page
- * (7.40): several simulated players on one screen, each a real runtime
- * frame (U3) connected through the InMemoryTransport (U5) via its own
- * NovaSession (S1) — the runtime protocol is never bypassed.
- *
- * This is the arena section of the editor, not a standalone page: the
- * editor hands over the source that was on screen (seeded with the saved
- * source on load; the editor re-tests by pressing Run with a new source,
- * which restarts every player). Desktop shows the player frames in a
- * wrapping flex row (5cl.15: auto-fit widths, dragged frames wrap instead
- * of overlapping) with a shared simulation toolbar; phones show one player
- * at a time in tabs with the shared controls in a collapsible panel (never
- * covering the game). Per-player connection state reflects the simulated
- * transport state (disconnect → leave, reconnect → rejoin, suspend →
- * background suspension), and every player's console/errors land in its own
- * log panel.
+ * Multiplayer arena embedded in the editor. Each player has a real runtime
+ * frame and its own NovaSession over InMemoryTransport. New source restarts
+ * all players. Desktop and mobile share mounted frames, with separate
+ * per-player logs and controls that exercise transport lifecycle behavior.
  */
 import { Badge } from "../ui/Badge";
 import { useWindowPointerDrag } from "../ui/useWindowPointerDrag";
@@ -76,7 +64,6 @@ function formatDate(timestamp: number): string {
   return new Date(timestamp).toLocaleDateString(undefined, { dateStyle: "medium" });
 }
 
-/** Game-frame heights: a sane default (~45vh) with hard clamps. */
 function defaultFrameHeightPx(): number {
   return clampFrameHeight(
     Math.round((typeof window === "undefined" ? 800 : window.innerHeight) * 0.45),
@@ -88,8 +75,6 @@ function clampFrameHeight(value: number): number {
   return Math.min(Math.max(value, 160), max);
 }
 
-/** Game-frame widths: frames fill their grid cell by default; once
- *  dragged, a fixed pixel width with hard clamps. */
 function clampFrameWidth(value: number): number {
   const max =
     typeof window === "undefined" ? 1200 : Math.max(320, Math.round(window.innerWidth * 0.92));
@@ -145,10 +130,7 @@ function runStateLabel(player: ArenaPlayer): string {
 export interface ArenaSectionProps {
   /** Saved game under test (undefined for a blank-editor draft run). */
   game?: SavedGame;
-  /**
-   * The source under test, frozen when the creator pressed Test
-   * multiplayer. Passing a NEW source restarts every player with it.
-   */
+  /** Source frozen at the last Run; changing it restarts every player. */
   source: string;
   /** The editor's current source differs from the source under test. */
   stale: boolean;
@@ -165,9 +147,7 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
   const onRunSucceeded = useCallback(
     (_outcome: { runId: number; source: string }) => {
       if (game === undefined) return;
-      // Persist the last successful test time (U2 recordTestResults). Only a
-      // clean full run (every player registered + started, no fatal errors)
-      // counts as success.
+      // Only a complete run with every player started and no fatal errors counts as success.
       recordTestResults.mutate({
         id: game.id,
         results: { lastTestedAt: Date.now(), lastTestSucceeded: true },
@@ -183,8 +163,6 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
     gameTitle: game?.title,
     runtimeOrigin: runtimeOriginForMainOrigin(window.location.origin),
     initialPlayers: [
-      // 7.5: the first arena player defaults to the player's saved name so
-      // the test arena feels like "you" right away.
       { id: "player-1", name: getSavedPlayerName() ?? "Player 1", memberId: "member-1" },
       { id: "player-2", name: "Player 2", memberId: "member-2" },
     ],
@@ -209,9 +187,7 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
     if (diagnostics.length > 0) onDiagnostics?.(diagnostics);
   }, [state?.players, onDiagnostics]);
 
-  // The engine mounts once per arena mount; when the editor re-tests with a
-  // new source (a Run press), restart every player with it instead of
-  // remounting the whole section.
+  // Replace source inside the existing engine rather than remounting the arena.
   const lastSourceRef = useRef(source);
   useEffect(() => {
     if (lastSourceRef.current === source) return;
@@ -228,7 +204,6 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
   const [frameWidthPx, setFrameWidthPx] = useState<number | null>(null);
   const [renameTarget, setRenameTarget] = useState<ArenaPlayer | null>(null);
 
-  // Keep the mobile tab on an existing player when players are removed.
   useEffect(() => {
     if (state === null) return;
     if (!state.players.some((player) => player.id === activePlayerId)) {
@@ -243,7 +218,6 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
 
   const beginWindowDrag = useWindowPointerDrag();
 
-  /** Shared vertical drag: resize every game frame (7.13). */
   const handleFrameResize = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       event.preventDefault();
@@ -263,15 +237,12 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
     [beginWindowDrag, frameHeightPx],
   );
 
-  /** Shared horizontal drag: resize every game frame's width (11.15). */
   const handleFrameWidthResize = useCallback(
     (event: ReactPointerEvent<HTMLDivElement>) => {
       event.preventDefault();
       const handle = event.currentTarget;
       const startX = event.clientX;
-      // At the default auto width the frames fill their grid cell, so seed
-      // the drag from the frame's rendered width — the first drag shouldn't
-      // jump.
+      // Seed from rendered width so the first drag from auto sizing does not jump.
       const frame = handle.previousElementSibling as HTMLElement | null;
       const startWidth = frameWidthPx ?? (frame?.offsetWidth || 480);
       try {
@@ -585,9 +556,6 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
 
   return (
     <div className="flex flex-col gap-3" data-testid="arena-section">
-      {/* Quiet arena header: only the stale badge (something needs
-          attention) and the launch-into-party action remain — the stage
-          speaks for itself. */}
       {stale || game !== undefined ? (
         <div className="flex flex-wrap items-center gap-3">
           {stale ? (
@@ -612,15 +580,12 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
 
       {summaryBar}
 
-      {/* Desktop: shared toolbar above the player grid. */}
       <div className="hidden flex-col gap-3 md:flex" data-testid="arena-desktop">
         <div className="flex flex-wrap items-center gap-2 rounded-2xl border-2 border-border bg-surface p-3">
           {toolbar("desktop")}
         </div>
       </div>
 
-      {/* Phone: player tabs + shared controls in a collapsible panel so
-          they never cover the game. */}
       <div className="flex flex-col gap-3 md:hidden" data-testid="arena-mobile">
         <div
           role="tablist"
@@ -648,16 +613,8 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
         </details>
       </div>
 
-      {/* The one and only set of player frames. Phones show the active
-          player and hide the rest with CSS (`max-md:hidden`), so every
-          frame stays mounted and switching tabs never reloads it; desktop
-          shows them all in a wrapping flex row. 5cl.15: the row is
-          flex-wrap with each frame's width as its flex-basis — frames that
-          were dragged wider than the row simply wrap to the next line, so
-          test pages can NEVER overlap at any viewport width, and at the
-          default (auto) width every frame shares the row equally, filling
-          the editor's width on large screens instead of leaving empty
-          columns. */}
+      {/* Hide inactive phone players with CSS so switching tabs keeps frames
+          mounted. Shared frame widths wrap instead of overlapping. */}
       <div className="flex flex-wrap gap-4" data-testid="arena-grid">
         {state.players.map((player) => (
           <div

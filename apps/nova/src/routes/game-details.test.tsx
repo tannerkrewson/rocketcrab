@@ -8,20 +8,6 @@ import { gameRepository } from "../lib/games/instance";
 import type { PartyEngineState } from "../lib/party/engine";
 import { routeTree } from "../routeTree.gen";
 
-/**
- * Game detail page party tests (10.9 / 2t1.10 / 5cl.8 / 5cl.10): the
- * shared /game/:gameId page also serves saved games (title, description,
- * mode from the IndexedDB repository). The CTA is contextual: when a party
- * is waiting in its lobby the creator gets a "Select game" action that
- * hands the game to the party engine and returns to /party; when no party
- * is active the page offers "Start party" (with the game preselected for
- * saved games, plain /party for classic). There is no standalone "play
- * game" view anymore. The browser is classic-only (5cl.10), and inside a
- * party the page shows the party shell header (logo + code) instead of the
- * brand row (5cl.8). Select actions still navigate to /party; the host's
- * address bar then normalizes to /<code> in place (rocketcrab-r0f).
- */
-
 const IDLE_STATE: PartyEngineState = {
   phase: "idle",
   phaseDetail: null,
@@ -51,7 +37,6 @@ const IDLE_STATE: PartyEngineState = {
   peerLink: null,
 };
 
-/** A party waiting in its lobby (creator, no game picked yet). */
 const LOBBY_STATE: PartyEngineState = {
   ...IDLE_STATE,
   phase: "lobby",
@@ -81,7 +66,6 @@ const LOBBY_STATE: PartyEngineState = {
   startBlockedReason: "Pick a game before starting the party.",
 };
 
-/** A guest sitting in a party's lobby (no pick rights). */
 const GUEST_STATE: PartyEngineState = {
   ...LOBBY_STATE,
   role: "joiner",
@@ -167,8 +151,6 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     expect(await screen.findByRole("heading", { name: "Rocket Rumble" })).toBeInTheDocument();
     expect(screen.getByText(/simulation mode · saved/)).toBeInTheDocument();
     expect(screen.getByText("Blast off with friends.")).toBeInTheDocument();
-    // Without an active party there is no select action — but a "Start
-    // party" CTA that preseeds this game (2t1.10).
     expect(screen.queryByRole("button", { name: /select game/i })).not.toBeInTheDocument();
     const start = screen.getByRole("link", { name: /Start party/ });
     expect(start.getAttribute("href")).toBe(
@@ -176,11 +158,9 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     );
     const edit = screen.getByRole("link", { name: "Edit game" });
     expect(edit.getAttribute("href")).toBe(`/games/${game.id}/edit`);
-    // The back link is a compact soft button, not a full-width bar.
     const back = screen.getByRole("link", { name: "Back to games" });
     expect(back.className).toContain("button--tertiary");
     expect(back.className).toContain("self-start");
-    // The brand row stays visible on the details page (2t1.1).
     expect(screen.getByRole("link", { name: /rocketcrab\.com/ })).toBeInTheDocument();
   });
 
@@ -205,8 +185,6 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
         apiVersion: 1,
       }),
     );
-    // Back in the party lobby — the host's address bar now reads the code
-    // (rocketcrab-r0f replaces /party with /<code> once a party is active).
     await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
     expect(screen.queryByRole("button", { name: /select game/i })).not.toBeInTheDocument();
   });
@@ -219,8 +197,6 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     await userEvent.click(select);
 
     await vi.waitFor(() => expect(stubEngine.selectClassicGame).toHaveBeenCalledWith("drawphone"));
-    // Back in the party lobby — the address bar reads the code, not /party
-    // (rocketcrab-r0f).
     await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
   });
 
@@ -228,17 +204,12 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     stubs.mode = "lobby";
     renderAt("/game/drawphone?from=party-browse");
 
-    // The lobby's shared header (origin + lowercase code) replaces the
-    // standalone brand row on the details page reached from a party.
     const title = await screen.findByText("Nova party");
     expect(title.textContent).toBe("Nova party");
     expect(screen.queryByRole("link", { name: /rocketcrab\.com/ })).not.toBeInTheDocument();
-    // The back link returns to the party's browse mode (5cl.7: /party?browse=1
-    // reopens the lobby browser, which restores the category the host left).
     const back = screen.getByRole("link", { name: "Back to category" });
     expect(back.getAttribute("href")).toBe("/party?browse=true");
     expect(back.className).toContain("self-start");
-    // The host can still select this classic game for the party.
     const select = screen.getByRole("button", { name: /select game/i });
     expect(select.className).toContain("button--lg");
     expect(select.className).toContain("button--primary");
@@ -298,9 +269,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     const start = await screen.findByRole("link", { name: "Start party" });
     expect(start.className).toContain("button--primary");
     expect(start.className).toContain("button--lg");
-    // Classic games can't be preselected over the URL — plain /party entry.
     expect(start.getAttribute("href")).toBe("/party");
-    // And the old standalone play-game view is gone.
     expect(screen.queryByRole("link", { name: /Play game/ })).not.toBeInTheDocument();
   });
 });

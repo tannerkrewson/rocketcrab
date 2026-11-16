@@ -8,9 +8,9 @@ import type { PartyDiagnostics } from "../../lib/party/engine";
 export interface PartyDiagnosticsPanelProps {
   diagnostics: PartyDiagnostics | null;
   onRefresh: () => void;
-  /** Party shell host display name (kept accessible here, 10.7). */
+  /** Shell host display name; kept in diagnostics rather than the lobby. */
   hostNameForDiagnostics?: string | null;
-  /** Current internal authority display name (kept accessible here, 10.7). */
+  /** Internal authority display name; kept in diagnostics rather than the lobby. */
   authorityName?: string | null;
 }
 
@@ -31,13 +31,7 @@ function connectionLabel(state: string): string {
   }
 }
 
-/**
- * Connection diagnostics for the party (P4): relay sockets, join errors,
- * peer latency samples, and the transport's identity — the same telemetry
- * the P1 adapter exposes. Purely informational. The shell-host/authority
- * summary (10.7) lives here too: those roles are diagnostic, so the lobby
- * itself does not show them.
- */
+/** Informational transport diagnostics, including internal host and authority roles. */
 export function PartyDiagnosticsPanel({
   diagnostics,
   onRefresh,

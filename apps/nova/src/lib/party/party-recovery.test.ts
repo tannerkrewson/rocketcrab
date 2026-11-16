@@ -8,13 +8,7 @@ import {
   type PartyRecoveryInput,
 } from "./party-recovery";
 
-/**
- * M1 recovery-record tests: the shell persists just enough local
- * information (code + invite secret + identity + game) for a one-tap
- * rejoin after a Mobile Safari page reload, validates strictly on read,
- * and clears on leave/dismiss. The game source is deliberately never
- * stored (ADR-0005); rejoin re-fetches it from the party (P3).
- */
+/** Recovery records contain no game source (ADR-0005); rejoin fetches it from peers. */
 
 const SECRET = "A".repeat(43); // valid unpadded base64url session secret
 
@@ -73,7 +67,6 @@ describe("party recovery record", () => {
   });
 
   it("returns null when storage is unavailable or corrupted", () => {
-    // A malformed localStorage value must not crash the shell.
     window.localStorage.setItem("nova:party:recovery:v1", "{broken");
     expect(readPartyRecovery()).toBeNull();
   });

@@ -4,15 +4,12 @@ import type { SavedGame } from "@rocketcrab/core";
 /** Name of the main-origin IndexedDB database holding saved games (ADR-0005). */
 export const GAMES_DB_NAME = "nova-games";
 
-/** Current schema version of the games database. */
 export const GAMES_DB_SCHEMA_VERSION = 1;
 
 /**
- * IndexedDB database for saved games, on Nova's main origin only (ADR-0005;
- * engineering rule 4 — never runtime-origin storage). Schema changes bump
- * {@link GAMES_DB_SCHEMA_VERSION} and add another `.version(n).stores(...)`
- * block; Dexie runs the upgrade in place. See `db.test.ts` for the migration
- * test that exercises an upgrade from a pre-games schema.
+ * Main-origin storage only, never runtime-origin (ADR-0005). Schema changes
+ * bump GAMES_DB_SCHEMA_VERSION and add a .version(n).stores(...) block;
+ * Dexie upgrades in place, with migrations covered by db.test.ts.
  */
 export class GamesDatabase extends Dexie {
   /** Saved games keyed by `SavedGame.id`. */

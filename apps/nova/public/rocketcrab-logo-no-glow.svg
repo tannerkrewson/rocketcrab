@@ -28,18 +28,18 @@
     <path d="M 84,73 C 98,80 106,92 104,100 C 98,98 94,88 84,78 Z" />
   </g>
 
-  <!-- Arm Outlines & Color (Pushed Outward) -->
+  <!-- Arm Outlines & Color -->
   <path d="M 42,54 C 24,42 20,30 28,24" stroke="#1D1D1D" stroke-width="8" stroke-linecap="round" fill="none" />
   <path d="M 42,54 C 24,42 20,30 28,24" stroke="#E53935" stroke-width="3.5" stroke-linecap="round" fill="none" />
 
   <path d="M 86,54 C 104,42 108,30 100,24" stroke="#1D1D1D" stroke-width="8" stroke-linecap="round" fill="none" />
   <path d="M 86,54 C 104,42 108,30 100,24" stroke="#E53935" stroke-width="3.5" stroke-linecap="round" fill="none" />
 
-  <!-- Larger Left Claw (Shifted Left to Clear Eye) -->
+  <!-- Left Claw -->
   <path d="M 28,24 C 12,18 4,-2 24,0 C 30,8 25,15 28,18 C 36,10 41,12 36,26 Z" 
         fill="#FF5252" stroke="#1D1D1D" stroke-width="3.5" stroke-linejoin="round" />
 
-  <!-- Larger Right Claw (Shifted Right to Clear Eye) -->
+  <!-- Right Claw -->
   <path d="M 100,24 C 116,18 124,-2 104,0 C 98,8 103,15 100,18 C 92,10 87,12 92,26 Z" 
         fill="#FF5252" stroke="#1D1D1D" stroke-width="3.5" stroke-linejoin="round" />
 

@@ -12,11 +12,6 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
 }
 
-/**
- * The U4 editor for one saved game: load the stored source into the
- * CodeMirror editor, run/fix/save it, and never overwrite the saved version
- * with unsaved source.
- */
 function EditGamePage() {
   const { gameId } = Route.useParams();
   const gameQuery = useSavedGame(gameId);

@@ -1,12 +1,4 @@
-/**
- * Arena engine integration tests (U6): several simulated players, each a
- * real runtime frame driven through the U3 bridge seams, wired to their own
- * NovaSession over the InMemoryTransport. The fake host mirrors
- * EditorPage.test.tsx: fresh channels per load, ready/registration/apiCall/
- * console/error deliveries, and assertions on the validated messages the
- * engine pushes back (game.apiEvent). No DOM-free shortcuts: the runtime
- * protocol is exercised end to end.
- */
+/** Arena integration tests exercise the runtime protocol through fake host channels. */
 import type { GameApiEvent } from "@rocketcrab/protocol";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArenaEngine, type ArenaEngineOptions, type ArenaPlayerSpec } from "./engine";
@@ -83,8 +75,7 @@ async function runToStartWithEngine(
 ): Promise<void> {
   await runToStart(harness.channels, count, baseline);
   await vi.waitFor(() => {
-    // S2: the authority's frame must answer the engine's state requests
-    // before the game can start (the fake frame answers immediately).
+    // The authority frame must answer state requests before the game can start.
     answerStateRequests(harness.channels, count, baseline);
     const snapshot = engine.getSnapshot();
     expect(snapshot.players.every((player) => player.runState === "started")).toBe(true);
@@ -119,12 +110,9 @@ describe("ArenaEngine — happy path", () => {
       failed: 0,
       success: true,
     });
-    // One success outcome per run.
     expect(harness.outcomes).toHaveLength(1);
     expect(harness.outcomes[0]).toMatchObject({ runId: 1, source: SOURCE });
 
-    // Player 2's frame observed player 1 joining, the connection settling,
-    // and the game starting — all as validated apiEvent messages.
     const events = apiEventsOf(harness, 1);
     expect(events).toContainEqual({
       kind: "playerJoined",
@@ -134,7 +122,6 @@ describe("ArenaEngine — happy path", () => {
     expect(
       events.some((event) => event.kind === "connection" && event.status === "connected"),
     ).toBe(true);
-    // The bootstrap carried each player's own distinct identity.
     const bootstraps = harness.windowMessages
       .map((message) => message.data as Record<string, unknown>)
       .filter((message) => message.type === "runtime.bootstrap");
@@ -205,8 +192,6 @@ describe("ArenaEngine — happy path", () => {
     expect(snapshot.stateDiagnostics?.stateSizeBytes).toBeGreaterThan(0);
     expect(snapshot.authorityPlayerId).toBe("player-1");
 
-    // Player 1 dispatches drawCard; the authority frame applies it and the
-    // engine publishes revision 2 with updated per-player views.
     deliver(
       harness.channels[0]!.port1,
       apiCallMessage("dispatch", {
@@ -219,9 +204,8 @@ describe("ArenaEngine — happy path", () => {
       expect(engine.getSnapshot().stateDiagnostics?.revision).toBe(2);
     });
     snapshot = engine.getSnapshot();
-    expect(snapshot.stateDiagnostics?.appliedCount).toBe(2); // initial + action
+    expect(snapshot.stateDiagnostics?.appliedCount).toBe(2);
 
-    // Player 1's frame saw the new view (its hand) and the accepted ack.
     const states0 = apiEventsOf(harness, 0).filter((event) => event.kind === "state");
     expect(states0.at(-1)).toEqual({
       kind: "state",
@@ -234,7 +218,6 @@ describe("ArenaEngine — happy path", () => {
       status: "accepted",
       revision: 2,
     });
-    // Player 2's frame saw only its own view — never the full state.
     const states1 = apiEventsOf(harness, 1).filter((event) => event.kind === "state");
     expect(states1.at(-1)).toEqual({
       kind: "state",
@@ -253,7 +236,6 @@ describe("ArenaEngine — happy path", () => {
     expect(snapshot.players).toHaveLength(6);
     expect(snapshot.players.every((player) => player.runState === "started")).toBe(true);
     expect(snapshot.summary.success).toBe(true);
-    // Every frame received every other player (join order, distinct ids).
     const memberIds = snapshot.players.map((player) => player.memberId);
     expect(new Set(memberIds).size).toBe(6);
     for (let index = 0; index < 6; index += 1) {
@@ -271,7 +253,6 @@ describe("ArenaEngine — happy path", () => {
     engine.start();
     await runToStartWithEngine(engine, harness, 2);
 
-    // Player 1 declares a raw channel and broadcasts on it.
     deliver(
       harness.channels[0]!.port1,
       apiCallMessage("raw.createChannel", { spec: { name: "chat" } }),
@@ -338,15 +319,12 @@ describe("ArenaEngine — happy path", () => {
     engine.start();
     await runToStartWithEngine(engine, harness, 2);
 
-    // Player 1 declares and then closes a raw channel.
     deliver(
       harness.channels[0]!.port1,
       apiCallMessage("raw.createChannel", { spec: { name: "chat" } }),
     );
     deliver(harness.channels[0]!.port1, apiCallMessage("raw.close", { name: "chat" }));
     await vi.waitFor(() => {
-      // After the close, Player 1's session has no channels: a send now
-      // fails and surfaces an error event to Player 1's frame.
       deliver(
         harness.channels[0]!.port1,
         apiCallMessage("raw.send", { name: "chat", payload: "hi" }),
@@ -370,16 +348,11 @@ describe("ArenaEngine — happy path", () => {
     engine.start();
     await runToStart(harness.channels, 2);
 
-    // Simulation mode starts without state requests: the initial authority
-    // announces and produces authoritative snapshots by asking its frame to
-    // serialize its state (the fake frame answers every request).
     await vi.waitFor(() => {
       answerSimulationRequests(harness.channels, 2);
       const snapshot = engine.getSnapshot();
       expect(snapshot.players.every((player) => player.runState === "started")).toBe(true);
     });
-    // The authority session retains an authoritative snapshot and the arena
-    // surfaces the simulation diagnostics (latency/drift visible).
     await vi.waitFor(
       () => {
         answerSimulationRequests(harness.channels, 2);
@@ -391,10 +364,8 @@ describe("ArenaEngine — happy path", () => {
       },
       { timeout: 5_000, interval: 20 },
     );
-    // The frames received the tick events Nova drives.
     const tickEvents = apiEventsOf(harness, 1).filter((event) => event.kind === "simulationTick");
     expect(tickEvents.length).toBeGreaterThan(0);
-    // The frame was asked to serialize its state (snapshot production).
     const requests = apiEventsOf(harness, 0).filter((event) => event.kind === "simulationRequest");
     expect(requests.length).toBeGreaterThan(0);
   });
@@ -414,7 +385,6 @@ describe("ArenaEngine — network controls", () => {
     const { harness, engine } = await started();
     await engine.disconnectPlayer("player-1");
     expect(engine.getSnapshot().players[0]?.sessionStatus).toBe("disconnected");
-    // Player 2's frame observed the leave.
     await vi.waitFor(() =>
       expect(apiEventsOf(harness, 1)).toContainEqual({
         kind: "playerLeft",
@@ -459,13 +429,11 @@ describe("ArenaEngine — network controls", () => {
     const before = engine.getSnapshot().players[0]!.memberId;
 
     await engine.triggerAuthorityLoss();
-    // The authority player's connection was re-established with a fresh id.
     await vi.waitFor(() => {
       const player = engine.getSnapshot().players[0]!;
       expect(player.sessionStatus).toBe("connected");
       expect(player.memberId).toBe(before);
     });
-    // Peers observed the loss: leave (old connection) then join (new one).
     const events = apiEventsOf(harness, 1);
     const left = events.filter((event) => event.kind === "playerLeft");
     const joined = events.filter((event) => event.kind === "playerJoined");
@@ -478,9 +446,6 @@ describe("ArenaEngine — network controls", () => {
     const { engine } = await started();
     expect(engine.getSnapshot().authorityPlayerId).toBe("player-1");
 
-    // Suspend the authority (simulated backgrounded phone, issue step 10):
-    // peers suspect immediately, elect the next-lowest connected member, and
-    // the arena badge follows the session diagnostics.
     await engine.suspendPlayer("player-1");
     await vi.waitFor(
       () => {
@@ -489,7 +454,6 @@ describe("ArenaEngine — network controls", () => {
       { timeout: 10_000, interval: 100 },
     );
 
-    // Resume: the reconnected player catches up and the game keeps running.
     await engine.resumePlayer("player-1");
     await vi.waitFor(
       () => {
@@ -524,7 +488,6 @@ describe("ArenaEngine — player management", () => {
     engine.start();
     await runToStartWithEngine(engine, harness, 2);
 
-    // Add a third player: it loads once its container is mounted.
     engine.addPlayer("Zoe");
     expect(engine.getSnapshot().players).toHaveLength(3);
     const third = document.createElement("div");
@@ -532,8 +495,7 @@ describe("ArenaEngine — player management", () => {
     harness.containers.set("player-3", third);
     void engine.loadPending();
     await vi.waitFor(() => expect(harness.channels.length).toBe(3));
-    // Registration may arrive before load() settles: the engine must never
-    // downgrade a registered player back to "running" (regression test).
+    // Registration may arrive before load settles; never downgrade a registered player.
     deliver(harness.channels[2]!.port1, readyMessage());
     deliver(harness.channels[2]!.port1, registrationMessage("Game 3"));
     deliver(harness.channels[2]!.port1, apiCallMessage("ready", {}));
@@ -541,7 +503,6 @@ describe("ArenaEngine — player management", () => {
     expect(engine.getSnapshot().players[2]?.memberId).toBe("member-3");
     expect(engine.getSnapshot().summary.success).toBe(true);
 
-    // Rename updates the arena and the player's own frame.
     engine.renamePlayer("player-1", "Alice");
     expect(engine.getSnapshot().players[0]?.name).toBe("Alice");
     expect(apiEventsOf(harness, 0)).toContainEqual({
@@ -549,7 +510,6 @@ describe("ArenaEngine — player management", () => {
       player: { id: "member-1", name: "Alice" },
     });
 
-    // Remove the third player: frame destroyed and identity gone.
     const thirdContainer = harness.containers.get("player-3");
     engine.removePlayer("player-3");
     expect(engine.getSnapshot().players.map((player) => player.id)).toEqual([
@@ -578,7 +538,6 @@ describe("ArenaEngine — player management", () => {
           .players[1]?.logs.some((log) => log.message.includes("Unexpected token")),
       ).toBe(true),
     );
-    // Player 1's logs never see player 2's error.
     expect(
       engine.getSnapshot().players[0]?.logs.some((log) => log.message.includes("Unexpected token")),
     ).toBe(false);
@@ -591,7 +550,6 @@ describe("ArenaEngine — player management", () => {
     engine.start();
     await runToStartWithEngine(engine, harness, 2);
 
-    // The category the runtime reports when a dispatch cannot reach the host.
     deliver(
       harness.channels[0]!.port1,
       runtimeErrorMessage(
@@ -630,7 +588,6 @@ describe("ArenaEngine — player management", () => {
       expect(snapshot.summary.failed).toBe(1);
       expect(snapshot.summary.success).toBe(false);
     });
-    // Only a clean full run persists test results.
     expect(harness.outcomes).toHaveLength(0);
   });
 });
@@ -646,10 +603,9 @@ describe("ArenaEngine — restart and source replacement", () => {
     const firstFrames = [...harness.frames];
     const firstChannels = harness.channels.length;
     engine.restartAll();
-    expect(harness.outcomes).toHaveLength(1); // first run succeeded before the restart
+    expect(harness.outcomes).toHaveLength(1);
 
     await runToStartWithEngine(engine, harness, 2, firstChannels);
-    // Fresh channels + bootstraps: every old runtime was destroyed.
     expect(harness.channels.length).toBe(firstChannels + 2);
     expect(harness.frames.length).toBe(firstFrames.length + 2);
     for (const frame of firstFrames) {
@@ -706,7 +662,6 @@ describe("ArenaEngine — per-player state", () => {
     engine.start();
     await runToStartWithEngine(engine, harness, 2);
     expect(states.length).toBeGreaterThan(0);
-    // The last snapshot reflects the settled run.
     const last = states.at(-1)!;
     expect(last.players[0]?.connectionState).toBe("connected");
     engine.stop();

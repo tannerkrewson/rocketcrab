@@ -1,12 +1,7 @@
 import type { GameApiEvent, GameEndReason } from "@rocketcrab/protocol";
 import type { NovaSessionEvent } from "@rocketcrab/nova-api";
 
-/**
- * Map one host-side session event to the plain-data `game.apiEvent` payload
- * pushed into a game frame (U6 session router). Session events that are
- * host-side only (state committed, action acks, authority changes) return
- * null — the game never sees them.
- */
+/** Return the game-facing API event, or null for host-only session events. */
 export function toApiEvent(event: NovaSessionEvent): GameApiEvent | null {
   switch (event.type) {
     case "playerJoined":

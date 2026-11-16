@@ -3,12 +3,9 @@ import type { PartyPhase, PeerLinkStatus } from "../../lib/party/engine";
 import { Button } from "../ui/Button";
 
 /**
- * Generic peer-link alert (PLAN.md §7 stages 2 and 4). It never names a
- * player: the tunnel hooks do not identify the peer, and a name is unknown
- * before admission. "connecting" is informational. "failed" offers a retry
- * (the engine's reconnect path) outside the game. During play there is no
- * button: Trystero re-attempts a failed pair on re-announce, and a reconnect
- * would tear down the running game.
+ * Never name a peer: tunnel hooks do not identify pairs and names are
+ * unknown before admission. Reconnect is offered only outside play because
+ * it tears down the game; active games rely on transport re-announcement.
  */
 export function PeerLinkAlert({
   status,

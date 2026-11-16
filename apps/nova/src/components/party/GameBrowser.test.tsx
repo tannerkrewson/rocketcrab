@@ -14,12 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { gameRepository } from "../../lib/games/instance";
 import { GameBrowser } from "./GameBrowser";
 
-/**
- * GameBrowser party-exit tests (rocketcrab-8z9): the browser's empty saved
- * list "New game" action leaves the party flow entirely. In party mode
- * (`inParty`) it asks "Leave the party?" first and only navigates after the
- * player confirms (leaving the party first); standalone it stays a plain link.
- */
+/** Builder actions must confirm and leave an active party before navigating. */
 
 const { leavePartyMock } = vi.hoisted(() => ({
   leavePartyMock: vi.fn(async () => undefined),
@@ -77,24 +72,20 @@ describe("GameBrowser exit links (8z9)", () => {
   it("asks 'Leave the party?' before New game in party mode, and leaves first (8z9)", async () => {
     const router = await renderBrowser({ inParty: true });
 
-    // Empty saved list -> the New-game action in the My games category.
     await userEvent.click(screen.getByRole("button", { name: /My games/ }));
     const newGame = await screen.findByRole("button", { name: "New game" });
     await userEvent.click(newGame);
 
-    // The prompt appears first — nothing navigated and nothing left yet.
     const dialog = screen.getByRole("dialog", { name: "Leave the party?" });
     expect(within(dialog).getByText(/you'll leave this party first/)).toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/");
     expect(leavePartyMock).not.toHaveBeenCalled();
 
-    // Staying keeps you in the party and on the browse page.
     await userEvent.click(within(dialog).getByRole("button", { name: "Stay in party" }));
     expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
     expect(router.state.location.pathname).toBe("/");
     expect(leavePartyMock).not.toHaveBeenCalled();
 
-    // Confirming leaves the party and then opens the game builder.
     await userEvent.click(screen.getByRole("button", { name: "New game" }));
     await userEvent.click(
       within(screen.getByRole("dialog", { name: "Leave the party?" })).getByRole("button", {
@@ -126,7 +117,6 @@ describe("GameBrowser exit links (8z9)", () => {
   it("does not prompt outside a party — New game stays a plain link (8z9)", async () => {
     const router = await renderBrowser({ inParty: false });
 
-    // No party: the New-game action is a plain link to the builder.
     await userEvent.click(screen.getByRole("button", { name: /My games/ }));
     const newGameLink = await screen.findByRole("link", { name: "New game" });
     expect(newGameLink.getAttribute("href")).toBe("/build");

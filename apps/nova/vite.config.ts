@@ -29,21 +29,14 @@ function httpsServerConfig(mode: string) {
 }
 
 /**
- * Strict SPA CSP baked into the built index.html (M2; ADR-0001, ADR-0008).
+ * Strict SPA CSP shared by index.html and Cloudflare asset headers
+ * (ADR-0001, ADR-0008).
  *
- * The main origin's strict policy is emitted as a CSP meta tag and as
- * a Cloudflare static asset header from the same policy. The
- * runtime iframe is allowed only from the configured runtime origin
- * (`VITE_RUNTIME_ORIGIN`, set by the deploy script); without it,
- * `frame-src` falls back to `default-src 'self'` and the runtime frame is
- * blocked — a loud misconfiguration, never a silent loosening. The runtime
- * origin has NO CSP meta on purpose: it must keep ordinary web capabilities
- * for game HTML (permissive runtime policy, docs/architecture/deployment.md).
- *
- * Classic external iframe games (rocketcrab-9fv.7.7.1) are embedded on the
- * main origin, so their origins are allowlisted in `frame-src` alongside the
- * runtime origin. The allowlist is the static set of classic game origins
- * (CLASSIC_FRAME_ORIGINS) — never a wildcard.
+ * Only the configured runtime origin and static CLASSIC_FRAME_ORIGINS
+ * allowlist can be framed. Missing VITE_RUNTIME_ORIGIN intentionally blocks
+ * the runtime instead of weakening the policy. The separate runtime origin
+ * has no CSP meta tag so game HTML retains ordinary web capabilities
+ * (docs/architecture/deployment.md).
  */
 function cspMetaPlugin(): Plugin {
   return {
