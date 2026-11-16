@@ -99,11 +99,15 @@ Record results in `docs/testing/trystero-connectivity-findings.md` and
 - [ ] Attach `rocketcrab.com` to `rocketcrab-nova`; add it to the edge
       `ORIGIN_ALLOWLIST`; rebuild the runtime with the new
       `VITE_MAIN_ORIGIN`; redeploy all three.
-- [ ] Move the edge to a `rocketcrab.com` subdomain (for example
-      `edge.rocketcrab.com`). School and company web filters commonly block
-      `*.workers.dev`, and when signaling is blocked nothing connects. Decide
-      whether the runtime needs its own domain for the same reason; it must
-      stay on a different site from the app.
+- [ ] Move the edge onto `rocketcrab.com` (for example `edge.rocketcrab.com`,
+      or merged into the app Worker under `/api`). School and company
+      filters often block `*.workers.dev`, and without signaling nothing
+      connects.
+- [ ] **Owner:** register a second domain for the game runtime and attach
+      it to `rocketcrab-runtime`. It must be a different site from the app (a
+      `rocketcrab.com` subdomain is the same site, so a looping game would
+      freeze the app on desktop), and leaving it on workers.dev keeps the
+      filter risk.
 
 ## Known limits and open decisions
 
