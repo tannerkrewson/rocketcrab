@@ -104,7 +104,10 @@ canonical index or an ADR:
 - `docs/game-author-debugging.md` — the authoring loop, editor diagnostics,
   common failure messages, and how to debug a real party.
 - `docs/history/nova-simplification-evidence.md` — archived simplification
-  evidence; the only file in `docs/history/`.
+  evidence.
+- `docs/history/nova-connectivity-plan-2026-11.md` — the archived
+  connectivity plan with its evidence; `PLAN.md §n` references in code
+  point here.
 - `docs/testing/` — milestone findings and checklists, each linked from its
   owning ADR (e.g. the S4 state-mode vertical slice from ADR-0006).
 - `deploy/cloudflare.md` — runbook and live state for the one Cloudflare
