@@ -148,7 +148,7 @@ flowchart LR
   only available after start; before that it throws `not_started` (the S1
   guarantee that API calls fail clearly before readiness).
 - **`nova.onEnd(fn)`** — the game ended. `fn` receives the reason:
-  `"user_exit"`, `"host_closed"`, `"authority_migrated"`, or `"error"`.
+  `"user_exit"`, `"host_closed"`, or `"error"`.
   After the end, sending calls throw `ended`.
 - **`nova.onConnectionChange(fn)`** — your own connection status:
   `"connecting"`, `"connected"`, `"reconnecting"`, `"suspended"`,

@@ -119,11 +119,9 @@ describe("/build?page=prompt — the master-prompt step", () => {
 
     // The complete generated prompt is present (inside the expandable panel).
     expect(screen.getByText(new RegExp("Nova Master Prompt"))).toBeInTheDocument();
-    expect(
-      screen.getByText(new RegExp("Interview the user before writing any code")),
-    ).toBeInTheDocument();
+    expect(screen.getByText(new RegExp("Interview the user first"))).toBeInTheDocument();
     // The embedded API reference travels with the prompt.
-    expect(screen.getByText(new RegExp("The whole API in one block"))).toBeInTheDocument();
+    expect(screen.getByText(new RegExp("Nova API — AI Quick Reference"))).toBeInTheDocument();
     // The version badge was removed from the generator UI and the prompt.
     expect(screen.queryByText(/template v\d+ · Nova API v\d+/)).not.toBeInTheDocument();
   });

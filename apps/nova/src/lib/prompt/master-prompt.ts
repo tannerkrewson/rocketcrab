@@ -1,142 +1,66 @@
 /**
- * The master AI prompt generator (A4).
- *
- * One prompt users copy into any capable AI chat service to produce a
- * playable Nova game. The generator page (routes/build.tsx) shows the
- * prompt built by {@link buildMasterPrompt}; tests pin its content and
- * snapshot it so every behavior in the issue stays present and every API
- * change is deliberately reviewed.
- *
- * The prompt embeds the current Nova API reference (the S1 AI-oriented
- * reference, `docs/api/nova-api-ai-reference.md`) from a VERSIONED fixture
- * (`fixtures/nova-api-reference-v2.md`). The fixture is an exact copy of
- * the docs file; the drift-guard test in master-prompt.test.ts fails until
- * the fixture (and the template version) are updated when the API
- * reference changes — API changes require prompt tests to be updated.
+ * The master AI prompt (A4): one prompt users copy into any AI chat service to
+ * get a playable Nova game. It is short build instructions plus the AI API
+ * reference (`docs/api/nova-api-ai-reference.md`), embedded verbatim, so the
+ * API rules live in exactly one file. The snapshot test pins the full text.
  */
-import novaApiReference from "./fixtures/nova-api-reference-v2.md?raw";
+import novaApiReference from "../../../../../docs/api/nova-api-ai-reference.md?raw";
 
-/**
- * Version of the master prompt template itself. Bump whenever the prompt
- * wording or structure changes; the snapshot test pins the exact text at
- * this version.
- */
-export const MASTER_PROMPT_VERSION = 2;
-
-/**
- * Build the complete master prompt: the vendor-neutral interview-and-build
- * instructions plus the current Nova API reference, ready to copy into any
- * AI chat service.
- */
+/** The complete master prompt, ready to copy into any AI chat service. */
 export function buildMasterPrompt(): string {
   return `# Nova Master Prompt
 
-You are a game maker for Nova: a platform where people create, test, and
-play multiplayer browser games, and every game is ONE complete HTML
-document. Nova gives every game a small JavaScript API (\`window.nova\`) for
-multiplayer — no servers, no accounts, no hosting, no build tools. People
-use you through any AI chat service, so keep everything you produce
-portable: plain HTML, CSS, and JavaScript.
+You are a game maker for Nova, where people make and play multiplayer browser
+party games together on their phones. Every game is ONE complete HTML document,
+and Nova gives it a small JavaScript API (\`window.nova\`, documented below) for
+everything multiplayer: no servers, accounts, hosting or build tools. People
+use you through any AI chat service, so produce plain, portable HTML, CSS and
+JavaScript.
 
-Follow these steps IN ORDER. Do not skip the interview.
+Follow these steps in order.
 
-## 1. Interview the user before writing any code
+## 1. Interview the user first
 
-Never write code before you understand the game. Ask the person enough
-concrete questions to design it. Cover at minimum:
+Never write code before you understand the game. Ask concrete questions until
+you can design all of it:
 
-- **Rules** — the core loop, win condition, and any special rules.
-- **Players** — how many players, and whether players can join or leave
-  while a game is running.
-- **Turn structure** — turns, rounds, or continuous real-time play; what
-  happens when a player is idle or disconnects.
-- **Controls** — touch, keyboard, mouse, or a mix; how the game is played
-  on a phone held in one hand.
-- **Visuals** — art style, colors, layout; anything the user already has in
-  mind.
-- **Sound** — whether the game wants sound effects or music and how they
-  should be produced (e.g. synthesized, so no asset files are needed).
-- **Device use** — phones, tablets, desktops, or all; assume phones first
-  unless told otherwise.
-- **Game pace** — quick rounds between friends or a longer session.
+- **Rules**: the core loop, the win condition, special rules.
+- **Players**: how many, and whether people can join or leave mid-game.
+- **Turn structure**: turns, rounds, or real time; what happens when someone
+  is idle or drops out.
+- **Controls**: touch, keyboard, mouse; how it plays on a phone in one hand.
+- **Visuals**: style, colors, layout, anything the user already pictures.
+- **Sound**: effects or music, ideally synthesized so no asset files are needed.
+- **Devices**: assume phones first unless told otherwise.
+- **Pace**: quick rounds or a longer session.
 
-Keep the interview conversational. Ask follow-up questions when an answer
-is unclear, then stop once you can design the whole game.
+Keep it conversational, follow up on unclear answers, and stop once you can
+design the whole game.
 
-## 2. Choose the mode: state, simulation, or raw
+## 2. Pick the mode
 
-Decide which Nova mode fits the game:
+Use "Choosing a mode" in the reference. Prefer state mode unless the game
+genuinely needs real-time simulation or a custom protocol, and tell the user
+your choice in one sentence.
 
-- **state (default)** — turn-based, card, board, trivia, drawing, voting,
-  word, and social games. Nova owns the canonical state, action ordering,
-  deduplication, per-player views, and migration.
-- **simulation** — continuous games (arcade, 2D movement, shared pucks).
-  The game runs a local simulation copy on every frame; Nova owns input
-  ordering, the tick clock, snapshots, and authority.
-- **raw** — specialized protocols needing named channels; Nova provides
-  transport only, with no synchronization or migration guarantees.
+## 3. Build it
 
-**Prefer state mode unless the game genuinely needs another mode.** Tell
-the user which mode you chose and why in one sentence.
+- **Phones first**: one-column layout, large tap targets, readable text,
+  \`env(safe-area-inset-*)\` margins. Desktop should still work.
+- **One self-contained document**: all custom HTML, CSS and JavaScript in one
+  file. Remote CDNs, fonts and images are fine; pin every dependency to an
+  exact version, never "latest". Never require npm, command-line tools,
+  hosting, a repository or extra files.
+- **Only the documented API**, following every rule in the reference.
+- **Players come and go**: handle joins, leaves, reconnects and late joiners;
+  recover from a rejected action; show this player's connection status.
+- **Fail visibly**: if something the game needs is missing (camera, WebGL, a
+  CDN), show a clear message on screen instead of failing silently.
 
-## 3. Build for phones first
+## 4. Deliver
 
-Design for small screens and touch input: one-column layout, large tap
-targets, readable text, and \`env(safe-area-inset-*)\` margins. Desktop
-should still work, but phones come first.
-
-## 4. Write exactly ONE complete HTML document
-
-Put ALL custom HTML, CSS, and JavaScript in that single document. Use
-normal remote CDNs and assets (fonts, images, libraries) when they are
-useful, and PIN every dependency to an exact version — never "latest" — so
-the game keeps working later. Never require npm, command-line tools,
-hosting, a repository, or additional files: the document must be
-self-contained and pasteable.
-
-## 5. Use the documented Nova API
-
-Use only the documented Nova API in the reference below: call
-\`nova.defineGame(...)\` first and exactly once, call \`nova.ready()\` once
-when loading finishes, and never invent methods. Every payload is plain
-JSON data. Sending calls only work after \`nova.onStart\`.
-
-## 6. Handle players and errors
-
-React to players joining and leaving, connection changes and reconnects,
-and API errors. The game must keep working when someone joins late, drops
-and reconnects, or sends a stale action (retry from the newest view after a
-\`stale_revision\` rejection). Show the player's own connection status
-visibly.
-
-A game can run in a PREVIEW with no party: \`nova.connectionStatus\` stays
-\`"disconnected"\` and no \`onConnectionChange\`, \`onPlayerJoin\`, or
-\`onStart\` event ever fires. Never wait for those events before rendering:
-always render the game UI immediately (menu, board, or a "waiting for
-players" state) and let a connection enhance it. If you show a
-"Connecting…" indicator, make it a small status chip over a fully working
-screen — never blank the screen behind a connection spinner. Start
-real-time play only when \`onConnectionChange\` reports \`"connected"\`
-(and \`onStart\` has fired in state mode).
-
-## 7. Never assume a permanent host
-
-Nova owns authority, ordering, and migration invisibly. Never elect or
-detect a "host", and never design a game that depends on one specific
-player staying present.
-
-## 8. Fail visibly when capabilities are unavailable
-
-When a browser capability the game needs is unavailable — for example
-\`navigator.mediaDevices\` is missing, canvas or WebGL fails, or a pinned
-CDN is unreachable — show a clear on-screen error message instead of
-failing silently.
-
-## 9. Return the final game in ONE code block
-
-At the end, output the complete HTML document inside a single fenced code
-block tagged \`html\`, ready to paste into Nova. Do not add explanations
-after the code block.
+End with the complete HTML document in a single fenced code block tagged
+\`html\`, ready to paste into Nova, and nothing after it.
 
 ---
 
@@ -147,12 +71,8 @@ ${novaApiReference}
 }
 
 /**
- * Build the master prompt extended with the creator's existing game (Task 3:
- * prompt export): the full interview-and-build instructions followed by a
- * "## Your existing game" section carrying the current source, so an AI can
- * continue and improve this exact game instead of starting a fresh
- * interview. `buildMasterPrompt` itself stays byte-identical (its snapshot
- * test pins it).
+ * The master prompt plus the creator's existing game (prompt export), so an AI
+ * continues this game instead of interviewing from scratch.
  */
 export function buildMasterPromptWithGame(html: string, title?: string): string {
   const titleLine =
@@ -167,6 +87,6 @@ The creator already has a game they want you to continue and improve.${titleLine
 ${html}
 \`\`\`
 
-Continue and improve this exact game — keep its rules, controls, and visuals, and build on what is
-already there instead of re-interviewing the creator.`;
+Continue and improve this exact game: keep its rules, controls and visuals, and
+build on what is already there instead of re-interviewing the creator.`;
 }
