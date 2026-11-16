@@ -22,7 +22,6 @@ export * from "./types";
 export * from "./constants";
 export * from "./validation";
 export * from "./client";
-export * from "./media";
 export * from "./session";
 export * from "./state-engine";
 export * from "./state-executor";

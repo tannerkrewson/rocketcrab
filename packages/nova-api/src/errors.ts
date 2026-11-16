@@ -76,12 +76,6 @@ export const NOVA_ERROR_CODES = {
   snapshot_error: "snapshot_error",
   /** A replicated simulation snapshot failed its hash check (A1). */
   invalid_snapshot: "invalid_snapshot",
-  /**
-   * Media transport is not available in this build: tracks/streams cannot
-   * cross the runtime frame boundary yet (A3 experimental surface; see
-   * `docs/testing/media-bridging-findings.md`).
-   */
-  media_unsupported: "media_unsupported",
 } as const;
 
 export type NovaErrorCode = (typeof NOVA_ERROR_CODES)[keyof typeof NOVA_ERROR_CODES];

@@ -25,7 +25,6 @@ export const NOVA_API_SURFACE: readonly string[] = [
   "state",
   "raw",
   "simulation",
-  "media",
 ] as const;
 
 /**

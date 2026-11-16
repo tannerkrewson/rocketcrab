@@ -477,89 +477,42 @@ the AI reference (A4) follows the same guidance.
 
 ---
 
-## 11. Media (experimental — A3)
-
-`nova.media` is the experimental camera/microphone surface. The A3 spike
-(`docs/testing/media-bridging-findings.md`) evaluated how a game frame that
-acquires media could publish it through the party transport; the verdict is
-that cross-frame media transport is **experimental and unsupported in this
-build** (Blocker Register B7): media objects cannot cross the runtime frame
-boundary until device verification passes.
-
-```js
-// Acquisition stays inside your frame: ordinary browser permission prompts.
-var stream = await navigator.mediaDevices.getUserMedia({ video: true });
-
-// Probe the platform: can this realm structured-clone a MediaStream?
-// false rules the whole bridge out on this platform.
-var platformCanClone = nova.media.isSupported();
-
-// Publishing is EXPERIMENTAL: in this build it always throws a NovaError
-// with code "media_unsupported" (after lifecycle + input validation).
-// Do not build voice/video multiplayer on nova.media yet.
-try {
-  nova.media.publish(stream);
-} catch (error) {
-  nova.log(error.code, error.message); // "media_unsupported"
-}
-```
-
-Contract:
-
-- `nova.media.isSupported()` — platform capability probe (can this realm
-  structured-clone a `MediaStream`). `true` is necessary but **not
-  sufficient** for the bridge; `false` means cross-frame media transfer is
-  certainly unavailable on this platform.
-- `nova.media.publish(trackOrStream)` — takes a live `MediaStreamTrack` or
-  `MediaStream` from **this** frame (cross-realm or plain objects are
-  rejected with `invalid_options`), then throws `media_unsupported` in this
-  build. Lifecycle gating matches every sending call: `not_started` before
-  start, `ended` after end.
-- Media **never reaches the party** today: no track/stream crosses the
-  frame boundary, no protocol message exists, and the data-only MVP is
-  untouched. Camera/mic capture inside the game frame works (F4 verified on
-  Mobile Safari) with ordinary permission prompts; permission scope is
-  origin-wide (ADR-0008).
-
----
-
-## 12. Errors
+## 11. Errors
 
 Every API failure is a `NovaError` with a stable `code` and a human message:
 
-| Code                      | Meaning                                                                                                      |
-| ------------------------- | ------------------------------------------------------------------------------------------------------------ |
-| `unsupported_api_version` | `defineGame` targeted an API version this build cannot serve.                                                |
-| `already_registered`      | `defineGame` was called more than once.                                                                      |
-| `not_registered`          | A call requires `defineGame` to have run first.                                                              |
-| `already_ready`           | `ready` was called more than once.                                                                           |
-| `already_started`         | A lifecycle transition was attempted after the game started.                                                 |
-| `not_started`             | A sending call ran before the game started (see `onStart`).                                                  |
-| `ended`                   | A call ran after the game ended.                                                                             |
-| `invalid_options`         | Options or arguments failed structural validation.                                                           |
-| `invalid_payload`         | A payload is not structured-clone-compatible / JSON plain data.                                              |
-| `unknown_channel`         | A raw send referenced a channel that was not created.                                                        |
-| `reserved_channel`        | A raw channel used the reserved protocol name.                                                               |
-| `rate_limited`            | A raw send exceeded the per-second rate limit (A2).                                                          |
-| `not_connected`           | A targeted send referenced a player who is not connected.                                                    |
-| `invalid_message`         | The host received an invalid protocol message (delivered via `onError`).                                     |
-| `unsupported`             | The operation is not available in this build (reported by the runtime).                                      |
-| `media_unsupported`       | `nova.media.publish` ran in a build/platform where media cannot cross the frame boundary (experimental; A3). |
-| `stale_revision`          | An action was based on an outdated revision; another action applied first. Retry from the latest view.       |
-| `timed_out`               | The authority did not apply a dispatched action within 10 seconds.                                           |
-| `unknown_action`          | `nova.dispatch` named an action that has no handler in `actions`.                                            |
-| `payload_too_large`       | An action payload exceeded 16 KiB, or a raw payload exceeded 1 MiB.                                          |
-| `state_too_large`         | The resulting canonical state exceeded the 512 KiB snapshot limit.                                           |
-| `no_authority`            | No authority is currently available to apply the action.                                                     |
-| `game_ended`              | The game ended before the authority applied the action.                                                      |
-| `no_snapshot_handler`     | A simulation authority has no `serializeState` handler, so it cannot produce snapshots.                      |
+| Code                      | Meaning                                                                                                |
+| ------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `unsupported_api_version` | `defineGame` targeted an API version this build cannot serve.                                          |
+| `already_registered`      | `defineGame` was called more than once.                                                                |
+| `not_registered`          | A call requires `defineGame` to have run first.                                                        |
+| `already_ready`           | `ready` was called more than once.                                                                     |
+| `already_started`         | A lifecycle transition was attempted after the game started.                                           |
+| `not_started`             | A sending call ran before the game started (see `onStart`).                                            |
+| `ended`                   | A call ran after the game ended.                                                                       |
+| `invalid_options`         | Options or arguments failed structural validation.                                                     |
+| `invalid_payload`         | A payload is not structured-clone-compatible / JSON plain data.                                        |
+| `unknown_channel`         | A raw send referenced a channel that was not created.                                                  |
+| `reserved_channel`        | A raw channel used the reserved protocol name.                                                         |
+| `rate_limited`            | A raw send exceeded the per-second rate limit (A2).                                                    |
+| `not_connected`           | A targeted send referenced a player who is not connected.                                              |
+| `invalid_message`         | The host received an invalid protocol message (delivered via `onError`).                               |
+| `unsupported`             | The operation is not available in this build (reported by the runtime).                                |
+| `stale_revision`          | An action was based on an outdated revision; another action applied first. Retry from the latest view. |
+| `timed_out`               | The authority did not apply a dispatched action within 10 seconds.                                     |
+| `unknown_action`          | `nova.dispatch` named an action that has no handler in `actions`.                                      |
+| `payload_too_large`       | An action payload exceeded 16 KiB, or a raw payload exceeded 1 MiB.                                    |
+| `state_too_large`         | The resulting canonical state exceeded the 512 KiB snapshot limit.                                     |
+| `no_authority`            | No authority is currently available to apply the action.                                               |
+| `game_ended`              | The game ended before the authority applied the action.                                                |
+| `no_snapshot_handler`     | A simulation authority has no `serializeState` handler, so it cannot produce snapshots.                |
 
 Unknown methods fail as `TypeError`s (reported as game errors), never as
 silent no-ops.
 
 ---
 
-## 13. What crosses the frame
+## 12. What crosses the frame
 
 Everything a game sends through `nova` must be **structured-clone-compatible
 plain data** (the same rule `postMessage` enforces). Functions registered
@@ -569,7 +522,7 @@ on raw channels.
 
 ---
 
-## 14. Where the API lives and why it behaves the same everywhere
+## 13. Where the API lives and why it behaves the same everywhere
 
 - `packages/nova-api` defines the surface (`createNovaClient`) and the
   transport-neutral session engine (`NovaSession`) that drives it over the
@@ -583,7 +536,7 @@ on raw channels.
 
 ---
 
-## 14.5 Mobile Safari notes (M1; ADR-0012)
+## 14. Mobile Safari notes (M1; ADR-0012)
 
 Mobile Safari is a first-class Nova platform, and it is the most
 restrictive browser in scope. Game code that follows these notes behaves

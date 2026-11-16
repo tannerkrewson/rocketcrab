@@ -23,11 +23,6 @@
  * channel: no extra message listeners, and nothing to leak across restarts.
  * The bridge never touches the host origin or Trystero, and holds no Nova
  * secrets.
- *
- * `nova.media` is an experimental surface. Media transport cannot cross the
- * frame boundary in this build (see docs/testing/media-bridging-findings.md),
- * so it probes platform support and fails clearly. It never reports to the
- * runtime, and the data-only protocol is untouched.
  */
 import {
   PROTOCOL_VERSION,
@@ -449,36 +444,6 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
     }
   };
 
-  // --- Experimental media surface. ---
-  // Media transport cannot cross the frame boundary in this build (see
-  // docs/testing/media-bridging-findings.md). The surface exists so games can
-  // probe the platform and fail clearly. Publish never reports to the runtime
-  // because there is no media transport path; the data-only protocol is untouched.
-  function mediaIsSupported() {
-    try {
-      if (typeof structuredClone !== 'function') return false;
-      if (typeof MediaStream === 'undefined') return false;
-      var probe = new MediaStream();
-      return structuredClone(probe) instanceof MediaStream;
-    } catch (_) { return false; }
-  }
-  function isMediaInput(value) {
-    if (value === null || value === undefined) return false;
-    if (typeof MediaStreamTrack !== 'undefined' && value instanceof MediaStreamTrack) return true;
-    if (typeof MediaStream !== 'undefined' && value instanceof MediaStream) return true;
-    return false;
-  }
-  var mediaHandle = {
-    isSupported: mediaIsSupported,
-    publish: function (trackOrStream) {
-      requireStarted('media.publish');
-      if (!isMediaInput(trackOrStream)) {
-        fail('invalid_options', 'nova.media.publish expects a MediaStreamTrack or MediaStream.');
-      }
-      fail('media_unsupported', 'Media transport is experimental in this build: camera/microphone media cannot cross the runtime frame boundary yet.');
-    }
-  };
-
   function hasPlayer(id) {
     for (var i = 0; i < players.length; i++) {
       if (players[i].id === id) return true;
@@ -664,8 +629,7 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
     },
     state: stateHandle,
     raw: rawHandle,
-    simulation: simulationHandle,
-    media: mediaHandle
+    simulation: simulationHandle
   };
   window.nova = api;
   window.__novaGameBridge = { version: ${PROTOCOL_VERSION}, receive: receive };
