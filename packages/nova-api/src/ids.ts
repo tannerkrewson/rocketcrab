@@ -1,14 +1,12 @@
 /**
- * Identifier and timestamp generation for protocol messages (S1).
+ * Identifier and timestamp generation for protocol messages.
  *
  * The session generates its own protocol-level message IDs and monotonic
  * per-sender sequence numbers; the transport assigns its own delivery
- * stamps independently (U5). Sequence numbers start at 1 and increase for
- * every ordered message this session sends (F6: ordered families require a
- * per-sender monotonic `seq`).
+ * stamps independently. Sequence numbers start at 1 and increase for
+ * every ordered message this session sends.
  */
 
-/** Unique protocol message ID (envelope requirement). */
 export function newMessageId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -16,7 +14,6 @@ export function newMessageId(): string {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
-/** Epoch-millisecond timestamp for the message envelope. */
 export function nowSentAt(): number {
   return Date.now();
 }

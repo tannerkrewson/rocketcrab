@@ -1,11 +1,9 @@
 /**
- * S1 session attach tests (P4 party lobby).
+ * Session attachment to an already-joined party transport.
  *
  * `NovaSession.attach()` wires a session to a transport the party layer has
- * ALREADY joined (the P2/P3 `createParty`/`joinPartyByCode` flows join the
- * private room internally). These tests verify the session observes the
- * party it missed during transport establishment: current peers are
- * replayed, the connection status is seeded, and a peer that introduces
+ * already joined through `createParty` or `joinPartyByInvite`.
+ * Current peers must be replayed, connection status seeded, and a peer that introduces
  * itself after our readiness announcement still learns we are ready
  * (the late-attach ready race).
  */
@@ -129,8 +127,8 @@ describe("NovaSession.attach (already-joined transport)", () => {
 });
 
 // ---------------------------------------------------------------------------
-// A2 raw data-channel mode: channel lifecycle, mid-game joins, limits,
-// transfer progress, and diagnostics (rocketcrab-9fv.5.2).
+// raw data-channel mode: channel lifecycle, mid-game joins, limits,
+// transfer progress, and diagnostics.
 // ---------------------------------------------------------------------------
 
 describe("NovaSession raw channels (A2)", () => {
@@ -160,7 +158,7 @@ describe("NovaSession raw channels (A2)", () => {
     await a.join();
     await b.join();
     await settle(hub);
-    // Raw channels are only available after the game starts (S1 lifecycle).
+    // Raw channels are only available after the game starts (lifecycle).
     a.start();
     b.start();
     // The authority's start path resolves through async executor turns;
@@ -184,8 +182,8 @@ describe("NovaSession raw channels (A2)", () => {
     expect(b.getRawDiagnostics().channelCount).toBe(2);
     expect(b.getRawDiagnostics().selfDeclaredChannelCount).toBe(0);
 
-    // Carol joins mid-game: she must learn Ada's open channels (A2
-    // join/leave of peers mid-channel) so she can subscribe and send.
+    // Carol joins mid-game and learns Ada's open channels without waiting
+    // for a new declaration.
     const transportC = hub.createTransport({ memberId: "member-c", displayName: "Carol" });
     const c = createNovaSession({
       transport: transportC,
@@ -238,7 +236,7 @@ describe("NovaSession raw channels (A2)", () => {
     await settle(hub);
     expect(aMessages).toEqual([{ text: "from ben" }]);
 
-    // Closing an unknown channel is an idempotent no-op (A2 lifecycle rule).
+    // Closing an unknown channel is an idempotent no-op.
     expect(() => a.client.raw.close("chat")).not.toThrow();
     expect(() => a.client.raw.close("nope")).not.toThrow();
   });
@@ -289,7 +287,6 @@ describe("NovaSession raw channels (A2)", () => {
       code: "payload_too_large",
     });
     expect(a.getRawDiagnostics().oversizedRejections).toBe(1);
-    // The oversized send never reached Ben.
     expect(b.getRawDiagnostics().receivedCount).toBe(0);
   });
 

@@ -2,8 +2,8 @@
  * Structural validation for game-facing API inputs.
  *
  * The game-facing API validates every input with the same bounded Zod
- * schemas used at the protocol boundary (threat model T10; engineering
- * rules 15/21 — no `any`, never trust game-supplied values). The runtime
+ * schemas used at the protocol boundary (threat model T10 — no `any`, never
+ * trust game-supplied values). The runtime
  * frame re-validates everything at its own boundary; these schemas give the
  * game an immediate, clear error before anything crosses a trust boundary.
  *
@@ -16,7 +16,7 @@ import { titleSchema } from "@rocketcrab/protocol";
 import { z } from "zod";
 import { NovaError } from "./errors";
 
-/** Bounded registration options for `nova.defineGame` (S1 surface). */
+/** Bounded registration options for `nova.defineGame`. */
 export const novaGameDeclarationSchema = z.object({
   title: titleSchema.optional(),
   mode: z.enum(["state", "simulation", "raw"]).optional(),

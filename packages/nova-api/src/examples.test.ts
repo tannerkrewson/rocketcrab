@@ -1,5 +1,5 @@
 /**
- * S1 documentation check: the JavaScript examples in `docs/api/` are the
+ * Documentation check: the JavaScript examples in `docs/api/` are the
  * canonical usage examples, and they must actually work against the real
  * API. Each example is executed with a session-backed `nova` client (the
  * same client the runtime frame bridge builds), and the minimal game is

@@ -1,14 +1,13 @@
 /**
- * Transport-agnostic Nova session contract suite (S1 surface + S2 state
- * mode).
+ * Transport-agnostic Nova session contract suite.
  *
  * `runNovaSessionContractTests` runs the same two-player game scenarios
  * against any {@link NovaTransport} implementation provided by a harness.
- * InMemoryTransport (the test arena, U5) runs it today; TrysteroTransport
- * (real parties, P1) must pass the same suite (ADR-0003: the game-facing
+ * InMemoryTransport (the test arena) and TrysteroTransport
+ * (real parties) must pass the same suite (ADR-0003: the game-facing
  * API behaves identically over both transports).
  *
- * S2 state mode is exercised through the same transport-neutral seam games
+ * state mode is exercised through the same transport-neutral seam games
  * use in the arena: handlers registered via `nova.defineGame` run
  * in-process (LocalGameExecutor, immer), so the suite covers initial
  * state, revisioned snapshots, per-player views, sequential application,
@@ -148,7 +147,7 @@ function buildInjectedDispatch(
 }
 
 // ---------------------------------------------------------------------------
-// A1 simulation-mode helpers
+// simulation-mode helpers
 // ---------------------------------------------------------------------------
 
 /** Short deterministic simulation timings for the contract tests. */
@@ -430,7 +429,7 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
     });
 
     // ------------------------------------------------------------------
-    // S2 state mode
+    // state mode
     // ------------------------------------------------------------------
 
     it("creates the initial state and delivers each player's selected view", async () => {
@@ -825,7 +824,7 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
     });
 
     // ------------------------------------------------------------------
-    // Raw, simulation, and protocol boundaries (S1)
+    // Raw, simulation, and protocol boundaries
     // ------------------------------------------------------------------
 
     it("exchanges raw channel messages, targeted and binary", async () => {
@@ -990,7 +989,7 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
     });
 
     // ------------------------------------------------------------------
-    // A1 simulation mode
+    // simulation mode
     // ------------------------------------------------------------------
 
     it("advances the simulation clock on every session after start", async () => {

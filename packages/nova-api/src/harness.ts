@@ -1,8 +1,6 @@
 /**
- * Test harness: the in-memory transport (U5) as a NovaTransportHarness, so
- * the contract suite and example tests run against the arena transport.
- * P1 runs the same contract suite against TrysteroTransport with its own
- * harness.
+ * In-memory NovaTransportHarness for the contract suite and example tests.
+ * TrysteroTransport runs the same contract suite with its own harness.
  */
 import type { NovaTransport } from "@rocketcrab/core";
 import { InMemoryTransportHub } from "@rocketcrab/testing";

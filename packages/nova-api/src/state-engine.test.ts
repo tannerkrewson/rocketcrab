@@ -1,7 +1,6 @@
 /**
- * S2 state-engine unit tests: the action protocol guarantees from the
- * issue's acceptance criteria — duplicate, stale, malformed, late, and
- * timed-out actions; exactly-once application; sequential execution;
+ * State-engine unit tests: duplicate, stale, malformed, late, and timed-out
+ * actions; exactly-once application; sequential execution;
  * per-player views; bounded history; and the invariant that an
  * authority-runtime failure never corrupts the last committed state.
  *
@@ -81,7 +80,7 @@ class RecordingHost implements StateEngineHost {
   }
 }
 
-/** Every engine created in this file (disposed after each test; S3 timers). */
+/** Engines disposed after each test to stop their election timers. */
 const createdEngines: NovaStateEngine[] = [];
 
 function track(engine: NovaStateEngine): NovaStateEngine {
@@ -196,7 +195,7 @@ describe("NovaStateEngine authority start", () => {
       sentAt: 1_700_000_000_000,
       senderMemberId: "member-b",
     });
-    // S3 routing: only the current authority applies actions; an unstarted
+    // Routing: only the current authority applies actions; an unstarted
     // shell (no authority yet) drops dispatches — the sender re-sends once
     // the authority is announced. The client blocks dispatch pre-start.
     expect(host.acks).toHaveLength(0);

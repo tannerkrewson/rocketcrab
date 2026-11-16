@@ -1,15 +1,14 @@
 /**
- * The A1 simulation-mode engine: Nova's half of a simulation game.
+ * The simulation-mode engine: Nova's half of a simulation game.
  *
  * Simulation mode (ADR-0006) trades state-mode guarantees for speed: the
  * game owns the simulation rules and runs a local copy on every frame; Nova
  * owns everything else — ordered input delivery, the shared simulation
- * clock (the tick), authority selection (reusing S3's election machinery),
+ * clock (the tick), authority selection (reusing the state engine's election machinery),
  * periodic authoritative snapshots, snapshot replication, restore after
  * authority migration, input/snapshot rate bounds, and latency/drift
  * reporting. Rollback netcode and deterministic third-party physics are
- * explicitly NOT provided (initial limitations; the game corrects drift from
- * authoritative snapshots).
+ * explicitly NOT provided (the game corrects drift from authoritative snapshots).
  *
  * The engine lives inside the host-side {@link NovaSession} and never talks
  * to the transport directly: the session provides a
@@ -28,7 +27,7 @@
  *   verifies the size bound, hashes it, and broadcasts
  *   `simulation.snapshot` (tick, term, authority, hash, state). Every
  *   session retains the latest snapshot for migration.
- * - **Authority migration** (S3): when the state engine reports a new
+ * - **Authority migration**: when the state engine reports a new
  *   authority, followers push their retained snapshot to it; the new
  *   authority collects pushes for `restoreWindowMs`, adopts the highest
  *   valid snapshot (hash-checked), re-broadcasts it as a correction, and
@@ -92,7 +91,7 @@ export type SimulationEngineEvent =
   | { type: "error"; code: string; message: string };
 
 /**
- * The serialized-state executor seam (A1): the single place the simulation
+ * The serialized-state executor seam: the single place the simulation
  * engine asks the authority's game to serialize its simulation state. The
  * in-process {@link LocalSimulationExecutor} calls the `serializeState`
  * handler the game registered through `nova.simulation.register`; the arena
@@ -166,7 +165,6 @@ export interface NovaSimulationEngineOptions {
   now?: () => number;
 }
 
-/** Clamp a configured value into [min, max] (Nova limits are authoritative). */
 function clamp(value: number | undefined, fallback: number, min: number, max: number): number {
   if (value === undefined) return fallback;
   return Math.min(max, Math.max(min, value));
@@ -181,7 +179,7 @@ interface LatencySample {
 /**
  * The simulation engine. One instance per session; the session drives it
  * from lifecycle events (start/end), inbound `simulation.input` and
- * `simulation.snapshot` messages, and the S3 authority-change events.
+ * `simulation.snapshot` messages, and authority-change events.
  */
 export class NovaSimulationEngine {
   private readonly host: SimulationEngineHost;
@@ -236,7 +234,6 @@ export class NovaSimulationEngine {
     this.now = options.now ?? (() => Date.now());
   }
 
-  /** Swap the executor (the session wires game handlers registered later). */
   setExecutor(executor: NovaSimulationExecutor): void {
     this.executor = executor;
   }
@@ -277,7 +274,7 @@ export class NovaSimulationEngine {
   }
 
   /**
-   * The authority changed (S3): the session reports the state engine's
+   * The authority changed: the session reports the state engine's
    * authority decisions. Becoming the authority starts the restore window
    * (collecting peer snapshot pushes) and then the snapshot cadence;
    * becoming a follower pushes the retained snapshot to the new authority
@@ -285,7 +282,7 @@ export class NovaSimulationEngine {
    */
   onAuthorityChanged(authorityMemberId: string | null, term: number): void {
     if (this.disposed || this.ended) return;
-    if (term < this.term) return; // stale term can never win
+    if (term < this.term) return;
     const changed = authorityMemberId !== this.authorityMemberId || term !== this.term;
     this.term = Math.max(this.term, term);
     this.authorityMemberId = authorityMemberId;
@@ -301,7 +298,7 @@ export class NovaSimulationEngine {
       }
       return;
     }
-    if (!changed) return; // re-announcement of the same authority
+    if (!changed) return;
     if (this.latest === null) {
       // Fresh authority (the initial authority): nothing to restore;
       // produce snapshots from the frame's state right away.
@@ -359,7 +356,7 @@ export class NovaSimulationEngine {
     sentAt?: number;
   }): RetainedSimulationSnapshot | null {
     if (this.disposed) return null;
-    if (message.term < this.term) return null; // a stale term can never win
+    if (message.term < this.term) return null;
     if (message.term > this.term || this.authorityMemberId === null) {
       this.term = message.term;
       this.authorityMemberId = message.authorityMemberId;
@@ -387,7 +384,7 @@ export class NovaSimulationEngine {
         // Resync the local clock to the authority (the game restores from
         // the snapshot and continues from the authoritative clock).
         this.tick = Math.max(0, Math.round(authorityTickNow));
-        this.driftTicks = 0; // the clock was realigned
+        this.driftTicks = 0;
       } else {
         this.driftTicks = Math.round(drift);
       }
@@ -442,7 +439,7 @@ export class NovaSimulationEngine {
     return this.isAuthority;
   }
 
-  /** Host-side diagnostics (A1 acceptance: latency and drift are visible). */
+  /** Host-side latency, drift, and snapshot diagnostics. */
   getDiagnostics(): NovaSimulationDiagnostics {
     const now = this.now();
     const avgLatency = this.averageLatency(now);
@@ -548,7 +545,7 @@ export class NovaSimulationEngine {
    */
   private async finishRestore(): Promise<void> {
     if (this.disposed || this.ended) return;
-    if (!this.isAuthority) return; // deposed mid-restore
+    if (!this.isAuthority) return;
     this.restored = true;
     const candidate = this.latest;
     if (candidate !== null && candidate.stateHash !== null) {

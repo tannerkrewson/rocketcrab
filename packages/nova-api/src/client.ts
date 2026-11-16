@@ -1,5 +1,5 @@
 /**
- * The game-facing Nova API client (S1).
+ * The game-facing Nova API client.
  *
  * `createNovaClient(backend)` builds the exact object games receive as
  * `window.nova` (the in-frame bridge and the arena construct the same client
@@ -9,8 +9,7 @@
  *
  * - it enforces the lifecycle (registration → ready → start → end) and makes
  *   every call that requires a later stage fail with a clear
- *   {@link NovaError} (S1 acceptance: API calls fail clearly before
- *   readiness; unknown methods or versions fail safely);
+ *   {@link NovaError};
  * - it validates every input against the same bounded schemas used at the
  *   protocol boundary (no `any`, never trust game input);
  * - inbound events arrive as plain data ({@link NovaSessionEvent}) and are
@@ -54,7 +53,7 @@ import type {
 /**
  * Every event a session backend can push to a client. Only the client-event
  * kinds below are forwarded to game handlers; host-side events such as
- * `actionReceived` (the S2 authority seam) are ignored by the client.
+ * `actionReceived` (the authority seam) are ignored by the client.
  */
 export type NovaSessionEvent =
   | { type: "playerJoined"; player: NovaPlayer }
@@ -66,10 +65,10 @@ export type NovaSessionEvent =
   | { type: "rawMessage"; channel: string; message: NovaRawMessage }
   | { type: "simulationInput"; input: NovaSimulationInput & { sender: NovaPlayer } }
   | { type: "simulationSnapshot"; snapshot: NovaSimulationSnapshot }
-  /** The local simulation clock advanced one time step (A1). */
+  /** The local simulation clock advanced one time step. */
   | { type: "simulationTick"; tick: number }
   /**
-   * The game's authority changed (A1). Games never learn which player is
+   * The game's authority changed. Games never learn which player is
    * authoritative — the event carries the monotonic term only, and the
    * next snapshot is the restore point.
    */
@@ -93,7 +92,7 @@ export type NovaSessionEvent =
    */
   | { type: "ready"; memberId: string }
   | {
-      /** S3: the authority changed (election/migration). Host-side only. */
+      /** The authority changed (election/migration). Host-side only. */
       type: "authorityChanged";
       authorityMemberId: string | null;
       term: number;
@@ -113,7 +112,7 @@ export type NovaSessionEvent =
 /**
  * The backend a client is projected over: the in-process session engine or
  * the in-frame bridge. The interface is data-only — functions registered by
- * a game stay in the client, never crossing the frame (S1 design goal).
+ * a game stay in the client, never crossing the frame.
  */
 export interface NovaClientBackend {
   /** API version this backend speaks (matches `nova.version`). */
@@ -365,7 +364,7 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
       // The session validates channels, limits, and connectivity asynchronously
       // (transport send); failures are delivered to `nova.onError` handlers so
       // games observe them uniformly in the arena, over party transports, and
-      // in-process (S1: every API failure is a stable NovaError).
+      // in-process (every API failure is a stable NovaError).
       Promise.resolve()
         .then(() => backend.sendRaw(name, payload, options))
         .catch((error: unknown) => {
@@ -424,8 +423,7 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
       assertStructuredCloneSafe(input.payload, "nova.simulation.sendInput payload");
       // Runtime rejections (rate limit, not connected) arrive via
       // `nova.onError` so games observe them uniformly in the arena, over
-      // party transports, and in-process (S1: every API failure is a
-      // stable NovaError).
+      // party transports, and in-process (every API failure is a stable NovaError).
       Promise.resolve()
         .then(() => backend.sendSimulationInput(input))
         .catch((error: unknown) => {
@@ -530,7 +528,7 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
       );
       assertStructuredCloneSafe(action.payload, "nova.dispatch action payload");
       // The action id is generated here so the authority's ack can be
-      // correlated with this promise (S2: dispatch resolves on the ack).
+      // correlated with this promise.
       const actionId = newActionId();
       const pending = new Promise<void>((resolve, reject) => {
         const timer = setTimeout(() => {

@@ -1,5 +1,5 @@
 /**
- * A1 simulation-engine unit tests.
+ * Simulation-engine unit tests.
  *
  * The engine is tested in isolation with fake timers and a recording host:
  * the local tick clock, snapshot production (the game's serializeState
@@ -149,7 +149,6 @@ describe(
         { type: "tick", tick: 2 },
         { type: "tick", tick: 3 },
       ]);
-      // The clock stops at end.
       engine.end();
       vi.advanceTimersByTime(300);
       expect(engine.getTick()).toBe(3);
@@ -186,7 +185,6 @@ describe(
       // The produced snapshot is the retained replication copy.
       expect(engine.getLatestSnapshot()?.state).toEqual({ count: 7 });
       expect(engine.getLatestSnapshot()?.tick).toBe(5);
-      // Diagnostics expose the cadence and snapshot age.
       const diagnostics = engine.getDiagnostics();
       expect(diagnostics.tickMs).toBe(100);
       expect(diagnostics.snapshotIntervalMs).toBe(500);
@@ -195,7 +193,6 @@ describe(
       expect(diagnostics.snapshotSizeBytes).toBeGreaterThan(0);
       expect(diagnostics.authorityMemberId).toBe("member-a");
       expect(diagnostics.term).toBe(1);
-      // The cadence repeats.
       vi.advanceTimersByTime(500);
       await waitUntil(() => host.snapshots.length >= 2, "second snapshot");
     });
@@ -403,7 +400,6 @@ describe(
         target: "member-c",
         snapshot: { tick: 9, state: { count: 9 }, term: 2, authorityMemberId: "member-c" },
       });
-      // The cadence is stopped as a follower.
       engine.begin();
       vi.advanceTimersByTime(2_000);
       expect(host.snapshots.filter((send) => send.target === undefined)).toHaveLength(0);
@@ -504,7 +500,7 @@ declare function setImmediate(callback: () => void): unknown;
 /**
  * Wall-clock budget for `waitUntil`. The engine's real-async work (sha256
  * digests) slows down arbitrarily under CPU contention in parallel CI runs,
- * so a fixed poll-count budget flakes (rocketcrab-9fv.7.24 / 7.32).
+ * so a fixed poll-count budget is unreliable.
  * `performance.now` is NOT faked by the test timers, so a generous
  * wall-clock deadline is deterministic; the loop exits as soon as the
  * condition holds, so the budget is only consumed when something is

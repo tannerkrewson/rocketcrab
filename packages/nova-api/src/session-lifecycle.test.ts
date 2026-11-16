@@ -1,5 +1,5 @@
 /**
- * Session lifecycle tests (§10 review): what a session must stop or release
+ * Session lifecycle tests: what a session must stop or release
  * when the player leaves, and how the dispatch buffer stays bounded while no
  * authority is known.
  */

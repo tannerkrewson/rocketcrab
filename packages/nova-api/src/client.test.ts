@@ -140,7 +140,7 @@ describe("createNovaClient lifecycle", () => {
     client.defineGame({ title: "T" });
     client.ready();
     emit({ type: "start" });
-    // dispatch resolves only when the authority acks (S2).
+    // Dispatch resolves only when the authority acks.
     const dispatched = client.dispatch({ type: "playCard", payload: { card: "ace" } });
     await Promise.resolve(); // let the backend record the action id
     ackLastDispatch("accepted", { revision: 2 });

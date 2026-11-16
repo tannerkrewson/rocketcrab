@@ -1,5 +1,5 @@
 /**
- * Canonical API usage examples (S1 documentation deliverable).
+ * Canonical API usage examples.
  *
  * These strings are the JavaScript examples shown in `docs/api/` and the
  * AI-oriented reference. They are exported so tests can verify them against

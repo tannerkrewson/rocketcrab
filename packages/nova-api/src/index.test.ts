@@ -1,11 +1,10 @@
 /**
- * Package surface checks (S1): the exported API matches the documented
+ * Package surface checks: the exported API matches the documented
  * manifest, the game-facing object exposes exactly the documented surface,
  * and the surface carries no game-hosting, deployment, authority, or
- * transport concepts (S1 acceptance: the API has no game-hosting or
- * deployment concept; no Trystero terminology; no authority roles). The
- * docs markdown itself is written from these source types (see docs/api/),
- * and the runtime bridge parity test asserts the injected `window.nova`
+ * transport concepts. The docs markdown itself is written from these source
+ * types (see docs/api/), and the runtime bridge parity test asserts that
+ * the injected `window.nova`
  * script exposes the same surface manifest.
  */
 import { describe, expect, it } from "vitest";

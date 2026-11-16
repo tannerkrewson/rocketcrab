@@ -1,9 +1,8 @@
 /**
- * S4 — the state-mode vertical-slice example game, executed end to end.
+ * State-mode example game, executed end to end.
  *
- * `examples/games/nova-quiz.html` is the single-file state-mode game this
- * issue defines as the backendless MVP milestone. Its inline module script
- * is extracted and run against real session-backed `nova` clients (the same
+ * `examples/games/nova-quiz.html` is a single-file state-mode game. Its inline
+ * module script runs against real session-backed `nova` clients (the same
  * clients the runtime frame bridge builds) over the in-memory transport, so
  * this suite exercises the REAL state engine: action application on the
  * authority, per-player views, private answers, round progression, auto
@@ -328,7 +327,6 @@ describe("four players play full rounds (arena-style)", () => {
       view = await waitForView(world, a, (v) => v.phase === "finished");
       expect(view.winnerId).not.toBeNull();
       expect(view.scores[0]?.id).toBe(view.winnerId);
-      // Every frame agrees on the final state.
       for (const session of world.sessions) {
         const finalView = await waitForView(world, session, (v) => v.phase === "finished");
         expect(finalView.roundsTotal).toBe(2);
@@ -377,7 +375,6 @@ describe("four players play full rounds (arena-style)", () => {
     );
     expect(joined).toContain("stale_revision");
     expect(joined).toContain("Nova Quiz started with 4 player(s)");
-    // The game still progressed despite the races.
     await waitForView(world, a, (v) => v.round >= 2);
   });
 });
@@ -566,7 +563,7 @@ describe("reconnect and late join", () => {
     expect(aRound2.roster.map((p) => p.id)).not.toContain("member-d");
 
     // Dana reconnects: the authority hands her the current canonical state
-    // (S2 late-join catch-up), so her frame shows the live round.
+    // (late-join catch-up), so her frame shows the live round.
     await d.join();
     await settle(world, 250);
     const dView = await waitForView(world, d, (v) => v.round === 2);

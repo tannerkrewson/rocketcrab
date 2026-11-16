@@ -1,20 +1,19 @@
 /**
- * The Nova session (S1): the host-side engine that makes the game-facing
+ * The Nova session: the host-side engine that makes the game-facing
  * API function over the transport.
  *
  * A session owns one player's connection to the party: it joins the
  * transport, tracks players and connection status, exchanges validated
- * protocol messages (F6 schemas), and drives the client object games use.
+ * protocol messages, and drives the client object games use.
  * Everything here is transport-neutral — it implements {@link NovaClientBackend}
  * against {@link NovaTransport}, so the same session (and therefore the same
- * game code) works over InMemoryTransport (the test arena, U5) and later
- * over TrysteroTransport (real parties, P1). No Trystero terminology, no
- * authority roles, no hosting concepts (engineering rules 1/7/15).
+ * game code) works over InMemoryTransport (the test arena) and
+ * TrysteroTransport (real parties). The game-facing client exposes no
+ * Trystero terminology, authority roles, or hosting concepts.
  *
- * S1 scope: the ready lifecycle, game start/end, player lists, connection
- * status, dispatch (send side), state subscription (receive side), raw
- * channels, simulation registration and inputs, and logging all function
- * over the transport. State and simulation modes add authority election,
+ * The session supports readiness, game start/end, player lists, connection
+ * status, dispatch, state subscriptions, raw channels, simulation inputs,
+ * and logging over the transport. State and simulation modes add authority election,
  * action application, snapshots and the simulation clock on top (see the
  * state and simulation engines).
  */
@@ -115,7 +114,7 @@ import {
 
 /** Options for {@link NovaSession}. */
 export interface NovaSessionOptions {
-  /** The transport-neutral connection this session drives (U5/P1). */
+  /** The transport-neutral connection this session drives. */
   readonly transport: NovaTransport;
 
   readonly room: string;
@@ -131,14 +130,14 @@ export interface NovaSessionOptions {
     readonly version?: string;
   };
   /**
-   * The state-mode executor (S2). The arena injects a frame executor that
+   * The state-mode executor. The arena injects a frame executor that
    * runs the game's handlers inside the authority's runtime frame; when
    * omitted, handlers registered through `nova.defineGame` run in-process
    * (contract suite / tests) with the real immer package.
    */
   readonly stateExecutor?: NovaStateExecutor;
   /**
-   * The simulation-mode executor (A1). The arena injects a frame executor
+   * The simulation-mode executor. The arena injects a frame executor
    * that asks the authority's game frame to serialize its simulation state
    * (`nova.simulation.register({ serializeState })`); when omitted, the
    * in-process handlers registered through `nova.simulation.register` run
@@ -154,7 +153,7 @@ export interface NovaSessionOptions {
    */
   readonly acceptStartRequest?: (memberId: string) => boolean;
   /**
-   * Simulation-mode configuration (A1). Defaults follow the protocol
+   * Simulation-mode configuration. Defaults follow the protocol
    * limits; values are clamped into the Nova bounds (see
    * `@rocketcrab/protocol` limits) so games can never exceed them.
    */
@@ -167,7 +166,7 @@ export interface NovaSessionOptions {
     readonly now?: () => number;
   };
   /**
-   * Authority election timings (S3, ADR-0007). Defaults follow the protocol
+   * Authority election timings (ADR-0007). Defaults follow the protocol
    * limits; tests inject small deterministic values with fake timers.
    */
   readonly authority?: {
@@ -189,7 +188,7 @@ export interface NovaSessionPlayer extends NovaPlayer {
   readonly connectionId: string;
   readonly ready: boolean;
   readonly joinedAt: number;
-  /** Authority eligibility (ADR-0007 member identity; always true for S3). */
+  /** Authority eligibility (ADR-0007 member identity; all players are eligible). */
   readonly authorityEligible: boolean;
 }
 
@@ -202,13 +201,13 @@ interface PlayerRecord {
   joinedAt: number;
   authorityEligible: boolean;
 }
-/** One open raw channel (S1 raw mode). Every raw channel is reliable and ordered. */
+/** One open raw channel (raw mode). Every raw channel is reliable and ordered. */
 export interface NovaRawChannelState {
   /** True when THIS session declared the channel; peer declarations are informational. */
   readonly declaredBySelf: boolean;
 }
 
-/** Sliding-window send rate for the raw rate limit (A2). */
+/** Sliding-window send rate for the raw rate limit. */
 interface RawRateWindow {
   /** Send timestamps within the window, in send order. */
   timestamps: number[];
@@ -216,7 +215,7 @@ interface RawRateWindow {
   rejections: number;
 }
 
-/** Raw-mode counters (A2 diagnostics). */
+/** Raw-mode traffic counters. */
 interface RawStats {
   sent: number;
   received: number;
@@ -253,7 +252,7 @@ interface OutboxEntry {
   seq?: number;
 }
 
-/** One action dispatch held or in flight (S3 election buffering). */
+/** One action dispatch held or in flight (election buffering). */
 interface BufferedDispatch {
   readonly actionId: string;
   readonly type: string;
@@ -298,7 +297,7 @@ export class NovaSession implements NovaClientBackend {
   private readonly injectedExecutor: NovaStateExecutor | undefined;
   private stateHandlers: NovaStateHandlers | null = null;
 
-  /** The A1 simulation engine (simulation mode; inert in other modes). */
+  /** The simulation engine (simulation mode; inert in other modes). */
   private readonly simulationEngine: NovaSimulationEngine;
   private readonly injectedSimulationExecutor: NovaSimulationExecutor | undefined;
   private readonly acceptStartRequest: (memberId: string) => boolean;
@@ -321,7 +320,7 @@ export class NovaSession implements NovaClientBackend {
   private readonly listeners = new Set<(event: NovaSessionEvent) => void>();
   private readonly transportUnsubscribers: Array<() => void> = [];
   private readonly outbox: OutboxEntry[] = [];
-  /** Dispatches held while no authority is known (S3 election buffering). */
+  /** Dispatches held while no authority is known (election buffering). */
   private readonly dispatchBuffer: BufferedDispatch[] = [];
   /** Dispatches sent but not yet acked (re-sent when the authority changes). */
   private readonly inflightDispatches = new Map<string, BufferedDispatch>();
@@ -422,19 +421,19 @@ export class NovaSession implements NovaClientBackend {
     return this.status;
   }
 
-  /** State-size and action-rate diagnostics (S2; host/arena visible). */
+  /** State-size and action-rate diagnostics (host/arena visible). */
   getStateModeDiagnostics(): NovaStateDiagnostics {
     return this.engine.getDiagnostics();
   }
 
-  /** Simulation diagnostics (A1; host/arena visible). */
+  /** Simulation diagnostics (host/arena visible). */
   getSimulationDiagnostics(): NovaSimulationDiagnostics {
     return this.simulationEngine.getDiagnostics();
   }
 
   /**
    * The latest replicated authoritative simulation snapshot this shell
-   * retains (A1; host-side only — the game frame receives it through
+   * retains (host-side only — the game frame receives it through
    * `nova.simulation`'s `onSnapshot`). Null before the first snapshot.
    */
   getSimulationSnapshot(): {
@@ -445,7 +444,7 @@ export class NovaSession implements NovaClientBackend {
     return this.simulationEngine.getLatestSnapshot();
   }
 
-  /** Raw-mode traffic diagnostics (A2; host/arena visible). */
+  /** Raw-mode traffic diagnostics (host/arena visible). */
   getRawDiagnostics(): NovaRawDiagnostics {
     this.pruneRawRateWindow();
     return {
@@ -554,8 +553,8 @@ export class NovaSession implements NovaClientBackend {
   }
 
   /**
-   * Attach to an ALREADY-JOINED transport (P4 party lobby). The party layer
-   * joins the private room inside `createParty`/`joinPartyByCode`, so this
+   * Attach to an ALREADY-JOINED transport. The party layer
+   * joins the private room inside `createParty`/`joinPartyByInvite`, so this
    * session never calls `transport.join()`; it wires the same listeners
    * {@link NovaSession.join} would, seeds the connection status from the
    * transport's current state, and replays the current peers so the session
@@ -616,7 +615,7 @@ export class NovaSession implements NovaClientBackend {
     const initialized = await this.engine.initializeAsAuthority();
     if (!initialized || this.ended || this.disposed) return;
     if (this.game.mode === "simulation") {
-      // A1: the initial authority's simulation engine starts producing
+      // The initial authority's simulation engine starts producing
       // snapshots (no canonical state to create in simulation mode).
       this.simulationEngine.onAuthorityChanged(this.selfPlayer.id, this.engine.getTerm());
     }
@@ -701,7 +700,7 @@ export class NovaSession implements NovaClientBackend {
   }
 
   /**
-   * Dispatch one action (S2/S3): validate, assign the base revision, and
+   * Dispatch one action: validate, assign the base revision, and
    * either apply locally (this session is the current authority), send the
    * action to the authority, or — when no authority is known (election in
    * progress) — buffer it until the new authority is announced (ADR-0007:
@@ -804,7 +803,7 @@ export class NovaSession implements NovaClientBackend {
   }
 
   /**
-   * Close a raw channel (A2 channel lifecycle): local sends on it fail with
+   * Close a raw channel: local sends on it fail with
    * `unknown_channel` afterwards and peers are told the channel closed.
    * Peers that declared the channel themselves keep their own declaration.
    * Idempotent: closing an unknown channel is a no-op.
@@ -856,7 +855,7 @@ export class NovaSession implements NovaClientBackend {
     if (sizeBytes > rawMessageWarnBytes) {
       this.rawStats.warned = true;
     }
-    // A2 rate limit: a sliding 10-second window of sends per player. Bursts
+    // Raw rate limit: a sliding 10-second window of sends per player. Bursts
     // beyond the hard rate are rejected with a clear error (diagnostics).
     // The per-window cap is the per-second rate × window length, so the
     // diagnostic `ratePerSecond` stays comparable to state-mode action rates.
@@ -890,7 +889,7 @@ export class NovaSession implements NovaClientBackend {
   }
 
   /**
-   * Signal that the game registered simulation handlers (A1). In-process
+   * Signal that the game registered simulation handlers. In-process
    * games pass the handlers so the session can run `serializeState` for
    * snapshot production; the frame bridge never sends functions, and the
    * arena injects a frame executor that talks to the authority's frame
@@ -1003,10 +1002,9 @@ export class NovaSession implements NovaClientBackend {
         targetMemberId: peer.memberId,
       }).catch((error: unknown) => this.emitError(error));
     }
-    // A2 channel lifecycle: a peer that joins mid-game receives every raw
-    // channel this session has open, so it can subscribe and send on them
-    // without waiting for a fresh declaration. The declarations travel on
-    // the reliable+ordered protocol channel, so the joiner never misses one.
+    // Re-announce open raw channels to mid-game joiners on the ordered
+    // protocol channel. Peer declarations allow subscriptions, not sends;
+    // sending still requires the joiner's own declaration.
     for (const [channelName, state] of this.channels) {
       if (!state.declaredBySelf) {
         continue;
@@ -1015,9 +1013,9 @@ export class NovaSession implements NovaClientBackend {
         targetMemberId: peer.memberId,
       }).catch((error: unknown) => this.emitError(error));
     }
-    // S2 late join: the authority hands the new shell the current canonical
+    // State-mode late join: the authority hands the new shell the current canonical
     // state (migration copy) and computes the new player's selected view.
-    // A1 simulation late join: the authority sends its latest authoritative
+    // Simulation-mode late join: the authority sends its latest authoritative
     // snapshot (the joiner restores from it and starts).
     if (this.started && this.engine.isAuthorityElect()) {
       if (this.game.mode === "simulation") {
@@ -1028,7 +1026,7 @@ export class NovaSession implements NovaClientBackend {
     }
   }
 
-  /** Send the current canonical state + the new player's view (S2). */
+  /** Send the current canonical state + the new player's view. */
   private sendCatchUp(memberId: string, displayName: string): void {
     const snapshot = this.engine.getDiagnostics();
     if (snapshot.revision === 0 || this.engine.getCanonicalState() === null) return;
@@ -1059,7 +1057,7 @@ export class NovaSession implements NovaClientBackend {
     this.playersMap.delete(peer.memberId);
     this.emit({ type: "playerLeft", player: toNovaPlayer(player) });
     if (this.engine.getAuthorityMemberId() === peer.memberId) {
-      // The fixed initial authority left: no authority until S3 election.
+      // The authority left: wait for election before applying more actions.
       // Every shell keeps the last committed state (never corrupted).
       this.engine.notifyAuthorityLeft();
     }
@@ -1176,7 +1174,7 @@ export class NovaSession implements NovaClientBackend {
         }
         break;
       case "action.dispatch":
-        // Host-side observability; every shell routes the dispatch to its
+        // Every shell routes the dispatch to its
         // engine, which applies only when this session is the current
         // authority (other shells drop it and re-send on authority change).
         this.emit({
@@ -1295,7 +1293,7 @@ export class NovaSession implements NovaClientBackend {
           state: peerMessage.state,
           sentAt: peerMessage.sentAt,
         });
-        if (retained === null) break; // stale term: dropped
+        if (retained === null) break;
         if (!this.startEmitted) {
           // A late joiner starts from the targeted catch-up snapshot.
           this.startEmitted = true;
@@ -1313,7 +1311,7 @@ export class NovaSession implements NovaClientBackend {
         // Peer channel declarations are recorded so channel lifecycle works
         // across the party: the session knows which names are in use, peer
         // closes remove only peer declarations, and this session re-announces
-        // its own declarations when a peer joins mid-game (A2).
+        // its own declarations when a peer joins mid-game.
         if (!this.channels.has(peerMessage.channelName)) {
           this.channels.set(peerMessage.channelName, { declaredBySelf: false });
         }
@@ -1329,10 +1327,8 @@ export class NovaSession implements NovaClientBackend {
         break;
       }
       default:
-        // peer.capabilities, join.*, party.*, game.source.* and
-        // peer.connectionStatus are host/protocol-level traffic that the
-        // game-facing API does not expose (P2/P3 own them); authority.* is
-        // handled above (announce) or is S3 traffic (heartbeat/election).
+        // Capability, party, source, and connection-status messages stay on the
+        // host side; the game-facing API does not expose them.
         break;
     }
   }
@@ -1389,7 +1385,7 @@ export class NovaSession implements NovaClientBackend {
   }
 
   /**
-   * The authority changed (S3): flush buffered dispatches toward the new
+   * The authority changed: flush buffered dispatches toward the new
    * authority and re-send in-flight ones whose ack may have been lost in the
    * migration. Deduplication on the authority side (history + queue) makes
    * the re-sends exactly-once.
@@ -1468,7 +1464,6 @@ export class NovaSession implements NovaClientBackend {
     };
   }
 
-  /** Map simulation-engine events onto session events (client + host). */
   private handleSimulationEvent(event: SimulationEngineEvent): void {
     switch (event.type) {
       case "tick":
@@ -1621,7 +1616,6 @@ export class NovaSession implements NovaClientBackend {
     ).catch((error: unknown) => this.emitError(error));
   }
 
-  /** Broadcast an authority announcement. */
   private sendEngineAnnounce(announcement: AuthorityAnnounceEnvelope): void {
     const seq = this.takeSeq();
     void this.sendProtocol(
@@ -1638,7 +1632,7 @@ export class NovaSession implements NovaClientBackend {
     ).catch((error: unknown) => this.emitError(error));
   }
 
-  /** Broadcast an authority heartbeat (S3; live-only, never queued). */
+  /** Broadcast an authority heartbeat (live-only, never queued). */
   private sendEngineHeartbeat(heartbeat: AuthorityHeartbeatEnvelope): void {
     if (this.transport.connectionState !== "connected") return; // soft state
     const seq = this.takeSeq();
@@ -1654,7 +1648,7 @@ export class NovaSession implements NovaClientBackend {
     ).catch((error: unknown) => this.emitError(error));
   }
 
-  /** Broadcast an authority election campaign (S3; live-only, never queued). */
+  /** Broadcast an authority election campaign (live-only, never queued). */
   private sendEngineElection(election: AuthorityElectionEnvelope): void {
     if (this.transport.connectionState !== "connected") return; // soft state
     const seq = this.takeSeq();
@@ -1673,7 +1667,6 @@ export class NovaSession implements NovaClientBackend {
     ).catch((error: unknown) => this.emitError(error));
   }
 
-  /** Map state-engine events onto session events (client + host). */
   private handleEngineEvent(event: StateEngineEvent): void {
     switch (event.type) {
       case "stateCommitted":
@@ -1703,13 +1696,12 @@ export class NovaSession implements NovaClientBackend {
         // in-flight ones (deduplication makes the re-sends exactly-once).
         this.flushDispatchBuffer();
         if (this.game.mode === "simulation") {
-          // A1: authority changes notify the simulation loop (restore after
+          // Authority changes notify the simulation loop (restore after
           // migration / follower snapshot pushes).
           this.simulationEngine.onAuthorityChanged(event.authorityMemberId, event.term);
         }
-        // Host-side observability (S3 acceptance: the arena can display the
-        // elected authority and migration as it happens). Games never see
-        // this event; the game-facing client ignores it.
+        // Host-side only: the arena displays authority migration, but the
+        // game-facing client ignores this event.
         this.emit({
           type: "authorityChanged",
           authorityMemberId: event.authorityMemberId,
@@ -1745,7 +1737,6 @@ export class NovaSession implements NovaClientBackend {
     return this.nextSeq;
   }
 
-  /** Record one raw send in the sliding rate window. */
   private recordRawSend(): void {
     this.pruneRawRateWindow();
     this.rawRate.timestamps.push(Date.now());
@@ -1756,7 +1747,6 @@ export class NovaSession implements NovaClientBackend {
     return this.rawRate.timestamps.length / (RAW_RATE_WINDOW_MS / 1000);
   }
 
-  /** Drop send timestamps older than the window. */
   private pruneRawRateWindow(): void {
     const cutoff = Date.now() - RAW_RATE_WINDOW_MS;
     while (this.rawRate.timestamps.length > 0 && (this.rawRate.timestamps[0] ?? 0) < cutoff) {
@@ -1764,7 +1754,7 @@ export class NovaSession implements NovaClientBackend {
     }
   }
 
-  /** Channels this session declared itself (A2 diagnostics). */
+  /** Channels declared by this session, excluding peer declarations. */
   private selfDeclaredChannelCount(): number {
     let count = 0;
     for (const state of this.channels.values()) {
@@ -1895,7 +1885,7 @@ function toNovaSimulationSnapshot(snapshot: RetainedSimulationSnapshot): NovaSim
 }
 
 /**
- * Size of one raw payload in bytes (A2 size limit): byte length for binary
+ * Size of one raw payload in bytes: byte length for binary
  * payloads, UTF-8 serialized size for structured data (the same measurement
  * the transports use for chunking and progress).
  */

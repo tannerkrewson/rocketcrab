@@ -1,5 +1,5 @@
 /**
- * S3 authority election tests (ADR-0007).
+ * Authority election tests (ADR-0007).
  *
  * - Engine unit tests: heartbeats, grace, deterministic election, monotonic
  *   terms, announcement reconciliation, same-revision state conflict
@@ -217,7 +217,7 @@ async function yieldLoop(): Promise<void> {
 /**
  * Wall-clock budget for engine/pump waits. The engine's real-async work
  * (sha256 digests) slows down arbitrarily under CPU contention in parallel
- * CI runs, so a fixed poll-count budget flakes (rocketcrab-9fv.7.24).
+ * CI runs, so a fixed poll-count budget is unreliable.
  * `performance.now` is NOT faked by the test timers, so a generous
  * wall-clock deadline is deterministic; the loops exit as soon as the
  * condition holds, so the budget is only consumed when something is
@@ -882,19 +882,15 @@ describe(
         (error: unknown) => error,
       );
       await advance(100);
-      // The local commit happens while the partition is still strict (no
-      // drain), so the campaigns stay undelivered and the commit can never
-      // race the authority change. The mid-commit authority-loss race is
-      // covered deterministically by the engine commit-race test and the
-      // reconnect-mid-campaign integration test (rocketcrab-9fv.7.30); here
-      // the merge below is the single delivery point.
+      // Keep the partition strict until the local commit finishes. The merge
+      // below is the only delivery point, so campaigns cannot race this commit.
       const localDeadline = performance.now() + WAIT_BUDGET_MS;
       while (a.getStateModeDiagnostics().revision !== 2 && performance.now() < localDeadline) {
         await advance(100);
       }
       // Local commit on the authority: the ack must come back accepted. (A
       // mid-commit authority change must never surface as an unhandled
-      // rejection or an invalid_state ack — rocketcrab-9fv.7.30.)
+      // rejection or an invalid_state ack.)
       expect(a.getStateModeDiagnostics().revision).toBe(2);
       expect(await aSide).toBe("accepted");
 
@@ -986,13 +982,9 @@ describe(
     });
 
     it("reconnects the authority mid-campaign with a committed action and converges (7.31)", async () => {
-      // The exact property-test counterexample that wedged under load:
-      // dispatch on the authority, then drop (reconnect) it. The followers
-      // campaign at term 2 while the authority is out of the room, so it
-      // never hears the campaign; the winner-wait re-election must still
-      // converge every shell on one authority and the committed state
-      // (rocketcrab-9fv.7.31), and the local action must be re-sent, not
-      // rejected as invalid_state (rocketcrab-9fv.7.30).
+      // Reconnect the authority during a local dispatch. It misses the peer
+      // campaign, so winner-wait re-election must converge the party and
+      // re-send the action rather than reject it as invalid_state.
       const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
       const [a, b, c] = trio(sessions);
       const outcome = a.client.dispatch({ type: "mark", payload: { marker: "m0" } }).then(
@@ -1043,7 +1035,7 @@ const PROPERTY_OPS = fcRecord({
   amount: fcInteger({ min: 20, max: 250 }),
 });
 
-/** Run one random scenario and assert the S3 invariants hold. */
+/** Run one random scenario and assert the invariants hold. */
 async function runPropertyScenario(
   ops: Array<{
     op: string;
@@ -1130,7 +1122,7 @@ async function runPropertyScenario(
     // authority (agreement needs announce propagation, which the
     // advance+pump loop provides), and is bounded by a generous fake-time
     // cap so slow real-async digest work under CPU contention can't starve
-    // it (rocketcrab-9fv.7.24).
+    // it.
     const connectedStarted = () =>
       sessions.filter(
         (session) => session.transport.connectionState === "connected" && session.isStarted(),
@@ -1145,14 +1137,13 @@ async function runPropertyScenario(
         (session) => session.getStateModeDiagnostics().authorityMemberId,
       );
       // Every connected started shell must KNOW the authority and agree.
-      // A null authority while not electing is the 7.31 wedge — winner-
-      // waiting for a reconnected member that never heard the campaign —
-      // so the settle loop must keep going until the re-election converges.
+      // A null authority may be waiting for a reconnected member that missed
+      // the campaign; keep settling until re-election converges.
       if (authorities.some((authority) => authority === null)) return false;
       if (new Set(authorities).size !== 1) return false;
       // State must have converged too: agreeing on the authority is not
       // enough while the newly elected authority is still inside its
-      // restore window (restoreDone=false, pre-replication) — 7.31.
+      // restore window (restoreDone=false, pre-replication).
       const revisions = shells.map((session) => session.getStateModeDiagnostics().revision);
       return new Set(revisions).size === 1;
     };

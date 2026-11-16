@@ -1,11 +1,10 @@
 /**
- * A1 — the simulation-mode vertical slice: the example game executed end to
- * end.
+ * Simulation-mode example game, executed end to end.
  *
- * `examples/games/nova-drift.html` is the single-file simulation-mode game
- * this issue defines (a simple continuous 2D movement game). Its inline
- * module script is extracted and run against real session-backed `nova`
- * clients over the in-memory transport, so this suite exercises the REAL
+ * `examples/games/nova-drift.html` is a single-file simulation-mode game
+ * (continuous 2D movement). Its inline module script is extracted and run
+ * against real session-backed `nova` clients over the in-memory transport,
+ * so this suite exercises the real
  * simulation engine: the Nova-provided tick clock advancing every frame's
  * local simulation, ordered input routing (with the sender loop-back),
  * authoritative snapshot production from the authority frame's

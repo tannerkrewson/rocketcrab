@@ -1,8 +1,8 @@
 /**
- * The S2/S3 state-mode engine: Nova's authority-side state machine.
+ * The state-mode engine: Nova's authority-side state machine.
  *
- * The engine lives inside the host-side NovaSession and owns everything the
- * issue's action protocol requires, without any game code:
+ * The engine lives inside the host-side NovaSession and owns the action
+ * protocol independently of game code:
  *
  * - sequential authority execution (a FIFO queue; one apply in flight);
  * - schema and size checks (action payloads at intake, committed states at
@@ -17,9 +17,9 @@
  *   and replication of the canonical state to every party shell;
  * - per-player views (only the player's selected view reaches its frame);
  * - state-size and action-rate diagnostics;
- * - automatic authority election and migration (S3, ADR-0007).
+ * - automatic authority election and migration (ADR-0007).
  *
- * ## S3: authority election and migration
+ * ## Authority election and migration
  *
  * Game code never knows which peer executes authoritative transitions. The
  * engine implements the ADR-0007 protocol over the term + revision + hash
@@ -178,7 +178,7 @@ export interface AuthorityAnnounceEnvelope {
   readonly eligibleMemberIds: readonly string[];
 }
 
-/** An authority heartbeat (S3 liveness for the current term). */
+/** An authority heartbeat (liveness for the current term). */
 export interface AuthorityHeartbeatEnvelope {
   readonly term: number;
   readonly authorityMemberId: string;
@@ -193,7 +193,7 @@ export interface ObservedStateEnvelope {
   readonly stateHash: string | null;
 }
 
-/** An authority election campaign (S3). */
+/** An authority election campaign. */
 export interface AuthorityElectionEnvelope {
   readonly term: number;
   readonly candidateMemberId: string;
@@ -220,9 +220,9 @@ export interface StateEngineHost {
   sendResync(targetMemberId: string, request: StateResyncEnvelope): void;
   /** Announce this session as the authority. */
   sendAnnounce(announcement: AuthorityAnnounceEnvelope): void;
-  /** Broadcast an authority heartbeat (S3). */
+  /** Broadcast an authority heartbeat. */
   sendHeartbeat(heartbeat: AuthorityHeartbeatEnvelope): void;
-  /** Broadcast an authority election campaign (S3). */
+  /** Broadcast an authority election campaign. */
   sendElection(election: AuthorityElectionEnvelope): void;
   /** Emit a host-side engine event. */
   emit(event: StateEngineEvent): void;
@@ -265,7 +265,7 @@ export interface NovaStateEngineOptions {
   readonly executor: NovaStateExecutor;
   readonly selfMemberId: string;
   /**
-   * True when the session runs a simulation-mode game (A1). The election
+   * True when the session runs a simulation-mode game. The election
    * machinery is mode-agnostic, but simulation mode has no canonical state:
    * the initial authority announces without creating one, and an elected
    * authority never reports `no_replicated_state` (the simulation engine
@@ -278,13 +278,13 @@ export interface NovaStateEngineOptions {
   executorTimeoutMs?: number;
   /** Bounded action-history retention. */
   historyLimit?: number;
-  /** Authority heartbeat interval (S3; configurable for tests). */
+  /** Authority heartbeat interval (configurable for tests). */
   heartbeatIntervalMs?: number;
-  /** Missing-heartbeat grace period before suspicion (S3). */
+  /** Missing-heartbeat grace period before suspicion. */
   gracePeriodMs?: number;
-  /** How long an election collects candidates before finalizing (S3). */
+  /** How long an election collects candidates before finalizing. */
   electionWindowMs?: number;
-  /** How long the winner collects state pushes before restoring (S3). */
+  /** How long the winner collects state pushes before restoring. */
   restoreWindowMs?: number;
   /**
    * SHA-256 state digest (tests inject a deferred implementation to race
@@ -466,7 +466,7 @@ export class NovaStateEngine {
     return this.authorityMemberId;
   }
 
-  /** The current authority term (monotonic; S3). */
+  /** The current authority term (monotonic). */
   getTerm(): number {
     return this.term;
   }
@@ -491,7 +491,7 @@ export class NovaStateEngine {
     return [...this.history.keys()];
   }
 
-  /** Host-side diagnostics (S2/S3 acceptance: election state is visible). */
+  /** Host-side diagnostics (host/arena visible). */
   getDiagnostics(): NovaStateDiagnostics {
     return {
       revision: this.revision,
@@ -569,14 +569,13 @@ export class NovaStateEngine {
     if (this.disposed || this.ended) return false;
     if (!this.isAuthorityElect()) return false;
     if (this.authorityMemberId !== null && this.authorityMemberId !== this.selfMemberId) {
-      // Another member already claimed authority (reconciliation decides).
       return false;
     }
     this.authorityMemberId = this.selfMemberId;
     this.authorityStateRevision = this.revision;
     if (this.simulation) {
-      // A1: simulation mode has no canonical state. The initial authority
-      // announces and starts heartbeats (the S3 election machinery runs
+      // Simulation mode has no canonical state. The initial authority
+      // announces and starts heartbeats (the election machinery runs
       // unchanged); the simulation engine produces its own snapshots.
       this.announce();
       this.startHeartbeats();
@@ -646,7 +645,7 @@ export class NovaStateEngine {
   }): void {
     if (this.disposed) return;
     if (this.authorityMemberId !== this.selfMemberId) {
-      return; // only the current authority applies actions
+      return;
     }
     if (!this.started) {
       this.rejectAction(message, "not_started", "Actions are only accepted after the game starts.");
@@ -732,7 +731,7 @@ export class NovaStateEngine {
       return;
     }
     if (this.queue.some((pending) => pending.actionId === message.actionId)) {
-      return; // already queued
+      return;
     }
     const seq = (this.lastSeqByActor.get(this.selfMemberId) ?? 0) + 1;
     this.lastSeqByActor.set(this.selfMemberId, seq);
@@ -769,8 +768,8 @@ export class NovaStateEngine {
   }
 
   /**
-   * A `state.snapshot` arrived: replicate the canonical state (S3: term
-   * gated, same-revision conflicts reconciled deterministically, and a
+   * A `state.snapshot` arrived: replicate the canonical state (term-gated,
+   * same-revision conflicts reconciled deterministically, and a
    * deposed/split authority's stale-term state is never adopted).
    */
   handleSnapshot(message: InboundSnapshot): void {
@@ -789,7 +788,7 @@ export class NovaStateEngine {
    * a gap: the window is marked incomplete and the existing resync path runs.
    */
   private beginDeltaSnapshot(message: InboundSnapshot): void {
-    if (message.term < this.term) return; // a stale term can never win
+    if (message.term < this.term) return;
     if (message.revision <= this.revision) {
       // Stale, or a same-revision state we cannot read as a delta: ask for the
       // full state when it differs from ours.
@@ -866,7 +865,7 @@ export class NovaStateEngine {
       this.requestRepair();
       return;
     }
-    if (message.term < this.term) return; // a stale term can never win
+    if (message.term < this.term) return;
     let adoptedAuthority = false;
     if (message.term > this.term) {
       this.adoptTerm(message.term, message.authorityMemberId);
@@ -890,7 +889,7 @@ export class NovaStateEngine {
       if (adoptedAuthority) {
         this.maybePushTo(message.authorityMemberId, message.revision, message.stateHash);
       }
-      return; // stale delivery
+      return;
     }
     if (message.historyMode === "full") {
       // A full snapshot from the authority answers an outstanding resync,
@@ -1004,7 +1003,7 @@ export class NovaStateEngine {
     if (this.canonical === null) return;
     const requester = request.requesterMemberId;
     if (requester === this.selfMemberId || !this.host.isConnected(requester)) return;
-    if (request.knownRevision > this.revision) return; // impossible: ignore
+    if (request.knownRevision > this.revision) return;
     const now = this.now();
     // Forget requesters whose window has passed, so the map stays bounded.
     for (const [member, at] of this.resyncServedAt) {
@@ -1036,7 +1035,7 @@ export class NovaStateEngine {
   }
 
   /**
-   * An `authority.announce` arrived (S3: term-gated with deterministic
+   * An `authority.announce` arrived (term-gated with deterministic
    * reconciliation of conflicting same-term claims).
    */
   handleAnnounce(message: {
@@ -1053,7 +1052,6 @@ export class NovaStateEngine {
       message.stateHash ?? null,
     );
     if (this.adoptHigherTerm(message.term, message.authorityMemberId, message.stateRevision)) {
-      // adopted
     } else if (message.authorityMemberId === this.authorityMemberId) {
       // The current authority re-announced (reconnect / revision bump).
       this.authorityStateRevision = Math.max(this.authorityStateRevision, message.stateRevision);
@@ -1076,7 +1074,7 @@ export class NovaStateEngine {
   }
 
   /**
-   * An `authority.heartbeat` arrived (S3): refreshes liveness of the current
+   * An `authority.heartbeat` arrived: refreshes liveness of the current
    * term's authority; a strictly higher term adopts the new authority.
    */
   handleHeartbeat(message: {
@@ -1110,7 +1108,7 @@ export class NovaStateEngine {
   }
 
   /**
-   * An `authority.election` arrived (S3): a strictly higher term makes every
+   * An `authority.election` arrived: a strictly higher term makes every
    * connected member (including a sitting authority) join the campaign; the
    * deterministic winner is the lowest connected eligible member id.
    */
@@ -1187,7 +1185,7 @@ export class NovaStateEngine {
   }
 
   // ------------------------------------------------------------------
-  // S3 election machinery
+  // election machinery
   // ------------------------------------------------------------------
 
   /** Start an election at the next monotonic term. */
@@ -1298,7 +1296,7 @@ export class NovaStateEngine {
     this.startHeartbeats();
     if (this.restoreBackup === null) {
       if (this.simulation) {
-        // A1: simulation mode has no canonical state to restore; the
+        // Simulation mode has no canonical state to restore; the
         // simulation engine restores the replicated simulation snapshot on
         // its own authority-change notification (same restore window).
         this.restoreDone = true;
@@ -1427,7 +1425,7 @@ export class NovaStateEngine {
   private onGraceExpired(): void {
     if (this.disposed || !this.started || this.ended) return;
     if (!this.host.selfConnected()) return; // reconnect first (re-arms)
-    if (this.election !== null) return; // already campaigning
+    if (this.election !== null) return;
     if (this.authorityMemberId === this.selfMemberId) return;
     this.startElection();
   }
@@ -1444,7 +1442,7 @@ export class NovaStateEngine {
       this.winnerWaitTimer = null;
       if (this.disposed || !this.started || this.ended) return;
       if (!this.host.selfConnected()) return;
-      if (this.election !== null) return; // a new campaign is underway
+      if (this.election !== null) return;
       if (this.authorityMemberId === null) {
         this.startElection(); // the winner never announced: elect again
       }
@@ -1487,7 +1485,7 @@ export class NovaStateEngine {
     authorityHash: string | null,
   ): void {
     if (this.disposed || !this.started || this.ended) return;
-    if (authorityMemberId === this.selfMemberId) return; // we are the authority
+    if (authorityMemberId === this.selfMemberId) return;
     if (this.canonical === null) return;
     if (this.revision > authorityRevision) {
       this.host.sendSnapshot(this.snapshotEnvelope("full"), authorityMemberId);
@@ -1685,7 +1683,7 @@ export class NovaStateEngine {
    */
   private processQueue(): void {
     if (!this.restoreDone) return;
-    if (this.processing !== null) return; // the running loop drains new items
+    if (this.processing !== null) return;
     this.processing = this.runQueue().finally(() => {
       this.processing = null;
     });

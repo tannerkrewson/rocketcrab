@@ -1,5 +1,5 @@
 /**
- * The state-mode executor seam (S2): the single place the state engine
+ * The state-mode executor seam: the single place the state engine
  * asks a game to run its functions.
  *
  * State-mode games register handler functions (`createInitialState`,

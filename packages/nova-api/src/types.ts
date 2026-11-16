@@ -1,5 +1,5 @@
 /**
- * The game-facing Nova API surface (S1).
+ * The game-facing Nova API surface.
  *
  * These types are the contract AI-generated games program against. The API
  * is deliberately small: a handful of concepts (registration, players,
@@ -137,12 +137,12 @@ export interface NovaAction {
   /**
    * The state revision this action was based on. Omit it and Nova sends
    * the latest revision your frame has seen; a stale base revision is
-   * rejected with `stale_revision` (S2).
+   * rejected with `stale_revision`.
    */
   readonly baseRevision?: number;
 }
 
-/** The result of one dispatched action (S2 action protocol). */
+/** The result of one dispatched action. */
 export type NovaActionStatus = "accepted" | "rejected" | "superseded";
 
 /**
@@ -163,10 +163,9 @@ export interface NovaActionAck {
 }
 
 /**
- * State-size and action-rate diagnostics (S2 acceptance: diagnostics are
- * visible to the host and the arena). Values reflect the last committed
- * canonical state. S3 adds the authority election state so the arena can
- * force and display migration (ADR-0007 acceptance).
+ * State-size and action-rate diagnostics (host/arena visible). Values reflect
+ * the last committed canonical state and expose election state so the arena can
+ * force and display migration (ADR-0007).
  */
 export interface NovaStateDiagnostics {
   /** Current canonical revision (0 before the first snapshot). */
@@ -177,7 +176,7 @@ export interface NovaStateDiagnostics {
   readonly stateHash: string | null;
   /** The current authority's member id, or null when none is known. */
   readonly authorityMemberId: string | null;
-  /** Current authority term (monotonic; ADR-0007 S3). */
+  /** Current authority term (monotonic; ADR-0007). */
   readonly term: number;
   /** True while this shell is campaigning (election in progress). */
   readonly electionInProgress: boolean;
@@ -233,12 +232,12 @@ export interface NovaSimulationInput {
   readonly type: string;
   /** Input payload; must be JSON-serializable. */
   readonly payload?: unknown;
-  /** Optional target simulation tick (simulation clock arrives with A1). */
+  /** Optional target simulation tick. */
   readonly tick?: number;
 }
 
 /**
- * One authoritative simulation snapshot (A1). The snapshot state is
+ * One authoritative simulation snapshot. The snapshot state is
  * game-defined plain data: the authority's game produced it through the
  * `serializeState` callback and Nova replicated it to every player. Games
  * restore from a snapshot (correction, late join, or authority migration)
@@ -327,7 +326,7 @@ export interface NovaRawHandle {
 }
 
 /**
- * Raw-mode traffic diagnostics (A2; host/arena visible). Counters reflect
+ * Raw-mode traffic diagnostics (host/arena visible). Counters reflect
  * this session's raw-channel activity since the last reset; the rate is a
  * sliding 10-second window like state-mode action rates.
  */
@@ -355,8 +354,8 @@ export interface NovaRawDiagnostics {
 }
 
 /**
- * Simulation-mode diagnostics (A1 acceptance: latency and drift are
- * visible). Values reflect this session's simulation engine.
+ * Simulation-mode diagnostics (host/arena visible). Values reflect this
+ * session's simulation engine.
  */
 export interface NovaSimulationDiagnostics {
   /** The local simulation tick (advanced by the Nova-provided clock). */
@@ -369,7 +368,7 @@ export interface NovaSimulationDiagnostics {
   readonly authorityTick: number | null;
   /** The current authority's member id, or null when none is known. */
   readonly authorityMemberId: string | null;
-  /** Current authority term (monotonic; ADR-0007 S3). */
+  /** Current authority term (monotonic; ADR-0007). */
   readonly term: number;
   /** Epoch ms the last snapshot was received, or null. */
   readonly lastSnapshotAt: number | null;
@@ -417,8 +416,7 @@ export interface NovaSimulationHandle {
  * Lifecycle: call {@link defineGame} once at startup, subscribe to events,
  * call {@link ready} once the game finished loading, then react to
  * {@link onStart} / {@link onEnd}. Calls that require a later lifecycle
- * stage fail with a {@link NovaError} (S1 acceptance: API calls fail
- * clearly before readiness).
+ * stage fail with a {@link NovaError}.
  */
 export interface NovaApi {
   /** The Nova API version this build speaks. */

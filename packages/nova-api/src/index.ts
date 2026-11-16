@@ -1,7 +1,7 @@
 /**
  * @rocketcrab/nova-api
  *
- * The game-facing Nova API (S1): the small, versioned surface AI-generated
+ * The game-facing Nova API: the small, versioned surface AI-generated
  * games use in every mode, plus the transport-neutral session engine that
  * makes it work.
  *
@@ -10,7 +10,7 @@
  *   different backends).
  * - `NovaSession` is the host-side engine that drives a client over the
  *   transport-neutral `NovaTransport` (InMemoryTransport in the test arena,
- *   TrysteroTransport for real parties in P1) — the same game code works in
+ *   TrysteroTransport for real parties) — the same game code works in
  *   test and party transports.
  * - All types are documented from source (see `docs/api/`); the API has no
  *   Trystero terminology, no hosting or deployment concepts, no authority

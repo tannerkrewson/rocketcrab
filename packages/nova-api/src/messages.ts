@@ -3,8 +3,7 @@
  *
  * Every message the session sends is built from its Zod schema and validated
  * with `assertPeerMessage` before it touches the transport (threat model
- * T10; engineering rules 15/21 — never emit an unvalidated message, no
- * `any` at the boundary).
+ * T10; never emit an unvalidated message or accept `any` at the boundary).
  */
 import {
   PROTOCOL_VERSION,
@@ -75,7 +74,7 @@ export function buildPlayerIdentityMessage(
       ...envelope(base),
       type: "player.identity",
       displayName,
-      // S1 has no authority election (S3 owns it); every player is eligible
+      // Every player is eligible for authority
       // so no game code ever needs to reason about authority roles.
       authorityEligible: true,
     }),
@@ -108,7 +107,7 @@ export function buildActionDispatchMessage(
   );
 }
 
-/** Build and validate an `action.ack` message (S2 action protocol). */
+/** Build and validate an `action.ack` message (action protocol). */
 export function buildActionAckMessage(
   base: PeerMessageBase,
   input: {
@@ -134,7 +133,7 @@ export function buildActionAckMessage(
   );
 }
 
-/** Build and validate a `state.snapshot` message (S2 state mode). */
+/** Build and validate a `state.snapshot` message (state mode). */
 export function buildStateSnapshotMessage(
   base: PeerMessageBase,
   input: {
@@ -187,7 +186,7 @@ export function buildStateResyncMessage(
   );
 }
 
-/** Build and validate a `state.view` message (S2 per-player views). */
+/** Build and validate a `state.view` message (per-player views). */
 export function buildStateViewMessage(
   base: PeerMessageBase,
   input: {
@@ -211,7 +210,7 @@ export function buildStateViewMessage(
   );
 }
 
-/** Build and validate an `authority.announce` message (S2/S3). */
+/** Build and validate an `authority.announce` message. */
 export function buildAuthorityAnnounceMessage(
   base: PeerMessageBase,
   input: {
@@ -237,7 +236,7 @@ export function buildAuthorityAnnounceMessage(
   );
 }
 
-/** Build and validate an `authority.heartbeat` message (S3). */
+/** Build and validate an `authority.heartbeat` message. */
 export function buildAuthorityHeartbeatMessage(
   base: PeerMessageBase,
   input: {
@@ -261,7 +260,7 @@ export function buildAuthorityHeartbeatMessage(
   );
 }
 
-/** Build and validate an `authority.election` message (S3). */
+/** Build and validate an `authority.election` message. */
 export function buildAuthorityElectionMessage(
   base: PeerMessageBase,
   input: {
@@ -303,7 +302,7 @@ export function buildRawChannelMessage(
   );
 }
 
-/** Build and validate a `raw.close` announcement (A2 channel lifecycle). */
+/** Build and validate a `raw.close` announcement. */
 export function buildRawChannelCloseMessage(
   base: PeerMessageBase,
   channelName: string,
@@ -341,7 +340,7 @@ export function buildSimulationInputMessage(
   );
 }
 
-/** Build and validate a `simulation.snapshot` message (A1). */
+/** Build and validate a `simulation.snapshot` message. */
 export function buildSimulationSnapshotMessage(
   base: PeerMessageBase,
   input: {

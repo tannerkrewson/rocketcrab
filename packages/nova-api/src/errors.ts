@@ -3,8 +3,7 @@
  *
  * Every failure the game-facing API produces is a {@link NovaError} with a
  * stable machine-readable `code`, so games can react to failures and the
- * runtime can surface them clearly (S1 acceptance: API calls fail clearly
- * before readiness; unknown methods or versions fail safely).
+ * runtime can surface them clearly.
  */
 
 /** Stable error codes of the Nova API. */
@@ -35,46 +34,46 @@ export const NOVA_ERROR_CODES = {
   reserved_channel: "reserved_channel",
   /** A targeted send referenced a player that is not connected. */
   not_connected: "not_connected",
-  /** A raw send exceeded the per-second rate limit (A2). */
+  /** A raw send exceeded the per-second rate limit. */
   rate_limited: "rate_limited",
   /** An inbound protocol message failed validation at the boundary. */
   invalid_message: "invalid_message",
   /** The host cannot perform the requested operation in this build. */
   unsupported: "unsupported",
-  /** A dispatched action was based on an outdated state revision (S2). */
+  /** A dispatched action was based on an outdated state revision. */
   stale_revision: "stale_revision",
-  /** A dispatched action was not applied before its deadline (S2). */
+  /** A dispatched action was not applied before its deadline. */
   timed_out: "timed_out",
-  /** The action type has no registered handler (S2). */
+  /** The action type has no registered handler. */
   unknown_action: "unknown_action",
-  /** The action payload exceeded the size limit (S2). */
+  /** The action payload exceeded the size limit. */
   payload_too_large: "payload_too_large",
-  /** Applying the action produced an oversized canonical state (S2). */
+  /** Applying the action produced an oversized canonical state. */
   state_too_large: "state_too_large",
-  /** An action handler produced a non-plain-data state (S2). */
+  /** An action handler produced a non-plain-data state. */
   invalid_state: "invalid_state",
-  /** No authority is active, so the action cannot be applied (S2; S3). */
+  /** No authority is active, so the action cannot be applied. */
   no_authority: "no_authority",
-  /** The game ended before the action could be applied (S2). */
+  /** The game ended before the action could be applied. */
   game_ended: "game_ended",
-  /** An action handler threw (S2). */
+  /** An action handler threw. */
   handler_error: "handler_error",
-  /** A player's view could not be computed (S2). */
+  /** A player's view could not be computed. */
   view_error: "view_error",
-  /** The initial state could not be created (S2). */
+  /** The initial state could not be created. */
   initial_state_error: "initial_state_error",
-  /** The authority runtime did not answer in time (S2). */
+  /** The authority runtime did not answer in time. */
   execution_timeout: "execution_timeout",
-  /** The authority runtime failed while executing (S2). */
+  /** The authority runtime failed while executing. */
   execution_failed: "execution_failed",
   /**
    * The game did not register a `serializeState` handler, so Nova cannot
-   * produce authoritative simulation snapshots (A1).
+   * produce authoritative simulation snapshots.
    */
   no_snapshot_handler: "no_snapshot_handler",
-  /** The game's `serializeState` handler threw (A1). */
+  /** The game's `serializeState` handler threw. */
   snapshot_error: "snapshot_error",
-  /** A replicated simulation snapshot failed its hash check (A1). */
+  /** A replicated simulation snapshot failed its hash check. */
   invalid_snapshot: "invalid_snapshot",
 } as const;
 
@@ -91,17 +90,17 @@ export class NovaError extends Error {
   }
 }
 
-/** Error message for calls gated on registration (S1 lifecycle). */
+/** Error message for calls gated on registration (lifecycle). */
 export function notRegisteredMessage(method: string): string {
   return `nova.${method}() must be called after nova.defineGame().`;
 }
 
-/** Error message for calls gated on game start (S1 lifecycle). */
+/** Error message for calls gated on game start (lifecycle). */
 export function notStartedMessage(method: string): string {
   return `nova.${method}() is only available after the game starts (see nova.onStart).`;
 }
 
-/** Error message for calls after the game ended (S1 lifecycle). */
+/** Error message for calls after the game ended (lifecycle). */
 export function endedMessage(method: string): string {
   return `nova.${method}() is not available after the game ended.`;
 }

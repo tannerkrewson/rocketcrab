@@ -1,12 +1,11 @@
 /**
  * Nova API versioning.
  *
- * The game-facing Nova API (S1) has its own version, independent of the
+ * The game-facing Nova API has its own version, independent of the
  * internal protocol version (`PROTOCOL_VERSION` in @rocketcrab/protocol).
  * Games read `nova.version` and may declare the API version they target via
  * `nova.defineGame({ apiVersion })`; unknown versions fail with a clear
- * error rather than being guessed at (S1 acceptance: unknown versions fail
- * safely).
+ * error rather than being guessed at.
  */
 
 /** Current game-facing API version understood by this build. */
