@@ -79,7 +79,6 @@ export type NovaSessionEvent =
    * authoritative — the event carries the monotonic term only, and the
    * next snapshot is the restore point.
    */
-  | { type: "simulationAuthorityChange"; term: number }
   | { type: "error"; error: NovaError }
   | { type: "bandwidthWarning"; message: string }
   | { type: "actionReceived"; action: NovaAction }
@@ -195,7 +194,6 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
   let started = false;
   let ended = false;
   let stateValue: unknown | null = null;
-  let renderHandler: ((view: unknown) => void) | null = null;
   /** The latest state received before start (delivered on the start event). */
   let bufferedState: { has: boolean; value: unknown } = { has: false, value: null };
 
@@ -220,7 +218,6 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
   const rawHandlers = new Map<string, Set<Handler<NovaRawMessage>>>();
   let simulationHandlers: NovaSimulationHandlers | null = null;
   let simulationTick = 0;
-  const simulationAuthorityChangeHandlers = new Set<Handler<void>>();
 
   const unsubscribeEvents = backend.onEvent((event) => {
     switch (event.type) {
@@ -251,9 +248,6 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
           stateValue = bufferedState.value;
           bufferedState = { has: false, value: null };
           callSafely(stateHandlers, stateValue);
-          if (renderHandler !== null) {
-            callSafely(new Set([renderHandler]), stateValue);
-          }
         }
         callSafely(startHandlers);
         break;
@@ -270,9 +264,6 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
         }
         stateValue = event.state;
         callSafely(stateHandlers, event.state);
-        if (renderHandler !== null) {
-          callSafely(new Set([renderHandler]), event.state);
-        }
         break;
       case "rawMessage": {
         const handlers = rawHandlers.get(event.channel);
@@ -297,11 +288,6 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
         if (simulationHandlers?.onTick !== undefined) {
           callSafely(new Set([simulationHandlers.onTick]), event.tick);
         }
-        break;
-      case "simulationAuthorityChange":
-        // Games never learn which player is authoritative: a bare
-        // notification (the next snapshot is the restore point).
-        callSafely(simulationAuthorityChangeHandlers);
         break;
       case "error":
         callSafely(errorHandlers, event.error);
@@ -459,9 +445,6 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
           );
         });
     },
-    onAuthorityChange(handler) {
-      return addHandler(simulationAuthorityChangeHandlers, handler);
-    },
     getTick() {
       return simulationTick;
     },
@@ -488,9 +471,6 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
       // a failed defineGame leaves the client unregistered.
       const handlers = extractStateHandlers(options);
       registered = true;
-      if (handlers?.render !== undefined) {
-        renderHandler = handlers.render;
-      }
       // The declaration that crosses the backend boundary is plain data
       // only: handler functions stay in this context (never serialized).
       const declaration: NovaGameDeclaration = {
@@ -604,8 +584,6 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
       stateHandlers.clear();
       rawHandlers.clear();
       simulationHandlers = null;
-      simulationAuthorityChangeHandlers.clear();
-      renderHandler = null;
       for (const entry of pendingDispatches.values()) {
         clearTimeout(entry.timer);
         entry.reject(
@@ -624,8 +602,7 @@ function extractStateHandlers(options: NovaGameDeclaration): NovaStateHandlers |
   const declared =
     options.createInitialState !== undefined ||
     options.actions !== undefined ||
-    options.selectView !== undefined ||
-    options.render !== undefined;
+    options.selectView !== undefined;
   if (!declared) return undefined;
   const handlers: NovaStateHandlers = {};
   if (options.createInitialState !== undefined) {
@@ -642,12 +619,6 @@ function extractStateHandlers(options: NovaGameDeclaration): NovaStateHandlers |
       throw new NovaError("invalid_options", "nova.defineGame: selectView must be a function.");
     }
     handlers.selectView = options.selectView;
-  }
-  if (options.render !== undefined) {
-    if (typeof options.render !== "function") {
-      throw new NovaError("invalid_options", "nova.defineGame: render must be a function.");
-    }
-    handlers.render = options.render;
   }
   if (options.actions !== undefined) {
     if (typeof options.actions !== "object" || options.actions === null) {

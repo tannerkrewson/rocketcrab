@@ -206,9 +206,8 @@ describe("createNovaClient lifecycle", () => {
     }
   });
 
-  it("registers state-mode handlers and calls render with each view", async () => {
+  it("registers state-mode handlers and delivers each view to onChange", async () => {
     const { client, emit, calls } = makeClient();
-    const renders: unknown[] = [];
     const stateChanges: unknown[] = [];
     client.defineGame({
       title: "T",
@@ -220,7 +219,6 @@ describe("createNovaClient lifecycle", () => {
         },
       },
       selectView: (state: { count: number }) => ({ count: state.count }),
-      render: (view) => renders.push(view),
     });
     expect(calls).toEqual(["register"]);
     client.ready();
@@ -229,7 +227,6 @@ describe("createNovaClient lifecycle", () => {
     emit({ type: "state", state: { count: 1 } });
     emit({ type: "state", state: { count: 2 } });
     expect(stateChanges).toEqual([{ count: 1 }, { count: 2 }]);
-    expect(renders).toEqual([{ count: 1 }, { count: 2 }]);
   });
 
   it("rejects non-function state-mode handlers", () => {

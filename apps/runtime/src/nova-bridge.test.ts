@@ -86,7 +86,6 @@ describe("NOVA_BRIDGE_SCRIPT", () => {
       "'simulationInput'",
       "'simulationSnapshot'",
       "'simulationTick'",
-      "'simulationAuthorityChange'",
       "'simulationRequest'",
       "'error'",
     ]) {

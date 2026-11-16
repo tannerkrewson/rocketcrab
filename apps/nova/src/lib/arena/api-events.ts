@@ -29,8 +29,6 @@ export function toApiEvent(event: NovaSessionEvent): GameApiEvent | null {
       return { kind: "simulationSnapshot", snapshot: event.snapshot };
     case "simulationTick":
       return { kind: "simulationTick", tick: event.tick };
-    case "simulationAuthorityChange":
-      return { kind: "simulationAuthorityChange", term: event.term };
     case "error":
       return { kind: "error", code: event.error.code, message: event.error.message };
     case "actionAck":

@@ -193,7 +193,6 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
   var stateCreateInitialState = null;
   var stateActions = null;
   var stateSelectView = null;
-  var stateRender = null;
   var ACTION_TIMEOUT_MS = ${actionTimeoutMs};
   // Null-prototype maps: channel names and action ids are game- or host-chosen
   // strings, so names like constructor or __proto__ must not hit Object.prototype.
@@ -384,7 +383,6 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
   var simulationTickHandler = null;
   var simulationSerializeHandler = null;
   var simulationTickValue = 0;
-  var simulationAuthorityChangeHandlers = [];
 
   var stateHandle = {
     get: function () { return stateValue; },
@@ -429,10 +427,6 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
     sendInput: function (input) {
       requireStarted('simulation.sendInput');
       report('simulation.sendInput', { input: input });
-    },
-    onAuthorityChange: function (fn) {
-      if (typeof fn !== 'function') fail('invalid_options', 'nova.simulation.onAuthorityChange expects a function.');
-      return subscribe(simulationAuthorityChangeHandlers, fn);
     },
     getTick: function () {
       return simulationTickValue;
@@ -496,9 +490,6 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
       case 'state':
         stateValue = payload && payload.state;
         callHandlers(stateHandlers, stateValue);
-        if (stateRender) {
-          try { stateRender(stateValue); } catch (_) {}
-        }
         break;
       case 'stateRequest':
         if (payload && payload.requestId && payload.request) {
@@ -550,8 +541,6 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
           try { simulationTickHandler(simulationTickValue); } catch (_) {}
         }
         break;
-      case 'simulationAuthorityChange':
-        callHandlers(simulationAuthorityChangeHandlers);
         break;
       case 'simulationRequest':
         if (payload && payload.requestId) {
@@ -582,7 +571,6 @@ export const NOVA_BRIDGE_SCRIPT = `(function () {
         if (typeof options.createInitialState === 'function') stateCreateInitialState = options.createInitialState;
         if (options.actions != null && typeof options.actions === 'object') stateActions = options.actions;
         if (typeof options.selectView === 'function') stateSelectView = options.selectView;
-        if (typeof options.render === 'function') stateRender = options.render;
       }
       registered = true;
       report('defineGame', { options: gameDeclaration(options) });

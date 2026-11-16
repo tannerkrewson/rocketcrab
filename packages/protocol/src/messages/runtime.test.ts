@@ -240,7 +240,6 @@ describe("runtime message schemas", () => {
       },
       { kind: "simulationSnapshot", snapshot: { tick: 5, state: { x: 1 } } },
       { kind: "simulationTick", tick: 7 },
-      { kind: "simulationAuthorityChange", term: 2 },
       { kind: "simulationRequest", requestId: "sim-1" },
       {
         kind: "error",

@@ -247,10 +247,6 @@ export const gameApiEventSchema = z.discriminatedUnion("kind", [
     tick: z.number().int().nonnegative(),
   }),
   z.object({
-    kind: z.literal("simulationAuthorityChange"),
-    term: z.number().int().min(1),
-  }),
-  z.object({
     kind: z.literal("error"),
     code: z.string().min(1).max(64),
     message: z.string().min(1).max(512),

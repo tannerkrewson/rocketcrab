@@ -637,7 +637,6 @@ export class ArenaEngine {
       case "simulationInput":
       case "simulationSnapshot":
       case "simulationTick":
-      case "simulationAuthorityChange":
       case "actionReceived":
         break; // routed to the frame only
       case "actionAck":

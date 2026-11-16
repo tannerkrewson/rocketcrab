@@ -1718,10 +1718,6 @@ export class NovaSession implements NovaClientBackend {
           // A1: authority changes notify the simulation loop (restore after
           // migration / follower snapshot pushes).
           this.simulationEngine.onAuthorityChanged(event.authorityMemberId, event.term);
-          // Games never learn which player is authoritative (engineering
-          // rule 1): the game-facing event carries the monotonic term only,
-          // so frames know to treat the next snapshot as the restore point.
-          this.emit({ type: "simulationAuthorityChange", term: event.term });
         }
         // Host-side observability (S3 acceptance: the arena can display the
         // elected authority and migration as it happens). Games never see

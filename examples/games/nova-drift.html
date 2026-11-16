@@ -152,11 +152,6 @@
         },
       });
 
-      // Subscribe to migrations: the next snapshot is the restore point.
-      nova.simulation.onAuthorityChange(function () {
-        setStatus("re-syncing…");
-      });
-
       var keymap = {
         ArrowLeft: "ArrowLeft",
         ArrowRight: "ArrowRight",

@@ -100,12 +100,6 @@ export interface NovaStateHandlers {
    * view (ADR-0006).
    */
   selectView?(state: unknown, viewer: NovaPlayer): unknown;
-  /**
-   * Optional render hook: Nova calls `render(view)` after every state
-   * change (subscription-based rendering via `nova.state.onChange` is
-   * preferred; render is a convenience, never a rendering framework).
-   */
-  render?(view: unknown): void;
 }
 
 /**
@@ -128,8 +122,6 @@ export interface NovaGameDeclaration {
   actions?: NovaStateActions;
   /** State mode: select the view one player sees (defaults to full state). */
   selectView?(state: unknown, viewer: NovaPlayer): unknown;
-  /** State mode: optional render hook, called with the latest view. */
-  render?(view: unknown): void;
 }
 
 /**
@@ -431,14 +423,6 @@ export interface NovaSimulationHandle {
   register(handlers: NovaSimulationHandlers): () => void;
   /** Send one player input to the party. Only available after start. */
   sendInput(input: NovaSimulationInput): void;
-  /**
-   * Subscribe to authority migrations (A1). Fires whenever the game's
-   * authority changed (election or migration). The handler receives no
-   * identity — games never learn which player is authoritative — but they
-   * should treat the next snapshot as the authoritative restore point and
-   * drop stale local prediction. Returns an unsubscribe function.
-   */
-  onAuthorityChange(handler: () => void): () => void;
   /**
    * The current local simulation tick (interpolation hook). 0 before the
    * clock starts.

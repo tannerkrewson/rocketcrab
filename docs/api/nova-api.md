@@ -94,9 +94,6 @@ nova.defineGame({
   selectView: function (state, viewer) {
     return state;
   },
-  render: function (view) {
-    /* optional */
-  },
 });
 ```
 
@@ -226,8 +223,6 @@ const current = nova.state.get();
   runtime through Immer (ADR-0006); the resulting state gets a new revision.
 - `selectView(state, viewer)` computes the view one player sees (default:
   the full state). Only your own view ever reaches your frame.
-- `render(view)` is an optional convenience called with each new view;
-  subscription-based rendering via `nova.state.onChange` is preferred.
 - `context` is `{ self, players, revision, now, actor? }` — plain data.
 
 ### The action protocol
@@ -293,13 +288,6 @@ nova.simulation.register({
   },
 });
 
-// Optional: know when the game's authority migrated (term only — Nova
-// never reveals which player is authoritative). Treat the next snapshot as
-// the authoritative restore point and drop stale local prediction.
-nova.simulation.onAuthorityChange(function () {
-  resetPrediction();
-});
-
 nova.onStart(function () {
   // Send an input (arrow keys, taps, …). Only available after start.
   nova.simulation.sendInput({ type: "move", payload: { dx: 1, dy: 0 } });
@@ -338,8 +326,8 @@ var tick = nova.simulation.getTick();
   state mode). When the authority migrates (its tab closes, it loses
   connection), the new authority restores the most recent valid snapshot
   (hash-checked) and re-broadcasts it — every frame restores and the game
-  continues. Games observe the migration only as an
-  `onAuthorityChange` notification and the following snapshot.
+  continues. Games observe the migration only as the following
+  snapshot.
 
 ### Rate bounds and diagnostics
 
