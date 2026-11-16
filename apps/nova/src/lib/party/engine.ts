@@ -18,7 +18,6 @@
  * {@link TrysteroTransport} in production and over the in-memory hub with
  * injected seams (fake clock, fake runtime bridge) in deterministic tests.
  */
-import { handshakeTimeoutMs } from "@rocketcrab/protocol";
 import type { GameApiEvent, GameMode, MemberId } from "@rocketcrab/protocol";
 import type { TransportConnectionState } from "@rocketcrab/core";
 import {
@@ -56,6 +55,7 @@ import { clearPartyRecovery, savePartyRecovery } from "./party-recovery";
 import { createTrysteroPartyTransportFactory } from "./transport-factory";
 import { SignalingOutage } from "./signaling-outage";
 import { PartySimulationExecutor, PartyStateExecutor } from "./party-executors";
+import { PeerLinkAlert } from "./peer-link-alert";
 import { reportConnection } from "../connection-log";
 import {
   fetchTurnCredentials,
@@ -356,13 +356,6 @@ const RECONNECT_RETRY_CAP_MS = 30_000;
  * screen, then a clear error, is the honest outcome.
  */
 const DEFAULT_PEER_CONNECT_TIMEOUT_MS = 15_000;
-/**
- * How long a "Connecting to a player…" alert may stand without a pairing or a
- * failure (PLAN.md §7). A switched pair that closes quietly reports nothing,
- * so the alert must expire on its own. Matches the transport handshake timeout.
- */
-const PEER_LINK_CONNECTING_WINDOW_MS = handshakeTimeoutMs;
-
 /** Injectable scheduler for engine-owned timers (defaults to setTimeout). */
 function defaultScheduler(callback: () => void, delayMs: number): () => void {
   const id = setTimeout(callback, delayMs);
@@ -405,9 +398,7 @@ export class PartyEngine {
   private readonly now: () => number;
   /** Latest TURN credential outcome, surfaced in engine diagnostics. */
   private turnStatus: "configured" | "unavailable" | "disabled" | null = null;
-  /** Generic peer-link alert (PLAN.md §7); see {@link PeerLinkStatus}. */
-  private peerLink: PeerLinkStatus = null;
-  private cancelPeerLinkWindow: (() => void) | null = null;
+  private readonly peerLink: PeerLinkAlert;
   /** Members removed by a kick: their leave is already announced, so skip the "left" notice. */
   private readonly removedMemberIds = new Set<MemberId>();
 
@@ -519,6 +510,12 @@ export class PartyEngine {
     };
     this.identity = config.identity ?? localPartyIdentity();
     this.schedule = config.schedule ?? defaultScheduler;
+    this.peerLink = new PeerLinkAlert(
+      this.schedule,
+      () =>
+        this.phase === "creating" || this.phase === "joining" || this.isInPartyPhase(this.phase),
+      () => this.emit(),
+    );
     this.signalingOutage = new SignalingOutage(this.schedule, (visible) => {
       this.signalingOutageVisible = visible;
       // One event per visible outage: the only log line that sees signaling
@@ -625,7 +622,7 @@ export class PartyEngine {
       notices: [...this.notices],
       lastError: this.lastError,
       setupFailureCode: this.setupFailureCode,
-      peerLink: this.peerLink,
+      peerLink: this.peerLink.status,
     };
   }
 
@@ -1247,7 +1244,7 @@ export class PartyEngine {
     this.endedReason = null;
     this.notices = [];
     this.removedMemberIds.clear();
-    this.clearPeerLink();
+    this.peerLink.clear();
     this.lastError = this.teardownFailed ? UNSAFE_TEARDOWN_MESSAGE : null;
     this.lastSetup = null;
     this.phase = this.teardownFailed ? "error" : nextPhase;
@@ -1284,7 +1281,7 @@ export class PartyEngine {
     if (transport === undefined || this.leaving) {
       return;
     }
-    this.clearPeerLink();
+    this.peerLink.clear();
     this.reconnectAttempts += 1;
     this.phase = "reconnecting";
     this.phaseDetail = `Reconnecting… (attempt ${this.reconnectAttempts})`;
@@ -1536,58 +1533,6 @@ export class PartyEngine {
     });
   }
 
-  // ------------------------------------------------------------------
-  // Peer-link alert (PLAN.md §7 stages 2 and 4)
-  // ------------------------------------------------------------------
-
-  /** Setup and party phases: a peer's link can report while they are live. */
-  private peerLinkPhase(): boolean {
-    return this.phase === "creating" || this.phase === "joining" || this.isInPartyPhase(this.phase);
-  }
-
-  /**
-   * A peer connection moved onto the edge tunnel. Simultaneous switches share
-   * one "connecting" alert, and each switch restarts the expiry window. A
-   * failure already showing stays. Every switch emits, because the diagnostics'
-   * relayed flags change with each pair.
-   */
-  private handleTunnelSwitch(): void {
-    if (!this.peerLinkPhase()) return;
-    if (this.peerLink !== "failed") {
-      this.armPeerLinkWindow();
-      this.peerLink = "connecting";
-    }
-    this.emit();
-  }
-
-  /** A tunnelled pair failed terminally: one alert with a retry action. */
-  private handleTunnelFailure(): void {
-    if (!this.peerLinkPhase()) return;
-    this.cancelPeerLinkWindowTimer();
-    if (this.peerLink === "failed") return;
-    this.peerLink = "failed";
-    this.emit();
-  }
-
-  /**
-   * An admitted peer clears the alert, whether it was connecting or failed.
-   * Trystero re-attempts a failed pair on re-announce, and the playing phase
-   * has no retry, so a failure must clear when recovery arrives. Trade-off: an
-   * unrelated peer's admission also clears it (the hooks do not identify the pair).
-   */
-  private handlePeerJoinedForLink(): void {
-    if (this.peerLink === null) return;
-    this.cancelPeerLinkWindowTimer();
-    this.peerLink = null;
-    this.emit();
-  }
-
-  /** Drop the alert: on leave, on setup failure, and when a retry starts. */
-  private clearPeerLink(): void {
-    this.cancelPeerLinkWindowTimer();
-    this.peerLink = null;
-  }
-
   /** A member who left without a kick gets one brief info notice (PLAN §7). */
   private noteMemberLeft(memberId: MemberId, displayName: string | undefined): void {
     if (this.removedMemberIds.delete(memberId)) return;
@@ -1600,21 +1545,6 @@ export class PartyEngine {
     if (displayName === undefined) return;
     const message = leftNoticeMessage(displayName);
     this.notices = this.notices.filter((notice) => notice.message !== message);
-  }
-
-  private armPeerLinkWindow(): void {
-    this.cancelPeerLinkWindowTimer();
-    this.cancelPeerLinkWindow = this.schedule(() => {
-      this.cancelPeerLinkWindow = null;
-      if (this.peerLink !== "connecting") return;
-      this.peerLink = null;
-      this.emit();
-    }, PEER_LINK_CONNECTING_WINDOW_MS);
-  }
-
-  private cancelPeerLinkWindowTimer(): void {
-    this.cancelPeerLinkWindow?.();
-    this.cancelPeerLinkWindow = null;
   }
 
   /** Auto-retry the reconnect with backoff (cancelled on success/leave). */
@@ -1774,11 +1704,11 @@ export class PartyEngine {
       },
       onTunnel: () => {
         if (this.activeErrorScope !== scope || setup?.signal.aborted) return;
-        this.handleTunnelSwitch();
+        this.peerLink.switched();
       },
       onTunnelFailure: () => {
         if (this.activeErrorScope !== scope || setup?.signal.aborted) return;
-        this.handleTunnelFailure();
+        this.peerLink.failed();
       },
     };
     if (!turnCredsConfigured()) {
@@ -1868,7 +1798,7 @@ export class PartyEngine {
     this.unsubParty = party.onEvent((event) => this.handlePartyEvent(event));
     this.unsubTransport = [
       party.privateTransport.on("connection:state", (state) => this.handleTransportState(state)),
-      party.privateTransport.on("peer:joined", () => this.handlePeerJoinedForLink()),
+      party.privateTransport.on("peer:joined", () => this.peerLink.peerJoined()),
       ...this.subscribeRelayState(party),
     ];
     this.coordinator = new GameSourceCoordinator({
@@ -2071,7 +2001,7 @@ export class PartyEngine {
       directCode === null
         ? connectionErrorMessage(error)
         : "Couldn't connect to the party. Try again.";
-    this.clearPeerLink();
+    this.peerLink.clear();
     this.phase = "error";
     this.phaseDetail = null;
     this.joinStage = null;
