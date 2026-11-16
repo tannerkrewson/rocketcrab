@@ -68,7 +68,8 @@ describe("gate", () => {
   it("allows only POST and known paths", async () => {
     expect((await call("/", { method: "GET" })).status).toBe(405);
     expect((await call("/nope")).status).toBe(404);
-    expect((await call("/turn/", {}, TURN_ENV)).status).not.toBe(404);
+    // A trailing slash still routes to /turn (no secrets: 500, and no network).
+    expect((await call("/turn/")).status).toBe(500);
   });
 
   it("rate limits per route and IP with Retry-After", async () => {
