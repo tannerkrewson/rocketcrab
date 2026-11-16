@@ -21,13 +21,14 @@ forwards binary frames between at most two sockets. Frames are AES-GCM
 encrypted with directional keys derived from the party secret
 (`tunnel-crypto.ts`), so the edge never sees plaintext. Trystero keeps the same
 channel object and sees `connecting` and then `connected`; the switch is
-one-way for the life of the connection. Media tracks are not tunnelled.
+one-way once the pair is on the tunnel (see below). Media tracks are not tunnelled.
 
-Known edge case: each side's 8 s deadline starts when it has both
-descriptions, so the answerer starts about one signaling hop earlier. If the
-native channel opens inside that gap, one side can be on the tunnel while the
-other is native. That pair stalls until Trystero's handshake (10 s) or answer
-TTL (about 23 s) closes it, and the next attempt starts fresh.
+Native wins until the tunnel pairs: a side still waiting for `paired` whose
+native channel opens drops its socket and stays native. Both sides start
+their 8 s deadline one signaling hop apart, so this rule keeps them on the
+same path. Once paired, the switch is one-way. The only remaining split is a
+native open inside the one-way latency between the two `paired` frames; the
+dropped socket then fails the partner at once and Trystero retries the pair.
 
 Re-check the RTCPeerConnection surface in the upgrade checklist below on every
 Trystero upgrade; the wrapper relies on it.

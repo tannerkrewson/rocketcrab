@@ -1247,6 +1247,80 @@ describe("FallbackPeerConnection", () => {
     expect(h.network.sockets).toHaveLength(2);
   });
 
+  it("offerer: a native open before pairing wins, drops the socket and stays native", async () => {
+    const h = harness();
+    const { a, b, chA } = await connectPair(h);
+    const nativeA = a.native.channels[0];
+    if (!nativeA) throw new Error("no native channel");
+    let opens = 0;
+    chA.onopen = () => {
+      opens += 1;
+    };
+    // Only A gives up on native (its deadline started earlier, or ICE flapped).
+    a.native.setStates("failed", "failed");
+    await until(() => h.network.sockets.length === 1, "A's lone socket");
+    expect(isTunnelledConnection(a.pc)).toBe(true);
+
+    nativeA.open();
+    const socket = h.network.sockets[0];
+    expect(socket?.closeCalls).toEqual([1000]);
+    expect(isTunnelledConnection(a.pc)).toBe(false);
+    expect(chA.readyState).toBe("open");
+    expect(opens).toBe(1);
+    chA.send("native-again");
+    expect(nativeA.sent).toEqual(["native-again"]);
+
+    const nativeB = deliverNativeChannel(b);
+    expect(bChannel(b)?.readyState).toBe("open");
+    nativeB.receive("hi");
+    await settle();
+    h.clock.advance(60000);
+    await settle();
+    expect(h.failures).toEqual([]);
+    expect(h.network.sockets).toHaveLength(1);
+    expect(h.outcomes.map((o) => [o.side, o.info.outcome]).sort()).toEqual([
+      ["a", "direct"],
+      ["b", "direct"],
+    ]);
+  });
+
+  it("answerer: a native channel before pairing wins and is handed to Trystero", async () => {
+    const h = harness();
+    const { b } = await connectPair(h);
+    b.native.setStates("failed", "failed");
+    await until(() => h.network.sockets.length === 1, "B's lone socket");
+    expect(b.incoming).toHaveLength(0);
+
+    const nativeB = deliverNativeChannel(b);
+    expect(h.network.sockets[0]?.closeCalls).toEqual([1000]);
+    expect(isTunnelledConnection(b.pc)).toBe(false);
+    const chB = bChannel(b);
+    expect(chB?.readyState).toBe("open");
+    const got: unknown[] = [];
+    if (chB) chB.onmessage = (event) => got.push(event.data);
+    nativeB.receive("over-native");
+    expect(got).toEqual(["over-native"]);
+    h.clock.advance(60000);
+    await settle();
+    expect(h.failures).toEqual([]);
+  });
+
+  it("a revert during a pending open retry stops the retries", async () => {
+    const h = harness();
+    const { a, b } = await connectPair(h);
+    h.network.rejectNext = 1;
+    a.native.setStates("failed", "failed");
+    await until(() => h.network.sockets.length === 1, "first (rejected) open");
+    await settle();
+    a.native.channels[0]?.open();
+    deliverNativeChannel(b);
+    h.clock.advance(60000);
+    await settle();
+    expect(h.network.sockets).toHaveLength(1);
+    expect(h.failures).toEqual([]);
+    expect(isTunnelledConnection(a.pc)).toBe(false);
+  });
+
   it("rejects a send over the tunnel frame limit and accepts one at it", async () => {
     const h = harness();
     const { chA, b } = await pairUp(h);

@@ -109,11 +109,6 @@ Record results in `docs/testing/trystero-connectivity-findings.md` and
 
 - **Party size.** No `maxUsers`. Trystero's `scale()` overlay tracks at most
   2,048 peers, and real-browser runs stop at 50; "unlimited" means hundreds.
-- **Fallback deadline race.** Each side's 8 s deadline starts when it has
-  both descriptions, so they differ by one signaling hop. If the native
-  channel opens in that gap, the pair stalls until Trystero's 10–23 s timeouts
-  close it and retry (ADR-0003, amendment 2026-11-15). Fix only if real-device
-  stats show it.
 - **Peer-link messages are generic** ("Connecting to a player…"). Trystero
   exposes no named pre-connection event.
 - **Networks that block WebSockets to Cloudflare** cannot connect at all. They

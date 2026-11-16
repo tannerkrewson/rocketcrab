@@ -23,7 +23,13 @@
  *   deadline decides, so it cannot hide a dead peer for longer than that.
  * - The native connection is NOT closed at the switch. Closing it would send a
  *   DTLS close, and a partner still on native WebRTC would tear the peer down.
- * - The switch is one-way for the connection's lifetime.
+ * - Native wins until the tunnel pairs. A side still waiting for `paired`
+ *   whose native channel opens goes back to native and drops its socket, so
+ *   both sides apply the same rule even though their deadlines start one
+ *   signaling hop apart. Once paired, the switch is one-way. The only split
+ *   left is a native open inside the ~one-way-latency gap between the two
+ *   `paired` frames; the dropped socket then fails the partner at once and
+ *   Trystero retries.
  * - One data channel per connection. Trystero uses exactly one.
  * - Sends are paced to the edge's per-socket budget (see the pace constants).
  * - Each instance reports one connection outcome at most (`onOutcome`, PLAN.md
@@ -391,6 +397,15 @@ class ChannelFacade {
     if (!this.closed) this.tunnelled = true;
   }
 
+  /** Back to the native channel (the tunnel never paired). */
+  exitTunnel(): void {
+    this.tunnelled = false;
+    if (this.native) {
+      this.native.binaryType = this.kind;
+      this.native.bufferedAmountLowThreshold = this.threshold;
+    }
+  }
+
   /** Tunnel paired. Fires `open` once; a channel that was already open stays so. */
   tunnelOpened(): void {
     if (this.closed) return;
@@ -433,7 +448,9 @@ class ChannelFacade {
     this.native = native;
     native.binaryType = this.kind;
     native.addEventListener("open", () => {
-      if (this.tunnelled || this.closed) return;
+      if (this.closed) return;
+      // Native won the race against a tunnel that has not paired yet.
+      if (this.tunnelled && !this.session.revertToNative()) return;
       this.opened = true;
       this.session.onChannelOpened();
       this.fire("open");
@@ -495,6 +512,10 @@ class Session {
   private drainTimer: unknown = undefined;
 
   private socket: WebSocket | null = null;
+  /** Rejects the pending socket open, if any. */
+  private abortOpen: (() => void) | null = null;
+  /** Bumped on every switch and revert; stale tunnel work checks it and stops. */
+  private tunnelAttempt = 0;
   private cipher: TunnelCipher | null = null;
   private ready = false;
   private readonly readyGate: Promise<void>;
@@ -757,20 +778,53 @@ class Session {
     const elapsedMs = this.timerStarted ? this.switchedAt - this.timerStartedAt : 0;
     invokeCallback(() => this.deps.onTunnel?.({ reason, elapsedMs }));
     this.emitStates();
-    void this.startTunnel();
+    this.tunnelAttempt += 1;
+    void this.startTunnel(this.tunnelAttempt);
   }
 
-  private async startTunnel(): Promise<void> {
+  /**
+   * The native channel came up while the tunnel was still pairing: native
+   * wins. Drops the socket (the edge then frees the pair) and resumes native
+   * pass-through. Returns false once paired or closed, when the tunnel stays.
+   */
+  revertToNative(): boolean {
+    if (this.closed || this.mode !== "tunnel" || this.ready) return false;
+    this.mode = "native";
+    this.tunnelAttempt += 1;
+    this.cipher = null;
+    this.cancelPause(this.retrySlot);
+    this.abortOpen?.();
+    const socket = this.socket;
+    this.socket = null;
+    if (socket) {
+      socket.onopen = socket.onmessage = socket.onerror = socket.onclose = null;
+      try {
+        socket.close(CLOSE_NORMAL, "native connected");
+      } catch {
+        // Already going away.
+      }
+    }
+    this.channel?.exitTunnel();
+    this.emitStates();
+    return true;
+  }
+
+  private stale(attempt: number): boolean {
+    return this.closed || attempt !== this.tunnelAttempt;
+  }
+
+  private async startTunnel(attempt: number): Promise<void> {
     try {
       const local = this.native.localDescription?.sdp;
       const remote = this.native.remoteDescription?.sdp;
       if (!local || !remote) throw new Error("Tunnel needs local and remote descriptions.");
       const { pairId, localRole } = await computeTunnelPairing(local, remote, this.deps.roomId);
       const keys = await deriveTunnelKeys(this.deps.partySecret, pairId, localRole);
-      if (this.closed) return;
+      if (this.stale(attempt)) return;
       this.cipher = new TunnelCipher(keys);
-      await this.connectWithRetry(this.deps.tunnelUrl(pairId));
+      await this.connectWithRetry(this.deps.tunnelUrl(pairId), attempt);
     } catch (error) {
+      if (this.stale(attempt)) return;
       if (error instanceof TunnelOpenError) {
         this.failTerminal({ reason: "open-failed", attempts: error.attempts });
       } else {
@@ -784,19 +838,19 @@ class Session {
    * with doubling backoff. A retry is never scheduled past the fallback
    * deadline (switch time + fallbackAfterMs).
    */
-  private async connectWithRetry(url: string): Promise<void> {
+  private async connectWithRetry(url: string, attempt: number): Promise<void> {
     const deadline = this.switchedAt + this.deps.fallbackAfterMs;
     let delay = OPEN_RETRY_BASE_MS;
-    for (let attempt = 1; ; attempt += 1) {
+    for (let tries = 1; ; tries += 1) {
       try {
         await this.openSocket(url);
         return;
       } catch (error) {
-        if (this.closed) throw error;
-        if (attempt >= OPEN_ATTEMPTS) throw new TunnelOpenError(attempt);
-        if (this.deps.now() + delay > deadline) throw new TunnelOpenError(attempt);
+        if (this.stale(attempt)) throw error;
+        if (tries >= OPEN_ATTEMPTS) throw new TunnelOpenError(tries);
+        if (this.deps.now() + delay > deadline) throw new TunnelOpenError(tries);
         await this.pause(this.retrySlot, delay);
-        if (this.closed) throw error;
+        if (this.stale(attempt)) throw error;
         delay *= 2;
       }
     }
@@ -823,7 +877,9 @@ class Session {
       socket.binaryType = "arraybuffer";
       // Kept now so close() can stop an in-flight attempt.
       this.socket = socket;
+      this.abortOpen = () => reject(new Error("Tunnel open was abandoned."));
       socket.onopen = () => {
+        this.abortOpen = null;
         socket.onmessage = (event) => this.onSocketMessage(event);
         socket.onerror = () => this.failTerminal({ reason: "socket-error" });
         socket.onclose = (event) => this.onSocketClosed(event.code);
@@ -1019,7 +1075,10 @@ class Session {
   private onNativeChannel(native: RTCDataChannel): void {
     // After a switch the native channel is left unused. Closing it would send an
     // SCTP close, and the partner's Trystero would tear the peer down.
-    if (this.closed || this.mode === "tunnel") return;
+    if (this.closed) return;
+    // A native channel arriving while the tunnel is still pairing means native
+    // works: it wins. After pairing it is left unused.
+    if (this.mode === "tunnel" && !this.revertToNative()) return;
     const facade = new ChannelFacade(this, native);
     this.channel = facade;
     this.firePc("datachannel", { channel: facade });
