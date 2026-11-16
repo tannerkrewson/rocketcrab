@@ -1,8 +1,8 @@
 # Trystero transport e2e (P1)
 
 Real-browser integration smoke tests for `@rocketcrab/trystero-transport`.
-Local-relay tests, deliberately NOT part of the CI smoke run
-(`npm run test:e2e`); run them explicitly with:
+The local-relay suite runs separately from `npm run test:e2e` and is a
+Chromium CI gate. Run it locally with:
 
 ```sh
 npm run test:e2e:trystero

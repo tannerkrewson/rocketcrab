@@ -129,7 +129,7 @@ Record results in `docs/testing/trystero-connectivity-findings.md` and
 
 ## Cleanup
 
-Done 2026-11-15: Archived the superseded media-bridging spike; retained the runtime sandbox findings and matrix because current architecture and support-policy docs rely on them.
+Done 2026-11-15: Archived the superseded media-bridging spike; retained the runtime sandbox findings and matrix because current architecture and support-policy docs rely on them. Added the separate Chromium transport suite to CI.
 
 ## Cleanup for the owner
 

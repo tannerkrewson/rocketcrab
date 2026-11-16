@@ -156,7 +156,8 @@ static deployment; nothing is published yet).
 GitHub Actions (`.github/workflows/ci.yml`) runs the same checks as `npm run
 check` from a clean checkout using `npm ci` (the committed lockfile), then
 uploads the Nova and Runtime bundles as separate artifacts and runs the Playwright
-browser suite (`e2e/`) on Chromium, Firefox and WebKit. Generated files (TanStack Router `routeTree.gen.ts`) are
+browser suite (`e2e/`) on Chromium, Firefox and WebKit, plus the separate
+Trystero transport suite (`e2e-trystero/`) on Chromium. Generated files (TanStack Router `routeTree.gen.ts`) are
 excluded from formatting and lint via `.oxfmtrc.json` / `.oxlintrc.json`.
 
 Dependency updates are handled by Dependabot (`.github/dependabot.yml`).
@@ -170,7 +171,8 @@ route-split into a lazy chunk. The budget is a warning, not a CI gate.
 
 - **Unit tests**: Vitest, one config per app/package, run via `npm test`.
 - **End-to-end**: Playwright (`npm run test:e2e`). Install browsers once with
-  `npx playwright install`.
+  `npx playwright install`. Run `npm run test:e2e:trystero` for the separate
+  Chromium transport and tunnel suite.
 
 ## Security posture (summary)
 

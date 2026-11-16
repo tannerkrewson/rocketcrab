@@ -228,7 +228,9 @@ Re-verify every item on each Trystero upgrade. The installed core is under
 - **Tests** (PLAN §3.1, §3.6, §5). Run `npm run check`,
   `npm run test:e2e`, `npm run test:e2e:trystero` and
   `npm run test:edge:integration`. Run the Playwright suites in the pinned
-  Playwright 1.62.1 image. Record results in the matching PLAN evidence.
+  Playwright 1.62.1 image. CI runs the Trystero suite separately on Chromium;
+  it uses its own serial execution, relay and fixture servers. Record results
+  in the matching PLAN evidence.
 
 ## Alternatives considered
 
