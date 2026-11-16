@@ -877,17 +877,6 @@ export class NovaSession implements NovaClientBackend {
       throw new NovaError("not_connected", `Player "${options.to}" is not connected.`);
     }
     this.consumeGameBytes(Math.max(1, sizeBytes));
-    const onProgress =
-      options.onProgress === undefined
-        ? undefined
-        : (progress: { bytesTransferred: number; totalBytes: number; fraction: number }) => {
-            options.onProgress?.({
-              at: Date.now(),
-              bytesTransferred: progress.bytesTransferred,
-              totalBytes: progress.totalBytes,
-              fraction: progress.fraction,
-            });
-          };
     this.rawStats.sent += 1;
     this.rawStats.sentBytes += sizeBytes;
     await this.transport.send({
@@ -897,7 +886,6 @@ export class NovaSession implements NovaClientBackend {
       reliability: "reliable",
       ordering: "ordered",
       ...(targetConnectionId !== undefined ? { targetConnectionId } : {}),
-      ...(onProgress !== undefined ? { onProgress } : {}),
     });
   }
 

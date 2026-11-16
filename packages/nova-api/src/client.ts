@@ -359,12 +359,6 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
         novaChannelNameSchema.safeParse(name).success,
         "nova.raw.send: bad channel name.",
       );
-      if (options.onProgress !== undefined && typeof options.onProgress !== "function") {
-        throw new NovaError(
-          "invalid_options",
-          "nova.raw.send options.onProgress must be a function.",
-        );
-      }
       if (!isBinaryPayload(payload)) {
         assertStructuredCloneSafe(payload, `nova.raw.send payload on channel "${name}"`);
       }

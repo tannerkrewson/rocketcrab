@@ -262,10 +262,6 @@ describe("createNovaClient lifecycle", () => {
     expectNovaError(() => client.raw.createChannel({ name: "nova.protocol" }), "reserved_channel");
     expectNovaError(() => client.raw.createChannel({ name: "x".repeat(65) }), "invalid_options");
     expectNovaError(() => client.raw.close("x".repeat(65)), "invalid_options");
-    expectNovaError(
-      () => client.raw.send("chat", "hi", { onProgress: 42 as unknown as () => void }),
-      "invalid_options",
-    );
   });
 
   it("forwards raw.close to the backend with lifecycle gating (A2)", () => {

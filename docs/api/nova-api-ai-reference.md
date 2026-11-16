@@ -63,7 +63,6 @@ nova.simulation.getTick(); // local tick, for interpolation
 nova.raw.createChannel({ name: "chat" }); // after start; reliable and ordered
 nova.raw.send("chat", { text: "hi" }); // to everyone
 nova.raw.send("chat", "hi", { to: playerId }); // to one player
-nova.raw.send("chat", bytes, { onProgress: (p) => {} }); // big payloads report progress
 nova.raw.onMessage("chat", (message) => {}); // { from, payload, binary }
 nova.raw.close("chat");
 

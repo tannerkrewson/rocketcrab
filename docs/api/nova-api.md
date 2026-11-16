@@ -369,7 +369,7 @@ var tick = nova.simulation.getTick();
 ## 10. Raw mode (`mode: "raw"`)
 
 For specialized protocols. Nova provides named channels (always reliable
-and ordered), binary support, rate/size limits, transfer progress, and channel
+and ordered), binary support, rate/size limits, and channel
 lifecycle — but no synchronization, migration, or cheating resistance
 (ADR-0006).
 
@@ -424,7 +424,7 @@ and the relay fallback) offers nothing else, so there are no delivery
 options. Binary payloads (`Uint8Array`, `ArrayBuffer`) are detected per
 send; `message.binary` tells the receiver which kind arrived.
 
-### Size, rate, and progress (A2)
+### Size and rate
 
 Each player shares a 256 KiB/s game-message byte budget with a 1 MiB burst across state actions, simulation inputs, and raw messages. Sends exceeding the available budget are rejected with `rate_limited`; the test arena warns when 80% of the burst is used. Nova control and game-source traffic are exempt.
 
@@ -435,11 +435,8 @@ Each player shares a 256 KiB/s game-message byte budget with a 1 MiB burst acros
   a sliding 10-second window). Bursts beyond it are rejected with
   `rate_limited` and counted in the host diagnostics. Both thresholds live
   in `packages/protocol/src/limits.ts` beside the F6 limits.
-- **Progress**: payloads above the chunk threshold travel as chunked
-  transfers. Pass `onProgress({ at, bytesTransferred, totalBytes, fraction })`
-  in `nova.raw.send` options to observe sender-side transfer progress
-  (a plain function — it stays in your context and never crosses a
-  boundary).
+- **Large payloads**: payloads above 64 KiB travel in chunks and arrive as
+  one message.
 - **Backpressure**: `nova.raw.send` queues into the transport and returns
   immediately; failures (unknown channel, not connected, over a limit)
   surface through `nova.onError` with a stable code.

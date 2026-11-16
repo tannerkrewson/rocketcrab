@@ -317,20 +317,13 @@ describe("NovaSession raw channels (A2)", () => {
     expect(a.getRawDiagnostics().warned).toBe(true);
   });
 
-  it("forwards sender-side transfer progress for chunked payloads", async () => {
+  it("delivers a chunked payload", async () => {
     const { hub, a, b } = await makeRawPair();
     a.client.raw.createChannel({ name: "big" });
     b.client.raw.createChannel({ name: "big" });
-    const progress: number[] = [];
     const payload = new Uint8Array(200 * 1024).fill(7); // ~200 KiB → chunked
-    await a.sendRaw("big", payload, {
-      onProgress(observation) {
-        progress.push(observation.fraction);
-      },
-    });
+    await a.sendRaw("big", payload);
     await settle(hub);
-    expect(progress.length).toBeGreaterThan(0);
-    expect(progress[progress.length - 1]).toBe(1);
     const received = b.getRawDiagnostics();
     expect(received.receivedCount).toBe(1);
     expect(received.receivedBytes).toBe(payload.byteLength);

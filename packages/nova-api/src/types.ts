@@ -215,25 +215,6 @@ export interface NovaRawChannelSpec {
 export interface NovaRawSendOptions {
   /** Target one player by id; omit to broadcast to every connected player. */
   readonly to?: string;
-  /**
-   * Optional sender-side transfer progress for payloads moved in chunks
-   * (payloads above ~64 KiB travel as chunked transfers). Called with the
-   * fraction of the payload the transport has handed off so far. Plain
-   * function: stays in the game's own context, never crosses a boundary.
-   */
-  readonly onProgress?: (progress: NovaRawProgress) => void;
-}
-
-/** One raw transfer-progress observation (A2 transfer observability). */
-export interface NovaRawProgress {
-  /** Epoch-ms timestamp of the observation. */
-  readonly at: number;
-  /** Bytes of the payload handed off so far. */
-  readonly bytesTransferred: number;
-  /** Total payload size in bytes. */
-  readonly totalBytes: number;
-  /** Fraction of the payload transferred, in [0, 1]. */
-  readonly fraction: number;
 }
 
 /** One raw message received on a raw channel. */

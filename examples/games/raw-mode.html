@@ -75,15 +75,8 @@
         }
         // Broadcast binary data.
         nova.raw.send("positions", new Uint8Array([1, 2, 3]));
-        // A large payload exercises chunked transfer with progress.
-        const big = new Uint8Array(150 * 1024).fill(9);
-        nova.raw.send("positions", big, {
-          onProgress(progress) {
-            if (progress.fraction === 1) {
-              log("large transfer complete: " + progress.totalBytes + " bytes");
-            }
-          },
-        });
+        // A large payload travels in chunks; it still arrives as one message.
+        nova.raw.send("positions", new Uint8Array(150 * 1024).fill(9));
       });
 
       nova.onPlayerJoin((player) => log(player.name + " joined."));
