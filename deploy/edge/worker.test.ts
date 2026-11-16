@@ -94,6 +94,32 @@ describe("gate", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
+  it("charges signal, tunnel and log to the bulk budget, never the strict one", async () => {
+    const strict = vi.fn(async () => ({ success: false }));
+    const bulk = vi.fn(async (_options: { key: string }) => ({ success: true }));
+    const forward = {
+      idFromName: (name: string) => name,
+      get: () => ({ fetch: async () => new Response("ok") }),
+    };
+    const env: EdgeEnv = {
+      ...BASE_ENV,
+      RATE_LIMITER: { limit: strict },
+      BULK_RATE_LIMITER: { limit: bulk },
+      SIGNAL_HUB: forward,
+      TUNNEL_PAIR: forward,
+    };
+    const upgrade = { method: "GET", headers: { Upgrade: "websocket" } };
+    expect((await call(`/signal/${"a".repeat(32)}`, upgrade, env)).status).toBe(200);
+    expect((await call(`/tunnel/${"b".repeat(64)}`, upgrade, env)).status).toBe(200);
+    expect((await call("/log", { body: "{}" }, env)).status).not.toBe(429);
+    expect(strict).not.toHaveBeenCalled();
+    expect(bulk.mock.calls.map(([arg]) => arg.key)).toEqual([
+      "signal:203.0.113.7",
+      "tunnel:203.0.113.7",
+      "log:203.0.113.7",
+    ]);
+  });
+
   it("fails open when the rate limiter itself fails", async () => {
     mockFetch(Response.json({ gameCode: "ABCD" }));
     const env: EdgeEnv = {
@@ -232,7 +258,7 @@ describe("tunnel route", () => {
     const env: EdgeEnv = {
       ...BASE_ENV,
       TUNNEL_PAIR: { idFromName, get: () => ({ fetch }) },
-      RATE_LIMITER: { limit },
+      BULK_RATE_LIMITER: { limit },
       ...overrides,
     };
     return { env, idFromName, fetch, limit };

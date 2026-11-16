@@ -98,7 +98,7 @@ describe("signal routing", () => {
     const env: EdgeEnv = {
       ORIGIN_ALLOWLIST: "https://app.example",
       SIGNAL_HUB: { idFromName, get: () => ({ fetch }) },
-      RATE_LIMITER: { limit },
+      BULK_RATE_LIMITER: { limit },
     };
     const call = (path: string, init: RequestInit = {}) =>
       edge.fetch(new Request(`https://edge.example${path}`, init), env);

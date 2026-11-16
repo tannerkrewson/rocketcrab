@@ -66,8 +66,8 @@ worked locally; 100–200 only in the in-process simulation.
 ## 2. First deploy and smoke test (agent, after §1)
 
 - [ ] `npm run edge:deploy`; runbook smoke test: 403 without Origin,
-      `iceServers` with one, Classic `spyfall-new` returns a code, 61st
-      request in a minute returns 429, `/signal` and `/tunnel` upgrade.
+      `iceServers` with one, Classic `spyfall-new` returns a code, 121st
+      `/turn` request in a minute returns 429, `/signal` and `/tunnel` upgrade.
 - [ ] `npm run deploy:runtime` and `npm run deploy:nova`; open the app,
       create a game, run it in the editor; `curl -I` both for the headers.
 - [ ] A two-device party on the live stack; confirm `/log` events arrive

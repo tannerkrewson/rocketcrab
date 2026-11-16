@@ -84,7 +84,7 @@ describe("connection events", () => {
   });
   it("gates origin, rate limits independently and reports missing or broken binding", async () => {
     const limit = vi.fn(async () => ({ success: false }));
-    const env = { ORIGIN_ALLOWLIST: origin, RATE_LIMITER: { limit } };
+    const env = { ORIGIN_ALLOWLIST: origin, BULK_RATE_LIMITER: { limit } };
     expect(
       (
         await call(JSON.stringify(event), env, {

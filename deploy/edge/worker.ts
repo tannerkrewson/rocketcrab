@@ -23,28 +23,41 @@ export interface RateLimitBinding {
   limit(options: { key: string }): Promise<{ success: boolean }>;
 }
 
+interface ObjectNamespace {
+  idFromName(name: string): unknown;
+  get(id: unknown): { fetch(request: Request): Promise<Response> };
+}
+
 export interface EdgeEnv extends TurnEnv, LogEnv {
   /** Comma-separated exact origins allowed to call the Worker. */
   ORIGIN_ALLOWLIST?: string;
-  /** Workers Rate Limiting binding (wrangler.toml `[[ratelimits]]`). */
+  /** Per-IP limit for costly routes: `/turn` and the Classic relay. */
   RATE_LIMITER?: RateLimitBinding;
-  SIGNAL_HUB?: {
-    idFromName(name: string): unknown;
-    get(id: unknown): { fetch(request: Request): Promise<Response> };
-  };
-  TUNNEL_PAIR?: {
-    idFromName(name: string): unknown;
-    get(id: unknown): { fetch(request: Request): Promise<Response> };
-  };
+  /**
+   * Per-IP limit for cheap, high-volume routes: `/signal`, `/tunnel`, `/log`.
+   * A whole school behind one NAT address, every player tunnelling to up to
+   * nine neighbours, must fit under it.
+   */
+  BULK_RATE_LIMITER?: RateLimitBinding;
+  SIGNAL_HUB?: ObjectNamespace;
+  TUNNEL_PAIR?: ObjectNamespace;
 }
 
 type Handler = (request: Request, env: EdgeEnv) => Promise<Response>;
+type Limiter = "RATE_LIMITER" | "BULK_RATE_LIMITER";
 
-const ROUTES: Record<string, { handler: Handler; rateLimitKey: string }> = {
-  "/turn": { handler: handleTurn, rateLimitKey: "turn" },
-  "/log": { handler: handleLog, rateLimitKey: "log" },
-  "/": { handler: handleRelay, rateLimitKey: "relay" },
+/** POST routes; responses carry CORS headers. */
+const ROUTES: Record<string, { handler: Handler; key: string; limiter: Limiter }> = {
+  "/turn": { handler: handleTurn, key: "turn", limiter: "RATE_LIMITER" },
+  "/log": { handler: handleLog, key: "log", limiter: "BULK_RATE_LIMITER" },
+  "/": { handler: handleRelay, key: "relay", limiter: "RATE_LIMITER" },
 };
+
+/** WebSocket routes, each forwarded to one Durable Object per id. */
+const SOCKET_ROUTES: { pattern: RegExp; key: string; binding: "SIGNAL_HUB" | "TUNNEL_PAIR" }[] = [
+  { pattern: /^\/signal\/([0-9a-f]{32})$/, key: "signal", binding: "SIGNAL_HUB" },
+  { pattern: /^\/tunnel\/([0-9a-f]{64})$/, key: "tunnel", binding: "TUNNEL_PAIR" },
+];
 
 /** Fixed window of the platform rate limiter, in seconds. */
 const RATE_LIMIT_PERIOD_SECONDS = 60;
@@ -70,22 +83,35 @@ function corsHeaders(origin: string): Record<string, string> {
  * True when the request may proceed. A missing binding (unit tests) or a
  * binding failure fails open: a rate-limiter outage must never block a join.
  */
-async function withinRateLimit(env: EdgeEnv, key: string): Promise<boolean> {
-  if (env.RATE_LIMITER === undefined) return true;
+async function withinRateLimit(
+  request: Request,
+  binding: RateLimitBinding | undefined,
+  route: string,
+): Promise<boolean> {
+  if (binding === undefined) return true;
+  // Keys are per route, so one route's traffic never spends another's budget.
+  const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
   try {
-    return (await env.RATE_LIMITER.limit({ key })).success;
+    return (await binding.limit({ key: `${route}:${ip}` })).success;
   } catch (error) {
     console.log(`edge: rate limiter failed open: ${String(error)}`);
     return true;
   }
 }
 
+function rateLimited(): Response {
+  return jsonError(429, "rate_limited", "too many requests; retry in a minute", {
+    "Retry-After": String(RATE_LIMIT_PERIOD_SECONDS),
+  });
+}
+
 async function route(request: Request, env: EdgeEnv): Promise<Response> {
   const path = new URL(request.url).pathname.replace(/(.)\/+$/, "$1");
   const target = ROUTES[path];
-  const signal = /^\/signal\/([0-9a-f]{32})$/.exec(path);
-  const tunnel = /^\/tunnel\/([0-9a-f]{64})$/.exec(path);
-  if (target === undefined && signal === null && tunnel === null)
+  const socket = SOCKET_ROUTES.map((r) => ({ ...r, match: r.pattern.exec(path) })).find(
+    (r) => r.match !== null,
+  );
+  if (target === undefined && socket === undefined)
     return jsonError(404, "not_found", `no route for ${path}`);
 
   // No CORS headers on a rejected origin, so other sites cannot read it.
@@ -93,33 +119,16 @@ async function route(request: Request, env: EdgeEnv): Promise<Response> {
   if (origin === "" || !parseAllowlist(env.ORIGIN_ALLOWLIST).includes(origin)) {
     return jsonError(403, "origin_not_allowed", "request Origin is missing or not allowlisted");
   }
-  const cors = corsHeaders(origin);
 
-  if (signal !== null) {
+  if (socket !== undefined) {
     if (request.method !== "GET") return jsonError(405, "method_not_allowed", "GET required");
     if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket")
       return jsonError(426, "upgrade_required", "WebSocket upgrade required");
-    const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
-    if (!(await withinRateLimit(env, `signal:${ip}`)))
-      return jsonError(429, "rate_limited", "too many requests; retry in a minute", {
-        "Retry-After": String(RATE_LIMIT_PERIOD_SECONDS),
-      });
-    if (!env.SIGNAL_HUB) return jsonError(503, "unavailable", "signaling unavailable");
-    return env.SIGNAL_HUB.get(env.SIGNAL_HUB.idFromName(signal[1]!)).fetch(request);
+    if (!(await withinRateLimit(request, env.BULK_RATE_LIMITER, socket.key))) return rateLimited();
+    const namespace = env[socket.binding];
+    if (!namespace) return jsonError(503, "unavailable", `${socket.key} unavailable`);
+    return namespace.get(namespace.idFromName(socket.match![1]!)).fetch(request);
   }
-  if (tunnel !== null) {
-    if (request.method !== "GET") return jsonError(405, "method_not_allowed", "GET required");
-    if (request.headers.get("Upgrade")?.toLowerCase() !== "websocket")
-      return jsonError(426, "upgrade_required", "WebSocket upgrade required");
-    const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
-    if (!(await withinRateLimit(env, `tunnel:${ip}`)))
-      return jsonError(429, "rate_limited", "too many requests; retry in a minute", {
-        "Retry-After": String(RATE_LIMIT_PERIOD_SECONDS),
-      });
-    if (!env.TUNNEL_PAIR) return jsonError(503, "unavailable", "tunnel unavailable");
-    return env.TUNNEL_PAIR.get(env.TUNNEL_PAIR.idFromName(tunnel[1]!)).fetch(request);
-  }
-  if (target === undefined) return jsonError(404, "not_found", `no route for ${path}`);
 
   let response: Response;
   if (request.method === "OPTIONS") {
@@ -127,15 +136,12 @@ async function route(request: Request, env: EdgeEnv): Promise<Response> {
   } else if (request.method !== "POST") {
     response = jsonError(405, "method_not_allowed", `method ${request.method} is not allowed`);
   } else {
-    // Keys are per route, so TURN joins never consume Classic's budget.
-    const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
-    response = (await withinRateLimit(env, `${target.rateLimitKey}:${ip}`))
-      ? await target.handler(request, env)
-      : jsonError(429, "rate_limited", "too many requests; retry in a minute", {
-          "Retry-After": String(RATE_LIMIT_PERIOD_SECONDS),
-        });
+    response = (await withinRateLimit(request, env[target!.limiter], target!.key))
+      ? await target!.handler(request, env)
+      : rateLimited();
   }
-  for (const [name, value] of Object.entries(cors)) response.headers.set(name, value);
+  for (const [name, value] of Object.entries(corsHeaders(origin)))
+    response.headers.set(name, value);
   return response;
 }
 

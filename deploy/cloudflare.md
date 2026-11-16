@@ -103,12 +103,18 @@ subscribers, including the publisher. We deliberately omit its aggregate 10,000
 subscription default to respect the unlimited-party decision; per-socket limits
 remain. See Cloudflare's [WebSocket hibernation documentation](https://developers.cloudflare.com/durable-objects/best-practices/websockets/) and [class migrations](https://developers.cloudflare.com/durable-objects/reference/durable-objects-migrations/).
 
-**Rate limit:** the Workers Rate Limiting binding, 60 requests/min per IP per
-route (`turn:<ip>`, `relay:<ip>`, `signal:<ip>`, `tunnel:<ip>` and `log:<ip>` are separate counters). A 10-player party
-behind one carrier-NAT address uses 10 TURN mints at join; reconnects reuse
-the cached credential. The counter is approximate and per Cloudflare
-location, so it is an abuse backstop, not a quota. If the limiter itself
-errors, requests are allowed (a limiter outage must not block joins).
+**Rate limits:** two Workers Rate Limiting bindings, per IP and per route
+(`turn:<ip>`, `relay:<ip>`, `signal:<ip>`, `tunnel:<ip>` and `log:<ip>` are
+separate counters). `RATE_LIMITER` allows 120/min for `/turn` and the Classic
+relay: one TURN mint per player per party, and reconnects reuse it.
+`BULK_RATE_LIMITER` allows 2,000/min for `/signal`, `/tunnel` and `/log`. A
+big party behind one school or carrier-NAT address with WebRTC blocked opens a
+tunnel from every player to each of up to nine neighbours and logs each
+attempt, so 100 players need about 900 tunnel upgrades. Counters are
+approximate and per Cloudflare location, so they are an abuse backstop, not a
+quota; the per-socket budgets in `signal.ts` and `tunnel.ts` bound what each
+connection can cost. If a limiter errors, requests are allowed (a limiter
+outage must not block joins).
 
 There is deliberately no global daily cap: KV cannot count atomically, and a
 cap that can be bypassed is worse than none. Spend is watched with billing

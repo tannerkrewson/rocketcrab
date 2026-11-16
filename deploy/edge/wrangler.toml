@@ -1,4 +1,4 @@
-# Nova edge Worker: TURN mint (POST /turn) + Classic CORS relay (POST /).
+# Nova edge Worker: TURN mint, Classic CORS relay, signaling, tunnel, log.
 # This file is the single source of truth for the deployed Worker.
 # Deploy with `npm run edge:deploy`; see deploy/cloudflare.md.
 name = "rocketcrab-edge"
@@ -33,13 +33,22 @@ new_sqlite_classes = ["TunnelPair"]
 # anyway, so this only keeps other websites from using it.
 ORIGIN_ALLOWLIST = "https://rocketcrab.com,https://rocketcrab-nova.tannerkrewson.workers.dev,http://localhost:5173,https://localhost:5173,http://127.0.0.1:5173,https://127.0.0.1:5173"
 
-# Per-IP, per-route limit. 60/min covers a 10-player party behind one
-# carrier-NAT address (10 joins + reloads); reconnects reuse the credential.
-# The counter is approximate and per Cloudflare location — a backstop.
+# Per-IP, per-route limits. Counters are approximate and per Cloudflare
+# location: a backstop, not the abuse defence (that is the Origin gate plus
+# the per-socket budgets in signal.ts and tunnel.ts).
+# Strict: /turn and the Classic relay. One TURN mint per player per party.
 [[ratelimits]]
 name = "RATE_LIMITER"
 namespace_id = "1001"
-simple = { limit = 60, period = 60 }
+simple = { limit = 120, period = 60 }
+
+# Bulk: /signal, /tunnel, /log. Sized for a big party behind one school or
+# carrier-NAT address where WebRTC is blocked: every player opens a tunnel to
+# each of up to nine direct neighbours and logs each attempt.
+[[ratelimits]]
+name = "BULK_RATE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 2000, period = 60 }
 
 # Keep console.log output (including turn_cred_mint lines) in Workers Logs.
 [observability]
