@@ -1,12 +1,6 @@
 /**
- * E2E helpers for the runtime-origin tests (U3).
- *
- * The runtime's real host is the Nova shell (apps/nova); until U4 wires it
- * into the UI, the e2e tests act as the host: they install a small harness
- * on the Nova origin (http://localhost:5173), embed the runtime iframe
- * (http://localhost:5174), and perform the exact-origin postMessage
- * bootstrap with a dedicated MessageChannel — the same handshake the host
- * bridge (apps/nova/src/lib/runtime-host.ts) performs.
+ * Install a test host on the Nova origin and exercise the runtime's exact-origin
+ * bootstrap with a dedicated MessageChannel, matching runtime-host.ts.
  */
 import type { Frame, Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
@@ -31,7 +25,6 @@ export interface GameInput {
   displayName?: string;
 }
 
-/** Install the host harness on the Nova origin page. */
 export async function installHarness(page: Page): Promise<void> {
   await page.goto(NOVA_ORIGIN + "/");
   await page.evaluate(() => {
@@ -168,7 +161,6 @@ export function findRuntimeFrame(page: Page): Frame | undefined {
   return page.frames().find((frame) => frame.url().startsWith(RUNTIME_ORIGIN));
 }
 
-/** Send a game to the runtime and wait for the runtime to be ready. */
 export async function loadGame(
   page: Page,
   game: Omit<GameInput, "memberId" | "displayName">,
@@ -182,7 +174,6 @@ export async function loadGame(
   );
 }
 
-/** Events the host harness observed from the runtime. */
 export async function harnessEvents(page: Page): Promise<Array<Record<string, unknown>>> {
   return page.evaluate(() =>
     (

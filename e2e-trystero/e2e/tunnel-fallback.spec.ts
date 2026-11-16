@@ -1,6 +1,5 @@
-// Real-browser WebRTC-to-tunnel fallback (PLAN.md §5.6) through the local
-// edge Worker: one page's native WebRTC is forced to fail, so its pair moves
-// onto the /tunnel/:pairId WebSocket. Shares the harness with trystero.spec.ts.
+// Force one page's WebRTC to fail and exercise /tunnel/:pairId through
+// the local edge Worker, using the shared Trystero browser harness.
 import { randomBytes } from "node:crypto";
 import { expect, test } from "@playwright/test";
 import type { Browser, Page, WebSocket } from "@playwright/test";
@@ -185,11 +184,9 @@ test("a forced player and its normal partner both tunnel once, and actions flow 
   test.setTimeout(180_000);
   const { host, joiner } = await joinPair(browser, true);
   try {
-    // Each page's pair is carried by one tunnel socket: exactly one per side.
     await expect.poll(() => host.tunnelSockets.length, { timeout: PAST_FALLBACK_MS * 2 }).toBe(1);
     await expect.poll(() => joiner.tunnelSockets.length, { timeout: 5_000 }).toBe(1);
 
-    // Both report the peer as tunnelled and started exactly one fallback.
     await expect.poll(async () => (await state(host.page)).peers[0]?.tunnelled).toBe(true);
     await expect.poll(async () => (await state(joiner.page)).peers[0]?.tunnelled).toBe(true);
     for (const peer of [host, joiner]) {
@@ -198,7 +195,6 @@ test("a forced player and its normal partner both tunnel once, and actions flow 
       expect(current.tunnel.failures).toEqual([]);
       expect(current.errors).toEqual([]);
     }
-    // One connection outcome per side for the forced pair: the tunnel (PLAN.md §8.2).
     for (const peer of [host, joiner]) {
       await expect
         .poll(async () => (await state(peer.page)).outcomes.map((o) => o.outcome))
@@ -209,9 +205,7 @@ test("a forced player and its normal partner both tunnel once, and actions flow 
       expect((await state(peer.page)).outcomes.map((o) => o.outcome)).toEqual(["tunnel"]);
     }
 
-    // Actions flow in both directions over the tunnel. The binary traffic
-    // counters must grow across the exchange: this proves the data itself
-    // crossed the tunnel, not just that the sockets opened.
+    // Count binary traffic to prove data crossed the tunnel, not just that sockets opened.
     const hostBefore = await trafficOf(host);
     const joinerBefore = await trafficOf(joiner);
     await host.page.evaluate(() => (window as unknown as HarnessWindow).__harness.sendStruct());
@@ -265,8 +259,7 @@ test("healthy pairs stay on native WebRTC and never open a tunnel", async ({ bro
       expect(current.peers[0]?.tunnelled).toBe(false);
       expect(current.tunnel.starts).toEqual([]);
       expect(current.tunnel.failures).toEqual([]);
-      // One outcome per side on native WebRTC: direct when the selected pair is
-      // readable, unknown when it is not. Never tunnel or failed (PLAN.md §8.2).
+      // Native outcomes may be unknown when selected-pair stats are unreadable.
       await expect
         .poll(async () => (await state(peer.page)).outcomes.map((o) => o.outcome))
         .toHaveLength(1);
@@ -314,11 +307,9 @@ test("a 2 MiB game source crosses the tunnel byte-identical and verified", async
     expect(received.receivedLength).toBe(source.length);
     expect(received.events).toContain("received");
 
-    // Still tunnelled: the transfer did not fall back to native WebRTC mid-way.
     expect((await state(joiner.page)).peers[0]?.tunnelled).toBe(true);
     expect((await state(joiner.page)).tunnel.failures).toEqual([]);
     expect(joiner.tunnelSockets).toHaveLength(1);
-    // The 2 MiB source (UTF-8 bytes, plus framing) had to cross the tunnel.
     const sourceBytes = new TextEncoder().encode(source).byteLength;
     expect((await trafficOf(joiner)).bytesReceived).toBeGreaterThanOrEqual(sourceBytes);
   } finally {
@@ -339,9 +330,8 @@ test("closing one side tears the tunnelled partner down", async ({ browser }) =>
     await joiner.page.evaluate(() => (window as unknown as HarnessWindow).__harness.leave());
     await waitPeers(host.page, 0, 60_000);
 
-    // The partner's tunnel socket closes too (the edge closes the pair when
-    // one side leaves). The host may see this as a Trystero peer leave before
-    // its socket closes, so a terminal failure is not required here.
+    // Trystero may report peer leave before the tunnel socket closes, so
+    // terminal failure is not required when a partner leaves cleanly.
     await expect.poll(() => host.closedTunnelSockets.length, { timeout: 30_000 }).toBe(1);
   } finally {
     await closeAll(host, joiner);

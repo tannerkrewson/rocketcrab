@@ -1,9 +1,6 @@
 /**
- * Three players, no forced tunnel: lobby to start on every browser (PLAN §5.6).
- *
- * The control for the tunnel proof. Every pair is a direct WebRTC link, so a
- * failure here is in the party itself (membership, source transfer, the start
- * gate or its retries) and not in the tunnel. Runs with retries disabled.
+ * Direct-WebRTC lobby-to-start control for party-tunnel.spec.ts. Separate
+ * party-flow failures from tunnel failures, without retries hiding stalls.
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import { expectPlayViewOnAll, recordConsole, recordCopiedInvites } from "./party-debug";
@@ -57,14 +54,12 @@ test("three players reach the lobby and start the game on every browser", async 
 
     await joiner.goto(invite);
     await third.goto(invite);
-    // Every page lists all three members: membership is complete everywhere.
     for (const page of [host, joiner, third]) {
       await expect(page.locator('[data-testid^="party-member-"]')).toHaveCount(3, {
         timeout: 120_000,
       });
     }
 
-    // Start enables once every member has the game source and has registered it.
     const startButton = host.getByRole("button", { name: "Start game" });
     await expect(startButton).toBeEnabled({ timeout: 180_000 });
     await startButton.click();

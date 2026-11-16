@@ -112,7 +112,6 @@ test("two pages join through the Trystero adapter, exchange messages, ping, and 
   expect(s2.peers[0]!.memberId).toBe(s1.selfMemberId);
   expect(s1.connectionState).toBe("connected");
 
-  // Structured message p1 -> p2
   await p1.evaluate(() => window.__harness.sendStruct());
   await waitMessages(p2, 1);
   const afterStruct = await stateOf(p2);
@@ -122,7 +121,6 @@ test("two pages join through the Trystero adapter, exchange messages, ping, and 
     kind: "json",
   });
 
-  // Binary message p2 -> p1 (256 KiB)
   const bytes: number[] = [];
   for (let i = 0; i < 256 * 1024; i += 1) {
     bytes.push(i % 251);
@@ -135,9 +133,6 @@ test("two pages join through the Trystero adapter, exchange messages, ping, and 
     { timeout: 30_000 },
   );
 
-  // Large transfer with progress on both sides (acceptance: large transfers
-  // report progress). 1 MiB over loopback completes in ~1 s; Trystero
-  // reports the final chunk as 100%.
   const LARGE = 1024 * 1024;
   await p1.evaluate((size) => window.__harness.sendLarge(size), LARGE);
   const sentProgress = (await stateOf(p1)).progress.filter(
@@ -158,11 +153,9 @@ test("two pages join through the Trystero adapter, exchange messages, ping, and 
   expect(receivedProgress.length).toBeGreaterThan(0);
   expect(receivedProgress[receivedProgress.length - 1]!.fraction).toBe(1);
 
-  // Ping measures round-trip latency
   const ping = await p1.evaluate(() => window.__harness.ping());
   expect(ping).not.toBeNull();
 
-  // Leave p1; p2 observes peer:left
   await p1.evaluate(() => window.__harness.leave());
   await waitPeers(p2, 0, 30_000);
   const finalS1 = await stateOf(p1);

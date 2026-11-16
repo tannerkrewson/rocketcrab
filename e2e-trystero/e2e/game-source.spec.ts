@@ -102,7 +102,6 @@ test("host transfers the full 2 MiB source by Trystero request, byte-identical a
   await enter(p2, room, "join");
   await Promise.all([waitPeers(p1, 1, 120_000), waitPeers(p2, 1, 120_000)]);
 
-  // The host registers the game and announces it over the private transport.
   await p1.evaluate(
     ([id, src]) => (window as unknown as HarnessWindow).__harness.sourceHostStart(id, src),
     [gameId, source] as const,
@@ -112,15 +111,12 @@ test("host transfers the full 2 MiB source by Trystero request, byte-identical a
   expect(hostSource.sourceSha256).toMatch(/^[0-9a-f]{64}$/);
   expect(hostSource.sourceSizeBytes).toBe(new TextEncoder().encode(source).byteLength);
 
-  // The joiner attaches its coordinator, requests the game, and receives the
-  // verified, byte-identical source.
   await p2.evaluate(() => (window as unknown as HarnessWindow).__harness.sourceJoinerStart());
   await waitForReceived(p2);
   const joinerSource = await sourceStateOf(p2);
   expect(joinerSource.gameId).toBe(gameId);
   expect(joinerSource.received).toBe(true);
   expect(joinerSource.sourceSha256).toBe(hostSource.sourceSha256);
-  // Byte-identical: same character length and byte count as the host's.
   expect(joinerSource.receivedLength).toBe(source.length);
   expect(joinerSource.sourceSizeBytes ?? 0).toBe(new TextEncoder().encode(source).byteLength);
   expect(joinerSource.events).toContain("received");

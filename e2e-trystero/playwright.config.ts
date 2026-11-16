@@ -22,7 +22,7 @@ export default defineConfig({
   reporter: [["list"], ["html", { open: "never" }]],
   use: {
     baseURL,
-    ignoreHTTPSErrors: true, // local spike certs are self-signed
+    ignoreHTTPSErrors: true, // Local certificates are self-signed.
     trace: "on-first-retry",
   },
   projects: [{ name: "chromium", use: { ...devices["Desktop Chrome"] } }],

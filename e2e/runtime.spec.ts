@@ -1,12 +1,4 @@
-/**
- * U3 runtime-origin e2e: the runtime app (apps/runtime, http://localhost:5174)
- * exercised end-to-end from a host harness on the Nova origin
- * (http://localhost:5173) — exact-origin bootstrap, dedicated
- * MessageChannel, game execution (inline + module scripts, remote deps),
- * registration, error/console forwarding, heartbeat, reload/destroy, and
- * cross-origin isolation. Mirrors the F4 spike validation with the F6
- * protocol schemas.
- */
+/** Exercise the runtime through a Nova-origin host: execution, reporting, lifecycle, and isolation. */
 import { expect, test } from "@playwright/test";
 import {
   NOVA_ORIGIN,
@@ -33,15 +25,15 @@ test.describe("runtime bootstrap and game execution", () => {
     });
 
     const state = await gameState(page);
-    expect(state?.inlineClassic).toBe(true); // classic inline script ran
-    expect(state?.moduleRan).toBe(true); // inline module ran
-    expect(state?.registered).toBe(true); // game called nova.defineGame
-    expect(state?.novaVersion).toBe(1); // injected Nova API bootstrap version
+    expect(state?.inlineClassic).toBe(true);
+    expect(state?.moduleRan).toBe(true);
+    expect(state?.registered).toBe(true);
+    expect(state?.novaVersion).toBe(1);
     expect(state?.bridgeVersion).toBe(1);
 
     const events = await harnessEvents(page);
     const registration = events.find((e) => e.type === "game.registration");
-    expect(registration?.title).toBe("Hello Game"); // game-declared title
+    expect(registration?.title).toBe("Hello Game");
     expect(registration?.gameMode).toBe("state");
     expect(registration?.gameVersion).toBe("1.0.0");
     expect(registration?.gameId).toBe("game-hello");
@@ -57,7 +49,7 @@ test.describe("runtime bootstrap and game execution", () => {
     });
     await expect
       .poll(async () => (await gameState(page))?.remoteDep, { timeout: 60_000 })
-      .toMatch(/^[0-9a-f-]{36}$/); // uuid v4() result
+      .toMatch(/^[0-9a-f-]{36}$/);
   });
 });
 
@@ -141,7 +133,6 @@ test.describe("runtime lifecycle controls", () => {
         ),
       )
       .toBe(true);
-    // A fresh frame means the counter restarts at 1 and the module re-runs.
     const state = await gameState(page);
     expect(state?.bootCount).toBe(1);
     expect(state?.moduleRan).toBe(true);
@@ -167,7 +158,6 @@ test.describe("runtime lifecycle controls", () => {
     const internals = await runtimeInternals(page);
     expect(internals.hasFrame).toBe(false);
     expect(internals.activeInstanceCount).toBe(0);
-    // The per-instance game hook must be gone.
     const runtime = page.frames().find((f) => f.url().startsWith(RUNTIME_ORIGIN));
     const hookGone = await runtime!.evaluate(
       () => (window as unknown as { __novaRuntime?: unknown }).__novaRuntime === undefined,
@@ -189,8 +179,6 @@ test.describe("runtime lifecycle controls", () => {
       await expect.poll(async () => (await runtimeInternals(page)).activeInstanceCount).toBe(0);
     }
 
-    // One more session: a single ping must produce exactly one pong and the
-    // runtime must not have accumulated security errors or duplicate state.
     await loadGame(page, {
       gameId: "game-final",
       gameMode: "state",
@@ -208,7 +196,7 @@ test.describe("runtime lifecycle controls", () => {
     expect(internals.activeInstanceCount).toBe(1);
     expect((internals.outgoingTypes as string[]).filter((t) => t === "runtime.ready")).toHaveLength(
       1,
-    ); // exactly one ready for the current instance
+    );
     expect((internals.outgoingTypes as string[]).filter((t) => t === "runtime.error")).toHaveLength(
       0,
     );
@@ -248,7 +236,6 @@ test.describe("cross-origin isolation", () => {
     expect(m.topNav).toContain("blocked");
     expect(m.disableStop).toContain("blocked");
     expect(m.runtimePageDom).toBe(true); // same-origin with the runtime page (ADR-0008)
-    // The host tab never navigated.
     expect(page.url()).toBe(NOVA_ORIGIN + "/");
   });
 

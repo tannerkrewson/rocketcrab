@@ -1,11 +1,7 @@
 /**
- * Real 3-player party over the real transport (PLAN.md §5.6): one player's
- * WebRTC is forced to fail, so its two pairs carry their data on the edge
- * tunnel. All three play the sample state-mode game (nova-quiz.html) and each
- * sees the others' answers and the reveal.
- *
- * Each player has its own browser context, so identities never collide.
- * Needs the root dev stack (nova 5173, runtime 5174, edge 8787).
+ * Three isolated browser contexts play nova-quiz with one player's WebRTC
+ * forced onto edge tunnels. Requires the root dev stack: Nova on 5173,
+ * runtime on 5174, and edge on 8787.
  */
 import {
   expect,
@@ -91,20 +87,14 @@ async function revealedRows(frame: Frame): Promise<string[]> {
   });
 }
 
-/**
- * PLAN.md §7 stages 2–3 in a real lobby: a forced-tunnel pair admits both
- * players with no alarm (no "Couldn't connect" alert on either side), and the
- * diagnostics mark the other player "relayed" on each side.
- */
+/** A tunneled pair must join without failure alerts and show relayed diagnostics. */
 test("a tunnelled pair joins with no alarm and shows a relayed badge", async ({ browser }) => {
   test.setTimeout(240_000);
   const host = await newPlayer(browser, false);
   const forced = await newPlayer(browser, true);
   const players = [host, forced];
   try {
-    // Passive observer: did the generic "Connecting to a player…" alert show on
-    // the forced page during the switch? Recorded as an annotation until the
-    // window is measured; it is not asserted yet.
+    // Record connecting-alert visibility as an annotation, not an assertion.
     await forced.page.addInitScript(() => {
       const win = window as unknown as { __sawConnecting: boolean };
       win.__sawConnecting = false;
@@ -115,7 +105,6 @@ test("a tunnelled pair joins with no alarm and shows a relayed badge", async ({ 
       }).observe(document, { subtree: true, childList: true, characterData: true });
     });
     await host.page.goto("/party");
-    // With no game preselected, /party shows the entry page: start the party from it.
     await host.page.getByRole("button", { name: "Start a party" }).click();
     await expect(host.page.getByRole("button", { name: "Copy URL" })).toBeEnabled({
       timeout: 120_000,
@@ -157,10 +146,8 @@ test("a tunnelled pair joins with no alarm and shows a relayed badge", async ({ 
   }
 });
 
-// Party proof (PLAN §5.6): a 3-player party, one player forced onto the tunnel,
-// plays the sample game; a player's game rebooted after start still gets start.
-// Runs on every browser, with retries disabled so that a start stall is not
-// hidden by a retry (PLAN §5.6). The lobby control is e2e/party-lobby.spec.ts.
+// Disable retries so start stalls stay visible; party-lobby.spec.ts is the
+// direct-WebRTC control for this forced-tunnel game flow.
 test.describe.configure({ retries: 0 });
 
 test("a 3-player party with one tunnelled player plays a state-mode game", async ({ browser }) => {
@@ -190,7 +177,6 @@ test("a 3-player party with one tunnelled player plays a state-mode game", async
     );
     await host.page.goto(`/party?gameId=${GAME_ID}&mode=state&title=Nova%20Quiz`);
 
-    // The invite link is copied to the clipboard (the page shows only the code).
     await expect(host.page.getByRole("button", { name: "Copy URL" })).toBeEnabled({
       timeout: 120_000,
     });
@@ -205,7 +191,6 @@ test("a 3-player party with one tunnelled player plays a state-mode game", async
       })
       .toContain("/join#secret=");
 
-    // Joiners open the invite; the lobby shows all three members everywhere.
     await joiner.page.goto(invite);
     const forcedJoinStart = Date.now();
     await forced.page.goto(invite);
@@ -224,19 +209,15 @@ test("a 3-player party with one tunnelled player plays a state-mode game", async
     });
     console.log(`JOIN_TO_PAIRED_MS ${JSON.stringify(pairedMs)}`);
 
-    // The host starts once every game is verified and loaded in every player.
     const startButton = host.page.getByRole("button", { name: "Start game" });
     await expect(startButton).toBeEnabled({ timeout: 180_000 });
     await startButton.click();
     await expectPlayViewOnAll(pages);
 
-    // Round 1 goes live in every frame.
     for (const player of players) {
       await waitForGameState(await frameOf(player), (s) => s.phase === "question", 120_000);
     }
 
-    // Every player acts: the quizmaster (the only one with a reveal button)
-    // reveals, and the others answer.
     let quizmaster: Player | null = null;
     const answerers: Player[] = [];
     for (const player of players) {
@@ -245,11 +226,8 @@ test("a 3-player party with one tunnelled player plays a state-mode game", async
       else answerers.push(player);
     }
     expect(quizmaster).not.toBeNull();
-    // An answer is based on the view the player has. The authority can commit
-    // a newer revision first (the start), and the game then refuses the stale
-    // answer with stale_revision and does not retry it. A player who sees the
-    // rejection clicks again, so keep answering until the quizmaster sees both
-    // answers, then reveal.
+    // Start can commit a newer revision before an answer arrives. Retry a
+    // stale_revision rejection as a player would, until both answers are visible.
     await expect
       .poll(
         async () => {
@@ -263,7 +241,6 @@ test("a 3-player party with one tunnelled player plays a state-mode game", async
       .toContain("2/2 answered");
     await clickInGame(await frameOf(quizmaster!), '[data-action="reveal"]');
 
-    // Every frame shows the reveal with both other players' answers.
     for (const player of players) {
       await waitForGameState(await frameOf(player), (s) => s.phase === "revealed", 120_000);
       const rows = await revealedRows(await frameOf(player));
@@ -271,8 +248,6 @@ test("a 3-player party with one tunnelled player plays a state-mode game", async
       for (const row of rows) expect(row).toContain("chose");
     }
 
-    // Tunnel shape: the forced player has one tunnel per partner, and each
-    // healthy-side player has exactly one, to the forced player.
     expect(forced.tunnelSockets).toHaveLength(2);
     expect(host.tunnelSockets).toHaveLength(1);
     expect(joiner.tunnelSockets).toHaveLength(1);

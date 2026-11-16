@@ -1,9 +1,5 @@
-// P1 real-browser integration harness for TrysteroTransport.
-//
-// Serves the adapter behind a small `window.__harness` (same pattern as the
-// F5 spike) so Playwright can simulate multiple peers on one machine. Uses
-// ONLY the adapter's public surface — never raw Trystero — so this is a true
-// end-to-end test of the adapter over the local signaling relay + WebRTC.
+// Browser harness for TrysteroTransport's public API, exposed as window.__harness.
+// Peers use the local signaling relay and real WebRTC.
 import { TrysteroTransport } from "@rocketcrab/trystero-transport";
 import type {
   TrysteroTransportDiagnostics,
@@ -25,12 +21,12 @@ interface HarnessState {
     tunnelled?: boolean;
   }>;
   signalingConnected: boolean | null;
-  /** WebRTC-to-tunnel fallback events for this page's transport (PLAN.md §5). */
+  /** WebRTC-to-tunnel fallback events from this page's transport. */
   tunnel: {
     starts: Array<{ reason: string; elapsedMs: number }>;
     failures: string[];
   };
-  /** Connection outcome per peer attempt (PLAN.md §8.2), as the transport reports it. */
+  /** One connection outcome per peer attempt, as reported by the transport. */
   outcomes: Array<{ outcome: string; msToConnect: number }>;
   messages: Array<{
     channel: string;
@@ -41,7 +37,7 @@ interface HarnessState {
   progress: Array<{ dir: string; fraction: number; channel: string }>;
   pings: number[];
   errors: string[];
-  /** P3 game-source transfer state (host announcement / joiner receipt). */
+  /** Game-source announcement and verified receipt state. */
   source: {
     gameId: string | null;
     sourceSha256: string | null;
@@ -273,11 +269,6 @@ async function pingFirst(): Promise<number | null> {
   return ms;
 }
 
-// ---------------------------------------------------------------------------
-// P3: peer-to-peer game source transfer over the established party transport
-// ---------------------------------------------------------------------------
-
-/** Host role: register the game source and announce it to the party. */
 async function sourceHostStart(gameId: string, source: string): Promise<void> {
   const current = requireTransport();
   sourceCoordinator?.dispose();
@@ -293,7 +284,6 @@ async function sourceHostStart(gameId: string, source: string): Promise<void> {
   state.source.sourceSizeBytes = metadata.sourceSizeBytes;
 }
 
-/** Joiner role: attach the coordinator and wait for the verified source. */
 async function sourceJoinerStart(): Promise<void> {
   const current = requireTransport();
   sourceCoordinator?.dispose();

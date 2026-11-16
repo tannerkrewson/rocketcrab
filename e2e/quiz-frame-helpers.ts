@@ -1,8 +1,4 @@
-/**
- * Quiz frame helpers shared by the arena S4 spec, the real-party tunnel spec
- * and the party lobby spec. Each reads one runtime frame's game DOM through
- * `__runtimeApi`.
- */
+/** Read quiz DOM state through __runtimeApi for arena and real-party specs. */
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
