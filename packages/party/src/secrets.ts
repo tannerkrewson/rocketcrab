@@ -10,17 +10,17 @@ import { sessionSecretSchema } from "@rocketcrab/protocol";
  * material friends share, solely through private invite fragments (ADR-0011).
  * Every side derives the room/password/session locally.
  *
- * Derivation scheme (P2 decision): for each label L,
+ * Derivation scheme: for each label L,
  * `material = SHA-256(label || 0x00 || secret)`. The 0x00 separator keeps
  * label/secret concatenations unambiguous; SHA-256 over a high-entropy
  * secret with domain separation is sufficient here (the secret already has
  * full entropy — no key expansion needed), and `crypto.subtle` is available
- * in every secure context Nova runs in (F5 finding F9).
+ * in every secure context Nova runs in.
  *
  * - `roomId`    — the Trystero room name of the private party room,
  *                 `party:` + 64 lowercase hex chars (256 bits).
  * - `password`  — the Trystero room password, 32 bytes as unpadded
- *                 base64url (43 chars; F8: wrong password → JoinError).
+ *                 base64url (43 chars; wrong password → JoinError).
  * - `sessionId` — the private session ID carried in every private-party
  *                 peer message, 64 lowercase hex chars.
  */
@@ -82,7 +82,6 @@ async function deriveBase64Url(label: string, secret: string): Promise<string> {
   return bytesToBase64Url(new Uint8Array(digest));
 }
 
-/** Concatenate label bytes, a 0x00 separator, and the secret bytes. */
 function domainSeparated(label: string, secret: string): Uint8Array<ArrayBuffer> {
   const encoder = new TextEncoder();
   const labelBytes = encoder.encode(label);

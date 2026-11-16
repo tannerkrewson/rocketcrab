@@ -14,21 +14,20 @@ import {
 } from "@rocketcrab/protocol";
 
 /**
- * Party control message builders and parsing (P2).
+ * Party control message builders and parsing.
  *
  * Control traffic stays inside the private password-protected party room.
  * Messages are validated before sending and again against the transport sender
  * on receipt. The invite secret is never transmitted as a control message.
  *
- * The channel is distinct from `nova.protocol` (S1's game-facing channel),
+ * The channel is distinct from `nova.protocol` (the game-facing channel),
  * so party control never reaches game code and game protocol messages never
  * reach the party layer.
  */
 
-/** Transport channel carrying party control messages (P2). */
+/** Transport channel carrying party control messages. */
 export const PARTY_CONTROL_CHANNEL = "nova.party";
 
-/** Envelope fields every party control message carries. */
 export interface PartyControlBase {
   readonly sessionId: string;
   readonly senderMemberId: string;
@@ -46,7 +45,6 @@ function envelope(base: PartyControlBase) {
   };
 }
 
-/** Build private shell-control context. */
 export function buildPartyContextMessage(
   base: PartyControlBase,
   input: { creatorMemberId: string },
@@ -60,7 +58,7 @@ export function buildPartyContextMessage(
   );
 }
 
-/** Build and validate a `party.rename` announcement (private room, 7.25). */
+/** Build and validate a `party.rename` announcement (private room). */
 export function buildPartyRenameMessage(
   base: PartyControlBase,
   input: { displayName: string },
@@ -74,7 +72,7 @@ export function buildPartyRenameMessage(
   );
 }
 
-/** Build and validate a `party.classicRoom` announcement (private room, 7.7.4). */
+/** Build and validate a `party.classicRoom` announcement (private room). */
 export function buildPartyClassicRoomMessage(
   base: PartyControlBase,
   input: {
@@ -94,7 +92,7 @@ export function buildPartyClassicRoomMessage(
   );
 }
 
-/** Build and validate a `party.classicRoom.request` (private room, 7.7.4). */
+/** Build and validate a `party.classicRoom.request` (private room). */
 export function buildPartyClassicRoomRequestMessage(base: PartyControlBase): PeerMessage {
   return assertPeerMessage(
     partyClassicRoomRequestMessageSchema.parse({
@@ -104,7 +102,7 @@ export function buildPartyClassicRoomRequestMessage(base: PartyControlBase): Pee
   );
 }
 
-/** Build and validate a `party.kick` (private room, 7.29). */
+/** Build and validate a `party.kick` (private room). */
 export function buildPartyKickMessage(
   base: PartyControlBase,
   input: { targetMemberId: string; reason?: string },
@@ -119,7 +117,7 @@ export function buildPartyKickMessage(
   );
 }
 
-/** Build and validate a `party.reloadAll` (private room, 7.29). */
+/** Build and validate a `party.reloadAll` (private room). */
 export function buildPartyReloadAllMessage(base: PartyControlBase): PeerMessage {
   return assertPeerMessage(
     partyReloadAllMessageSchema.parse({
@@ -139,7 +137,6 @@ export function parsePartyControlMessage(payload: unknown): ParseResult<PeerMess
 // package stays free of the game-facing API surface).
 // ---------------------------------------------------------------------------
 
-/** Unique protocol message ID (envelope requirement). */
 export function newMessageId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -147,7 +144,6 @@ export function newMessageId(): string {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
-/** Epoch-millisecond timestamp for the message envelope. */
 export function nowSentAt(): number {
   return Date.now();
 }

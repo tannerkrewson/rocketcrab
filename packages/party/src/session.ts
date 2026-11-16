@@ -21,7 +21,7 @@ export interface PartyIdentity {
 export interface PartyTransportFactory {
   /**
    * `secret` is the party session secret. It is passed only to the transport
-   * (tunnel keys are derived from it, PLAN.md §5.4) and never sent to peers.
+   * (tunnel keys are derived from it) and never sent to peers.
    */
   createPrivateTransport(
     identity: PartyIdentity & { readonly password: string; readonly secret: SessionSecret },
