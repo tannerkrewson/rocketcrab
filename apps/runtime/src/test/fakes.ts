@@ -1,6 +1,6 @@
 /**
  * Test doubles for runtime tests: jsdom has no MessageChannel/MessagePort
- * (verified during U3), so instances and the bootstrap listener are driven
+ * so instances and the bootstrap listener are driven
  * through a minimal port double.
  */
 import type { FrameFactory, PortLike } from "../runtime-instance";

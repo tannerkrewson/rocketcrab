@@ -260,8 +260,7 @@ describe("RuntimeInstance registration", () => {
     const error = runtimeMessage(port, "runtime.error");
     expect(error?.category).toBe("unsupported");
     expect(error?.message).toContain("Unsupported Nova API version 99");
-    // Unknown API versions fail registration with a clear error (S1
-    // acceptance: unknown versions fail rather than being guessed at).
+    // Unknown API versions fail registration rather than being guessed at.
     expect(runtimeMessage(port, "game.registration")).toBeUndefined();
   });
 

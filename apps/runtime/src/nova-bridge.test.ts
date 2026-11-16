@@ -39,7 +39,7 @@ describe("gameDeclarationSchema", () => {
 
   it("accepts and bounds the declared Nova API version", () => {
     expect(gameDeclarationSchema.safeParse({ apiVersion: 1 }).success).toBe(true);
-    // API versions start at 1 (S1 policy: NOVA_API_VERSION).
+    // API versions start at 1.
     expect(gameDeclarationSchema.safeParse({ apiVersion: 0 }).success).toBe(false);
     expect(gameDeclarationSchema.safeParse({ apiVersion: -1 }).success).toBe(false);
     expect(gameDeclarationSchema.safeParse({ apiVersion: 1.5 }).success).toBe(false);

@@ -160,7 +160,7 @@ export function buildConsoleMessage(
 /**
  * Build and validate a `game.apiCall` message: a Nova API call the game
  * forwarded through the injected bridge, already validated against
- * `novaApiCallSchemas`. The host session router (U6 arena / P1 party)
+ * `novaApiCallSchemas`. The host session router
  * routes it into the player's NovaSession over the transport.
  */
 export function buildApiCallMessage(

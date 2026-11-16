@@ -1,6 +1,6 @@
 /**
  * Runtime origin application (apps/runtime) — the isolated execution origin
- * for game HTML (ADR-0001, ADR-0008; F4 spike shape industrialized by U3).
+ * for game HTML (ADR-0001, ADR-0008).
  *
  * Responsibilities:
  * - accept exactly one bootstrap: a `runtime.bootstrap` message over
@@ -46,7 +46,7 @@ const container: HTMLElement = containerEl;
 
 let activeInstance: RuntimeInstance | null = null;
 
-/** Creates the same-origin sandboxed game frame (F4 spike injection shape). */
+/** Creates the same-origin sandboxed game frame. */
 function createFrameFactory(): FrameFactory {
   return {
     create(source: string, allowTokens: readonly string[]) {
@@ -58,8 +58,8 @@ function createFrameFactory(): FrameFactory {
         "sandbox",
         "allow-scripts allow-same-origin allow-pointer-lock allow-fullscreen",
       );
-      // Permission delegation must be carried at every iframe hop (F4
-      // finding): base set + whatever the host delegated in the bootstrap.
+      // Permissions must be delegated at every iframe hop: use the base set
+      // plus whatever the host delegated in the bootstrap.
       const allow = new Set([
         "camera",
         "microphone",

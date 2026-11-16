@@ -8,7 +8,7 @@
     <script>
       // Isolation probe: the game tries to reach the Nova (host) origin from
       // the runtime origin. Everything must fail with SecurityError while the
-      // game itself still runs (F4 isolation findings).
+      // game itself still runs.
       window.__malicious = {};
       try {
         window.__malicious.topDom =
