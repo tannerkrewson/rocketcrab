@@ -24,15 +24,9 @@ function collectMessages(
 
 describe("InMemoryTransportHub — messaging", () => {
   it("drops in-flight messages to a reconnected transport's old connection so the new stream is never corrupted (9fv.4.5)", async () => {
-    // Regression (rocketcrab-9fv.4.5): a receiver reconnect tears the old
-    // connection down. Messages that were in flight to the OLD connection
-    // (already stamped for the old per-(sender, target) link) must be dropped
-    // at delivery time — otherwise their stale stamps land in the fresh
-    // ordered stream (expectedSeq restarted at 1), buffer, and then flush
-    // when the new link's stamps catch up — inflating expectedSeq past the
-    // new link's stamp space and silently dropping the first post-reconnect
-    // messages. In the authority-election property that wedged a follower
-    // one revision behind the authority forever.
+    // A receiver reconnect restarts its ordered stream at 1. Drop in-flight
+    // messages stamped for the old connection so their stale stamps cannot
+    // advance expectedSeq past the new stream and suppress fresh messages.
     const hub = new InMemoryTransportHub({ schedule: () => () => undefined });
     const a = hub.createTransport({ memberId: "member-a" });
     const b = hub.createTransport({ memberId: "member-b" });
@@ -66,9 +60,8 @@ describe("InMemoryTransportHub — messaging", () => {
     expect(received.map((m) => m.payload)).toEqual(["n1", "n2", "n3", "n4", "n5"]);
     received.length = 0;
 
-    // n6..n8 continue the new stream (stamps 6..8). Without the fix the
-    // stale m6..m8 would have flushed on the previous drain, inflating the
-    // receiver's expected sequence to 9 and dropping n6..n8 as duplicates.
+    // n6..n8 must survive: stale m6..m8 must not advance the new stream
+    // to sequence 9 and make these fresh messages look like duplicates.
     for (let i = 6; i <= 8; i += 1) {
       await a.send({ channel: "state", payload: `n${i}` });
     }

@@ -16,14 +16,14 @@ import { MemoryRequests } from "./requests";
 import type { RequiredFaultProfile } from "./faults";
 
 /**
- * In-memory transport (U5): one simulated player connection driven by an
+ * In-memory transport: one simulated player connection driven by an
  * {@link InMemoryTransportHub}. Implements the transport-neutral
  * {@link NovaTransport} interface (ADR-0003) so the game-facing Nova API
- * behaves identically in the local test arena (U6) and over a real party
- * transport (P1). No WebRTC, no Trystero.
+ * behaves identically in the local test arena and over a real party
+ * transport. No WebRTC, no Trystero.
  *
  * Receiver-side rules implemented here:
- * - ordered channels buffer and reorder by monotonic `seq` (F6);
+ * - ordered channels buffer and reorder by monotonic `seq`;
  * - duplicated messages (same seq) are dropped;
  * - chunked transfers are reassembled and reported with progress;
  * - messages arriving while suspended are buffered or dropped per profile.
@@ -190,7 +190,7 @@ export class InMemoryTransport implements NovaTransport, InMemoryPeer {
    * transports re-discover the room roster on rejoin, so a transport that
    * was disconnected while another member left must learn about it —
    * otherwise the session keeps a departed member in its eligible set and
-   * elections can name a ghost as the winner forever (rocketcrab-9fv.7.31).
+   * elections can wait forever for a departed member.
    */
   syncPeers(peers: readonly TransportPeerInfo[]): void {
     const incoming = new Map(peers.map((peer) => [peer.connectionId, peer]));

@@ -19,10 +19,10 @@ import {
 import { InMemoryTransport } from "./in-memory-transport";
 
 /**
- * In-memory transport hub (U5): simulates rooms, peer identities, message
+ * In-memory transport hub: simulates rooms, peer identities, message
  * delivery, and link faults — latency, jitter, loss, duplication, reordering,
  * background suspension — without any WebRTC or Trystero code, so the local
- * test arena (U6) can run several players on one page through the same
+ * test arena can run several players on one page through the same
  * transport-neutral Nova interface (ADR-0003) a real party uses.
  *
  * Determinism: the hub owns a single seeded PRNG (mulberry32) and every
@@ -287,7 +287,7 @@ export class InMemoryTransportHub {
     this.assertNotDisposed();
     // "disconnected" joins like "idle": a transport that left cleanly can
     // re-join the same (or a new) room with a fresh connection, exactly
-    // like a real transport (F11 rejoin). Sessions use this for the arena's
+    // like a real transport. Sessions use this for the arena's
     // disconnect → reconnect controls.
     if (transport.connectionState !== "idle" && transport.connectionState !== "disconnected") {
       return Promise.reject(
@@ -465,16 +465,9 @@ export class InMemoryTransportHub {
       // never stamped, so a dropped unreliable message leaves no gap.
       const deliveries = targets.map((target) => ({
         target,
-        // The connection this delivery was stamped for. A receiver that
-        // reconnects tears its old connection down (like a real transport):
-        // in-flight messages destined for the old connection are dropped at
-        // delivery time instead of reaching the new connection's restarted
-        // sequence space. Without this, stale old-link stamps (e.g. 6,7,8)
-        // arrive against the fresh stream (expected=1), buffer, then flush —
-        // inflating the receiver's expected sequence past the new link's
-        // stamps and silently dropping the first post-reconnect messages
-        // (rocketcrab-9fv.4.5: a follower that missed one commit broadcast
-        // never converged).
+        // Bind delivery to this connection. A reconnect restarts the receiver
+        // stream at 1; old-link stamps must not enter it and suppress fresh
+        // messages as duplicates.
         targetConn: target.selfConnectionId,
         message: this.stampForTarget(message, transport, target),
       }));
@@ -496,7 +489,7 @@ export class InMemoryTransportHub {
     }
 
     // Chunked transfer: simulate chunked delivery with progress on both
-    // sides (F5 scenario 4 parity). Chunks inherit the message's delivery
+    // sides. Chunks inherit the message's delivery
     // guarantees; loss of any chunk aborts the transfer. The transfer's
     // per-link stamp is reserved up front (in send order); if every chunk is
     // lost the receiver sees a gap, matching head-of-line blocking on a
@@ -703,7 +696,7 @@ export class InMemoryTransportHub {
       }
       // The rejoining transport re-discovers the current roster (real
       // transports re-list peers on rejoin): a member that left while it
-      // was away drops out of its peer view (rocketcrab-9fv.7.31).
+      // was away drops out of its peer view.
       transport.syncPeers(roster.map((member) => this.peerInfo(member)));
     }
   }

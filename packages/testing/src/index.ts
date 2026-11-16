@@ -1,7 +1,7 @@
 /**
  * @rocketcrab/testing
  *
- * In-memory transport and reusable fixtures for the local test arena (U5/U6).
+ * In-memory transport and reusable fixtures for the local test arena.
  * The in-memory transport implements the transport-neutral NovaTransport
  * interface from @rocketcrab/core (ADR-0003) with deterministic seeded
  * simulation (latency, jitter, loss, duplication, reordering, background

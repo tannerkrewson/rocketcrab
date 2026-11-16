@@ -158,7 +158,6 @@ describe("InMemoryTransport lifecycle", () => {
     expect(bJoined.map((p) => p.connectionId)).toEqual([oldConnectionId, a.selfConnectionId]);
     expect(b.peers.map((p) => p.memberId)).toEqual(["member-a"]);
 
-    // Messages flow again after reconnect.
     const received = collectMessages(b);
     await a.send({ channel: "raw", payload: "after-reconnect" });
     hub.drain();

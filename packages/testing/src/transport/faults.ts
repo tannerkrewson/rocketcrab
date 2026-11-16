@@ -23,9 +23,9 @@ export interface FaultProfile {
   reorderRate?: number;
   /** Extra delay in ms applied when reordering fires. */
   reorderMaxDelayMs?: number;
-  /** Delay before a join completes (simulated discovery latency, F3/F5). */
+  /** Delay before a join completes (simulated discovery latency). */
   joinDelayMs?: number;
-  /** Delay before a reconnect completes (simulated rejoin, F11). */
+  /** Delay before a reconnect completes (simulated rejoin). */
   rejoinDelayMs?: number;
   /** Drop incoming messages while suspended instead of buffering them. */
   dropWhileSuspended?: boolean;
