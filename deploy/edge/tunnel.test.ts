@@ -54,7 +54,6 @@ class UpgradeResponse extends Response {
 }
 
 const frame = (bytes: number) => new ArrayBuffer(bytes);
-/** One full bucket's worth of 256 KiB frames is 16; the 17th must be refused. */
 const FRAME_256K = 262144;
 
 function setup() {
@@ -110,7 +109,7 @@ describe("TunnelPair forwarding", () => {
     const { a, b } = await pairUp();
     const outbound = new Uint8Array([1, 2, 3]).buffer;
     pair.webSocketMessage(typed(a), outbound);
-    expect(b.send).toHaveBeenCalledTimes(2); // paired, then the frame
+    expect(b.send).toHaveBeenCalledTimes(2);
     expect(b.send.mock.calls[1]?.[0]).toBe(outbound);
     const inbound = new Uint8Array([4, 5]).buffer;
     pair.webSocketMessage(typed(b), inbound);
@@ -124,7 +123,7 @@ describe("TunnelPair forwarding", () => {
     pair.webSocketMessage(typed(a), "paired");
     expect(a.close).toHaveBeenCalledWith(1003, "binary only");
     expect(b.close).toHaveBeenCalledWith(1003, "binary only");
-    expect(b.send).toHaveBeenCalledTimes(1); // only the paired frame
+    expect(b.send).toHaveBeenCalledTimes(1);
     expect(a.send).toHaveBeenCalledTimes(1);
   });
 
@@ -149,7 +148,7 @@ describe("TunnelPair forwarding", () => {
     b.readyState = 3;
     pair.webSocketMessage(typed(a), frame(4));
     expect(a.close).toHaveBeenCalledWith(1011, "partner gone");
-    expect(b.send).toHaveBeenCalledTimes(1); // only the paired frame
+    expect(b.send).toHaveBeenCalledTimes(1);
   });
 });
 
@@ -182,7 +181,7 @@ describe("TunnelPair relay budget", () => {
     const { pair, typed, pairUp } = setup();
     const { a, b } = await pairUp();
     for (let i = 0; i < 10; i++) pair.webSocketMessage(typed(a), frame(FRAME_256K));
-    expect(b.send).toHaveBeenCalledTimes(11); // paired + 10 frames
+    expect(b.send).toHaveBeenCalledTimes(11);
     expect(a.close).not.toHaveBeenCalled();
   });
 
@@ -190,7 +189,6 @@ describe("TunnelPair relay budget", () => {
     vi.spyOn(Date, "now").mockReturnValue(1_000);
     const { pair, typed, pairUp } = setup();
     const { a, b } = await pairUp();
-    // 16 frames of 256 KiB exactly drain the 4 MiB burst.
     for (let i = 0; i < BURST_BYTES / FRAME_256K; i++)
       pair.webSocketMessage(typed(a), frame(FRAME_256K));
     expect(a.close).not.toHaveBeenCalled();
@@ -206,7 +204,7 @@ describe("TunnelPair relay budget", () => {
     const { a, b } = await pairUp();
     for (let i = 0; i < BURST_BYTES / FRAME_256K; i++)
       pair.webSocketMessage(typed(a), frame(FRAME_256K));
-    clock.mockReturnValue(1_000 + 1_000); // one second later
+    clock.mockReturnValue(1_000 + 1_000);
     const before = b.send.mock.calls.length;
     pair.webSocketMessage(typed(a), frame(FRAME_256K));
     pair.webSocketMessage(typed(a), frame(FRAME_256K));
@@ -246,7 +244,6 @@ describe("TunnelPair relay budget", () => {
     }
     expect(writes.mock.calls.length).toBeLessThanOrEqual(2);
     expect(a.close).not.toHaveBeenCalled();
-    // Once a second has passed since the last write, the next frame writes once.
     clock.mockReturnValue(2_100);
     pair.webSocketMessage(typed(a), frame(1024));
     expect(writes.mock.calls.length).toBeLessThanOrEqual(3);
@@ -289,7 +286,7 @@ describe("TunnelPair relay budget", () => {
     const { a } = await pairUp();
     for (let i = 0; i < BURST_BYTES / FRAME_256K; i++)
       pair.webSocketMessage(typed(a), frame(FRAME_256K));
-    pair.webSocketMessage(typed(a), frame(FRAME_256K)); // exhausted: closes both
+    pair.webSocketMessage(typed(a), frame(FRAME_256K));
     expect(a.stored).toMatchObject({ tokens: 0, lastRefillMs: 1_000, closedByServer: true });
   });
 
@@ -305,7 +302,6 @@ describe("TunnelPair relay budget", () => {
     for (const corrupt of malformed) {
       const { a, b } = await pairUp();
       a.stored = { ...a.stored, ...corrupt } as unknown as Attachment;
-      // The woken object rebuilds the bucket from the corrupt fields: empty, so 1 byte is refused.
       wake().webSocketMessage(typed(a), frame(1));
       expect(a.close).toHaveBeenCalledWith(1008, "rate limit");
       expect(b.close).toHaveBeenCalledWith(1008, "rate limit");
@@ -383,20 +379,18 @@ describe("TunnelPair pairing over fetch", () => {
     const { a, b } = await pairUp();
     const woke = wake();
 
-    // Traffic still forwards through a woken object that remembers nothing.
     const data = frame(3);
     woke.webSocketMessage(typed(a), data);
     expect(b.send.mock.calls).toEqual([[PAIRED_FRAME], [data]]);
     expect(a.send.mock.calls).toEqual([[PAIRED_FRAME]]);
 
-    // The reconstructed object still sees a full pair: no alarm, and a third is refused.
     woke.alarm();
     expect(a.close).not.toHaveBeenCalled();
     expect(b.close).not.toHaveBeenCalled();
     const third = await connect(woke);
     expect(third.response.status).toBe(409);
     expect(storage.setAlarm).toHaveBeenCalledTimes(1);
-    expect(sockets).toHaveLength(2); // the refused socket is never accepted
+    expect(sockets).toHaveLength(2);
   });
 
   it("rejects a third socket with 409 and does not accept it", async () => {
@@ -457,7 +451,7 @@ describe("TunnelPair pairing over fetch", () => {
     expect(await newcomer.response.json()).toEqual({
       error: { code: "pair_closing", message: "previous tunnel pair is still closing; retry" },
     });
-    expect(sockets).toHaveLength(2); // the newcomer is not accepted
+    expect(sockets).toHaveLength(2);
     expect(a.close).not.toHaveBeenCalled();
   });
 
@@ -497,7 +491,7 @@ describe("TunnelPair stale close echoes", () => {
   it("ignores the echo of an alarm close, so a later joiner keeps its alarm", async () => {
     const { pair, typed, connect, storage } = setup();
     const a = await connect();
-    pair.alarm(); // closes A by the server
+    pair.alarm();
     const b = await connect(); // A is closing, so B is alone and gets its own alarm
     expect(storage.setAlarm).toHaveBeenCalledTimes(2);
     pair.webSocketClose(typed(a.server), 1000, "echo");
@@ -509,20 +503,17 @@ describe("TunnelPair stale close echoes", () => {
   it("keeps two joiners paired when they join while two closed sockets are still echoing", async () => {
     const { pair, typed, pairUp, connect } = setup();
     const { a, b } = await pairUp();
-    // Server closes the pair; both sockets are now closing.
     pair.webSocketMessage(typed(a), frame(MAX_TUNNEL_FRAME_BYTES + 1));
     const c = await connect();
     const d = await connect();
     expect(c.server.send.mock.calls).toEqual([[PAIRED_FRAME]]);
     expect(d.server.send.mock.calls).toEqual([[PAIRED_FRAME]]);
-    // At most two live: a third is refused while C and D are paired.
     expect((await connect()).response.status).toBe(409);
     // The old pair's echoes arrive late; they must not touch C or D.
     pair.webSocketClose(typed(a), 1009, "echo");
     pair.webSocketClose(typed(b), 1009, "echo");
     expect(c.server.close).not.toHaveBeenCalled();
     expect(d.server.close).not.toHaveBeenCalled();
-    // C and D still forward to each other.
     const data = frame(8);
     pair.webSocketMessage(typed(c.server), data);
     expect(d.server.send).toHaveBeenLastCalledWith(data);
@@ -535,6 +526,6 @@ describe("TunnelPair stale close echoes", () => {
     b.stored = { ...b.stored!, generation: "other-generation" };
     pair.webSocketMessage(typed(a), frame(4));
     expect(a.close).toHaveBeenCalledWith(1011, "partner gone");
-    expect(b.send).toHaveBeenCalledTimes(1); // only the paired frame
+    expect(b.send).toHaveBeenCalledTimes(1);
   });
 });

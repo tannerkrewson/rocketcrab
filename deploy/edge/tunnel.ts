@@ -1,38 +1,23 @@
 /**
- * Connection fallback tunnel: one hibernating Durable Object per pair
- * (`GET /tunnel/:pairId`). It forwards frames between exactly two sockets.
+ * Hibernating per-pair WebSocket tunnel (GET /tunnel/:pairId).
  *
- * Design notes (see PLAN.md §5):
- * - Control and data are kept apart. The server sends the text frame
- *   `paired` to each side exactly when the second socket is accepted. Client
- *   data frames must be binary (the client encrypts them); a client text
- *   frame closes both sockets with 1003, so text can never reach the peer.
- * - Nothing is stored in storage. Each socket's attachment (which survives
- *   hibernation, as in signal.ts) holds its pairing generation, a
- *   "closed by server" flag and a copy of its token bucket. Frames are
- *   forwarded as they arrive. Before pairing, a frame is dropped rather than
- *   buffered: the client only sends once `paired` has arrived. After pairing,
- *   a frame with no open partner closes the sender with 1011.
- * - While awake, each socket's bucket lives in memory. The attachment copy is
- *   written when a socket closes, at most once per second, and after every
- *   512 KiB spent since the last write. After a wake, buckets are rebuilt from
- *   the attachments. Spending since the last write is at most 512 KiB, so a
- *   woken socket is over-credited by at most about one second of rate. See the
- *   runbook.
- * - Pairing state is derived from `getWebSockets()` and the attachments on
- *   every event, not from memory, so it survives hibernation. `paired` is sent
- *   only from `fetch`, the one place a second socket joins, so a wake-up never
- *   repeats it.
- * - A close the server starts is marked in the socket's attachment before the
- *   close is sent. The peer's echo of that close is then ignored, so it cannot
- *   reach a socket that joined later. Partners are matched only within the
- *   same pairing generation.
- * - Dropping a frame silently would corrupt an ordered data channel, so any
- *   protocol violation (text, oversize or over-budget traffic) tears down the
- *   whole pair.
- * - Storage use is one Durable Object alarm per pairing lifecycle (set when the
- *   first socket joins, cleared when the second does). Timers do not survive
- *   hibernation; alarms do.
+ * The server sends text `paired` once when the second socket joins. Client
+ * data must be binary; text closes both sides with 1003 so it cannot spoof
+ * control frames. Before pairing, drop rather than buffer data; afterward,
+ * losing the partner closes the sender with 1011. Protocol violations close
+ * the whole pair because silent drops would corrupt an ordered channel.
+ *
+ * Socket attachments retain pairing generations, server-close flags, and
+ * token buckets across hibernation. Derive pairing from live sockets and
+ * attachments, not memory. Mark server closes before sending them and match
+ * partners by generation so late close echoes cannot reach a new pair.
+ *
+ * Awake buckets live in memory and are persisted on close or traffic-driven
+ * interval/spend thresholds. Rebuilding from attachments can over-credit
+ * at most about one second of rate (see deploy/cloudflare.md).
+ *
+ * A Durable Object alarm enforces the lone-socket deadline across hibernation;
+ * ordinary timers would not survive. Clear it when the second socket joins.
  */
 
 import { jsonError } from "./http";
@@ -44,17 +29,14 @@ import { jsonError } from "./http";
  */
 export const MAX_TUNNEL_FRAME_BYTES = 262144 + 64;
 /**
- * Per-socket relay budget. Legitimate traffic is the 256 KiB/s game budget
- * (PLAN §6) plus up-to-2 MiB game-source transfers, so 512 KiB/s sustained
- * with a 4 MiB burst covers both. A socket that empties its bucket closes the
- * pair with 1008.
+ * Allow the 256 KiB/s game budget plus up-to-2 MiB source transfers: sustain
+ * 512 KiB/s with a 4 MiB burst. Exhausting a bucket closes the pair with 1008.
  */
 export const RATE_BYTES_PER_SECOND = 512 * 1024;
 export const BURST_BYTES = 4 * 1024 * 1024;
 /**
- * The attachment copy of a bucket is written at least once per second, and
- * also after every 512 KiB spent. Spending not yet written is therefore always
- * under 512 KiB, so a wake over-credits by at most about one second of rate.
+ * Persist on traffic after one second or 512 KiB spent, and on close. A wake
+ * may restore unpersisted spending, bounded to about one second of refill.
  */
 const PERSIST_INTERVAL_MS = 1000;
 const PERSIST_SPENT_BYTES = 512 * 1024;
@@ -62,12 +44,10 @@ const PERSIST_SPENT_BYTES = 512 * 1024;
 export const PARTNER_WAIT_MS = 30_000;
 /** Server-to-client text frame sent to both sides once the pair is complete. */
 export const PAIRED_FRAME = "paired";
-/** Pairs hold at most two sockets; a third connection gets HTTP 409. */
 const MAX_SOCKETS = 2;
 const OPEN = 1;
 const CLOSING = 2;
 
-/** Per-socket state, kept in the socket attachment. */
 interface Attachment {
   /** Shared by the two sockets of one pair; null until paired. */
   generation: string | null;
@@ -84,7 +64,6 @@ interface Bucket {
   lastRefillMs: number;
   /** The `lastRefillMs` last written to the attachment. */
   persistedMs: number;
-  /** Bytes spent since the last write. */
   spentSincePersist: number;
 }
 
@@ -121,13 +100,11 @@ export function sendableCloseCode(code: number): boolean {
   );
 }
 
-/** Bytes in the bucket at `now`, including refill since its last update. */
 function refilled(bucket: Bucket, now: number): number {
   const elapsed = Math.max(0, now - bucket.lastRefillMs);
   return Math.min(BURST_BYTES, bucket.tokens + (elapsed / 1000) * RATE_BYTES_PER_SECOND);
 }
 
-/** Runs a storage call; a failure is swallowed (see the callers). */
 function settle(operation: () => void | Promise<void>): Promise<void> {
   return new Promise<void>((resolve) => resolve(operation())).catch(() => undefined);
 }
@@ -169,10 +146,8 @@ export class TunnelPair {
         throw error;
       }
     } else {
-      // Second socket: the pair is complete. Both sockets get a new generation,
-      // so only they can be partners, and each side is told once. The
-      // lone-socket deadline no longer applies; if clearing it fails, the alarm
-      // is harmless (alarm() does nothing once two sockets are live).
+      // A fresh generation isolates this pair from late close echoes.
+      // If alarm clearing fails, alarm() is harmless while both sockets are live.
       const generation = crypto.randomUUID();
       const partner = live[0]!;
       this.write(partner, { generation });
@@ -214,7 +189,6 @@ export class TunnelPair {
       bucket.spentSincePersist >= PERSIST_SPENT_BYTES
     )
       this.write(socket, {});
-    // Before pairing there is no partner yet: drop the frame (see module comment).
     if (att.generation === null) return;
     const partner = this.partnerOf(socket);
     if (partner === undefined || partner.readyState !== OPEN) {
@@ -229,7 +203,6 @@ export class TunnelPair {
     const forwarded = sendableCloseCode(code) ? code : 1000;
     const echo = attachmentOf(socket).closedByServer;
     this.answer(socket, forwarded, "closed");
-    // The echo of a close we started is not a new event; nothing to relay.
     if (echo) return;
     this.dissolve(socket, forwarded, "partner closed");
   }
@@ -241,7 +214,6 @@ export class TunnelPair {
     this.dissolve(socket, 1011, "partner error");
   }
 
-  /** Runs when the partner deadline passes; does nothing once paired. */
   alarm(): void {
     const sockets = this.live();
     if (sockets.length >= MAX_SOCKETS) return;
@@ -262,7 +234,6 @@ export class TunnelPair {
     }
   }
 
-  /** The socket's bucket, rebuilt from its attachment when this object has just woken. */
   private bucketOf(socket: TunnelSocket, now: number): Bucket {
     const known = this.buckets.get(socket);
     if (known) return known;
@@ -304,7 +275,7 @@ export class TunnelPair {
     try {
       socket.close(code, reason);
     } catch {
-      // Already fully closed; nothing left to answer.
+      // The peer may finish closing before its handshake answer is sent.
     }
   }
 
@@ -324,14 +295,12 @@ export class TunnelPair {
     );
   }
 
-  /** Closes the sender and its partner with the same code and reason. */
   private closePair(socket: TunnelSocket, code: number, reason: string): void {
     const partner = this.partnerOf(socket);
     this.close(socket, code, reason);
     if (partner) this.close(partner, code, reason);
   }
 
-  /** Closes whichever socket remains after `gone` has closed or errored. */
   private dissolve(gone: TunnelSocket, code: number, reason: string): void {
     const partner = this.partnerOf(gone);
     if (partner) this.close(partner, code, reason);

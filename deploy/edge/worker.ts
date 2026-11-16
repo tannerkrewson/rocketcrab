@@ -46,20 +46,17 @@ export interface EdgeEnv extends TurnEnv, LogEnv {
 type Handler = (request: Request, env: EdgeEnv) => Promise<Response>;
 type Limiter = "RATE_LIMITER" | "BULK_RATE_LIMITER";
 
-/** POST routes; responses carry CORS headers. */
 const ROUTES: Record<string, { handler: Handler; key: string; limiter: Limiter }> = {
   "/turn": { handler: handleTurn, key: "turn", limiter: "RATE_LIMITER" },
   "/log": { handler: handleLog, key: "log", limiter: "BULK_RATE_LIMITER" },
   "/": { handler: handleRelay, key: "relay", limiter: "RATE_LIMITER" },
 };
 
-/** WebSocket routes, each forwarded to one Durable Object per id. */
 const SOCKET_ROUTES: { pattern: RegExp; key: string; binding: "SIGNAL_HUB" | "TUNNEL_PAIR" }[] = [
   { pattern: /^\/signal\/([0-9a-f]{32})$/, key: "signal", binding: "SIGNAL_HUB" },
   { pattern: /^\/tunnel\/([0-9a-f]{64})$/, key: "tunnel", binding: "TUNNEL_PAIR" },
 ];
 
-/** Fixed window of the platform rate limiter, in seconds. */
 const RATE_LIMIT_PERIOD_SECONDS = 60;
 
 export function parseAllowlist(raw: string | undefined): string[] {

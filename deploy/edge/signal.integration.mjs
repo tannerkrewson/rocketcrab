@@ -107,9 +107,6 @@ test(
   },
 );
 
-// One real-workerd tunnel pairing. The server sends `paired` (text) once to
-// each side when the second socket joins; client data must be binary, and a
-// client text frame closes both sides with 1003.
 function collector(socket) {
   const messages = [];
   const closes = [];
@@ -135,7 +132,6 @@ test(
     const tunnelUrl = (pairId) => `${wsBase}/tunnel/${pairId}`;
     assert.equal(await rejected(`${wsBase}/tunnel/${"A".repeat(64)}`, origin), 404);
 
-    // Pair one: paired, binary both ways, third refused, close propagated.
     const pairOne = tunnelUrl(randomBytes(32).toString("hex"));
     const a = connect(pairOne),
       b = connect(pairOne);
@@ -159,7 +155,6 @@ test(
       assert.deepEqual([...bytes], [1, 2, 3]);
       assert.equal(await rejected(pairOne, origin), 409);
       a.close(1000, "done");
-      // Checked via the received close frame, as for the text case below.
       await waitFor(() => b._closeFrameReceived, "partner close frame");
       assert.equal(b._closeCode, 1000);
       assert.equal(b._closeMessage.toString(), "partner closed");
@@ -167,11 +162,9 @@ test(
       for (const socket of sockets) socket.terminate();
     }
 
-    // Pair two: a client text frame closes both sides with 1003 and forwards nothing.
-    // The sender's close event arrives at once. The partner's close frame is
-    // checked via ws internals (`_closeFrameReceived`, `_closeCode`; ws starts
-    // `_closeCode` at 1006, so only `_closeFrameReceived` marks a real frame).
-    // On local workerd the partner's TCP close event lags, so it can't be awaited.
+    // Local workerd delays the partner's TCP close event. Inspect the received
+    // close frame instead: ws initializes _closeCode to 1006, so only
+    // _closeFrameReceived proves that an actual close frame arrived.
     const pairTwo = tunnelUrl(randomBytes(32).toString("hex"));
     const c = connect(pairTwo),
       d = connect(pairTwo);
@@ -194,8 +187,6 @@ test(
   },
 );
 
-// Relay limits over the wire. A frame over the limit closes the pair; the
-// received close frame is checked, as above.
 function closeFrame(socket) {
   return socket._closeFrameReceived
     ? { code: socket._closeCode, reason: socket._closeMessage.toString() }

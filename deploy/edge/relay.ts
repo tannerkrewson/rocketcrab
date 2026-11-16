@@ -1,13 +1,10 @@
 /**
- * Classic room-creation relay. 16 of the 22 Classic games create rooms on
- * third-party servers that send no CORS headers, so the browser asks this
- * Worker to make the request instead. Only the fixed endpoints below can be
- * reached (never an open proxy); the client mirror is RELAY_ENDPOINT_KEYS in
- * apps/nova/src/lib/classic/relay.ts, kept in sync by worker.test.ts.
+ * Create Classic rooms whose upstream endpoints lack CORS support. Only the
+ * fixed endpoints below are reachable; never act as an open proxy. Keep the
+ * client RELAY_ENDPOINT_KEYS mirror in sync (worker.test.ts).
  *
- * Request: { endpoint: <key>, body?: <JSON forwarded to POST endpoints>,
- * urlId?: <netgames.io game id> }. Response: the upstream JSON, or
- * { url: <final redirect URL> } for netgames.io.
+ * Request: { endpoint, body?, urlId? }. Return upstream JSON, or the final
+ * redirect URL as { url } for netgames.io.
  */
 import { json, jsonError } from "./http";
 
