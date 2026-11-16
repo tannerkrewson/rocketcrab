@@ -2559,7 +2559,8 @@ describe("party engine — signaling outage setup", () => {
     expect(player.engine.getState().signalingOutage).toBe(true);
     // One connection-log event per visible outage, marked signaling_ok: false.
     expect(sendBeacon).toHaveBeenCalledOnce();
-    expect(JSON.parse(sendBeacon.mock.calls[0]![1] as string)).toMatchObject({
+    const [, body] = sendBeacon.mock.calls[0] as unknown as [string, string];
+    expect(JSON.parse(body)).toMatchObject({
       outcome: "failed",
       error_code: "relay-failed",
       signaling_ok: false,
