@@ -7,6 +7,31 @@
   ADR-0004 (private invites), F5 (connectivity spike), M3 (TURN decision),
   P0 `rocketcrab-23s` (TURN implementation)
 
+## Amended 2026-11-15: WebSocket tunnel fallback
+
+Networks that block all WebRTC, TURN included, are covered by a per-pair
+tunnel. Nova passes Trystero a `rtcPolyfill` class
+(`packages/trystero-transport/src/fallback-peer-connection.ts`) that wraps the
+browser's `RTCPeerConnection`. If a pair's data channel has not opened 8 s after
+both descriptions exist, or ICE reports `failed`, that pair's one data channel
+moves to `wss://<edge>/tunnel/<pairId>`. The pair ID is a SHA-256 of both DTLS
+fingerprints and the room ID, so both sides compute it without extra signaling.
+Each `pairId` is one `TunnelPair` Durable Object (`deploy/edge/tunnel.ts`) that
+forwards binary frames between at most two sockets. Frames are AES-GCM
+encrypted with directional keys derived from the party secret
+(`tunnel-crypto.ts`), so the edge never sees plaintext. Trystero keeps the same
+channel object and sees `connecting` and then `connected`; the switch is
+one-way for the life of the connection. Media tracks are not tunnelled.
+
+Known edge case: each side's 8 s deadline starts when it has both
+descriptions, so the answerer starts about one signaling hop earlier. If the
+native channel opens inside that gap, one side can be on the tunnel while the
+other is native. That pair stalls until Trystero's handshake (10 s) or answer
+TTL (about 23 s) closes it, and the next attempt starts fresh.
+
+Re-check the RTCPeerConnection surface in the upgrade checklist below on every
+Trystero upgrade; the wrapper relies on it.
+
 ## Amended 2026-11-13: owned room-scoped signaling
 
 The decision and addenda below preserve their historical context; Nostr relay
@@ -24,8 +49,8 @@ routes each key to a separate `SignalHub` Durable Object. It implements the
 Trystero WebSocket relay subscribe/publish protocol, including publisher echo;
 socket subscription attachments survive hibernation and messages are not
 persisted. Origin checks and connection rate limits apply. This is signaling,
-not a WebRTC data fallback; TURN remains the cross-network mechanism, and the
-proposed WebSocket data tunnel remains future work (PLAN §5).
+not a WebRTC data fallback; TURN is the cross-network mechanism, with the
+WebSocket tunnel (amendment above) as the last resort.
 
 Source and local test evidence are in PLAN §4.5 and the
 [edge runbook](../../deploy/cloudflare.md). The code is staged, not evidence of
@@ -151,7 +176,7 @@ Trystero API. Code locations are relative to the repository root.
 | —                                                                                                                                                                                                                                                                                                               | **Authority election and migration.** Heartbeats, deterministic election and snapshot restore in `packages/nova-api/src/state-engine.ts` (`startElection` at `:909`, `finalizeElection` at `:957`) and the simulation engine, per ADR-0007. Trystero's `authority.mjs` is not used: it handles signed roles and moderation, not game-executor election (PLAN §3.4).                                                                                                                                                                                   |
 | **Room lifecycle primitives.** `room.leave()`, and unsubscribe handles returned by room, action and user-state listeners.                                                                                                                                                                                       | **Lifecycle state machine.** Shared teardown barrier: `releaseRoom` keeps a rejected release as the barrier (`trystero-transport.ts:1153-1162`); `join`, `leave`, `reconnect`, `suspend` and `resume` (`:268-530`) rejoin with a fresh connection ID. Suspend tears the room down and resume rejoins; `setRelayConnectivity` is exported by 0.27 but not called. Engine: fail-closed on teardown failure (`engine.ts:267, 1134`) and auto-reconnect with backoff (`engine.ts:326, 1431`).                                                             |
 | **Overlay routing.** `scale()` multi-hop routing, promotion of bulk transfers to direct links, and the upstream 2,048-descriptor bound (`@trystero-p2p/core` `scale/descriptors.mjs`).                                                                                                                          | **Configuration and status.** `scale({ maxDirectPeers: 9 })` (`trystero-transport.ts:689`) gives a full mesh up to ten players. Identity admission, source verification, cancellation and party semantics stay with Nova. Status per PLAN §3.6: adopted in code and marked experimental; a test-only eight-browser, four-neighbour proof passes; 10/25/50-player local headless runs are recorded in [large-room load](../testing/large-room-load.md) and 100 is incomplete; the descriptor bound is an open owner decision. No arbitrary-size claim. |
-| `rtcPolyfill` hook, used only by the prototype.                                                                                                                                                                                                                                                                 | **Prototype only.** `e2e-trystero/src/fallback-proof.js` over the local signaling and tunnel fixture (`e2e-trystero/fallback-server.mjs`, plaintext and unauthenticated). No production `FallbackPeerConnection`, `TunnelPair` or pair encryption exists; `deploy/edge/tunnel.ts` is absent. Building it waits for the owner gate (PLAN §5).                                                                                                                                                                                                          |
+| `rtcPolyfill` hook.                                                                                                                                                                                                                                                                                             | **Tunnel fallback.** `FallbackPeerConnection` and its encryption, plus the edge `TunnelPair` (amendment 2026-11-15).                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ### Upgrade checklist
 
