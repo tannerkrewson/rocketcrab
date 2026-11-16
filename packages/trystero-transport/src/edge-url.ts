@@ -1,6 +1,6 @@
 /**
  * WebSocket URLs on the Nova edge Worker. Both signaling (`/signal/:room`) and
- * the WebRTC fallback tunnel (`/tunnel/:pairId`, PLAN.md §5) hang off the same
+ * the WebRTC fallback tunnel (`/tunnel/:pairId`) hang off the same
  * origin as `VITE_EDGE_ORIGIN`, with the scheme mapped http→ws and https→wss.
  */
 

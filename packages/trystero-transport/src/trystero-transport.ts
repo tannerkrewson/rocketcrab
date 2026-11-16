@@ -56,8 +56,8 @@ import {
  * {@link NovaTransport} interface (ADR-0003), built on Trystero 0.27.0's
  * self-hosted WebSocket relay strategy.
  *
- * Game-facing code never sees this class (engineering rule 1): it is the
- * production twin of `InMemoryTransport` (U5, @rocketcrab/testing) and must
+ * Game-facing code never sees this class: it is the production twin of
+ * `InMemoryTransport` (@rocketcrab/testing) and must
  * pass the same contract suite, so the Nova API behaves identically in the
  * local test arena and over real parties.
  *
@@ -107,8 +107,8 @@ export class TrysteroTransport implements NovaTransport {
   roomName = "";
 
   private readonly options: InternalOptions;
-  // Keep this array stable: Trystero 0.25.3's offer pool closes over the
-  // initial room config, including when allocating peers for later rooms.
+  // Keep the ICE-server array stable for peers allocated from the shared
+  // offer pool across room joins.
   private readonly now: () => number;
   private readonly scheduleFn: (callback: () => void, delayMs: number) => () => void;
   /** Trystero peer ID once initialized; provisional until room.getSelf(). */
@@ -668,8 +668,8 @@ export class TrysteroTransport implements NovaTransport {
 
   /**
    * Whether the WebRTC link to this peer is carried by the edge tunnel rather
-   * than a direct connection (PLAN.md §5). False for unknown peers. Media is
-   * not tunnelled, so UI must hide audio/video for these peers (§7).
+   * than a direct connection. False for unknown peers. Media is
+   * not tunnelled, so UI must hide audio/video for these peers.
    */
   isPeerTunnelled(connectionId: ConnectionId): boolean {
     const peerId = this.connectionToPeerId.get(connectionId);
@@ -764,7 +764,7 @@ export class TrysteroTransport implements NovaTransport {
   }
 
   /**
-   * The WebRTC-to-tunnel fallback class for one join (PLAN.md §5.6). Null when
+   * The WebRTC-to-tunnel fallback class for one join. Null when
    * the transport has no party secret (the tunnel keys come from it) or when
    * there is no browser WebRTC, so non-browser callers keep plain Trystero.
    * Built per join because its options are per room.
@@ -1544,17 +1544,17 @@ export interface TrysteroTransportOptions {
   /** Extra RTC configuration (e.g. STUN servers). */
   readonly rtcConfig?: RTCConfiguration;
   /**
-   * Party session secret (ADR-0004). Tunnel keys are derived from it (PLAN.md
-   * §5.4). Without it, joins use plain WebRTC with no tunnel fallback.
+   * Party session secret (ADR-0004). Tunnel keys are derived from it. Without
+   * it, joins use plain WebRTC with no tunnel fallback.
    */
   readonly partySecret?: SessionSecret;
-  /** Fires when a pair moves onto the edge tunnel (PLAN.md §5.5). */
+  /** Fires when a pair moves onto the edge tunnel. */
   readonly onTunnel?: (info: TunnelStartInfo) => void;
-  /** Fires once when a tunnelled pair fails terminally (PLAN.md §5.5). */
+  /** Fires once when a tunnelled pair fails terminally. */
   readonly onTunnelFailure?: (info: TerminalFailureInfo) => void;
   /**
-   * Fires at most once per peer connection attempt with its outcome (PLAN.md
-   * §8.2). Scale virtual peers have no connection, so they never fire it.
+   * Fires at most once per peer connection attempt with its outcome. Scale
+   * virtual peers have no connection, so they never fire it.
    */
   readonly onOutcome?: (info: ConnectionOutcomeInfo) => void;
   /**

@@ -1,5 +1,5 @@
 /**
- * Environment-specific Trystero app ID (P1 deliverable).
+ * Environment-specific Trystero app ID.
  *
  * Trystero derives the deterministic relay selection from `appId`
  * (seeded shuffle over the relay list), so every peer in a party MUST use

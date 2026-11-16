@@ -1,5 +1,5 @@
 /**
- * Connection fallback wrapper for Trystero's `rtcPolyfill` (PLAN.md §5.5).
+ * Connection fallback wrapper for Trystero's `rtcPolyfill`.
  *
  * `createFallbackPeerConnectionClass` returns a constructor that delegates to
  * the browser's real RTCPeerConnection. When a pair's data channel has not
@@ -14,11 +14,11 @@
  *   needs an open channel. A peer connection that is connected while the
  *   channel stays closed (for example SCTP blackholed) must not stall.
  * - The timer starts only once BOTH descriptions exist. Initiator offers are
- *   pooled before a remote description exists (PLAN.md §5.1).
+ *   pooled before a remote description exists.
  * - `failed` and `disconnected` are never shown to Trystero while the pair is
  *   switching or tunnelled. Trystero closes a peer on either. Mid-session
  *   `disconnected` after the pair has connected is passed through; there is no
- *   switch mid-session (PLAN.md §5.5).
+ *   switch mid-session.
  * - A native channel close before its first open is held back until the
  *   deadline decides, so it cannot hide a dead peer for longer than that.
  * - The native connection is NOT closed at the switch. Closing it would send a
@@ -32,11 +32,10 @@
  *   Trystero retries.
  * - One data channel per connection. Trystero uses exactly one.
  * - Sends are paced to the edge's per-socket budget (see the pace constants).
- * - Each instance reports one connection outcome at most (`onOutcome`, PLAN.md
- *   §8.2). The first success or failure claims it; a later event cannot.
+ * - Each instance reports one connection outcome at most (`onOutcome`). The
+ *   first success or failure claims it; a later event cannot.
  *
- * The transport wires this in through `rtcPolyfill` (trystero-transport.ts,
- * PLAN.md §5.6).
+ * The transport wires this in through `rtcPolyfill` (trystero-transport.ts).
  */
 import type { SessionSecret } from "@rocketcrab/protocol";
 import {
@@ -66,7 +65,7 @@ export const TUNNEL_MAX_FRAME_BYTES = 262144;
  */
 export const TUNNEL_PACE_BYTES_PER_SECOND = 448 * 1024;
 export const TUNNEL_PACE_BURST_BYTES = 3.5 * 1024 * 1024;
-/** Delay from both descriptions existing to the tunnel fallback (PLAN.md §5). */
+/** Delay from both descriptions existing to the tunnel fallback. */
 export const FALLBACK_AFTER_MS = 8000;
 /** Server text frame that marks a completed pair. Any other text is fatal. */
 export const TUNNEL_PAIRED_FRAME = "paired";
@@ -94,7 +93,7 @@ export const OPEN_ATTEMPTS = 5;
 export const OPEN_RETRY_BASE_MS = 250;
 /**
  * How long a native open waits for its selected-pair read (`getStats`) before
- * the outcome is `unknown` (PLAN.md §8.2). The outcome is claimed at open
+ * the outcome is `unknown`. The outcome is claimed at open
  * either way; only the path resolves late.
  */
 export const STATS_TIMEOUT_MS = 2000;
@@ -135,7 +134,7 @@ export type TerminalFailureInfo =
   | { readonly reason: "socket-closed"; readonly closeCode: number };
 
 /**
- * How one physical connection attempt ended (PLAN.md §8.2). `direct` and `turn`
+ * How one physical connection attempt ended. `direct` and `turn`
  * come from the native selected candidate pair; `unknown` is a native open whose
  * path cannot be read; `tunnel` and `failed` come from the tunnel.
  */
@@ -164,7 +163,7 @@ export interface FallbackPeerConnectionOptions {
   /**
    * TEST ONLY. The native connection is created with no ICE servers and
    * `iceTransportPolicy: "relay"`, so it cannot gather a usable candidate and
-   * the pair falls back to the tunnel (PLAN.md §5.1). The transport exposes
+   * the pair falls back to the tunnel. The transport exposes
    * this only to test builds; production never sets it.
    */
   readonly forceRelayOnlyNoServers?: boolean;
@@ -182,7 +181,7 @@ export interface FallbackPeerConnectionOptions {
    * during a deliberate local teardown.
    */
   readonly onOutcome?: (info: ConnectionOutcomeInfo) => void;
-  /** True during a deliberate local teardown of the room (PLAN.md §8.2). Default: false. */
+  /** True during a deliberate local teardown of the room. Default: false. */
   readonly isTearingDown?: () => boolean;
 }
 
@@ -470,7 +469,7 @@ class ChannelFacade {
     native.addEventListener("close", () => {
       if (this.tunnelled || this.closed) return;
       // A close before the first open is the failed native attempt. The
-      // deadline decides (PLAN.md §5.5), so it is not forwarded here.
+      // deadline decides, so it is not forwarded here.
       if (!this.opened && !this.session.nativeConnectionClosed()) return;
       this.closed = true;
       this.session.close();
@@ -494,7 +493,7 @@ class Session {
   private timerStartedAt = 0;
   private timer: unknown = undefined;
   private switchedAt = 0;
-  /** When both descriptions first existed. Undefined means no physical attempt (PLAN.md §8.2). */
+  /** When both descriptions first existed. Undefined means no physical attempt. */
   private attemptStartedAt: number | undefined = undefined;
   /**
    * The attempt's one outcome is claimed synchronously, when its success or
@@ -800,9 +799,7 @@ class Session {
       socket.onopen = socket.onmessage = socket.onerror = socket.onclose = null;
       try {
         socket.close(CLOSE_NORMAL, "native connected");
-      } catch {
-        // Already going away.
-      }
+      } catch {}
     }
     this.channel?.exitTunnel();
     this.emitStates();

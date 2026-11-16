@@ -128,7 +128,7 @@ describe("computeTunnelPairing", () => {
   });
 
   it("matches the documented canonical string", async () => {
-    // Independent recomputation of the canonical format from PLAN.md §5.3.
+    // Recompute the canonical pairing format independently of the implementation.
     const localSide = `sha-256 ${fingerprint(1)}`;
     const remoteSide = `sha-256 ${fingerprint(2)}`;
     const canonical = `${[localSide, remoteSide].sort().join("|")}|${ROOM}`;
@@ -362,8 +362,8 @@ describe("TunnelCipher", () => {
 
 describe("TunnelCipher call order", () => {
   const BIG = 256 * 1024;
-  // WebCrypto finishes a small job before a large one in most trials, so repeat
-  // each scenario so that the old, unserialised code fails reliably.
+  // WebCrypto may finish small jobs before large ones. Repetition makes
+  // out-of-order completion likely enough to exercise serialization.
   const TRIALS = 10;
 
   it("resolves seals in call order when a later, smaller seal finishes first", async () => {

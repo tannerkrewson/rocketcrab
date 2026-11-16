@@ -2,9 +2,9 @@
 
 import type { RoomError, RoomErrorCode } from "@trystero-p2p/ws-relay";
 
-/** User-actionable join failure categories (F5 recommendation table). */
+/** User-actionable join failure categories. */
 export type TrysteroJoinErrorCategory =
-  /** Wrong room password (F8: structured Trystero error). */
+  /** Wrong room password (structured Trystero error). */
   | "password_mismatch"
   /** The remote room has reached its configured capacity. */
   | "room_full"
@@ -16,7 +16,7 @@ export type TrysteroJoinErrorCategory =
   | "handshake_timeout"
   /** Peer disconnected while negotiating. */
   | "peer_disconnected"
-  /** SDP/ICE exchange failed — TURN likely required (F5 S3, Blocker B2). */
+  /** SDP/ICE exchange failed — TURN may be required. */
   | "peer_connection_failed"
   /** Adapter-detected: no relay socket reached OPEN within the timeout. */
   | "relay_unreachable"
@@ -33,7 +33,7 @@ export type TrysteroJoinErrorCategory =
   /** Anything Trystero reports that we cannot classify. */
   | "unknown";
 
-/** Categories that can never recover without user action (S1 retry UX). */
+/** Categories that can never recover without user action. */
 const FATAL_CATEGORIES: ReadonlySet<TrysteroJoinErrorCategory> = new Set([
   "password_mismatch",
   "room_full",
@@ -76,7 +76,7 @@ export class TrysteroJoinError extends Error {
     }
   }
 
-  /** True when retrying without user input cannot succeed (S1 retry UX). */
+  /** True when retrying without user input cannot succeed. */
   get isFatal(): boolean {
     return FATAL_CATEGORIES.has(this.category);
   }

@@ -11,9 +11,9 @@ import type { DataPayload, RequestAction, RequestOptions } from "@trystero-p2p/w
 import { TrysteroTransport } from "./trystero-transport";
 
 /**
- * Shared contract suite (P1 acceptance: the adapter passes the same contract
- * suite as InMemoryTransport). The SAME scenarios run against the in-memory
- * arena transport (U5) and the Trystero adapter (mocked, deterministic), and
+ * Shared contract suite for InMemoryTransport and TrysteroTransport.
+ * The same scenarios run against the in-memory arena transport and the
+ * Trystero adapter (mocked, deterministic), and
  * assert identical observable behavior: connection-state sequences,
  * peer join/leave mapping, broadcast/targeted delivery with envelope fields,
  * and send rejection when not connected.
@@ -45,7 +45,7 @@ interface World {
 }
 
 // ---------------------------------------------------------------------------
-// InMemoryTransport world (U5)
+// InMemoryTransport world
 // ---------------------------------------------------------------------------
 
 class InMemoryWorld implements World {

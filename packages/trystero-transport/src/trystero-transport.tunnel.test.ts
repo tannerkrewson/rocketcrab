@@ -4,7 +4,7 @@ import { TrysteroTransport } from "./trystero-transport";
 import * as fallback from "./fallback-peer-connection";
 
 /**
- * Wiring of the WebRTC-to-tunnel fallback into the adapter (PLAN.md §5.6).
+ * Wiring of the WebRTC-to-tunnel fallback into the adapter.
  * Trystero's `joinRoom` is mocked, so these tests inspect the config the
  * adapter builds and the `rtcPolyfill` class it hands to Trystero.
  */

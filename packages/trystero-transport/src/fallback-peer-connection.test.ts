@@ -1397,7 +1397,7 @@ describe("FallbackPeerConnection", () => {
 });
 
 // ---------------------------------------------------------------------------
-// Connection outcome (PLAN.md §8.2): one report per physical attempt
+// Connection outcome: one report per physical attempt
 // ---------------------------------------------------------------------------
 
 function outcomesOf(h: Harness, side: string): ConnectionOutcomeInfo[] {

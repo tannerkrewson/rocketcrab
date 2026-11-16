@@ -8,8 +8,7 @@
  * sessionId, seq, deliverySeq, binary flag, serialized size) in the
  * metadata, so the receiver can rebuild the interface's `TransportMessage`
  * without guessing. This keeps channel names free of Trystero's 32-byte
- * action-name limit and matches how the F5 spike carried `sentAt`/`totalBytes`
- * metadata for large transfers.
+ * action-name limit.
  *
  * Peer identity (memberId + connectionId + displayName) is exchanged through
  * per-user state and validated before the adapter publishes a peer.
@@ -44,7 +43,7 @@ export interface WireEnvelopeInput {
   readonly totalBytes?: number;
 }
 
-/** Build a wire envelope (optional fields via spread, keep types immutable). */
+/** Build the metadata envelope without serializing absent optional fields. */
 export function buildWireEnvelope(input: WireEnvelopeInput): WireEnvelope {
   return {
     v: 1,

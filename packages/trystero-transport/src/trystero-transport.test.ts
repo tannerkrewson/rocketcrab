@@ -444,7 +444,7 @@ describe("TrysteroTransport join", () => {
     await expect(promise).rejects.toMatchObject({ category: "relay_unreachable" });
     expect(adapter.connectionState).toBe("idle");
     expect(adapter.sessionId).toBeNull();
-    // fail fast: the room is left so a rejected joiner stops churning offers (F4)
+    // Fail fast: the room is left so a rejected joiner stops churning offers
     expect(room.leave).toHaveBeenCalled();
   });
 
@@ -1209,7 +1209,6 @@ describe("TrysteroTransport send", () => {
     const [payload, options] = room.action.send.mock.calls[0]!;
     expect(payload).toBe("to-b");
     expect(options.target).toBe("peer-1");
-    // the wire envelope is attached as metadata
     expect(options.metadata).toMatchObject({
       v: 1,
       channel: "raw",
@@ -1792,7 +1791,6 @@ describe("TrysteroTransport leave / reconnect / suspend", () => {
     await expect(adapter.send({ channel: "raw", payload: "x" })).rejects.toMatchObject({
       category: "not_connected",
     });
-    // leave() is idempotent
     await adapter.leave();
     expect(adapter.connectionState).toBe("disconnected");
   });

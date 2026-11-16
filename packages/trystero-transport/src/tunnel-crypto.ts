@@ -1,10 +1,8 @@
 /**
  * Tunnel pairing, directional frame encryption and message encoding for the
- * WebSocket fallback (PLAN.md §5.3–§5.4). These are pure helpers: nothing in
- * the transport calls them yet (the wrapper is §5.5 and wiring is §5.6).
+ * WebSocket fallback. Used by fallback-peer-connection.ts.
  *
- * Canonical parameters (the edge Worker and any future server-side check must
- * agree on these exactly; see PLAN.md §5.3–§5.4):
+ * Canonical wire parameters shared by both peers:
  *
  * - Fingerprint value: `<algorithm lowercased> <hex uppercased>`, e.g.
  *   `sha-256 AB:CD:…`. Deduplicated per SDP.
