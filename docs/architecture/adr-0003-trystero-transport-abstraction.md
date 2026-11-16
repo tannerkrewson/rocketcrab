@@ -60,7 +60,7 @@ verification remains in PLAN §9. Historical public relay observations are
 retained in [F5 findings](../testing/trystero-connectivity-findings.md). The
 [large-room state-mode experiment](../testing/large-room-load.md) records local
 headless measurements and open release gates; it is not phone evidence. Its
-[in-process authority fan-out simulation](../testing/large-room-load.md#in-process-simulation-no-webrtc)
+[in-process authority fan-out simulation](../testing/large-room-load.md#authority-upload-in-process-simulation-no-webrtc)
 measures 10–200-player authority traffic over the in-memory transport, with no
 WebRTC, and is likewise not phone or real-network evidence.
 
@@ -134,8 +134,9 @@ The Trystero adapter enables the 0.27 `scale()` plugin with nine direct
 neighbors, retaining a full mesh for up to ten peers while allowing virtual
 routes in larger rooms. Trystero owns overlay routing and bulk transfer; Nova
 still owns identity admission, source verification, cancellation and party
-semantics. A test-only eight-browser, four-neighbor setup verifies a 2 MiB
-source over a multi-hop route with new signaling blocked. This is not proof of
+semantics. A one-off eight-browser, four-neighbor proof (2026-11-13, since
+removed) carried a 2 MiB source over a multi-hop route with new signaling
+blocked; multi-hop routing has no standing regression test. This is not proof of
 arbitrary room size or real-device behavior: the 10/25/50/100 load tests and
 phone gate in `PLAN.md` remain open.
 
@@ -225,9 +226,7 @@ Re-verify every item on each Trystero upgrade. The installed core is under
   setting that removes the bound, revisit the owner decision before changing
   the status above.
 - **Tests** (PLAN §3.1, §3.6, §5). Run `npm run check`,
-  `npm run test:e2e:trystero` (`e2e-trystero/playwright.config.ts`),
-  `npx playwright test -c e2e-trystero/scale.playwright.config.js`,
-  `npx playwright test -c e2e-trystero/fallback.playwright.config.js` and
+  `npm run test:e2e`, `npm run test:e2e:trystero` and
   `npm run test:edge:integration`. Run the Playwright suites in the pinned
   Playwright 1.62.1 image. Record results in the matching PLAN evidence.
 

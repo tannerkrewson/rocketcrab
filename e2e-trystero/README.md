@@ -10,41 +10,17 @@ npm run test:e2e:trystero
 
 ## What it does
 
-- Serves a small harness page (`src/main.ts`) that drives the REAL adapter
-  (`TrysteroTransport` — the P1 deliverable) behind a `window.__harness`,
-  exactly like the F5 spike driver did for raw Trystero.
-- Two specs, modeled on the F5 spike's Playwright approach (vite dev server,
-  multiple pages in one Chromium, HTTPS + `ignoreHTTPSErrors` when locally
-  trusted certs are present at `certs/key.pem` + `certs/cert.pem`):
-  1. Two pages discover each other through the local edge signaling relay, exchange a
-     structured message, a 256 KiB binary payload, and a 1 MiB large string
-     with progress events on both sides, ping each other, then leave.
-  2. Relay diagnostics + connection quality are observable after joining.
-  3. P3: two pages run the game-source coordinator (packages/party) over the
-     real transport — the host registers a multi-chunk game source, the
-     admitted joiner requests and receives it byte-identical, and the
-     SHA-256 digest + byte count verify before launch.
-  4. Real `room-full` rejection: a test-only raw Trystero page
-     (`room-full.html`, `src/room-full-proof.ts`) joins with `maxUsers: 2`; a
-     third joiner gets a real RoomError mapped by `fromRoomError`, and the first
-     two stay connected. This does not use `TrysteroTransport.join`; production
-     sets no cap.
+A small harness page (`src/main.ts`) drives the real `TrysteroTransport`
+behind `window.__harness`. Three specs:
 
-## Multi-hop scale proof
-
-The isolated scale tests use a test-only local WebSocket relay and force four
-neighbors to create virtual routes. Start their server separately, then run the
-proof (stop the server afterward):
-
-```sh
-(cd e2e-trystero && ../node_modules/.bin/vite --config scale-server.mjs)
-npx playwright test -c e2e-trystero/scale.playwright.config.js
-```
-
-The test-only shim substitutes local signaling and a smaller topology for the
-Nova adapter; it does not exercise the deployed signaling service. The proof
-blocks new signaling and checks a 2 MiB request and verified game source on a
-virtual route. It does not replace load tests or real-device validation.
+1. `trystero.spec.ts`: two pages discover each other through the local edge
+   signaling relay, exchange structured, binary and 1 MiB messages, ping, and
+   leave; relay diagnostics and connection quality are observable.
+2. `game-source.spec.ts`: the game-source coordinator (`packages/party`)
+   transfers a multi-chunk game source that verifies by SHA-256.
+3. `tunnel-fallback.spec.ts`: a pair whose WebRTC is forced off moves to the
+   edge tunnel, carries a 2 MiB source intact, and tears down cleanly, while a
+   healthy pair stays on WebRTC.
 
 ## Local relay
 
