@@ -127,6 +127,10 @@ Record results in `docs/testing/trystero-connectivity-findings.md` and
   (they degrade) and calls the minimal game "9 lines" (it is 5). Changing it
   changes the shipped prompt.
 
+## Cleanup
+
+Done 2026-11-15: Archived the superseded media-bridging spike; retained the runtime sandbox findings and matrix because current architecture and support-policy docs rely on them.
+
 ## Cleanup for the owner
 
 - [ ] Delete the 46 local `work/*` branches left by the earlier agents. Each
