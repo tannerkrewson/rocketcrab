@@ -12,16 +12,15 @@ import type {
 /**
  * Transport-neutral Nova transport (ADR-0003).
  *
- * The single interface shared by InMemoryTransport (U5, local test arena) and
- * TrysteroTransport (P1, real parties). Generated games never see this
- * interface (engineering rule 1); the game-facing Nova API (S1) sits above it
- * and must behave identically over both implementations (P1 acceptance: both
- * pass the same contract suite).
+ * The single interface shared by InMemoryTransport (local test arena) and
+ * TrysteroTransport (real parties). Generated games never see this interface;
+ * the game-facing Nova API sits above it. Both implementations must pass the
+ * same contract suite.
  *
  * The interface is React-free and does not reference Trystero: no room
  * objects, no peer objects, no relay configuration. Lifecycle events
  * (join/leave/reconnect/suspension) match what a real transport produces
- * (F5 findings; threat-model T15).
+ * (threat-model T15).
  */
 export interface NovaTransport {
   /** Transport implementation identity, e.g. "in-memory" | "trystero". */
@@ -59,7 +58,7 @@ export interface NovaTransport {
   leave(): Promise<void>;
 
   /**
-   * Simulate a dropped connection and re-establishment (F11 rejoin). The
+   * Simulate a dropped connection and re-establishment (rejoin). The
    * member keeps its `memberId` and receives a fresh `connectionId`; peers
    * observe `peer:left` (old connection) then `peer:joined` (new connection),
    * and the local transport emits `peer:reconnected`.

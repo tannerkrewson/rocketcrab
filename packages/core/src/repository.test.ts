@@ -7,7 +7,7 @@ import {
 } from "./repository";
 
 /**
- * Contract-level tests for the shared repository types (U2). The full
+ * Contract-level tests for the shared repository types. The full
  * behavior of a {@link GameRepository} implementation (create/read/update/
  * delete/duplicate/list/search/recordTestResults) is exercised against the
  * Dexie implementation in apps/nova, which also owns the IndexedDB access.

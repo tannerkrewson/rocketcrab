@@ -5,14 +5,14 @@ import type { ConnectionId, MemberId, MessageId, SessionId, Timestamp } from "@r
  *
  * The transport layer moves payloads between party connections and reports
  * lifecycle events. It is deliberately agnostic about payload contents: the
- * runtime protocol (F6 peer schemas) formats and validates messages above
+ * runtime protocol formats and validates messages above
  * this layer. The delivered envelope exposes the same fields the peer
  * envelope carries (version, sessionId, senderMemberId, senderConnectionId,
  * messageId, sentAt and, for ordered families, the monotonic `seq`), so the
  * shell and adapters can correlate transport events with protocol messages.
  *
- * React-free by design; shared by InMemoryTransport (U5) and
- * TrysteroTransport (P1).
+ * React-free by design; shared by InMemoryTransport and
+ * TrysteroTransport.
  */
 
 /** Delivery reliability for a transport message (ADR-0006 raw mode). */
@@ -23,7 +23,7 @@ export type TransportOrdering = "ordered" | "unordered";
 
 /**
  * Connection lifecycle of one transport. Mirrors the lifecycle expected from
- * a real party transport (F5 findings: join latency, background suspension on
+ * a real party transport (join latency, background suspension on
  * Mobile Safari, reconnect with a fresh connection ID).
  */
 export type TransportConnectionState =
@@ -36,7 +36,7 @@ export type TransportConnectionState =
 /**
  * Payload carried by a transport message: a structured protocol message
  * (plain JSON object, validated at the protocol boundary per threat T10) or a
- * raw binary blob (ADR-0006 raw mode, P3 game-source chunks).
+ * raw binary blob (ADR-0006 raw mode, game-source chunks).
  */
 export type TransportPayload = unknown;
 
@@ -54,12 +54,12 @@ export interface TransportPeerInfo {
 
 /**
  * A message as delivered to the recipient. Envelope fields are compatible
- * with the peer envelope (F6): protocol messages additionally carry their own
+ * with the peer envelope: protocol messages additionally carry their own
  * copy of these fields inside `payload`, and adapters may assert the two
  * agree (the transport never fabricates protocol content).
  */
 export interface TransportMessage {
-  /** Protocol version, when the sender knows it (F6 `version`). */
+  /** Protocol version, when the sender knows it (`version`). */
   readonly version?: number;
   /** Party session ID (private room session once admitted, ADR-0004). */
   readonly sessionId: SessionId;
@@ -71,7 +71,7 @@ export interface TransportMessage {
   readonly messageId: MessageId;
   /** Epoch-ms timestamp captured when the message was sent. */
   readonly sentAt: Timestamp;
-  /** Per-sender monotonic sequence for ordered families (F6 `seq`). */
+  /** Per-sender monotonic sequence for ordered families (`seq`). */
   readonly seq?: number;
   readonly reliability: TransportReliability;
   readonly ordering: TransportOrdering;
@@ -92,9 +92,9 @@ export interface TransportMessage {
 }
 
 /**
- * Chunked-transfer progress (F5 scenario 4: large payloads report progress on
- * both sides). The in-memory transport simulates chunked delivery; the
- * Trystero adapter maps this to Trystero's action progress callbacks.
+ * Chunked-transfer progress reported by both sender and receiver. The
+ * in-memory transport simulates chunked delivery; the Trystero adapter maps
+ * this to Trystero's action progress callbacks.
  */
 export interface TransferProgress {
   readonly direction: "send" | "receive";
@@ -120,9 +120,9 @@ export interface TransportSendOptions {
   readonly reliability?: TransportReliability;
   /** Ordering guarantee; defaults to "ordered" (Trystero default). */
   readonly ordering?: TransportOrdering;
-  /** Monotonic per-sender sequence for ordered families (F6 `seq`). */
+  /** Monotonic per-sender sequence for ordered families (`seq`). */
   readonly seq?: number;
-  /** Protocol version of the payload (F6 `version`), when known. */
+  /** Protocol version of the payload (`version`), when known. */
   readonly version?: number;
   /**
    * True when the payload is a raw binary blob. Binary payloads bypass

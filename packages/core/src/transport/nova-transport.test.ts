@@ -11,8 +11,8 @@ import type {
 
 /**
  * Contract smoke test for the transport-neutral interface: a minimal
- * implementation compiles and satisfies the shape both InMemoryTransport (U5)
- * and TrysteroTransport (P1) must provide.
+ * implementation compiles and satisfies the shape both InMemoryTransport
+ * and TrysteroTransport must provide.
  */
 class MockTransport implements NovaTransport {
   readonly kind = "mock";

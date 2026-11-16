@@ -2,10 +2,7 @@ import type { GameMode } from "@rocketcrab/protocol";
 
 /**
  * A saved user-created game, persisted in IndexedDB on Nova's main origin
- * (ADR-0005). This interface is authoritative for U2 (issue rocketcrab-9fv.2.2)
- * and must stay in sync with the issue's data model:
- * id, title, description?, html, sourceHash, apiVersion?, mode?, createdAt,
- * updatedAt, lastTestedAt?, lastTestSucceeded?, sourceBytes.
+ * (ADR-0005).
  */
 export interface SavedGame {
   id: string;
@@ -22,7 +19,7 @@ export interface SavedGame {
   createdAt: number;
   /** Epoch-millisecond timestamp of the last edit (not of test runs). */
   updatedAt: number;
-  /** Epoch-millisecond timestamp of the latest test run (U6 arena). */
+  /** Epoch-millisecond timestamp of the latest test run (arena). */
   lastTestedAt?: number;
   /** Outcome of the latest test run. */
   lastTestSucceeded?: boolean;
@@ -57,7 +54,6 @@ export class GameRepositoryError extends Error {
   }
 }
 
-/** Type guard over {@link GameRepositoryError}. */
 export function isGameRepositoryError(error: unknown): error is GameRepositoryError {
   return error instanceof GameRepositoryError;
 }
@@ -90,7 +86,7 @@ export interface DuplicateSavedGameInput {
   title?: string;
 }
 
-/** Outcome of a test run, recorded on a saved game (U6 test arena). */
+/** Outcome of a test run, recorded on a saved game (test arena). */
 export interface TestResultsInput {
   /** Epoch-millisecond timestamp of the test run. */
   lastTestedAt: number;
