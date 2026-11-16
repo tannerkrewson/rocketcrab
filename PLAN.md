@@ -60,8 +60,10 @@ worked locally; 100–200 only in the in-process simulation.
       `wrangler secret put` prompts (`deploy/cloudflare.md`).
 - [ ] Add the Realtime usage billing notification and, if offered, a
       Workers/Durable Objects limit notification; confirm a test email.
-- [ ] Decide whether to delete the old `rocketcrab-cors-relay` Worker
-      (nothing in the repo uses it).
+- [ ] Delete the old `rocketcrab-cors-relay` Worker (verified unused
+      2026-11-15: no branch or the legacy site references it):
+      `npx --yes wrangler@4.161.0 delete --name rocketcrab-cors-relay`, then
+      drop it from "Live state" in `deploy/cloudflare.md`.
 
 ## 2. First deploy and smoke test (agent, after §1)
 
@@ -125,6 +127,13 @@ Record results in `docs/testing/trystero-connectivity-findings.md` and
   (they degrade) and calls the minimal game "9 lines" (it is 5). Changing it
   changes the shipped prompt.
 
+## Cleanup for the owner
+
+- [ ] Delete the 46 local `work/*` branches left by the earlier agents. Each
+      one's changes are already on `nova` (checked with `git cherry`; the
+      tunnel-server commits were squashed with identical content):
+      `git branch --list 'work/*' --format='%(refname:short)' | xargs git branch -D`
+
 ## Decisions log
 
 | Date       | Decision                                                                                |
@@ -143,7 +152,6 @@ Record results in `docs/testing/trystero-connectivity-findings.md` and
 | 2026-11-13 | No 100-browser runs; browsers ≤ 50, larger sizes by in-process simulation.              |
 | 2026-11-13 | Authority fan-out: lean snapshots, targeted dispatch, then state deltas.                |
 | 2026-11-13 | Keep Nova member IDs; Trystero persistent identity not adopted.                         |
-| 2026-11-15 | Keep `rocketcrab-cors-relay` until the owner decides (agent choice).                    |
 | 2026-11-15 | A player who leaves may rejoin; the engine never auto-rejoins after a deliberate leave. |
 | 2026-11-15 | Signaling outages are logged once each (`relay-failed`, `signaling_ok: false`).         |
 
