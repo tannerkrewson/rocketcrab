@@ -2501,6 +2501,11 @@ describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
 // ---------------------------------------------------------------------------
 
 describe("party engine — signaling outage setup", () => {
+  afterEach(() => {
+    vi.unstubAllEnvs();
+    vi.unstubAllGlobals();
+  });
+
   function failingRelay(world: World, category: string) {
     let attempts = 0;
     let connected = false;
@@ -2536,6 +2541,9 @@ describe("party engine — signaling outage setup", () => {
   }
 
   it("warns after five seconds, retries one join at a time, and recovers", async () => {
+    vi.stubEnv("VITE_EDGE_ORIGIN", "https://edge.example");
+    const sendBeacon = vi.fn(() => true);
+    vi.stubGlobal("navigator", { ...globalThis.navigator, sendBeacon, userAgent: "" });
     const world = makeWorld();
     const relay = failingRelay(world, "relay_unreachable");
     const player = makePlayer(world, "host");
@@ -2545,9 +2553,17 @@ describe("party engine — signaling outage setup", () => {
     world.clock.advance(4_999);
     await flush();
     expect(player.engine.getState().signalingOutage).toBe(false);
+    expect(sendBeacon).not.toHaveBeenCalled();
     world.clock.advance(1);
     await flush();
     expect(player.engine.getState().signalingOutage).toBe(true);
+    // One connection-log event per visible outage, marked signaling_ok: false.
+    expect(sendBeacon).toHaveBeenCalledOnce();
+    expect(JSON.parse(sendBeacon.mock.calls[0]![1] as string)).toMatchObject({
+      outcome: "failed",
+      error_code: "relay-failed",
+      signaling_ok: false,
+    });
     relay.connect();
     expect(player.engine.getState().signalingOutage).toBe(false);
     world.clock.advance(1_000);

@@ -215,7 +215,7 @@ text/plain payload), at most 1024 bytes, with exactly these required fields:
 - `outcome`: `direct`, `turn`, `tunnel`, `failed`, or `unknown` (blob1). `unknown` means the connection opened but the browser cannot honestly tell whether it was direct or TURN (e.g. selected-pair stats are missing, ambiguous or rejected, or a scale virtual peer has no native connection).
 - `error_code`: empty or a Trystero 0.27 RoomError code: `room-full`, `banned`, `relay-failed`, `identity-failed`, `plugin-failed`, `decrypt-failed`, `peer-connect-failed`, `handshake-failed`, `peer-error` (blob2).
 - `ms_to_connect`: integer 0–3600000 milliseconds (double1; report uses connected outcomes only).
-- `signaling_ok`: boolean (blob3, encoded `true` or `false`).
+- `signaling_ok`: boolean (blob3, encoded `true` or `false`). Peer-attempt events are always `true`. A player whose signaling stays down long enough to see the outage message sends one `failed` / `relay-failed` / `false` event.
 - `browser`: `unknown`, `safari-ios`, `safari`, `chrome-android`, `chrome`, `firefox`, `edge`, or `other` (blob4).
 - `network`: `unknown`, `slow-2g`, `2g`, `3g`, `4g`, `bluetooth`, `cellular`, `ethernet`, `wifi`, `wimax`, `none`, or `other` (blob5).
 - `app_version`: numeric `major.minor.patch`, each component 0–999 without leading zeros (blob6).

@@ -69,6 +69,7 @@ import { browserLifecycleSource, type PartyLifecycleSource } from "./lifecycle";
 import { clearPartyRecovery, savePartyRecovery } from "./party-recovery";
 import { createTrysteroPartyTransportFactory } from "./transport-factory";
 import { SignalingOutage } from "./signaling-outage";
+import { reportConnection } from "../connection-log";
 import {
   fetchTurnCredentials,
   turnCredsConfigured,
@@ -620,6 +621,15 @@ export class PartyEngine {
     this.schedule = config.schedule ?? defaultScheduler;
     this.signalingOutage = new SignalingOutage(this.schedule, (visible) => {
       this.signalingOutageVisible = visible;
+      // One event per visible outage: the only log line that sees signaling
+      // fail (peer-attempt events imply signaling worked).
+      if (visible)
+        reportConnection({
+          outcome: "failed",
+          error_code: "relay-failed",
+          ms_to_connect: 0,
+          signaling_ok: false,
+        });
       this.emit();
     });
     this.now = config.now ?? (() => Date.now());
