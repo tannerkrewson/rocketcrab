@@ -84,15 +84,12 @@ export const novaApiCallSchemas = {
       }),
     })
     .strict(),
-  // The authority frame's answer to a stateRequest event.
   stateResponse: z
     .object({
       requestId: z.string().min(1).max(64),
       result: stateResponseSchema,
     })
     .strict(),
-  // The authority frame's answer to a simulationRequest event (the game's
-  // serializeState callback produced its simulation state).
   simulationResponse: z
     .object({
       requestId: z.string().min(1).max(64),
@@ -161,7 +158,6 @@ export function serializeConsoleArgs(args: readonly unknown[]): SerializedConsol
   return { message, details };
 }
 
-/** Title fallback when neither the game nor the host supplied a usable one. */
 export const DEFAULT_GAME_TITLE = "Untitled game";
 
 /**

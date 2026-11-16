@@ -1,19 +1,7 @@
 /**
- * One runtime instance: the per-bootstrap execution context (deliverable:
- * one dedicated MessageChannel per runtime instance).
- *
- * An instance owns:
- * - its MessagePort (validated incoming messages, pong replies);
- * - the sandboxed game frame created from the bootstrap's HTML source;
- * - the per-instance `window.__novaRuntime` hook the injected Nova bridge
- *   reports through (errors, unhandled rejections, console entries, and
- *   `nova.defineGame` declarations);
- * - the game registration timeout;
- * - rate-limited error/console forwarding;
- * - reload and destroy (parent-controlled).
- *
- * Game code must never reach the host origin. Everything the game reports is
- * untrusted input, validated here before it becomes a protocol message.
+ * Per-bootstrap execution context: owns the channel, sandboxed frame,
+ * bridge hook, registration timeout, and rate-limited reporting. Revalidate
+ * all game-originated data before forwarding it to the host.
  */
 import {
   parseRuntimeMessage,
@@ -59,7 +47,6 @@ export interface PortLike {
   onmessageerror?: ((event: MessageEvent) => void) | null;
 }
 
-/** The sandboxed game frame, as seen by the runtime. */
 interface GameFrame {
   readonly window: Window | null;
   destroy(): void;
@@ -156,12 +143,10 @@ export class RuntimeInstance {
     return this.frame?.window ?? null;
   }
 
-  /** True once the instance has been torn down (destroy / replacement). */
   isDestroyed(): boolean {
     return this.destroyed;
   }
 
-  /** The game frame is present (test/observability hook). */
   hasFrame(): boolean {
     return this.frame !== null;
   }
@@ -171,7 +156,6 @@ export class RuntimeInstance {
     return this.outgoing;
   }
 
-  /** Parent-controlled destroy: tear down the game and the channel. */
   destroy(reason?: string): void {
     if (this.destroyed) return;
     this.destroyed = true;
@@ -230,10 +214,7 @@ export class RuntimeInstance {
   }
 
   private injectedSource(html: string): string {
-    // The validated bootstrap player identity is injected before the bridge
-    // script so `window.nova.player` is correct from the first game tick
-    // (same-origin forwarding of data the host already validated; the game
-    // frame never sees the host origin).
+    // Inject identity before the bridge so window.nova.player is correct immediately.
     // JSON string escaping alone does not stop HTML's script end-tag parser.
     // Names are player-controlled and may contain </script>.
     const identity = JSON.stringify({
@@ -341,7 +322,6 @@ export class RuntimeInstance {
         this.handleConsole(payload);
         break;
       default:
-        // Unknown report kind — ignore silently (game-originated junk).
         break;
     }
   }
@@ -362,8 +342,6 @@ export class RuntimeInstance {
       return;
     }
     const declaration = parsed.data as GameDeclaration;
-    // An unknown API version fails registration with a clear error rather
-    // than being guessed at.
     if (
       declaration.apiVersion !== undefined &&
       !SUPPORTED_NOVA_API_VERSIONS.includes(declaration.apiVersion)
@@ -386,13 +364,7 @@ export class RuntimeInstance {
     this.send(buildLifecycleMessage(this.runtimeInstanceId, "started", undefined, this.sessionId));
   }
 
-  /**
-   * A forwarded Nova API call: validate the payload (never trust game
-   * input), then forward it to the host session router as a `game.apiCall`
-   * message. The host routes the call into this game's
-   * NovaSession over the transport; host-pushed events come back as
-   * `game.apiEvent`. Never dropped silently.
-   */
+  /** Validate game API calls before forwarding to the host; never silently drop failures. */
   private handleApiCall(method: NovaApiCallMethod, payload: unknown): void {
     const parsed = novaApiCallSchemas[method].safeParse(payload);
     if (!parsed.success) {
@@ -403,11 +375,9 @@ export class RuntimeInstance {
   }
 
   /**
-   * A host-pushed session event (`game.apiEvent`): deliver it into the game
-   * frame through the same-origin bridge hook. Events only flow after the
-   * game registered (the host joins the session on registration), so the
-   * bridge is installed by the time the first event arrives; a missing
-   * frame (torn down between messages) drops the event safely.
+   * Deliver validated host events through the same-origin bridge. Events begin
+   * after registration, when the bridge is already installed; safely drop them
+   * if teardown has removed the frame.
    */
   private handleApiEvent(event: GameApiEventMessage["event"]): void {
     const bridge = this.frame?.window as
@@ -484,8 +454,6 @@ export class RuntimeInstance {
     ) {
       return;
     }
-    // The injected bridge always sends an args array; anything else is
-    // game-originated junk and is ignored at the boundary.
     if (!("args" in p) || !Array.isArray(p.args)) {
       return;
     }
@@ -506,9 +474,8 @@ export class RuntimeInstance {
     try {
       this.port.postMessage(message);
     } catch (error) {
-      // The host never received this message, e.g. a payload the channel
-      // cannot clone. Say so: a silent drop leaves the game waiting on an
-      // answer that will never come. A failed error report is not re-reported.
+      // Surface clone/send failures so dispatch promises cannot wait forever.
+      // Do not recurse if reporting the failure also fails.
       if (message.type !== "runtime.error") {
         const what = message.type === "game.apiCall" ? `nova.${message.method}()` : message.type;
         const reason = error instanceof Error ? error.message : String(error);

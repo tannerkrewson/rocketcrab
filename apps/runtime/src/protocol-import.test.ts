@@ -6,11 +6,6 @@ import {
   runtimeMessagesSchema,
 } from "@rocketcrab/protocol";
 
-/**
- * Compile + runtime smoke test: the runtime app consumes
- * @rocketcrab/protocol, so the shared types are exercised by the app's
- * `tsc --noEmit` typecheck and its vitest run.
- */
 describe("@rocketcrab/protocol shared types in the runtime app", () => {
   it("exposes the protocol version", () => {
     expect(PROTOCOL_VERSION).toBe(1);

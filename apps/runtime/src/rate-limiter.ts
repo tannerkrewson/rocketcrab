@@ -1,8 +1,6 @@
 /**
- * Token-bucket rate limiter for runtime-plane reporting (F6 limits:
- * `runtimeLogRatePerSecond` console entries and `errorReportRatePerSecond`
- * error reports per runtime frame). A malicious or buggy game must not be
- * able to flood the host over the MessageChannel (threat model T10/T11).
+ * Rate-limit console and error reports per runtime instance so a buggy or
+ * malicious game cannot flood the host channel (threat model T10/T11).
  */
 import { errorReportRatePerSecond, runtimeLogRatePerSecond } from "@rocketcrab/protocol";
 
@@ -11,7 +9,7 @@ export interface RateLimiter {
   tryAcquire(now?: number): boolean;
 }
 
-/** Token bucket with second-granularity refill (testable with injected time). */
+/** Token bucket with time-based refill and an injectable clock. */
 export class TokenBucket implements RateLimiter {
   private tokens: number;
   private lastRefillMs: number;

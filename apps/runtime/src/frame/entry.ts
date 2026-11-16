@@ -1,20 +1,8 @@
 /**
- * The script that runs first inside every game frame. It is bundled into one
- * IIFE at build time (see `novaFrameScript` in vite.config.ts) and inlined
- * ahead of the game's own code.
- *
- * It does three things:
- * - forwards window errors, unhandled rejections and console output to the
- *   runtime page;
- * - builds `window.nova` with `createNovaClient` from `@rocketcrab/nova-api`,
- *   the same client the contract suite tests, over a backend that reports
- *   calls to the runtime page and receives host events;
- * - runs state-mode handlers (with Immer) and simulation snapshots when the
- *   host asks this frame to, because game functions never leave the frame.
- *
- * The frame is same-origin with the runtime page, so it reports through a hook
- * on the parent (`__novaRuntime.report`) rather than postMessage. The runtime
- * page validates everything it receives; nothing here is trusted.
+ * Bundled IIFE inlined before game code. Builds window.nova, forwards
+ * diagnostics, and executes handlers that cannot leave the frame. Reports
+ * through the same-origin parent's __novaRuntime hook; the runtime page
+ * revalidates every report because game-frame input is untrusted.
  */
 import { createNovaClient, type NovaSessionEvent } from "@rocketcrab/nova-api/client";
 import { NovaError, toErrorCode } from "@rocketcrab/nova-api/errors";
@@ -205,7 +193,6 @@ function install(): void {
     }
   }
 
-  /** One validated `game.apiEvent` from the host (see the protocol's gameApiEventSchema). */
   function receive(kind: string, raw: unknown): void {
     const p = (raw ?? {}) as Payload & Record<string, unknown>;
     switch (kind) {

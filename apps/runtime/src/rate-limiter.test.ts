@@ -41,14 +41,14 @@ describe("RateLimitedSink", () => {
     sink.send("a", start);
     sink.send("b", start);
     sink.send("c", start);
-    sink.send("d", start); // dropped
-    sink.send("e", start); // dropped
+    sink.send("d", start);
+    sink.send("e", start);
     expect(forwarded).toEqual([
       { item: "a", dropped: 0 },
       { item: "b", dropped: 0 },
       { item: "c", dropped: 0 },
     ]);
-    sink.send("f", start + 1000); // refill
+    sink.send("f", start + 1000);
     expect(forwarded.at(-1)).toEqual({ item: "f", dropped: 2 });
   });
 

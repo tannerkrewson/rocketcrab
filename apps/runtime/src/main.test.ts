@@ -70,9 +70,7 @@ function bootstrap(origin: string = MAIN_ORIGIN): FakePort {
 }
 
 afterEach(() => {
-  // Tear down whatever instance a test left running so tests stay isolated.
   const port = createFakePort();
-  // A bootstrap with a fresh port replaces (and destroys) any active instance.
   dispatchBootstrap(MAIN_ORIGIN, bootstrapMessage({ runtimeInstanceId: "teardown" }), [port]);
   receiveOnPort(port, {
     version: 1,

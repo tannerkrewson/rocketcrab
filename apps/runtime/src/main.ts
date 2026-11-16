@@ -1,21 +1,9 @@
 /**
- * Runtime origin application (apps/runtime) — the isolated execution origin
- * for game HTML (ADR-0001, ADR-0008).
- *
- * Responsibilities:
- * - accept exactly one bootstrap: a `runtime.bootstrap` message over
- *   postMessage from the exact main origin, transferring a dedicated
- *   MessageChannel (one per runtime instance);
- * - run the game inside a same-origin sandboxed iframe with the injected
- *   Nova API bridge prepended (never sanitizing or rewriting game HTML);
- * - forward validated errors, console entries, lifecycle events, and game
- *   registrations back over the channel;
- * - answer heartbeats and honor parent-controlled reload / destroy;
- * - report page-visibility transitions (pause diagnostic for Mobile Safari
- *   backgrounding, ADR-0012/B6).
- *
- * This page is secret-free by construction: no Nova credentials, no saved
- * game source, no party secrets (ADR-0008, threat model).
+ * Secret-free game execution origin (ADR-0001, ADR-0008). Accept bootstrap
+ * only from the embedding main-origin page and use its dedicated channel,
+ * and run HTML in a same-origin sandboxed frame with the Nova bridge.
+ * Forward validated reports and honor parent-controlled reload/destroy.
+ * Visibility events support Mobile Safari recovery (ADR-0012).
  */
 import { parseRuntimeMessage } from "@rocketcrab/protocol";
 import { mainOriginForRuntimeOrigin } from "./origins";
@@ -23,12 +11,8 @@ import { RuntimeInstance, type FrameFactory } from "./runtime-instance";
 
 const MAIN_ORIGIN = mainOriginForRuntimeOrigin(location.origin);
 
-// Service-worker hygiene (M2; ADR-0008): the runtime origin must not run a
-// service worker — no persistent network control over game traffic. No
-// runtime code registers one and browsers reject registration from the
-// sandboxed game frame, but sweep any leftover registration (e.g. from a
-// misconfigured static host) on page load so the runtime page always starts
-// clean.
+// Remove leftover service workers so they cannot retain network control
+// over game traffic; the runtime must not register its own (ADR-0008).
 if ("serviceWorker" in navigator) {
   void navigator.serviceWorker.getRegistrations().then((registrations) => {
     for (const registration of registrations) {
@@ -46,7 +30,6 @@ const container: HTMLElement = containerEl;
 
 let activeInstance: RuntimeInstance | null = null;
 
-/** Creates the same-origin sandboxed game frame. */
 function createFrameFactory(): FrameFactory {
   return {
     create(source: string, allowTokens: readonly string[]) {
@@ -113,8 +96,6 @@ function handleBootstrap(event: MessageEvent): void {
     console.warn("[runtime] bootstrap without a MessagePort");
     return;
   }
-  // A fresh bootstrap starts a fresh instance with a fresh channel: tear the
-  // previous instance down (old port is closed) before taking the new one.
   activeInstance?.destroy();
   activeInstance = new RuntimeInstance({
     runtimeInstanceId: parsed.value.runtimeInstanceId,
@@ -124,13 +105,9 @@ function handleBootstrap(event: MessageEvent): void {
   });
 }
 
-// Exact-origin bootstrap handshake: only a page on MAIN_ORIGIN may start a
-// session, and only with a versioned runtime.bootstrap message.
 window.addEventListener("message", handleBootstrap);
 
-// Pause diagnostic: report visibility transitions so the shell can react to
-// Mobile Safari backgrounding (ADR-0012, B6). Page-level listeners are
-// installed once and outlive instances.
+// Page-level visibility listeners outlive instances and support Safari recovery (ADR-0012).
 document.addEventListener("visibilitychange", () => {
   activeInstance?.pageVisibilityChanged(document.hidden);
 });

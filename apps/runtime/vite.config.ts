@@ -10,7 +10,6 @@ const CERT_DIR = fileURLToPath(new URL("../../.certs", import.meta.url));
 const CERT = join(CERT_DIR, "localhost-cert.pem");
 const KEY = join(CERT_DIR, "localhost-key.pem");
 
-/** Vite `server.https` config in `https` mode; `undefined` (plain HTTP) otherwise. */
 function httpsServerConfig(mode: string) {
   if (mode !== "https") {
     return undefined;
@@ -72,13 +71,9 @@ export function novaFrameScript(): Plugin {
   };
 }
 
-// Static origin for the isolated game runtime.
-// In production this is deployed to a separate origin (runtime.nova.example).
-// The dev server listens on a distinct port so both origins run locally.
-// Intentionally NO CSP meta: the runtime page must keep ordinary web
-// capabilities for game HTML (permissive runtime policy — compensated by the
-// separate origin, secret-free content, no service workers, and the strict
-// main-origin policy; docs/architecture/deployment.md).
+// Intentionally no CSP meta: game HTML retains ordinary web capabilities.
+// Isolation relies on a separate, secret-free origin without service workers
+// and the main origin's strict policy (docs/architecture/deployment.md).
 export default defineConfig(({ mode }) => ({
   plugins: [novaFrameScript(), runtimeHeaders()],
   server: {

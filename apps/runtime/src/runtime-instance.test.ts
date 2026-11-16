@@ -130,7 +130,7 @@ describe("RuntimeInstance heartbeat and lifecycle", () => {
 
   it("reloads into a clean frame and re-arms registration", () => {
     const { instance, port, frameHost } = setup();
-    instance.outgoingMessages(); // sanity: log is readable
+    instance.outgoingMessages();
     receiveOnPort(port, {
       version: 1,
       runtimeInstanceId: "runtime-1",
@@ -141,7 +141,6 @@ describe("RuntimeInstance heartbeat and lifecycle", () => {
     expect(frameHost.frames).toHaveLength(2);
     expect(frameHost.frames[0]?.destroyed).toBe(true);
     expect(frameHost.frames[1]?.destroyed).toBe(false);
-    // created, loaded, reloaded
     expect(messageTypes(port).filter((t) => t === "game.lifecycle").length).toBe(3);
     const reloaded = port.sent
       .filter((m) => (m as { type: string }).type === "game.lifecycle")
@@ -260,7 +259,6 @@ describe("RuntimeInstance registration", () => {
     const error = runtimeMessage(port, "runtime.error");
     expect(error?.category).toBe("unsupported");
     expect(error?.message).toContain("Unsupported Nova API version 99");
-    // Unknown API versions fail registration rather than being guessed at.
     expect(runtimeMessage(port, "game.registration")).toBeUndefined();
   });
 
@@ -456,8 +454,6 @@ describe("RuntimeInstance protocol boundary", () => {
       "simulationResponse",
       "stateResponse",
     ]);
-    // The validated payload is forwarded verbatim and the envelope carries
-    // the runtime instance id and session id.
     expect((byMethod.get("dispatch") as { payload: unknown }).payload).toEqual({
       action: { type: "playCard", payload: { c: 1 } },
       actionId: "action-frame-1",
@@ -491,7 +487,6 @@ describe("RuntimeInstance protocol boundary", () => {
     expect(frame.source).toContain("window.__novaBootstrap");
     expect(frame.source).toContain('"memberId":"member-7"');
     expect(frame.source).toContain('"displayName":"Robin"');
-    // The bridge script still runs before the game HTML.
     expect(frame.source.indexOf("window.__novaBootstrap")).toBeLessThan(
       frame.source.indexOf("defineGame"),
     );
@@ -542,7 +537,6 @@ describe("RuntimeInstance protocol boundary", () => {
       { kind: "connection", payload: { kind: "connection", status: "connected" } },
     ]);
     expect(instance.isDestroyed()).toBe(false);
-    // Events are never echoed back to the host.
     expect(messageTypes(port)).not.toContain("game.apiEvent");
   });
 

@@ -25,7 +25,6 @@ export function createFakePort(): FakePort {
   return port;
 }
 
-/** Deliver an incoming message to the port's onmessage handler. */
 export function receiveOnPort(port: FakePort, message: unknown): void {
   port.onmessage?.({ data: message } as MessageEvent);
 }
@@ -56,8 +55,6 @@ export function createFakeFrameFactory(): FakeFrameHost {
         destroyed: false,
         received: [],
       };
-      // The runtime delivers host-pushed events through the same-origin
-      // bridge hook; the double records them for assertions.
       const bridge = {
         receive: (kind: string, payload: unknown) => {
           record.received.push({ kind, payload });

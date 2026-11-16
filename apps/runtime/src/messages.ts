@@ -1,10 +1,4 @@
-/**
- * Outgoing runtime-plane message construction.
- *
- * Every message the runtime sends is built here and validated against the
- * shared protocol schemas before it leaves the runtime (threat model T10;
- * engineering rules 15/21 — never emit an unvalidated message).
- */
+/** Validate every outgoing runtime message against shared protocol schemas. */
 import {
   PROTOCOL_VERSION,
   assertRuntimeMessage,
@@ -22,7 +16,6 @@ import {
   type RuntimeErrorMessage,
 } from "@rocketcrab/protocol";
 
-/** Unique message ID for one runtime-plane message (envelope requirement). */
 export function newMessageId(): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
     return crypto.randomUUID();
@@ -30,7 +23,6 @@ export function newMessageId(): string {
   return `msg-${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
 }
 
-/** Epoch-millisecond timestamp for the message envelope. */
 export function nowSentAt(): number {
   return Date.now();
 }
@@ -39,7 +31,6 @@ type GameLifecycleEvent = GameLifecycleEventMessage["event"];
 type RuntimeConsoleLevel = RuntimeConsoleMessage["level"];
 type RuntimeErrorMessageCategory = RuntimeErrorMessage["category"];
 
-/** Build and validate a `runtime.ready` message. */
 export function buildReadyMessage(runtimeInstanceId: string, sessionId?: string) {
   return assertRuntimeMessage(
     runtimeReadinessMessageSchema.parse({
@@ -54,7 +45,6 @@ export function buildReadyMessage(runtimeInstanceId: string, sessionId?: string)
   );
 }
 
-/** Build and validate a `runtime.pong` message. */
 export function buildPongMessage(runtimeInstanceId: string, sessionId?: string) {
   return assertRuntimeMessage(
     runtimePongMessageSchema.parse({
@@ -68,7 +58,6 @@ export function buildPongMessage(runtimeInstanceId: string, sessionId?: string) 
   );
 }
 
-/** Build and validate a `game.lifecycle` event message. */
 export function buildLifecycleMessage(
   runtimeInstanceId: string,
   event: GameLifecycleEvent,
@@ -89,7 +78,6 @@ export function buildLifecycleMessage(
   );
 }
 
-/** Build and validate a `game.registration` message. */
 export function buildRegistrationMessage(
   runtimeInstanceId: string,
   registration: Omit<
@@ -111,7 +99,6 @@ export function buildRegistrationMessage(
   );
 }
 
-/** Build and validate a `runtime.error` message. */
 export function buildErrorMessage(
   runtimeInstanceId: string,
   category: RuntimeErrorMessageCategory,
@@ -134,7 +121,6 @@ export function buildErrorMessage(
   );
 }
 
-/** Build and validate a `runtime.console` message. */
 export function buildConsoleMessage(
   runtimeInstanceId: string,
   level: RuntimeConsoleLevel,
@@ -157,12 +143,6 @@ export function buildConsoleMessage(
   );
 }
 
-/**
- * Build and validate a `game.apiCall` message: a Nova API call the game
- * forwarded through the injected bridge, already validated against
- * `novaApiCallSchemas`. The host session router
- * routes it into the player's NovaSession over the transport.
- */
 export function buildApiCallMessage(
   runtimeInstanceId: string,
   method: NovaApiCallMethod,
