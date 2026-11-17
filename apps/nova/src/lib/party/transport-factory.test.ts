@@ -183,7 +183,7 @@ describe("tunnel fallback wiring", () => {
   });
 });
 
-describe("connection outcome beacons (PLAN.md §8.2)", () => {
+describe("connection outcome beacons", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
   });

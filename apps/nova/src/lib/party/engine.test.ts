@@ -2965,7 +2965,7 @@ describe("party engine — relay diagnostics surfacing (rocketcrab-ont.1)", () =
   });
 });
 
-describe("party engine — peer-link alert (PLAN.md §7 stages 2 and 4)", () => {
+describe("party engine — peer-link alert", () => {
   afterEach(() => {
     transportFactoryMocks.createTrysteroPartyTransportFactory.mockReset();
   });
@@ -3176,7 +3176,7 @@ describe("party engine — peer-link alert (PLAN.md §7 stages 2 and 4)", () => 
   });
 });
 
-describe("party engine — §10 review: lifecycle cleanup", () => {
+describe("party engine — lifecycle cleanup", () => {
   it("re-arms a reconnect on resume when hiding cancelled the retry and the room is idle", async () => {
     const world = makeWorld();
     const lifecycle = createMemoryLifecycleSource();

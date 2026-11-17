@@ -3,7 +3,7 @@
 The single tracker for remaining work (see `AGENTS.md`). The connectivity
 program's full plan and evidence are archived in
 [`docs/history/nova-connectivity-plan-2026-11.md`](docs/history/nova-connectivity-plan-2026-11.md).
-Code comments that cite `PLAN.md §n` refer to that archive. Earlier programs
+Earlier programs
 are in `docs/history/nova-simplification-evidence.md`.
 
 ## Goal and rules (owner direction)
@@ -122,10 +122,6 @@ Record results in `docs/testing/trystero-connectivity-findings.md` and
 - **Replayed action IDs** after an authority migration can report `accepted`
   for an action whose rejection ack was lost (archive §3.7). Rare; fixing it
   changes the wire format.
-- **Owner decision:** `docs/api/nova-api-ai-reference.md` (embedded in the
-  master prompt) implies raw reliable/ordered options hold on real parties
-  (they degrade) and calls the minimal game "9 lines" (it is 5). Changing it
-  changes the shipped prompt.
 
 ## Cleanup
 
