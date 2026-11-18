@@ -1,12 +1,15 @@
 import { jsonError } from "./http";
 
-export interface LogEnv {
-  CONNECTION_EVENTS?: {
-    writeDataPoint(point: { blobs: string[]; doubles: number[] }): void;
-  };
-}
-
-const outcomes = ["direct", "turn", "tunnel", "failed", "unknown"];
+const outcomes = [
+  "direct",
+  "turn",
+  "tunnel",
+  "failed",
+  "unknown",
+  "lobby-ready",
+  "join-failed",
+  "game-ready",
+];
 const errors = [
   "",
   "room-full",
@@ -54,7 +57,7 @@ const fields = [
 ];
 const MAX_BYTES = 1024;
 
-export async function handleLog(request: Request, env: LogEnv): Promise<Response> {
+export async function handleLog(request: Request): Promise<Response> {
   // Bound streamed bodies even when Content-Length is absent or false.
   const reader = request.body?.getReader();
   if (!reader) return jsonError(400, "invalid_body", "event required");
@@ -98,22 +101,7 @@ export async function handleLog(request: Request, env: LogEnv): Promise<Response
       !/^(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})\.(0|[1-9]\d{0,2})$/.test(event.app_version)
     )
       throw new Error();
-    if (!env.CONNECTION_EVENTS) return jsonError(503, "unavailable", "analytics unavailable");
-    try {
-      env.CONNECTION_EVENTS.writeDataPoint({
-        blobs: [
-          event.outcome as string,
-          event.error_code as string,
-          event.signaling_ok ? "true" : "false",
-          event.browser as string,
-          event.network as string,
-          event.app_version,
-        ],
-        doubles: [event.ms_to_connect],
-      });
-    } catch {
-      return jsonError(503, "unavailable", "analytics unavailable");
-    }
+    console.log({ event: "nova_connection", ...event });
     return new Response(null, { status: 204 });
   } catch {
     return jsonError(400, "invalid_body", "invalid event");

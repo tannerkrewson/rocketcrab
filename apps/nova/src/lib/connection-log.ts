@@ -1,7 +1,16 @@
 import { version } from "../../package.json";
 import { edgeOrigin } from "./edge";
 
-const outcomes = ["direct", "turn", "tunnel", "failed", "unknown"] as const;
+const outcomes = [
+  "direct",
+  "turn",
+  "tunnel",
+  "failed",
+  "unknown",
+  "lobby-ready",
+  "join-failed",
+  "game-ready",
+] as const;
 const errors = [
   "",
   "room-full",

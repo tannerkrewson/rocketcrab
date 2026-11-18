@@ -6,6 +6,7 @@ import {
   type PartySession,
   type PartyTransportFactory,
 } from "@rocketcrab/party";
+import { reportConnection } from "../connection-log";
 import {
   connectionErrorCategory,
   connectionErrorMessage,
@@ -90,6 +91,7 @@ export class PartySetup {
     const identity = this.state.identity;
     const normalizedInput = input;
     this.state.lastSetup = { kind: "join-invite", input: normalizedInput };
+    const startedAt = performance.now();
     this.state.phase = "joining";
     this.state.joinStage = "discovering";
     this.state.phaseDetail = "Joining the party from your invite…";
@@ -130,6 +132,12 @@ export class PartySetup {
         return; // cancelled while waiting — leaveParty already cleaned up
       }
       this.state.observedJoinFailure = null;
+      reportConnection({
+        outcome: "lobby-ready",
+        error_code: "",
+        ms_to_connect: Math.round(performance.now() - startedAt),
+        signaling_ok: this.state.signalingConnected === true,
+      });
       this.state.phase = "lobby";
       this.state.phaseDetail = null;
       this.state.joinStage = null;
@@ -146,6 +154,14 @@ export class PartySetup {
         );
       this.services().game.askForClassicRoom();
     } catch (error) {
+      if (!setup.signal.aborted) {
+        reportConnection({
+          outcome: "join-failed",
+          error_code: "",
+          ms_to_connect: Math.round(performance.now() - startedAt),
+          signaling_ok: this.state.signalingConnected === true,
+        });
+      }
       await this.finishFailedSetup(setup, error);
     } finally {
       if (this.state.setupAbort === setup) this.state.setupAbort = null;

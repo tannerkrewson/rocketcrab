@@ -4,7 +4,7 @@
  * Browser endpoints:
  *   POST /turn          mint a Cloudflare Realtime TURN credential (turn.ts)
  *   POST /              Classic room-creation CORS relay (relay.ts)
- *   POST /log           privacy-limited connection analytics (log.ts)
+ *   POST /log           privacy-limited connection events (log.ts)
  *   GET /signal/:room   WebSocket signaling through a per-room Durable Object
  *   GET /tunnel/:pair   WebSocket fallback tunnel between two peers (tunnel.ts)
  *
@@ -14,7 +14,7 @@
  */
 import { jsonError } from "./http";
 import { handleRelay } from "./relay";
-import { handleLog, type LogEnv } from "./log";
+import { handleLog } from "./log";
 import { handleTurn, type TurnEnv } from "./turn";
 export { SignalHub } from "./signal";
 export { TunnelPair } from "./tunnel";
@@ -28,7 +28,7 @@ interface ObjectNamespace {
   get(id: unknown): { fetch(request: Request): Promise<Response> };
 }
 
-export interface EdgeEnv extends TurnEnv, LogEnv {
+export interface EdgeEnv extends TurnEnv {
   /** Comma-separated exact origins allowed to call the Worker. */
   ORIGIN_ALLOWLIST?: string;
   /** Per-IP limit for costly routes: `/turn` and the Classic relay. */

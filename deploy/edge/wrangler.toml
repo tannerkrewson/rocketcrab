@@ -7,10 +7,6 @@ compatibility_date = "2026-08-01"
 workers_dev = true
 preview_urls = false
 
-[[analytics_engine_datasets]]
-binding = "CONNECTION_EVENTS"
-dataset = "connection_events"
-
 [[durable_objects.bindings]]
 name = "SIGNAL_HUB"
 class_name = "SignalHub"

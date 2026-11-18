@@ -4,6 +4,7 @@ import type { NovaSessionEvent } from "@rocketcrab/nova-api";
 import { createNovaSession } from "@rocketcrab/nova-api";
 import { toApiEvent } from "../arena/api-events";
 import { findClassicGame } from "../classic";
+import { reportConnection } from "../connection-log";
 import { updatePartyDisplayName } from "./identity";
 import { PartySimulationExecutor, PartyStateExecutor } from "./party-executors";
 import type { PartySourceSpec } from "./engine-types";
@@ -428,6 +429,12 @@ export class PartyGameLifecycle {
         this.state.startGaveUp = false;
         this.state.gameStarted = true;
         this.state.phase = "playing";
+        reportConnection({
+          outcome: "game-ready",
+          error_code: "",
+          ms_to_connect: 0,
+          signaling_ok: this.state.signalingConnected === true,
+        });
         this.state.phaseDetail = null;
         this.services().snapshot.addNotice("info", "The game started.");
         this.services().snapshot.emit();
