@@ -12,10 +12,9 @@
  * Trystero terminology, authority roles, or hosting concepts.
  *
  * The session supports readiness, game start/end, player lists, connection
- * status, dispatch, state subscriptions, raw channels, simulation inputs,
- * and logging over the transport. State and simulation modes add authority election,
- * action application, snapshots and the simulation clock on top (see the
- * state and simulation engines).
+ * status, dispatch, state subscriptions, raw channels, controls and logging
+ * over the transport. State mode adds authority election, action application,
+ * the tick and snapshots on top (see the state engine).
  */
 import type {
   NovaTransport,
@@ -34,7 +33,6 @@ import {
   rawRatePerSecond,
   rawMessageWarnBytes,
   rawWarnRatePerSecond,
-  simulationInputRatePerSecond,
   controlsBytes,
   tickRateDefault,
   type GameEndReason,
@@ -50,7 +48,6 @@ import {
 import { NOVA_PROTOCOL_CHANNEL } from "./constants";
 import { NovaError, endedMessage, toErrorCode } from "./errors";
 import { NOVA_API_VERSION } from "./version";
-import { newInputId } from "./ids";
 import {
   buildActionAckMessage,
   buildActionDispatchMessage,
@@ -64,8 +61,6 @@ import {
   buildPlayerIdentityMessage,
   buildRawChannelCloseMessage,
   buildRawChannelMessage,
-  buildSimulationInputMessage,
-  buildSimulationSnapshotMessage,
   buildStateResyncMessage,
   buildStateSnapshotMessage,
   buildStateViewMessage,
@@ -83,15 +78,6 @@ import {
   type StateViewEnvelope,
 } from "./state-engine";
 import { LocalGameExecutor, type NovaStateExecutor } from "./state-executor";
-import {
-  LocalSimulationExecutor,
-  NovaSimulationEngine,
-  type NovaSimulationExecutor,
-  type RetainedSimulationSnapshot,
-  type SimulationEngineEvent,
-  type SimulationEngineHost,
-  type SimulationSnapshotEnvelope,
-} from "./simulation-engine";
 import type {
   NovaAction,
   NovaActionAck,
@@ -101,10 +87,6 @@ import type {
   NovaRawChannelSpec,
   NovaRawDiagnostics,
   NovaRawSendOptions,
-  NovaSimulationDiagnostics,
-  NovaSimulationHandlers,
-  NovaSimulationInput,
-  NovaSimulationSnapshot,
   NovaStateDiagnostics,
   NovaStateHandlers,
 } from "./types";
@@ -113,7 +95,6 @@ import {
   isBinaryPayload,
   novaActionSchema,
   novaRawChannelSpecSchema,
-  novaSimulationInputSchema,
 } from "./validation";
 
 /** Options for {@link NovaSession}. */
@@ -141,14 +122,6 @@ export interface NovaSessionOptions {
    */
   readonly stateExecutor?: NovaStateExecutor;
   /**
-   * The simulation-mode executor. The arena injects a frame executor
-   * that asks the authority's game frame to serialize its simulation state
-   * (`nova.simulation.register({ serializeState })`); when omitted, the
-   * in-process handlers registered through `nova.simulation.register` run
-   * directly (contract suite / tests).
-   */
-  readonly simulationExecutor?: NovaSimulationExecutor;
-  /**
    * Decides whether a `game.start` request from another member starts the
    * game. The elected authority asks it for each request; a request it
    * rejects is ignored and reported as a session error. Omitted means every
@@ -156,19 +129,6 @@ export interface NovaSessionOptions {
    * engine accepts only the host, once every member has the game source.
    */
   readonly acceptStartRequest?: (memberId: string) => boolean;
-  /**
-   * Simulation-mode configuration. Defaults follow the protocol
-   * limits; values are clamped into the Nova bounds (see
-   * `@rocketcrab/protocol` limits) so games can never exceed them.
-   */
-  readonly simulation?: {
-    /** Simulation time step in ms (default 100 = 10 Hz; 16..500). */
-    readonly tickMs?: number;
-    /** Snapshot cadence in ms (default 1000; 50..10000). */
-    readonly snapshotIntervalMs?: number;
-    /** Epoch-ms clock (tests inject a fake). */
-    readonly now?: () => number;
-  };
   /**
    * Authority election timings (ADR-0007). Defaults follow the protocol
    * limits; tests inject small deterministic values with fake timers.
@@ -301,11 +261,6 @@ export class NovaSession implements NovaClientBackend {
   private readonly injectedExecutor: NovaStateExecutor | undefined;
   private stateHandlers: NovaStateHandlers | null = null;
 
-  /** The simulation engine (simulation mode; inert in other modes). */
-  private readonly simulationEngine: NovaSimulationEngine;
-  private readonly injectedSimulationExecutor: NovaSimulationExecutor | undefined;
-  /** True after a rate-limited input was reported, until a send succeeds. */
-  private simulationInputThrottled = false;
   /** Every player's latest controls (filled on the authority; ticks read it). */
   private readonly controlsByMember = new Map<string, unknown>();
   /** This player's controls as last set, and as last sent to the authority. */
@@ -358,7 +313,6 @@ export class NovaSession implements NovaClientBackend {
     this.sessionId = options.sessionId;
     this.game = options.game;
     this.injectedExecutor = options.stateExecutor;
-    this.injectedSimulationExecutor = options.simulationExecutor;
     this.acceptStartRequest = options.acceptStartRequest ?? (() => true);
     const memberId = options.player.memberId;
     this.selfPlayer = {
@@ -374,7 +328,6 @@ export class NovaSession implements NovaClientBackend {
       host: this.engineHost,
       executor: this.injectedExecutor ?? new LocalGameExecutor(null),
       selfMemberId: memberId,
-      simulation: options.game.mode === "simulation",
       ...(options.authority?.now !== undefined ? { now: options.authority.now } : {}),
       ...(options.authority?.heartbeatIntervalMs !== undefined
         ? { heartbeatIntervalMs: options.authority.heartbeatIntervalMs }
@@ -388,23 +341,6 @@ export class NovaSession implements NovaClientBackend {
       ...(options.authority?.restoreWindowMs !== undefined
         ? { restoreWindowMs: options.authority.restoreWindowMs }
         : {}),
-    });
-    this.simulationEngine = new NovaSimulationEngine({
-      host: this.simulationHost,
-      executor: this.injectedSimulationExecutor ?? new LocalSimulationExecutor(null),
-      selfMemberId: memberId,
-      ...(options.simulation?.tickMs !== undefined ? { tickMs: options.simulation.tickMs } : {}),
-      ...(options.simulation?.snapshotIntervalMs !== undefined
-        ? { snapshotIntervalMs: options.simulation.snapshotIntervalMs }
-        : {}),
-      ...(options.authority?.restoreWindowMs !== undefined
-        ? { restoreWindowMs: options.authority.restoreWindowMs }
-        : {}),
-      ...(options.simulation?.now !== undefined
-        ? { now: options.simulation.now }
-        : options.authority?.now !== undefined
-          ? { now: options.authority.now }
-          : {}),
     });
   }
 
@@ -438,24 +374,6 @@ export class NovaSession implements NovaClientBackend {
   /** State-size and action-rate diagnostics (host/arena visible). */
   getStateModeDiagnostics(): NovaStateDiagnostics {
     return this.engine.getDiagnostics();
-  }
-
-  /** Simulation diagnostics (host/arena visible). */
-  getSimulationDiagnostics(): NovaSimulationDiagnostics {
-    return this.simulationEngine.getDiagnostics();
-  }
-
-  /**
-   * The latest replicated authoritative simulation snapshot this shell
-   * retains (host-side only — the game frame receives it through
-   * `nova.simulation`'s `onSnapshot`). Null before the first snapshot.
-   */
-  getSimulationSnapshot(): {
-    tick: number;
-    state: unknown;
-    stateHash: string | null;
-  } | null {
-    return this.simulationEngine.getLatestSnapshot();
   }
 
   /** Raw-mode traffic diagnostics (host/arena visible). */
@@ -595,9 +513,8 @@ export class NovaSession implements NovaClientBackend {
       clearTimeout(timer);
     }
     this.dispatchRetryTimers.clear();
-    // A left session can deliver nothing, so its clock and snapshot cadence
-    // stop here; otherwise they keep ticking and queue snapshots forever.
-    this.simulationEngine.end();
+    // A left session can deliver nothing, so its tick stops here.
+    this.engine.setTickRate(null);
     await this.transport.leave();
   }
 
@@ -628,19 +545,10 @@ export class NovaSession implements NovaClientBackend {
   private async startAsAuthority(): Promise<void> {
     const initialized = await this.engine.initializeAsAuthority();
     if (!initialized || this.ended || this.disposed) return;
-    if (this.game.mode === "simulation") {
-      // The initial authority's simulation engine starts producing
-      // snapshots (no canonical state to create in simulation mode).
-      this.simulationEngine.onAuthorityChanged(this.selfPlayer.id, this.engine.getTerm());
-    }
     await this.sendProtocol((base) => buildGameStartMessage(base));
     if (this.startEmitted) return;
     this.startEmitted = true;
     this.emit({ type: "start" });
-    if (this.game.mode === "simulation") {
-      // Every session runs its own local clock from game start.
-      this.simulationEngine.begin();
-    }
   }
 
   /**
@@ -651,7 +559,6 @@ export class NovaSession implements NovaClientBackend {
     if (this.ended) return;
     this.ended = true;
     this.engine.endGame();
-    this.simulationEngine.end();
     void this.sendProtocol((base) => buildGameEndMessage(base, reason)).catch((error: unknown) =>
       this.emitError(error),
     );
@@ -663,7 +570,6 @@ export class NovaSession implements NovaClientBackend {
     if (this.disposed) return;
     this.disposed = true;
     this.engine.dispose();
-    this.simulationEngine.dispose();
     if (this.controlsTimer !== null) clearTimeout(this.controlsTimer);
     for (const unsubscribe of this.transportUnsubscribers) {
       unsubscribe();
@@ -905,20 +811,6 @@ export class NovaSession implements NovaClientBackend {
   }
 
   /**
-   * Signal that the game registered simulation handlers. In-process
-   * games pass the handlers so the session can run `serializeState` for
-   * snapshot production; the frame bridge never sends functions, and the
-   * arena injects a frame executor that talks to the authority's frame
-   * instead.
-   */
-  registerSimulation(handlers?: NovaSimulationHandlers): void {
-    this.assertAlive();
-    if (handlers !== undefined && this.injectedSimulationExecutor === undefined) {
-      this.simulationEngine.setExecutor(new LocalSimulationExecutor(handlers));
-    }
-  }
-
-  /**
    * The tick rate this player's game frame declared (hosts pass it from the
    * frame's registration). Every frame runs the same game, so every session
    * agrees; only the authority ticks.
@@ -974,55 +866,6 @@ export class NovaSession implements NovaClientBackend {
       }
     }
     return controls;
-  }
-
-  sendSimulationInput(input: NovaSimulationInput): void {
-    this.assertAlive();
-    assertValidSchema(
-      novaSimulationInputSchema.safeParse(input),
-      "nova.simulation.sendInput options failed validation.",
-    );
-    assertStructuredCloneSafe(input.payload, "nova.simulation.sendInput payload");
-    if (!this.simulationEngine.recordInputSent()) {
-      // Report the first drop of a streak, not every one: a game sending on
-      // every animation frame or pointer move would otherwise flood onError
-      // and the party notices with one error per frame.
-      if (this.simulationInputThrottled) return;
-      this.simulationInputThrottled = true;
-      throw new NovaError(
-        "rate_limited",
-        `nova.simulation.sendInput is over the ${simulationInputRatePerSecond} inputs/second limit, so inputs are dropped until the rate falls. Send an input when it changes (a key goes down or up), or at most once per onTick, not on every animation frame or pointer move.`,
-      );
-    }
-    this.simulationInputThrottled = false;
-    this.consumeGameBytes(rawPayloadBytes(input));
-    const seq = (this.nextSeq += 1);
-    const inputId = newInputId();
-    void this.sendProtocol(
-      (base) =>
-        buildSimulationInputMessage(base, {
-          seq,
-          inputId,
-          inputType: input.type,
-          payload: input.payload,
-          targetTick: input.tick,
-        }),
-      { seq },
-    ).catch((error: unknown) => this.emitError(error));
-    // Local loop-back: the sender's own frame receives its input exactly
-    // like every other player's (a uniform onInput contract — the game
-    // applies every input, including its own, in onInput/onTick; the
-    // transport never loops a broadcast back to its sender).
-    this.simulationEngine.handleInputReceived();
-    this.emit({
-      type: "simulationInput",
-      input: {
-        type: input.type,
-        payload: input.payload,
-        ...(input.tick !== undefined ? { tick: input.tick } : {}),
-        sender: this.player,
-      },
-    });
   }
 
   onEvent(handler: (event: NovaSessionEvent) => void): () => void {
@@ -1097,13 +940,8 @@ export class NovaSession implements NovaClientBackend {
     }
     // State-mode late join: the authority hands the new shell the current canonical
     // state (migration copy) and computes the new player's selected view.
-    // Simulation-mode late join: the authority sends its latest authoritative
-    // snapshot (the joiner restores from it and starts).
     if (this.started && this.engine.isAuthorityElect()) {
-      if (this.game.mode === "simulation") {
-        const snapshot = this.simulationEngine.getCatchUpSnapshot();
-        if (snapshot !== null) this.sendSimulationSnapshot(snapshot, peer.memberId);
-      } else if (this.engine.getCanonicalState() !== null) {
+      if (this.engine.getCanonicalState() !== null) {
         this.sendCatchUp(peer.memberId, joined.name);
       }
     }
@@ -1228,10 +1066,6 @@ export class NovaSession implements NovaClientBackend {
           this.startEmitted = true;
           this.engine.beginGame();
           this.emit({ type: "start" });
-          if (this.game.mode === "simulation") {
-            // Every session runs its own local clock from game start.
-            this.simulationEngine.begin();
-          }
           break;
         }
         // A start request from another admitted member. The lowest eligible
@@ -1369,41 +1203,6 @@ export class NovaSession implements NovaClientBackend {
           observed: peerMessage.observed,
         });
         break;
-      case "simulation.input":
-        this.simulationEngine.handleInputReceived(peerMessage.sentAt);
-        this.emit({
-          type: "simulationInput",
-          input: {
-            type: peerMessage.inputType,
-            payload: peerMessage.payload,
-            ...(peerMessage.targetTick !== undefined ? { tick: peerMessage.targetTick } : {}),
-            sender: this.playerOf(peerMessage.senderMemberId),
-          },
-        });
-        break;
-      case "simulation.snapshot": {
-        const retained = this.simulationEngine.handleSnapshot({
-          tick: peerMessage.tick,
-          term: peerMessage.term,
-          authorityMemberId: peerMessage.authorityMemberId,
-          stateHash: peerMessage.stateHash ?? null,
-          state: peerMessage.state,
-          senderMemberId: message.senderMemberId,
-        });
-        if (retained === null) break;
-        if (!this.startEmitted) {
-          // A late joiner starts from the targeted catch-up snapshot.
-          this.startEmitted = true;
-          this.engine.beginGame();
-          this.simulationEngine.begin();
-          this.emit({ type: "start" });
-        }
-        this.emit({
-          type: "simulationSnapshot",
-          snapshot: toNovaSimulationSnapshot(retained),
-        });
-        break;
-      }
       case "raw.channel":
         // Peer channel declarations are recorded so channel lifecycle works
         // across the party: the session knows which names are in use, peer
@@ -1549,57 +1348,6 @@ export class NovaSession implements NovaClientBackend {
   private noteActionAck(actionId: string): void {
     this.inflightDispatches.delete(actionId);
     this.clearDispatchRetry(actionId);
-  }
-
-  /** The transport-facing half the simulation engine uses to send/emit. */
-  private get simulationHost(): SimulationEngineHost {
-    return {
-      players: () => this.players,
-      sendSnapshot: (snapshot, targetMemberId) =>
-        this.sendSimulationSnapshot(snapshot, targetMemberId),
-      emit: (event) => this.handleSimulationEvent(event),
-    };
-  }
-
-  private handleSimulationEvent(event: SimulationEngineEvent): void {
-    switch (event.type) {
-      case "tick":
-        this.emit({ type: "simulationTick", tick: event.tick });
-        break;
-      case "restored":
-        this.emit({
-          type: "simulationSnapshot",
-          snapshot: toNovaSimulationSnapshot(event.snapshot),
-        });
-        break;
-      case "error":
-        this.emit({ type: "error", error: new NovaError(toErrorCode(event.code), event.message) });
-        break;
-    }
-  }
-
-  /** Send a simulation snapshot (broadcast, or targeted at one shell). */
-  private sendSimulationSnapshot(
-    snapshot: SimulationSnapshotEnvelope,
-    targetMemberId?: string,
-  ): void {
-    const seq = this.takeSeq();
-    const options: { targetMemberId?: string } = {};
-    if (targetMemberId !== undefined) {
-      options.targetMemberId = targetMemberId;
-    }
-    void this.sendProtocol(
-      (base) =>
-        buildSimulationSnapshotMessage(base, {
-          seq,
-          tick: snapshot.tick,
-          ...(snapshot.stateHash !== null ? { stateHash: snapshot.stateHash } : {}),
-          term: snapshot.term,
-          authorityMemberId: snapshot.authorityMemberId,
-          state: snapshot.state,
-        }),
-      options,
-    ).catch((error: unknown) => this.emitError(error));
   }
 
   /** The transport-facing half the state engine uses to send and emit. */
@@ -1791,11 +1539,6 @@ export class NovaSession implements NovaClientBackend {
         this.flushDispatchBuffer();
         // The new authority has never seen this player's controls.
         this.flushControls(true);
-        if (this.game.mode === "simulation") {
-          // Authority changes notify the simulation loop (restore after
-          // migration / follower snapshot pushes).
-          this.simulationEngine.onAuthorityChanged(event.authorityMemberId, event.term);
-        }
         // Host-side only: the arena displays authority migration, but the
         // game-facing client ignores this event.
         this.emit({
@@ -1969,15 +1712,6 @@ export class NovaSession implements NovaClientBackend {
 
 function toNovaPlayer(player: PlayerRecord): NovaPlayer {
   return { id: player.id, name: player.name };
-}
-
-/** Map a retained engine snapshot onto the game-facing snapshot shape. */
-function toNovaSimulationSnapshot(snapshot: RetainedSimulationSnapshot): NovaSimulationSnapshot {
-  return {
-    tick: snapshot.tick,
-    state: snapshot.state,
-    ...(snapshot.stateHash !== null ? { stateHash: snapshot.stateHash } : {}),
-  };
 }
 
 /**

@@ -9,14 +9,12 @@
 import {
   actionTimeoutMs,
   type GameApiEvent,
-  type SimulationResponse,
   type StateRequest,
   type StateResponse,
 } from "@rocketcrab/protocol";
 import type {
   NovaGameContext,
   NovaPlayer,
-  NovaSimulationExecutor,
   NovaStateExecutor,
   NovaStateStateResult,
   NovaStateViewResult,
@@ -25,11 +23,6 @@ import type {
 
 interface PendingRequest {
   settle: (result: StateResponse) => void;
-  timer: ReturnType<typeof setTimeout>;
-}
-
-interface SimulationPendingRequest {
-  settle: (result: SimulationResponse) => void;
   timer: ReturnType<typeof setTimeout>;
 }
 
@@ -180,90 +173,5 @@ export class FrameStateExecutor implements NovaStateExecutor {
       this.pushEvent({ kind: "stateRequest", requestId, request });
     });
     return result;
-  }
-}
-
-export interface FrameSimulationResponsePayload {
-  requestId: string;
-  result: SimulationResponse;
-}
-
-export function createFrameSimulationExecutor(
-  pushEvent: (event: GameApiEvent) => void,
-  timeoutMs: number = actionTimeoutMs,
-): FrameSimulationExecutor {
-  return new FrameSimulationExecutor(pushEvent, timeoutMs);
-}
-
-/**
- * Correlate simulation serialization requests with authority-frame replies.
- * Drop late replies; a timeout yields execution_timeout so the simulation
- * engine can skip the snapshot and keep running.
- */
-export class FrameSimulationExecutor implements NovaSimulationExecutor {
-  private readonly pending = new Map<string, SimulationPendingRequest>();
-  private disposed = false;
-
-  constructor(
-    private readonly pushEvent: (event: GameApiEvent) => void,
-    private readonly timeoutMs: number = actionTimeoutMs,
-  ) {}
-
-  serializeState(): Promise<
-    | { readonly ok: true; readonly state: unknown }
-    | { readonly ok: false; readonly code: string; readonly message: string }
-  > {
-    const requestId = newRequestId().replace(/^state-/u, "simulation-");
-    const result = new Promise<
-      | { readonly ok: true; readonly state: unknown }
-      | { readonly ok: false; readonly code: string; readonly message: string }
-    >((resolve) => {
-      const timer = setTimeout(() => {
-        this.pending.delete(requestId);
-        resolve({
-          ok: false,
-          code: "execution_timeout",
-          message: "The authority frame did not answer the simulation request in time.",
-        });
-      }, this.timeoutMs);
-      this.pending.set(requestId, {
-        settle: (response: SimulationResponse) => {
-          if (response.ok) {
-            resolve({ ok: true, state: response.state });
-          } else {
-            resolve({ ok: false, code: response.code, message: response.message });
-          }
-        },
-        timer,
-      });
-      this.pushEvent({ kind: "simulationRequest", requestId });
-    });
-    return result;
-  }
-
-  handleResponse(payload: FrameSimulationResponsePayload): void {
-    if (this.disposed) return;
-    const request = this.pending.get(payload.requestId);
-    if (request === undefined) {
-      return; // Ignore responses to settled or timed-out requests.
-    }
-    this.pending.delete(payload.requestId);
-    clearTimeout(request.timer);
-    request.settle(payload.result);
-  }
-
-  dispose(): void {
-    if (this.disposed) return;
-    this.disposed = true;
-    for (const request of this.pending.values()) {
-      clearTimeout(request.timer);
-      request.settle({
-        kind: "error",
-        ok: false,
-        code: "execution_failed",
-        message: "The frame executor was disposed.",
-      });
-    }
-    this.pending.clear();
   }
 }

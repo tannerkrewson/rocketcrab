@@ -58,26 +58,6 @@ export interface ArenaStateDiagnostics {
   readonly actionRatePerSecond: number;
 }
 
-/** Live diagnostics from the authority session. */
-export interface ArenaSimulationDiagnostics {
-  readonly tick: number;
-  /** The configured tick interval in ms (the Nova-provided time step). */
-  readonly tickMs: number;
-  readonly snapshotIntervalMs: number;
-  /** The last authoritative tick learned from a snapshot, or null. */
-  readonly authorityTick: number | null;
-  readonly snapshotsReceived: number;
-  /** Inputs delivered per second over the last 10-second window. */
-  readonly inputRatePerSecond: number;
-  /** Average input delivery latency in ms, or null. */
-  readonly inputLatencyMs: number | null;
-  /** True when input latency crossed the high-latency threshold. */
-  readonly highLatency: boolean;
-  /** Local-clock drift in ticks vs. the authority's snapshot clock. */
-  readonly driftTicks: number;
-  readonly term: number;
-}
-
 /** Snapshot of the whole arena, re-emitted after every change. */
 export interface ArenaState {
   readonly status: "starting" | "running" | "stopped" | "failed";
@@ -90,8 +70,6 @@ export interface ArenaState {
   readonly startedAt: number | null;
   /** Last committed state diagnostics, or null before the first commit. */
   readonly stateDiagnostics: ArenaStateDiagnostics | null;
-  /** Authority-session simulation diagnostics, or null. */
-  readonly simulationDiagnostics: ArenaSimulationDiagnostics | null;
   readonly summary: ArenaSummary;
   /** The session id labeling every message of this run. */
   readonly sessionId: string;

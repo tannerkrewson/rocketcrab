@@ -2,10 +2,7 @@ import type { NovaAction } from "@rocketcrab/nova-api";
 import { RuntimeHostClient, type RuntimeHostEvent } from "../runtime-host";
 import { arenaApiCallSchemas } from "../arena/api-calls";
 import type { ArenaLogEntry } from "../arena/types";
-import type {
-  FrameSimulationResponsePayload,
-  FrameStateResponsePayload,
-} from "../arena/state-executor";
+import type { FrameStateResponsePayload } from "../arena/state-executor";
 import type { PartyEngineContext } from "./engine-context";
 import type { PartyEngineServices } from "./engine-services";
 import { errorMessage } from "./engine-utils";
@@ -330,41 +327,10 @@ export class PartyRuntime {
         }
         break;
       }
-      case "simulation.register":
-        if (arenaApiCallSchemas["simulation.register"].safeParse(payload).success) {
-          session.registerSimulation();
-        }
-        break;
-      case "simulation.sendInput": {
-        const parsed = arenaApiCallSchemas["simulation.sendInput"].safeParse(payload);
-        if (parsed.success) {
-          try {
-            session.sendSimulationInput(parsed.data.input);
-          } catch (error) {
-            this.services().snapshot.addNotice(
-              "error",
-              `nova.simulation.sendInput() failed: ${errorMessage(error)}`,
-            );
-            const code =
-              error instanceof Error && "code" in error ? String(error.code) : "invalid_options";
-            this.state.runtime?.pushApiEvent({ kind: "error", code, message: errorMessage(error) });
-          }
-        }
-        break;
-      }
       case "stateResponse": {
         const parsed = arenaApiCallSchemas.stateResponse.safeParse(payload);
         if (parsed.success) {
           this.state.stateExecutor?.handleResponse(parsed.data as FrameStateResponsePayload);
-        }
-        break;
-      }
-      case "simulationResponse": {
-        const parsed = arenaApiCallSchemas.simulationResponse.safeParse(payload);
-        if (parsed.success) {
-          this.state.simulationExecutor?.handleResponse(
-            parsed.data as FrameSimulationResponsePayload,
-          );
         }
         break;
       }
@@ -405,21 +371,6 @@ export class PartyRuntime {
     }
     // Followers do not set session.isStarted(); gameStarted tracks received starts too.
     this.deliverStartToFrame();
-    // A simulation frame that boots mid-game (a late joiner's catch-up arrived
-    // first, or the frame reloaded) resumes from the latest snapshot. On the
-    // authority this matters most: its next snapshot would otherwise publish
-    // the fresh frame's initial state to everyone.
-    const snapshot = session.getSimulationSnapshot();
-    if (this.state.frameStartDelivered && snapshot !== null) {
-      runtime.pushApiEvent({
-        kind: "simulationSnapshot",
-        snapshot: {
-          tick: snapshot.tick,
-          state: snapshot.state,
-          ...(snapshot.stateHash !== null ? { stateHash: snapshot.stateHash } : {}),
-        },
-      });
-    }
   }
 
   clearRuntimeLogs(): void {

@@ -25,7 +25,7 @@ describe("gameDeclarationSchema", () => {
     expect(
       gameDeclarationSchema.safeParse({
         title: "Card Game",
-        gameMode: "simulation",
+        gameMode: "raw",
         gameVersion: "1.2.3",
       }).success,
     ).toBe(true);
@@ -80,17 +80,9 @@ describe("novaApiCallSchemas", () => {
       }).success,
     ).toBe(true);
     expect(novaApiCallSchemas["raw.close"].safeParse({ name: "chat" }).success).toBe(true);
-    expect(
-      novaApiCallSchemas["simulation.sendInput"].safeParse({
-        input: { type: "move", tick: 3 },
-      }).success,
-    ).toBe(true);
-    expect(
-      novaApiCallSchemas.simulationResponse.safeParse({
-        requestId: "sim-1",
-        result: { kind: "state", ok: true, state: { puck: { x: 1 } } },
-      }).success,
-    ).toBe(true);
+    expect(novaApiCallSchemas["controls.set"].safeParse({ controls: { left: true } }).success).toBe(
+      true,
+    );
   });
 
   it("rejects malformed forwarded calls", () => {
@@ -108,16 +100,10 @@ describe("novaApiCallSchemas", () => {
     ).toBe(false);
     expect(novaApiCallSchemas["raw.send"].safeParse({ name: "chat" }).success).toBe(false);
     expect(novaApiCallSchemas["raw.close"].safeParse({ name: "x".repeat(65) }).success).toBe(false);
-    expect(
-      novaApiCallSchemas["simulation.sendInput"].safeParse({ input: { type: "move", tick: -1 } })
-        .success,
-    ).toBe(false);
-    expect(
-      novaApiCallSchemas.simulationResponse.safeParse({
-        requestId: "sim-1",
-        result: { kind: "view", ok: true, view: {} },
-      }).success,
-    ).toBe(false);
+    expect(novaApiCallSchemas["controls.set"].safeParse({ controls: null }).success).toBe(true);
+    expect(novaApiCallSchemas["controls.set"].safeParse({ controls: 1, extra: 1 }).success).toBe(
+      false,
+    );
   });
 });
 
@@ -228,6 +214,7 @@ function runBridge(): ExecutedFrame {
     setTimeout,
     clearTimeout,
     structuredClone,
+    TextEncoder,
     crypto,
     Uint8Array,
     ArrayBuffer,
@@ -323,20 +310,11 @@ describe("NOVA_BRIDGE_SCRIPT executed in a frame-like context", () => {
     bridge.nova.raw.createChannel({ name: "chat" });
     bridge.nova.raw.send("chat", { hi: 1 }, { to: "member-2" });
     bridge.nova.raw.close("chat");
-    bridge.nova.simulation.register({ serializeState: () => ({ t: 1 }) });
-    bridge.nova.simulation.sendInput({ type: "jump" });
+    bridge.nova.controls.set({ jump: true });
     await settle();
     const calls = reports.filter((r) => r.kind in novaApiCallSchemas);
     expect(calls.map((r) => r.kind).sort()).toEqual(
-      [
-        "dispatch",
-        "raw.close",
-        "raw.createChannel",
-        "raw.send",
-        "ready",
-        "simulation.register",
-        "simulation.sendInput",
-      ].sort(),
+      ["dispatch", "raw.close", "raw.createChannel", "raw.send", "ready", "controls.set"].sort(),
     );
     for (const call of calls) {
       const schema = novaApiCallSchemas[call.kind as keyof typeof novaApiCallSchemas];

@@ -218,12 +218,12 @@ describe("RuntimeInstance registration", () => {
 
   it("falls back to the host-declared title and mode", () => {
     const { port } = setup({
-      bootstrap: bootstrapMessage({ gameTitle: "Host Title", gameMode: "simulation" }),
+      bootstrap: bootstrapMessage({ gameTitle: "Host Title", gameMode: "raw" }),
     });
     hook().report("defineGame", { options: {} });
     const registration = runtimeMessage(port, "game.registration");
     expect(registration?.title).toBe("Host Title");
-    expect(registration?.gameMode).toBe("simulation");
+    expect(registration?.gameMode).toBe("raw");
   });
 
   it("uses a safe default title when neither side supplied one", () => {
@@ -430,28 +430,21 @@ describe("RuntimeInstance protocol boundary", () => {
     hook().report("raw.createChannel", { spec: { name: "chat" } });
     hook().report("raw.send", { name: "chat", payload: "hi", options: { to: "member-2" } });
     hook().report("raw.close", { name: "chat" });
-    hook().report("simulation.register", {});
-    hook().report("simulation.sendInput", { input: { type: "move", tick: 3 } });
+    hook().report("controls.set", { controls: { left: true } });
     hook().report("stateResponse", {
       requestId: "state-1",
       result: { kind: "view", ok: true, view: { hand: "ace" } },
     });
-    hook().report("simulationResponse", {
-      requestId: "sim-1",
-      result: { kind: "state", ok: true, state: { puck: { x: 1 } } },
-    });
     const calls = port.sent.filter((m) => (m as { type: string }).type === "game.apiCall");
-    expect(calls).toHaveLength(9);
+    expect(calls).toHaveLength(7);
     const byMethod = new Map(calls.map((m) => [(m as { method: string }).method, m]));
     expect([...byMethod.keys()].sort()).toEqual([
+      "controls.set",
       "dispatch",
       "raw.close",
       "raw.createChannel",
       "raw.send",
       "ready",
-      "simulation.register",
-      "simulation.sendInput",
-      "simulationResponse",
       "stateResponse",
     ]);
     expect((byMethod.get("dispatch") as { payload: unknown }).payload).toEqual({

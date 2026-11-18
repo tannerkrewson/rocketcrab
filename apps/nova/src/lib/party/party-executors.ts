@@ -1,9 +1,7 @@
 import {
   LocalGameExecutor,
-  LocalSimulationExecutor,
   type NovaGameContext,
   type NovaPlayer,
-  type NovaSimulationExecutor,
   type NovaStateExecutor,
   type NovaStateStateResult,
   type NovaStateViewResult,
@@ -11,10 +9,7 @@ import {
 } from "@rocketcrab/nova-api";
 import type { RuntimeHostClient } from "../runtime-host";
 import {
-  createFrameSimulationExecutor,
   createFrameStateExecutor,
-  type FrameSimulationExecutor,
-  type FrameSimulationResponsePayload,
   type FrameStateExecutor,
   type FrameStateResponsePayload,
 } from "../arena/state-executor";
@@ -73,38 +68,6 @@ export class PartyStateExecutor implements NovaStateExecutor {
   }
 
   handleResponse(payload: FrameStateResponsePayload): void {
-    this.frame.handleResponse(payload);
-  }
-
-  dispose(): void {
-    this.frame.dispose();
-  }
-}
-
-/**
- * The party's simulation executor: forwards `simulationRequest` apiEvents to
- * the frame (the game's `serializeState` snapshot callback) and correlates
- * `simulationResponse`s. Falls back to the no-handler local executor when no
- * runtime frame exists (classic games, or a boot failure).
- */
-export class PartySimulationExecutor implements NovaSimulationExecutor {
-  private readonly frame: FrameSimulationExecutor;
-  private readonly local = new LocalSimulationExecutor(null);
-  private readonly runtime: () => RuntimeHostClient | null;
-
-  constructor(runtime: () => RuntimeHostClient | null) {
-    this.runtime = runtime;
-    this.frame = createFrameSimulationExecutor((event) => runtime()?.pushApiEvent(event));
-  }
-
-  serializeState(): Promise<
-    | { readonly ok: true; readonly state: unknown }
-    | { readonly ok: false; readonly code: string; readonly message: string }
-  > {
-    return this.runtime() !== null ? this.frame.serializeState() : this.local.serializeState();
-  }
-
-  handleResponse(payload: FrameSimulationResponsePayload): void {
     this.frame.handleResponse(payload);
   }
 

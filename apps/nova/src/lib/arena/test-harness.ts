@@ -173,27 +173,3 @@ export function answerStateRequests(channels: FakeChannel[], count: number, base
     }
   }
 }
-
-/** Answer pending simulation requests; call while waiting for the run to settle. */
-export function answerSimulationRequests(
-  channels: FakeChannel[],
-  count: number,
-  baseline = 0,
-): void {
-  for (let index = 0; index < count; index += 1) {
-    const port = channels[baseline + index]!.port1;
-    const requests = port.sent
-      .filter((message) => (message as { type?: string }).type === "game.apiEvent")
-      .map((message) => (message as { event: GameApiEvent }).event)
-      .filter((event) => event.kind === "simulationRequest");
-    for (const event of requests) {
-      deliver(
-        port,
-        apiCallMessage("simulationResponse", {
-          requestId: event.requestId,
-          result: { kind: "state", ok: true, state: { puck: { x: 1, y: 2 } } },
-        }),
-      );
-    }
-  }
-}

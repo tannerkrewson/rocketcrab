@@ -66,14 +66,7 @@ export const NOVA_ERROR_CODES = {
   execution_timeout: "execution_timeout",
   /** The authority runtime failed while executing. */
   execution_failed: "execution_failed",
-  /**
-   * The game did not register a `serializeState` handler, so Nova cannot
-   * produce authoritative simulation snapshots.
-   */
-  no_snapshot_handler: "no_snapshot_handler",
-  /** The game's `serializeState` handler threw. */
-  snapshot_error: "snapshot_error",
-  /** A replicated simulation snapshot failed its hash check. */
+  /** A restored replicated state failed its hash check. */
   invalid_snapshot: "invalid_snapshot",
 } as const;
 

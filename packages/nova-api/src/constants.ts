@@ -20,7 +20,6 @@ export const NOVA_API_SURFACE: readonly string[] = [
   "dispatch",
   "state",
   "raw",
-  "simulation",
   "controls",
 ] as const;
 

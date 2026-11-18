@@ -29,7 +29,6 @@ import {
   novaChannelNameSchema,
   novaGameDeclarationSchema,
   novaRawChannelSpecSchema,
-  novaSimulationInputSchema,
 } from "./validation";
 import { NOVA_ACTION_TIMEOUT_MS } from "./types";
 import type {
@@ -43,10 +42,6 @@ import type {
   NovaRawHandle,
   NovaRawMessage,
   NovaRawSendOptions,
-  NovaSimulationHandle,
-  NovaSimulationHandlers,
-  NovaSimulationInput,
-  NovaSimulationSnapshot,
   NovaStateHandle,
   NovaStateHandlers,
 } from "./types";
@@ -64,10 +59,6 @@ export type NovaSessionEvent =
   | { type: "end"; reason: string }
   | { type: "state"; state: unknown }
   | { type: "rawMessage"; channel: string; message: NovaRawMessage }
-  | { type: "simulationInput"; input: NovaSimulationInput & { sender: NovaPlayer } }
-  | { type: "simulationSnapshot"; snapshot: NovaSimulationSnapshot }
-  /** The local simulation clock advanced one time step. */
-  | { type: "simulationTick"; tick: number }
   /**
    * The game's authority changed. Games never learn which player is
    * authoritative — the event carries the monotonic term only, and the
@@ -142,10 +133,6 @@ export interface NovaClientBackend {
   closeRawChannel(name: string): void;
   /** Send a payload on a raw channel. */
   sendRaw(name: string, payload: unknown, options?: NovaRawSendOptions): void;
-  /** Signal that the game registered simulation handlers. */
-  registerSimulation(handlers?: NovaSimulationHandlers): void;
-  /** Send one simulation input to the party. */
-  sendSimulationInput(input: NovaSimulationInput): void;
   /** Replace this player's controls (a ticking game's input). */
   setControls(value: unknown): void;
   /** Subscribe to inbound events. Returns an unsubscribe function. */
@@ -214,9 +201,8 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
   const errorHandlers = new Set<Handler<NovaError>>();
   const stateHandlers = new Set<Handler<unknown>>();
   const rawHandlers = new Map<string, Set<Handler<NovaRawMessage>>>();
-  let simulationHandlers: NovaSimulationHandlers | null = null;
-  let simulationTick = 0;
 
+  let lastControlsJson: string | null = null;
   const unsubscribeEvents = backend.onEvent((event) => {
     switch (event.type) {
       case "playerJoined":
@@ -273,22 +259,6 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
         callSafely(handlers, event.message);
         break;
       }
-      case "simulationInput":
-        if (simulationHandlers?.onInput !== undefined) {
-          callSafely(new Set([simulationHandlers.onInput]), event.input);
-        }
-        break;
-      case "simulationSnapshot":
-        if (simulationHandlers?.onSnapshot !== undefined) {
-          callSafely(new Set([simulationHandlers.onSnapshot]), event.snapshot);
-        }
-        break;
-      case "simulationTick":
-        simulationTick = event.tick;
-        if (simulationHandlers?.onTick !== undefined) {
-          callSafely(new Set([simulationHandlers.onTick]), event.tick);
-        }
-        break;
       case "error":
         callSafely(errorHandlers, event.error);
         break;
@@ -390,56 +360,6 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
         rawHandlers.set(name, handlers);
       }
       return addHandler(handlers, handler);
-    },
-  };
-
-  const simulationHandle: NovaSimulationHandle = {
-    register(handlers) {
-      const onInput = handlers.onInput;
-      const onSnapshot = handlers.onSnapshot;
-      const onTick = handlers.onTick;
-      const serializeState = handlers.serializeState;
-      if (
-        (onInput !== undefined && typeof onInput !== "function") ||
-        (onSnapshot !== undefined && typeof onSnapshot !== "function") ||
-        (onTick !== undefined && typeof onTick !== "function") ||
-        (serializeState !== undefined && typeof serializeState !== "function")
-      ) {
-        throw new NovaError(
-          "invalid_options",
-          "nova.simulation.register expects onInput/onSnapshot/onTick/serializeState functions.",
-        );
-      }
-      simulationHandlers = handlers;
-      backend.registerSimulation(handlers);
-      return () => {
-        if (simulationHandlers === handlers) {
-          simulationHandlers = null;
-        }
-      };
-    },
-    sendInput(input) {
-      if (ended) throw new NovaError("ended", endedMessage("simulation.sendInput"));
-      if (!started) throw new NovaError("not_started", notStartedMessage("simulation.sendInput"));
-      assertValid(
-        novaSimulationInputSchema.safeParse(input).success,
-        "nova.simulation.sendInput options failed validation.",
-      );
-      assertStructuredCloneSafe(input.payload, "nova.simulation.sendInput payload");
-      // Runtime rejections (rate limit, not connected) arrive via
-      // `nova.onError` so games observe them uniformly in the arena, over
-      // party transports, and in-process (every API failure is a stable NovaError).
-      Promise.resolve()
-        .then(() => backend.sendSimulationInput(input))
-        .catch((error: unknown) => {
-          callSafely(
-            errorHandlers,
-            error instanceof NovaError ? error : new NovaError("invalid_options", String(error)),
-          );
-        });
-    },
-    getTick() {
-      return simulationTick;
     },
   };
 
@@ -575,11 +495,11 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
             `nova.controls.set takes at most ${controlsBytes} bytes of JSON; this value is ${bytes}.`,
           );
         }
+        const json = JSON.stringify(value) ?? "null";
+        if (json === lastControlsJson) return; // games may call this every frame
+        lastControlsJson = json;
         backend.setControls(value);
       },
-    },
-    get simulation() {
-      return simulationHandle;
     },
     dispose() {
       unsubscribeEvents();
@@ -591,7 +511,6 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
       errorHandlers.clear();
       stateHandlers.clear();
       rawHandlers.clear();
-      simulationHandlers = null;
       for (const entry of pendingDispatches.values()) {
         clearTimeout(entry.timer);
         entry.reject(

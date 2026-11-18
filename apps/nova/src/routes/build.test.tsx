@@ -146,7 +146,7 @@ describe("/build?page=prompt — the master-prompt step", () => {
     ).toBeInTheDocument();
 
     expect(screen.getByText("Nova Quiz")).toBeInTheDocument();
-    expect(screen.getByText("state mode")).toBeInTheDocument();
+    expect(screen.getAllByText("state mode")).toHaveLength(2);
     expect(screen.getByText("Nova Drift")).toBeInTheDocument();
     expect(screen.getByText("Chatter (raw mode sample)")).toBeInTheDocument();
 

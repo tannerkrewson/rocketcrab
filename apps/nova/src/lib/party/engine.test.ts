@@ -6,7 +6,6 @@ import {
   type PartyTransportFactory,
 } from "@rocketcrab/party";
 import type { NovaTransport, TransportEventMap } from "@rocketcrab/core";
-import type { NovaSession } from "@rocketcrab/nova-api";
 import { InMemoryTransportHub } from "@rocketcrab/testing";
 import { fromRoomError } from "@rocketcrab/trystero-transport";
 import type { ChannelPort } from "../runtime-host";
@@ -131,7 +130,7 @@ interface HostHarness {
   frames: HTMLIFrameElement[];
   port1: FakePort;
   ready(): void;
-  register(title: string, mode?: PartySourceSpec["mode"]): void;
+  register(title: string, mode?: PartySourceSpec["mode"], tickRate?: number): void;
   apiCall(method: string, payload: unknown): void;
 }
 
@@ -198,7 +197,7 @@ function createHostHarness(): HostHarness {
         status: "ready",
       });
     },
-    register(title: string, mode: PartySourceSpec["mode"] = "state") {
+    register(title: string, mode: PartySourceSpec["mode"] = "state", tickRate?: number) {
       deliver(harness.port1, {
         version: 1,
         runtimeInstanceId: "runtime-1",
@@ -208,6 +207,7 @@ function createHostHarness(): HostHarness {
         gameId: GAME.gameId,
         title,
         gameMode: mode,
+        ...(tickRate !== undefined ? { tickRate } : {}),
       });
     },
     apiCall(method: string, payload: unknown) {
@@ -423,36 +423,7 @@ describe("party engine — game mode and source transitions", () => {
     });
   }
 
-  it("configures simulation for a joiner before registration and delivers inputs on both peers", async () => {
-    const world = makeWorld();
-    const a = makePlayer(world, "a");
-    const b = makePlayer(world, "b");
-    await runCreate(a, world, { ...GAME, mode: "simulation" });
-    const invite = parseInviteFragment(new URL(a.engine.getState().inviteUrl as string).hash)!;
-    const joining = b.engine.joinByInvite({ secret: invite.secret! });
-    await settle(world);
-    await joining;
-    a.harness.ready();
-    b.harness.ready();
-    a.harness.apiCall("simulation.register", {});
-    b.harness.apiCall("simulation.register", {});
-    a.harness.register(GAME.title, "simulation");
-    b.harness.register(GAME.title, "simulation");
-    await settle(world);
-    a.engine.startGame();
-    await settle(world);
-    expect(b.engine.getState().phase).toBe("playing");
-    b.harness.apiCall("simulation.sendInput", { input: { type: "move", payload: { x: 1 } } });
-    await settle(world);
-    expect(events(a, "simulationInput")).not.toHaveLength(0);
-    expect(events(b, "simulationInput")).not.toHaveLength(0);
-    expect(events(a, "stateRequest")).toHaveLength(0);
-    expect(events(b, "stateRequest")).toHaveLength(0);
-    await a.engine.leaveParty();
-    await b.engine.leaveParty();
-  });
-
-  it("switches an existing state-mode party to simulation without resetting on repeated metadata", async () => {
+  it("ticks a game on the host's frame with every player's controls", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
     const b = makePlayer(world, "b");
@@ -461,33 +432,31 @@ describe("party engine — game mode and source transitions", () => {
     const joining = b.engine.joinByInvite({ secret: invite.secret! });
     await settle(world);
     await joining;
-    await registerLocalGame(a, world);
-    await registerLocalGame(b, world);
-    await a.engine.selectGame({ ...GAME, gameId: "game_simulation", mode: "simulation" });
-    await settle(world);
-    expect(b.engine.getState().game?.gameId).toBe("game_simulation");
-    expect(b.engine.getState().game?.mode).toBe("simulation");
-    a.harness.ready();
-    b.harness.ready();
-    a.harness.apiCall("simulation.register", {});
-    b.harness.apiCall("simulation.register", {});
-    a.harness.register(GAME.title, "simulation");
-    b.harness.register(GAME.title, "simulation");
-    await settle(world);
-    // Re-announcing identical metadata must not discard readiness or handlers.
-    await a.engine.selectGame({ ...GAME, gameId: "game_simulation", mode: "simulation" });
-    await settle(world);
-    expect(memberOf(b.engine.getState(), b.memberId).ready).toBe(true);
-    a.harness.ready();
-    a.harness.apiCall("simulation.register", {});
-    a.harness.register(GAME.title, "simulation");
+    for (const player of [a, b]) {
+      player.harness.ready();
+      player.harness.register(GAME.title, "state", 30);
+    }
     await settle(world);
     a.engine.startGame();
     await settle(world);
-    b.harness.apiCall("simulation.sendInput", { input: { type: "move" } });
-    await settle(world);
-    expect(events(a, "simulationInput")).not.toHaveLength(0);
-    expect(events(b, "simulationInput")).not.toHaveLength(0);
+    expect(b.engine.getState().phase).toBe("playing");
+    b.harness.apiCall("controls.set", { controls: { left: true } });
+    await vi.waitFor(
+      async () => {
+        await settle(world);
+        const ticks = events(a, "stateRequest").filter(
+          (message) =>
+            (message as { event: { request: { kind: string } } }).event.request.kind === "tick",
+        ) as Array<{ event: { request: { context: { controls: Record<string, unknown> } } } }>;
+        expect(ticks.at(-1)?.event.request.context.controls[b.memberId]).toEqual({ left: true });
+      },
+      { timeout: 3_000, interval: 20 },
+    );
+    expect(
+      events(b, "stateRequest").some(
+        (m) => (m as { event: { request: { kind: string } } }).event.request.kind === "tick",
+      ),
+    ).toBe(false);
     await a.engine.leaveParty();
     await b.engine.leaveParty();
   });
@@ -884,30 +853,6 @@ describe("party engine — start delivery to a frame instance", () => {
     emitSessionEvent(b, { type: "start" });
     await settle(world);
     expect(frameEvents(b).filter((event) => event.kind === "start")).toHaveLength(1);
-
-    await a.engine.leaveParty();
-    await b.engine.leaveParty();
-    await settle(world);
-  });
-
-  it("resumes a rebooted simulation frame from the latest snapshot, after its start", async () => {
-    const world = makeWorld();
-    const { a, b } = await playingPair(world);
-    const session = (b.engine as unknown as { session: NovaSession }).session;
-    vi.spyOn(session, "getSimulationSnapshot").mockReturnValue({
-      tick: 42,
-      state: { puck: { x: 3 } },
-      stateHash: null,
-    });
-    b.engine.setContainer(null);
-    b.engine.setContainer(b.container);
-    await settle(world);
-    await registerLocalGame(b, world);
-    const sinceReboot = frameEvents(b).slice(-2);
-    expect(sinceReboot).toEqual([
-      { kind: "start" },
-      { kind: "simulationSnapshot", snapshot: { tick: 42, state: { puck: { x: 3 } } } },
-    ]);
 
     await a.engine.leaveParty();
     await b.engine.leaveParty();

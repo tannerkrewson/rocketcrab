@@ -123,8 +123,6 @@ export class PartyConnection {
     if ((await pendingTeardown) === false) this.state.teardownFailed = true;
     this.state.stateExecutor?.dispose();
     this.state.stateExecutor = null;
-    this.state.simulationExecutor?.dispose();
-    this.state.simulationExecutor = null;
     this.state.lastStateApiEvent = null;
     this.state.pendingSource = null;
     this.state.runtimeLogs = [];

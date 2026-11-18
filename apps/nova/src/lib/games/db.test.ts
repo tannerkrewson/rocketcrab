@@ -47,4 +47,22 @@ describe("GamesDatabase", () => {
     });
     expect(await db.games.count()).toBe(1);
   });
+
+  it("turns saved simulation-mode games into state-mode games", async () => {
+    const legacy = new Dexie(`nova-games-simulation-${Date.now()}`);
+    legacy.version(1).stores({
+      games: "id, title, mode, apiVersion, createdAt, updatedAt, lastTestedAt",
+    });
+    await legacy.open();
+    await legacy.table("games").bulkAdd([
+      { id: "drift", title: "Drift", mode: "simulation" },
+      { id: "chat", title: "Chat", mode: "raw" },
+    ]);
+    legacy.close();
+
+    const { db } = createTestGameDatabase(legacy.name);
+    await db.open();
+    expect((await db.games.get("drift"))?.mode).toBe("state");
+    expect((await db.games.get("chat"))?.mode).toBe("raw");
+  });
 });

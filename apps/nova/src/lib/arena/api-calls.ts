@@ -4,7 +4,7 @@
  * by contract, with tests guarding against drift.
  */
 import { z } from "zod";
-import { simulationResponseSchema, stateResponseSchema } from "@rocketcrab/protocol";
+import { stateResponseSchema } from "@rocketcrab/protocol";
 
 export const arenaApiCallSchemas = {
   ready: z.object({}).strict(),
@@ -47,26 +47,10 @@ export const arenaApiCallSchemas = {
     })
     .strict(),
   "controls.set": z.object({ controls: z.unknown() }).strict(),
-  "simulation.register": z.object({}).strict(),
-  "simulation.sendInput": z
-    .object({
-      input: z.object({
-        type: z.string().min(1).max(64),
-        payload: z.unknown().optional(),
-        tick: z.number().int().nonnegative().optional(),
-      }),
-    })
-    .strict(),
   stateResponse: z
     .object({
       requestId: z.string().min(1).max(64),
       result: stateResponseSchema,
-    })
-    .strict(),
-  simulationResponse: z
-    .object({
-      requestId: z.string().min(1).max(64),
-      result: simulationResponseSchema,
     })
     .strict(),
 } as const;

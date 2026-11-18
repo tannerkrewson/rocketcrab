@@ -24,7 +24,7 @@ export const Route = createFileRoute("/party")({
   component: PartyPage,
 });
 
-const GAME_MODES: readonly GameMode[] = ["state", "simulation", "raw"];
+const GAME_MODES: readonly GameMode[] = ["state", "raw"];
 
 interface PartySearch {
   gameId?: string;

@@ -105,7 +105,7 @@ describe("DexieGameRepository", () => {
       title: "Rockets",
       description: "desc",
       html: "<p>x</p>",
-      mode: "simulation",
+      mode: "raw",
     });
     await repository.recordTestResults(original.id, { lastTestedAt: 5, lastTestSucceeded: true });
 
@@ -116,7 +116,7 @@ describe("DexieGameRepository", () => {
     expect(copy.html).toBe(original.html);
     expect(copy.sourceHash).toBe(original.sourceHash);
     expect(copy.sourceBytes).toBe(original.sourceBytes);
-    expect(copy.mode).toBe("simulation");
+    expect(copy.mode).toBe("raw");
     expect(copy.lastTestedAt).toBeUndefined();
     expect(copy.lastTestSucceeded).toBeUndefined();
     expect(copy.createdAt).toBeGreaterThanOrEqual(original.createdAt);

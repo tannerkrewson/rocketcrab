@@ -26,8 +26,6 @@ function fakeBackend(): NovaClientBackend {
     createRawChannel() {},
     closeRawChannel() {},
     sendRaw() {},
-    registerSimulation() {},
-    sendSimulationInput() {},
     setControls() {},
     onEvent(handler) {
       listeners.add(handler);
@@ -56,7 +54,7 @@ describe("nova-api package surface", () => {
       "LocalGameExecutor",
       "MINIMAL_GAME_EXAMPLE",
       "STATE_MODE_EXAMPLE",
-      "SIMULATION_MODE_EXAMPLE",
+      "TICK_EXAMPLE",
       "RAW_MODE_EXAMPLE",
     ];
     for (const name of expected) {

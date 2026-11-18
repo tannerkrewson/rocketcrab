@@ -18,7 +18,7 @@ export function fixture(name: string): string {
 
 export interface GameInput {
   gameId: string;
-  gameMode: "state" | "simulation" | "raw";
+  gameMode: "state" | "raw";
   gameSource: string;
   gameTitle?: string;
   memberId?: string;

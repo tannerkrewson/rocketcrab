@@ -1,7 +1,7 @@
 import { z } from "zod";
 
-/** Game execution modes (ADR-0006 state / simulation / raw modes). */
-export const gameModeSchema = z.enum(["state", "simulation", "raw"]);
+/** Game execution modes (ADR-0006 state / raw modes). */
+export const gameModeSchema = z.enum(["state", "raw"]);
 
 export type GameMode = z.infer<typeof gameModeSchema>;
 

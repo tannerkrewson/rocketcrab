@@ -74,43 +74,29 @@ nova.state.onChange(function (state) {
 nova.ready();
 `;
 
-/** A simulation-mode game: register handlers and send inputs. */
-export const SIMULATION_MODE_EXAMPLE = `// Simulation-mode example: a continuous paddle game. Nova owns the input
-// order, the tick clock, authority selection, and authoritative snapshots;
-// the game owns the rules and its own local simulation copy.
-nova.defineGame({ title: "Pong-ish", mode: "simulation" });
+/** A ticking state-mode game: the authority steps it; players send controls. */
+export const TICK_EXAMPLE = `// Ticking example: every player slides a paddle. Nova runs tick on one
+// player's device 15 times a second and sends the state to everyone.
+nova.defineGame({
+  title: "Paddles",
+  createInitialState: function () {
+    return { paddles: {} };
+  },
+  tick: function (draft, context) {
+    context.players.forEach(function (player) {
+      var paddle = draft.paddles[player.id] || (draft.paddles[player.id] = { x: 50 });
+      var controls = context.controls[player.id] || {};
+      paddle.x += (controls.dx || 0) * 30 * context.dt;
+    });
+  },
+});
 
-var pos = { x: 0, y: 0 };
-var inputs = [];
-
-nova.simulation.register({
-  onInput: function (input) {
-    inputs.push(input); // { type, payload, sender } — apply during the next tick
-  },
-  onTick: function (tick) {
-    // Advance one fixed step (the Nova-provided time step).
-    while (inputs.length > 0) {
-      var input = inputs.shift();
-      if (input.type === "move") {
-        pos.x += input.payload.dx;
-        pos.y += input.payload.dy;
-      }
-    }
-  },
-  onSnapshot: function (snapshot) {
-    // Authoritative correction (or restore after migration): drop local
-    // prediction and adopt the authoritative state.
-    pos = snapshot.state.pos;
-  },
-  serializeState: function () {
-    // Authority side: the snapshot Nova replicates to every player.
-    return { pos: { x: pos.x, y: pos.y } };
-  }
+nova.state.onChange(function (state) {
+  nova.log("paddles", state.paddles);
 });
 
 nova.onStart(function () {
-  // Send inputs as the player acts (here: once at start).
-  nova.simulation.sendInput({ type: "move", payload: { dx: 1, dy: 0 } });
+  nova.controls.set({ dx: 1 }); // hold right
 });
 
 nova.ready();

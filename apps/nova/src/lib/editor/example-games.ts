@@ -1,5 +1,5 @@
 /** Lazy source imports for the example catalog shared by /examples and /build. */
-export type ExampleGameMode = "state" | "simulation" | "raw";
+export type ExampleGameMode = "state" | "raw";
 
 export interface ExampleGame {
   id: string;
@@ -12,7 +12,6 @@ export interface ExampleGame {
 
 export const exampleModeLabel: Record<ExampleGameMode, string> = {
   state: "state mode",
-  simulation: "simulation mode",
   raw: "raw mode",
 };
 
@@ -28,9 +27,9 @@ export const exampleGames: ExampleGame[] = [
   {
     id: "nova-drift",
     title: "Nova Drift",
-    mode: "simulation",
+    mode: "state",
     description:
-      "Every player steers a shared puck with the arrow keys. Showcases simulation mode: ordered inputs, the Nova tick clock, and authoritative snapshots.",
+      "Every player steers a shared puck with the keys or a finger. Showcases a ticking game: controls, a host-run tick, and smooth drawing between ticks.",
     load: () => import("../../../../../examples/games/nova-drift.html?raw"),
   },
   {

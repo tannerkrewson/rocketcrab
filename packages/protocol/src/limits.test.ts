@@ -23,17 +23,6 @@ import {
   rawWarnRatePerSecond,
   runtimeLogRatePerSecond,
   runtimeLogWarnRatePerSecond,
-  simulationHighLatencyMs,
-  simulationInputRatePerSecond,
-  simulationInputWarnRatePerSecond,
-  simulationSnapshotBytes,
-  simulationSnapshotIntervalMs,
-  simulationSnapshotMaxIntervalMs,
-  simulationSnapshotMinIntervalMs,
-  simulationSnapshotWarnBytes,
-  simulationTickMaxMs,
-  simulationTickMinMs,
-  simulationTickMs,
   stateSnapshotBytes,
   stateSnapshotWarnBytes,
 } from "./limits";
@@ -53,16 +42,6 @@ describe("protocol limits", () => {
     expect(actionTimeoutMs).toBe(10_000);
     expect(authorityHeartbeatIntervalMs).toBe(1_000);
     expect(authorityGracePeriodMs).toBe(5_000);
-    // Simulation bounds.
-    expect(simulationTickMs).toBe(100);
-    expect(simulationTickMinMs).toBeLessThan(simulationTickMs);
-    expect(simulationTickMaxMs).toBeGreaterThan(simulationTickMs);
-    expect(simulationSnapshotIntervalMs).toBe(1_000);
-    expect(simulationSnapshotMinIntervalMs).toBeLessThan(simulationSnapshotIntervalMs);
-    expect(simulationSnapshotMaxIntervalMs).toBeGreaterThan(simulationSnapshotIntervalMs);
-    expect(simulationInputRatePerSecond).toBeGreaterThan(actionRatePerSecond);
-    expect(simulationSnapshotBytes).toBe(stateSnapshotBytes);
-    expect(simulationHighLatencyMs).toBeGreaterThan(0);
   });
 
   it("keeps warn thresholds below hard limits", () => {
@@ -76,8 +55,6 @@ describe("protocol limits", () => {
     expect(rawWarnRatePerSecond).toBeLessThan(rawRatePerSecond);
     expect(runtimeLogWarnRatePerSecond).toBeLessThan(runtimeLogRatePerSecond);
     expect(errorReportWarnRatePerSecond).toBeLessThan(errorReportRatePerSecond);
-    expect(simulationInputWarnRatePerSecond).toBeLessThan(simulationInputRatePerSecond);
-    expect(simulationSnapshotWarnBytes).toBeLessThan(simulationSnapshotBytes);
   });
 
   it("exports the complete typed limits table", () => {
@@ -86,11 +63,7 @@ describe("protocol limits", () => {
     expect(LIMITS.errorReportWarnRatePerSecond).toBe(errorReportWarnRatePerSecond);
     expect(LIMITS.rawMessageBytes).toBe(rawMessageBytes);
     expect(LIMITS.rawWarnRatePerSecond).toBe(rawWarnRatePerSecond);
-    expect(LIMITS.simulationTickMs).toBe(simulationTickMs);
-    expect(LIMITS.simulationSnapshotIntervalMs).toBe(simulationSnapshotIntervalMs);
-    expect(LIMITS.simulationInputRatePerSecond).toBe(simulationInputRatePerSecond);
-    expect(LIMITS.simulationSnapshotBytes).toBe(simulationSnapshotBytes);
-    expect(LIMITS.simulationHighLatencyMs).toBe(simulationHighLatencyMs);
+    expect(LIMITS.tickRateDefault).toBeLessThanOrEqual(LIMITS.tickRateMax);
   });
 
   it("enforces the HTML source hard limit in the schema", () => {

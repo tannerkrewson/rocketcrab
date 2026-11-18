@@ -25,7 +25,6 @@ export * from "./client";
 export * from "./session";
 export * from "./state-engine";
 export * from "./state-executor";
-export * from "./simulation-engine";
 export * from "./examples";
 
 export const packageName = "@rocketcrab/nova-api";

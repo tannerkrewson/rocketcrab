@@ -19,7 +19,7 @@ import { NovaError } from "./errors";
 /** Bounded registration options for `nova.defineGame`. */
 export const novaGameDeclarationSchema = z.object({
   title: titleSchema.optional(),
-  mode: z.enum(["state", "simulation", "raw"]).optional(),
+  mode: z.enum(["state", "raw"]).optional(),
   version: z.string().min(1).max(32).optional(),
   apiVersion: z.number().int().min(1).optional(),
   tickRate: z.number().int().min(1).max(tickRateMax).optional(),
@@ -39,13 +39,6 @@ export const novaRawChannelSpecSchema = z.object({
 
 /** Bounded raw channel name for `nova.raw.send` / `onMessage`. */
 export const novaChannelNameSchema = z.string().min(1).max(64);
-
-/** Bounded simulation input shape for `nova.simulation.sendInput`. */
-export const novaSimulationInputSchema = z.object({
-  type: z.string().min(1).max(64),
-  payload: z.unknown().optional(),
-  tick: z.number().int().nonnegative().optional(),
-});
 
 /** True when a payload is binary and travels on the transport binary path. */
 export function isBinaryPayload(payload: unknown): boolean {

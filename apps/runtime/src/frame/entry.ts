@@ -10,7 +10,6 @@ import { LocalGameExecutor } from "@rocketcrab/nova-api/state-executor";
 import type {
   NovaGameContext,
   NovaPlayer,
-  NovaSimulationHandlers,
   NovaStateHandlers,
   NovaTickContext,
 } from "@rocketcrab/nova-api";
@@ -78,10 +77,6 @@ function captureErrorsAndConsole(): void {
   }
 }
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
-
 function install(): void {
   if (window.__novaGameBridge) return;
   captureErrorsAndConsole();
@@ -96,7 +91,6 @@ function install(): void {
       : null;
   const listeners = new Set<(event: NovaSessionEvent) => void>();
   let executor = new LocalGameExecutor(null);
-  let simulation: NovaSimulationHandlers | null = null;
 
   const emit = (event: NovaSessionEvent) => {
     for (const listener of listeners) listener(event);
@@ -131,11 +125,6 @@ function install(): void {
         payload,
         options: options?.to !== undefined ? { to: options.to } : {},
       }),
-    registerSimulation(handlers) {
-      simulation = handlers ?? null;
-      report("simulation.register", {});
-    },
-    sendSimulationInput: (input) => report("simulation.sendInput", { input }),
     setControls: (controls) => report("controls.set", { controls }),
     onEvent(listener) {
       listeners.add(listener);
@@ -192,23 +181,6 @@ function install(): void {
     );
   }
 
-  async function answerSimulationRequest(requestId: string) {
-    const respond = (result: unknown) => report("simulationResponse", { requestId, result });
-    const fail = (code: string, message: string) =>
-      respond({ ok: false, kind: "error", code, message: message.slice(0, 256) });
-    if (simulation?.serializeState === undefined) {
-      fail("no_snapshot_handler", "The game did not register a serializeState handler.");
-      return;
-    }
-    try {
-      const state = await simulation.serializeState();
-      if (state === undefined) fail("no_snapshot_handler", "serializeState returned nothing.");
-      else respond({ ok: true, kind: "state", state });
-    } catch (error) {
-      fail("snapshot_error", errorMessage(error));
-    }
-  }
-
   function receive(kind: string, raw: unknown): void {
     const p = (raw ?? {}) as Payload & Record<string, unknown>;
     switch (kind) {
@@ -217,9 +189,6 @@ function install(): void {
         return;
       case "stateRequest":
         void answerStateRequest(String(p.requestId), p.request as Record<string, unknown>);
-        return;
-      case "simulationRequest":
-        void answerSimulationRequest(String(p.requestId));
         return;
       case "actionAck":
         emit({
@@ -246,9 +215,6 @@ function install(): void {
       case "end":
       case "state":
       case "rawMessage":
-      case "simulationInput":
-      case "simulationSnapshot":
-      case "simulationTick":
         // These host events have the same fields as the client's events.
         emit({ ...p, type: kind } as NovaSessionEvent);
         return;

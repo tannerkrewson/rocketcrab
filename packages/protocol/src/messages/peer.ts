@@ -19,7 +19,7 @@ import { gameEndReasonSchema, gameModeSchema } from "./shared";
  * extends the peer envelope, so each message carries the protocol version,
  * message type, session ID, sender member ID, sender connection ID, unique
  * message ID, and timestamp. Ordered families (actions, state, authority,
- * simulation) additionally require the per-sender monotonic `seq`.
+ * controls) additionally require the per-sender monotonic `seq`.
  *
  * All peer messages travel only inside the private password-protected party room.
  */
@@ -356,38 +356,6 @@ export const authorityElectionMessageSchema = z.object({
 export type AuthorityElectionMessage = z.infer<typeof authorityElectionMessageSchema>;
 
 /**
- * Simulation input: an ordered player input on the shared simulation clock
- * (ADR-0006 simulation mode).
- */
-export const simulationInputMessageSchema = z.object({
-  ...peerEnvelopeFields,
-  seq: monotonicSequenceSchema,
-  type: z.literal("simulation.input"),
-  inputId: z.string().min(1).max(64),
-  inputType: z.string().min(1).max(64),
-  payload: z.unknown(),
-  targetTick: z.number().int().nonnegative().optional(),
-  expiresAtMs: timestampSchema.optional(),
-});
-export type SimulationInputMessage = z.infer<typeof simulationInputMessageSchema>;
-
-/**
- * Simulation snapshot: a periodic authoritative snapshot for restore after
- * migration (ADR-0006 simulation mode).
- */
-export const simulationSnapshotMessageSchema = z.object({
-  ...peerEnvelopeFields,
-  seq: monotonicSequenceSchema,
-  type: z.literal("simulation.snapshot"),
-  tick: z.number().int().nonnegative(),
-  term: z.number().int().min(1),
-  authorityMemberId: memberIdSchema,
-  stateHash: sha256Schema.optional(),
-  state: z.unknown(),
-});
-export type SimulationSnapshotMessage = z.infer<typeof simulationSnapshotMessageSchema>;
-
-/**
  * Player ready announcement: the sender's game
  * finished loading and is ready to play. The sender's identity comes from
  * the peer envelope; the message carries no payload fields.
@@ -469,7 +437,7 @@ export const gameSourceMetadataMessageSchema = z.object({
   title: titleSchema.optional(),
   /** Nova API version the game was built against (`nova.defineGame`). */
   apiVersion: z.number().int().min(1).optional(),
-  /** Execution mode the host will launch (state / simulation / raw). */
+  /** Execution mode the host will launch (state / raw). */
   mode: gameModeSchema.optional(),
   sourceSha256: sha256Schema,
   sourceSizeBytes: z.number().int().nonnegative(),
@@ -512,8 +480,6 @@ export const peerMessagesSchema = z.discriminatedUnion("type", [
   authorityAnnouncementMessageSchema,
   authorityHeartbeatMessageSchema,
   authorityElectionMessageSchema,
-  simulationInputMessageSchema,
-  simulationSnapshotMessageSchema,
   gameReadyMessageSchema,
   gameControlsMessageSchema,
   gameStartMessageSchema,

@@ -18,9 +18,6 @@ import { arenaApiCallSchemas } from "./api-calls";
 import { toApiEvent } from "./api-events";
 import {
   createFrameStateExecutor,
-  createFrameSimulationExecutor,
-  type FrameSimulationExecutor,
-  type FrameSimulationResponsePayload,
   type FrameStateExecutor,
   type FrameStateResponsePayload,
 } from "./state-executor";
@@ -30,7 +27,6 @@ import type {
   ArenaPlayerRunState,
   ArenaRegistration,
   ArenaRunOutcome,
-  ArenaSimulationDiagnostics,
   ArenaState,
   ArenaStateDiagnostics,
   ArenaSummary,
@@ -98,7 +94,6 @@ interface PlayerRuntime {
   transport: InMemoryTransport | null;
   session: NovaSession | null;
   stateExecutor: FrameStateExecutor | null;
-  simulationExecutor: FrameSimulationExecutor | null;
   unsubSession: (() => void) | null;
   runState: ArenaPlayerRunState;
   registered: ArenaRegistration | null;
@@ -160,7 +155,6 @@ export class ArenaEngine {
       latencyMs: this.latencyMs,
       startedAt: this.startedAt,
       stateDiagnostics: this.stateDiagnostics,
-      simulationDiagnostics: this.computeSimulationDiagnostics(players),
       summary,
       sessionId: this.sessionId,
       runId: this.runId,
@@ -331,7 +325,6 @@ export class ArenaEngine {
       runtime.transport = null;
       runtime.session = null;
       runtime.stateExecutor = null;
-      runtime.simulationExecutor = null;
       runtime.unsubSession = null;
       runtime.runState = "pending";
       runtime.registered = null;
@@ -359,7 +352,6 @@ export class ArenaEngine {
       transport: null,
       session: null,
       stateExecutor: null,
-      simulationExecutor: null,
       unsubSession: null,
       runState: "pending",
       registered: null,
@@ -496,10 +488,6 @@ export class ArenaEngine {
     runtime.stateExecutor = createFrameStateExecutor((event) =>
       this.pushApiEvent(runtime.spec.id, event),
     );
-    // Ask the authority frame to serialize its simulation state.
-    runtime.simulationExecutor = createFrameSimulationExecutor((event) =>
-      this.pushApiEvent(runtime.spec.id, event),
-    );
     const session = createNovaSession({
       transport,
       room: this.room,
@@ -511,7 +499,6 @@ export class ArenaEngine {
         ...(this.options.gameTitle !== undefined ? { title: this.options.gameTitle } : {}),
       },
       stateExecutor: runtime.stateExecutor,
-      simulationExecutor: runtime.simulationExecutor,
     });
     session.setTickRate(runtime.tickRate);
     runtime.session = session;
@@ -600,9 +587,6 @@ export class ArenaEngine {
         break;
       case "rawMessage":
       case "state":
-      case "simulationInput":
-      case "simulationSnapshot":
-      case "simulationTick":
       case "actionReceived":
         break;
       case "actionAck":
@@ -740,40 +724,6 @@ export class ArenaEngine {
         }
         break;
       }
-      case "simulation.register": {
-        if (!arenaApiCallSchemas["simulation.register"].safeParse(message.payload).success) {
-          this.logPlayer(
-            runtime.spec.id,
-            "error",
-            "nova.simulation.register() call failed validation at the host; ignored.",
-          );
-          return;
-        }
-        session.registerSimulation();
-        break;
-      }
-      case "simulation.sendInput": {
-        const parsed = arenaApiCallSchemas["simulation.sendInput"].safeParse(message.payload);
-        if (!parsed.success) {
-          this.logPlayer(
-            runtime.spec.id,
-            "error",
-            "nova.simulation.sendInput() call failed validation at the host; ignored.",
-          );
-          return;
-        }
-        try {
-          session.sendSimulationInput(parsed.data.input);
-        } catch (error) {
-          // Rate-limit and connectivity rejections surface as Nova errors
-          // (the frame observes them through nova.onError).
-          this.logPlayer(runtime.spec.id, "error", errorMessage(error));
-          const code =
-            error instanceof Error && "code" in error ? String(error.code) : "invalid_options";
-          this.pushApiEvent(runtime.spec.id, { kind: "error", code, message: errorMessage(error) });
-        }
-        break;
-      }
       case "stateResponse": {
         const parsed = arenaApiCallSchemas.stateResponse.safeParse(message.payload);
         if (!parsed.success) {
@@ -785,19 +735,6 @@ export class ArenaEngine {
           return;
         }
         runtime.stateExecutor?.handleResponse(parsed.data as FrameStateResponsePayload);
-        break;
-      }
-      case "simulationResponse": {
-        const parsed = arenaApiCallSchemas.simulationResponse.safeParse(message.payload);
-        if (!parsed.success) {
-          this.logPlayer(
-            runtime.spec.id,
-            "error",
-            "simulationResponse call failed validation at the host; ignored.",
-          );
-          return;
-        }
-        runtime.simulationExecutor?.handleResponse(parsed.data as FrameSimulationResponsePayload);
         break;
       }
     }
@@ -859,32 +796,6 @@ export class ArenaEngine {
     }
   }
 
-  /** Read live authority-session diagnostics; null before any session connects. */
-  private computeSimulationDiagnostics(
-    players: readonly ArenaPlayer[],
-  ): ArenaSimulationDiagnostics | null {
-    const authorityId = this.computeAuthorityPlayerId(players);
-    for (const runtime of this.players.values()) {
-      const session = runtime.session;
-      if (authorityId !== null && runtime.spec.id !== authorityId) continue;
-      if (session === null) continue;
-      const diag = session.getSimulationDiagnostics();
-      return {
-        tick: diag.tick,
-        tickMs: diag.tickMs,
-        snapshotIntervalMs: diag.snapshotIntervalMs,
-        authorityTick: diag.authorityTick,
-        snapshotsReceived: diag.snapshotsReceived,
-        inputRatePerSecond: diag.inputRatePerSecond,
-        inputLatencyMs: diag.inputLatencyMs,
-        highLatency: diag.highLatency,
-        driftTicks: diag.driftTicks,
-        term: diag.term,
-      };
-    }
-    return null;
-  }
-
   private computeAuthorityPlayerId(players: readonly ArenaPlayer[]): string | null {
     // Disconnected sessions retain stale authority beliefs; only trust connected players.
     for (const runtime of this.players.values()) {
@@ -909,8 +820,6 @@ export class ArenaEngine {
     }
     runtime.stateExecutor?.dispose();
     runtime.stateExecutor = null;
-    runtime.simulationExecutor?.dispose();
-    runtime.simulationExecutor = null;
     runtime.session?.dispose();
     runtime.session = null;
     runtime.transport?.dispose();

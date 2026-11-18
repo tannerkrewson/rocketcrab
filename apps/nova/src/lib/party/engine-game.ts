@@ -6,7 +6,7 @@ import { toApiEvent } from "../arena/api-events";
 import { findClassicGame } from "../classic";
 import { reportConnection } from "../connection-log";
 import { updatePartyDisplayName } from "./identity";
-import { PartySimulationExecutor, PartyStateExecutor } from "./party-executors";
+import { PartyStateExecutor } from "./party-executors";
 import type { PartySourceSpec } from "./engine-types";
 import type { PartyEngineContext, ClassicAnnouncement } from "./engine-context";
 import type { PartyEngineServices } from "./engine-services";
@@ -234,9 +234,7 @@ export class PartyGameLifecycle {
     // Read the current runtime at request time so reboots do not leave stale targets.
     // Executors belong to one session; disposal prevents pending requests crossing sessions.
     this.state.stateExecutor?.dispose();
-    this.state.simulationExecutor?.dispose();
     this.state.stateExecutor = new PartyStateExecutor(() => this.state.runtime);
-    this.state.simulationExecutor = new PartySimulationExecutor(() => this.state.runtime);
     const session = createNovaSession({
       acceptStartRequest: (memberId) => this.acceptStartRequestFrom(memberId),
       transport: party.privateTransport,
@@ -252,7 +250,6 @@ export class PartyGameLifecycle {
         ...(this.state.game?.title !== undefined ? { title: this.state.game.title } : {}),
       },
       stateExecutor: this.state.stateExecutor,
-      simulationExecutor: this.state.simulationExecutor,
     });
     session.setTickRate(this.state.frameTickRate);
     this.state.session = session;
@@ -472,7 +469,7 @@ export class PartyGameLifecycle {
         this.services().snapshot.emit();
         break;
       default:
-        break; // raw/state/simulation events route to the frame only
+        break; // raw and state events route to the frame only
     }
     // Observable events go to the frame; registration replays any snapshot missed before boot.
     const apiEvent = toApiEvent(event);

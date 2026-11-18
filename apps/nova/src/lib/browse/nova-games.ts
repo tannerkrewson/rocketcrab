@@ -1,10 +1,9 @@
 /** Shared mode labels for saved-game details and party overlays. */
 
-export type NovaGameMode = "state" | "simulation" | "raw";
+export type NovaGameMode = "state" | "raw";
 
 const modeLabel: Record<NovaGameMode, string> = {
   state: "state mode",
-  simulation: "simulation mode",
   raw: "raw mode",
 };
 

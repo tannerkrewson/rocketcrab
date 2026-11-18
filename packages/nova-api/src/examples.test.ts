@@ -9,7 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   MINIMAL_GAME_EXAMPLE,
   RAW_MODE_EXAMPLE,
-  SIMULATION_MODE_EXAMPLE,
+  TICK_EXAMPLE,
   STATE_MODE_EXAMPLE,
 } from "./examples";
 import { createInMemoryHarness } from "./harness";
@@ -23,8 +23,7 @@ function runExample(
   memberId: string,
   displayName: string,
   options: {
-    mode?: "state" | "simulation" | "raw";
-    simulation?: { tickMs?: number; snapshotIntervalMs?: number };
+    mode?: "state" | "raw";
   } = {},
 ): NovaSession {
   const transport = harness.createTransport({ memberId, displayName });
@@ -34,7 +33,6 @@ function runExample(
     sessionId: SESSION,
     player: { memberId, displayName },
     game: { gameId: "game-example", mode: options.mode ?? "state", title: "Example Game" },
-    simulation: options.simulation,
   });
   // Syntax + behavior: execute the documented source against the real API.
   new Function("nova", source)(session.client);
@@ -84,7 +82,7 @@ describe("documented examples", () => {
     for (const example of [
       MINIMAL_GAME_EXAMPLE,
       STATE_MODE_EXAMPLE,
-      SIMULATION_MODE_EXAMPLE,
+      TICK_EXAMPLE,
       RAW_MODE_EXAMPLE,
     ]) {
       expect(() => new Function("nova", example)).not.toThrow();
@@ -143,55 +141,26 @@ describe("documented examples", () => {
     }
   });
 
-  it("simulation-mode example routes inputs, advances ticks, and restores snapshots", async () => {
+  it("tick example moves each player's paddle by their controls", async () => {
     const harness = createInMemoryHarness();
-    // Fast deterministic cadence (real timers; the clock is fake-timer free).
-    const timings = {
-      mode: "simulation" as const,
-      simulation: { tickMs: 20, snapshotIntervalMs: 60 },
-    };
-    const a = runExample(harness, SIMULATION_MODE_EXAMPLE, "member-a", "Ada", timings);
-    const b = runExample(harness, SIMULATION_MODE_EXAMPLE, "member-b", "Ben", timings);
+    const a = runExample(harness, TICK_EXAMPLE, "member-a", "Ada");
+    const b = runExample(harness, TICK_EXAMPLE, "member-b", "Ben");
     await a.join();
     await b.join();
     await flush(harness);
     a.start();
     b.start();
-    // Poll with real time + drain: the in-memory hub only delivers on
-    // drain() and the simulation clock is driven by real timers.
-    const waitFor = async (condition: () => boolean, label: string): Promise<void> => {
-      const deadline = Date.now() + 5_000;
-      while (!condition()) {
-        if (Date.now() > deadline) throw new Error(`waitFor ${label} timed out`);
-        await flush(harness);
-        await new Promise((resolve) => setTimeout(resolve, 10));
-      }
-    };
-    // Inputs crossed the transport in both directions (the example sends
-    // once per player at start).
-    await waitFor(
-      () =>
-        b.getSimulationDiagnostics().inputsReceived >= 1 &&
-        a.getSimulationDiagnostics().inputsReceived >= 1,
-      "inputs",
-    );
-    // The Nova-provided clock advances every frame's local simulation.
-    await waitFor(
-      () => a.getSimulationDiagnostics().tick >= 2 && b.getSimulationDiagnostics().tick >= 2,
-      "ticks",
-    );
-    // The authority produces authoritative snapshots (the example's
-    // serializeState callback) and every shell replicates them. The
-    // authority itself never receives its own broadcasts (no loopback),
-    // so its retained snapshot is asserted through `authorityTick`.
-    await waitFor(
-      () =>
-        b.getSimulationDiagnostics().snapshotsReceived >= 1 &&
-        a.getSimulationDiagnostics().authorityTick !== null,
-      "snapshots",
-    );
-    expect(a.getSimulationDiagnostics().authorityMemberId).toBe("member-a");
-    expect(b.getSimulationDiagnostics().authorityMemberId).toBe("member-a");
+    const deadline = Date.now() + 5_000;
+    const paddleX = (session: NovaSession, id: string): number =>
+      (session.getCanonicalState()?.state as { paddles?: Record<string, { x: number }> })
+        ?.paddles?.[id]?.x ?? 0;
+    // Both players hold right from onStart; the authority's tick moves both
+    // paddles, and Ben's copy of the state follows.
+    while (paddleX(b, "member-b") <= 52 || paddleX(b, "member-a") <= 52) {
+      if (Date.now() > deadline) throw new Error("paddles never moved");
+      await flush(harness);
+      await new Promise((resolve) => setTimeout(resolve, 10));
+    }
   });
 
   it("raw-mode example exchanges chat messages between players", async () => {

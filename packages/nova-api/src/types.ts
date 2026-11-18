@@ -3,7 +3,7 @@
  *
  * These types are the contract AI-generated games program against. The API
  * is deliberately small: a handful of concepts (registration, players,
- * lifecycle, state, actions, raw channels, simulation), zero transport or
+ * lifecycle, state, actions, ticks, controls, raw channels), zero transport or
  * hosting vocabulary, and every value that crosses a boundary is plain,
  * structured-clone-compatible data.
  *
@@ -126,7 +126,7 @@ export interface NovaStateHandlers {
 export interface NovaGameDeclaration {
   /** Human-readable game title shown in lobbies. */
   title?: string;
-  /** Execution mode (ADR-0006): "state" (default) | "simulation" | "raw". */
+  /** Execution mode (ADR-0006): "state" (default) | "raw". */
   mode?: GameMode;
   /** The game's own version string (distinct from the Nova API version). */
   version?: string;
@@ -246,66 +246,6 @@ export interface NovaRawMessage {
   readonly binary: boolean;
 }
 
-/** One player input in simulation mode (ADR-0006 simulation mode). */
-export interface NovaSimulationInput {
-  /** Input kind, e.g. "move". Bounded to 1..64 characters. */
-  readonly type: string;
-  /** Input payload; must be JSON-serializable. */
-  readonly payload?: unknown;
-  /** Optional target simulation tick. */
-  readonly tick?: number;
-}
-
-/**
- * One authoritative simulation snapshot. The snapshot state is
- * game-defined plain data: the authority's game produced it through the
- * `serializeState` callback and Nova replicated it to every player. Games
- * restore from a snapshot (correction, late join, or authority migration)
- * by replacing their local simulation state with `snapshot.state`.
- */
-export interface NovaSimulationSnapshot {
-  /** The authoritative simulation tick the snapshot was taken at. */
-  readonly tick: number;
-  /** The serialized simulation state (produced by the game's callback). */
-  readonly state: unknown;
-  /** SHA-256 of the serialized state (verification; best-effort). */
-  readonly stateHash?: string;
-}
-
-/**
- * Handlers a simulation-mode game registers to receive inputs. All handler
- * functions stay in the game's own context (the frame or the in-process
- * client) and are never serialized across a boundary.
- */
-export interface NovaSimulationHandlers {
-  /**
-   * Called for every inbound player input (with the sending player), in
-   * per-sender Nova-assigned order, as it arrives. Games usually queue it
-   * and apply it during the next {@link NovaSimulationHandlers.onTick} step
-   * (local prediction; the authoritative snapshot corrects drift).
-   */
-  onInput?: (input: NovaSimulationInput & { readonly sender: NovaPlayer }) => void;
-  /**
-   * Called when an authoritative simulation snapshot arrives: restore the
-   * local simulation from `snapshot.state` (correction snapshot, late join,
-   * or the snapshot the new authority re-broadcasts after a migration).
-   */
-  onSnapshot?: (snapshot: NovaSimulationSnapshot) => void;
-  /**
-   * Called every simulation time step (the Nova-provided clock): advance
-   * the local simulation one step (fixed timestep). `tick` is this frame's
-   * local clock; authoritative ticks arrive inside snapshots.
-   */
-  onTick?: (tick: number) => void;
-  /**
-   * Authority-side snapshot production: return the current simulation
-   * state serialized as plain data. Nova calls this on the authority's
-   * frame at the snapshot cadence (and after a migration) and broadcasts
-   * the result to every player.
-   */
-  serializeState?: () => unknown;
-}
-
 /** The `nova.state` handle: read and subscribe to canonical state. */
 export interface NovaStateHandle {
   /** Current canonical state, or null before any state has been received. */
@@ -374,63 +314,6 @@ export interface NovaRawDiagnostics {
 }
 
 /**
- * Simulation-mode diagnostics (host/arena visible). Values reflect this
- * session's simulation engine.
- */
-export interface NovaSimulationDiagnostics {
-  /** The local simulation tick (advanced by the Nova-provided clock). */
-  readonly tick: number;
-  /** The configured tick interval in ms (the Nova-provided time step). */
-  readonly tickMs: number;
-  /** The configured snapshot interval in ms. */
-  readonly snapshotIntervalMs: number;
-  /** The last authoritative tick learned from a snapshot (or null). */
-  readonly authorityTick: number | null;
-  /** The current authority's member id, or null when none is known. */
-  readonly authorityMemberId: string | null;
-  /** Current authority term (monotonic; ADR-0007). */
-  readonly term: number;
-  /** Epoch ms the last snapshot was received, or null. */
-  readonly lastSnapshotAt: number | null;
-  /** Age in ms of the latest snapshot (null before the first). */
-  readonly snapshotAgeMs: number | null;
-  /** Inputs sent by this session (rate-bounded). */
-  readonly inputsSent: number;
-  /** Inputs received from every player. */
-  readonly inputsReceived: number;
-  /** Inputs rejected by the rate limit. */
-  readonly rateLimitRejections: number;
-  /** Inputs delivered per second over the last 10-second window. */
-  readonly inputRatePerSecond: number;
-  /** Average input delivery latency (send → local receive) in ms. */
-  readonly inputLatencyMs: number | null;
-  /** True when input latency crossed the high-latency threshold. */
-  readonly highLatency: boolean;
-  /** Local-clock drift in ticks vs. the authority's snapshot clock. */
-  readonly driftTicks: number;
-  /** Snapshots received from the authority. */
-  readonly snapshotsReceived: number;
-  /** Serialized size in bytes of the latest snapshot (or null). */
-  readonly snapshotSizeBytes: number | null;
-}
-
-/** The `nova.simulation` handle (ADR-0006 simulation mode). */
-export interface NovaSimulationHandle {
-  /**
-   * Register the game's simulation input handlers. Returns an unsubscribe
-   * function. Call during setup, before the game starts.
-   */
-  register(handlers: NovaSimulationHandlers): () => void;
-  /** Send one player input to the party. Only available after start. */
-  sendInput(input: NovaSimulationInput): void;
-  /**
-   * The current local simulation tick (interpolation hook). 0 before the
-   * clock starts.
-   */
-  getTick(): number;
-}
-
-/**
  * The complete game-facing API object (`window.nova`).
  *
  * Lifecycle: call {@link defineGame} once at startup, subscribe to events,
@@ -484,8 +367,6 @@ export interface NovaApi {
   readonly state: NovaStateHandle;
   /** Raw-mode channels (raw mode). */
   readonly raw: NovaRawHandle;
-  /** Simulation inputs (simulation mode). */
-  readonly simulation: NovaSimulationHandle;
   /**
    * This player's controls for a ticking game: what they are doing right
    * now (buttons held, joystick, pointer). The authority's `tick` reads them

@@ -4,7 +4,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { ArenaEngine, type ArenaEngineOptions, type ArenaPlayerSpec } from "./engine";
 import type { ArenaState } from "./types";
 import {
-  answerSimulationRequests,
   answerStateRequests,
   apiCallMessage,
   createHarness,
@@ -339,35 +338,6 @@ describe("ArenaEngine — happy path", () => {
         ),
       ).toBe(true);
     });
-  });
-
-  it("runs a simulation-mode game: snapshots flow through the authority frame (A1)", async () => {
-    const harness = createHarness();
-    mountContainers(harness, 2);
-    const engine = createEngine(harness, { gameMode: "simulation" });
-    engine.start();
-    await runToStart(harness.channels, 2);
-
-    await vi.waitFor(() => {
-      answerSimulationRequests(harness.channels, 2);
-      const snapshot = engine.getSnapshot();
-      expect(snapshot.players.every((player) => player.runState === "started")).toBe(true);
-    });
-    await vi.waitFor(
-      () => {
-        answerSimulationRequests(harness.channels, 2);
-        const diag = engine.getSnapshot().simulationDiagnostics;
-        expect(diag).not.toBeNull();
-        expect(diag?.authorityTick).not.toBeNull();
-        expect(diag?.tickMs).toBe(100);
-        expect(diag?.snapshotIntervalMs).toBe(1_000);
-      },
-      { timeout: 5_000, interval: 20 },
-    );
-    const tickEvents = apiEventsOf(harness, 1).filter((event) => event.kind === "simulationTick");
-    expect(tickEvents.length).toBeGreaterThan(0);
-    const requests = apiEventsOf(harness, 0).filter((event) => event.kind === "simulationRequest");
-    expect(requests.length).toBeGreaterThan(0);
   });
 });
 

@@ -22,8 +22,3 @@ export function nowSentAt(): number {
 export function newActionId(): string {
   return `action-${newMessageId()}`;
 }
-
-/** Unique input id for one `simulation.input` (deduplication, ADR-0006). */
-export function newInputId(): string {
-  return `input-${newMessageId()}`;
-}

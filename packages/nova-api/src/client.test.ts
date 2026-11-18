@@ -50,12 +50,6 @@ function makeClient(overrides: Partial<NovaClientBackend> = {}): {
     sendRaw() {
       calls.push("sendRaw");
     },
-    registerSimulation() {
-      calls.push("registerSimulation");
-    },
-    sendSimulationInput() {
-      calls.push("sendSimulationInput");
-    },
     setControls() {
       calls.push("setControls");
     },
@@ -97,7 +91,7 @@ describe("createNovaClient lifecycle", () => {
   it("registers a valid game and forwards it to the backend", () => {
     const { client, calls } = makeClient();
     expect(client.version).toBe(1);
-    client.defineGame({ title: "My Game", mode: "simulation", version: "1.0.0" });
+    client.defineGame({ title: "My Game", mode: "raw", version: "1.0.0" });
     expect(calls).toEqual(["register"]);
     expectNovaError(() => client.defineGame({}), "already_registered");
   });
@@ -106,6 +100,23 @@ describe("createNovaClient lifecycle", () => {
     const { client } = makeClient();
     expectNovaError(() => client.defineGame({ apiVersion: 99 }), "unsupported_api_version");
     expectNovaError(() => client.defineGame({ apiVersion: 2 }), "unsupported_api_version");
+  });
+
+  it("declares a tick and its rate, and forwards controls", () => {
+    const { client, calls, backend } = makeClient();
+    let declared: NovaGameDeclaration | undefined;
+    backend.register = (declaration) => {
+      declared = declaration;
+    };
+    client.defineGame({ title: "T", tick() {} });
+    expect(declared?.tickRate).toBe(15); // a tick always declares its rate
+    client.controls.set({ left: true });
+    expect(calls).toContain("setControls");
+    expectNovaError(() => makeClient().client.defineGame({ tickRate: 0 }), "invalid_options");
+    expectNovaError(
+      () => makeClient().client.defineGame({ tick: 5 as unknown as () => void }),
+      "invalid_options",
+    );
   });
 
   it("rejects invalid registration options", () => {
@@ -125,7 +136,6 @@ describe("createNovaClient lifecycle", () => {
     expectNovaError(() => client.dispatch({ type: "x" }), "not_started");
     expectNovaError(() => client.raw.createChannel({ name: "chat" }), "not_started");
     expectNovaError(() => client.raw.send("chat", "hi"), "not_started");
-    expectNovaError(() => client.simulation.sendInput({ type: "move" }), "not_started");
 
     // After registration, before start.
     client.defineGame({ title: "T" });
@@ -258,10 +268,8 @@ describe("createNovaClient lifecycle", () => {
       () => client.dispatch({ type: "x", payload: new Uint8Array([1]) }),
       "invalid_payload",
     );
-    expectNovaError(
-      () => client.simulation.sendInput({ type: "x", payload: new Uint8Array([1]) }),
-      "invalid_payload",
-    );
+    expectNovaError(() => client.controls.set(new Uint8Array([1])), "invalid_payload");
+    expectNovaError(() => client.controls.set({ big: "x".repeat(2000) }), "payload_too_large");
     expectNovaError(() => client.raw.createChannel({ name: "nova.protocol" }), "reserved_channel");
     expectNovaError(() => client.raw.createChannel({ name: "x".repeat(65) }), "invalid_options");
     expectNovaError(() => client.raw.close("x".repeat(65)), "invalid_options");
@@ -305,7 +313,6 @@ describe("createNovaClient lifecycle", () => {
     emit({ type: "end", reason: "user_exit" });
     expectNovaError(() => client.dispatch({ type: "x" }), "ended");
     expectNovaError(() => client.raw.send("chat", "hi"), "ended");
-    expectNovaError(() => client.simulation.sendInput({ type: "x" }), "ended");
     expectNovaError(() => client.ready(), "ended");
   });
 
@@ -363,33 +370,6 @@ describe("createNovaClient lifecycle", () => {
     });
     expect(chat).toEqual(["hi"]);
     expect(other).toHaveLength(0);
-  });
-
-  it("routes simulation events to registered handlers", () => {
-    const { client, emit } = makeClient();
-    const inputs: unknown[] = [];
-    const snapshots: unknown[] = [];
-    const unsubscribe = client.simulation.register({
-      onInput: (input) => inputs.push(input),
-      onSnapshot: (snapshot) => snapshots.push(snapshot),
-    });
-    emit({
-      type: "simulationInput",
-      input: {
-        type: "move",
-        payload: { dx: 1 },
-        sender: { id: "member-b", name: "Ben" },
-      },
-    });
-    emit({ type: "simulationSnapshot", snapshot: { tick: 5, state: { x: 1 } } });
-    expect(inputs).toHaveLength(1);
-    expect(snapshots).toEqual([{ tick: 5, state: { x: 1 } }]);
-    unsubscribe();
-    emit({
-      type: "simulationInput",
-      input: { type: "move", sender: { id: "member-b", name: "Ben" } },
-    });
-    expect(inputs).toHaveLength(1);
   });
 
   it("forwards errors to onError handlers and disposes cleanly", () => {

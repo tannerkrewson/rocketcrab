@@ -18,12 +18,6 @@ export function toApiEvent(event: NovaSessionEvent): GameApiEvent | null {
       return { kind: "state", state: event.state };
     case "rawMessage":
       return { kind: "rawMessage", channel: event.channel, message: event.message };
-    case "simulationInput":
-      return { kind: "simulationInput", input: event.input };
-    case "simulationSnapshot":
-      return { kind: "simulationSnapshot", snapshot: event.snapshot };
-    case "simulationTick":
-      return { kind: "simulationTick", tick: event.tick };
     case "error":
       return { kind: "error", code: event.error.code, message: event.error.message };
     case "actionAck":

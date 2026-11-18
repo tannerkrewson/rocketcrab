@@ -36,10 +36,7 @@ export const NOVA_API_CALL_METHODS = [
   "raw.close",
   "raw.send",
   "controls.set",
-  "simulation.register",
-  "simulation.sendInput",
   "stateResponse",
-  "simulationResponse",
 ] as const;
 
 export type NovaApiCallMethod = (typeof NOVA_API_CALL_METHODS)[number];
@@ -155,45 +152,6 @@ export const stateResponseSchema = z.discriminatedUnion("kind", [
 export type StateResponse = z.infer<typeof stateResponseSchema>;
 
 /**
- * The frame's answer to a `simulationRequest` — the serialized
- * simulation state the authority's game produced through its snapshot
- * callback (`nova.simulation.register({ serializeState })`), or a stable
- * rejection.
- */
-export const simulationResponseSchema = z.discriminatedUnion("kind", [
-  z
-    .object({
-      kind: z.literal("state"),
-      ok: z.literal(true),
-      state: z.unknown(),
-    })
-    .strict(),
-  z
-    .object({
-      kind: z.literal("error"),
-      ok: z.literal(false),
-      code: z.string().min(1).max(64),
-      message: z.string().max(256),
-    })
-    .strict(),
-]);
-export type SimulationResponse = z.infer<typeof simulationResponseSchema>;
-
-/**
- * The host asks the authority's game frame to serialize its current
- * simulation state (periodic snapshot production; the state itself is
- * game-defined — Nova only carries and replicates it). The game answers
- * with a `simulationResponse` apiCall.
- */
-export const simulationRequestEventSchema = z
-  .object({
-    kind: z.literal("simulationRequest"),
-    requestId: z.string().min(1).max(64),
-  })
-  .strict();
-export type SimulationRequestEvent = z.infer<typeof simulationRequestEventSchema>;
-
-/**
  * Action acks pushed into the dispatcher's frame so `nova.dispatch`
  * promises resolve when the authority applies or rejects the action.
  */
@@ -233,30 +191,6 @@ export const gameApiEventSchema = z.discriminatedUnion("kind", [
       }),
     })
     .strict(),
-  z
-    .object({
-      kind: z.literal("simulationInput"),
-      input: z.object({
-        type: z.string().min(1).max(64),
-        payload: z.unknown().optional(),
-        tick: z.number().int().nonnegative().optional(),
-        sender: novaPlayerSchema,
-      }),
-    })
-    .strict(),
-  z.object({
-    kind: z.literal("simulationSnapshot"),
-    snapshot: z.object({
-      tick: z.number().int().nonnegative(),
-      state: z.unknown(),
-      stateHash: sha256Schema.optional(),
-    }),
-  }),
-  simulationRequestEventSchema,
-  z.object({
-    kind: z.literal("simulationTick"),
-    tick: z.number().int().nonnegative(),
-  }),
   z.object({
     kind: z.literal("error"),
     code: z.string().min(1).max(64),

@@ -144,17 +144,17 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
       title: "Rocket Rumble",
       description: "Blast off with friends.",
       html: SAVED_HTML,
-      mode: "simulation",
+      mode: "raw",
     });
     renderAt(`/game/${game.id}`);
 
     expect(await screen.findByRole("heading", { name: "Rocket Rumble" })).toBeInTheDocument();
-    expect(screen.getByText(/simulation mode · saved/)).toBeInTheDocument();
+    expect(screen.getByText(/raw mode · saved/)).toBeInTheDocument();
     expect(screen.getByText("Blast off with friends.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /select game/i })).not.toBeInTheDocument();
     const start = screen.getByRole("link", { name: /Start party/ });
     expect(start.getAttribute("href")).toBe(
-      `/party?gameId=${game.id}&mode=simulation&title=Rocket+Rumble`,
+      `/party?gameId=${game.id}&mode=raw&title=Rocket+Rumble`,
     );
     const edit = screen.getByRole("link", { name: "Edit game" });
     expect(edit.getAttribute("href")).toBe(`/games/${game.id}/edit`);

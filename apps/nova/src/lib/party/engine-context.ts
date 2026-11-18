@@ -13,7 +13,7 @@ import type { ClassicGameConnectResult } from "../classic";
 import { localPartyIdentity } from "./identity";
 import { browserLifecycleSource, type PartyLifecycleSource } from "./lifecycle";
 import { SignalingOutage } from "./signaling-outage";
-import type { PartySimulationExecutor, PartyStateExecutor } from "./party-executors";
+import type { PartyStateExecutor } from "./party-executors";
 import { PeerLinkAlert } from "./peer-link-alert";
 import { reportConnection } from "../connection-log";
 import { fetchTurnCredentials, type TurnCredentialsResult } from "./turn-creds";
@@ -123,7 +123,6 @@ export class PartyEngineContext {
   frameStartDelivered = false;
 
   stateExecutor: PartyStateExecutor | null = null;
-  simulationExecutor: PartySimulationExecutor | null = null;
   /** Replay this view when a container rebind boots a new frame after the initial state event. */
   lastStateApiEvent: GameApiEvent | null = null;
 

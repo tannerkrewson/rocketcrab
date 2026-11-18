@@ -304,10 +304,7 @@ export class RuntimeInstance {
       case "raw.close":
       case "raw.send":
       case "controls.set":
-      case "simulation.register":
-      case "simulation.sendInput":
       case "stateResponse":
-      case "simulationResponse":
         this.handleApiCall(kind, payload);
         break;
       case "error":

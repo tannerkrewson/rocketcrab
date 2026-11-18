@@ -71,7 +71,7 @@ describe("parsePeerMessage", () => {
     expect(parsePeerMessage({ ...wire, actionType: "" }).ok).toBe(false);
     expect(parsePeerMessage({ ...wire, seq: undefined }).ok).toBe(false);
     expect(parsePeerMessage({ ...wire, version: 99 }).ok).toBe(false);
-    expect(parsePeerMessage({ ...wire, type: "simulation.input" }).ok).toBe(false);
+    expect(parsePeerMessage({ ...wire, type: "simulation.snapshot" }).ok).toBe(false);
   });
 
   it("rejects non-object input as an invalid envelope", () => {
