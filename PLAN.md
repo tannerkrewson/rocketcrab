@@ -92,7 +92,8 @@ beta and physical-device checks are still pending.
       Worker secrets after the edge exists.
 - [ ] Configure the Realtime usage alert and Workers/Durable Objects spending
       controls. Confirm the notification destination.
-- [ ] Approve retiring the old relay after the replacement passes smoke checks.
+- [x] Retire the old relay. `rocketcrab-cors-relay` deleted 2026-11-18 with
+      owner approval (`wrangler delete`; no requests in the prior 4 weeks).
 
 ## 2. First deploy and smoke test
 

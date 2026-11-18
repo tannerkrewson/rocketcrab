@@ -95,5 +95,6 @@ service until midnight UTC. Check account usage before inviting a wider beta.
   was disabled. The staged Worker now uses Workers Logs.
 - Edge migrations create the `SignalHub` and `TunnelPair` SQLite classes.
   They have yet to run against the account. TURN secrets are pending.
-- Retire the old `rocketcrab-cors-relay` Worker after the new edge passes
-  smoke checks and live consumers are checked. Deletion needs owner approval.
+- 2026-11-18, with owner approval: deleted the old `rocketcrab-cors-relay`
+  Worker (no requests in the prior 4 weeks) and the unrelated
+  `curly-dream-16c4` Notion CORS proxy. The account has no other Workers.
