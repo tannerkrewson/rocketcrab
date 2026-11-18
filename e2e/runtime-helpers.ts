@@ -69,10 +69,7 @@ export async function installHarness(page: Page): Promise<void> {
       if (!iframe) {
         iframe = document.createElement("iframe");
         iframe.setAttribute("sandbox", "allow-scripts allow-same-origin");
-        iframe.setAttribute(
-          "allow",
-          "camera; microphone; clipboard-read; clipboard-write; fullscreen",
-        );
+        iframe.setAttribute("allow", "camera; microphone; fullscreen");
         iframe.allowFullscreen = true;
         iframe.style.cssText = "width:100%;height:600px;border:0";
         container.appendChild(iframe);

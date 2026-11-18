@@ -43,14 +43,7 @@ function createFrameFactory(): FrameFactory {
       );
       // Permissions must be delegated at every iframe hop: use the base set
       // plus whatever the host delegated in the bootstrap.
-      const allow = new Set([
-        "camera",
-        "microphone",
-        "clipboard-read",
-        "clipboard-write",
-        "fullscreen",
-        ...allowTokens,
-      ]);
+      const allow = new Set(["camera", "microphone", "fullscreen", ...allowTokens]);
       frame.setAttribute("allow", [...allow].join("; "));
       frame.allowFullscreen = true;
       frame.setAttribute("title", "game sandbox");

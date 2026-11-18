@@ -41,8 +41,9 @@ your choice in one sentence.
 - **Phones first**: one-column layout, large tap targets, readable text,
   \`env(safe-area-inset-*)\` margins. Desktop should still work.
 - **One self-contained document**: all custom HTML, CSS and JavaScript in one
-  file. Remote CDNs, fonts and images are fine; pin every dependency to an
-  exact version, never "latest". Never require npm, command-line tools,
+  file. Prefer a game that runs from that file alone. Use remote libraries,
+  fonts or images when they materially help, and pin dependencies to an exact
+  version. Never require npm, command-line tools,
   hosting, a repository or extra files.
 - **Only the documented API**, following every rule in the reference.
 - **Players come and go**: handle joins, leaves, reconnects and late joiners;
