@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   BURST_BYTES,
   MAX_TUNNEL_FRAME_BYTES,
+  MIN_TUNNEL_FRAME_CHARGE,
   PAIRED_FRAME,
   PARTNER_WAIT_MS,
   TunnelPair,
@@ -196,6 +197,19 @@ describe("TunnelPair relay budget", () => {
     expect(a.close).toHaveBeenCalledWith(1008, "rate limit");
     expect(b.close).toHaveBeenCalledWith(1008, "rate limit");
     expect(b.send).toHaveBeenCalledTimes(1 + BURST_BYTES / FRAME_256K);
+  });
+
+  it("charges empty frames against the same budget as data", async () => {
+    vi.spyOn(Date, "now").mockReturnValue(1_000);
+    const { typed, wake, pairUp } = setup();
+    const { a, b } = await pairUp();
+    a.stored = { ...a.stored!, tokens: MIN_TUNNEL_FRAME_CHARGE };
+    const awake = wake();
+    awake.webSocketMessage(typed(a), frame(0));
+    expect(b.send).toHaveBeenCalledTimes(2);
+    awake.webSocketMessage(typed(a), frame(0));
+    expect(a.close).toHaveBeenCalledWith(1008, "rate limit");
+    expect(b.send).toHaveBeenCalledTimes(2);
   });
 
   it("refills at the sustained rate", async () => {

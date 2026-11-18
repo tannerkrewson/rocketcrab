@@ -34,6 +34,8 @@ export const MAX_TUNNEL_FRAME_BYTES = 262144 + 64;
  */
 export const RATE_BYTES_PER_SECOND = 512 * 1024;
 export const BURST_BYTES = 4 * 1024 * 1024;
+// Every frame costs a Durable Object event even when its payload is empty.
+export const MIN_TUNNEL_FRAME_CHARGE = 256;
 /**
  * Persist on traffic after one second or 512 KiB spent, and on close. A wake
  * may restore unpersisted spending, bounded to about one second of refill.
@@ -177,13 +179,14 @@ export class TunnelPair {
     const now = Date.now();
     const bucket = this.bucketOf(socket, now);
     const tokens = refilled(bucket, now);
-    if (!(tokens >= message.byteLength)) {
+    const charge = Math.max(MIN_TUNNEL_FRAME_CHARGE, message.byteLength);
+    if (!(tokens >= charge)) {
       this.closePair(socket, 1008, "rate limit");
       return;
     }
-    bucket.tokens = tokens - message.byteLength;
+    bucket.tokens = tokens - charge;
     bucket.lastRefillMs = now;
-    bucket.spentSincePersist += message.byteLength;
+    bucket.spentSincePersist += charge;
     if (
       bucket.lastRefillMs - bucket.persistedMs >= PERSIST_INTERVAL_MS ||
       bucket.spentSincePersist >= PERSIST_SPENT_BYTES
