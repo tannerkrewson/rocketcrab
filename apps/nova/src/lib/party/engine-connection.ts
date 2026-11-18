@@ -160,6 +160,7 @@ export class PartyConnection {
    */
   reconnect(): Promise<void> {
     if (this.reconnectInFlight !== null) return this.reconnectInFlight;
+    this.cancelReconnectRetry();
     const attempt = this.runReconnect().finally(() => {
       if (this.reconnectInFlight === attempt) this.reconnectInFlight = null;
     });
@@ -284,14 +285,12 @@ export class PartyConnection {
       this.enterReconnecting(
         "Your connection was suspended while the page was in the background. Reconnecting…",
       );
-      this.cancelReconnectRetry();
       void this.reconnect();
       return;
     }
     if (transport.connectionState !== "connected") {
       // Hiding cancels retries; an idle transport needs a new attempt on resume.
       if (transport.connectionState === "idle" && this.state.phase === "reconnecting") {
-        this.cancelReconnectRetry();
         void this.reconnect();
       }
       return; // joining: the state handler settles it
@@ -306,18 +305,25 @@ export class PartyConnection {
     if (typeof ping !== "function") {
       return; // This adapter has no liveness probe.
     }
+    const connectionId = transport.selfConnectionId;
     const answers = await Promise.all(
       peers.map((peer) => this.probePeer(ping, transport, peer.connectionId)),
     );
-    if (answers.some((alive) => alive)) {
-      return; // at least one peer answers: the connection is healthy
-    }
+    // A probe still running after leave or reconnect describes the old link.
+    if (
+      this.pageWasHidden ||
+      this.state.leaving ||
+      this.state.party?.privateTransport !== transport ||
+      transport.selfConnectionId !== connectionId ||
+      transport.connectionState !== "connected" ||
+      answers.some((alive) => alive)
+    )
+      return;
     this.services().snapshot.addNotice(
       "warn",
       "Your phone's connection went quiet in the background — reconnecting with a fresh connection.",
     );
     this.enterReconnecting("Your connection went quiet in the background. Reconnecting…");
-    this.cancelReconnectRetry();
     void this.reconnect();
   }
 

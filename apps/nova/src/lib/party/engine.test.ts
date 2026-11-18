@@ -3177,6 +3177,35 @@ describe("party engine — peer-link alert", () => {
 });
 
 describe("party engine — lifecycle cleanup", () => {
+  it("ignores a resume probe that finishes after the player leaves", async () => {
+    const world = makeWorldWithStaleJoiner("member-b");
+    const lifecycle = createMemoryLifecycleSource();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b", { lifecycle: lifecycle.source });
+    const secret = await runCreate(a, world);
+    const { join, settled } = startJoin(b, world, secret);
+    await settled;
+    await join;
+
+    let finishPing: ((value: number | null) => void) | undefined;
+    const ping = vi.spyOn(StalePingTransport.prototype, "ping").mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishPing = resolve;
+        }),
+    );
+    lifecycle.hide();
+    lifecycle.show();
+    expect(finishPing).toBeDefined();
+
+    await b.engine.leaveParty();
+    finishPing?.(null);
+    await settle(world);
+    expect(b.engine.getState().phase).toBe("idle");
+    expect(b.engine.getState().notices).toEqual([]);
+    ping.mockRestore();
+  });
+
   it("re-arms a reconnect on resume when hiding cancelled the retry and the room is idle", async () => {
     const world = makeWorld();
     const lifecycle = createMemoryLifecycleSource();

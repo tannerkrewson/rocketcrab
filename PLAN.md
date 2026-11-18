@@ -65,6 +65,12 @@ beta and physical-device checks are still pending.
 - [x] Review native room broadcasts. Keep targeted delivery for now to
       preserve Nova admission and avoid a second state-sync path. Revisit
       small explicitly shared updates if host upload becomes a practical limit.
+- [x] Replicate recent rejection results in the existing action history.
+      The authority handoff regression drops the original acknowledgement.
+- [x] Ignore stale wake-up probes after leaving or reconnecting.
+      The lifecycle regression verifies that leaving keeps the app idle.
+- [ ] Use the live iPhone checks to evaluate room, link, and game recovery
+      before consolidating any other retry paths.
 
 ## 1. Owner actions
 
@@ -125,9 +131,6 @@ Record results here and in the [Mobile Safari checklist](docs/testing/mobile-saf
   exposes no named pre-connection event.
 - **Networks that block WebSockets to Cloudflare** cannot connect at all. They
   can report a signaling failure only when the HTTP logging endpoint remains reachable.
-- **Replayed action IDs** after an authority migration can report `accepted`
-  for an action whose rejection ack was lost. Rare; fixing it
-  changes the wire format.
 
 ## Cleanup for the owner
 
