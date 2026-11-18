@@ -118,6 +118,15 @@ export const authorityHeartbeatIntervalMs = 1_000;
  */
 export const authorityGracePeriodMs = 5_000;
 
+/** Ticks per second for a state-mode game with a `tick` handler, unless it declares one. */
+export const tickRateDefault = 15;
+
+/** Fastest declared tick rate. */
+export const tickRateMax = 60;
+
+/** Most a `nova.controls.set` value may serialize to. */
+export const controlsBytes = 1024;
+
 /**
  * Default simulation tick interval: the Nova-provided time step at
  * which a simulation-mode game advances (10 Hz by default; games may pick a
@@ -180,6 +189,9 @@ export const simulationMaxInputsPerTick = 64;
 
 /** The complete limits table, typed. */
 export const LIMITS = {
+  tickRateDefault,
+  tickRateMax,
+  controlsBytes,
   htmlSourceBytes,
   htmlSourceWarnBytes,
   messageBytesBeforeChunking,

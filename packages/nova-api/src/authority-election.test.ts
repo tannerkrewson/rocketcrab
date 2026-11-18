@@ -51,6 +51,9 @@ const THREE_PLAYERS: NovaPlayer[] = [
 
 /** A recording host: every send/event is captured for assertions. */
 class RecordingHost implements StateEngineHost {
+  controls(): Record<string, unknown> {
+    return {};
+  }
   readonly acks: Array<{ target: string; ack: NovaActionAck }> = [];
   readonly snapshots: Array<{ target?: string; snapshot: StateSnapshotEnvelope }> = [];
   readonly views: Array<{ target: string; view: StateViewEnvelope }> = [];

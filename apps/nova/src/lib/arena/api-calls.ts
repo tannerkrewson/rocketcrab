@@ -46,6 +46,7 @@ export const arenaApiCallSchemas = {
         .optional(),
     })
     .strict(),
+  "controls.set": z.object({ controls: z.unknown() }).strict(),
   "simulation.register": z.object({}).strict(),
   "simulation.sendInput": z
     .object({

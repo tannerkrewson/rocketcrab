@@ -271,6 +271,8 @@ export const stateSnapshotMessageSchema = z.object({
     .optional(),
   /** Present on full snapshots; absent on deltas. A full snapshot without it is invalid (checked by the engine). */
   state: z.unknown().optional(),
+  /** The game has no selectView: every frame's view is this state, so no per-player views follow. */
+  viewIsState: z.literal(true).optional(),
 });
 export type StateSnapshotMessage = z.infer<typeof stateSnapshotMessageSchema>;
 export type StateActionRejection = NonNullable<StateSnapshotMessage["actionRejections"]>[number];
@@ -397,6 +399,17 @@ export const gameReadyMessageSchema = z.object({
 export type GameReadyMessage = z.infer<typeof gameReadyMessageSchema>;
 
 /**
+ * A player's latest controls for a ticking game, sent to the authority only
+ * when they change. Latest value wins; the authority reads them each tick.
+ */
+export const gameControlsMessageSchema = z.object({
+  ...peerEnvelopeFields,
+  type: z.literal("game.controls"),
+  controls: z.unknown(),
+});
+export type GameControlsMessage = z.infer<typeof gameControlsMessageSchema>;
+
+/**
  * Game start: announced to every player when the game begins. The
  * start policy (who decides when to start) is host/arena policy, not game
  * code — games only observe the start event. Idempotent: a session that is
@@ -502,6 +515,7 @@ export const peerMessagesSchema = z.discriminatedUnion("type", [
   simulationInputMessageSchema,
   simulationSnapshotMessageSchema,
   gameReadyMessageSchema,
+  gameControlsMessageSchema,
   gameStartMessageSchema,
   gameEndMessageSchema,
   rawChannelMetadataMessageSchema,

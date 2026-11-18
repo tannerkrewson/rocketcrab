@@ -254,6 +254,7 @@ export class PartyGameLifecycle {
       stateExecutor: this.state.stateExecutor,
       simulationExecutor: this.state.simulationExecutor,
     });
+    session.setTickRate(this.state.frameTickRate);
     this.state.session = session;
     this.state.unsubSession = session.onSessionEvent((event) => this.handleSessionEvent(event));
     await session.attach();

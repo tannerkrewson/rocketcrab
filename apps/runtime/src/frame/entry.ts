@@ -12,6 +12,7 @@ import type {
   NovaPlayer,
   NovaSimulationHandlers,
   NovaStateHandlers,
+  NovaTickContext,
 } from "@rocketcrab/nova-api";
 import { NOVA_API_VERSION } from "@rocketcrab/nova-api/version";
 import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
@@ -116,6 +117,7 @@ function install(): void {
           ...(declaration.mode !== undefined ? { gameMode: declaration.mode } : {}),
           ...(declaration.version !== undefined ? { gameVersion: declaration.version } : {}),
           ...(declaration.apiVersion !== undefined ? { apiVersion: declaration.apiVersion } : {}),
+          ...(declaration.tickRate !== undefined ? { tickRate: declaration.tickRate } : {}),
         },
       });
     },
@@ -134,6 +136,7 @@ function install(): void {
       report("simulation.register", {});
     },
     sendSimulationInput: (input) => report("simulation.sendInput", { input }),
+    setControls: (controls) => report("controls.set", { controls }),
     onEvent(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -168,10 +171,23 @@ function install(): void {
               context,
               viewers,
             })
-          : { ok: false as const, code: "invalid_request", message: "Unknown state request." };
+          : request.kind === "tick"
+            ? await executor.tick({
+                state: request.state,
+                context: context as NovaTickContext,
+                steps: Number(request.steps),
+                viewers,
+              })
+            : { ok: false as const, code: "invalid_request", message: "Unknown state request." };
     respond(
       result.ok
-        ? { ok: true, kind: "state", state: result.state, views: result.views }
+        ? {
+            ok: true,
+            kind: "state",
+            state: result.state,
+            views: result.views,
+            ...(result.viewIsState === true ? { viewIsState: true } : {}),
+          }
         : { ok: false, kind: "error", code: result.code, message: result.message },
     );
   }

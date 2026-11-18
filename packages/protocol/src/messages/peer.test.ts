@@ -9,6 +9,7 @@ import {
   authorityHeartbeatMessageSchema,
   connectionStatusMessageSchema,
   gameSourceMetadataMessageSchema,
+  gameControlsMessageSchema,
   gameReadyMessageSchema,
   gameStartMessageSchema,
   gameEndMessageSchema,
@@ -68,6 +69,7 @@ describe("peer message schemas", () => {
       simulationInputMessageSchema,
       simulationSnapshotMessageSchema,
       gameReadyMessageSchema,
+      gameControlsMessageSchema,
       gameStartMessageSchema,
       gameEndMessageSchema,
       rawChannelMetadataMessageSchema,
@@ -222,6 +224,9 @@ describe("peer message schemas", () => {
         }),
       ),
       gameReadyMessageSchema.parse(basePeer({ type: "game.ready" })),
+      gameControlsMessageSchema.parse(
+        basePeer({ type: "game.controls", controls: { left: true } }),
+      ),
       gameStartMessageSchema.parse(basePeer({ type: "game.start" })),
       gameEndMessageSchema.parse(basePeer({ type: "game.end", reason: "user_exit" })),
       rawChannelMetadataMessageSchema.parse(
@@ -311,6 +316,7 @@ describe("peer message schemas", () => {
       basePeer({ type: "simulation.input", seq: 8, inputId: "input-1", inputType: "move" }),
       basePeer({ type: "simulation.snapshot", seq: 9, tick: -1, term: 1, state: {} }),
       basePeer({ type: "game.ready", seq: "one" }),
+      basePeer({ type: "game.controls", seq: "one", controls: {} }),
       basePeer({ type: "game.start", seq: "one" }),
       basePeer({ type: "game.end", reason: "banana" }),
       basePeer({

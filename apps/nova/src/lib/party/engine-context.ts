@@ -151,6 +151,8 @@ export class PartyEngineContext {
   connectionState: TransportConnectionState = "idle";
   /** Unlike session.isStarted(), this also tracks starts received by followers. */
   gameStarted = false;
+  /** Ticks per second the running game frame declared (null: no tick). */
+  frameTickRate: number | null = null;
   startGaveUp = false;
 
   reconnectAttempts = 0;

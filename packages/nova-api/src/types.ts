@@ -53,6 +53,20 @@ export interface NovaGameContext {
   readonly actor?: NovaPlayer;
 }
 
+/** What a `tick` handler receives on top of the usual context. */
+export interface NovaTickContext extends NovaGameContext {
+  /** Seconds one tick covers (1 / tickRate). */
+  readonly dt: number;
+  /**
+   * Each connected player's latest `nova.controls.set` value, by player id.
+   * Players who have not set controls, or who left, are absent.
+   */
+  readonly controls: Readonly<Record<string, unknown>>;
+}
+
+/** A state-mode tick: advance the Immer draft by one fixed step of `dt`. */
+export type NovaTickHandler = (draft: any, context: NovaTickContext) => void | unknown;
+
 /**
  * One state-mode action handler (ADR-0006): validate and mutate the Immer
  * draft. May also return a new state to replace the draft (Immer recipe
@@ -100,6 +114,8 @@ export interface NovaStateHandlers {
    * view (ADR-0006).
    */
   selectView?(state: unknown, viewer: NovaPlayer): unknown;
+  /** Runs on the authority `tickRate` times a second once the game starts. */
+  tick?: NovaTickHandler;
 }
 
 /**
@@ -122,6 +138,10 @@ export interface NovaGameDeclaration {
   actions?: NovaStateActions;
   /** State mode: select the view one player sees (defaults to full state). */
   selectView?(state: unknown, viewer: NovaPlayer): unknown;
+  /** State mode: advance the game by one step, `tickRate` times a second. */
+  tick?: NovaTickHandler;
+  /** Ticks per second (1..60, default 20). Only used with `tick`. */
+  tickRate?: number;
 }
 
 /**
@@ -466,4 +486,16 @@ export interface NovaApi {
   readonly raw: NovaRawHandle;
   /** Simulation inputs (simulation mode). */
   readonly simulation: NovaSimulationHandle;
+  /**
+   * This player's controls for a ticking game: what they are doing right
+   * now (buttons held, joystick, pointer). The authority's `tick` reads them
+   * as `context.controls[playerId]`. Plain JSON, at most 1 KiB.
+   */
+  readonly controls: NovaControlsHandle;
+}
+
+/** The `nova.controls` handle. */
+export interface NovaControlsHandle {
+  /** Replace this player's controls. Cheap to call often: Nova sends changes only. */
+  set(value: unknown): void;
 }

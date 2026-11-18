@@ -56,6 +56,9 @@ function makeClient(overrides: Partial<NovaClientBackend> = {}): {
     sendSimulationInput() {
       calls.push("sendSimulationInput");
     },
+    setControls() {
+      calls.push("setControls");
+    },
     onEvent(handler) {
       listeners.add(handler);
       return () => {

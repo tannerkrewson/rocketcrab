@@ -22,14 +22,20 @@
  */
 import { produce } from "immer";
 import { assertStructuredCloneSafe } from "./validation";
-import type { NovaGameContext, NovaPlayer, NovaStateHandlers } from "./types";
+import type { NovaGameContext, NovaPlayer, NovaStateHandlers, NovaTickContext } from "./types";
 
 /** The players a view is computed for (member id -> view). */
 export type NovaStateViews = Record<string, unknown>;
 
 /** Result of creating the initial state (or of applying one action). */
 export type NovaStateStateResult =
-  | { readonly ok: true; readonly state: unknown; readonly views: NovaStateViews }
+  | {
+      readonly ok: true;
+      readonly state: unknown;
+      readonly views: NovaStateViews;
+      /** No selectView: `views` is empty and every player's view is `state`. */
+      readonly viewIsState?: true;
+    }
   | { readonly ok: false; readonly code: string; readonly message: string };
 
 /** Result of computing one player's view. */
@@ -52,6 +58,17 @@ export interface NovaStateExecutor {
     payload: unknown;
     state: unknown;
     context: NovaGameContext;
+    viewers: readonly NovaPlayer[];
+  }): Promise<NovaStateStateResult>;
+
+  /**
+   * Run the game's `tick` `steps` times on `state` (a host that fell behind
+   * catches up in one request) and compute every player's new view.
+   */
+  tick?(input: {
+    state: unknown;
+    context: NovaTickContext;
+    steps: number;
     viewers: readonly NovaPlayer[];
   }): Promise<NovaStateStateResult>;
 
@@ -90,8 +107,7 @@ export class LocalGameExecutor implements NovaStateExecutor {
           ? {}
           : await this.handlers.createInitialState(input.context);
       assertStructuredCloneSafe(state, "createInitialState result");
-      const views = await this.computeViews(state, input.viewers);
-      return { ok: true, state, views };
+      return await this.withViews(state, input.viewers);
     } catch (error) {
       return failure("initial_state_error", error);
     }
@@ -118,8 +134,29 @@ export class LocalGameExecutor implements NovaStateExecutor {
         handler(draft, input.context, input.payload),
       );
       assertStructuredCloneSafe(next, "action result state");
-      const views = await this.computeViews(next, input.viewers);
-      return { ok: true, state: next, views };
+      return await this.withViews(next, input.viewers);
+    } catch (error) {
+      return failure("handler_error", error);
+    }
+  }
+
+  async tick(input: {
+    state: unknown;
+    context: NovaTickContext;
+    steps: number;
+    viewers: readonly NovaPlayer[];
+  }): Promise<NovaStateStateResult> {
+    const handler = this.handlers?.tick;
+    if (typeof handler !== "function") {
+      return { ok: false, code: "handler_error", message: "The game has no tick handler." };
+    }
+    try {
+      let next = input.state;
+      for (let step = 0; step < input.steps; step += 1) {
+        next = await produce(next, (draft: unknown) => handler(draft, input.context));
+      }
+      assertStructuredCloneSafe(next, "tick result state");
+      return await this.withViews(next, input.viewers);
     } catch (error) {
       return failure("handler_error", error);
     }
@@ -136,6 +173,16 @@ export class LocalGameExecutor implements NovaStateExecutor {
     } catch (error) {
       return failure("view_error", error);
     }
+  }
+
+  private async withViews(
+    state: unknown,
+    viewers: readonly NovaPlayer[],
+  ): Promise<NovaStateStateResult> {
+    if (this.handlers?.selectView === undefined) {
+      return { ok: true, state, views: {}, viewIsState: true };
+    }
+    return { ok: true, state, views: await this.computeViews(state, viewers) };
   }
 
   private async computeViews(

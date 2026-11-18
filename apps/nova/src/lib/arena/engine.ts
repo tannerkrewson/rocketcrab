@@ -102,6 +102,8 @@ interface PlayerRuntime {
   unsubSession: (() => void) | null;
   runState: ArenaPlayerRunState;
   registered: ArenaRegistration | null;
+  /** Ticks per second the frame declared, or null for a game without a tick. */
+  tickRate: number | null;
   runtimeInstanceId: string | null;
   logs: ArenaLogEntry[];
   lastError: string | null;
@@ -361,6 +363,7 @@ export class ArenaEngine {
       unsubSession: null,
       runState: "pending",
       registered: null,
+      tickRate: null,
       runtimeInstanceId: null,
       logs: [],
       lastError: null,
@@ -430,6 +433,7 @@ export class ArenaEngine {
           title: event.message.title,
           gameMode: event.message.gameMode,
         };
+        runtime.tickRate = event.message.tickRate ?? null;
         runtime.runState = "registered";
         this.logPlayer(
           id,
@@ -509,6 +513,7 @@ export class ArenaEngine {
       stateExecutor: runtime.stateExecutor,
       simulationExecutor: runtime.simulationExecutor,
     });
+    session.setTickRate(runtime.tickRate);
     runtime.session = session;
     runtime.unsubSession = session.onSessionEvent((event) =>
       this.handleSessionEvent(runtime.spec.id, event),
@@ -579,6 +584,7 @@ export class ArenaEngine {
           rejectedCount: event.rejectedCount,
           actionRatePerSecond: event.actionRatePerSecond,
         };
+        if (event.tick) break; // a ticking game commits many times a second
         this.logPlayer(
           id,
           "info",
@@ -718,6 +724,19 @@ export class ArenaEngine {
           session.closeRawChannel(parsed.data.name);
         } catch (error) {
           this.sessionError(runtime.spec.id, error);
+        }
+        break;
+      }
+      case "controls.set": {
+        const parsed = arenaApiCallSchemas["controls.set"].safeParse(message.payload);
+        if (!parsed.success) return;
+        try {
+          session.setControls(parsed.data.controls);
+        } catch (error) {
+          this.logPlayer(runtime.spec.id, "error", errorMessage(error));
+          const code =
+            error instanceof Error && "code" in error ? String(error.code) : "invalid_options";
+          this.pushApiEvent(runtime.spec.id, { kind: "error", code, message: errorMessage(error) });
         }
         break;
       }

@@ -303,6 +303,7 @@ export class RuntimeInstance {
       case "raw.createChannel":
       case "raw.close":
       case "raw.send":
+      case "controls.set":
       case "simulation.register":
       case "simulation.sendInput":
       case "stateResponse":

@@ -8,7 +8,7 @@ import {
   timestampSchema,
   titleSchema,
 } from "../ids";
-import { htmlSourceSchema } from "../limits";
+import { htmlSourceSchema, tickRateMax } from "../limits";
 import { gameEndReasonSchema, gameModeSchema } from "./shared";
 
 /**
@@ -35,6 +35,7 @@ export const NOVA_API_CALL_METHODS = [
   "raw.createChannel",
   "raw.close",
   "raw.send",
+  "controls.set",
   "simulation.register",
   "simulation.sendInput",
   "stateResponse",
@@ -108,6 +109,15 @@ export const stateRequestSchema = z.discriminatedUnion("kind", [
       viewer: novaPlayerSchema,
     })
     .strict(),
+  z
+    .object({
+      kind: z.literal("tick"),
+      state: z.unknown(),
+      context: z.unknown(),
+      steps: z.number().int().min(1).max(tickRateMax),
+      viewers: z.array(novaPlayerSchema),
+    })
+    .strict(),
 ]);
 export type StateRequest = z.infer<typeof stateRequestSchema>;
 
@@ -122,6 +132,8 @@ export const stateResponseSchema = z.discriminatedUnion("kind", [
       ok: z.literal(true),
       state: z.unknown(),
       views: z.record(memberIdSchema, z.unknown()),
+      /** The game has no selectView, so `views` is empty: each view is the state. */
+      viewIsState: z.literal(true).optional(),
     })
     .strict(),
   z
@@ -326,6 +338,8 @@ export const gameRegistrationMessageSchema = z.object({
   gameMode: gameModeSchema,
   /** The game's own declared version; distinct from the protocol version. */
   gameVersion: z.string().min(1).max(32).optional(),
+  /** Ticks per second, present when the game declared a `tick` handler. */
+  tickRate: z.number().int().min(1).max(tickRateMax).optional(),
 });
 export type GameRegistrationMessage = z.infer<typeof gameRegistrationMessageSchema>;
 

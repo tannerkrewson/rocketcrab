@@ -14,6 +14,7 @@ import {
   authorityElectionMessageSchema,
   authorityHeartbeatMessageSchema,
   gameEndMessageSchema,
+  gameControlsMessageSchema,
   gameReadyMessageSchema,
   gameStartMessageSchema,
   playerIdentityMessageSchema,
@@ -51,6 +52,13 @@ function envelope(base: PeerMessageBase) {
 /** Build and validate a `game.ready` announcement. */
 export function buildGameReadyMessage(base: PeerMessageBase): PeerMessage {
   return assertPeerMessage(gameReadyMessageSchema.parse({ ...envelope(base), type: "game.ready" }));
+}
+
+/** Build and validate a player's `game.controls` update. */
+export function buildGameControlsMessage(base: PeerMessageBase, controls: unknown): PeerMessage {
+  return assertPeerMessage(
+    gameControlsMessageSchema.parse({ ...envelope(base), type: "game.controls", controls }),
+  );
 }
 
 /** Build and validate a `game.start` announcement. */
@@ -151,6 +159,7 @@ export function buildStateSnapshotMessage(
     processedActionIds: readonly string[];
     actionRejections?: Readonly<NonNullable<StateSnapshotMessage["actionRejections"]>>;
     state?: unknown;
+    viewIsState?: true;
   },
 ): PeerMessage {
   return assertPeerMessage(
@@ -170,6 +179,7 @@ export function buildStateSnapshotMessage(
       processedActionIds: input.processedActionIds,
       ...(input.actionRejections ? { actionRejections: input.actionRejections } : {}),
       state: input.state,
+      ...(input.viewIsState === true ? { viewIsState: true } : {}),
     }),
   );
 }

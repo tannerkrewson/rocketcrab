@@ -30,6 +30,7 @@ import type {
   NovaSimulationInput,
   NovaSimulationSnapshot,
   NovaStateHandlers,
+  NovaTickContext,
 } from "./types";
 
 /** A transport factory plus a deterministic delivery pump (see module docs). */
@@ -986,6 +987,86 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       expect(b.getCanonicalState()?.state).toEqual({ shellOnly: true });
       // ...but never reaches the game-facing state handle.
       expect(b.client.state.get()).toEqual({ hand: undefined, deckCount: 3 });
+    });
+
+    // ------------------------------------------------------------------
+    // ticking games (state mode with a tick)
+    // ------------------------------------------------------------------
+
+    it("ticks on the authority and steps each player by their controls", async () => {
+      const handlers: NovaStateHandlers = {
+        createInitialState: () => ({ x: {} as Record<string, number>, ticks: 0 }),
+        tick(draft: { x: Record<string, number>; ticks: number }, context) {
+          draft.ticks += 1;
+          for (const player of context.players) {
+            const controls = context.controls[player.id] as { dx?: number } | undefined;
+            draft.x[player.id] = (draft.x[player.id] ?? 0) + (controls?.dx ?? 0);
+          }
+          expect(context.dt).toBeCloseTo(1 / 50);
+        },
+      };
+      const pair = await makePair(harnessFactory, {
+        handlers: { ...handlers, tickRate: 50 } as NovaStateHandlers,
+      });
+      await startBoth(pair);
+      const views: Array<{ x: Record<string, number>; ticks: number }> = [];
+      pair.b.client.state.onChange((view) => views.push(view as (typeof views)[number]));
+      pair.b.client.controls.set({ dx: 1 });
+      pair.b.client.controls.set({ dx: 1 }); // unchanged: nothing more is sent
+      await waitForSimulation(
+        pair.harness,
+        () => (views.at(-1)?.x["member-b"] ?? 0) >= 3,
+        "Ben's controls moving him on every screen",
+      );
+      expect(views.at(-1)?.x["member-a"]).toBe(0);
+      // Ben leaves: his controls stop counting.
+      await pair.b.leave();
+      await settle(pair.harness);
+      const before = pair.a.getCanonicalState()?.state as { x: Record<string, number> };
+      await waitForSimulation(
+        pair.harness,
+        () => ((pair.a.getCanonicalState()?.state as { ticks: number }).ticks ?? 0) > 5,
+        "more ticks",
+      );
+      expect(
+        (pair.a.getCanonicalState()?.state as { x: Record<string, number> }).x["member-b"],
+      ).toBe(before.x["member-b"]);
+    });
+
+    it("keeps ticking from the replicated state after the authority leaves", async () => {
+      const handlers = {
+        createInitialState: () => ({ ticks: 0, held: {} as Record<string, unknown> }),
+        tick(draft: { ticks: number; held: Record<string, unknown> }, context: NovaTickContext) {
+          draft.ticks += 1;
+          draft.held = { ...context.controls };
+        },
+        tickRate: 50,
+      };
+      const pair = await makePair(harnessFactory, { handlers: handlers as NovaStateHandlers });
+      await startBoth(pair);
+      pair.b.client.controls.set({ fire: true });
+      await waitForSimulation(
+        pair.harness,
+        () => ((pair.b.getCanonicalState()?.state as { ticks: number } | null)?.ticks ?? 0) >= 5,
+        "ticks before migration",
+      );
+      // Ada is the authority; Ben leaves the authority role to her until she
+      // leaves, then continues from his replicated copy and his own controls.
+      await pair.a.leave();
+      await settle(pair.harness);
+      const ticksAtHandoff = (pair.b.getCanonicalState()?.state as { ticks: number }).ticks;
+      await waitForSimulation(
+        pair.harness,
+        () => {
+          const state = pair.b.getCanonicalState()?.state as {
+            ticks: number;
+            held: Record<string, unknown>;
+          };
+          return state.ticks > ticksAtHandoff + 3 && state.held["member-b"] !== undefined;
+        },
+        "Ben ticking as the new authority",
+        8_000,
+      );
     });
 
     // ------------------------------------------------------------------

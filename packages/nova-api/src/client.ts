@@ -16,6 +16,7 @@
  *   dispatched to the game's handlers inside this context — functions
  *   registered by a game never cross the frame, only data does.
  */
+import { controlsBytes, tickRateDefault } from "@rocketcrab/protocol";
 import { isSupportedApiVersion } from "./version";
 import { NovaError, endedMessage, notStartedMessage, toErrorCode } from "./errors";
 import { isReservedChannelName } from "./constants";
@@ -84,6 +85,8 @@ export type NovaSessionEvent =
       appliedCount: number;
       rejectedCount: number;
       actionRatePerSecond: number;
+      /** True for a tick's commit (hosts skip per-commit logging). */
+      tick: boolean;
     }
   | { type: "actionRejected"; actionId: string; code: string; message: string }
   /**
@@ -143,6 +146,8 @@ export interface NovaClientBackend {
   registerSimulation(handlers?: NovaSimulationHandlers): void;
   /** Send one simulation input to the party. */
   sendSimulationInput(input: NovaSimulationInput): void;
+  /** Replace this player's controls (a ticking game's input). */
+  setControls(value: unknown): void;
   /** Subscribe to inbound events. Returns an unsubscribe function. */
   onEvent(handler: (event: NovaSessionEvent) => void): () => void;
 }
@@ -466,6 +471,8 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
         ...(options.mode !== undefined ? { mode: options.mode } : {}),
         ...(options.version !== undefined ? { version: options.version } : {}),
         ...(options.apiVersion !== undefined ? { apiVersion: options.apiVersion } : {}),
+        // A game with a tick always declares its rate, so the host never guesses.
+        ...(handlers?.tick !== undefined ? { tickRate: options.tickRate ?? tickRateDefault } : {}),
       };
       backend.register(declaration, handlers);
     },
@@ -558,6 +565,19 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
     get raw() {
       return rawHandle;
     },
+    controls: {
+      set(value: unknown) {
+        assertStructuredCloneSafe(value, "nova.controls.set value");
+        const bytes = new TextEncoder().encode(JSON.stringify(value) ?? "null").length;
+        if (bytes > controlsBytes) {
+          throw new NovaError(
+            "payload_too_large",
+            `nova.controls.set takes at most ${controlsBytes} bytes of JSON; this value is ${bytes}.`,
+          );
+        }
+        backend.setControls(value);
+      },
+    },
     get simulation() {
       return simulationHandle;
     },
@@ -590,7 +610,8 @@ function extractStateHandlers(options: NovaGameDeclaration): NovaStateHandlers |
   const declared =
     options.createInitialState !== undefined ||
     options.actions !== undefined ||
-    options.selectView !== undefined;
+    options.selectView !== undefined ||
+    options.tick !== undefined;
   if (!declared) return undefined;
   const handlers: NovaStateHandlers = {};
   if (options.createInitialState !== undefined) {
@@ -607,6 +628,12 @@ function extractStateHandlers(options: NovaGameDeclaration): NovaStateHandlers |
       throw new NovaError("invalid_options", "nova.defineGame: selectView must be a function.");
     }
     handlers.selectView = options.selectView;
+  }
+  if (options.tick !== undefined) {
+    if (typeof options.tick !== "function") {
+      throw new NovaError("invalid_options", "nova.defineGame: tick must be a function.");
+    }
+    handlers.tick = options.tick;
   }
   if (options.actions !== undefined) {
     if (typeof options.actions !== "object" || options.actions === null) {

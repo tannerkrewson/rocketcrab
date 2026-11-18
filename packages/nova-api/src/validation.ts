@@ -12,7 +12,7 @@
  * and DOM nodes must never cross the frame, and the transport moves plain
  * JSON data.
  */
-import { titleSchema } from "@rocketcrab/protocol";
+import { tickRateMax, titleSchema } from "@rocketcrab/protocol";
 import { z } from "zod";
 import { NovaError } from "./errors";
 
@@ -22,6 +22,7 @@ export const novaGameDeclarationSchema = z.object({
   mode: z.enum(["state", "simulation", "raw"]).optional(),
   version: z.string().min(1).max(32).optional(),
   apiVersion: z.number().int().min(1).optional(),
+  tickRate: z.number().int().min(1).max(tickRateMax).optional(),
 });
 
 /** Bounded action shape for `nova.dispatch` (state mode). */

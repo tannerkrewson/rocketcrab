@@ -20,6 +20,7 @@ import type {
   NovaStateExecutor,
   NovaStateStateResult,
   NovaStateViewResult,
+  NovaTickContext,
 } from "@rocketcrab/nova-api";
 
 interface PendingRequest {
@@ -87,6 +88,21 @@ export class FrameStateExecutor implements NovaStateExecutor {
     });
   }
 
+  tick(input: {
+    state: unknown;
+    context: NovaTickContext;
+    steps: number;
+    viewers: readonly NovaPlayer[];
+  }): Promise<NovaStateStateResult> {
+    return this.request<NovaStateStateResult>({
+      kind: "tick",
+      state: input.state,
+      context: input.context,
+      steps: input.steps,
+      viewers: [...input.viewers],
+    });
+  }
+
   computeView(input: { state: unknown; viewer: NovaPlayer }): Promise<NovaStateViewResult> {
     return this.request<NovaStateViewResult>({
       kind: "computeView",
@@ -146,7 +162,12 @@ export class FrameStateExecutor implements NovaStateExecutor {
           // protocol's `kind` discriminator is internal).
           if (response.ok) {
             if (response.kind === "state") {
-              resolve({ ok: true, state: response.state, views: response.views } as T);
+              resolve({
+                ok: true,
+                state: response.state,
+                views: response.views,
+                ...(response.viewIsState === true ? { viewIsState: true } : {}),
+              } as T);
             } else {
               resolve({ ok: true, view: response.view } as T);
             }

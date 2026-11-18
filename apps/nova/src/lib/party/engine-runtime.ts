@@ -150,6 +150,8 @@ export class PartyRuntime {
       case "registration":
         if (this.reloadPending) break;
         this.state.registered = true;
+        this.state.frameTickRate = event.message.tickRate ?? null;
+        this.state.session?.setTickRate(this.state.frameTickRate);
         // Registration implies readiness; explicit nova.ready() is idempotent.
         this.state.session?.ready();
         // Session attachment precedes frame creation, so registration must replay identity and peers.
@@ -311,6 +313,19 @@ export class PartyRuntime {
               "error",
               `nova.raw.close() failed: ${errorMessage(error)}`,
             );
+          }
+        }
+        break;
+      }
+      case "controls.set": {
+        const parsed = arenaApiCallSchemas["controls.set"].safeParse(payload);
+        if (parsed.success) {
+          try {
+            session.setControls(parsed.data.controls);
+          } catch (error) {
+            const code =
+              error instanceof Error && "code" in error ? String(error.code) : "invalid_options";
+            this.state.runtime?.pushApiEvent({ kind: "error", code, message: errorMessage(error) });
           }
         }
         break;

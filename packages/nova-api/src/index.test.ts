@@ -28,6 +28,7 @@ function fakeBackend(): NovaClientBackend {
     sendRaw() {},
     registerSimulation() {},
     sendSimulationInput() {},
+    setControls() {},
     onEvent(handler) {
       listeners.add(handler);
       return () => {

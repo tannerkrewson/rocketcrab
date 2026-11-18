@@ -35,6 +35,8 @@ import {
   rawMessageWarnBytes,
   rawWarnRatePerSecond,
   simulationInputRatePerSecond,
+  controlsBytes,
+  tickRateDefault,
   type GameEndReason,
   type GameMode,
   type PeerMessage,
@@ -56,6 +58,7 @@ import {
   buildAuthorityElectionMessage,
   buildAuthorityHeartbeatMessage,
   buildGameEndMessage,
+  buildGameControlsMessage,
   buildGameReadyMessage,
   buildGameStartMessage,
   buildPlayerIdentityMessage,
@@ -303,6 +306,14 @@ export class NovaSession implements NovaClientBackend {
   private readonly injectedSimulationExecutor: NovaSimulationExecutor | undefined;
   /** True after a rate-limited input was reported, until a send succeeds. */
   private simulationInputThrottled = false;
+  /** Every player's latest controls (filled on the authority; ticks read it). */
+  private readonly controlsByMember = new Map<string, unknown>();
+  /** This player's controls as last set, and as last sent to the authority. */
+  private myControls: { value: unknown; json: string } | null = null;
+  private sentControlsJson: string | null = null;
+  private controlsTimer: ReturnType<typeof setTimeout> | null = null;
+  /** Controls go out at most once per tick (the game's declared rate). */
+  private controlsIntervalMs = 1000 / tickRateDefault;
   private readonly acceptStartRequest: (memberId: string) => boolean;
 
   private readonly selfPlayer: PlayerRecord;
@@ -653,6 +664,7 @@ export class NovaSession implements NovaClientBackend {
     this.disposed = true;
     this.engine.dispose();
     this.simulationEngine.dispose();
+    if (this.controlsTimer !== null) clearTimeout(this.controlsTimer);
     for (const unsubscribe of this.transportUnsubscribers) {
       unsubscribe();
     }
@@ -685,6 +697,7 @@ export class NovaSession implements NovaClientBackend {
   register(declaration: NovaGameDeclaration, handlers?: NovaStateHandlers): void {
     this.assertAlive();
     this.declaration = declaration;
+    if (declaration.tickRate !== undefined) this.setTickRate(declaration.tickRate);
     if (handlers !== undefined) {
       this.stateHandlers = handlers;
       if (this.injectedExecutor === undefined) {
@@ -905,6 +918,64 @@ export class NovaSession implements NovaClientBackend {
     }
   }
 
+  /**
+   * The tick rate this player's game frame declared (hosts pass it from the
+   * frame's registration). Every frame runs the same game, so every session
+   * agrees; only the authority ticks.
+   */
+  setTickRate(rate: number | null): void {
+    if (rate !== null) this.controlsIntervalMs = 1000 / rate;
+    this.engine.setTickRate(rate);
+  }
+
+  /**
+   * Replace this player's controls. Only changes go out, to the authority
+   * only, at most once per tick; a burst of calls sends the latest value.
+   */
+  setControls(value: unknown): void {
+    this.assertAlive();
+    assertStructuredCloneSafe(value, "nova.controls.set value");
+    const json = JSON.stringify(value) ?? "null";
+    if (new TextEncoder().encode(json).length > controlsBytes) {
+      throw new NovaError(
+        "payload_too_large",
+        `nova.controls.set takes at most ${controlsBytes} bytes of JSON. Send what the player is doing (buttons, a direction), not game state.`,
+      );
+    }
+    if (json === this.myControls?.json) return;
+    this.myControls = { value, json };
+    this.controlsByMember.set(this.selfPlayer.id, value);
+    if (this.controlsTimer === null) this.flushControls();
+  }
+
+  /** Send this player's controls to the authority if they changed since the last send. */
+  private flushControls(force = false): void {
+    const mine = this.myControls;
+    const authority = this.engine.getAuthorityMemberId();
+    if (mine === null || authority === null || authority === this.selfPlayer.id) return;
+    if (!force && mine.json === this.sentControlsJson) return;
+    this.sentControlsJson = mine.json;
+    void this.sendProtocol((base) => buildGameControlsMessage(base, mine.value), {
+      targetMemberId: authority,
+    }).catch((error: unknown) => this.emitError(error));
+    if (this.controlsTimer !== null) clearTimeout(this.controlsTimer);
+    this.controlsTimer = setTimeout(() => {
+      this.controlsTimer = null;
+      this.flushControls();
+    }, this.controlsIntervalMs);
+  }
+
+  /** The latest controls of every connected player, for the tick. */
+  private connectedControls(): Record<string, unknown> {
+    const controls: Record<string, unknown> = {};
+    for (const [memberId, value] of this.controlsByMember) {
+      if (memberId === this.selfPlayer.id || this.playersMap.has(memberId)) {
+        controls[memberId] = value;
+      }
+    }
+    return controls;
+  }
+
   sendSimulationInput(input: NovaSimulationInput): void {
     this.assertAlive();
     assertValidSchema(
@@ -1001,6 +1072,8 @@ export class NovaSession implements NovaClientBackend {
     const joined = this.playersMap.get(peer.memberId);
     if (joined === undefined) return;
     this.emit({ type: "playerJoined", player: toNovaPlayer(joined) });
+    // The authority dropped this player's controls when the link went down.
+    if (peer.memberId === this.engine.getAuthorityMemberId()) this.flushControls(true);
     // Identity exchange: tell the new peer who we are, and (if we already
     // announced ready) that we are ready.
     void this.sendProtocol((base) => buildPlayerIdentityMessage(base, this.selfPlayer.name), {
@@ -1053,9 +1126,11 @@ export class NovaSession implements NovaClientBackend {
         historyComplete: this.engine.isHistoryComplete(),
         ...this.engine.actionHistory(),
         state: this.engine.getCanonicalState(),
+        viewIsState: this.engine.viewsAreState(),
       },
       memberId,
     );
+    if (this.engine.viewsAreState()) return; // the snapshot is the joiner's view
     void this.engine
       .computeViewFor({ id: memberId, name: displayName })
       .catch((error: unknown) => this.emitError(error));
@@ -1065,6 +1140,7 @@ export class NovaSession implements NovaClientBackend {
     const player = this.playersMap.get(peer.memberId);
     if (player === undefined) return;
     this.playersMap.delete(peer.memberId);
+    this.controlsByMember.delete(peer.memberId);
     this.emit({ type: "playerLeft", player: toNovaPlayer(player) });
     if (this.engine.getAuthorityMemberId() === peer.memberId) {
       // The authority left: wait for election before applying more actions.
@@ -1122,6 +1198,13 @@ export class NovaSession implements NovaClientBackend {
           void this.sendProtocol((base) => buildGameReadyMessage(base), {
             targetMemberId: peerMessage.senderMemberId,
           }).catch((error: unknown) => this.emitError(error));
+        }
+        break;
+      }
+      case "game.controls": {
+        const json = JSON.stringify(peerMessage.controls) ?? "null";
+        if (new TextEncoder().encode(json).length <= controlsBytes) {
+          this.controlsByMember.set(peerMessage.senderMemberId, peerMessage.controls);
         }
         break;
       }
@@ -1241,6 +1324,7 @@ export class NovaSession implements NovaClientBackend {
             ? { actionRejections: peerMessage.actionRejections }
             : {}),
           state: peerMessage.state,
+          ...(peerMessage.viewIsState === true ? { viewIsState: true } : {}),
           senderMemberId: peerMessage.senderMemberId,
         });
         if (!this.startEmitted) {
@@ -1528,6 +1612,7 @@ export class NovaSession implements NovaClientBackend {
         [this.selfPlayer, ...this.playersMap.values()]
           .filter((record) => record.authorityEligible)
           .map((record) => record.id),
+      controls: () => this.connectedControls(),
       sendAck: (targetMemberId, ack) => this.sendEngineAck(targetMemberId, ack),
       sendSnapshot: (snapshot, targetMemberId) => this.sendEngineSnapshot(snapshot, targetMemberId),
       sendView: (targetMemberId, view) => this.sendEngineView(targetMemberId, view),
@@ -1584,6 +1669,7 @@ export class NovaSession implements NovaClientBackend {
           processedActionIds: snapshot.processedActionIds,
           ...(snapshot.actionRejections ? { actionRejections: snapshot.actionRejections } : {}),
           state: snapshot.state,
+          ...(snapshot.viewIsState ? { viewIsState: true as const } : {}),
         }),
       options,
     ).catch((error: unknown) => this.emitError(error));
@@ -1682,7 +1768,11 @@ export class NovaSession implements NovaClientBackend {
           appliedCount: event.appliedCount,
           rejectedCount: event.rejectedCount,
           actionRatePerSecond: event.actionRatePerSecond,
+          tick: event.tick,
         });
+        break;
+      case "viewFromState":
+        this.emit({ type: "state", state: event.state });
         break;
       case "actionRejected":
         this.emit({
@@ -1699,6 +1789,8 @@ export class NovaSession implements NovaClientBackend {
         // Flush buffered dispatches toward the new authority and re-send
         // in-flight ones (deduplication makes the re-sends exactly-once).
         this.flushDispatchBuffer();
+        // The new authority has never seen this player's controls.
+        this.flushControls(true);
         if (this.game.mode === "simulation") {
           // Authority changes notify the simulation loop (restore after
           // migration / follower snapshot pushes).

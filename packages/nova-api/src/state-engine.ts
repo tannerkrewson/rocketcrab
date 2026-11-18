@@ -131,6 +131,7 @@ export interface StateSnapshotEnvelope {
   readonly processedActionIds: readonly string[];
   readonly actionRejections?: readonly StateActionRejection[];
   readonly state: unknown;
+  readonly viewIsState: boolean;
 }
 
 /** A request for a full snapshot after a gap in the authority's stream (state.resync). */
@@ -160,6 +161,8 @@ export interface InboundSnapshot {
   readonly actionRejections?: readonly StateActionRejection[];
   /** Present on full snapshots; absent on deltas. */
   readonly state?: unknown;
+  /** Every frame's view is the canonical state (the game has no selectView). */
+  readonly viewIsState?: boolean;
   /** The transport sender (for targeted convergence re-sends). */
   readonly senderMemberId?: string;
 }
@@ -213,6 +216,8 @@ export interface StateEngineHost {
   selfConnected(): boolean;
   /** Member ids of every connected member eligible for authority. */
   eligibleMemberIds(): readonly string[];
+  /** Each connected player's latest controls (a ticking game's input). */
+  controls(): Readonly<Record<string, unknown>>;
   /** Send one action ack to a member (targeted). */
   sendAck(targetMemberId: string, ack: NovaActionAck): void;
   /** Broadcast a state snapshot, or target one member. */
@@ -241,8 +246,12 @@ export type StateEngineEvent =
       appliedCount: number;
       rejectedCount: number;
       actionRatePerSecond: number;
+      /** True for a tick's commit (hosts skip per-commit logging). */
+      tick: boolean;
     }
   | { type: "actionRejected"; actionId: string; code: string; message: string }
+  /** This shell's frame should show `state` (a game without selectView). */
+  | { type: "viewFromState"; state: unknown }
   | { type: "stateError"; code: string; message: string }
   /** The authority for the current term changed (session flushes buffers). */
   | { type: "authorityChanged"; authorityMemberId: string | null; term: number }
@@ -420,6 +429,18 @@ export class NovaStateEngine {
   private readonly lastSeqByActor = new Map<string, number>();
   private readonly stats: ActionStats = { applied: 0, rejected: 0, timestamps: [] };
   private lastCommitAt: number | null = null;
+  /** The game has no selectView, so views are the canonical state itself. */
+  private viewIsState = false;
+  /** Ticks per second once the game declared a `tick` handler. */
+  private tickRate: number | null = null;
+  private tickTimer: ReturnType<typeof setTimeout> | null = null;
+  /** The tick clock's reference point: `ticksCounted` ticks were due at `tickAnchorAt`. */
+  private tickAnchorAt = 0;
+  private ticksCounted = 0;
+  /** Ticks due but not yet applied (they run after queued actions). */
+  private pendingTicks = 0;
+  /** The tick failure already reported (cleared by a successful tick). */
+  private reportedTickProblem: string | null = null;
 
   constructor(options: NovaStateEngineOptions) {
     this.host = options.host;
@@ -434,6 +455,16 @@ export class NovaStateEngine {
     this.electionWindowMs = options.electionWindowMs ?? 500;
     this.restoreWindowMs = options.restoreWindowMs ?? 500;
     this.stateHashImpl = options.stateHash ?? stateHashOf;
+  }
+
+  /**
+   * Run the game's tick on this engine while it is the authority. The rate
+   * comes from this player's own game frame, which declares the same rate on
+   * every device; null turns ticking off.
+   */
+  setTickRate(rate: number | null): void {
+    this.tickRate = rate;
+    this.syncTickClock();
   }
 
   /**
@@ -485,6 +516,11 @@ export class NovaStateEngine {
   }
 
   /** The replicated canonical state (migration; null before the first). */
+  /** True when every frame's view is the canonical state (no selectView). */
+  viewsAreState(): boolean {
+    return this.viewIsState;
+  }
+
   getCanonicalState(): unknown {
     return this.canonical;
   }
@@ -619,7 +655,7 @@ export class NovaStateEngine {
       this.host.emit({ type: "stateError", code: result.code, message: result.message });
       return false;
     }
-    if (!(await this.commit(result.state, result.views))) {
+    if (!(await this.commit(result))) {
       this.host.emit({
         type: "stateError",
         code: "invalid_state",
@@ -636,6 +672,7 @@ export class NovaStateEngine {
   announce(): void {
     if (this.disposed || this.ended) return;
     if (!this.isAuthorityElect()) return;
+    this.syncTickClock();
     this.authorityMemberId = this.selfMemberId;
     this.authorityStateRevision = this.revision;
     this.host.sendAnnounce({
@@ -963,6 +1000,10 @@ export class NovaStateEngine {
     this.canonical = message.state;
     this.revision = message.revision;
     this.stateHash = message.stateHash;
+    this.viewIsState = message.viewIsState === true;
+    if (this.viewIsState && message.authorityMemberId !== this.selfMemberId) {
+      this.host.emit({ type: "viewFromState", state: this.canonical });
+    }
     if (message.authorityMemberId === this.authorityMemberId || adoptedAuthority) {
       this.authorityStateRevision = Math.max(this.authorityStateRevision, message.revision);
     }
@@ -1588,6 +1629,7 @@ export class NovaStateEngine {
       ...this.actionHistory(historyMode === "increment" ? [...this.pendingHistoryIds] : undefined),
       // A delta has no state: the key is absent on the wire, not null.
       state: delta ? undefined : this.canonical,
+      viewIsState: this.viewIsState,
     };
   }
 
@@ -1708,6 +1750,7 @@ export class NovaStateEngine {
    * restored its state are buffered and applied afterwards.
    */
   private processQueue(): void {
+    this.syncTickClock();
     if (!this.restoreDone) return;
     if (this.processing !== null) return;
     this.processing = this.runQueue().finally(() => {
@@ -1724,9 +1767,15 @@ export class NovaStateEngine {
   }
 
   private async runQueue(): Promise<void> {
-    while (this.canonical !== null && this.queue.length > 0) {
+    while (this.canonical !== null && (this.queue.length > 0 || this.pendingTicks > 0)) {
       const item = this.queue[0];
-      if (item === undefined) break;
+      if (item === undefined) {
+        // Actions go first; the due ticks then step the state they produced.
+        const steps = this.pendingTicks;
+        this.pendingTicks = 0;
+        await this.applyTick(steps);
+        continue;
+      }
       const handled = await this.applyOne(item);
       if (handled) {
         this.queue.shift();
@@ -1734,6 +1783,131 @@ export class NovaStateEngine {
         break; // the executor failed outside an action result: stop the queue
       }
     }
+  }
+
+  // ------------------------------------------------------------------
+  // The tick (authority only)
+  // ------------------------------------------------------------------
+
+  private shouldTick(): boolean {
+    return (
+      this.tickRate !== null &&
+      this.started &&
+      !this.ended &&
+      !this.disposed &&
+      this.authorityMemberId === this.selfMemberId &&
+      this.restoreDone &&
+      this.canonical !== null
+    );
+  }
+
+  /** Start the tick clock when this engine should tick, stop it when not. */
+  private syncTickClock(): void {
+    if (!this.shouldTick()) {
+      this.clearTickTimer();
+      this.pendingTicks = 0;
+      return;
+    }
+    if (this.tickTimer !== null) return;
+    this.tickAnchorAt = this.now();
+    this.ticksCounted = 0;
+    this.scheduleTick();
+  }
+
+  /**
+   * Wake at the next tick boundary. The clock follows elapsed time, not
+   * timer callbacks: ticks a busy or background tab missed run in one burst
+   * (up to a second's worth), and a longer gap or a backwards clock jump is
+   * skipped, so the game runs at the same speed on every host.
+   */
+  private scheduleTick(): void {
+    const tickMs = 1000 / (this.tickRate ?? 1);
+    const next = this.tickAnchorAt + (this.ticksCounted + 1) * tickMs;
+    this.tickTimer = setTimeout(
+      () => {
+        this.tickTimer = null;
+        if (!this.shouldTick()) {
+          this.pendingTicks = 0;
+          return;
+        }
+        const now = this.now();
+        const due = Math.floor((now - this.tickAnchorAt) / tickMs) - this.ticksCounted;
+        const maxBurst = this.tickRate ?? 1;
+        if (now < this.tickAnchorAt || due > maxBurst) {
+          this.tickAnchorAt = now;
+          this.ticksCounted = 0;
+        } else {
+          this.ticksCounted += Math.max(0, due);
+        }
+        // A host slower than its tick rate slows the game instead of piling up work.
+        this.pendingTicks = Math.min(maxBurst, this.pendingTicks + Math.max(0, due));
+        this.scheduleTick(); // before processQueue, which would otherwise start a second clock
+        this.processQueue();
+      },
+      Math.max(0, next - this.now()),
+    );
+  }
+
+  private clearTickTimer(): void {
+    if (this.tickTimer !== null) {
+      clearTimeout(this.tickTimer);
+      this.tickTimer = null;
+    }
+  }
+
+  /** Run `steps` ticks and commit the result once (unchanged state commits nothing). */
+  private async applyTick(steps: number): Promise<void> {
+    if (!this.shouldTick()) return;
+    const termAtStart = this.term;
+    const tick = this.executor.tick?.bind(this.executor);
+    if (tick === undefined) return;
+    const result = await this.withExecutorTimeout(
+      tick({
+        state: this.canonical,
+        context: {
+          ...this.contextFor(this.revision),
+          dt: 1 / (this.tickRate ?? 1),
+          controls: this.host.controls(),
+        },
+        steps,
+        viewers: this.viewers(),
+      }),
+    );
+    if (this.disposed || this.authorityMemberId !== this.selfMemberId) return;
+    if (this.term !== termAtStart || !this.restoreDone) return;
+    const problem = !result.ok
+      ? { code: result.code, message: result.message }
+      : this.stateProblem(result.state, "tick");
+    if (problem !== null) {
+      // A broken tick fails every step: report it once, not 20 times a second.
+      if (this.reportedTickProblem !== problem.code) {
+        this.reportedTickProblem = problem.code;
+        this.host.emit({ type: "stateError", ...problem });
+      }
+      return;
+    }
+    this.reportedTickProblem = null;
+    if (result.ok) await this.commit(result, undefined, true);
+  }
+
+  /** Why a handler's result cannot become the canonical state, or null. */
+  private stateProblem(state: unknown, source: string): { code: string; message: string } | null {
+    try {
+      assertStructuredCloneSafe(state, `${source} result state`);
+    } catch (error) {
+      return {
+        code: "invalid_state",
+        message: `The ${source} handler produced state that is not plain data: ${describeError(error)}`,
+      };
+    }
+    const size = serializedBytesSync(state);
+    if (size > stateSnapshotBytes) {
+      return {
+        code: "state_too_large",
+        message: `The ${source} handler produced a ${size}-byte state; the hard limit is ${stateSnapshotBytes} bytes.`,
+      };
+    }
+    return null;
   }
 
   /** Apply one queued action; resolves true when it was settled. */
@@ -1782,26 +1956,12 @@ export class NovaStateEngine {
       this.settleRejected(item, result.code, result.message);
       return true;
     }
-    try {
-      assertStructuredCloneSafe(result.state, "action result state");
-    } catch (error) {
-      this.settleRejected(
-        item,
-        "invalid_state",
-        `The action handler produced state that is not plain data: ${error instanceof Error ? error.message : String(error)}`,
-      );
+    const problem = this.stateProblem(result.state, "action");
+    if (problem !== null) {
+      this.settleRejected(item, problem.code, problem.message);
       return true;
     }
-    const size = serializedBytesSync(result.state);
-    if (size > stateSnapshotBytes) {
-      this.settleRejected(
-        item,
-        "state_too_large",
-        `Applying the action produced a ${size}-byte state; the hard limit is ${stateSnapshotBytes} bytes.`,
-      );
-      return true;
-    }
-    if (!(await this.commit(result.state, result.views, item.actionId))) {
+    if (!(await this.commit(result, item.actionId))) {
       // The authority changed (or the engine disposed) during the async
       // state-hash digest: drop the result silently, exactly like the
       // post-handler check above. The dispatcher re-sends once the new
@@ -1826,10 +1986,11 @@ export class NovaStateEngine {
    * no action commits twice).
    */
   private async commit(
-    state: unknown,
-    views: Record<string, unknown>,
+    result: { state: unknown; views: Record<string, unknown>; viewIsState?: true },
     actionId?: string,
+    tick = false,
   ): Promise<boolean> {
+    const { state, views } = result;
     if (this.disposed) return false;
     if (this.authorityMemberId !== this.selfMemberId || !this.restoreDone) return false;
     // Hash BEFORE mutating revision/canonical: a catch-up snapshot read
@@ -1838,6 +1999,8 @@ export class NovaStateEngine {
     const stateHash = await this.stateHashImpl(state);
     if (this.disposed) return false;
     if (this.authorityMemberId !== this.selfMemberId || !this.restoreDone) return false;
+    // A tick that changed nothing (a paused game) sends nothing.
+    if (tick && stateHash === this.stateHash) return true;
     this.revision += 1;
     this.canonical = state;
     this.stateHash = stateHash;
@@ -1850,15 +2013,26 @@ export class NovaStateEngine {
       });
     }
     this.lastCommitAt = this.now();
-    this.stats.applied += 1;
-    this.noteProcessed();
+    if (!tick) {
+      this.stats.applied += 1;
+      this.noteProcessed();
+    }
     this.authorityStateRevision = this.revision;
+    this.viewIsState = result.viewIsState === true;
     this.broadcastSnapshot(true);
     const envelope = {
       revision: this.revision,
       stateHash: this.stateHash,
     };
-    for (const player of this.host.players()) {
+    if (this.viewIsState) {
+      // Every shell already holds the state from the broadcast; only this frame needs it.
+      this.host.sendView(this.selfMemberId, {
+        ...envelope,
+        forMemberId: this.selfMemberId,
+        view: state,
+      });
+    }
+    for (const player of this.viewIsState ? [] : this.host.players()) {
       const view = views[player.id];
       if (view === undefined) {
         this.host.emit({
@@ -1878,6 +2052,7 @@ export class NovaStateEngine {
       appliedCount: this.stats.applied,
       rejectedCount: this.stats.rejected,
       actionRatePerSecond: this.actionRate(),
+      tick,
     });
     return true;
   }
@@ -2106,6 +2281,7 @@ export class NovaStateEngine {
   }
 
   private clearTimers(): void {
+    this.clearTickTimer();
     this.clearGraceTimer();
     this.clearHeartbeatTimer();
     this.clearRestoreTimer();

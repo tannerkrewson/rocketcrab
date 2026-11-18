@@ -7,6 +7,7 @@ import {
   type NovaStateExecutor,
   type NovaStateStateResult,
   type NovaStateViewResult,
+  type NovaTickContext,
 } from "@rocketcrab/nova-api";
 import type { RuntimeHostClient } from "../runtime-host";
 import {
@@ -56,6 +57,15 @@ export class PartyStateExecutor implements NovaStateExecutor {
     viewers: readonly NovaPlayer[];
   }): Promise<NovaStateStateResult> {
     return this.runtime() !== null ? this.frame.applyAction(input) : this.local.applyAction(input);
+  }
+
+  tick(input: {
+    state: unknown;
+    context: NovaTickContext;
+    steps: number;
+    viewers: readonly NovaPlayer[];
+  }): Promise<NovaStateStateResult> {
+    return this.runtime() !== null ? this.frame.tick(input) : this.local.tick(input);
   }
 
   computeView(input: { state: unknown; viewer: NovaPlayer }): Promise<NovaStateViewResult> {

@@ -8,6 +8,7 @@ import {
   gameModeSchema,
   simulationResponseSchema,
   stateResponseSchema,
+  tickRateMax,
   titleSchema,
   type GameMode,
 } from "@rocketcrab/protocol";
@@ -29,6 +30,7 @@ export const gameDeclarationSchema = z.object({
   gameMode: gameModeSchema.optional(),
   gameVersion: z.string().min(1).max(32).optional(),
   apiVersion: z.number().int().min(1).optional(),
+  tickRate: z.number().int().min(1).max(tickRateMax).optional(),
 });
 export type GameDeclaration = z.infer<typeof gameDeclarationSchema>;
 
@@ -74,6 +76,7 @@ export const novaApiCallSchemas = {
         .optional(),
     })
     .strict(),
+  "controls.set": z.object({ controls: z.unknown() }).strict(),
   "simulation.register": z.object({}).strict(),
   "simulation.sendInput": z
     .object({
@@ -175,6 +178,7 @@ export function registrationFields(input: {
   title: string;
   gameMode: GameMode;
   gameVersion?: string;
+  tickRate?: number;
 } {
   return {
     gameId: input.bootstrapGameId,
@@ -183,5 +187,6 @@ export function registrationFields(input: {
     ...(input.declaration?.gameVersion !== undefined
       ? { gameVersion: input.declaration.gameVersion }
       : {}),
+    ...(input.declaration?.tickRate !== undefined ? { tickRate: input.declaration.tickRate } : {}),
   };
 }
