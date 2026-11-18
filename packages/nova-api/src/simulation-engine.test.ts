@@ -5,13 +5,15 @@
  * the local tick clock, snapshot production (the game's serializeState
  * callback), snapshot retention and replication, restore after authority
  * migration (adopt highest valid snapshot, hash-checked), follower pushes,
- * input rate bounding, latency/drift reporting, clock resync, stale-term
+ * input rate bounding, latency/drift reporting, the elapsed-time clock
+ * (catch-up, suspension, snapshot ticks), snapshot validation, stale-term
  * gating, and snapshot size bounds.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { stateHashOf } from "./state-engine";
 import {
   LocalSimulationExecutor,
+  MAX_CATCH_UP_MS,
   NovaSimulationEngine,
   type NovaSimulationExecutor,
   type SimulationEngineEvent,
@@ -176,7 +178,7 @@ describe(
       const sent = host.snapshots[0];
       expect(sent?.target).toBeUndefined(); // broadcast
       expect(sent?.snapshot).toMatchObject({
-        tick: 4,
+        tick: 5, // taken right after the tick it describes
         state: { count: 7 },
         term: 1,
         authorityMemberId: "member-a",
@@ -184,7 +186,7 @@ describe(
       expect(sent?.snapshot.stateHash).toMatch(/^[0-9a-f]{64}$/);
       // The produced snapshot is the retained replication copy.
       expect(engine.getLatestSnapshot()?.state).toEqual({ count: 7 });
-      expect(engine.getLatestSnapshot()?.tick).toBe(4);
+      expect(engine.getLatestSnapshot()?.tick).toBe(5);
       const diagnostics = engine.getDiagnostics();
       expect(diagnostics.tickMs).toBe(100);
       expect(diagnostics.snapshotIntervalMs).toBe(500);
@@ -251,6 +253,114 @@ describe(
       });
     });
 
+    it("reports a failing serializeState once, not at every snapshot", async () => {
+      let failing = true;
+      let calls = 0;
+      const { engine, host } = makeTimedEngine("member-a", {
+        async serializeState() {
+          calls += 1;
+          if (failing) throw new Error("game exploded");
+          return { ok: true as const, state: { count: calls } };
+        },
+      });
+      const errors = () => host.events.filter((event) => event.type === "error");
+      engine.onAuthorityChanged("member-a", 1);
+      engine.begin();
+      for (let i = 0; i < 3; i += 1) {
+        vi.advanceTimersByTime(500);
+        await waitUntil(() => calls > i, `attempt ${i + 1}`);
+        await new Promise<void>((resolve) => setImmediate(resolve)); // let it settle
+      }
+      expect(errors()).toHaveLength(1);
+      failing = false;
+      vi.advanceTimersByTime(500);
+      await waitUntil(() => host.snapshots.length === 1, "recovered snapshot");
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      failing = true;
+      vi.advanceTimersByTime(500);
+      await waitUntil(() => errors().length === 2, "a new failure is reported again");
+    });
+
+    it("never stacks serializeState requests behind a slow frame", async () => {
+      let calls = 0;
+      let answer: (state: unknown) => void = () => undefined;
+      const { engine, host } = makeTimedEngine("member-a", {
+        serializeState() {
+          calls += 1;
+          return new Promise((resolve) => {
+            answer = (state) => resolve({ ok: true, state });
+          });
+        },
+      });
+      engine.onAuthorityChanged("member-a", 1);
+      engine.begin();
+      vi.advanceTimersByTime(2_000);
+      expect(calls).toBe(1);
+      answer({ count: 1 });
+      await waitUntil(() => host.snapshots.length === 1, "slow snapshot");
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      vi.advanceTimersByTime(500);
+      expect(calls).toBe(2);
+    });
+
+    it("rejects state that cannot travel as JSON with a clear error", async () => {
+      const cyclic: Record<string, unknown> = {};
+      cyclic.self = cyclic;
+      for (const state of [undefined, cyclic, { big: 1n }]) {
+        const { engine, host } = makeTimedEngine("member-a", {
+          async serializeState() {
+            return { ok: true as const, state };
+          },
+        });
+        engine.onAuthorityChanged("member-a", 1);
+        engine.begin();
+        vi.advanceTimersByTime(500);
+        await waitUntil(() => host.events.some((event) => event.type === "error"), "state error");
+        expect(host.events).toContainEqual(
+          expect.objectContaining({ type: "error", code: "invalid_state" }),
+        );
+        expect(host.snapshots).toHaveLength(0);
+      }
+    });
+
+    it("sends NaN as null, as other players receive it, and warns once", async () => {
+      const { engine, host } = makeTimedEngine("member-a", {
+        async serializeState() {
+          return { ok: true as const, state: { ball: { x: Number.NaN, y: 2 } } };
+        },
+      });
+      engine.onAuthorityChanged("member-a", 1);
+      engine.begin();
+      vi.advanceTimersByTime(500);
+      await waitUntil(() => host.snapshots.length === 1, "lossy snapshot");
+      await new Promise<void>((resolve) => setImmediate(resolve));
+      expect(host.snapshots[0]?.snapshot.state).toEqual({ ball: { x: null, y: 2 } });
+      expect(host.events).toContainEqual({
+        type: "error",
+        code: "invalid_state",
+        message: expect.stringContaining('"x" is NaN') as unknown as string,
+      });
+      vi.advanceTimersByTime(500);
+      await waitUntil(() => host.snapshots.length === 2, "second lossy snapshot");
+      expect(host.events.filter((event) => event.type === "error")).toHaveLength(1);
+    });
+
+    it("retains a copy, not the game's live object", async () => {
+      const live = { puck: { x: 1 } };
+      const { engine, host } = makeTimedEngine("member-a", {
+        async serializeState() {
+          return { ok: true as const, state: live };
+        },
+      });
+      engine.onAuthorityChanged("member-a", 1);
+      engine.begin();
+      vi.advanceTimersByTime(500);
+      await waitUntil(() => host.snapshots.length === 1, "snapshot");
+      live.puck.x = 99;
+      expect(engine.getLatestSnapshot()?.state).toEqual({ puck: { x: 1 } });
+      expect(engine.getLatestSnapshot()?.stateHash).toBe(await stateHashOf({ puck: { x: 1 } }));
+    });
+
     it("does not produce snapshots as a follower or before starting", async () => {
       const { engine, host } = makeTimedEngine("member-a");
       engine.onAuthorityChanged("member-b", 1); // follower
@@ -271,7 +381,6 @@ describe(
         authorityMemberId: "member-a",
         stateHash: "a".repeat(64),
         state: { count: 10 },
-        sentAt: 0,
       });
       expect(received).toEqual({ tick: 10, state: { count: 10 }, stateHash: "a".repeat(64) });
       expect(host.events).toHaveLength(0); // the session delivers to the frame
@@ -281,7 +390,6 @@ describe(
         authorityMemberId: "member-a",
         stateHash: "b".repeat(64),
         state: { count: 8 },
-        sentAt: 0,
       });
       expect(older).toBeNull();
       expect(engine.getLatestSnapshot()?.tick).toBe(10);
@@ -322,7 +430,6 @@ describe(
         authorityMemberId: "member-a",
         stateHash: "a".repeat(64),
         state: { count: 50 },
-        sentAt: 0,
       });
       expect(received).toBeNull();
       expect(engine.getLatestSnapshot()).toBeNull();
@@ -338,7 +445,6 @@ describe(
         authorityMemberId: "member-a",
         stateHash: null,
         state: { count: 10 },
-        sentAt: 0,
       });
       engine.onAuthorityChanged("member-b", 2); // election: B wins term 2
       // A peer push with a higher snapshot arrives during the restore window.
@@ -349,7 +455,6 @@ describe(
         authorityMemberId: "member-b",
         stateHash: higher,
         state: { count: 14 },
-        sentAt: 0,
       });
       // The restore window closes: the highest valid snapshot is adopted and
       // re-broadcast as a correction (restore after authority migration).
@@ -402,7 +507,6 @@ describe(
         authorityMemberId: "member-a",
         stateHash: prior,
         state: { count: 10 },
-        sentAt: 0,
       });
       engine.onAuthorityChanged("member-b", 2);
       engine.handleSnapshot({
@@ -411,7 +515,6 @@ describe(
         authorityMemberId: "member-b",
         stateHash: "f".repeat(64), // does not match sha256({count: 12})
         state: { count: 12 },
-        sentAt: 0,
       });
       expect(engine.getLatestSnapshot()?.tick).toBe(10);
       expect(engine.getCatchUpSnapshot()).toBeNull();
@@ -440,7 +543,6 @@ describe(
         authorityMemberId: "member-a",
         stateHash: null,
         state: { count: 9 },
-        sentAt: 0,
       });
       // The authority migrated from A to C.
       engine.onAuthorityChanged("member-c", 2);
@@ -484,35 +586,82 @@ describe(
       expect(engine.getDiagnostics().inputLatencyMs).toBeCloseTo(733.33, 0);
     });
 
-    it("resyncs the local clock to the authority's snapshot clock on drift", () => {
-      let now = 1_000_000;
-      const { engine } = makeTimedEngine("member-a", undefined, () => now);
+    it("continues the clock from an accepted snapshot's tick", () => {
+      const { engine, host } = makeTimedEngine("member-b");
       engine.begin();
       vi.advanceTimersByTime(500); // local tick 5
-      // The authority is far ahead: a snapshot at tick 10 sent 50 ms ago.
-      now += 50;
+      // The authority's state is from tick 3: the frame restores it, so the
+      // next step must be tick 4, whatever the device clocks say.
       engine.handleSnapshot({
-        tick: 10,
+        tick: 3,
         term: 1,
         authorityMemberId: "member-a",
         stateHash: null,
         state: {},
-        sentAt: now - 50,
       });
-      // Expected tick = 10 + 50/100 = 10.5 → resync to 11.
-      expect(engine.getTick()).toBe(11);
-      expect(engine.getDiagnostics().driftTicks).toBe(0); // realigned
-      // Small drift does not resync.
+      expect(engine.getTick()).toBe(3);
+      expect(engine.getDiagnostics().driftTicks).toBe(2); // local had run ahead
+      host.events.length = 0;
+      vi.advanceTimersByTime(200);
+      expect(host.events).toEqual([
+        { type: "tick", tick: 4 },
+        { type: "tick", tick: 5 },
+      ]);
+    });
+
+    it("starts a late joiner's clock at the catch-up snapshot's tick", () => {
+      const { engine, host } = makeTimedEngine("member-c");
       engine.handleSnapshot({
-        tick: 11,
+        tick: 40,
         term: 1,
         authorityMemberId: "member-a",
         stateHash: null,
         state: {},
-        sentAt: now,
       });
-      expect(engine.getTick()).toBe(11);
-      expect(engine.getDiagnostics().driftTicks).toBe(0);
+      engine.begin();
+      vi.advanceTimersByTime(100);
+      expect(host.events).toEqual([{ type: "tick", tick: 41 }]);
+    });
+
+    it("catches up ticks a throttled timer missed, in one burst", () => {
+      const { engine, host } = makeTimedEngine("member-a");
+      engine.begin();
+      vi.advanceTimersByTime(100); // tick 1
+      // A background tab: the timer wakes a second late.
+      vi.setSystemTime(Date.now() + 1_000);
+      vi.advanceTimersByTime(100);
+      expect(engine.getTick()).toBe(12);
+      expect(host.events.filter((event) => event.type === "tick")).toHaveLength(12);
+      // The clock is back on its cadence afterwards.
+      vi.advanceTimersByTime(100);
+      expect(engine.getTick()).toBe(13);
+    });
+
+    it("skips a long suspension instead of replaying it", () => {
+      const { engine } = makeTimedEngine("member-a");
+      engine.begin();
+      vi.setSystemTime(Date.now() + 60_000); // a phone slept for a minute
+      vi.advanceTimersByTime(100);
+      expect(engine.getTick()).toBe(MAX_CATCH_UP_MS / 100);
+      vi.advanceTimersByTime(100);
+      expect(engine.getTick()).toBe(MAX_CATCH_UP_MS / 100 + 1);
+    });
+
+    it("keeps ticking at the cadence when the system clock moves backwards", () => {
+      const { engine } = makeTimedEngine("member-a");
+      engine.begin();
+      vi.advanceTimersByTime(300);
+      vi.setSystemTime(Date.now() - 60_000);
+      vi.advanceTimersByTime(300);
+      expect(engine.getTick()).toBeGreaterThanOrEqual(5);
+      expect(engine.getTick()).toBeLessThanOrEqual(6);
+    });
+
+    it("does not count this player's own inputs toward latency", () => {
+      const { engine } = makeTimedEngine("member-a");
+      engine.handleInputReceived();
+      expect(engine.getDiagnostics().inputsReceived).toBe(1);
+      expect(engine.getDiagnostics().inputLatencyMs).toBeNull();
     });
 
     it("exposes complete diagnostics", () => {

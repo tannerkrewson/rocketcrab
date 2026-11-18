@@ -1006,19 +1006,20 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
     });
 
     it("routes inputs in Nova-assigned order and reports latency", async () => {
-      const { harness, b, gameB } = await makeSimulationPair(harnessFactory);
+      const { harness, b, gameA, gameB } = await makeSimulationPair(harnessFactory);
       gameB.client.simulation.sendInput({ type: "move", payload: { dx: 5 } });
       await waitForSimulation(harness, () => gameB.received.length >= 1, "self input");
       // Two more moves from Ada: per-sender order is preserved (the ordered
-      // channel + Nova-assigned per-sender seq), so Ben's frame applies
-      // dx 1, dx 1, dx 5 in that order.
-      gameB.client.simulation.sendInput({ type: "move", payload: { dx: 1 } });
-      gameB.client.simulation.sendInput({ type: "move", payload: { dx: 1 } });
+      // channel + Nova-assigned per-sender seq), so Ben's frame sees his own
+      // dx 5, then Ada's dx 1, dx 1.
+      gameA.client.simulation.sendInput({ type: "move", payload: { dx: 1 } });
+      gameA.client.simulation.sendInput({ type: "move", payload: { dx: 1 } });
       await waitForSimulation(harness, () => gameB.received.length >= 3, "ordered inputs");
       const dxs = gameB.received.map((input) => (input.payload as { dx?: number }).dx);
       expect(dxs.slice(0, 3)).toEqual([5, 1, 1]);
       const diagnostics = b.getSimulationDiagnostics();
       expect(diagnostics.inputsReceived).toBeGreaterThanOrEqual(3);
+      // Latency is measured on Ada's inputs; Ben's own loop-back has none.
       expect(diagnostics.inputLatencyMs).not.toBeNull();
     });
 

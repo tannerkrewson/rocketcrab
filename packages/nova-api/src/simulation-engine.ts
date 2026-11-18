@@ -19,25 +19,36 @@
  * ## Flow
  *
  * - Every session runs a **local clock** at `tickMs`; each tick is emitted
- *   as a `tick` event and the game advances one fixed time step. Inputs are
- *   delivered as they arrive (per-sender Nova-assigned order); the game
- *   applies them during its next step (local prediction).
- * - The **authority** additionally runs a snapshot cadence at
- *   `snapshotIntervalMs`: it asks the frame for the serialized state,
- *   verifies the size bound, hashes it, and broadcasts
- *   `simulation.snapshot` (tick, term, authority, hash, state). Every
- *   session retains the latest snapshot for migration.
+ *   as a `tick` event and the game advances one fixed time step. The clock
+ *   follows elapsed time, not timer callbacks: a late or throttled timer
+ *   (a busy main thread, a background tab) emits the missed ticks in one
+ *   burst, up to {@link MAX_CATCH_UP_MS}; a longer gap (a suspended tab, a
+ *   clock change) is skipped rather than replayed. Every device therefore
+ *   runs the game at the same speed. Inputs are delivered as they arrive
+ *   (per-sender Nova-assigned order); the game applies them during its next
+ *   step (local prediction).
+ * - The **authority** takes a snapshot every `snapshotIntervalMs` worth of
+ *   ticks, right after the tick it describes: it asks the frame for the
+ *   serialized state, checks that it is plain JSON within the size bound,
+ *   hashes it, and broadcasts `simulation.snapshot` (tick, term, authority,
+ *   hash, state). At most one request is in flight, and a failure is
+ *   reported once until a snapshot succeeds again. Every session retains
+ *   the latest snapshot for migration.
+ * - **Tick and state agree.** Accepting a snapshot sets the local tick to
+ *   the snapshot's tick, so after `onSnapshot` the next `onTick` steps the
+ *   restored state forward from exactly that tick. Device clocks are never
+ *   compared (phones disagree by hundreds of ms); a follower simply runs
+ *   about one transit time behind the authority.
  * - **Authority migration**: when the state engine reports a new
  *   authority, followers push their retained snapshot to it; the new
  *   authority collects pushes for `restoreWindowMs`, adopts the highest
  *   valid snapshot (hash-checked), re-broadcasts it as a correction, and
  *   resumes the cadence. Every frame (including the new authority's) sees
  *   the correction through `onSnapshot` and restores.
- * - **Latency and drift**: input latency is measured from the message
- *   envelope's `sentAt`; drift is the local clock vs. the authority's
- *   snapshot clock (snapshot tick + transit time). High latency and drift
- *   are reported through {@link NovaSimulationDiagnostics}, and the local
- *   clock resyncs to the authority when drift exceeds a tick or two.
+ * - **Diagnostics**: input latency is measured from the message envelope's
+ *   `sentAt` (sender clock, so only indicative); drift is how far the local
+ *   tick had run from the authoritative snapshot when it arrived. Both are
+ *   reported through {@link NovaSimulationDiagnostics}.
  *
  * All timings are configurable (bounded by the protocol limits) so tests
  * use fake timers and deterministic runs.
@@ -58,6 +69,14 @@ import type { NovaPlayer, NovaSimulationDiagnostics } from "./types";
 
 /** Length of the input-rate and latency sliding windows. */
 const RATE_WINDOW_MS = 10_000;
+
+/**
+ * The most simulated time one clock wake-up replays. Background tabs run
+ * timers about once a second, so two seconds keeps a throttled authority at
+ * full speed; anything longer (a suspended phone) is skipped, and the next
+ * snapshot corrects the state.
+ */
+export const MAX_CATCH_UP_MS = 2_000;
 
 /** One authoritative simulation snapshot as the engine replicates it. */
 export interface SimulationSnapshotEnvelope {
@@ -112,9 +131,13 @@ function simulationFailure(
   code: string,
   error: unknown,
 ): { ok: false; code: string; message: string } {
+  return { ok: false, code, message: errorText(error) };
+}
+
+function errorText(error: unknown): string {
   const message =
     error instanceof Error ? error.message : typeof error === "string" ? error : String(error);
-  return { ok: false, code, message: message.slice(0, 256) };
+  return message.slice(0, 256);
 }
 
 /**
@@ -167,7 +190,7 @@ export interface NovaSimulationEngineOptions {
 }
 
 function clamp(value: number | undefined, fallback: number, min: number, max: number): number {
-  if (value === undefined) return fallback;
+  if (value === undefined || !Number.isFinite(value)) return fallback;
   return Math.min(max, Math.max(min, value));
 }
 
@@ -188,10 +211,16 @@ export class NovaSimulationEngine {
   private readonly selfMemberId: string;
   private readonly tickMs: number;
   private readonly snapshotIntervalMs: number;
+  /** Snapshot cadence in ticks (snapshots are taken right after a tick). */
+  private readonly snapshotEveryTicks: number;
+  private readonly maxCatchUpTicks: number;
   private readonly restoreWindowMs: number;
   private readonly now: () => number;
 
   private tick = 0;
+  /** The clock's reference point: `tick` was `anchorTick` at `anchorAt`. */
+  private anchorTick = 0;
+  private anchorAt = 0;
   private term = 1;
   private authorityMemberId: string | null = null;
   private isAuthority = false;
@@ -200,10 +229,15 @@ export class NovaSimulationEngine {
   private started = false;
   private ended = false;
   private disposed = false;
-  private tickTimer: ReturnType<typeof setInterval> | null = null;
-  private snapshotTimer: ReturnType<typeof setTimeout> | null = null;
+  private tickTimer: ReturnType<typeof setTimeout> | null = null;
   private restoreTimer: ReturnType<typeof setTimeout> | null = null;
   private restoreCandidate: RetainedSimulationSnapshot | null = null;
+  /** The tick of the last snapshot this authority produced or restored. */
+  private lastSnapshotTick: number | null = null;
+  /** True while a serializeState request is outstanding. */
+  private serializing = false;
+  /** The snapshot problem already reported (cleared by a clean snapshot). */
+  private reportedProblem: string | null = null;
 
   /** The latest replicated snapshot and the timeline it was delivered from. */
   private latestTimeline: { term: number; authorityMemberId: string } | null = null;
@@ -232,6 +266,8 @@ export class NovaSimulationEngine {
       simulationSnapshotMinIntervalMs,
       simulationSnapshotMaxIntervalMs,
     );
+    this.snapshotEveryTicks = Math.max(1, Math.round(this.snapshotIntervalMs / this.tickMs));
+    this.maxCatchUpTicks = Math.max(1, Math.floor(MAX_CATCH_UP_MS / this.tickMs));
     this.restoreWindowMs = options.restoreWindowMs ?? 150;
     this.now = options.now ?? (() => Date.now());
   }
@@ -248,11 +284,8 @@ export class NovaSimulationEngine {
   begin(): void {
     if (this.started || this.ended || this.disposed) return;
     this.started = true;
-    this.tickTimer = setInterval(() => {
-      if (this.ended || this.disposed || (this.isAuthority && !this.restored)) return;
-      this.tick += 1;
-      this.host.emit({ type: "tick", tick: this.tick });
-    }, this.tickMs);
+    this.setTick(this.tick);
+    this.scheduleTick();
   }
 
   /** Stop the clock and the snapshot cadence (game end). */
@@ -290,10 +323,10 @@ export class NovaSimulationEngine {
     this.authorityMemberId = authorityMemberId;
     this.isAuthority = authorityMemberId === this.selfMemberId;
     if (!this.isAuthority) {
-      this.stopCadence();
       this.stopRestoreTimer();
       this.restoreCandidate = null;
       this.restored = true;
+      this.lastSnapshotTick = null;
       if (changed && authorityMemberId !== null && this.latest !== null) {
         // A follower pushes its replicated snapshot to the elected winner
         // (the winner restores the highest valid snapshot).
@@ -305,7 +338,7 @@ export class NovaSimulationEngine {
     if (term === 1 && this.latest === null) {
       // The initial authority can start without a recovery snapshot.
       this.restored = true;
-      this.startCadence();
+      this.lastSnapshotTick = this.tick;
       return;
     }
     // Collect peer snapshots even if the replacement host missed every update.
@@ -323,17 +356,19 @@ export class NovaSimulationEngine {
   // ------------------------------------------------------------------
 
   /**
-   * One `simulation.input` arrived: record latency (envelope `sentAt`) and
-   * the receive rate for diagnostics. Inputs themselves are delivered to
-   * the game by the session immediately (per-sender ordered).
+   * One `simulation.input` arrived: record the receive rate and, for a
+   * peer's input, the latency from its envelope `sentAt` (diagnostics).
+   * Omit `sentAt` for this player's own looped-back input. Inputs
+   * themselves are delivered to the game by the session immediately
+   * (per-sender ordered).
    */
-  handleInputReceived(sentAt: number): void {
+  handleInputReceived(sentAt?: number): void {
     if (this.disposed) return;
     this.inputsReceived += 1;
     const now = this.now();
     this.receivedTimestamps.push(now);
     this.prune(this.receivedTimestamps, now);
-    if (sentAt > 0) {
+    if (sentAt !== undefined && sentAt > 0) {
       this.latencySamples.push({ at: now, latency: Math.max(0, now - sentAt) });
       this.pruneLatency(now);
     }
@@ -341,9 +376,9 @@ export class NovaSimulationEngine {
 
   /**
    * One authoritative `simulation.snapshot` arrived: retain the replicated
-   * copy (highest tick wins; stale terms are dropped), resync the local
-   * clock to the authority's clock, and return the snapshot so the session
-   * can deliver it to the game frame (correction / late join / restore).
+   * copy (highest tick wins; stale terms are dropped), move the local clock
+   * to the snapshot's tick, and return the snapshot so the session can
+   * deliver it to the game frame (correction / late join / restore).
    * Restore candidates remain internal until the replacement host validates one.
    */
   handleSnapshot(message: {
@@ -352,8 +387,6 @@ export class NovaSimulationEngine {
     authorityMemberId: string;
     stateHash: string | null;
     state: unknown;
-    /** Envelope send timestamp (drift measurement). */
-    sentAt?: number;
     senderMemberId?: string;
   }): RetainedSimulationSnapshot | null {
     if (this.disposed || this.ended || message.term < this.term) return null;
@@ -399,21 +432,10 @@ export class NovaSimulationEngine {
     this.latestReceivedAt = receivedAt;
     this.snapshotsReceived += 1;
     this.lastSnapshotAt = receivedAt;
-    this.snapshotSizeBytes = serializedBytesSync(message.state);
-    // Drift: how far the local clock is from the authority's clock at the
-    // moment this snapshot arrived (transit time estimated from sentAt).
-    if (message.sentAt !== undefined && message.sentAt > 0 && this.started) {
-      const authorityTickNow = message.tick + (receivedAt - message.sentAt) / this.tickMs;
-      const drift = this.tick - authorityTickNow;
-      if (Math.abs(drift) >= 2) {
-        // Resync the local clock to the authority (the game restores from
-        // the snapshot and continues from the authoritative clock).
-        this.tick = Math.max(0, Math.round(authorityTickNow));
-        this.driftTicks = 0;
-      } else {
-        this.driftTicks = Math.round(drift);
-      }
-    }
+    this.snapshotSizeBytes = serializedBytes(message.state);
+    // The game restores this state, so the clock continues from its tick.
+    if (this.started) this.driftTicks = this.tick - message.tick;
+    this.setTick(message.tick);
     return retained;
   }
 
@@ -495,35 +517,84 @@ export class NovaSimulationEngine {
   }
 
   // ------------------------------------------------------------------
+  // The clock
+  // ------------------------------------------------------------------
+
+  /** Jump the clock to `tick`, measuring the next steps from now. */
+  private setTick(tick: number): void {
+    this.tick = tick;
+    this.anchorTick = tick;
+    this.anchorAt = this.now();
+  }
+
+  /** Wake at the next tick boundary (self-correcting, never drifts). */
+  private scheduleTick(): void {
+    if (this.ended || this.disposed || !this.started) return;
+    const next = this.anchorAt + (this.tick - this.anchorTick + 1) * this.tickMs;
+    this.tickTimer = setTimeout(
+      () => {
+        this.tickTimer = null;
+        this.runClock();
+        this.scheduleTick();
+      },
+      Math.max(0, next - this.now()),
+    );
+  }
+
+  /** Emit every tick that is due, then take a snapshot if one is due. */
+  private runClock(): void {
+    if (this.ended || this.disposed) return;
+    if (this.isAuthority && !this.restored) {
+      // The replacement host holds its clock until it has restored.
+      this.setTick(this.tick);
+      return;
+    }
+    const now = this.now();
+    let due = this.anchorTick + Math.floor((now - this.anchorAt) / this.tickMs) - this.tick;
+    if (now < this.anchorAt) {
+      // The system clock moved backwards: measure from here.
+      this.setTick(this.tick);
+      due = 0;
+    } else if (due > this.maxCatchUpTicks) {
+      // A suspended tab: replay a bounded burst and skip the rest.
+      due = this.maxCatchUpTicks;
+      this.anchorTick = this.tick + due;
+      this.anchorAt = now;
+    }
+    for (let step = 0; step < due; step += 1) {
+      if (this.ended || this.disposed) return;
+      this.tick += 1;
+      this.host.emit({ type: "tick", tick: this.tick });
+    }
+    this.maybeProduceSnapshot();
+  }
+
+  // ------------------------------------------------------------------
   // Snapshot production (authority side)
   // ------------------------------------------------------------------
 
-  /** Start the periodic snapshot cadence (authority only). */
-  private startCadence(): void {
-    this.stopCadence();
+  /** Take a snapshot when this authority's cadence is due (after a tick). */
+  private maybeProduceSnapshot(): void {
     if (this.disposed || this.ended || !this.isAuthority || !this.restored) return;
-    this.snapshotTimer = setTimeout(() => {
-      this.snapshotTimer = null;
-      if (this.disposed || this.ended || !this.isAuthority || !this.restored) return;
-      void this.produceSnapshot();
-      this.startCadence();
-    }, this.snapshotIntervalMs);
-  }
-
-  private stopCadence(): void {
-    if (this.snapshotTimer !== null) {
-      clearTimeout(this.snapshotTimer);
-      this.snapshotTimer = null;
+    if (this.serializing) return;
+    if (this.lastSnapshotTick === null || this.lastSnapshotTick > this.tick) {
+      this.lastSnapshotTick = this.tick;
     }
+    if (this.tick - this.lastSnapshotTick < this.snapshotEveryTicks) return;
+    this.lastSnapshotTick = this.tick;
+    this.serializing = true;
+    void this.produceSnapshot().finally(() => {
+      this.serializing = false;
+    });
   }
 
   /**
-   * Ask the authority's game for its serialized state, verify the size
-   * bound, hash it, retain it, and broadcast it. Failures surface as engine
-   * errors (games see `nova.onError`) and the cadence continues.
+   * Ask the authority's game for its serialized state, check that it is
+   * plain JSON within the size bound, hash it, retain it, and broadcast it.
+   * Failures surface as engine errors (games see `nova.onError`), once per
+   * kind of failure, and the cadence continues.
    */
   private async produceSnapshot(): Promise<void> {
-    if (this.disposed || this.ended || !this.isAuthority || !this.restored) return;
     const { term, tick } = this;
     let result: Awaited<ReturnType<NovaSimulationExecutor["serializeState"]>>;
     try {
@@ -531,28 +602,30 @@ export class NovaSimulationEngine {
     } catch (error) {
       // An executor must never take the engine down (frame crashes, game
       // handler throws): surface a stable error and keep the cadence going.
-      this.host.emit({
-        type: "error",
-        code: "snapshot_error",
-        message: error instanceof Error ? error.message.slice(0, 256) : String(error),
-      });
-      return;
+      result = simulationFailure("snapshot_error", error);
     }
     if (this.disposed || this.ended || !this.isAuthority || !this.restored) return;
     if (!result.ok) {
-      this.host.emit({ type: "error", code: result.code, message: result.message });
+      this.reportProblem(result.code, result.message);
       return;
     }
-    const size = serializedBytesSync(result.state);
+    const encoded = encodeSnapshotState(result.state);
+    if (!encoded.ok) {
+      this.reportProblem("invalid_state", encoded.message);
+      return;
+    }
+    const size = new TextEncoder().encode(encoded.json).length;
     if (size > simulationSnapshotBytes) {
-      this.host.emit({
-        type: "error",
-        code: "state_too_large",
-        message: `The simulation snapshot is ${size} bytes; the hard limit is ${simulationSnapshotBytes} bytes. Save only the state needed to resume play.`,
-      });
+      this.reportProblem(
+        "state_too_large",
+        `The simulation snapshot is ${size} bytes; the hard limit is ${simulationSnapshotBytes} bytes. Save only the state needed to resume play.`,
+      );
       return;
     }
-    const stateHash = await stateHashOf(result.state);
+    // Replicate exactly what other players will receive (JSON), never a
+    // live reference the game keeps mutating.
+    const state: unknown = JSON.parse(encoded.json);
+    const stateHash = await stateHashOf(state);
     if (
       this.disposed ||
       this.ended ||
@@ -565,13 +638,25 @@ export class NovaSimulationEngine {
         tick <= this.latest.tick)
     )
       return;
-    this.latest = { tick, state: result.state, stateHash };
+    if (encoded.lossy === null) {
+      this.reportedProblem = null;
+    } else {
+      this.reportProblem("invalid_state", encoded.lossy);
+    }
+    this.latest = { tick, state, stateHash };
     this.latestTimeline = { term, authorityMemberId: this.selfMemberId };
     const now = this.now();
     this.latestReceivedAt = now;
     this.lastSnapshotAt = now;
     this.snapshotSizeBytes = size;
     this.host.sendSnapshot(this.envelope());
+  }
+
+  /** Report a snapshot problem once, not at every cadence step. */
+  private reportProblem(code: string, message: string): void {
+    if (this.reportedProblem === code) return;
+    this.reportedProblem = code;
+    this.host.emit({ type: "error", code, message });
   }
 
   /**
@@ -601,12 +686,14 @@ export class NovaSimulationEngine {
     this.restoreCandidate = null;
     this.restored = true;
     if (this.latest !== null) {
-      this.tick = this.latest.tick;
+      this.setTick(this.latest.tick);
       this.latestTimeline = { term, authorityMemberId: this.selfMemberId };
       this.host.emit({ type: "restored", snapshot: this.latest });
       this.host.sendSnapshot(this.envelope());
+    } else {
+      this.setTick(this.tick);
     }
-    this.startCadence();
+    this.lastSnapshotTick = this.tick;
   }
 
   /** The snapshot envelope for this shell's current replicated state. */
@@ -661,16 +748,55 @@ export class NovaSimulationEngine {
   }
 
   private clearTimers(): void {
-    this.stopCadence();
     this.stopRestoreTimer();
     if (this.tickTimer !== null) {
-      clearInterval(this.tickTimer);
+      clearTimeout(this.tickTimer);
       this.tickTimer = null;
     }
   }
 }
 
-function serializedBytesSync(value: unknown): number {
-  const json = JSON.stringify(value);
-  return new TextEncoder().encode(json).length;
+/**
+ * Encode a game's serialized state as the JSON other players receive.
+ * Fails when nothing would arrive (undefined, a function) or JSON cannot
+ * encode it (a cycle, a BigInt). `lossy` names the first value JSON
+ * silently changes — NaN/Infinity arrive as null, a Map or Set as `{}` —
+ * the usual cause of a game that works for the host and breaks for
+ * everyone else.
+ */
+export function encodeSnapshotState(
+  state: unknown,
+): { ok: true; json: string; lossy: string | null } | { ok: false; message: string } {
+  let lossy: string | null = null;
+  let json: string | undefined;
+  try {
+    json = JSON.stringify(state, (key, value: unknown) => {
+      if (lossy === null) {
+        const where = key === "" ? "The snapshot" : `Snapshot key "${key}"`;
+        if (typeof value === "number" && !Number.isFinite(value)) {
+          lossy = `${where} is ${value}, which other players receive as null. Check for a division by zero.`;
+        } else if (value instanceof Map || value instanceof Set) {
+          lossy = `${where} is a ${value instanceof Map ? "Map" : "Set"}, which other players receive as {}. Use a plain object or an array.`;
+        }
+      }
+      return value;
+    });
+  } catch (error) {
+    return {
+      ok: false,
+      message: `serializeState must return plain JSON data: ${errorText(error)}`,
+    };
+  }
+  if (json === undefined) {
+    return {
+      ok: false,
+      message:
+        "serializeState returned nothing. Return your simulation state as a plain object, for example { players, ball, score }.",
+    };
+  }
+  return { ok: true, json, lossy };
+}
+
+function serializedBytes(value: unknown): number {
+  return new TextEncoder().encode(JSON.stringify(value) ?? "").length;
 }

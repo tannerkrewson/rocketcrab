@@ -933,7 +933,7 @@ export class NovaSession implements NovaClientBackend {
     // like every other player's (a uniform onInput contract — the game
     // applies every input, including its own, in onInput/onTick; the
     // transport never loops a broadcast back to its sender).
-    this.simulationEngine.handleInputReceived(Date.now());
+    this.simulationEngine.handleInputReceived();
     this.emit({
       type: "simulationInput",
       input: {
@@ -1295,7 +1295,6 @@ export class NovaSession implements NovaClientBackend {
           authorityMemberId: peerMessage.authorityMemberId,
           stateHash: peerMessage.stateHash ?? null,
           state: peerMessage.state,
-          sentAt: peerMessage.sentAt,
           senderMemberId: message.senderMemberId,
         });
         if (retained === null) break;
