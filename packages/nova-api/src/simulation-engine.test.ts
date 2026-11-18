@@ -479,6 +479,61 @@ describe(
       });
     });
 
+    it("takes over from its own running frame instead of rewinding", async () => {
+      // B has been playing: its frame is at count 99, far past the last
+      // snapshot it received (count 10), e.g. because the old host slept.
+      const game = counterExecutor(99);
+      const { engine, host } = makeTimedEngine("member-b", game.executor);
+      engine.begin();
+      engine.handleSnapshot({
+        tick: 10,
+        term: 1,
+        authorityMemberId: "member-a",
+        stateHash: null,
+        state: { count: 10 },
+      });
+      vi.advanceTimersByTime(2_000); // the grace period passes
+      engine.onAuthorityChanged("member-b", 2);
+      await waitUntil(() => host.snapshots.length === 1, "take-over snapshot");
+      expect(host.snapshots[0]).toMatchObject({
+        snapshot: { tick: 30, state: { count: 99 }, term: 2, authorityMemberId: "member-b" },
+      });
+      expect(host.snapshots[0]?.target).toBeUndefined();
+      // The frame already holds this state: no restore is delivered to it.
+      expect(host.events.some((event) => event.type === "restored")).toBe(false);
+      expect(engine.getCatchUpSnapshot()?.state).toEqual({ count: 99 });
+      // The clock and cadence carry on.
+      vi.advanceTimersByTime(500);
+      await waitUntil(() => host.snapshots.length === 2, "cadence after take-over");
+      expect(host.snapshots[1]?.snapshot.tick).toBe(35);
+    });
+
+    it("falls back to the replicated snapshot when its frame cannot serialize", async () => {
+      const { engine, host } = makeTimedEngine("member-b", new LocalSimulationExecutor(null));
+      engine.begin();
+      engine.handleSnapshot({
+        tick: 10,
+        term: 1,
+        authorityMemberId: "member-a",
+        stateHash: null,
+        state: { count: 10 },
+      });
+      vi.advanceTimersByTime(1_000);
+      engine.onAuthorityChanged("member-b", 2);
+      await waitUntil(
+        () => host.events.some((event) => event.type === "error"),
+        "serialize failure",
+      );
+      vi.advanceTimersByTime(100); // the push window
+      await waitUntil(() => host.snapshots.length === 1, "fallback re-broadcast");
+      expect(host.snapshots[0]?.snapshot).toMatchObject({ tick: 10, state: { count: 10 } });
+      expect(host.events).toContainEqual({
+        type: "restored",
+        snapshot: engine.getLatestSnapshot(),
+      });
+      expect(engine.getTick()).toBe(10);
+    });
+
     it("recovers from a peer when the replacement host has no local snapshot", async () => {
       const { engine, host } = makeTimedEngine("member-b");
       engine.onAuthorityChanged("member-b", 2);

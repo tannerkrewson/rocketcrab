@@ -39,12 +39,16 @@
  *   restored state forward from exactly that tick. Device clocks are never
  *   compared (phones disagree by hundreds of ms); a follower simply runs
  *   about one transit time behind the authority.
- * - **Authority migration**: when the state engine reports a new
- *   authority, followers push their retained snapshot to it; the new
- *   authority collects pushes for `restoreWindowMs`, adopts the highest
- *   valid snapshot (hash-checked), re-broadcasts it as a correction, and
- *   resumes the cadence. Every frame (including the new authority's) sees
- *   the correction through `onSnapshot` and restores.
+ * - **Authority migration**: a new authority whose game is already running
+ *   publishes its own frame's live state at once. That state is newer than
+ *   any retained snapshot: a host whose phone sleeps is only replaced after
+ *   the grace period, seconds after its last snapshot, and restoring that
+ *   snapshot would rewind everyone. Followers restore from it as from any
+ *   correction. Only when the new authority has not started (or its
+ *   serializeState fails) does it fall back to replicated snapshots:
+ *   followers push their retained copy to it, it collects pushes for
+ *   `restoreWindowMs`, adopts the highest valid one (hash-checked), restores
+ *   its own frame from it, and re-broadcasts it.
  * - **Diagnostics**: input latency is measured from the message envelope's
  *   `sentAt` (sender clock, so only indicative); drift is how far the local
  *   tick had run from the authoritative snapshot when it arrived. Both are
@@ -341,14 +345,41 @@ export class NovaSimulationEngine {
       this.lastSnapshotTick = this.tick;
       return;
     }
-    // Collect peer snapshots even if the replacement host missed every update.
     this.restored = false;
-    this.restoreCandidate = this.latest;
     this.stopRestoreTimer();
+    if (this.started) {
+      void this.takeOverFromOwnFrame();
+      return;
+    }
+    this.collectRestorePushes();
+  }
+
+  /** Collect peer snapshots even if the replacement host missed every update. */
+  private collectRestorePushes(): void {
+    this.restoreCandidate = this.latest;
     this.restoreTimer = setTimeout(() => {
       this.restoreTimer = null;
       void this.finishRestore();
     }, this.restoreWindowMs);
+  }
+
+  /**
+   * Become the authority from this frame's live state: publish it as the
+   * new timeline's first snapshot. Falls back to the replicated snapshots
+   * when the frame cannot serialize.
+   */
+  private async takeOverFromOwnFrame(): Promise<void> {
+    const { term, tick } = this;
+    const captured = await this.captureState();
+    if (this.disposed || this.ended || !this.isAuthority || this.restored || this.term !== term) {
+      return;
+    }
+    if (captured === null) {
+      this.collectRestorePushes();
+      return;
+    }
+    this.restored = true;
+    this.publish(term, tick, captured);
   }
 
   // ------------------------------------------------------------------
@@ -588,45 +619,12 @@ export class NovaSimulationEngine {
     });
   }
 
-  /**
-   * Ask the authority's game for its serialized state, check that it is
-   * plain JSON within the size bound, hash it, retain it, and broadcast it.
-   * Failures surface as engine errors (games see `nova.onError`), once per
-   * kind of failure, and the cadence continues.
-   */
+  /** Serialize, validate, retain and broadcast one cadence snapshot. */
   private async produceSnapshot(): Promise<void> {
     const { term, tick } = this;
-    let result: Awaited<ReturnType<NovaSimulationExecutor["serializeState"]>>;
-    try {
-      result = await this.executor.serializeState();
-    } catch (error) {
-      // An executor must never take the engine down (frame crashes, game
-      // handler throws): surface a stable error and keep the cadence going.
-      result = simulationFailure("snapshot_error", error);
-    }
-    if (this.disposed || this.ended || !this.isAuthority || !this.restored) return;
-    if (!result.ok) {
-      this.reportProblem(result.code, result.message);
-      return;
-    }
-    const encoded = encodeSnapshotState(result.state);
-    if (!encoded.ok) {
-      this.reportProblem("invalid_state", encoded.message);
-      return;
-    }
-    const size = new TextEncoder().encode(encoded.json).length;
-    if (size > simulationSnapshotBytes) {
-      this.reportProblem(
-        "state_too_large",
-        `The simulation snapshot is ${size} bytes; the hard limit is ${simulationSnapshotBytes} bytes. Save only the state needed to resume play.`,
-      );
-      return;
-    }
-    // Replicate exactly what other players will receive (JSON), never a
-    // live reference the game keeps mutating.
-    const state: unknown = JSON.parse(encoded.json);
-    const stateHash = await stateHashOf(state);
+    const captured = await this.captureState();
     if (
+      captured === null ||
       this.disposed ||
       this.ended ||
       !this.isAuthority ||
@@ -638,17 +636,69 @@ export class NovaSimulationEngine {
         tick <= this.latest.tick)
     )
       return;
+    this.publish(term, tick, captured);
+  }
+
+  /**
+   * Ask this frame's game for its serialized state, check that it is plain
+   * JSON within the size bound, and hash it. Returns null after reporting
+   * the problem (games see `nova.onError`, once per kind of failure).
+   */
+  private async captureState(): Promise<{
+    state: unknown;
+    stateHash: string;
+    size: number;
+  } | null> {
+    let result: Awaited<ReturnType<NovaSimulationExecutor["serializeState"]>>;
+    try {
+      result = await this.executor.serializeState();
+    } catch (error) {
+      // An executor must never take the engine down (frame crashes, game
+      // handler throws): surface a stable error and keep the cadence going.
+      result = simulationFailure("snapshot_error", error);
+    }
+    if (this.disposed || this.ended) return null;
+    if (!result.ok) {
+      this.reportProblem(result.code, result.message);
+      return null;
+    }
+    const encoded = encodeSnapshotState(result.state);
+    if (!encoded.ok) {
+      this.reportProblem("invalid_state", encoded.message);
+      return null;
+    }
+    const size = new TextEncoder().encode(encoded.json).length;
+    if (size > simulationSnapshotBytes) {
+      this.reportProblem(
+        "state_too_large",
+        `The simulation snapshot is ${size} bytes; the hard limit is ${simulationSnapshotBytes} bytes. Save only the state needed to resume play.`,
+      );
+      return null;
+    }
     if (encoded.lossy === null) {
       this.reportedProblem = null;
     } else {
       this.reportProblem("invalid_state", encoded.lossy);
     }
-    this.latest = { tick, state, stateHash };
+    // Replicate exactly what other players will receive (JSON), never a
+    // live reference the game keeps mutating.
+    const state: unknown = JSON.parse(encoded.json);
+    return { state, stateHash: await stateHashOf(state), size };
+  }
+
+  /** Retain a captured state as this authority's latest and broadcast it. */
+  private publish(
+    term: number,
+    tick: number,
+    captured: { state: unknown; stateHash: string; size: number },
+  ): void {
+    this.latest = { tick, state: captured.state, stateHash: captured.stateHash };
     this.latestTimeline = { term, authorityMemberId: this.selfMemberId };
+    this.lastSnapshotTick = tick;
     const now = this.now();
     this.latestReceivedAt = now;
     this.lastSnapshotAt = now;
-    this.snapshotSizeBytes = size;
+    this.snapshotSizeBytes = captured.size;
     this.host.sendSnapshot(this.envelope());
   }
 
@@ -660,7 +710,7 @@ export class NovaSimulationEngine {
   }
 
   /**
-   * Restore completed: verify the adopted snapshot's hash (reverting to the
+   * Restore from replicated snapshots completed: verify the adopted snapshot's hash (reverting to the
    * previous valid snapshot on mismatch), re-broadcast it as a correction
    * (every frame — including the new authority's own frame — restores from
    * it), and resume the cadence.
