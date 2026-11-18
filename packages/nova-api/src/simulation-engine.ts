@@ -314,10 +314,11 @@ export class NovaSimulationEngine {
 
   /**
    * The authority changed: the session reports the state engine's
-   * authority decisions. Becoming the authority starts the restore window
-   * (collecting peer snapshot pushes) and then the snapshot cadence;
-   * becoming a follower pushes the retained snapshot to the new authority
-   * (restore after migration) and stops the cadence.
+   * authority decisions. Becoming the authority publishes this frame's
+   * running state, or, before this session started, restores from peer
+   * snapshot pushes collected for the restore window; the snapshot cadence
+   * follows. Becoming a follower pushes the retained snapshot to the new
+   * authority and stops the cadence.
    */
   onAuthorityChanged(authorityMemberId: string | null, term: number): void {
     if (this.disposed || this.ended) return;
@@ -379,6 +380,7 @@ export class NovaSimulationEngine {
       return;
     }
     this.restored = true;
+    this.setTick(tick);
     this.publish(term, tick, captured);
   }
 
