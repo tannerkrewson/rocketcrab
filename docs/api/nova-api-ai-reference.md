@@ -109,6 +109,11 @@ nova.onError((error) => {}); // { code, message }
   physics). Every player runs the simulation locally from ordered inputs;
   regular snapshots from the authority correct drift and restore after
   migration. No rollback netcode.
+  Keep the JSON returned by `serializeState()` small. Aim for 48 KiB or less
+  so updates stay cheap on mobile connections. Save only what another browser
+  needs to resume play, such as positions, velocities, scores, and the current
+  round. Rebuild visuals from that state. Leave out assets, caches, and past
+  inputs the game no longer needs. The runtime rejects snapshots over 512 KiB.
 - **raw**: custom protocols over named channels. Nova only delivers
   messages: no shared state, no migration, no cheating resistance.
 

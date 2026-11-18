@@ -321,7 +321,8 @@ var tick = nova.simulation.getTick();
   cadence (default 1 s; Nova bounds 50..10 000 ms): it calls the game's
   `serializeState()` on the authority frame, verifies the size bound
   (512 KiB), hashes it, and broadcasts `{ tick, state, stateHash? }` to
-  every player. Every frame's `onSnapshot` fires; restore from it.
+  other players. Their `onSnapshot` fires; restore from it. Aim for snapshots
+  of 48 KiB or less and serialize only what a returning player needs to resume.
 - Snapshots are **replicated** to every shell (like canonical state in
   state mode). When the authority migrates (its tab closes, it loses
   connection), the new authority restores the most recent valid snapshot
