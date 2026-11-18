@@ -979,5 +979,30 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       expect(pair.a.getStateModeDiagnostics().authorityMemberId).toBe("member-a");
       expect(pair.b.getStateModeDiagnostics().authorityMemberId).toBe("member-a");
     });
+
+    it("keeps the authority's state identical to what others receive (NaN)", async () => {
+      const handlers = {
+        createInitialState: () => ({ speed: 0, distance: 0 }),
+        actions: {
+          divide(draft: { speed: number; distance: number }) {
+            draft.speed = draft.distance / 0 - draft.distance / 0; // NaN
+          },
+        },
+      };
+      const errors: string[] = [];
+      const pair = await makePair(harnessFactory, {
+        handlers: handlers as NovaStateHandlers,
+        setup: (a) =>
+          a.onSessionEvent((event) => {
+            if (event.type === "error") errors.push(event.error.message);
+          }),
+      });
+      await startBoth(pair);
+      await pair.b.dispatch({ type: "divide" }, "divide-1");
+      await settle(pair.harness);
+      expect(canonicalOf(pair.a)).toEqual({ speed: null, distance: 0 });
+      expect(canonicalOf(pair.b)).toEqual({ speed: null, distance: 0 });
+      expect(errors).toEqual([expect.stringContaining('"speed" is NaN')]);
+    });
   });
 }

@@ -430,6 +430,8 @@ export class NovaStateEngine {
   private ticksCounted = 0;
   /** Ticks due but not yet applied (they run after queued actions). */
   private pendingTicks = 0;
+  /** A lossy-JSON warning was already reported this session. */
+  private reportedLossyState = false;
   /** The tick failure already reported (cleared by a successful tick). */
   private reportedTickProblem: string | null = null;
 
@@ -1878,6 +1880,33 @@ export class NovaStateEngine {
     if (result.ok) await this.commit(result, undefined, true);
   }
 
+  /**
+   * The state exactly as other players will receive it (JSON). NaN and
+   * Infinity become null and a Map or Set becomes {}; keeping the original
+   * here would leave the authority's game different from everyone else's.
+   * The first such value is reported once, since it is almost always a bug
+   * (a division by zero, a Map in the state).
+   */
+  private asReplicated(state: unknown): unknown {
+    let lossy: string | null = null;
+    const json = JSON.stringify(state, (key, value: unknown) => {
+      if (lossy === null) {
+        const where = key === "" ? "The state" : `State key "${key}"`;
+        if (typeof value === "number" && !Number.isFinite(value)) {
+          lossy = `${where} is ${value}, which other players receive as null. Check for a division by zero.`;
+        } else if (value instanceof Map || value instanceof Set) {
+          lossy = `${where} is a ${value instanceof Map ? "Map" : "Set"}, which other players receive as {}. Use a plain object or an array.`;
+        }
+      }
+      return value;
+    });
+    if (lossy !== null && !this.reportedLossyState) {
+      this.reportedLossyState = true;
+      this.host.emit({ type: "stateError", code: "invalid_state", message: lossy });
+    }
+    return lossy === null ? state : (JSON.parse(json) as unknown);
+  }
+
   /** Why a handler's result cannot become the canonical state, or null. */
   private stateProblem(state: unknown, source: string): { code: string; message: string } | null {
     try {
@@ -1978,7 +2007,8 @@ export class NovaStateEngine {
     actionId?: string,
     tick = false,
   ): Promise<boolean> {
-    const { state, views } = result;
+    const { views } = result;
+    const state = this.asReplicated(result.state);
     if (this.disposed) return false;
     if (this.authorityMemberId !== this.selfMemberId || !this.restoreDone) return false;
     // Hash BEFORE mutating revision/canonical: a catch-up snapshot read
