@@ -6,6 +6,7 @@ import {
   type PartyTransportFactory,
 } from "@rocketcrab/party";
 import type { NovaTransport, TransportEventMap } from "@rocketcrab/core";
+import type { NovaSession } from "@rocketcrab/nova-api";
 import { InMemoryTransportHub } from "@rocketcrab/testing";
 import { fromRoomError } from "@rocketcrab/trystero-transport";
 import type { ChannelPort } from "../runtime-host";
@@ -883,6 +884,30 @@ describe("party engine — start delivery to a frame instance", () => {
     emitSessionEvent(b, { type: "start" });
     await settle(world);
     expect(frameEvents(b).filter((event) => event.kind === "start")).toHaveLength(1);
+
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+    await settle(world);
+  });
+
+  it("resumes a rebooted simulation frame from the latest snapshot, after its start", async () => {
+    const world = makeWorld();
+    const { a, b } = await playingPair(world);
+    const session = (b.engine as unknown as { session: NovaSession }).session;
+    vi.spyOn(session, "getSimulationSnapshot").mockReturnValue({
+      tick: 42,
+      state: { puck: { x: 3 } },
+      stateHash: null,
+    });
+    b.engine.setContainer(null);
+    b.engine.setContainer(b.container);
+    await settle(world);
+    await registerLocalGame(b, world);
+    const sinceReboot = frameEvents(b).slice(-2);
+    expect(sinceReboot).toEqual([
+      { kind: "start" },
+      { kind: "simulationSnapshot", snapshot: { tick: 42, state: { puck: { x: 3 } } } },
+    ]);
 
     await a.engine.leaveParty();
     await b.engine.leaveParty();

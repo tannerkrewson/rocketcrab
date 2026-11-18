@@ -390,6 +390,21 @@ export class PartyRuntime {
     }
     // Followers do not set session.isStarted(); gameStarted tracks received starts too.
     this.deliverStartToFrame();
+    // A simulation frame that boots mid-game (a late joiner's catch-up arrived
+    // first, or the frame reloaded) resumes from the latest snapshot. On the
+    // authority this matters most: its next snapshot would otherwise publish
+    // the fresh frame's initial state to everyone.
+    const snapshot = session.getSimulationSnapshot();
+    if (this.state.frameStartDelivered && snapshot !== null) {
+      runtime.pushApiEvent({
+        kind: "simulationSnapshot",
+        snapshot: {
+          tick: snapshot.tick,
+          state: snapshot.state,
+          ...(snapshot.stateHash !== null ? { stateHash: snapshot.stateHash } : {}),
+        },
+      });
+    }
   }
 
   clearRuntimeLogs(): void {
