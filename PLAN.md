@@ -1,10 +1,6 @@
 # Nova remaining-work plan
 
-The single tracker for remaining work (see `AGENTS.md`). The connectivity
-program's full plan and evidence are archived in
-[`docs/history/nova-connectivity-plan-2026-11.md`](docs/history/nova-connectivity-plan-2026-11.md).
-Earlier programs
-are in `docs/history/nova-simplification-evidence.md`.
+Remaining work, owner decisions, and release gates for Nova.
 
 ## Goal and rules (owner direction)
 
@@ -43,42 +39,51 @@ Addresses until cutover are in `deploy/origins.json`. Cloudflare account
 `f82d64d09da6cb5a0afa0120033a7e13`; `rocketcrab.com` still serves the legacy
 site.
 
-## State (2026-11-15)
+## Local verification (2026-11-17)
 
-Everything above is built and tested locally, and nothing is deployed.
-`npm run check` passes, and so does the real-browser tunnel test
-(`e2e/party-tunnel.spec.ts`: one player's WebRTC forced off, three-player game
-plays, pairing about 6 s after join). Large rooms: 10/25/50 real browsers
-worked locally; 100–200 only in the in-process simulation.
+`npm run check` passed. All 84 app browser tests passed across Chromium,
+Firefox, and WebKit, plus 7 dedicated Chromium transport tests. The edge
+deploy dry run and built runtime header verification passed. The hosted
+beta and physical-device checks are still pending.
 
-## 1. Owner actions (blocking)
+## Before beta
 
-- [ ] Enable Workers Analytics Engine (Dashboard → Workers → Analytics
-      Engine). The first `npm run edge:deploy` (2026-11-15) failed with API
-      error 10089 because of the `CONNECTION_EVENTS` binding.
-- [ ] Create a Realtime TURN key, then enter both secrets at the
-      `wrangler secret put` prompts (`deploy/cloudflare.md`).
-- [ ] Add the Realtime usage billing notification and, if offered, a
-      Workers/Durable Objects limit notification; confirm a test email.
-- [ ] Delete the old `rocketcrab-cors-relay` Worker (verified unused
-      2026-11-15: no branch or the legacy site references it):
-      `npx --yes wrangler@4.161.0 delete --name rocketcrab-cors-relay`, then
-      drop it from "Live state" in `deploy/cloudflare.md`.
+- [x] Prefer self-contained games. Block workers and clipboard access in the
+      deployed runtime policy. Creator prompt and runtime changes in `ac16264`.
+- [x] Charge small tunnel frames against the existing rate budget and use
+      Workers Logs for connection and readiness events (`fa0bcfe`, `9025080`).
+- [x] Confirm the built runtime policy blocks workers in Chromium and Firefox.
+- [ ] Check the deployed runtime headers and confirm that exiting a broken
+      game returns to a usable lobby on iPhone.
+- [x] Share transport reconnect setup and simplify admission timing. Keep Nova’s
+      readiness acknowledgement and targeted delivery because Trystero’s room
+      membership alone does not establish Nova compatibility or game readiness
+      (`640d38c`).
+- [x] Require peer confirmation before opening a tunnel. The transport regression
+      covers a peer choosing native between the edge’s two pairing notifications.
+      Trystero retries failures after a native channel has already opened.
+- [x] Review native room broadcasts. Keep targeted delivery for now to
+      preserve Nova admission and avoid a second state-sync path. Revisit
+      small explicitly shared updates if host upload becomes a practical limit.
 
-## 2. First deploy and smoke test (agent, after §1)
+## 1. Owner actions
 
-- [ ] `npm run edge:deploy`; runbook smoke test: 403 without Origin,
-      `iceServers` with one, Classic `spyfall-new` returns a code, 121st
-      `/turn` request in a minute returns 429, `/signal` and `/tunnel` upgrade.
-- [ ] `npm run deploy:runtime` and `npm run deploy:nova`; open the app,
-      create a game, run it in the editor; `curl -I` both for the headers.
-- [ ] A two-device party on the live stack; confirm `/log` events arrive
-      (`scripts/connection-stats.mjs`, needs an Account Analytics Read token).
+- [ ] Approve the first deployment and create the Realtime TURN key. Set both
+      Worker secrets after the edge exists.
+- [ ] Configure the Realtime usage alert and Workers/Durable Objects spending
+      controls. Confirm the notification destination.
+- [ ] Approve retiring the old relay after the replacement passes smoke checks.
+
+## 2. First deploy and smoke test
+
+- [ ] Deploy the edge and run the checks in [the runbook](deploy/cloudflare.md).
+- [ ] Deploy the runtime and app, check headers, and test a game in the editor.
+- [ ] Play on the live stack with two devices. Confirm that Workers Logs shows
+      lobby and game readiness alongside transport outcomes.
 
 ## 3. Real-device checks
 
-Record results in `docs/testing/trystero-connectivity-findings.md` and
-`docs/testing/mobile-safari-checklist.md`, with the connection stats.
+Record results here and in the [Mobile Safari checklist](docs/testing/mobile-safari-checklist.md).
 
 - [ ] Desktop Wi-Fi ↔ iPhone on cellular; two phones on different carriers;
       up for more than a minute.
@@ -114,18 +119,15 @@ Record results in `docs/testing/trystero-connectivity-findings.md` and
 ## Known limits and open decisions
 
 - **Party size.** No `maxUsers`. Trystero's `scale()` overlay tracks at most
-  2,048 peers, and real-browser runs stop at 50; "unlimited" means hundreds.
+  2,048 peer descriptors. Practical capacity depends on the game and the
+  authority’s connection. Local browser runs reached 50.
 - **Peer-link messages are generic** ("Connecting to a player…"). Trystero
   exposes no named pre-connection event.
 - **Networks that block WebSockets to Cloudflare** cannot connect at all. They
-  appear in the stats as `failed` / `relay-failed` / `signaling_ok: false`.
+  can report a signaling failure only when the HTTP logging endpoint remains reachable.
 - **Replayed action IDs** after an authority migration can report `accepted`
-  for an action whose rejection ack was lost (archive §3.7). Rare; fixing it
+  for an action whose rejection ack was lost. Rare; fixing it
   changes the wire format.
-
-## Cleanup
-
-Done 2026-11-15: Split the party engine into collaborators, audited source comments, added the separate Chromium transport suite to CI, and archived the superseded media-bridging spike. Retained and linked the runtime sandbox findings and matrix because current docs rely on them.
 
 ## Cleanup for the owner
 
@@ -133,27 +135,6 @@ Done 2026-11-15: Split the party engine into collaborators, audited source comme
       one's changes are already on `nova` (checked with `git cherry`; the
       tunnel-server commits were squashed with identical content):
       `git branch --list 'work/*' --format='%(refname:short)' | xargs git branch -D`
-
-## Decisions log
-
-| Date       | Decision                                                                                |
-| ---------- | --------------------------------------------------------------------------------------- |
-| 2026-11-12 | OpenTofu removed; `wrangler.toml` + `wrangler deploy` is the only path.                 |
-| 2026-11-12 | One `VITE_EDGE_ORIGIN` for all edge routes.                                             |
-| 2026-11-12 | Static hosting on Cloudflare assets Workers; GitHub Pages removed.                      |
-| 2026-11-12 | Runtime on a different site from the app (process isolation).                           |
-| 2026-11-12 | Beta on workers.dev; saved games not migrated at cutover (accepted).                    |
-| 2026-11-12 | Own signaling relay, one Durable Object per room; no Nostr.                             |
-| 2026-11-12 | Tunnel fallback via `rtcPolyfill`, one Durable Object per pair; not proposed upstream.  |
-| 2026-11-12 | Workers Free through beta; Workers Paid from the `rocketcrab.com` cutover.              |
-| 2026-11-12 | No host-relayed star topology; Trystero mesh (+ tunnel) instead.                        |
-| 2026-11-13 | Generic "Connecting to a player…"; no pre-connect discovery protocol.                   |
-| 2026-11-13 | Log an explicit `unknown` outcome when the path can't be determined.                    |
-| 2026-11-13 | No 100-browser runs; browsers ≤ 50, larger sizes by in-process simulation.              |
-| 2026-11-13 | Authority fan-out: lean snapshots, targeted dispatch, then state deltas.                |
-| 2026-11-13 | Keep Nova member IDs; Trystero persistent identity not adopted.                         |
-| 2026-11-15 | A player who leaves may rejoin; the engine never auto-rejoins after a deliberate leave. |
-| 2026-11-15 | Signaling outages are logged once each (`relay-failed`, `signaling_ok: false`).         |
 
 ## Legacy branches (no action needed for Nova)
 

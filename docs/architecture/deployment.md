@@ -20,8 +20,8 @@ domain are not sufficient. `workers.dev` is on the Public Suffix List, so
 the two Worker hostnames are separate sites. Browser process isolation is
 implementation-dependent, but same-site hosting exposed a tab-wedging CPU
 exhaustion failure in [the runtime findings](../testing/runtime-sandbox-findings.md).
-See ADR-0001 and ADR-0008. Keep the runtime on workers.dev when the app moves
-to `rocketcrab.com`.
+See ADR-0001 and ADR-0008. Use a separate registrable domain at public
+cutover so the runtime can also load on networks that block workers.dev.
 
 The runtime contains no Nova secrets, authentication cookies or service
 worker authority; games share its origin and are not isolated from each
@@ -31,8 +31,8 @@ use `Referrer-Policy: no-referrer` and no-referrer meta tags.
 Nova's Vite plugin emits a strict CSP both in its HTML meta tag and in
 `dist/_headers`, where it adds `frame-ancestors 'none'`. Its `frame-src`
 contains the pinned runtime and the Classic game allowlist. The runtime
-plugin emits its permissive CSP as an HTTP header, including
-`frame-ancestors` pinned to the main origin; absent a pin it denies framing.
+plugin emits an HTTP policy with `frame-ancestors` pinned to the main origin
+and `worker-src 'none'`. Without an app origin pin, it denies framing.
 Hashed `/assets/*` are immutable; other assets use Cloudflare defaults.
 Workers apply `_headers` from the built asset directory
 ([Cloudflare documentation](https://developers.cloudflare.com/workers/static-assets/headers/),
