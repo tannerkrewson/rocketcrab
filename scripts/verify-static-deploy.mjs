@@ -93,7 +93,8 @@ if (origin === "nova") {
       /(?:^|;)\s*frame-ancestors\s+([^;]+)/.exec(headerCsp)?.[1].trim() ===
         new URL(mainOrigin).origin,
   );
-  // Runtime origin: intentionally permissive — no CSP meta, no service workers.
+  expect("runtime CSP blocks workers", /(?:^|;)\s*worker-src\s+'none'\s*(?:;|$)/.test(headerCsp));
+  // Runtime policy comes from the HTTP header, which also controls workers.
   expect(
     "runtime has NO CSP meta (permissive by design)",
     !/<meta[^>]*http-equiv="Content-Security-Policy"[^>]*>/i.test(indexHtml),

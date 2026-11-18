@@ -11,16 +11,6 @@ import { RuntimeInstance, type FrameFactory } from "./runtime-instance";
 
 const MAIN_ORIGIN = mainOriginForRuntimeOrigin(location.origin);
 
-// Remove leftover service workers so they cannot retain network control
-// over game traffic; the runtime must not register its own (ADR-0008).
-if ("serviceWorker" in navigator) {
-  void navigator.serviceWorker.getRegistrations().then((registrations) => {
-    for (const registration of registrations) {
-      void registration.unregister();
-    }
-  });
-}
-
 const containerEl = document.getElementById("game-container");
 if (!containerEl) {
   throw new Error("runtime page is missing #game-container");
