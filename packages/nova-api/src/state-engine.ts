@@ -1196,6 +1196,19 @@ export class NovaStateEngine {
   }
 
   /**
+   * Hand authority to another player now (this page is being hidden, and a
+   * phone may suspend it). The session marks this player ineligible first,
+   * so the election it starts picks someone else; resigning is skipped when
+   * nobody else could take over, so the party never ends up leaderless.
+   */
+  stepDown(): void {
+    if (this.disposed || !this.started || this.ended) return;
+    if (this.authorityMemberId !== this.selfMemberId || this.election !== null) return;
+    if (this.lowestEligibleMemberId() === null) return;
+    this.startElection();
+  }
+
+  /**
    * This transport reconnected (fresh connection id): a sitting authority
    * re-announces and resumes heartbeats; a follower restarts its authority
    * watch (the catch-up snapshot materializes the current authority, and the

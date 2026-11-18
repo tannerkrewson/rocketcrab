@@ -811,6 +811,23 @@ export class NovaSession implements NovaClientBackend {
   }
 
   /**
+   * This player's page was hidden (`away`) or shown again (host policy).
+   * A hidden phone can be suspended at any moment, freezing every game it
+   * hosts until the grace period runs out, so an away player is not
+   * eligible for authority and a sitting authority hands off at once.
+   * Coming back does not take authority back.
+   */
+  setAway(away: boolean): void {
+    if (this.disposed || this.selfPlayer.authorityEligible === !away) return;
+    this.selfPlayer.authorityEligible = !away;
+    // Peers must see the new eligibility before the election it starts.
+    void this.sendProtocol((base) =>
+      buildPlayerIdentityMessage(base, this.selfPlayer.name, !away),
+    ).catch((error: unknown) => this.emitError(error));
+    if (away) this.engine.stepDown();
+  }
+
+  /**
    * The tick rate this player's game frame declared (hosts pass it from the
    * frame's registration). Every frame runs the same game, so every session
    * agrees; only the authority ticks.
@@ -919,9 +936,11 @@ export class NovaSession implements NovaClientBackend {
     if (peer.memberId === this.engine.getAuthorityMemberId()) this.flushControls(true);
     // Identity exchange: tell the new peer who we are, and (if we already
     // announced ready) that we are ready.
-    void this.sendProtocol((base) => buildPlayerIdentityMessage(base, this.selfPlayer.name), {
-      targetMemberId: peer.memberId,
-    }).catch((error: unknown) => this.emitError(error));
+    void this.sendProtocol(
+      (base) =>
+        buildPlayerIdentityMessage(base, this.selfPlayer.name, this.selfPlayer.authorityEligible),
+      { targetMemberId: peer.memberId },
+    ).catch((error: unknown) => this.emitError(error));
     if (this.readySent) {
       void this.sendProtocol((base) => buildGameReadyMessage(base), {
         targetMemberId: peer.memberId,

@@ -933,5 +933,51 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
         8_000,
       );
     });
+
+    it("hands authority to another player when the host's page is hidden", async () => {
+      const handlers = {
+        createInitialState: () => ({ ticks: 0 }),
+        tick(draft: { ticks: number }) {
+          draft.ticks += 1;
+        },
+        tickRate: 50,
+      };
+      const pair = await makePair(harnessFactory, { handlers: handlers as NovaStateHandlers });
+      await startBoth(pair);
+      await waitForTicks(
+        pair.harness,
+        () => ((canonicalOf(pair.b) as { ticks?: number } | undefined)?.ticks ?? 0) >= 3,
+        "Ada ticking",
+      );
+      pair.a.setAway(true); // Ada switches apps
+      await waitForTicks(
+        pair.harness,
+        () =>
+          pair.a.getStateModeDiagnostics().authorityMemberId === "member-b" &&
+          pair.b.getStateModeDiagnostics().authorityMemberId === "member-b",
+        "Ben taking over",
+      );
+      const ticks = (canonicalOf(pair.b) as { ticks: number }).ticks;
+      await waitForTicks(
+        pair.harness,
+        () => (canonicalOf(pair.a) as { ticks: number }).ticks > ticks + 3,
+        "Ben's ticks reaching Ada",
+      );
+      // Coming back does not take authority back.
+      pair.a.setAway(false);
+      await settle(pair.harness);
+      expect(pair.b.getStateModeDiagnostics().authorityMemberId).toBe("member-b");
+    });
+
+    it("keeps authority when nobody else could take over", async () => {
+      const pair = await makePair(harnessFactory);
+      await startBoth(pair);
+      pair.b.setAway(true);
+      await settle(pair.harness);
+      pair.a.setAway(true); // the last eligible player stays the authority
+      await settle(pair.harness);
+      expect(pair.a.getStateModeDiagnostics().authorityMemberId).toBe("member-a");
+      expect(pair.b.getStateModeDiagnostics().authorityMemberId).toBe("member-a");
+    });
   });
 }

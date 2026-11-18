@@ -75,15 +75,15 @@ export function buildGameEndMessage(base: PeerMessageBase, reason: GameEndReason
 export function buildPlayerIdentityMessage(
   base: PeerMessageBase,
   displayName: string,
+  authorityEligible = true,
 ): PeerMessage {
   return assertPeerMessage(
     playerIdentityMessageSchema.parse({
       ...envelope(base),
       type: "player.identity",
       displayName,
-      // Every player is eligible for authority
-      // so no game code ever needs to reason about authority roles.
-      authorityEligible: true,
+      // False only while this player's page is hidden (see NovaSession.setAway).
+      authorityEligible,
     }),
   );
 }

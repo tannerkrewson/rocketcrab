@@ -229,6 +229,8 @@ export class PartyConnection {
 
   private handlePageHidden(): void {
     this.pageWasHidden = true;
+    // A hidden phone may be suspended: hand off authority before it is.
+    this.state.session?.setAway(true);
     // Hidden-page timers are unreliable; resume probing decides when to retry.
     this.cancelReconnectRetry();
   }
@@ -236,6 +238,7 @@ export class PartyConnection {
   /** Resume must check peer liveness even if the transport still reports connected. */
   private handlePageResumed(): void {
     this.pageWasHidden = false;
+    this.state.session?.setAway(false);
     if (this.state.leaving) {
       return;
     }

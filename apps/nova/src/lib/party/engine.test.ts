@@ -1525,6 +1525,44 @@ describe("party engine — M1 lifecycle: backgrounding, resume, and F11 rejoin",
     expect(reconnectSpy).toHaveBeenCalledTimes(1);
   });
 
+  it("hands the game to another player when the host's page is hidden", async () => {
+    const world = makeWorld();
+    const lifecycle = createMemoryLifecycleSource();
+    const a = makePlayer(world, "a", { lifecycle: lifecycle.source });
+    const b = makePlayer(world, "b");
+    const code = await runCreate(a, world);
+    await registerLocalGame(a, world);
+    const { join: joinPromise, settled } = startJoin(b, world, code);
+    await settled;
+    await settle(world);
+    await joinPromise;
+    await settle(world);
+    await registerLocalGame(b, world);
+    a.engine.startGame();
+    await settle(world);
+    const authority = (player: Player) =>
+      (
+        player.engine as unknown as {
+          session: { getStateModeDiagnostics(): { authorityMemberId: string | null } };
+        }
+      ).session.getStateModeDiagnostics().authorityMemberId;
+    expect(authority(b)).toBe(a.memberId);
+
+    lifecycle.hide(); // the host switches apps
+    await vi.waitFor(
+      async () => {
+        await settle(world);
+        expect(authority(b)).toBe(b.memberId);
+      },
+      { timeout: 3_000, interval: 20 },
+    );
+    lifecycle.show();
+    await settle(world);
+    expect(authority(a)).toBe(b.memberId);
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+  });
+
   it("going offline enters the reconnect flow; coming back online reconnects automatically", async () => {
     const world = makeWorld();
     const lifecycle = createMemoryLifecycleSource();
