@@ -34,6 +34,7 @@ import {
   rawRatePerSecond,
   rawMessageWarnBytes,
   rawWarnRatePerSecond,
+  simulationInputRatePerSecond,
   type GameEndReason,
   type GameMode,
   type PeerMessage,
@@ -300,6 +301,8 @@ export class NovaSession implements NovaClientBackend {
   /** The simulation engine (simulation mode; inert in other modes). */
   private readonly simulationEngine: NovaSimulationEngine;
   private readonly injectedSimulationExecutor: NovaSimulationExecutor | undefined;
+  /** True after a rate-limited input was reported, until a send succeeds. */
+  private simulationInputThrottled = false;
   private readonly acceptStartRequest: (memberId: string) => boolean;
 
   private readonly selfPlayer: PlayerRecord;
@@ -910,11 +913,17 @@ export class NovaSession implements NovaClientBackend {
     );
     assertStructuredCloneSafe(input.payload, "nova.simulation.sendInput payload");
     if (!this.simulationEngine.recordInputSent()) {
+      // Report the first drop of a streak, not every one: a game sending on
+      // every animation frame or pointer move would otherwise flood onError
+      // and the party notices with one error per frame.
+      if (this.simulationInputThrottled) return;
+      this.simulationInputThrottled = true;
       throw new NovaError(
         "rate_limited",
-        "nova.simulation.sendInput exceeded the input rate limit; the input was dropped.",
+        `nova.simulation.sendInput is over the ${simulationInputRatePerSecond} inputs/second limit, so inputs are dropped until the rate falls. Send an input when it changes (a key goes down or up), or at most once per onTick, not on every animation frame or pointer move.`,
       );
     }
+    this.simulationInputThrottled = false;
     this.consumeGameBytes(rawPayloadBytes(input));
     const seq = (this.nextSeq += 1);
     const inputId = newInputId();

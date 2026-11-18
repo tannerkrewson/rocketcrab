@@ -1140,7 +1140,8 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       }
       await flushMacrotasks();
       await settle(harness);
-      expect(errors.filter((error) => error.code === "rate_limited").length).toBeGreaterThan(0);
+      // One report per over-limit streak, not one per dropped input.
+      expect(errors.filter((error) => error.code === "rate_limited")).toHaveLength(1);
       expect(a.getSimulationDiagnostics().rateLimitRejections).toBeGreaterThan(0);
       expect(a.getSimulationDiagnostics().inputsSent).toBe(600);
     });
