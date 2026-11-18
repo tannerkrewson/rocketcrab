@@ -166,6 +166,83 @@ What Nova guarantees in state mode:
 - A rejected or failed action never corrupts state.
 - A player who joins late gets the current state and their view.
 
+## Simulation mode example
+
+```js
+nova.defineGame({ title: "Racers", mode: "simulation", apiVersion: 1 });
+
+// Everything another browser needs to continue lives in `sim`, including
+// which buttons each player is holding right now.
+let sim = { cars: {}, held: {} }; // held["playerId:left"] = true
+const queued = [];
+
+nova.simulation.register({
+  onInput(input) {
+    queued.push(input); // apply in the next onTick
+  },
+  onTick(tick) {
+    for (const input of queued.splice(0)) {
+      const key = input.sender.id + ":" + input.payload.button;
+      if (input.type === "press") sim.held[key] = true;
+      else delete sim.held[key];
+    }
+    for (const player of nova.players) {
+      const car = (sim.cars[player.id] ??= { x: 100, y: 100 });
+      if (sim.held[player.id + ":left"]) car.x -= 5;
+      if (sim.held[player.id + ":right"]) car.x += 5;
+    }
+  },
+  onSnapshot(snapshot) {
+    sim = snapshot.state; // the authority's state; play continues from it
+  },
+  serializeState() {
+    return sim;
+  },
+});
+
+nova.onPlayerLeave((player) => {
+  delete sim.cars[player.id];
+  for (const key in sim.held) if (key.startsWith(player.id + ":")) delete sim.held[key];
+});
+
+let started = false;
+nova.onStart(() => (started = true));
+function hold(button, pressed) {
+  if (started)
+    nova.simulation.sendInput({ type: pressed ? "press" : "release", payload: { button } });
+}
+// Send on change only: once on press, once on release.
+leftButton.onpointerdown = () => hold("left", true);
+leftButton.onpointerup = leftButton.onpointercancel = () => hold("left", false);
+addEventListener("keydown", (e) => e.key === "ArrowLeft" && !e.repeat && hold("left", true));
+addEventListener("keyup", (e) => e.key === "ArrowLeft" && hold("left", false));
+
+requestAnimationFrame(function frame() {
+  draw(sim); // draw every animation frame from the local simulation
+  requestAnimationFrame(frame);
+});
+nova.ready();
+```
+
+What a simulation game must do:
+
+- `onTick` runs 10 times a second on every player's screen. Advance exactly
+  one step per tick, and count time in ticks (a 3-second countdown is 30
+  ticks), never `Date.now()`. For smooth motion, draw every animation frame and
+  interpolate between ticks.
+- Return everything needed to continue from `serializeState()`: positions,
+  velocities, scores, timers, and the inputs players are still holding. About
+  once a second every other player replaces their state with it in
+  `onSnapshot`, and the next `onTick` continues from `snapshot.tick`.
+- Send an input when it changes (pressed, released, tapped), not every
+  animation frame or pointer move. Ignore key repeats. Over 60 inputs per
+  second are dropped with one `rate_limited` error.
+- Release a player's held inputs in `nova.onPlayerLeave`, or their character
+  keeps moving after they leave.
+- Snapshots travel as JSON: `NaN` and `Infinity` arrive as `null`, a `Map` or
+  `Set` as `{}`, and class instances lose their methods. Keep plain objects,
+  arrays, strings and finite numbers.
+
 ## Smallest game
 
 ```js

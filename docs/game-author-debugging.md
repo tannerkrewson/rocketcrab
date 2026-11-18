@@ -44,6 +44,15 @@ game ID is unchanged.
   handler, so Nova cannot produce snapshots (`The game did not register a
   serializeState handler…`). Check that the declared mode matches the API surface
   you used.
+- **`invalid_state` in simulation mode** — `serializeState` returned something
+  other players cannot receive as sent. `undefined` (a missing `return`), a cycle
+  or a `BigInt` stops the snapshot. `NaN`/`Infinity` (often a division by zero)
+  arrive as `null`, and a `Map` or `Set` as `{}`; the snapshot still goes out, but
+  other players' games will break on it. The message names the key. Each problem
+  is reported once until a snapshot succeeds again.
+- **`rate_limited` from `nova.simulation.sendInput`** — the game sent more than
+  60 inputs per second, usually one per animation frame or pointer move. Inputs
+  are dropped quietly after the first report. Send an input only when it changes.
 - **"Couldn't reach anyone in this party. It may have ended, or your networks may
   need a TURN relay."** — the joiner was admitted, but no peer data channel opened
   within 15 seconds. Same-Wi-Fi play often succeeds without TURN; different

@@ -313,34 +313,57 @@ var tick = nova.simulation.getTick();
 
 - Every frame runs its own **local clock** at the configured tick interval
   (default 100 ms = 10 Hz; Nova bounds 16..500 ms). Each tick fires
-  `onTick(tick)`; advance your simulation by exactly one fixed step.
+  `onTick(tick)`; advance your simulation by exactly one fixed step. The
+  clock follows elapsed time, so every device runs the game at the same
+  speed: ticks a busy or background tab missed fire in one burst (up to
+  2 seconds' worth), and a longer suspension is skipped rather than
+  replayed. Count game time in ticks, never `Date.now()`, which differs
+  between devices.
 - Inputs arrive through `onInput` as they are sent (per-sender order is
   guaranteed; your own input is looped back locally). Apply them during the
   next tick for local prediction.
 - The **authority** produces authoritative snapshots at the configured
-  cadence (default 1 s; Nova bounds 50..10 000 ms): it calls the game's
-  `serializeState()` on the authority frame, verifies the size bound
-  (512 KiB), hashes it, and broadcasts `{ tick, state, stateHash? }` to
-  other players. Their `onSnapshot` fires; restore from it. Aim for snapshots
-  of 48 KiB or less and serialize only what a returning player needs to resume.
+  cadence (default 1 s; Nova bounds 50..10 000 ms), right after the tick
+  they describe: it calls the game's `serializeState()` on the authority
+  frame, checks the result, hashes it, and broadcasts `{ tick, state,
+  stateHash? }` to other players. Their `onSnapshot` fires; restore from it.
+  The local clock moves to `snapshot.tick`, so the next `onTick` steps the
+  restored state forward from exactly that tick. Aim for snapshots of 48 KiB
+  or less and serialize only what a returning player needs to resume,
+  including inputs that are still held.
+- Snapshots travel as **JSON**. `serializeState` must return plain data:
+  `undefined`, cycles and `BigInt` are rejected with `invalid_state`.
+  `NaN` and `Infinity` arrive as `null` and a `Map` or `Set` as `{}`; Nova
+  still sends the snapshot and reports `invalid_state` once so the bug is
+  visible. Class instances arrive as plain objects without their methods.
+  A failing `serializeState` (missing, throwing, too large) is reported
+  once, not at every snapshot, until a snapshot succeeds again.
 - Snapshots are **replicated** to every shell (like canonical state in
   state mode). When the authority migrates (its tab closes, it loses
-  connection), the new authority restores the most recent valid snapshot
-  (hash-checked) and re-broadcasts it — every frame restores and the game
-  continues. Games observe the migration only as the following
-  snapshot.
+  connection, its phone sleeps past the grace period), the new authority
+  publishes its own running game's state as the first snapshot of the new
+  term, so nobody rewinds to the last snapshot from before the old host
+  went silent. Every frame restores from it and the game continues. A new
+  authority that has not started yet (or whose `serializeState` fails)
+  restores the most recent valid replicated snapshot (hash-checked)
+  instead. Games observe the migration only as the following snapshot.
+- A game frame that loads mid-game (a late joiner, or a reloaded frame)
+  receives the latest snapshot right after `onStart`.
 
 ### Rate bounds and diagnostics
 
 - Inputs are bounded per player: 60 inputs/second on average, enforced over a
   10-second sliding window (600 inputs per window; F6 parity). Over-limit sends
-  are rejected with a stable `rate_limited` error delivered through
-  `nova.onError`.
+  are dropped; the first drop of a streak is reported with a stable
+  `rate_limited` error through `nova.onError`. Send an input when it changes
+  (a key goes down or up), not on every animation frame or pointer move.
 - Snapshot frequency is bounded by Nova (50 ms..10 s, configurable by the
   host within those limits) and each snapshot is capped at 512 KiB.
 - `nova.simulation.getTick()` exposes the local clock; host/arena
-  diagnostics expose the tick, snapshot age, input latency, high-latency
-  flag, and clock drift (simulated latency is visible in the arena).
+  diagnostics expose the tick, snapshot age, input latency (from the
+  sender's clock, so indicative only), the high-latency flag, and drift
+  (how many ticks the local clock had run ahead of the last snapshot when it
+  arrived).
 
 ### When to choose simulation vs. state mode
 
@@ -478,10 +501,12 @@ Every API failure is a `NovaError` with a stable `code` and a human message:
 | `timed_out`               | The authority did not apply a dispatched action within 10 seconds.                                     |
 | `unknown_action`          | `nova.dispatch` named an action that has no handler in `actions`.                                      |
 | `payload_too_large`       | An action payload exceeded 16 KiB, or a raw payload exceeded 1 MiB.                                    |
-| `state_too_large`         | The resulting canonical state exceeded the 512 KiB snapshot limit.                                     |
+| `state_too_large`         | The resulting canonical state, or a simulation snapshot, exceeded the 512 KiB snapshot limit.          |
 | `no_authority`            | No authority is currently available to apply the action.                                               |
 | `game_ended`              | The game ended before the authority applied the action.                                                |
 | `no_snapshot_handler`     | A simulation authority has no `serializeState` handler, so it cannot produce snapshots.                |
+| `snapshot_error`          | A simulation authority's `serializeState` threw; the message is the thrown error's.                    |
+| `invalid_state`           | `serializeState` returned data that is not plain JSON (or contains `NaN`, `Infinity`, `Map`, `Set`).   |
 
 Unknown methods fail as `TypeError`s (reported as game errors), never as
 silent no-ops.

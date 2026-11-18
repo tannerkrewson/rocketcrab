@@ -7,6 +7,27 @@
   S4 (state-mode MVP; verification in
   `docs/testing/state-mode-vertical-slice.md`), ADR-0007 (authority)
 
+## Amended 2026-11-17: simulation clock, snapshots and handoff
+
+Real devices broke three simulation assumptions, so the engine changed:
+
+- **The clock follows elapsed time.** Counting timer callbacks let a busy or
+  background authority slow the game for everyone. Missed ticks now fire in
+  one burst of up to 2 seconds; longer suspensions are skipped.
+- **Device clocks are never compared.** Followers used to resync their tick
+  from the snapshot's send time, which phones' clock skew corrupts. Accepting
+  a snapshot now sets the local tick to the snapshot's tick, so the tick
+  always matches the state the game is stepping.
+- **A running replacement host keeps its own state.** A host whose phone
+  sleeps is replaced only after the grace period, so restoring the last
+  snapshot rewound everyone by seconds. A new authority whose game is
+  running now publishes its own state; replicated snapshots and follower
+  pushes remain the fallback for one that has not started.
+
+Snapshots are taken right after the tick they describe, checked as JSON
+(lossy values such as `NaN` are reported), and failures are reported once
+per streak.
+
 ## Amended 2026-11-15: raw channels are always reliable and ordered
 
 The raw-mode `reliable`, `ordered` and `binary` channel options were removed.
