@@ -51,7 +51,7 @@ passes when its expected result holds **on the phone**.
 | #   | Scenario                             | Steps (physical iPhone)                                                                                                         | Expected result                                                                                                                                                                                                     | CI equivalent                                             |
 | --- | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------- |
 | B1  | Audio start after user gesture       | Run a game that plays a beep (or add `new AudioContext()` + `resume()` on a tap). Open it in the editor preview and in a party. | The first audible sound happens only **after** a user gesture (tap); before any gesture the AudioContext is suspended, no sound plays, and no error breaks the game. A second tap plays sound again after a reload. | runtime Web Audio tests (headless, after gesture)         |
-| B2  | Audio startup instructions are clear | Read the game-author guidance in `docs/api/nova-api.md` (Mobile Safari notes) and the editor preview help.                      | The instructions say audio needs a user gesture, show the `resume()` pattern, and mention iOS silent-switch behavior; a game author can find them.                                                                  | docs review                                               |
+| B2  | Audio startup instructions are clear | Read the game-author guidance in `docs/api/nova-api-ai-reference.md` ("Phones and browsers") and the editor preview help.       | The instructions say audio needs a user gesture, show the `resume()` pattern, and mention iOS silent-switch behavior; a game author can find them.                                                                  | docs review                                               |
 | B3  | Camera/mic permission                | Run a game calling `getUserMedia({ video: true })` in a party on the phone.                                                     | Safari prompts for camera access; allowing it shows the capture indicator; the prompt appears (delegation reaches the game frame); denying shows a clear `NotAllowedError` to the game.                             | F4 matrix (device pass ✅); media tests with fake devices |
 | B4  | Permission denial                    | Deny camera permission, then call `getUserMedia` again.                                                                         | The game receives a structured failure it can surface; the shell keeps working; re-requesting after Settings → Safari → Camera reset prompts again.                                                                 | F4 matrix                                                 |
 
@@ -125,15 +125,15 @@ passes when its expected result holds **on the phone**.
 
 ## Acceptance-criteria mapping
 
-| M1 acceptance criterion                                                  | Where it is proven                                                       |
-| ------------------------------------------------------------------------ | ------------------------------------------------------------------------ |
-| State-mode vertical slice survives authority-phone backgrounding         | E1 + S4 e2e (arena suspend) + M1 "playing phone" unit test               |
-| A resumed player rejoins with current state                              | C2/C3/C5/E3 + M1 catch-up/reconnect tests                                |
-| No desktop-only controls are required                                    | A5 + UI review (touch targets, no hover/keyboard-only paths)             |
-| Test arena controls remain usable on a phone                             | A5/F2                                                                    |
-| Audio startup instructions are clear                                     | B2 + `docs/api/nova-api.md` Mobile Safari notes                          |
-| Compatibility limitations are documented                                 | This checklist + `docs/architecture/adr-0012-*` + `docs/api/nova-api.md` |
-| Playwright WebKit tests supplemented by documented physical-device tests | This document (the human pass) alongside the WebKit/Playwright suites    |
+| M1 acceptance criterion                                                  | Where it is proven                                                    |
+| ------------------------------------------------------------------------ | --------------------------------------------------------------------- |
+| State-mode vertical slice survives authority-phone backgrounding         | E1 + S4 e2e (arena suspend) + M1 "playing phone" unit test            |
+| A resumed player rejoins with current state                              | C2/C3/C5/E3 + M1 catch-up/reconnect tests                             |
+| No desktop-only controls are required                                    | A5 + UI review (touch targets, no hover/keyboard-only paths)          |
+| Test arena controls remain usable on a phone                             | A5/F2                                                                 |
+| Audio startup instructions are clear                                     | B2 + `docs/api/nova-api-ai-reference.md` "Phones and browsers"        |
+| Compatibility limitations are documented                                 | This checklist + `docs/architecture/adr-0012-*` + the AI reference    |
+| Playwright WebKit tests supplemented by documented physical-device tests | This document (the human pass) alongside the WebKit/Playwright suites |
 
 ## Known compatibility limitations (document, do not hide)
 
