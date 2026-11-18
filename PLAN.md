@@ -71,24 +71,20 @@ beta and physical-device checks are still pending.
       The lifecycle regression verifies that leaving keeps the app idle.
 - [ ] Use the live iPhone checks to evaluate room, link, and game recovery
       before consolidating any other retry paths.
-- [x] Reject older simulation snapshots within a host’s term and restore the
-      replacement host’s own game frame before it resumes publishing.
 - [x] Audit Trystero shared-state checkpoints. Keep the current snapshot path.
       Trystero can reject records by timestamp before Nova’s validator runs,
       so one shared value cannot reliably choose across game terms.
-- [x] Harden the simulation engine for real devices: an elapsed-time clock
-      (throttled tabs catch up, suspensions skip), the tick set from accepted
-      snapshots instead of cross-device clocks, JSON-checked snapshots with
-      one report per problem, rate-limit errors once per streak, and a running
-      replacement host publishing its own state instead of rewinding everyone
-      (`ae1a9f9`, `34161be`, `cd24c1e`). Rebooted frames resume from the
-      latest snapshot (`4c67de4`). Drift draws, steers by touch, and releases
-      a leaver's keys (`87b6a62`).
-- [ ] Test Drift on real phones with late join, mobile wake, and a sleeping
-      host. Check that every browser resumes the same race after handoff.
-- [ ] **Owner:** decide whether games may choose their simulation tick rate.
-      Every game runs at 10 Hz today (the declaration has no rate, and the
-      host never sets one), so arcade games must interpolate to look smooth.
+- [x] Replace simulation mode with ticking state games: `tick` + `tickRate`
+      on the authority, `nova.controls.set` for held input, no per-player view
+      copies without `selectView` (`7c51fdf`, `81748f5`). Spike: 8 players at
+      20 Hz cost ~6% CPU for all sessions in one process; upload was the
+      cost, about half of it view copies. NaN/Map state is stored as
+      replicated (`b4fd922`).
+- [x] Hand authority off when the host's page is hidden (`20530fc`).
+- [ ] Test Drift on real phones: late join, a host that switches apps, and
+      a host that leaves. Check that the puck keeps moving on every screen.
+- [ ] Measure a ticking game's host upload over TURN on cellular with 4–8
+      phones, and lower the default tick rate if it is too costly.
 
 ## 1. Owner actions
 
@@ -120,7 +116,7 @@ Record results here and in the [Mobile Safari checklist](docs/testing/mobile-saf
 - [ ] Airplane mode and a blocked `/signal` show the messages and recover.
 - [ ] Full create → prompt → paste → test → save → party → play on Mobile
       Safari; master prompt on two AI chat services.
-- [ ] State, simulation and raw sample games; authority migration; link and
+- [ ] Turn-based, ticking and raw sample games; authority migration; link and
       QR joins.
 - [ ] A friend beta without coaching.
 

@@ -2,8 +2,24 @@
 
 The compact reference for AI-built Nova games; the master prompt embeds this
 file verbatim. `window.nova` already exists when your game's code runs, and it
-behaves the same in the editor's test arena and in real parties. The full
-human reference is `docs/api/nova-api.md`.
+behaves the same in the editor's test arena and in real parties.
+
+## How a Nova game works
+
+Nova keeps one copy of the game's state. Your handlers (`createInitialState`,
+`actions`, `tick`) run on one player's device, which Nova picks and replaces
+if that player leaves. Every player receives each new state through
+`nova.state.onChange` and draws it. Players change the state in two ways:
+
+- **Actions** (`nova.dispatch`) for things that happen once: play a card,
+  answer, vote, jump, shoot, buy. Nova applies each one exactly once, in order.
+- **Controls** (`nova.controls.set`) for what a player is doing right now:
+  buttons held, a joystick direction, where a finger is. Only a game with a
+  `tick` reads them.
+
+A game with a `tick` handler is a real-time game: Nova calls `tick`
+`tickRate` times a second (default 15) to move things along. Without one,
+the state only changes when someone acts.
 
 ## The whole API
 
@@ -11,18 +27,23 @@ human reference is `docs/api/nova-api.md`.
 // --- Registration: first, exactly once ---
 nova.defineGame({
   title: "My Game", // <= 64 chars
-  mode: "state", // "state" (default) | "simulation" | "raw"
   apiVersion: 1, // always include: keeps this game working after API changes
-  // State mode only:
   createInitialState(context) {
-    return {}; // the canonical state
+    return {}; // the starting state (plain JSON)
   },
   actions: {
-    playCard(draft, context, payload) {
-      // Validate, then mutate the draft (or return a new state).
-      // context.actor is the player who dispatched.
+    playCard(state, context, payload) {
+      // Validate, then change `state` in place. context.actor = who acted.
+      // Throw an Error to reject the action; nothing changes.
     },
   },
+  // Real-time games only:
+  tickRate: 15, // ticks per second, 1..60
+  tick(state, context) {
+    // Move things by one step. context.dt = seconds per tick;
+    // context.controls[playerId] = that player's latest controls (or undefined).
+  },
+  // Only when players must not see everything (hidden hands, secret roles):
   selectView(state, viewer) {
     return state; // what this one player may see
   },
@@ -30,7 +51,7 @@ nova.defineGame({
 
 // --- Lifecycle ---
 nova.ready(); // once, when your game has loaded
-nova.onStart(() => {}); // the party started the game; sending works from here
+nova.onStart(() => {}); // the party started the game
 nova.onEnd((reason) => {}); // "user_exit" | "host_closed" | "error"
 nova.onConnectionChange((status) => {});
 // "connecting" | "connected" | "reconnecting" | "suspended" | "disconnected"
@@ -41,25 +62,14 @@ nova.players; // everyone, this player first, then join order
 nova.onPlayerJoin((player) => {});
 nova.onPlayerLeave((player) => {});
 
-// --- State mode ---
-nova.state.get(); // your view, or null before start
-nova.state.onChange((view) => render(view));
+// --- State ---
+nova.state.get(); // the latest state (or your view), or null before start
+nova.state.onChange((state) => {}); // a new state arrived
 nova.dispatch({ type: "playCard", payload: { card: "ace" } }); // Promise
 // Resolves once applied; rejects with { code, message }.
+nova.controls.set({ left: true, right: false }); // any time; only changes are sent
 
-// --- Simulation mode ---
-nova.simulation.register({
-  onInput(input) {}, // { type, payload?, tick?, sender: { id, name } }, yours included
-  onTick(tick) {}, // advance your local simulation one fixed step
-  onSnapshot(snapshot) {}, // { tick, state }: replace your local state with snapshot.state
-  serializeState() {
-    return {}; // your simulation state as plain data (Nova shares it)
-  },
-});
-nova.simulation.sendInput({ type: "move", payload: { dx: 1 } });
-nova.simulation.getTick(); // local tick, for interpolation
-
-// --- Raw mode ---
+// --- Raw messages (rarely needed) ---
 nova.raw.createChannel({ name: "chat" }); // after start; reliable and ordered
 nova.raw.send("chat", { text: "hi" }); // to everyone
 nova.raw.send("chat", "hi", { to: playerId }); // to one player
@@ -75,67 +85,50 @@ nova.onError((error) => {}); // { code, message }
 
 1. **`nova.defineGame` first, exactly once; `nova.ready()` once after
    loading.** The game starts when the party starts it; `onStart` tells you.
-2. **Send only after `onStart`.** `dispatch`, `raw.createChannel`,
-   `raw.send`, `raw.close` and `simulation.sendInput` throw `not_started`
-   before it and `ended` after `onEnd`.
-3. **Plain JSON data only** in state, payloads and views: no functions,
-   class instances, cycles, `BigInt` or DOM objects. Binary
-   (`Uint8Array`/`ArrayBuffer`) works on raw channels only.
+2. **Dispatch only after `onStart`.** `dispatch` and the `raw` calls throw
+   `not_started` before it and `ended` after `onEnd`. `controls.set` works
+   any time.
+3. **Plain JSON in state, payloads and controls**: objects, arrays, strings,
+   booleans and finite numbers. No functions, class instances, `Map`, `Set`,
+   `Date`, `NaN`, `Infinity` or DOM objects. `NaN` arrives as `null`.
 4. **Never invent methods**, and never write networking, rooms, hosts or
-   peers. Nova picks the authority, orders messages and migrates if a player
-   leaves; your game never knows who the authority is.
-5. **Treat views as read-only.** Change state only by dispatching actions.
-6. **Every `on…` call returns an unsubscribe function.**
-7. **Limits.** Each player shares 256 KiB/s (1 MiB burst) across actions,
-   simulation inputs and raw sends; one action payload is at most 16 KiB,
-   one raw payload at most 1 MiB, canonical state at most 512 KiB, and at
-   most 120 raw messages per second. Going over rejects the send with
-   `rate_limited` or `payload_too_large` (raw and simulation errors arrive
-   through `nova.onError`).
-8. **Render immediately; never wait for the party.** In the editor preview
+   peers. Your game never knows which device runs the handlers.
+5. **Handlers only change `state`.** Never touch the DOM, globals, timers or
+   `nova` from `createInitialState`, `actions`, `tick` or `selectView`; they
+   run on one device only. `Math.random()` is fine there: it runs once and
+   everyone receives the result.
+6. **Treat received state as read-only.** Change it only through actions,
+   controls and the tick.
+7. **Every `on…` call returns an unsubscribe function.**
+8. **Limits.** State at most 512 KiB, one action payload at most 16 KiB,
+   controls at most 1 KiB, one raw payload at most 1 MiB. Each player shares
+   256 KiB/s across actions and raw sends. Going over rejects the call with
+   `payload_too_large`, `state_too_large` or `rate_limited`.
+9. **Render immediately; never wait for the party.** In the editor preview
    there is no party: `nova.connectionStatus` stays `"disconnected"` and
    `onStart`, `onPlayerJoin` and `onConnectionChange` never fire. Show a
    working screen at once (menu, board, or "waiting for players"). A
    connection indicator is a small chip over a working screen, never a
-   blank screen with a spinner. Start real-time play only after `onStart`.
+   blank screen with a spinner.
 
-## Choosing a mode
-
-- **state** (default; prefer it): turn-based, card, board, trivia, drawing,
-  voting, word and social games. Nova keeps the canonical state, runs your
-  actions in order exactly once, gives each player only their `selectView`,
-  and catches up late joiners.
-- **simulation**: continuous real-time games (arcade, movement, shared
-  physics). Every player runs the simulation locally from ordered inputs;
-  regular snapshots from the authority correct drift and restore after
-  migration. No rollback netcode.
-  Keep the JSON returned by `serializeState()` small. Aim for 48 KiB or less
-  so updates stay cheap on mobile connections. Save only what another browser
-  needs to resume play, such as positions, velocities, scores, and the current
-  round. Rebuild visuals from that state. Leave out assets, caches, and past
-  inputs the game no longer needs. The runtime rejects snapshots over 512 KiB.
-- **raw**: custom protocols over named channels. Nova only delivers
-  messages: no shared state, no migration, no cheating resistance.
-
-## State mode example
+## Turn-based example
 
 ```js
 nova.defineGame({
   title: "Draw One",
-  mode: "state",
   apiVersion: 1,
   createInitialState(context) {
-    // context: { self, players, revision, now }
     return { deck: ["ace", "king", "queen"], hands: {} };
   },
   actions: {
-    drawCard(draft, context) {
-      if (draft.hands[context.actor.id] || draft.deck.length === 0) return;
-      draft.hands[context.actor.id] = draft.deck.pop();
+    drawCard(state, context) {
+      if (state.hands[context.actor.id]) throw new Error("You already drew.");
+      if (state.deck.length === 0) throw new Error("The deck is empty.");
+      state.hands[context.actor.id] = state.deck.pop();
     },
   },
   selectView(state, viewer) {
-    // Each player receives only this, never the full state.
+    // Each player sees only their own card.
     return { hand: state.hands[viewer.id] ?? null, cardsLeft: state.deck.length };
   },
 });
@@ -150,103 +143,126 @@ function render(view) {
 
 function draw() {
   nova.dispatch({ type: "drawCard" }).catch((error) => {
-    // stale_revision: someone acted first; the next onChange has the new view.
-    // Other codes: timed_out, unknown_action, payload_too_large,
-    // state_too_large, game_ended, no_authority.
-    nova.log("draw rejected", error.code);
+    // error.message is the Error your action threw, or a Nova reason such as
+    // stale_revision (someone acted first) or timed_out.
+    showMessage(error.message);
   });
 }
 ```
 
-What Nova guarantees in state mode:
+Nova guarantees: actions apply one at a time, in order, exactly once; a
+rejected action changes nothing; a player who joins late gets the current
+state.
 
-- Actions apply one at a time, in order, exactly once. An action based on an
-  old view is rejected with `stale_revision` and changes nothing; act again
-  from the newest `onChange` view.
-- A rejected or failed action never corrupts state.
-- A player who joins late gets the current state and their view.
-
-## Simulation mode example
+## Real-time example
 
 ```js
-nova.defineGame({ title: "Racers", mode: "simulation", apiVersion: 1 });
-
-// Everything another browser needs to continue lives in `sim`, including
-// which buttons each player is holding right now.
-let sim = { cars: {}, held: {} }; // held["playerId:left"] = true
-const queued = [];
-
-nova.simulation.register({
-  onInput(input) {
-    queued.push(input); // apply in the next onTick
+nova.defineGame({
+  title: "Bumper Dots",
+  apiVersion: 1,
+  tickRate: 15,
+  createInitialState() {
+    return { dots: {}, timeLeft: 60 };
   },
-  onTick(tick) {
-    for (const input of queued.splice(0)) {
-      const key = input.sender.id + ":" + input.payload.button;
-      if (input.type === "press") sim.held[key] = true;
-      else delete sim.held[key];
-    }
-    for (const player of nova.players) {
-      const car = (sim.cars[player.id] ??= { x: 100, y: 100 });
-      if (sim.held[player.id + ":left"]) car.x -= 5;
-      if (sim.held[player.id + ":right"]) car.x += 5;
+  tick(state, context) {
+    state.timeLeft = Math.max(0, state.timeLeft - context.dt); // timers live in state
+    const here = new Set(context.players.map((player) => player.id));
+    for (const id in state.dots) if (!here.has(id)) delete state.dots[id]; // left
+    for (const player of context.players) {
+      const dot = (state.dots[player.id] ??= { x: 50, y: 50, score: 0 });
+      const c = context.controls[player.id] ?? { dx: 0, dy: 0 };
+      dot.x = round(clamp(dot.x + c.dx * 40 * context.dt, 0, 100));
+      dot.y = round(clamp(dot.y + c.dy * 40 * context.dt, 0, 100));
     }
   },
-  onSnapshot(snapshot) {
-    sim = snapshot.state; // the authority's state; play continues from it
-  },
-  serializeState() {
-    return sim;
+  actions: {
+    boost(state, context) {
+      state.dots[context.actor.id].score += 1; // one-off events are actions
+    },
   },
 });
 
-nova.onPlayerLeave((player) => {
-  delete sim.cars[player.id];
-  for (const key in sim.held) if (key.startsWith(player.id + ":")) delete sim.held[key];
+// Smooth drawing: glide from the previous state to the latest one.
+let previous = null;
+let latest = null;
+let arrivedAt = 0;
+nova.state.onChange((state) => {
+  previous = latest ?? state;
+  latest = state;
+  arrivedAt = performance.now();
 });
-
-let started = false;
-nova.onStart(() => (started = true));
-function hold(button, pressed) {
-  if (started)
-    nova.simulation.sendInput({ type: pressed ? "press" : "release", payload: { button } });
-}
-// Send on change only: once on press, once on release.
-leftButton.onpointerdown = () => hold("left", true);
-leftButton.onpointerup = leftButton.onpointercancel = () => hold("left", false);
-addEventListener("keydown", (e) => e.key === "ArrowLeft" && !e.repeat && hold("left", true));
-addEventListener("keyup", (e) => e.key === "ArrowLeft" && hold("left", false));
-
 requestAnimationFrame(function frame() {
-  draw(sim); // draw every animation frame from the local simulation
+  if (latest) {
+    const t = Math.min(1, (performance.now() - arrivedAt) / (1000 / 15));
+    draw(previous, latest, t); // position = a + (b - a) * t
+  }
   requestAnimationFrame(frame);
 });
+
+// Controls: report what is held. Calling set often is fine.
+const held = { dx: 0, dy: 0 };
+function steer(dx, dy) {
+  held.dx = dx;
+  held.dy = dy;
+  nova.controls.set(held);
+}
+addEventListener("keydown", (e) => e.key === "ArrowLeft" && steer(-1, held.dy));
+addEventListener("keyup", (e) => e.key === "ArrowLeft" && steer(0, held.dy));
+addEventListener("blur", () => steer(0, 0)); // a hidden tab never sees keyup
+boostButton.onclick = () => nova.dispatch({ type: "boost" }).catch(() => {});
+
+function round(n) {
+  return Math.round(n * 10) / 10; // short numbers keep updates small
+}
+function clamp(n, min, max) {
+  return Math.min(max, Math.max(min, n));
+}
 nova.ready();
 ```
 
-What a simulation game must do:
+What a real-time game must do:
 
-- `onTick` runs 10 times a second on every player's screen. Advance exactly
-  one step per tick, and count time in ticks (a 3-second countdown is 30
-  ticks), never `Date.now()`. For smooth motion, draw every animation frame and
-  interpolate between ticks.
-- Return everything needed to continue from `serializeState()`: positions,
-  velocities, scores, timers, and the inputs players are still holding. About
-  once a second every other player replaces their state with it in
-  `onSnapshot`, and the next `onTick` continues from `snapshot.tick`.
-- Send an input when it changes (pressed, released, tapped), not every
-  animation frame or pointer move. Ignore key repeats. Over 60 inputs per
-  second are dropped with one `rate_limited` error.
-- Release a player's held inputs in `nova.onPlayerLeave`, or their character
-  keeps moving after they leave.
-- Snapshots travel as JSON: `NaN` and `Infinity` arrive as `null`, a `Map` or
-  `Set` as `{}`, and class instances lose their methods. Keep plain objects,
-  arrays, strings and finite numbers.
+- **Keep everything in the state**: positions, velocities, scores, timers
+  (count down with `context.dt`), the current round. Nothing that matters may
+  live only in a local variable.
+- **Read players from `context.players` in `tick`**: add an entity for a new
+  player and delete the entities of players who left.
+- **Use controls for held input and actions for one-off events.** Put the
+  current direction or buttons in controls; a jump, shot or purchase is an
+  action.
+- **Draw every animation frame**, gliding between the last two states as
+  above. New states arrive `tickRate` times a second plus network delay
+  (often 50–200 ms), so never move things only when a state arrives.
+- **Keep the state small**: it goes to every player every tick. Round
+  positions, and leave out anything you can recompute while drawing.
+- **For twitchy games** (racing, aiming), move this player's own character on
+  screen at once, put its position in controls, and have `tick` copy that
+  position into the state. Everything else follows the state.
+
+## Phones and browsers
+
+- **Sound starts after a tap.** Create or resume the `AudioContext` inside a
+  tap or click handler, never on load, and show a "tap for sound" hint. The
+  iPhone silent switch still mutes it.
+- **Touch first.** No hover-only or keyboard-only controls; buttons at least
+  44 px. Fullscreen, pointer lock and tilt (device orientation) do not work.
+- **The page can freeze.** A backgrounded phone stops timers and animation
+  frames, and Nova moves the game to another device. When the page comes
+  back it gets the current state through `onChange`; draw from that, never
+  from time measured locally while away.
+- **Camera and microphone** (`getUserMedia`) work after `onStart`, from a
+  tap, with the usual browser prompt.
+
+## Raw messages
+
+Only for data that is not game state, such as voice-like streams or a custom
+protocol. Raw messages have no shared state and no catch-up for late
+joiners. Prefer actions and controls for everything else.
 
 ## Smallest game
 
 ```js
-nova.defineGame({ title: "Hello Nova", mode: "state", apiVersion: 1 });
+nova.defineGame({ title: "Hello Nova", apiVersion: 1 });
 nova.onStart(() => nova.log("Game started!"));
 nova.ready();
 ```

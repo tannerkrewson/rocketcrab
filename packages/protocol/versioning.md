@@ -18,7 +18,7 @@ every envelope.
   `PROTOCOL_VERSION` in `src/version.ts`).
 - Every peer message envelope carries: `version`, `type`, `sessionId`,
   `senderMemberId`, `senderConnectionId`, `messageId`, `sentAt`, and — for
-  ordered families (actions, state, authority, simulation) — a per-sender
+  ordered families (actions, state, authority) — a per-sender
   monotonic `seq`.
 - Every runtime message envelope carries: `version`, `type`,
   `runtimeInstanceId`, optional `sessionId`, `messageId`, and `sentAt`.

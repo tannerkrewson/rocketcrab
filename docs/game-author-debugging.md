@@ -1,10 +1,8 @@
 # Game author and debugging guide
 
 This guide is for someone **playing and debugging Nova games**, not for
-changing Nova itself. The complete API contract is in `docs/api/nova-api.md`;
-the condensed version embedded in the master prompt is
-`docs/api/nova-api-ai-reference.md`. Read those for `nova.state`,
-`nova.simulation`, and `nova.raw` semantics.
+changing Nova itself. The API is described in
+`docs/api/nova-api-ai-reference.md`, which the master prompt embeds.
 
 ## The authoring loop
 
@@ -38,21 +36,12 @@ game ID is unchanged.
   before it). Check the console and that the document has no syntax error.
 - **Validation: incomplete HTML document** — Nova expects one complete document
   (`<!doctype html>` through `</html>`), not a fragment or multiple files.
-- **`unknown_action` / `no_snapshot_handler`** — in state mode, a dispatch named
-  an action that is not in `actions` (`No action handler named "…" was
-  registered.`). In simulation mode, the authority's frame has no `serializeState`
-  handler, so Nova cannot produce snapshots (`The game did not register a
-  serializeState handler…`). Check that the declared mode matches the API surface
-  you used.
-- **`invalid_state` in simulation mode** — `serializeState` returned something
-  other players cannot receive as sent. `undefined` (a missing `return`), a cycle
-  or a `BigInt` stops the snapshot. `NaN`/`Infinity` (often a division by zero)
-  arrive as `null`, and a `Map` or `Set` as `{}`; the snapshot still goes out, but
-  other players' games will break on it. The message names the key. Each problem
-  is reported once until a snapshot succeeds again.
-- **`rate_limited` from `nova.simulation.sendInput`** — the game sent more than
-  60 inputs per second, usually one per animation frame or pointer move. Inputs
-  are dropped quietly after the first report. Send an input only when it changes.
+- **`unknown_action`** — a dispatch named an action that is not in `actions`
+  (`No action handler named "…" was registered.`).
+- **`invalid_state`** — the state is not plain JSON. A cycle or a `BigInt`
+  rejects the change. `NaN`/`Infinity` (often a division by zero) become `null`
+  and a `Map` or `Set` becomes `{}`; the change still applies, and the message
+  names the key. A failing `tick` is reported once, not every tick.
 - **"Couldn't reach anyone in this party. It may have ended, or your networks may
   need a TURN relay."** — the joiner was admitted, but no peer data channel opened
   within 15 seconds. Same-Wi-Fi play often succeeds without TURN; different
@@ -117,7 +106,6 @@ TURN, and the tunnel fallback are not yet live for players.
 Nova does not provide anti-cheat, server-authoritative simulation, guaranteed
 direct connections on every network, or per-game isolation on the shared runtime
 origin. A connection that cannot go direct may fall back to an encrypted relay
-through Cloudflare's edge Worker, which still sees connection metadata. Media
-support is experimental. See `docs/architecture/threat-model.md`
+through Cloudflare's edge Worker, which still sees connection metadata. See `docs/architecture/threat-model.md`
 and ADR-0008/ADR-0010 for the exact limits — do not describe stronger guarantees
 to players than these documents support.

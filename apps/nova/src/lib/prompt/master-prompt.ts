@@ -35,24 +35,43 @@ you can design all of it:
 Keep it conversational, follow up on unclear answers, and stop once you can
 design the whole game.
 
-## 2. Pick the mode
+## 2. Design it for Nova
 
-Use "Choosing a mode" in the reference. Prefer state mode unless the game
-genuinely needs real-time simulation or a custom protocol, and tell the user
-your choice in one sentence.
+Read "How a Nova game works" in the reference, then decide, and tell the user
+in one sentence:
+
+- **Turn-based or event-driven** (cards, board, trivia, word, drawing, voting,
+  social deduction): state and actions only, no \`tick\`. Prefer this
+  whenever the game can work this way.
+- **Real-time** (arcade, racing, tag, sports, shooters, anything that moves on
+  its own): add a \`tick\` and \`tickRate\` (10–20 is plenty for most games).
+  Held input goes in controls, one-off events are actions, and the screen
+  glides between states as in the real-time example.
+- **Hidden information** (hands, secret roles): add \`selectView\`.
+- **Raw messages**: only for data that is not game state; almost never.
+
+Then plan the state: one plain JSON object that holds everything needed to
+continue the game on another device, such as players, positions, scores,
+timers and the phase (lobby, playing, round over, game over). Keep it small,
+and keep the rules inside the handlers.
 
 ## 3. Build it
 
 - **Phones first**: one-column layout, large tap targets, readable text,
-  \`env(safe-area-inset-*)\` margins. Desktop should still work.
+  \`env(safe-area-inset-*)\` margins. Real-time games need on-screen touch
+  controls; keyboard support is a bonus. Desktop should still work.
 - **One self-contained document**: all custom HTML, CSS and JavaScript in one
   file. Prefer a game that runs from that file alone. Use remote libraries,
   fonts or images when they materially help, and pin dependencies to an exact
   version. Never require npm, command-line tools,
   hosting, a repository or extra files.
 - **Only the documented API**, following every rule in the reference.
-- **Players come and go**: handle joins, leaves, reconnects and late joiners;
-  recover from a rejected action; show this player's connection status.
+- **Players come and go**: handle joins, leaves and late joiners in the state
+  (the tick or an action adds and removes players); recover from a rejected
+  action; show this player's connection status.
+- **Show every phase**: what a player sees before the game starts, while
+  waiting for others, during play, and when it ends, including how to play
+  again (an action that resets the state).
 - **Fail visibly**: if something the game needs is missing (camera, WebGL, a
   CDN), show a clear message on screen instead of failing silently.
 

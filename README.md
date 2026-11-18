@@ -46,9 +46,10 @@ install tools, understand code, deploy a website, or create a repository.
   Trystero 0.27's WebSocket relay against the edge Worker, not public relays. A
   WebRTC connection that has not opened directly within 8 seconds falls back to
   an end-to-end encrypted tunnel through the same Worker.
-- **Three game modes.** `state` (Nova-owned canonical state, actions, authority,
-  migration), `simulation` (ordered inputs, shared clock, authoritative
-  snapshots), and `raw` (named data channels for specialized games).
+- **One game model.** Nova keeps the canonical state and runs the game's
+  actions (and, for real-time games, its `tick` with each player's controls)
+  on one elected device, replicating the result and migrating if that player
+  leaves. `raw` channels remain for specialized protocols.
 
 ## Workspace layout
 
@@ -99,8 +100,9 @@ canonical index or an ADR:
 
 - `docs/architecture/` — 13 ADRs (`adr-0001`..`adr-0013`), the threat model
   (`threat-model.md`), and the deployment guide (`deployment.md`).
-- `docs/api/nova-api.md` — the full game-developer API reference; the
-  condensed, prompt-embedded version is `docs/api/nova-api-ai-reference.md`.
+- `docs/api/nova-api-ai-reference.md` — the game-facing API reference,
+  embedded verbatim in the master prompt; the types in
+  `packages/nova-api/src/types.ts` are the exact contract.
 - `docs/game-author-debugging.md` — the authoring loop, editor diagnostics,
   common failure messages, and how to debug a real party.
 - `docs/testing/` — milestone findings and checklists, each linked from its

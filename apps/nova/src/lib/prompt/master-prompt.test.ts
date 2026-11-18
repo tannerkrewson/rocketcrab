@@ -26,7 +26,8 @@ describe("master prompt", () => {
     expect(normalized).toContain("Phones first");
     expect(normalized).toContain("One self-contained document");
     expect(normalized).toContain("single fenced code block tagged `html`");
-    expect(normalized).toContain("Prefer state mode");
+    expect(normalized).toContain("Prefer this whenever the game can work this way");
+    expect(normalized).toContain("Held input goes in controls");
   });
 
   it("tells games to render without a party (the preview has no session)", () => {
