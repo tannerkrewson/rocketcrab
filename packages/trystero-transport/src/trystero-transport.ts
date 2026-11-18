@@ -132,8 +132,6 @@ export class TrysteroTransport implements NovaTransport {
   private readonly admissionTimers = new Map<string, () => void>();
   /** Cancels the pending identity-ack retransmit per peer (see IDENTITY_ACK_RETRANSMIT_MS). */
   private readonly ackRetransmits = new Map<string, () => void>();
-  /** Admission restarts used per peer (see ADMISSION_RESTARTS). */
-  private readonly admissionRestarts = new Map<string, number>();
   /** announced connectionId → trystero peerId (targeting). */
   private readonly connectionToPeerId = new Map<ConnectionId, string>();
   private readonly deliverySeqCounters = new Map<string, number>();
@@ -439,7 +437,6 @@ export class TrysteroTransport implements NovaTransport {
     }
     const generation = ++this.lifecycleGeneration;
     const oldConnectionId = this.selfConnectionId;
-    const roomName = this.roomName;
     const room = this.room;
     this.connectionState = "joining";
     this.emit("connection:state", "joining");
@@ -462,35 +459,7 @@ export class TrysteroTransport implements NovaTransport {
     }
     this.connectionEpoch += 1;
     this.selfConnectionId = `${this.selfIdBase}#${this.connectionEpoch}`;
-    let nextRoom: Room;
-    const startedAt = this.now();
-    try {
-      const url = await this.deriveSignalUrl(roomName);
-      if (generation !== this.lifecycleGeneration)
-        throw new TrysteroJoinError({ category: "cancelled", message: "Reconnect was cancelled." });
-      this.signalRelayUrl = url;
-      this.tearingDown = false;
-      nextRoom = joinRoom(this.buildConfig(url, roomName), roomName);
-    } catch (cause) {
-      if (generation !== this.lifecycleGeneration) throw cause;
-      this.connectionState = "disconnected";
-      this.emit("connection:state", "disconnected");
-      if (cause instanceof TrysteroJoinError) throw cause;
-      throw new TrysteroJoinError({
-        category: "invalid_state",
-        message: "Reconnect failed to create a room.",
-        cause,
-      });
-    }
-    await this.startRoom(
-      nextRoom,
-      Math.max(0, this.options.joinTimeoutMs - (this.now() - startedAt)),
-    );
-    this.emit("peer:reconnected", {
-      memberId: this.selfMemberId,
-      oldConnectionId,
-      newConnectionId: this.selfConnectionId,
-    });
+    await this.rejoinRoom(generation, oldConnectionId, "disconnected");
   }
 
   /** Drop the connection (Mobile Safari backgrounding; threat T15). */
@@ -528,7 +497,6 @@ export class TrysteroTransport implements NovaTransport {
     }
     const generation = ++this.lifecycleGeneration;
     const oldConnectionId = this.selfConnectionId;
-    const roomName = this.roomName;
     this.connectionEpoch += 1;
     this.selfConnectionId = `${this.selfIdBase}#${this.connectionEpoch}`;
     this.tearingDown = false;
@@ -537,22 +505,36 @@ export class TrysteroTransport implements NovaTransport {
     if (generation !== this.lifecycleGeneration) {
       throw new TrysteroJoinError({ category: "cancelled", message: "Resume was cancelled." });
     }
+    await this.rejoinRoom(generation, oldConnectionId, "suspended");
+  }
+
+  private async rejoinRoom(
+    generation: number,
+    oldConnectionId: ConnectionId,
+    failureState: "suspended" | "disconnected",
+  ): Promise<void> {
+    const roomName = this.roomName;
+    const operation = failureState === "suspended" ? "Resume" : "Reconnect";
     let room: Room;
     const startedAt = this.now();
     try {
       const url = await this.deriveSignalUrl(roomName);
       if (generation !== this.lifecycleGeneration)
-        throw new TrysteroJoinError({ category: "cancelled", message: "Resume was cancelled." });
+        throw new TrysteroJoinError({
+          category: "cancelled",
+          message: `${operation} was cancelled.`,
+        });
       this.signalRelayUrl = url;
+      this.tearingDown = false;
       room = joinRoom(this.buildConfig(url, roomName), roomName);
     } catch (cause) {
       if (generation !== this.lifecycleGeneration) throw cause;
-      this.connectionState = "suspended";
-      this.emit("connection:state", "suspended");
+      this.connectionState = failureState;
+      this.emit("connection:state", failureState);
       if (cause instanceof TrysteroJoinError) throw cause;
       throw new TrysteroJoinError({
         category: "invalid_state",
-        message: "Resume failed to create a room.",
+        message: `${operation} failed to create a room.`,
         cause,
       });
     }
@@ -939,8 +921,8 @@ export class TrysteroTransport implements NovaTransport {
       armAckRetransmit(peerId, identity);
     };
     // Our acknowledgement of a peer's identity. It counts as sent only once the
-    // send resolves; a rejected send is retried by armAckRetransmit. A `reply`
-    // answers a peer's re-sent ack; it is never answered in turn.
+    // send resolves. Trystero can drop actions before the remote peer is active,
+    // even after local send resolves. Keep retrying until both sides are ready.
     const sendAck = (peerId: string, identity: PeerIdentity, reply = false): void => {
       const payload: AckPayload = reply
         ? { connectionId: identity.connectionId, reply: true }
@@ -967,20 +949,13 @@ export class TrysteroTransport implements NovaTransport {
       }, IDENTITY_ACK_RETRANSMIT_MS);
       this.ackRetransmits.set(peerId, cancel);
     };
-    // The admission deadline. A peer still present gets one more handshake
-    // window (its acknowledgement keeps being re-sent); after that it is rejected.
+    // Allow a full retry window for the readiness acknowledgement to arrive.
     const armAdmissionTimer = (peerId: string): void => {
       this.admissionTimers.set(
         peerId,
         this.scheduleFn(() => {
           this.admissionTimers.delete(peerId);
           if (this.room !== room || this.readyPeers.has(peerId)) return;
-          const restarts = this.admissionRestarts.get(peerId) ?? 0;
-          if (restarts < ADMISSION_RESTARTS && room.getPeers()[peerId]) {
-            this.admissionRestarts.set(peerId, restarts + 1);
-            armAdmissionTimer(peerId);
-            return;
-          }
           this.handlePeerLeave(peerId);
           this.rejectedPeers.add(peerId);
           this.recordJoinError(
@@ -992,7 +967,7 @@ export class TrysteroTransport implements NovaTransport {
               roomId: this.roomName,
             }),
           );
-        }, this.options.handshakeTimeoutMs),
+        }, 2 * this.options.handshakeTimeoutMs),
       );
     };
     this.roomUnsubscribers.push(
@@ -1105,7 +1080,6 @@ export class TrysteroTransport implements NovaTransport {
     this.admissionTimers.delete(peerId);
     this.ackRetransmits.get(peerId)?.();
     this.ackRetransmits.delete(peerId);
-    this.admissionRestarts.delete(peerId);
     this.acknowledgedPeers.delete(peerId);
     this.sentAcknowledgements.delete(peerId);
     this.readyPeers.delete(peerId);
@@ -1114,11 +1088,7 @@ export class TrysteroTransport implements NovaTransport {
     this.settlePeerWaiters(peerId, false);
     const identity = this.identityByPeerId.get(peerId);
     this.identityByPeerId.delete(peerId);
-    for (const [connectionId, mappedPeerId] of this.connectionToPeerId) {
-      if (mappedPeerId === peerId) {
-        this.connectionToPeerId.delete(connectionId);
-      }
-    }
+    if (identity) this.connectionToPeerId.delete(identity.connectionId);
     const connectionId = identity?.connectionId ?? peerId;
     const index = this.peersList.findIndex((peer) => peer.connectionId === connectionId);
     if (index >= 0) {
@@ -1388,7 +1358,6 @@ export class TrysteroTransport implements NovaTransport {
     this.admissionTimers.clear();
     for (const cancel of this.ackRetransmits.values()) cancel();
     this.ackRetransmits.clear();
-    this.admissionRestarts.clear();
     for (const peerId of this.readyWaiters.keys()) this.settlePeerWaiters(peerId, false);
     this.connectionToPeerId.clear();
     this.deliverySeqCounters.clear();
@@ -1491,8 +1460,6 @@ function parseAckPayload(data: unknown): { connectionId: string; reply: boolean 
  * not buffer it, so a single ack can be lost; re-sending is idempotent.
  */
 const IDENTITY_ACK_RETRANSMIT_MS = 2_000;
-/** An admission timeout restarts the handshake this many times, if the peer is still present. */
-const ADMISSION_RESTARTS = 1;
 
 /** Edge origin when the caller does not configure one (local `npm run dev`). */
 const DEFAULT_EDGE_ORIGIN = "http://localhost:8787";

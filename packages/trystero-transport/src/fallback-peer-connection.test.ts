@@ -1,5 +1,5 @@
 import type { SessionSecret } from "@rocketcrab/protocol";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   FALLBACK_AFTER_MS,
   OPEN_ATTEMPTS,
@@ -293,6 +293,7 @@ class FakeNetwork {
   /** How many of the next socket opens fail, like the edge's transient 409. */
   rejectNext = 0;
   stalled = false;
+  betweenPairedNotifications?: () => void;
   readonly WebSocketImpl: typeof WebSocket;
   private readonly waiting = new Map<string, FakeSocket>();
 
@@ -323,6 +324,7 @@ class FakeNetwork {
       socket.peer = other;
       queueMicrotask(() => {
         other.onmessage?.({ data: TUNNEL_PAIRED_FRAME });
+        this.betweenPairedNotifications?.();
         socket.onmessage?.({ data: TUNNEL_PAIRED_FRAME });
       });
     });
@@ -725,8 +727,8 @@ describe("FallbackPeerConnection", () => {
 
   it("backpressure: bufferedAmount rises and bufferedamountlow fires once after the drop", async () => {
     const h = harness();
-    h.network.stalled = true;
     const { chA, b } = await pairUp(h);
+    h.network.stalled = true;
     const chB = bChannel(b);
     if (!chB) throw new Error("no answering channel");
     const received: unknown[] = [];
@@ -743,7 +745,7 @@ describe("FallbackPeerConnection", () => {
     expect(chA.bufferedAmount).toBeGreaterThan(16384);
 
     // Frames are sealed asynchronously, so wait until the sender's socket holds them all.
-    const senderOf = () => h.network.sockets.find((s) => s.sent.length === 5);
+    const senderOf = () => h.network.sockets.find((s) => s.sent.length === 6);
     await until(() => senderOf()?.bufferedAmount === 5 * frameBytes, "frames queued on socket");
     const sender = senderOf();
     if (!sender) throw new Error("no sending socket");
@@ -935,7 +937,7 @@ describe("FallbackPeerConnection", () => {
       await until(() => countBySide(h.failures).b === 1, "partner closes");
 
       expect(received).toBe(32);
-      const sender = h.network.sockets.find((s) => s.sent.length === 32);
+      const sender = h.network.sockets.find((s) => s.sent.length === 33);
       if (!sender) throw new Error("no sending socket");
       expect(sender.closeCalls).toEqual([1000]);
       expect(h.failures.map((f) => f.info)).toEqual([{ reason: "socket-closed", closeCode: 1000 }]);
@@ -973,7 +975,7 @@ describe("FallbackPeerConnection", () => {
       expect(drainedMs).toBeLessThan(2050);
       expect(received).toBeGreaterThan(60);
       expect(received).toBeLessThan(80);
-      const sender = h.network.sockets.find((s) => s.sent.length > 0);
+      const sender = h.network.sockets.find((s) => s.sent.length > 1);
       if (!sender) throw new Error("no sending socket");
       expect(sender.closeCalls).toEqual([1000]);
       for (const socket of h.network.sockets) {
@@ -1189,8 +1191,8 @@ describe("FallbackPeerConnection", () => {
 
   it("resets bufferedAmount after close", async () => {
     const h = harness();
-    h.network.stalled = true;
     const { a, chA } = await pairUp(h);
+    h.network.stalled = true;
     for (let i = 0; i < 3; i += 1) chA.send(new ArrayBuffer(10000));
     expect(chA.bufferedAmount).toBeGreaterThan(0);
     // A close with queued frames drains first (bounded), so wait for the channel to close.
@@ -1282,6 +1284,23 @@ describe("FallbackPeerConnection", () => {
       ["a", "direct"],
       ["b", "direct"],
     ]);
+  });
+
+  it("does not open a tunnel when the other peer chooses native between pairing notifications", async () => {
+    const h = harness();
+    const { a, b, chA } = await connectPair(h);
+    const open = vi.fn();
+    chA.onopen = open;
+    a.native.setStates("failed", "failed");
+    await until(() => h.network.sockets[0]?.readyState === 1, "first socket waiting");
+    h.network.betweenPairedNotifications = () => deliverNativeChannel(b);
+    b.native.setStates("failed", "failed");
+
+    await until(() => h.failures.some((failure) => failure.side === "a"), "interrupted tunnel");
+    expect(open).not.toHaveBeenCalled();
+    expect(chA.readyState).toBe("closed");
+    expect(h.outcomes.some(({ info }) => info.outcome === "tunnel")).toBe(false);
+    expect(bChannel(b)?.readyState).toBe("open");
   });
 
   it("answerer: a native channel before pairing wins and is handed to Trystero", async () => {
@@ -1620,7 +1639,7 @@ describe("FallbackPeerConnection connection outcome", () => {
 
   it("reports one unknown outcome when the stats read outlasts its timeout, then ignores the late answer", async () => {
     const h = harness();
-    const { a, b, chA } = await connectPair(h);
+    const { a, b } = await connectPair(h);
     let release: (report: RTCStatsReport) => void = () => undefined;
     a.native.stats = () =>
       new Promise<RTCStatsReport>((resolve) => {
@@ -1628,23 +1647,24 @@ describe("FallbackPeerConnection connection outcome", () => {
       });
     h.clock.advance(1000);
     a.native.channels[0]?.open();
-    // A's native connection now fails, so A switches to the tunnel. B times out
-    // and switches too, so the pair completes while A's stats read is pending.
-    a.native.setStates("failed", "failed");
-    h.clock.advance(FALLBACK_AFTER_MS);
-    await until(
-      () => chA.readyState === "open" && bChannel(b)?.readyState === "open",
-      "tunnel pairing after the native open",
-    );
+    deliverNativeChannel(b);
+    h.clock.advance(STATS_TIMEOUT_MS);
     release(selectedPath("host", "host"));
     await settle();
 
-    // A's read started at clock 1000 and times out at 3000, before B's switch at 8000.
     expect(outcomesOf(h, "a")).toEqual([{ outcome: "unknown", msToConnect: 1000 }]);
-    // B's deadline is measured from its own descriptions, at clock 0.
-    expect(outcomesOf(h, "b")).toEqual([
-      { outcome: "tunnel", msToConnect: 1000 + FALLBACK_AFTER_MS },
-    ]);
+  });
+
+  it("lets Trystero reconnect when an established native channel fails", async () => {
+    const h = harness();
+    const { a, b } = await connectPair(h);
+    a.native.channels[0]?.open();
+    deliverNativeChannel(b);
+    a.native.setStates("failed", "failed");
+    h.clock.advance(FALLBACK_AFTER_MS);
+    expect(a.pc.connectionState).toBe("failed");
+    expect(a.pc.iceConnectionState).toBe("failed");
+    expect(h.tunnels).toHaveLength(0);
   });
 
   it("reports nothing more after a tunnel that paired fails terminally", async () => {

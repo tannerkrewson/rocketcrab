@@ -709,7 +709,7 @@ describe("TrysteroTransport peer mapping", () => {
     room.joinHandler!({ peerId: "slow", userId: "slow-user" });
     clock.advance(4999);
     expect(onJoinError).not.toHaveBeenCalled();
-    // The first deadline restarts the handshake once, because the peer is still present.
+    // Keep the peer eligible for a full second handshake window.
     clock.advance(1);
     expect(onJoinError).not.toHaveBeenCalled();
     clock.advance(4999);

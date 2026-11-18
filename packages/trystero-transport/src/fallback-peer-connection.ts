@@ -1,41 +1,14 @@
 /**
- * Connection fallback wrapper for Trystero's `rtcPolyfill`.
+ * Trystero uses one reliable, ordered data channel per WebRTC connection.
+ * Once offer and answer are present, allow native WebRTC (including TURN)
+ * to open the channel. A stall or initial ICE failure starts the edge tunnel.
+ * Keep the native connection alive during the race so closing it cannot
+ * interrupt a peer still using WebRTC.
  *
- * `createFallbackPeerConnectionClass` returns a constructor that delegates to
- * the browser's real RTCPeerConnection. When a pair's data channel has not
- * opened within `fallbackAfterMs` of both descriptions existing, or the native
- * connection reports `failed`, the pair's single data channel moves onto the
- * edge tunnel (`/tunnel/:pairId`, see deploy/edge/tunnel.ts). Trystero keeps
- * the same channel object and sees `connecting` until the tunnel reports
- * `paired`, then `connected`.
- *
- * Rules that follow from the Trystero 0.27 code (`peer.mjs`, `strategy.mjs`):
- * - "Healthy" means the data channel has opened, and nothing else. Trystero
- *   needs an open channel. A peer connection that is connected while the
- *   channel stays closed (for example SCTP blackholed) must not stall.
- * - The timer starts only once BOTH descriptions exist. Initiator offers are
- *   pooled before a remote description exists.
- * - `failed` and `disconnected` are never shown to Trystero while the pair is
- *   switching or tunnelled. Trystero closes a peer on either. Mid-session
- *   `disconnected` after the pair has connected is passed through; there is no
- *   switch mid-session.
- * - A native channel close before its first open is held back until the
- *   deadline decides, so it cannot hide a dead peer for longer than that.
- * - The native connection is NOT closed at the switch. Closing it would send a
- *   DTLS close, and a partner still on native WebRTC would tear the peer down.
- * - Native wins until the tunnel pairs. A side still waiting for `paired`
- *   whose native channel opens goes back to native and drops its socket, so
- *   both sides apply the same rule even though their deadlines start one
- *   signaling hop apart. Once paired, the switch is one-way. The only split
- *   left is a native open inside the ~one-way-latency gap between the two
- *   `paired` frames; the dropped socket then fails the partner at once and
- *   Trystero retries.
- * - One data channel per connection. Trystero uses exactly one.
- * - Sends are paced to the edge's per-socket budget (see the pace constants).
- * - Each instance reports one connection outcome at most (`onOutcome`). The
- *   first success or failure claims it; a later event cannot.
- *
- * The transport wires this in through `rtcPolyfill` (trystero-transport.ts).
+ * Each browser can prefer native until the edge tells it that sockets paired.
+ * Exchange an authenticated empty frame before opening the tunnel: pairing
+ * alone cannot prove the remote browser chose it. An established channel
+ * that fails is left to Trystero to reconnect with a fresh ordered stream.
  */
 import type { SessionSecret } from "@rocketcrab/protocol";
 import {
@@ -516,9 +489,8 @@ class Session {
   /** Bumped on every switch and revert; stale tunnel work checks it and stops. */
   private tunnelAttempt = 0;
   private cipher: TunnelCipher | null = null;
+  private paired = false;
   private ready = false;
-  private readonly readyGate: Promise<void>;
-  private openReadyGate: () => void = () => undefined;
   private sendChain: Promise<void> = Promise.resolve();
   private recvChain: Promise<void> = Promise.resolve();
   /** Wire bytes accepted by send() and not yet handed to the socket. */
@@ -533,9 +505,6 @@ class Session {
     private readonly deps: Deps,
   ) {
     this.paceRefilledAt = deps.now();
-    this.readyGate = new Promise<void>((resolve) => {
-      this.openReadyGate = resolve;
-    });
     native.addEventListener("connectionstatechange", () => this.onNativeState());
     native.addEventListener("iceconnectionstatechange", () => this.onNativeState());
     native.addEventListener("datachannel", (event) => this.onNativeChannel(event.channel));
@@ -547,8 +516,8 @@ class Session {
     const native = this.native.connectionState;
     if (this.closed) return native;
     if (this.mode === "tunnel") return this.ready ? "connected" : "connecting";
-    if (native === "failed") return "connecting";
-    if (native === "disconnected" && !this.everConnected) return "connecting";
+    if (!this.everConnected && (native === "failed" || native === "disconnected"))
+      return "connecting";
     return native;
   }
 
@@ -556,8 +525,8 @@ class Session {
     const native = this.native.iceConnectionState;
     if (this.closed) return native;
     if (this.mode === "tunnel") return this.ready ? "connected" : "checking";
-    if (native === "failed") return "checking";
-    if (native === "disconnected" && !this.everConnected) return "checking";
+    if (!this.everConnected && (native === "failed" || native === "disconnected"))
+      return "checking";
     return native;
   }
 
@@ -642,7 +611,6 @@ class Session {
     this.cancelPause(this.paceSlot);
     // A read still pending when the connection closes reports unknown now.
     this.settleStats?.();
-    this.openReadyGate();
     const socket = this.socket;
     if (socket && (socket.readyState === WS_CONNECTING || socket.readyState === WS_OPEN)) {
       try {
@@ -761,7 +729,10 @@ class Session {
   private onNativeState(): void {
     if (this.closed || this.mode !== "native") return;
     const native = this.native;
-    if (native.connectionState === "failed" || native.iceConnectionState === "failed") {
+    if (
+      !this.everConnected &&
+      (native.connectionState === "failed" || native.iceConnectionState === "failed")
+    ) {
       this.switchToTunnel("native-failed");
       return;
     }
@@ -787,7 +758,7 @@ class Session {
    * pass-through. Returns false once paired or closed, when the tunnel stays.
    */
   revertToNative(): boolean {
-    if (this.closed || this.mode !== "tunnel" || this.ready) return false;
+    if (this.closed || this.mode !== "tunnel" || this.paired) return false;
     this.mode = "native";
     this.tunnelAttempt += 1;
     this.cipher = null;
@@ -916,12 +887,19 @@ class Session {
   private onSocketMessage(event: MessageEvent): void {
     if (this.closed) return;
     const data: unknown = event.data;
-    if (!this.ready) {
-      if (data === TUNNEL_PAIRED_FRAME) {
-        this.becomeReady();
+    if (!this.paired) {
+      if (data !== TUNNEL_PAIRED_FRAME || !this.cipher || !this.socket) {
+        this.failTerminal({ reason: "protocol-violation", detail: "frame before paired" });
         return;
       }
-      this.failTerminal({ reason: "protocol-violation", detail: "frame before paired" });
+      this.paired = true;
+      const socket = this.socket;
+      this.sendChain = this.cipher
+        .seal(new Uint8Array())
+        .then((confirmation) => {
+          if (!this.closed) socket.send(confirmation);
+        })
+        .catch((error: unknown) => this.failTerminal({ reason: "send-failed", error }));
       return;
     }
     if (!(data instanceof ArrayBuffer)) {
@@ -937,6 +915,18 @@ class Session {
     try {
       const plaintext = await this.cipher.open(frame);
       if (this.closed) return;
+      if (!this.ready) {
+        if (plaintext.byteLength !== 0) {
+          this.failTerminal({
+            reason: "protocol-violation",
+            detail: "missing tunnel confirmation",
+          });
+          return;
+        }
+        await this.sendChain;
+        this.becomeReady();
+        return;
+      }
       this.channel?.deliver(decodeTunnelMessage(plaintext));
     } catch (error) {
       if (error instanceof TunnelFrameError) {
@@ -951,7 +941,6 @@ class Session {
     if (this.ready || this.closed) return;
     this.ready = true;
     this.claimOutcome("tunnel");
-    this.openReadyGate();
     this.emitStates();
     if (!this.channel) {
       // The answering side has no native channel to wrap, so Trystero gets a
@@ -981,7 +970,6 @@ class Session {
     // One serial chain: frames are sealed, paced and sent in the order sent.
     this.sendChain = this.sendChain
       .then(async () => {
-        if (!this.ready) await this.readyGate;
         if (this.closed || !this.cipher || !this.socket) return;
         const frame = await this.cipher.seal(encoded);
         await this.paceFrame(frame.byteLength);
