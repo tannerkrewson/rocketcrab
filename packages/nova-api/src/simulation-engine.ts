@@ -88,6 +88,7 @@ export interface SimulationEngineHost {
 /** Host-side engine events (the session maps them to session events). */
 export type SimulationEngineEvent =
   | { type: "tick"; tick: number }
+  | { type: "restored"; snapshot: RetainedSimulationSnapshot }
   | { type: "error"; code: string; message: string };
 
 /**
@@ -202,9 +203,10 @@ export class NovaSimulationEngine {
   private tickTimer: ReturnType<typeof setInterval> | null = null;
   private snapshotTimer: ReturnType<typeof setTimeout> | null = null;
   private restoreTimer: ReturnType<typeof setTimeout> | null = null;
-  private restoreBackup: RetainedSimulationSnapshot | null = null;
+  private restoreCandidate: RetainedSimulationSnapshot | null = null;
 
-  /** The latest replicated snapshot (migration copy; highest tick wins). */
+  /** The latest replicated snapshot and the timeline it was delivered from. */
+  private latestTimeline: { term: number; authorityMemberId: string } | null = null;
   private latest: RetainedSimulationSnapshot | null = null;
   private latestReceivedAt: number | null = null;
   private snapshotsReceived = 0;
@@ -247,7 +249,7 @@ export class NovaSimulationEngine {
     if (this.started || this.ended || this.disposed) return;
     this.started = true;
     this.tickTimer = setInterval(() => {
-      if (this.ended || this.disposed) return;
+      if (this.ended || this.disposed || (this.isAuthority && !this.restored)) return;
       this.tick += 1;
       this.host.emit({ type: "tick", tick: this.tick });
     }, this.tickMs);
@@ -267,7 +269,7 @@ export class NovaSimulationEngine {
     this.clearTimers();
     this.latest = null;
     this.latestReceivedAt = null;
-    this.restoreBackup = null;
+    this.restoreCandidate = null;
     this.sendTimestamps.length = 0;
     this.receivedTimestamps.length = 0;
     this.latencySamples.length = 0;
@@ -290,27 +292,25 @@ export class NovaSimulationEngine {
     if (!this.isAuthority) {
       this.stopCadence();
       this.stopRestoreTimer();
+      this.restoreCandidate = null;
       this.restored = true;
-      if (changed && this.latest !== null) {
+      if (changed && authorityMemberId !== null && this.latest !== null) {
         // A follower pushes its replicated snapshot to the elected winner
         // (the winner restores the highest valid snapshot).
-        this.host.sendSnapshot(this.envelope(), authorityMemberId ?? undefined);
+        this.host.sendSnapshot(this.envelope(), authorityMemberId);
       }
       return;
     }
     if (!changed) return;
-    if (this.latest === null) {
-      // Fresh authority (the initial authority): nothing to restore;
-      // produce snapshots from the frame's state right away.
+    if (term === 1 && this.latest === null) {
+      // The initial authority can start without a recovery snapshot.
       this.restored = true;
       this.startCadence();
       return;
     }
-    // An elected authority with a replicated snapshot: collect peer pushes
-    // for the restore window, then adopt the highest valid snapshot and
-    // re-broadcast it (correction) before producing new ones.
+    // Collect peer snapshots even if the replacement host missed every update.
     this.restored = false;
-    this.restoreBackup = this.latest;
+    this.restoreCandidate = this.latest;
     this.stopRestoreTimer();
     this.restoreTimer = setTimeout(() => {
       this.restoreTimer = null;
@@ -344,7 +344,7 @@ export class NovaSimulationEngine {
    * copy (highest tick wins; stale terms are dropped), resync the local
    * clock to the authority's clock, and return the snapshot so the session
    * can deliver it to the game frame (correction / late join / restore).
-   * Returns null when the snapshot was dropped (stale term).
+   * Restore candidates remain internal until the replacement host validates one.
    */
   handleSnapshot(message: {
     tick: number;
@@ -354,22 +354,47 @@ export class NovaSimulationEngine {
     state: unknown;
     /** Envelope send timestamp (drift measurement). */
     sentAt?: number;
+    senderMemberId?: string;
   }): RetainedSimulationSnapshot | null {
-    if (this.disposed) return null;
-    if (message.term < this.term) return null;
-    if (message.term > this.term || this.authorityMemberId === null) {
-      this.term = message.term;
-      this.authorityMemberId = message.authorityMemberId;
-      this.isAuthority = message.authorityMemberId === this.selfMemberId;
-    }
+    if (this.disposed || this.ended || message.term < this.term) return null;
     const retained: RetainedSimulationSnapshot = {
       tick: message.tick,
       state: message.state,
       stateHash: message.stateHash,
     };
-    if (this.latest === null || message.tick >= this.latest.tick) {
-      this.latest = retained;
+    if (
+      this.isAuthority &&
+      !this.restored &&
+      message.term === this.term &&
+      message.authorityMemberId === this.selfMemberId
+    ) {
+      if (this.restoreTimer !== null && message.tick > (this.restoreCandidate?.tick ?? -1)) {
+        this.restoreCandidate = retained;
+      }
+      return null;
     }
+    if (
+      (message.senderMemberId !== undefined &&
+        message.senderMemberId !== message.authorityMemberId) ||
+      (message.term === this.term &&
+        this.authorityMemberId !== null &&
+        message.authorityMemberId !== this.authorityMemberId)
+    )
+      return null;
+    if (
+      this.latestTimeline?.term === message.term &&
+      this.latestTimeline.authorityMemberId === message.authorityMemberId &&
+      this.latest !== null &&
+      message.tick <= this.latest.tick
+    )
+      return null;
+    if (message.term > this.term || this.authorityMemberId === null) {
+      this.term = message.term;
+      this.authorityMemberId = message.authorityMemberId;
+      this.isAuthority = message.authorityMemberId === this.selfMemberId;
+    }
+    this.latest = retained;
+    this.latestTimeline = { term: message.term, authorityMemberId: message.authorityMemberId };
     const receivedAt = this.now();
     this.latestReceivedAt = receivedAt;
     this.snapshotsReceived += 1;
@@ -427,6 +452,10 @@ export class NovaSimulationEngine {
   /** The latest replicated snapshot, or null before the first. */
   getLatestSnapshot(): RetainedSimulationSnapshot | null {
     return this.latest;
+  }
+
+  getCatchUpSnapshot(): SimulationSnapshotEnvelope | null {
+    return this.isAuthority && this.restored && this.latest !== null ? this.envelope() : null;
   }
 
   /** The current authority's member id (host-side; never game-facing). */
@@ -495,6 +524,7 @@ export class NovaSimulationEngine {
    */
   private async produceSnapshot(): Promise<void> {
     if (this.disposed || this.ended || !this.isAuthority || !this.restored) return;
+    const { term, tick } = this;
     let result: Awaited<ReturnType<NovaSimulationExecutor["serializeState"]>>;
     try {
       result = await this.executor.serializeState();
@@ -518,18 +548,25 @@ export class NovaSimulationEngine {
       this.host.emit({
         type: "error",
         code: "state_too_large",
-        message: `The simulation snapshot is ${size} bytes; the hard limit is ${simulationSnapshotBytes} bytes.`,
+        message: `The simulation snapshot is ${size} bytes; the hard limit is ${simulationSnapshotBytes} bytes. Save only the state needed to resume play.`,
       });
       return;
     }
     const stateHash = await stateHashOf(result.state);
-    if (this.disposed || this.ended || !this.isAuthority || !this.restored) return;
-    const snapshot: RetainedSimulationSnapshot = {
-      tick: this.tick,
-      state: result.state,
-      stateHash,
-    };
-    this.latest = snapshot;
+    if (
+      this.disposed ||
+      this.ended ||
+      !this.isAuthority ||
+      !this.restored ||
+      this.term !== term ||
+      (this.latestTimeline?.term === term &&
+        this.latestTimeline.authorityMemberId === this.selfMemberId &&
+        this.latest !== null &&
+        tick <= this.latest.tick)
+    )
+      return;
+    this.latest = { tick, state: result.state, stateHash };
+    this.latestTimeline = { term, authorityMemberId: this.selfMemberId };
     const now = this.now();
     this.latestReceivedAt = now;
     this.lastSnapshotAt = now;
@@ -546,25 +583,27 @@ export class NovaSimulationEngine {
   private async finishRestore(): Promise<void> {
     if (this.disposed || this.ended) return;
     if (!this.isAuthority) return;
-    this.restored = true;
-    const candidate = this.latest;
-    if (candidate !== null && candidate.stateHash !== null) {
-      const actual = await stateHashOf(candidate.state);
-      if (this.disposed) return;
-      if (actual !== candidate.stateHash) {
-        if (this.restoreBackup !== null) {
-          this.latest = this.restoreBackup;
-        }
+    const term = this.term;
+    const candidate = this.restoreCandidate;
+    if (candidate !== null) {
+      const hash = candidate.stateHash === null ? null : await stateHashOf(candidate.state);
+      if (this.disposed || this.ended || !this.isAuthority || this.term !== term) return;
+      if (hash === candidate.stateHash) {
+        this.latest = candidate;
+      } else {
         this.host.emit({
           type: "error",
           code: "invalid_snapshot",
-          message:
-            "The restored simulation snapshot failed its hash check; the previous replicated snapshot was kept.",
+          message: "The recovery snapshot failed its hash check. Resuming from the previous copy.",
         });
       }
     }
-    this.restoreBackup = null;
+    this.restoreCandidate = null;
+    this.restored = true;
     if (this.latest !== null) {
+      this.tick = this.latest.tick;
+      this.latestTimeline = { term, authorityMemberId: this.selfMemberId };
+      this.host.emit({ type: "restored", snapshot: this.latest });
       this.host.sendSnapshot(this.envelope());
     }
     this.startCadence();

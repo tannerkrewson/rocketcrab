@@ -71,6 +71,13 @@ beta and physical-device checks are still pending.
       The lifecycle regression verifies that leaving keeps the app idle.
 - [ ] Use the live iPhone checks to evaluate room, link, and game recovery
       before consolidating any other retry paths.
+- [x] Reject older simulation snapshots within a host’s term and restore the
+      replacement host’s own game frame before it resumes publishing.
+- [x] Audit Trystero shared-state checkpoints. Keep the current snapshot path.
+      Trystero can reject records by timestamp before Nova’s validator runs,
+      so one shared value cannot reliably choose across game terms.
+- [ ] Test Drift on real phones with late join, mobile wake, and a sleeping
+      host. Check that every browser resumes the same race after handoff.
 
 ## 1. Owner actions
 

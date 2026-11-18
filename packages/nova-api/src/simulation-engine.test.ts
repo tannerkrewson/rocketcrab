@@ -176,7 +176,7 @@ describe(
       const sent = host.snapshots[0];
       expect(sent?.target).toBeUndefined(); // broadcast
       expect(sent?.snapshot).toMatchObject({
-        tick: 5,
+        tick: 4,
         state: { count: 7 },
         term: 1,
         authorityMemberId: "member-a",
@@ -184,7 +184,7 @@ describe(
       expect(sent?.snapshot.stateHash).toMatch(/^[0-9a-f]{64}$/);
       // The produced snapshot is the retained replication copy.
       expect(engine.getLatestSnapshot()?.state).toEqual({ count: 7 });
-      expect(engine.getLatestSnapshot()?.tick).toBe(5);
+      expect(engine.getLatestSnapshot()?.tick).toBe(4);
       const diagnostics = engine.getDiagnostics();
       expect(diagnostics.tickMs).toBe(100);
       expect(diagnostics.snapshotIntervalMs).toBe(500);
@@ -275,19 +275,42 @@ describe(
       });
       expect(received).toEqual({ tick: 10, state: { count: 10 }, stateHash: "a".repeat(64) });
       expect(host.events).toHaveLength(0); // the session delivers to the frame
-      engine.handleSnapshot({
-        tick: 8, // older: kept only as a delivered correction, not retained
+      const older = engine.handleSnapshot({
+        tick: 8,
         term: 1,
         authorityMemberId: "member-a",
         stateHash: "b".repeat(64),
         state: { count: 8 },
         sentAt: 0,
       });
+      expect(older).toBeNull();
       expect(engine.getLatestSnapshot()?.tick).toBe(10);
       const diagnostics = engine.getDiagnostics();
-      expect(diagnostics.snapshotsReceived).toBe(2);
+      expect(diagnostics.snapshotsReceived).toBe(1);
       expect(diagnostics.authorityTick).toBe(10);
       expect(diagnostics.authorityMemberId).toBe("member-a");
+    });
+
+    it("accepts the new host's correction even when its tick is lower", () => {
+      const { engine } = makeTimedEngine("member-b");
+      engine.handleSnapshot({
+        tick: 10,
+        term: 1,
+        authorityMemberId: "member-a",
+        stateHash: null,
+        state: { count: 10 },
+      });
+      engine.onAuthorityChanged("member-c", 2);
+      expect(
+        engine.handleSnapshot({
+          tick: 8,
+          term: 2,
+          authorityMemberId: "member-c",
+          stateHash: null,
+          state: { count: 8 },
+        })?.tick,
+      ).toBe(8);
+      expect(engine.getLatestSnapshot()?.tick).toBe(8);
     });
 
     it("drops stale-term snapshots", () => {
@@ -345,6 +368,29 @@ describe(
         authorityMemberId: "member-b",
       });
       expect(rebroadcast?.target).toBeUndefined();
+      expect(host.events).toContainEqual({
+        type: "restored",
+        snapshot: engine.getLatestSnapshot(),
+      });
+    });
+
+    it("recovers from a peer when the replacement host has no local snapshot", async () => {
+      const { engine, host } = makeTimedEngine("member-b");
+      engine.onAuthorityChanged("member-b", 2);
+      const state = { count: 14 };
+      engine.handleSnapshot({
+        tick: 14,
+        term: 2,
+        authorityMemberId: "member-b",
+        senderMemberId: "member-c",
+        stateHash: await stateHashOf(state),
+        state,
+      });
+      expect(engine.getLatestSnapshot()).toBeNull();
+      vi.advanceTimersByTime(100);
+      await waitUntil(() => host.snapshots.length > 0, "peer snapshot restored");
+      expect(engine.getLatestSnapshot()?.state).toEqual(state);
+      expect(engine.getTick()).toBe(14);
     });
 
     it("keeps the previous valid snapshot when the adopted push fails its hash", async () => {
@@ -367,6 +413,8 @@ describe(
         state: { count: 12 },
         sentAt: 0,
       });
+      expect(engine.getLatestSnapshot()?.tick).toBe(10);
+      expect(engine.getCatchUpSnapshot()).toBeNull();
       vi.advanceTimersByTime(100);
       await waitUntil(() => host.snapshots.length >= 1, "restore re-broadcast");
       expect(engine.getLatestSnapshot()).toEqual({

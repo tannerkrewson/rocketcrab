@@ -1019,7 +1019,8 @@ export class NovaSession implements NovaClientBackend {
     // snapshot (the joiner restores from it and starts).
     if (this.started && this.engine.isAuthorityElect()) {
       if (this.game.mode === "simulation") {
-        this.sendSimulationCatchUp(peer.memberId);
+        const snapshot = this.simulationEngine.getCatchUpSnapshot();
+        if (snapshot !== null) this.sendSimulationSnapshot(snapshot, peer.memberId);
       } else if (this.engine.getCanonicalState() !== null) {
         this.sendCatchUp(peer.memberId, joined.name);
       }
@@ -1295,6 +1296,7 @@ export class NovaSession implements NovaClientBackend {
           stateHash: peerMessage.stateHash ?? null,
           state: peerMessage.state,
           sentAt: peerMessage.sentAt,
+          senderMemberId: message.senderMemberId,
         });
         if (retained === null) break;
         if (!this.startEmitted) {
@@ -1472,6 +1474,12 @@ export class NovaSession implements NovaClientBackend {
       case "tick":
         this.emit({ type: "simulationTick", tick: event.tick });
         break;
+      case "restored":
+        this.emit({
+          type: "simulationSnapshot",
+          snapshot: toNovaSimulationSnapshot(event.snapshot),
+        });
+        break;
       case "error":
         this.emit({ type: "error", error: new NovaError(toErrorCode(event.code), event.message) });
         break;
@@ -1500,22 +1508,6 @@ export class NovaSession implements NovaClientBackend {
         }),
       options,
     ).catch((error: unknown) => this.emitError(error));
-  }
-
-  /** Send the latest authoritative simulation snapshot to a late joiner. */
-  private sendSimulationCatchUp(memberId: string): void {
-    const latest = this.simulationEngine.getLatestSnapshot();
-    if (latest === null) return;
-    this.sendSimulationSnapshot(
-      {
-        tick: latest.tick,
-        state: latest.state,
-        stateHash: latest.stateHash,
-        term: this.engine.getTerm(),
-        authorityMemberId: this.selfPlayer.id,
-      },
-      memberId,
-    );
   }
 
   /** The transport-facing half the state engine uses to send and emit. */
