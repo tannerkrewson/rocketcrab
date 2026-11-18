@@ -62,7 +62,7 @@ it("waits for both validated identity and acknowledgement before announcing a pe
   peers.remote = { userId: "user" };
   values.user = {
     v: 1,
-    transportVersion: 5,
+    transportVersion: 6,
     memberId: "remote-member",
     connectionId: "remote-connection",
   };
@@ -123,7 +123,7 @@ it("waits for both validated identity and acknowledgement before announcing a pe
   expect(joined).toHaveBeenCalledOnce();
   values.user = {
     v: 1,
-    transportVersion: 5,
+    transportVersion: 6,
     memberId: "impostor",
     connectionId: "remote-connection",
   };
@@ -132,7 +132,7 @@ it("waits for both validated identity and acknowledgement before announcing a pe
   // A changed identity is quarantined for this connection.
   values.user = {
     v: 1,
-    transportVersion: 5,
+    transportVersion: 6,
     memberId: "remote-member",
     connectionId: "remote-connection",
   };
@@ -143,7 +143,7 @@ it("waits for both validated identity and acknowledgement before announcing a pe
   peers.other = { userId: "other-user" };
   values["other-user"] = {
     v: 1,
-    transportVersion: 5,
+    transportVersion: 6,
     memberId: "other",
     connectionId: "other-connection",
   };

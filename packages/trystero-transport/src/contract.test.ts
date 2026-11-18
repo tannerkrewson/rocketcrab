@@ -375,7 +375,7 @@ class TrysteroClientImpl implements Client {
     this.room.peers[peerId] = { userId };
     this.room.values[userId] = {
       v: 1,
-      transportVersion: 5,
+      transportVersion: 6,
       memberId: other.adapter.selfMemberId,
       connectionId: other.adapter.selfConnectionId,
       displayName: other.adapter.displayName,

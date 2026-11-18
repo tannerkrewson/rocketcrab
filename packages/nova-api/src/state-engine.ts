@@ -73,6 +73,7 @@ import {
   stateHistoryLimit,
   stateResyncMinIntervalMs,
   stateSnapshotBytes,
+  type StateActionRejection,
 } from "@rocketcrab/protocol";
 import type { NovaStateExecutor } from "./state-executor";
 import { applyJsonPatch, canonicalJson, deltaFor, type JsonDeltaOp } from "./json-delta";
@@ -128,6 +129,7 @@ export interface StateSnapshotEnvelope {
   /** The sender's window is complete (a full snapshot with false is merged, not replaced). */
   readonly historyComplete: boolean;
   readonly processedActionIds: readonly string[];
+  readonly actionRejections?: readonly StateActionRejection[];
   readonly state: unknown;
 }
 
@@ -155,6 +157,7 @@ export interface InboundSnapshot {
   readonly stateMode?: "full" | "delta";
   readonly ops?: readonly JsonDeltaOp[];
   readonly processedActionIds: readonly string[];
+  readonly actionRejections?: readonly StateActionRejection[];
   /** Present on full snapshots; absent on deltas. */
   readonly state?: unknown;
   /** The transport sender (for targeted convergence re-sends). */
@@ -489,6 +492,28 @@ export class NovaStateEngine {
   /** The processed action ids shipped in snapshots (bounded, oldest first). */
   processedActionIds(): readonly string[] {
     return [...this.history.keys()];
+  }
+
+  actionHistory(
+    ids = this.processedActionIds(),
+  ): Pick<StateSnapshotEnvelope, "processedActionIds" | "actionRejections"> {
+    // Most actions succeed. Only carry extra data for rejections, and keep
+    // game-authored error text on the original targeted acknowledgement.
+    const actionRejections: StateActionRejection[] = [];
+    for (const actionId of ids) {
+      const record = this.history.get(actionId);
+      if (record === undefined || record.status === "accepted") continue;
+      const { status, errorCode } = record;
+      actionRejections.push({
+        actionId,
+        status,
+        ...(errorCode && errorCode.length <= 64 ? { errorCode } : {}),
+      });
+    }
+    return {
+      processedActionIds: ids,
+      ...(actionRejections.length > 0 ? { actionRejections } : {}),
+    };
   }
 
   /** Host-side diagnostics (host/arena visible). */
@@ -965,12 +990,14 @@ export class NovaStateEngine {
       this.historyComplete = false;
       repairNeeded = true;
     }
+    const rejections = new Map(
+      message.actionRejections?.map((result) => [result.actionId, result]),
+    );
     for (const actionId of message.processedActionIds) {
       if (!this.history.has(actionId)) {
         this.storeHistory(actionId, {
           actionId,
-          status: "accepted",
-          revision: message.revision,
+          ...(rejections.get(actionId) ?? { status: "accepted", revision: message.revision }),
           processedAt: this.now(),
         });
       }
@@ -1558,8 +1585,7 @@ export class NovaStateEngine {
       stateMode: delta ? "delta" : "full",
       ops,
       historyComplete: this.historyComplete,
-      processedActionIds:
-        historyMode === "full" ? this.processedActionIds() : [...this.pendingHistoryIds],
+      ...this.actionHistory(historyMode === "increment" ? [...this.pendingHistoryIds] : undefined),
       // A delta has no state: the key is absent on the wire, not null.
       state: delta ? undefined : this.canonical,
     };

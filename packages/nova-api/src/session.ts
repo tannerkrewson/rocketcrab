@@ -1041,7 +1041,7 @@ export class NovaSession implements NovaClientBackend {
         stateMode: "full",
         ops: null,
         historyComplete: this.engine.isHistoryComplete(),
-        processedActionIds: this.engine.processedActionIds(),
+        ...this.engine.actionHistory(),
         state: this.engine.getCanonicalState(),
       },
       memberId,
@@ -1227,6 +1227,9 @@ export class NovaSession implements NovaClientBackend {
           stateMode: peerMessage.stateMode,
           ...(peerMessage.ops !== undefined ? { ops: peerMessage.ops } : {}),
           processedActionIds: peerMessage.processedActionIds,
+          ...(peerMessage.actionRejections
+            ? { actionRejections: peerMessage.actionRejections }
+            : {}),
           state: peerMessage.state,
           senderMemberId: peerMessage.senderMemberId,
         });
@@ -1579,6 +1582,7 @@ export class NovaSession implements NovaClientBackend {
           stateMode: snapshot.stateMode,
           ...(snapshot.ops !== null ? { ops: snapshot.ops } : {}),
           processedActionIds: snapshot.processedActionIds,
+          ...(snapshot.actionRejections ? { actionRejections: snapshot.actionRejections } : {}),
           state: snapshot.state,
         }),
       options,

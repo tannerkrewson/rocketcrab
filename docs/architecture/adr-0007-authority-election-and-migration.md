@@ -58,7 +58,8 @@ State envelopes carry enough information to compare:
 - term;
 - authority member ID;
 - state hash;
-- recent processed action IDs.
+- recent processed action IDs and rejection outcomes, so a replacement
+  authority can answer retries from its replicated history.
 
 When peers report conflicting state at the same revision, the resolution is
 deterministic and documented: prefer the **majority-matching hash** when

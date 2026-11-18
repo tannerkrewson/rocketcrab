@@ -1781,6 +1781,41 @@ describe("fan-out review fixes", { timeout: 60_000 }, () => {
     expect(b.getStateModeDiagnostics().revision).toBe(2);
   });
 
+  it("replays a lost rejection after authority handoff", async () => {
+    const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
+    const [a, b, c] = trio(sessions);
+    const lost = dropNextMatching(a.transport, (options) => {
+      const payload = options.payload as { type?: string; actionId?: string };
+      return payload.type === "action.ack" && payload.actionId === "stale-move";
+    });
+    await c.dispatch({ type: "mark", payload: { marker: "stale" }, baseRevision: 0 }, "stale-move");
+    await pumpUntil(hub, () => lost.dropped === 1, "original rejection dropped");
+
+    const valid = a.client.dispatch({ type: "mark", payload: { marker: "valid" } });
+    await pumpUntil(hub, () => b.getStateModeDiagnostics().revision === 2, "history replicated");
+    await valid;
+    await a.leave();
+    await settleElection(hub);
+    await pumpUntil(
+      hub,
+      () => b.getStateModeDiagnostics().authorityMemberId === "member-b",
+      "replacement authority elected",
+    );
+
+    const acks: Array<{ status: string; errorCode?: string }> = [];
+    c.onSessionEvent((event) => {
+      if (event.type === "actionAck" && event.ack.actionId === "stale-move") {
+        acks.push(event.ack);
+      }
+    });
+    await c.dispatch({ type: "mark", payload: { marker: "stale" }, baseRevision: 0 }, "stale-move");
+    await pumpUntil(hub, () => acks.length > 0, "replacement authority replayed the result");
+    expect(acks).toEqual([
+      expect.objectContaining({ status: "superseded", errorCode: "stale_revision" }),
+    ]);
+    expect(b.getCanonicalState()?.state).toEqual({ count: 1, markers: ["valid"] });
+  });
+
   it("the first broadcast after migration is a full snapshot", async () => {
     const { hub, sessions } = await makeParty(["member-a", "member-b", "member-c"]);
     const [a, b, c] = trio(sessions);

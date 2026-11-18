@@ -235,7 +235,7 @@ async function simulatePeerJoin(
 ): Promise<void> {
   const userId = `user-${peerId}`;
   room.peers[peerId] = { userId };
-  room.values[userId] = { v: 1, transportVersion: 5, ...identity };
+  room.values[userId] = { v: 1, transportVersion: 6, ...identity };
   room.metas[userId] = { peerId, userId, online: true };
   room.joinHandler!({ peerId, userId });
   room.acknowledgement.onMessage!({ connectionId: selfConnectionId }, { peerId });
@@ -737,7 +737,7 @@ describe("TrysteroTransport peer mapping", () => {
       room.peers[peerId] = { userId };
       room.values[userId] = {
         v: 1,
-        transportVersion: 5,
+        transportVersion: 6,
         memberId,
         connectionId: `conn-${peerId}`,
         displayName: memberId,
@@ -960,7 +960,7 @@ describe("TrysteroTransport peer mapping", () => {
 
     expect(room.ownIdentity).toEqual({
       v: 1,
-      transportVersion: 5,
+      transportVersion: 6,
       memberId: "member-a",
       connectionId: "self-peer-id",
       displayName: "Ada",

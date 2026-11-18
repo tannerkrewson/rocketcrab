@@ -259,10 +259,21 @@ export const stateSnapshotMessageSchema = z.object({
   stateMode: z.enum(["full", "delta"]).default("full"),
   ops: z.array(stateDeltaOpSchema).max(stateDeltaMaxOps).optional(),
   processedActionIds: z.array(z.string().min(1).max(64)).max(stateHistoryLimit),
+  actionRejections: z
+    .array(
+      z.object({
+        actionId: z.string().min(1).max(64),
+        status: z.enum(["rejected", "superseded"]),
+        errorCode: z.string().min(1).max(64).optional(),
+      }),
+    )
+    .max(stateHistoryLimit)
+    .optional(),
   /** Present on full snapshots; absent on deltas. A full snapshot without it is invalid (checked by the engine). */
   state: z.unknown().optional(),
 });
 export type StateSnapshotMessage = z.infer<typeof stateSnapshotMessageSchema>;
+export type StateActionRejection = NonNullable<StateSnapshotMessage["actionRejections"]>[number];
 
 /**
  * State resync request: a member that detected a gap in the authority's

@@ -26,6 +26,7 @@ import {
   stateViewMessageSchema,
   type GameEndReason,
   type PeerMessage,
+  type StateSnapshotMessage,
 } from "@rocketcrab/protocol";
 import { newMessageId, nowSentAt } from "./ids";
 
@@ -148,6 +149,7 @@ export function buildStateSnapshotMessage(
     stateMode: "full" | "delta";
     ops?: readonly unknown[];
     processedActionIds: readonly string[];
+    actionRejections?: Readonly<NonNullable<StateSnapshotMessage["actionRejections"]>>;
     state?: unknown;
   },
 ): PeerMessage {
@@ -166,6 +168,7 @@ export function buildStateSnapshotMessage(
       stateMode: input.stateMode,
       ...(input.ops !== undefined ? { ops: input.ops } : {}),
       processedActionIds: input.processedActionIds,
+      ...(input.actionRejections ? { actionRejections: input.actionRejections } : {}),
       state: input.state,
     }),
   );
