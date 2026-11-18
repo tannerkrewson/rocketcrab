@@ -76,8 +76,19 @@ beta and physical-device checks are still pending.
 - [x] Audit Trystero shared-state checkpoints. Keep the current snapshot path.
       Trystero can reject records by timestamp before Nova’s validator runs,
       so one shared value cannot reliably choose across game terms.
+- [x] Harden the simulation engine for real devices: an elapsed-time clock
+      (throttled tabs catch up, suspensions skip), the tick set from accepted
+      snapshots instead of cross-device clocks, JSON-checked snapshots with
+      one report per problem, rate-limit errors once per streak, and a running
+      replacement host publishing its own state instead of rewinding everyone
+      (`ae1a9f9`, `34161be`, `cd24c1e`). Rebooted frames resume from the
+      latest snapshot (`4c67de4`). Drift draws, steers by touch, and releases
+      a leaver's keys (`87b6a62`).
 - [ ] Test Drift on real phones with late join, mobile wake, and a sleeping
       host. Check that every browser resumes the same race after handoff.
+- [ ] **Owner:** decide whether games may choose their simulation tick rate.
+      Every game runs at 10 Hz today (the declaration has no rate, and the
+      host never sets one), so arcade games must interpolate to look smooth.
 
 ## 1. Owner actions
 
