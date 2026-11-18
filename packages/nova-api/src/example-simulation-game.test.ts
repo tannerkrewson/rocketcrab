@@ -62,6 +62,7 @@ function makeWorld(): World {
 /** The local simulation a frame runs (as the game's test seam exposes it). */
 interface DriftSim {
   puck: { x: number; y: number };
+  keys: Record<string, boolean>;
 }
 
 function driftSim(): DriftSim {
@@ -72,6 +73,11 @@ function driftSim(): DriftSim {
     throw new Error("The game did not expose its test seam.");
   }
   return seam.getSim();
+}
+
+/** The held keys in a session's latest snapshot. */
+function snapshotKeys(session: NovaSession): Record<string, boolean> {
+  return (session.getSimulationSnapshot()?.state as { keys?: Record<string, boolean> })?.keys ?? {};
 }
 
 /** Create a session running the game source (extracted module script). */
@@ -167,7 +173,10 @@ describe("nova-drift (simulation-mode example game)", () => {
     );
     const retained = b.getSimulationSnapshot();
     expect(retained).not.toBeNull();
-    expect(retained?.state).toEqual({ puck: { x: expect.any(Number), y: expect.any(Number) } });
+    expect(retained?.state).toEqual({
+      puck: { x: expect.any(Number), y: expect.any(Number) },
+      keys: { "member-a:ArrowRight": true }, // held keys travel with the state
+    });
     if (retained === null) return;
     expect((retained.state as { puck: { x: number } }).puck.x).toBeGreaterThan(400);
     expect(b.getSimulationDiagnostics().authorityMemberId).toBe("member-a");
@@ -232,5 +241,31 @@ describe("nova-drift (simulation-mode example game)", () => {
     // The new authority's frame keeps the game playable.
     b.client.simulation.sendInput({ type: "keydown", payload: { key: "ArrowDown" } });
     await waitFor(world, () => driftSim().puck.y > 250, "puck moving down after migration");
+  });
+
+  it("stops steering for a player who leaves with a key held", async () => {
+    const world = makeWorld();
+    worlds.push(world);
+    const a = createGameSession(world, "member-a", "Ada");
+    const b = createGameSession(world, "member-b", "Ben");
+    await a.join();
+    await b.join();
+    await flush(world);
+    a.start();
+    b.start();
+    await waitFor(world, () => b.getSimulationDiagnostics().tick >= 1, "ticks");
+    // Ben's tab closes while he holds ArrowDown: no keyup will ever come.
+    b.client.simulation.sendInput({ type: "keydown", payload: { key: "ArrowDown" } });
+    await waitFor(
+      world,
+      () => a.getSimulationSnapshot() !== null && "member-b:ArrowDown" in snapshotKeys(a),
+      "held key in the authority's snapshot",
+    );
+    await b.leave();
+    await waitFor(
+      world,
+      () => !("member-b:ArrowDown" in snapshotKeys(a)),
+      "the leaver's key released",
+    );
   });
 });
