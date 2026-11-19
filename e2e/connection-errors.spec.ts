@@ -28,7 +28,7 @@ for (const [code, message] of [
           ),
       });
     });
-    await page.goto(`/join#secret=${randomBytes(32).toString("base64url")}`);
+    await page.goto(`/party#secret=${randomBytes(32).toString("base64url")}`);
     await expect(
       page.getByText("Connecting to the private party.", { exact: false }),
     ).toBeVisible();
@@ -93,7 +93,7 @@ test("peer errors in a live party are qualified notices, not party failures", as
 
 test("an invite with no room contact stays a generic timeout", async ({ page }) => {
   test.setTimeout(45_000);
-  await page.goto(`/join#secret=${randomBytes(32).toString("base64url")}`);
+  await page.goto(`/party#secret=${randomBytes(32).toString("base64url")}`);
   await expect(page.getByText("The party couldn't be set up")).toBeVisible({ timeout: 30_000 });
   await expect(
     page.getByText("Couldn't reach anyone in this party.", { exact: false }),

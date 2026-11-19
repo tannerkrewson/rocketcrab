@@ -127,7 +127,7 @@ test("a tunnelled pair joins with no alarm and shows a relayed badge", async ({ 
         );
         return invite;
       })
-      .toContain("/join#secret=");
+      .toContain("/party#secret=");
 
     await forced.page.goto(invite);
     for (const player of players) {
@@ -206,7 +206,7 @@ test("a 3-player party with one tunnelled player plays a state-mode game", async
         );
         return invite;
       })
-      .toContain("/join#secret=");
+      .toContain("/party#secret=");
 
     await joiner.page.goto(invite);
     const forcedJoinStart = Date.now();

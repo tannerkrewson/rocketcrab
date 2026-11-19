@@ -8,7 +8,7 @@
 
 Generate a 32-byte CSPRNG secret using Web Crypto. Derive the private Trystero
 room ID, password, and session ID via SHA-256 with separate domain labels.
-Invites use `/join#secret=…`: only the fragment contains the capability, never
+Invites use `/party#secret=…` (the same route that starts a party; `/join` was removed 2026-11-18): only the fragment contains the capability, never
 paths or queries. Fragments are not sent in HTTP requests. The trusted shell
 imports it and strips it from the address bar/history before opening game frames.
 No application logging, analytics or game messages may contain the secret.

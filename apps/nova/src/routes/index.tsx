@@ -4,6 +4,7 @@ import { toast } from "../lib/toast";
 import { BrandLogo } from "../components/layout/BrandLogo";
 import { NovaSilk } from "../components/backgrounds/NovaSilk";
 import { Button, buttonStyles } from "../components/ui/Button";
+import { Dialog } from "../components/ui/Dialog";
 import { writeToClipboard } from "../lib/editor/clipboard";
 import { usePartyEngine } from "../lib/party/use-party";
 
@@ -30,6 +31,8 @@ const NEXT_LOGO_PHASE: Record<Exclude<LogoAnimationPhase, "idle">, LogoAnimation
 
 function HomeComponent() {
   const [logoAnimationPhase, setLogoAnimationPhase] = useState<LogoAnimationPhase>("idle");
+  // Joining needs a friend's invite link, so Join party explains how to get one.
+  const [joinHelpOpen, setJoinHelpOpen] = useState(false);
 
   const handleLogoLaunch = () => {
     if (logoAnimationPhase !== "idle") return;
@@ -137,9 +140,9 @@ function HomeComponent() {
       </section>
 
       <section aria-label="Start or join a party" className="button-row">
-        <Link to="/join" className={buttonStyles("primary", "lg")}>
+        <Button variant="primary" size="lg" onClick={() => setJoinHelpOpen(true)}>
           Join party
-        </Link>
+        </Button>
         <Link
           to="/party"
           search={{ gameId: undefined, mode: undefined, title: undefined }}
@@ -163,6 +166,19 @@ function HomeComponent() {
           About
         </Link>
       </section>
+
+      <Dialog open={joinHelpOpen} onClose={() => setJoinHelpOpen(false)} title="Join a party">
+        <div className="flex flex-col gap-4">
+          <p className="leading-relaxed text-foreground/80">
+            Ask a friend who&apos;s already in the party to send you their invite link, or scan the
+            QR code on their screen with your phone&apos;s camera. Opening the link takes you
+            straight into their party.
+          </p>
+          <Button variant="primary" className="self-end" onClick={() => setJoinHelpOpen(false)}>
+            Got it
+          </Button>
+        </div>
+      </Dialog>
     </div>
   );
 }

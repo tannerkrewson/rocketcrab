@@ -13,6 +13,7 @@ import {
 } from "../lib/party/party-recovery";
 import { resetPartySourceForTests, storePartySource } from "../lib/party/source-handoff";
 import { routeTree } from "../routeTree.gen";
+import { resetInviteImportForTests } from "../lib/party/invite-import";
 
 const IDLE_STATE: PartyEngineState = {
   phase: "idle",
@@ -156,6 +157,8 @@ beforeEach(async () => {
   resetPartySourceForTests();
   clearPartyRecovery();
   resetPartyIdentityForTests();
+  resetInviteImportForTests();
+  window.history.pushState({}, "", "/party");
 });
 
 describe("/party", () => {
@@ -245,6 +248,28 @@ describe("/party", () => {
     fireEvent.click(await screen.findByRole("button", { name: /not now/i }));
     expect(screen.queryByTestId("party-resume-banner")).not.toBeInTheDocument();
     expect(readPartyRecovery()).toBeNull();
+  });
+
+  it("joins a friend's party from an invite link, after the name step", async () => {
+    const secret = "E".repeat(43);
+    window.history.pushState({}, "", `/party#secret=${secret}`);
+    renderParty("/party");
+    expect(await screen.findByRole("heading", { name: "What's your name?" })).toBeInTheDocument();
+    await waitFor(() => expect(window.location.hash).toBe(""));
+    expect(stubEngine.joinByInvite).not.toHaveBeenCalled();
+    fireEvent.change(screen.getByLabelText("Your player name"), { target: { value: "Ada" } });
+    fireEvent.click(screen.getByRole("button", { name: "Join party" }));
+    await waitFor(() => expect(stubEngine.joinByInvite).toHaveBeenCalledWith({ secret }));
+    expect(stubEngine.createParty).not.toHaveBeenCalled();
+  });
+
+  it("joins straight away from an invite link when the name is saved", async () => {
+    updatePartyDisplayName("Ada");
+    const secret = "F".repeat(43);
+    window.history.pushState({}, "", `/party#secret=${secret}`);
+    renderParty("/party");
+    await waitFor(() => expect(stubEngine.joinByInvite).toHaveBeenCalledWith({ secret }));
+    expect(stubEngine.createParty).not.toHaveBeenCalled();
   });
 
   describe("host URL normalization to /<code> (rocketcrab-r0f)", () => {

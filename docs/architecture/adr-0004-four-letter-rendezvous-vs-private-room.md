@@ -11,7 +11,7 @@ A party uses one password-protected Trystero room. Creation generates a
 derives room ID, password, and session ID. These derivations are deterministic,
 so the invite secret is the only capability friends need to join.
 
-Share one private `/join#secret=…` link using native sharing, copy, or the displayed
+Share one private `/party#secret=…` link using native sharing, copy, or the displayed
 QR code. Opening it automatically joins with a saved/generated player identity;
 name editing is optional. Import the fragment into the trusted shell and remove
 it from the address bar/history. No secrets in paths, queries, application logs,

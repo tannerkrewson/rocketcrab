@@ -11,6 +11,7 @@ import { buttonStyles } from "../components/ui/Button";
 import { usePartyEngine } from "../lib/party/use-party";
 import { takePartySource } from "../lib/party/source-handoff";
 import { getSavedPlayerName } from "../lib/party/identity";
+import { importInviteFromLocation, type ImportedInvite } from "../lib/party/invite-import";
 import { gameRepository } from "../lib/games/instance";
 
 export const Route = createFileRoute("/party")({
@@ -40,6 +41,11 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
 }
 
+/**
+ * The party entry point. A plain visit starts your own party; a link with an
+ * invite fragment (`/party#secret=…`, ADR-0011) joins a friend's. Either way
+ * a player without a saved name names themselves first.
+ */
 function PartyPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
@@ -47,11 +53,28 @@ function PartyPage() {
   const startedRef = useRef(false);
   const [attempt, setAttempt] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
-  // Players must pick a real name before any party starts.
+  // Players must pick a real name before any party starts or is joined.
   const [needsName, setNeedsName] = useState(() => getSavedPlayerName() === null);
+  // The invite fragment is imported (and stripped from the URL) once per page
+  // load, then held here. Until the import effect runs, a fragment in the URL
+  // means an invite is probably on its way, so nothing starts yet.
+  const [invite, setInvite] = useState<ImportedInvite | null>(null);
+  const [importing, setImporting] = useState(() => window.location.hash.length > 0);
+  useEffect(() => {
+    // StrictMode re-runs this; the importer returns null the second time, so
+    // only ever store a real invite.
+    const imported = importInviteFromLocation(window.location);
+    if (imported !== null) setInvite(imported);
+    setImporting(false);
+  }, []);
 
   useEffect(() => {
-    if (startedRef.current || engine.isActive() || needsName) {
+    if (startedRef.current || engine.isActive() || needsName || importing) {
+      return;
+    }
+    if (invite !== null) {
+      startedRef.current = true;
+      void engine.joinByInvite(invite);
       return;
     }
     const gameId = search.gameId;
@@ -68,8 +91,8 @@ function PartyPage() {
     setLoadError(null);
     void (async () => {
       try {
-        // The editor hands the CURRENT (possibly unsaved) source over via
-        // sessionStorage; otherwise load the saved game from IndexedDB.
+        // The editor may hand over source via sessionStorage; otherwise load
+        // the saved game from IndexedDB.
         const source = takePartySource(gameId) ?? (await gameRepository.read(gameId)).html;
         await engine.createParty({
           gameId,
@@ -83,7 +106,7 @@ function PartyPage() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine, search.gameId, search.mode, search.title, attempt, needsName]);
+  }, [engine, search.gameId, search.mode, search.title, attempt, needsName, importing, invite]);
 
   const handleRetry = () => {
     startedRef.current = false;
@@ -114,18 +137,24 @@ function PartyPage() {
       </div>
     );
   }
+  if (importing) return null;
   if (needsName) {
+    const joining = invite !== null;
     return (
       <NameEntry
-        description="Your friends will see this when they join your party."
-        submitLabel="Start party"
+        description={
+          joining
+            ? "Your friends will see this in the party."
+            : "Your friends will see this when they join your party."
+        }
+        submitLabel={joining ? "Join party" : "Start party"}
         onSubmit={(name) => {
           engine.setDisplayName(name);
           setNeedsName(false);
         }}
         secondary={
           <>
-            <PartyResumeBanner engine={engine} />
+            {joining ? null : <PartyResumeBanner engine={engine} />}
             <Link to="/" className={buttonStyles("default", "md", undefined, true)}>
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               Back to home
@@ -136,6 +165,14 @@ function PartyPage() {
     );
   }
   return (
-    <LoadingState label={search.gameId !== undefined ? "Loading game…" : "Starting your party…"} />
+    <LoadingState
+      label={
+        invite !== null
+          ? "Joining the party…"
+          : search.gameId !== undefined
+            ? "Loading game…"
+            : "Starting your party…"
+      }
+    />
   );
 }

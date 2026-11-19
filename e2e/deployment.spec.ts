@@ -13,7 +13,7 @@ test.describe("static deployment properties", () => {
     const requests: string[] = [];
     page.on("request", (request) => requests.push(request.url()));
 
-    await page.goto(`/join#secret=${secret}`);
+    await page.goto(`/party#secret=${secret}`);
 
     await expect.poll(() => page.url()).not.toContain("secret=");
 

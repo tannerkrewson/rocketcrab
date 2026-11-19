@@ -1,5 +1,5 @@
 import { RouterProvider, createMemoryHistory, createRouter } from "@tanstack/react-router";
-import { cleanup, fireEvent, render, screen, within } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -112,8 +112,21 @@ describe("/", () => {
     renderHome();
     const primaryRow = await screen.findByRole("region", { name: "Start or join a party" });
     expect(primaryRow).toBeInTheDocument();
-    const links = within(primaryRow).getAllByRole("link");
-    expect(links.map((link) => link.textContent)).toEqual(["Join party", "Start party"]);
+    const join = within(primaryRow).getByRole("button", { name: "Join party" });
+    expect(
+      join.compareDocumentPosition(within(primaryRow).getByRole("link", { name: "Start party" })),
+    ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
+  });
+
+  it("explains how to join in a popup, with no start-party button", async () => {
+    renderHome();
+    await userEvent.click(await screen.findByRole("button", { name: "Join party" }));
+    const dialog = await screen.findByRole("dialog", { name: "Join a party" });
+    expect(within(dialog).getByText(/invite link/)).toBeInTheDocument();
+    expect(within(dialog).queryByRole("link", { name: /start/i })).not.toBeInTheDocument();
+    expect(within(dialog).queryByRole("button", { name: /start/i })).not.toBeInTheDocument();
+    await userEvent.click(within(dialog).getByRole("button", { name: "Got it" }));
+    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
   });
 
   it("lists the secondary actions column below the primaries", async () => {
@@ -139,8 +152,8 @@ describe("/", () => {
   it("styles the party buttons solid primary and the stack as glass (2t1.8/5cl.5)", async () => {
     renderHome();
     const primaryRow = await screen.findByRole("region", { name: "Start or join a party" });
-    for (const link of within(primaryRow).getAllByRole("link")) {
-      expect(link).toHaveClass("button--primary");
+    for (const button of Array.from(primaryRow.children)) {
+      expect(button).toHaveClass("button--primary");
     }
     expect(primaryRow).toHaveClass("button-row");
     const more = await screen.findByRole("region", { name: "More" });

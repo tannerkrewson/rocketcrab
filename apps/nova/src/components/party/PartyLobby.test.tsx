@@ -150,7 +150,7 @@ describe("PartyLobby", () => {
     expect(within(rowA).getByTitle("Connected")).toBeInTheDocument();
     expect(within(rowA).queryByText("Game ready")).not.toBeInTheDocument();
     expect(within(rowA).queryByTitle("Ready")).not.toBeInTheDocument();
-    expect(within(rowA).getByRole("link", { name: /edit your name/i })).toBeInTheDocument();
+    expect(within(rowA).getByRole("button", { name: /edit your name/i })).toBeInTheDocument();
     expect(within(rowA).queryByText("(you)")).not.toBeInTheDocument();
     expect(within(rowA).queryByText("Greeter")).not.toBeInTheDocument();
 
@@ -447,15 +447,20 @@ describe("PartyLobby", () => {
     expect(screen.queryByRole("button", { name: /browse games/i })).not.toBeInTheDocument();
   });
 
-  it("opens the shared name-editing page from the pencil (2t1.9)", async () => {
+  it("renames from the pencil in a dialog, without leaving the lobby (2t1.9)", async () => {
     const onEditName = vi.fn();
     await renderLobby(makeState(), { onEditName });
-    expect(screen.queryByText(/you are playing as/i)).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /^edit name$/i })).not.toBeInTheDocument();
-    const pencil = screen.getByRole("link", { name: /edit your name/i });
-    expect(pencil.getAttribute("href")).toBe("/join?edit=name");
     expect(screen.queryByLabelText("Your player name")).not.toBeInTheDocument();
-    expect(onEditName).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: /edit your name/i }));
+    const input = await screen.findByLabelText("Your player name");
+    expect(input).toHaveValue("Player A");
+    await userEvent.clear(input);
+    await userEvent.type(input, "Ada");
+    await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
+    expect(onEditName).toHaveBeenCalledWith("Ada");
+    await waitFor(() =>
+      expect(screen.queryByLabelText("Your player name")).not.toBeInTheDocument(),
+    );
   });
 
   it("never nags about a missing name in the lobby (names are set before joining)", async () => {

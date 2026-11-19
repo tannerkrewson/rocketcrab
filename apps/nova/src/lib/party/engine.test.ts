@@ -341,7 +341,7 @@ describe("party engine — two phones end to end", () => {
     expect(creatorState.phase).toBe("lobby");
     expect(creatorState.role).toBe("creator");
     expect(creatorState.members).toHaveLength(1);
-    expect(creatorState.inviteUrl).toContain(`/join#secret=${code}`);
+    expect(creatorState.inviteUrl).toContain(`/party#secret=${code}`);
     await registerLocalGame(a, world);
     expect(a.engine.getState().members[0]?.ready).toBe(true);
 

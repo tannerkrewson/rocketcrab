@@ -6,7 +6,9 @@ import { toast } from "../../lib/toast";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState, PartyMemberView, PartyNotice } from "../../lib/party/engine";
 import { Button, buttonStyles } from "../ui/Button";
+import { Dialog } from "../ui/Dialog";
 import { GameBrowser } from "./GameBrowser";
+import { NameForm } from "./NameEntry";
 import { WelcomeSlats } from "../backgrounds/WelcomeSlats";
 import { PartyInviteQr } from "./PartyInviteQr";
 import { clearBrowseContext } from "../../lib/browse/back-context";
@@ -17,7 +19,7 @@ export interface PartyLobbyProps {
   onLeave: () => void;
   /** Host-only removal; callers must confirm first. */
   onKickMember: (memberId: string) => void;
-  /** Compatibility callback; name editing routes through /join?edit=name. */
+  /** Rename the local player (from the lobby's rename dialog). */
   onEditName: (name: string) => void;
   /** Notify the shell to compact its header while the lobby browser is open. */
   onBrowseModeChange?: (browsing: boolean) => void;
@@ -122,6 +124,7 @@ export function PartyLobby({
   onStart,
   onLeave,
   onKickMember,
+  onEditName,
   onBrowseModeChange,
   initialBrowsing = false,
 }: PartyLobbyProps) {
@@ -132,6 +135,7 @@ export function PartyLobby({
     onBrowseModeChange?.(browsing);
   }, [browsing, onBrowseModeChange]);
   const [qrOpen, setQrOpen] = useState(false);
+  const [renaming, setRenaming] = useState(false);
 
   const hostName =
     state.members.find((member) => member.memberId === state.hostMemberId)?.displayName ?? null;
@@ -363,15 +367,17 @@ export function PartyLobby({
                   <div className="flex shrink-0 items-center gap-1.5">
                     {transferIndicator(member)}
                     {member.isSelf ? (
-                      <Link
-                        to="/join"
-                        search={{ edit: "name" }}
-                        className={buttonStyles("default", "sm", undefined, true)}
+                      <Button
+                        variant="default"
+                        soft
+                        size="sm"
+                        isIconOnly
+                        onClick={() => setRenaming(true)}
                         aria-label="Edit your name"
                         title="Edit your name"
                       >
                         <Pencil className="h-3 w-3" aria-hidden="true" />
-                      </Link>
+                      </Button>
                     ) : null}
                     {state.amHost && !member.isSelf ? (
                       <Button
@@ -411,6 +417,17 @@ export function PartyLobby({
           {state.members.length === 1 ? "End party" : "Leave party"}
         </Button>
       </div>
+
+      <Dialog open={renaming} onClose={() => setRenaming(false)} title="Your name">
+        <NameForm
+          initialName={state.displayName}
+          submitLabel="Save"
+          onSubmit={(name) => {
+            onEditName(name);
+            setRenaming(false);
+          }}
+        />
+      </Dialog>
 
       {qrOpen && state.inviteUrl !== null ? (
         <div

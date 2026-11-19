@@ -56,7 +56,7 @@ test("three players reach the lobby and start the game on every browser", async 
         );
         return invite;
       })
-      .toContain("/join#secret=");
+      .toContain("/party#secret=");
 
     await joiner.goto(invite);
     await third.goto(invite);

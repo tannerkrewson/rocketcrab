@@ -265,7 +265,7 @@ export class PartySnapshot {
     }
     try {
       return buildInviteUrl({
-        baseUrl: `${defaultBaseUrl()}/join`,
+        baseUrl: `${defaultBaseUrl()}/party`,
         secret: party.secret,
       });
     } catch {
