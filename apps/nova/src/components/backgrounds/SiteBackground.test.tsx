@@ -1,6 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { PartyEngine, PartyEngineState } from "../../lib/party/engine";
+import { SiteFooter } from "../layout/SiteFooter";
 import { SiteBackground } from "./SiteBackground";
 
 /** Drive the shared playing-phase signal through an injectable fake party engine. */
@@ -122,6 +123,20 @@ describe("SiteBackground (22n)", () => {
     });
     await waitFor(() => {
       expect(screen.getByTestId("app-background")).toBeInTheDocument();
+    });
+  });
+});
+
+describe("SiteFooter during play", () => {
+  it("shows the credit footer outside a game and hides it while playing", async () => {
+    const { engine, setState } = makeEngine(IDLE_STATE);
+    cleanup();
+    render(<SiteFooter engine={engine} />);
+    expect(screen.getByRole("contentinfo")).toBeInTheDocument();
+
+    setState(IN_GAME_STATE);
+    await waitFor(() => {
+      expect(screen.queryByRole("contentinfo")).not.toBeInTheDocument();
     });
   });
 });

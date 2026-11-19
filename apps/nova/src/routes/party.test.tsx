@@ -83,8 +83,9 @@ const { stubEngine, stubs } = vi.hoisted(() => {
   const stubs: {
     started: boolean;
     state: PartyEngineState | null;
-    handler: ((state: PartyEngineState) => void) | null;
-  } = { started: false, state: null, handler: null };
+    // Several components subscribe (page, site background, footer), so keep them all.
+    handlers: Set<(state: PartyEngineState) => void>;
+  } = { started: false, state: null, handlers: new Set() };
   const currentState = (): PartyEngineState =>
     stubs.state ?? (stubs.started ? ACTIVE_STATE : IDLE_STATE);
   return {
@@ -92,9 +93,11 @@ const { stubEngine, stubs } = vi.hoisted(() => {
     stubEngine: {
       getState: vi.fn((): PartyEngineState => currentState()),
       onState: vi.fn((handler: (state: PartyEngineState) => void) => {
-        stubs.handler = handler;
+        stubs.handlers.add(handler);
         handler(currentState());
-        return () => undefined;
+        return () => {
+          stubs.handlers.delete(handler);
+        };
       }),
       isActive: vi.fn(() => currentState().phase !== "idle"),
       setContainer: vi.fn(),
@@ -104,7 +107,7 @@ const { stubEngine, stubs } = vi.hoisted(() => {
       dismissError: vi.fn(),
       createParty: vi.fn(async () => {
         stubs.started = true;
-        stubs.handler?.(ACTIVE_STATE);
+        for (const handler of stubs.handlers) handler(ACTIVE_STATE);
       }),
       joinByCode: vi.fn(async () => undefined),
       joinByInvite: vi.fn(async () => undefined),
@@ -148,7 +151,7 @@ beforeEach(async () => {
   vi.clearAllMocks();
   stubs.started = false;
   stubs.state = null;
-  stubs.handler = null;
+  stubs.handlers.clear();
   await gameRepository.clear();
   resetPartySourceForTests();
   clearPartyRecovery();
