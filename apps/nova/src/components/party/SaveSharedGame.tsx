@@ -7,7 +7,7 @@ import { usePartyEngine } from "../../lib/party/use-party";
 import { gamesQueryKey, useSavedGames } from "../../lib/games/queries";
 import { saveSharedGame, sharedGameStatus } from "../../lib/games/shared-copies";
 import { toast } from "../../lib/toast";
-import { Button } from "../ui/Button";
+import { Button, buttonStyles } from "../ui/Button";
 
 /**
  * Save a friend's game to My games, or update an older saved copy.
@@ -38,7 +38,8 @@ export function SaveSharedGame({
       <Link
         to="/game/$gameId"
         params={{ gameId: status.game.id }}
-        className="inline-flex items-center gap-1.5 text-sm font-semibold text-foreground/70 hover:text-foreground"
+        className={buttonStyles("default", size, undefined, true)}
+        title="Open your saved copy"
       >
         <Check className="h-4 w-4 text-success" aria-hidden="true" />
         In My games
@@ -80,8 +81,15 @@ export function SaveSharedGame({
   }
 
   return (
-    <div className="flex flex-col items-center gap-1.5">
-      <Button variant="default" soft size={size} onClick={() => void save()} disabled={saving}>
+    <div className="flex flex-col gap-1.5">
+      <Button
+        variant="default"
+        soft
+        size={size}
+        className="w-full"
+        onClick={() => void save()}
+        disabled={saving}
+      >
         {status.kind === "update" ? (
           <RefreshCw className="h-4 w-4" aria-hidden="true" />
         ) : (
@@ -90,7 +98,7 @@ export function SaveSharedGame({
         {saving ? "Saving…" : label}
       </Button>
       {showHint && hint !== null ? (
-        <p className="max-w-xs text-xs text-foreground/60">{hint}</p>
+        <p className="max-w-xs text-center text-xs text-foreground/60">{hint}</p>
       ) : null}
     </div>
   );

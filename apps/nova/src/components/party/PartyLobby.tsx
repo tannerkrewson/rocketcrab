@@ -288,16 +288,18 @@ export function PartyLobby({
                   ? "As the host, you have to start the game!"
                   : "Waiting for the host to start the game…"}
               </p>
-              <Link
-                to="/game/$gameId"
-                params={{ gameId: state.game.gameId }}
-                search={{ from: "party" }}
-                onClick={clearBrowseContext}
-                className={buttonStyles("default", "md", undefined, true)}
-              >
-                What is {state.game.title}?
-              </Link>
-              {sharedGame !== undefined ? <SaveSharedGame game={sharedGame} /> : null}
+              <div className="button-row items-start">
+                <Link
+                  to="/game/$gameId"
+                  params={{ gameId: state.game.gameId }}
+                  search={{ from: "party" }}
+                  onClick={clearBrowseContext}
+                  className={buttonStyles("default", "md", undefined, true)}
+                >
+                  What is {state.game.title}?
+                </Link>
+                {sharedGame !== undefined ? <SaveSharedGame game={sharedGame} /> : null}
+              </div>
             </>
           ) : (
             <p className="text-sm font-semibold text-foreground/70">{noGameMessage}</p>

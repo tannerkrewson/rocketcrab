@@ -1,9 +1,10 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import type {
-  CreateSavedGameInput,
-  DuplicateSavedGameInput,
-  TestResultsInput,
-  UpdateSavedGameInput,
+import {
+  isGameRepositoryError,
+  type CreateSavedGameInput,
+  type DuplicateSavedGameInput,
+  type TestResultsInput,
+  type UpdateSavedGameInput,
 } from "@rocketcrab/core";
 import { gameRepository } from "./instance";
 
@@ -32,6 +33,10 @@ export function useSavedGame(id: string) {
     queryKey: gameQueryKey(id),
     queryFn: () => gameRepository.read(id),
     enabled: id.length > 0,
+    // A missing game (e.g. a friend's, shared in a party) won't appear by
+    // retrying; answer at once so the page can fall back.
+    retry: (failures, error) =>
+      !(isGameRepositoryError(error) && error.code === "not_found") && failures < 3,
   });
 }
 
