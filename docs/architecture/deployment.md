@@ -30,7 +30,8 @@ use `Referrer-Policy: no-referrer` and no-referrer meta tags.
 
 Nova's Vite plugin emits a strict CSP both in its HTML meta tag and in
 `dist/_headers`, where it adds `frame-ancestors 'none'`. Its `frame-src`
-contains the pinned runtime and the Classic game allowlist. The runtime
+contains the pinned runtime and the Classic game allowlist; its `img-src`
+allows only the hosts of Classic games' screenshots. The runtime
 plugin emits an HTTP policy with `frame-ancestors` pinned to the main origin
 and `worker-src 'none'`. Without an app origin pin, it denies framing.
 Hashed `/assets/*` are immutable; other assets use Cloudflare defaults.

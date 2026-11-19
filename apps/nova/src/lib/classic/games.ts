@@ -793,6 +793,13 @@ export const CLASSIC_FRAME_ORIGINS: readonly string[] = [
   ...new Set(CLASSIC_GAMES.flatMap((game) => game.frameOrigins)),
 ];
 
+/** Unique origins of classic games' screenshots (CSP img-src allowlist). */
+export const CLASSIC_IMAGE_ORIGINS: readonly string[] = [
+  ...new Set(
+    CLASSIC_GAMES.flatMap((game) => (game.pictures ?? []).map((url) => new URL(url).origin)),
+  ),
+];
+
 export function findClassicGame(id: string): ClassicGame | undefined {
   return CLASSIC_GAMES.find((game) => game.id === id);
 }

@@ -1,5 +1,10 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CLASSIC_FRAME_ORIGINS, CLASSIC_GAMES, findClassicGame } from "./games";
+import {
+  CLASSIC_FRAME_ORIGINS,
+  CLASSIC_GAMES,
+  CLASSIC_IMAGE_ORIGINS,
+  findClassicGame,
+} from "./games";
 import type { ClassicGameConnectResult } from "./types";
 import { buildClassicGameUrl, randomRoomId } from "./url";
 
@@ -56,6 +61,15 @@ describe("CLASSIC_GAMES data", () => {
     expect(findClassicGame("netgamesio-avalon")?.name).toBe("Avalon");
     expect(findClassicGame("ooc-story")?.name).toBe("Raconteur");
     expect(findClassicGame("does-not-exist")).toBeUndefined();
+  });
+
+  it("CLASSIC_IMAGE_ORIGINS covers every screenshot host, once each", () => {
+    expect(new Set(CLASSIC_IMAGE_ORIGINS).size).toBe(CLASSIC_IMAGE_ORIGINS.length);
+    for (const game of CLASSIC_GAMES) {
+      for (const url of game.pictures ?? []) {
+        expect(CLASSIC_IMAGE_ORIGINS).toContain(new URL(url).origin);
+      }
+    }
   });
 
   it("CLASSIC_FRAME_ORIGINS is the unique origin set incl. both drawphone origins", () => {
