@@ -44,10 +44,8 @@ describe("/build — page 1 (hero)", () => {
     renderBuild();
 
     const hero = await screen.findByTestId("build-hero");
-    // The hero sits on the full-page Nova silk; the page content carries the
-    // view-transition name that fades in after the home card expands.
+    // The hero sits directly on the full-page Nova silk background.
     expect(hero.className).not.toContain("border");
-    expect(hero.closest(".vt-nova-content")).not.toBeNull();
 
     const logo = hero.querySelector("img");
     expect(logo?.getAttribute("src")).toBe("/rocketcrab-logo-no-glow.svg");

@@ -9,7 +9,7 @@ import { Button, buttonStyles } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { GameBrowser } from "./GameBrowser";
 import { NameForm } from "./NameEntry";
-import { WelcomeSlats } from "../backgrounds/WelcomeSlats";
+import { WelcomeWaves } from "../backgrounds/WelcomeWaves";
 import { PartyInviteQr } from "./PartyInviteQr";
 import { clearBrowseContext } from "../../lib/browse/back-context";
 
@@ -249,7 +249,7 @@ export function PartyLobby({
         aria-label="Welcome"
         className="relative flex min-h-40 flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl bg-background p-5 text-center"
       >
-        <WelcomeSlats />
+        <WelcomeWaves />
         <div className="relative flex flex-col items-center gap-3">
           <h2 className="text-xl font-black">Welcome to rocketcrab!</h2>
           {state.game !== null ? (

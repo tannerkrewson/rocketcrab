@@ -40,8 +40,7 @@ function SilkCanvas({ dpr }: { dpr: number }) {
  * - `card`: fills a positioned parent (the home page's Nova card). The canvas
  *   is viewport-shaped and centered, the card crops it, so the card is a
  *   window onto the same fabric rather than a squashed copy.
- * - `page`: the fixed full-viewport background on /build, which the card
- *   expands into through the shared `vt-nova-hero` view-transition name.
+ * - `page`: the full-viewport background on the Nova build and editor pages.
  *
  * A scrim keeps white and `text-nova-text` copy legible over the highlights.
  */

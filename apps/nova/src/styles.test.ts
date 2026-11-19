@@ -36,7 +36,8 @@ describe("styles.css HeroUI setup", () => {
     for (const token of [
       "@utility pb-safe",
       "@utility pt-safe",
-      ".vt-nova-hero",
+      ".rc-bg-in",
+      ".rc-page-in",
       "@utility glass",
       "rc-logo-launch",
       '[data-testid="party-frame"].invisible',

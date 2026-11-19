@@ -61,6 +61,20 @@ describe("AppLayout", () => {
     expect(screen.getByRole("main")).toHaveClass("relative", "z-10");
   });
 
+  it("picks the background by page: Nova silk, black for parties, molten elsewhere", async () => {
+    renderAt("/build");
+    await screen.findByRole("heading", { name: "Introducing Nova" });
+    expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "nova");
+
+    renderAt("/editor");
+    await screen.findByRole("tab", { name: "Code" });
+    expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "nova");
+
+    renderAt("/about");
+    await screen.findByRole("heading", { name: "Coming soon" });
+    expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "molten");
+  });
+
   it("shows the background on every page when no game is live (5cl.4/22n)", async () => {
     renderAt("/");
     await screen.findByRole("heading", { name: "rocketcrab.com" });

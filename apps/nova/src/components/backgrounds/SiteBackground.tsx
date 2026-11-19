@@ -14,60 +14,36 @@ const MoltenMetal = lazy(() => import("../../vendor/react-bits/MoltenMetal"));
 const PIXEL_BUDGET = 300_000;
 
 /**
- * Site-wide decorative background (React Bits "Molten Metal") in rocket red.
- * An orange-hot (never white-hot) core and wide hazy filaments over a warm
- * gradient, with light grain for texture, so the page has depth without
- * bright spots competing with the content. The
- * injected engine is a test seam: the playing phase mounts the full-screen
- * game shell, so the background unmounts and frees the GPU for the game.
- * `nova` swaps in the full-page Nova silk (the /build pages).
+ * - `molten`: rocketcrab's default.
+ * - `nova`: deep-blue silk for the Nova build and editor pages.
+ * - `party`: plain black, so the lobby's own effect is the only motion.
  */
-export function SiteBackground({ engine, nova = false }: { engine?: PartyEngine; nova?: boolean }) {
-  const { state } = usePartyEngine(engine);
-  const [pixelRatio] = useState(() => viewportPixelRatio(PIXEL_BUDGET));
+export type SiteBackgroundVariant = "molten" | "nova" | "party";
 
-  if (state.phase === "playing") {
-    return null;
-  }
-  if (nova) {
-    // Nova pages trade the molten metal for full-page silk. It carries the
-    // home card's view-transition name, so that card expands into it.
-    return (
-      <div
-        aria-hidden="true"
-        data-testid="app-background"
-        data-variant="nova"
-        className="vt-nova-hero pointer-events-none fixed inset-0 z-0"
-      >
-        <NovaSilk variant="page" />
-      </div>
-    );
-  }
+function MoltenBackground() {
+  const [pixelRatio] = useState(() => viewportPixelRatio(PIXEL_BUDGET));
   return (
-    <div
-      aria-hidden="true"
-      data-testid="app-background"
-      className="pointer-events-none fixed inset-0 z-0"
-    >
-      {/* Static warm gradient under the canvas so the page reads as a deep
-          ember glow rather than flat black (and is the fallback without WebGL). */}
-      <div className="absolute inset-0 bg-[radial-gradient(120%_70%_at_50%_115%,rgb(120_22_10/0.45),transparent_65%),radial-gradient(80%_55%_at_0%_0%,rgb(70_12_28/0.35),transparent_60%),radial-gradient(70%_50%_at_100%_25%,rgb(90_24_8/0.25),transparent_60%),linear-gradient(180deg,#0b0405,#100505)]" />
+    <>
       {canUseWebGL2() ? (
         <Suspense fallback={null}>
           <MoltenMetal
-            colors={["#4a0a06", "#c42a14"]}
-            coreColor="#ff8a5c"
-            colorMode="ember"
-            speed={0.22}
+            // Saturated reds with an orange core that never reaches white,
+            // on true black: rich color without bright hot spots or a hazy
+            // red wash.
+            colors={["#5a0a06", "#e0281b"]}
+            coreColor="#ff8a52"
+            colorMode="molten"
+            // Fine, slow-moving filaments: texture, not motion that competes
+            // with the UI.
+            speed={0.15}
+            drift={0.15}
             scale={4}
             detail={3}
-            glow={1.3}
-            thickness={1.5}
-            haze={0.9}
-            brightness={1.05}
-            opacity={0.85}
-            drift={0.25}
-            grain={0.04}
+            glow={1.5}
+            haze={0.75}
+            brightness={1.15}
+            opacity={1}
+            grain={0}
             // Taps land on buttons and cards; keep the background calm.
             mouseInteraction={false}
             flareOnClick={false}
@@ -75,6 +51,43 @@ export function SiteBackground({ engine, nova = false }: { engine?: PartyEngine;
           />
         </Suspense>
       ) : null}
+      {/* Darken where the content sits so the glow frames the page rather
+          than running behind the text. */}
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_70%_60%_at_50%_45%,rgb(0_0_0/0.55),transparent_75%)]" />
+    </>
+  );
+}
+
+/**
+ * Site-wide decorative background (React Bits "Molten Metal" / "Silk").
+ * Switching variants dips through black and fades the new one in. The
+ * injected engine is a test seam: the playing phase mounts the full-screen
+ * game shell, so the background unmounts and frees the GPU for the game.
+ */
+export function SiteBackground({
+  engine,
+  variant = "molten",
+}: {
+  engine?: PartyEngine;
+  variant?: SiteBackgroundVariant;
+}) {
+  const { state } = usePartyEngine(engine);
+
+  if (state.phase === "playing") {
+    return null;
+  }
+  return (
+    <div
+      aria-hidden="true"
+      data-testid="app-background"
+      data-variant={variant}
+      className="pointer-events-none fixed inset-0 z-0 bg-black"
+    >
+      {/* Keyed by variant: a change remounts the layer, which fades in. */}
+      <div key={variant} className="rc-bg-in absolute inset-0">
+        {variant === "molten" ? <MoltenBackground /> : null}
+        {variant === "nova" ? <NovaSilk variant="page" /> : null}
+      </div>
     </div>
   );
 }

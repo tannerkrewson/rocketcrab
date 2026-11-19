@@ -88,8 +88,7 @@ function HomeComponent() {
   }, [engine, state.phase]);
 
   return (
-    // vt-nova-home: fades back in once the Nova silk has shrunk into its card.
-    <div className="vt-nova-home flex min-h-[calc(100dvh-16rem)] flex-col items-center justify-center gap-10">
+    <div className="rc-page-in flex min-h-[calc(100dvh-16rem)] flex-col items-center justify-center gap-10">
       <section className="flex flex-col items-center gap-3 text-center">
         <Button
           variant="default"
@@ -121,13 +120,11 @@ function HomeComponent() {
           rocketcrab<span className="text-primary">.com</span>
         </h1>
         <p className="text-lg text-foreground/70">party games for phones</p>
-        {/* Same satin as the /build hero; the shared view-transition name
-            expands this card into the hero (and back via its back link). */}
+        {/* A window onto the Nova silk that /build uses as its background. */}
         <Link
           to="/build"
-          viewTransition={{ types: ["nova-open"] }}
           data-testid="nova-card"
-          className="vt-nova-hero relative mt-4 -mb-1 block w-full max-w-md overflow-hidden rounded-2xl bg-background px-6 py-4 text-center transition-transform active:scale-[0.98] motion-reduce:transition-none"
+          className="relative mt-4 -mb-1 block w-full max-w-md overflow-hidden rounded-2xl bg-background px-6 py-4 text-center transition-transform active:scale-[0.98] motion-reduce:transition-none"
         >
           <NovaSilk />
           <span className="relative block text-lg font-black [text-shadow:0_1px_12px_rgb(0_0_0/0.8)]">
