@@ -687,10 +687,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         <div className="flex flex-wrap items-center gap-2">{actions}</div>
         <div style={{ height: `${editorHeightPx}px` }}>
           <div className="grid h-full grid-cols-2 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
-            <section
-              className="min-h-0 overflow-hidden rounded-2xl border-2 border-border bg-surface"
-              aria-label="Editor"
-            >
+            <section className="min-h-0 overflow-hidden rounded-2xl bg-overlay" aria-label="Editor">
               <div className="h-full">
                 <CodeEditor value={source} onChange={setSource} ariaLabel="Game HTML source" />
               </div>
@@ -714,7 +711,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
         <div
           role="separator"
           aria-label="Resize the code editor"
-          className="flex h-3 cursor-ns-resize select-none items-center justify-center rounded-md border border-foreground/30 bg-surface-secondary text-foreground/60 transition-colors hover:bg-surface-tertiary hover:text-foreground/90"
+          className="flex h-3 cursor-ns-resize select-none items-center justify-center rounded-md bg-surface-tertiary text-foreground/60 transition-colors hover:bg-surface-tertiary hover:text-foreground/90"
           onPointerDown={handleEditorResize}
           title="Drag to resize the code editor"
         >
@@ -725,7 +722,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       <div className="flex flex-col gap-3 md:hidden" data-testid="mobile-layout">
         {tabs}
         {mobileTab === "code" ? (
-          <div className="overflow-hidden rounded-2xl border-2 border-border bg-surface">
+          <div className="overflow-hidden rounded-2xl bg-overlay">
             <div className="h-[50vh] min-h-72">
               <CodeEditor value={source} onChange={setSource} ariaLabel="Game HTML source" />
             </div>
@@ -747,7 +744,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
       {arenaSection}
 
       <div
-        className="sticky bottom-0 z-20 -mx-4 flex items-center gap-2 overflow-x-auto border-t-2 border-border bg-surface py-2 pb-safe pl-4 pr-[9.5rem] md:hidden"
+        className="sticky bottom-0 z-20 -mx-4 flex items-center gap-2 overflow-x-auto bg-overlay py-2 pb-safe pl-4 pr-[9.5rem] md:hidden"
         data-testid="mobile-actions-bar"
       >
         <Button

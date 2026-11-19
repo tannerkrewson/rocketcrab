@@ -7,6 +7,9 @@ import { Button, buttonStyles } from "../components/ui/Button";
 import { writeToClipboard } from "../lib/editor/clipboard";
 import { usePartyEngine } from "../lib/party/use-party";
 
+/** The secondary menu: equal-width glass buttons with centered labels. */
+const MORE_LINK = buttonStyles("default", "lg", "w-full justify-center", true);
+
 export const Route = createFileRoute("/")({
   component: HomeComponent,
 });
@@ -136,32 +139,29 @@ function HomeComponent() {
         aria-label="Start or join a party"
         className="flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row"
       >
-        <Link
-          to="/join"
-          className={buttonStyles("primary", "lg", "w-full sm:w-auto sm:px-10", true)}
-        >
+        <Link to="/join" className={buttonStyles("primary", "lg", "w-full sm:w-44")}>
           Join party
         </Link>
         <Link
           to="/party"
           search={{ gameId: undefined, mode: undefined, title: undefined }}
-          className={buttonStyles("primary", "lg", "w-full sm:w-auto sm:px-10", true)}
+          className={buttonStyles("primary", "lg", "w-full sm:w-44")}
         >
           Start party
         </Link>
       </section>
 
-      <section aria-label="More" className="flex w-fit flex-col gap-2">
-        <Link to="/build" className={buttonStyles("default", "lg", undefined, true)}>
+      <section aria-label="More" className="flex w-full max-w-56 flex-col gap-2">
+        <Link to="/build" className={MORE_LINK}>
           Build a game
         </Link>
-        <Link to="/library" className={buttonStyles("default", "lg", undefined, true)}>
+        <Link to="/library" className={MORE_LINK}>
           My games
         </Link>
-        <Link to="/browse" className={buttonStyles("default", "lg", undefined, true)}>
+        <Link to="/browse" className={MORE_LINK}>
           Browse games
         </Link>
-        <Link to="/about" className={buttonStyles("default", "lg", undefined, true)}>
+        <Link to="/about" className={MORE_LINK}>
           About
         </Link>
       </section>

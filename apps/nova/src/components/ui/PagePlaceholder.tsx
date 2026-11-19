@@ -19,7 +19,7 @@ export function PagePlaceholder({
   return (
     <section
       className={cn(
-        "flex flex-col items-center justify-center gap-3 rounded-2xl border-2 border-border bg-surface px-6 py-14 text-center",
+        "flex flex-col items-center justify-center gap-3 glass rounded-2xl px-6 py-14 text-center",
         className,
       )}
     >

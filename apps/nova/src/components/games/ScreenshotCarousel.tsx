@@ -21,7 +21,7 @@ export function ScreenshotCarousel({ images, gameName }: ScreenshotCarouselProps
     return null;
   }
   return (
-    <div className="rounded-2xl border-2 border-border bg-surface p-4">
+    <div className="glass rounded-2xl p-4">
       <Swiper
         modules={[A11y, Pagination]}
         slidesPerView={2.5}

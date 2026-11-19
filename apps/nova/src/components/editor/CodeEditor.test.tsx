@@ -27,7 +27,7 @@ describe("CodeEditor", () => {
     render(<CodeEditor value="" onChange={() => {}} ariaLabel="Game HTML source" />);
     await waitFor(() => expect(document.querySelector(".cm-theme-dark")).not.toBeNull());
     const styles = injectedStyles();
-    expect(styles).toContain("var(--surface)");
+    expect(styles).toContain("var(--overlay)");
     expect(styles).toContain("var(--foreground)");
     expect(styles).toContain("var(--surface-secondary)");
   });

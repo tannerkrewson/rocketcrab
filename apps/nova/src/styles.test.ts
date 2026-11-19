@@ -37,6 +37,7 @@ describe("styles.css HeroUI setup", () => {
       "@utility pb-safe",
       "@utility pt-safe",
       ".vt-nova-hero",
+      "@utility glass",
       "rc-logo-launch",
       '[data-testid="party-frame"].invisible',
     ]) {

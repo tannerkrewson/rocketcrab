@@ -35,7 +35,7 @@ export function PromptExportMenu({ source, title }: PromptExportMenuProps) {
         <ScrollText className="h-4 w-4" aria-hidden="true" />
         Copy prompt
       </summary>
-      <ul className="absolute right-0 z-50 mt-1 flex w-64 list-none flex-col gap-1 rounded-2xl border-2 border-border bg-overlay p-2 shadow-lg">
+      <ul className="absolute right-0 z-50 mt-1 flex w-64 list-none flex-col gap-1 rounded-2xl bg-overlay p-2 shadow-overlay">
         <li>
           <button
             type="button"

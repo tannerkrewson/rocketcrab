@@ -68,7 +68,7 @@ export function DiagnosticsPanel({
         </span>
       </div>
 
-      <div className="flex flex-col gap-2 rounded-2xl border-2 border-border bg-surface p-3">
+      <div className="flex flex-col gap-2 glass rounded-2xl p-3">
         <h3 className="text-xs font-black text-foreground/60">Validation</h3>
         {validationIssues.length === 0 ? (
           <p className="text-sm text-foreground/60">Looks like a complete HTML document.</p>
@@ -84,7 +84,7 @@ export function DiagnosticsPanel({
         )}
       </div>
 
-      <div className="flex flex-col gap-2 rounded-2xl border-2 border-border bg-surface p-3">
+      <div className="flex flex-col gap-2 glass rounded-2xl p-3">
         <h3 className="text-xs font-black text-foreground/60">Runtime errors</h3>
         {diagnostics.length === 0 ? (
           <p className="text-sm text-foreground/60">No runtime errors from the last run.</p>
@@ -109,7 +109,7 @@ export function DiagnosticsPanel({
         )}
       </div>
 
-      <div className="flex flex-col gap-2 rounded-2xl border-2 border-border bg-surface p-3">
+      <div className="flex flex-col gap-2 glass rounded-2xl p-3">
         <h3 className="text-xs font-black text-foreground/60">Console</h3>
         {consoleEntries.length === 0 ? (
           <p className="text-sm text-foreground/60">No console output from the last run.</p>

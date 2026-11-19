@@ -38,18 +38,24 @@
     /* Crimson, so destructive buttons don't read as the red brand accent. */
     --danger: oklch(58% 0.2 8);
 
-    /* Pure black page with neutral (hue-free) surfaces. Cards are slightly
-       translucent so the background glows through without a costly blur. */
+    /* Pure black page. Cards and buttons are neutral "clear glass": a
+       translucent hue-free tint with a faint top highlight and no outline,
+       so the background glows through. No backdrop blur — re-blurring an
+       animated full-screen canvas every frame is too costly on phones.
+       Overlays (dialogs, menus) stay opaque for legibility. */
     --background: oklch(0% 0 0);
-    --surface: oklch(17% 0 0 / 0.88);
-    --surface-secondary: oklch(21% 0 0);
-    --surface-tertiary: oklch(25% 0 0);
-    --overlay: oklch(19% 0 0);
-    --default: oklch(24% 0 0);
-    --field-background: oklch(21% 0 0);
-    --segment: oklch(33% 0 0);
-    --border: oklch(28% 0 0);
-    --separator: oklch(23% 0 0);
+    --surface: oklch(30% 0 0 / 0.5);
+    --surface-secondary: oklch(100% 0 0 / 0.06);
+    --surface-tertiary: oklch(100% 0 0 / 0.1);
+    --surface-shadow: inset 0 1px 0 0 oklch(100% 0 0 / 0.07), 0 12px 32px -16px oklch(0% 0 0 / 0.7);
+    --overlay: oklch(17% 0 0);
+    --overlay-shadow: inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 24px 48px -12px oklch(0% 0 0 / 0.8);
+    --default: oklch(100% 0 0 / 0.1);
+    --default-hover: oklch(100% 0 0 / 0.16);
+    --field-background: oklch(100% 0 0 / 0.08);
+    --segment: oklch(100% 0 0 / 0.16);
+    --border: oklch(100% 0 0 / 0.12);
+    --separator: oklch(100% 0 0 / 0.08);
     --muted: oklch(72% 0 0);
   }
 
@@ -173,6 +179,19 @@
 @utility pt-safe {
   /* Never flush with the top edge — at least 0.5rem even without a notch. */
   padding-top: max(0.5rem, env(safe-area-inset-top));
+}
+
+/* Glass card for raw markup; HeroUI Card/Alert get the same look from the
+   --surface/--surface-shadow tokens. */
+@utility glass {
+  background-color: var(--surface);
+  box-shadow: var(--surface-shadow);
+}
+
+/* HeroUI's "secondary" button draws accent-colored text on a gray fill;
+   keep the glass fill with plain white text instead. */
+.button--secondary {
+  --button-fg: var(--foreground);
 }
 
 /* The home page's Nova card and the /build hero share this name, so a

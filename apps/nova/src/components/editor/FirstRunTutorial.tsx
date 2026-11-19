@@ -26,7 +26,7 @@ export function FirstRunTutorial() {
 
   return (
     <div
-      className="flex flex-col gap-3 rounded-2xl border-2 border-primary/40 bg-surface p-4"
+      className="flex flex-col gap-3 rounded-2xl bg-primary/15 p-4 shadow-surface"
       data-testid="first-run-tutorial"
     >
       <div className="flex flex-wrap items-start justify-between gap-3">

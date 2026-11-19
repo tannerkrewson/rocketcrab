@@ -93,7 +93,7 @@ export function PartyPlayShell({
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-black" data-testid="party-play-view">
       {!barHidden ? (
-        <header className="relative z-50 flex items-center gap-2 border-b-2 border-border bg-surface px-3 pb-2 pt-safe">
+        <header className="relative z-50 flex items-center gap-2 bg-overlay px-3 pb-2 pt-safe">
           <Button
             size="sm"
             variant="tertiary"
@@ -122,7 +122,7 @@ export function PartyPlayShell({
 
           <Button
             size="sm"
-            variant="outline"
+            variant="tertiary"
             className="shrink-0"
             aria-expanded={menuOpen}
             onClick={() => setPanel(menuOpen ? null : "menu")}
@@ -133,7 +133,7 @@ export function PartyPlayShell({
 
           {menuOpen ? (
             <ul
-              className="absolute right-0 top-full z-50 flex w-max min-w-56 flex-col rounded-b-box border-2 border-t-0 border-border bg-surface p-1.5 shadow-lg"
+              className="absolute right-0 top-full z-50 flex w-max min-w-56 flex-col rounded-b-2xl bg-overlay p-1.5 shadow-overlay"
               role="menu"
               aria-label="Game menu"
             >
@@ -254,11 +254,11 @@ export function PartyPlayShell({
               data-testid="players-popup-backdrop"
             />
             <div
-              className="absolute left-1/2 top-3 z-50 flex max-h-[calc(100%-1.5rem)] w-[min(28rem,calc(100%-1.5rem))] -translate-x-1/2 flex-col overflow-hidden rounded-2xl border-2 border-border bg-surface shadow-xl"
+              className="absolute left-1/2 top-3 z-50 flex max-h-[calc(100%-1.5rem)] w-[min(28rem,calc(100%-1.5rem))] -translate-x-1/2 flex-col overflow-hidden rounded-2xl bg-overlay shadow-overlay"
               role="dialog"
               aria-label="Players"
             >
-              <div className="flex items-center gap-2 border-b-2 border-border px-3 py-2">
+              <div className="flex items-center gap-2 bg-surface-secondary px-3 py-2">
                 <Button
                   size="sm"
                   variant="secondary"
@@ -276,7 +276,7 @@ export function PartyPlayShell({
                   {state.members.map((member) => (
                     <li
                       key={member.memberId}
-                      className="flex items-center gap-2 rounded-2xl border-2 border-border bg-surface px-3 py-2 text-sm"
+                      className="flex items-center gap-2 rounded-2xl bg-surface-secondary px-3 py-2 text-sm"
                     >
                       <span className="min-w-0 flex-1 truncate font-bold">
                         {member.displayName}
@@ -315,11 +315,11 @@ export function PartyPlayShell({
               data-testid="logs-panel-backdrop"
             />
             <div
-              className="absolute left-1/2 top-3 z-50 flex max-h-[calc(100%-1.5rem)] w-[min(32rem,calc(100%-1.5rem))] -translate-x-1/2 flex-col overflow-hidden rounded-2xl border-2 border-border bg-surface shadow-xl"
+              className="absolute left-1/2 top-3 z-50 flex max-h-[calc(100%-1.5rem)] w-[min(32rem,calc(100%-1.5rem))] -translate-x-1/2 flex-col overflow-hidden rounded-2xl bg-overlay shadow-overlay"
               role="dialog"
               aria-label="Logs"
             >
-              <div className="flex items-center gap-2 border-b-2 border-border px-3 py-2">
+              <div className="flex items-center gap-2 bg-surface-secondary px-3 py-2">
                 <Button
                   size="sm"
                   variant="secondary"
@@ -333,7 +333,7 @@ export function PartyPlayShell({
                 <div className="min-w-0 flex-1" />
                 <Button
                   size="sm"
-                  variant="outline"
+                  variant="tertiary"
                   onClick={() => onClearLogs?.()}
                   disabled={state.runtimeLogs.length === 0}
                   title="Clear these logs"
@@ -344,7 +344,7 @@ export function PartyPlayShell({
               </div>
               <div className="min-h-0 overflow-y-auto p-3">
                 {state.runtimeLogs.length === 0 ? (
-                  <p className="rounded-2xl border-2 border-dashed border-border p-6 text-center text-sm text-foreground/60">
+                  <p className="rounded-2xl bg-surface-secondary p-6 text-center text-sm text-foreground/60">
                     No logs yet — the game&apos;s console output will appear here.
                   </p>
                 ) : (
@@ -353,9 +353,9 @@ export function PartyPlayShell({
                       <li
                         key={entry.id}
                         className={cn(
-                          "break-words rounded-2xl border-2 border-border bg-surface-secondary/50 px-2.5 py-1.5",
-                          entry.level === "error" && "border-danger/40 text-danger",
-                          entry.level === "warn" && "border-warning/40 text-warning",
+                          "break-words rounded-2xl bg-surface-secondary px-2.5 py-1.5",
+                          entry.level === "error" && "bg-danger/10 text-danger",
+                          entry.level === "warn" && "bg-warning/10 text-warning",
                         )}
                       >
                         <span className="mr-2 text-foreground/40">
@@ -393,11 +393,11 @@ export function PartyPlayShell({
               data-testid="browse-panel-backdrop"
             />
             <div
-              className="absolute left-1/2 top-3 z-50 flex max-h-[calc(100%-1.5rem)] w-[min(42rem,calc(100%-1.5rem))] -translate-x-1/2 flex-col overflow-hidden rounded-2xl border-2 border-border bg-surface shadow-xl"
+              className="absolute left-1/2 top-3 z-50 flex max-h-[calc(100%-1.5rem)] w-[min(42rem,calc(100%-1.5rem))] -translate-x-1/2 flex-col overflow-hidden rounded-2xl bg-overlay shadow-overlay"
               role="dialog"
               aria-label="Pick a game"
             >
-              <div className="flex items-center gap-2 border-b-2 border-border px-3 py-2">
+              <div className="flex items-center gap-2 bg-surface-secondary px-3 py-2">
                 <Button
                   variant="default"
                   size="md"
@@ -448,7 +448,7 @@ export function PartyPlayShell({
           aria-modal="true"
           aria-label="End the game for everyone"
         >
-          <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border-2 border-border bg-surface p-5">
+          <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl bg-overlay p-5 shadow-overlay">
             <p className="font-black">Exit to the lobby?</p>
             <p className="text-sm text-foreground/70">
               Every player&apos;s game will end and the party will return to the lobby. This is the
@@ -479,7 +479,7 @@ export function PartyPlayShell({
           aria-modal="true"
           aria-label="Reload every player's game"
         >
-          <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border-2 border-border bg-surface p-5">
+          <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl bg-overlay p-5 shadow-overlay">
             <p className="font-black">Reload every player&apos;s game?</p>
             <p className="text-sm text-foreground/70">
               Every player&apos;s game will reload, and any unsaved progress in the running games
@@ -536,7 +536,7 @@ function PartyKickConfirm({
       aria-modal="true"
       aria-label="Kick a player from the party"
     >
-      <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border-2 border-border bg-surface p-5">
+      <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl bg-overlay p-5 shadow-overlay">
         <p className="font-black">Kick {memberName} from the party?</p>
         <p className="text-sm">
           This removes them for now, not permanently. They can rejoin with the same private invite.

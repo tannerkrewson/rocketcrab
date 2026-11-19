@@ -44,7 +44,7 @@ export function PartyResumeBanner({ engine }: PartyResumeBannerProps) {
 
   return (
     <section
-      className="flex flex-col gap-3 rounded-2xl border-2 border-primary/40 bg-surface p-4"
+      className="flex flex-col gap-3 rounded-2xl bg-primary/15 p-4 shadow-surface"
       aria-label="Return to your party"
       data-testid="party-resume-banner"
     >

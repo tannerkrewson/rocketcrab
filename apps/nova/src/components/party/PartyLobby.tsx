@@ -28,18 +28,24 @@ export interface PartyLobbyProps {
   initialBrowsing?: boolean;
 }
 
-const PLAYER_BORDER_COLORS = [
-  "border-primary",
-  "border-secondary",
-  "border-accent",
-  "border-accent",
-  "border-success",
-  "border-warning",
-  "border-danger",
+/** Each player's avatar color, by join order (rocket red, Nova blue, then a spread). */
+const PLAYER_AVATAR_COLORS = [
+  "bg-primary",
+  "bg-secondary",
+  "bg-amber-500",
+  "bg-emerald-500",
+  "bg-violet-500",
+  "bg-cyan-500",
+  "bg-pink-500",
 ] as const;
 
-function playerBorderColor(index: number): string {
-  return PLAYER_BORDER_COLORS[index % PLAYER_BORDER_COLORS.length] ?? "border-primary";
+function playerAvatarColor(index: number): string {
+  return PLAYER_AVATAR_COLORS[index % PLAYER_AVATAR_COLORS.length] ?? "bg-primary";
+}
+
+/** First letter of a display name for its avatar (falls back to "?"). */
+function initialOf(name: string): string {
+  return Array.from(name.trim())[0]?.toUpperCase() ?? "?";
 }
 
 function roleLabels(member: PartyMemberView, isCreator: boolean): string {
@@ -228,7 +234,7 @@ export function PartyLobby({
 
       <section
         aria-label="Invite your friends"
-        className="flex flex-col items-center gap-3 rounded-2xl border-2 border-border bg-surface p-5 text-center"
+        className="glass flex flex-col items-center gap-3 rounded-2xl p-5 text-center"
       >
         <h2 className="text-lg font-black">Get your friends to join!</h2>
         <div className="flex items-center justify-center gap-2">
@@ -262,7 +268,7 @@ export function PartyLobby({
       </section>
       <section
         aria-label="Welcome"
-        className="relative flex min-h-40 flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border-2 border-border bg-background p-5 text-center"
+        className="relative flex min-h-40 flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl bg-background p-5 text-center"
       >
         <WelcomeSlats />
         <div className="relative flex flex-col items-center gap-3">
@@ -296,7 +302,7 @@ export function PartyLobby({
       {needsName ? (
         <section
           aria-label="Set your name"
-          className="flex flex-wrap items-center justify-center gap-3 rounded-2xl border-2 border-primary/40 bg-surface p-4"
+          className="flex flex-wrap items-center justify-center gap-3 rounded-2xl bg-primary/15 p-4 shadow-surface"
         >
           <p className="text-sm font-semibold">
             You haven&apos;t set a name yet — friends see you as{" "}
@@ -350,7 +356,7 @@ export function PartyLobby({
           </Alert.Content>
         </Alert>
       ) : null}
-      <details className="group rounded-2xl border-2 border-border bg-surface" open>
+      <details className="glass group rounded-2xl" open>
         <summary className="flex cursor-pointer list-none items-center gap-2 p-4 text-sm font-black text-foreground/60">
           Players ({state.members.length})
         </summary>
@@ -362,22 +368,19 @@ export function PartyLobby({
                 <li
                   key={member.memberId}
                   data-testid={`party-member-${member.memberId}`}
-                  className={`flex min-w-0 items-center gap-3 rounded-2xl border-2 bg-surface p-3.5 ${playerBorderColor(index)}`}
+                  className="flex min-w-0 items-center gap-3 rounded-2xl bg-surface-secondary p-3"
                 >
-                  <div className="flex min-w-0 flex-1 items-center gap-2.5">
-                    {member.connected ? (
+                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                    <span
+                      aria-hidden="true"
+                      className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-black text-white ${playerAvatarColor(index)}`}
+                    >
+                      {initialOf(member.displayName)}
                       <span
-                        title="Connected"
-                        className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-success"
-                        aria-hidden="true"
+                        title={member.connected ? "Connected" : "Disconnected"}
+                        className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full ring-2 ring-black ${member.connected ? "bg-success" : "bg-danger"}`}
                       />
-                    ) : (
-                      <span
-                        title="Disconnected"
-                        className="inline-block h-2.5 w-2.5 shrink-0 rounded-full bg-danger"
-                        aria-hidden="true"
-                      />
-                    )}
+                    </span>
                     <div className="min-w-0">
                       <p className="truncate text-lg font-black leading-tight">
                         {member.displayName}
@@ -462,7 +465,7 @@ export function PartyLobby({
           aria-modal="true"
           aria-label="Party QR code"
         >
-          <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl border-2 border-border bg-surface p-5">
+          <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl bg-overlay p-5 shadow-overlay">
             <p className="font-black">Scan to join the party</p>
             <PartyInviteQr inviteUrl={state.inviteUrl} size={200} label={pageTitle ?? undefined} />
             <Button variant="default" soft onClick={() => setQrOpen(false)}>
@@ -478,7 +481,7 @@ export function PartyLobby({
           aria-modal="true"
           aria-label="Start before everyone is ready"
         >
-          <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border-2 border-border bg-surface p-5">
+          <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl bg-overlay p-5 shadow-overlay">
             <p className="font-black">Start before everyone is ready?</p>
             <p className="text-sm text-foreground/70">
               Every player has the game, but not everyone has reported ready. Starting now means
@@ -534,7 +537,7 @@ function PartyKickConfirm({
       aria-modal="true"
       aria-label="Kick a player from the party"
     >
-      <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border-2 border-border bg-surface p-5">
+      <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl bg-overlay p-5 shadow-overlay">
         <p className="font-black">Kick {memberName} from the party?</p>
         <p className="text-sm">
           This removes them for now, not permanently. They can rejoin with the same private invite.

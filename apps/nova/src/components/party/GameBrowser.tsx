@@ -101,7 +101,7 @@ function GameCard({
         key={game.id}
         type="button"
         onClick={() => onPick(game)}
-        className="group flex w-full items-center justify-between gap-3 rounded-2xl border-2 border-border bg-surface px-4 py-3 text-left transition-colors hover:border-primary"
+        className="group flex w-full items-center justify-between gap-3 glass rounded-2xl px-4 py-3 text-left transition-colors hover:bg-surface-tertiary"
       >
         {body}
       </button>
@@ -114,7 +114,7 @@ function GameCard({
       params={{ gameId: game.id }}
       search={detailOrigin === undefined ? undefined : { from: detailOrigin }}
       onClick={onOpen}
-      className="group flex items-center justify-between gap-3 rounded-2xl border-2 border-border bg-surface px-4 py-3 transition-colors hover:border-primary"
+      className="group flex items-center justify-between gap-3 glass rounded-2xl px-4 py-3 transition-colors hover:bg-surface-tertiary"
     >
       {body}
     </Link>
@@ -155,7 +155,7 @@ function SavedGameRow({
         key={game.id}
         type="button"
         onClick={() => onPickSaved(game.id)}
-        className="group flex w-full items-center justify-between gap-3 rounded-2xl border-2 border-border bg-surface px-4 py-3 text-left transition-colors hover:border-primary"
+        className="group flex w-full items-center justify-between gap-3 glass rounded-2xl px-4 py-3 text-left transition-colors hover:bg-surface-tertiary"
       >
         {body}
       </button>
@@ -164,7 +164,7 @@ function SavedGameRow({
   return (
     <div
       key={game.id}
-      className="group flex items-center justify-between gap-2 rounded-2xl border-2 border-border bg-surface px-4 py-3 transition-colors hover:border-primary"
+      className="group flex items-center justify-between gap-2 glass rounded-2xl px-4 py-3 transition-colors hover:bg-surface-tertiary"
     >
       <Link
         to="/game/$gameId"
@@ -195,7 +195,7 @@ function CategoryCard({
   href?: string;
 }) {
   const classes =
-    "group flex items-center gap-3 rounded-2xl border-2 border-border bg-surface p-4 text-left transition-all hover:-translate-y-0.5 hover:border-primary hover:shadow-lg hover:shadow-primary/10";
+    "group flex items-center gap-3 glass rounded-2xl p-4 text-left transition-all hover:-translate-y-0.5 hover:bg-surface-tertiary";
   const body = (
     <>
       <span className="shrink-0 text-2xl" aria-hidden="true">
@@ -380,7 +380,7 @@ export function GameBrowser({
               detailOrigin={compact ? "party-browse" : undefined}
             />
           ) : prebuiltGames.length === 0 ? (
-            <p className="rounded-2xl border-2 border-border bg-surface p-6 text-center text-foreground/70">
+            <p className="glass rounded-2xl p-6 text-center text-foreground/70">
               No games match{query !== "" ? ` “${query}”` : ""}.
             </p>
           ) : (
@@ -404,7 +404,7 @@ export function GameBrowser({
           aria-modal="true"
           aria-label="Leave the party?"
         >
-          <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl border-2 border-border bg-surface p-5">
+          <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl bg-overlay p-5 shadow-overlay">
             <p className="font-black">Leave the party?</p>
             <p className="text-sm text-foreground/70">
               To open the game builder, you&apos;ll leave this party first. You can always start or
@@ -456,7 +456,7 @@ function SavedGamesList({
   }
   if (games.length === 0) {
     return (
-      <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-border bg-surface p-6 text-center">
+      <div className="flex flex-col items-center gap-3 glass rounded-2xl p-6 text-center">
         <p className="text-sm text-foreground/70">
           {query !== ""
             ? `No saved games match “${query}”.`

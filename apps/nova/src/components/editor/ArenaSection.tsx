@@ -399,7 +399,7 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
     <section
       key={player.id}
       data-testid={`arena-player-${player.id}`}
-      className="flex flex-col gap-2 rounded-2xl border-2 border-border bg-surface p-3"
+      className="flex flex-col gap-2 glass rounded-2xl p-3"
       style={frameWidthPx !== null ? { width: `${frameWidthPx}px` } : undefined}
       aria-label={`Player ${player.name}`}
     >
@@ -497,7 +497,7 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
       </div>
       <div className="flex items-stretch gap-1">
         <div
-          className="min-w-0 flex-1 overflow-hidden rounded-md border border-border bg-black"
+          className="min-w-0 flex-1 overflow-hidden rounded-md bg-black"
           style={{ height: `${frameHeightPx}px` }}
           data-testid={`arena-frame-${player.id}`}
         >
@@ -506,7 +506,7 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
         <div
           role="separator"
           aria-label={`Resize ${player.name}'s game frame width`}
-          className="flex w-3 cursor-ew-resize select-none items-center justify-center rounded-md border border-foreground/30 bg-surface-secondary text-foreground/60 transition-colors hover:bg-surface-tertiary hover:text-foreground/90"
+          className="flex w-3 cursor-ew-resize select-none items-center justify-center rounded-md bg-surface-tertiary text-foreground/60 transition-colors hover:bg-surface-tertiary hover:text-foreground/90"
           onPointerDown={handleFrameWidthResize}
           title="Drag to resize width"
         >
@@ -516,14 +516,14 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
       <div
         role="separator"
         aria-label={`Resize ${player.name}'s game frame`}
-        className="flex h-3 cursor-ns-resize select-none items-center justify-center rounded-md border border-foreground/30 bg-surface-secondary text-foreground/60 transition-colors hover:bg-surface-tertiary hover:text-foreground/90"
+        className="flex h-3 cursor-ns-resize select-none items-center justify-center rounded-md bg-surface-tertiary text-foreground/60 transition-colors hover:bg-surface-tertiary hover:text-foreground/90"
         onPointerDown={handleFrameResize}
         title="Drag to resize"
       >
         <GripHorizontal className="h-3 w-3" aria-hidden="true" />
       </div>
       <div
-        className="max-h-32 min-h-16 overflow-y-auto rounded-2xl border border-border bg-surface-secondary p-2 font-mono text-[11px] leading-relaxed"
+        className="max-h-32 min-h-16 overflow-y-auto rounded-2xl bg-surface-secondary p-2 font-mono text-[11px] leading-relaxed"
         data-testid={`arena-logs-${player.id}`}
         aria-label={`Logs for ${player.name}`}
       >
@@ -581,7 +581,7 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
       {summaryBar}
 
       <div className="hidden flex-col gap-3 md:flex" data-testid="arena-desktop">
-        <div className="flex flex-wrap items-center gap-2 rounded-2xl border-2 border-border bg-surface p-3">
+        <div className="flex flex-wrap items-center gap-2 glass rounded-2xl p-3">
           {toolbar("desktop")}
         </div>
       </div>
@@ -605,7 +605,7 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
             </button>
           ))}
         </div>
-        <details className="rounded-2xl border-2 border-border bg-surface">
+        <details className="glass rounded-2xl">
           <summary className="cursor-pointer list-none p-4 text-sm font-bold">
             Simulation controls
           </summary>

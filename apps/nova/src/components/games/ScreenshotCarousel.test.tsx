@@ -42,7 +42,7 @@ describe("ScreenshotCarousel", () => {
     const { container } = render(<ScreenshotCarousel images={images} gameName="Drawphone" />);
 
     const swiper = container.querySelector(".swiper.nova-screenshots");
-    expect(swiper?.parentElement).toHaveClass("rounded-2xl", "bg-surface", "p-4");
+    expect(swiper?.parentElement).toHaveClass("rounded-2xl", "glass", "p-4");
     for (const img of container.querySelectorAll<HTMLImageElement>(".swiper-slide img")) {
       expect(img).not.toHaveClass("p-2", "rounded-2xl", "border", "shadow-sm");
     }

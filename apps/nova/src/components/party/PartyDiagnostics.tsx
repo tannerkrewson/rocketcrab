@@ -45,7 +45,7 @@ export function PartyDiagnosticsPanel({
 
   return (
     <details
-      className="group rounded-2xl border-2 border-border bg-surface"
+      className="glass group rounded-2xl"
       open={open}
       onToggle={(event) => setOpen(event.currentTarget.open)}
     >

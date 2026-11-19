@@ -88,9 +88,9 @@ function BuildHeroPage() {
         aria-label="How to build a game"
         className="flex w-full flex-col gap-4 sm:grid sm:grid-cols-3 sm:gap-4"
       >
-        <li className="flex flex-col items-center gap-2.5 rounded-2xl border border-border bg-surface p-6 text-center shadow-sm">
+        <li className="flex flex-col items-center gap-2.5 glass rounded-2xl p-6 text-center">
           <span
-            className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-border text-foreground"
+            className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-tertiary text-foreground"
             aria-hidden="true"
           >
             <Sparkles className="h-5 w-5" />
@@ -101,9 +101,9 @@ function BuildHeroPage() {
             One copyable prompt that turns any AI chatbot into a Nova game maker.
           </p>
         </li>
-        <li className="flex flex-col items-center gap-2.5 rounded-2xl border border-border bg-surface p-6 text-center shadow-sm">
+        <li className="flex flex-col items-center gap-2.5 glass rounded-2xl p-6 text-center">
           <span
-            className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-border text-foreground"
+            className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-tertiary text-foreground"
             aria-hidden="true"
           >
             <Bot className="h-5 w-5" />
@@ -115,9 +115,9 @@ function BuildHeroPage() {
             your game.
           </p>
         </li>
-        <li className="flex flex-col items-center gap-2.5 rounded-2xl border border-border bg-surface p-6 text-center shadow-sm">
+        <li className="flex flex-col items-center gap-2.5 glass rounded-2xl p-6 text-center">
           <span
-            className="flex h-12 w-12 items-center justify-center rounded-full border-2 border-border text-foreground"
+            className="flex h-12 w-12 items-center justify-center rounded-full bg-surface-tertiary text-foreground"
             aria-hidden="true"
           >
             <ClipboardPaste className="h-5 w-5" />
@@ -169,19 +169,19 @@ function BuildPromptPage() {
         aria-label="What to do with the prompt"
         className="flex w-full flex-wrap items-center justify-center gap-2 text-sm font-semibold text-foreground/70"
       >
-        <li className="flex items-center gap-2 rounded-full border-2 border-border bg-surface px-4 py-2">
+        <li className="flex items-center gap-2 glass rounded-full px-4 py-2">
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent/20 font-black text-accent">
             1
           </span>
           Copy the prompt
         </li>
-        <li className="flex items-center gap-2 rounded-full border-2 border-border bg-surface px-4 py-2">
+        <li className="flex items-center gap-2 glass rounded-full px-4 py-2">
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent/20 font-black text-accent">
             2
           </span>
           Chat about your idea
         </li>
-        <li className="flex items-center gap-2 rounded-full border-2 border-border bg-surface px-4 py-2">
+        <li className="flex items-center gap-2 glass rounded-full px-4 py-2">
           <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent/20 font-black text-accent">
             3
           </span>
@@ -216,7 +216,7 @@ function BuildPromptPage() {
                 Show the full prompt ({prompt.length.toLocaleString()} characters)
               </span>
             </summary>
-            <pre className="mt-3 max-h-96 overflow-auto rounded-2xl border-2 border-border bg-surface-secondary p-4 text-xs leading-relaxed whitespace-pre-wrap">
+            <pre className="mt-3 max-h-96 overflow-auto rounded-2xl bg-surface-secondary p-4 text-xs leading-relaxed whitespace-pre-wrap">
               {prompt}
             </pre>
           </details>

@@ -10,8 +10,9 @@ export interface CodeEditorProps {
 
 /** Use HeroUI variables for surfaces; dark: true also sets CodeMirror's base contrast. */
 const themeSpec = {
+  // Opaque (overlay) rather than glass: code stays legible over the background.
   "&": {
-    backgroundColor: "var(--surface)",
+    backgroundColor: "var(--overlay)",
     color: "var(--foreground)",
   },
   ".cm-gutters": {

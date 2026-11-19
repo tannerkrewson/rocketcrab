@@ -51,7 +51,7 @@ export function JoinFlow() {
           </Button>
           <Button
             type="button"
-            variant="outline"
+            variant="tertiary"
             onClick={() => void navigate({ to: "/join", search: { edit: undefined } })}
           >
             Back

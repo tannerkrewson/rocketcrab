@@ -34,7 +34,7 @@ export function PartyGameDetailsModal({ game, onClose }: PartyGameDetailsModalPr
       aria-modal="true"
       aria-label={`About ${game.title}`}
     >
-      <div className="flex max-h-[80vh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-2xl border-2 border-border bg-surface p-5">
+      <div className="flex max-h-[80vh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-2xl bg-overlay p-5 shadow-overlay">
         <div className="flex items-start justify-between gap-2">
           <h2 className="text-xl font-black">{game.title}</h2>
           <Button
