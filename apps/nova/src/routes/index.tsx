@@ -88,7 +88,7 @@ function HomeComponent() {
   }, [engine, state.phase]);
 
   return (
-    <div className="rc-page-in flex min-h-[calc(100dvh-16rem)] flex-col items-center justify-center gap-10">
+    <div className="flex min-h-[calc(100dvh-16rem)] flex-col items-center justify-center gap-10">
       <section className="flex flex-col items-center gap-3 text-center">
         <Button
           variant="default"

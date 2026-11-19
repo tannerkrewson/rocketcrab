@@ -216,19 +216,18 @@
   --button-fg: var(--foreground);
 }
 
-/* Page and background entrances: the site background fades in from black
-   when its style changes (e.g. molten → Nova silk), and pages fade up. The
-   global reduced-motion rule above shortens both to nothing. */
+/* Background transitions: the site background fades in from black
+   when its style changes (e.g. molten → Nova silk), and the molten fades out
+   on entering a party. The global reduced-motion rule shortens both. */
 @keyframes rc-fade-in {
   from {
     opacity: 0;
   }
 }
 
-@keyframes rc-fade-up {
-  from {
+@keyframes rc-fade-out {
+  to {
     opacity: 0;
-    transform: translateY(10px);
   }
 }
 
@@ -236,8 +235,8 @@
   animation: rc-fade-in 900ms ease-out both;
 }
 
-.rc-page-in {
-  animation: rc-fade-up 450ms cubic-bezier(0.2, 0.8, 0.2, 1) both;
+.rc-bg-out {
+  animation: rc-fade-out 700ms ease-in both;
 }
 
 /* The lobby's invisible runtime frame must never take vertical space. */

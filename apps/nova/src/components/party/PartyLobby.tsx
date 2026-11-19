@@ -381,11 +381,14 @@ export function PartyLobby({
                         soft
                         size="sm"
                         isIconOnly
+                        // Lighter than the pill it sits on, so it reads as a
+                        // raised control rather than a hole in the card.
+                        className="bg-white/12 hover:bg-white/20"
                         onClick={() => setRenaming(true)}
                         aria-label="Edit your name"
                         title="Edit your name"
                       >
-                        <Pencil className="h-3 w-3" aria-hidden="true" />
+                        <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
                       </Button>
                     ) : null}
                     {state.amHost && !member.isSelf ? (
@@ -421,7 +424,7 @@ export function PartyLobby({
         </Alert>
       ) : null}
       <div className="flex justify-center">
-        <Button variant="danger" size="md" onClick={onLeave}>
+        <Button variant="default" soft size="md" onClick={onLeave}>
           <LogOut className="h-4 w-4" aria-hidden="true" />
           {state.members.length === 1 ? "End party" : "Leave party"}
         </Button>

@@ -44,7 +44,7 @@ export function BuildPage() {
 
 function BuildHeroPage() {
   return (
-    <div className="rc-page-in theme-nova mx-auto flex w-full max-w-2xl flex-col items-center gap-10 text-center">
+    <div className="theme-nova mx-auto flex w-full max-w-2xl flex-col items-center gap-10 text-center">
       <Link to="/" className={buttonStyles("default", "md", "self-start", true)}>
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         back
@@ -147,7 +147,7 @@ function BuildPromptPage() {
   };
 
   return (
-    <div className="rc-page-in theme-nova mx-auto flex w-full max-w-2xl flex-col items-center gap-8 text-center">
+    <div className="theme-nova mx-auto flex w-full max-w-2xl flex-col items-center gap-8 text-center">
       <Link to="/build" className={buttonStyles("default", "md", "self-start", true)}>
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         back

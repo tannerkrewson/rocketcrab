@@ -5,9 +5,9 @@ const LineWaves = lazy(() => import("../../vendor/react-bits/LineWaves"));
 
 /**
  * Flowing fine lines (React Bits "Line Waves") filling a positioned parent:
- * the lobby's Welcome card. Mostly white with a rocket-red tint; a scrim
- * darkens the middle so the white text reads. Lines bend toward a finger or
- * cursor and ripple on tap (only inside the card).
+ * the lobby's Welcome card. Even, neutral grey lines (no highlight streaks,
+ * no color cycling) kept dim enough that the white text always reads. Lines
+ * bend toward a finger or cursor and ripple on tap (only inside the card).
  */
 export function WelcomeWaves() {
   return (
@@ -16,15 +16,17 @@ export function WelcomeWaves() {
         <Suspense fallback={null}>
           <LineWaves
             color1="#ffffff"
-            color2="#ff6b4f"
-            color3="#ffd2c4"
-            colorCycleSpeed={0.6}
+            color2="#ffffff"
+            color3="#ffffff"
+            colorCycleSpeed={0}
+            // No moving bright "river": every line is lit the same.
+            highlight={0}
+            brightness={0.3}
+            glow={0.25}
             speed={0.2}
-            lineCount={48}
-            lineWidth={1.2}
-            glow={0.5}
-            brightness={0.9}
-            warpIntensity={0.8}
+            lineCount={40}
+            lineWidth={1}
+            warpIntensity={0.7}
             rotation={-24}
             edgeFade={0.3}
             intro={false}
@@ -32,7 +34,7 @@ export function WelcomeWaves() {
           />
         </Suspense>
       ) : null}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgb(0_0_0/0.6),transparent_80%)]" />
+      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgb(0_0_0/0.45),transparent_80%)]" />
     </div>
   );
 }

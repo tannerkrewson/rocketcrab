@@ -16,11 +16,12 @@ const PIXEL_BUDGET = 300_000;
 /**
  * - `molten`: rocketcrab's default.
  * - `nova`: deep-blue silk for the Nova build and editor pages.
- * - `party`: the molten, dimmed, so the lobby's own effect leads.
+ * - `party`: plain black, so the lobby's own effect leads. Arriving from a
+ *   molten page fades the molten out rather than cutting it.
  */
 export type SiteBackgroundVariant = "molten" | "nova" | "party";
 
-function MoltenBackground({ dim = false }: { dim?: boolean }) {
+function MoltenBackground() {
   const [pixelRatio] = useState(() => viewportPixelRatio(PIXEL_BUDGET));
   return (
     <>
@@ -45,7 +46,6 @@ function MoltenBackground({ dim = false }: { dim?: boolean }) {
             glow={1.9}
             haze={0.9}
             brightness={1.15}
-            opacity={dim ? 0.45 : 1}
             grain={0}
             // Taps land on buttons and cards; keep the background calm.
             mouseInteraction={false}
@@ -54,7 +54,6 @@ function MoltenBackground({ dim = false }: { dim?: boolean }) {
           />
         </Suspense>
       ) : null}
-      {dim ? <div className="absolute inset-0 bg-black/45" /> : null}
     </>
   );
 }
@@ -73,10 +72,19 @@ export function SiteBackground({
   variant?: SiteBackgroundVariant;
 }) {
   const { state } = usePartyEngine(engine);
+  // The molten stays mounted while it fades out (molten → party) so the
+  // pattern doesn't jump; it unmounts when the fade ends to free the GPU.
+  const [prevVariant, setPrevVariant] = useState(variant);
+  const [moltenLeaving, setMoltenLeaving] = useState(false);
+  if (variant !== prevVariant) {
+    setPrevVariant(variant);
+    setMoltenLeaving(prevVariant === "molten" && variant === "party");
+  }
 
   if (state.phase === "playing") {
     return null;
   }
+  const showMolten = variant === "molten" || moltenLeaving;
   return (
     <div
       aria-hidden="true"
@@ -84,12 +92,23 @@ export function SiteBackground({
       data-variant={variant}
       className="pointer-events-none fixed inset-0 z-0 bg-black"
     >
-      {/* Keyed by variant: a change remounts the layer, which fades in. */}
-      <div key={variant} className="rc-bg-in absolute inset-0">
-        {variant === "molten" ? <MoltenBackground /> : null}
-        {variant === "party" ? <MoltenBackground dim /> : null}
-        {variant === "nova" ? <NovaSilk variant="page" /> : null}
-      </div>
+      {showMolten ? (
+        <div
+          className={`absolute inset-0 ${variant === "molten" ? "rc-bg-in" : "rc-bg-out"}`}
+          onAnimationEnd={(event) => {
+            if (event.target === event.currentTarget && variant !== "molten") {
+              setMoltenLeaving(false);
+            }
+          }}
+        >
+          <MoltenBackground />
+        </div>
+      ) : null}
+      {variant === "nova" ? (
+        <div className="rc-bg-in absolute inset-0">
+          <NovaSilk variant="page" />
+        </div>
+      ) : null}
     </div>
   );
 }

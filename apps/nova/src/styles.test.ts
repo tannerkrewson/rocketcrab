@@ -37,7 +37,7 @@ describe("styles.css HeroUI setup", () => {
       "@utility pb-safe",
       "@utility pt-safe",
       ".rc-bg-in",
-      ".rc-page-in",
+      ".rc-bg-out",
       "@utility glass",
       "rc-logo-launch",
       '[data-testid="party-frame"].invisible',
