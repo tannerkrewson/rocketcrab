@@ -80,9 +80,9 @@ The automated suites cover everything that can run headless. Steps **6**,
 **10**, and **13** need physical phones (two+ devices on the same Wi-Fi/LAN;
 the host on a laptop, guests on phones). Expected results are in bold.
 
-1. **Open Create** (`/create`). Paste the contents of
-   `packages/testing/fixtures/games/nova-quiz.html` into the editor.
-2. **Run four simulated players.** Press _Test multiplayer_ → the arena
+1. **Open the editor** (`/editor`). Copy the contents of
+   `packages/testing/fixtures/games/nova-quiz.html` and press _Paste game_.
+2. **Run four simulated players.** The game runs on the _Test_ tab: the arena
    loads with two players; add two more with _Add player_. **Every frame
    registers "Nova Quiz" (state mode), "Test passed" appears, and after a
    brief "Waiting for players" card, round 1 goes live in all four frames.**

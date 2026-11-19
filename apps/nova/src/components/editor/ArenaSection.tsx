@@ -8,7 +8,6 @@ import { Badge } from "../ui/Badge";
 import { useWindowPointerDrag } from "../ui/useWindowPointerDrag";
 import { diagnosticFromBandwidthLog, type Diagnostic } from "../../lib/editor/diagnostics";
 import type { SavedGame } from "@rocketcrab/core";
-import { Link } from "@tanstack/react-router";
 import {
   Activity,
   AlertTriangle,
@@ -17,12 +16,10 @@ import {
   Gauge,
   GripHorizontal,
   GripVertical,
-  PartyPopper,
   Pause,
   Play,
   Plus,
   RotateCcw,
-  Trash2,
   Wifi,
   WifiOff,
   X,
@@ -37,7 +34,7 @@ import {
   type PointerEvent as ReactPointerEvent,
   type ReactNode,
 } from "react";
-import { Button, buttonStyles } from "../ui/Button";
+import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { cn } from "../../lib/cn";
 import { useRecordTestResults } from "../../lib/games/queries";
@@ -58,10 +55,6 @@ export const ArenaRuntimeSeamsContext = createContext<ArenaRuntimeSeams>({});
 
 function formatTime(timestamp: number): string {
   return new Date(timestamp).toLocaleTimeString(undefined, { timeStyle: "short" });
-}
-
-function formatDate(timestamp: number): string {
-  return new Date(timestamp).toLocaleDateString(undefined, { dateStyle: "medium" });
 }
 
 function defaultFrameHeightPx(): number {
@@ -132,12 +125,10 @@ export interface ArenaSectionProps {
   game?: SavedGame;
   /** Source frozen at the last Run; changing it restarts every player. */
   source: string;
-  /** The editor's current source differs from the source under test. */
-  stale: boolean;
   onDiagnostics?: (diagnostics: Diagnostic[]) => void;
 }
 
-export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectionProps) {
+export function ArenaSection({ game, source, onDiagnostics }: ArenaSectionProps) {
   const seams = useContext(ArenaRuntimeSeamsContext);
   const recordTestResults = useRecordTestResults();
 
@@ -196,8 +187,8 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
   }, [actions, source]);
 
   const [activePlayerId, setActivePlayerId] = useState("player-1");
-  const [newPlayerName, setNewPlayerName] = useState("");
-  const [debugOpen, setDebugOpen] = useState(false);
+  // Network simulation, per-player connection controls and logs.
+  const [advanced, setAdvanced] = useState(false);
   const [frameHeightPx, setFrameHeightPx] = useState(defaultFrameHeightPx);
   // null = the frame fills its grid cell (no fixed width); a drag fixes a
   // shared pixel width for every frame, session-local like the height.
@@ -212,9 +203,8 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
   }, [state, activePlayerId]);
 
   const handleAddPlayer = useCallback(() => {
-    actions.addPlayer(newPlayerName);
-    setNewPlayerName("");
-  }, [actions, newPlayerName]);
+    actions.addPlayer("");
+  }, [actions]);
 
   const beginWindowDrag = useWindowPointerDrag();
 
@@ -277,48 +267,38 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
   const summary = state.summary;
   const authority = state.authorityPlayerId;
 
-  /** Shared simulation toolbar. Rendered once for desktop and once inside
-   *  the phone controls panel; `idPrefix` keeps the latency slider ids
-   *  unique across the two instances. */
+  /** Simulation toolbar. Everyday actions up front; network simulation
+   *  only with Advanced. `idPrefix` keeps the latency slider ids unique. */
   const toolbar = (idPrefix: string) => {
     const latencyId = `arena-latency-${idPrefix}`;
     return (
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex items-center gap-2">
-          <input
-            type="text"
-            value={newPlayerName}
-            onChange={(event) => setNewPlayerName(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Enter") handleAddPlayer();
-            }}
-            placeholder="Player name"
-            aria-label="New player name"
-            maxLength={32}
-            className="input input--primary input--sm w-36"
-          />
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={handleAddPlayer}
-            title="Add a simulated player"
-          >
-            <Plus className="h-4 w-4" aria-hidden="true" />
-            Add player
-          </Button>
-        </div>
+        <Button variant="default" soft size="md" onClick={handleAddPlayer} title="Add a player">
+          <Plus className="h-4 w-4" aria-hidden="true" />
+          Add player
+        </Button>
         <Button
-          variant={debugOpen ? "accent" : "default"}
-          soft={!debugOpen}
+          variant="default"
+          soft
           size="md"
-          onClick={() => setDebugOpen((open) => !open)}
-          aria-expanded={debugOpen}
-          title="Show or hide network simulation controls and diagnostics"
+          onClick={actions.restartAll}
+          title="Restart the game for every player"
+        >
+          <RotateCcw className="h-4 w-4" aria-hidden="true" />
+          Restart
+        </Button>
+        <Button
+          variant={advanced ? "accent" : "default"}
+          soft={!advanced}
+          size="md"
+          onClick={() => setAdvanced((open) => !open)}
+          aria-pressed={advanced}
+          title="Show network simulation, per-player connection controls and logs"
         >
           <Bug className="h-4 w-4" aria-hidden="true" />
-          {debugOpen ? "Debug on" : "Debug"}
+          Advanced
         </Button>
-        {debugOpen ? (
+        {advanced ? (
           <>
             <div className="flex items-center gap-2">
               <Gauge className="h-4 w-4 text-foreground/60" aria-hidden="true" />
@@ -339,6 +319,7 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
             </div>
             <Button
               variant="danger"
+              soft
               size="md"
               onClick={() => void actions.triggerAuthorityLoss()}
               disabled={authority === null}
@@ -347,28 +328,18 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
               <AlertTriangle className="h-4 w-4" aria-hidden="true" />
               Authority loss
             </Button>
+            <Button
+              variant="default"
+              soft
+              size="md"
+              onClick={actions.clearLogs}
+              title="Clear every player's logs"
+            >
+              <X className="h-4 w-4" aria-hidden="true" />
+              Clear logs
+            </Button>
           </>
         ) : null}
-        <Button
-          variant="danger"
-          soft
-          size="md"
-          onClick={actions.clearLogs}
-          title="Clear every player's logs"
-        >
-          <X className="h-4 w-4" aria-hidden="true" />
-          Clear logs
-        </Button>
-        <Button
-          variant="default"
-          soft
-          size="md"
-          onClick={actions.restartAll}
-          title="Restart every simulated player"
-        >
-          <RotateCcw className="h-4 w-4" aria-hidden="true" />
-          Restart all
-        </Button>
       </div>
     );
   };
@@ -376,7 +347,7 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
   const summaryBar = (
     <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-foreground/70">
       {summary.failed > 0 ? <Badge color="danger">{summary.failed} failed</Badge> : null}
-      {debugOpen && state.stateDiagnostics !== null ? (
+      {advanced && state.stateDiagnostics !== null ? (
         <Badge className="font-mono" title="State-mode diagnostics">
           state rev {state.stateDiagnostics.revision} · {state.stateDiagnostics.stateSizeBytes} B ·{" "}
           {state.stateDiagnostics.actionRatePerSecond.toFixed(1)} act/s
@@ -385,13 +356,7 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
       <Badge color={summary.success ? "success" : "default"}>
         {summary.success ? "Test passed" : "Testing…"}
       </Badge>
-      {game?.lastTestedAt !== undefined ? (
-        <span>
-          Last passed: {formatDate(game.lastTestedAt)}
-          {game.lastTestSucceeded === false ? " (failed last time)" : ""}
-        </span>
-      ) : null}
-      <span className="font-mono">run #{state.runId}</span>
+      {advanced ? <span className="font-mono">run #{state.runId}</span> : null}
     </div>
   );
 
@@ -404,6 +369,19 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
       aria-label={`Player ${player.name}`}
     >
       <div className="flex flex-wrap items-center gap-2">
+        <span
+          aria-hidden="true"
+          className={cn(
+            "h-2.5 w-2.5 shrink-0 rounded-full",
+            player.connectionState === "connected"
+              ? "bg-success"
+              : player.connectionState === "joining"
+                ? "bg-accent"
+                : player.connectionState === "suspended"
+                  ? "bg-warning"
+                  : "bg-danger",
+          )}
+        />
         <button
           type="button"
           className="font-black hover:underline"
@@ -413,14 +391,14 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
           {player.name}
         </button>
         {authority === player.id ? (
-          <Badge color="accent" title="Simulated authority player">
+          <Badge color="accent" title="Runs the game's shared state (the simulated host)">
             Authority
           </Badge>
         ) : null}
-        {connectionBadge(player)}
-        <Badge>{runStateLabel(player)}</Badge>
+        {advanced ? connectionBadge(player) : null}
+        {advanced ? <Badge>{runStateLabel(player)}</Badge> : null}
         <div className="flex-1" />
-        {player.sessionStatus === "disconnected" ? (
+        {!advanced ? null : player.sessionStatus === "disconnected" ? (
           <Button
             variant="default"
             soft
@@ -444,7 +422,7 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
             Disconnect
           </Button>
         )}
-        {player.sessionStatus === "suspended" ? (
+        {!advanced ? null : player.sessionStatus === "suspended" ? (
           <Button
             variant="default"
             soft
@@ -469,17 +447,26 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
           </Button>
         )}
         <Button
-          variant="danger"
+          variant="default"
           soft
-          size="md"
+          size="sm"
+          isIconOnly
           onClick={() => actions.removePlayer(player.id)}
           title="Remove this player"
           aria-label={`Remove ${player.name}`}
         >
-          <Trash2 className="h-4 w-4" aria-hidden="true" />
+          <X className="h-4 w-4" aria-hidden="true" />
         </Button>
       </div>
-      <div className="flex flex-wrap items-center gap-2 text-xs font-semibold text-foreground/60">
+      {player.loadError !== null && !advanced ? (
+        <p className="text-xs font-semibold text-danger">Startup failed: {player.loadError}</p>
+      ) : null}
+      <div
+        className={cn(
+          "flex flex-wrap items-center gap-2 text-xs font-semibold text-foreground/60",
+          !advanced && "hidden",
+        )}
+      >
         <span className="font-mono">{player.memberId}</span>
         {player.registered ? (
           <span>
@@ -523,7 +510,10 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
         <GripHorizontal className="h-3 w-3" aria-hidden="true" />
       </div>
       <div
-        className="max-h-32 min-h-16 overflow-y-auto rounded-2xl bg-surface-secondary p-2 font-mono text-[11px] leading-relaxed"
+        className={cn(
+          "max-h-32 min-h-16 overflow-y-auto rounded-2xl bg-surface-secondary p-2 font-mono text-[11px] leading-relaxed",
+          !advanced && "hidden",
+        )}
         data-testid={`arena-logs-${player.id}`}
         aria-label={`Logs for ${player.name}`}
       >
@@ -556,34 +546,10 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
 
   return (
     <div className="flex flex-col gap-3" data-testid="arena-section">
-      {stale || game !== undefined ? (
-        <div className="flex flex-wrap items-center gap-3">
-          {stale ? (
-            <Badge color="warning" size="md" title="The editor changed since this test run">
-              Editor changed — press Run to re-test
-            </Badge>
-          ) : null}
-          <div className="flex-1" />
-          {game !== undefined ? (
-            <Link
-              to="/party"
-              search={{ gameId: game.id, mode: game.mode ?? "state", title: game.title }}
-              className={buttonStyles("secondary")}
-              title="Launch this game into a real party"
-            >
-              <PartyPopper className="h-4 w-4" aria-hidden="true" />
-              Play with friends
-            </Link>
-          ) : null}
-        </div>
-      ) : null}
-
       {summaryBar}
 
       <div className="hidden flex-col gap-3 md:flex" data-testid="arena-desktop">
-        <div className="flex flex-wrap items-center gap-2 glass rounded-2xl p-3">
-          {toolbar("desktop")}
-        </div>
+        {toolbar("desktop")}
       </div>
 
       <div className="flex flex-col gap-3 md:hidden" data-testid="arena-mobile">
@@ -605,12 +571,7 @@ export function ArenaSection({ game, source, stale, onDiagnostics }: ArenaSectio
             </button>
           ))}
         </div>
-        <details className="glass rounded-2xl">
-          <summary className="cursor-pointer list-none p-4 text-sm font-bold">
-            Simulation controls
-          </summary>
-          <div className="p-4 pt-0">{toolbar("mobile")}</div>
-        </details>
+        {toolbar("mobile")}
       </div>
 
       {/* Hide inactive phone players with CSS so switching tabs keeps frames

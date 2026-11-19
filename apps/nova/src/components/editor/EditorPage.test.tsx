@@ -5,7 +5,7 @@ import {
   createMemoryHistory,
   createRouter,
 } from "@tanstack/react-router";
-import { act, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -199,24 +199,29 @@ async function runtimeChannelIndex(harness: HostHarness, count = 1): Promise<num
   return harness.channels.length - 1;
 }
 
-/** Query the currently mounted layout subtree (re-queried after navigation). */
-async function layout(layout: "desktop-layout" | "mobile-layout") {
-  const element = await screen.findByTestId(layout);
-  return within(element);
+/** The toolbar's Paste game button (the empty state repeats it). */
+function pasteButton() {
+  return screen.getAllByRole("button", { name: /^Paste game$/ })[0] as HTMLElement;
 }
 
-/** The desktop editor's contenteditable (CodeMirror splits text into
- * syntax-highlight spans, so assert on textContent rather than getByText). */
-async function editorInDesktop() {
-  return (await layout("desktop-layout")).getByRole("textbox", {
-    name: "Game HTML source",
-  });
+/** CodeMirror's contenteditable (it splits text into highlight spans, so
+ *  assert on textContent). Mounted in both tabs; the Code tab only shows it. */
+async function codeEditor() {
+  return screen.findByRole("textbox", { name: "Game HTML source" });
+}
+
+/** Open the More menu and pick an item. */
+async function moreMenu(item: string | RegExp) {
+  await userEvent.click(screen.getByText("More"));
+  await userEvent.click(screen.getByRole("menuitem", { name: item }));
 }
 
 beforeEach(async () => {
   await gameRepository.clear();
   window.history.pushState({}, "", "/");
   window.localStorage.clear();
+  // The tutorial modal would hide the page from queries; tests open it explicitly.
+  window.localStorage.setItem("nova:editor-tutorial-dismissed:v1", "1");
 });
 
 afterEach(() => {
@@ -225,18 +230,19 @@ afterEach(() => {
   delete (navigator as { clipboard?: unknown }).clipboard;
 });
 
-describe("/editor — paste, run, save", () => {
-  it("pastes from the clipboard, runs the source, and saves it", async () => {
+describe("/editor — a new game", () => {
+  it("starts empty, and pasting runs the game immediately; Save adds it to My games", async () => {
     mockClipboard(PASTED_SOURCE);
     const harness = createHostHarness();
     renderEditor(["/editor"], harness);
 
-    const desktop = await layout("desktop-layout");
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
-    const editor = await editorInDesktop();
-    await waitFor(() => expect(editor.textContent).toContain("cards"));
+    expect(await screen.findByTestId("editor-empty-state")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Save$/ })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Play with friends/ })).toBeDisabled();
 
-    await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
+    await userEvent.click(pasteButton());
+    const editor = await codeEditor();
+    await waitFor(() => expect(editor.textContent).toContain("cards"));
     const runtimeIndex = await runtimeChannelIndex(harness);
     expect(runtimeBootstraps(harness)[0]?.gameSource).toBe(PASTED_SOURCE);
     expect(runtimeBootstraps(harness)[0]?.gameId).toMatch(/^draft-/);
@@ -246,19 +252,14 @@ describe("/editor — paste, run, save", () => {
     });
 
     harness.ready(runtimeIndex);
-    await waitFor(() =>
-      expect(desktop.getByRole("button", { name: /^Re-run$/ })).toBeInTheDocument(),
-    );
-    expect(
-      document.querySelectorAll('[data-testid="hidden-runtime-container"] iframe'),
-    ).toHaveLength(1);
-
     harness.register(runtimeIndex, "Card Sharks");
-    harness.console(runtimeIndex, "log", "dealt 5 cards");
-    await waitFor(() => expect(desktop.getByText("dealt 5 cards")).toBeInTheDocument());
+    await waitFor(() =>
+      expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Card Sharks"),
+    );
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
 
-    await userEvent.click(desktop.getByRole("button", { name: /^Save$/ }));
-    await screen.findByRole("link", { name: /Play with friends/ });
+    await userEvent.click(screen.getByRole("button", { name: /^Save$/ }));
+    await waitFor(() => expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument());
 
     const games = await gameRepository.list();
     expect(games).toHaveLength(1);
@@ -266,109 +267,30 @@ describe("/editor — paste, run, save", () => {
     expect(games[0]?.title).toBe("Card Sharks");
     expect(games[0]?.mode).toBe("state");
     expect(games[0]?.apiVersion).toBe(1);
-
-    const reopened = await editorInDesktop();
-    expect(reopened.textContent).toContain("<!doctype html>");
+    const reopened = await codeEditor();
     expect(reopened.textContent).toContain("cards");
   });
 
-  it("mounts the test arena by default and seeds it with the saved source", async () => {
-    const game = await gameRepository.create({ title: "Rocket Rumble", html: SAVED_SOURCE });
-    mockClipboard(PASTED_SOURCE);
-    const harness = createHostHarness();
-    renderEditor([`/games/${game.id}/edit`], harness);
-
-    const arena = within(await screen.findByTestId("arena-section"));
-    const grid = within(arena.getByTestId("arena-grid"));
-    expect(grid.getByText("Player 1")).toBeInTheDocument();
-    expect(grid.getByText("Player 2")).toBeInTheDocument();
-
-    await runToStart(harness.channels, 2);
-    const arenaBootstraps = harness.windowMessages
-      .map((message) => message.data as Record<string, unknown>)
-      .filter((message) => message.type === "runtime.bootstrap");
-    expect(arenaBootstraps).toHaveLength(2);
-    expect(arenaBootstraps[0]?.gameSource).toBe(SAVED_SOURCE);
-    expect(arenaBootstraps[1]?.gameSource).toBe(SAVED_SOURCE);
-    expect(sessionStorage.getItem("nova:arena-source:v1")).toBeNull();
-    expect((await gameRepository.read(game.id)).html).toBe(SAVED_SOURCE);
-  });
-
-  it("Run is gated on validation errors", async () => {
-    mockClipboard("");
+  it("an empty clipboard pastes nothing and starts no run", async () => {
+    mockClipboard("   ");
     const harness = createHostHarness();
     renderEditor(["/editor"], harness);
-    const desktop = await layout("desktop-layout");
-    await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
-    await waitFor(() =>
-      expect(desktop.getAllByText(/Game source is empty/).length).toBeGreaterThan(0),
-    );
-    expect(runtimeBootstraps(harness)).toHaveLength(0);
-    expect(screen.getByTestId("arena-section")).toBeInTheDocument();
-  });
-
-  it("clear-all deletes every line of code after confirmation", async () => {
-    mockClipboard(PASTED_SOURCE);
-    const harness = createHostHarness();
-    renderEditor(["/editor"], harness);
-
-    const desktop = await layout("desktop-layout");
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
-    const editor = await editorInDesktop();
-    await waitFor(() => expect(editor.textContent).toContain("cards"));
-
-    await userEvent.click(desktop.getByRole("button", { name: /Clear all/ }));
-    const dialog = await screen.findByRole("dialog");
-    await userEvent.click(within(dialog).getByRole("button", { name: "Keep code" }));
-    expect(editor.textContent).toContain("cards");
-
-    await userEvent.click(desktop.getByRole("button", { name: /Clear all/ }));
-    const dialog2 = await screen.findByRole("dialog");
-    await userEvent.click(within(dialog2).getByRole("button", { name: /Clear all/ }));
-    await waitFor(() => expect(editor.textContent?.trim()).toBe(""));
+    await screen.findByTestId("editor-empty-state");
+    await userEvent.click(pasteButton());
+    await waitFor(() => expect(screen.getByTestId("editor-empty-state")).toBeInTheDocument());
     expect(runtimeBootstraps(harness)).toHaveLength(0);
   });
 
-  it("shows the first-run tutorial and dismisses it permanently", async () => {
+  it("does not start a run for an oversized source and lists the problem", async () => {
+    mockClipboard(`<!doctype html>${"x".repeat(2 * 1024 * 1024)}`);
     const harness = createHostHarness();
     renderEditor(["/editor"], harness);
+    await screen.findByTestId("editor-empty-state");
+    await userEvent.click(pasteButton());
 
-    expect(await screen.findByTestId("first-run-tutorial")).toBeInTheDocument();
-    expect(screen.getByText(/New to Nova\? Here's how the editor works/)).toBeInTheDocument();
-
-    await userEvent.click(screen.getByRole("button", { name: "Got it" }));
-    await waitFor(() => expect(screen.queryByTestId("first-run-tutorial")).not.toBeInTheDocument());
-
-    document.body.innerHTML = "";
-    renderEditor(["/editor"], harness);
-    expect(screen.queryByTestId("first-run-tutorial")).not.toBeInTheDocument();
-  });
-
-  it("does not start a run for an empty source", async () => {
-    const harness = createHostHarness();
-    renderEditor(["/editor"], harness);
-
-    const desktop = await layout("desktop-layout");
-    await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
-
+    const problems = within(await screen.findByTestId("problems-panel"));
     await waitFor(() =>
-      expect(desktop.getAllByText(/Game source is empty/).length).toBeGreaterThan(0),
-    );
-    expect(runtimeBootstraps(harness)).toHaveLength(0);
-  });
-
-  it("does not start a run for an oversized source", async () => {
-    const oversized = `<!doctype html>${"x".repeat(2 * 1024 * 1024)}`;
-    mockClipboard(oversized);
-    const harness = createHostHarness();
-    renderEditor(["/editor"], harness);
-
-    const desktop = await layout("desktop-layout");
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
-    await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
-
-    await waitFor(() =>
-      expect(desktop.getAllByText(/over the .* hard limit/).length).toBeGreaterThan(0),
+      expect(problems.getAllByText(/over the .* hard limit/).length).toBeGreaterThan(0),
     );
     expect(runtimeBootstraps(harness)).toHaveLength(0);
   });
@@ -377,33 +299,27 @@ describe("/editor — paste, run, save", () => {
     mockClipboard("<div>a fragment</div>");
     const harness = createHostHarness();
     renderEditor(["/editor"], harness);
+    await screen.findByTestId("editor-empty-state");
+    await userEvent.click(pasteButton());
 
-    const desktop = await layout("desktop-layout");
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
-    await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
-
-    await waitFor(() =>
-      expect(desktop.getAllByText(/No <!doctype> or <html> tag found/).length).toBeGreaterThan(0),
-    );
+    const problems = within(await screen.findByTestId("problems-panel"));
+    expect(problems.getAllByText(/No <!doctype> or <html> tag found/).length).toBeGreaterThan(0);
     await vi.waitFor(() => expect(runtimeBootstraps(harness)).toHaveLength(1));
   });
 
-  it("shows runtime error categories, including unsupported Nova API versions", async () => {
+  it("lists runtime errors, including unsupported Nova API versions", async () => {
     mockClipboard(PASTED_SOURCE);
     const harness = createHostHarness();
     renderEditor(["/editor"], harness);
-
-    const desktop = await layout("desktop-layout");
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
-    await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
+    await screen.findByTestId("editor-empty-state");
+    await userEvent.click(pasteButton());
     const runtimeIndex = await runtimeChannelIndex(harness);
     harness.ready(runtimeIndex);
-    await waitFor(() =>
-      expect(desktop.getByRole("button", { name: /^Re-run$/ })).toBeInTheDocument(),
-    );
 
     harness.runtimeError(runtimeIndex, "syntax", "Unexpected token");
-    await waitFor(() => expect(desktop.getByText(/Unexpected token/)).toBeInTheDocument());
+    const problems = within(await screen.findByTestId("problems-panel"));
+    await waitFor(() => expect(problems.getByText(/Unexpected token/)).toBeInTheDocument());
+    expect(problems.getByText("1 problem")).toBeInTheDocument();
 
     harness.runtimeError(
       runtimeIndex,
@@ -411,85 +327,94 @@ describe("/editor — paste, run, save", () => {
       "Unsupported Nova API version 99. Supported versions: [1].",
     );
     await waitFor(() =>
-      expect(desktop.getByText(/Unsupported Nova API version 99/)).toBeInTheDocument(),
+      expect(problems.getByText(/Unsupported Nova API version 99/)).toBeInTheDocument(),
     );
+    expect(problems.getByText("2 problems")).toBeInTheDocument();
   });
 
-  it("reports a runtime startup failure as a diagnostic", async () => {
+  it("reports a runtime startup failure as a problem", async () => {
     mockClipboard(PASTED_SOURCE);
     const harness = createHostHarness();
     renderEditor(["/editor"], harness, { bootstrapTimeoutMs: 50 });
+    await screen.findByTestId("editor-empty-state");
+    await userEvent.click(pasteButton());
 
-    const desktop = await layout("desktop-layout");
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
-    await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
+    await waitFor(() => expect(screen.getByText(/did not start in time/)).toBeInTheDocument());
+  });
 
-    await waitFor(() => expect(desktop.getByText(/did not start in time/)).toBeInTheDocument());
+  it("Play with friends saves the new game first, then starts a party with it", async () => {
+    mockClipboard(PASTED_SOURCE);
+    const harness = createHostHarness();
+    renderEditor(["/editor"], harness);
+    await screen.findByTestId("editor-empty-state");
+    await userEvent.click(pasteButton());
+    await runtimeChannelIndex(harness);
+
+    await userEvent.click(screen.getByRole("button", { name: /Play with friends/ }));
+    await vi.waitFor(async () => expect(await gameRepository.list()).toHaveLength(1));
+    const [saved] = await gameRepository.list();
+    expect(saved?.html).toBe(PASTED_SOURCE);
+  });
+
+  it("opens the tutorial on the first visit and reopens it from the help button", async () => {
+    window.localStorage.removeItem("nova:editor-tutorial-dismissed:v1");
+    const harness = createHostHarness();
+    renderEditor(["/editor"], harness);
+
+    expect(await screen.findByTestId("editor-tutorial")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Got it" }));
+    await waitFor(() => expect(screen.queryByTestId("editor-tutorial")).not.toBeInTheDocument());
+
+    cleanup();
+    renderEditor(["/editor"], harness);
+    await screen.findByTestId("editor-empty-state");
+    expect(screen.queryByTestId("editor-tutorial")).not.toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: "How the editor works" }));
+    expect(await screen.findByTestId("editor-tutorial")).toBeInTheDocument();
+    // Close it so teardown doesn't remove the body under an open modal portal.
+    await userEvent.click(screen.getByRole("button", { name: "Got it" }));
+    await waitFor(() => expect(screen.queryByTestId("editor-tutorial")).not.toBeInTheDocument());
   });
 });
 
 describe("/games/:id/edit — saved games", () => {
-  it("loads the saved source and resets unsaved changes", async () => {
+  it("loads and tests the saved source; Discard puts back the saved version", async () => {
     const game = await gameRepository.create({ title: "Rocket Rumble", html: SAVED_SOURCE });
     mockClipboard(PASTED_SOURCE);
     const harness = createHostHarness();
     renderEditor([`/games/${game.id}/edit`], harness);
 
-    const desktop = await layout("desktop-layout");
-    const editor = desktop.getByRole("textbox", { name: "Game HTML source" });
+    const editor = await codeEditor();
     await waitFor(() => expect(editor.textContent).toContain("rockets"));
-    expect(screen.queryByText(/· unsaved changes/)).not.toBeInTheDocument();
+    expect(await screen.findByTestId("arena-section")).toBeInTheDocument();
+    expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^Save$/ })).toBeDisabled();
 
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
+    await userEvent.click(pasteButton());
     await waitFor(() => expect(editor.textContent).toContain("cards"));
-    expect(screen.getByText(/· unsaved changes/)).toBeInTheDocument();
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
+    expect((await gameRepository.read(game.id)).html).toBe(SAVED_SOURCE);
 
-    await userEvent.click(desktop.getByRole("button", { name: /^Reset$/ }));
-    const dialog = screen.getByRole("dialog");
+    await moreMenu(/Discard unsaved changes/);
+    const dialog = await screen.findByRole("dialog");
     await userEvent.click(within(dialog).getByRole("button", { name: "Discard changes" }));
-
     await waitFor(() => expect(editor.textContent).toContain("rockets"));
     expect(editor.textContent).not.toContain("cards");
-    expect(screen.queryByText(/· unsaved changes/)).not.toBeInTheDocument();
-  });
-
-  it("running unsaved source never overwrites the saved version", async () => {
-    const game = await gameRepository.create({ title: "Rocket Rumble", html: SAVED_SOURCE });
-    mockClipboard(PASTED_SOURCE);
-    const harness = createHostHarness();
-    renderEditor([`/games/${game.id}/edit`], harness);
-
-    const desktop = await layout("desktop-layout");
-    const editor = desktop.getByRole("textbox", { name: "Game HTML source" });
-    await waitFor(() => expect(editor.textContent).toContain("rockets"));
-
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
-    await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
-    const runtimeIndex = await runtimeChannelIndex(harness);
-    expect(runtimeBootstraps(harness)[0]?.gameSource).toBe(PASTED_SOURCE);
-    harness.ready(runtimeIndex);
-    harness.register(runtimeIndex, "Rocket Rumble");
-
-    const saved = await gameRepository.read(game.id);
-    expect(saved.html).toBe(SAVED_SOURCE);
-    expect(saved.lastTestedAt).toBeUndefined();
+    expect(screen.queryByText("Unsaved changes")).not.toBeInTheDocument();
   });
 
   it("a successful run of the saved source updates test metadata", async () => {
     const game = await gameRepository.create({ title: "Rocket Rumble", html: SAVED_SOURCE });
     const harness = createHostHarness();
     renderEditor([`/games/${game.id}/edit`], harness);
-
-    const desktop = await layout("desktop-layout");
-    const editor = desktop.getByRole("textbox", { name: "Game HTML source" });
+    const editor = await codeEditor();
     await waitFor(() => expect(editor.textContent).toContain("rockets"));
 
-    await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
+    await userEvent.click(screen.getByRole("tab", { name: "Code" }));
+    await userEvent.click(screen.getByRole("button", { name: /^Run$/ }));
     const runtimeIndex = await runtimeChannelIndex(harness);
     harness.ready(runtimeIndex);
-    await waitFor(() =>
-      expect(desktop.getByRole("button", { name: /^Re-run$/ })).toBeInTheDocument(),
-    );
     harness.register(runtimeIndex, "Rocket Rumble");
 
     await vi.waitFor(async () => {
@@ -499,51 +424,38 @@ describe("/games/:id/edit — saved games", () => {
     });
   });
 
-  it("save-as-copy creates a new game from the current source, then save edits it", async () => {
+  it("saves a copy from the More menu, then Save edits the copy", async () => {
     const game = await gameRepository.create({ title: "Rocket Rumble", html: SAVED_SOURCE });
     mockClipboard(PASTED_SOURCE);
     const harness = createHostHarness();
     renderEditor([`/games/${game.id}/edit`], harness);
-
-    const desktop = await layout("desktop-layout");
-    const editor = desktop.getByRole("textbox", { name: "Game HTML source" });
+    const editor = await codeEditor();
     await waitFor(() => expect(editor.textContent).toContain("rockets"));
 
-    await userEvent.click(desktop.getByRole("button", { name: /Save as copy/ }));
+    await moreMenu(/Save as a copy/);
     await screen.findByRole("heading", { level: 1, name: "Rocket Rumble (copy)" });
-
     const games = await gameRepository.list();
     expect(games).toHaveLength(2);
     const copy = games.find((candidate) => candidate.id !== game.id);
-    expect(copy?.title).toBe("Rocket Rumble (copy)");
     expect(copy?.html).toBe(SAVED_SOURCE);
 
-    const editorAfterCopy = (await layout("desktop-layout")).getByRole("textbox", {
-      name: "Game HTML source",
-    });
-    await waitFor(() => expect(editorAfterCopy.textContent).toContain("rockets"));
-    await userEvent.click(
-      (await layout("desktop-layout")).getByRole("button", { name: /^Paste$/ }),
-    );
-    await waitFor(() => expect(editorAfterCopy.textContent).toContain("cards"));
-    await userEvent.click((await layout("desktop-layout")).getByRole("button", { name: /^Save$/ }));
+    await userEvent.click(pasteButton());
+    await waitFor(async () => expect((await codeEditor()).textContent).toContain("cards"));
+    await userEvent.click(screen.getByRole("button", { name: /^Save$/ }));
     await vi.waitFor(async () => {
-      const reloaded = await gameRepository.read(copy?.id as string);
-      expect(reloaded.html).toBe(PASTED_SOURCE);
+      expect((await gameRepository.read(copy?.id as string)).html).toBe(PASTED_SOURCE);
     });
     expect((await gameRepository.read(game.id)).html).toBe(SAVED_SOURCE);
   });
 
-  it("blocks navigation while dirty and discards on confirmation", async () => {
+  it("asks to save or discard before leaving with unsaved changes", async () => {
     const game = await gameRepository.create({ title: "Rocket Rumble", html: SAVED_SOURCE });
     mockClipboard(PASTED_SOURCE);
     const harness = createHostHarness();
     renderEditor([`/games/${game.id}/edit`], harness, {}, { browserHistory: true });
-
-    const desktop = await layout("desktop-layout");
-    const editor = desktop.getByRole("textbox", { name: "Game HTML source" });
+    const editor = await codeEditor();
     await waitFor(() => expect(editor.textContent).toContain("rockets"));
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
+    await userEvent.click(pasteButton());
     await waitFor(() => expect(editor.textContent).toContain("cards"));
 
     const unloadEvent = new Event("beforeunload", { cancelable: true });
@@ -551,25 +463,40 @@ describe("/games/:id/edit — saved games", () => {
     expect(unloadEvent.defaultPrevented).toBe(true);
 
     await userEvent.click(screen.getByRole("link", { name: "My games" }));
-    const dialog = await screen.findByRole("dialog");
+    const dialog = await screen.findByRole("dialog", { name: "Save your changes?" });
     await userEvent.click(within(dialog).getByRole("button", { name: "Keep editing" }));
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Rocket Rumble");
-    expect(screen.getByRole("button", { name: "Rocket Rumble" })).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("link", { name: "My games" }));
-    const dialog2 = await screen.findByRole("dialog");
-    await userEvent.click(within(dialog2).getByRole("button", { name: "Discard changes" }));
-    expect(await screen.findByText("My games")).toBeInTheDocument();
+    const dialog2 = await screen.findByRole("dialog", { name: "Save your changes?" });
+    await userEvent.click(within(dialog2).getByRole("button", { name: /^Save$/ }));
+    expect(await screen.findByRole("heading", { name: "My games" })).toBeInTheDocument();
+    expect((await gameRepository.read(game.id)).html).toBe(PASTED_SOURCE);
+  });
+
+  it("can leave without saving", async () => {
+    const game = await gameRepository.create({ title: "Rocket Rumble", html: SAVED_SOURCE });
+    mockClipboard(PASTED_SOURCE);
+    const harness = createHostHarness();
+    renderEditor([`/games/${game.id}/edit`], harness, {}, { browserHistory: true });
+    const editor = await codeEditor();
+    await waitFor(() => expect(editor.textContent).toContain("rockets"));
+    await userEvent.click(pasteButton());
+    await waitFor(() => expect(editor.textContent).toContain("cards"));
+
+    await userEvent.click(screen.getByRole("link", { name: "My games" }));
+    const dialog = await screen.findByRole("dialog", { name: "Save your changes?" });
+    await userEvent.click(within(dialog).getByRole("button", { name: "Don't save" }));
+    expect(await screen.findByRole("heading", { name: "My games" })).toBeInTheDocument();
+    expect((await gameRepository.read(game.id)).html).toBe(SAVED_SOURCE);
   });
 
   it("does not block navigation when clean", async () => {
     const game = await gameRepository.create({ title: "Rocket Rumble", html: SAVED_SOURCE });
     const harness = createHostHarness();
     renderEditor([`/games/${game.id}/edit`], harness, {}, { browserHistory: true });
-
-    const desktop = await layout("desktop-layout");
-    const editor = desktop.getByRole("textbox", { name: "Game HTML source" });
+    const editor = await codeEditor();
     await waitFor(() => expect(editor.textContent).toContain("rockets"));
 
     const unloadEvent = new Event("beforeunload", { cancelable: true });
@@ -577,14 +504,14 @@ describe("/games/:id/edit — saved games", () => {
     expect(unloadEvent.defaultPrevented).toBe(false);
 
     await userEvent.click(screen.getByRole("link", { name: "My games" }));
-    expect(await screen.findByText("My games")).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "My games" })).toBeInTheDocument();
   });
 
   it("edits the game title inline (click-to-edit)", async () => {
     const game = await gameRepository.create({ title: "Rocket Rumble", html: SAVED_SOURCE });
     const harness = createHostHarness();
     renderEditor([`/games/${game.id}/edit`], harness);
-    await layout("desktop-layout");
+    await codeEditor();
 
     expect(screen.queryByRole("textbox", { name: "Game title" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Rocket Rumble");
@@ -597,12 +524,10 @@ describe("/games/:id/edit — saved games", () => {
     await userEvent.keyboard("Card Sharks{Enter}");
     expect(screen.queryByRole("textbox", { name: "Game title" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Card Sharks");
-
-    expect(screen.getByText(/· unsaved changes/)).toBeInTheDocument();
+    expect(screen.getByText("Unsaved changes")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("heading", { level: 1 }));
     await userEvent.keyboard("Trivia Night{Escape}");
-    expect(screen.queryByRole("textbox", { name: "Game title" })).not.toBeInTheDocument();
     expect(screen.getByRole("heading", { level: 1 })).toHaveTextContent("Card Sharks");
 
     await userEvent.click(screen.getByRole("heading", { level: 1 }));
@@ -613,139 +538,76 @@ describe("/games/:id/edit — saved games", () => {
   });
 });
 
-describe("diagnostic report", () => {
-  it("copies a report with the source hash and diagnostics", async () => {
+describe("problem report and prompts", () => {
+  it("copies a problem report for the AI with the source hash and errors", async () => {
     const { writeText } = mockClipboard(PASTED_SOURCE);
     const harness = createHostHarness();
     renderEditor(["/editor"], harness);
-
-    const desktop = await layout("desktop-layout");
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
-    await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
+    await screen.findByTestId("editor-empty-state");
+    await userEvent.click(pasteButton());
     const runtimeIndex = await runtimeChannelIndex(harness);
     harness.ready(runtimeIndex);
     harness.runtimeError(runtimeIndex, "syntax", "Unexpected token");
 
-    await waitFor(() => expect(desktop.getByText(/^[0-9a-f]{12}…$/)).toBeInTheDocument());
-
-    await userEvent.click(desktop.getByRole("button", { name: /Copy report/ }));
-    await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-    const report = writeText.mock.calls[0]?.[0] as string;
+    const problems = within(await screen.findByTestId("problems-panel"));
+    // The source hash is computed after a short debounce.
+    await act(() => new Promise((resolve) => setTimeout(resolve, 400)));
+    await userEvent.click(problems.getByRole("button", { name: /Copy for AI/ }));
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalled());
+    const report = writeText.mock.calls.at(-1)?.[0] as string;
     expect(report).toContain("Rocketcrab Nova — game diagnostic report");
-    expect(report).toContain("Source SHA-256: ");
+    expect(report).toMatch(/Source SHA-256: [0-9a-f]{64}/);
     expect(report).toContain("syntax");
     expect(report).toContain("Unexpected token");
   });
 
-  it("keeps the current source's hash when an older digest resolves last", async () => {
-    mockClipboard(PASTED_SOURCE);
-    const resolveDigest: Array<(hash: Sha256) => void> = [];
-    vi.mocked(hashSource)
-      .mockImplementationOnce(() => new Promise((resolve) => resolveDigest.push(resolve)))
-      .mockImplementationOnce(() => new Promise((resolve) => resolveDigest.push(resolve)));
-    const harness = createHostHarness();
-    renderEditor(["/editor"], harness);
-    const desktop = await layout("desktop-layout");
-
-    // Digest 0 hashes the empty starting source; paste starts digest 1.
-    await waitFor(() => expect(resolveDigest).toHaveLength(1));
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
-    await waitFor(() => expect(resolveDigest).toHaveLength(2));
-
-    await act(async () => {
-      resolveDigest[1]!("new-hash" as Sha256);
-    });
-    await waitFor(() => expect(desktop.getByTitle("Source SHA-256: new-hash")).toBeInTheDocument());
-
-    await act(async () => {
-      resolveDigest[0]!("stale-hash" as Sha256);
-    });
-    expect(desktop.getByTitle("Source SHA-256: new-hash")).toBeInTheDocument();
-  });
-});
-
-describe("prompt export (Task 3)", () => {
-  it("copies the raw master prompt from the actions row", async () => {
+  it("copies the AI prompt, alone or with the current game, from the More menu", async () => {
     const { writeText } = mockClipboard(PASTED_SOURCE);
     const harness = createHostHarness();
     renderEditor(["/editor"], harness);
-    const desktop = await layout("desktop-layout");
+    await screen.findByTestId("editor-empty-state");
 
-    await userEvent.click(desktop.getByText("Copy prompt"));
-    await userEvent.click(screen.getByRole("button", { name: "Master prompt" }));
+    await moreMenu("Copy AI prompt");
     await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-    const copied = writeText.mock.calls[0]?.[0] as string;
-    expect(copied).toContain("# Nova Master Prompt");
-    expect(copied).not.toContain("## Your existing game");
-  });
+    expect(writeText.mock.calls[0]?.[0]).toContain("# Nova Master Prompt");
+    expect(writeText.mock.calls[0]?.[0]).not.toContain("## Your existing game");
 
-  it("copies the prompt plus the current game source", async () => {
-    const { writeText } = mockClipboard(PASTED_SOURCE);
-    const harness = createHostHarness();
-    renderEditor(["/editor"], harness);
-    const desktop = await layout("desktop-layout");
-
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
-    await userEvent.click(desktop.getByText("Copy prompt"));
-    await userEvent.click(screen.getByRole("button", { name: "Prompt + my game" }));
-    await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-    const copied = writeText.mock.calls[0]?.[0] as string;
-    expect(copied).toContain("# Nova Master Prompt");
+    await userEvent.click(pasteButton());
+    await waitFor(async () => expect((await codeEditor()).textContent).toContain("cards"));
+    await moreMenu("Copy AI prompt + my game");
+    await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(2));
+    const copied = writeText.mock.calls[1]?.[0] as string;
     expect(copied).toContain("## Your existing game");
     expect(copied).toContain(PASTED_SOURCE);
-  });
-});
-
-describe("phone layout", () => {
-  it("switches between Code and Errors tabs", async () => {
-    const harness = createHostHarness();
-    renderEditor(["/editor"], harness);
-
-    const mobile = await layout("mobile-layout");
-    const tabs = within(mobile.getByRole("tablist", { name: "Editor views" }));
-    expect(tabs.getByRole("tab", { name: "Code" })).toHaveAttribute("aria-selected", "true");
-    expect(tabs.queryByRole("tab", { name: "Preview" })).not.toBeInTheDocument();
-
-    await userEvent.click(tabs.getByRole("tab", { name: "Errors" }));
-    expect(tabs.getByRole("tab", { name: "Errors" })).toHaveAttribute("aria-selected", "true");
-    expect(mobile.getByText("No runtime errors from the last run.")).toBeInTheDocument();
-
-    const bar = within(await screen.findByTestId("mobile-actions-bar"));
-    expect(bar.getByRole("button", { name: /^Run$/ })).toBeInTheDocument();
-    expect(bar.getByRole("button", { name: /^Save$/ })).toBeInTheDocument();
   });
 
   it("replaces the runtime frame completely on every run (no HMR)", async () => {
     mockClipboard(PASTED_SOURCE);
     const harness = createHostHarness();
     renderEditor(["/editor"], harness);
+    await screen.findByTestId("editor-empty-state");
 
-    const desktop = await layout("desktop-layout");
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
-
-    await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
+    await userEvent.click(pasteButton());
     const firstRuntimeIndex = await runtimeChannelIndex(harness);
     harness.ready(firstRuntimeIndex);
-    await waitFor(() =>
-      expect(desktop.getByRole("button", { name: /^Re-run$/ })).toBeInTheDocument(),
+    await vi.waitFor(() =>
+      expect(
+        document.querySelectorAll('[data-testid="hidden-runtime-container"] iframe'),
+      ).toHaveLength(1),
     );
     const firstFrame = document.querySelector('[data-testid="hidden-runtime-container"] iframe');
 
     mockClipboard(SAVED_SOURCE);
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
-    await userEvent.click(desktop.getByRole("button", { name: /Re-run/ }));
+    await userEvent.click(pasteButton());
     const secondRuntimeIndex = await runtimeChannelIndex(harness, 2);
     expect(runtimeBootstraps(harness)[1]?.gameSource).toBe(SAVED_SOURCE);
     harness.ready(secondRuntimeIndex);
-    await waitFor(() =>
-      expect(desktop.getByRole("button", { name: /^Re-run$/ })).toBeInTheDocument(),
-    );
 
-    const runtimeFrames = document.querySelectorAll(
-      '[data-testid="hidden-runtime-container"] iframe',
-    );
-    expect(runtimeFrames).toHaveLength(1);
-    expect(runtimeFrames[0]).not.toBe(firstFrame);
+    await vi.waitFor(() => {
+      const frames = document.querySelectorAll('[data-testid="hidden-runtime-container"] iframe');
+      expect(frames).toHaveLength(1);
+      expect(frames[0]).not.toBe(firstFrame);
+    });
     expect(firstFrame?.isConnected).toBe(false);
   });
 });

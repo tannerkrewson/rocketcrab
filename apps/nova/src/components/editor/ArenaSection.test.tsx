@@ -82,6 +82,8 @@ beforeEach(async () => {
   await gameRepository.clear();
   sessionStorage.clear();
   window.localStorage.clear();
+  // The tutorial modal would hide the page from queries; tests open it explicitly.
+  window.localStorage.setItem("nova:editor-tutorial-dismissed:v1", "1");
   document.body.innerHTML = "";
 });
 
@@ -117,7 +119,6 @@ describe("ArenaSection — desktop grid", () => {
       new Set(bootstraps.map((bootstrap) => (bootstrap.player as { memberId: string }).memberId))
         .size,
     ).toBe(2);
-    expect(screen.getByText(/run #1/)).toBeInTheDocument();
   });
 
   it("resizes every frame's width with the shared horizontal drag handle", async () => {
@@ -183,6 +184,10 @@ describe("ArenaSection — desktop grid", () => {
     await openArena();
     await runToStart(harness.channels, 2);
     const playerCard = within(screen.getByTestId("arena-player-player-1"));
+    // Connection controls live behind Advanced; Remove and Authority are always shown.
+    expect(playerCard.queryByRole("button", { name: /Disconnect/ })).not.toBeInTheDocument();
+    expect(playerCard.getByRole("button", { name: /Remove Player 1/ })).toBeInTheDocument();
+    await userEvent.click((await desktopLayout()).getByRole("button", { name: /^Advanced$/ }));
     await waitFor(() => expect(playerCard.getAllByText("Connected").length).toBeGreaterThan(0));
     expect(playerCard.getByRole("button", { name: /Disconnect/ })).toBeInTheDocument();
     expect(playerCard.getByRole("button", { name: /Suspend/ })).toBeInTheDocument();
@@ -204,10 +209,9 @@ describe("ArenaSection — desktop grid", () => {
     const desktop = await desktopLayout();
     await runToStart(harness.channels, 2);
 
-    await userEvent.type(desktop.getByLabelText("New player name"), "Zoe");
     await userEvent.click(desktop.getByRole("button", { name: /Add player/ }));
     const grid = await gridLayout();
-    await waitFor(() => expect(grid.getByText("Zoe")).toBeInTheDocument());
+    await waitFor(() => expect(grid.getByText("Player 3")).toBeInTheDocument());
 
     await vi.waitFor(() => expect(harness.channels.length).toBe(3));
     deliver(harness.channels[2]!.port1, readyMessage());
@@ -250,18 +254,7 @@ describe("ArenaSection — desktop grid", () => {
     }
   });
 
-  it("offers the launch-into-party action for saved games", async () => {
-    const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
-    const harness = createHarness();
-    renderEditor([`/games/${game.id}/edit`], harness);
-    await openArena();
-
-    const link = await screen.findByRole("link", { name: /Play with friends/ });
-    expect(link.getAttribute("href")).toContain("/party");
-    expect(link.getAttribute("href")).toContain(encodeURIComponent(game.id));
-  });
-
-  it("applies the shared latency and drop-message controls (behind the debug menu)", async () => {
+  it("applies the shared latency control (behind Advanced)", async () => {
     const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
     const harness = createHarness();
     renderEditor([`/games/${game.id}/edit`], harness);
@@ -270,7 +263,7 @@ describe("ArenaSection — desktop grid", () => {
     await runToStart(harness.channels, 2);
 
     expect(desktop.queryByLabelText("Artificial latency")).not.toBeInTheDocument();
-    await userEvent.click(desktop.getByRole("button", { name: /^Debug$/ }));
+    await userEvent.click(desktop.getByRole("button", { name: /^Advanced$/ }));
 
     const latency = desktop.getByLabelText("Artificial latency");
     fireEvent.change(latency, { target: { value: "300" } });
@@ -303,7 +296,6 @@ describe("ArenaSection — phone layout", () => {
     const desktop = await desktopLayout();
     await runToStart(harness.channels, 2);
     for (const name of ["Player 3", "Player 4"]) {
-      await userEvent.type(desktop.getByLabelText("New player name"), name);
       await userEvent.click(desktop.getByRole("button", { name: /Add player/ }));
       await vi.waitFor(() => expect(harness.channels.length).toBeGreaterThanOrEqual(3));
       const index = harness.channels.length - 1;
@@ -326,25 +318,22 @@ describe("ArenaSection — phone layout", () => {
     expect(tabs.getByRole("tab", { name: "Player 4" })).toHaveAttribute("aria-selected", "true");
     expect(screen.getByTestId("arena-card-player-4").className).not.toContain("max-md:hidden");
     expect(screen.getAllByTestId(/arena-frame-/)).toHaveLength(4);
-    expect(mobile.getByText("Simulation controls")).toBeInTheDocument();
     expect(mobile.getByRole("button", { name: /Add player/ })).toBeInTheDocument();
   });
 });
 
 describe("ArenaSection — source handoff and re-testing", () => {
-  it("runs the editor's current source in the arena without touching the saved copy", async () => {
+  it("pasting re-tests the arena with the new source without touching the saved copy", async () => {
     const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
     mockClipboard(PASTED_SOURCE);
     const harness = createHarness();
     renderEditor([`/games/${game.id}/edit`], harness);
-    const desktop = within(await screen.findByTestId("desktop-layout"));
 
     await runToStart(harness.channels, 2);
     await waitFor(() => expect(screen.getByText("Test passed")).toBeInTheDocument());
 
-    // Ready the hidden runtime's channel before arena restart channels are created.
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
-    await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
+    // Paste replaces the code and runs it at once (no separate Run step).
+    await userEvent.click(screen.getByRole("button", { name: /^Paste game$/ }));
     await vi.waitFor(() => expect(runtimeBootstraps(harness)).toHaveLength(1));
     const runtimeIndex = harness.channels.length - 1;
     deliver(harness.channels[runtimeIndex]!.port1, readyMessage());
@@ -352,64 +341,18 @@ describe("ArenaSection — source handoff and re-testing", () => {
       const restarts = arenaBootstraps(harness, "member-1");
       expect(restarts.at(-1)?.gameSource).toBe(PASTED_SOURCE);
     });
+    expect(screen.queryByRole("button", { name: /^Run$/ })).not.toBeInTheDocument();
     const saved = await gameRepository.read(game.id);
     expect(saved.html).toBe(SOURCE);
     expect(sessionStorage.getItem("nova:arena-source:v1")).toBeNull();
   });
 
-  it("re-tests with a new source after the editor changed", async () => {
-    const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
-    mockClipboard(PASTED_SOURCE);
-    const harness = createHarness();
-    renderEditor([`/games/${game.id}/edit`], harness);
-    const desktop = within(await screen.findByTestId("desktop-layout"));
-
-    await runToStart(harness.channels, 2);
-    await waitFor(() => expect(screen.getByText("Test passed")).toBeInTheDocument());
-    expect(screen.getByText(/run #1/)).toBeInTheDocument();
-
-    await userEvent.click(desktop.getByRole("button", { name: /^Paste$/ }));
-    await waitFor(() =>
-      expect(screen.getByText(/Editor changed — press Run to re-test/)).toBeInTheDocument(),
-    );
-
-    // The hidden runtime resolves first; only then do arena restart channels exist.
-    await userEvent.click(desktop.getByRole("button", { name: /^Run$/ }));
-    await vi.waitFor(() => expect(runtimeBootstraps(harness)).toHaveLength(1));
-    const runtimeIndex = harness.channels.length - 1;
-    deliver(harness.channels[runtimeIndex]!.port1, readyMessage());
-
-    await vi.waitFor(() =>
-      expect(harness.channels.length).toBeGreaterThanOrEqual(runtimeIndex + 2),
-    );
-    deliver(harness.channels[runtimeIndex + 1]!.port1, readyMessage());
-    await vi.waitFor(() =>
-      expect(harness.channels.length).toBeGreaterThanOrEqual(runtimeIndex + 3),
-    );
-    deliver(harness.channels[runtimeIndex + 2]!.port1, readyMessage());
-    deliver(harness.channels[runtimeIndex + 1]!.port1, registrationMessage("Game 1"));
-    deliver(harness.channels[runtimeIndex + 1]!.port1, apiCallMessage("ready", {}));
-    deliver(harness.channels[runtimeIndex + 2]!.port1, registrationMessage("Game 2"));
-    deliver(harness.channels[runtimeIndex + 2]!.port1, apiCallMessage("ready", {}));
-
-    await waitFor(() => expect(screen.getByText("Test passed")).toBeInTheDocument());
-    await waitFor(() => expect(screen.getByText(/run #2/)).toBeInTheDocument());
-    await waitFor(() => expect(screen.queryByText(/Editor changed/)).not.toBeInTheDocument());
-    expect(arenaBootstraps(harness, "member-1").at(-1)?.gameSource).toBe(PASTED_SOURCE);
-  });
-
-  it("mounts the arena by default and seeds it with the current source", async () => {
+  it("starts a new game on an empty paste prompt instead of an empty arena", async () => {
     const harness = createHarness();
     renderEditor(["/editor"], harness);
 
-    const section = await openArena();
-    expect(section.getByTestId("arena-grid")).toBeInTheDocument();
-    expect(within(section.getByTestId("arena-grid")).getByText("Player 1")).toBeInTheDocument();
-    expect(within(section.getByTestId("arena-grid")).getByText("Player 2")).toBeInTheDocument();
-
-    await vi.waitFor(() => expect(harness.channels.length).toBeGreaterThanOrEqual(1));
-    await vi.waitFor(() =>
-      expect(arenaBootstraps(harness, "member-1").length).toBeGreaterThanOrEqual(1),
-    );
+    expect(await screen.findByTestId("editor-empty-state")).toBeInTheDocument();
+    expect(screen.queryByTestId("arena-section")).not.toBeInTheDocument();
+    expect(harness.channels).toHaveLength(0);
   });
 });

@@ -120,6 +120,11 @@ test.describe("S4 arena — four simulated players play Nova Quiz", () => {
     expect(authorityBefore).not.toBeNull();
     const suspendedPlayerId = authorityBefore as string;
     const suspendedCard = playerCard(page, suspendedPlayerId);
+    // Per-player connection controls live behind the arena's Advanced toggle.
+    await page
+      .getByTestId("arena-desktop")
+      .getByRole("button", { name: "Advanced", exact: true })
+      .click();
     await suspendedCard.getByRole("button", { name: /Suspend/ }).click();
     await expect(suspendedCard.getByText("Suspended", { exact: true })).toBeVisible({
       timeout: 10_000,

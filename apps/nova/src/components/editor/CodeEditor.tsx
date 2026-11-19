@@ -1,4 +1,4 @@
-import CodeMirror from "@uiw/react-codemirror";
+import CodeMirror, { Prec } from "@uiw/react-codemirror";
 import { html } from "@codemirror/lang-html";
 import { EditorView } from "@codemirror/view";
 
@@ -24,7 +24,9 @@ const themeSpec = {
 };
 
 // The app is dark-only (index.html sets `.dark` on <html>).
-const darkTheme = EditorView.theme(themeSpec, { dark: true });
+// Highest precedence so the neutral surfaces beat the one-dark base theme's
+// blue-gray background.
+const darkTheme = Prec.highest(EditorView.theme(themeSpec, { dark: true }));
 
 export function CodeEditor({ value, onChange, ariaLabel }: CodeEditorProps) {
   return (

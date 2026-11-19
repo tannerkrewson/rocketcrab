@@ -6,28 +6,26 @@ changing Nova itself. The API is described in
 
 ## The authoring loop
 
-1. Open **Create** (`/build`) and copy the master prompt — or use
-   **Copy prompt → Prompt + my game** in the editor to keep iteration context.
-2. Paste the AI's single HTML document into the editor.
-3. Press **Run**. Nova validates the document, starts it in the isolated runtime
-   origin, and the game calls `nova.defineGame(...)`.
-4. Add simulated players in the test arena, then use **Save** to keep the game
-   or **Play with friends** to open a real party.
+1. Open **Build** (`/build`) and copy the master prompt, or use
+   **More → Copy AI prompt + my game** in the editor to keep iteration context.
+2. In the editor, press **Paste game**. Nova validates the document, starts it
+   in the isolated runtime origin (the game calls `nova.defineGame(...)`), and
+   runs it as several simulated players on the **Test** tab.
+3. To edit by hand, use the **Code** tab and press **Run**.
+4. **Save** keeps the game in My games; **Play with friends** saves it and opens
+   a real party. Leaving with unsaved changes asks to save or discard them.
 
-Saved games live in this browser's IndexedDB only. The editor's **Diagnostics**
-panel is the primary debugging surface:
+Saved games live in this browser's IndexedDB only. When the last run had
+problems, a **problems bar** appears above the tabs: it counts validation
+issues, runtime errors (category, message and detail) and console
+errors/warnings, and expands to list them. **Copy for AI** copies a full report
+(validation, runtime errors, console tail, source size and SHA-256) to paste
+into an AI chat or a bug report. The arena's **Advanced** toggle adds network
+simulation, per-player connection controls and per-player logs.
 
-| Section            | What it answers                                                                                      |
-| ------------------ | ---------------------------------------------------------------------------------------------------- |
-| **Validation**     | Is this a complete HTML document? Are there blocking source issues?                                  |
-| **Runtime errors** | What failed in the last run (category + message + detail), if anything.                              |
-| **Console**        | The game's own console output (bounded tail, rate-limited with drop counts).                         |
-| **Copy report**    | Copies validation, runtime errors, console tail, size, and source hash for an AI chat or bug report. |
-
-The source byte count and SHA-256 are shown beside the panel. All players must
-run byte-identical HTML; the party transfers the source peer-to-peer and
-verifies the hash, so an edited file is a different game version even when the
-game ID is unchanged.
+All players must run byte-identical HTML; the party transfers the source
+peer-to-peer and verifies the hash, so an edited file is a different game
+version even when the game ID is unchanged.
 
 ## Common failures and what they mean
 

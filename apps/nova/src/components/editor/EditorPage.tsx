@@ -4,15 +4,14 @@ import { Link, useBlocker, useNavigate } from "@tanstack/react-router";
 import {
   ArrowLeft,
   ClipboardPaste,
-  CopyPlus,
-  Eraser,
-  GripHorizontal,
-  MonitorSmartphone,
+  Code2,
+  HelpCircle,
   PartyPopper,
   Pencil,
   Play,
   Save,
-  Trash2,
+  Sparkles,
+  Users,
 } from "lucide-react";
 import {
   useCallback,
@@ -23,14 +22,12 @@ import {
   useState,
   createContext,
   type KeyboardEvent as ReactKeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
+  type ReactNode,
 } from "react";
-import { Alert } from "@heroui/react";
 import { toast } from "../../lib/toast";
+import { cn } from "../../lib/cn";
 import { Button, buttonStyles } from "../ui/Button";
-import { BrandLogo } from "../layout/BrandLogo";
 import { Dialog } from "../ui/Dialog";
-import { useWindowPointerDrag } from "../ui/useWindowPointerDrag";
 import { useCreateGame, useRecordTestResults, useUpdateGame } from "../../lib/games/queries";
 import { hashSource, sourceByteLength } from "../../lib/games/hashing";
 import type { ChannelPort, RuntimeHostEvent } from "../../lib/runtime-host";
@@ -45,12 +42,11 @@ import {
 import { useRuntimeSession } from "../../lib/editor/runtime-session";
 import { validateSource } from "../../lib/editor/validation";
 import { readFromClipboard, writeToClipboard } from "../../lib/editor/clipboard";
-import { storePartySource } from "../../lib/party/source-handoff";
 import { CodeEditor } from "./CodeEditor";
-import { DiagnosticsPanel } from "./DiagnosticsPanel";
+import { ProblemsPanel } from "./ProblemsPanel";
 import { ArenaSection, ArenaRuntimeSeamsContext } from "./ArenaSection";
-import { FirstRunTutorial } from "./FirstRunTutorial";
-import { PromptExportMenu } from "./PromptExportMenu";
+import { EditorTutorial, markTutorialSeen, shouldAutoOpenTutorial } from "./EditorTutorial";
+import { EditorMoreMenu } from "./EditorMoreMenu";
 
 /** Default title for a new, unnamed game (matches the runtime's fallback). */
 const DEFAULT_GAME_TITLE = "Untitled game";
@@ -87,31 +83,27 @@ function draftGameId(): string {
   return `draft-${Date.now().toString(36)}`;
 }
 
-function defaultEditorHeightPx(): number {
-  return clampEditorHeight(
-    Math.round((typeof window === "undefined" ? 800 : window.innerHeight) * 0.22),
-  );
-}
-
-function clampEditorHeight(value: number): number {
-  const max = typeof window === "undefined" ? 500 : Math.round(window.innerHeight * 0.5);
-  return Math.min(Math.max(value, 160), max);
-}
+type EditorView = "test" | "code";
 
 /**
- * Editor with a live multiplayer arena and a hidden single-player runtime
- * for diagnostics and mode detection. Each Run recreates frames; unsaved
- * source never overwrites the saved game. A route-level draft key remounts
- * this component for each new handoff.
+ * The Nova editor. Most games are written by an AI elsewhere and pasted in,
+ * so the page leads with Paste and a live multiplayer test; the code editor
+ * is a second tab. A hidden single-player runtime supplies diagnostics and
+ * the registered title/mode.
+ *
+ * Saving is explicit and predictable: /editor is always a fresh, empty game;
+ * a game reopens only from My games (/games/:id/edit). Leaving with unsaved
+ * changes asks to save or discard, and Play with friends saves first, so a
+ * game that was played is always in My games afterwards.
  */
-export function EditorPage({ game, initialSource }: { game?: SavedGame; initialSource?: string }) {
+export function EditorPage({ game }: { game?: SavedGame }) {
   const navigate = useNavigate();
   const createGame = useCreateGame();
   const updateGame = useUpdateGame();
   const recordTestResults = useRecordTestResults();
   const seams = useContext(EditorRuntimeSeamsContext);
 
-  const savedSource = initialSource ?? game?.html ?? "";
+  const savedSource = game?.html ?? "";
   // New-game mode starts with an empty title; the game's declared title
   // (nova.defineGame) fills the gap on save when the creator typed nothing.
   const savedTitle = game?.title ?? "";
@@ -129,21 +121,23 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     sourceHash: string;
     runtimeInstanceId: string | null;
   } | null>(null);
-  const [mobileTab, setMobileTab] = useState<"code" | "errors">("code");
+  const [view, setView] = useState<EditorView>("test");
+  const [tutorialOpen, setTutorialOpen] = useState(shouldAutoOpenTutorial);
   const [titleEditing, setTitleEditing] = useState(false);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const displayTitle = title.trim() || registration?.title || DEFAULT_GAME_TITLE;
   // The pre-edit title, so Escape can cancel an in-progress edit.
   const titleDraftRef = useRef(title);
 
+  const closeTutorial = useCallback(() => {
+    markTutorialSeen();
+    setTutorialOpen(false);
+  }, []);
+
   const startEditingTitle = useCallback(() => {
     titleDraftRef.current = title;
     setTitleEditing(true);
   }, [title]);
-
-  const commitTitle = useCallback(() => {
-    setTitleEditing(false);
-  }, []);
 
   const handleTitleKeyDown = useCallback((event: ReactKeyboardEvent<HTMLInputElement>) => {
     if (event.key === "Enter") {
@@ -159,11 +153,11 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     titleInputRef.current?.focus();
     titleInputRef.current?.select();
   }, [titleEditing]);
-  const [discardDialog, setDiscardDialog] = useState<{ onConfirm: () => void } | null>(null);
-  const [clearAllDialog, setClearAllDialog] = useState(false);
+
+  const [leaveDialog, setLeaveDialog] = useState(false);
+  const [discardDialog, setDiscardDialog] = useState(false);
+  // The arena runs this source; it changes only on Run (or paste).
   const [arenaSource, setArenaSource] = useState<string>(savedSource);
-  const [editorHeightPx, setEditorHeightPx] = useState(defaultEditorHeightPx);
-  // Keep a separate hidden runtime for diagnostics, mode detection, and saved-source test metadata.
   const hiddenRuntimeRef = useRef<HTMLDivElement | null>(null);
 
   const dirty = source !== savedSource || title !== savedTitle;
@@ -245,145 +239,140 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
 
   const runStatus = session.status;
 
-  const handleRun = useCallback(async () => {
-    const issues = validateSource(source);
-    const errors = issues.filter((issue) => issue.severity === "error");
-    const warnings = issues.filter((issue) => issue.severity === "warning");
-    setDiagnostics([]);
-    setConsoleEntries([]);
-    setRegistration(null);
-    if (errors.length > 0) {
-      appendDiagnostics(
-        errors.map((issue) => ({
-          id: `validation-${issue.code}`,
-          severity: "error" as const,
-          category: issue.code,
-          message: issue.message,
-          timestamp: Date.now(),
-        })),
-      );
-      return;
-    }
-    lastRunSourceRef.current = source;
-    const startedAt = Date.now();
-    const hash = await hashSource(source);
-    setRunInfo({ startedAt, sourceHash: hash, runtimeInstanceId: null });
-    if (warnings.length > 0) {
-      appendDiagnostics(
-        warnings.map((issue) => ({
-          id: `validation-${issue.code}`,
-          severity: "warning" as const,
-          category: issue.code,
-          message: issue.message,
-          timestamp: Date.now(),
-        })),
-      );
-    }
-    try {
-      await session.run({
-        gameId: game?.id ?? draftGameId(),
-        gameMode: game?.mode ?? "state",
-        gameSource: source,
-        player: { memberId: "local-creator", displayName: "You" },
-        ...(title.trim().length > 0 ? { gameTitle: title.trim() } : {}),
-      });
-      // Restart the arena only after runtime startup succeeds; failures keep the
-      // last testable arena state rather than replacing it with a failed source.
-      setArenaSource(source);
-      setRunInfo((previous) =>
-        previous
-          ? {
-              ...previous,
-              runtimeInstanceId: session.diagnose()?.runtimeInstanceId ?? null,
-            }
-          : previous,
-      );
-    } catch (error) {
-      appendDiagnostics([
-        {
-          id: `startup-${Date.now()}`,
-          severity: "error",
-          category: "startup",
-          message: friendlyStartupMessage(error),
-          timestamp: Date.now(),
-        },
-      ]);
-    }
-  }, [appendDiagnostics, game?.id, game?.mode, session, source, title]);
+  /** Validate, then run `code` in the hidden runtime and (on success) the arena. */
+  const runSource = useCallback(
+    async (code: string) => {
+      const issues = validateSource(code);
+      const errors = issues.filter((issue) => issue.severity === "error");
+      const warnings = issues.filter((issue) => issue.severity === "warning");
+      setDiagnostics([]);
+      setConsoleEntries([]);
+      setRegistration(null);
+      if (errors.length > 0) {
+        appendDiagnostics(
+          errors.map((issue) => ({
+            id: `validation-${issue.code}`,
+            severity: "error" as const,
+            category: issue.code,
+            message: issue.message,
+            timestamp: Date.now(),
+          })),
+        );
+        return;
+      }
+      lastRunSourceRef.current = code;
+      const startedAt = Date.now();
+      const hash = await hashSource(code);
+      setRunInfo({ startedAt, sourceHash: hash, runtimeInstanceId: null });
+      if (warnings.length > 0) {
+        appendDiagnostics(
+          warnings.map((issue) => ({
+            id: `validation-${issue.code}`,
+            severity: "warning" as const,
+            category: issue.code,
+            message: issue.message,
+            timestamp: Date.now(),
+          })),
+        );
+      }
+      try {
+        await session.run({
+          gameId: game?.id ?? draftGameId(),
+          gameMode: game?.mode ?? "state",
+          gameSource: code,
+          player: { memberId: "local-creator", displayName: "You" },
+          ...(title.trim().length > 0 ? { gameTitle: title.trim() } : {}),
+        });
+        // Restart the arena only after runtime startup succeeds; failures keep the
+        // last testable arena state rather than replacing it with a failed source.
+        setArenaSource(code);
+        setRunInfo((previous) =>
+          previous
+            ? {
+                ...previous,
+                runtimeInstanceId: session.diagnose()?.runtimeInstanceId ?? null,
+              }
+            : previous,
+        );
+      } catch (error) {
+        appendDiagnostics([
+          {
+            id: `startup-${Date.now()}`,
+            severity: "error",
+            category: "startup",
+            message: friendlyStartupMessage(error),
+            timestamp: Date.now(),
+          },
+        ]);
+      }
+    },
+    [appendDiagnostics, game?.id, game?.mode, session, title],
+  );
 
+  const handleRun = useCallback(() => {
+    setView("test");
+    void runSource(source);
+  }, [runSource, source]);
+
+  /** Paste replaces the code and tests it immediately: the main path for AI-written games. */
   const handlePaste = useCallback(async () => {
     try {
       const text = await readFromClipboard();
-      if (text.length === 0) {
-        toast.info("Your clipboard is empty.");
+      if (text.trim().length === 0) {
+        toast.info("Your clipboard is empty. Copy your game's HTML first.");
         return;
       }
       setSource(text);
-      setMobileTab("code");
-      toast.success("Pasted into the editor. Run it to see it live.");
+      setView("test");
+      void runSource(text);
+      toast.success("Pasted. Testing it now.");
     } catch {
       toast.danger(
-        "Couldn't read the clipboard. Your browser may need clipboard permission — use Cmd/Ctrl+V in the editor instead.",
+        "Couldn't read the clipboard. Your browser may need clipboard permission — open the Code tab and paste with Cmd/Ctrl+V instead.",
       );
     }
-  }, []);
+  }, [runSource]);
 
-  /** Hand the current source to a real party without writing unsaved edits to the saved game. */
-  const handlePlayWithFriends = useCallback(() => {
-    const errors = validateSource(source).filter((issue) => issue.severity === "error");
-    if (errors.length > 0) {
-      toast.danger("Fix the validation errors before starting a party.");
-      return;
-    }
-    const id = game?.id ?? draftGameId();
-    storePartySource({ gameId: id, source });
-    void navigate({
-      to: "/party",
-      search: {
-        gameId: id,
-        mode: game?.mode ?? "state",
-        title: title.trim() || registration?.title || DEFAULT_GAME_TITLE,
-      },
-      ignoreBlocker: true,
-    });
-  }, [game, navigate, registration, source, title]);
-
-  const handleSave = useCallback(async () => {
-    if (savingRef.current) return;
+  /**
+   * Persist the current source and title. A new game is created; a saved
+   * game is updated. Resolves to the saved game's id, or null on failure.
+   */
+  const persist = useCallback(async (): Promise<string | null> => {
+    if (savingRef.current) return null;
     savingRef.current = true;
     try {
       const nextTitle = title.trim() || registration?.title || DEFAULT_GAME_TITLE;
+      const input = {
+        title: nextTitle,
+        html: source,
+        apiVersion: PROTOCOL_VERSION,
+        ...(registration ? { mode: registration.gameMode } : {}),
+      };
       if (game) {
-        await updateGame.mutateAsync({
-          id: game.id,
-          input: {
-            title: nextTitle,
-            html: source,
-            apiVersion: PROTOCOL_VERSION,
-            ...(registration ? { mode: registration.gameMode } : {}),
-          },
-        });
-        toast.success("Saved.");
-      } else {
-        const created = await createGame.mutateAsync({
-          title: nextTitle,
-          html: source,
-          apiVersion: PROTOCOL_VERSION,
-          ...(registration ? { mode: registration.gameMode } : {}),
-        });
-        toast.success(`Created “${created.title}”.`);
-        await navigate({
-          to: "/games/$gameId/edit",
-          params: { gameId: created.id },
-          ignoreBlocker: true,
-        });
+        await updateGame.mutateAsync({ id: game.id, input });
+        return game.id;
       }
+      const created = await createGame.mutateAsync(input);
+      return created.id;
     } catch (error) {
       toast.danger(errorMessage(error));
+      return null;
     } finally {
       savingRef.current = false;
     }
-  }, [createGame, game, navigate, registration, source, title, updateGame]);
+  }, [createGame, game, registration, source, title, updateGame]);
+
+  const handleSave = useCallback(async () => {
+    const id = await persist();
+    if (id === null) return;
+    if (game) {
+      toast.success("Saved.");
+      return;
+    }
+    toast.success("Saved to My games.");
+    // A new game becomes a saved game: keep editing it at its own URL.
+    await navigate({ to: "/games/$gameId/edit", params: { gameId: id }, ignoreBlocker: true });
+  }, [game, navigate, persist]);
 
   const handleSaveAsCopy = useCallback(async () => {
     if (savingRef.current) return;
@@ -409,59 +398,43 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     }
   }, [createGame, navigate, registration, source, title]);
 
-  const confirmReset = useCallback(() => {
+  /** Save first (so the game is in My games), then start a party with it. */
+  const handlePlayWithFriends = useCallback(async () => {
+    const errors = validateSource(source).filter((issue) => issue.severity === "error");
+    if (errors.length > 0) {
+      toast.danger(errors[0]?.message ?? "Fix the problems before starting a party.");
+      return;
+    }
+    const id = !game || dirty ? await persist() : game.id;
+    if (id === null) return;
+    await navigate({
+      to: "/party",
+      search: {
+        gameId: id,
+        mode: registration?.gameMode ?? game?.mode ?? "state",
+        title: title.trim() || registration?.title || DEFAULT_GAME_TITLE,
+      },
+      ignoreBlocker: true,
+    });
+  }, [dirty, game, navigate, persist, registration, source, title]);
+
+  const confirmDiscard = useCallback(() => {
     setSource(savedSource);
     setTitle(savedTitle);
     setDiagnostics([]);
     setConsoleEntries([]);
     setRegistration(null);
     setRunInfo(null);
+    setArenaSource(savedSource);
     lastRunSourceRef.current = null;
     session.stop();
-    setDiscardDialog(null);
-    setMobileTab("code");
+    setDiscardDialog(false);
     toast.info("Discarded unsaved changes.");
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [savedSource, savedTitle, session]);
-
-  /** Clear the draft without deleting the saved copy. */
-  const handleClearAll = useCallback(() => {
-    setSource("");
-    setDiagnostics([]);
-    setConsoleEntries([]);
-    setRegistration(null);
-    setRunInfo(null);
-    lastRunSourceRef.current = null;
-    session.stop();
-    setClearAllDialog(false);
-    setMobileTab("code");
-    toast.info("Editor cleared.");
-  }, [session]);
-
-  const beginWindowDrag = useWindowPointerDrag();
-
-  const handleEditorResize = useCallback(
-    (event: ReactPointerEvent<HTMLDivElement>) => {
-      event.preventDefault();
-      const handle = event.currentTarget;
-      const startY = event.clientY;
-      const startHeight = editorHeightPx;
-      try {
-        handle.setPointerCapture(event.pointerId);
-      } catch {
-        // Pointer capture unavailable (some test environments); the window
-        // listeners below still track the drag.
-      }
-      beginWindowDrag((moveEvent) => {
-        setEditorHeightPx(clampEditorHeight(startHeight + (moveEvent.clientY - startY)));
-      });
-    },
-    [beginWindowDrag, editorHeightPx],
-  );
 
   const handleCopyReport = useCallback(async () => {
     const report = buildDiagnosticReport({
-      title: title.trim() || DEFAULT_GAME_TITLE,
+      title: displayTitle,
       saved: game !== undefined,
       sourceHash,
       sourceBytes: sourceByteLength(source),
@@ -474,12 +447,13 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     });
     const ok = await writeToClipboard(report);
     if (ok) {
-      toast.success("Diagnostic report copied to your clipboard.");
+      toast.success("Problem report copied. Paste it into your AI.");
     } else {
-      toast.danger("Couldn't copy the report — select the text above and copy manually.");
+      toast.danger("Couldn't copy the report — your browser may need clipboard permission.");
     }
-  }, [consoleEntries, diagnostics, game, runInfo, runStatus, source, sourceHash, title]);
+  }, [consoleEntries, diagnostics, displayTitle, game, runInfo, runStatus, source, sourceHash]);
 
+  // Leaving with unsaved changes asks to save or discard them.
   const shouldBlockNavigation = useCallback(() => dirty, [dirty]);
   const blocker = useBlocker({
     shouldBlockFn: shouldBlockNavigation,
@@ -487,160 +461,45 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
     withResolver: true,
   });
   useEffect(() => {
-    if (blocker.status === "blocked") {
-      setDiscardDialog({
-        onConfirm: () => {
-          blocker.proceed();
-          setDiscardDialog(null);
-        },
-      });
-    } else if (discardDialog !== null && blocker.status === "idle") {
-      setDiscardDialog(null);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
+    setLeaveDialog(blocker.status === "blocked");
   }, [blocker.status]);
 
-  const validationIssues = useMemo(() => validateSource(source), [source]);
+  const saveAndLeave = useCallback(async () => {
+    const id = await persist();
+    if (id === null) return;
+    toast.success("Saved to My games.");
+    blocker.proceed?.();
+  }, [blocker, persist]);
+
+  // The empty-source error is the empty state's job, not a "problem".
+  const validationIssues = useMemo(
+    () => validateSource(source).filter((issue) => issue.code !== "empty"),
+    [source],
+  );
+  const hasCode = source.trim().length > 0;
   const arenaStale = arenaSource !== source;
+  const saving = createGame.isPending || updateGame.isPending;
 
-  const actions = (
-    <>
-      <Button
-        variant="default"
-        soft
-        onClick={handlePaste}
-        title="Paste from clipboard (replaces the editor content)"
-      >
-        <ClipboardPaste className="h-4 w-4" aria-hidden="true" />
-        Paste
-      </Button>
-      <Button
-        variant="danger"
-        soft
-        onClick={() => setClearAllDialog(true)}
-        disabled={source.length === 0}
-        title="Delete every line of code in the editor"
-      >
-        <Trash2 className="h-4 w-4" aria-hidden="true" />
-        Clear all
-      </Button>
-      <Button
-        variant="default"
-        soft
-        onClick={() => setDiscardDialog({ onConfirm: confirmReset })}
-        disabled={!dirty}
-        title="Reset unsaved changes"
-      >
-        <Eraser className="h-4 w-4" aria-hidden="true" />
-        Reset
-      </Button>
-      <div className="flex-1" />
-      <Button
-        variant="default"
-        soft
-        onClick={handleSaveAsCopy}
-        title="Save the current source as a new game"
-      >
-        <CopyPlus className="h-4 w-4" aria-hidden="true" />
-        Save as copy
-      </Button>
-      <Button
-        variant="secondary"
-        onClick={handleSave}
-        disabled={createGame.isPending || updateGame.isPending}
-      >
-        <Save className="h-4 w-4" aria-hidden="true" />
-        Save
-      </Button>
-      <Button
-        variant="primary"
-        onClick={() => void handleRun()}
-        disabled={runStatus === "starting"}
-      >
-        <Play className="h-4 w-4" aria-hidden="true" />
-        {runStatus === "running" ? "Re-run" : "Run"}
-      </Button>
-      <Button
-        variant="primary"
-        onClick={handlePlayWithFriends}
-        title="Create a real party from this source and play it with friends"
-      >
-        <PartyPopper className="h-4 w-4" aria-hidden="true" />
-        Play with friends
-      </Button>
-      <PromptExportMenu source={source} title={title} />
-    </>
-  );
-
-  const tabs = (
-    <div
-      className="flex gap-1 rounded-xl bg-surface-secondary p-1"
-      role="tablist"
-      aria-label="Editor views"
+  const tabButton = (id: EditorView, label: string, icon: ReactNode) => (
+    <button
+      key={id}
+      role="tab"
+      type="button"
+      aria-selected={view === id}
+      className={cn(
+        "flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-bold transition-colors",
+        view === id ? "bg-surface-tertiary text-foreground" : "text-foreground/60",
+      )}
+      onClick={() => setView(id)}
     >
-      {(
-        [
-          { id: "code", label: "Code" },
-          {
-            id: "errors",
-            label:
-              diagnostics.length > 0 || consoleEntries.length > 0
-                ? `Errors (${diagnostics.length})`
-                : "Errors",
-          },
-        ] as const
-      ).map((tab) => (
-        <button
-          key={tab.id}
-          role="tab"
-          type="button"
-          aria-selected={mobileTab === tab.id}
-          className={`rounded-lg px-3 py-1.5 text-sm font-bold ${mobileTab === tab.id ? "bg-surface text-foreground shadow-sm" : "text-muted"}`}
-          onClick={() => setMobileTab(tab.id)}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </div>
-  );
-
-  const arenaSection = (
-    <ArenaRuntimeSeamsContext.Provider value={seams}>
-      <ArenaSection
-        game={game}
-        source={arenaSource}
-        stale={arenaStale}
-        onDiagnostics={appendDiagnostics}
-      />
-    </ArenaRuntimeSeamsContext.Provider>
+      {icon}
+      {label}
+    </button>
   );
 
   return (
     <div className="theme-nova flex flex-col gap-4">
-      <FirstRunTutorial />
-
-      <div className="sm:hidden" data-testid="phone-prompt">
-        <Alert status="warning">
-          <MonitorSmartphone className="h-6 w-6 shrink-0" aria-hidden="true" />
-          <Alert.Content>
-            <Alert.Title>The editor works best on a computer</Alert.Title>
-            <Alert.Description>
-              Writing and testing a game needs a big screen. Open Rocketcrab Nova on a laptop or
-              desktop to use the editor and test arena.
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
-      </div>
-
       <header className="flex flex-wrap items-center gap-3">
-        <Link
-          to="/"
-          className="flex items-center"
-          aria-label="Rocketcrab Nova home"
-          title="Rocketcrab Nova"
-        >
-          <BrandLogo size={40} />
-        </Link>
         <Link
           to="/library"
           className={buttonStyles("default", "md", undefined, true)}
@@ -658,210 +517,191 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
               onChange={(event) => setTitle(event.target.value)}
               onFocus={(event) => event.target.select()}
               onKeyDown={handleTitleKeyDown}
-              onBlur={commitTitle}
+              onBlur={() => setTitleEditing(false)}
               aria-label="Game title"
               maxLength={64}
-              className="input input--primary w-full max-w-md text-lg font-black"
+              className="input w-full max-w-md text-lg font-black"
             />
           ) : (
             <button
               type="button"
               onClick={startEditingTitle}
-              className="group inline-flex max-w-full items-center gap-2 rounded-md px-1 py-0.5 -mx-1 hover:bg-surface-secondary/60"
+              className="group -mx-1 inline-flex max-w-full items-center gap-2 rounded-md px-1 py-0.5 hover:bg-surface-secondary"
               title="Click to edit the game title"
             >
               <h1 className="truncate text-xl font-black">{displayTitle}</h1>
-              <Pencil
-                className="h-4 w-4 shrink-0 text-foreground/40 opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100"
-                aria-hidden="true"
-              />
+              <Pencil className="h-4 w-4 shrink-0 text-foreground/40" aria-hidden="true" />
             </button>
           )}
         </div>
         {dirty ? (
-          <span className="text-xs font-semibold text-foreground/60">· unsaved changes</span>
+          <span className="text-xs font-semibold text-foreground/60">Unsaved changes</span>
         ) : null}
+        <Button
+          variant="default"
+          soft
+          size="md"
+          isIconOnly
+          onClick={() => setTutorialOpen(true)}
+          aria-label="How the editor works"
+          title="How the editor works"
+        >
+          <HelpCircle className="h-5 w-5" aria-hidden="true" />
+        </Button>
       </header>
 
-      <div className="hidden flex-col gap-4 md:flex" data-testid="desktop-layout">
-        <div className="flex flex-wrap items-center gap-2">{actions}</div>
-        <div style={{ height: `${editorHeightPx}px` }}>
-          <div className="grid h-full grid-cols-2 gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,24rem)]">
-            <section className="min-h-0 overflow-hidden rounded-2xl bg-overlay" aria-label="Editor">
-              <div className="h-full">
-                <CodeEditor value={source} onChange={setSource} ariaLabel="Game HTML source" />
-              </div>
-            </section>
-            <section
-              className="flex min-h-0 flex-col gap-4 overflow-y-auto"
-              aria-label="Diagnostics"
-            >
-              <DiagnosticsPanel
-                sourceBytes={sourceByteLength(source)}
-                sourceHash={sourceHash}
-                validationIssues={validationIssues}
-                diagnostics={diagnostics}
-                consoleEntries={consoleEntries}
-                onCopyReport={() => void handleCopyReport()}
-                busy={createGame.isPending || updateGame.isPending}
-              />
-            </section>
-          </div>
+      <div className="flex flex-wrap items-center gap-2">
+        <div role="tablist" aria-label="Editor views" className="glass flex gap-1 rounded-full p-1">
+          {tabButton("test", "Test", <Users className="h-4 w-4" aria-hidden="true" />)}
+          {tabButton("code", "Code", <Code2 className="h-4 w-4" aria-hidden="true" />)}
         </div>
-        <div
-          role="separator"
-          aria-label="Resize the code editor"
-          className="flex h-3 cursor-ns-resize select-none items-center justify-center rounded-md bg-surface-tertiary text-foreground/60 transition-colors hover:bg-surface-tertiary hover:text-foreground/90"
-          onPointerDown={handleEditorResize}
-          title="Drag to resize the code editor"
-        >
-          <GripHorizontal className="h-3 w-3" aria-hidden="true" />
-        </div>
-      </div>
-
-      <div className="flex flex-col gap-3 md:hidden" data-testid="mobile-layout">
-        {tabs}
-        {mobileTab === "code" ? (
-          <div className="overflow-hidden rounded-2xl bg-overlay">
-            <div className="h-[50vh] min-h-72">
-              <CodeEditor value={source} onChange={setSource} ariaLabel="Game HTML source" />
-            </div>
-          </div>
+        {view === "code" || (hasCode && arenaStale) ? (
+          <Button
+            variant="default"
+            soft
+            onClick={handleRun}
+            disabled={runStatus === "starting"}
+            title="Test your latest code"
+          >
+            <Play className="h-4 w-4" aria-hidden="true" />
+            Run
+          </Button>
         ) : null}
-        {mobileTab === "errors" ? (
-          <DiagnosticsPanel
-            sourceBytes={sourceByteLength(source)}
-            sourceHash={sourceHash}
-            validationIssues={validationIssues}
-            diagnostics={diagnostics}
-            consoleEntries={consoleEntries}
-            onCopyReport={() => void handleCopyReport()}
-            busy={createGame.isPending || updateGame.isPending}
-          />
-        ) : null}
-      </div>
-
-      {arenaSection}
-
-      <div
-        className="sticky bottom-0 z-20 -mx-4 flex items-center gap-2 overflow-x-auto bg-overlay py-2 pb-safe pl-4 pr-[9.5rem] md:hidden"
-        data-testid="mobile-actions-bar"
-      >
+        <div className="flex-1" />
         <Button
-          variant="default"
-          soft
-          size="md"
-          onClick={handlePaste}
-          aria-label="Paste from clipboard (replaces the editor content)"
-          title="Paste from clipboard (replaces the editor content)"
+          variant={hasCode ? "default" : "primary"}
+          soft={hasCode}
+          onClick={() => void handlePaste()}
+          title="Replace the code with your clipboard and test it"
         >
           <ClipboardPaste className="h-4 w-4" aria-hidden="true" />
-        </Button>
-        <Button
-          variant="danger"
-          soft
-          size="md"
-          onClick={() => setClearAllDialog(true)}
-          disabled={source.length === 0}
-          aria-label="Delete every line of code in the editor"
-          title="Delete every line of code in the editor"
-        >
-          <Trash2 className="h-4 w-4" aria-hidden="true" />
+          Paste game
         </Button>
         <Button
           variant="default"
           soft
-          size="md"
-          onClick={() => setDiscardDialog({ onConfirm: confirmReset })}
-          disabled={!dirty}
-          aria-label="Reset unsaved changes"
-          title="Reset unsaved changes"
-        >
-          <Eraser className="h-4 w-4" aria-hidden="true" />
-        </Button>
-        <div className="flex-1" />
-        <Button variant="default" soft size="md" onClick={handleSaveAsCopy}>
-          <CopyPlus className="h-4 w-4" aria-hidden="true" />
-          Copy
-        </Button>
-        <Button
-          variant="secondary"
-          size="md"
-          onClick={handleSave}
-          disabled={createGame.isPending || updateGame.isPending}
+          onClick={() => void handleSave()}
+          disabled={saving || !hasCode || (game !== undefined && !dirty)}
         >
           <Save className="h-4 w-4" aria-hidden="true" />
           Save
         </Button>
         <Button
           variant="primary"
-          size="md"
-          onClick={() => void handleRun()}
-          disabled={runStatus === "starting"}
-        >
-          <Play className="h-4 w-4" aria-hidden="true" />
-          Run
-        </Button>
-        <Button
-          variant="primary"
-          size="md"
-          onClick={handlePlayWithFriends}
-          title="Create a real party from this source and play it with friends"
+          onClick={() => void handlePlayWithFriends()}
+          disabled={saving || !hasCode}
+          title="Save this game and start a party with it"
         >
           <PartyPopper className="h-4 w-4" aria-hidden="true" />
-          Party
+          Play with friends
         </Button>
+        <EditorMoreMenu
+          source={source}
+          title={title}
+          {...(hasCode ? { onSaveAsCopy: () => void handleSaveAsCopy() } : {})}
+          {...(game !== undefined && dirty
+            ? { onDiscardChanges: () => setDiscardDialog(true) }
+            : {})}
+        />
       </div>
 
-      <Dialog
-        open={discardDialog !== null}
-        onClose={() => setDiscardDialog(null)}
-        title="Discard unsaved changes?"
+      <ProblemsPanel
+        validationIssues={hasCode ? validationIssues : []}
+        diagnostics={diagnostics}
+        consoleEntries={consoleEntries}
+        onCopyReport={() => void handleCopyReport()}
+      />
+
+      {/* Both views stay mounted so switching tabs keeps the arena running. */}
+      <section
+        aria-label="Code"
+        className={cn(
+          "h-[calc(100dvh-14rem)] min-h-80 overflow-hidden rounded-2xl bg-overlay",
+          view !== "code" && "hidden",
+        )}
       >
+        <CodeEditor value={source} onChange={setSource} ariaLabel="Game HTML source" />
+      </section>
+
+      <section aria-label="Test" className={cn(view !== "test" && "hidden")}>
+        {arenaSource.trim().length > 0 ? (
+          <ArenaRuntimeSeamsContext.Provider value={seams}>
+            <ArenaSection game={game} source={arenaSource} onDiagnostics={appendDiagnostics} />
+          </ArenaRuntimeSeamsContext.Provider>
+        ) : (
+          <div
+            className="glass flex flex-col items-center gap-4 rounded-2xl px-6 py-14 text-center"
+            data-testid="editor-empty-state"
+          >
+            <ClipboardPaste className="h-10 w-10 text-accent-soft-foreground" aria-hidden="true" />
+            <div className="flex flex-col gap-1">
+              <h2 className="text-2xl font-black">Paste your game to test it</h2>
+              <p className="max-w-md text-foreground/70">
+                Copy the HTML your AI wrote, then paste it here. It runs right away as several
+                players.
+              </p>
+            </div>
+            <div className="button-row">
+              <Button variant="primary" size="lg" onClick={() => void handlePaste()}>
+                <ClipboardPaste className="h-5 w-5" aria-hidden="true" />
+                Paste game
+              </Button>
+              <Link
+                to="/build"
+                search={{ page: "prompt" }}
+                className={buttonStyles("default", "lg", undefined, true)}
+              >
+                <Sparkles className="h-5 w-5" aria-hidden="true" />
+                Get the AI prompt
+              </Link>
+            </div>
+            <button
+              type="button"
+              className="text-sm font-semibold text-foreground/60 underline-offset-4 hover:underline"
+              onClick={() => setView("code")}
+            >
+              or write the code yourself
+            </button>
+          </div>
+        )}
+      </section>
+
+      <EditorTutorial open={tutorialOpen} onClose={closeTutorial} />
+
+      <Dialog open={leaveDialog} onClose={() => blocker.reset?.()} title="Save your changes?">
         <div className="flex flex-col gap-4">
           <p>
-            Your edits to “{title.trim() || DEFAULT_GAME_TITLE}” haven't been saved. Leaving now
-            loses them.
+            “{displayTitle}” has changes that aren&apos;t saved. Save them to My games before you
+            leave?
           </p>
-          <div className="flex justify-end gap-2">
-            <Button
-              variant="default"
-              soft
-              onClick={() => {
-                if (discardDialog?.onConfirm === confirmReset) {
-                  setDiscardDialog(null);
-                } else if (blocker.status === "blocked") {
-                  blocker.reset();
-                  setDiscardDialog(null);
-                }
-              }}
-            >
+          <div className="flex flex-wrap justify-end gap-2">
+            <Button variant="danger" soft onClick={() => blocker.proceed?.()}>
+              Don&apos;t save
+            </Button>
+            <Button variant="default" soft onClick={() => blocker.reset?.()}>
               Keep editing
             </Button>
-            <Button variant="danger" onClick={() => discardDialog?.onConfirm()}>
-              Discard changes
+            <Button variant="primary" onClick={() => void saveAndLeave()} disabled={saving}>
+              <Save className="h-4 w-4" aria-hidden="true" />
+              Save
             </Button>
           </div>
         </div>
       </Dialog>
 
       <Dialog
-        open={clearAllDialog}
-        onClose={() => setClearAllDialog(false)}
-        title="Clear all code?"
+        open={discardDialog}
+        onClose={() => setDiscardDialog(false)}
+        title="Discard unsaved changes?"
       >
         <div className="flex flex-col gap-4">
-          <p>
-            This deletes every line of code in the editor.
-            {game ? " Your saved version is untouched — Reset restores it." : ""}
-          </p>
-          <div className="flex justify-end gap-2">
-            <Button variant="default" soft onClick={() => setClearAllDialog(false)}>
-              Keep code
+          <p>This puts “{displayTitle}” back to its last saved version.</p>
+          <div className="button-row self-end">
+            <Button variant="default" soft onClick={() => setDiscardDialog(false)}>
+              Keep editing
             </Button>
-            <Button variant="danger" onClick={handleClearAll}>
-              <Trash2 className="h-4 w-4" aria-hidden="true" />
-              Clear all
+            <Button variant="danger" onClick={confirmDiscard}>
+              Discard changes
             </Button>
           </div>
         </div>
