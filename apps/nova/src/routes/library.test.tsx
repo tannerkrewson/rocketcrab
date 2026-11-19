@@ -46,16 +46,16 @@ describe("/library", () => {
     const back = backs[0];
     expect(back!.getAttribute("href")).toBe("/");
     expect(back!.className).toContain("button--tertiary");
-    expect(back!.className).toContain("self-start");
+    // Compact: it sits beside the search box, not across the page.
+    expect(back!.className).not.toContain("w-full");
     expect(screen.queryByRole("link", { name: /Browse games/ })).not.toBeInTheDocument();
 
     const build = screen.getByRole("link", { name: "New game" });
     expect(build.getAttribute("href")).toBe("/build");
     expect(build.className).toContain("button--primary");
-    expect(build.className).toContain("button--lg");
   });
 
-  it("lists saved games with their metadata", async () => {
+  it("lists saved games with a short line of context and Play/Edit", async () => {
     await gameRepository.create({
       title: "Rocket Rumble",
       description: "Fight in space",
@@ -67,8 +67,11 @@ describe("/library", () => {
     renderLibrary();
     expect(await screen.findByText("Rocket Rumble")).toBeInTheDocument();
     expect(screen.getByText("Card Sharks")).toBeInTheDocument();
-    expect(screen.getByText("state mode")).toBeInTheDocument();
-    expect(screen.getAllByText("Not tested")).toHaveLength(2);
+    // No jargon: mode, size, hash and untested badges are gone.
+    expect(screen.queryByText(/state mode/)).not.toBeInTheDocument();
+    expect(screen.queryByText("Not tested")).not.toBeInTheDocument();
+    expect(screen.getAllByText(/^Edited /)).toHaveLength(2);
+    expect(screen.getAllByRole("link", { name: "Edit" })).toHaveLength(2);
     const starts = screen.getAllByRole("link", { name: "Start party" });
     expect(starts).toHaveLength(2);
     expect(starts[0]!.getAttribute("href")).toContain("/party?gameId=");
@@ -98,7 +101,9 @@ describe("/library", () => {
     expect(card).not.toBeNull();
     const cardScope = within(card as HTMLElement);
 
-    await userEvent.click(cardScope.getByRole("button", { name: /^Delete$/ }));
+    const openMenu = () => userEvent.click(cardScope.getByLabelText("More actions for Doomed"));
+    await openMenu();
+    await userEvent.click(cardScope.getByRole("menuitem", { name: "Delete" }));
     expect(screen.getByRole("dialog")).toBeInTheDocument();
     expect(screen.getByText("Doomed")).toBeInTheDocument();
 
@@ -106,11 +111,22 @@ describe("/library", () => {
     await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
     expect(screen.getByText("Doomed")).toBeInTheDocument();
 
-    await userEvent.click(cardScope.getByRole("button", { name: /^Delete$/ }));
+    await openMenu();
+    await userEvent.click(cardScope.getByRole("menuitem", { name: "Delete" }));
     await userEvent.click(await screen.findByRole("button", { name: "Delete game" }));
     await waitFor(() => expect(screen.queryByText("Doomed")).not.toBeInTheDocument());
     expect(await screen.findByText("No saved games yet")).toBeInTheDocument();
     await expect(gameRepository.read(game.id)).rejects.toMatchObject({ code: "not_found" });
+  });
+
+  it("shows who shared a game saved from a party", async () => {
+    await gameRepository.create({
+      title: "Their Game",
+      html: "<p>x</p>",
+      copiedFrom: { gameId: "game_theirs", sourceHash: "a".repeat(64), sharedBy: "Ada" },
+    });
+    renderLibrary();
+    expect(await screen.findByText(/from Ada/)).toBeInTheDocument();
   });
 
   it("duplicates a game from its card", async () => {
@@ -119,7 +135,9 @@ describe("/library", () => {
 
     const card = (await screen.findByText("Rockets")).closest("li");
     expect(card).not.toBeNull();
-    await userEvent.click(within(card as HTMLElement).getByRole("button", { name: /duplicate/i }));
+    const cardScope = within(card as HTMLElement);
+    await userEvent.click(cardScope.getByLabelText("More actions for Rockets"));
+    await userEvent.click(cardScope.getByRole("menuitem", { name: "Duplicate" }));
 
     expect(await screen.findByText("Rockets (copy)")).toBeInTheDocument();
     expect(screen.getByText("Rockets")).toBeInTheDocument();

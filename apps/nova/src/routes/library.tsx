@@ -57,32 +57,34 @@ export function LibraryPage() {
     <div className="mx-auto flex w-full max-w-xl flex-col gap-6">
       <BrandHeader />
 
-      <Link to="/" className={buttonStyles("default", "md", "self-start", true)}>
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        back
-      </Link>
-
-      <header className="flex flex-wrap items-end justify-between gap-4">
+      {/* Same header as the games browser: title, then back + search. */}
+      <header className="flex items-center justify-between gap-4">
         <h1 className="text-3xl font-black">My games</h1>
-        <Link to="/build" className={buttonStyles("primary", "lg")}>
+        <Link to="/build" className={buttonStyles("primary", "md")}>
           <PlusCircle className="h-4 w-4" aria-hidden="true" />
           New game
         </Link>
       </header>
 
-      <div className="relative">
-        <Search
-          className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-foreground/40"
-          aria-hidden="true"
-        />
-        <input
-          type="search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search your games…"
-          aria-label="Search your games"
-          className="input input--primary w-full pl-10"
-        />
+      <div className="flex flex-wrap items-center gap-3">
+        <Link to="/" className={buttonStyles("default", "md", undefined, true)}>
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+          back
+        </Link>
+        <div className="relative min-w-0 flex-1 basis-56">
+          <Search
+            className="pointer-events-none absolute left-3 top-1/2 h-5 w-5 -translate-y-1/2 text-foreground/40"
+            aria-hidden="true"
+          />
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Search your games…"
+            aria-label="Search your games"
+            className="input input--primary w-full pl-10"
+          />
+        </div>
       </div>
 
       {gamesQuery.isPending ? (
@@ -108,7 +110,7 @@ export function LibraryPage() {
           />
         )
       ) : (
-        <ul className="flex flex-col gap-4">
+        <ul className="flex flex-col gap-3">
           {games.map((game) => (
             <li key={game.id}>
               <GameCard
