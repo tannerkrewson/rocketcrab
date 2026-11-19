@@ -9,7 +9,6 @@ import { getSavedPlayerName } from "../../lib/party/identity";
 import { Button, buttonStyles } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
 import { WelcomeSlats } from "../backgrounds/WelcomeSlats";
-import { PartyDiagnosticsPanel } from "./PartyDiagnostics";
 import { PartyInviteQr } from "./PartyInviteQr";
 import { clearBrowseContext } from "../../lib/browse/back-context";
 
@@ -17,7 +16,6 @@ export interface PartyLobbyProps {
   state: PartyEngineState;
   onStart: (force: boolean) => void;
   onLeave: () => void;
-  onRefreshDiagnostics: () => void;
   /** Host-only removal; callers must confirm first. */
   onKickMember: (memberId: string) => void;
   /** Compatibility callback; name editing routes through /join?edit=name. */
@@ -124,7 +122,6 @@ export function PartyLobby({
   state,
   onStart,
   onLeave,
-  onRefreshDiagnostics,
   onKickMember,
   onBrowseModeChange,
   initialBrowsing = false,
@@ -136,14 +133,6 @@ export function PartyLobby({
     onBrowseModeChange?.(browsing);
   }, [browsing, onBrowseModeChange]);
   const [qrOpen, setQrOpen] = useState(false);
-  const hostNameForDiagnostics =
-    state.members.find((member) => member.memberId === state.hostMemberId)?.displayName ??
-    state.hostMemberId ??
-    null;
-  const authorityName =
-    state.members.find((member) => member.memberId === state.authorityMemberId)?.displayName ??
-    state.authorityMemberId ??
-    null;
 
   const needsName = getSavedPlayerName() === null;
 
@@ -156,17 +145,6 @@ export function PartyLobby({
         ? "Waiting for the host to select a game"
         : `Waiting for ${hostName} to select a game`;
   }
-
-  const pageTitle = "Nova party";
-
-  useEffect(() => {
-    if (pageTitle === null) return;
-    const previous = document.title;
-    document.title = pageTitle;
-    return () => {
-      document.title = previous;
-    };
-  }, [pageTitle]);
 
   // Keep only the latest relevant notice; membership changes toast separately.
   const latestNotice =
@@ -445,12 +423,6 @@ export function PartyLobby({
           </Alert.Content>
         </Alert>
       ) : null}
-      <PartyDiagnosticsPanel
-        diagnostics={state.diagnostics}
-        onRefresh={onRefreshDiagnostics}
-        hostNameForDiagnostics={hostNameForDiagnostics}
-        authorityName={authorityName}
-      />
       <div className="flex justify-center">
         <Button variant="danger" size="md" onClick={onLeave}>
           <LogOut className="h-4 w-4" aria-hidden="true" />
@@ -467,7 +439,7 @@ export function PartyLobby({
         >
           <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl bg-overlay p-5 shadow-overlay">
             <p className="font-black">Scan to join the party</p>
-            <PartyInviteQr inviteUrl={state.inviteUrl} size={200} label={pageTitle ?? undefined} />
+            <PartyInviteQr inviteUrl={state.inviteUrl} size={200} />
             <Button variant="default" soft onClick={() => setQrOpen(false)}>
               Close
             </Button>

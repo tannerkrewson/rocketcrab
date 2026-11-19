@@ -1,4 +1,6 @@
-import { BrandLogo } from "../layout/BrandLogo";
+import { BrandHeader } from "../layout/BrandHeader";
+
+/** The standard rocketcrab.com brand row; not a link, so it can't pull a player out of the party. */
 export function PartyShellHeader({
   compact = false,
 }: {
@@ -6,9 +8,8 @@ export function PartyShellHeader({
   inviteUrl?: string | null;
 }) {
   return (
-    <header className="flex flex-col items-center gap-2 py-3 text-center">
-      <BrandLogo size={compact ? 24 : 40} />
-      <span className="text-xl font-bold">Nova party</span>
+    <header className="flex justify-center py-3">
+      <BrandHeader noLink size={compact ? 24 : 40} />
     </header>
   );
 }

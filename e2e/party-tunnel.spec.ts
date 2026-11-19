@@ -136,10 +136,18 @@ test("a tunnelled pair joins with no alarm and shows a relayed badge", async ({ 
 
     for (const player of players) {
       await expect(player.page.getByText("Couldn't connect to a player.")).toHaveCount(0);
-      await player.page.getByText("Connection diagnostics").click();
-      await expect(player.page.getByText("relayed", { exact: true })).toBeVisible({
-        timeout: 30_000,
-      });
+      // The lobby has no diagnostics panel; read relay use from the dev debug hook.
+      await expect
+        .poll(
+          () =>
+            player.page.evaluate(() => {
+              const debug = (window as { __NOVA_PARTY_DEBUG__?: () => { relayedPeers?: number } })
+                .__NOVA_PARTY_DEBUG__;
+              return debug?.().relayedPeers ?? 0;
+            }),
+          { timeout: 30_000 },
+        )
+        .toBeGreaterThan(0);
     }
   } finally {
     for (const player of players) await player.context.close();

@@ -249,7 +249,6 @@ function renderPhase(
           state={state}
           onStart={(force) => engine.startGame(force)}
           onLeave={() => void handleLeave()}
-          onRefreshDiagnostics={() => void engine.refreshDiagnostics()}
           onKickMember={handleKickMember}
           onEditName={handleEditName}
           onBrowseModeChange={onBrowseModeChange}

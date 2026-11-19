@@ -101,7 +101,6 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
       {...props}
       onStart={handlers.onStart ?? props.onStart}
       onLeave={handlers.onLeave ?? props.onLeave}
-      onRefreshDiagnostics={handlers.onRefreshDiagnostics ?? props.onRefreshDiagnostics}
       onKickMember={handlers.onKickMember ?? props.onKickMember}
       onEditName={handlers.onEditName ?? props.onEditName}
     />
@@ -233,64 +232,11 @@ describe("PartyLobby", () => {
     expect(within(rowB).getByText("retries exhausted")).toBeInTheDocument();
   });
 
-  it("hides the greeter and authority badges but keeps them in diagnostics (10.7)", async () => {
-    const state = makeState({
-      diagnostics: {
-        connectionState: "connected",
-        selfConnectionId: "conn-a",
-        room: "room-1",
-        sessionId: "session-1",
-        signalingConnected: null,
-        joinErrors: null,
-        peers: [],
-        lastQuality: [],
-        turn: null,
-      },
-    });
-    await renderLobby(state);
+  it("shows no greeter/authority badges and no connection diagnostics (10.7)", async () => {
+    await renderLobby(makeState());
     expect(screen.queryByText(/Greeter:/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Authority \(diagnostic\)/)).not.toBeInTheDocument();
-    await userEvent.click(screen.getByText("Connection diagnostics"));
-    expect(screen.getByText(/party host: Player A/)).toBeInTheDocument();
-    expect(screen.getByText(/authority: Player A/)).toBeInTheDocument();
-  });
-
-  it("shows connected signaling", async () => {
-    const state = makeState({
-      diagnostics: {
-        connectionState: "connected",
-        selfConnectionId: "conn-a",
-        room: "room-1",
-        sessionId: "session-1",
-        signalingConnected: true,
-        joinErrors: null,
-        peers: [],
-        lastQuality: [],
-        turn: null,
-      },
-    });
-    await renderLobby(state);
-    expect(screen.getByText("Signaling: connected")).toBeInTheDocument();
-  });
-
-  it("warns when no relay socket is open (signaling down)", async () => {
-    const state = makeState({
-      diagnostics: {
-        connectionState: "joining",
-        selfConnectionId: "conn-a",
-        room: "room-1",
-        sessionId: "session-1",
-        signalingConnected: false,
-        joinErrors: null,
-        peers: [],
-        lastQuality: [],
-        turn: null,
-      },
-    });
-    await renderLobby(state);
-    await userEvent.click(screen.getByText("Connection diagnostics"));
-    expect(screen.getByText(/No relay socket is open/)).toBeInTheDocument();
-    expect(screen.getByText("Signaling: disconnected")).toBeInTheDocument();
+    expect(screen.queryByText("Connection diagnostics")).not.toBeInTheDocument();
   });
 
   it("does not show the pick-a-game blocker text near the buttons (10.7)", async () => {
@@ -695,12 +641,12 @@ describe("PartyLobby", () => {
     expect(screen.queryByText(/invite-secret/)).not.toBeInTheDocument();
   });
 
-  it("opens the QR code in a modal with the safe label (10.5)", async () => {
+  it("opens the QR code in a modal without the invite secret (10.5)", async () => {
     await renderLobby(makeState());
     await userEvent.click(screen.getByRole("button", { name: /qr code/i }));
     const dialog = screen.getByRole("dialog", { name: "Party QR code" });
     expect(within(dialog).getByLabelText("Party invite QR code")).toBeInTheDocument();
-    expect(within(dialog).getByText("Nova party")).toBeInTheDocument();
+    expect(within(dialog).getByText("Scan to join the party")).toBeInTheDocument();
     expect(screen.queryByText(/invite-secret/)).not.toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: /close/i }));
     expect(screen.queryByLabelText("Party invite QR code")).not.toBeInTheDocument();

@@ -145,6 +145,8 @@ export class PartySnapshot {
         ready: member.ready,
       })),
       notices: state.notices.map((notice) => notice.message),
+      // Peers reached through the relay tunnel rather than direct WebRTC.
+      relayedPeers: state.diagnostics?.peers.filter((peer) => peer.tunnelled === true).length ?? 0,
     };
   }
 

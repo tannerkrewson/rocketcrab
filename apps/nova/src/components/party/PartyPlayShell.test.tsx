@@ -120,7 +120,7 @@ async function renderShell(
 describe("PartyPlayShell in-game chrome (7.38)", () => {
   it("shows the centered rocketcrab.com party URL instead of the game name", async () => {
     await renderShell(makeState());
-    expect(screen.getByLabelText("Party link Nova party")).toBeInTheDocument();
+    expect(screen.getByLabelText("Copy the invite link")).toHaveTextContent("rocketcrab.com");
     expect(screen.queryByText("Rocket Rumble")).not.toBeInTheDocument();
     expect(screen.queryByText("connected")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Party code ABCD")).not.toBeInTheDocument();
@@ -131,7 +131,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     await userEvent.click(screen.getByRole("button", { name: /hide the top bar/i }));
     expect(screen.getByRole("button", { name: /show the top bar/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /menu/i })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Party link Nova party")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Copy the invite link")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /show the top bar/i }));
     expect(screen.getByRole("button", { name: /menu/i })).toBeInTheDocument();
   });
@@ -314,7 +314,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
 
   it("scales the party URL down while pressed like the homepage title (0dd)", async () => {
     await renderShell(makeState());
-    const url = screen.getByLabelText("Party link Nova party");
+    const url = screen.getByLabelText("Copy the invite link");
     expect(url).toHaveClass("active:scale-95", "transition-transform");
   });
 
@@ -336,7 +336,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
       configurable: true,
     });
     await renderShell(makeState());
-    await userEvent.click(screen.getByLabelText("Party link Nova party"));
+    await userEvent.click(screen.getByLabelText("Copy the invite link"));
     expect(writeText).toHaveBeenCalledWith(
       "http://localhost:5173/join#code=abcd&secret=invite-secret",
     );

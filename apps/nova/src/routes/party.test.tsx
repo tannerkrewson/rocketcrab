@@ -268,7 +268,7 @@ describe("/party", () => {
       stubs.started = true;
       const router = renderParty("/party?browse=true");
       // The router serializes the boolean as ?browse=true; ?browse=1 does not round-trip.
-      expect(await screen.findByText("Nova party")).toBeInTheDocument();
+      expect(await screen.findByTestId("browser-brand-row")).toBeInTheDocument();
       expect(router.state.location.pathname).toBe("/party");
       expect(router.state.location.searchStr).toBe("?browse=true");
     });

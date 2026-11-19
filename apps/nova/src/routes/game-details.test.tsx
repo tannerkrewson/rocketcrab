@@ -200,12 +200,12 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
   });
 
-  it("shares the party shell header (logo + code) while in a lobby (5cl.8)", async () => {
+  it("shares the party shell header (unlinked brand row) while in a lobby (5cl.8)", async () => {
     stubs.mode = "lobby";
     renderAt("/game/drawphone?from=party-browse");
 
-    const title = await screen.findByText("Nova party");
-    expect(title.textContent).toBe("Nova party");
+    const brand = await screen.findByTestId("browser-brand-row");
+    expect(brand.textContent).toBe("rocketcrab.com");
     expect(screen.queryByRole("link", { name: /rocketcrab\.com/ })).not.toBeInTheDocument();
     const back = screen.getByRole("link", { name: "Back to category" });
     expect(back.getAttribute("href")).toBe("/party?browse=true");
@@ -241,7 +241,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     await userEvent.click(back);
 
     await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
-    expect(screen.getByText("Nova party")).toHaveTextContent("Nova party");
+    expect(screen.getByTestId("browser-brand-row")).toHaveTextContent("rocketcrab.com");
     expect(stubEngine.leaveParty).not.toHaveBeenCalled();
   });
 

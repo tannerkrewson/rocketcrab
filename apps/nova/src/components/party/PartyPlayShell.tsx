@@ -87,7 +87,6 @@ export function PartyPlayShell({
     }
   };
 
-  const roomUrl = "Nova party";
   const menuOpen = panel === "menu";
 
   return (
@@ -111,10 +110,10 @@ export function PartyPlayShell({
               className="font-title whitespace-nowrap text-lg font-black text-foreground transition-transform active:scale-95 md:text-xl"
               onClick={() => void copyInvite()}
               disabled={state.inviteUrl === null}
-              title={state.inviteUrl === null ? roomUrl : "Copy the invite link"}
-              aria-label={`Party link ${roomUrl}`}
+              title="Copy the invite link"
+              aria-label="Copy the invite link"
             >
-              {roomUrl}
+              rocketcrab<span className="text-primary">.com</span>
             </button>
           </div>
 
