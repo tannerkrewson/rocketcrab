@@ -159,27 +159,21 @@ beforeEach(async () => {
 });
 
 describe("/party", () => {
-  it("shows the entry point when no party is active and no game is chosen", async () => {
+  it("asks for a name first when none was ever set; no start-party page", async () => {
     renderParty("/party");
-    expect(await screen.findByRole("heading", { name: "Start a party" })).toBeInTheDocument();
-    expect(screen.queryByLabelText("Your player name")).not.toBeInTheDocument();
-    expect(screen.queryByText(/your party starts in the lobby/i)).not.toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "What's your name?" })).toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Start a party" })).not.toBeInTheDocument();
     expect(stubEngine.createParty).not.toHaveBeenCalled();
   });
 
-  it("shows no secondary actions on the start-party page (7.37)", async () => {
+  it("starts the party as soon as the name is entered (rocketcrab-9j3)", async () => {
     renderParty("/party");
-    await screen.findByRole("heading", { name: "Start a party" });
-    expect(screen.queryByRole("link", { name: /start with a game/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /join a party/i })).not.toBeInTheDocument();
-  });
-
-  it("starts a party without a game directly from the entry (rocketcrab-9j3)", async () => {
-    renderParty("/party");
-    await screen.findByRole("heading", { name: "Start a party" });
-    fireEvent.click(screen.getByRole("button", { name: /start a party/i }));
+    fireEvent.change(await screen.findByLabelText("Your player name"), {
+      target: { value: "Ada" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Start party" }));
+    expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada");
     await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledWith());
-    expect(stubEngine.setDisplayName).not.toHaveBeenCalled();
   });
 
   it("skips the entry page for a returning player with a saved name (7.37)", async () => {
@@ -188,10 +182,11 @@ describe("/party", () => {
     await waitFor(() => expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada"));
     await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledWith());
     expect(await screen.findByText("Welcome to rocketcrab!")).toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Start a party" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "What's your name?" })).not.toBeInTheDocument();
   });
 
   it("creates a party from a saved game", async () => {
+    updatePartyDisplayName("Ada");
     const game = await gameRepository.create({
       title: "Rocket Rumble",
       html: SAVED_HTML,
@@ -211,6 +206,7 @@ describe("/party", () => {
   });
 
   it("prefers the editor's handed-off source over the saved game", async () => {
+    updatePartyDisplayName("Ada");
     const game = await gameRepository.create({ title: "Rocket Rumble", html: SAVED_HTML });
     const unsaved = "<!doctype html><html><body><p>unsaved</p></body></html>";
     storePartySource({ gameId: game.id, source: unsaved });
@@ -253,8 +249,8 @@ describe("/party", () => {
 
   describe("host URL normalization to /<code> (rocketcrab-r0f)", () => {
     it("replaces /party with /<code> once a party is active", async () => {
+      updatePartyDisplayName("Ada");
       const router = renderParty("/party");
-      fireEvent.click(await screen.findByRole("button", { name: /start a party/i }));
       await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
       // The rewrite is a REPLACE: the /party entry is gone from history, so
       // there is no back-navigation spam into the party flow.
@@ -275,7 +271,7 @@ describe("/party", () => {
 
     it("never redirects while idle or still creating", async () => {
       let router = renderParty("/party");
-      expect(await screen.findByRole("heading", { name: "Start a party" })).toBeInTheDocument();
+      expect(await screen.findByRole("heading", { name: "What's your name?" })).toBeInTheDocument();
       expect(router.state.location.pathname).toBe("/party");
       stubs.state = CREATING_STATE;
       router = renderParty("/party");

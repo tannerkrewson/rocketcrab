@@ -13,7 +13,12 @@ import {
   type WebSocket,
 } from "@playwright/test";
 import { findRuntimeFrame } from "./runtime-helpers";
-import { expectPlayViewOnAll, recordConsole, recordCopiedInvites } from "./party-debug";
+import {
+  expectPlayViewOnAll,
+  recordConsole,
+  recordCopiedInvites,
+  seedPlayerName,
+} from "./party-debug";
 import { clickInGame, gameState, NOVA_QUIZ_HTML, waitForGameState } from "./quiz-frame-helpers";
 
 const GAME_ID = "game_tunnel_quiz";
@@ -31,6 +36,10 @@ interface Player {
 async function newPlayer(browser: Browser, forced: boolean): Promise<Player> {
   const context = await browser.newContext({ baseURL: PARTY_ORIGIN });
   await recordCopiedInvites(context);
+  await seedPlayerName(
+    context,
+    forced ? "Tunnelled" : `Player ${Math.random().toString(36).slice(2, 6)}`,
+  );
   await context.addInitScript((forceTunnel: boolean) => {
     if (forceTunnel) {
       (window as unknown as { __NOVA_TEST_FORCE_TUNNEL__?: boolean }).__NOVA_TEST_FORCE_TUNNEL__ =

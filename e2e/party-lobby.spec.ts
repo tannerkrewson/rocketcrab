@@ -3,7 +3,12 @@
  * party-flow failures from tunnel failures, without retries hiding stalls.
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
-import { expectPlayViewOnAll, recordConsole, recordCopiedInvites } from "./party-debug";
+import {
+  expectPlayViewOnAll,
+  recordConsole,
+  recordCopiedInvites,
+  seedPlayerName,
+} from "./party-debug";
 import { NOVA_QUIZ_HTML } from "./quiz-frame-helpers";
 
 test.describe.configure({ retries: 0 });
@@ -14,6 +19,7 @@ const PARTY_ORIGIN = "http://localhost:5173";
 async function newPlayer(browser: Browser): Promise<{ context: BrowserContext; page: Page }> {
   const context = await browser.newContext({ baseURL: PARTY_ORIGIN });
   await recordCopiedInvites(context);
+  await seedPlayerName(context, `Player ${Math.random().toString(36).slice(2, 6)}`);
   return { context, page: await context.newPage() };
 }
 

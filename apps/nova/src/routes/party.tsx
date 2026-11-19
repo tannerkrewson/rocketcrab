@@ -1,14 +1,13 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { ArrowLeft, PartyPopper } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { PROTOCOL_VERSION, type GameMode } from "@rocketcrab/protocol";
 import { PartyExperience } from "../components/party/PartyExperience";
 import { PartyResumeBanner } from "../components/party/PartyResumeBanner";
-import { PartyShellHeader } from "../components/party/PartyShellHeader";
+import { NameEntry } from "../components/party/NameEntry";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
 import { LoadingState } from "../components/ui/LoadingState";
-import { Button, buttonStyles } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
+import { buttonStyles } from "../components/ui/Button";
 import { usePartyEngine } from "../lib/party/use-party";
 import { takePartySource } from "../lib/party/source-handoff";
 import { getSavedPlayerName } from "../lib/party/identity";
@@ -48,19 +47,18 @@ function PartyPage() {
   const startedRef = useRef(false);
   const [attempt, setAttempt] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
+  // Players must pick a real name before any party starts.
+  const [needsName, setNeedsName] = useState(() => getSavedPlayerName() === null);
 
   useEffect(() => {
-    if (startedRef.current || engine.isActive()) {
+    if (startedRef.current || engine.isActive() || needsName) {
       return;
     }
     const gameId = search.gameId;
     if (gameId === undefined) {
-      const savedName = getSavedPlayerName();
-      if (savedName === null) {
-        return;
-      }
       startedRef.current = true;
-      engine.setDisplayName(savedName);
+      const savedName = getSavedPlayerName();
+      if (savedName !== null) engine.setDisplayName(savedName);
       void engine.createParty();
       return;
     }
@@ -85,16 +83,12 @@ function PartyPage() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine, search.gameId, search.mode, search.title, attempt]);
+  }, [engine, search.gameId, search.mode, search.title, attempt, needsName]);
 
   const handleRetry = () => {
     startedRef.current = false;
     setLoadError(null);
     setAttempt((value) => value + 1);
-  };
-
-  const handleStartParty = () => {
-    void engine.createParty();
   };
 
   if (engine.isActive()) {
@@ -120,30 +114,28 @@ function PartyPage() {
       </div>
     );
   }
-  if (search.gameId !== undefined) {
-    return <LoadingState label="Loading game…" />;
+  if (needsName) {
+    return (
+      <NameEntry
+        description="Your friends will see this when they join your party."
+        submitLabel="Start party"
+        onSubmit={(name) => {
+          engine.setDisplayName(name);
+          setNeedsName(false);
+        }}
+        secondary={
+          <>
+            <PartyResumeBanner engine={engine} />
+            <Link to="/" className={buttonStyles("default", "md", undefined, true)}>
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+              Back to home
+            </Link>
+          </>
+        }
+      />
+    );
   }
   return (
-    <div className="mx-auto flex w-full max-w-md flex-col gap-4">
-      <PartyShellHeader />
-      <PartyResumeBanner engine={engine} />
-      <Card>
-        <div className="flex flex-col gap-3">
-          <h1 className="text-2xl font-black">Start a party</h1>
-          <Button variant="primary" size="lg" onClick={handleStartParty}>
-            <PartyPopper className="h-5 w-5" aria-hidden="true" />
-            Start a party
-          </Button>
-        </div>
-      </Card>
-      <Link
-        to="/"
-        className={buttonStyles("default", "md", "self-center", true)}
-        title="Back to home"
-      >
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        Back to home
-      </Link>
-    </div>
+    <LoadingState label={search.gameId !== undefined ? "Loading game…" : "Starting your party…"} />
   );
 }

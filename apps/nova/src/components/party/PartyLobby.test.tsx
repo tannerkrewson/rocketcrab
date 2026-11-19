@@ -458,13 +458,11 @@ describe("PartyLobby", () => {
     expect(onEditName).not.toHaveBeenCalled();
   });
 
-  it("prompts for a name once in the lobby when none was ever set (2t1.9)", async () => {
+  it("never nags about a missing name in the lobby (names are set before joining)", async () => {
     resetPartyIdentityForTests();
     await renderLobby(makeState());
-    const prompt = screen.getByLabelText("Set your name");
-    expect(within(prompt).getByText(/you haven't set a name yet/i)).toBeInTheDocument();
-    expect(within(prompt).getByRole("link", { name: /set your name/i })).toBeInTheDocument();
-    expect(within(prompt).getByRole("link").getAttribute("href")).toBe("/join?edit=name");
+    expect(screen.queryByLabelText("Set your name")).not.toBeInTheDocument();
+    expect(screen.queryByText(/you haven't set a name yet/i)).not.toBeInTheDocument();
   });
 
   it("does not prompt for a name once one is saved (2t1.9)", async () => {

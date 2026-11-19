@@ -5,7 +5,6 @@ import { Alert } from "@heroui/react";
 import { toast } from "../../lib/toast";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState, PartyMemberView, PartyNotice } from "../../lib/party/engine";
-import { getSavedPlayerName } from "../../lib/party/identity";
 import { Button, buttonStyles } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
 import { WelcomeSlats } from "../backgrounds/WelcomeSlats";
@@ -133,8 +132,6 @@ export function PartyLobby({
     onBrowseModeChange?.(browsing);
   }, [browsing, onBrowseModeChange]);
   const [qrOpen, setQrOpen] = useState(false);
-
-  const needsName = getSavedPlayerName() === null;
 
   const hostName =
     state.members.find((member) => member.memberId === state.hostMemberId)?.displayName ?? null;
@@ -277,21 +274,6 @@ export function PartyLobby({
           )}
         </div>
       </section>
-      {needsName ? (
-        <section
-          aria-label="Set your name"
-          className="flex flex-wrap items-center justify-center gap-3 rounded-2xl bg-primary/15 p-4 shadow-surface"
-        >
-          <p className="text-sm font-semibold">
-            You haven&apos;t set a name yet — friends see you as{" "}
-            <span className="font-black">{state.displayName}</span>.
-          </p>
-          <Link to="/join" search={{ edit: "name" }} className={buttonStyles("primary", "md")}>
-            <Pencil className="h-4 w-4" aria-hidden="true" />
-            Set your name
-          </Link>
-        </section>
-      ) : null}
 
       <section className="flex flex-wrap items-center justify-center gap-2">
         {state.amHost ? (

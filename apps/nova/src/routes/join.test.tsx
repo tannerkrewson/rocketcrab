@@ -141,14 +141,30 @@ beforeEach(() => {
 describe("/join", () => {
   it("offers private invite instructions without code entry or a name prompt", async () => {
     renderJoin();
-    expect(
-      await screen.findByRole("heading", { name: "Join a private party" }),
-    ).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "Join a party" })).toBeInTheDocument();
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Start a party" })).toHaveAttribute("href", "/party");
+    expect(screen.getByRole("link", { name: "Start your own party" })).toHaveAttribute(
+      "href",
+      "/party",
+    );
+  });
+
+  it("asks for a name before joining from an invite, then joins", async () => {
+    window.history.pushState({}, "", `/join#code=ABCD&secret=${VALID_SECRET}`);
+    renderJoin();
+    expect(await screen.findByRole("heading", { name: "What's your name?" })).toBeInTheDocument();
+    expect(stubEngine.joinByInvite).not.toHaveBeenCalled();
+    await waitFor(() => expect(window.location.hash).toBe(""));
+    fireEvent.change(screen.getByLabelText("Your player name"), { target: { value: "Ada" } });
+    fireEvent.click(screen.getByRole("button", { name: "Join party" }));
+    expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada");
+    await waitFor(() =>
+      expect(stubEngine.joinByInvite).toHaveBeenCalledWith({ secret: VALID_SECRET }),
+    );
   });
 
   it("imports an invite fragment secret and strips it from the URL", async () => {
+    setSavedPlayerName("Ada");
     window.history.pushState({}, "", `/join#code=ABCD&secret=${VALID_SECRET}`);
     renderJoin();
     await waitFor(() => expect(stubEngine.joinByInvite).toHaveBeenCalledTimes(1));
@@ -166,6 +182,7 @@ describe("/join", () => {
   });
 
   it("shows the loading screen for a URL-driven invite join (5cl.3)", async () => {
+    setSavedPlayerName("Ada");
     window.history.pushState({}, "", `/join#code=ABCD&secret=${VALID_SECRET}`);
     renderJoin();
     await waitFor(() => expect(stubEngine.joinByInvite).toHaveBeenCalledTimes(1));
@@ -174,6 +191,7 @@ describe("/join", () => {
   });
 
   it("surfaces a failed URL-driven join on the form (5cl.3)", async () => {
+    setSavedPlayerName("Ada");
     window.history.pushState({}, "", `/join#code=ZZZZ&secret=${VALID_SECRET}`);
     renderJoin();
     await waitFor(() => expect(stubEngine.joinByInvite).toHaveBeenCalledTimes(1));
@@ -221,7 +239,7 @@ describe("/join", () => {
     fireEvent.change(input, { target: { value: "Ada" } });
     fireEvent.click(screen.getByRole("button", { name: /^save$/i }));
     await waitFor(() => expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada"));
-    expect(await screen.findByText("Join a private party")).toBeInTheDocument();
+    expect(await screen.findByText("Join a party")).toBeInTheDocument();
     expect(screen.queryByLabelText("Your player name")).not.toBeInTheDocument();
   });
 
@@ -229,7 +247,7 @@ describe("/join", () => {
     renderJoin("/join?edit=name");
     await screen.findByLabelText("Your player name");
     fireEvent.click(screen.getByRole("button", { name: /^back$/i }));
-    expect(await screen.findByText("Join a private party")).toBeInTheDocument();
+    expect(await screen.findByText("Join a party")).toBeInTheDocument();
     expect(stubEngine.setDisplayName).not.toHaveBeenCalled();
   });
 });

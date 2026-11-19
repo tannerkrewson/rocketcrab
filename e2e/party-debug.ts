@@ -11,6 +11,18 @@ import { expect, type BrowserContext, type Page } from "@playwright/test";
 const TRACE_DIR = process.env.PLAY_TRACE_DIR;
 
 /**
+ * Players must name themselves before starting or joining a party. Seed a
+ * saved name (the app's own storage key) so party specs skip that step.
+ */
+export async function seedPlayerName(context: BrowserContext, name: string): Promise<void> {
+  await context.addInitScript((value: string) => {
+    if (localStorage.getItem("nova:player:name:v1") === null) {
+      localStorage.setItem("nova:player:name:v1", value);
+    }
+  }, name);
+}
+
+/**
  * Record the invite each page copies, instead of reading the clipboard:
  * Firefox and WebKit do not grant clipboard permissions in Playwright. A page
  * reads its last copied text from `window.__copied`.
