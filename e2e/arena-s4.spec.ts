@@ -9,6 +9,7 @@ import { clickInGame, gameState, NOVA_QUIZ_HTML, waitForGameState } from "./quiz
 import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { openEditorWithSource } from "./editor-helpers";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -66,14 +67,9 @@ async function capture(page: Page, name: string): Promise<void> {
 }
 
 async function openArenaWithFourPlayers(page: Page): Promise<void> {
-  await page.goto("/");
-  await page.evaluate((source) => {
-    sessionStorage.setItem(
-      "nova:draft-source:v1",
-      JSON.stringify({ gameId: "draft-s4", source, updatedAt: Date.now() }),
-    );
-  }, NOVA_QUIZ_HTML);
-  await page.goto("/editor");
+  await openEditorWithSource(page, NOVA_QUIZ_HTML);
+  // Run rebuilds the arena; add players only once that first run settles.
+  await expect(page.getByText("Test passed")).toBeVisible({ timeout: 90_000 });
 
   const addButton = page.getByRole("button", { name: /Add player/ });
   await expect(addButton).toBeVisible({ timeout: 30_000 });

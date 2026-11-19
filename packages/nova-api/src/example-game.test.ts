@@ -1,7 +1,7 @@
 /**
  * State-mode example game, executed end to end.
  *
- * `examples/games/nova-quiz.html` is a single-file state-mode game. Its inline
+ * `packages/testing/fixtures/games/nova-quiz.html` is a single-file state-mode game. Its inline
  * module script runs against real session-backed `nova` clients (the same
  * clients the runtime frame bridge builds) over the in-memory transport, so
  * this suite exercises the REAL state engine: action application on the
@@ -18,7 +18,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InMemoryTransportHub, type InMemoryTransport } from "@rocketcrab/testing";
 // The single-file example game, verbatim (Vite ?raw import; the tests
 // execute the exact source that runs in the arena and real parties).
-import GAME_SOURCE from "../../../examples/games/nova-quiz.html?raw";
+import GAME_SOURCE from "../../testing/fixtures/games/nova-quiz.html?raw";
 import { createNovaSession, type NovaSession, type NovaSessionOptions } from "./session";
 import type { NovaAction } from "./types";
 

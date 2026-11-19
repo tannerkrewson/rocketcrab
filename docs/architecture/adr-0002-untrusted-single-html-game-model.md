@@ -70,5 +70,6 @@ only inside the isolated runtime origin (ADR-0001).
   load failures). It does not attempt to prove correctness.
 - P3 transfers the exact HTML string peer-to-peer, verified by SHA-256, so all
   players run byte-identical documents.
-- The repository layout reserves `examples/games` for complete single-HTML
-  sample games (S4, M4).
+- Complete single-HTML games used by the test suites live in
+  `packages/testing/fixtures/games` (S4, M4). The app ships no example
+  catalog; players start from the master prompt or a blank editor.

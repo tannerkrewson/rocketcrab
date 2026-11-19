@@ -6,9 +6,9 @@ import type { Frame } from "@playwright/test";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
-/** The bundled nova-quiz example: the state-mode game the quiz specs play. */
+/** The nova-quiz fixture: the state-mode game the quiz specs play. */
 export const NOVA_QUIZ_HTML = readFileSync(
-  path.join(dirname, "..", "examples", "games", "nova-quiz.html"),
+  path.join(dirname, "..", "packages", "testing", "fixtures", "games", "nova-quiz.html"),
   "utf8",
 );
 

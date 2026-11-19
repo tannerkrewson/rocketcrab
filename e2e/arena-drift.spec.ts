@@ -7,12 +7,15 @@ import { expect, test, type Frame, type Page } from "@playwright/test";
 import { readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { openEditorWithSource } from "./editor-helpers";
 
 const DRIFT_HTML = readFileSync(
   path.join(
     path.dirname(fileURLToPath(import.meta.url)),
     "..",
-    "examples",
+    "packages",
+    "testing",
+    "fixtures",
     "games",
     "nova-drift.html",
   ),
@@ -67,14 +70,7 @@ test("Nova Drift: controls steer the puck everywhere and survive a host handoff"
   page,
 }) => {
   test.setTimeout(120_000);
-  await page.goto("/");
-  await page.evaluate((source) => {
-    sessionStorage.setItem(
-      "nova:draft-source:v1",
-      JSON.stringify({ gameId: "draft-drift", source, updatedAt: Date.now() }),
-    );
-  }, DRIFT_HTML);
-  await page.goto("/editor");
+  await openEditorWithSource(page, DRIFT_HTML);
   await expect(page.locator('[data-testid^="arena-frame-player-"] iframe')).toHaveCount(2, {
     timeout: 30_000,
   });

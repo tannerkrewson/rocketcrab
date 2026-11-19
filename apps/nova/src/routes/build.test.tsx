@@ -5,7 +5,6 @@ import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { buildMasterPrompt } from "../lib/prompt/master-prompt";
-import { readDraftSource } from "../lib/editor/draft-handoff";
 import { routeTree } from "../routeTree.gen";
 
 const PROMPT = buildMasterPrompt();
@@ -136,37 +135,6 @@ describe("/build?page=prompt — the master-prompt step", () => {
     expect(editor.className).toContain("button--primary");
 
     expect(screen.queryByRole("textbox", { name: "Paste game HTML" })).not.toBeInTheDocument();
-  });
-
-  it("surfaces the Nova example games and opens one as a draft (wks)", async () => {
-    renderBuild("/build?page=prompt");
-    await screen.findByRole("heading", { name: "Get the master prompt" });
-
-    expect(
-      screen.getByRole("heading", { name: "Or start from a Nova example" }),
-    ).toBeInTheDocument();
-
-    expect(screen.getByText("Nova Quiz")).toBeInTheDocument();
-    expect(screen.getAllByText("state mode")).toHaveLength(2);
-    expect(screen.getByText("Nova Drift")).toBeInTheDocument();
-    expect(screen.getByText("Chatter (raw mode sample)")).toBeInTheDocument();
-
-    const openButtons = await screen.findAllByRole("button", {
-      name: /^Open in the editor/,
-    });
-    expect(openButtons).toHaveLength(3);
-    await userEvent.click(openButtons[0] as HTMLElement);
-
-    // jsdom renders both layouts, so scope assertions to the desktop editor.
-    const desktop = await screen.findByTestId("desktop-layout");
-    const editor = within(desktop).getByRole("textbox", { name: "Game HTML source" });
-    expect(editor.textContent).toContain("<!doctype html>");
-
-    const draft = readDraftSource();
-    expect(draft?.gameId.startsWith("draft-")).toBe(true);
-    expect(draft?.source).toContain("<!doctype html>");
-    expect(draft?.source).toContain("nova.defineGame");
-    expect(draft?.source).toContain("Nova Quiz");
   });
 
   it("keeps the editor as the paste target — no paste box (7.44)", async () => {

@@ -64,13 +64,11 @@ install tools, understand code, deploy a website, or create a repository.
 │   ├── nova-api/             # Game-facing API client and session engine
 │   ├── party/                # Party session, membership and source transfer
 │   ├── trystero-transport/   # Real-party transport (Trystero 0.27) and tunnel fallback
-│   └── testing/              # In-memory transport and reusable fixtures
+│   └── testing/              # In-memory transport and fixtures (incl. test games)
 ├── deploy/
 │   ├── edge/                 # The one Cloudflare edge Worker (signaling, tunnel, TURN, relay)
 │   ├── nova/, runtime/       # Static-asset Worker configs (not deployed yet)
 │   └── cloudflare.md         # Edge Worker runbook and live state
-├── examples/
-│   └── games/                # Complete single-HTML sample games
 ├── e2e/, e2e-trystero/       # Playwright browser suites
 ├── scripts/                  # Build, bundle-size and deploy verification helpers
 ├── docs/

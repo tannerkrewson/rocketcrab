@@ -97,10 +97,5 @@ describe("AppLayout", () => {
     await screen.findByRole("heading", { name: "Introducing Nova" });
     const buildBack = screen.getByRole("link", { name: "back" });
     expect(buildBack.getAttribute("href")).toBe("/");
-
-    renderAt("/examples");
-    await screen.findByRole("heading", { name: "Example games" });
-    const home = screen.getByRole("link", { name: "Back to home" });
-    expect(home.getAttribute("href")).toBe("/");
   });
 });

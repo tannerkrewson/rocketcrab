@@ -21,7 +21,7 @@ Owner: M1 (rocketcrab-9fv.6.1) → handed to M4 (rocketcrab-9fv.6.4).
   localhost, so start each workspace by hand (see
   `docs/architecture/deployment.md`). Install the throwaway cert on each phone
   (`https://<LAN IP>:5174` first, then the app origin).
-- A game to play: `examples/games/nova-quiz.html` (Nova Quiz, state mode) is
+- A game to play: `packages/testing/fixtures/games/nova-quiz.html` (Nova Quiz, state mode) is
   the reference game — paste it into Create, save it, and use it for every
   scenario.
 - Low Power Mode: enable on one phone via Settings → Battery (practical

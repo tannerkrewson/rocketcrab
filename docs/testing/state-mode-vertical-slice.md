@@ -5,7 +5,7 @@ Status: **automated verification green** (2026-08-12). Physical-phone steps
 run them at release validation (M4) with two+ phones on the same LAN/Wi-Fi.
 
 The backendless state-mode MVP milestone: one complete example game
-(`examples/games/nova-quiz.html` — "Nova Quiz", a round-based trivia
+(`packages/testing/fixtures/games/nova-quiz.html` — "Nova Quiz", a round-based trivia
 face-off) proves the whole create → play → migrate → reconnect workflow
 with no Nova backend. Nova owns state, ordering, per-player views,
 authority election, and migration; the game file contains no networking and
@@ -81,7 +81,7 @@ The automated suites cover everything that can run headless. Steps **6**,
 the host on a laptop, guests on phones). Expected results are in bold.
 
 1. **Open Create** (`/create`). Paste the contents of
-   `examples/games/nova-quiz.html` into the editor.
+   `packages/testing/fixtures/games/nova-quiz.html` into the editor.
 2. **Run four simulated players.** Press _Test multiplayer_ → the arena
    loads with two players; add two more with _Add player_. **Every frame
    registers "Nova Quiz" (state mode), "Test passed" appears, and after a

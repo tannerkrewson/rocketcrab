@@ -1,5 +1,4 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Badge } from "../components/ui/Badge";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import {
   ArrowLeft,
   Bot,
@@ -16,8 +15,6 @@ import { Button, buttonStyles } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { BrandLogo } from "../components/layout/BrandLogo";
 import { NovaSilk } from "../components/backgrounds/NovaSilk";
-import { storeDraftSource } from "../lib/editor/draft-handoff";
-import { exampleGames, exampleModeLabel } from "../lib/editor/example-games";
 import { writeToClipboard } from "../lib/editor/clipboard";
 import { buildMasterPrompt } from "../lib/prompt/master-prompt";
 
@@ -37,7 +34,7 @@ interface BuildSearch {
 const NOVA_API_REFERENCE_URL =
   "https://github.com/tannerkrewson/rocketcrab/blob/docs/api/nova-api-ai-reference.md";
 
-/** Build flow: introduction, then a copyable prompt and example-game handoff. */
+/** Build flow: introduction, then a copyable prompt and the editor handoff. */
 export function BuildPage() {
   const search = Route.useSearch();
   if (search.page === "prompt") {
@@ -138,10 +135,8 @@ function BuildHeroPage() {
 }
 
 function BuildPromptPage() {
-  const navigate = useNavigate();
   const prompt = useMemo(() => buildMasterPrompt(), []);
   const [copied, setCopied] = useState(false);
-  const [openingId, setOpeningId] = useState<string | null>(null);
 
   const handleCopyPrompt = async () => {
     const ok = await writeToClipboard(prompt);
@@ -150,21 +145,6 @@ function BuildPromptPage() {
       toast.success("Master prompt copied to your clipboard.");
     } else {
       toast.danger("Couldn't copy the prompt — expand it below and copy manually.");
-    }
-  };
-
-  const handleOpenExample = async (gameId: string) => {
-    if (openingId !== null) return;
-    setOpeningId(gameId);
-    try {
-      const game = exampleGames.find((candidate) => candidate.id === gameId);
-      if (game === undefined) return;
-      const source = (await game.load()).default;
-      storeDraftSource(source);
-      await navigate({ to: "/editor" });
-    } catch {
-      toast.danger("Couldn't load this example game.");
-      setOpeningId(null);
     }
   };
 
@@ -253,42 +233,6 @@ function BuildPromptPage() {
             .
           </p>
         </Card>
-      </section>
-
-      <section aria-labelledby="example-games-heading" className="w-full text-left">
-        <h2 id="example-games-heading" className="text-xl font-black">
-          Or start from a Nova example
-        </h2>
-        <p className="mt-1 text-sm leading-relaxed text-foreground/70">
-          No prompt needed — open a complete game in the editor as a new draft, run it, and make it
-          yours.
-        </p>
-        <div className="mt-4 flex flex-col gap-4">
-          {exampleGames.map((game) => (
-            <Card
-              key={game.id}
-              title={
-                <span className="flex flex-wrap items-center gap-2">
-                  {game.title}
-                  <Badge color="accent" variant="secondary">
-                    {exampleModeLabel[game.mode]}
-                  </Badge>
-                </span>
-              }
-              description={game.description}
-              actions={
-                <Button
-                  variant="primary"
-                  onClick={() => void handleOpenExample(game.id)}
-                  disabled={openingId !== null}
-                >
-                  <Code2 className="h-4 w-4" aria-hidden="true" />
-                  {openingId === game.id ? "Opening…" : "Open in the editor"}
-                </Button>
-              }
-            />
-          ))}
-        </div>
       </section>
 
       {/* The prompt is instructions for an AI, not game HTML; open a blank

@@ -1,11 +1,11 @@
 /**
- * Nova Drift (examples/games/nova-drift.html) run end to end: its inline
+ * Nova Drift (packages/testing/fixtures/games/nova-drift.html) run end to end: its inline
  * script drives real sessions over the in-memory transport. The DOM half is
  * guarded, so the same source runs here, in the arena and in parties.
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { InMemoryTransportHub } from "@rocketcrab/testing";
-import GAME_SOURCE from "../../../examples/games/nova-drift.html?raw";
+import GAME_SOURCE from "../../testing/fixtures/games/nova-drift.html?raw";
 import { createNovaSession, type NovaSession } from "./session";
 
 const SCRIPT = /<script type="module">([\s\S]*?)<\/script>/u.exec(GAME_SOURCE)?.[1] ?? "";

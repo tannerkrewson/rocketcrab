@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import EXAMPLE_GAME_SOURCE from "../../../../../examples/games/nova-quiz.html?raw";
+import EXAMPLE_GAME_SOURCE from "../../../../../packages/testing/fixtures/games/nova-quiz.html?raw";
 import {
   GameSourceCoordinator,
   parseInviteFragment,
