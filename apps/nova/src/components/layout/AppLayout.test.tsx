@@ -67,7 +67,8 @@ describe("AppLayout", () => {
     expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "nova");
 
     renderAt("/editor");
-    await screen.findByRole("tab", { name: "Code" });
+    // (The first-visit tutorial modal hides the page from role queries.)
+    await screen.findByTestId("editor-empty-state");
     expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "nova");
 
     renderAt("/about");
