@@ -35,7 +35,7 @@ test("screenshot carousel keeps a sane width as assets load and on resize", asyn
   expect(widthAfterResize).toBeLessThan(2000);
 });
 
-test("pagination keeps the selected slide across a page re-render", async ({ page }) => {
+test("pagination keeps the selected slide across a re-measure", async ({ page }) => {
   await page.route("**/*", (route) => {
     if (route.request().resourceType() === "image") return route.abort();
     return route.continue();
@@ -52,7 +52,9 @@ test("pagination keeps the selected slide across a page re-render", async ({ pag
   await slideThree.click();
   await expect.poll(() => realIndex(carousel), { timeout: 3000 }).toBe(2);
 
-  await page.getByRole("button", { name: "Light theme" }).click();
+  // The theme switcher that used to force a re-render is gone; a viewport
+  // resize makes Swiper re-measure every slide instead.
+  await page.setViewportSize({ width: 900, height: 720 });
   await expect.poll(() => realIndex(carousel), { timeout: 3000 }).toBe(2);
 
   await expect(page.getByRole("button", { name: "Go to slide 3" })).toHaveClass(
