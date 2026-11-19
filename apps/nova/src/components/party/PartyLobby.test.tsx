@@ -166,7 +166,8 @@ describe("PartyLobby", () => {
     await renderLobby(state);
     expect(screen.queryByRole("button", { name: /start game/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /start anyway/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /browse games/i })).not.toBeInTheDocument();
+    // Guests can still browse; picking is explained on the game's page.
+    expect(screen.getByRole("button", { name: /browse games/i })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy url/i })).toBeInTheDocument();
     expect(screen.getByText(/Players \(2\)/)).toBeInTheDocument();
@@ -445,15 +446,15 @@ describe("PartyLobby", () => {
     await renderLobby(state);
     expect(screen.getByText("Waiting for Player A to select a game")).toBeInTheDocument();
     expect(screen.queryByText("No game selected yet")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /browse games/i })).not.toBeInTheDocument();
   });
 
-  it("renames from the pencil in a dialog, without leaving the lobby (2t1.9)", async () => {
+  it("renames on the same name screen as first entry, without leaving the lobby (2t1.9)", async () => {
     const onEditName = vi.fn();
     await renderLobby(makeState(), { onEditName });
     expect(screen.queryByLabelText("Your player name")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /edit your name/i }));
     const input = await screen.findByLabelText("Your player name");
+    expect(screen.getByRole("heading", { name: "What's your name?" })).toBeInTheDocument();
     expect(input).toHaveValue("Player A");
     await userEvent.clear(input);
     await userEvent.type(input, "Ada");

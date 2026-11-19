@@ -68,11 +68,17 @@ export function BrowseGamePage() {
   const [selecting, setSelecting] = useState(false);
   const [editConfirmationOpen, setEditConfirmationOpen] = useState(false);
 
-  const inPartyLobby = (state.phase === "lobby" || state.phase === "starting") && state.amHost;
+  const lobbyPhase = state.phase === "lobby" || state.phase === "starting";
+  const inPartyLobby = lobbyPhase && state.amHost;
+  // Guests can browse too; their "Select game" explains that the host picks.
+  const guestInLobby = lobbyPhase && !state.amHost;
+  const [askHostOpen, setAskHostOpen] = useState(false);
+  const hostName =
+    state.members.find((member) => member.memberId === state.hostMemberId)?.displayName ?? null;
   const notInParty = state.phase === "idle";
   const inParty = engine.isActive();
-  const partyBack = from === "party" || from === "party-browse" || inPartyLobby;
-  const partyBrowseBack = from === "party-browse" || (from === undefined && inPartyLobby);
+  const partyBack = from === "party" || from === "party-browse" || lobbyPhase;
+  const partyBrowseBack = from === "party-browse" || (from === undefined && lobbyPhase);
 
   // Restore the browser's category and query, including when the lobby remounts.
   const browseBack = readBrowseContext();
@@ -154,7 +160,12 @@ export function BrowseGamePage() {
   };
 
   const selectForParty = (pick: () => Promise<void>) =>
-    inPartyLobby ? (
+    guestInLobby ? (
+      <Button variant="primary" size="lg" onClick={() => setAskHostOpen(true)}>
+        <PartyPopper className="h-4 w-4" aria-hidden="true" />
+        Select game
+      </Button>
+    ) : inPartyLobby ? (
       <Button
         variant="primary"
         size="lg"
@@ -165,6 +176,20 @@ export function BrowseGamePage() {
         {selecting ? "Selecting…" : "Select game"}
       </Button>
     ) : null;
+
+  const askHostDialog = (title: string) => (
+    <Dialog open={askHostOpen} onClose={() => setAskHostOpen(false)} title="Only the host picks">
+      <div className="flex flex-col gap-4">
+        <p>
+          Tell {hostName ?? "the host"} you want to play <b>{title}</b>. They pick the game for
+          everyone.
+        </p>
+        <Button variant="primary" className="self-end" onClick={() => setAskHostOpen(false)}>
+          Got it
+        </Button>
+      </div>
+    </Dialog>
+  );
 
   if (prebuilt === undefined) {
     if (savedQuery.isLoading) {
@@ -241,6 +266,7 @@ export function BrowseGamePage() {
             {saved.description ?? "No description yet. Open it in the editor to add one."}
           </p>
         </AboutCard>
+        {askHostDialog(saved.title)}
         <Dialog
           open={editConfirmationOpen}
           onClose={() => setEditConfirmationOpen(false)}
@@ -348,6 +374,7 @@ export function BrowseGamePage() {
           </div>
         ) : null}
       </AboutCard>
+      {askHostDialog(prebuilt.name)}
     </GamePageLayout>
   );
 }

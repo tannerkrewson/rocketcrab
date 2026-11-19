@@ -52,26 +52,32 @@ export function NameForm({
 }
 
 /**
- * Full-page "What's your name?" step. Players must have a real name before
- * they start or join a party.
+ * The "What's your name?" screen: shown before starting or joining a party,
+ * and again (prefilled, without the brand row the lobby already shows) when
+ * a player renames themselves from the lobby.
  */
 export function NameEntry({
   description = "Your friends will see this in the party.",
   submitLabel = "Let's go",
+  initialName,
+  showHeader = true,
   onSubmit,
   secondary,
 }: {
   description?: string;
   submitLabel?: string;
+  initialName?: string;
+  /** False where the page already shows the brand row (the lobby). */
+  showHeader?: boolean;
   onSubmit: (name: string) => void;
   /** Optional extra content under the form (e.g. a resume banner, Back). */
   secondary?: ReactNode;
 }) {
   return (
     <section className="mx-auto flex w-full max-w-sm flex-col items-center gap-5 text-center">
-      <PartyShellHeader />
+      {showHeader ? <PartyShellHeader /> : null}
       <div className="glass w-full rounded-2xl p-6">
-        <NameForm submitLabel={submitLabel} onSubmit={onSubmit}>
+        <NameForm initialName={initialName} submitLabel={submitLabel} onSubmit={onSubmit}>
           <div className="flex flex-col gap-1">
             <h1 className="text-2xl font-black">What&apos;s your name?</h1>
             <p className="text-sm text-foreground/70">{description}</p>

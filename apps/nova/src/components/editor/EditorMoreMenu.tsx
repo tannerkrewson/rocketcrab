@@ -1,4 +1,4 @@
-import { CopyPlus, Ellipsis, ScrollText, Undo2 } from "lucide-react";
+import { CopyPlus, Ellipsis, FileUp, ScrollText, Undo2 } from "lucide-react";
 import { useRef, type ReactNode } from "react";
 import { toast } from "../../lib/toast";
 import { writeToClipboard } from "../../lib/editor/clipboard";
@@ -13,25 +13,25 @@ export interface EditorMoreMenuProps {
   onSaveAsCopy?: () => void;
   /** Omitted when there are no unsaved changes to a saved game. */
   onDiscardChanges?: () => void;
+  /** Opens the file picker for an .html game file. */
+  onUploadFile: () => void;
 }
 
 function Item({
   icon,
   children,
   onClick,
-  danger = false,
 }: {
   icon: ReactNode;
   children: ReactNode;
   onClick: () => void;
-  danger?: boolean;
 }) {
   return (
     <li>
       <button
         type="button"
         role="menuitem"
-        className={`flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-bold hover:bg-surface-secondary ${danger ? "text-danger" : ""}`}
+        className="flex w-full items-center gap-2 rounded-xl px-3 py-2 text-left text-sm font-bold hover:bg-surface-secondary"
         onClick={onClick}
       >
         {icon}
@@ -47,6 +47,7 @@ export function EditorMoreMenu({
   title,
   onSaveAsCopy,
   onDiscardChanges,
+  onUploadFile,
 }: EditorMoreMenuProps) {
   const detailsRef = useRef<HTMLDetailsElement | null>(null);
   const close = () => detailsRef.current?.removeAttribute("open");
@@ -75,6 +76,15 @@ export function EditorMoreMenu({
         role="menu"
         className="absolute right-0 z-50 mt-1 flex w-64 list-none flex-col gap-0.5 rounded-2xl bg-overlay p-1.5 shadow-overlay"
       >
+        <Item
+          icon={<FileUp className="h-4 w-4" aria-hidden="true" />}
+          onClick={() => {
+            close();
+            onUploadFile();
+          }}
+        >
+          Upload an HTML file
+        </Item>
         <Item
           icon={<ScrollText className="h-4 w-4" aria-hidden="true" />}
           onClick={() => void copy(buildMasterPrompt(), "AI prompt copied to your clipboard.")}
@@ -107,7 +117,6 @@ export function EditorMoreMenu({
         ) : null}
         {onDiscardChanges !== undefined ? (
           <Item
-            danger
             icon={<Undo2 className="h-4 w-4" aria-hidden="true" />}
             onClick={() => {
               close();

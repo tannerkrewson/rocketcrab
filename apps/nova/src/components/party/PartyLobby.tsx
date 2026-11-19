@@ -8,7 +8,7 @@ import type { PartyEngineState, PartyMemberView, PartyNotice } from "../../lib/p
 import { Button, buttonStyles } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { GameBrowser } from "./GameBrowser";
-import { NameForm } from "./NameEntry";
+import { NameEntry } from "./NameEntry";
 import { WelcomeWaves } from "../backgrounds/WelcomeWaves";
 import { PartyInviteQr } from "./PartyInviteQr";
 import { clearBrowseContext } from "../../lib/browse/back-context";
@@ -35,7 +35,7 @@ const PLAYER_AVATAR_COLORS = [
   "bg-emerald-500",
   "bg-violet-500",
   "bg-cyan-500",
-  "bg-pink-500",
+  "bg-teal-500",
 ] as const;
 
 function playerAvatarColor(index: number): string {
@@ -196,6 +196,25 @@ export function PartyLobby({
 
   const showShareButton = canNativeShare(state.inviteUrl);
 
+  if (renaming) {
+    return (
+      <NameEntry
+        showHeader={false}
+        initialName={state.displayName}
+        submitLabel="Save"
+        onSubmit={(name) => {
+          onEditName(name);
+          setRenaming(false);
+        }}
+        secondary={
+          <Button variant="default" soft size="md" onClick={() => setRenaming(false)}>
+            Cancel
+          </Button>
+        }
+      />
+    );
+  }
+
   if (browsing) {
     return (
       <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
@@ -247,7 +266,7 @@ export function PartyLobby({
       </section>
       <section
         aria-label="Welcome"
-        className="relative flex min-h-40 flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl bg-background p-5 text-center"
+        className="relative flex min-h-40 select-none flex-col [-webkit-touch-callout:none] items-center justify-center gap-3 overflow-hidden rounded-2xl bg-background p-5 text-center"
       >
         <WelcomeWaves />
         <div className="relative flex flex-col items-center gap-3">
@@ -280,21 +299,20 @@ export function PartyLobby({
       </section>
 
       <section className="button-row self-center">
-        {state.amHost ? (
-          <Button
-            variant="secondary"
-            size="lg"
-            onClick={() => {
-              // Always open at the top-level menu; only returning from a
-              // game's details page restores the last category.
-              clearBrowseContext();
-              setBrowsing(true);
-            }}
-          >
-            <Gamepad2 className="h-5 w-5" aria-hidden="true" />
-            Browse games
-          </Button>
-        ) : null}
+        {/* Everyone can browse; only the host can pick (guests are told so). */}
+        <Button
+          variant="secondary"
+          size="lg"
+          onClick={() => {
+            // Always open at the top-level menu; only returning from a
+            // game's details page restores the last category.
+            clearBrowseContext();
+            setBrowsing(true);
+          }}
+        >
+          <Gamepad2 className="h-5 w-5" aria-hidden="true" />
+          Browse games
+        </Button>
         {state.amHost ? (
           <Button
             variant="primary"
@@ -429,17 +447,6 @@ export function PartyLobby({
           {state.members.length === 1 ? "End party" : "Leave party"}
         </Button>
       </div>
-
-      <Dialog open={renaming} onClose={() => setRenaming(false)} title="Your name">
-        <NameForm
-          initialName={state.displayName}
-          submitLabel="Save"
-          onSubmit={(name) => {
-            onEditName(name);
-            setRenaming(false);
-          }}
-        />
-      </Dialog>
 
       {qrOpen && state.inviteUrl !== null ? (
         <div

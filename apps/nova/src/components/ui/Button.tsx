@@ -31,7 +31,8 @@ function heroVariant(variant: ButtonVariant, soft: boolean): HeroVariant {
     case "outline":
       return "outline";
     case "danger":
-      return soft ? "danger-soft" : "danger";
+      // No tinted (pinkish) danger: a soft danger is the plain dark button.
+      return soft ? "tertiary" : "danger";
     case "default":
       return soft ? "tertiary" : "secondary";
     case "tertiary":

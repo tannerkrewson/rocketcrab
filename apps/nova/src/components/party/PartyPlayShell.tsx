@@ -214,7 +214,7 @@ export function PartyPlayShell({
                   <button
                     type="button"
                     role="menuitem"
-                    className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold text-danger hover:bg-surface-secondary"
+                    className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold hover:bg-surface-secondary"
                     onClick={() => {
                       setPanel(null);
                       setConfirmReloadAll(true);
@@ -230,7 +230,7 @@ export function PartyPlayShell({
                   <button
                     type="button"
                     role="menuitem"
-                    className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold text-danger hover:bg-surface-secondary"
+                    className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold hover:bg-surface-secondary"
                     onClick={() => {
                       setPanel(null);
                       setConfirmEnd(true);

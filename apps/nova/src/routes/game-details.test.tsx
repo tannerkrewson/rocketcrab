@@ -215,14 +215,17 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     expect(select.className).toContain("button--primary");
   });
 
-  it("shows no CTA to a guest in a party — the host picks (2t1.10)", async () => {
+  it("tells a guest that the host picks when they press Select game (2t1.10)", async () => {
     stubs.mode = "guest";
     renderAt("/game/drawphone");
 
     await screen.findByRole("heading", { name: "Drawphone" });
-    expect(screen.queryByRole("button", { name: /select game/i })).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Start party/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Start party/ })).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /select game/i }));
+    const dialog = screen.getByRole("dialog", { name: "Only the host picks" });
+    expect(dialog).toHaveTextContent("Drawphone");
+    expect(stubEngine.selectClassicGame).not.toHaveBeenCalled();
+    await userEvent.click(screen.getByRole("button", { name: "Got it" }));
   });
 
   it("returns from lobby What is details to the live party without leaving", async () => {

@@ -5,6 +5,7 @@ import {
   ArrowLeft,
   ClipboardPaste,
   Code2,
+  FileUp,
   HelpCircle,
   PartyPopper,
   Pencil,
@@ -52,6 +53,11 @@ import { EditorMoreMenu } from "./EditorMoreMenu";
 /** Default title for a new, unnamed game (matches the runtime's fallback). */
 const DEFAULT_GAME_TITLE = "Untitled game";
 
+/**
+ * Refuse obviously wrong files before reading them. Anything smaller loads,
+ * and the problems bar reports a game over the real source limit.
+ */
+const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const MAX_CONSOLE_ENTRIES = 100;
 const MAX_DIAGNOSTICS = 50;
 
@@ -315,6 +321,17 @@ export function EditorPage({ game }: { game?: SavedGame }) {
     void runSource(source);
   }, [runSource, source]);
 
+  /** Replace the code with a whole new game and test it right away. */
+  const loadGame = useCallback(
+    (text: string, message: string) => {
+      setSource(text);
+      setView("test");
+      void runSource(text);
+      toast.success(message);
+    },
+    [runSource],
+  );
+
   /** Paste replaces the code and tests it immediately: the main path for AI-written games. */
   const handlePaste = useCallback(async () => {
     try {
@@ -323,16 +340,37 @@ export function EditorPage({ game }: { game?: SavedGame }) {
         toast.info("Your clipboard is empty. Copy your game's HTML first.");
         return;
       }
-      setSource(text);
-      setView("test");
-      void runSource(text);
-      toast.success("Pasted. Testing it now.");
+      loadGame(text, "Pasted. Testing it now.");
     } catch {
       toast.danger(
         "Couldn't read the clipboard. Your browser may need clipboard permission — open the Code tab and paste with Cmd/Ctrl+V instead.",
       );
     }
-  }, [runSource]);
+  }, [loadGame]);
+
+  /** An AI's downloadable .html file works the same as pasting it. */
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const handleFileChosen = useCallback(
+    async (file: File | undefined) => {
+      if (file === undefined) return;
+      if (file.size > MAX_UPLOAD_BYTES) {
+        toast.danger("That file is too big for a game. Pick the .html file your AI made.");
+        return;
+      }
+      try {
+        const text = await file.text();
+        if (text.trim().length === 0) {
+          toast.info("That file is empty.");
+          return;
+        }
+        loadGame(text, `Loaded ${file.name}. Testing it now.`);
+      } catch {
+        toast.danger("Couldn't read that file. Try again or paste the HTML instead.");
+      }
+    },
+    [loadGame],
+  );
+  const openFilePicker = () => fileInputRef.current?.click();
 
   /**
    * Persist the current source and title. A new game is created; a saved
@@ -607,6 +645,7 @@ export function EditorPage({ game }: { game?: SavedGame }) {
           </Button>
           <EditorMoreMenu
             source={source}
+            onUploadFile={openFilePicker}
             title={title}
             {...(hasCode ? { onSaveAsCopy: () => void handleSaveAsCopy() } : {})}
             {...(game !== undefined && dirty
@@ -648,10 +687,10 @@ export function EditorPage({ game }: { game?: SavedGame }) {
                 aria-hidden="true"
               />
               <div className="flex flex-col gap-1">
-                <h2 className="text-2xl font-black">Paste your game to test it</h2>
+                <h2 className="text-2xl font-black">Add your game to test it</h2>
                 <p className="max-w-md text-foreground/70">
-                  Copy the HTML your AI wrote, then paste it here. It runs right away as several
-                  players.
+                  Paste the HTML your AI wrote, or upload its .html file. It runs right away as
+                  several players.
                 </p>
               </div>
               <div className="button-row">
@@ -659,15 +698,19 @@ export function EditorPage({ game }: { game?: SavedGame }) {
                   <ClipboardPaste className="h-5 w-5" aria-hidden="true" />
                   Paste game
                 </Button>
-                <Link
-                  to="/build"
-                  search={{ page: "prompt" }}
-                  className={buttonStyles("default", "lg", undefined, true)}
-                >
-                  <Sparkles className="h-5 w-5" aria-hidden="true" />
-                  Get the AI prompt
-                </Link>
+                <Button variant="default" soft size="lg" onClick={openFilePicker}>
+                  <FileUp className="h-5 w-5" aria-hidden="true" />
+                  Upload file
+                </Button>
               </div>
+              <Link
+                to="/build"
+                search={{ page: "prompt" }}
+                className={buttonStyles("default", "md", undefined, true)}
+              >
+                <Sparkles className="h-4 w-4" aria-hidden="true" />
+                Get the AI prompt
+              </Link>
               <button
                 type="button"
                 className="text-sm font-semibold text-foreground/60 underline-offset-4 hover:underline"
@@ -678,6 +721,21 @@ export function EditorPage({ game }: { game?: SavedGame }) {
             </div>
           )}
         </section>
+
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept=".html,.htm,text/html"
+          className="hidden"
+          data-testid="editor-file-input"
+          aria-label="Upload an HTML game file"
+          onChange={(event) => {
+            const file = event.target.files?.[0];
+            // Reset so choosing the same file again still fires a change.
+            event.target.value = "";
+            void handleFileChosen(file);
+          }}
+        />
 
         <EditorTutorial open={tutorialOpen} onClose={closeTutorial} />
 

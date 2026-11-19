@@ -39,7 +39,8 @@ describe("Button (HeroUI)", () => {
         Remove
       </Button>,
     );
-    expect(screen.getByRole("button", { name: "Remove" })).toHaveClass("button--danger-soft");
+    // Soft danger is the plain dark button (no pinkish tint).
+    expect(screen.getByRole("button", { name: "Remove" })).toHaveClass("button--tertiary");
   });
 
   it("accepts disabled as an alias for isDisabled", async () => {
@@ -65,6 +66,6 @@ describe("Button (HeroUI)", () => {
     expect(buttonStyles("primary", "lg", "px-8")).toContain("button--primary");
     expect(buttonStyles("primary", "lg", "px-8")).toContain("button--lg");
     expect(buttonStyles("primary", "lg", "px-8")).toContain("px-8");
-    expect(buttonStyles("danger", "sm", undefined, true)).toContain("button--danger-soft");
+    expect(buttonStyles("danger", "sm", undefined, true)).toContain("button--tertiary");
   });
 });

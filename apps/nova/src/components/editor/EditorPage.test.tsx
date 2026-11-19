@@ -268,6 +268,21 @@ describe("/editor — a new game", () => {
     expect(reopened.textContent).toContain("cards");
   });
 
+  it("uploading an .html file loads and runs it like a paste", async () => {
+    const harness = createHostHarness();
+    renderEditor(["/editor"], harness);
+    await screen.findByTestId("editor-empty-state");
+    expect(screen.getByRole("button", { name: /Upload file/ })).toBeInTheDocument();
+
+    const file = new File([PASTED_SOURCE], "card-sharks.html", { type: "text/html" });
+    await userEvent.upload(screen.getByTestId("editor-file-input"), file);
+
+    const editor = await codeEditor();
+    await waitFor(() => expect(editor.textContent).toContain("cards"));
+    await runtimeChannelIndex(harness);
+    expect(runtimeBootstraps(harness)[0]?.gameSource).toBe(PASTED_SOURCE);
+  });
+
   it("an empty clipboard pastes nothing and starts no run", async () => {
     mockClipboard("   ");
     const harness = createHostHarness();

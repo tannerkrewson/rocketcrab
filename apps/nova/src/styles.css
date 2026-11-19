@@ -36,7 +36,7 @@
 
     --accent: var(--rocket);
     /* Crimson, so destructive buttons don't read as the red brand accent. */
-    --danger: oklch(58% 0.2 8);
+    --danger: oklch(58% 0.22 27);
 
     /* Near-black page (SiteBackground paints a warm gradient over it). Cards
        and buttons are neutral dark glass: mostly opaque hue-free grays, so
