@@ -453,7 +453,7 @@ export function PartyPlayShell({
               Every player&apos;s game will end and the party will return to the lobby. This is the
               emergency stop — game code cannot disable it.
             </p>
-            <div className="flex justify-end gap-2">
+            <div className="button-row self-end">
               <Button variant="default" soft onClick={() => setConfirmEnd(false)}>
                 Keep playing
               </Button>
@@ -484,7 +484,7 @@ export function PartyPlayShell({
               Every player&apos;s game will reload, and any unsaved progress in the running games
               will be lost. Are you sure?
             </p>
-            <div className="flex justify-end gap-2">
+            <div className="button-row self-end">
               <Button variant="default" soft onClick={() => setConfirmReloadAll(false)}>
                 Cancel
               </Button>
@@ -543,7 +543,7 @@ function PartyKickConfirm({
         <p className="text-sm text-foreground/70">
           {memberName} will be removed from the party and will have to rejoin with the invite link.
         </p>
-        <div className="flex justify-end gap-2">
+        <div className="button-row self-end">
           <Button variant="default" soft onClick={onCancel}>
             Cancel
           </Button>

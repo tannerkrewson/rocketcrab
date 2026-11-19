@@ -189,6 +189,27 @@
   box-shadow: var(--surface-shadow);
 }
 
+/* Button groups: every button in the group is as wide as the widest label
+   needs (no extra side padding), so the group lines up without stretching.
+   The group itself is only as wide as its buttons. */
+@utility button-row {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.5rem;
+  & > * {
+    width: 100%;
+  }
+}
+
+@utility button-stack {
+  display: inline-grid;
+  gap: 0.5rem;
+  & > * {
+    width: 100%;
+  }
+}
+
 /* HeroUI's "secondary" button draws accent-colored text on a gray fill;
    keep the glass fill with plain white text instead. */
 .button--secondary {

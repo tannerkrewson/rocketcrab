@@ -410,7 +410,7 @@ export function GameBrowser({
               To open the game builder, you&apos;ll leave this party first. You can always start or
               join another one later.
             </p>
-            <div className="flex justify-end gap-2">
+            <div className="button-row self-end">
               <Button variant="default" soft onClick={() => setPendingExit(false)}>
                 Stay in party
               </Button>

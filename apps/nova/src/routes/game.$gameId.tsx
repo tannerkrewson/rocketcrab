@@ -236,7 +236,7 @@ export function BrowseGamePage() {
               To open the editor, you&apos;ll leave this party first. You can always start or join
               another one later.
             </p>
-            <div className="flex justify-end gap-2">
+            <div className="button-row self-end">
               <Button variant="default" soft onClick={() => setEditConfirmationOpen(false)}>
                 Stay in party
               </Button>

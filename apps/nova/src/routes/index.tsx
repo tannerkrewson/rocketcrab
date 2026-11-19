@@ -7,8 +7,8 @@ import { Button, buttonStyles } from "../components/ui/Button";
 import { writeToClipboard } from "../lib/editor/clipboard";
 import { usePartyEngine } from "../lib/party/use-party";
 
-/** The secondary menu: equal-width glass buttons with centered labels. */
-const MORE_LINK = buttonStyles("default", "lg", "w-full justify-center", true);
+/** The secondary menu: glass buttons sized to the longest label (button-stack). */
+const MORE_LINK = buttonStyles("default", "lg", undefined, true);
 
 export const Route = createFileRoute("/")({
   component: HomeComponent,
@@ -135,23 +135,20 @@ function HomeComponent() {
         </Link>
       </section>
 
-      <section
-        aria-label="Start or join a party"
-        className="flex w-full flex-col justify-center gap-3 sm:w-auto sm:flex-row"
-      >
-        <Link to="/join" className={buttonStyles("primary", "lg", "w-full sm:w-44")}>
+      <section aria-label="Start or join a party" className="button-row">
+        <Link to="/join" className={buttonStyles("primary", "lg")}>
           Join party
         </Link>
         <Link
           to="/party"
           search={{ gameId: undefined, mode: undefined, title: undefined }}
-          className={buttonStyles("primary", "lg", "w-full sm:w-44")}
+          className={buttonStyles("primary", "lg")}
         >
           Start party
         </Link>
       </section>
 
-      <section aria-label="More" className="flex w-full max-w-56 flex-col gap-2">
+      <section aria-label="More" className="button-stack">
         <Link to="/build" className={MORE_LINK}>
           Build a game
         </Link>

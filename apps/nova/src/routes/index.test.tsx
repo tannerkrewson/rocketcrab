@@ -136,15 +136,17 @@ describe("/", () => {
     );
   });
 
-  it("styles the party buttons solid primary and the stack as equal-width glass (2t1.8/5cl.5)", async () => {
+  it("styles the party buttons solid primary and the stack as glass (2t1.8/5cl.5)", async () => {
     renderHome();
     const primaryRow = await screen.findByRole("region", { name: "Start or join a party" });
     for (const link of within(primaryRow).getAllByRole("link")) {
       expect(link).toHaveClass("button--primary");
     }
+    expect(primaryRow).toHaveClass("button-row");
     const more = await screen.findByRole("region", { name: "More" });
+    expect(more).toHaveClass("button-stack");
     for (const link of within(more).getAllByRole("link")) {
-      expect(link).toHaveClass("button--tertiary", "w-full", "justify-center");
+      expect(link).toHaveClass("button--tertiary");
       expect(link).not.toHaveClass("button--danger");
     }
   });

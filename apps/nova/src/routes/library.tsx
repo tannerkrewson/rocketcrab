@@ -133,7 +133,7 @@ export function LibraryPage() {
               “{pendingDelete.title}” and its source will be removed from this browser. This can't
               be undone.
             </p>
-            <div className="flex justify-end gap-2">
+            <div className="button-row self-end">
               <Button variant="default" soft onClick={() => setPendingDelete(null)}>
                 Cancel
               </Button>

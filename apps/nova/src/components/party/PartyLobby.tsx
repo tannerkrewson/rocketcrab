@@ -212,7 +212,7 @@ export function PartyLobby({
         className="glass flex flex-col items-center gap-3 rounded-2xl p-5 text-center"
       >
         <h2 className="text-lg font-black">Get your friends to join!</h2>
-        <div className="flex items-center justify-center gap-2">
+        <div className="button-row">
           <Button variant="primary" size="md" onClick={() => void copyInvite()}>
             <Copy className="h-4 w-4" aria-hidden="true" />
             Copy URL
@@ -275,7 +275,7 @@ export function PartyLobby({
         </div>
       </section>
 
-      <section className="flex flex-wrap items-center justify-center gap-2">
+      <section className="button-row self-center">
         {state.amHost ? (
           <Button variant="secondary" size="lg" onClick={() => setBrowsing(true)}>
             <Gamepad2 className="h-5 w-5" aria-hidden="true" />
@@ -441,7 +441,7 @@ export function PartyLobby({
               Every player has the game, but not everyone has reported ready. Starting now means
               some players may miss the start signal. They can still rejoin.
             </p>
-            <div className="flex justify-end gap-2">
+            <div className="button-row self-end">
               <Button variant="default" soft onClick={() => setForceDialog(false)}>
                 Cancel
               </Button>
@@ -499,7 +499,7 @@ function PartyKickConfirm({
         <p className="text-sm text-foreground/70">
           {memberName} will be removed from the party and will have to rejoin with the invite link.
         </p>
-        <div className="flex justify-end gap-2">
+        <div className="button-row self-end">
           <Button variant="default" soft onClick={onCancel}>
             Cancel
           </Button>
