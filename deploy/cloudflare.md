@@ -90,11 +90,23 @@ service until midnight UTC. Check account usage before inviting a wider beta.
 
 ## Live state
 
-- Nova edge, app, and runtime have yet to deploy successfully. The
-  2026-11-15 edge attempt failed before deployment because Analytics Engine
-  was disabled. The staged Worker now uses Workers Logs.
-- Edge migrations create the `SignalHub` and `TunnelPair` SQLite classes.
-  They have yet to run against the account. TURN secrets are pending.
+- 2026-11-18 (UTC 2026-11-19), with owner approval: first deploy of all three
+  Workers on workers.dev. Edge version `7cb56dab`, runtime `fa44334c`, app
+  `68431c6c`. The edge migrations created `SignalHub` and `TunnelPair`.
+- `TURN_KEY_ID` and `TURN_KEY_API_TOKEN` were set as `secret_text` with the
+  first edge deploy (`--secrets-file`). The key was checked against the
+  Realtime API first. Later redeploys keep them.
+- Edge smoke checks passed. `/turn` returns 403 without an allowed Origin and
+  STUN/TURN servers with one. Classic room creation returns a `gameCode`.
+  Signal and tunnel WebSockets open. The limiter returned 429 after about
+  100 requests on one connection. Counts are per Cloudflare machine, so
+  requests spread over many connections were not throttled at 300+.
+- Live headers on the app and runtime match their `_headers` files.
+- A two-browser Chromium party on the live app reached the lobby and started
+  a game. Workers Logs showed `turn_cred_mint`, `direct`, `lobby-ready`, and
+  `game-ready`.
 - 2026-11-18, with owner approval: deleted the old `rocketcrab-cors-relay`
   Worker (no requests in the prior 4 weeks) and the unrelated
-  `curly-dream-16c4` Notion CORS proxy. The account has no other Workers.
+  `curly-dream-16c4` Notion CORS proxy.
+- Not yet confirmed: the Realtime usage alert and spending controls (owner,
+  dashboard).

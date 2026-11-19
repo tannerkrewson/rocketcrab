@@ -54,7 +54,8 @@ beta and physical-device checks are still pending.
       Workers Logs for connection and readiness events (`fa0bcfe`, `9025080`).
 - [x] Confirm the built runtime policy blocks workers in Chromium and Firefox.
 - [ ] Check the deployed runtime headers and confirm that exiting a broken
-      game returns to a usable lobby on iPhone.
+      game returns to a usable lobby on iPhone. Headers verified live on
+      2026-11-18. iPhone check pending.
 - [x] Share transport reconnect setup and simplify admission timing. Keep Nova’s
       readiness acknowledgement and targeted delivery because Trystero’s room
       membership alone does not establish Nova compatibility or game readiness
@@ -88,8 +89,9 @@ beta and physical-device checks are still pending.
 
 ## 1. Owner actions
 
-- [ ] Approve the first deployment and create the Realtime TURN key. Set both
-      Worker secrets after the edge exists.
+- [x] Approve the first deployment and create the Realtime TURN key. Set both
+      Worker secrets. Deployed 2026-11-18 with both secrets
+      (`deploy/cloudflare.md`, Live state).
 - [ ] Configure the Realtime usage alert and Workers/Durable Objects spending
       controls. Confirm the notification destination.
 - [x] Retire the old relay. `rocketcrab-cors-relay` deleted 2026-11-18 with
@@ -97,10 +99,14 @@ beta and physical-device checks are still pending.
 
 ## 2. First deploy and smoke test
 
-- [ ] Deploy the edge and run the checks in [the runbook](deploy/cloudflare.md).
+- [x] Deploy the edge and run the checks in [the runbook](deploy/cloudflare.md).
+      Origin gate, TURN, Classic, sockets, and 429 all passed on 2026-11-18.
 - [ ] Deploy the runtime and app, check headers, and test a game in the editor.
+      Deployed, and live headers match `_headers`. Editor test pending.
 - [ ] Play on the live stack with two devices. Confirm that Workers Logs shows
-      lobby and game readiness alongside transport outcomes.
+      lobby and game readiness alongside transport outcomes. Two Chromium
+      browsers on one machine passed (`direct`, `lobby-ready`, `game-ready`).
+      Two real devices are still pending.
 
 ## 3. Real-device checks
 
