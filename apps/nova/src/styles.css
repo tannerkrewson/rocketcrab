@@ -38,20 +38,21 @@
     /* Crimson, so destructive buttons don't read as the red brand accent. */
     --danger: oklch(58% 0.2 8);
 
-    /* Pure black page. Cards and buttons are neutral "clear glass": a
-       translucent hue-free tint with a faint top highlight and no outline,
-       so the background glows through. No backdrop blur — re-blurring an
+    /* Near-black page (SiteBackground paints a warm gradient over it). Cards
+       and buttons are neutral dark glass: mostly opaque hue-free grays, so
+       the red background can't tint them warm, with a faint top highlight
+       and no outline. No backdrop blur — re-blurring an
        animated full-screen canvas every frame is too costly on phones.
        Overlays (dialogs, menus) stay opaque for legibility. */
     --background: oklch(0% 0 0);
-    --surface: oklch(30% 0 0 / 0.5);
+    --surface: oklch(15% 0 0 / 0.72);
     --surface-secondary: oklch(100% 0 0 / 0.06);
     --surface-tertiary: oklch(100% 0 0 / 0.1);
     --surface-shadow: inset 0 1px 0 0 oklch(100% 0 0 / 0.07), 0 12px 32px -16px oklch(0% 0 0 / 0.7);
     --overlay: oklch(17% 0 0);
     --overlay-shadow: inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 24px 48px -12px oklch(0% 0 0 / 0.8);
-    --default: oklch(100% 0 0 / 0.1);
-    --default-hover: oklch(100% 0 0 / 0.16);
+    --default: oklch(23% 0 0 / 0.85);
+    --default-hover: oklch(29% 0 0 / 0.9);
     --field-background: oklch(100% 0 0 / 0.08);
     --segment: oklch(100% 0 0 / 0.16);
     --border: oklch(100% 0 0 / 0.12);

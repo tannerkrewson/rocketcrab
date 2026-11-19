@@ -14,8 +14,9 @@ const PIXEL_BUDGET = 300_000;
 
 /**
  * Site-wide decorative background (React Bits "Molten Metal") in rocket red.
- * Tuned low-contrast: a red-hot (not white-hot) core, wide hazy filaments
- * and reduced brightness, so no bright spots compete with the page. The
+ * An orange-hot (never white-hot) core and wide hazy filaments over a warm
+ * gradient, with light grain for texture, so the page has depth without
+ * bright spots competing with the content. The
  * injected engine is a test seam: the playing phase mounts the full-screen
  * game shell, so the background unmounts and frees the GPU for the game.
  */
@@ -32,22 +33,25 @@ export function SiteBackground({ engine }: { engine?: PartyEngine }) {
       data-testid="app-background"
       className="pointer-events-none fixed inset-0 z-0"
     >
+      {/* Static warm gradient under the canvas so the page reads as a deep
+          ember glow rather than flat black (and is the fallback without WebGL). */}
+      <div className="absolute inset-0 bg-[radial-gradient(120%_70%_at_50%_115%,rgb(120_22_10/0.45),transparent_65%),radial-gradient(80%_55%_at_0%_0%,rgb(70_12_28/0.35),transparent_60%),radial-gradient(70%_50%_at_100%_25%,rgb(90_24_8/0.25),transparent_60%),linear-gradient(180deg,#0b0405,#100505)]" />
       {canUseWebGL2() ? (
         <Suspense fallback={null}>
           <MoltenMetal
-            colors={["#3d0805", "#a3200f"]}
-            coreColor="#c73a24"
+            colors={["#4a0a06", "#c42a14"]}
+            coreColor="#ff8a5c"
             colorMode="ember"
             speed={0.22}
             scale={4}
             detail={3}
-            glow={1}
-            thickness={1.6}
-            haze={1}
-            brightness={0.85}
-            opacity={0.7}
+            glow={1.3}
+            thickness={1.5}
+            haze={0.9}
+            brightness={1.05}
+            opacity={0.85}
             drift={0.25}
-            grain={0}
+            grain={0.04}
             // Taps land on buttons and cards; keep the background calm.
             mouseInteraction={false}
             flareOnClick={false}

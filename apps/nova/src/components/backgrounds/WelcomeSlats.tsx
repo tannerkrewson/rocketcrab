@@ -5,8 +5,8 @@ const MicroSlats = lazy(() => import("../../vendor/react-bits/MicroSlats"));
 
 /**
  * Greyscale rolling slats (React Bits "Micro Slats") filling a positioned
- * parent: the lobby's Welcome card. Dim grey slats with soft grey glints on
- * black keep the white text readable; a scrim darkens the middle further.
+ * parent: the lobby's Welcome card. Mid-grey slats with soft glints on black,
+ * stirred by touch; a scrim darkens the middle so the white text reads.
  */
 export function WelcomeSlats() {
   return (
@@ -15,14 +15,21 @@ export function WelcomeSlats() {
         <Suspense fallback={null}>
           <MicroSlats
             preset="tide"
-            color="#2e2e2e"
-            glintColor="#a3a3a3"
+            color="#575757"
+            glintColor="#c4c4c4"
             backgroundColor="#000000"
             slatWidth={8}
             slatHeight={20}
             gap={3}
-            // Taps land on the card's buttons; skip the cursor fluid sim.
-            interactive={false}
+            // Low contrast and no fog keep every slat lit: dim troughs used
+            // to fade slats to transparent, leaving pure-black holes.
+            contrast={0.35}
+            fog={0}
+            // Touch and drag stir the slats (listeners are on window, so the
+            // card's buttons still get their taps).
+            interactive
+            cursorSize={50}
+            intro={false}
           />
         </Suspense>
       ) : null}
