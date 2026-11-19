@@ -216,26 +216,84 @@
   --button-fg: var(--foreground);
 }
 
-/* The home page's Nova card and the /build hero share this name, so a
-   `viewTransition` link morphs one into the other. Browsers without the
-   View Transitions API just navigate. Only one element per page may carry it. */
+/* Home's Nova card and the /build page's full-screen silk background share
+   `nova-hero`: a `viewTransition` link grows the card into the whole page
+   (and shrinks it back). The build content (`nova-content`) fades in only once
+   the silk has finished expanding; home (`nova-home`) does the same when it
+   shrinks back.
+   Browsers without the View Transitions API just navigate. Each name may
+   appear on only one element per page. */
 .vt-nova-hero {
   view-transition-name: nova-hero;
 }
 
-::view-transition-group(nova-hero) {
-  animation-duration: 420ms;
-  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+.vt-nova-content {
+  view-transition-name: nova-content;
 }
 
-/* Fade the outgoing card's text quickly so it doesn't ghost over the new one. */
-::view-transition-old(nova-hero) {
-  animation-duration: 160ms;
+.vt-nova-home {
+  view-transition-name: nova-home;
+}
+
+@keyframes rc-vt-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+}
+
+@keyframes rc-vt-fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+::view-transition-group(nova-hero) {
+  animation-duration: 620ms;
+  animation-timing-function: cubic-bezier(0.65, 0, 0.25, 1);
 }
 
 ::view-transition-image-pair(nova-hero) {
   border-radius: 1rem;
   overflow: hidden;
+}
+
+/* Cross-fade the card's text-bearing snapshot out early; the live silk
+   underneath carries the motion. */
+::view-transition-old(nova-hero) {
+  animation: rc-vt-fade-out 220ms ease both;
+}
+
+::view-transition-new(nova-hero) {
+  animation: none;
+}
+
+/* Closing: keep the page silk until it has mostly shrunk, then reveal the
+   card (whose live snapshot would otherwise show oversized text). */
+@keyframes rc-vt-appear {
+  from {
+    opacity: 0;
+  }
+}
+
+html:active-view-transition-type(nova-close)::view-transition-old(nova-hero) {
+  animation: rc-vt-fade-out 240ms ease 300ms both;
+}
+
+html:active-view-transition-type(nova-close)::view-transition-new(nova-hero) {
+  animation: rc-vt-appear 240ms ease 300ms both;
+}
+
+/* HeroUI sets `:root { view-transition-name: none }`, so the rest of the page
+   stays live; only these named regions fade. */
+::view-transition-old(nova-home),
+::view-transition-old(nova-content) {
+  animation: rc-vt-fade-out 180ms ease both;
+}
+
+::view-transition-new(nova-home),
+::view-transition-new(nova-content) {
+  animation: rc-vt-fade-in 420ms cubic-bezier(0.2, 0.8, 0.2, 1) 560ms both;
 }
 
 @media (prefers-reduced-motion: reduce) {

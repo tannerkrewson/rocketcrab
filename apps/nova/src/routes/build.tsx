@@ -14,7 +14,6 @@ import { toast } from "../lib/toast";
 import { Button, buttonStyles } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { BrandLogo } from "../components/layout/BrandLogo";
-import { NovaSilk } from "../components/backgrounds/NovaSilk";
 import { writeToClipboard } from "../lib/editor/clipboard";
 import { buildMasterPrompt } from "../lib/prompt/master-prompt";
 
@@ -45,8 +44,13 @@ export function BuildPage() {
 
 function BuildHeroPage() {
   return (
-    <div className="theme-nova mx-auto flex w-full max-w-2xl flex-col items-center gap-10 text-center">
-      <Link to="/" viewTransition className={buttonStyles("default", "md", "self-start", true)}>
+    // vt-nova-content: fades in once the home card has expanded into the page silk.
+    <div className="vt-nova-content theme-nova mx-auto flex w-full max-w-2xl flex-col items-center gap-10 text-center">
+      <Link
+        to="/"
+        viewTransition={{ types: ["nova-close"] }}
+        className={buttonStyles("default", "md", "self-start", true)}
+      >
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         back
       </Link>
@@ -54,11 +58,10 @@ function BuildHeroPage() {
       <section
         aria-labelledby="build-hero-heading"
         data-testid="build-hero"
-        // The home page's Nova card expands into this hero (shared view-transition name).
-        className="vt-nova-hero relative w-full overflow-hidden rounded-2xl bg-background"
+        // Sits directly on the page's Nova silk background (SiteBackground).
+        className="relative w-full"
       >
-        <NovaSilk />
-        <div className="relative flex flex-col items-center gap-4 px-6 py-12 sm:px-12 sm:py-16">
+        <div className="relative flex flex-col items-center gap-4 px-2 py-10 sm:py-14">
           <BrandLogo variant="no-glow" size={80} responsive aria-hidden />
           <h1
             id="build-hero-heading"
@@ -75,7 +78,7 @@ function BuildHeroPage() {
             className={buttonStyles(
               "info",
               "lg",
-              "drop-shadow-[0_0_22px_oklch(62%_0.19_264/0.55)] mt-1 sm:px-14",
+              "drop-shadow-[0_0_22px_oklch(62%_0.19_264/0.55)] mt-1",
             )}
           >
             <Sparkles className="h-5 w-5" aria-hidden="true" />

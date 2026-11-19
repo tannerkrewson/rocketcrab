@@ -1,6 +1,7 @@
 import { lazy, Suspense, useState } from "react";
 import type { PartyEngine } from "../../lib/party/engine";
 import { usePartyEngine } from "../../lib/party/use-party";
+import { NovaSilk } from "./NovaSilk";
 import { canUseWebGL2, viewportPixelRatio } from "./webgl";
 
 // Lazy so the shader code never delays the first paint of the page itself.
@@ -19,13 +20,28 @@ const PIXEL_BUDGET = 300_000;
  * bright spots competing with the content. The
  * injected engine is a test seam: the playing phase mounts the full-screen
  * game shell, so the background unmounts and frees the GPU for the game.
+ * `nova` swaps in the full-page Nova silk (the /build pages).
  */
-export function SiteBackground({ engine }: { engine?: PartyEngine }) {
+export function SiteBackground({ engine, nova = false }: { engine?: PartyEngine; nova?: boolean }) {
   const { state } = usePartyEngine(engine);
   const [pixelRatio] = useState(() => viewportPixelRatio(PIXEL_BUDGET));
 
   if (state.phase === "playing") {
     return null;
+  }
+  if (nova) {
+    // Nova pages trade the molten metal for full-page silk. It carries the
+    // home card's view-transition name, so that card expands into it.
+    return (
+      <div
+        aria-hidden="true"
+        data-testid="app-background"
+        data-variant="nova"
+        className="vt-nova-hero pointer-events-none fixed inset-0 z-0"
+      >
+        <NovaSilk variant="page" />
+      </div>
+    );
   }
   return (
     <div

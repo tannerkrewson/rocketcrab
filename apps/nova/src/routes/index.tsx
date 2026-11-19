@@ -85,7 +85,8 @@ function HomeComponent() {
   }, [engine, state.phase]);
 
   return (
-    <div className="flex min-h-[calc(100dvh-16rem)] flex-col items-center justify-center gap-10">
+    // vt-nova-home: fades back in once the Nova silk has shrunk into its card.
+    <div className="vt-nova-home flex min-h-[calc(100dvh-16rem)] flex-col items-center justify-center gap-10">
       <section className="flex flex-col items-center gap-3 text-center">
         <Button
           variant="default"
@@ -121,7 +122,7 @@ function HomeComponent() {
             expands this card into the hero (and back via its back link). */}
         <Link
           to="/build"
-          viewTransition
+          viewTransition={{ types: ["nova-open"] }}
           data-testid="nova-card"
           className="vt-nova-hero relative mt-4 -mb-1 block w-full max-w-md overflow-hidden rounded-2xl bg-background px-6 py-4 text-center transition-transform active:scale-[0.98] motion-reduce:transition-none"
         >
