@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createMemoryHistory, createRouter } from "@tanstack/react-router";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { routeTree } from "../../routeTree.gen";
@@ -26,12 +26,19 @@ beforeEach(() => {
 });
 
 describe("AppLayout", () => {
-  it("renders no footer anywhere", async () => {
+  it("credits the author and links GitHub at the bottom of every page", async () => {
     renderAt("/about");
     await screen.findByRole("heading", { name: "Coming soon" });
 
-    expect(screen.queryByRole("contentinfo")).not.toBeInTheDocument();
-    expect(screen.queryByRole("navigation", { name: "Footer" })).not.toBeInTheDocument();
+    const footer = screen.getByRole("contentinfo");
+    expect(footer).toHaveTextContent("rocketcrab by Tanner Krewson");
+    const author = within(footer).getByRole("link", { name: "Tanner Krewson" });
+    expect(author).toHaveAttribute("href", "https://tannerkrewson.com");
+    expect(author).toHaveAttribute("target", "_blank");
+    expect(author).toHaveAttribute("rel", "noopener noreferrer");
+    const github = within(footer).getByRole("link", { name: "View on GitHub" });
+    expect(github).toHaveAttribute("href", "https://github.com/tannerkrewson/rocketcrab");
+    expect(github).toHaveAttribute("target", "_blank");
     expect(screen.queryByText(/party games for phones/)).not.toBeInTheDocument();
   });
 
