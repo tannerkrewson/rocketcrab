@@ -14,8 +14,6 @@ import { routeTree } from "../../routeTree.gen";
 import type { ChannelPort } from "../../lib/runtime-host";
 import { runToStart } from "../../lib/arena/test-harness";
 import { EditorRuntimeSeamsContext, type EditorRuntimeSeams } from "./EditorPage";
-import { hashSource } from "../../lib/games/hashing";
-import type { Sha256 } from "@rocketcrab/protocol";
 
 // Pass-through spy: tests can hold a digest open to control resolve order.
 vi.mock("../../lib/games/hashing", async (importOriginal) => {

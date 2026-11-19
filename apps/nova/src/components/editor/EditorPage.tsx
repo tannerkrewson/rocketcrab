@@ -28,6 +28,7 @@ import { toast } from "../../lib/toast";
 import { cn } from "../../lib/cn";
 import { Button, buttonStyles } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
+import { BrandHeader } from "../layout/BrandHeader";
 import { useCreateGame, useRecordTestResults, useUpdateGame } from "../../lib/games/queries";
 import { hashSource, sourceByteLength } from "../../lib/games/hashing";
 import type { ChannelPort, RuntimeHostEvent } from "../../lib/runtime-host";
@@ -498,217 +499,230 @@ export function EditorPage({ game }: { game?: SavedGame }) {
   );
 
   return (
-    <div className="theme-nova flex flex-col gap-4">
-      <header className="flex flex-wrap items-center gap-3">
-        <Link
-          to="/library"
-          className={buttonStyles("default", "md", undefined, true)}
-          title="Back to your games"
-        >
-          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          My games
-        </Link>
-        <div className="min-w-0 flex-1">
-          {titleEditing ? (
-            <input
-              ref={titleInputRef}
-              type="text"
-              value={title}
-              onChange={(event) => setTitle(event.target.value)}
-              onFocus={(event) => event.target.select()}
-              onKeyDown={handleTitleKeyDown}
-              onBlur={() => setTitleEditing(false)}
-              aria-label="Game title"
-              maxLength={64}
-              className="input w-full max-w-md text-lg font-black"
-            />
-          ) : (
-            <button
-              type="button"
-              onClick={startEditingTitle}
-              className="group -mx-1 inline-flex max-w-full items-center gap-2 rounded-md px-1 py-0.5 hover:bg-surface-secondary"
-              title="Click to edit the game title"
-            >
-              <h1 className="truncate text-xl font-black">{displayTitle}</h1>
-              <Pencil className="h-4 w-4 shrink-0 text-foreground/40" aria-hidden="true" />
-            </button>
-          )}
-        </div>
-        {dirty ? (
-          <span className="text-xs font-semibold text-foreground/60">Unsaved changes</span>
-        ) : null}
-        <Button
-          variant="default"
-          soft
-          size="md"
-          isIconOnly
-          onClick={() => setTutorialOpen(true)}
-          aria-label="How the editor works"
-          title="How the editor works"
-        >
-          <HelpCircle className="h-5 w-5" aria-hidden="true" />
-        </Button>
-      </header>
-
-      <div className="flex flex-wrap items-center gap-2">
-        <div role="tablist" aria-label="Editor views" className="glass flex gap-1 rounded-full p-1">
-          {tabButton("test", "Test", <Users className="h-4 w-4" aria-hidden="true" />)}
-          {tabButton("code", "Code", <Code2 className="h-4 w-4" aria-hidden="true" />)}
-        </div>
-        {view === "code" || (hasCode && arenaStale) ? (
+    <div className="flex flex-col gap-4">
+      {/* Same brand row as the other pages (outside the Nova scope, so it
+          keeps rocketcrab red); leaving through it still asks about unsaved
+          changes (the blocker below). */}
+      <BrandHeader size={32} className="-mt-1" />
+      <div className="theme-nova flex flex-col gap-4">
+        <header className="flex flex-wrap items-center gap-3">
+          <Link
+            to="/library"
+            className={buttonStyles("default", "md", undefined, true)}
+            title="Back to your games"
+          >
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            My games
+          </Link>
+          <div className="min-w-0 flex-1">
+            {titleEditing ? (
+              <input
+                ref={titleInputRef}
+                type="text"
+                value={title}
+                onChange={(event) => setTitle(event.target.value)}
+                onFocus={(event) => event.target.select()}
+                onKeyDown={handleTitleKeyDown}
+                onBlur={() => setTitleEditing(false)}
+                aria-label="Game title"
+                maxLength={64}
+                className="input w-full max-w-md text-lg font-black"
+              />
+            ) : (
+              <button
+                type="button"
+                onClick={startEditingTitle}
+                className="group -mx-1 inline-flex max-w-full items-center gap-2 rounded-md px-1 py-0.5 hover:bg-surface-secondary"
+                title="Click to edit the game title"
+              >
+                <h1 className="truncate text-xl font-black">{displayTitle}</h1>
+                <Pencil className="h-4 w-4 shrink-0 text-foreground/40" aria-hidden="true" />
+              </button>
+            )}
+          </div>
+          {dirty ? (
+            <span className="text-xs font-semibold text-foreground/60">Unsaved changes</span>
+          ) : null}
           <Button
             variant="default"
             soft
-            onClick={handleRun}
-            disabled={runStatus === "starting"}
-            title="Test your latest code"
+            size="md"
+            isIconOnly
+            onClick={() => setTutorialOpen(true)}
+            aria-label="How the editor works"
+            title="How the editor works"
           >
-            <Play className="h-4 w-4" aria-hidden="true" />
-            Run
+            <HelpCircle className="h-5 w-5" aria-hidden="true" />
           </Button>
-        ) : null}
-        <div className="flex-1" />
-        <Button
-          variant={hasCode ? "default" : "primary"}
-          soft={hasCode}
-          onClick={() => void handlePaste()}
-          title="Replace the code with your clipboard and test it"
-        >
-          <ClipboardPaste className="h-4 w-4" aria-hidden="true" />
-          Paste game
-        </Button>
-        <Button
-          variant="default"
-          soft
-          onClick={() => void handleSave()}
-          disabled={saving || !hasCode || (game !== undefined && !dirty)}
-        >
-          <Save className="h-4 w-4" aria-hidden="true" />
-          Save
-        </Button>
-        <Button
-          variant="primary"
-          onClick={() => void handlePlayWithFriends()}
-          disabled={saving || !hasCode}
-          title="Save this game and start a party with it"
-        >
-          <PartyPopper className="h-4 w-4" aria-hidden="true" />
-          Play with friends
-        </Button>
-        <EditorMoreMenu
-          source={source}
-          title={title}
-          {...(hasCode ? { onSaveAsCopy: () => void handleSaveAsCopy() } : {})}
-          {...(game !== undefined && dirty
-            ? { onDiscardChanges: () => setDiscardDialog(true) }
-            : {})}
-        />
-      </div>
+        </header>
 
-      <ProblemsPanel
-        validationIssues={hasCode ? validationIssues : []}
-        diagnostics={diagnostics}
-        consoleEntries={consoleEntries}
-        onCopyReport={() => void handleCopyReport()}
-      />
-
-      {/* Both views stay mounted so switching tabs keeps the arena running. */}
-      <section
-        aria-label="Code"
-        className={cn(
-          "h-[calc(100dvh-14rem)] min-h-80 overflow-hidden rounded-2xl bg-overlay",
-          view !== "code" && "hidden",
-        )}
-      >
-        <CodeEditor value={source} onChange={setSource} ariaLabel="Game HTML source" />
-      </section>
-
-      <section aria-label="Test" className={cn(view !== "test" && "hidden")}>
-        {arenaSource.trim().length > 0 ? (
-          <ArenaRuntimeSeamsContext.Provider value={seams}>
-            <ArenaSection game={game} source={arenaSource} onDiagnostics={appendDiagnostics} />
-          </ArenaRuntimeSeamsContext.Provider>
-        ) : (
+        <div className="flex flex-wrap items-center gap-2">
           <div
-            className="glass flex flex-col items-center gap-4 rounded-2xl px-6 py-14 text-center"
-            data-testid="editor-empty-state"
+            role="tablist"
+            aria-label="Editor views"
+            className="glass flex gap-1 rounded-full p-1"
           >
-            <ClipboardPaste className="h-10 w-10 text-accent-soft-foreground" aria-hidden="true" />
-            <div className="flex flex-col gap-1">
-              <h2 className="text-2xl font-black">Paste your game to test it</h2>
-              <p className="max-w-md text-foreground/70">
-                Copy the HTML your AI wrote, then paste it here. It runs right away as several
-                players.
-              </p>
-            </div>
-            <div className="button-row">
-              <Button variant="primary" size="lg" onClick={() => void handlePaste()}>
-                <ClipboardPaste className="h-5 w-5" aria-hidden="true" />
-                Paste game
-              </Button>
-              <Link
-                to="/build"
-                search={{ page: "prompt" }}
-                className={buttonStyles("default", "lg", undefined, true)}
-              >
-                <Sparkles className="h-5 w-5" aria-hidden="true" />
-                Get the AI prompt
-              </Link>
-            </div>
-            <button
-              type="button"
-              className="text-sm font-semibold text-foreground/60 underline-offset-4 hover:underline"
-              onClick={() => setView("code")}
+            {tabButton("test", "Test", <Users className="h-4 w-4" aria-hidden="true" />)}
+            {tabButton("code", "Code", <Code2 className="h-4 w-4" aria-hidden="true" />)}
+          </div>
+          {view === "code" || (hasCode && arenaStale) ? (
+            <Button
+              variant="default"
+              soft
+              onClick={handleRun}
+              disabled={runStatus === "starting"}
+              title="Test your latest code"
             >
-              or write the code yourself
-            </button>
-          </div>
-        )}
-      </section>
-
-      <EditorTutorial open={tutorialOpen} onClose={closeTutorial} />
-
-      <Dialog open={leaveDialog} onClose={() => blocker.reset?.()} title="Save your changes?">
-        <div className="flex flex-col gap-4">
-          <p>
-            “{displayTitle}” has changes that aren&apos;t saved. Save them to My games before you
-            leave?
-          </p>
-          <div className="flex flex-wrap justify-end gap-2">
-            <Button variant="danger" soft onClick={() => blocker.proceed?.()}>
-              Don&apos;t save
+              <Play className="h-4 w-4" aria-hidden="true" />
+              Run
             </Button>
-            <Button variant="default" soft onClick={() => blocker.reset?.()}>
-              Keep editing
-            </Button>
-            <Button variant="primary" onClick={() => void saveAndLeave()} disabled={saving}>
-              <Save className="h-4 w-4" aria-hidden="true" />
-              Save
-            </Button>
-          </div>
+          ) : null}
+          <div className="flex-1" />
+          <Button
+            variant={hasCode ? "default" : "primary"}
+            soft={hasCode}
+            onClick={() => void handlePaste()}
+            title="Replace the code with your clipboard and test it"
+          >
+            <ClipboardPaste className="h-4 w-4" aria-hidden="true" />
+            Paste game
+          </Button>
+          <Button
+            variant="default"
+            soft
+            onClick={() => void handleSave()}
+            disabled={saving || !hasCode || (game !== undefined && !dirty)}
+          >
+            <Save className="h-4 w-4" aria-hidden="true" />
+            Save
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => void handlePlayWithFriends()}
+            disabled={saving || !hasCode}
+            title="Save this game and start a party with it"
+          >
+            <PartyPopper className="h-4 w-4" aria-hidden="true" />
+            Play with friends
+          </Button>
+          <EditorMoreMenu
+            source={source}
+            title={title}
+            {...(hasCode ? { onSaveAsCopy: () => void handleSaveAsCopy() } : {})}
+            {...(game !== undefined && dirty
+              ? { onDiscardChanges: () => setDiscardDialog(true) }
+              : {})}
+          />
         </div>
-      </Dialog>
 
-      <Dialog
-        open={discardDialog}
-        onClose={() => setDiscardDialog(false)}
-        title="Discard unsaved changes?"
-      >
-        <div className="flex flex-col gap-4">
-          <p>This puts “{displayTitle}” back to its last saved version.</p>
-          <div className="button-row self-end">
-            <Button variant="default" soft onClick={() => setDiscardDialog(false)}>
-              Keep editing
-            </Button>
-            <Button variant="danger" onClick={confirmDiscard}>
-              Discard changes
-            </Button>
+        <ProblemsPanel
+          validationIssues={hasCode ? validationIssues : []}
+          diagnostics={diagnostics}
+          consoleEntries={consoleEntries}
+          onCopyReport={() => void handleCopyReport()}
+        />
+
+        {/* Both views stay mounted so switching tabs keeps the arena running. */}
+        <section
+          aria-label="Code"
+          className={cn(
+            "h-[calc(100dvh-14rem)] min-h-80 overflow-hidden rounded-2xl bg-overlay",
+            view !== "code" && "hidden",
+          )}
+        >
+          <CodeEditor value={source} onChange={setSource} ariaLabel="Game HTML source" />
+        </section>
+
+        <section aria-label="Test" className={cn(view !== "test" && "hidden")}>
+          {arenaSource.trim().length > 0 ? (
+            <ArenaRuntimeSeamsContext.Provider value={seams}>
+              <ArenaSection game={game} source={arenaSource} onDiagnostics={appendDiagnostics} />
+            </ArenaRuntimeSeamsContext.Provider>
+          ) : (
+            <div
+              className="glass flex flex-col items-center gap-4 rounded-2xl px-6 py-14 text-center"
+              data-testid="editor-empty-state"
+            >
+              <ClipboardPaste
+                className="h-10 w-10 text-accent-soft-foreground"
+                aria-hidden="true"
+              />
+              <div className="flex flex-col gap-1">
+                <h2 className="text-2xl font-black">Paste your game to test it</h2>
+                <p className="max-w-md text-foreground/70">
+                  Copy the HTML your AI wrote, then paste it here. It runs right away as several
+                  players.
+                </p>
+              </div>
+              <div className="button-row">
+                <Button variant="primary" size="lg" onClick={() => void handlePaste()}>
+                  <ClipboardPaste className="h-5 w-5" aria-hidden="true" />
+                  Paste game
+                </Button>
+                <Link
+                  to="/build"
+                  search={{ page: "prompt" }}
+                  className={buttonStyles("default", "lg", undefined, true)}
+                >
+                  <Sparkles className="h-5 w-5" aria-hidden="true" />
+                  Get the AI prompt
+                </Link>
+              </div>
+              <button
+                type="button"
+                className="text-sm font-semibold text-foreground/60 underline-offset-4 hover:underline"
+                onClick={() => setView("code")}
+              >
+                or write the code yourself
+              </button>
+            </div>
+          )}
+        </section>
+
+        <EditorTutorial open={tutorialOpen} onClose={closeTutorial} />
+
+        <Dialog open={leaveDialog} onClose={() => blocker.reset?.()} title="Save your changes?">
+          <div className="flex flex-col gap-4">
+            <p>
+              “{displayTitle}” has changes that aren&apos;t saved. Save them to My games before you
+              leave?
+            </p>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="danger" soft onClick={() => blocker.proceed?.()}>
+                Don&apos;t save
+              </Button>
+              <Button variant="default" soft onClick={() => blocker.reset?.()}>
+                Keep editing
+              </Button>
+              <Button variant="primary" onClick={() => void saveAndLeave()} disabled={saving}>
+                <Save className="h-4 w-4" aria-hidden="true" />
+                Save
+              </Button>
+            </div>
           </div>
-        </div>
-      </Dialog>
+        </Dialog>
 
-      <div className="hidden" data-testid="hidden-runtime-container" aria-hidden="true">
-        <div ref={hiddenRuntimeRef} />
+        <Dialog
+          open={discardDialog}
+          onClose={() => setDiscardDialog(false)}
+          title="Discard unsaved changes?"
+        >
+          <div className="flex flex-col gap-4">
+            <p>This puts “{displayTitle}” back to its last saved version.</p>
+            <div className="button-row self-end">
+              <Button variant="default" soft onClick={() => setDiscardDialog(false)}>
+                Keep editing
+              </Button>
+              <Button variant="danger" onClick={confirmDiscard}>
+                Discard changes
+              </Button>
+            </div>
+          </div>
+        </Dialog>
+
+        <div className="hidden" data-testid="hidden-runtime-container" aria-hidden="true">
+          <div ref={hiddenRuntimeRef} />
+        </div>
       </div>
     </div>
   );
