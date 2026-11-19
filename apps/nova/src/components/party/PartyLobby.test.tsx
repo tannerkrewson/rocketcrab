@@ -14,6 +14,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { gameRepository } from "../../lib/games/instance";
 import type { PartyEngineState } from "../../lib/party/engine";
 import { resetPartyIdentityForTests, setSavedPlayerName } from "../../lib/party/identity";
+import { saveBrowseContext } from "../../lib/browse/back-context";
 import { PartyLobby, type PartyLobbyProps } from "./PartyLobby";
 import type { PartyMemberView } from "../../lib/party/engine";
 
@@ -461,6 +462,14 @@ describe("PartyLobby", () => {
     await waitFor(() =>
       expect(screen.queryByLabelText("Your player name")).not.toBeInTheDocument(),
     );
+  });
+
+  it("Browse games always opens the top-level menu, not the last category", async () => {
+    saveBrowseContext("drawing", "");
+    await renderLobby(makeState());
+    await userEvent.click(screen.getByRole("button", { name: /browse games/i }));
+    expect(await screen.findByRole("region", { name: "Categories" })).toBeInTheDocument();
+    expect(screen.queryByRole("region", { name: "Games" })).not.toBeInTheDocument();
   });
 
   it("never nags about a missing name in the lobby (names are set before joining)", async () => {

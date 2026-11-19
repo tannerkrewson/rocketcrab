@@ -14,6 +14,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "../../lib/toast";
 import type { BrowseEntry } from "../../lib/browse";
 import { writeToClipboard } from "../../lib/editor/clipboard";
+import { clearBrowseContext } from "../../lib/browse/back-context";
 import { cn } from "../../lib/cn";
 import type { PartyEngineState } from "../../lib/party/engine";
 import { BrandLogo } from "../layout/BrandLogo";
@@ -154,7 +155,11 @@ export function PartyPlayShell({
                     type="button"
                     role="menuitem"
                     className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold hover:bg-surface-secondary"
-                    onClick={() => setPanel("browse")}
+                    onClick={() => {
+                      // Always open at the top-level menu.
+                      clearBrowseContext();
+                      setPanel("browse");
+                    }}
                   >
                     <Gamepad2 className="h-4 w-4" aria-hidden="true" />
                     Browse games

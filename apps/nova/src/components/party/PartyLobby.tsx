@@ -281,7 +281,16 @@ export function PartyLobby({
 
       <section className="button-row self-center">
         {state.amHost ? (
-          <Button variant="secondary" size="lg" onClick={() => setBrowsing(true)}>
+          <Button
+            variant="secondary"
+            size="lg"
+            onClick={() => {
+              // Always open at the top-level menu; only returning from a
+              // game's details page restores the last category.
+              clearBrowseContext();
+              setBrowsing(true);
+            }}
+          >
             <Gamepad2 className="h-5 w-5" aria-hidden="true" />
             Browse games
           </Button>
