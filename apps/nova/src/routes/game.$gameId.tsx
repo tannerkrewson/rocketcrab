@@ -11,9 +11,12 @@ import { Dialog } from "../components/ui/Dialog";
 import { ScreenshotCarousel } from "../components/games/ScreenshotCarousel";
 import { BrandHeader } from "../components/layout/BrandHeader";
 import { PartyShellHeader } from "../components/party/PartyShellHeader";
+import { SaveSharedGame } from "../components/party/SaveSharedGame";
+import { sharedGameStatus } from "../lib/games/shared-copies";
+import { useSavedGame, useSavedGames } from "../lib/games/queries";
+import type { SharedPartyGame } from "../lib/party/engine";
 import { BROWSE_CATEGORIES, findBrowseGame, type BrowseCategory } from "../lib/browse";
 import { readBrowseContext } from "../lib/browse/back-context";
-import { useSavedGame } from "../lib/games/queries";
 import { usePartyEngine } from "../lib/party/use-party";
 
 export const Route = createFileRoute("/game/$gameId")({
@@ -200,6 +203,51 @@ export function BrowseGamePage() {
       );
     }
     const saved = savedQuery.data;
+    const shared = state.sharedGames.find((game) => game.gameId === gameId);
+    if ((savedQuery.isError || saved === undefined) && shared !== undefined) {
+      // A friend's game from this party: not in My games, but it can be.
+      const isCurrent = state.game?.gameId === shared.gameId;
+      return (
+        <GamePageLayout header={header} backLink={backLink}>
+          <GameHero
+            title={shared.title}
+            byline={shared.sharedBy !== null ? <>shared by {shared.sharedBy}</> : undefined}
+            facts={
+              <Badge size="md" className="theme-nova" color="accent">
+                Made with Nova
+              </Badge>
+            }
+            actions={
+              <>
+                {isCurrent
+                  ? null
+                  : selectForParty(async () => {
+                      const source = engine.sharedGameSource(shared.gameId);
+                      if (source === undefined) throw new Error("The game isn't on this device.");
+                      await engine.selectGame({
+                        gameId: source.gameId,
+                        title: source.title,
+                        mode: source.mode,
+                        source: source.source,
+                        apiVersion: source.apiVersion ?? PROTOCOL_VERSION,
+                      });
+                    })}
+                <SaveSharedGame game={shared} size="lg" showHint={false} />
+              </>
+            }
+          />
+          <AboutCard>
+            <p className="leading-relaxed text-foreground/80">
+              {shared.sharedBy ?? "A friend"} made this game with Nova and shared it in this party.
+              Save it to keep it in My games: you can play it in your own parties and change it in
+              the editor.
+            </p>
+            <SharedCopyNote game={shared} />
+          </AboutCard>
+          {askHostDialog(shared.title)}
+        </GamePageLayout>
+      );
+    }
     if (savedQuery.isError || saved === undefined) {
       return (
         <div className="mx-auto flex w-full max-w-xl flex-col gap-4 py-6">
@@ -447,4 +495,28 @@ function ExternalTextLink({ href, children }: { href: string; children: ReactNod
       {children}
     </a>
   );
+}
+
+/** Explains an update or an edited copy, under the About text. */
+function SharedCopyNote({ game }: { game: SharedPartyGame }) {
+  const games = useSavedGames().data;
+  if (games === undefined) return null;
+  const status = sharedGameStatus(games, game);
+  const from = game.sharedBy ?? "The host";
+  if (status.kind === "update") {
+    return (
+      <p className="text-sm text-foreground/60">
+        {from} changed this game since you saved it. Update your copy to get the new version.
+      </p>
+    );
+  }
+  if (status.kind === "edited") {
+    return (
+      <p className="text-sm text-foreground/60">
+        You changed your copy (“{status.game.title}”), so saving keeps yours and adds this version
+        as another game.
+      </p>
+    );
+  }
+  return null;
 }

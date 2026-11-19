@@ -21,6 +21,8 @@ import {
   saveBrowseContext,
 } from "../../lib/browse/back-context";
 import { useSavedGames } from "../../lib/games/queries";
+import { sharedGameStatus } from "../../lib/games/shared-copies";
+import type { SharedPartyGame } from "../../lib/party/engine";
 
 export interface GameBrowserProps {
   /** Pick mode selects directly instead of opening details; used by the in-game browse panel. */
@@ -47,17 +49,14 @@ export interface GameBrowserProps {
   inParty?: boolean;
 }
 
-type BrowseView = "mine" | BrowseCategory["id"];
+type BrowseView = "mine" | "friends" | BrowseCategory["id"];
 
 function isBrowseView(value: string | null | undefined): value is BrowseView {
-  return value === null || value === "mine" || BROWSE_CATEGORIES.some((box) => box.id === value);
-}
-
-function KindBadge() {
   return (
-    <Badge color="danger" variant="secondary" title="External iframe game from classic Rocketcrab">
-      classic
-    </Badge>
+    value === null ||
+    value === "mine" ||
+    value === "friends" ||
+    BROWSE_CATEGORIES.some((box) => box.id === value)
   );
 }
 
@@ -82,10 +81,7 @@ function GameCard({
   const body = (
     <>
       <span className="flex min-w-0 flex-col gap-1">
-        <span className="flex flex-wrap items-center gap-2">
-          <span className="font-black">{game.name}</span>
-          <KindBadge />
-        </span>
+        <span className="font-black">{game.name}</span>
         <span className="text-sm font-medium text-foreground/50">by {game.author}</span>
       </span>
       <ArrowRight
@@ -135,12 +131,7 @@ function SavedGameRow({
   const body = (
     <>
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="flex flex-wrap items-center gap-2">
-          <span className="truncate font-black">{game.title}</span>
-          <Badge color="accent" variant="secondary">
-            {game.mode ?? "state"}
-          </Badge>
-        </span>
+        <span className="truncate font-black">{game.title}</span>
       </span>
       <ArrowRight
         className="h-5 w-5 shrink-0 text-foreground/40 transition-transform group-hover:translate-x-1 group-hover:text-primary"
@@ -238,7 +229,7 @@ export function GameBrowser({
   inParty = false,
 }: GameBrowserProps) {
   const navigate = useNavigate();
-  const { engine } = usePartyEngine();
+  const { engine, state: partyState } = usePartyEngine();
   // Explicit route search takes precedence over the stored in-lobby position.
   const stored = readBrowseContext();
   const [query, setQuery] = useState(initialQuery ?? stored?.query ?? "");
@@ -264,6 +255,19 @@ export function GameBrowser({
     const needle = query.toLowerCase();
     return savedGames.filter((game) => game.title.toLowerCase().includes(needle));
   }, [savedGames, query]);
+
+  // Friends' Nova games shared in this party (lobby browsing only).
+  const browsingLobby = inParty && compact && onPick === undefined && onPickSaved === undefined;
+  const friendsGames = useMemo(() => {
+    if (!browsingLobby) return [];
+    const needle = query.toLowerCase();
+    return partyState.sharedGames.filter(
+      (game) =>
+        !game.sharedBySelf &&
+        !savedGames.some((saved) => saved.id === game.gameId) &&
+        game.title.toLowerCase().includes(needle),
+    );
+  }, [browsingLobby, partyState.sharedGames, savedGames, query]);
 
   const showingList = view !== null || query !== "";
   const savedCount = savedGamesQuery.isLoading ? null : savedGames.length;
@@ -348,6 +352,14 @@ export function GameBrowser({
           ) : (
             <CategoryCard emoji="📦" label="My games" count={savedCount} href="/library" />
           )}
+          {friendsGames.length > 0 ? (
+            <CategoryCard
+              emoji="🤝"
+              label="Friends' games"
+              count={friendsGames.length}
+              onClick={() => setView("friends")}
+            />
+          ) : null}
           {BROWSE_CATEGORIES.map((box) => (
             <CategoryCard
               key={box.id}
@@ -362,7 +374,13 @@ export function GameBrowser({
 
       {showingList ? (
         <section aria-label="Games" className="flex flex-col gap-3">
-          {view === "mine" ? (
+          {view === "friends" ? (
+            <FriendsGamesList
+              games={friendsGames}
+              savedGames={savedGames}
+              onOpen={recordPosition}
+            />
+          ) : view === "mine" ? (
             <SavedGamesList
               query={query}
               isLoading={savedGamesQuery.isLoading}
@@ -486,6 +504,58 @@ function SavedGamesList({
           />
         </li>
       ))}
+    </ul>
+  );
+}
+
+/** Games friends shared in this party; each opens its details to save it. */
+function FriendsGamesList({
+  games,
+  savedGames,
+  onOpen,
+}: {
+  games: readonly SharedPartyGame[];
+  savedGames: readonly SavedGame[];
+  onOpen: () => void;
+}) {
+  if (games.length === 0) {
+    return (
+      <p className="glass rounded-2xl p-6 text-center text-foreground/70">
+        No friends&apos; games match.
+      </p>
+    );
+  }
+  return (
+    <ul className="flex flex-col gap-2">
+      {games.map((game) => {
+        const status = sharedGameStatus(savedGames, game).kind;
+        return (
+          <li key={game.gameId}>
+            <Link
+              to="/game/$gameId"
+              params={{ gameId: game.gameId }}
+              search={{ from: "party-browse" }}
+              onClick={onOpen}
+              className="group flex items-center justify-between gap-3 glass rounded-2xl px-4 py-3 transition-colors hover:bg-surface-tertiary"
+            >
+              <span className="flex min-w-0 flex-col gap-1">
+                <span className="truncate font-black">{game.title}</span>
+                <span className="text-sm font-medium text-foreground/50">
+                  {game.sharedBy !== null ? `shared by ${game.sharedBy}` : "Shared in this party"}
+                </span>
+              </span>
+              <span className="flex shrink-0 items-center gap-2">
+                {status === "saved" ? <Badge>Saved</Badge> : null}
+                {status === "update" ? <Badge color="accent">Update</Badge> : null}
+                <ArrowRight
+                  className="h-5 w-5 text-foreground/40 transition-transform group-hover:translate-x-1 group-hover:text-primary"
+                  aria-hidden="true"
+                />
+              </span>
+            </Link>
+          </li>
+        );
+      })}
     </ul>
   );
 }

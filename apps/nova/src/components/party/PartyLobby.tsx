@@ -6,11 +6,11 @@ import { toast } from "../../lib/toast";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState, PartyMemberView, PartyNotice } from "../../lib/party/engine";
 import { Button, buttonStyles } from "../ui/Button";
-import { Dialog } from "../ui/Dialog";
 import { GameBrowser } from "./GameBrowser";
 import { NameEntry } from "./NameEntry";
 import { WelcomeWaves } from "../backgrounds/WelcomeWaves";
 import { PartyInviteQr } from "./PartyInviteQr";
+import { SaveSharedGame } from "./SaveSharedGame";
 import { clearBrowseContext } from "../../lib/browse/back-context";
 
 export interface PartyLobbyProps {
@@ -136,6 +136,12 @@ export function PartyLobby({
   }, [browsing, onBrowseModeChange]);
   const [qrOpen, setQrOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
+
+  // A Nova game from someone else can be saved to this player's games.
+  const sharedGame =
+    state.game === null || state.classicGame !== null
+      ? undefined
+      : state.sharedGames.find((game) => game.gameId === state.game?.gameId);
 
   const hostName =
     state.members.find((member) => member.memberId === state.hostMemberId)?.displayName ?? null;
@@ -291,6 +297,7 @@ export function PartyLobby({
               >
                 What is {state.game.title}?
               </Link>
+              {sharedGame !== undefined ? <SaveSharedGame game={sharedGame} /> : null}
             </>
           ) : (
             <p className="text-sm font-semibold text-foreground/70">{noGameMessage}</p>

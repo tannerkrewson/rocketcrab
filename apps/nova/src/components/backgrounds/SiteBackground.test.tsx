@@ -33,6 +33,7 @@ const IDLE_STATE: PartyEngineState = {
   joinStage: null,
   lastError: null,
   peerLink: null,
+  sharedGames: [],
 };
 
 const IN_GAME_STATE: PartyEngineState = {

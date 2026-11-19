@@ -46,25 +46,12 @@ describe("/browse", () => {
     expect(wrapper.querySelector("svg.lucide-search")).not.toBeNull();
   });
 
-  it("lists classic games in their category boxes with the classic badge", async () => {
+  it("lists classic games in their category boxes, without a jargon badge", async () => {
     renderAt("/browse");
     await userEvent.click(await screen.findByRole("button", { name: /Drawing/ }));
     expect(screen.getByText("Drawphone")).toBeInTheDocument();
-    expect(screen.getAllByText("classic").length).toBeGreaterThan(0);
+    expect(screen.queryByText("classic")).not.toBeInTheDocument();
     expect(screen.getAllByText(/^by Tanner Krewson$/).length).toBeGreaterThan(0);
-  });
-
-  it("badges classic games red (7.42)", async () => {
-    renderAt("/browse");
-    await screen.findByRole("button", { name: /Drawing/ });
-    await userEvent.click(screen.getByRole("button", { name: /Drawing/ }));
-    await screen.findByText("Drawphone");
-
-    const classicBadges = screen.getAllByText("classic");
-    expect(classicBadges.length).toBeGreaterThan(0);
-    for (const badge of classicBadges) {
-      expect(badge.closest(".chip")).toHaveClass("chip--danger");
-    }
   });
 
   it("filters games by search (the list appears, category cards hide)", async () => {

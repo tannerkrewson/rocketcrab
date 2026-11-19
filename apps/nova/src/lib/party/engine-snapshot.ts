@@ -109,6 +109,9 @@ export class PartySnapshot {
       lastError: this.state.lastError,
       setupFailureCode: this.state.setupFailureCode,
       peerLink: this.state.peerLink.status,
+      sharedGames: [...this.state.sharedGames.values()]
+        .reverse()
+        .map(({ source: _source, ...game }) => game),
     };
   }
 

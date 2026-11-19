@@ -502,6 +502,42 @@ describe("party engine — game mode and source transitions", () => {
     await b.engine.leaveParty();
   });
 
+  it("remembers each verified game for the session so guests can save it", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    await runCreate(a, world);
+    const invite = parseInviteFragment(new URL(a.engine.getState().inviteUrl as string).hash)!;
+    const joining = b.engine.joinByInvite({ secret: invite.secret! });
+    await settle(world);
+    await joining;
+    await a.engine.selectGame(GAME);
+    await settle(world);
+
+    const shared = b.engine.getState().sharedGames;
+    expect(shared).toHaveLength(1);
+    expect(shared[0]).toMatchObject({
+      gameId: GAME.gameId,
+      title: GAME.title,
+      sharedBySelf: false,
+    });
+    expect(shared[0]).not.toHaveProperty("source");
+    expect(b.engine.sharedGameSource(GAME.gameId)?.source).toBe(GAME.source);
+    expect(a.engine.getState().sharedGames[0]?.sharedBySelf).toBe(true);
+
+    // A newer version replaces the old one under the same id.
+    const edited = GAME.source + "<!-- v2 -->";
+    await a.engine.selectGame({ ...GAME, source: edited });
+    await settle(world);
+    expect(b.engine.getState().sharedGames).toHaveLength(1);
+    expect(b.engine.sharedGameSource(GAME.gameId)?.source).toBe(edited);
+    expect(b.engine.getState().sharedGames[0]?.sourceSha256).not.toBe(shared[0]?.sourceSha256);
+
+    await b.engine.leaveParty();
+    expect(b.engine.getState().sharedGames).toHaveLength(0);
+    await a.engine.leaveParty();
+  });
+
   it("does not allow a joiner to replace the party game", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");

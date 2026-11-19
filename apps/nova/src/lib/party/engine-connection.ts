@@ -125,6 +125,8 @@ export class PartyConnection {
     this.state.stateExecutor = null;
     this.state.lastStateApiEvent = null;
     this.state.pendingSource = null;
+    this.state.sharedGames.clear();
+    this.state.sourceApiVersions.clear();
     this.state.runtimeLogs = [];
     this.state.game = null;
     this.state.classic = null;

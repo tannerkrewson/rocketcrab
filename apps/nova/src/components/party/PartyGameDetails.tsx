@@ -1,9 +1,10 @@
 import { Badge } from "../ui/Badge";
 import type { GameMode } from "@rocketcrab/protocol";
 import { BookOpen, X } from "lucide-react";
-import { findBrowseGame } from "../../lib/browse";
-import { NOVA_MODE_LABELS } from "../../lib/browse/nova-games";
+import { BROWSE_CATEGORIES, findBrowseGame } from "../../lib/browse";
 import { useSavedGame } from "../../lib/games/queries";
+import { usePartyEngine } from "../../lib/party/use-party";
+import { SaveSharedGame } from "./SaveSharedGame";
 import { Button } from "../ui/Button";
 import { LoadingState } from "../ui/LoadingState";
 
@@ -62,9 +63,13 @@ function PrebuiltDetails({ game }: { game: NonNullable<ReturnType<typeof findBro
     <div className="flex flex-col gap-3">
       {game.category.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
-          {game.category.map((category) => (
-            <Badge key={category}>{category}</Badge>
-          ))}
+          {BROWSE_CATEGORIES.filter((category) => game.category.includes(category.match)).map(
+            (category) => (
+              <Badge key={category.id}>
+                <span aria-hidden="true">{category.emoji}</span> {category.label}
+              </Badge>
+            ),
+          )}
         </div>
       ) : null}
       <p className="whitespace-pre-line text-sm text-foreground/80">{game.description}</p>
@@ -91,25 +96,31 @@ function PrebuiltDetails({ game }: { game: NonNullable<ReturnType<typeof findBro
 
 function SavedGameDetails({ gameId }: { gameId: string }) {
   const savedQuery = useSavedGame(gameId);
+  const { state } = usePartyEngine();
   if (savedQuery.isLoading) {
     return <LoadingState label="Loading game details…" />;
   }
   const saved = savedQuery.data;
   if (savedQuery.isError || saved === undefined) {
+    // Someone else's game: everyone in the party received it.
+    const shared = state.sharedGames.find((game) => game.gameId === gameId);
     return (
-      <p className="text-sm text-foreground/70">
-        Couldn't load this game's details from this browser's saved games.
-      </p>
+      <div className="flex flex-col items-start gap-3">
+        <p className="text-sm text-foreground/80">
+          {shared?.sharedBy ?? "A friend"} made this game with Nova and shared it in this party.
+        </p>
+        {shared !== undefined ? <SaveSharedGame game={shared} /> : null}
+      </div>
     );
   }
   return (
     <div className="flex flex-col gap-3">
-      <p className="text-sm font-semibold text-foreground/60">
-        {NOVA_MODE_LABELS[saved.mode ?? "state"]}
-      </p>
-      <p className="whitespace-pre-line text-sm text-foreground/80">
-        {saved.description ?? "No description yet — open it in the editor to learn more."}
-      </p>
+      <Badge className="theme-nova self-start" color="accent">
+        Made with Nova
+      </Badge>
+      {saved.description ? (
+        <p className="whitespace-pre-line text-sm text-foreground/80">{saved.description}</p>
+      ) : null}
     </div>
   );
 }

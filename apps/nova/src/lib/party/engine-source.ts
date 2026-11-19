@@ -1,9 +1,17 @@
 import type { MemberId } from "@rocketcrab/protocol";
 import { type GameSourceTransferEvent } from "@rocketcrab/party";
-import type { PartyMemberView, PartyEngineState, PartySourceSpec } from "./engine-types";
+import type {
+  PartyMemberView,
+  PartyEngineState,
+  PartySourceSpec,
+  SharedPartyGameSource,
+} from "./engine-types";
 import type { PartyEngineContext, TransferState } from "./engine-context";
 import type { PartyEngineServices } from "./engine-services";
 import { SOURCE_RETRANSMIT_INTERVAL_MS, errorMessage, formatBytes } from "./engine-utils";
+
+/** Each kept game holds its source (up to 2 MiB), so the list is short. */
+const MAX_SHARED_GAMES = 10;
 
 /** Verified source distribution, transfer bookkeeping, and source retry timers. */
 export class PartySource {
@@ -70,6 +78,7 @@ export class PartySource {
       })
       .then((metadata) => {
         this.adoptSourceHash(metadata.sourceSha256);
+        this.rememberShared(input, metadata.sourceSha256);
         this.state.selfVerified = true;
         this.state.selfVerifiedSha256 = metadata.sourceSha256;
         this.state.transfers.set(this.state.identity.memberId, {
@@ -90,6 +99,34 @@ export class PartySource {
       });
   }
 
+  /** The verified source of a game shared this session, to save a copy. */
+  sharedGameSource(gameId: string): SharedPartyGameSource | undefined {
+    return this.state.sharedGames.get(gameId);
+  }
+
+  /** Keep a verified game (newest version per game id) for this session. */
+  private rememberShared(spec: PartySourceSpec, sourceSha256: string): void {
+    const hostId = this.state.party?.hostMemberId ?? null;
+    const games = this.state.sharedGames;
+    games.delete(spec.gameId);
+    const apiVersion = spec.apiVersion ?? this.state.sourceApiVersions.get(spec.gameId);
+    games.set(spec.gameId, {
+      gameId: spec.gameId,
+      title: spec.title,
+      mode: spec.mode,
+      ...(apiVersion !== undefined ? { apiVersion } : {}),
+      source: spec.source,
+      sourceSha256,
+      sharedBy: hostId === null ? null : this.services().snapshot.displayNameOf(hostId),
+      sharedBySelf: hostId === this.state.identity.memberId,
+    });
+    while (games.size > MAX_SHARED_GAMES) {
+      const oldest = games.keys().next().value;
+      if (oldest === undefined) break;
+      games.delete(oldest);
+    }
+  }
+
   handleCoordinatorEvent(event: GameSourceTransferEvent): void {
     switch (event.type) {
       case "metadata": {
@@ -98,6 +135,9 @@ export class PartySource {
           title: event.metadata.title ?? "Untitled game",
           mode: event.metadata.mode ?? "state",
         };
+        if (event.metadata.apiVersion !== undefined) {
+          this.state.sourceApiVersions.set(game.gameId, event.metadata.apiVersion);
+        }
         const changed =
           this.state.game?.gameId !== game.gameId || this.state.game.mode !== game.mode;
         this.state.game = game;
@@ -125,6 +165,7 @@ export class PartySource {
             this.state.selfVerified = true;
             this.state.selfVerifiedSha256 = event.metadata.sourceSha256;
             this.state.pendingSource = { ...game, source: cached };
+            this.rememberShared(this.state.pendingSource, event.metadata.sourceSha256);
             void this.services().runtime.maybeBootFrame();
           }
         }
@@ -204,6 +245,7 @@ export class PartySource {
           mode: this.state.game?.mode ?? "state",
           source: event.source,
         };
+        this.rememberShared(this.state.pendingSource, event.sourceSha256);
         this.services().snapshot.addNotice("info", "You received the game — starting it now.");
         this.services().snapshot.emit();
         void this.services().runtime.maybeBootFrame();

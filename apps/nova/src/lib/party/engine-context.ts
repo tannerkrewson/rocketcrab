@@ -26,6 +26,7 @@ import type {
   JoinStage,
   PartyEngineConfig,
   PartySourceSpec,
+  SharedPartyGameSource,
 } from "./engine-types";
 import {
   DEFAULT_PEER_CONNECT_TIMEOUT_MS,
@@ -114,6 +115,10 @@ export class PartyEngineContext {
   runtime: RuntimeHostClient | null = null;
   container: HTMLElement | null = null;
   pendingSource: PartySourceSpec | null = null;
+  /** Verified Nova games shared this session, oldest first (bounded). */
+  readonly sharedGames = new Map<string, SharedPartyGameSource>();
+  /** apiVersion from the latest source metadata, per game id. */
+  readonly sourceApiVersions = new Map<string, number>();
   classic: ClassicSelection | null = null;
   classicFrameEpoch = 0;
   removedReason: string | null = null;

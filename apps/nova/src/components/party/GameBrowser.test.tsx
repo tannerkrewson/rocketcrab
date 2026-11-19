@@ -22,7 +22,7 @@ const { leavePartyMock } = vi.hoisted(() => ({
 
 vi.mock("../../lib/party/use-party", () => ({
   usePartyEngine: () => ({
-    state: { phase: "lobby" },
+    state: { phase: "lobby", sharedGames: [] },
     engine: { leaveParty: leavePartyMock },
   }),
 }));

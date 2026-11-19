@@ -133,6 +133,8 @@ export interface PartyEngineState {
   readonly lastError: string | null;
   readonly setupFailureCode?: "room-full" | "decrypt-failed" | null;
   readonly peerLink: PeerLinkStatus;
+  /** Nova games shared in this party session, most recent first. */
+  readonly sharedGames: readonly SharedPartyGame[];
   readonly runtimeLogs: readonly ArenaLogEntry[];
 }
 
@@ -161,6 +163,27 @@ export interface PartyEngineConfig {
    * because injected factories own transport construction.
    */
   turnCreds?: () => Promise<TurnCredentialsResult>;
+}
+
+/**
+ * A Nova game shared in this party (selected by a host and verified by
+ * hash), so players can save it to their own games. Remembered only for the
+ * party session; the source itself is read with `sharedGameSource`.
+ */
+export interface SharedPartyGame {
+  readonly gameId: string;
+  readonly title: string;
+  readonly mode: GameMode;
+  readonly apiVersion?: number;
+  readonly sourceSha256: string;
+  /** Display name of the host who shared it, if known. */
+  readonly sharedBy: string | null;
+  /** True when this player shared it (it is already theirs). */
+  readonly sharedBySelf: boolean;
+}
+
+export interface SharedPartyGameSource extends SharedPartyGame {
+  readonly source: string;
 }
 
 export interface PartySourceSpec {

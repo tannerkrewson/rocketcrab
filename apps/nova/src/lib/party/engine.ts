@@ -19,6 +19,7 @@ import type {
   PartyEngineState,
   PartyPhase,
   PartySourceSpec,
+  SharedPartyGameSource,
 } from "./engine-types";
 import { PartyEngineContext } from "./engine-context";
 import type { PartyEngineServices } from "./engine-services";
@@ -41,6 +42,8 @@ export type {
   PartyEngineState,
   PartyEngineConfig,
   PartySourceSpec,
+  SharedPartyGame,
+  SharedPartyGameSource,
 } from "./engine-types";
 
 export class PartyEngine {
@@ -97,6 +100,11 @@ export class PartyEngine {
 
   selectGame(input: PartySourceSpec): Promise<void> {
     return this.services.game.selectGame(input);
+  }
+
+  /** The verified source of a Nova game shared in this party, to save a copy. */
+  sharedGameSource(gameId: string): SharedPartyGameSource | undefined {
+    return this.services.source.sharedGameSource(gameId);
   }
 
   /** Host-only, in the lobby. Create one external room and share its URL spec with all players. */

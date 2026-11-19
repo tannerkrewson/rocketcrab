@@ -60,3 +60,26 @@ game source and metadata to be stored in **IndexedDB on Nova's main origin**
   peer-to-peer (P3), so storage stays local while play remains shared.
 - A failed write must not destroy the prior saved version; delete requires
   confirmation (U2 acceptance).
+
+## Saving a friend's game (2026-11-19)
+
+Every player in a party already receives and hash-verifies the selected Nova
+game (P3). The engine keeps the newest verified source of each game shared
+during the party session (at most 10, cleared on leaving), so any player,
+not only the host, can save it to their own local repository from the lobby,
+the game's details page, the in-game **About this game** sheet, or the
+lobby browser's **Friends' games** category. Nothing new is uploaded.
+
+A saved copy records `copiedFrom` (the shared game's id in the party, the
+saved version's hash, and who shared it). When a later party shares that id
+again with a different hash:
+
+- an **unedited** copy (its hash still equals `copiedFrom.sourceHash`) is
+  offered **Update my copy**, which replaces it in place;
+- an **edited** copy is never overwritten: **Save their version** adds the
+  new version as a separate game;
+- any saved game with the exact same hash counts as already saved.
+
+Duplicating a game in the editor drops `copiedFrom`: the duplicate is the
+player's own fork. Players only see games that were selected in a party they
+joined; browsing friends' whole libraries is not supported.

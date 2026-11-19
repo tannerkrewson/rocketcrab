@@ -1,6 +1,20 @@
 import type { GameMode } from "@rocketcrab/protocol";
 
 /**
+ * Where a game saved from a party came from. Lets a later party offer the
+ * sharer's newer version: an unedited copy updates in place; an edited copy
+ * is never overwritten (the new version is saved as another copy).
+ */
+export interface SavedGameOrigin {
+  /** The shared game's id in the party (the sharer's own game id). */
+  gameId: string;
+  /** Hash of the version saved. Differs from `sourceHash` once you edit it. */
+  sourceHash: string;
+  /** Display name of whoever shared it. */
+  sharedBy?: string;
+}
+
+/**
  * A saved user-created game, persisted in IndexedDB on Nova's main origin
  * (ADR-0005).
  */
@@ -25,6 +39,8 @@ export interface SavedGame {
   lastTestSucceeded?: boolean;
   /** UTF-8 byte length of `html`, matching protocol byte-limit semantics. */
   sourceBytes: number;
+  /** Set when the game was saved from a friend's party. */
+  copiedFrom?: SavedGameOrigin;
 }
 
 /** Failure modes surfaced by {@link GameRepository} implementations. */
@@ -65,6 +81,7 @@ export interface CreateSavedGameInput {
   html: string;
   apiVersion?: number;
   mode?: GameMode;
+  copiedFrom?: SavedGameOrigin;
 }
 
 /**
@@ -78,6 +95,7 @@ export interface UpdateSavedGameInput {
   html?: string;
   apiVersion?: number;
   mode?: GameMode;
+  copiedFrom?: SavedGameOrigin;
 }
 
 /** Options for duplicating a saved game. */

@@ -79,6 +79,7 @@ export class DexieGameRepository implements GameRepository {
       sourceBytes: sourceByteLength(input.html),
       ...(input.apiVersion !== undefined ? { apiVersion: input.apiVersion } : {}),
       ...(input.mode !== undefined ? { mode: input.mode } : {}),
+      ...(input.copiedFrom !== undefined ? { copiedFrom: input.copiedFrom } : {}),
       createdAt: now,
       updatedAt: now,
     };
@@ -126,6 +127,9 @@ export class DexieGameRepository implements GameRepository {
     }
     if (input.mode !== undefined) {
       next.mode = input.mode;
+    }
+    if (input.copiedFrom !== undefined) {
+      next.copiedFrom = input.copiedFrom;
     }
     try {
       await this.db.games.put(next);

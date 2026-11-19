@@ -35,6 +35,7 @@ const IDLE_STATE: PartyEngineState = {
   runtimeLogs: [],
   lastError: null,
   peerLink: null,
+  sharedGames: [],
 };
 
 const LOBBY_STATE: PartyEngineState = {
