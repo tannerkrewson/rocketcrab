@@ -2,27 +2,69 @@
 @import "@heroui/styles";
 
 /*
- * Nova brand tokens on top of HeroUI v3.
+ * Rocketcrab theme on top of HeroUI v3. The app is dark-only: index.html
+ * puts `.dark` on <html>, so HeroUI's dark theme applies and the overrides
+ * below sit on the same selector to win the cascade.
  *
- * HeroUI owns every component's visuals and the light/dark surface, text,
- * border, accent and status tokens. Nova keeps only its two brand colors
- * (rocket red + signal blue) and the font choices. `.dark` on <html> switches
- * HeroUI's dark theme (applied by lib/theme.ts).
+ * HeroUI owns every component's visuals; this file only re-points its color
+ * tokens. Two brand colors drive everything:
+ *   --rocket  rocket red, the site-wide brand (HeroUI accent, `primary`)
+ *   --nova    deep Nova blue, the brand inside `.theme-nova` (build/editor)
+ * `--brand` is whichever applies; `secondary` is always Nova blue.
+ * The WebGL backgrounds (components/backgrounds) use the same hues, so keep
+ * their hex palettes in sync when these change.
  */
-@theme {
+@theme inline {
   --font-sans: "Mukta", ui-sans-serif, system-ui, sans-serif;
   --font-title: "Inconsolata Variable", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
 
-  --color-primary: oklch(62% 0.21 22);
+  --color-primary: var(--brand);
   --color-primary-foreground: oklch(99% 0 0);
-  --color-secondary: oklch(58% 0.17 250);
+  --color-secondary: var(--nova);
   --color-secondary-foreground: oklch(99% 0 0);
+  --color-nova-text: var(--nova-text);
 }
 
-/* Darken the brand red slightly for readable text on dark surfaces. */
-.dark {
-  --color-primary: oklch(65% 0.21 25);
-  --color-secondary: oklch(60% 0.17 250);
+@layer base {
+  .dark,
+  [data-theme="dark"] {
+    --rocket: oklch(60% 0.22 30);
+    --nova: oklch(55% 0.21 264);
+    /* Light enough to read on black and on the Nova silk. */
+    --nova-text: oklch(80% 0.12 262);
+    --brand: var(--rocket);
+
+    --accent: var(--rocket);
+    /* Crimson, so destructive buttons don't read as the red brand accent. */
+    --danger: oklch(58% 0.2 8);
+
+    /* Pure black page with neutral (hue-free) surfaces. Cards are slightly
+       translucent so the background glows through without a costly blur. */
+    --background: oklch(0% 0 0);
+    --surface: oklch(17% 0 0 / 0.88);
+    --surface-secondary: oklch(21% 0 0);
+    --surface-tertiary: oklch(25% 0 0);
+    --overlay: oklch(19% 0 0);
+    --default: oklch(24% 0 0);
+    --field-background: oklch(21% 0 0);
+    --segment: oklch(33% 0 0);
+    --border: oklch(28% 0 0);
+    --separator: oklch(23% 0 0);
+    --muted: oklch(72% 0 0);
+  }
+
+  /* Nova's deep blue replaces the accent inside this subtree. HeroUI derives
+     hover/soft/focus colors from --accent where they are declared (the root),
+     so they are re-derived here too. */
+  .theme-nova {
+    --brand: var(--nova);
+    --accent: var(--nova);
+    --focus: var(--nova);
+    --accent-hover: color-mix(in oklab, var(--nova) 90%, var(--accent-foreground) 10%);
+    --accent-soft: color-mix(in oklab, var(--nova) 12%, transparent);
+    --accent-soft-hover: color-mix(in oklab, var(--nova) 16%, transparent);
+    --accent-soft-foreground: color-mix(in oklab, var(--nova) 65%, var(--foreground) 35%);
+  }
 }
 
 @layer base {
@@ -133,14 +175,34 @@
   padding-top: max(0.5rem, env(safe-area-inset-top));
 }
 
-/* Nova brand glow: the build page's hero uses the brand color's soft halo,
-   matching the rocket/crab logo drop-shadow glow. */
-@utility glow-info {
-  box-shadow: 0 0 26px -6px oklch(72% 0.11 225 / 0.6);
+/* The home page's Nova card and the /build hero share this name, so a
+   `viewTransition` link morphs one into the other. Browsers without the
+   View Transitions API just navigate. Only one element per page may carry it. */
+.vt-nova-hero {
+  view-transition-name: nova-hero;
 }
 
-@utility text-glow-info {
-  text-shadow: 0 0 20px oklch(72% 0.11 225 / 0.55);
+::view-transition-group(nova-hero) {
+  animation-duration: 420ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Fade the outgoing card's text quickly so it doesn't ghost over the new one. */
+::view-transition-old(nova-hero) {
+  animation-duration: 160ms;
+}
+
+::view-transition-image-pair(nova-hero) {
+  border-radius: 1rem;
+  overflow: hidden;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(*),
+  ::view-transition-old(*),
+  ::view-transition-new(*) {
+    animation: none !important;
+  }
 }
 
 /* The lobby's invisible runtime frame must never take vertical space. */

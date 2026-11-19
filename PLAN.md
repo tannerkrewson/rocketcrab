@@ -125,6 +125,12 @@ Record results here and in the [Mobile Safari checklist](docs/testing/mobile-saf
       Safari; master prompt on two AI chat services.
 - [ ] Turn-based, ticking and raw sample games; authority migration; link and
       QR joins.
+- [ ] WebGL backgrounds (React Bits, `apps/nova/src/vendor/react-bits`) on
+      an older/low-end phone: home (site background plus the Nova card) and
+      `/build` stay smooth, and the party lobby (site background plus the
+      Welcome slats) doesn't heat the phone or drain the battery over a 10+
+      minute wait. Headless SwiftShader checks held 60 fps on both. If a phone
+      struggles, lower `PIXEL_BUDGET` in `SiteBackground.tsx` first.
 - [ ] A friend beta without coaching.
 
 ## 4. Cutover (owner approval)

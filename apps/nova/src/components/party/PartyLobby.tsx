@@ -8,7 +8,7 @@ import type { PartyEngineState, PartyMemberView, PartyNotice } from "../../lib/p
 import { getSavedPlayerName } from "../../lib/party/identity";
 import { Button, buttonStyles } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
-import { IdleParticles } from "./IdleParticles";
+import { WelcomeSlats } from "../backgrounds/WelcomeSlats";
 import { PartyDiagnosticsPanel } from "./PartyDiagnostics";
 import { PartyInviteQr } from "./PartyInviteQr";
 import { clearBrowseContext } from "../../lib/browse/back-context";
@@ -262,9 +262,9 @@ export function PartyLobby({
       </section>
       <section
         aria-label="Welcome"
-        className="relative flex flex-col items-center gap-3 overflow-hidden rounded-2xl border-2 border-border bg-surface p-5 text-center"
+        className="relative flex min-h-40 flex-col items-center justify-center gap-3 overflow-hidden rounded-2xl border-2 border-border bg-background p-5 text-center"
       >
-        <IdleParticles />
+        <WelcomeSlats />
         <div className="relative flex flex-col items-center gap-3">
           <h2 className="text-xl font-black">Welcome to rocketcrab!</h2>
           {state.game !== null ? (

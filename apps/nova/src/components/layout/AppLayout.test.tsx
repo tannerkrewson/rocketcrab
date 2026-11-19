@@ -45,56 +45,29 @@ describe("AppLayout", () => {
     expect(screen.queryByText("🚀")).not.toBeInTheDocument();
   });
 
-  it("floats the theme/color controls in the bottom-right corner on every page", async () => {
+  it("layers the page content above the site background", async () => {
     renderAt("/about");
     await screen.findByRole("heading", { name: "Coming soon" });
 
-    const control = screen.getByTestId("floating-theme-control");
-    expect(control.className).toContain("fixed");
-    expect(control.className).toContain("bottom");
-    expect(control.className).toContain("right");
-
-    // Check stacking classes, not just DOM presence: negative-z stars can hide behind the shell.
-    expect(screen.getByTestId("app-starfield")).toHaveClass("z-0");
+    // Check stacking classes, not just DOM presence: a negative-z layer can hide behind the shell.
+    expect(screen.getByTestId("app-background")).toHaveClass("z-0");
     expect(screen.getByRole("main")).toHaveClass("relative", "z-10");
-
-    expect(screen.getByRole("button", { name: "Light theme" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "System theme" })).toBeInTheDocument();
-    expect(screen.queryByText("Light")).not.toBeInTheDocument();
-    expect(screen.queryByText("Dark")).not.toBeInTheDocument();
   });
 
-  it("shows the starfield on every page when no game is live (5cl.4/22n)", async () => {
+  it("shows the background on every page when no game is live (5cl.4/22n)", async () => {
     renderAt("/");
     await screen.findByRole("heading", { name: "rocketcrab.com" });
-    expect(screen.getByTestId("app-starfield")).toBeInTheDocument();
+    expect(screen.getByTestId("app-background")).toBeInTheDocument();
 
     renderAt("/about");
     await screen.findByRole("heading", { name: "Coming soon" });
-    expect(screen.getByTestId("app-starfield")).toBeInTheDocument();
+    expect(screen.getByTestId("app-background")).toBeInTheDocument();
   });
 
-  it("keeps the same floating bottom-right theme control on party routes", async () => {
-    renderAt("/join");
-    await screen.findByRole("heading", { name: "Join a private party" });
-
-    const control = screen.getByTestId("floating-theme-control");
-    expect(control.className).toContain("fixed");
-    expect(control.className).toContain("bottom");
-    expect(control.className).toContain("right");
-    expect(screen.getByRole("button", { name: "Light theme" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: "System theme" })).toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Rocketcrab home/ })).not.toBeInTheDocument();
-    expect(screen.queryByRole("contentinfo")).not.toBeInTheDocument();
-  });
-
-  it("keeps theme controls reachable on the library page, which links back home and to build (2t1.5)", async () => {
+  it("links the library page back home and to build (2t1.5)", async () => {
     renderAt("/library");
     await screen.findByRole("heading", { name: "My games" });
 
-    expect(screen.getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
     const home = screen.getByRole("link", { name: "back" });
     expect(home.getAttribute("href")).toBe("/");
     const builds = screen.getAllByRole("link", { name: /New game/ });

@@ -1,8 +1,8 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type AnimationEvent } from "react";
-import { Alert } from "@heroui/react";
 import { toast } from "../lib/toast";
 import { BrandLogo } from "../components/layout/BrandLogo";
+import { NovaSilk } from "../components/backgrounds/NovaSilk";
 import { Button, buttonStyles } from "../components/ui/Button";
 import { writeToClipboard } from "../lib/editor/clipboard";
 import { usePartyEngine } from "../lib/party/use-party";
@@ -114,20 +114,22 @@ function HomeComponent() {
           rocketcrab<span className="text-primary">.com</span>
         </h1>
         <p className="text-lg text-foreground/70">party games for phones</p>
-        <Alert
-          status="accent"
-          role="alert"
-          className="mt-4 -mb-1 w-fit max-w-[calc(100vw-2rem)] cursor-pointer border-dotted transition-colors hover:bg-accent/20 motion-reduce:transition-none"
+        {/* Same satin as the /build hero; the shared view-transition name
+            expands this card into the hero (and back via its back link). */}
+        <Link
+          to="/build"
+          viewTransition
+          data-testid="nova-card"
+          className="vt-nova-hero relative mt-4 -mb-1 block w-full max-w-md overflow-hidden rounded-2xl bg-background px-6 py-4 text-center transition-transform active:scale-[0.98] motion-reduce:transition-none"
         >
-          <Alert.Content>
-            <Link to="/build" className="block min-w-0 text-center">
-              <span className="block text-base font-black">Introducing Nova</span>
-              <span className="block text-sm opacity-80">
-                Build your own games and play them with friends, instantly.
-              </span>
-            </Link>
-          </Alert.Content>
-        </Alert>
+          <NovaSilk />
+          <span className="relative block text-lg font-black [text-shadow:0_1px_12px_rgb(0_0_0/0.8)]">
+            Introducing <span className="text-nova-text">Nova</span>
+          </span>
+          <span className="relative block text-sm text-foreground/85 [text-shadow:0_1px_8px_rgb(0_0_0/0.8)]">
+            Build your own games and play them with friends, instantly.
+          </span>
+        </Link>
       </section>
 
       <section

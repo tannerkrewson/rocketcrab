@@ -616,7 +616,7 @@ export function EditorPage({ game, initialSource }: { game?: SavedGame; initialS
   );
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="theme-nova flex flex-col gap-4">
       <FirstRunTutorial />
 
       <div className="sm:hidden" data-testid="phone-prompt">

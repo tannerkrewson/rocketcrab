@@ -16,7 +16,6 @@ import type { BrowseEntry } from "../../lib/browse";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import { cn } from "../../lib/cn";
 import type { PartyEngineState } from "../../lib/party/engine";
-import { ThemeSelector } from "../layout/ThemeSelector";
 import { BrandLogo } from "../layout/BrandLogo";
 import { Button } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
@@ -238,12 +237,6 @@ export function PartyPlayShell({
                   </button>
                 </li>
               ) : null}
-              <li role="separator" aria-hidden="true" className="my-1 border-t-2 border-border" />
-              <li>
-                <div className="flex items-center justify-center px-3 py-1.5">
-                  <ThemeSelector />
-                </div>
-              </li>
             </ul>
           ) : null}
         </header>

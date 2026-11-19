@@ -2,7 +2,10 @@ import { Button as HeroButton, type ButtonProps as HeroButtonProps } from "@hero
 import { buttonVariants } from "@heroui/styles";
 import { cn } from "../../lib/cn";
 
-/** Nova button intents, mapped onto HeroUI's semantic variants. */
+/**
+ * Nova button intents, mapped onto HeroUI's semantic variants. The accent is
+ * rocket red; `info` is the same button in Nova blue (`.theme-nova`).
+ */
 export type ButtonVariant =
   | "primary"
   | "secondary"
@@ -67,7 +70,7 @@ export function Button({
       variant={heroVariant(variant, soft)}
       size={size}
       isDisabled={disabled ?? props.isDisabled}
-      className={cn("font-bold", className)}
+      className={cn("font-bold", variant === "info" && "theme-nova", className)}
       {...props}
     />
   );
@@ -83,5 +86,10 @@ export function buttonStyles(
   className?: string,
   soft = false,
 ) {
-  return cn("font-bold", buttonVariants({ variant: heroVariant(variant, soft), size }), className);
+  return cn(
+    "font-bold",
+    variant === "info" && "theme-nova",
+    buttonVariants({ variant: heroVariant(variant, soft), size }),
+    className,
+  );
 }

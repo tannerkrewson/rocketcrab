@@ -312,18 +312,6 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(screen.queryByRole("dialog", { name: "About Drawphone" })).not.toBeInTheDocument();
   });
 
-  it("moves the light/dark/system theme control into the Menu (i47)", async () => {
-    await renderShell(makeState());
-    expect(screen.queryByTestId("floating-theme-control")).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: "Dark theme" })).not.toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /menu/i }));
-    const menu = screen.getByRole("menu", { name: /game menu/i });
-    expect(within(menu).getByRole("button", { name: "Light theme" })).toBeInTheDocument();
-    expect(within(menu).getByRole("button", { name: "Dark theme" })).toBeInTheDocument();
-    expect(within(menu).getByRole("button", { name: "System theme" })).toBeInTheDocument();
-    expect(screen.queryByTestId("floating-theme-control")).not.toBeInTheDocument();
-  });
-
   it("scales the party URL down while pressed like the homepage title (0dd)", async () => {
     await renderShell(makeState());
     const url = screen.getByLabelText("Party link Nova party");

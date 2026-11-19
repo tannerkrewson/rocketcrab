@@ -1,7 +1,7 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import { describe, expect, it } from "vitest";
 import type { PartyEngine, PartyEngineState } from "../../lib/party/engine";
-import { StarfieldBackground } from "./StarfieldBackground";
+import { SiteBackground } from "./SiteBackground";
 
 /** Drive the shared playing-phase signal through an injectable fake party engine. */
 
@@ -69,51 +69,51 @@ function makeEngine(initial: PartyEngineState): FakeEngine {
   };
 }
 
-function renderStarfield(engine?: PartyEngine) {
+function renderBackground(engine?: PartyEngine) {
   cleanup();
-  return render(<StarfieldBackground engine={engine} />);
+  return render(<SiteBackground engine={engine} />);
 }
 
-describe("StarfieldBackground (22n)", () => {
-  it("renders the starfield when no party game is live (idle engine)", () => {
+describe("SiteBackground (22n)", () => {
+  it("renders the background when no party game is live (idle engine)", () => {
     const { engine } = makeEngine(IDLE_STATE);
-    renderStarfield(engine);
-    expect(screen.getByTestId("app-starfield")).toBeInTheDocument();
+    renderBackground(engine);
+    expect(screen.getByTestId("app-background")).toBeInTheDocument();
   });
 
-  it("renders the starfield while a party is in the lobby (game not yet selected)", () => {
+  it("renders the background while a party is in the lobby (game not yet selected)", () => {
     const { engine } = makeEngine({ ...IDLE_STATE, phase: "lobby" });
-    renderStarfield(engine);
-    expect(screen.getByTestId("app-starfield")).toBeInTheDocument();
+    renderBackground(engine);
+    expect(screen.getByTestId("app-background")).toBeInTheDocument();
   });
 
-  it("keeps the starfield visible in the lobby after a game is selected", () => {
+  it("keeps the background visible in the lobby after a game is selected", () => {
     const { engine } = makeEngine({ ...IN_GAME_STATE, phase: "lobby" });
-    renderStarfield(engine);
-    expect(screen.getByTestId("app-starfield")).toBeInTheDocument();
+    renderBackground(engine);
+    expect(screen.getByTestId("app-background")).toBeInTheDocument();
   });
 
-  it("hides the starfield once the party is actively playing a game", () => {
+  it("hides the background once the party is actively playing a game", () => {
     const { engine } = makeEngine(IN_GAME_STATE);
-    renderStarfield(engine);
-    expect(screen.queryByTestId("app-starfield")).not.toBeInTheDocument();
+    renderBackground(engine);
+    expect(screen.queryByTestId("app-background")).not.toBeInTheDocument();
   });
 
-  it("unmounts the starfield reactively when a game starts (no fade logic)", async () => {
+  it("unmounts the background reactively when a game starts (no fade logic)", async () => {
     const { engine, setState } = makeEngine(IDLE_STATE);
-    renderStarfield(engine);
-    expect(screen.getByTestId("app-starfield")).toBeInTheDocument();
+    renderBackground(engine);
+    expect(screen.getByTestId("app-background")).toBeInTheDocument();
 
     setState(IN_GAME_STATE);
     await waitFor(() => {
-      expect(screen.queryByTestId("app-starfield")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("app-background")).not.toBeInTheDocument();
     });
   });
 
-  it("renders the starfield again when the game ends and the lobby returns", async () => {
+  it("renders the background again when the game ends and the lobby returns", async () => {
     const { engine, setState } = makeEngine(IN_GAME_STATE);
-    renderStarfield(engine);
-    expect(screen.queryByTestId("app-starfield")).not.toBeInTheDocument();
+    renderBackground(engine);
+    expect(screen.queryByTestId("app-background")).not.toBeInTheDocument();
 
     setState({
       ...IDLE_STATE,
@@ -121,7 +121,7 @@ describe("StarfieldBackground (22n)", () => {
       endedReason: "host ended the game",
     });
     await waitFor(() => {
-      expect(screen.getByTestId("app-starfield")).toBeInTheDocument();
+      expect(screen.getByTestId("app-background")).toBeInTheDocument();
     });
   });
 });

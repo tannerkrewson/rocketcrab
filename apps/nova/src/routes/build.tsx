@@ -15,6 +15,7 @@ import { toast } from "../lib/toast";
 import { Button, buttonStyles } from "../components/ui/Button";
 import { Card } from "../components/ui/Card";
 import { BrandLogo } from "../components/layout/BrandLogo";
+import { NovaSilk } from "../components/backgrounds/NovaSilk";
 import { storeDraftSource } from "../lib/editor/draft-handoff";
 import { exampleGames, exampleModeLabel } from "../lib/editor/example-games";
 import { writeToClipboard } from "../lib/editor/clipboard";
@@ -36,91 +37,6 @@ interface BuildSearch {
 const NOVA_API_REFERENCE_URL =
   "https://github.com/tannerkrewson/rocketcrab/blob/docs/api/nova-api-ai-reference.md";
 
-/**
- * Fixed orb positions keep the decorative glow stable across renders.
- * Low opacity preserves text contrast; backwards fill prevents a flash
- * before delayed animations begin.
- */
-const ORBS = [
-  {
-    className: "h-40 w-72 bg-accent/40 blur-2xl",
-    left: "5%",
-    top: "6%",
-    breathe: "7s",
-    delay: "0s",
-  },
-  {
-    className: "h-28 w-52 bg-secondary/30 blur-xl",
-    left: "56%",
-    top: "2%",
-    breathe: "9s",
-    delay: "1.2s",
-  },
-  {
-    className: "h-24 w-44 bg-accent/30 blur-xl",
-    left: "28%",
-    top: "12%",
-    breathe: "8s",
-    delay: "0.9s",
-  },
-  {
-    className: "h-36 w-64 bg-accent/35 blur-2xl",
-    left: "72%",
-    top: "22%",
-    breathe: "10s",
-    delay: "2s",
-  },
-  {
-    className: "h-28 w-52 bg-primary/25 blur-2xl",
-    left: "12%",
-    top: "30%",
-    breathe: "6s",
-    delay: "1.6s",
-  },
-  {
-    className: "h-24 w-44 bg-accent/30 blur-xl",
-    left: "44%",
-    top: "34%",
-    breathe: "11s",
-    delay: "2.6s",
-  },
-  {
-    className: "h-32 w-60 bg-secondary/25 blur-2xl",
-    left: "80%",
-    top: "48%",
-    breathe: "12s",
-    delay: "0.7s",
-  },
-  {
-    className: "h-28 w-52 bg-accent/25 blur-xl",
-    left: "6%",
-    top: "58%",
-    breathe: "9s",
-    delay: "1.4s",
-  },
-  {
-    className: "h-24 w-44 bg-accent/30 blur-xl",
-    left: "38%",
-    top: "64%",
-    breathe: "8s",
-    delay: "3s",
-  },
-  {
-    className: "h-36 w-64 bg-primary/25 blur-2xl",
-    left: "64%",
-    top: "70%",
-    breathe: "10s",
-    delay: "2.3s",
-  },
-  {
-    className: "h-28 w-52 bg-accent/25 blur-2xl",
-    left: "22%",
-    top: "82%",
-    breathe: "7s",
-    delay: "3.6s",
-  },
-];
-
 /** Build flow: introduction, then a copyable prompt and example-game handoff. */
 export function BuildPage() {
   const search = Route.useSearch();
@@ -132,8 +48,8 @@ export function BuildPage() {
 
 function BuildHeroPage() {
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-10 text-center">
-      <Link to="/" className={buttonStyles("default", "md", "self-start", true)}>
+    <div className="theme-nova mx-auto flex w-full max-w-2xl flex-col items-center gap-10 text-center">
+      <Link to="/" viewTransition className={buttonStyles("default", "md", "self-start", true)}>
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         back
       </Link>
@@ -141,54 +57,19 @@ function BuildHeroPage() {
       <section
         aria-labelledby="build-hero-heading"
         data-testid="build-hero"
-        className="relative w-full overflow-hidden rounded-2xl border-2 border-border bg-surface shadow-sm"
+        // The home page's Nova card expands into this hero (shared view-transition name).
+        className="vt-nova-hero relative w-full overflow-hidden rounded-2xl bg-background"
       >
-        <div className="rc-build-glow" aria-hidden="true">
-          {ORBS.map((orb, index) => (
-            <span
-              key={index}
-              className={`rc-build-orb ${orb.className}`}
-              style={{
-                left: orb.left,
-                top: orb.top,
-                animation: `rc-build-orb-breathe ${orb.breathe} ease-in-out ${orb.delay} infinite alternate backwards`,
-              }}
-            />
-          ))}
-        </div>
-        <style>{`
-          .rc-build-glow {
-            position: absolute;
-            inset: 0;
-            overflow: hidden;
-            pointer-events: none;
-          }
-          .rc-build-orb {
-            position: absolute;
-            border-radius: 9999px;
-          }
-          @keyframes rc-build-orb-breathe {
-            0% { transform: scale(0.92); opacity: 0.5; }
-            50% { transform: scale(1.08); opacity: 0.85; }
-            100% { transform: scale(0.92); opacity: 0.5; }
-          }
-          @media (prefers-reduced-motion: reduce) {
-            /* Inline animation styles would otherwise beat this rule. */
-            .rc-build-orb {
-              animation: none !important;
-              opacity: 0.55;
-            }
-          }
-        `}</style>
+        <NovaSilk />
         <div className="relative flex flex-col items-center gap-4 px-6 py-12 sm:px-12 sm:py-16">
           <BrandLogo variant="no-glow" size={80} responsive aria-hidden />
           <h1
             id="build-hero-heading"
-            className="text-glow-info text-4xl font-black text-foreground sm:text-5xl"
+            className="text-4xl font-black text-foreground [text-shadow:0_2px_16px_rgb(0_0_0/0.8)] sm:text-5xl"
           >
-            Introducing <span className="text-accent">Nova</span>
+            Introducing <span className="text-nova-text">Nova</span>
           </h1>
-          <p className="max-w-md text-lg leading-relaxed text-foreground/70">
+          <p className="max-w-md text-lg leading-relaxed text-foreground/85 [text-shadow:0_1px_10px_rgb(0_0_0/0.8)]">
             Turn any idea into a game your friends can play.
           </p>
           <Link
@@ -197,7 +78,7 @@ function BuildHeroPage() {
             className={buttonStyles(
               "info",
               "lg",
-              "drop-shadow-[0_0_22px_oklch(72%_0.11_225/0.55)] mt-1 sm:px-14",
+              "drop-shadow-[0_0_22px_oklch(62%_0.19_264/0.55)] mt-1 sm:px-14",
             )}
           >
             <Sparkles className="h-5 w-5" aria-hidden="true" />
@@ -288,7 +169,7 @@ function BuildPromptPage() {
   };
 
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col items-center gap-8 text-center">
+    <div className="theme-nova mx-auto flex w-full max-w-2xl flex-col items-center gap-8 text-center">
       <Link to="/build" className={buttonStyles("default", "md", "self-start", true)}>
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
         back
@@ -417,7 +298,7 @@ function BuildPromptPage() {
         className={buttonStyles(
           "info",
           "lg",
-          "drop-shadow-[0_0_22px_oklch(72%_0.11_225/0.55)] w-full sm:w-auto sm:px-16",
+          "drop-shadow-[0_0_22px_oklch(62%_0.19_264/0.55)] w-full sm:w-auto sm:px-16",
         )}
       >
         <Code2 className="h-5 w-5" aria-hidden="true" />

@@ -88,12 +88,10 @@ describe("/", () => {
     expect(screen.queryByText("🚀")).not.toBeInTheDocument();
     expect(screen.getByText("party games for phones")).toBeInTheDocument();
     const alert = screen.getByRole("link", { name: /Introducing Nova/ });
-    expect(alert.parentElement).not.toHaveClass("aura");
-    expect(document.querySelector(".rc-alert-orb, .rc-alert-star")).toBeNull();
-    const alertBox = alert.closest('[data-slot="alert-root"]');
-    expect(alertBox).not.toBeNull();
-    expect(alertBox).toHaveClass("alert--accent", "border-dotted");
-    expect(within(alert).getByText("Introducing Nova")).toBeInTheDocument();
+    // Shares the /build hero's view-transition name so it expands into it.
+    expect(alert).toHaveClass("vt-nova-hero");
+    expect(alert).toHaveTextContent(/^Introducing Nova/);
+    expect(within(alert).getByText("Nova")).toHaveClass("text-nova-text");
     expect(
       within(alert).getByText("Build your own games and play them with friends, instantly."),
     ).toBeInTheDocument();

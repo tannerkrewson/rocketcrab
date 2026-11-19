@@ -46,8 +46,9 @@ describe("/build — page 1 (hero)", () => {
 
     const hero = await screen.findByTestId("build-hero");
     expect(hero.className).toContain("rounded-2xl");
-    expect(hero.className).toContain("border-border");
-    expect(hero.className).not.toContain("border-accent");
+    // Borderless satin card; shares the home Nova card's view-transition name.
+    expect(hero.className).not.toContain("border");
+    expect(hero.className).toContain("vt-nova-hero");
 
     const logo = hero.querySelector("img");
     expect(logo?.getAttribute("src")).toBe("/rocketcrab-logo-no-glow.svg");
@@ -56,7 +57,7 @@ describe("/build — page 1 (hero)", () => {
     expect(
       await within(hero).findByRole("heading", { name: "Introducing Nova" }),
     ).toBeInTheDocument();
-    expect(within(hero).getByText("Nova").className).toContain("text-accent");
+    expect(within(hero).getByText("Nova").className).toContain("text-nova-text");
 
     expect(
       screen.getByText("Turn any idea into a game your friends can play."),

@@ -30,7 +30,7 @@ export function ExamplesPage() {
   };
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="theme-nova flex flex-col gap-6">
       <header className="flex flex-col gap-3">
         <Link to="/" className={buttonStyles("default", "md", "w-fit", true)} title="Back to home">
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />

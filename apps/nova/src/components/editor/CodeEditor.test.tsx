@@ -1,7 +1,6 @@
 import { render, screen, waitFor } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { describe, expect, it } from "vitest";
 import { CodeEditor } from "./CodeEditor";
-import { THEME_STORAGE_KEY } from "../../lib/theme";
 
 /** All injected <style> content (CodeMirror injects its theme CSS). */
 function injectedStyles(): string {
@@ -9,11 +8,6 @@ function injectedStyles(): string {
     .map((style) => style.textContent ?? "")
     .join("\n");
 }
-
-afterEach(() => {
-  window.localStorage.clear();
-  document.documentElement.removeAttribute("data-theme");
-});
 
 /** Keep the wrapper's fixed-height chain intact so CodeMirror scrolls internally. */
 describe("CodeEditor", () => {
@@ -29,29 +23,12 @@ describe("CodeEditor", () => {
     expect(editor?.parentElement).toHaveClass("h-full");
   });
 
-  it("maps CodeMirror surfaces to HeroUI variables and follows the app theme", async () => {
-    const { unmount } = render(
-      <CodeEditor value="" onChange={() => {}} ariaLabel="Game HTML source" />,
-    );
-    await waitFor(() => expect(document.querySelector(".cm-theme-light")).not.toBeNull());
-    const lightStyles = injectedStyles();
-    expect(lightStyles).toContain("var(--surface)");
-    expect(lightStyles).toContain("var(--foreground)");
-    expect(lightStyles).toContain("var(--surface-secondary)");
-    unmount();
-
-    for (const darkTheme of ["dark"]) {
-      window.localStorage.setItem(THEME_STORAGE_KEY, darkTheme);
-      document.documentElement.classList.add("dark");
-      document.documentElement.setAttribute("data-theme", darkTheme);
-      const { unmount: unmountDark } = render(
-        <CodeEditor value="" onChange={() => {}} ariaLabel="Game HTML source" />,
-      );
-      await waitFor(() => expect(document.querySelector(".cm-theme-dark")).not.toBeNull());
-      expect(injectedStyles()).toContain("var(--surface)");
-      expect(injectedStyles()).toContain("var(--foreground)");
-      expect(injectedStyles()).toContain("var(--surface-secondary)");
-      unmountDark();
-    }
+  it("maps CodeMirror surfaces to HeroUI variables in its dark theme", async () => {
+    render(<CodeEditor value="" onChange={() => {}} ariaLabel="Game HTML source" />);
+    await waitFor(() => expect(document.querySelector(".cm-theme-dark")).not.toBeNull());
+    const styles = injectedStyles();
+    expect(styles).toContain("var(--surface)");
+    expect(styles).toContain("var(--foreground)");
+    expect(styles).toContain("var(--surface-secondary)");
   });
 });
