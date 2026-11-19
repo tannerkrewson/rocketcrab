@@ -149,7 +149,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     renderAt(`/game/${game.id}`);
 
     expect(await screen.findByRole("heading", { name: "Rocket Rumble" })).toBeInTheDocument();
-    expect(screen.getByText(/raw mode · saved/)).toBeInTheDocument();
+    expect(screen.getByText("My game")).toBeInTheDocument();
     expect(screen.getByText("Blast off with friends.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /select game/i })).not.toBeInTheDocument();
     const start = screen.getByRole("link", { name: /Start party/ });

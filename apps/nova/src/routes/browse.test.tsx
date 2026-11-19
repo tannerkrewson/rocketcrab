@@ -136,55 +136,48 @@ describe("/browse", () => {
 });
 
 describe("/game/:gameId", () => {
-  it("shows the classic Info detail with author, players, categories, and description", async () => {
+  it("shows the classic detail: author, players, categories, actions, description", async () => {
     renderAt("/game/drawphone");
 
     expect(await screen.findByRole("heading", { name: "Drawphone" })).toBeInTheDocument();
-    expect(screen.getByText("classic")).toBeInTheDocument();
     expect(screen.getByText("by Tanner Krewson")).toBeInTheDocument();
     expect(screen.getByText("1+ players")).toBeInTheDocument();
-    expect(screen.getByText("drawing")).toBeInTheDocument();
-    expect(screen.getByText("easy")).toBeInTheDocument();
+    expect(screen.getByText("Drawing")).toBeInTheDocument();
+    expect(screen.getByText("Very simple")).toBeInTheDocument();
     expect(screen.getByText(/In Drawphone, there are no winners/)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Play game/ })).not.toBeInTheDocument();
     const start = screen.getByRole("link", { name: /Start party/ });
     expect(start.getAttribute("href")).toBe("/party");
+    const guide = screen.getByRole("link", { name: /How to play/ });
+    expect(guide).toHaveAttribute("href", "https://drawphone.tannerkrewson.com/how-to-play");
+    expect(guide).toHaveAttribute("target", "_blank");
     expect(screen.getByRole("link", { name: /rocketcrab\.com/ })).toBeInTheDocument();
   });
 
-  it("sits every badge and the game/donation links at the top of the page (l41)", async () => {
+  it("puts the facts and actions above the screenshots and the About text (l41)", async () => {
     renderAt("/game/drawphone");
     await screen.findByRole("heading", { name: "Drawphone" });
 
-    const description = screen.getByText(/In Drawphone, there are no winners/);
     const before = (a: Element, b: Element) =>
       (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0;
-
-    for (const badge of [
-      screen.getByText("classic"),
-      screen.getByText("drawing"),
-      screen.getByText("easy"),
-    ]) {
-      expect(badge.closest(".chip")).toHaveClass("chip--soft");
-    }
-    const gameLink = screen.getByText("drawphone.tannerkrewson.com");
-    const donationLink = screen.getByText("Buy Tanner a taco!");
-    const tabs = screen.getByRole("tablist");
-    expect(before(gameLink, tabs)).toBe(true);
-    expect(before(donationLink, tabs)).toBe(true);
-    expect(before(screen.getByText("drawing"), description)).toBe(true);
-    expect(before(screen.getByText("easy"), description)).toBe(true);
+    const screenshots = screen.getByRole("region", { name: "Screenshots" });
+    const about = screen.getByRole("region", { name: "About" });
+    expect(before(screen.getByText("Drawing"), screenshots)).toBe(true);
+    expect(before(screen.getByRole("link", { name: /Start party/ }), screenshots)).toBe(true);
+    expect(before(screenshots, about)).toBe(true);
+    // The game's own links live with its description.
+    expect(about).toContainElement(screen.getByText("drawphone.tannerkrewson.com"));
+    expect(about).toContainElement(screen.getByText("Buy Tanner a taco!"));
   });
 
-  it("switches between Info and Guide tabs (classic layout)", async () => {
+  it("rejoins hard-wrapped description lines into paragraphs", async () => {
     renderAt("/game/drawphone");
     await screen.findByRole("heading", { name: "Drawphone" });
 
-    const guideTab = screen.getByRole("tab", { name: "Guide" });
-    await userEvent.click(guideTab);
-
-    expect(screen.getByRole("link", { name: /Read the guide/ })).toBeInTheDocument();
-    expect(screen.queryByText(/In Drawphone, there are no winners/)).not.toBeInTheDocument();
+    const first = screen.getByText(/In Drawphone, there are no winners/);
+    expect(first.textContent).toContain("Players take turns drawing");
+    expect(first.textContent).not.toMatch(/\n/);
+    expect(screen.getByText(/Drawphone was inspired by/)).not.toBe(first);
   });
 
   it("shows an error panel for an unknown game id", async () => {

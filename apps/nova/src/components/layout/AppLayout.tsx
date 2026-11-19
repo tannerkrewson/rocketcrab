@@ -2,13 +2,21 @@ import { Outlet, useRouterState } from "@tanstack/react-router";
 import { SiteBackground, type SiteBackgroundVariant } from "../backgrounds/SiteBackground";
 import { SiteFooter } from "./SiteFooter";
 
-/** Nova's build and editor pages get the silk; party pages stay black. */
+/** Nova's build and editor pages get the silk; party pages are plain black. */
 const NOVA_ROUTES = new Set(["/build", "/editor", "/games/$gameId/edit"]);
 
-function backgroundFor(matches: ReadonlyArray<{ routeId: string }>): SiteBackgroundVariant {
+function backgroundFor(
+  matches: ReadonlyArray<{ routeId: string; search: unknown }>,
+): SiteBackgroundVariant {
   if (matches.some((match) => NOVA_ROUTES.has(match.routeId))) return "nova";
   if (matches.some((match) => match.routeId === "/party")) return "party";
-  return "molten";
+  // A game's details opened from the lobby are still part of the party.
+  const fromParty = matches.some((match) => {
+    if (match.routeId !== "/game/$gameId") return false;
+    const from = (match.search as { from?: string } | undefined)?.from;
+    return from === "party" || from === "party-browse";
+  });
+  return fromParty ? "party" : "molten";
 }
 
 /** Shared page column over the site background; routes own their navigation and party chrome. */

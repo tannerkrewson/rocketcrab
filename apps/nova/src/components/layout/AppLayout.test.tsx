@@ -74,6 +74,15 @@ describe("AppLayout", () => {
     renderAt("/about");
     await screen.findByRole("heading", { name: "Coming soon" });
     expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "molten");
+
+    // A game's details stay black when opened from the party lobby.
+    renderAt("/game/drawphone?from=party-browse");
+    await screen.findByRole("heading", { name: "Drawphone" });
+    expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "party");
+
+    renderAt("/game/drawphone");
+    await screen.findByRole("heading", { name: "Drawphone" });
+    expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "molten");
   });
 
   it("shows the background on every page when no game is live (5cl.4/22n)", async () => {

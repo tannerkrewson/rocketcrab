@@ -1,65 +1,45 @@
-import { expect, test, type Locator } from "@playwright/test";
-
-/** Swiper exposes its instance on the container element. */
-type SwiperEl = HTMLElement & { swiper: { realIndex: number } };
-
-function realIndex(carousel: Locator): Promise<number> {
-  return carousel.evaluate((el) => (el as SwiperEl).swiper.realIndex);
-}
+import { expect, test } from "@playwright/test";
 
 /**
- * A definite Swiper width prevents slide sizing and container min-content
- * measurements from feeding back into unbounded growth. Block remote images
- * to keep layout tests independent of the network, including failed loads.
+ * The screenshot row must stay inside its column as images load, fail and
+ * the viewport changes. Block remote images to keep layout tests independent
+ * of the network, including failed loads.
  */
-test("screenshot carousel keeps a sane width as assets load and on resize", async ({ page }) => {
+test("screenshot row keeps a sane width as assets load and on resize", async ({ page }) => {
   await page.route("**/*", (route) => {
     if (route.request().resourceType() === "image") return route.abort();
     return route.continue();
   });
 
   await page.goto("/game/drawphone");
-  const carousel = page.locator(".swiper.nova-screenshots");
-  await expect(carousel).toBeVisible();
+  const row = page.getByTestId("screenshot-row");
+  await expect(row).toBeVisible();
 
-  // Give image error/font swap events time to trigger swiper re-measures.
   await page.waitForTimeout(1500);
-  const widthAfterLoad = await carousel.evaluate((el) => el.clientWidth);
+  const column = page.locator(".mx-auto.max-w-2xl").first();
+  const columnWidth = await column.evaluate((el) => el.clientWidth);
+  const widthAfterLoad = await row.evaluate((el) => el.clientWidth);
   expect(widthAfterLoad).toBeGreaterThan(0);
-  expect(widthAfterLoad).toBeLessThan(2000);
+  expect(widthAfterLoad).toBeLessThanOrEqual(columnWidth);
 
   await page.setViewportSize({ width: 900, height: 720 });
   await page.waitForTimeout(800);
-  const widthAfterResize = await carousel.evaluate((el) => el.clientWidth);
+  const widthAfterResize = await row.evaluate((el) => el.clientWidth);
   expect(widthAfterResize).toBeGreaterThan(0);
-  expect(widthAfterResize).toBeLessThan(2000);
+  expect(widthAfterResize).toBeLessThanOrEqual(await column.evaluate((el) => el.clientWidth));
 });
 
-test("pagination keeps the selected slide across a re-measure", async ({ page }) => {
-  await page.route("**/*", (route) => {
-    if (route.request().resourceType() === "image") return route.abort();
-    return route.continue();
-  });
-
+test("arrow buttons scroll the screenshot row on wide screens", async ({ page }) => {
+  await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/game/drawphone");
-  const carousel = page.locator(".swiper.nova-screenshots");
-  await expect(carousel).toBeVisible();
+  const row = page.getByTestId("screenshot-row");
+  await expect(row).toBeVisible();
 
-  // Swiper creates its pagination bullets on init, so the bullet exists once
-  // the carousel can be driven.
-  const slideThree = page.getByRole("button", { name: "Go to slide 3" });
-  await expect(slideThree).toBeVisible();
-  await slideThree.click();
-  await expect.poll(() => realIndex(carousel), { timeout: 3000 }).toBe(2);
-
-  // The theme switcher that used to force a re-render is gone; a viewport
-  // resize makes Swiper re-measure every slide instead.
-  await page.setViewportSize({ width: 900, height: 720 });
-  await expect.poll(() => realIndex(carousel), { timeout: 3000 }).toBe(2);
-
-  await expect(page.getByRole("button", { name: "Go to slide 3" })).toHaveClass(
-    /swiper-pagination-bullet-active/,
-  );
+  const more = page.getByRole("button", { name: "More screenshots" });
+  await expect(more).toBeVisible();
+  await more.click();
+  await expect.poll(() => row.evaluate((el) => el.scrollLeft)).toBeGreaterThan(0);
+  await expect(page.getByRole("button", { name: "Previous screenshots" })).toBeVisible();
 });
 
 test("back link is a compact button, not a full-width bar", async ({ page }) => {

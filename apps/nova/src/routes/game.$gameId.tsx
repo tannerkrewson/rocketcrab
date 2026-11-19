@@ -1,9 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Tabs } from "@heroui/react";
 import { toast } from "../lib/toast";
 import { Badge } from "../components/ui/Badge";
-import { ArrowLeft, BookOpen, ExternalLink, PartyPopper, Pencil } from "lucide-react";
-import { useState } from "react";
+import { ArrowLeft, BookOpen, ExternalLink, PartyPopper, Pencil, Users } from "lucide-react";
+import { useState, type ReactNode } from "react";
 import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
 import { Button, buttonStyles } from "../components/ui/Button";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
@@ -12,9 +11,8 @@ import { Dialog } from "../components/ui/Dialog";
 import { ScreenshotCarousel } from "../components/games/ScreenshotCarousel";
 import { BrandHeader } from "../components/layout/BrandHeader";
 import { PartyShellHeader } from "../components/party/PartyShellHeader";
-import { findBrowseGame } from "../lib/browse";
+import { BROWSE_CATEGORIES, findBrowseGame, type BrowseCategory } from "../lib/browse";
 import { readBrowseContext } from "../lib/browse/back-context";
-import { NOVA_MODE_LABELS } from "../lib/browse/nova-games";
 import { useSavedGame } from "../lib/games/queries";
 import { usePartyEngine } from "../lib/party/use-party";
 
@@ -35,8 +33,20 @@ function isGameDetailOrigin(value: unknown): value is GameDetailOrigin {
   return value === "party" || value === "party-browse";
 }
 
-function CategoryBadge({ label }: { label: string }) {
-  return <Badge>{label}</Badge>;
+/** A classic game's categories as the browser shows them (emoji + label). */
+function categoryChips(categories: readonly string[]): BrowseCategory[] {
+  return BROWSE_CATEGORIES.filter((category) => categories.includes(category.match));
+}
+
+/**
+ * Classic descriptions are indented template literals with hard-wrapped
+ * lines: rejoin each paragraph so it wraps to the page instead.
+ */
+function paragraphs(text: string): string[] {
+  return text
+    .split(/\n\s*\n/)
+    .map((paragraph) => paragraph.replace(/\s+/g, " ").trim())
+    .filter((paragraph) => paragraph.length > 0);
 }
 
 function errorMessage(error: unknown): string {
@@ -55,7 +65,6 @@ export function BrowseGamePage() {
   const prebuilt = findBrowseGame(gameId);
   const savedQuery = useSavedGame(prebuilt === undefined ? gameId : "");
   const { state, engine } = usePartyEngine();
-  const [tab, setTab] = useState<"info" | "guide">("info");
   const [selecting, setSelecting] = useState(false);
   const [editConfirmationOpen, setEditConfirmationOpen] = useState(false);
 
@@ -174,58 +183,64 @@ export function BrowseGamePage() {
         </div>
       );
     }
+    const editAction = inParty ? (
+      <Button variant="default" soft size="lg" onClick={requestEdit}>
+        <Pencil className="h-4 w-4" aria-hidden="true" />
+        Edit game
+      </Button>
+    ) : (
+      <Link
+        to="/games/$gameId/edit"
+        params={{ gameId: saved.id }}
+        className={buttonStyles("default", "lg", undefined, true)}
+      >
+        <Pencil className="h-4 w-4" aria-hidden="true" />
+        Edit game
+      </Link>
+    );
     return (
-      <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
-        {header}
-        {backLink}
-        <header className="flex flex-col gap-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-3xl font-black">{saved.title}</h1>
-            <Badge color="accent">{NOVA_MODE_LABELS[saved.mode ?? "state"]} · saved</Badge>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {inParty ? (
-              <Button variant="default" soft size="md" onClick={requestEdit}>
-                <Pencil className="h-4 w-4" aria-hidden="true" />
-                Edit game
-              </Button>
-            ) : (
-              <Link
-                to="/games/$gameId/edit"
-                params={{ gameId: saved.id }}
-                className={buttonStyles("default", "md", undefined, true)}
-              >
-                <Pencil className="h-4 w-4" aria-hidden="true" />
-                Edit game
-              </Link>
-            )}
-          </div>
-        </header>
-        <p className="whitespace-pre-line text-foreground/80">
-          {saved.description ?? "No description yet — open it in the editor to learn more."}
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          {notInParty ? (
-            <Link
-              to="/party"
-              search={{ gameId: saved.id, mode: saved.mode ?? "state", title: saved.title }}
-              className={buttonStyles("primary", "lg")}
-              title="Create a party from this game and play it with friends"
-            >
-              <PartyPopper className="h-4 w-4" aria-hidden="true" />
-              Start party
-            </Link>
-          ) : null}
-          {selectForParty(async () => {
-            await engine.selectGame({
-              gameId: saved.id,
-              title: saved.title,
-              mode: saved.mode ?? "state",
-              source: saved.html,
-              apiVersion: saved.apiVersion ?? PROTOCOL_VERSION,
-            });
-          })}
-        </div>
+      <GamePageLayout header={header} backLink={backLink}>
+        <GameHero
+          title={saved.title}
+          facts={
+            <>
+              <Badge size="md">My game</Badge>
+              <Badge size="md" className="theme-nova" color="accent">
+                Made with Nova
+              </Badge>
+            </>
+          }
+          actions={
+            <>
+              {notInParty ? (
+                <Link
+                  to="/party"
+                  search={{ gameId: saved.id, mode: saved.mode ?? "state", title: saved.title }}
+                  className={buttonStyles("primary", "lg")}
+                  title="Create a party from this game and play it with friends"
+                >
+                  <PartyPopper className="h-4 w-4" aria-hidden="true" />
+                  Start party
+                </Link>
+              ) : null}
+              {selectForParty(async () => {
+                await engine.selectGame({
+                  gameId: saved.id,
+                  title: saved.title,
+                  mode: saved.mode ?? "state",
+                  source: saved.html,
+                  apiVersion: saved.apiVersion ?? PROTOCOL_VERSION,
+                });
+              })}
+              {editAction}
+            </>
+          }
+        />
+        <AboutCard>
+          <p className="whitespace-pre-line leading-relaxed text-foreground/80">
+            {saved.description ?? "No description yet. Open it in the editor to add one."}
+          </p>
+        </AboutCard>
         <Dialog
           open={editConfirmationOpen}
           onClose={() => setEditConfirmationOpen(false)}
@@ -246,106 +261,163 @@ export function BrowseGamePage() {
             </div>
           </div>
         </Dialog>
-      </div>
+      </GamePageLayout>
     );
   }
 
+  const hasLinks = Boolean(prebuilt.displayUrlHref || prebuilt.donationUrlHref);
   return (
-    <div className="mx-auto flex w-full max-w-2xl flex-col gap-5">
+    <GamePageLayout header={header} backLink={backLink}>
+      <GameHero
+        title={prebuilt.name}
+        byline={
+          <>
+            by {prebuilt.author}
+            {prebuilt.basedOnName ? <> · based on {prebuilt.basedOnName}</> : null}
+          </>
+        }
+        facts={
+          <>
+            {prebuilt.players ? (
+              <Badge size="md">
+                <Users className="h-3.5 w-3.5" aria-hidden="true" />
+                {prebuilt.players} players
+              </Badge>
+            ) : null}
+            {categoryChips(prebuilt.category).map((category) => (
+              <Badge key={category.id} size="md">
+                <span aria-hidden="true">{category.emoji}</span> {category.label}
+              </Badge>
+            ))}
+          </>
+        }
+        actions={
+          <>
+            {notInParty ? (
+              // Classic rooms are created in the lobby, so they cannot be preselected via URL.
+              <Link
+                to="/party"
+                search={{ gameId: undefined, mode: undefined, title: undefined }}
+                className={buttonStyles("primary", "lg")}
+                title="Start a party and pick this game in the lobby"
+              >
+                <PartyPopper className="h-4 w-4" aria-hidden="true" />
+                Start party
+              </Link>
+            ) : null}
+            {selectForParty(async () => {
+              await engine.selectClassicGame(prebuilt.id);
+            })}
+            {prebuilt.guideUrl ? (
+              <a
+                href={prebuilt.guideUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonStyles("default", "lg", undefined, true)}
+              >
+                <BookOpen className="h-4 w-4" aria-hidden="true" />
+                How to play
+              </a>
+            ) : null}
+          </>
+        }
+      />
+
+      {prebuilt.pictures && prebuilt.pictures.length > 0 ? (
+        <ScreenshotCarousel images={prebuilt.pictures} gameName={prebuilt.name} />
+      ) : null}
+
+      <AboutCard>
+        {paragraphs(prebuilt.description).map((paragraph) => (
+          <p key={paragraph} className="leading-relaxed text-foreground/80">
+            {paragraph}
+          </p>
+        ))}
+        {hasLinks ? (
+          <div className="flex flex-wrap gap-x-5 gap-y-2 pt-1 text-sm font-semibold">
+            {prebuilt.displayUrlHref ? (
+              <ExternalTextLink href={prebuilt.displayUrlHref}>
+                {prebuilt.displayUrlText ?? prebuilt.displayUrlHref}
+              </ExternalTextLink>
+            ) : null}
+            {prebuilt.donationUrlHref ? (
+              <ExternalTextLink href={prebuilt.donationUrlHref}>
+                {prebuilt.donationUrlText ?? "Support the author"}
+              </ExternalTextLink>
+            ) : null}
+          </div>
+        ) : null}
+      </AboutCard>
+    </GamePageLayout>
+  );
+}
+
+/** Brand row, back link, then the page's cards. */
+function GamePageLayout({
+  header,
+  backLink,
+  children,
+}: {
+  header: ReactNode;
+  backLink: ReactNode;
+  children: ReactNode;
+}) {
+  return (
+    <div className="mx-auto flex w-full max-w-2xl flex-col gap-4">
       {header}
       {backLink}
-
-      <header className="flex flex-col gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <h1 className="text-3xl font-black">{prebuilt.name}</h1>
-          <Badge color="danger">classic</Badge>
-          {prebuilt.category.map((category) => (
-            <CategoryBadge key={category} label={category} />
-          ))}
-        </div>
-        <p className="font-semibold text-foreground/50">by {prebuilt.author}</p>
-        {prebuilt.players ? (
-          <p className="text-sm font-semibold text-foreground/60">{prebuilt.players} players</p>
-        ) : null}
-        <div className="flex flex-wrap gap-x-5 gap-y-1 text-sm font-semibold text-foreground/60">
-          {prebuilt.displayUrlHref ? (
-            <a
-              href={prebuilt.displayUrlHref}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-1 font-semibold text-link underline-offset-4 hover:underline"
-            >
-              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-              {prebuilt.displayUrlText ?? prebuilt.displayUrlHref}
-            </a>
-          ) : null}
-          {prebuilt.donationUrlHref ? (
-            <a
-              href={prebuilt.donationUrlHref}
-              target="_blank"
-              rel="noreferrer"
-              className="link inline-flex items-center gap-1"
-            >
-              <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
-              {prebuilt.donationUrlText ?? "Support the author"}
-            </a>
-          ) : null}
-        </div>
-      </header>
-
-      <Tabs
-        selectedKey={tab}
-        onSelectionChange={(key) => setTab(key === "guide" ? "guide" : "info")}
-        aria-label="Game details"
-      >
-        <Tabs.List>
-          <Tabs.Tab id="info">Info</Tabs.Tab>
-          {prebuilt.guideUrl ? <Tabs.Tab id="guide">Guide</Tabs.Tab> : null}
-        </Tabs.List>
-      </Tabs>
-
-      {tab === "info" ? (
-        <section aria-label="Info" className="flex flex-col gap-4">
-          {prebuilt.pictures && prebuilt.pictures.length > 0 ? (
-            <ScreenshotCarousel images={prebuilt.pictures} gameName={prebuilt.name} />
-          ) : null}
-
-          <p className="whitespace-pre-line text-foreground/80">{prebuilt.description}</p>
-        </section>
-      ) : (
-        <section aria-label="Guide" className="flex flex-col gap-3">
-          <p className="text-foreground/70">
-            {prebuilt.name} is hosted by its author. The official rules are linked below.
-          </p>
-          <a
-            href={prebuilt.guideUrl}
-            target="_blank"
-            rel="noreferrer"
-            className={buttonStyles("default", "md", "self-start", true)}
-          >
-            <BookOpen className="h-4 w-4" aria-hidden="true" />
-            Read the guide
-          </a>
-        </section>
-      )}
-
-      <div className="flex flex-wrap items-center justify-center gap-3">
-        {notInParty ? (
-          // Classic rooms are created in the lobby, so they cannot be preselected via URL.
-          <Link
-            to="/party"
-            search={{ gameId: undefined, mode: undefined, title: undefined }}
-            className={buttonStyles("primary", "lg")}
-            title="Start a party and pick this game in the lobby"
-          >
-            <PartyPopper className="h-4 w-4" aria-hidden="true" />
-            Start party
-          </Link>
-        ) : null}
-        {selectForParty(async () => {
-          await engine.selectClassicGame(prebuilt.id);
-        })}
-      </div>
+      {children}
     </div>
+  );
+}
+
+/** Title, byline, quick facts and the page's actions, in one card. */
+function GameHero({
+  title,
+  byline,
+  facts,
+  actions,
+}: {
+  title: string;
+  byline?: ReactNode;
+  facts: ReactNode;
+  actions: ReactNode;
+}) {
+  return (
+    <section
+      aria-label="Game"
+      className="glass flex flex-col items-center gap-4 rounded-2xl p-6 text-center"
+    >
+      <div className="flex flex-col gap-1">
+        <h1 className="text-3xl font-black sm:text-4xl">{title}</h1>
+        {byline ? <p className="font-semibold text-foreground/60">{byline}</p> : null}
+      </div>
+      <div className="flex flex-wrap justify-center gap-2">{facts}</div>
+      {/* Empty for a guest in a party: the host picks the game. */}
+      <div className="button-row empty:hidden">{actions}</div>
+    </section>
+  );
+}
+
+function AboutCard({ children }: { children: ReactNode }) {
+  return (
+    <section aria-label="About" className="glass flex flex-col gap-3 rounded-2xl p-5 sm:p-6">
+      <h2 className="text-sm font-black text-foreground/60">About</h2>
+      {children}
+    </section>
+  );
+}
+
+function ExternalTextLink({ href, children }: { href: string; children: ReactNode }) {
+  return (
+    <a
+      href={href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-1.5 text-foreground/70 underline-offset-4 hover:text-foreground hover:underline"
+    >
+      <ExternalLink className="h-3.5 w-3.5" aria-hidden="true" />
+      {children}
+    </a>
   );
 }

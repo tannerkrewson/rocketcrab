@@ -12,7 +12,6 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { gameRepository } from "../../lib/games/instance";
 import { routeTree } from "../../routeTree.gen";
 import type { ChannelPort } from "../../lib/runtime-host";
-import { runToStart } from "../../lib/arena/test-harness";
 import { EditorRuntimeSeamsContext, type EditorRuntimeSeams } from "./EditorPage";
 
 // Pass-through spy: tests can hold a digest open to control resolve order.
