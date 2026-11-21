@@ -45,15 +45,15 @@
        animated full-screen canvas every frame is too costly on phones.
        Overlays (dialogs, menus) stay opaque for legibility. */
     --background: oklch(0% 0 0);
-    --surface: oklch(25% 0 0 / 0.85);
-    --surface-secondary: oklch(100% 0 0 / 0.09);
-    --surface-tertiary: oklch(100% 0 0 / 0.15);
+    --surface: oklch(21% 0 0 / 0.85);
+    --surface-secondary: oklch(100% 0 0 / 0.075);
+    --surface-tertiary: oklch(100% 0 0 / 0.125);
     --surface-shadow: inset 0 1px 0 0 oklch(100% 0 0 / 0.07), 0 12px 32px -16px oklch(0% 0 0 / 0.7);
-    --overlay: oklch(27% 0 0);
+    --overlay: oklch(23% 0 0);
     --overlay-shadow: inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 24px 48px -12px oklch(0% 0 0 / 0.8);
-    --default: oklch(32% 0 0 / 0.9);
-    --default-hover: oklch(37% 0 0 / 0.95);
-    --field-background: oklch(100% 0 0 / 0.12);
+    --default: oklch(28% 0 0 / 0.9);
+    --default-hover: oklch(33% 0 0 / 0.95);
+    --field-background: oklch(100% 0 0 / 0.1);
     --segment: oklch(100% 0 0 / 0.16);
     --border: oklch(100% 0 0 / 0.12);
     --separator: oklch(100% 0 0 / 0.08);
@@ -228,25 +228,15 @@
     radial-gradient(120% 60% at 50% -15%, #182f76 0%, transparent 60%);
 }
 
-/* The molten canvas fades in or out against the party background. */
+/* Fade the molten background in when it mounts. */
 @keyframes rc-fade-in {
   from {
     opacity: 0;
   }
 }
 
-@keyframes rc-fade-out {
-  to {
-    opacity: 0;
-  }
-}
-
 .rc-bg-in {
   animation: rc-fade-in 900ms ease-out both;
-}
-
-.rc-bg-out {
-  animation: rc-fade-out 700ms ease-in both;
 }
 
 /* The lobby's invisible runtime frame must never take vertical space. */

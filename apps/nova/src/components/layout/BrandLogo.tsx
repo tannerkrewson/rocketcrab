@@ -30,13 +30,11 @@ export function BrandLogo({
       aria-hidden="true"
       data-testid="brand-logo"
     >
-      {/* Animate the img height itself when the party header compacts;
-          parent transitions do not animate a child's inline height. */}
       <img
         src={noGlow ? "/rocketcrab-logo-no-glow.svg" : "/rocketcrab-logo.svg"}
         alt=""
         draggable={false}
-        className="block transition-[height] duration-300 ease-out motion-reduce:transition-none"
+        className="block"
         style={{ height }}
       />
     </span>

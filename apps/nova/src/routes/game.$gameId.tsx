@@ -121,8 +121,7 @@ export function BrowseGamePage() {
     </Link>
   );
 
-  const header =
-    partyBack && inParty ? <PartyShellHeader inviteUrl={state.inviteUrl} /> : <BrandHeader />;
+  const header = partyBack && inParty ? <PartyShellHeader /> : <BrandHeader />;
 
   const navigateToEditor = () => {
     void navigate({ to: "/games/$gameId/edit", params: { gameId } });

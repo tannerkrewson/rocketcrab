@@ -61,13 +61,12 @@ describe("AppLayout", () => {
     expect(screen.getByRole("main")).toHaveClass("relative", "z-10");
   });
 
-  it("picks the background by page: blue molten metal, black for parties, molten elsewhere", async () => {
+  it("picks blue molten metal for Nova pages and red molten metal elsewhere", async () => {
     renderAt("/build");
     await screen.findByRole("heading", { name: "Introducing Nova" });
     expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "nova");
 
     renderAt("/editor");
-    // (The first-visit tutorial modal hides the page from role queries.)
     await screen.findByTestId("editor-empty-state");
     expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "nova");
 
@@ -75,10 +74,10 @@ describe("AppLayout", () => {
     await screen.findByRole("heading", { name: "Coming soon" });
     expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "molten");
 
-    // A game's details stay black when opened from the party lobby.
+    // A game's details keep the lobby's background.
     renderAt("/game/drawphone?from=party-browse");
     await screen.findByRole("heading", { name: "Drawphone" });
-    expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "party");
+    expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "molten");
 
     renderAt("/game/drawphone");
     await screen.findByRole("heading", { name: "Drawphone" });
@@ -99,7 +98,7 @@ describe("AppLayout", () => {
     renderAt("/library");
     await screen.findByRole("heading", { name: "My games" });
 
-    const home = screen.getByRole("link", { name: "back" });
+    const home = screen.getByRole("link", { name: "Back" });
     expect(home.getAttribute("href")).toBe("/");
     const builds = screen.getAllByRole("link", { name: /New game/ });
     expect(builds.length).toBeGreaterThanOrEqual(1);

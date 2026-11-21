@@ -1,6 +1,6 @@
 import { ArrowLeft, PartyPopper } from "lucide-react";
 import { Alert } from "@heroui/react";
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { toast } from "../../lib/toast";
 import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
 import { cn } from "../../lib/cn";
@@ -146,8 +146,6 @@ export function PartyExperience({
       />
     );
 
-  const [browsing, setBrowsing] = useState(initialBrowse);
-
   const settingUp = state.phase === "creating" || state.phase === "joining";
   const shellShown =
     !settingUp && state.phase !== "idle" && state.phase !== "error" && state.phase !== "removed";
@@ -185,7 +183,7 @@ export function PartyExperience({
 
   return (
     <div className="flex flex-col gap-4">
-      {shellShown ? <PartyShellHeader inviteUrl={state.inviteUrl} compact={browsing} /> : null}
+      {shellShown || settingUp ? <PartyShellHeader /> : null}
       {shellShown && state.signalingOutage ? <SignalingOutageAlert /> : null}
       {shellShown ? peerLinkAlert : null}
       {frameArea}
@@ -197,7 +195,6 @@ export function PartyExperience({
         handlePickPrebuilt,
         handleEditName,
         handleKickMember,
-        setBrowsing,
         onLeft,
         initialBrowse,
       )}
@@ -224,7 +221,6 @@ function renderPhase(
   handlePickPrebuilt: (entry: BrowseEntry) => Promise<void>,
   handleEditName: (name: string) => void,
   handleKickMember: (memberId: string) => void,
-  onBrowseModeChange: (browsing: boolean) => void,
   onLeft?: () => void,
   initialBrowse = false,
 ) {
@@ -232,7 +228,7 @@ function renderPhase(
     case "creating":
     case "joining":
       return (
-        <div className="mx-auto flex w-full max-w-md flex-col items-center gap-3 py-10 text-center">
+        <div className="mx-auto flex w-full max-w-md flex-col items-center gap-3 pb-10 pt-14 text-center sm:pt-20">
           {state.signalingOutage ? (
             <ErrorPanel
               title="Connection interrupted"
@@ -255,7 +251,6 @@ function renderPhase(
           onLeave={() => void handleLeave()}
           onKickMember={handleKickMember}
           onEditName={handleEditName}
-          onBrowseModeChange={onBrowseModeChange}
           initialBrowsing={initialBrowse}
         />
       );

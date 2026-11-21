@@ -69,7 +69,7 @@ export function LibraryPage() {
       <div className="flex flex-wrap items-center gap-3">
         <Link to="/" className={buttonStyles("default", "md", undefined, true)}>
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          back
+          Back
         </Link>
         <div className="relative min-w-0 flex-1 basis-56">
           <Search

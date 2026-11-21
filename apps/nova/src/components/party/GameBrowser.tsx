@@ -322,7 +322,7 @@ export function GameBrowser({
           title={compact ? "Back to lobby" : "Back to home"}
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-          back
+          Back
         </Button>
         <div className="relative min-w-0 flex-1 basis-56">
           <Search

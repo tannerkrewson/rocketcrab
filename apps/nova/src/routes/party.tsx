@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { PROTOCOL_VERSION, type GameMode } from "@rocketcrab/protocol";
 import { PartyExperience } from "../components/party/PartyExperience";
 import { PartyResumeBanner } from "../components/party/PartyResumeBanner";
+import { PartyShellHeader } from "../components/party/PartyShellHeader";
 import { NameEntry } from "../components/party/NameEntry";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
 import { LoadingState } from "../components/ui/LoadingState";
@@ -163,14 +164,18 @@ function PartyPage() {
     );
   }
   return (
-    <LoadingState
-      label={
-        invite !== null
-          ? "Joining the party…"
-          : search.gameId !== undefined
-            ? "Loading game…"
-            : "Creating your private party…"
-      }
-    />
+    <div className="flex flex-col gap-4">
+      <PartyShellHeader />
+      <LoadingState
+        className="pt-14 sm:pt-20"
+        label={
+          invite !== null
+            ? "Joining the party…"
+            : search.gameId !== undefined
+              ? "Loading game…"
+              : "Creating your private party…"
+        }
+      />
+    </div>
   );
 }

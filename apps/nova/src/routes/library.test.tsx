@@ -41,7 +41,7 @@ describe("/library", () => {
 
     expect(await screen.findByRole("link", { name: /rocketcrab\.com/ })).toBeInTheDocument();
 
-    const backs = screen.getAllByRole("link", { name: "back" });
+    const backs = screen.getAllByRole("link", { name: "Back" });
     expect(backs).toHaveLength(1);
     const back = backs[0];
     expect(back!.getAttribute("href")).toBe("/");

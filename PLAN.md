@@ -58,6 +58,10 @@ beta and physical-device checks are still pending.
       authority. Chromium, Firefox, and WebKit passed the focused rerun.
 - [x] Fade between the red and blue Molten Metal palettes on one canvas.
       Verified navigation in both directions and with reduced motion.
+- [x] Restore red Molten Metal in the lobby and keep the background
+      unmounted while playing. Party route and background tests cover both.
+- [x] Darken shared gray surfaces, define the Welcome card around its
+      faded waves, and keep the party header consistent during setup and browsing.
 - [ ] Investigate the extra Firefox fallback socket in the three-player tunnel
       test. The quiz completed, then the socket-count assertion failed on both
       the polished version and the baseline `bb6521a`.

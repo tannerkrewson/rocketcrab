@@ -311,7 +311,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     await userEvent.click(screen.getByRole("menuitem", { name: /browse games/i }));
     const browse = screen.getByRole("dialog", { name: "Pick a game" });
-    await userEvent.click(within(browse).getByRole("button", { name: "back" }));
+    await userEvent.click(within(browse).getByRole("button", { name: "Back" }));
     expect(screen.queryByRole("dialog", { name: "Pick a game" })).not.toBeInTheDocument();
   });
 

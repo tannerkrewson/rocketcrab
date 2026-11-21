@@ -186,6 +186,7 @@ describe("/party", () => {
     await waitFor(() => expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada"));
     await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledWith());
     expect(await screen.findByText("Welcome to rocketcrab!")).toBeInTheDocument();
+    expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "molten");
     expect(screen.queryByRole("heading", { name: "What's your name?" })).not.toBeInTheDocument();
   });
 
@@ -290,7 +291,8 @@ describe("/party", () => {
       stubs.started = true;
       const router = renderParty("/party?browse=true");
       // The router serializes the boolean as ?browse=true; ?browse=1 does not round-trip.
-      expect(await screen.findByTestId("browser-brand-row")).toBeInTheDocument();
+      const brand = await screen.findByTestId("browser-brand-row");
+      expect(brand.querySelector("img")).toHaveStyle({ height: "40px" });
       expect(router.state.location.pathname).toBe("/party");
       expect(router.state.location.searchStr).toBe("?browse=true");
     });
@@ -302,6 +304,7 @@ describe("/party", () => {
       stubs.state = CREATING_STATE;
       router = renderParty("/party");
       expect(await screen.findByText("Creating party…")).toBeInTheDocument();
+      expect(screen.getByTestId("browser-brand-row")).toHaveTextContent("rocketcrab.com");
       expect(router.state.location.pathname).toBe("/party");
     });
   });

@@ -14,7 +14,7 @@ function AboutPage() {
       <BrandHeader />
       <Link to="/" className={buttonStyles("default", "md", "self-start", true)}>
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        back
+        Back
       </Link>
       <PagePlaceholder
         title="Coming soon"

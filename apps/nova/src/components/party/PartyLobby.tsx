@@ -21,30 +21,8 @@ export interface PartyLobbyProps {
   onKickMember: (memberId: string) => void;
   /** Rename the local player (from the lobby's rename dialog). */
   onEditName: (name: string) => void;
-  /** Notify the shell to compact its header while the lobby browser is open. */
-  onBrowseModeChange?: (browsing: boolean) => void;
   /** Restore browse mode when returning from game details. */
   initialBrowsing?: boolean;
-}
-
-/** Each player's avatar color, by join order (rocket red, Nova blue, then a spread). */
-const PLAYER_AVATAR_COLORS = [
-  "bg-primary",
-  "bg-secondary",
-  "bg-amber-500",
-  "bg-emerald-500",
-  "bg-violet-500",
-  "bg-cyan-500",
-  "bg-teal-500",
-] as const;
-
-function playerAvatarColor(index: number): string {
-  return PLAYER_AVATAR_COLORS[index % PLAYER_AVATAR_COLORS.length] ?? "bg-primary";
-}
-
-/** First letter of a display name for its avatar (falls back to "?"). */
-function initialOf(name: string): string {
-  return Array.from(name.trim())[0]?.toUpperCase() ?? "?";
 }
 
 function roleLabels(member: PartyMemberView, isCreator: boolean): string {
@@ -125,15 +103,11 @@ export function PartyLobby({
   onLeave,
   onKickMember,
   onEditName,
-  onBrowseModeChange,
   initialBrowsing = false,
 }: PartyLobbyProps) {
   const [forceDialog, setForceDialog] = useState(false);
   const [kickPending, setKickPending] = useState<string | null>(null);
   const [browsing, setBrowsing] = useState(initialBrowsing);
-  useEffect(() => {
-    onBrowseModeChange?.(browsing);
-  }, [browsing, onBrowseModeChange]);
   const [qrOpen, setQrOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
 
@@ -272,7 +246,7 @@ export function PartyLobby({
       </section>
       <section
         aria-label="Welcome"
-        className="relative flex min-h-40 select-none flex-col [-webkit-touch-callout:none] items-center justify-center gap-3 overflow-hidden rounded-2xl glass p-5 text-center"
+        className="relative flex min-h-40 select-none flex-col [-webkit-touch-callout:none] items-center justify-center gap-3 overflow-hidden rounded-2xl border border-border glass p-5 text-center"
       >
         <WelcomeWaves />
         <div className="relative flex flex-col items-center gap-3">
@@ -362,25 +336,22 @@ export function PartyLobby({
         </summary>
         <div className="p-4 pt-0">
           <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-            {state.members.map((member, index) => {
+            {state.members.map((member) => {
               const roleLabel = roleLabels(member, state.amHost);
+              const connectionLabel = member.connected ? "Connected" : "Disconnected";
               return (
                 <li
                   key={member.memberId}
                   data-testid={`party-member-${member.memberId}`}
                   className="flex min-w-0 items-center gap-3 rounded-2xl bg-surface-secondary p-3"
                 >
-                  <div className="flex min-w-0 flex-1 items-center gap-3">
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
                     <span
-                      aria-hidden="true"
-                      className={`relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-lg font-black text-white ${playerAvatarColor(index)}`}
-                    >
-                      {initialOf(member.displayName)}
-                      <span
-                        title={member.connected ? "Connected" : "Disconnected"}
-                        className={`absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full ring-2 ring-black ${member.connected ? "bg-success" : "bg-danger"}`}
-                      />
-                    </span>
+                      role="img"
+                      aria-label={connectionLabel}
+                      title={connectionLabel}
+                      className={`size-2 shrink-0 rounded-full ${member.connected ? "bg-success" : "bg-danger"}`}
+                    />
                     <div className="min-w-0">
                       <p className="truncate text-lg font-black leading-tight">
                         {member.displayName}
