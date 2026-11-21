@@ -1,49 +1,26 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  ArrowLeft,
-  Bot,
-  Check,
-  ClipboardCopy,
-  ClipboardPaste,
-  Code2,
-  ScrollText,
-  Sparkles,
-} from "lucide-react";
-import { useMemo, useState } from "react";
-import { toast } from "../lib/toast";
-import { Button, buttonStyles } from "../components/ui/Button";
-import { Card } from "../components/ui/Card";
+import { createFileRoute, Link, redirect } from "@tanstack/react-router";
+import { ArrowLeft, Bot, ClipboardPaste, Sparkles } from "lucide-react";
+import { buttonStyles } from "../components/ui/Button";
 import { BrandLogo } from "../components/layout/BrandLogo";
-import { writeToClipboard } from "../lib/editor/clipboard";
-import { buildMasterPrompt } from "../lib/prompt/master-prompt";
 
 export const Route = createFileRoute("/build")({
-  validateSearch: (search: Record<string, unknown>): BuildSearch => ({
-    // Keep the prompt step addressable for browser Back and refresh.
+  validateSearch: (search: Record<string, unknown>): { page?: "prompt" } => ({
     page: search.page === "prompt" ? "prompt" : undefined,
   }),
+  // Old prompt links open the new prompt and import flow in the editor.
+  beforeLoad: ({ search }) => {
+    if (search.page === "prompt") throw redirect({ to: "/editor", replace: true });
+  },
   component: BuildPage,
 });
 
-interface BuildSearch {
-  page?: "prompt";
-}
-
-/** Build flow: introduction, then a copyable prompt and the editor handoff. */
+/** Introduce Nova and link to the editor's game creation flow. */
 export function BuildPage() {
-  const search = Route.useSearch();
-  if (search.page === "prompt") {
-    return <BuildPromptPage />;
-  }
-  return <BuildHeroPage />;
-}
-
-function BuildHeroPage() {
   return (
     <div className="theme-nova mx-auto flex w-full max-w-2xl flex-col items-center gap-10 text-center">
       <Link to="/" className={buttonStyles("default", "md", "self-start", true)}>
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        back
+        Back
       </Link>
 
       <section
@@ -53,19 +30,23 @@ function BuildHeroPage() {
         className="relative w-full"
       >
         <div className="relative flex flex-col items-center gap-4 px-2 py-10 sm:py-14">
-          <BrandLogo variant="no-glow" size={80} responsive aria-hidden />
+          <BrandLogo
+            variant="no-glow"
+            size={80}
+            responsive
+            className="drop-shadow-[0_0_15px_oklch(64%_0.2_264/0.55)]"
+          />
           <h1
             id="build-hero-heading"
-            className="text-4xl font-black text-foreground [text-shadow:0_2px_16px_rgb(0_0_0/0.8)] sm:text-5xl"
+            className="text-4xl font-black text-foreground [text-shadow:0_2px_16px_rgb(0_0_0/0.8),0_0_20px_oklch(64%_0.2_264/0.45)] sm:text-5xl"
           >
             Introducing <span className="text-nova-text">Nova</span>
           </h1>
-          <p className="max-w-md text-lg leading-relaxed text-foreground/85 [text-shadow:0_1px_10px_rgb(0_0_0/0.8)]">
+          <p className="max-w-md text-lg leading-relaxed text-foreground/85 [text-shadow:0_1px_10px_rgb(0_0_0/0.8),0_0_14px_oklch(64%_0.2_264/0.4)]">
             Turn any idea into a game your friends can play.
           </p>
           <Link
-            to="/build"
-            search={{ page: "prompt" }}
+            to="/editor"
             className={buttonStyles(
               "info",
               "lg",
@@ -124,79 +105,6 @@ function BuildHeroPage() {
           </p>
         </li>
       </ol>
-    </div>
-  );
-}
-
-function BuildPromptPage() {
-  const prompt = useMemo(() => buildMasterPrompt(), []);
-  const [copied, setCopied] = useState(false);
-  const [previewed, setPreviewed] = useState(false);
-
-  const handleCopyPrompt = async () => {
-    const ok = await writeToClipboard(prompt);
-    if (ok) {
-      setCopied(true);
-    } else {
-      toast.danger("Couldn't copy the prompt. Open the full prompt to copy it manually.");
-    }
-  };
-
-  return (
-    <div className="theme-nova mx-auto flex w-full max-w-2xl flex-col items-center gap-5">
-      <Link to="/build" className={buttonStyles("tertiary", "md", "self-start")}>
-        <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        Back
-      </Link>
-
-      <h1 className="sr-only">Game prompt</h1>
-      <Card className="w-full">
-        <Button
-          variant="primary"
-          size="lg"
-          className="self-start"
-          onPress={() => void handleCopyPrompt()}
-        >
-          <ClipboardCopy className="h-5 w-5" aria-hidden="true" />
-          {copied ? "Copy again" : "Copy prompt"}
-        </Button>
-        <details
-          onToggle={(event) => {
-            if (event.currentTarget.open) setPreviewed(true);
-          }}
-        >
-          <summary className="cursor-pointer font-bold text-nova-text">
-            <span className="inline-flex items-center gap-2">
-              <ScrollText className="h-4 w-4" aria-hidden="true" />
-              Show the full prompt ({prompt.length.toLocaleString()} characters)
-            </span>
-          </summary>
-          <pre className="mt-3 max-h-96 overflow-auto rounded-2xl bg-surface-secondary p-4 text-xs leading-relaxed whitespace-pre-wrap">
-            {prompt}
-          </pre>
-        </details>
-      </Card>
-
-      {copied || previewed ? (
-        <div className="glass flex w-full flex-col items-start gap-3 rounded-2xl p-5">
-          <div role="status" className="flex flex-col gap-1">
-            {copied ? (
-              <p className="flex items-center gap-2 font-bold">
-                <Check className="h-4 w-4 text-success" aria-hidden="true" />
-                Prompt copied
-              </p>
-            ) : null}
-            <p className="text-foreground/80">
-              Paste the prompt into your AI chat and describe your game. When it gives you the
-              game&apos;s HTML, come back to paste it in or upload the file.
-            </p>
-          </div>
-          <Link to="/editor" className={buttonStyles("outline", "md")}>
-            <Code2 className="h-4 w-4" aria-hidden="true" />
-            Paste or upload my game
-          </Link>
-        </div>
-      ) : null}
     </div>
   );
 }

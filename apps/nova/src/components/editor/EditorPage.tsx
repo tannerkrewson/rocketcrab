@@ -1,17 +1,15 @@
 import { PROTOCOL_VERSION, type GameMode } from "@rocketcrab/protocol";
 import type { SavedGame } from "@rocketcrab/core";
-import { Link, useBlocker, useNavigate } from "@tanstack/react-router";
+import { useBlocker, useCanGoBack, useNavigate, useRouter } from "@tanstack/react-router";
 import {
   ArrowLeft,
   ClipboardPaste,
   Code2,
-  FileUp,
   HelpCircle,
   PartyPopper,
   Pencil,
   Play,
   Save,
-  Sparkles,
   Users,
 } from "lucide-react";
 import {
@@ -27,8 +25,9 @@ import {
 } from "react";
 import { toast } from "../../lib/toast";
 import { cn } from "../../lib/cn";
-import { Button, buttonStyles } from "../ui/Button";
+import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
+import { LoadingState } from "../ui/LoadingState";
 import { BrandHeader } from "../layout/BrandHeader";
 import { useCreateGame, useRecordTestResults, useUpdateGame } from "../../lib/games/queries";
 import { hashSource, sourceByteLength } from "../../lib/games/hashing";
@@ -49,6 +48,7 @@ import { ProblemsPanel } from "./ProblemsPanel";
 import { ArenaSection, ArenaRuntimeSeamsContext } from "./ArenaSection";
 import { EditorTutorial, markTutorialSeen, shouldAutoOpenTutorial } from "./EditorTutorial";
 import { EditorMoreMenu } from "./EditorMoreMenu";
+import { EditorEmptyState } from "./EditorEmptyState";
 
 /** Default title for a new, unnamed game (matches the runtime's fallback). */
 const DEFAULT_GAME_TITLE = "Untitled game";
@@ -105,6 +105,8 @@ type EditorView = "test" | "code";
  */
 export function EditorPage({ game }: { game?: SavedGame }) {
   const navigate = useNavigate();
+  const router = useRouter();
+  const canGoBack = useCanGoBack();
   const createGame = useCreateGame();
   const updateGame = useUpdateGame();
   const recordTestResults = useRecordTestResults();
@@ -414,8 +416,13 @@ export function EditorPage({ game }: { game?: SavedGame }) {
       return;
     }
     toast.success("Saved to My games.");
-    // A new game becomes a saved game: keep editing it at its own URL.
-    await navigate({ to: "/games/$gameId/edit", params: { gameId: id }, ignoreBlocker: true });
+    // Keep editing the same game at its saved URL and preserve where Back leads.
+    await navigate({
+      to: "/games/$gameId/edit",
+      params: { gameId: id },
+      replace: true,
+      ignoreBlocker: true,
+    });
   }, [game, navigate, persist]);
 
   const handleSaveAsCopy = useCallback(async () => {
@@ -515,12 +522,23 @@ export function EditorPage({ game }: { game?: SavedGame }) {
     blocker.proceed?.();
   }, [blocker, persist]);
 
+  const handleBack = () => {
+    if (canGoBack) {
+      router.history.back();
+    } else {
+      void navigate({ to: game === undefined ? "/build" : "/library", replace: true });
+    }
+  };
+
   // The empty-source error is the empty state's job, not a "problem".
   const validationIssues = useMemo(
     () => validateSource(source).filter((issue) => issue.code !== "empty"),
     [source],
   );
   const hasCode = source.trim().length > 0;
+  const hasArenaSource = arenaSource.trim().length > 0;
+  const awaitingGame = !hasCode && !hasArenaSource;
+  const showToolbar = !awaitingGame || view === "code" || game !== undefined;
   const arenaStale = arenaSource !== source;
   const saving = createGame.isPending || updateGame.isPending;
 
@@ -547,16 +565,14 @@ export function EditorPage({ game }: { game?: SavedGame }) {
           keeps rocketcrab red); leaving through it still asks about unsaved
           changes (the blocker below). */}
       <BrandHeader size={32} className="-mt-1" />
-      <div className="theme-nova flex flex-col gap-4">
+      <div
+        className={cn("theme-nova flex flex-col gap-4", !showToolbar && "mx-auto w-full max-w-2xl")}
+      >
         <header className="flex flex-wrap items-center gap-3">
-          <Link
-            to="/library"
-            className={buttonStyles("default", "md", undefined, true)}
-            title="Back to your games"
-          >
+          <Button variant="default" soft onPress={handleBack}>
             <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-            My games
-          </Link>
+            Back
+          </Button>
           <div className="min-w-0 flex-1">
             {titleEditing ? (
               <input
@@ -620,43 +636,49 @@ export function EditorPage({ game }: { game?: SavedGame }) {
               Run
             </Button>
           ) : null}
-          <div className="flex-1" />
-          <Button
-            variant={hasCode ? "default" : "primary"}
-            soft={hasCode}
-            onClick={() => void handlePaste()}
-            title="Replace the code with your clipboard and test it"
-          >
-            <ClipboardPaste className="h-4 w-4" aria-hidden="true" />
-            Paste game
-          </Button>
-          <Button
-            variant="default"
-            soft
-            onClick={() => void handleSave()}
-            disabled={saving || !hasCode || (game !== undefined && !dirty)}
-          >
-            <Save className="h-4 w-4" aria-hidden="true" />
-            Save
-          </Button>
-          <Button
-            variant="primary"
-            onClick={() => void handlePlayWithFriends()}
-            disabled={saving || !hasCode}
-            title="Save this game and start a party with it"
-          >
-            <PartyPopper className="h-4 w-4" aria-hidden="true" />
-            Play with friends
-          </Button>
-          <EditorMoreMenu
-            source={source}
-            onUploadFile={openFilePicker}
-            title={title}
-            {...(hasCode ? { onSaveAsCopy: () => void handleSaveAsCopy() } : {})}
-            {...(game !== undefined && dirty
-              ? { onDiscardChanges: () => setDiscardDialog(true) }
-              : {})}
-          />
+          {showToolbar ? (
+            <>
+              <div className="flex-1" />
+              {view === "code" || !awaitingGame ? (
+                <Button
+                  variant={hasCode ? "default" : "primary"}
+                  soft={hasCode}
+                  onClick={() => void handlePaste()}
+                  title="Replace the code with your clipboard and test it"
+                >
+                  <ClipboardPaste className="h-4 w-4" aria-hidden="true" />
+                  Paste game
+                </Button>
+              ) : null}
+              <Button
+                variant="default"
+                soft
+                onClick={() => void handleSave()}
+                disabled={saving || !hasCode || (game !== undefined && !dirty)}
+              >
+                <Save className="h-4 w-4" aria-hidden="true" />
+                Save
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => void handlePlayWithFriends()}
+                disabled={saving || !hasCode}
+                title="Save this game and start a party with it"
+              >
+                <PartyPopper className="h-4 w-4" aria-hidden="true" />
+                Play with friends
+              </Button>
+              <EditorMoreMenu
+                source={source}
+                onUploadFile={openFilePicker}
+                title={title}
+                {...(hasCode ? { onSaveAsCopy: () => void handleSaveAsCopy() } : {})}
+                {...(game !== undefined && dirty
+                  ? { onDiscardChanges: () => setDiscardDialog(true) }
+                  : {})}
+              />
+            </>
+          ) : null}
         </div>
 
         <ProblemsPanel
@@ -667,63 +689,34 @@ export function EditorPage({ game }: { game?: SavedGame }) {
         />
 
         {/* Both views stay mounted so switching tabs keeps the arena running. */}
-        <section
-          aria-label="Code"
-          className={cn(
-            "h-[calc(100dvh-14rem)] min-h-80 overflow-hidden rounded-2xl bg-overlay",
-            view !== "code" && "hidden",
-          )}
-        >
-          <CodeEditor value={source} onChange={setSource} ariaLabel="Game HTML source" />
+        <section aria-label="Code" className={cn(view !== "code" && "hidden")}>
+          <div className="flex h-[calc(100dvh-14rem)] min-h-80 flex-col overflow-hidden rounded-2xl bg-overlay">
+            {!hasCode ? (
+              <p className="shrink-0 border-b border-border px-4 py-2 text-sm text-muted">
+                Paste or write a single complete HTML page here.
+              </p>
+            ) : null}
+            <div className="min-h-0 flex-1">
+              <CodeEditor value={source} onChange={setSource} ariaLabel="Game HTML source" />
+            </div>
+          </div>
         </section>
 
-        <section aria-label="Test" className={cn(view !== "test" && "hidden")}>
-          {arenaSource.trim().length > 0 ? (
+        <section aria-label="Test" hidden={view !== "test"}>
+          {hasArenaSource ? (
             <ArenaRuntimeSeamsContext.Provider value={seams}>
               <ArenaSection game={game} source={arenaSource} onDiagnostics={appendDiagnostics} />
             </ArenaRuntimeSeamsContext.Provider>
-          ) : (
-            <div
-              className="glass flex flex-col items-center gap-4 rounded-2xl px-6 py-14 text-center"
-              data-testid="editor-empty-state"
-            >
-              <ClipboardPaste
-                className="h-10 w-10 text-accent-soft-foreground"
-                aria-hidden="true"
-              />
-              <div className="flex flex-col gap-1">
-                <h2 className="text-2xl font-black">Add your game to test it</h2>
-                <p className="max-w-md text-foreground/70">
-                  Paste the HTML your AI wrote, or upload its .html file. It runs right away as
-                  several players.
-                </p>
-              </div>
-              <div className="button-row">
-                <Button variant="primary" size="lg" onClick={() => void handlePaste()}>
-                  <ClipboardPaste className="h-5 w-5" aria-hidden="true" />
-                  Paste game
-                </Button>
-                <Button variant="default" soft size="lg" onClick={openFilePicker}>
-                  <FileUp className="h-5 w-5" aria-hidden="true" />
-                  Upload file
-                </Button>
-              </div>
-              <Link
-                to="/build"
-                search={{ page: "prompt" }}
-                className={buttonStyles("default", "md", undefined, true)}
-              >
-                <Sparkles className="h-4 w-4" aria-hidden="true" />
-                Get the AI prompt
-              </Link>
-              <button
-                type="button"
-                className="text-sm font-semibold text-foreground/60 underline-offset-4 hover:underline"
-                onClick={() => setView("code")}
-              >
-                or write the code yourself
-              </button>
+          ) : hasCode ? (
+            <div className="glass rounded-2xl text-center">
+              {runStatus === "starting" ? (
+                <LoadingState label="Starting the test…" />
+              ) : (
+                <p className="p-8 text-muted">Run your game to test it.</p>
+              )}
             </div>
+          ) : (
+            <EditorEmptyState onPaste={() => void handlePaste()} onUpload={openFilePicker} />
           )}
         </section>
 

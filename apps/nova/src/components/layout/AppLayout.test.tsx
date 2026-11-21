@@ -125,7 +125,7 @@ describe("AppLayout", () => {
 
     renderAt("/build");
     await screen.findByRole("heading", { name: "Introducing Nova" });
-    const buildBack = screen.getByRole("link", { name: "back" });
+    const buildBack = screen.getByRole("link", { name: "Back" });
     expect(buildBack.getAttribute("href")).toBe("/");
   });
 });

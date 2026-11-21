@@ -62,6 +62,9 @@ beta and physical-device checks are still pending.
       unmounted while playing. Party route and background tests cover both.
 - [x] Darken shared gray surfaces, define the Welcome card around its
       faded waves, and keep the party header consistent during setup and browsing.
+- [x] Combine prompt and HTML import in the empty editor, keep the full prompt
+      expandable, and use history for editor Back. Build and editor tests cover
+      the copy, import, tutorial, and unsaved Back flows.
 - [ ] Investigate the extra Firefox fallback socket in the three-player tunnel
       test. The quiz completed, then the socket-count assertion failed on both
       the polished version and the baseline `bb6521a`.

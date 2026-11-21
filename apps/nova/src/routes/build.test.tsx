@@ -57,7 +57,7 @@ describe("/build — page 1 (hero)", () => {
     ).toBeInTheDocument();
 
     const cta = within(hero).getByRole("link", { name: "Get started" });
-    expect(cta.getAttribute("href")).toBe("/build?page=prompt");
+    expect(cta.getAttribute("href")).toBe("/editor");
     expect(cta.className).toContain("button--primary");
     expect(cta.className).toContain("drop-shadow");
 
@@ -83,43 +83,44 @@ describe("/build — page 1 (hero)", () => {
   });
 });
 
-describe("/build?page=prompt", () => {
-  async function openPromptPage() {
-    renderBuild("/build?page=prompt");
-    await screen.findByRole("button", { name: "Copy prompt" });
+describe("Build to editor", () => {
+  async function startBuilding() {
+    renderBuild();
+    await userEvent.click(await screen.findByRole("link", { name: "Get started" }));
+    return screen.findByTestId("editor-empty-state");
   }
 
-  it("lets readers expand the full prompt and continue after copying it manually", async () => {
-    await openPromptPage();
-    expect(screen.queryByRole("link", { name: "Paste or upload my game" })).not.toBeInTheDocument();
+  it("shows the full prompt on demand and keeps import available without copying", async () => {
+    const empty = within(await startBuilding());
 
-    await userEvent.click(screen.getByText(/Show the full prompt/));
-    expect(screen.getByText(/Nova API — AI Quick Reference/)).toBeVisible();
-    const editor = await screen.findByRole("link", { name: "Paste or upload my game" });
-    expect(editor).toHaveAttribute("href", "/editor");
+    await userEvent.click(empty.getByText(/Show the full prompt/));
+    expect(empty.getByText(/Nova API — AI Quick Reference/)).toBeVisible();
+    expect(empty.getByRole("button", { name: "Paste game" })).toBeVisible();
+    expect(empty.getByRole("button", { name: "Upload HTML file" })).toBeVisible();
   });
 
-  it("copies the full prompt, then explains the next step and links to the paste target", async () => {
+  it("copies the full prompt and gives next steps alongside the import controls", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText },
       configurable: true,
     });
-    await openPromptPage();
+    const empty = within(await startBuilding());
 
-    await userEvent.click(screen.getByRole("button", { name: "Copy prompt" }));
+    await userEvent.click(empty.getByRole("button", { name: "Copy prompt" }));
 
     expect(writeText).toHaveBeenCalledTimes(1);
     expect(writeText).toHaveBeenCalledWith(PROMPT);
-    expect(await screen.findByText("Prompt copied")).toBeInTheDocument();
-    expect(screen.getByText(/Paste the prompt into your AI chat/)).toBeVisible();
-    await userEvent.click(screen.getByRole("link", { name: "Paste or upload my game" }));
-    expect(await screen.findByTestId("editor-empty-state")).toBeInTheDocument();
+    expect(await empty.findByText("Prompt copied.")).toBeInTheDocument();
+    expect(empty.getByText(/Paste it into your AI chat/)).toBeVisible();
+    expect(empty.getByRole("button", { name: "Paste game" })).toBeVisible();
     expect(screen.queryByTestId("editor-tutorial")).not.toBeInTheDocument();
   });
 
-  it("links back to the intro page", async () => {
-    await openPromptPage();
-    expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/build");
+  it("redirects a legacy prompt link to the editor", async () => {
+    renderBuild("/build?page=prompt");
+    expect(await screen.findByTestId("editor-empty-state")).toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: "Back" }));
+    expect(await screen.findByRole("heading", { name: "Introducing Nova" })).toBeVisible();
   });
 });

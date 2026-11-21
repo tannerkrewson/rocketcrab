@@ -83,7 +83,7 @@ export function EditorMoreMenu({
             onUploadFile();
           }}
         >
-          Upload an HTML file
+          Upload HTML file
         </Item>
         <Item
           icon={<ScrollText className="h-4 w-4" aria-hidden="true" />}
