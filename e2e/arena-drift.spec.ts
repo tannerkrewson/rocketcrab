@@ -93,6 +93,7 @@ test("Nova Drift: controls steer the puck everywhere and survive a host handoff"
   expect(authority).not.toBeNull();
   const survivor = authority === "player-1" ? two : one;
   const card = page.locator(`[data-testid="arena-grid"] [data-testid="arena-player-${authority}"]`);
+  await page.getByRole("button", { name: "Advanced", exact: true }).click();
   await card.getByRole("button", { name: /Suspend/ }).click();
   await expect.poll(() => authorityPlayerId(page), { timeout: 30_000 }).not.toBe(authority);
   const x = (await puckX(survivor)) ?? 0;

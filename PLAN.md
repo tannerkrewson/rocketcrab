@@ -53,7 +53,12 @@ beta and physical-device checks are still pending.
 - [x] Use blue Molten Metal for Nova, soften the lobby waves, lighten shared
       surfaces, and confirm local game reloads. `npm run check` passed for `d0e915b`.
 - [x] Streamline the prompt-to-editor handoff and defer the tutorial until the
-      first game import. Build and editor tests passed.
+      first game import. `npm run check` passed on Node 24.
+- [x] Update the Drift browser test to open Advanced before suspending the
+      authority. Chromium, Firefox, and WebKit passed the focused rerun.
+- [ ] Investigate the extra Firefox fallback socket in the three-player tunnel
+      test. The quiz completed, then the socket-count assertion failed on both
+      the polished version and the baseline `bb6521a`.
 
 ## Before beta
 
