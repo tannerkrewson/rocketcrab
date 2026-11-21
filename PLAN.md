@@ -63,6 +63,8 @@ beta and physical-device checks are still pending.
 - [x] Darken shared gray surfaces, match the Welcome card to the other lobby
       cards, and keep the party header consistent during setup and browsing.
       The waves fill the card to its rounded edges with shader edge fade set to zero.
+- [x] Space out the Welcome waves and remove tap ripples. A finger drag can
+      move the same wave distortion as the mouse without selecting the text.
 - [x] Combine prompt and HTML import in the empty editor, keep the full prompt
       expandable, and use history for editor Back. Build and editor tests cover
       the copy, import, tutorial, and unsaved Back flows.

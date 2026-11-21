@@ -7,7 +7,7 @@ const LineWaves = lazy(() => import("../../vendor/react-bits/LineWaves"));
  * Flowing fine lines (React Bits "Line Waves") filling a positioned parent:
  * the lobby's Welcome card. Even, neutral grey lines (no highlight streaks,
  * no color cycling) kept dim enough that the white text always reads. Lines
- * bend toward a finger or cursor and ripple on tap (only inside the card).
+ * bend toward a finger or cursor inside the card.
  */
 export function WelcomeWaves() {
   return (
@@ -24,11 +24,13 @@ export function WelcomeWaves() {
             brightness={0.22}
             glow={0.25}
             speed={0.2}
-            lineCount={40}
-            lineWidth={1}
+            lineCount={24}
+            lineWidth={1.25}
             warpIntensity={0.7}
+            warpScale={1.2}
             rotation={-24}
             edgeFade={0}
+            clickRipple={false}
             intro={false}
             maxDevicePixelRatio={2}
           />
