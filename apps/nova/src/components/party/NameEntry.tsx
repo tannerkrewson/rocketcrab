@@ -9,11 +9,13 @@ export function NameForm({
   initialName = "",
   submitLabel,
   onSubmit,
+  backAction,
   children,
 }: {
   initialName?: string;
   submitLabel: string;
   onSubmit: (name: string) => void;
+  backAction?: ReactNode;
   /** Extra content above the input (a heading, a hint). */
   children?: ReactNode;
 }) {
@@ -30,12 +32,12 @@ export function NameForm({
     >
       {children}
       <label htmlFor="player-name" className="sr-only">
-        Your player name
+        Enter your name here
       </label>
       <input
         id="player-name"
-        className="input w-full text-center text-lg font-bold"
-        placeholder="Your name"
+        className="input w-full text-left text-lg font-bold"
+        placeholder="Enter your name here"
         value={name}
         onChange={(event) => setName(event.target.value)}
         maxLength={MAX_PLAYER_NAME_LENGTH}
@@ -44,9 +46,12 @@ export function NameForm({
         // oxlint-disable-next-line jsx-a11y/no-autofocus
         autoFocus
       />
-      <Button type="submit" variant="primary" size="lg" disabled={trimmed.length === 0}>
-        {submitLabel}
-      </Button>
+      <div className="flex flex-wrap items-center justify-center gap-2">
+        {backAction}
+        <Button type="submit" variant="primary" size="lg" disabled={trimmed.length === 0}>
+          {submitLabel}
+        </Button>
+      </div>
     </form>
   );
 }
@@ -62,6 +67,7 @@ export function NameEntry({
   initialName,
   showHeader = true,
   onSubmit,
+  backAction,
   secondary,
 }: {
   description?: string;
@@ -70,14 +76,20 @@ export function NameEntry({
   /** False where the page already shows the brand row (the lobby). */
   showHeader?: boolean;
   onSubmit: (name: string) => void;
-  /** Optional extra content under the form (e.g. a resume banner, Back). */
+  backAction?: ReactNode;
+  /** Optional extra content under the form (e.g. a resume banner). */
   secondary?: ReactNode;
 }) {
   return (
     <section className="mx-auto flex w-full max-w-sm flex-col items-center gap-5 text-center">
       {showHeader ? <PartyShellHeader /> : null}
       <div className="glass w-full rounded-2xl p-6">
-        <NameForm initialName={initialName} submitLabel={submitLabel} onSubmit={onSubmit}>
+        <NameForm
+          initialName={initialName}
+          submitLabel={submitLabel}
+          onSubmit={onSubmit}
+          backAction={backAction}
+        >
           <div className="flex flex-col gap-1">
             <h1 className="text-2xl font-black">What&apos;s your name?</h1>
             <p className="text-sm text-foreground/70">{description}</p>

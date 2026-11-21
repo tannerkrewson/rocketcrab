@@ -172,7 +172,7 @@ describe("/party", () => {
 
   it("starts the party as soon as the name is entered (rocketcrab-9j3)", async () => {
     renderParty("/party");
-    fireEvent.change(await screen.findByLabelText("Your player name"), {
+    fireEvent.change(await screen.findByLabelText("Enter your name here"), {
       target: { value: "Ada" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Start party" }));
@@ -258,7 +258,7 @@ describe("/party", () => {
     expect(await screen.findByRole("heading", { name: "What's your name?" })).toBeInTheDocument();
     await waitFor(() => expect(window.location.hash).toBe(""));
     expect(stubEngine.joinByInvite).not.toHaveBeenCalled();
-    fireEvent.change(screen.getByLabelText("Your player name"), { target: { value: "Ada" } });
+    fireEvent.change(screen.getByLabelText("Enter your name here"), { target: { value: "Ada" } });
     fireEvent.click(screen.getByRole("button", { name: "Join party" }));
     await waitFor(() => expect(stubEngine.joinByInvite).toHaveBeenCalledWith({ secret }));
     expect(stubEngine.createParty).not.toHaveBeenCalled();

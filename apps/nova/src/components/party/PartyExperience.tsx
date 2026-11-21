@@ -1,4 +1,4 @@
-import { Loader2, PartyPopper } from "lucide-react";
+import { ArrowLeft, PartyPopper } from "lucide-react";
 import { Alert } from "@heroui/react";
 import { useMemo, useState } from "react";
 import { toast } from "../../lib/toast";
@@ -12,6 +12,7 @@ import type { BrowseEntry } from "../../lib/browse";
 import { gameRepository } from "../../lib/games/instance";
 import { Button } from "../ui/Button";
 import { ErrorPanel } from "../ui/ErrorPanel";
+import { LoadingState } from "../ui/LoadingState";
 import { PartyLobby } from "./PartyLobby";
 import { PartyPlayShell } from "./PartyPlayShell";
 import { PartyReconnectScreen } from "./PartyReconnectScreen";
@@ -147,7 +148,9 @@ export function PartyExperience({
 
   const [browsing, setBrowsing] = useState(initialBrowse);
 
-  const shellShown = state.phase !== "idle" && state.phase !== "error" && state.phase !== "removed";
+  const settingUp = state.phase === "creating" || state.phase === "joining";
+  const shellShown =
+    !settingUp && state.phase !== "idle" && state.phase !== "error" && state.phase !== "removed";
 
   const peerLinkAlert =
     state.peerLink === null ? null : (
@@ -183,8 +186,8 @@ export function PartyExperience({
   return (
     <div className="flex flex-col gap-4">
       {shellShown ? <PartyShellHeader inviteUrl={state.inviteUrl} compact={browsing} /> : null}
-      {state.signalingOutage ? <SignalingOutageAlert /> : null}
-      {peerLinkAlert}
+      {shellShown && state.signalingOutage ? <SignalingOutageAlert /> : null}
+      {shellShown ? peerLinkAlert : null}
       {frameArea}
       {renderPhase(
         state,
@@ -230,14 +233,15 @@ function renderPhase(
     case "joining":
       return (
         <div className="mx-auto flex w-full max-w-md flex-col items-center gap-3 py-10 text-center">
-          <Loader2 className="h-10 w-10 animate-spin text-primary" aria-hidden="true" />
-          <p className="font-black">{state.phaseDetail ?? "Working…"}</p>
-          <p className="text-sm text-foreground/70">
-            {state.phase === "joining"
-              ? "Connecting to the private party. Anyone with this invite joins automatically; a friend must still be connected."
-              : "Your private party is being set up."}
-          </p>
-          <Button variant="default" soft size="md" onClick={() => void handleLeave()}>
+          {state.signalingOutage ? (
+            <ErrorPanel
+              title="Connection interrupted"
+              message={SIGNALING_OUTAGE_MESSAGE + " We'll keep trying to connect."}
+            />
+          ) : (
+            <LoadingState label={state.phaseDetail ?? "Connecting…"} className="p-0" />
+          )}
+          <Button variant="tertiary" onPress={() => void handleLeave()}>
             Cancel
           </Button>
         </div>
@@ -294,7 +298,7 @@ function renderPhase(
                 onLeft?.();
               }}
             >
-              <PartyPopper className="h-4 w-4" aria-hidden="true" />
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               Back
             </Button>
           </div>

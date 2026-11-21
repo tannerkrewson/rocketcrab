@@ -47,7 +47,7 @@ export class PartySetup {
     const identity = this.state.identity;
     this.state.lastSetup = { kind: "create", input };
     this.state.phase = "creating";
-    this.state.phaseDetail = "Creating your private invite…";
+    this.state.phaseDetail = "Creating your private party…";
     this.state.lastError = null;
     this.services().snapshot.emit();
     try {

@@ -452,9 +452,9 @@ describe("PartyLobby", () => {
   it("renames on the same name screen as first entry, without leaving the lobby (2t1.9)", async () => {
     const onEditName = vi.fn();
     await renderLobby(makeState(), { onEditName });
-    expect(screen.queryByLabelText("Your player name")).not.toBeInTheDocument();
+    expect(screen.queryByLabelText("Enter your name here")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /edit your name/i }));
-    const input = await screen.findByLabelText("Your player name");
+    const input = await screen.findByLabelText("Enter your name here");
     expect(screen.getByRole("heading", { name: "What's your name?" })).toBeInTheDocument();
     expect(input).toHaveValue("Player A");
     await userEvent.clear(input);
@@ -462,7 +462,7 @@ describe("PartyLobby", () => {
     await userEvent.click(screen.getByRole("button", { name: /^save$/i }));
     expect(onEditName).toHaveBeenCalledWith("Ada");
     await waitFor(() =>
-      expect(screen.queryByLabelText("Your player name")).not.toBeInTheDocument(),
+      expect(screen.queryByLabelText("Enter your name here")).not.toBeInTheDocument(),
     );
   });
 

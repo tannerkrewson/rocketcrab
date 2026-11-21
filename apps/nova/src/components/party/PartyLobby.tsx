@@ -212,8 +212,8 @@ export function PartyLobby({
           onEditName(name);
           setRenaming(false);
         }}
-        secondary={
-          <Button variant="default" soft size="md" onClick={() => setRenaming(false)}>
+        backAction={
+          <Button variant="tertiary" size="lg" onClick={() => setRenaming(false)}>
             Cancel
           </Button>
         }

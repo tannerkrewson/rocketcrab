@@ -152,15 +152,13 @@ function PartyPage() {
           engine.setDisplayName(name);
           setNeedsName(false);
         }}
-        secondary={
-          <>
-            {joining ? null : <PartyResumeBanner engine={engine} />}
-            <Link to="/" className={buttonStyles("default", "md", undefined, true)}>
-              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-              Back to home
-            </Link>
-          </>
+        backAction={
+          <Link to="/" className={buttonStyles("tertiary", "lg")}>
+            <ArrowLeft className="h-4 w-4" aria-hidden="true" />
+            {joining ? "Cancel" : "Back"}
+          </Link>
         }
+        secondary={joining ? null : <PartyResumeBanner engine={engine} />}
       />
     );
   }
@@ -171,7 +169,7 @@ function PartyPage() {
           ? "Joining the party…"
           : search.gameId !== undefined
             ? "Loading game…"
-            : "Starting your party…"
+            : "Creating your private party…"
       }
     />
   );
