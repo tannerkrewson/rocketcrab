@@ -44,7 +44,7 @@ describe("/build — page 1 (hero)", () => {
     renderBuild();
 
     const hero = await screen.findByTestId("build-hero");
-    // The hero sits directly on the full-page Nova silk background.
+    // The hero sits directly on the full-page blue molten metal background.
     expect(hero.className).not.toContain("border");
 
     const logo = hero.querySelector("img");

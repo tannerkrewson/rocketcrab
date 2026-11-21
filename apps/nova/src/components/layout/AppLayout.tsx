@@ -2,7 +2,7 @@ import { Outlet, useRouterState } from "@tanstack/react-router";
 import { SiteBackground, type SiteBackgroundVariant } from "../backgrounds/SiteBackground";
 import { SiteFooter } from "./SiteFooter";
 
-/** Nova's build and editor pages get the silk; party pages are plain black. */
+/** Nova's build and editor pages get blue molten metal; party pages are plain black. */
 const NOVA_ROUTES = new Set(["/build", "/editor", "/games/$gameId/edit"]);
 
 function backgroundFor(

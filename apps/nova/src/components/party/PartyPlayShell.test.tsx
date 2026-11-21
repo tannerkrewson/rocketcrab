@@ -137,13 +137,27 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(screen.getByRole("button", { name: /menu/i })).toBeInTheDocument();
   });
 
-  it("shows Reload my game to everyone and asks before Reload all (host, 7.38)", async () => {
+  it("confirms both reload actions for the host", async () => {
     const onReloadMyGame = vi.fn();
     const onReloadAllGames = vi.fn();
     await renderShell(makeState(), { onReloadMyGame, onReloadAllGames });
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     await userEvent.click(screen.getByRole("menuitem", { name: /reload my game/i }));
+    const reloadMine = await screen.findByRole("dialog", { name: "Reload my game?" });
+    expect(within(reloadMine).getByText(/lose unsaved progress/i)).toBeInTheDocument();
+    expect(onReloadMyGame).not.toHaveBeenCalled();
+    await userEvent.click(within(reloadMine).getByRole("button", { name: "Cancel" }));
+    expect(onReloadMyGame).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: /menu/i }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /reload my game/i }));
+    await userEvent.click(
+      within(await screen.findByRole("dialog", { name: "Reload my game?" })).getByRole("button", {
+        name: "Reload my game",
+      }),
+    );
     expect(onReloadMyGame).toHaveBeenCalledTimes(1);
+    expect(onReloadAllGames).not.toHaveBeenCalled();
 
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     await userEvent.click(screen.getByRole("menuitem", { name: /reload all/i }));

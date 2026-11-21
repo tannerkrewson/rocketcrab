@@ -272,7 +272,7 @@ export function PartyLobby({
       </section>
       <section
         aria-label="Welcome"
-        className="relative flex min-h-40 select-none flex-col [-webkit-touch-callout:none] items-center justify-center gap-3 overflow-hidden rounded-2xl bg-background p-5 text-center"
+        className="relative flex min-h-40 select-none flex-col [-webkit-touch-callout:none] items-center justify-center gap-3 overflow-hidden rounded-2xl glass p-5 text-center"
       >
         <WelcomeWaves />
         <div className="relative flex flex-col items-center gap-3">

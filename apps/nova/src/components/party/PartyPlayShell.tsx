@@ -19,6 +19,7 @@ import { cn } from "../../lib/cn";
 import type { PartyEngineState } from "../../lib/party/engine";
 import { BrandLogo } from "../layout/BrandLogo";
 import { Button } from "../ui/Button";
+import { Dialog } from "../ui/Dialog";
 import { GameBrowser } from "./GameBrowser";
 import { PartyGameDetailsModal } from "./PartyGameDetails";
 
@@ -63,6 +64,7 @@ export function PartyPlayShell({
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [confirmKickMemberId, setConfirmKickMemberId] = useState<string | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
+  const [confirmReloadMine, setConfirmReloadMine] = useState(false);
   const [confirmReloadAll, setConfirmReloadAll] = useState(false);
 
   useEffect(() => {
@@ -202,7 +204,7 @@ export function PartyPlayShell({
                   className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold hover:bg-surface-secondary"
                   onClick={() => {
                     setPanel(null);
-                    onReloadMyGame();
+                    setConfirmReloadMine(true);
                   }}
                 >
                   <RotateCcw className="h-4 w-4" aria-hidden="true" />
@@ -475,6 +477,34 @@ export function PartyPlayShell({
           </div>
         </div>
       ) : null}
+
+      <Dialog
+        open={confirmReloadMine}
+        onClose={() => setConfirmReloadMine(false)}
+        title="Reload my game?"
+        className="sm:max-w-sm"
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-foreground/80">
+            Reloading can fix a frozen or blank game screen. You may lose unsaved progress on this
+            device.
+          </p>
+          <div className="button-row self-end">
+            <Button variant="secondary" autoFocus onPress={() => setConfirmReloadMine(false)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onPress={() => {
+                setConfirmReloadMine(false);
+                onReloadMyGame();
+              }}
+            >
+              Reload my game
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       {confirmReloadAll ? (
         <div

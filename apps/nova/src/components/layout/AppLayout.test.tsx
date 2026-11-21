@@ -61,7 +61,7 @@ describe("AppLayout", () => {
     expect(screen.getByRole("main")).toHaveClass("relative", "z-10");
   });
 
-  it("picks the background by page: Nova silk, black for parties, molten elsewhere", async () => {
+  it("picks the background by page: blue molten metal, black for parties, molten elsewhere", async () => {
     renderAt("/build");
     await screen.findByRole("heading", { name: "Introducing Nova" });
     expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "nova");

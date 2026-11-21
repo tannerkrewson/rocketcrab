@@ -1,7 +1,7 @@
 import { lazy, Suspense, useState } from "react";
 import type { PartyEngine } from "../../lib/party/engine";
 import { usePartyEngine } from "../../lib/party/use-party";
-import { NovaSilk } from "./NovaSilk";
+import { cn } from "../../lib/cn";
 import { canUseWebGL2, viewportPixelRatio } from "./webgl";
 
 // Lazy so the shader code never delays the first paint of the page itself.
@@ -15,26 +15,23 @@ const PIXEL_BUDGET = 300_000;
 
 /**
  * - `molten`: rocketcrab's default.
- * - `nova`: deep-blue silk for the Nova build and editor pages.
+ * - `nova`: blue molten metal for the Nova build and editor pages.
  * - `party`: plain black, so the lobby's own effect leads. Arriving from a
  *   molten page fades the molten out rather than cutting it.
  */
 export type SiteBackgroundVariant = "molten" | "nova" | "party";
 
-function MoltenBackground() {
+function MoltenBackground({ blue }: { blue: boolean }) {
   const [pixelRatio] = useState(() => viewportPixelRatio(PIXEL_BUDGET));
+  const [webgl] = useState(canUseWebGL2);
   return (
     <>
-      {/* A deep, saturated crimson glow under the canvas (rising from the
-          bottom, faint at the top) so the page has depth rather than flat
-          black. Kept crimson, not brown, so it never reads as a wash. */}
-      <div className="absolute inset-0 bg-[radial-gradient(140%_80%_at_50%_115%,#4a0410_0%,#1c0106_45%,transparent_75%),radial-gradient(120%_60%_at_50%_-15%,#2a0309_0%,transparent_60%)]" />
-      {canUseWebGL2() ? (
+      <div className={cn("absolute inset-0", blue ? "rc-molten-blue" : "rc-molten-red")} />
+      {webgl ? (
         <Suspense fallback={null}>
           <MoltenMetal
-            // Crimson filaments with an orange core that never reaches white.
-            colors={["#5c0410", "#e3142c"]}
-            coreColor="#ff7a4d"
+            colors={blue ? ["#081954", "#2d59dc"] : ["#5c0410", "#e3142c"]}
+            coreColor={blue ? "#669bff" : "#ff7a4d"}
             colorMode="molten"
             // Fine, slow-moving filaments with a soft glow that fills the
             // page: texture, not motion that competes with the UI.
@@ -59,10 +56,8 @@ function MoltenBackground() {
 }
 
 /**
- * Site-wide decorative background (React Bits "Molten Metal" / "Silk").
- * Switching variants dips through black and fades the new one in. The
- * injected engine is a test seam: the playing phase mounts the full-screen
- * game shell, so the background unmounts and frees the GPU for the game.
+ * Blue and red share one Molten Metal canvas, so its pattern continues
+ * across navigation. The canvas fades out into a party and unmounts during play.
  */
 export function SiteBackground({
   engine,
@@ -72,19 +67,20 @@ export function SiteBackground({
   variant?: SiteBackgroundVariant;
 }) {
   const { state } = usePartyEngine(engine);
-  // The molten stays mounted while it fades out (molten → party) so the
-  // pattern doesn't jump; it unmounts when the fade ends to free the GPU.
   const [prevVariant, setPrevVariant] = useState(variant);
-  const [moltenLeaving, setMoltenLeaving] = useState(false);
+  const [leavingVariant, setLeavingVariant] = useState<Exclude<
+    SiteBackgroundVariant,
+    "party"
+  > | null>(null);
   if (variant !== prevVariant) {
     setPrevVariant(variant);
-    setMoltenLeaving(prevVariant === "molten" && variant === "party");
+    setLeavingVariant(variant === "party" && prevVariant !== "party" ? prevVariant : null);
   }
 
   if (state.phase === "playing") {
     return null;
   }
-  const showMolten = variant === "molten" || moltenLeaving;
+  const palette = variant === "party" ? leavingVariant : variant;
   return (
     <div
       aria-hidden="true"
@@ -92,21 +88,16 @@ export function SiteBackground({
       data-variant={variant}
       className="pointer-events-none fixed inset-0 z-0 bg-black"
     >
-      {showMolten ? (
+      {palette !== null ? (
         <div
-          className={`absolute inset-0 ${variant === "molten" ? "rc-bg-in" : "rc-bg-out"}`}
+          className={`absolute inset-0 ${variant === "party" ? "rc-bg-out" : "rc-bg-in"}`}
           onAnimationEnd={(event) => {
-            if (event.target === event.currentTarget && variant !== "molten") {
-              setMoltenLeaving(false);
+            if (event.target === event.currentTarget && variant === "party") {
+              setLeavingVariant(null);
             }
           }}
         >
-          <MoltenBackground />
-        </div>
-      ) : null}
-      {variant === "nova" ? (
-        <div className="rc-bg-in absolute inset-0">
-          <NovaSilk variant="page" />
+          <MoltenBackground blue={palette === "nova"} />
         </div>
       ) : null}
     </div>

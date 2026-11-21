@@ -11,7 +11,7 @@ const LineWaves = lazy(() => import("../../vendor/react-bits/LineWaves"));
  */
 export function WelcomeWaves() {
   return (
-    <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-black">
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0">
       {canUseWebGL2() ? (
         <Suspense fallback={null}>
           <LineWaves
@@ -21,20 +21,19 @@ export function WelcomeWaves() {
             colorCycleSpeed={0}
             // No moving bright "river": every line is lit the same.
             highlight={0}
-            brightness={0.3}
+            brightness={0.22}
             glow={0.25}
             speed={0.2}
             lineCount={40}
             lineWidth={1}
             warpIntensity={0.7}
             rotation={-24}
-            edgeFade={0.3}
+            edgeFade={0.6}
             intro={false}
             maxDevicePixelRatio={2}
           />
         </Suspense>
       ) : null}
-      <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgb(0_0_0/0.45),transparent_80%)]" />
     </div>
   );
 }

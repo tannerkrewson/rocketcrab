@@ -2,7 +2,6 @@ import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type AnimationEvent } from "react";
 import { toast } from "../lib/toast";
 import { BrandLogo } from "../components/layout/BrandLogo";
-import { NovaSilk } from "../components/backgrounds/NovaSilk";
 import { Button, buttonStyles } from "../components/ui/Button";
 import { Dialog } from "../components/ui/Dialog";
 import { writeToClipboard } from "../lib/editor/clipboard";
@@ -120,13 +119,11 @@ function HomeComponent() {
           rocketcrab<span className="text-primary">.com</span>
         </h1>
         <p className="text-lg text-foreground/70">party games for phones</p>
-        {/* A window onto the Nova silk that /build uses as its background. */}
         <Link
           to="/build"
           data-testid="nova-card"
-          className="relative mt-4 -mb-1 block w-full max-w-md overflow-hidden rounded-2xl bg-background px-6 py-4 text-center transition-transform active:scale-[0.98] motion-reduce:transition-none"
+          className="relative mt-4 -mb-1 block w-full max-w-md overflow-hidden rounded-2xl bg-[#060b1f] rc-molten-blue px-6 py-4 text-center transition-transform active:scale-[0.98] motion-reduce:transition-none"
         >
-          <NovaSilk />
           <span className="relative block text-lg font-black [text-shadow:0_1px_12px_rgb(0_0_0/0.8)]">
             Introducing <span className="text-nova-text">Nova</span>
           </span>

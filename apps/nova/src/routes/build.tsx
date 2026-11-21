@@ -53,7 +53,7 @@ function BuildHeroPage() {
       <section
         aria-labelledby="build-hero-heading"
         data-testid="build-hero"
-        // Sits directly on the page's Nova silk background (SiteBackground).
+        // Sits directly on the page's blue molten metal background (SiteBackground).
         className="relative w-full"
       >
         <div className="relative flex flex-col items-center gap-4 px-2 py-10 sm:py-14">

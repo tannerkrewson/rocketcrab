@@ -186,7 +186,7 @@ function CategoryCard({
   href?: string;
 }) {
   const classes =
-    "group flex items-center gap-3 glass rounded-2xl p-4 text-left transition-all hover:-translate-y-0.5 hover:bg-surface-tertiary";
+    "group flex cursor-pointer items-center gap-3 glass rounded-2xl p-4 text-left transition-all hover:-translate-y-0.5 hover:bg-surface-tertiary";
   const body = (
     <>
       <span className="shrink-0 text-2xl" aria-hidden="true">

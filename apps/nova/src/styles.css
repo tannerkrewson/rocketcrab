@@ -30,7 +30,7 @@
   [data-theme="dark"] {
     --rocket: oklch(60% 0.22 30);
     --nova: oklch(55% 0.21 264);
-    /* Light enough to read on black and on the Nova silk. */
+    /* Light enough to read on black and over the Nova background. */
     --nova-text: oklch(80% 0.12 262);
     --brand: var(--rocket);
 
@@ -45,15 +45,15 @@
        animated full-screen canvas every frame is too costly on phones.
        Overlays (dialogs, menus) stay opaque for legibility. */
     --background: oklch(0% 0 0);
-    --surface: oklch(15% 0 0 / 0.72);
-    --surface-secondary: oklch(100% 0 0 / 0.06);
-    --surface-tertiary: oklch(100% 0 0 / 0.1);
+    --surface: oklch(25% 0 0 / 0.85);
+    --surface-secondary: oklch(100% 0 0 / 0.09);
+    --surface-tertiary: oklch(100% 0 0 / 0.15);
     --surface-shadow: inset 0 1px 0 0 oklch(100% 0 0 / 0.07), 0 12px 32px -16px oklch(0% 0 0 / 0.7);
-    --overlay: oklch(17% 0 0);
+    --overlay: oklch(27% 0 0);
     --overlay-shadow: inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 24px 48px -12px oklch(0% 0 0 / 0.8);
-    --default: oklch(23% 0 0 / 0.85);
-    --default-hover: oklch(29% 0 0 / 0.9);
-    --field-background: oklch(100% 0 0 / 0.08);
+    --default: oklch(32% 0 0 / 0.9);
+    --default-hover: oklch(37% 0 0 / 0.95);
+    --field-background: oklch(100% 0 0 / 0.12);
     --segment: oklch(100% 0 0 / 0.16);
     --border: oklch(100% 0 0 / 0.12);
     --separator: oklch(100% 0 0 / 0.08);
@@ -216,9 +216,19 @@
   --button-fg: var(--foreground);
 }
 
-/* Background transitions: the site background fades in from black
-   when its style changes (e.g. molten → Nova silk), and the molten fades out
-   on entering a party. The global reduced-motion rule shortens both. */
+.rc-molten-red {
+  background-image:
+    radial-gradient(140% 80% at 50% 115%, #4a0410 0%, #1c0106 45%, transparent 75%),
+    radial-gradient(120% 60% at 50% -15%, #2a0309 0%, transparent 60%);
+}
+
+.rc-molten-blue {
+  background-image:
+    radial-gradient(140% 80% at 50% 115%, #142a78 0%, #0a1435 45%, transparent 75%),
+    radial-gradient(120% 60% at 50% -15%, #182f76 0%, transparent 60%);
+}
+
+/* The molten canvas fades in or out against the party background. */
 @keyframes rc-fade-in {
   from {
     opacity: 0;
