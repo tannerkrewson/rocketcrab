@@ -1,33 +1,9 @@
 import { RouterProvider, createMemoryHistory, createRouter } from "@tanstack/react-router";
-import { cleanup, fireEvent, render, screen, waitFor, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { routeTree } from "../routeTree.gen";
-
-// jsdom does not provide AnimationEvent, so React otherwise skips registering
-// its animation event plugin. Install the smallest test-only implementation
-// before React DOM is loaded so lifecycle events can be exercised here.
-vi.hoisted(() => {
-  const testWindow = window as unknown as { AnimationEvent?: unknown; Event: typeof Event };
-  if (testWindow.AnimationEvent === undefined) {
-    const WindowEvent = testWindow.Event;
-
-    class TestAnimationEvent extends WindowEvent {
-      readonly animationName: string;
-
-      constructor(type: string, init?: EventInit & { animationName?: string }) {
-        super(type, init);
-        this.animationName = init?.animationName ?? "";
-      }
-    }
-
-    Object.defineProperty(window, "AnimationEvent", {
-      configurable: true,
-      value: TestAnimationEvent,
-    });
-  }
-});
 
 const { toastMock, partyStub } = vi.hoisted(() => {
   const party: { active: boolean; phase: string } = { active: false, phase: "lobby" };
@@ -36,7 +12,7 @@ const { toastMock, partyStub } = vi.hoisted(() => {
     leaveParty: vi.fn(async () => undefined),
   };
   return {
-    toastMock: { success: vi.fn(), error: vi.fn() },
+    toastMock: { success: vi.fn() },
     partyStub: {
       party,
       engine,
@@ -67,15 +43,10 @@ function renderHome() {
 beforeEach(() => {
   cleanup();
   toastMock.success.mockClear();
-  toastMock.error.mockClear();
   partyStub.engine.isActive.mockClear();
   partyStub.engine.leaveParty.mockClear();
   // Default: no active party, so the guard is a no-op for the page tests.
   partyStub.party.active = false;
-});
-
-afterEach(() => {
-  delete (navigator as { clipboard?: unknown }).clipboard;
 });
 
 describe("/", () => {
@@ -83,7 +54,7 @@ describe("/", () => {
     renderHome();
     expect(await screen.findByRole("heading", { name: "rocketcrab.com" })).toBeInTheDocument();
     const logo = screen.getByTestId("brand-logo");
-    expect(logo.querySelector('img[src="/rocketcrab-logo.svg"]')).not.toBeNull();
+    expect(logo).toHaveAttribute("src", "/rocketcrab-logo-no-glow.svg");
     expect(screen.queryByText("🦀")).not.toBeInTheDocument();
     expect(screen.queryByText("🚀")).not.toBeInTheDocument();
     expect(screen.getByText("party games for phones")).toBeInTheDocument();
@@ -162,67 +133,11 @@ describe("/", () => {
     }
   });
 
-  it("scales the title down on press (2t1.8)", async () => {
+  it("keeps the logo and wordmark out of the tab order", async () => {
     renderHome();
     const title = await screen.findByRole("heading", { name: "rocketcrab.com" });
-    expect(title).toHaveClass("active:scale-95", "transition-transform", "cursor-pointer");
-  });
-
-  it("runs the logo through shake, launch, and return phases without duplicating repeats", async () => {
-    const user = userEvent.setup();
-    renderHome();
-
-    const launchButton = await screen.findByRole("button", { name: "Launch Rocketcrab" });
-    const logoAnimation = screen.getByTestId("logo-animation");
-    expect(logoAnimation).not.toHaveClass("rc-logo-shake", "rc-logo-launch", "rc-logo-return");
-
-    await user.click(launchButton);
-    await user.click(launchButton);
-    expect(logoAnimation).toHaveClass("rc-logo-shake");
-
-    const finishAnimation = (animationName: string) =>
-      fireEvent.animationEnd(logoAnimation, { animationName });
-
-    finishAnimation("rc-logo-shake");
-    expect(logoAnimation).toHaveClass("rc-logo-launch");
-    finishAnimation("rc-logo-launch");
-    expect(logoAnimation).toHaveClass("rc-logo-return");
-    finishAnimation("rc-logo-return");
-    expect(logoAnimation).not.toHaveClass("rc-logo-shake", "rc-logo-launch", "rc-logo-return");
-  });
-
-  it("activates the logo launch control from the keyboard", async () => {
-    const user = userEvent.setup();
-    renderHome();
-
-    const launchButton = await screen.findByRole("button", { name: "Launch Rocketcrab" });
-    launchButton.focus();
-    await user.keyboard("{Enter}");
-
-    expect(screen.getByTestId("logo-animation")).toHaveClass("rc-logo-shake");
-  });
-
-  it("keeps the logo still when reduced motion is requested", async () => {
-    const originalMatchMedia = window.matchMedia;
-    Object.defineProperty(window, "matchMedia", {
-      configurable: true,
-      value: vi.fn(() => ({ matches: true }) as MediaQueryList),
-    });
-
-    try {
-      renderHome();
-      const launchButton = await screen.findByRole("button", { name: "Launch Rocketcrab" });
-      const logoAnimation = screen.getByTestId("logo-animation");
-
-      await userEvent.click(launchButton);
-
-      expect(logoAnimation).not.toHaveClass("rc-logo-shake", "rc-logo-launch", "rc-logo-return");
-    } finally {
-      Object.defineProperty(window, "matchMedia", {
-        configurable: true,
-        value: originalMatchMedia,
-      });
-    }
+    expect(title).not.toHaveAttribute("tabindex");
+    expect(screen.getByTestId("brand-logo").closest("button, a, [tabindex]")).toBeNull();
   });
 
   it("no longer shows the Recent games section (7.35)", async () => {
@@ -237,25 +152,6 @@ describe("/", () => {
     renderHome();
     const title = await screen.findByRole("heading", { name: "rocketcrab.com" });
     expect(title).toHaveClass("font-title");
-  });
-
-  it("copies the title to the clipboard on tap and shows a toast (9fv.11.4)", async () => {
-    const writeText = vi.fn().mockResolvedValue(undefined);
-    Object.defineProperty(navigator, "clipboard", {
-      value: { writeText },
-      configurable: true,
-    });
-    renderHome();
-
-    const title = await screen.findByRole("heading", { name: "rocketcrab.com" });
-    expect(title).toHaveAttribute("title", "Copy rocketcrab.com to your clipboard");
-
-    await userEvent.click(title);
-
-    expect(writeText).toHaveBeenCalledTimes(1);
-    expect(writeText).toHaveBeenCalledWith("rocketcrab.com");
-    expect(toastMock.success).toHaveBeenCalledWith("Copied rocketcrab.com to your clipboard.");
-    expect(toastMock.error).not.toHaveBeenCalled();
   });
 
   it("leaves any active party when the homepage is shown (8z9)", async () => {

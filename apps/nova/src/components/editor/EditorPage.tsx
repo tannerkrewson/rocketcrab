@@ -561,10 +561,7 @@ export function EditorPage({ game }: { game?: SavedGame }) {
 
   return (
     <div className="flex flex-col gap-4">
-      {/* Same brand row as the other pages (outside the Nova scope, so it
-          keeps rocketcrab red); leaving through it still asks about unsaved
-          changes (the blocker below). */}
-      <BrandHeader size={32} className="-mt-1" />
+      <BrandHeader nova className="-mt-1" />
       <div
         className={cn("theme-nova flex flex-col gap-4", !showToolbar && "mx-auto w-full max-w-2xl")}
       >

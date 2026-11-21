@@ -162,7 +162,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     const back = screen.getByRole("link", { name: "Back to games" });
     expect(back.className).toContain("button--tertiary");
     expect(back.className).toContain("self-start");
-    expect(screen.getByRole("link", { name: /rocketcrab\.com/ })).toBeInTheDocument();
+    expect(screen.getByTestId("browser-brand-row")).toHaveTextContent("rocketcrab.com");
   });
 
   it("selects a saved game for the active party and returns to the lobby (10.9)", async () => {

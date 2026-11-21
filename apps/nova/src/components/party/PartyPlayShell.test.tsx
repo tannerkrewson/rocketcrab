@@ -119,20 +119,20 @@ async function renderShell(
 }
 
 describe("PartyPlayShell in-game chrome (7.38)", () => {
-  it("shows the centered rocketcrab.com party URL instead of the game name", async () => {
+  it("shows the Rocketcrab wordmark in the top bar", async () => {
     await renderShell(makeState());
-    expect(screen.getByLabelText("Copy the invite link")).toHaveTextContent("rocketcrab.com");
+    expect(screen.getByTestId("browser-brand-row")).toHaveTextContent("rocketcrab.com");
     expect(screen.queryByText("Rocket Rumble")).not.toBeInTheDocument();
     expect(screen.queryByText("connected")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Party code ABCD")).not.toBeInTheDocument();
   });
 
-  it("collapses the top bar to a floating logo on logo tap and reopens it (7.38)", async () => {
+  it("collapses and reopens the top bar using its toggle (7.38)", async () => {
     await renderShell(makeState());
     await userEvent.click(screen.getByRole("button", { name: /hide the top bar/i }));
     expect(screen.getByRole("button", { name: /show the top bar/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /menu/i })).not.toBeInTheDocument();
-    expect(screen.queryByLabelText("Copy the invite link")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("browser-brand-row")).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /show the top bar/i }));
     expect(screen.getByRole("button", { name: /menu/i })).toBeInTheDocument();
   });
@@ -327,31 +327,15 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(screen.queryByRole("dialog", { name: "About Drawphone" })).not.toBeInTheDocument();
   });
 
-  it("scales the party URL down while pressed like the homepage title (0dd)", async () => {
-    await renderShell(makeState());
-    const url = screen.getByLabelText("Copy the invite link");
-    expect(url).toHaveClass("active:scale-95", "transition-transform");
-  });
-
-  it("uses the non-glowing brand mark in the top bar and collapsed logo (ch6)", async () => {
-    await renderShell(makeState());
-    const hide = screen.getByRole("button", { name: /hide the top bar/i });
-    const topMark = hide.querySelector('img[src="/rocketcrab-logo-no-glow.svg"]');
-    expect(topMark).not.toBeNull();
-    await userEvent.click(hide);
-    const show = screen.getByRole("button", { name: /show the top bar/i });
-    const collapsedMark = show.querySelector('img[src="/rocketcrab-logo-no-glow.svg"]');
-    expect(collapsedMark).not.toBeNull();
-  });
-
-  it("copies the invite URL when the centered party URL is tapped (9fv.11.11 / nil)", async () => {
+  it("copies the invite URL from the game menu (9fv.11.11 / nil)", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText },
       configurable: true,
     });
     await renderShell(makeState());
-    await userEvent.click(screen.getByLabelText("Copy the invite link"));
+    await userEvent.click(screen.getByRole("button", { name: "Menu" }));
+    await userEvent.click(screen.getByRole("menuitem", { name: "Copy invite link" }));
     expect(writeText).toHaveBeenCalledWith(
       "http://localhost:5173/join#code=abcd&secret=invite-secret",
     );

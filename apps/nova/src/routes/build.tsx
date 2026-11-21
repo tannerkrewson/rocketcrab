@@ -30,12 +30,9 @@ export function BuildPage() {
         className="relative w-full"
       >
         <div className="relative flex flex-col items-center gap-4 px-2 py-10 sm:py-14">
-          <BrandLogo
-            variant="no-glow"
-            size={80}
-            responsive
-            className="drop-shadow-[0_0_15px_oklch(64%_0.2_264/0.55)]"
-          />
+          <div className="drop-shadow-[0_0_10px_oklch(64%_0.2_264/0.55)]">
+            <BrandLogo nova />
+          </div>
           <h1
             id="build-hero-heading"
             className="text-4xl font-black text-foreground [text-shadow:0_2px_16px_rgb(0_0_0/0.8),0_0_20px_oklch(64%_0.2_264/0.45)] sm:text-5xl"

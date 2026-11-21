@@ -39,7 +39,7 @@ describe("/library", () => {
     await gameRepository.create({ title: "Rockets", html: "<p>a</p>" });
     renderLibrary();
 
-    expect(await screen.findByRole("link", { name: /rocketcrab\.com/ })).toBeInTheDocument();
+    expect(await screen.findByTestId("browser-brand-row")).toHaveTextContent("rocketcrab.com");
 
     const backs = screen.getAllByRole("link", { name: "Back" });
     expect(backs).toHaveLength(1);

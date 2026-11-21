@@ -35,7 +35,7 @@ function RootErrorComponent({ error }: { error: unknown }) {
 function RootNotFoundComponent() {
   return (
     <main className="mx-auto flex w-full max-w-xl flex-col items-center justify-center gap-4 px-4 py-16 text-center">
-      <BrandLogo size={48} />
+      <BrandLogo />
       <h1 className="text-3xl font-black">Lost in space</h1>
       <p className="text-foreground/70">
         That page drifted off into the void. It doesn't exist (or hasn't been built yet).

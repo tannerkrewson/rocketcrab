@@ -32,13 +32,12 @@ describe("styles.css HeroUI setup", () => {
     expect(css).toContain("--font-title");
   });
 
-  it("keeps the app-specific utilities (safe areas, logo motion, Nova transition, hidden frame)", () => {
+  it("keeps the app-specific utilities (safe areas, Nova transition, hidden frame)", () => {
     for (const token of [
       "@utility pb-safe",
       "@utility pt-safe",
       ".rc-bg-in",
       "@utility glass",
-      "rc-logo-launch",
       '[data-testid="party-frame"].invisible',
     ]) {
       expect(css).toContain(token);

@@ -1,6 +1,9 @@
 import {
   ArrowLeft,
   BookOpen,
+  ChevronDown,
+  ChevronUp,
+  Copy,
   Eraser,
   Gamepad2,
   Menu,
@@ -17,7 +20,7 @@ import { writeToClipboard } from "../../lib/editor/clipboard";
 import { clearBrowseContext } from "../../lib/browse/back-context";
 import { cn } from "../../lib/cn";
 import type { PartyEngineState } from "../../lib/party/engine";
-import { BrandLogo } from "../layout/BrandLogo";
+import { BrandHeader } from "../layout/BrandHeader";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { GameBrowser } from "./GameBrowser";
@@ -104,33 +107,21 @@ export function PartyPlayShell({
             aria-label="Hide the top bar"
             title="Hide the top bar"
           >
-            <BrandLogo variant="no-glow" size={26} className="shrink-0" />
+            <ChevronUp className="size-4" aria-hidden="true" />
           </Button>
 
-          <div className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
-            <button
-              type="button"
-              className="font-title whitespace-nowrap text-lg font-black text-foreground transition-transform active:scale-95 md:text-xl"
-              onClick={() => void copyInvite()}
-              disabled={state.inviteUrl === null}
-              title="Copy the invite link"
-              aria-label="Copy the invite link"
-            >
-              rocketcrab<span className="text-primary">.com</span>
-            </button>
-          </div>
-
-          <div className="min-w-0 flex-1" />
+          <BrandHeader className="mx-auto" />
 
           <Button
             size="sm"
             variant="tertiary"
             className="shrink-0"
+            aria-label="Menu"
             aria-expanded={menuOpen}
             onClick={() => setPanel(menuOpen ? null : "menu")}
           >
             <Menu className="h-4 w-4" aria-hidden="true" />
-            Menu
+            <span className="hidden min-[360px]:inline">Menu</span>
           </Button>
 
           {menuOpen ? (
@@ -148,6 +139,21 @@ export function PartyPlayShell({
                 >
                   <Users className="h-4 w-4" aria-hidden="true" />
                   Players
+                </button>
+              </li>
+              <li>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold hover:bg-surface-secondary disabled:opacity-50"
+                  disabled={state.inviteUrl === null}
+                  onClick={() => {
+                    setPanel(null);
+                    void copyInvite();
+                  }}
+                >
+                  <Copy className="size-4" aria-hidden="true" />
+                  Copy invite link
                 </button>
               </li>
               {/* Host only: replacing the game ends it for every player. */}
@@ -439,7 +445,7 @@ export function PartyPlayShell({
           aria-label="Show the top bar"
           title="Show the top bar"
         >
-          <BrandLogo variant="no-glow" size={28} />
+          <ChevronDown className="size-4" aria-hidden="true" />
         </Button>
       ) : null}
 

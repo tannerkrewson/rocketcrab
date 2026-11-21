@@ -26,19 +26,20 @@ describe("BrandLogo", () => {
     expect(minY + height).toBeGreaterThanOrEqual(127);
   });
 
-  it("keeps shared marks at 40px while allowing the hero size to stay larger", () => {
+  it("renders both color palettes at the same size", () => {
     render(
       <>
-        <BrandLogo size={40} />
-        <BrandLogo size={80} responsive />
+        <BrandLogo />
+        <BrandLogo nova />
       </>,
     );
 
-    const logos = screen.getAllByTestId("brand-logo");
-    expect(logos[0]?.querySelector("img")).toHaveStyle({ height: "40px" });
-    expect(logos[1]?.querySelector("img")).toHaveAttribute(
-      "style",
-      expect.stringContaining("height: min(80px, 16vw)"),
-    );
+    const [red, blue] = screen.getAllByTestId("brand-logo");
+    expect(red).toHaveAttribute("src", "/rocketcrab-logo-no-glow.svg");
+    expect(blue).toHaveAttribute("src", "/rocketcrab-logo-nova.svg");
+    for (const logo of [red, blue]) {
+      expect(logo).toHaveAttribute("height", "40");
+      expect(logo).toHaveAttribute("width", "40");
+    }
   });
 });

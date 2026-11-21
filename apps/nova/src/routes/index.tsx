@@ -1,10 +1,9 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState, type AnimationEvent } from "react";
+import { useEffect, useRef, useState } from "react";
 import { toast } from "../lib/toast";
 import { BrandLogo } from "../components/layout/BrandLogo";
 import { Button, buttonStyles } from "../components/ui/Button";
 import { Dialog } from "../components/ui/Dialog";
-import { writeToClipboard } from "../lib/editor/clipboard";
 import { usePartyEngine } from "../lib/party/use-party";
 
 /** The secondary menu: glass buttons sized to the longest label (button-stack). */
@@ -14,57 +13,9 @@ export const Route = createFileRoute("/")({
   component: HomeComponent,
 });
 
-type LogoAnimationPhase = "idle" | "shake" | "launch" | "return";
-
-const LOGO_ANIMATION_NAMES = {
-  shake: "rc-logo-shake",
-  launch: "rc-logo-launch",
-  return: "rc-logo-return",
-} as const;
-
-const NEXT_LOGO_PHASE: Record<Exclude<LogoAnimationPhase, "idle">, LogoAnimationPhase> = {
-  shake: "launch",
-  launch: "return",
-  return: "idle",
-};
-
 function HomeComponent() {
-  const [logoAnimationPhase, setLogoAnimationPhase] = useState<LogoAnimationPhase>("idle");
   // Joining needs a friend's invite link, so Join party explains how to get one.
   const [joinHelpOpen, setJoinHelpOpen] = useState(false);
-
-  const handleLogoLaunch = () => {
-    if (logoAnimationPhase !== "idle") return;
-    if (
-      typeof window !== "undefined" &&
-      typeof window.matchMedia === "function" &&
-      window.matchMedia("(prefers-reduced-motion: reduce)").matches
-    ) {
-      return;
-    }
-    setLogoAnimationPhase("shake");
-  };
-
-  const handleLogoAnimationEnd = (event: AnimationEvent<HTMLSpanElement>) => {
-    if (event.target !== event.currentTarget) return;
-    setLogoAnimationPhase((currentPhase) => {
-      if (currentPhase === "idle") return currentPhase;
-      if (LOGO_ANIMATION_NAMES[currentPhase] !== event.animationName) return currentPhase;
-      return NEXT_LOGO_PHASE[currentPhase];
-    });
-  };
-
-  const logoAnimationClass =
-    logoAnimationPhase === "idle" ? undefined : LOGO_ANIMATION_NAMES[logoAnimationPhase];
-
-  const handleCopyTitle = async () => {
-    const ok = await writeToClipboard("rocketcrab.com");
-    if (ok) {
-      toast.success("Copied rocketcrab.com to your clipboard.");
-    } else {
-      toast.danger("Couldn't copy rocketcrab.com — copy it manually.");
-    }
-  };
 
   // Visiting home must leave any active party, including via the browser Back button.
   const { state, engine } = usePartyEngine();
@@ -89,33 +40,8 @@ function HomeComponent() {
   return (
     <div className="flex min-h-[calc(100dvh-16rem)] flex-col items-center justify-center gap-10">
       <section className="flex flex-col items-center gap-3 text-center">
-        <Button
-          variant="default"
-          aria-label="Launch Rocketcrab"
-          title="Launch Rocketcrab"
-          className="h-auto min-h-0 w-auto rounded-full border-0! bg-transparent! p-0 shadow-none hover:bg-transparent! active:bg-transparent!"
-          onClick={handleLogoLaunch}
-        >
-          <span
-            data-testid="logo-animation"
-            className={logoAnimationClass}
-            onAnimationEnd={handleLogoAnimationEnd}
-          >
-            <BrandLogo size={80} responsive />
-          </span>
-        </Button>
-        <h1
-          className="font-title cursor-pointer text-[2.5rem] font-black leading-none text-foreground transition-transform active:scale-95 sm:text-5xl"
-          title="Copy rocketcrab.com to your clipboard"
-          tabIndex={0}
-          onClick={() => void handleCopyTitle()}
-          onKeyDown={(event) => {
-            if (event.key === "Enter" || event.key === " ") {
-              event.preventDefault();
-              void handleCopyTitle();
-            }
-          }}
-        >
+        <BrandLogo />
+        <h1 className="font-title text-[2.5rem] font-black leading-none text-foreground sm:text-5xl">
           rocketcrab<span className="text-primary">.com</span>
         </h1>
         <p className="text-lg text-foreground/70">party games for phones</p>

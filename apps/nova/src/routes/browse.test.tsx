@@ -30,7 +30,7 @@ describe("/browse", () => {
   it("shows only the category cards by default — no game list, no All-games box (10.9/2t1.1)", async () => {
     renderAt("/browse");
     expect(await screen.findByRole("heading", { name: "Games" })).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: /rocketcrab\.com/ })).toBeInTheDocument();
+    expect(screen.getByTestId("browser-brand-row")).toHaveTextContent("rocketcrab.com");
     expect(screen.getByRole("link", { name: /My games/ })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /netgames\.io/ })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /All games/ })).not.toBeInTheDocument();
@@ -138,7 +138,7 @@ describe("/game/:gameId", () => {
     const guide = screen.getByRole("link", { name: /How to play/ });
     expect(guide).toHaveAttribute("href", "https://drawphone.tannerkrewson.com/how-to-play");
     expect(guide).toHaveAttribute("target", "_blank");
-    expect(screen.getByRole("link", { name: /rocketcrab\.com/ })).toBeInTheDocument();
+    expect(screen.getByTestId("browser-brand-row")).toHaveTextContent("rocketcrab.com");
   });
 
   it("puts the facts and actions above the screenshots and the About text (l41)", async () => {

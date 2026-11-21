@@ -1,42 +1,14 @@
-import { cn } from "../../lib/cn";
-
-export interface BrandLogoProps {
-  /**
-   * Height of the mark in px (the mark is squarish, so width ≈ size too).
-   */
-  size?: number;
-  /** Cap height at min(size, 16vw) so large marks fit on phones. */
-  responsive?: boolean;
-  /** Use the flat no-glow mark for busy backgrounds; glow is the default. */
-  variant?: "glow" | "no-glow";
-  /** Alias for variant="no-glow". */
-  glow?: boolean;
-  className?: string;
-}
-
-/** Decorative brand mark; callers must provide their own accessible label. */
-export function BrandLogo({
-  size = 32,
-  responsive = false,
-  variant = "glow",
-  glow = true,
-  className,
-}: BrandLogoProps) {
-  const noGlow = variant === "no-glow" || glow === false;
-  const height = responsive ? `min(${size}px, 16vw)` : `${size}px`;
+/** Decorative brand mark, shared at one size on every page. */
+export function BrandLogo({ nova = false }: { nova?: boolean }) {
   return (
-    <span
-      className={cn("inline-flex shrink-0 items-center overflow-visible", className)}
-      aria-hidden="true"
+    <img
+      src={nova ? "/rocketcrab-logo-nova.svg" : "/rocketcrab-logo-no-glow.svg"}
+      alt=""
+      draggable={false}
+      className="block size-10 shrink-0"
+      width={40}
+      height={40}
       data-testid="brand-logo"
-    >
-      <img
-        src={noGlow ? "/rocketcrab-logo-no-glow.svg" : "/rocketcrab-logo.svg"}
-        alt=""
-        draggable={false}
-        className="block"
-        style={{ height }}
-      />
-    </span>
+    />
   );
 }

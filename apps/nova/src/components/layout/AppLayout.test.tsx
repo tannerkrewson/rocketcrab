@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createMemoryHistory, createRouter } from "@tanstack/react-router";
 import { cleanup, render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it } from "vitest";
 import { routeTree } from "../../routeTree.gen";
@@ -69,6 +70,7 @@ describe("AppLayout", () => {
     renderAt("/editor");
     await screen.findByTestId("editor-empty-state");
     expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "nova");
+    expect(screen.getByTestId("brand-logo")).toHaveAttribute("src", "/rocketcrab-logo-nova.svg");
 
     renderAt("/about");
     await screen.findByRole("heading", { name: "Coming soon" });
@@ -116,11 +118,16 @@ describe("AppLayout", () => {
     ] as const) {
       renderAt(path);
       await screen.findByRole("heading", { name: heading });
-      const brand = screen.getByRole("link", { name: /rocketcrab\.com — home/ });
-      expect(brand.getAttribute("href")).toBe("/");
-      expect(screen.getByTestId("brand-logo").querySelector("img")).toHaveStyle({
-        height: "40px",
-      });
+      const brand = screen.getByTestId("browser-brand-row");
+      expect(brand).toHaveTextContent("rocketcrab.com");
+      expect(brand.querySelector("a, button")).toBeNull();
+      expect(screen.getByTestId("brand-logo")).toHaveAttribute("height", "40");
+      if (path === "/browse") {
+        await userEvent.click(screen.getByRole("button", { name: "Back" }));
+        expect(await screen.findByRole("heading", { name: "rocketcrab.com" })).toBeVisible();
+      } else {
+        expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/");
+      }
     }
 
     renderAt("/build");

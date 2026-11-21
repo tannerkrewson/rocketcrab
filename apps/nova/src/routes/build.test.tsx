@@ -44,8 +44,8 @@ describe("/build — page 1 (hero)", () => {
     expect(hero.className).not.toContain("border");
 
     const logo = hero.querySelector("img");
-    expect(logo?.getAttribute("src")).toBe("/rocketcrab-logo-no-glow.svg");
-    expect(logo?.style.height).toBe("min(80px, 16vw)");
+    expect(logo?.getAttribute("src")).toBe("/rocketcrab-logo-nova.svg");
+    expect(logo?.getAttribute("height")).toBe("40");
 
     expect(
       await within(hero).findByRole("heading", { name: "Introducing Nova" }),
