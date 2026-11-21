@@ -46,6 +46,15 @@ Firefox, and WebKit, plus 7 dedicated Chromium transport tests. The edge
 deploy dry run and built runtime header verification passed. The hosted
 beta and physical-device checks are still pending.
 
+## Nova UI polish (2026-11-21)
+
+- [x] Align name entry actions and replace the setup spinner during a signaling
+      outage. Party route tests and signaling recovery coverage in `d942d25`.
+- [x] Use blue Molten Metal for Nova, soften the lobby waves, lighten shared
+      surfaces, and confirm local game reloads. `npm run check` passed for `d0e915b`.
+- [x] Streamline the prompt-to-editor handoff and defer the tutorial until the
+      first game import. Build and editor tests passed.
+
 ## Before beta
 
 - [x] Prefer self-contained games. Block workers and clipboard access in the

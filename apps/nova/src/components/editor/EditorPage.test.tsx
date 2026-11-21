@@ -217,7 +217,7 @@ beforeEach(async () => {
   await gameRepository.clear();
   window.history.pushState({}, "", "/");
   window.localStorage.clear();
-  // The tutorial modal would hide the page from queries; tests open it explicitly.
+  // Most tests skip the tutorial that follows the first import.
   window.localStorage.setItem("nova:editor-tutorial-dismissed:v1", "1");
 });
 
@@ -368,11 +368,15 @@ describe("/editor — a new game", () => {
     expect(saved?.html).toBe(PASTED_SOURCE);
   });
 
-  it("opens the tutorial on the first visit and reopens it from the help button", async () => {
+  it("opens the tutorial after the first import and reopens it from the help button", async () => {
     window.localStorage.removeItem("nova:editor-tutorial-dismissed:v1");
+    mockClipboard(PASTED_SOURCE);
     const harness = createHostHarness();
     renderEditor(["/editor"], harness);
 
+    await screen.findByTestId("editor-empty-state");
+    expect(screen.queryByTestId("editor-tutorial")).not.toBeInTheDocument();
+    await userEvent.click(pasteButton());
     expect(await screen.findByTestId("editor-tutorial")).toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: "Got it" }));
     await waitFor(() => expect(screen.queryByTestId("editor-tutorial")).not.toBeInTheDocument());

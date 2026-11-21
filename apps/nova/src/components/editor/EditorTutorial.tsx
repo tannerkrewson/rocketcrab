@@ -1,5 +1,4 @@
-import { Link } from "@tanstack/react-router";
-import { ClipboardPaste, PartyPopper, Sparkles, Users, Wrench } from "lucide-react";
+import { PartyPopper, Users, Wrench } from "lucide-react";
 import type { ReactNode } from "react";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
@@ -46,16 +45,6 @@ export function EditorTutorial({ open, onClose }: { open: boolean; onClose: () =
     <Dialog open={open} onClose={onClose} title="How the Nova editor works" className="theme-nova">
       <div className="flex flex-col gap-5" data-testid="editor-tutorial">
         <ol className="flex flex-col gap-4">
-          <Step icon={<Sparkles className="h-4 w-4" />} title="Get a game from an AI">
-            Copy the{" "}
-            <Link to="/build" search={{ page: "prompt" }} className="font-bold underline">
-              master prompt
-            </Link>{" "}
-            into ChatGPT, Claude or Gemini and describe your idea. It writes one HTML file.
-          </Step>
-          <Step icon={<ClipboardPaste className="h-4 w-4" />} title="Paste it here">
-            Press <b>Paste game</b>. It runs right away.
-          </Step>
           <Step icon={<Users className="h-4 w-4" />} title="Test it">
             The <b>Test</b> tab plays your game as several players side by side, so you can see how
             it behaves in a real party.

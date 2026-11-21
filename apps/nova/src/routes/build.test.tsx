@@ -9,10 +9,6 @@ import { routeTree } from "../routeTree.gen";
 
 const PROMPT = buildMasterPrompt();
 
-/** GitHub link to the docs, branch-free (GitHub resolves the default branch). */
-const NOVA_API_REFERENCE_URL =
-  "https://github.com/tannerkrewson/rocketcrab/blob/docs/api/nova-api-ai-reference.md";
-
 function renderBuild(initialEntry = "/build") {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -87,70 +83,43 @@ describe("/build — page 1 (hero)", () => {
   });
 });
 
-describe("/build?page=prompt — the master-prompt step", () => {
-  async function openPromptPage(initialEntry: string) {
-    renderBuild(initialEntry);
-    await screen.findByRole("heading", { name: "Get the master prompt" });
+describe("/build?page=prompt", () => {
+  async function openPromptPage() {
+    renderBuild("/build?page=prompt");
+    await screen.findByRole("button", { name: "Copy prompt" });
   }
 
-  it("presents the generated prompt with the embedded API reference", async () => {
-    await openPromptPage("/build?page=prompt");
+  it("lets readers expand the full prompt and continue after copying it manually", async () => {
+    await openPromptPage();
+    expect(screen.queryByRole("link", { name: "Paste or upload my game" })).not.toBeInTheDocument();
 
-    expect(screen.getByText(new RegExp("Nova Master Prompt"))).toBeInTheDocument();
-    expect(screen.getByText(new RegExp("Interview the user first"))).toBeInTheDocument();
-    expect(screen.getByText(new RegExp("Nova API — AI Quick Reference"))).toBeInTheDocument();
-    expect(screen.queryByText(/template v\d+ · Nova API v\d+/)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByText(/Show the full prompt/));
+    expect(screen.getByText(/Nova API — AI Quick Reference/)).toBeVisible();
+    const editor = await screen.findByRole("link", { name: "Paste or upload my game" });
+    expect(editor).toHaveAttribute("href", "/editor");
   });
 
-  it("copies the full prompt and shows success feedback", async () => {
+  it("copies the full prompt, then explains the next step and links to the paste target", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText },
       configurable: true,
     });
-    await openPromptPage("/build?page=prompt");
+    await openPromptPage();
 
-    await userEvent.click(screen.getByRole("button", { name: "Copy the master prompt" }));
+    await userEvent.click(screen.getByRole("button", { name: "Copy prompt" }));
 
     expect(writeText).toHaveBeenCalledTimes(1);
     expect(writeText).toHaveBeenCalledWith(PROMPT);
-    expect(await screen.findByRole("button", { name: "Prompt copied!" })).toBeInTheDocument();
+    expect(await screen.findByText("Prompt copied")).toBeInTheDocument();
+    expect(screen.getByText(/Paste the prompt into your AI chat/)).toBeVisible();
+    await userEvent.click(screen.getByRole("link", { name: "Paste or upload my game" }));
+    expect(await screen.findByTestId("editor-empty-state")).toBeInTheDocument();
+    expect(screen.queryByTestId("editor-tutorial")).not.toBeInTheDocument();
   });
 
-  it("links to the Nova API reference on GitHub (branch-free URL)", async () => {
-    await openPromptPage("/build?page=prompt");
-
-    const link = await screen.findByRole("link", { name: "Nova API reference" });
-    expect(link).toHaveAttribute("href", NOVA_API_REFERENCE_URL);
-    expect(link.getAttribute("href")).not.toMatch(/\/blob\/(nova|dev|main|master)\//);
-  });
-
-  it("opens the editor through the existing editor-open plumbing", async () => {
-    await openPromptPage("/build?page=prompt");
-
-    const editor = screen.getByRole("link", { name: "Open the editor" });
-    expect(editor.getAttribute("href")).toBe("/editor");
-    expect(editor.className).toContain("button--primary");
-
-    expect(screen.queryByRole("textbox", { name: "Paste game HTML" })).not.toBeInTheDocument();
-  });
-
-  it("keeps the editor as the paste target — no paste box (7.44)", async () => {
-    await openPromptPage("/build?page=prompt");
-
-    expect(screen.queryByTestId("paste-target")).not.toBeInTheDocument();
-    expect(screen.queryByRole("textbox", { name: "Paste game HTML" })).not.toBeInTheDocument();
-    expect(
-      screen.queryByText(/Copy the master prompt below into any AI chat service/),
-    ).not.toBeInTheDocument();
-    expect(screen.queryByRole("heading", { name: "Next steps" })).not.toBeInTheDocument();
-  });
-
-  it("Back returns to the intro page so refresh/Back work sanely (gmo)", async () => {
-    renderBuild("/build?page=prompt");
-    await screen.findByRole("heading", { name: "Get the master prompt" });
-
-    const back = screen.getByRole("link", { name: "back" });
-    expect(back.getAttribute("href")).toBe("/build");
+  it("links back to the intro page", async () => {
+    await openPromptPage();
+    expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/build");
   });
 });

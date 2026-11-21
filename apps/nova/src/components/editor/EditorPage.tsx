@@ -129,7 +129,8 @@ export function EditorPage({ game }: { game?: SavedGame }) {
     runtimeInstanceId: string | null;
   } | null>(null);
   const [view, setView] = useState<EditorView>("test");
-  const [tutorialOpen, setTutorialOpen] = useState(shouldAutoOpenTutorial);
+  const [tutorialOpen, setTutorialOpen] = useState(false);
+  const firstImport = useRef(true);
   const [titleEditing, setTitleEditing] = useState(false);
   const titleInputRef = useRef<HTMLInputElement | null>(null);
   const displayTitle = title.trim() || registration?.title || DEFAULT_GAME_TITLE;
@@ -328,6 +329,10 @@ export function EditorPage({ game }: { game?: SavedGame }) {
       setView("test");
       void runSource(text);
       toast.success(message);
+      if (firstImport.current) {
+        firstImport.current = false;
+        if (shouldAutoOpenTutorial()) setTutorialOpen(true);
+      }
     },
     [runSource],
   );

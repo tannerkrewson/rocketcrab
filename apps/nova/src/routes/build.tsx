@@ -29,10 +29,6 @@ interface BuildSearch {
   page?: "prompt";
 }
 
-/** GitHub link to the Nova API reference docs, branch-free (default branch). */
-const NOVA_API_REFERENCE_URL =
-  "https://github.com/tannerkrewson/rocketcrab/blob/docs/api/nova-api-ai-reference.md";
-
 /** Build flow: introduction, then a copyable prompt and the editor handoff. */
 export function BuildPage() {
   const search = Route.useSearch();
@@ -135,117 +131,72 @@ function BuildHeroPage() {
 function BuildPromptPage() {
   const prompt = useMemo(() => buildMasterPrompt(), []);
   const [copied, setCopied] = useState(false);
+  const [previewed, setPreviewed] = useState(false);
 
   const handleCopyPrompt = async () => {
     const ok = await writeToClipboard(prompt);
     if (ok) {
       setCopied(true);
-      toast.success("Master prompt copied to your clipboard.");
     } else {
-      toast.danger("Couldn't copy the prompt — expand it below and copy manually.");
+      toast.danger("Couldn't copy the prompt. Open the full prompt to copy it manually.");
     }
   };
 
   return (
-    <div className="theme-nova mx-auto flex w-full max-w-2xl flex-col items-center gap-8 text-center">
-      <Link to="/build" className={buttonStyles("default", "md", "self-start", true)}>
+    <div className="theme-nova mx-auto flex w-full max-w-2xl flex-col items-center gap-5">
+      <Link to="/build" className={buttonStyles("tertiary", "md", "self-start")}>
         <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-        back
+        Back
       </Link>
 
-      <header className="flex flex-col items-center gap-3">
-        <h1 className="text-3xl font-black text-foreground sm:text-4xl">
-          Get the <span className="text-accent">master prompt</span>
-        </h1>
-        <p className="max-w-xl text-lg leading-relaxed text-foreground/70">
-          One prompt that works in every AI chat service. Copy it, tell the AI about your idea, and
-          it writes your game — one complete HTML file ready to paste into the editor.
-        </p>
-      </header>
-
-      <ol
-        aria-label="What to do with the prompt"
-        className="flex w-full flex-wrap items-center justify-center gap-2 text-sm font-semibold text-foreground/70"
-      >
-        <li className="flex items-center gap-2 glass rounded-full px-4 py-2">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent/20 font-black text-accent">
-            1
-          </span>
-          Copy the prompt
-        </li>
-        <li className="flex items-center gap-2 glass rounded-full px-4 py-2">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent/20 font-black text-accent">
-            2
-          </span>
-          Chat about your idea
-        </li>
-        <li className="flex items-center gap-2 glass rounded-full px-4 py-2">
-          <span className="flex h-5 w-5 items-center justify-center rounded-full bg-accent/20 font-black text-accent">
-            3
-          </span>
-          Paste the game in the editor
-        </li>
-      </ol>
-
-      <section aria-labelledby="master-prompt-heading" className="w-full text-left">
-        <Card
-          title={<span id="master-prompt-heading">The prompt</span>}
-          description="It embeds the complete Nova API reference, so the AI writes real Nova code — no tools, no setup."
+      <h1 className="sr-only">Game prompt</h1>
+      <Card className="w-full">
+        <Button
+          variant="primary"
+          size="lg"
+          className="self-start"
+          onPress={() => void handleCopyPrompt()}
         >
-          <div className="flex flex-wrap items-center gap-3">
-            <Button
-              variant="primary"
-              size="lg"
-              className="sm:px-10"
-              onClick={() => void handleCopyPrompt()}
-            >
-              {copied ? (
-                <Check className="h-5 w-5" aria-hidden="true" />
-              ) : (
-                <ClipboardCopy className="h-5 w-5" aria-hidden="true" />
-              )}
-              {copied ? "Prompt copied!" : "Copy the master prompt"}
-            </Button>
-          </div>
-          <details className="group">
-            <summary className="cursor-pointer font-bold text-primary">
-              <span className="inline-flex items-center gap-2">
-                <ScrollText className="h-4 w-4" aria-hidden="true" />
-                Show the full prompt ({prompt.length.toLocaleString()} characters)
-              </span>
-            </summary>
-            <pre className="mt-3 max-h-96 overflow-auto rounded-2xl bg-surface-secondary p-4 text-xs leading-relaxed whitespace-pre-wrap">
-              {prompt}
-            </pre>
-          </details>
-          <p className="text-sm text-foreground/70">
-            Reading the API reference? It's on GitHub:{" "}
-            <a
-              href={NOVA_API_REFERENCE_URL}
-              target="_blank"
-              rel="noreferrer"
-              className="font-bold text-primary underline underline-offset-2"
-            >
-              Nova API reference
-            </a>
-            .
-          </p>
-        </Card>
-      </section>
+          <ClipboardCopy className="h-5 w-5" aria-hidden="true" />
+          {copied ? "Copy again" : "Copy prompt"}
+        </Button>
+        <details
+          onToggle={(event) => {
+            if (event.currentTarget.open) setPreviewed(true);
+          }}
+        >
+          <summary className="cursor-pointer font-bold text-nova-text">
+            <span className="inline-flex items-center gap-2">
+              <ScrollText className="h-4 w-4" aria-hidden="true" />
+              Show the full prompt ({prompt.length.toLocaleString()} characters)
+            </span>
+          </summary>
+          <pre className="mt-3 max-h-96 overflow-auto rounded-2xl bg-surface-secondary p-4 text-xs leading-relaxed whitespace-pre-wrap">
+            {prompt}
+          </pre>
+        </details>
+      </Card>
 
-      {/* The prompt is instructions for an AI, not game HTML; open a blank
-          editor rather than handing the prompt over as source. */}
-      <Link
-        to="/editor"
-        className={buttonStyles(
-          "info",
-          "lg",
-          "drop-shadow-[0_0_22px_oklch(62%_0.19_264/0.55)] w-full sm:w-auto sm:px-16",
-        )}
-      >
-        <Code2 className="h-5 w-5" aria-hidden="true" />
-        Open the editor
-      </Link>
+      {copied || previewed ? (
+        <div className="glass flex w-full flex-col items-start gap-3 rounded-2xl p-5">
+          <div role="status" className="flex flex-col gap-1">
+            {copied ? (
+              <p className="flex items-center gap-2 font-bold">
+                <Check className="h-4 w-4 text-success" aria-hidden="true" />
+                Prompt copied
+              </p>
+            ) : null}
+            <p className="text-foreground/80">
+              Paste the prompt into your AI chat and describe your game. When it gives you the
+              game&apos;s HTML, come back to paste it in or upload the file.
+            </p>
+          </div>
+          <Link to="/editor" className={buttonStyles("outline", "md")}>
+            <Code2 className="h-4 w-4" aria-hidden="true" />
+            Paste or upload my game
+          </Link>
+        </div>
+      ) : null}
     </div>
   );
 }
