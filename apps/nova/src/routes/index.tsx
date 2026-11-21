@@ -1,5 +1,5 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { useEffect, useRef, useState, type MouseEvent } from "react";
 import { toast } from "../lib/toast";
 import { BrandLogo } from "../components/layout/BrandLogo";
 import { Button, buttonStyles } from "../components/ui/Button";
@@ -13,9 +13,48 @@ export const Route = createFileRoute("/")({
   component: HomeComponent,
 });
 
+const START_PARTY = { to: "/party" } as const;
+
 function HomeComponent() {
   // Joining needs a friend's invite link, so Join party explains how to get one.
   const [joinHelpOpen, setJoinHelpOpen] = useState(false);
+  const [launching, setLaunching] = useState(false);
+  const rocketRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
+
+  const startParty = (event: MouseEvent<HTMLAnchorElement>) => {
+    if (
+      event.button !== 0 ||
+      event.altKey ||
+      event.ctrlKey ||
+      event.metaKey ||
+      event.shiftKey ||
+      !rocketRef.current?.getAnimations ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
+      return;
+    }
+    event.preventDefault();
+    setLaunching(true);
+  };
+
+  useEffect(() => {
+    if (!launching) return;
+    let active = true;
+    const enterParty = () => {
+      if (active) void navigate(START_PARTY);
+    };
+    // Let the flight finish, and proceed if the browser cancels the animation.
+    const flight = rocketRef.current?.getAnimations()[0];
+    if (flight) {
+      void flight.finished.then(enterParty, enterParty);
+    } else {
+      enterParty();
+    }
+    return () => {
+      active = false;
+    };
+  }, [launching, navigate]);
 
   // Visiting home must leave any active party, including via the browser Back button.
   const { state, engine } = usePartyEngine();
@@ -40,7 +79,9 @@ function HomeComponent() {
   return (
     <div className="flex min-h-[calc(100dvh-16rem)] flex-col items-center justify-center gap-10">
       <section className="flex flex-col items-center gap-3 text-center">
-        <BrandLogo />
+        <div ref={rocketRef} className={launching ? "rc-logo-launch" : undefined}>
+          <BrandLogo />
+        </div>
         <h1 className="font-title text-[2.5rem] font-black leading-none text-foreground sm:text-5xl">
           rocketcrab<span className="text-primary">.com</span>
         </h1>
@@ -64,8 +105,9 @@ function HomeComponent() {
           Join party
         </Button>
         <Link
-          to="/party"
-          search={{ gameId: undefined, mode: undefined, title: undefined }}
+          {...START_PARTY}
+          onClick={startParty}
+          aria-busy={launching || undefined}
           className={buttonStyles("primary", "lg")}
         >
           Start party

@@ -68,6 +68,8 @@ beta and physical-device checks are still pending.
 - [x] Use a consistent, static Rocketcrab mark across pages and switch to
       the blue shell on the Build and editor routes. In-game controls have
       their own buttons and invite copying lives in the game menu.
+- [x] Launch the Rocketcrab when starting a party from home. The browser smoke
+      test covers takeoff and the reduced-motion path.
 - [x] Combine prompt and HTML import in the empty editor, keep the full prompt
       expandable, and use history for editor Back. Build and editor tests cover
       the copy, import, tutorial, and unsaved Back flows.
