@@ -28,8 +28,7 @@ export function WelcomeWaves() {
             lineWidth={1}
             warpIntensity={0.7}
             rotation={-24}
-            // Fade the lines into the card surface before its border.
-            edgeFade={0.6}
+            edgeFade={0}
             intro={false}
             maxDevicePixelRatio={2}
           />

@@ -60,8 +60,9 @@ beta and physical-device checks are still pending.
       Verified navigation in both directions and with reduced motion.
 - [x] Restore red Molten Metal in the lobby and keep the background
       unmounted while playing. Party route and background tests cover both.
-- [x] Darken shared gray surfaces, define the Welcome card around its
-      faded waves, and keep the party header consistent during setup and browsing.
+- [x] Darken shared gray surfaces, match the Welcome card to the other lobby
+      cards, and keep the party header consistent during setup and browsing.
+      The waves fill the card to its rounded edges with shader edge fade set to zero.
 - [x] Combine prompt and HTML import in the empty editor, keep the full prompt
       expandable, and use history for editor Back. Build and editor tests cover
       the copy, import, tutorial, and unsaved Back flows.
