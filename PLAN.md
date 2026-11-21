@@ -56,6 +56,8 @@ beta and physical-device checks are still pending.
       first game import. `npm run check` passed on Node 24.
 - [x] Update the Drift browser test to open Advanced before suspending the
       authority. Chromium, Firefox, and WebKit passed the focused rerun.
+- [x] Fade between the red and blue Molten Metal palettes on one canvas.
+      Verified navigation in both directions and with reduced motion.
 - [ ] Investigate the extra Firefox fallback socket in the three-player tunnel
       test. The quiz completed, then the socket-count assertion failed on both
       the polished version and the baseline `bb6521a`.

@@ -1,7 +1,6 @@
-import { lazy, Suspense, useState } from "react";
+import { lazy, Suspense, useEffect, useRef, useState } from "react";
 import type { PartyEngine } from "../../lib/party/engine";
 import { usePartyEngine } from "../../lib/party/use-party";
-import { cn } from "../../lib/cn";
 import { canUseWebGL2, viewportPixelRatio } from "./webgl";
 
 // Lazy so the shader code never delays the first paint of the page itself.
@@ -21,17 +20,53 @@ const PIXEL_BUDGET = 300_000;
  */
 export type SiteBackgroundVariant = "molten" | "nova" | "party";
 
+const PALETTE_FADE_MS = 650;
+type Rgb = readonly [number, number, number];
+
+function blendColor(from: Rgb, to: Rgb, blend: number): string {
+  const mix = (start: number, end: number) => Math.round(start + (end - start) * blend);
+  return `rgb(${mix(from[0], to[0])}, ${mix(from[1], to[1])}, ${mix(from[2], to[2])})`;
+}
+
 function MoltenBackground({ blue }: { blue: boolean }) {
   const [pixelRatio] = useState(() => viewportPixelRatio(PIXEL_BUDGET));
   const [webgl] = useState(canUseWebGL2);
+  const [blend, setBlend] = useState(blue ? 1 : 0);
+  const currentBlend = useRef(blend);
+
+  useEffect(() => {
+    const from = currentBlend.current;
+    const to = blue ? 1 : 0;
+    if (from === to) return;
+
+    const reducedMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)");
+    const start = performance.now();
+    let frame = requestAnimationFrame(function fade(now) {
+      const progress = reducedMotion?.matches
+        ? 1
+        : Math.min(1, Math.max(0, (now - start) / PALETTE_FADE_MS));
+      const eased = progress * progress * (3 - 2 * progress);
+      const next = from + (to - from) * eased;
+      currentBlend.current = next;
+      setBlend(next);
+      if (progress < 1) frame = requestAnimationFrame(fade);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [blue]);
+
   return (
     <>
-      <div className={cn("absolute inset-0", blue ? "rc-molten-blue" : "rc-molten-red")} />
+      <div className="rc-molten-red absolute inset-0" style={{ opacity: 1 - blend }} />
+      <div className="rc-molten-blue absolute inset-0" style={{ opacity: blend }} />
       {webgl ? (
         <Suspense fallback={null}>
           <MoltenMetal
-            colors={blue ? ["#081954", "#2d59dc"] : ["#5c0410", "#e3142c"]}
-            coreColor={blue ? "#669bff" : "#ff7a4d"}
+            // Update the palette without restarting the shader's animation.
+            colors={[
+              blendColor([92, 4, 16], [8, 25, 84], blend),
+              blendColor([227, 20, 44], [45, 89, 220], blend),
+            ]}
+            coreColor={blendColor([255, 122, 77], [102, 155, 255], blend)}
             colorMode="molten"
             // Fine, slow-moving filaments with a soft glow that fills the
             // page: texture, not motion that competes with the UI.
