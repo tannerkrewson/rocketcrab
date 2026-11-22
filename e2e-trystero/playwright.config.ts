@@ -8,7 +8,7 @@ import { defineConfig, devices } from "@playwright/test";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const hasCerts =
   existsSync(path.join(here, "certs/key.pem")) && existsSync(path.join(here, "certs/cert.pem"));
-const baseURL = hasCerts ? "https://localhost:5200" : "http://localhost:5200";
+const baseURL = hasCerts ? "https://localhost:2725" : "http://localhost:2725";
 const viteBin = path.join(here, "..", "node_modules", "vite", "bin", "vite.js");
 
 export default defineConfig({
@@ -29,14 +29,14 @@ export default defineConfig({
   webServer: [
     {
       command:
-        "npm run edge:dev -- --port 18787 --var ORIGIN_ALLOWLIST:http://localhost:5200,https://localhost:5200",
+        "npm run edge:dev -- --port 2726 --inspector-port 2728 --var ORIGIN_ALLOWLIST:http://localhost:2725,https://localhost:2725",
       cwd: path.join(here, ".."),
-      port: 18787,
+      port: 2726,
       reuseExistingServer: !process.env.CI,
       timeout: 120_000,
     },
     {
-      command: `node ${viteBin} --port 5200 --strictPort`,
+      command: `node ${viteBin} --port 2725 --strictPort`,
       cwd: here,
       url: baseURL,
       reuseExistingServer: !process.env.CI,

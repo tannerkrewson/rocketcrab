@@ -24,7 +24,7 @@ const { toastMock } = vi.hoisted(() => ({
 
 vi.mock("../../lib/toast", () => ({ toast: toastMock }));
 
-const INVITE_URL = "http://localhost:5173/join#code=abcd&secret=invite-secret";
+const INVITE_URL = "http://localhost:2722/join#code=abcd&secret=invite-secret";
 
 function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState {
   return {
@@ -651,7 +651,7 @@ describe("PartyLobby", () => {
     expect(screen.queryByRole("button", { name: /copy short link/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/easy to type or read aloud/i)).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy url/i })).toBeInTheDocument();
-    expect(screen.queryByText("http://localhost:5173/abcd")).not.toBeInTheDocument();
+    expect(screen.queryByText("http://localhost:2722/abcd")).not.toBeInTheDocument();
     expect(screen.queryByText(/invite-secret/)).not.toBeInTheDocument();
   });
 

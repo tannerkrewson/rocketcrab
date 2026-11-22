@@ -67,7 +67,7 @@ const ACTIVE_STATE: PartyEngineState = {
   hostMemberId: "member-a",
   amHost: true,
   authorityMemberId: "member-a",
-  inviteUrl: "http://localhost:5173/join#code=rcrb&secret=invite-secret",
+  inviteUrl: "http://localhost:2722/join#code=rcrb&secret=invite-secret",
   connectionState: "connected",
   canStart: false,
   canForceStart: false,

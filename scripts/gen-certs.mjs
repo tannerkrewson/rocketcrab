@@ -9,8 +9,8 @@
 //   node scripts/gen-certs.mjs 192.168.1.10   # also trust a LAN IP for physical devices
 //
 // After generation, `npm run dev:https` serves both origins over HTTPS:
-// the nova app on https://localhost:5173 and the runtime origin on
-// https://localhost:5174 (the two-origin derivation swaps ports in dev).
+// the nova app on https://localhost:2722 and the runtime origin on
+// https://localhost:2723 (the two-origin derivation swaps ports in dev).
 import { execSync } from "node:child_process";
 import { existsSync, mkdirSync } from "node:fs";
 import path from "node:path";

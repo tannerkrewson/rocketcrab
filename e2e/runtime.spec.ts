@@ -265,7 +265,7 @@ test.describe("cross-origin isolation", () => {
 
   test("a bootstrap from a non-main origin is rejected", async ({ page }) => {
     await page.goto(RUNTIME_ORIGIN + "/");
-    // Try the bootstrap from the runtime page itself (origin 5174, not 5173).
+    // Try the bootstrap from the runtime page itself (origin 2723, not 2722).
     await page.evaluate(() => {
       const channel = new MessageChannel();
       (

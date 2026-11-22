@@ -58,7 +58,7 @@ least 256 bytes of its sender's budget so tiny messages still have a cost.
    Check headers on both origins. Create a game in the editor, join it on a
    second device, and exercise signaling and actual tunnel traffic.
 
-For local protocol checks, start `npm run edge:dev -- --local --port 18987`
+For local protocol checks, start `npm run edge:dev -- --local --port 2729 --inspector-port 2730`
 and run `npm run test:edge:integration`. Use `npm run edge:check` for a deploy
 dry run.
 

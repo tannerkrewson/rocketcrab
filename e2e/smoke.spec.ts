@@ -33,7 +33,7 @@ test("starting a party launches the crab and respects reduced motion", async ({ 
 });
 
 test("runtime origin serves its isolated page", async ({ request }) => {
-  const response = await request.get("http://localhost:5174/");
+  const response = await request.get("http://localhost:2723/");
   expect(response.ok()).toBeTruthy();
   const html = await response.text();
   expect(html).toContain("Rocketcrab Nova Runtime");

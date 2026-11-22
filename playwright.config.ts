@@ -1,7 +1,7 @@
 import { defineConfig, devices } from "@playwright/test";
 
 // E2E smoke tests: the Nova home page renders, and the separate runtime
-// origin (apps/runtime, dev port 5174) serves its page. The root `dev`
+// origin (apps/runtime, dev port 2723) serves its page. The root `dev`
 // script starts both apps via concurrently, matching local development.
 export default defineConfig({
   testDir: "./e2e",
@@ -15,7 +15,7 @@ export default defineConfig({
   // failure without masking product timeouts (tests are still capped at 30 s).
   expect: { timeout: 15_000 },
   use: {
-    baseURL: "http://localhost:5173",
+    baseURL: "http://localhost:2722",
     trace: "on-first-retry",
     navigationTimeout: 30_000,
   },
@@ -28,7 +28,7 @@ export default defineConfig({
   workers: 3,
   webServer: {
     command: "npm run dev",
-    url: "http://localhost:5173",
+    url: "http://localhost:2722",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,
   },

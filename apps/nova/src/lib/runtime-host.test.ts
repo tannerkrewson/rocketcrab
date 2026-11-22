@@ -40,7 +40,7 @@ function createHarness(
   const frames: HTMLIFrameElement[] = [];
   const windowMessages: HostHarness["windowMessages"] = [];
   const bridge = new RuntimeHostClient({
-    runtimeOrigin: "http://localhost:5174",
+    runtimeOrigin: "http://localhost:2723",
     container: document.body,
     onEvent: (event) => events.push(event),
     waitForFrameLoad: async (iframe) => {

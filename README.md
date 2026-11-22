@@ -128,7 +128,7 @@ static deployment; nothing is published yet).
 
 | Script                                    | Purpose                                                                                  |
 | ----------------------------------------- | ---------------------------------------------------------------------------------------- |
-| `npm run dev`                             | Run Nova, the runtime and the edge Worker (port 8787) in watch mode                      |
+| `npm run dev`                             | Run Nova, the runtime and the edge Worker (port 2724) in watch mode                      |
 | `npm run dev:https`                       | Run all apps over local HTTPS (run `npm run gen-certs` first)                            |
 | `npm run gen-certs`                       | Generate gitignored self-signed certs for local HTTPS (optional LAN IP arg)              |
 | `npm run build`                           | Build all apps and packages                                                              |
@@ -140,7 +140,7 @@ static deployment; nothing is published yet).
 | `npm run bundle:size`                     | Print built bundle sizes; warn when the Nova main bundle exceeds the limit               |
 | `npm run verify:deploy`                   | Verify a built origin's dist against the deployment requirements                         |
 | `npm run deploy:nova` / `deploy:runtime`  | Build with the pinned origins, verify, and deploy a static Worker (owner approval first) |
-| `npm run edge:dev`                        | Run the edge Worker locally (`wrangler dev`, port 8787)                                  |
+| `npm run edge:dev`                        | Run the edge Worker locally (`wrangler dev`, port 2724)                                  |
 | `npm run edge:check` / `edge:deploy`      | Bundle the edge Worker without uploading / deploy it (owner approval first)              |
 | `npm run test:edge`                       | Edge Worker unit tests                                                                   |
 | `npm run test:e2e:trystero`               | Playwright suite for the Trystero transport (needs the local edge and fixture servers)   |

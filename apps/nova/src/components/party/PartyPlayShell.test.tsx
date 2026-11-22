@@ -55,7 +55,7 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     hostMemberId: "member-a",
     amHost: overrides.amHost ?? overrides.role !== "joiner",
     authorityMemberId: "member-a",
-    inviteUrl: "http://localhost:5173/join#code=abcd&secret=invite-secret",
+    inviteUrl: "http://localhost:2722/join#code=abcd&secret=invite-secret",
     connectionState: "connected",
     canStart: false,
     canForceStart: false,
@@ -337,7 +337,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     await userEvent.click(screen.getByRole("button", { name: "Menu" }));
     await userEvent.click(screen.getByRole("menuitem", { name: "Copy invite link" }));
     expect(writeText).toHaveBeenCalledWith(
-      "http://localhost:5173/join#code=abcd&secret=invite-secret",
+      "http://localhost:2722/join#code=abcd&secret=invite-secret",
     );
     Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
   });

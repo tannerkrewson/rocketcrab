@@ -12,7 +12,7 @@ const hasCerts = existsSync(keyPath) && existsSync(certPath);
 
 export default defineConfig({
   server: {
-    port: 5200,
+    port: 2725,
     strictPort: true,
     host: true, // bind 0.0.0.0 so a physical phone on the LAN can reach it
     ...(hasCerts

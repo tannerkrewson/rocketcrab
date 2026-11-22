@@ -1,7 +1,7 @@
 /**
  * Three isolated browser contexts play nova-quiz with one player's WebRTC
- * forced onto edge tunnels. Requires the root dev stack: Nova on 5173,
- * runtime on 5174, and edge on 8787.
+ * forced onto edge tunnels. Requires the root dev stack: Nova on 2722,
+ * runtime on 2723, and edge on 2724.
  */
 import {
   expect,
@@ -22,7 +22,7 @@ import {
 import { clickInGame, gameState, NOVA_QUIZ_HTML, waitForGameState } from "./quiz-frame-helpers";
 
 const GAME_ID = "game_tunnel_quiz";
-const PARTY_ORIGIN = "http://localhost:5173";
+const PARTY_ORIGIN = "http://localhost:2722";
 
 interface Player {
   context: BrowserContext;

@@ -14,7 +14,7 @@ import { NOVA_QUIZ_HTML } from "./quiz-frame-helpers";
 test.describe.configure({ retries: 0 });
 
 const GAME_ID = "game_lobby_quiz";
-const PARTY_ORIGIN = "http://localhost:5173";
+const PARTY_ORIGIN = "http://localhost:2722";
 
 async function newPlayer(browser: Browser): Promise<{ context: BrowserContext; page: Page }> {
   const context = await browser.newContext({ baseURL: PARTY_ORIGIN });

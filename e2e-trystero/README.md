@@ -24,7 +24,7 @@ behind `window.__harness`. Three specs:
 
 ## Local relay
 
-Playwright starts the local edge Worker on port 18787. Signaling failures fail
+Playwright starts the local edge Worker on port 2726. Signaling failures fail
 the tests; they are never skipped when the relay is unreachable.
 
 ## HTTPS

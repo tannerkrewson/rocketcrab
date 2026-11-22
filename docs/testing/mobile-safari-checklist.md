@@ -14,13 +14,13 @@ Owner: M1 (rocketcrab-9fv.6.1) → handed to M4 (rocketcrab-9fv.6.4).
   party/authority scenarios need two) and a laptop on the **same Wi-Fi** as
   the Nova host. Mobile Safari is the target browser.
 - Local HTTPS with the LAN IP trusted: `npm run gen-certs -- <LAN IP>`. For
-  Nova set `VITE_RUNTIME_ORIGIN=https://<LAN IP>:5174` and
-  `VITE_EDGE_ORIGIN=https://<LAN IP>:8787`; for the runtime set
-  `VITE_MAIN_ORIGIN=https://<LAN IP>:5173`; add `https://<LAN IP>:5173` to the
+  Nova set `VITE_RUNTIME_ORIGIN=https://<LAN IP>:2723` and
+  `VITE_EDGE_ORIGIN=https://<LAN IP>:2724`; for the runtime set
+  `VITE_MAIN_ORIGIN=https://<LAN IP>:2722`; add `https://<LAN IP>:2722` to the
   edge Worker's `ORIGIN_ALLOWLIST`. The root `dev:https` script pins the edge to
   localhost, so start each workspace by hand (see
   `docs/architecture/deployment.md`). Install the throwaway cert on each phone
-  (`https://<LAN IP>:5174` first, then the app origin).
+  (`https://<LAN IP>:2723` first, then the app origin).
 - A game to play: `packages/testing/fixtures/games/nova-quiz.html` (Nova Quiz, state mode) is
   the reference game — paste it into Create, save it, and use it for every
   scenario.

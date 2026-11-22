@@ -60,7 +60,7 @@ export interface LoadGameInput {
 }
 
 export interface RuntimeHostOptions {
-  /** Full origin of the runtime app (dev: http://localhost:5174). */
+  /** Full origin of the runtime app (dev: http://localhost:2723). */
   runtimeOrigin: string;
   container: HTMLElement;
   /** Event sink for validated runtime-plane events. */

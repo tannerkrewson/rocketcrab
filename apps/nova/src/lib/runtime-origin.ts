@@ -1,5 +1,5 @@
 /** Runtime origin is pinned in production; localhost development swaps ports. */
-export const RUNTIME_ORIGIN_PORT = 5174;
+export const RUNTIME_ORIGIN_PORT = 2723;
 
 export function runtimeOriginForMainOrigin(mainOrigin: string): string {
   const raw = import.meta.env.VITE_RUNTIME_ORIGIN;

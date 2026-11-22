@@ -50,13 +50,13 @@ export function isConnectedState(state: TransportConnectionState): boolean {
 
 export function defaultRuntimeOrigin(): string {
   if (typeof window === "undefined") {
-    return "http://localhost:5174";
+    return "http://localhost:2723";
   }
   return runtimeOriginForMainOrigin(window.location.origin);
 }
 
 export function defaultBaseUrl(): string {
-  return typeof window === "undefined" ? "http://localhost:5173" : window.location.origin;
+  return typeof window === "undefined" ? "http://localhost:2722" : window.location.origin;
 }
 
 export function isInPartyPhase(phase: PartyPhase): boolean {

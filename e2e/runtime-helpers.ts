@@ -9,8 +9,8 @@ import { fileURLToPath } from "node:url";
 
 const dirname = path.dirname(fileURLToPath(import.meta.url));
 
-export const NOVA_ORIGIN = "http://localhost:5173";
-export const RUNTIME_ORIGIN = "http://localhost:5174";
+export const NOVA_ORIGIN = "http://localhost:2722";
+export const RUNTIME_ORIGIN = "http://localhost:2723";
 
 export function fixture(name: string): string {
   return readFileSync(path.join(dirname, "..", "apps", "runtime", "fixtures", name), "utf8");
@@ -28,7 +28,7 @@ export interface GameInput {
 export async function installHarness(page: Page): Promise<void> {
   await page.goto(NOVA_ORIGIN + "/");
   await page.evaluate(() => {
-    const RUNTIME_ORIGIN = "http://localhost:5174";
+    const RUNTIME_ORIGIN = "http://localhost:2723";
     const container = document.createElement("div");
     container.id = "runtime-host";
     document.body.appendChild(container);

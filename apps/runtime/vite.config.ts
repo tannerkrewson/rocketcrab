@@ -75,7 +75,8 @@ export function novaFrameScript(): Plugin {
 export default defineConfig(({ mode }) => ({
   plugins: [novaFrameScript(), runtimeHeaders()],
   server: {
-    port: 5174,
+    port: 2723,
+    strictPort: true,
     https: httpsServerConfig(mode),
   },
 }));

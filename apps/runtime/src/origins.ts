@@ -1,6 +1,6 @@
 /** Runtime bootstrap accepts the pinned main origin, or localhost in development. */
-export const MAIN_ORIGIN_PORT = 5173;
-export const RUNTIME_ORIGIN_PORT = 5174;
+export const MAIN_ORIGIN_PORT = 2722;
+export const RUNTIME_ORIGIN_PORT = 2723;
 
 export function mainOriginForRuntimeOrigin(runtimeOrigin: string): string {
   const raw = import.meta.env.VITE_MAIN_ORIGIN;

@@ -5,7 +5,7 @@ const PAIR = "a".repeat(64);
 
 describe("tunnelUrl", () => {
   it("maps an http edge origin to ws://.../tunnel/:pairId", () => {
-    expect(tunnelUrl("http://localhost:8787", PAIR)).toBe(`ws://localhost:8787/tunnel/${PAIR}`);
+    expect(tunnelUrl("http://localhost:2724", PAIR)).toBe(`ws://localhost:2724/tunnel/${PAIR}`);
   });
 
   it("maps an https edge origin to wss://.../tunnel/:pairId", () => {

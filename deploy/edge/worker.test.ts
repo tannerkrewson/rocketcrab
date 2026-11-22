@@ -5,7 +5,7 @@ import { MINT_TTL_SECONDS, dropPort53, isPort53IceUrl } from "./turn";
 import edge, { type EdgeEnv, parseAllowlist } from "./worker";
 
 const ORIGIN = "https://rocketcrab.com";
-const BASE_ENV: EdgeEnv = { ORIGIN_ALLOWLIST: `${ORIGIN},http://localhost:5173` };
+const BASE_ENV: EdgeEnv = { ORIGIN_ALLOWLIST: `${ORIGIN},http://localhost:2722` };
 const TURN_ENV: EdgeEnv = { ...BASE_ENV, TURN_KEY_ID: "key-id", TURN_KEY_API_TOKEN: "secret" };
 
 function call(path: string, init: RequestInit & { origin?: string | null } = {}, env = BASE_ENV) {

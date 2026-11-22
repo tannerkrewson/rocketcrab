@@ -32,8 +32,8 @@ it necessary.
 
 The repository currently implements two Vite applications in an npm workspace:
 
-- `apps/nova` — the main React SPA (dev server port 5173).
-- `apps/runtime` — the isolated iframe runner (dev server port 5174).
+- `apps/nova` — the main React SPA (dev server port 2722).
+- `apps/runtime` — the isolated iframe runner (dev server port 2723).
 
 ## Decision
 

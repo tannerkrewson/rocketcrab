@@ -12,7 +12,7 @@ import {
 export type RuntimeStatus = "idle" | "starting" | "running" | "stopped" | "failed";
 
 export interface RuntimeSessionOptions {
-  /** Full origin of the runtime app (dev: http://localhost:5174). */
+  /** Full origin of the runtime app (dev: http://localhost:2723). */
   runtimeOrigin: string;
   /** Container for the hidden diagnostics runtime. */
   containerRef: React.RefObject<HTMLDivElement | null>;

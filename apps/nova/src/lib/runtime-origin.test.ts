@@ -3,8 +3,8 @@ import { runtimeOriginForMainOrigin } from "./runtime-origin";
 
 describe("runtimeOriginForMainOrigin", () => {
   it("swaps the dev port to the runtime origin", () => {
-    expect(runtimeOriginForMainOrigin("http://localhost:5173")).toBe("http://localhost:5174");
-    expect(runtimeOriginForMainOrigin("http://127.0.0.1:5173")).toBe("http://127.0.0.1:5174");
+    expect(runtimeOriginForMainOrigin("http://localhost:2722")).toBe("http://localhost:2723");
+    expect(runtimeOriginForMainOrigin("http://127.0.0.1:2722")).toBe("http://127.0.0.1:2723");
   });
 
   it("requires a pin outside localhost", () => {

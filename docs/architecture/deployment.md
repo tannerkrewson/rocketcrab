@@ -79,17 +79,17 @@ usual deployment approval rules.
 
 ## Local development
 
-`npm run dev` serves Nova at `http://localhost:5173`, runtime at
-`http://localhost:5174`, and the edge Worker at `http://localhost:8787`. Origin
+`npm run dev` serves Nova at `http://localhost:2722`, runtime at
+`http://localhost:2723`, and the edge Worker at `http://localhost:2724`. Origin
 derivation is limited to localhost. For
 HTTPS, `npm run gen-certs` followed by `npm run dev:https` uses local
 self-signed certificates for both apps and the signaling Worker at
-`https://localhost:8787`. Trust the development certificate in the browser
+`https://localhost:2724`. Trust the development certificate in the browser
 or operating system before using party signaling. On a LAN hostname or IP, set
 `VITE_RUNTIME_ORIGIN` and `VITE_EDGE_ORIGIN` for Nova and `VITE_MAIN_ORIGIN` for
 the runtime to the matching HTTPS origins, and add the LAN origin to the edge
 Worker's `ORIGIN_ALLOWLIST` (the Worker rejects any Origin not on it). The root
-`dev:https` script pins `VITE_EDGE_ORIGIN` to `https://localhost:8787`, so a LAN
+`dev:https` script pins `VITE_EDGE_ORIGIN` to `https://localhost:2724`, so a LAN
 run starts each workspace by hand. Trust the development certificate on the
 device.
 Local ports alone are not separate sites, so CPU isolation cannot be assumed.

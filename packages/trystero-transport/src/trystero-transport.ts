@@ -1462,7 +1462,7 @@ function parseAckPayload(data: unknown): { connectionId: string; reply: boolean 
 const IDENTITY_ACK_RETRANSMIT_MS = 2_000;
 
 /** Edge origin when the caller does not configure one (local `npm run dev`). */
-const DEFAULT_EDGE_ORIGIN = "http://localhost:8787";
+const DEFAULT_EDGE_ORIGIN = "http://localhost:2724";
 
 /** Trystero action namespace (well under Trystero's 32-byte type limit). */
 const ACTION_NAMESPACE = "nova";

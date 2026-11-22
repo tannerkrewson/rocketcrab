@@ -112,7 +112,8 @@ export default defineConfig(({ mode }) => ({
     cspMetaPlugin(),
   ],
   server: {
-    port: 5173,
+    port: 2722,
+    strictPort: true,
     https: httpsServerConfig(mode),
   },
 }));

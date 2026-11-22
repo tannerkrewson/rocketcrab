@@ -5,7 +5,7 @@ import { once } from "node:events";
 import { test } from "node:test";
 import WebSocket from "ws";
 
-const base = process.env.SIGNAL_TEST_ORIGIN ?? "http://127.0.0.1:18987";
+const base = process.env.SIGNAL_TEST_ORIGIN ?? "http://127.0.0.1:2729";
 const parsedBase = new URL(base);
 if (
   parsedBase.protocol !== "http:" ||
@@ -16,7 +16,7 @@ if (
 ) {
   throw new Error("SIGNAL_TEST_ORIGIN must be a local HTTP origin");
 }
-const origin = "http://localhost:5173";
+const origin = "http://localhost:2722";
 const wsBase = base.replace(/^http/, "ws");
 const url = `${wsBase}/signal/${randomBytes(16).toString("hex")}`;
 const connect = (target = url, requestOrigin = origin) =>

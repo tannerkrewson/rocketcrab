@@ -55,7 +55,7 @@ re-litigates the workspace shape.
     `@testing-library/jest-dom` `7.0.0` + `@testing-library/user-event`
     `14.6.1`, Playwright `1.62.1`, `fake-indexeddb` `6.2.5`, `fast-check`
     `4.9.0`.
-  - Dev ports: `apps/nova` on 5173, `apps/runtime` on 5174.
+  - Dev ports: `apps/nova` on 2722, `apps/runtime` on 2723.
 
 - **Generated files.** TanStack Router's generated `routeTree.gen.ts` is
   excluded from formatting and linting (`.oxfmtrc.json`, `.oxlintrc.json`).
