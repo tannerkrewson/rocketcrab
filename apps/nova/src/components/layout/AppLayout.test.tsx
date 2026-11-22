@@ -120,8 +120,9 @@ describe("AppLayout", () => {
       await screen.findByRole("heading", { name: heading });
       const brand = screen.getByTestId("browser-brand-row");
       expect(brand).toHaveTextContent("rocketcrab.com");
-      expect(brand.querySelector("a, button")).toBeNull();
-      expect(screen.getByTestId("brand-logo")).toHaveAttribute("height", "56");
+      expect(within(brand).queryByRole("link")).not.toBeInTheDocument();
+      const launch = within(brand).getByRole("button", { name: "Launch Rocketcrab" });
+      expect(within(launch).getByTestId("brand-logo")).toHaveAttribute("height", "56");
       if (path === "/browse") {
         await userEvent.click(screen.getByRole("button", { name: "Back" }));
         expect(await screen.findByRole("heading", { name: "rocketcrab.com" })).toBeVisible();

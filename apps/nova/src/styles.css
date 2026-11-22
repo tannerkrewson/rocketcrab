@@ -110,45 +110,45 @@
     position: relative;
     z-index: 1;
     pointer-events: none;
-    transform-origin: 50% 75%;
-    animation: rc-logo-launch 620ms both;
+    animation: rc-logo-launch 3s both;
   }
 
   .rc-logo-launch::before {
     content: "";
     position: absolute;
     z-index: -1;
-    top: 62%;
-    left: 33%;
-    width: 34%;
-    height: 4.5rem;
+    top: 76%;
+    left: 32%;
+    width: 36%;
+    height: 5rem;
     border-radius: 35% 35% 100% 100%;
     background: linear-gradient(#fff5c2, #ffc04b 24%, #ff5529 60%, transparent);
     filter: drop-shadow(0 0 0.4rem #ff7437);
     transform-origin: top;
-    animation: rc-logo-exhaust 620ms ease-out both;
+    animation: rc-logo-exhaust 3s both;
   }
 
   @keyframes rc-logo-launch {
-    0% {
+    0%,
+    20% {
       transform: translate3d(0, 0, 0);
       opacity: 1;
-      animation-timing-function: ease-out;
-    }
-    22% {
-      transform: translate3d(-0.12rem, 0.24rem, 0) rotate(-6deg) scale(1.08, 0.91);
-      animation-timing-function: ease-in;
-    }
-    42% {
-      transform: translate3d(0.12rem, -0.4rem, 0) rotate(6deg);
-      animation-timing-function: cubic-bezier(0.45, 0, 0.86, 0.44);
+      animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.42);
     }
     80% {
+      transform: translate3d(0, calc(-100dvh - 3rem), 0) scale(0.8);
       opacity: 1;
+      animation-timing-function: steps(1, jump-start);
+    }
+    81%,
+    88% {
+      transform: translate3d(0, 0, 0);
+      opacity: 0;
+      animation-timing-function: ease-out;
     }
     100% {
-      transform: translate3d(18vw, calc(-100dvh - 3rem), 0) rotate(14deg) scale(0.7);
-      opacity: 0;
+      transform: translate3d(0, 0, 0);
+      opacity: 1;
     }
   }
 
@@ -157,16 +157,17 @@
       transform: scaleY(0.12);
       opacity: 0;
     }
-    28% {
-      transform: scale(0.75, 0.48);
+    20% {
+      transform: scale(0.72, 0.36);
       opacity: 1;
     }
-    63% {
-      transform: scale(1, 1.22);
-      opacity: 0.85;
+    58% {
+      transform: scale(1, 1.15);
+      opacity: 1;
     }
+    80%,
     100% {
-      transform: scale(0.45, 0.95);
+      transform: scale(0.55, 0.9);
       opacity: 0;
     }
   }

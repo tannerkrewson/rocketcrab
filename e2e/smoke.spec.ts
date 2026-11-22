@@ -10,7 +10,7 @@ test("Nova home page renders with the primary actions", async ({ page }) => {
   await expect(page.getByRole("link", { name: "My games" })).toBeVisible();
 });
 
-test("starting a party launches the crab and respects reduced motion", async ({ page }) => {
+test("starting a party leaves the crab on the launch pad", async ({ page }) => {
   await page.addInitScript(() => {
     document.addEventListener("animationstart", (event) => {
       if (event.animationName === "rc-logo-launch") {
@@ -22,14 +22,33 @@ test("starting a party launches the crab and respects reduced motion", async ({ 
   await page.goto("/");
   await page.getByRole("link", { name: "Start party" }).click();
   await expect(page).toHaveURL(/\/party$/);
-  expect(await page.evaluate(() => sessionStorage.getItem("test:launch-path"))).toBe("/");
-
-  await page.evaluate(() => sessionStorage.removeItem("test:launch-path"));
-  await page.emulateMedia({ reducedMotion: "reduce" });
-  await page.goto("/");
-  await page.getByRole("link", { name: "Start party" }).press("Enter");
-  await expect(page).toHaveURL(/\/party$/);
   expect(await page.evaluate(() => sessionStorage.getItem("test:launch-path"))).toBeNull();
+});
+
+test("launches on the home and Nova pages, then returns for another launch", async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: "no-preference" });
+  await page.goto("/");
+  const launch = page.getByRole("button", { name: "Launch Rocketcrab" });
+  const crab = page.getByTestId("brand-logo").locator("..");
+  await launch.click();
+  await expect(crab).toHaveClass(/rc-logo-launch/);
+  await expect(page).toHaveURL(/\/$/);
+  await expect(crab).not.toHaveClass(/rc-logo-launch/);
+
+  await launch.press("Enter");
+  await expect(crab).toHaveClass(/rc-logo-launch/);
+  await page.getByRole("link", { name: "Build a game" }).click();
+  await expect(page).toHaveURL(/\/build$/);
+  await expect(crab).not.toHaveClass(/rc-logo-launch/);
+  await launch.click();
+  await expect(crab).toHaveClass(/rc-logo-launch/);
+
+  // Changing the preference during takeoff cancels the motion and resets the button.
+  await page.emulateMedia({ reducedMotion: "reduce" });
+  await expect(crab).not.toHaveClass(/rc-logo-launch/);
+  await launch.click();
+  await expect(crab).toHaveCSS("animation-name", "none");
+  await expect(page).toHaveURL(/\/build$/);
 });
 
 test("runtime origin serves its isolated page", async ({ request }) => {

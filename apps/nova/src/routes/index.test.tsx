@@ -133,11 +133,13 @@ describe("/", () => {
     }
   });
 
-  it("keeps the logo and wordmark out of the tab order", async () => {
+  it("makes the crab a launch button and leaves the wordmark as plain text", async () => {
     renderHome();
     const title = await screen.findByRole("heading", { name: "rocketcrab.com" });
     expect(title).not.toHaveAttribute("tabindex");
-    expect(screen.getByTestId("brand-logo").closest("button, a, [tabindex]")).toBeNull();
+    expect(screen.getByRole("button", { name: "Launch Rocketcrab" })).toContainElement(
+      screen.getByTestId("brand-logo"),
+    );
   });
 
   it("no longer shows the Recent games section (7.35)", async () => {

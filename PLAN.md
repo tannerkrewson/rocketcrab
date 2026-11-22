@@ -65,11 +65,11 @@ beta and physical-device checks are still pending.
       The waves fill the card to its rounded edges with shader edge fade set to zero.
 - [x] Space out the Welcome waves and remove tap ripples. A finger drag can
       move the same wave distortion as the mouse without selecting the text.
-- [x] Use a consistent, static 56 px Rocketcrab mark across pages and switch to
+- [x] Use a consistent 56 px Rocketcrab mark across pages and switch to
       the blue shell on the Build and editor routes. In-game controls have
       their own buttons and invite copying lives in the game menu.
-- [x] Launch the Rocketcrab when starting a party from home. The browser smoke
-      test covers takeoff and the reduced-motion path.
+- [x] Give the shared Rocketcrab logo a slow, accelerating takeoff when pressed.
+      Browser smoke tests cover replay, reduced motion, and normal Start party navigation.
 - [x] Move local Nova, runtime, and edge ports to 2722–2724. Keep the transport
       test harness and Worker inspectors on separate ports above the app stack.
 - [x] Combine prompt and HTML import in the empty editor, keep the full prompt
