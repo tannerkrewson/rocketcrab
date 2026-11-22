@@ -121,7 +121,7 @@ describe("AppLayout", () => {
       const brand = screen.getByTestId("browser-brand-row");
       expect(brand).toHaveTextContent("rocketcrab.com");
       expect(brand.querySelector("a, button")).toBeNull();
-      expect(screen.getByTestId("brand-logo")).toHaveAttribute("height", "40");
+      expect(screen.getByTestId("brand-logo")).toHaveAttribute("height", "56");
       if (path === "/browse") {
         await userEvent.click(screen.getByRole("button", { name: "Back" }));
         expect(await screen.findByRole("heading", { name: "rocketcrab.com" })).toBeVisible();

@@ -38,8 +38,8 @@ describe("BrandLogo", () => {
     expect(red).toHaveAttribute("src", "/rocketcrab-logo-no-glow.svg");
     expect(blue).toHaveAttribute("src", "/rocketcrab-logo-nova.svg");
     for (const logo of [red, blue]) {
-      expect(logo).toHaveAttribute("height", "40");
-      expect(logo).toHaveAttribute("width", "40");
+      expect(logo).toHaveAttribute("height", "56");
+      expect(logo).toHaveAttribute("width", "56");
     }
   });
 });

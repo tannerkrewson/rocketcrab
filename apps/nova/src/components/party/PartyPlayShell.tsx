@@ -121,7 +121,7 @@ export function PartyPlayShell({
             onClick={() => setPanel(menuOpen ? null : "menu")}
           >
             <Menu className="h-4 w-4" aria-hidden="true" />
-            <span className="hidden min-[360px]:inline">Menu</span>
+            <span className="hidden min-[384px]:inline">Menu</span>
           </Button>
 
           {menuOpen ? (

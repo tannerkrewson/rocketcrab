@@ -292,7 +292,7 @@ describe("/party", () => {
       const router = renderParty("/party?browse=true");
       // The router serializes the boolean as ?browse=true; ?browse=1 does not round-trip.
       const brand = await screen.findByTestId("browser-brand-row");
-      expect(brand.querySelector("img")).toHaveAttribute("height", "40");
+      expect(brand.querySelector("img")).toHaveAttribute("height", "56");
       expect(router.state.location.pathname).toBe("/party");
       expect(router.state.location.searchStr).toBe("?browse=true");
     });

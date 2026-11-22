@@ -5,9 +5,9 @@ export function BrandLogo({ nova = false }: { nova?: boolean }) {
       src={nova ? "/rocketcrab-logo-nova.svg" : "/rocketcrab-logo-no-glow.svg"}
       alt=""
       draggable={false}
-      className="block size-10 shrink-0"
-      width={40}
-      height={40}
+      className="block size-14 shrink-0"
+      width={56}
+      height={56}
       data-testid="brand-logo"
     />
   );

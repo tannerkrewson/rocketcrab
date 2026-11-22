@@ -45,7 +45,7 @@ describe("/build — page 1 (hero)", () => {
 
     const logo = hero.querySelector("img");
     expect(logo?.getAttribute("src")).toBe("/rocketcrab-logo-nova.svg");
-    expect(logo?.getAttribute("height")).toBe("40");
+    expect(logo?.getAttribute("height")).toBe("56");
 
     expect(
       await within(hero).findByRole("heading", { name: "Introducing Nova" }),
