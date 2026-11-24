@@ -53,17 +53,24 @@ npm run deploy:nova      # builds and deploys the app and party API together
 ```
 
 After deploying, verify the app and runtime headers, open a deep link, and run
-a game in the editor. Test the API from the app origin. The following TURN
-check prints status codes only, so the minted credentials stay out of logs:
+a game in the editor. Confirm TURN minting by joining from the deployed party
+page and checking for `turn_cred_mint` in Workers Logs. Both requests below
+should return 403 after Turnstile has been configured.
 
 ```sh
 APP=https://rocketcrab-nova.tannerkrewson.workers.dev
 curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$APP/api/turn"  # 403
-curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$APP/api/turn" -H "Origin: $APP"  # 200
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$APP/api/turn" -H "Origin: $APP"  # 403
 ```
 
-For local protocol checks, start `npm run dev:api -- --port 2729 --inspector-port 2730`
-and run `npm run test:api:integration`.
+For local protocol checks, use separate Worker storage so the integration
+server can run alongside app development:
+
+```sh
+npm run dev:api -- --port 2729 --inspector-port 2730 --persist-to .wrangler/protocol-checks
+```
+
+Run `npm run test:api:integration` in another terminal.
 
 ### TURN secrets
 
