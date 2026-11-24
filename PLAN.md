@@ -186,11 +186,13 @@ green.
       Evidence: `943c34b`, `npm run check` passed (1,270 tests) when run without
       Playwright competing for resources after the tick timing failure recurred.
       Chromium passed 31 of 31.
-- [ ] **Remove dead and mirrored protocol.** Delete `peer.capabilities`
+- [x] **Remove dead and mirrored protocol.** Delete `peer.capabilities`
       (schema and tests; nothing sends or reads it). Let the edge Worker own
       the relay endpoint list and have the app import its type, replacing
       `RELAY_ENDPOINT_KEYS` and the test that keeps the copies equal. Replace
       leftover "state mode"/"state-mode" wording in comments.
+      Evidence: `011f2a0`, `npm run check` passed (1,269 tests) and Chromium
+      passed 31 of 31.
 - [ ] **Rewrite the party engine as an explicit state machine.** Today seven
       collaborators (setup, connection, game, runtime, source, snapshot,
       kinds) call each other through `services()` and mutate one
