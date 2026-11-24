@@ -167,7 +167,7 @@ first because the engine rewrite builds on them. No behavior changes except
 where a step says so; each step keeps `npm run check` and the browser suite
 green.
 
-- [ ] **One home for shared schemas.** The `defineGame` declaration and the
+- [x] **One home for shared schemas.** The `defineGame` declaration and the
       frame's API call payloads are defined three times:
       `packages/nova-api/src/validation.ts`, `apps/runtime/src/nova-bridge.ts`
       (`gameDeclarationSchema`, `novaApiCallSchemas`) and
@@ -175,6 +175,9 @@ green.
       duplicated min ≤ max player check. Define each once in
       `@rocketcrab/protocol` and import it everywhere. The runtime's
       protocol-key renames (`version` → `gameVersion`) stay a thin mapping.
+      Evidence: `b5c16dc`, `npm run check` passed (1,270 tests) with two Vitest
+      workers after a tick timing failure. Chromium passed 30 of 31 on the
+      first run. The tunnel test passed on an isolated retry.
 - [ ] **One frame API call router.** The arena (`lib/arena/engine.ts`) and
       the party engine (`lib/party/engine-runtime.ts`) each validate a
       frame's `game.apiCall` and route it to the session (ready, dispatch,
