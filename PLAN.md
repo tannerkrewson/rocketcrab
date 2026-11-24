@@ -8,6 +8,20 @@ Goals: it must work on any network (corporate, school, hotel, carrier NAT,
 mixed), stay simple yet robust, use Trystero as far as it fits (pinned; fix
 churn on upgrade), and need no paid always-on server.
 
+## Party and editor usability
+
+- [ ] Surface game selection failures as temporary toasts and keep the game
+      library open so the host can retry or choose another game.
+- [ ] Add a homepage support banner that opens an email to Tanner.
+- [ ] Tell players in the empty editor to paste the copied prompt into an AI
+      chat assistant.
+- [ ] Let the host tap Start game when blocked and show the reason in a dialog.
+- [ ] Put How to play before Select game on game details.
+- [ ] Remove lobby welcome waves so touch scrolling works over the card.
+- [ ] Restore the in-game Rocketcrab logo as the hide and show control.
+- [ ] Use one Back control in the in-game game picker.
+- [ ] Declare the dark color scheme in the root stylesheet.
+
 ## Before beta
 
 - [ ] Investigate the extra Firefox fallback socket in the three-player
@@ -23,7 +37,7 @@ churn on upgrade), and need no paid always-on server.
 - [ ] After the real-device checks below, evaluate room, link and game
       recovery before consolidating any other retry paths.
 
-## Real-device checks
+## Real-device checks requiring access or coordination
 
 Playwright WebKit doesn't replace physical iPhones. On this host, WebKit
 runs only in the pinned Playwright 1.62.1 Podman image. Use the LAN setup in
