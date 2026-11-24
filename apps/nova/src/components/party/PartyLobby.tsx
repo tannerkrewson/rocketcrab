@@ -8,7 +8,7 @@ import type { PartyEngineState, PartyMemberView, PartyNotice } from "../../lib/p
 import { Button, buttonStyles } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
 import { NameEntry } from "./NameEntry";
-import { WelcomeWaves } from "../backgrounds/WelcomeWaves";
+import { Dialog } from "../ui/Dialog";
 import { PartyInviteQr } from "./PartyInviteQr";
 import { SaveSharedGame } from "./SaveSharedGame";
 import { clearBrowseContext } from "../../lib/browse/back-context";
@@ -105,6 +105,7 @@ export function PartyLobby({
   onEditName,
   initialBrowsing = false,
 }: PartyLobbyProps) {
+  const [startHelpOpen, setStartHelpOpen] = useState(false);
   const [forceDialog, setForceDialog] = useState(false);
   const [kickPending, setKickPending] = useState<string | null>(null);
   const [browsing, setBrowsing] = useState(initialBrowsing);
@@ -246,39 +247,36 @@ export function PartyLobby({
       </section>
       <section
         aria-label="Welcome"
-        className="relative flex min-h-40 select-none flex-col [-webkit-touch-callout:none] items-center justify-center gap-3 overflow-hidden rounded-2xl glass p-5 text-center motion-safe:touch-pinch-zoom"
+        className="glass flex min-h-40 flex-col items-center justify-center gap-3 rounded-2xl p-5 text-center"
       >
-        <WelcomeWaves />
-        <div className="relative flex flex-col items-center gap-3">
-          <h2 className="text-xl font-black">Welcome to rocketcrab!</h2>
-          {state.game !== null ? (
-            <>
-              <p className="text-sm font-semibold text-foreground/70">
-                {state.amHost ? "You've selected" : `${hostName ?? "The host"} has selected`}
-              </p>
-              <p className="text-2xl font-black text-primary">{state.game.title}</p>
-              <p className="text-sm text-foreground/70">
-                {state.amHost
-                  ? "As the host, you have to start the game!"
-                  : "Waiting for the host to start the game…"}
-              </p>
-              <div className="button-row items-start">
-                <Link
-                  to="/game/$gameId"
-                  params={{ gameId: state.game.gameId }}
-                  search={{ from: "party" }}
-                  onClick={clearBrowseContext}
-                  className={buttonStyles("default", "md", undefined, true)}
-                >
-                  What is {state.game.title}?
-                </Link>
-                {sharedGame !== undefined ? <SaveSharedGame game={sharedGame} /> : null}
-              </div>
-            </>
-          ) : (
-            <p className="text-sm font-semibold text-foreground/70">{noGameMessage}</p>
-          )}
-        </div>
+        <h2 className="text-xl font-black">Welcome to rocketcrab!</h2>
+        {state.game !== null ? (
+          <>
+            <p className="text-sm font-semibold text-foreground/70">
+              {state.amHost ? "You've selected" : `${hostName ?? "The host"} has selected`}
+            </p>
+            <p className="text-2xl font-black text-primary">{state.game.title}</p>
+            <p className="text-sm text-foreground/70">
+              {state.amHost
+                ? "As the host, you have to start the game!"
+                : "Waiting for the host to start the game…"}
+            </p>
+            <div className="button-row items-start">
+              <Link
+                to="/game/$gameId"
+                params={{ gameId: state.game.gameId }}
+                search={{ from: "party" }}
+                onClick={clearBrowseContext}
+                className={buttonStyles("default", "md", undefined, true)}
+              >
+                What is {state.game.title}?
+              </Link>
+              {sharedGame !== undefined ? <SaveSharedGame game={sharedGame} /> : null}
+            </div>
+          </>
+        ) : (
+          <p className="text-sm font-semibold text-foreground/70">{noGameMessage}</p>
+        )}
       </section>
 
       <section className="button-row self-center">
@@ -300,9 +298,13 @@ export function PartyLobby({
           <Button
             variant="primary"
             size="lg"
-            disabled={!state.canStart}
-            onClick={() => onStart(false)}
-            title={state.startBlockedReason ?? "Start the game once every player is ready"}
+            aria-disabled={!state.canStart || undefined}
+            aria-haspopup={state.canStart ? undefined : "dialog"}
+            className={!state.canStart ? "pointer-events-auto" : undefined}
+            onPress={() => {
+              if (state.canStart) onStart(false);
+              else setStartHelpOpen(true);
+            }}
           >
             <Play className="h-5 w-5" aria-hidden="true" />
             Start game
@@ -315,21 +317,19 @@ export function PartyLobby({
           </Button>
         ) : null}
       </section>
-      {state.amHost &&
-      state.game !== null &&
-      state.endedReason === null &&
-      !state.canStart &&
-      !state.canForceStart &&
-      state.startBlockedReason !== null ? (
-        <Alert status="warning" role="alert" className="mx-auto w-fit">
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Description className="text-sm font-semibold">
-              {state.startBlockedReason}
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
-      ) : null}
+      <Dialog
+        open={startHelpOpen}
+        onClose={() => setStartHelpOpen(false)}
+        title={state.canStart ? "Ready to start" : "Can't start yet"}
+        className="sm:max-w-sm"
+      >
+        <p>
+          {state.startBlockedReason ??
+            (state.canStart
+              ? "Everyone is ready. You can start the game now."
+              : "Wait for the party to be ready, then try again.")}
+        </p>
+      </Dialog>
       {state.playerLimitNotice !== null && state.endedReason === null ? (
         <Alert status="warning" className="mx-auto w-fit" data-testid="player-limit-notice">
           <Alert.Indicator />

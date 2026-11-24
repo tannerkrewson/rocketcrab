@@ -1,4 +1,5 @@
 import { Link, createFileRoute } from "@tanstack/react-router";
+import { Mail } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "../lib/toast";
 import { BrandLogo } from "../components/layout/BrandLogo";
@@ -82,6 +83,14 @@ function HomeComponent() {
           About
         </Link>
       </section>
+
+      <a
+        href="mailto:tannerkrewson@gmail.com?subject=Rocketcrab%20support"
+        className={buttonStyles("tertiary", "md", "w-full max-w-md")}
+      >
+        <Mail className="size-4" aria-hidden="true" />
+        Having issues? Email Tanner
+      </a>
 
       <Dialog open={joinHelpOpen} onClose={() => setJoinHelpOpen(false)} title="Join a party">
         <div className="flex flex-col gap-4">

@@ -381,9 +381,6 @@ export function BrowseGamePage() {
                 Start party
               </Link>
             ) : null}
-            {selectForParty(async () => {
-              await selectCatalogGame(engine, prebuilt);
-            })}
             {prebuilt.guideUrl ? (
               <a
                 href={prebuilt.guideUrl}
@@ -395,6 +392,9 @@ export function BrowseGamePage() {
                 How to play
               </a>
             ) : null}
+            {selectForParty(async () => {
+              await selectCatalogGame(engine, prebuilt);
+            })}
           </>
         }
       />

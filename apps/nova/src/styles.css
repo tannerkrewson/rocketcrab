@@ -76,6 +76,7 @@
 
 @layer base {
   html {
+    color-scheme: only dark;
     /* Keep font scaling predictable on mobile; avoid iOS zoom jumps. */
     -webkit-text-size-adjust: 100%;
   }

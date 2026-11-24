@@ -12,15 +12,8 @@ churn on upgrade), and need no paid always-on server.
 
 - [ ] Surface game selection failures as temporary toasts and keep the game
       library open so the host can retry or choose another game.
-- [ ] Add a homepage support banner that opens an email to Tanner.
-- [ ] Tell players in the empty editor to paste the copied prompt into an AI
-      chat assistant.
-- [ ] Let the host tap Start game when blocked and show the reason in a dialog.
-- [ ] Put How to play before Select game on game details.
-- [ ] Remove lobby welcome waves so touch scrolling works over the card.
 - [ ] Restore the in-game Rocketcrab logo as the hide and show control.
 - [ ] Use one Back control in the in-game game picker.
-- [ ] Declare the dark color scheme in the root stylesheet.
 
 ## Before beta
 

@@ -267,14 +267,14 @@ describe("PartyLobby", () => {
     expect(screen.queryByText(/pick a game before starting/i)).not.toBeInTheDocument();
   });
 
-  it("shows the start-blocked reason as a styled outline alert when a game is selected", async () => {
-    const state = makeState({
-      startBlockedReason: "Waiting for every player's game to load and register.",
-    });
-    await renderLobby(state);
-    const alert = screen.getByRole("alert");
-    expect(alert).toHaveClass("alert--warning");
-    expect(within(alert).getByText(/waiting for every player/i)).toBeInTheDocument();
+  it("explains why starting is blocked without starting the game", async () => {
+    const onStart = vi.fn();
+    await renderLobby(makeState(), { onStart });
+    expect(screen.queryByText(/waiting for every player/i)).not.toBeInTheDocument();
+    await userEvent.click(screen.getByRole("button", { name: /start game/i }));
+    const dialog = await screen.findByRole("dialog", { name: "Can't start yet" });
+    expect(within(dialog).getByText(/waiting for every player/i)).toBeInTheDocument();
+    expect(onStart).not.toHaveBeenCalled();
   });
 
   it("shows ONE compact notice banner with the latest non-membership notice", async () => {
@@ -363,8 +363,10 @@ describe("PartyLobby", () => {
 
   it("disables start while players are not ready and enables it when they are", async () => {
     const blocked = await renderLobby(makeState());
-    expect(blocked.getByRole("button", { name: /start game/i })).toBeDisabled();
-    expect(blocked.getByText(/waiting for every player/i)).toBeInTheDocument();
+    expect(blocked.getByRole("button", { name: /start game/i })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
 
     const ready = makeState({
       members: [
@@ -522,7 +524,10 @@ describe("PartyLobby", () => {
       screen.queryByText("The game ended; leave the party to play again."),
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /start game/i })).toBeDisabled();
+    expect(screen.getByRole("button", { name: /start game/i })).toHaveAttribute(
+      "aria-disabled",
+      "true",
+    );
   });
 
   it("shows a host-only kick button that confirms before removing the member", async () => {

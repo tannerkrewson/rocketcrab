@@ -33,7 +33,8 @@ export function EditorEmptyState({
               Make a game with AI
             </h2>
             <p className="text-foreground/70">
-              Use the Nova prompt to turn your idea into a playable game.
+              Copy the Nova prompt, paste it into an AI chat assistant, and describe the game you
+              want to make.
             </p>
           </div>
           <div>
@@ -48,8 +49,8 @@ export function EditorEmptyState({
                     <Check className="h-4 w-4 text-success" aria-hidden="true" />
                     Prompt copied.
                   </strong>
-                  Paste it into your AI chat and describe your game. Bring the finished HTML back
-                  here.
+                  Paste it into your AI chat assistant and describe your game. Bring the finished
+                  HTML back here.
                 </p>
               ) : null}
             </div>
