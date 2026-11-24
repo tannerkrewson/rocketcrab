@@ -103,6 +103,30 @@ describe("whole-source requests", () => {
     expect(b.events.some((e) => e.type === "progress" && e.progress.fraction === 1)).toBe(true);
     expect(b.events.filter((e) => e.type === "error")).toEqual([]);
   });
+  it("uses the host's descriptor when a peer offers a matching cached copy", async () => {
+    const { hub, host, joiner } = await world();
+    const cachedPeer = hub.createTransport({ memberId: "cached" });
+    await cachedPeer.join({ room: "private", sessionId: "session" });
+    const a = coordinator(host);
+    const b = coordinator(joiner, {
+      acceptMetadata: (_metadata, from) => (from === "host" ? true : "cached"),
+    });
+    const metadata = await a.instance.setSource({ gameId: "game", source: "hello", title: "Host" });
+    await settle(hub);
+    b.events.length = 0;
+
+    await announce(cachedPeer, metadata, { sourceSizeBytes: metadata.sourceSizeBytes + 1 });
+    await settle(hub);
+    expect(b.events).toEqual([]);
+
+    await announce(cachedPeer, metadata, { title: "Other", apiVersion: 999 });
+    await settle(hub);
+    expect(b.events.filter((event) => event.type === "metadata")).toMatchObject([
+      { metadata, fromMemberId: "cached" },
+    ]);
+    expect(b.instance.getCachedSource("game")).toBe("hello");
+  });
+
   it("uses transport receive progress for a large response", async () => {
     const { hub, host, joiner } = await world();
     const a = coordinator(host);

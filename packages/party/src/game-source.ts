@@ -116,7 +116,11 @@ export interface GameSourceCoordinatorOptions {
   readonly transport: NovaTransport;
   readonly supportedApiVersions?: readonly number[];
   readonly compatibilityCheck?: GameSourceCompatibilityCheck;
-  readonly acceptMetadata?: (metadata: GameSourceMetadataInfo, from: MemberId) => boolean;
+  /** A cached offer can serve the selected source but cannot change its metadata. */
+  readonly acceptMetadata?: (
+    metadata: GameSourceMetadataInfo,
+    from: MemberId,
+  ) => boolean | "cached";
   readonly onEvent?: (event: GameSourceTransferEvent) => void;
 }
 interface RegisteredSource {
@@ -139,6 +143,7 @@ interface ReceiveTransfer {
 export class GameSourceCoordinator {
   private readonly transport: NovaTransport;
   private readonly compatibilityCheck: GameSourceCompatibilityCheck;
+  private selectedMetadata: GameSourceMetadataInfo | null = null;
   private readonly acceptMetadata: NonNullable<GameSourceCoordinatorOptions["acceptMetadata"]>;
   private readonly listeners = new Set<(event: GameSourceTransferEvent) => void>();
   private readonly sources = new Map<GameId, RegisteredSource>();
@@ -258,6 +263,7 @@ export class GameSourceCoordinator {
     this.offered.clear();
     this.cache({ metadata, source: info.source, bytes });
     this.currentGameId = metadata.gameId;
+    this.selectedMetadata = metadata;
     if (bytes.byteLength >= htmlSourceWarnBytes)
       this.emit({
         type: "warning",
@@ -271,6 +277,7 @@ export class GameSourceCoordinator {
   /** Stop advertising a Nova source when the party picks an external game. */
   clearSelection(): void {
     this.currentGameId = null;
+    this.selectedMetadata = null;
     this.cancelAll("selection_changed");
   }
 
@@ -381,10 +388,20 @@ export class GameSourceCoordinator {
       return;
     }
     if (control.type !== "game.source.metadata") return;
-    const metadata = this.metadata(control);
-    if (!this.acceptMetadata(metadata, message.senderMemberId)) return;
+    const advertised = this.metadata(control);
+    const admission = this.acceptMetadata(advertised, message.senderMemberId);
+    if (!admission) return;
+    const metadata = admission === "cached" ? this.selectedMetadata : advertised;
+    if (
+      metadata === null ||
+      advertised.gameId !== metadata.gameId ||
+      advertised.sourceSha256 !== metadata.sourceSha256 ||
+      advertised.sourceSizeBytes !== metadata.sourceSizeBytes
+    )
+      return;
     if (metadata.sourceSizeBytes > htmlSourceBytes)
       throw new GameSourceError("too_large", "Announced source exceeds the hard limit.");
+    this.selectedMetadata = metadata;
     // Remember matching announcements even while compatibility is pending. Do
     // not let conflicting descriptors inherit another peer's compatibility check.
     if (this.selection && sameMetadata(this.selection.metadata, metadata)) {

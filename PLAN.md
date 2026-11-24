@@ -14,6 +14,8 @@ churn on upgrade), and need no paid always-on server.
       the uniform iframe sandbox enabled.
 - [ ] Verify identity persistence and the in-memory fallback in Safari Private
       Mode, including a suspend and reconnect with IndexedDB restricted.
+      Desktop Playwright Chromium and WebKit cover the lobby with IndexedDB
+      access denied for one player.
 - [ ] When Trystero exposes a fresh verified endpoint ID per room join, use it
       as the Nova connection ID and remove the connection generation from
       `nova.identity`. Trystero 0.27 reuses its endpoint ID across reconnects.
@@ -63,6 +65,11 @@ the README for local devices.
       doesn't heat the phone or drain the battery. If it struggles, lower
       `PIXEL_BUDGET` in `SiteBackground.tsx` first.
 - [ ] A friend beta without coaching.
+
+## Maintenance
+
+- Make Nova's Vite config import graph compatible with the native config loader
+  before upgrading to a Vite release that defaults to it.
 
 ## Known limits
 

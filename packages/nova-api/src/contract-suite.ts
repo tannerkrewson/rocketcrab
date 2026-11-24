@@ -778,6 +778,42 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       expect(errors[0]?.message).toContain("protocol message");
     });
 
+    it("keeps game view, acknowledgements, and end behind their sender checks", async () => {
+      const { harness, a, b } = await makePair(harnessFactory, {
+        handlers: contractGameHandlers(),
+      });
+      await startBoth({ harness, a, b });
+      const events: string[] = [];
+      a.onSessionEvent((event) => events.push(event.type));
+      const base = {
+        version: PROTOCOL_VERSION,
+        sessionId: SESSION,
+        senderMemberId: "member-b",
+        senderConnectionId: b.transport.selfConnectionId,
+        messageId: "unauthorized",
+        sentAt: 1_700_000_000_000,
+        seq: 999,
+      };
+      for (const body of [
+        { type: "game.end", reason: "host_closed" },
+        { type: "state.view", revision: 1, forMemberId: "member-a", view: null },
+        { type: "action.ack", actionId: "unrelated", status: "accepted" },
+        {
+          type: "game.end",
+          reason: "host_closed",
+          senderMemberId: "member-a",
+          senderConnectionId: a.transport.selfConnectionId,
+        },
+      ]) {
+        await b.transport.send({
+          channel: "nova.protocol",
+          payload: assertPeerMessage({ ...base, ...body }),
+        });
+      }
+      await settle(harness);
+      expect(events.filter((event) => ["state", "actionAck", "end"].includes(event))).toEqual([]);
+    });
+
     it("replicates canonical snapshots to every shell (never to game frames)", async () => {
       const { harness, a, b } = await makePair(harnessFactory, {
         handlers: contractGameHandlers(),

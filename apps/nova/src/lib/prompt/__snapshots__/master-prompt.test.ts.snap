@@ -67,6 +67,7 @@ and keep the rules inside the handlers.
 - **Show every phase**: what a player sees before the game starts, while
   waiting for others, during play, and when it ends, including how to play
   again (an action that resets the state).
+- Games can request camera and microphone access via navigator.mediaDevices.getUserMedia.
 - **Fail visibly**: if something the game needs is missing (camera, WebGL, a
   CDN), show a clear message on screen instead of failing silently.
 
@@ -80,6 +81,8 @@ End with the complete HTML document in a single fenced code block tagged
 ## The Nova API reference
 
 # Nova API — AI Quick Reference
+
+Render player.name and other player-provided strings with \`textContent\`. Keep player input out of HTML strings passed to \`innerHTML\`. Games can request camera and microphone access via \`navigator.mediaDevices.getUserMedia\`. Handle permission denial in the game.
 
 The compact reference for AI-built Nova games; the master prompt embeds this
 file verbatim. \`window.nova\` already exists when your game's code runs, and it

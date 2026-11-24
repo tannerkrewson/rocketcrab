@@ -437,6 +437,7 @@ export class NovaSession extends SessionLifecycle {
         }
         break;
       case "authority.announce":
+        if (peerMessage.senderMemberId !== peerMessage.authorityMemberId) break;
         this.engine.handleAnnounce({
           term: peerMessage.term,
           authorityMemberId: peerMessage.authorityMemberId,
@@ -446,6 +447,7 @@ export class NovaSession extends SessionLifecycle {
         });
         break;
       case "authority.heartbeat":
+        if (peerMessage.senderMemberId !== peerMessage.authorityMemberId) break;
         this.engine.handleHeartbeat({
           term: peerMessage.term,
           authorityMemberId: peerMessage.authorityMemberId,
@@ -454,6 +456,7 @@ export class NovaSession extends SessionLifecycle {
         });
         break;
       case "authority.election":
+        if (peerMessage.senderMemberId !== peerMessage.candidateMemberId) break;
         this.engine.handleElection({
           term: peerMessage.term,
           candidateMemberId: peerMessage.candidateMemberId,

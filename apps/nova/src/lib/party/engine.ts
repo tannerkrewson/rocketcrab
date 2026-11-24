@@ -513,13 +513,13 @@ export class PartyEngine {
     this.state.coordinator = new GameSourceCoordinator({
       transport: party.privateTransport,
       acceptMetadata: (metadata, from) => {
+        if (from === party.hostMemberId) return true;
         const current = this.state.game;
-        return (
-          from === party.hostMemberId ||
-          (current?.kind === "nova" &&
-            current.gameId === metadata.gameId &&
-            this.state.currentSourceSha256 === metadata.sourceSha256)
-        );
+        return current?.kind === "nova" &&
+          current.gameId === metadata.gameId &&
+          this.state.currentSourceSha256 === metadata.sourceSha256
+          ? "cached"
+          : false;
       },
     });
     this.state.unsubCoordinator = this.state.coordinator.subscribe((event) =>
