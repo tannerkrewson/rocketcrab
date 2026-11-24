@@ -19,3 +19,5 @@ export * from "./wire";
 export * from "./tunnel-crypto";
 export * from "./fallback-peer-connection";
 export * from "./trystero-transport";
+
+export { createUserIdentity, type UserIdentity } from "@trystero-p2p/ws-relay";

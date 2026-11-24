@@ -502,6 +502,7 @@ export class PartyEngine {
 
   private async establish(party: PartySession): Promise<void> {
     this.state.party = party;
+    this.state.identity = { ...this.state.identity, memberId: party.memberId };
     this.state.connectionState = party.privateTransport.connectionState;
     this.state.unsubParty = party.onEvent((event) => this.handlePartyEvent(event));
     this.state.unsubTransport = [
@@ -1092,7 +1093,6 @@ export class PartyEngine {
     savePartyRecovery({
       role: party.role,
       secret: party.secret,
-      memberId: this.state.identity.memberId,
       displayName: this.state.identity.displayName,
       game:
         this.state.game === null

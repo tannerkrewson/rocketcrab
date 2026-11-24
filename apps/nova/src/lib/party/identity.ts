@@ -1,4 +1,4 @@
-/** Stable browser identity survives reloads so peers recognize rejoining players. */
+/** The shell persists the player name. Trystero manages the party identity. */
 
 const MEMBER_PREFIX = "member-";
 const IDENTITY_KEY = "nova:party:identity:v1";
@@ -25,53 +25,34 @@ export interface PartyIdentity {
 
 let cachedIdentity: PartyIdentity | null = null;
 
-function readStoredIdentity(): PartyIdentity | null {
-  try {
-    const raw = window.localStorage.getItem(IDENTITY_KEY);
-    if (raw === null) {
-      return null;
-    }
-    const parsed = JSON.parse(raw) as Partial<PartyIdentity>;
-    if (
-      typeof parsed.memberId !== "string" ||
-      parsed.memberId.length === 0 ||
-      typeof parsed.displayName !== "string" ||
-      parsed.displayName.length === 0
-    ) {
-      return null;
-    }
-    return { memberId: parsed.memberId, displayName: parsed.displayName };
-  } catch {
-    return null;
-  }
-}
-
-/** Reuse the persisted member id and prefer a saved name over a generated one. */
+/** A page-local placeholder until Trystero supplies the party member ID. */
 export function localPartyIdentity(): PartyIdentity {
   if (cachedIdentity === null) {
-    cachedIdentity = readStoredIdentity();
+    const memberId = generateMemberId();
+    cachedIdentity = {
+      memberId,
+      displayName: getSavedPlayerName() ?? `Player ${memberId.slice(-4).toUpperCase()}`,
+    };
   }
-  if (cachedIdentity !== null) {
-    return cachedIdentity;
-  }
-  const memberId = generateMemberId();
-  const savedName = getSavedPlayerName();
-  const identity: PartyIdentity = {
-    memberId,
-    displayName: savedName ?? `Player ${memberId.slice(-4).toUpperCase()}`,
-  };
-  cachedIdentity = identity;
-  try {
-    window.localStorage.setItem(IDENTITY_KEY, JSON.stringify(identity));
-  } catch {
-    // Storage unavailable (private mode): the identity lives for this page.
-  }
-  return identity;
+  return cachedIdentity;
 }
 
 /** Saved display name, or null when never set. */
 export function getSavedPlayerName(): string | null {
   try {
+    // Older clients persisted a name alongside a self-assigned member ID.
+    const legacy = window.localStorage.getItem(IDENTITY_KEY);
+    if (legacy !== null) {
+      window.localStorage.removeItem(IDENTITY_KEY);
+      try {
+        const name = (JSON.parse(legacy) as { displayName?: unknown } | null)?.displayName;
+        if (typeof name === "string" && window.localStorage.getItem(PLAYER_NAME_KEY) === null) {
+          setSavedPlayerName(name);
+        }
+      } catch {
+        // A malformed legacy record has no usable name.
+      }
+    }
     const raw = window.localStorage.getItem(PLAYER_NAME_KEY);
     if (raw === null) {
       return null;
@@ -108,11 +89,6 @@ export function updatePartyDisplayName(name: string): PartyIdentity | null {
   const identity = localPartyIdentity();
   const updated: PartyIdentity = { memberId: identity.memberId, displayName: trimmed };
   cachedIdentity = updated;
-  try {
-    window.localStorage.setItem(IDENTITY_KEY, JSON.stringify(updated));
-  } catch {
-    // Storage unavailable — identity lives for this page.
-  }
   return updated;
 }
 

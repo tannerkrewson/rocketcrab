@@ -12,8 +12,6 @@ export interface PartyRecoveryRecord {
   readonly role: "creator" | "joiner";
   /** Party session secret; derives the private room. */
   readonly secret: string;
-  /** This player's stable member identity. */
-  readonly memberId: string;
   readonly displayName: string;
   /** What the party was playing, when known. */
   readonly game: {
@@ -94,9 +92,6 @@ export function parsePartyRecovery(raw: string): PartyRecoveryRecord | null {
   if (typeof record.secret !== "string" || !sessionSecretSchema.safeParse(record.secret).success) {
     return null;
   }
-  if (typeof record.memberId !== "string" || record.memberId.length === 0) {
-    return null;
-  }
   if (typeof record.displayName !== "string" || record.displayName.length === 0) {
     return null;
   }
@@ -113,7 +108,6 @@ export function parsePartyRecovery(raw: string): PartyRecoveryRecord | null {
     savedAt: record.savedAt,
     role: record.role,
     secret: record.secret,
-    memberId: record.memberId,
     displayName: record.displayName,
     game,
   };

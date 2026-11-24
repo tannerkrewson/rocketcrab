@@ -10,8 +10,8 @@
  * without guessing. This keeps channel names free of Trystero's 32-byte
  * action-name limit.
  *
- * Peer identity (memberId + connectionId + displayName) is exchanged through
- * per-user state and validated before the adapter publishes a peer.
+ * Peer connection IDs and names are exchanged through per-user state. The
+ * verified Trystero user ID supplies the member ID.
  */
 
 /** One message envelope serialized into Trystero action metadata. */
@@ -60,19 +60,17 @@ export function buildWireEnvelope(input: WireEnvelopeInput): WireEnvelope {
 }
 
 /** Bump when the underlying action encoding is incompatible (Trystero 0.27). */
-export const TRANSPORT_VERSION = 6;
+export const TRANSPORT_VERSION = 7;
 
 /** Payload exchanged during peer identity admission. */
 export interface IdentityPayload {
   readonly v: 1;
   readonly transportVersion?: number;
-  readonly memberId: string;
   readonly connectionId: string;
   readonly displayName?: string;
 }
 
 const IDENTITY_VALIDATOR = {
-  memberId: (value: string): boolean => value.length >= 1 && value.length <= 64,
   connectionId: (value: string): boolean => value.length >= 1 && value.length <= 64,
   displayName: (value: string): boolean => value.length >= 1 && value.length <= 32,
 };
@@ -90,12 +88,8 @@ export function parseIdentityPayload(value: unknown): IdentityPayload | null {
   if (candidate["v"] !== 1) {
     return null;
   }
-  const memberId = candidate["memberId"];
   const connectionId = candidate["connectionId"];
   const displayName = candidate["displayName"];
-  if (typeof memberId !== "string" || !IDENTITY_VALIDATOR.memberId(memberId)) {
-    return null;
-  }
   if (typeof connectionId !== "string" || !IDENTITY_VALIDATOR.connectionId(connectionId)) {
     return null;
   }
@@ -106,7 +100,6 @@ export function parseIdentityPayload(value: unknown): IdentityPayload | null {
   }
   return {
     v: 1,
-    memberId,
     connectionId,
     displayName,
     ...(typeof candidate["transportVersion"] === "number"

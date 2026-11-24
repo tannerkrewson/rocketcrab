@@ -7,25 +7,19 @@ import {
   updatePartyDisplayName,
 } from "./identity";
 
-/** Persist identity across reloads, separately from the chosen name. */
 describe("party identity", () => {
   beforeEach(() => {
     resetPartyIdentityForTests();
   });
 
-  it("generates a stable identity and reuses it across page loads", () => {
-    const first = localPartyIdentity();
-    expect(first.memberId).toMatch(/^member-[0-9a-f]{8}$/);
-    expect(first.displayName.length).toBeGreaterThan(0);
-    // The identity is persisted, so a page reload (fresh module state, same
-    // localStorage) returns the same member. Simulate: clear the in-module
-    // cache, restore the persisted value, and load again.
-    const stored = window.localStorage.getItem("nova:party:identity:v1");
-    expect(stored).not.toBeNull();
-    resetPartyIdentityForTests();
-    window.localStorage.setItem("nova:party:identity:v1", stored as string);
-    const second = localPartyIdentity();
-    expect(second).toEqual(first);
+  it("migrates a saved name and removes the legacy identity", () => {
+    window.localStorage.setItem(
+      "nova:party:identity:v1",
+      JSON.stringify({ memberId: "old-id", displayName: "Ada" }),
+    );
+    expect(getSavedPlayerName()).toBe("Ada");
+    expect(window.localStorage.getItem("nova:party:identity:v1")).toBeNull();
+    expect(localPartyIdentity()).toMatchObject({ displayName: "Ada" });
   });
 
   it("reuses the cached identity within a page", () => {

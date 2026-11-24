@@ -17,7 +17,6 @@ function input(overrides: Partial<PartyRecoveryInput> = {}): PartyRecoveryInput 
   return {
     role: "joiner",
     secret: SECRET,
-    memberId: "member-a",
     displayName: "Player A",
     game: { gameId: "game-1", title: "Rocket Rumble" },
     ...overrides,
@@ -37,7 +36,6 @@ describe("party recovery record", () => {
     expect(record?.savedAt).toBe(1_700_000_000_000);
     expect(record?.role).toBe("joiner");
     expect(record?.secret).toBe(SECRET);
-    expect(record?.memberId).toBe("member-a");
     expect(record?.game).toEqual({
       gameId: "game-1",
       title: "Rocket Rumble",
@@ -70,7 +68,6 @@ describe("party recovery record", () => {
     expect(parsePartyRecovery(JSON.stringify({ ...input(), version: 99 }))).toBeNull();
     expect(parsePartyRecovery(JSON.stringify({ ...input(), role: "admin" }))).toBeNull();
     expect(parsePartyRecovery(JSON.stringify({ ...input(), secret: "not-a-secret" }))).toBeNull();
-    expect(parsePartyRecovery(JSON.stringify({ ...input(), memberId: "" }))).toBeNull();
     expect(parsePartyRecovery(JSON.stringify({ ...input(), game: { gameId: 1 } }))).toBeNull();
   });
 

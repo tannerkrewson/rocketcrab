@@ -12,15 +12,11 @@ churn on upgrade), and need no paid always-on server.
 
 - [ ] Verify the external game catalog in a coordinated multiplayer pass with
       the uniform iframe sandbox enabled.
-- [ ] **Unforgeable party identity (`packages/trystero-transport`, `apps/nova/src/lib/party/identity.ts`)**:
-      Adopt Trystero 0.27's built-in cryptographic `userId` instead of
-      `identity: "none"` + self-asserted `memberId`: derive `memberId` directly
-      from Trystero's verified `userId`, slim `nova.identity` userState down to
-      `transportVersion` and `displayName` (rejecting duplicate `memberId`s if
-      two connections share one), simplify `apps/nova/src/lib/party/identity.ts`
-      to persist only the display name, support passing `createUserIdentity()`
-      for ephemeral multi-instance tests, and verify Safari Private Mode
-      behavior when IndexedDB is restricted.
+- [ ] Verify identity persistence and the in-memory fallback in Safari Private
+      Mode, including a suspend and reconnect with IndexedDB restricted.
+- [ ] When Trystero exposes a fresh verified endpoint ID per room join, use it
+      as the Nova connection ID and remove the connection generation from
+      `nova.identity`. Trystero 0.27 reuses its endpoint ID across reconnects.
 - [ ] After the real-device checks below, evaluate room, link and game
       recovery before consolidating any other retry paths.
 
@@ -70,8 +66,8 @@ the README for local devices.
 
 ## Known limits
 
-- No party-wide size cap; games can set player limits. Trystero's `scale()`
-  overlay tracks at most 2,048 peers. Local browser runs reached 50.
+- Signaling allows 128 concurrent sockets per room. Games can set smaller
+  player limits. Local browser runs reached 50 players.
 - Peer-link messages are generic ("Connecting to a player…"): Trystero
   exposes no named pre-connection event.
 - Networks that block WebSockets to Cloudflare can't connect at all, and

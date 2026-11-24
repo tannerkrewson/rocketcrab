@@ -58,10 +58,9 @@ describe("createTrysteroPartyTransportFactory", () => {
       Record<string, unknown>,
       Record<string, unknown>,
     ];
-    expect(rendezvous).toMatchObject({ memberId: "m1", displayName: "A" });
+    expect(rendezvous).toMatchObject({ displayName: "A" });
     expect(rendezvous).not.toHaveProperty("turnConfig");
     expect(privateRoom).toMatchObject({
-      memberId: "m2",
       displayName: "B",
       password: "pw",
     });

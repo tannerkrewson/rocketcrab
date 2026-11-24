@@ -179,7 +179,7 @@ interface FakeRoom {
   ) => Promise<DataPayload>;
 }
 
-function makeFakeRoom(selfId: string): FakeRoom {
+function makeFakeRoom(selfId: string, selfMemberId: string): FakeRoom {
   const makeAction = (): FakeAction & {
     onMessage: (handler: MessageHandler) => () => void;
     onReceiveProgress: (handler: ProgressHandler) => () => void;
@@ -249,7 +249,7 @@ function makeFakeRoom(selfId: string): FakeRoom {
       return namespace === "nova.identity.ack" ? acknowledgement : action;
     }),
     ...{
-      getSelf: async () => ({ peerId: selfId }),
+      getSelf: async () => ({ peerId: selfId, userId: selfMemberId }),
       getPeers: () => room.peers,
       onPeerJoin: (handler: FakeRoom["joinHandler"]) => {
         room.joinHandler = handler;
@@ -288,12 +288,11 @@ class TrysteroClientImpl implements Client {
     this.name = name;
     this.clock = clock;
     this.adapter = new TrysteroTransport({
-      memberId,
       displayName,
       now: clock.now,
       schedule: clock.schedule,
     });
-    this.room = makeFakeRoom(`contract-self-${name}`);
+    this.room = makeFakeRoom(`contract-self-${name}`, memberId);
     // Mock only the upstream request boundary; actual chunking runs in browsers.
     this.room.dispatchRequest = async (namespace, data, options) => {
       const peer = [...this.peerIds].find(([, id]) => id === options.target)?.[0] as
@@ -371,12 +370,11 @@ class TrysteroClientImpl implements Client {
   async observe(peer: Client): Promise<void> {
     const other = peer as TrysteroClientImpl;
     const peerId = `peer-${other.name}`;
-    const userId = `user-${other.name}`;
+    const userId = other.adapter.selfMemberId;
     this.room.peers[peerId] = { userId };
     this.room.values[userId] = {
       v: 1,
-      transportVersion: 6,
-      memberId: other.adapter.selfMemberId,
+      transportVersion: 7,
       connectionId: other.adapter.selfConnectionId,
       displayName: other.adapter.displayName,
     };

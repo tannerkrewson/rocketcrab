@@ -1742,14 +1742,14 @@ describe("party engine — M1 local recovery record", () => {
     expect(record).not.toBeNull();
     expect(record?.role).toBe("creator");
     expect(record?.game?.gameId).toBe(GAME.gameId);
-    expect(record?.memberId).toBe(a.memberId);
+    expect(record?.displayName).toBe(a.engine.getState().displayName);
 
     await a.engine.leaveParty();
     await settle(world);
     expect(readPartyRecovery()).toBeNull();
   });
 
-  it("a reloaded page recovers its identity from the record while another participant remains", async () => {
+  it("a reloaded page uses the saved invite and its transport identity", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
     const b = makePlayer(world, "b");
@@ -1758,11 +1758,10 @@ describe("party engine — M1 local recovery record", () => {
     await settle(world);
     await joining;
     const record = readPartyRecovery()!;
-    expect(record.memberId).toBe(b.memberId);
     await b.engine.leaveParty();
     await settle(world);
     const reloaded = makePlayer(world, "reload", {
-      identity: { memberId: record.memberId, displayName: record.displayName },
+      identity: { memberId: b.memberId, displayName: record.displayName },
     });
     const rejoining = reloaded.engine.joinByInvite({ secret: record.secret });
     await settle(world);

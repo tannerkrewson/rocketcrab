@@ -77,7 +77,9 @@ export class PartySession {
   readonly privateTransport: NovaTransport;
   readonly secret: SessionSecret;
   readonly material: SessionMaterial;
-  readonly memberId: MemberId;
+  get memberId(): MemberId {
+    return this.privateTransport.selfMemberId;
+  }
   readonly role: "creator" | "joiner";
   readonly factory: PartyTransportFactory;
   private creatorMemberId: MemberId | null;
@@ -89,19 +91,17 @@ export class PartySession {
 
   constructor(config: {
     role: "creator" | "joiner";
-    memberId: MemberId;
     secret: SessionSecret;
     material: SessionMaterial;
     factory: PartyTransportFactory;
     privateTransport: NovaTransport;
   }) {
     this.role = config.role;
-    this.memberId = config.memberId;
     this.secret = config.secret;
     this.material = config.material;
     this.factory = config.factory;
     this.privateTransport = config.privateTransport;
-    this.creatorMemberId = config.role === "creator" ? config.memberId : null;
+    this.creatorMemberId = null;
     this.unsubscribers.push(
       this.privateTransport.on("peer:joined", (peer) => {
         this.renamedNames.delete(peer.memberId);
@@ -134,11 +134,10 @@ export class PartySession {
   get hostMemberId(): MemberId | null {
     // Wait for an existing participant's context before offering host controls
     // to a joining player. The creator remains preferred while connected.
-    if (this.creatorMemberId === null) return null;
+    const creator = this.role === "creator" ? this.memberId : this.creatorMemberId;
+    if (creator === null) return null;
     const members = this.members;
-    return members.includes(this.creatorMemberId)
-      ? this.creatorMemberId
-      : ([...members].sort()[0] ?? null);
+    return members.includes(creator) ? creator : ([...members].sort()[0] ?? null);
   }
   get amHost(): boolean {
     return this.hostMemberId === this.memberId;
@@ -184,10 +183,11 @@ export class PartySession {
     };
   }
   private async announceContext(): Promise<void> {
-    if (this.creatorMemberId === null || this.disposed) return;
+    const creatorMemberId = this.role === "creator" ? this.memberId : this.creatorMemberId;
+    if (creatorMemberId === null || this.disposed) return;
     await this.privateTransport.send({
       channel: PARTY_CONTROL_CHANNEL,
-      payload: buildPartyContextMessage(this.base(), { creatorMemberId: this.creatorMemberId }),
+      payload: buildPartyContextMessage(this.base(), { creatorMemberId }),
     });
   }
   async announceRename(displayName: string): Promise<void> {
@@ -254,7 +254,7 @@ export class PartySession {
       return;
     switch (value.type) {
       case "party.context":
-        if (this.creatorMemberId === null) {
+        if (this.role === "joiner" && this.creatorMemberId === null) {
           this.creatorMemberId = value.creatorMemberId;
           this.emit({ type: "host", hostMemberId: this.hostMemberId });
           // Peers that joined concurrently may have missed each other's context.
@@ -323,7 +323,6 @@ async function enter(
   });
   const session = new PartySession({
     role,
-    memberId: options.memberId,
     secret,
     material,
     factory: options.transportFactory,

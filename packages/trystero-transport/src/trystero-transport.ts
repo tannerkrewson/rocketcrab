@@ -18,6 +18,7 @@ import type {
   ActionProgressContext,
   Room,
   TurnServerConfig,
+  UserIdentity,
 } from "@trystero-p2p/ws-relay";
 import type {
   ConnectionId,
@@ -65,8 +66,8 @@ import {
  * - **Room-scoped signaling** through the configured edge Worker.
  * - **Environment-specific appId** (`rocketcrab-nova-v027-dev` / `-prod`,
  *   `app-id.ts`) so dev and prod rooms never collide.
- * - **Identity admission**: per-room ephemeral Trystero identities carry Nova
- *   member and connection IDs in validated user state. A bilateral ack gates
+ * - **Identity admission**: Trystero verifies the user ID used as the Nova member
+ *   ID. User state carries the connection generation and display name. A bilateral ack gates
  *   peer publication and early traffic is bounded until admission completes.
  * - **Join errors** are categorized (`errors.ts`). Trystero only reports
  *   handshake-stage failures; the adapter detects relay failure itself
@@ -92,7 +93,11 @@ import {
  */
 export class TrysteroTransport implements NovaTransport {
   readonly kind = "trystero";
-  readonly selfMemberId: MemberId;
+  private memberId: MemberId;
+
+  get selfMemberId(): MemberId {
+    return this.memberId;
+  }
   readonly displayName?: string;
   readonly appId: string;
 
@@ -173,7 +178,7 @@ export class TrysteroTransport implements NovaTransport {
     // The relay-reachability timeout and the overall join timeout race; the
     // first to elapse wins with its own category (relay_unreachable vs
     // join_timeout). Defaults are 15 s vs 30 s so relay failures surface first.
-    this.selfMemberId = options.memberId;
+    this.memberId = globalThis.crypto.randomUUID();
     this.displayName = options.displayName;
     const env: AppIdEnvironment = options.env ?? currentAppIdEnvironment();
     this.appId = resolveAppId(options.appId, env);
@@ -724,7 +729,7 @@ export class TrysteroTransport implements NovaTransport {
   ): JoinRoomConfig & { relayConfig: { urls: string[] } } {
     const config: JoinRoomConfig & { relayConfig: { urls: string[] } } = {
       appId: this.appId,
-      identity: "none",
+      identity: this.options.userIdentity ?? "local",
       // Nine direct neighbors retain a full mesh in rooms of up to ten.
       use: [scale({ maxDirectPeers: 9 })],
       maxReceiveBytes: 8 * 1024 * 1024,
@@ -833,7 +838,16 @@ export class TrysteroTransport implements NovaTransport {
 
   private async wireRoom(room: Room): Promise<void> {
     this.room = room;
+    this.roomUnsubscribers.push(
+      room.onError((error) => this.recordJoinError(fromRoomError(error))),
+    );
     for (const channel of this.requestHandlers.keys()) this.requestAction(channel);
+    const self = await room.getSelf();
+    if (this.room !== room) throw new Error("Room closed while joining.");
+    this.memberId = self.userId;
+    this.selfIdBase = self.peerId;
+    this.selfConnectionId =
+      this.connectionEpoch === 0 ? self.peerId : `${self.peerId}#${this.connectionEpoch}`;
     const action = room.makeAction(ACTION_NAMESPACE);
     const acknowledgement = room.makeAction("nova.identity.ack");
     const state = room.makeUserState<JsonValue>("nova.identity", null, { maxBytes: 1024 });
@@ -886,7 +900,8 @@ export class TrysteroTransport implements NovaTransport {
         return;
       const meta = state.getMeta(userId);
       if (!meta || !meta.online || meta.peerId !== peerId || meta.userId !== userId) return;
-      const identity = parseIdentityPayload(state.get(userId));
+      const payload = parseIdentityPayload(state.get(userId));
+      const identity = payload === null ? null : { ...payload, memberId: userId };
       const previous = this.identityByPeerId.get(peerId);
       if (previous) {
         if (
@@ -910,7 +925,11 @@ export class TrysteroTransport implements NovaTransport {
         );
         return;
       }
-      if (this.connectionToPeerId.has(identity.connectionId)) {
+      if (
+        userId === this.selfMemberId ||
+        [...this.identityByPeerId.values()].some((peer) => peer.memberId === userId) ||
+        this.connectionToPeerId.has(identity.connectionId)
+      ) {
         rejectIdentity(peerId, false);
         return;
       }
@@ -998,7 +1017,6 @@ export class TrysteroTransport implements NovaTransport {
         accept(peerId, userId);
       }),
       room.onPeerLeave(({ peerId }) => this.handlePeerLeave(peerId)),
-      room.onError((error) => this.recordJoinError(fromRoomError(error))),
       state.onChange((_value, context) => {
         if (context.self || this.room !== room) return;
         if (context.removed) {
@@ -1011,15 +1029,9 @@ export class TrysteroTransport implements NovaTransport {
         accept(context.peerId, context.userId);
       }),
     );
-    const self = await room.getSelf();
-    if (this.room !== room) throw new Error("Room closed while joining.");
-    this.selfIdBase = self.peerId;
-    this.selfConnectionId =
-      this.connectionEpoch === 0 ? self.peerId : `${self.peerId}#${this.connectionEpoch}`;
     await state.set({
       v: 1,
       transportVersion: TRANSPORT_VERSION,
-      memberId: this.selfMemberId,
       connectionId: this.selfConnectionId,
       ...(this.displayName !== undefined ? { displayName: this.displayName } : {}),
     });
@@ -1490,8 +1502,8 @@ function defaultScheduler(callback: () => void, delayMs: number): () => void {
 
 /** Options for {@link TrysteroTransport}. */
 export interface TrysteroTransportOptions {
-  /** Stable per-player identity; assigned by the layer above. */
-  readonly memberId: MemberId;
+  /** Test or explicit identity override. The default uses Trystero's local identity. */
+  readonly userIdentity?: UserIdentity;
   /** Optional player-facing name, announced to peers. */
   readonly displayName?: string;
   /**

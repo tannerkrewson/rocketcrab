@@ -31,7 +31,7 @@ it("waits for both validated identity and acknowledgement before announcing a pe
   );
   const dataSend = vi.fn(async () => {});
   const room = {
-    getSelf: async () => ({ peerId: "self" }),
+    getSelf: async () => ({ peerId: "self", userId: "local" }),
     getPeers: () => peers,
     leave: async () => {},
     onError: subscribe("error"),
@@ -52,7 +52,7 @@ it("waits for both validated identity and acknowledgement before announcing a pe
     }),
   };
   mocks.joinRoom.mockReturnValue(room);
-  const transport = new TrysteroTransport({ memberId: "local" });
+  const transport = new TrysteroTransport({});
   transport.handleRequest("rpc", async () => "response");
   const joined = vi.fn();
   transport.on("peer:joined", joined);
@@ -62,8 +62,7 @@ it("waits for both validated identity and acknowledgement before announcing a pe
   peers.remote = { userId: "user" };
   values.user = {
     v: 1,
-    transportVersion: 6,
-    memberId: "remote-member",
+    transportVersion: 7,
     connectionId: "remote-connection",
   };
   // An acknowledgement alone cannot admit a peer, and metadata from an old
@@ -113,27 +112,25 @@ it("waits for both validated identity and acknowledgement before announcing a pe
   await expect(request).resolves.toBe("response");
   expect(received.mock.calls[0]?.[0]).toMatchObject({
     payload: "hello",
-    senderMemberId: "remote-member",
+    senderMemberId: "user",
   });
   expect(joined.mock.calls[0]?.[0]).toMatchObject({
-    memberId: "remote-member",
+    memberId: "user",
     connectionId: "remote-connection",
   });
   listeners.state!(values.user, { peerId: "remote", userId: "user", self: false, removed: false });
   expect(joined).toHaveBeenCalledOnce();
   values.user = {
     v: 1,
-    transportVersion: 6,
-    memberId: "impostor",
-    connectionId: "remote-connection",
+    transportVersion: 7,
+    connectionId: "changed-connection",
   };
   listeners.state!(values.user, { peerId: "remote", userId: "user", self: false, removed: false });
   expect(transport.peers).toHaveLength(0);
   // A changed identity is quarantined for this connection.
   values.user = {
     v: 1,
-    transportVersion: 6,
-    memberId: "remote-member",
+    transportVersion: 7,
     connectionId: "remote-connection",
   };
   listeners.state!(values.user, { peerId: "remote", userId: "user", self: false, removed: false });
@@ -143,8 +140,7 @@ it("waits for both validated identity and acknowledgement before announcing a pe
   peers.other = { userId: "other-user" };
   values["other-user"] = {
     v: 1,
-    transportVersion: 6,
-    memberId: "other",
+    transportVersion: 7,
     connectionId: "other-connection",
   };
   metas["other-user"] = { online: true, peerId: "other", userId: "other-user" };

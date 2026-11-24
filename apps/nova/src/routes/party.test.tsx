@@ -257,7 +257,6 @@ describe("/party", () => {
     savePartyRecovery({
       role: "joiner",
       secret,
-      memberId: "member-a",
       displayName: "Player A",
       game: { gameId: "game-1", title: "Rocket Rumble" },
     });
@@ -272,7 +271,6 @@ describe("/party", () => {
     savePartyRecovery({
       role: "joiner",
       secret: "C".repeat(43),
-      memberId: "member-a",
       displayName: "Player A",
       game: null,
     });

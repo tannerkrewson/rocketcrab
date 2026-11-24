@@ -160,7 +160,10 @@ function makeFakeRoom(): FakeRoom {
     action,
     acknowledgement,
     ...{
-      getSelf: async () => ({ peerId: mocks.selfId }),
+      getSelf: async () => ({
+        peerId: mocks.selfId,
+        userId: mocks.selfId === "self-b" ? "member-b" : "member-a",
+      }),
       onPeerJoin: (handler: FakeRoom["joinHandler"]) => {
         room.joinHandler = handler;
         return () => {
@@ -205,7 +208,6 @@ interface Setup {
 function setup(options: Partial<TrysteroTransportOptions> = {}): Setup {
   const clock = makeFakeClock();
   const adapter = new TrysteroTransport({
-    memberId: "member-a",
     displayName: "Ada",
     ...options,
     now: clock.now,
@@ -233,9 +235,14 @@ async function simulatePeerJoin(
   identity: { memberId: MemberId; connectionId: ConnectionId; displayName?: string },
   selfConnectionId = mocks.selfId,
 ): Promise<void> {
-  const userId = `user-${peerId}`;
+  const userId = identity.memberId;
   room.peers[peerId] = { userId };
-  room.values[userId] = { v: 1, transportVersion: 6, ...identity };
+  room.values[userId] = {
+    v: 1,
+    transportVersion: 7,
+    connectionId: identity.connectionId,
+    displayName: identity.displayName,
+  };
   room.metas[userId] = { peerId, userId, online: true };
   room.joinHandler!({ peerId, userId });
   room.acknowledgement.onMessage!({ connectionId: selfConnectionId }, { peerId });
@@ -263,7 +270,7 @@ describe("TrysteroTransport construction", () => {
     const { adapter } = setup();
     const transport: NovaTransport = adapter;
     expect(transport.kind).toBe("trystero");
-    expect(transport.selfMemberId).toBe("member-a");
+    expect(transport.selfMemberId).toBeTruthy();
     expect(transport.connectionState).toBe("idle");
     expect(transport.peers).toEqual([]);
   });
@@ -271,9 +278,9 @@ describe("TrysteroTransport construction", () => {
   it("defaults the appId to the environment-specific dev ID", () => {
     const { adapter } = setup();
     expect(adapter.appId).toBe("rocketcrab-nova-v027-dev");
-    const prod = new TrysteroTransport({ memberId: "member-p", env: { PROD: true } });
+    const prod = new TrysteroTransport({ env: { PROD: true } });
     expect(prod.appId).toBe("rocketcrab-nova-v027-prod");
-    const explicit = new TrysteroTransport({ memberId: "member-x", appId: "rocketcrab-e2e" });
+    const explicit = new TrysteroTransport({ appId: "rocketcrab-e2e" });
     expect(explicit.appId).toBe("rocketcrab-e2e");
   });
 
@@ -733,12 +740,11 @@ describe("TrysteroTransport peer mapping", () => {
   describe("identity acknowledgement retransmission", () => {
     /** A peer whose identity is in the room, so the adapter acknowledges it. */
     function presentPeer(room: FakeRoom, peerId: string, memberId: string): void {
-      const userId = `user-${peerId}`;
+      const userId = memberId;
       room.peers[peerId] = { userId };
       room.values[userId] = {
         v: 1,
-        transportVersion: 6,
-        memberId,
+        transportVersion: 7,
         connectionId: `conn-${peerId}`,
         displayName: memberId,
       };
@@ -834,7 +840,7 @@ describe("TrysteroTransport peer mapping", () => {
       mocks.selfId = "self-b";
       const roomB = makeFakeRoom();
       mocks.joinRoom.mockReturnValue(roomB);
-      const b = setup({ handshakeTimeoutMs: 30_000, memberId: "member-b", displayName: "Bea" });
+      const b = setup({ handshakeTimeoutMs: 30_000, displayName: "Bea" });
       await joinConnected(b.adapter, b.clock);
       mocks.selfId = defaultSelfId;
 
@@ -861,8 +867,8 @@ describe("TrysteroTransport peer mapping", () => {
         guest.metas[userId] = { peerId, userId, online: true };
         guest.joinHandler!({ peerId, userId });
       };
-      introduce(roomA, roomB, "peer-a", "user-a");
-      introduce(roomB, roomA, "peer-b", "user-b");
+      introduce(roomA, roomB, "peer-a", "member-a");
+      introduce(roomB, roomA, "peer-b", "member-b");
       return { a, b, roomA, roomB };
     }
 
@@ -960,8 +966,7 @@ describe("TrysteroTransport peer mapping", () => {
 
     expect(room.ownIdentity).toEqual({
       v: 1,
-      transportVersion: 6,
-      memberId: "member-a",
+      transportVersion: 7,
       connectionId: "self-peer-id",
       displayName: "Ada",
     });
@@ -987,7 +992,39 @@ describe("TrysteroTransport peer mapping", () => {
     expect(adapter.peers[0]!.memberId).toBe("member-b");
   });
 
-  it.each([undefined, 1, 2, 3, 4])(
+  it("keeps the first connection for a verified user ID and ignores claimed member IDs", async () => {
+    const onJoinError = vi.fn();
+    const { adapter, clock } = setup({ onJoinError });
+    const room = makeFakeRoom();
+    mocks.joinRoom.mockReturnValue(room);
+    mocks.relaySockets[RELAY] = { readyState: 1 };
+    await joinConnected(adapter, clock);
+    await simulatePeerJoin(capturedCallbacks(), room, "peer-1", {
+      memberId: "member-b",
+      connectionId: "conn-b",
+    });
+    room.peers["peer-2"] = { userId: "member-b" };
+    room.metas["member-b"] = { peerId: "peer-2", userId: "member-b", online: true };
+    room.values["member-b"] = {
+      v: 1,
+      transportVersion: 7,
+      memberId: "member-c",
+      connectionId: "conn-c",
+    };
+    room.joinHandler!({ peerId: "peer-2", userId: "member-b" });
+    expect(adapter.peers.map((peer) => peer.memberId)).toEqual(["member-b"]);
+    expect(onJoinError).toHaveBeenCalledWith(expect.objectContaining({ category: "rejected" }));
+
+    room.peers["peer-3"] = { userId: "member-d" };
+    room.metas["member-d"] = { peerId: "peer-3", userId: "member-d", online: true };
+    room.values["member-d"] = { ...(room.values["member-b"] as object), connectionId: "conn-d" };
+    room.joinHandler!({ peerId: "peer-3", userId: "member-d" });
+    room.acknowledgement.onMessage!({ connectionId: mocks.selfId }, { peerId: "peer-3" });
+    await flushSetup();
+    expect(adapter.peers.map((peer) => peer.memberId)).toEqual(["member-b", "member-d"]);
+  });
+
+  it.each([undefined, 1, 2, 3, 4, 6])(
     "rejects incompatible transport version %s before actions",
     async (transportVersion) => {
       const onJoinError = vi.fn();

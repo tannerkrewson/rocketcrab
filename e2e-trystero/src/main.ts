@@ -125,7 +125,6 @@ let sourceCoordinator: GameSourceCoordinator | null = null;
 async function enterRoom(options: JoinOptions): Promise<string> {
   const sessionId = `${SESSION_PREFIX}${options.room}`;
   const next = new TrysteroTransport({
-    memberId: state.selfMemberId,
     displayName: `player-${state.selfMemberId.slice(-4)}`,
     appId: options.appId,
     relayConnectTimeoutMs: options.relayConnectTimeoutMs ?? 10_000,
@@ -177,6 +176,7 @@ async function enterRoom(options: JoinOptions): Promise<string> {
   });
   try {
     await next.join({ room: options.room, sessionId });
+    state.selfMemberId = next.selfMemberId;
   } catch (error) {
     const category =
       error instanceof Error && "category" in error

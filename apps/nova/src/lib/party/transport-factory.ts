@@ -57,7 +57,6 @@ export function createTrysteroPartyTransportFactory(
   const { onJoinError, onTunnel, onTunnelFailure } = options;
   const create = (identity: Parameters<PartyTransportFactory["createPrivateTransport"]>[0]) => {
     const transport = new TrysteroTransport({
-      memberId: identity.memberId,
       displayName: identity.displayName,
       ...("password" in identity ? { password: identity.password } : {}),
       partySecret: identity.secret,

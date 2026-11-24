@@ -78,7 +78,6 @@ afterEach(() => {
 describe("tunnel fallback polyfill", () => {
   it("passes rtcPolyfill to joinRoom when WebRTC and a party secret exist", async () => {
     const adapter = new TrysteroTransport({
-      memberId: "member-a",
       edgeOrigin: "https://edge.example",
       partySecret: SECRET,
     });
@@ -89,7 +88,6 @@ describe("tunnel fallback polyfill", () => {
 
   it("creates a fresh polyfill for each join", async () => {
     const adapter = new TrysteroTransport({
-      memberId: "member-a",
       edgeOrigin: "https://edge.example",
       partySecret: SECRET,
     });
@@ -104,7 +102,6 @@ describe("tunnel fallback polyfill", () => {
 
   it("omits rtcPolyfill without a party secret", async () => {
     const adapter = new TrysteroTransport({
-      memberId: "member-a",
       edgeOrigin: "https://e.test",
     });
     await joinAndAbandon(adapter);
@@ -114,7 +111,6 @@ describe("tunnel fallback polyfill", () => {
   it("omits rtcPolyfill when there is no RTCPeerConnection (non-browser)", async () => {
     vi.stubGlobal("RTCPeerConnection", undefined);
     const adapter = new TrysteroTransport({
-      memberId: "member-a",
       edgeOrigin: "https://edge.example",
       partySecret: SECRET,
     });
@@ -124,7 +120,6 @@ describe("tunnel fallback polyfill", () => {
 
   it("keeps the caller's ICE configuration when the tunnel is not forced", async () => {
     const adapter = new TrysteroTransport({
-      memberId: "member-a",
       edgeOrigin: "https://edge.example",
       partySecret: SECRET,
       rtcConfig: { iceServers: [{ urls: "stun:stun.example:3478" }] },
@@ -139,7 +134,6 @@ describe("tunnel fallback polyfill", () => {
 
   it("forces the native connection to relay-only with no ICE servers when requested", async () => {
     const adapter = new TrysteroTransport({
-      memberId: "member-a",
       edgeOrigin: "https://edge.example",
       partySecret: SECRET,
       forceRelayOnlyNoServers: true,
@@ -155,7 +149,6 @@ describe("tunnel fallback polyfill", () => {
 
   it("gives the polyfill the same room name that was joined", async () => {
     const adapter = new TrysteroTransport({
-      memberId: "member-a",
       edgeOrigin: "https://edge.example",
       partySecret: SECRET,
     });
@@ -169,7 +162,6 @@ describe("tunnel fallback polyfill", () => {
   it("forwards onOutcome to the wrapper of every peer connection it creates", async () => {
     const onOutcome = vi.fn();
     const adapter = new TrysteroTransport({
-      memberId: "member-a",
       edgeOrigin: "https://edge.example",
       partySecret: SECRET,
       onOutcome,
@@ -182,7 +174,6 @@ describe("tunnel fallback polyfill", () => {
 
   it("gives the wrapper isTearingDown: false during a join, true from leave() until the next join", async () => {
     const adapter = new TrysteroTransport({
-      memberId: "member-a",
       edgeOrigin: "https://edge.example",
       partySecret: SECRET,
     });
@@ -208,7 +199,6 @@ describe("tunnel fallback polyfill", () => {
   it("reports no outcomes without a party secret, since there is no wrapper", async () => {
     const onOutcome = vi.fn();
     const adapter = new TrysteroTransport({
-      memberId: "member-a",
       edgeOrigin: "https://e.test",
       onOutcome,
     });
@@ -219,7 +209,6 @@ describe("tunnel fallback polyfill", () => {
 
   it("reports no tunnelled peers for unknown connection IDs", () => {
     const adapter = new TrysteroTransport({
-      memberId: "member-a",
       partySecret: SECRET,
     });
     expect(adapter.isPeerTunnelled("nobody" as ConnectionId)).toBe(false);
