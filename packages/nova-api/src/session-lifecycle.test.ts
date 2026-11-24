@@ -6,6 +6,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { NovaTransport } from "@rocketcrab/core";
 import { InMemoryTransportHub } from "@rocketcrab/testing";
+import { useRealTime, useSimulatedTime } from "./simulated-time.test-helper";
 import { createNovaSession, type NovaSession } from "./session";
 
 const ROOM = "party:lifecycle-room";
@@ -66,13 +67,11 @@ function fillBufferToCap(): NovaSession {
 
 describe("NovaSession lifecycle (leave and dispatch buffer)", () => {
   beforeEach(() => {
-    vi.useFakeTimers({
-      toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
-    });
+    useSimulatedTime();
   });
 
   afterEach(() => {
-    vi.useRealTimers();
+    useRealTime();
   });
 
   it("leave() stops the authority's tick", async () => {

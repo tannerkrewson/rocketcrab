@@ -14,12 +14,12 @@
  * Timing is accelerated through the documented test seam
  * (`globalThis.__novaQuizConfig`), which nothing sets in a real browser.
  */
-import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InMemoryTransportHub, type InMemoryTransport } from "@rocketcrab/testing";
 // The single-file example game, verbatim (Vite ?raw import; the tests
 // execute the exact source that runs in the arena and real parties).
 import GAME_SOURCE from "../../testing/fixtures/games/nova-quiz.html?raw";
+import { useRealTime, useSimulatedTime } from "./simulated-time.test-helper";
 import { createNovaSession, type NovaSession, type NovaSessionOptions } from "./session";
 import type { NovaAction } from "./types";
 
@@ -257,23 +257,12 @@ function config(overrides: { answerMs?: number; resultsMs?: number; rounds?: num
 }
 
 beforeEach(() => {
-  vi.useFakeTimers({
-    toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
-  });
-  // WebCrypto resolves off the fake clock, which would let simulated time run
-  // ahead of the state-hash digest; the same SHA-256 resolves on a microtask.
-  vi.spyOn(crypto.subtle, "digest").mockImplementation(async (_algorithm, data) => {
-    const bytes = createHash("sha256")
-      .update(new Uint8Array(data as ArrayBuffer))
-      .digest();
-    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
-  });
+  useSimulatedTime();
   config({ answerMs: 2000, resultsMs: 1200, rounds: 2 });
 });
 
 afterEach(() => {
-  vi.useRealTimers();
-  vi.restoreAllMocks();
+  useRealTime();
   delete (globalThis as Record<string, unknown>).__novaQuizConfig;
   for (const world of worlds.splice(0)) {
     for (const session of world.sessions) {
