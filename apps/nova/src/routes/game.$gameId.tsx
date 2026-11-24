@@ -288,6 +288,7 @@ export function BrowseGamePage() {
                   Start party
                 </Link>
               ) : null}
+              {editAction}
               {selectForParty(async () => {
                 await engine.selectGame({
                   gameId: saved.id,
@@ -296,7 +297,6 @@ export function BrowseGamePage() {
                   apiVersion: saved.apiVersion ?? PROTOCOL_VERSION,
                 });
               })}
-              {editAction}
             </>
           }
         />

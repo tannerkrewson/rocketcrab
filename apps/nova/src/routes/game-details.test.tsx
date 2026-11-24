@@ -170,6 +170,8 @@ describe("/game/:gameId — saved games and party selection", () => {
     const router = renderAt(`/game/${game.id}`);
 
     const select = await screen.findByRole("button", { name: /select game/i });
+    const edit = screen.getByRole("button", { name: "Edit game" });
+    expect(edit.compareDocumentPosition(select) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
     await userEvent.click(select);
 
     await vi.waitFor(() =>
