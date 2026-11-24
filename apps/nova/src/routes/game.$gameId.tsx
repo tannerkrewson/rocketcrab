@@ -231,8 +231,8 @@ export function BrowseGamePage() {
           />
           <AboutCard>
             <p className="leading-relaxed text-foreground/80">
-              {shared.sharedBy ?? "A friend"} shared this Nova game in the party. Save it to keep it
-              in My games: you can play it in your own parties and change it in the editor.
+              {shared.sharedBy ?? "A friend"} shared this game in the party. Save it to keep it in
+              My games: you can play it in your own parties and change it in the editor.
             </p>
             <SharedCopyNote game={shared} />
           </AboutCard>

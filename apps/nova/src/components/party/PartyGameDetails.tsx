@@ -111,8 +111,8 @@ function SavedGameDetails({ gameId }: { gameId: string }) {
     return (
       <div className="flex flex-col items-start gap-3">
         <p className="text-sm text-foreground/80">
-          {shared?.sharedBy ?? "A friend"} shared this Nova game in the party. Save it to keep it in
-          My games.
+          {shared?.sharedBy ?? "A friend"} shared this game in the party. Save it to keep it in My
+          games.
         </p>
         {shared !== undefined ? <SaveSharedGame game={shared} /> : null}
       </div>
