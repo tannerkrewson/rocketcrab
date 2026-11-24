@@ -12,8 +12,7 @@ the `wrangler.toml` files (dashboard, secrets, account) under **Live state**.
 | Game runtime           | `deploy/runtime/wrangler.toml` | `https://rocketcrab-runtime.tannerkrewson.workers.dev` |
 
 Cloudflare account `f82d64d09da6cb5a0afa0120033a7e13`. `rocketcrab.com`
-still serves the legacy site. See **Beta cutover** for the live migration
-from the existing three-Worker deployment.
+serves the legacy site until the production cutover.
 
 Nova serves SPA assets directly from Workers Assets. Requests under `/api`
 run the Worker first.
@@ -42,8 +41,8 @@ the app origin and allows no workers.
 
 ## Deploying
 
-Ask the owner before the first deploy of a Worker, the beta cutover below,
-deleting a Worker, changing plans or DNS, or touching `rocketcrab.com`.
+Ask the owner before the first deploy of a Worker, deleting a Worker,
+changing plans or DNS, or touching `rocketcrab.com`.
 Routine redeploys of the approved configurations use the npm scripts pinned
 to Wrangler 4.161.0:
 
@@ -66,34 +65,22 @@ curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$APP/api/turn" -H "Origin: $A
 For local protocol checks, start `npm run dev:api -- --port 2729 --inspector-port 2730`
 and run `npm run test:api:integration`.
 
-## Beta cutover
+### TURN secrets
 
-1. With owner approval, provision `TURN_KEY_ID` and `TURN_KEY_API_TOKEN`
-   on `rocketcrab-nova`. Set each with
-   `npx --yes wrangler@4.161.0 secret put <NAME> --config deploy/nova/wrangler.toml`.
-   Use the existing key credentials from their source or provision a new key.
-2. Run `npm run deploy:nova`. The migration creates fresh SQLite-backed
-   `SignalHub` and `TunnelPair` namespaces. The old Worker keeps serving
-   clients with the previous app bundle, including parties already open.
-   Participants in one party should all reload and use the same build.
-3. Verify the TURN check above, start a live party across two browsers, and
-   verify the tunnel and Workers Logs. Keep `rocketcrab-edge` deployed
-   during validation. Record the versions in **Live state**.
-4. After old browser sessions have drained, get owner approval to delete
-   `rocketcrab-edge` and retire its namespaces. If a new TURN key was
-   provisioned, revoke the old one after its issued credentials expire.
+Provision a dedicated Realtime TURN key for the deployment. Store its ID
+and bearer token as Wrangler secrets on the Nova Worker:
 
-Cloudflare blocks a version rollback across a Durable Object migration. To
-restore the old app during the cutover, build the pre-cutover Nova assets in a
-separate checkout using that revision's origin pins. Copy its
-`apps/nova/dist` into the cutover checkout and redeploy with
-`npx --yes wrangler@4.161.0 deploy --config deploy/nova/wrangler.toml`.
-This retains the new namespaces and serves the old app, which still uses
-`rocketcrab-edge`. [Cloudflare rollback limits](https://developers.cloudflare.com/workers/versions-and-deployments/rollbacks/#bindings)
+```sh
+npx --yes wrangler@4.161.0 secret put TURN_KEY_ID --config deploy/nova/wrangler.toml
+npx --yes wrangler@4.161.0 secret put TURN_KEY_API_TOKEN --config deploy/nova/wrangler.toml
+```
+
+Keep the token in your credential store. Cloudflare returns it when the key is
+created. [Realtime TURN keys](https://developers.cloudflare.com/api/resources/calls/subresources/turn/)
 
 ## Monitoring
 
-After cutover, open Workers & Pages → `rocketcrab-nova` → Observability. Filter the `event` field
+Open Workers & Pages → `rocketcrab-nova` → Observability. Filter the `event` field
 for `nova_connection`: transport outcomes (`direct`, `turn`, `tunnel`,
 `failed`, `unknown`) and product outcomes (`lobby-ready`, `join-failed`,
 `game-ready`) are separate events. Payloads carry no names, room IDs or
@@ -135,9 +122,54 @@ secrets.
       runtime; play with two real devices and confirm Workers Logs shows
       lobby and game readiness next to transport outcomes.
 - [ ] Switch to Workers Paid ($5/month).
-- [ ] Attach `rocketcrab.com` to `rocketcrab-nova`, update
-      `origins.json`, and redeploy both Workers. The runtime must allow the
-      new app origin. The API follows the app to its new hostname.
-- [ ] **Owner:** register a second domain for the runtime and attach it to
-      `rocketcrab-runtime` (a different site from the app, and off
-      workers.dev for the same filter reason).
+
+## Production cutover
+
+1. Add a Cloudflare zone for a separate registrable runtime domain. Choose a
+   hostname there and configure it as a Custom Domain in
+   `deploy/runtime/wrangler.toml`. Add a `[[routes]]` entry with the hostname
+   as `pattern` and `custom_domain = true`. [Cloudflare Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)
+2. Save the existing `rocketcrab.com` DNS records and any Worker, Pages or
+   redirect bindings that serve the legacy app. Agree on a cutover window.
+   Prepare the runtime build to allow the production app by setting both
+   HTTPS origins in `deploy/origins.json`. Deploy the runtime and confirm its
+   `frame-ancestors` header allows `https://rocketcrab.com`.
+3. Resolve any conflicting legacy DNS or product binding for
+   `rocketcrab.com`, then add its Custom Domain to `deploy/nova/wrangler.toml`
+   and deploy Nova. The app and `/api` move together. Keep the legacy app
+   deployment available during validation.
+4. Verify the production editor and cross-site game frame, TURN minting and
+   a party on two networks, including tunnel fallback. If validation fails,
+   detach the Nova Custom Domain and restore the recorded legacy binding and
+   DNS. An ordinary code rollback can restore an earlier version on the
+   same domains if the Durable Object configuration matches.
+5. Once the production setup works, follow **Retire the beta URLs** below.
+
+## Beta teardown
+
+### Retire the beta URLs after launch
+
+Set `workers_dev = false` and keep `preview_urls = false` in both Worker configs,
+then redeploy both. Verify that the custom domains still work and that both
+beta URLs stop serving Rocketcrab. The production Workers and their Durable
+Objects remain in use. If production switched to a separate TURN key, delete
+the beta key after beta traffic has drained. [Disable workers.dev](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/#disabling-workersdev)
+
+### Remove a beta-only deployment entirely
+
+Confirm both Workers serve only the beta URLs and have no production custom
+domains or consumers. Deletion ends active parties and removes the Workers'
+secrets and Durable Object data. Run these from the repo root with the beta
+Cloudflare account selected:
+
+```sh
+npx --yes wrangler@4.161.0 delete --config deploy/nova/wrangler.toml
+npx --yes wrangler@4.161.0 delete --config deploy/runtime/wrangler.toml
+```
+
+In Cloudflare Realtime → TURN, delete the dedicated beta key after confirming
+that it has no other consumers. Delete any TURN API token created solely to
+administer this beta. Verify both Worker scripts and Nova's `SignalHub` and
+`TunnelPair` namespaces are gone, the beta URLs are inactive, and the beta
+key is absent. Leave account-wide workers.dev settings and other applications'
+resources in place. [Wrangler delete](https://developers.cloudflare.com/workers/wrangler/commands/workers/#delete)
