@@ -95,7 +95,7 @@ const setwithfriends: ExternalCatalogGame = {
       if (typeof idToken !== "string") {
         throw new Error("Set with Friends rejected the room request.");
       }
-      await fetch("https://us-central1-setwithfriends.cloudfunctions.net/createGame", {
+      const room = await fetch("https://us-central1-setwithfriends.cloudfunctions.net/createGame", {
         method: "POST",
         body: JSON.stringify({ data: { gameId: roomName, access: "private" } }),
         headers: {
@@ -103,6 +103,9 @@ const setwithfriends: ExternalCatalogGame = {
           "content-type": "application/json",
         },
       });
+      if (!room.ok) {
+        throw new Error(`Set with Friends couldn't create the room (HTTP ${room.status}).`);
+      }
       return { url: `https://setwithfriends.com/room/${roomName}` };
     },
     joinUrl: joinRoomUrl,

@@ -1,3 +1,4 @@
+import { useRef } from "react";
 import { ArrowLeft, PartyPopper } from "lucide-react";
 import { Alert } from "@heroui/react";
 import { toast } from "../../lib/toast";
@@ -35,6 +36,7 @@ export function PartyExperience({
   initialBrowse?: boolean;
 }) {
   const { state, engine, bindContainer } = usePartyEngine();
+  const picking = useRef(false);
 
   const handleLeave = async () => {
     // Failed setup has no party to leave, so do not toast that the player left.
@@ -72,17 +74,14 @@ export function PartyExperience({
     }
   };
 
-  /**
-   * Picking a game from the in-game browse while playing ends the running
-   * game first (session.end flips the phase back to lobby synchronously),
-   * then selects the new game — everyone returns to the lobby with the new
-   * game registered. From the lobby (never playing) the pick is direct.
-   */
-  const handlePickFromInGame = (pick: () => Promise<void>) => {
-    if (state.phase === "playing") {
-      engine.endGame("host_closed");
+  const handlePickFromInGame = async (pick: () => Promise<void>) => {
+    if (picking.current) return;
+    picking.current = true;
+    try {
+      await pick();
+    } finally {
+      picking.current = false;
     }
-    void pick();
   };
 
   const handleKickMember = (memberId: string) => {
@@ -153,8 +152,8 @@ export function PartyExperience({
         onReloadMyGame={handleReloadMyGame}
         onReloadAllGames={handleReloadAllGames}
         onKickMember={handleKickMember}
-        onPickGame={(gameId) => handlePickFromInGame(() => handlePickGame(gameId))}
-        onPickPrebuilt={(entry) => handlePickFromInGame(() => handlePickPrebuilt(entry))}
+        onPickGame={(gameId) => void handlePickFromInGame(() => handlePickGame(gameId))}
+        onPickPrebuilt={(entry) => void handlePickFromInGame(() => handlePickPrebuilt(entry))}
         onClearLogs={() => engine.clearRuntimeLogs()}
       >
         <div className="relative h-full w-full">
@@ -176,8 +175,6 @@ export function PartyExperience({
         state,
         engine,
         handleLeave,
-        handlePickGame,
-        handlePickPrebuilt,
         handleEditName,
         handleKickMember,
         onLeft,
@@ -202,8 +199,6 @@ function renderPhase(
   state: PartyEngineState,
   engine: ReturnType<typeof usePartyEngine>["engine"],
   handleLeave: () => Promise<void>,
-  handlePickGame: (gameId: string) => Promise<void>,
-  handlePickPrebuilt: (entry: CatalogGame) => Promise<void>,
   handleEditName: (name: string) => void,
   handleKickMember: (memberId: string) => void,
   onLeft?: () => void,

@@ -185,7 +185,11 @@ export class PartyEngine {
       this.saveRecovery();
       this.emit();
       if (input !== undefined) {
-        this.registerSource(input);
+        void this.registerSource(input).catch((error: unknown) => {
+          if (this.state.party !== party) return;
+          this.addNotice("error", `Could not register the game: ${errorMessage(error)}`);
+          this.emit();
+        });
       }
     } catch (error) {
       await this.finishFailedSetup(setup, error);
@@ -1098,47 +1102,48 @@ export class PartyEngine {
 
   private startRetryRemainingMs = 0;
 
-  /** Host-only, in the lobby: a Nova game's source, or an external game by id. */
+  /** The host can pick a game in the lobby or replace a running game. */
   async selectGame(selection: PartyGameSelection): Promise<void> {
+    const party = this.state.party;
+    if (!party?.amHost) return;
+    if (this.state.phase !== "lobby" && this.state.phase !== "playing") {
+      throw new Error("Wait for the party to finish connecting or starting, then try again.");
+    }
     if (selection.kind === "external") {
-      await this.selectExternalGame(selection.gameId);
+      await this.selectExternalGame(party, selection.gameId);
       return;
     }
-    if (this.state.phase !== "lobby" || this.state.party === null || !this.state.party.amHost) {
-      return;
-    }
+    if (this.state.phase === "playing") this.endGame("host_closed");
     const { kind: _kind, ...input } = selection;
     this.state.selectGame({ kind: "nova", gameId: input.gameId, title: input.title });
     this.teardownRuntimeFrame();
     // Previous-game verification must not open the new game's start gate.
     this.state.resetSource();
-    await this.replaceGameSession(this.state.party);
+    await this.replaceGameSession(party);
+    if (this.state.party !== party) return;
     this.emit();
-    this.registerSource(input);
+    await this.registerSource(input);
   }
 
   /** Create one external room and share it with all players. */
-  private async selectExternalGame(gameId: string): Promise<void> {
-    if (this.state.phase !== "lobby" || this.state.party === null || !this.state.party?.amHost) {
-      return;
-    }
+  private async selectExternalGame(party: PartySession, gameId: string): Promise<void> {
     const game = findExternalGame(gameId);
-    if (game === undefined) {
-      this.addNotice("error", `Unknown game "${gameId}".`);
-      this.emit();
-      return;
-    }
-    const party = this.state.party;
+    if (game === undefined) throw new Error(`Unknown game "${gameId}".`);
+
     try {
       const room = await game.play.createRoom();
-      // Ignore room creation that finishes after the party changes.
-      if (this.state.party !== party) return;
+      if (this.state.party !== party || !party.amHost || this.state.leaving) return;
+      if (this.state.phase === "playing") this.endGame("host_closed");
+      if (this.state.phase !== "lobby") {
+        throw new Error("Wait for the party to return to the lobby, then try again.");
+      }
+      const announcement = { gameId, room, creatorMemberId: this.state.identity.memberId };
+      await party.announceExternalRoom(announcement);
+      if (this.state.party !== party || this.state.leaving) return;
       this.state.selectGame({
         kind: "external",
-        gameId,
+        ...announcement,
         title: game.name,
-        room,
-        creatorMemberId: this.state.identity.memberId,
         frameEpoch: 0,
         ...playerLimitsOf(game),
       });
@@ -1147,12 +1152,11 @@ export class PartyEngine {
       this.state.registerFrame(this.state.frameTickRate);
       // The UI embeds external games directly; do not keep a Nova runtime alongside them.
       this.teardownRuntimeFrame();
-      await this.state.party.announceExternalRoom(this.externalAnnouncement());
+      this.emit();
     } catch (error) {
-      if (this.state.party !== party) return;
-      this.addNotice("error", `Couldn't set up ${game.name}: ${errorMessage(error)}`);
+      if (this.state.party !== party || this.state.leaving) return;
+      throw new Error(`Couldn't set up ${game.name}: ${errorMessage(error)}`, { cause: error });
     }
-    this.emit();
   }
 
   reloadMyGame(): void {
@@ -1316,8 +1320,9 @@ export class PartyEngine {
    * Defer disposal out of the session event loop and ignore an intervening leave.
    */
   private resetSessionForNextGame(): void {
+    const endedSession = this.state.session;
     queueMicrotask(() => {
-      if (this.state.party === null || this.state.leaving) {
+      if (this.state.party === null || this.state.leaving || this.state.session !== endedSession) {
         return;
       }
       void this.replaceGameSession(this.state.party).catch((error: unknown) => {
@@ -1798,37 +1803,29 @@ export class PartyEngine {
     this.cancelSourceRetransmit = null;
   }
 
-  private registerSource(input: PartySourceSpec): void {
+  private async registerSource(input: PartySourceSpec): Promise<void> {
+    const coordinator = this.state.coordinator;
+    if (coordinator === null) throw new Error("The party can't share the game right now.");
     this.state.stageSource(input);
     void this.maybeBootFrame();
-    const coordinator = this.state.coordinator;
-    if (coordinator === null) {
-      return;
-    }
-    void coordinator
-      .setSource({
-        gameId: input.gameId,
-        title: input.title,
-        apiVersion: input.apiVersion,
-        source: input.source,
-      })
-      .then((metadata) => {
-        this.state.adoptSourceHash(metadata.sourceSha256, this.state.identity.memberId);
-        this.rememberShared(input, metadata.sourceSha256);
-        this.state.verifyLocalSource(metadata.sourceSha256);
-        this.state.setTransfer(this.state.identity.memberId, {
-          fraction: 1,
-          bytesTransferred: input.source.length,
-          totalBytes: input.source.length,
-          state: "complete",
-          detail: "You have the game",
-        });
-        this.emit();
-      })
-      .catch((error: unknown) => {
-        this.addNotice("error", `Could not register the game: ${errorMessage(error)}`);
-        this.emit();
-      });
+    const metadata = await coordinator.setSource({
+      gameId: input.gameId,
+      title: input.title,
+      apiVersion: input.apiVersion,
+      source: input.source,
+    });
+    if (this.state.coordinator !== coordinator || this.state.leaving) return;
+    this.state.adoptSourceHash(metadata.sourceSha256, this.state.identity.memberId);
+    this.rememberShared(input, metadata.sourceSha256);
+    this.state.verifyLocalSource(metadata.sourceSha256);
+    this.state.setTransfer(this.state.identity.memberId, {
+      fraction: 1,
+      bytesTransferred: input.source.length,
+      totalBytes: input.source.length,
+      state: "complete",
+      detail: "You have the game",
+    });
+    this.emit();
   }
 
   /** The verified source of a game shared this session, to save a copy. */

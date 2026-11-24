@@ -6,6 +6,7 @@ import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { gameRepository } from "../lib/games/instance";
 import type { PartyEngineState } from "../lib/party/engine";
+import { toast } from "../lib/toast";
 import { routeTree } from "../routeTree.gen";
 
 const IDLE_STATE: PartyEngineState = {
@@ -194,6 +195,25 @@ describe("/game/:gameId — saved games and party selection", () => {
       expect(stubEngine.selectGame).toHaveBeenCalledWith({ kind: "external", gameId: "drawphone" }),
     );
     await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
+  });
+
+  it("shows a temporary error and stays in game details when selection fails", async () => {
+    stubs.mode = "lobby";
+    const notify = vi.spyOn(toast, "danger").mockImplementation(() => "");
+    stubEngine.selectGame.mockRejectedValueOnce(new Error("The game service is unavailable."));
+    try {
+      const router = renderAt("/game/drawphone?from=party-browse");
+      const select = await screen.findByRole("button", { name: "Select game" });
+      await userEvent.click(select);
+      expect(notify).toHaveBeenCalledWith(
+        "Couldn't select that game: The game service is unavailable.",
+      );
+      expect(router.state.location.pathname).toBe("/game/drawphone");
+      expect(select).toBeEnabled();
+      expect(screen.getByRole("link", { name: "Back to category" })).toBeInTheDocument();
+    } finally {
+      notify.mockRestore();
+    }
   });
 
   it("shares the party shell header (unlinked brand row) while in a lobby", async () => {

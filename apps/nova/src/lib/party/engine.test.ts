@@ -3354,11 +3354,13 @@ describe("party engine — lifecycle cleanup", () => {
     const setSource = vi
       .spyOn(GameSourceCoordinator.prototype, "setSource")
       .mockRejectedValueOnce(new Error("source rejected"));
-    await a.engine.selectGame({
-      gameId: "game_other",
-      title: "Other",
-      source: "<html>other</html>",
-    });
+    await expect(
+      a.engine.selectGame({
+        gameId: "game_other",
+        title: "Other",
+        source: "<html>other</html>",
+      }),
+    ).rejects.toThrow("source rejected");
     await settle(world);
     expect(setSource).toHaveBeenCalledTimes(1);
     setSource.mockRestore();
@@ -3406,6 +3408,28 @@ describe("party engine — lifecycle cleanup", () => {
     await settle(world);
     await retry;
     expect(player.engine.getState().phase).toBe("lobby");
+  });
+
+  it("rejects a failed external room setup without replacing the current game", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    await runCreate(a, world);
+    await registerLocalGame(a, world);
+    await settle(world);
+    const previousGame = a.engine.getState().game;
+    const external = EXTERNAL_GAMES[0]!;
+    const connect = vi
+      .spyOn(external.play, "createRoom")
+      .mockRejectedValueOnce(new Error("offline"));
+    try {
+      await expect(a.engine.selectGame({ kind: "external", gameId: external.id })).rejects.toThrow(
+        "offline",
+      );
+      expect(a.engine.getState().game).toEqual(previousGame);
+      expect(a.engine.getState().notices.some((notice) => notice.level === "error")).toBe(false);
+    } finally {
+      connect.mockRestore();
+    }
   });
 
   it("an external game whose room finishes creating after the party is left does not reach the next party", async () => {
