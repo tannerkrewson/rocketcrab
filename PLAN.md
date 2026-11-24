@@ -160,7 +160,53 @@ Section 1 verified 2026-11-24: `npm run check` passed, and the browser
 suite passed on Chromium and Firefox (31 each). WebKit and the Trystero
 transport suite were not run; the transport itself did not change.
 
-## 2. Before beta
+## 2. Simplify the code (owner direction, 2026-11-24)
+
+Cleanups found while doing section 1, in order: the small duplications go
+first because the engine rewrite builds on them. No behavior changes except
+where a step says so; each step keeps `npm run check` and the browser suite
+green.
+
+- [ ] **One home for shared schemas.** The `defineGame` declaration and the
+      frame's API call payloads are defined three times:
+      `packages/nova-api/src/validation.ts`, `apps/runtime/src/nova-bridge.ts`
+      (`gameDeclarationSchema`, `novaApiCallSchemas`) and
+      `apps/nova/src/lib/arena/api-calls.ts`, with "mirrors" comments and a
+      duplicated min ≤ max player check. Define each once in
+      `@rocketcrab/protocol` and import it everywhere. The runtime's
+      protocol-key renames (`version` → `gameVersion`) stay a thin mapping.
+- [ ] **One frame API call router.** The arena (`lib/arena/engine.ts`) and
+      the party engine (`lib/party/engine-runtime.ts`) each validate a
+      frame's `game.apiCall` and route it to the session (ready, dispatch,
+      controls, stateResponse) with near-identical code. Extract one router
+      both use, keeping only their logging/notice differences as callbacks.
+- [ ] **Remove dead and mirrored protocol.** Delete `peer.capabilities`
+      (schema and tests; nothing sends or reads it). Let the edge Worker own
+      the relay endpoint list and have the app import its type, replacing
+      `RELAY_ENDPOINT_KEYS` and the test that keeps the copies equal. Replace
+      leftover "state mode"/"state-mode" wording in comments.
+- [ ] **Rewrite the party engine as an explicit state machine.** Today seven
+      collaborators (setup, connection, game, runtime, source, snapshot,
+      kinds) call each other through `services()` and mutate one
+      `PartyEngineContext` with dozens of fields; readiness alone spans
+      `selfVerified`, `selfVerifiedSha256`, `currentSourceSha256`,
+      `registered`, `frameStarted`, `frameStartDelivered` and
+      `reloadPending`, and drift between them caused this session's bugs.
+      Model the phase plus per-game state as data changed only through
+      named transitions, derive the snapshot from it, and give tests a
+      public seam so they stop casting the engine to reach private methods
+      (`handleCoordinatorEvent`). Keep `PartyEngineState` and the
+      `engine.test.ts` behavior as the contract; run the full browser suite,
+      including WebKit, before ticking.
+- [ ] **Split the two largest API files.** `packages/nova-api/src/session.ts`
+      (~1,750 lines) and `state-engine.ts` (~2,200) along their existing
+      sections: lifecycle, authority election, snapshots and deltas, ticks,
+      and the byte budget. Pure moves, no behavior change.
+- [ ] **Drop old tracker IDs.** Test names and comments carry IDs such as
+      `(rocketcrab-b73)`, `(2t1.10)` and `(7.43/9fv.11.11)` from trackers
+      that no longer exist. Remove them, keeping the descriptive text.
+
+## 3. Before beta
 
 - [ ] Investigate the extra Firefox fallback socket in the three-player
       tunnel test. The quiz completed, then the socket-count assertion failed
@@ -168,12 +214,12 @@ transport suite were not run; the transport itself did not change.
 - [ ] After the real-device checks below, evaluate room, link, and game
       recovery before consolidating any other retry paths.
 
-## 3. Owner actions
+## 4. Owner actions
 
 - [ ] Configure the Realtime usage alert and Workers/Durable Objects spending
       controls. Confirm the notification destination.
 
-## 4. Live stack smoke test
+## 5. Live stack smoke test
 
 - [ ] Test a game in the editor on the deployed runtime and app. Live
       headers already match `_headers`.
@@ -181,7 +227,7 @@ transport suite were not run; the transport itself did not change.
       lobby and game readiness alongside transport outcomes. Two Chromium
       browsers on one machine passed (`direct`, `lobby-ready`, `game-ready`).
 
-## 5. Real-device checks
+## 6. Real-device checks
 
 Record results here and in the [Mobile Safari checklist](docs/testing/mobile-safari-checklist.md).
 
@@ -211,7 +257,7 @@ Record results here and in the [Mobile Safari checklist](docs/testing/mobile-saf
       struggles, lower `PIXEL_BUDGET` in `SiteBackground.tsx` first.
 - [ ] A friend beta without coaching.
 
-## 6. Cutover (owner approval)
+## 7. Cutover (owner approval)
 
 - [ ] Switch to Workers Paid ($5/month).
 - [ ] Attach `rocketcrab.com` to `rocketcrab-nova`; add it to the edge
