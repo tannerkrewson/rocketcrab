@@ -14,13 +14,9 @@ import {
   type InMemoryTransport,
 } from "@rocketcrab/testing";
 import { RuntimeHostClient, type ChannelPort, type RuntimeHostEvent } from "../runtime-host";
-import { novaApiCallSchemas } from "@rocketcrab/protocol";
+import { routeFrameApiCall } from "../frame-api-calls";
 import { toApiEvent } from "./api-events";
-import {
-  createFrameStateExecutor,
-  type FrameStateExecutor,
-  type FrameStateResponsePayload,
-} from "./state-executor";
+import { createFrameStateExecutor, type FrameStateExecutor } from "./state-executor";
 import type {
   ArenaLogEntry,
   ArenaPlayer,
@@ -603,74 +599,20 @@ export class ArenaEngine {
       );
       return;
     }
-    switch (message.method) {
-      case "ready": {
-        if (!novaApiCallSchemas.ready.safeParse(message.payload).success) {
-          this.logPlayer(
-            runtime.spec.id,
-            "error",
-            "nova.ready() call failed validation at the host; ignored.",
-          );
-          return;
-        }
-        session.ready();
-        break;
-      }
-      case "dispatch": {
-        const parsed = novaApiCallSchemas.dispatch.safeParse(message.payload);
-        if (!parsed.success) {
-          this.logPlayer(
-            runtime.spec.id,
-            "error",
-            "nova.dispatch() call failed validation at the host; ignored.",
-          );
-          return;
-        }
-        void session.dispatch(parsed.data.action, parsed.data.actionId).catch((error: unknown) => {
-          this.sessionError(runtime.spec.id, error);
-          const code =
-            error instanceof Error && "code" in error ? String(error.code) : "invalid_options";
-          this.pushApiEvent(runtime.spec.id, {
-            kind: "actionAck",
-            actionId: parsed.data.actionId,
-            status: "rejected",
-            errorCode: code,
-            errorMessage: errorMessage(error),
-          });
-        });
-        break;
-      }
-      case "controls.set": {
-        const parsed = novaApiCallSchemas["controls.set"].safeParse(message.payload);
-        if (!parsed.success) return;
-        try {
-          session.setControls(parsed.data.controls);
-        } catch (error) {
-          this.logPlayer(runtime.spec.id, "error", errorMessage(error));
-          const code =
-            error instanceof Error && "code" in error ? String(error.code) : "invalid_options";
-          this.pushApiEvent(runtime.spec.id, { kind: "error", code, message: errorMessage(error) });
-        }
-        break;
-      }
-      case "stateResponse": {
-        const parsed = novaApiCallSchemas.stateResponse.safeParse(message.payload);
-        if (!parsed.success) {
-          this.logPlayer(
-            runtime.spec.id,
-            "error",
-            "stateResponse call failed validation at the host; ignored.",
-          );
-          return;
-        }
-        runtime.stateExecutor?.handleResponse(parsed.data as FrameStateResponsePayload);
-        break;
-      }
-    }
-  }
-
-  private sessionError(id: string, error: unknown): void {
-    this.logPlayer(id, "error", errorMessage(error));
+    routeFrameApiCall(message, session, {
+      formatError: errorMessage,
+      onInvalid: (method) => {
+        const call = method === "stateResponse" ? method : `nova.${method}()`;
+        this.logPlayer(
+          runtime.spec.id,
+          "error",
+          `${call} call failed validation at the host; ignored.`,
+        );
+      },
+      onFailure: (_method, message) => this.logPlayer(runtime.spec.id, "error", message),
+      onStateResponse: (payload) => runtime.stateExecutor?.handleResponse(payload),
+      pushApiEvent: (event) => this.pushApiEvent(runtime.spec.id, event),
+    });
   }
 
   private handleRuntimeError(runtime: PlayerRuntime, category: string, message: string): void {

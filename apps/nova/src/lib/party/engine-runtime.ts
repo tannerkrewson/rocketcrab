@@ -1,8 +1,7 @@
-import type { NovaAction } from "@rocketcrab/nova-api";
+import type { GameApiCallMessage } from "@rocketcrab/protocol";
 import { RuntimeHostClient, type RuntimeHostEvent } from "../runtime-host";
-import { novaApiCallSchemas } from "@rocketcrab/protocol";
+import { routeFrameApiCall } from "../frame-api-calls";
 import type { ArenaLogEntry } from "../arena/types";
-import type { FrameStateResponsePayload } from "../arena/state-executor";
 import type { PartyEngineContext } from "./engine-context";
 import type { PartyEngineServices } from "./engine-services";
 import { errorMessage } from "./engine-utils";
@@ -235,62 +234,18 @@ export class PartyRuntime {
     }
   }
 
-  private routeApiCall(message: { method: string; payload: unknown }): void {
+  private routeApiCall(message: GameApiCallMessage): void {
     const session = this.state.session;
-    if (session === null) {
-      return;
-    }
-    const payload = message.payload as Record<string, unknown>;
-    switch (message.method) {
-      case "ready":
-        if (novaApiCallSchemas.ready.safeParse(payload).success) {
-          session.ready();
+    if (session === null) return;
+    routeFrameApiCall(message, session, {
+      onFailure: (method, message) => {
+        if (method === "dispatch") {
+          this.services().snapshot.addNotice("error", `nova.dispatch() failed: ${message}`);
         }
-        break;
-      case "dispatch": {
-        const parsed = novaApiCallSchemas.dispatch.safeParse(payload);
-        if (parsed.success) {
-          void session
-            .dispatch(parsed.data.action as NovaAction, parsed.data.actionId)
-            .catch((error: unknown) => {
-              this.services().snapshot.addNotice(
-                "error",
-                `nova.dispatch() failed: ${errorMessage(error)}`,
-              );
-              const code =
-                error instanceof Error && "code" in error ? String(error.code) : "invalid_options";
-              this.state.runtime?.pushApiEvent({
-                kind: "actionAck",
-                actionId: parsed.data.actionId,
-                status: "rejected",
-                errorCode: code,
-                errorMessage: errorMessage(error),
-              });
-            });
-        }
-        break;
-      }
-      case "controls.set": {
-        const parsed = novaApiCallSchemas["controls.set"].safeParse(payload);
-        if (parsed.success) {
-          try {
-            session.setControls(parsed.data.controls);
-          } catch (error) {
-            const code =
-              error instanceof Error && "code" in error ? String(error.code) : "invalid_options";
-            this.state.runtime?.pushApiEvent({ kind: "error", code, message: errorMessage(error) });
-          }
-        }
-        break;
-      }
-      case "stateResponse": {
-        const parsed = novaApiCallSchemas.stateResponse.safeParse(payload);
-        if (parsed.success) {
-          this.state.stateExecutor?.handleResponse(parsed.data as FrameStateResponsePayload);
-        }
-        break;
-      }
-    }
+      },
+      onStateResponse: (payload) => this.state.stateExecutor?.handleResponse(payload),
+      pushApiEvent: (event) => this.state.runtime?.pushApiEvent(event),
+    });
   }
 
   /**
