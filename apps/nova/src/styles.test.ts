@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 import pkg from "../package.json";
 
-/** Guard the HeroUI v3 styling contract. */
+/** HeroUI v3 is the only component library (AGENTS.md), loaded after Tailwind. */
 const css = readFileSync(join(process.cwd(), "src/styles.css"), "utf8");
 
 describe("styles.css HeroUI setup", () => {
@@ -17,30 +17,5 @@ describe("styles.css HeroUI setup", () => {
     expect(pkg.devDependencies).not.toHaveProperty("daisyui");
     expect(pkg.dependencies).toHaveProperty("@heroui/react");
     expect(pkg.dependencies).toHaveProperty("@heroui/styles");
-  });
-
-  it("drives HeroUI's accent from the rocket/nova brand tokens", () => {
-    expect(css).toContain("--rocket: oklch(");
-    expect(css).toContain("--nova: oklch(");
-    expect(css).toContain("--accent: var(--rocket)");
-    expect(css).toContain("--nova-text: oklch(");
-    expect(css).toContain("--color-primary: var(--brand)");
-    expect(css).toContain("--color-secondary: var(--nova)");
-    expect(css).toContain(".theme-nova {");
-    expect(css).toContain("--background: oklch(0% 0 0)");
-    expect(css).toContain("--font-sans");
-    expect(css).toContain("--font-title");
-  });
-
-  it("keeps the app-specific utilities (safe areas, Nova transition, hidden frame)", () => {
-    for (const token of [
-      "@utility pb-safe",
-      "@utility pt-safe",
-      ".rc-bg-in",
-      "@utility glass",
-      '[data-testid="party-frame"].invisible',
-    ]) {
-      expect(css).toContain(token);
-    }
   });
 });

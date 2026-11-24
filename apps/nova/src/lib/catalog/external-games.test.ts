@@ -94,6 +94,27 @@ describe("external room creation", () => {
     return fetchMock;
   }
 
+  // The production CSP allows the edge relay plus CATALOG_CONNECT_ORIGINS, so a
+  // game that fetches anything else would fail only in a deployed build.
+  it("only fetches origins the CSP's connect-src allows", async () => {
+    vi.stubEnv("VITE_EDGE_ORIGIN", "https://relay.example.net");
+    const fetched: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async (url: RequestInfo | URL) => {
+        fetched.push(new URL(String(url)).origin);
+        throw new Error("no network in tests");
+      }),
+    );
+    for (const entry of EXTERNAL_GAMES) {
+      await entry.play.createRoom().catch(() => undefined);
+    }
+    expect(fetched.length).toBeGreaterThan(0);
+    for (const origin of new Set(fetched)) {
+      expect(["https://relay.example.net", ...CATALOG_CONNECT_ORIGINS]).toContain(origin);
+    }
+  });
+
   it("derives URL rooms from random ids without a fetch", async () => {
     expect((await game("protobowl").play.createRoom()).url).toMatch(
       /^https:\/\/protobowl\.com\/rocketcrab-[0-9a-f]{16}$/,
