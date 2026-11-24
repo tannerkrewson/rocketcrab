@@ -1,6 +1,7 @@
 # Nova remaining-work plan
 
-Remaining work, owner decisions, and release gates for Nova.
+Remaining work, owner decisions, and release gates for Nova. Completed work
+is recorded in git history, not here.
 
 ## Goal and rules (owner direction)
 
@@ -39,109 +40,133 @@ Addresses until cutover are in `deploy/origins.json`. Cloudflare account
 `f82d64d09da6cb5a0afa0120033a7e13`; `rocketcrab.com` still serves the legacy
 site.
 
-## Local verification (2026-11-17)
+## 1. One game list and API cleanup (owner direction, 2026-11-24)
 
-`npm run check` passed. All 84 app browser tests passed across Chromium,
-Firefox, and WebKit, plus 7 dedicated Chromium transport tests. The edge
-deploy dry run and built runtime header verification passed. The hosted
-beta and physical-device checks are still pending.
+### Target design
 
-## Nova UI polish (2026-11-21)
+Today two questions share one answer: who runs the netcode, and where the
+game comes from. Every listed game is Classic and every saved game is
+Nova. Split them apart:
 
-- [x] Align name entry actions and replace the setup spinner during a signaling
-      outage. Party route tests and signaling recovery coverage in `d942d25`.
-- [x] Use blue Molten Metal for Nova, soften the lobby waves, lighten shared
-      surfaces, and confirm local game reloads. `npm run check` passed for `d0e915b`.
-- [x] Streamline the prompt-to-editor handoff and defer the tutorial until the
-      first game import. `npm run check` passed on Node 24.
-- [x] Update the Drift browser test to open Advanced before suspending the
-      authority. Chromium, Firefox, and WebKit passed the focused rerun.
-- [x] Fade between the red and blue Molten Metal palettes on one canvas.
-      Verified navigation in both directions and with reduced motion.
-- [x] Restore red Molten Metal in the lobby and keep the background
-      unmounted while playing. Party route and background tests cover both.
-- [x] Darken shared gray surfaces, match the Welcome card to the other lobby
-      cards, and keep the party header consistent during setup and browsing.
-      The waves fill the card to its rounded edges with shader edge fade set to zero.
-- [x] Space out the Welcome waves and remove tap ripples. A finger drag can
-      move the same wave distortion as the mouse without selecting the text.
-- [x] Use a consistent 56 px Rocketcrab mark across pages and switch to
-      the blue shell on the Build and editor routes. In-game controls have
-      their own buttons and invite copying lives in the game menu.
-- [x] Give the shared Rocketcrab logo a slow, accelerating takeoff when pressed.
-      Browser smoke tests cover replay, reduced motion, and normal Start party navigation.
-- [x] Move local Nova, runtime, and edge ports to 2722–2724. Keep the transport
-      test harness and Worker inspectors on separate ports above the app stack.
-- [x] Combine prompt and HTML import in the empty editor, keep the full prompt
-      expandable, and use history for editor Back. Build and editor tests cover
-      the copy, import, tutorial, and unsaved Back flows.
-- [ ] Investigate the extra Firefox fallback socket in the three-player tunnel
-      test. The quiz completed, then the socket-count assertion failed on both
-      the polished version and the baseline `bb6521a`.
+- **Engine (internal only).** `external` is today's Classic: the game
+  brings its own server, the host creates a room, and every player loads
+  the game's site in an iframe. `nova` is Nova's isolated runtime and state
+  engine. The code keeps this split; the UI never shows it.
+- **Source (what players see).** A game comes from the built-in list, from
+  My games, or from someone in the party. The UI shows one list with badges
+  like "Yours" or "Shared by Sam", plus player count and categories. There
+  are no Classic/Nova labels and no third category.
+- **Hosted Nova games.** A list entry can point at a Nova game's URL (for
+  example GitHub Pages, which sends `Access-Control-Allow-Origin: *`). The
+  host fetches the HTML and hands it to the existing `selectGame`, so
+  hashing, transfer, runtime isolation, authority migration, and "Save to
+  My games" stay unchanged. Joiners never fetch the URL; they get the host's
+  verified bytes, so a deploy in the middle of a party cannot split versions.
+  First-party Nova games use the same path with a relative URL such as
+  `/games/drift.html`.
+- **Rejected: loading a hosted Nova game straight into an iframe.**
+  `window.nova` exists only because the runtime writes the bridge in front
+  of the game in a same-origin frame (`runtime-instance.ts`). A cross-origin
+  `postMessage` bridge would be a second protocol and would bypass the
+  isolated runtime.
 
-## Before beta
+### Decisions
 
-- [x] Prefer self-contained games. Block workers and clipboard access in the
-      deployed runtime policy. Creator prompt and runtime changes in `ac16264`.
-- [x] Charge small tunnel frames against the existing rate budget and use
-      Workers Logs for connection and readiness events (`fa0bcfe`, `9025080`).
-- [x] Confirm the built runtime policy blocks workers in Chromium and Firefox.
-- [ ] Check the deployed runtime headers and confirm that exiting a broken
-      game returns to a usable lobby on iPhone. Headers verified live on
-      2026-11-18. iPhone check pending.
-- [x] Share transport reconnect setup and simplify admission timing. Keep Nova’s
-      readiness acknowledgement and targeted delivery because Trystero’s room
-      membership alone does not establish Nova compatibility or game readiness
-      (`640d38c`).
-- [x] Require peer confirmation before opening a tunnel. The transport regression
-      covers a peer choosing native between the edge’s two pairing notifications.
-      Trystero retries failures after a native channel has already opened.
-- [x] Review native room broadcasts. Keep targeted delivery for now to
-      preserve Nova admission and avoid a second state-sync path. Revisit
-      small explicitly shared updates if host upload becomes a practical limit.
-- [x] Replicate recent rejection results in the existing action history.
-      The authority handoff regression drops the original acknowledgement.
-- [x] Ignore stale wake-up probes after leaving or reconnecting.
-      The lifecycle regression verifies that leaving keeps the app idle.
-- [ ] Use the live iPhone checks to evaluate room, link, and game recovery
-      before consolidating any other retry paths.
-- [x] Audit Trystero shared-state checkpoints. Keep the current snapshot path.
-      Trystero can reject records by timestamp before Nova’s validator runs,
-      so one shared value cannot reliably choose across game terms.
-- [x] Replace simulation mode with ticking state games: `tick` + `tickRate`
-      on the authority, `nova.controls.set` for held input, no per-player view
-      copies without `selectView` (`7c51fdf`, `81748f5`). Spike: 8 players at
-      20 Hz cost ~6% CPU for all sessions in one process; upload was the
-      cost, about half of it view copies. NaN/Map state is stored as
-      replicated (`b4fd922`).
-- [x] Hand authority off when the host's page is hidden (`20530fc`).
-- [ ] Test Drift on real phones: late join, a host that switches apps, and
-      a host that leaves. Check that the puck keeps moving on every screen.
-- [ ] Measure a ticking game's host upload over TURN on cellular with 4–8
-      phones, and lower the default tick rate if it is too costly.
+- Delete raw mode. Nova games have one model, so `mode` goes away entirely.
+- The game's `defineGame` declaration is the only source of its title and
+  player limits. Saved and list metadata stop keeping their own copies.
+- Keep the Classic capabilities that have real uses (host-only URLs,
+  renamed and extra query parameters, player limits). Fold them into the
+  `createRoom`/`joinUrl` redesign below instead of deleting them.
+- Player limits are optional for both engines. "Enforced" means the lobby
+  shows text when the party is below the minimum or above the maximum;
+  starting is still allowed.
+- Set with Friends room creation is tracked in
+  [#139](https://github.com/tannerkrewson/rocketcrab/issues/139), not here.
 
-## 1. Owner actions
+### Steps (in order)
 
-- [x] Approve the first deployment and create the Realtime TURN key. Set both
-      Worker secrets. Deployed 2026-11-18 with both secrets
-      (`deploy/cloudflare.md`, Live state).
+API changes come first: they are breaking, they are cheapest before
+launch, and the list format depends on them.
+
+- [ ] **Remove raw mode.** Delete `nova.raw`, replacing the session when the
+      mode changes (`replaceGameSession`), the mode branches in the runtime
+      and the engine, `NOVA_MODE_LABELS`, and the raw sample game. Update
+      ADR-0006, the AI reference, the master prompt, the README, and the
+      real-device checklist.
+- [ ] **One source for a game's title.** Read it from the game's
+      registration. Stop caching mode and title in saved metadata
+      (`EditorPage.tsx`) and in the runtime bootstrap (`nova-bridge.ts`).
+      Keep an IndexedDB migration for games saved with the old fields.
+- [ ] **Fix the handler context.** Remove `context.self` from action
+      handlers: it resolves to whoever is the authority right now
+      (`state-engine.ts` `contextFor`), so a handler that reads it behaves
+      differently after a migration. Keep `actor`. Use plain join order for
+      `players` in both `context.players` and `nova.players`; today the
+      first puts self first and the second does not.
+- [ ] **Small API fixes.** Make `NovaApi.connectionStatus` read-only, have
+      `NovaGameDeclaration` extend `NovaStateHandlers` instead of copying
+      its fields, and pass the context to `selectView`.
+- [ ] **Optional player limits.** Add `minPlayers`/`maxPlayers` to
+      `defineGame` for Nova games and to list entries for external games.
+      Show lobby text when the party is out of range. When only the limits
+      are set, derive the shown player count from them instead of the
+      free-text `players` field.
+- [ ] **Redesign external games as `createRoom()` + `joinUrl()`.**
+      `createRoom()` returns plain JSON that the host broadcasts.
+      `joinUrl(room, { name, isHost })` runs on each player's device, since
+      every client already ships the list code. This replaces `renameParams`,
+      `customQueryParams`, `afterQueryParams`, and the host-override merge
+      while keeping what they could do, including host-only URLs.
+      `party.classicRoom` then carries only the room JSON. Rename Classic to
+      external in the code in the same step.
+- [ ] **Fix two likely external-game bugs** (`PartyExperience.tsx`):
+      renaming during a game changes the iframe URL and reloads the game,
+      and `isHost` uses `role === "creator"` instead of the current
+      `hostMemberId`. Reproduce each one in a test first.
+- [ ] **One list entry type.** Merge `ClassicGame` and `BrowseEntry` into
+      one entry with shared metadata plus
+      `play: { kind: "external", … } | { kind: "nova", url }`. Split
+      `category` into difficulty and genre, and drop the `netgamesio`
+      provider category. Derive `displayUrlText` from `displayUrlHref`.
+- [ ] **Hosted Nova games.** Fetch the entry's URL in the list module, not
+      the engine (2 MiB limit, readable errors), then call `selectGame`.
+      Build the main origin's `connect-src` from the list the same way
+      `frame-src` is built from `CLASSIC_FRAME_ORIGINS`. Support single-file
+      games first; relative assets can come later through a `baseUrl` in
+      the bootstrap that the runtime writes as `<base href>`.
+- [ ] **Remove Classic/Nova wording from the UI.** One list in the browser,
+      details page, and lobby, with source badges instead of engine labels.
+- [ ] **Merge the engine's game state.** Replace `state.game` plus
+      `state.classicGame` with one `game: { kind: "nova" | "external", … }`
+      and one `selectGame(selection)`. Give each engine a small adapter for
+      readiness, reload, and frame ownership. Remove the special cases:
+      `classicActive` shortcuts in `engine-snapshot.ts`, the "Classic game
+      ready" status text, `classicFrameEpoch`, and the split where the
+      engine owns the Nova frame but the UI owns the external iframe.
+
+## 2. Before beta
+
+- [ ] Investigate the extra Firefox fallback socket in the three-player
+      tunnel test. The quiz completed, then the socket-count assertion failed
+      on both the polished version and the baseline `bb6521a`.
+- [ ] After the real-device checks below, evaluate room, link, and game
+      recovery before consolidating any other retry paths.
+
+## 3. Owner actions
+
 - [ ] Configure the Realtime usage alert and Workers/Durable Objects spending
       controls. Confirm the notification destination.
-- [x] Retire the old relay. `rocketcrab-cors-relay` deleted 2026-11-18 with
-      owner approval (`wrangler delete`; no requests in the prior 4 weeks).
 
-## 2. First deploy and smoke test
+## 4. Live stack smoke test
 
-- [x] Deploy the edge and run the checks in [the runbook](deploy/cloudflare.md).
-      Origin gate, TURN, Classic, sockets, and 429 all passed on 2026-11-18.
-- [ ] Deploy the runtime and app, check headers, and test a game in the editor.
-      Deployed, and live headers match `_headers`. Editor test pending.
+- [ ] Test a game in the editor on the deployed runtime and app. Live
+      headers already match `_headers`.
 - [ ] Play on the live stack with two devices. Confirm that Workers Logs shows
       lobby and game readiness alongside transport outcomes. Two Chromium
       browsers on one machine passed (`direct`, `lobby-ready`, `game-ready`).
-      Two real devices are still pending.
 
-## 3. Real-device checks
+## 5. Real-device checks
 
 Record results here and in the [Mobile Safari checklist](docs/testing/mobile-safari-checklist.md).
 
@@ -152,12 +177,17 @@ Record results here and in the [Mobile Safari checklist](docs/testing/mobile-saf
 - [ ] Four mixed devices; a phone leaves and rejoins.
 - [ ] 2 MiB game source over cellular and over the tunnel.
 - [ ] iPhone Safari backgrounded 1–3 minutes recovers.
+- [ ] Exiting a broken game on iPhone returns to a usable lobby.
 - [ ] A party longer than an hour (one 24 h TURN credential).
 - [ ] Airplane mode and a blocked `/signal` show the messages and recover.
 - [ ] Full create → prompt → paste → test → save → party → play on Mobile
       Safari; master prompt on two AI chat services.
-- [ ] Turn-based, ticking and raw sample games; authority migration; link and
+- [ ] Turn-based and ticking sample games; authority migration; link and
       QR joins.
+- [ ] Drift on real phones: late join, a host that switches apps, and a host
+      that leaves. The puck keeps moving on every screen.
+- [ ] Measure a ticking game's host upload over TURN on cellular with 4–8
+      phones; lower the default tick rate if it is too costly.
 - [ ] WebGL backgrounds (React Bits, `apps/nova/src/vendor/react-bits`) on
       an older/low-end phone: home (site background plus the Nova card) and
       `/build` stay smooth, and the party lobby (site background plus the
@@ -166,7 +196,7 @@ Record results here and in the [Mobile Safari checklist](docs/testing/mobile-saf
       struggles, lower `PIXEL_BUDGET` in `SiteBackground.tsx` first.
 - [ ] A friend beta without coaching.
 
-## 4. Cutover (owner approval)
+## 6. Cutover (owner approval)
 
 - [ ] Switch to Workers Paid ($5/month).
 - [ ] Attach `rocketcrab.com` to `rocketcrab-nova`; add it to the edge
@@ -182,11 +212,12 @@ Record results here and in the [Mobile Safari checklist](docs/testing/mobile-saf
       freeze the app on desktop), and leaving it on workers.dev keeps the
       filter risk.
 
-## Known limits and open decisions
+## Known limits
 
-- **Party size.** No `maxUsers`. Trystero's `scale()` overlay tracks at most
-  2,048 peer descriptors. Practical capacity depends on the game and the
-  authority’s connection. Local browser runs reached 50.
+- **Party size.** No party-wide cap; games can set their own player limits
+  (section 1). Trystero's `scale()` overlay tracks at most 2,048 peer
+  descriptors. Practical capacity depends on the game and the authority’s
+  connection. Local browser runs reached 50.
 - **Peer-link messages are generic** ("Connecting to a player…"). Trystero
   exposes no named pre-connection event.
 - **Networks that block WebSockets to Cloudflare** cannot connect at all. They
@@ -198,8 +229,3 @@ Record results here and in the [Mobile Safari checklist](docs/testing/mobile-saf
       one's changes are already on `nova` (checked with `git cherry`; the
       tunnel-server commits were squashed with identical content):
       `git branch --list 'work/*' --format='%(refname:short)' | xargs git branch -D`
-
-## Legacy branches (no action needed for Nova)
-
-`security/node22-brotli`/`prod`, `deps`, `backup/deps-*`, `vitest-browser*`,
-`allbadcards`, `liesgame`, and old Dependabot branches are pre-Nova work.
