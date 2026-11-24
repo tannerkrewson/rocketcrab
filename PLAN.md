@@ -10,6 +10,10 @@ churn on upgrade), and need no paid always-on server.
 
 ## Before beta
 
+- [ ] Open game details from the in-game library for every player. Ask the
+      host to confirm switching, then transfer and start the new game in
+      place using the existing party readiness checks.
+
 - [ ] After the real-device checks below, evaluate room, link and game
       recovery before consolidating any other retry paths.
 
