@@ -3,7 +3,12 @@ import { defineConfig, devices } from "@playwright/test";
 // E2E smoke tests: the Nova home page renders, and the separate runtime
 // origin (apps/runtime, dev port 2723) serves its page. The root `dev`
 // script starts both apps via concurrently, matching local development.
-const CHROMIUM_ONLY = ["**/connection-errors.spec.ts", "**/signaling-outage.spec.ts"];
+const CHROMIUM_ONLY = [
+  "**/connection-errors.spec.ts",
+  "**/signaling-outage.spec.ts",
+  "**/arena-s4.spec.ts",
+  "**/arena-drift.spec.ts",
+];
 
 export default defineConfig({
   testDir: "./e2e",
@@ -21,9 +26,10 @@ export default defineConfig({
     trace: "on-first-retry",
     navigationTimeout: 30_000,
   },
-  // Error and outage handling is app logic over the same signaling socket in
-  // every browser, so it runs once; specs that touch WebRTC, frames, the
-  // sandbox, or layout run in all three engines.
+  // Error and outage handling is app logic over the same signaling socket,
+  // and the arena is a desktop authoring tool over in-memory transports, so
+  // those run once. Specs that touch WebRTC, the runtime frame and sandbox,
+  // or layout run in all three engines.
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
     {

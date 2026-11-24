@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   TUNNEL_FRAME_OVERHEAD_BYTES,
   TUNNEL_IV_BYTES,
@@ -362,67 +362,70 @@ describe("TunnelCipher", () => {
 
 describe("TunnelCipher call order", () => {
   const BIG = 256 * 1024;
-  // WebCrypto may finish small jobs before large ones. Repetition makes
-  // out-of-order completion likely enough to exercise serialization.
-  const TRIALS = 10;
 
-  it("resolves seals in call order when a later, smaller seal finishes first", async () => {
-    for (let trial = 0; trial < TRIALS; trial += 1) {
-      const { chrome } = await tunnelPair();
-      const order: string[] = [];
-      const big = chrome.seal(bytes(BIG, 1)).then((frame) => {
-        order.push("big");
-        return frame;
+  // Make WebCrypto finish the big job last, deterministically: any encrypt or
+  // decrypt over 1 KiB waits a macrotask first. Without serialization the
+  // small job would resolve first; with it, call order holds.
+  function slowBigJobs(): void {
+    for (const method of ["encrypt", "decrypt"] as const) {
+      const original = crypto.subtle[method].bind(crypto.subtle);
+      vi.spyOn(crypto.subtle, method).mockImplementation(async (algorithm, key, data) => {
+        if ((data as ArrayBuffer | ArrayBufferView).byteLength > 1024) {
+          await new Promise((resolve) => setTimeout(resolve, 10));
+        }
+        return original(algorithm, key, data);
       });
-      const small = chrome.seal(bytes(16, 2)).then((frame) => {
-        order.push("small");
-        return frame;
-      });
-      await Promise.all([big, small]);
-      expect(order).toEqual(["big", "small"]);
     }
+  }
+
+  afterEach(() => {
+    vi.restoreAllMocks();
   });
 
-  it(
-    "resolves opens in call order when a later, smaller frame decrypts first",
-    { timeout: 30_000 },
-    async () => {
-      for (let trial = 0; trial < TRIALS; trial += 1) {
-        const { chrome, firefox } = await tunnelPair();
-        const bigFrame = await chrome.seal(bytes(BIG, 3));
-        const smallFrame = await chrome.seal(bytes(16, 4));
-        const order: string[] = [];
-        const big = firefox.open(bigFrame).then((plaintext) => {
-          order.push("big");
-          return plaintext;
-        });
-        const small = firefox.open(smallFrame).then((plaintext) => {
-          order.push("small");
-          return plaintext;
-        });
-        const [bigPlaintext, smallPlaintext] = await Promise.all([big, small]);
-        expect(order).toEqual(["big", "small"]);
-        expect(bigPlaintext).toEqual(bytes(BIG, 3));
-        expect(smallPlaintext).toEqual(bytes(16, 4));
-      }
-    },
-  );
+  it("resolves seals in call order when a later, smaller seal finishes first", async () => {
+    const { chrome } = await tunnelPair();
+    slowBigJobs();
+    const order: string[] = [];
+    const big = chrome.seal(bytes(BIG, 1)).then(() => order.push("big"));
+    const small = chrome.seal(bytes(16, 2)).then(() => order.push("small"));
+    await Promise.all([big, small]);
+    expect(order).toEqual(["big", "small"]);
+  });
+
+  it("resolves opens in call order when a later, smaller frame decrypts first", async () => {
+    const { chrome, firefox } = await tunnelPair();
+    const bigFrame = await chrome.seal(bytes(BIG, 3));
+    const smallFrame = await chrome.seal(bytes(16, 4));
+    slowBigJobs();
+    const order: string[] = [];
+    const big = firefox.open(bigFrame).then((plaintext) => {
+      order.push("big");
+      return plaintext;
+    });
+    const small = firefox.open(smallFrame).then((plaintext) => {
+      order.push("small");
+      return plaintext;
+    });
+    const [bigPlaintext, smallPlaintext] = await Promise.all([big, small]);
+    expect(order).toEqual(["big", "small"]);
+    expect(bigPlaintext).toEqual(bytes(BIG, 3));
+    expect(smallPlaintext).toEqual(bytes(16, 4));
+  });
 
   it("opens every frame when the wire carries them in resolution order", async () => {
-    for (let trial = 0; trial < TRIALS; trial += 1) {
-      const { chrome, firefox } = await tunnelPair();
-      // The "wire": frames appended in the order their seals resolved, which is
-      // the order a `ws.send(await cipher.seal(x))` loop would transmit them.
-      const wire: { size: number; frame: Uint8Array<ArrayBuffer> }[] = [];
-      await Promise.all([
-        chrome.seal(bytes(BIG, 5)).then((frame) => wire.push({ size: BIG, frame })),
-        chrome.seal(bytes(16, 6)).then((frame) => wire.push({ size: 16, frame })),
-        chrome.seal(bytes(64, 7)).then((frame) => wire.push({ size: 64, frame })),
-      ]);
-      for (const { size, frame } of wire) {
-        const plaintext = await firefox.open(frame);
-        expect(plaintext.byteLength).toBe(size);
-      }
+    const { chrome, firefox } = await tunnelPair();
+    slowBigJobs();
+    // The "wire": frames appended in the order their seals resolved, which is
+    // the order a `ws.send(await cipher.seal(x))` loop would transmit them.
+    const wire: { size: number; frame: Uint8Array<ArrayBuffer> }[] = [];
+    await Promise.all([
+      chrome.seal(bytes(BIG, 5)).then((frame) => wire.push({ size: BIG, frame })),
+      chrome.seal(bytes(16, 6)).then((frame) => wire.push({ size: 16, frame })),
+      chrome.seal(bytes(64, 7)).then((frame) => wire.push({ size: 64, frame })),
+    ]);
+    for (const { size, frame } of wire) {
+      const plaintext = await firefox.open(frame);
+      expect(plaintext.byteLength).toBe(size);
     }
   });
 
