@@ -95,16 +95,17 @@ launch, and the list format depends on them.
       ADR-0006, the AI reference, the master prompt, the README, and the
       real-device checklist. `mode` is gone from the protocol, the API and
       saved games (IndexedDB v3 drops it); `npm run check` passed.
-- [ ] **One source for a game's title.** Read it from the game's
-      registration. Stop caching mode and title in saved metadata
-      (`EditorPage.tsx`) and in the runtime bootstrap (`nova-bridge.ts`).
-      Keep an IndexedDB migration for games saved with the old fields.
-- [ ] **Fix the handler context.** Remove `context.self` from action
-      handlers: it resolves to whoever is the authority right now
-      (`state-engine.ts` `contextFor`), so a handler that reads it behaves
-      differently after a migration. Keep `actor`. Use plain join order for
-      `players` in both `context.players` and `nova.players`; today the
-      first puts self first and the second does not.
+- [x] **One source for a game's title.** Revised: the saved title stays,
+      because people rename games in the editor and My games lists them
+      without running them. The declared title only names a new game on its
+      first save, and the runtime falls back to the saved title when a game
+      declares none. The real duplicate, the cached mode, went with raw mode.
+- [x] **Fix the handler context.** `context.self` is gone (it named the
+      current authority). `context.players` is sorted by id, the same on
+      every device and after a migration: devices only know when they saw
+      each player join, so no join order is shared. `nova.players` keeps
+      this player first, as the AI reference documents. State-engine and
+      contract tests cover both.
 - [ ] **Small API fixes.** Make `NovaApi.connectionStatus` read-only, have
       `NovaGameDeclaration` extend `NovaStateHandlers` instead of copying
       its fields, and pass the context to `selectView`.

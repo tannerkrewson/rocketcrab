@@ -213,7 +213,7 @@ describe("runtime message schemas", () => {
         requestId: "state-1",
         request: {
           kind: "createInitialState",
-          context: { self: { id: "member-1", name: "Alex" }, players: [], revision: 0, now: 1 },
+          context: { players: [], revision: 0, now: 1 },
           viewers: [{ id: "member-1", name: "Alex" }],
         },
       },
@@ -226,7 +226,7 @@ describe("runtime message schemas", () => {
           actionType: "drawCard",
           payload: {},
           state: { deck: ["ace"] },
-          context: { self: { id: "member-1", name: "Alex" }, players: [], revision: 1, now: 1 },
+          context: { players: [], revision: 1, now: 1 },
           viewers: [{ id: "member-1", name: "Alex" }],
         },
       },

@@ -158,6 +158,33 @@ async function startedEngine(options: { historyLimit?: number } = {}): Promise<{
   return { engine, host };
 }
 
+describe("NovaStateEngine handler context", () => {
+  it("sorts players by id, whichever device runs the handlers", async () => {
+    const host = new RecordingHost();
+    // The device's own list is in another order (sessions list self first).
+    host.players = () => [PLAYERS[1]!, PLAYERS[0]!];
+    let seen: readonly NovaPlayer[] = [];
+    const engine = track(
+      new NovaStateEngine({
+        host,
+        executor: new LocalGameExecutor(
+          handlers({
+            createInitialState: (context) => {
+              seen = context.players;
+              return { count: 0, lastActor: null };
+            },
+          }),
+        ),
+        selfMemberId: "member-a",
+        now: () => 1_700_000_000_000,
+      }),
+    );
+    engine.beginGame();
+    expect(await engine.initializeAsAuthority()).toBe(true);
+    expect(seen).toEqual(PLAYERS);
+  });
+});
+
 describe("NovaStateEngine authority start", () => {
   it("creates the initial state, publishes revision 1 with a hash, views, and an announce", async () => {
     const { engine, host } = await startedEngine();

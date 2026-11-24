@@ -35,15 +35,18 @@ export interface NovaPlayer {
 }
 
 /**
- * The context Nova passes to state-mode handler functions
- * (createInitialState / actions / selectView). Plain data only: handler
- * functions never cross a frame boundary, so the context is what the game
- * sees in place of networking or authority concepts.
+ * The context Nova passes to handler functions (createInitialState /
+ * actions / tick / selectView). Plain data only: handler functions never
+ * cross a frame boundary, so the context is what the game sees in place of
+ * networking or authority concepts. Handlers run on whichever device holds
+ * the game, so the context never says which device that is.
  */
 export interface NovaGameContext {
-  /** This game frame's player. */
-  readonly self: NovaPlayer;
-  /** Every connected player, self first, then peers in join order. */
+  /**
+   * Every connected player, sorted by id: the same order on every device,
+   * including after the game moves to another device. Store a turn order in
+   * state if the game needs one.
+   */
   readonly players: readonly NovaPlayer[];
   /** The canonical state revision the handler runs against. */
   readonly revision: number;
@@ -256,7 +259,7 @@ export interface NovaApi {
   log(...args: unknown[]): void;
   /** This player's identity, or null before the host provides one. */
   readonly player: NovaPlayer | null;
-  /** Every player in the game, including this player, in join order. */
+  /** Every player in the game: this player first, then the others as they joined. */
   readonly players: readonly NovaPlayer[];
   /** This player's connection status. Updated as the party connects. */
   connectionStatus: NovaConnectionStatus;

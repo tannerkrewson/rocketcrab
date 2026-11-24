@@ -31,7 +31,7 @@ describe("FrameStateExecutor", () => {
   it("sends createInitialState and correlates the response", async () => {
     const { executor, pushed } = makeHarness();
     const promise = executor.createInitialState({
-      context: { self: PLAYER_A, players: [PLAYER_A, PLAYER_B], revision: 0, now: 1 },
+      context: { players: [PLAYER_A, PLAYER_B], revision: 0, now: 1 },
       viewers: [PLAYER_A, PLAYER_B],
     });
     expect(pushed).toHaveLength(1);
@@ -65,7 +65,6 @@ describe("FrameStateExecutor", () => {
       payload: { deck: "main" },
       state: { deck: ["ace"] },
       context: {
-        self: PLAYER_A,
         players: [PLAYER_A, PLAYER_B],
         revision: 1,
         now: 1,

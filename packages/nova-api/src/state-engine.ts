@@ -2190,10 +2190,14 @@ export class NovaStateEngine {
   // Context, helpers
   // ------------------------------------------------------------------
 
+  /**
+   * Handlers may run on any device, so the context never names the device
+   * running them, and `players` is sorted by id: the same order everywhere,
+   * before and after a migration.
+   */
   private contextFor(revision: number, actor?: NovaPlayer): NovaGameContext {
     return {
-      self: this.host.players()[0] ?? { id: this.selfMemberId, name: this.selfMemberId },
-      players: this.host.players(),
+      players: [...this.host.players()].sort(compareById),
       revision,
       now: this.now(),
       ...(actor !== undefined ? { actor } : {}),
@@ -2312,4 +2316,9 @@ export class NovaStateEngine {
 function serializedBytesSync(value: unknown): number {
   const json = JSON.stringify(value);
   return new TextEncoder().encode(json).length;
+}
+
+/** Code-unit order by id, identical on every device (no locale rules). */
+function compareById(a: NovaPlayer, b: NovaPlayer): number {
+  return a.id < b.id ? -1 : a.id > b.id ? 1 : 0;
 }

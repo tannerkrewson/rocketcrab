@@ -29,6 +29,7 @@ nova.defineGame({
   title: "My Game", // <= 64 chars
   apiVersion: 1, // always include: keeps this game working after API changes
   createInitialState(context) {
+    // context.players = everyone, sorted by id (the same on every device).
     return {}; // the starting state (plain JSON)
   },
   actions: {

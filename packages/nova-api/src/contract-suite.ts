@@ -345,6 +345,37 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       expect(b.getStateModeDiagnostics().authorityMemberId).toBe("member-a");
     });
 
+    it("gives handlers a context that is the same on every device", async () => {
+      const contexts: Array<Record<string, unknown>> = [];
+      const { harness, a, b } = await makePair(harnessFactory, {
+        handlers: {
+          createInitialState: (context) => {
+            contexts.push({ ...context });
+            return { n: 0 };
+          },
+          actions: {
+            bump: (draft: { n: number }, context) => {
+              contexts.push({ ...context });
+              draft.n += 1;
+            },
+          },
+        },
+      });
+      await startBoth({ harness, a, b });
+      await b.client.dispatch({ type: "bump" });
+      await settle(harness);
+      const players = [
+        { id: "member-a", name: "Ada" },
+        { id: "member-b", name: "Ben" },
+      ];
+      expect(contexts).toHaveLength(2);
+      expect(Object.keys(contexts[0]!).sort()).toEqual(["now", "players", "revision"]);
+      expect(contexts[0]!.players).toEqual(players);
+      expect(Object.keys(contexts[1]!).sort()).toEqual(["actor", "now", "players", "revision"]);
+      expect(contexts[1]!.actor).toEqual({ id: "member-b", name: "Ben" });
+      expect(contexts[1]!.players).toEqual(players);
+    });
+
     it("applies actions on the authority and updates every player's view", async () => {
       const { harness, a, b } = await makePair(harnessFactory, {
         handlers: contractGameHandlers(),
