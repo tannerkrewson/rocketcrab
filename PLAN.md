@@ -10,6 +10,14 @@ churn on upgrade), and need no paid always-on server.
 
 ## Before beta
 
+- [ ] Serve Nova assets and the party API from one Worker, under /api for
+      TURN, room creation, signaling, fallback tunnels, and connection logs.
+      Keep the runtime on a separate site. Verify the local proxy and
+      combined Worker before the live cutover.
+- [ ] With owner approval, configure TURN secrets and deploy the combined
+      Nova Worker to the beta hostname. Verify the new API in a live party
+      before retiring the old Edge Worker. See deploy/README.md.
+
 - [ ] After the real-device checks below, evaluate room, link and game
       recovery before consolidating any other retry paths.
 
