@@ -1,6 +1,4 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RELAY_ENDPOINT_KEYS } from "../../apps/nova/src/lib/catalog/relay";
-import { RELAY_ENDPOINTS } from "./relay";
 import { MINT_TTL_SECONDS, dropPort53, isPort53IceUrl } from "./turn";
 import edge, { type EdgeEnv, parseAllowlist } from "./worker";
 
@@ -131,10 +129,6 @@ describe("gate", () => {
 });
 
 describe("external-game room relay", () => {
-  it("matches the client's endpoint list", () => {
-    expect(Object.keys(RELAY_ENDPOINTS).sort()).toEqual([...RELAY_ENDPOINT_KEYS].sort());
-  });
-
   it("forwards POST bodies to the fixed endpoint and passes JSON through", async () => {
     const fetchMock = mockFetch(Response.json({ gameCode: "ABCD" }));
     const response = await relay({ endpoint: "ooc-rocketcrab", body: { game: "x" } });

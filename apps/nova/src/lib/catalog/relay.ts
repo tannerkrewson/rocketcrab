@@ -4,21 +4,10 @@
  * create rooms through it; builds without VITE_EDGE_ORIGIN get a readable
  * error instead of a confusing CORS failure.
  */
+import type { RelayEndpointKey } from "../../../../../deploy/edge/relay";
 import { edgeOrigin } from "../edge";
 
-/** Mirror of the Worker's RELAY_ENDPOINTS keys (deploy/edge/worker.test.ts checks them). */
-export const RELAY_ENDPOINT_KEYS = [
-  "drawphone-new",
-  "dpk-new",
-  "netgamesio-new",
-  "ooc-rocketcrab",
-  "secret-hitler-netlify",
-  "snakeout-new",
-  "spyfall-new",
-  "werewolf-newroom",
-] as const;
-
-export type RelayEndpointKey = (typeof RELAY_ENDPOINT_KEYS)[number];
+export type { RelayEndpointKey } from "../../../../../deploy/edge/relay";
 
 export interface RelayRequestOptions {
   /** JSON payload forwarded to POST endpoints (defaults to {}). */

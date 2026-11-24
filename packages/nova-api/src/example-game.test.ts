@@ -1,7 +1,7 @@
 /**
- * State-mode example game, executed end to end.
+ * Nova example game, executed end to end.
  *
- * `packages/testing/fixtures/games/nova-quiz.html` is a single-file state-mode game. Its inline
+ * `packages/testing/fixtures/games/nova-quiz.html` is a single-file Nova game. Its inline
  * module script runs against real session-backed `nova` clients (the same
  * clients the runtime frame bridge builds) over the in-memory transport, so
  * this suite exercises the REAL state engine: action application on the

@@ -67,11 +67,11 @@ export interface NovaTickContext extends NovaGameContext {
   readonly controls: Readonly<Record<string, unknown>>;
 }
 
-/** A state-mode tick: advance the Immer draft by one fixed step of `dt`. */
+/** A tick: advance the Immer draft by one fixed step of `dt`. */
 export type NovaTickHandler = (draft: any, context: NovaTickContext) => void | unknown;
 
 /**
- * One state-mode action handler (ADR-0006): validate and mutate the Immer
+ * One action handler (ADR-0006): validate and mutate the Immer
  * draft. May also return a new state to replace the draft (Immer recipe
  * semantics). Handlers may be synchronous or async; Nova applies them on the
  * current authority's runtime and Nova owns ordering, deduplication, and
@@ -89,7 +89,7 @@ export type NovaStateActionHandler = (
   payload: any,
 ) => void | unknown;
 
-/** The action table a state-mode game registers (keyed by action type). */
+/** The action table a game registers (keyed by action type). */
 export interface NovaStateActions {
   readonly [type: string]: NovaStateActionHandler;
 }
@@ -143,7 +143,7 @@ export interface NovaGameDeclaration extends NovaStateHandlers {
 }
 
 /**
- * One action dispatched in state mode. Nova owns action ordering,
+ * One dispatched action. Nova owns action ordering,
  * deduplication, and application (ADR-0006); the game only describes the
  * action.
  */
@@ -273,14 +273,14 @@ export interface NovaApi {
   /** Subscribe to API errors. Returns an unsubscribe function. */
   onError(handler: (error: NovaError) => void): () => void;
   /**
-   * Dispatch one action (state mode). Resolves once the authority applied
+   * Dispatch one action. Resolves once the authority applied
    * the action (committed a new revision); rejects with a {@link NovaError}
    * when the authority rejected it (`errorCode` carries the stable code,
    * e.g. `stale_revision`, `timed_out`, `unknown_action`) or when no ack
    * arrives in time. Only available after the game starts.
    */
   dispatch(action: NovaAction): Promise<void>;
-  /** Read and subscribe to canonical state (state mode). */
+  /** Read and subscribe to canonical state. */
   readonly state: NovaStateHandle;
   /**
    * This player's controls for a ticking game: what they are doing right

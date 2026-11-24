@@ -1,5 +1,5 @@
 /**
- * The state-mode engine: Nova's authority-side state machine.
+ * Nova's authority-side state machine.
  *
  * The engine lives inside the host-side NovaSession and owns the action
  * protocol independently of game code:
@@ -348,7 +348,7 @@ function announcementWins(
 }
 
 /**
- * The state-mode engine. One instance per session; only the authority's
+ * The state engine. One instance per session; only the authority's
  * instance applies actions, every instance keeps the replicated canonical
  * state for migration (ADR-0007) and tracks the authority and its term.
  */

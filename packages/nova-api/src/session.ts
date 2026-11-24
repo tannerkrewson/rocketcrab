@@ -100,7 +100,7 @@ export interface NovaSessionOptions {
     readonly version?: string;
   };
   /**
-   * The state-mode executor. The arena injects a frame executor that
+   * The state executor. The arena injects a frame executor that
    * runs the game's handlers inside the authority's runtime frame; when
    * omitted, handlers registered through `nova.defineGame` run in-process
    * (contract suite / tests) with the real immer package.
@@ -764,7 +764,7 @@ export class NovaSession implements NovaClientBackend {
         targetMemberId: peer.memberId,
       }).catch((error: unknown) => this.emitError(error));
     }
-    // State-mode late join: the authority hands the new shell the current canonical
+    // Late joins: the authority hands the new shell the current canonical
     // state (migration copy) and computes the new player's selected view.
     if (this.started && this.engine.isAuthorityElect()) {
       if (this.engine.getCanonicalState() !== null) {

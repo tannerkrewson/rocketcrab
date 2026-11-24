@@ -41,7 +41,7 @@ export const novaPlayerSchema = z.object({
 export type NovaPlayer = z.infer<typeof novaPlayerSchema>;
 
 /**
- * State-mode requests the host sends into the authority's game frame
+ * State requests the host sends into the authority's game frame
  * (`stateRequest` apiEvent): create the initial state, apply one action to
  * the canonical state, or compute one player's view. The game's handler
  * functions live in the frame; only plain data crosses the boundary.

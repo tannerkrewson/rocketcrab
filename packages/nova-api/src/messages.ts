@@ -86,7 +86,7 @@ export function buildPlayerIdentityMessage(
   );
 }
 
-/** Build and validate an `action.dispatch` message (state mode). */
+/** Build and validate an `action.dispatch` message. */
 export function buildActionDispatchMessage(
   base: PeerMessageBase,
   input: {
@@ -138,7 +138,7 @@ export function buildActionAckMessage(
   );
 }
 
-/** Build and validate a `state.snapshot` message (state mode). */
+/** Build and validate a `state.snapshot` message. */
 export function buildStateSnapshotMessage(
   base: PeerMessageBase,
   input: {

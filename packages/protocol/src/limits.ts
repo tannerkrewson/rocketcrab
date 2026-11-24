@@ -22,11 +22,11 @@ export const htmlSourceWarnBytes = Math.floor(htmlSourceBytes * LIMIT_WARN_FRACT
 export const messageBytesBeforeChunking = 64 * 1024; // 64 KiB
 export const messageWarnBytes = Math.floor(messageBytesBeforeChunking * LIMIT_WARN_FRACTION);
 
-/** Hard cap on one canonical state snapshot (ADR-0006 state mode). */
+/** Hard cap on one canonical state snapshot (ADR-0006). */
 export const stateSnapshotBytes = 512 * 1024; // 512 KiB
 export const stateSnapshotWarnBytes = Math.floor(stateSnapshotBytes * LIMIT_WARN_FRACTION);
 
-/** Hard cap on one action payload (ADR-0006 state mode). */
+/** Hard cap on one action payload (ADR-0006). */
 export const actionPayloadBytes = 16 * 1024; // 16 KiB
 export const actionPayloadWarnBytes = Math.floor(actionPayloadBytes * LIMIT_WARN_FRACTION);
 
@@ -99,7 +99,7 @@ export const authorityHeartbeatIntervalMs = 1_000;
  */
 export const authorityGracePeriodMs = 5_000;
 
-/** Ticks per second for a state-mode game with a `tick` handler, unless it declares one. */
+/** Ticks per second for a game with a `tick` handler, unless it declares one. */
 export const tickRateDefault = 15;
 
 /** Fastest declared tick rate. */

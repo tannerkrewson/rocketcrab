@@ -1,8 +1,8 @@
 /**
- * The state-mode executor seam: the single place the state engine
+ * The state executor seam: the single place the state engine
  * asks a game to run its functions.
  *
- * State-mode games register handler functions (`createInitialState`,
+ * Games register handler functions (`createInitialState`,
  * `actions`, `selectView`) that never cross a frame boundary — Nova shells
  * retain the canonical state, and the current authority's runtime executes
  * action handlers through Immer (ADR-0006). The engine therefore never

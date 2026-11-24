@@ -20,7 +20,6 @@ import {
   partyExternalRoomRequestMessageSchema,
   partyKickMessageSchema,
   partyReloadAllMessageSchema,
-  peerCapabilitiesMessageSchema,
   peerMessagesSchema,
   playerIdentityMessageSchema,
   stateResyncMessageSchema,
@@ -53,7 +52,6 @@ describe("peer message schemas", () => {
       partyReloadAllMessageSchema,
       playerIdentityMessageSchema,
       connectionStatusMessageSchema,
-      peerCapabilitiesMessageSchema,
       actionDispatchMessageSchema,
       actionAcknowledgementMessageSchema,
       stateSnapshotMessageSchema,
@@ -111,14 +109,6 @@ describe("peer message schemas", () => {
         basePeer({
           type: "peer.connectionStatus",
           status: "online",
-        }),
-      ),
-      peerCapabilitiesMessageSchema.parse(
-        basePeer({
-          type: "peer.capabilities",
-          protocolVersions: [1],
-          chunkedMessages: true,
-          binaryPayloads: true,
         }),
       ),
       actionDispatchMessageSchema.parse(
@@ -242,7 +232,6 @@ describe("peer message schemas", () => {
       basePeer({ type: "party.reloadAll", sessionId: "" }),
       basePeer({ type: "player.identity", authorityEligible: "yes" }),
       basePeer({ type: "peer.connectionStatus", status: "connected" }),
-      basePeer({ type: "peer.capabilities", protocolVersions: [] }),
       basePeer({
         type: "action.dispatch",
         seq: 1,

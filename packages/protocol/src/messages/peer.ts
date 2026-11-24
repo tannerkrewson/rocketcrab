@@ -135,19 +135,8 @@ export const connectionStatusMessageSchema = z.object({
 });
 export type ConnectionStatusMessage = z.infer<typeof connectionStatusMessageSchema>;
 
-/** Peer capability declaration (ADR-0003 transport abstraction). */
-export const peerCapabilitiesMessageSchema = z.object({
-  ...peerEnvelopeFields,
-  type: z.literal("peer.capabilities"),
-  protocolVersions: z.array(z.number().int().min(1)).min(1),
-  chunkedMessages: z.boolean(),
-  binaryPayloads: z.boolean(),
-  maxMessageBytes: z.number().int().positive().optional(),
-});
-export type PeerCapabilitiesMessage = z.infer<typeof peerCapabilitiesMessageSchema>;
-
 /**
- * Action dispatch (ADR-0006 state mode): an ordered action with a base
+ * Action dispatch (ADR-0006): an ordered action with a base
  * revision, deduplication ID, and timeout. Payload size is bounded by
  * `actionPayloadBytes` at the serialization boundary.
  */
@@ -439,7 +428,6 @@ export const peerMessagesSchema = z.discriminatedUnion("type", [
   partyKickMessageSchema,
   partyReloadAllMessageSchema,
   connectionStatusMessageSchema,
-  peerCapabilitiesMessageSchema,
   actionDispatchMessageSchema,
   actionAcknowledgementMessageSchema,
   stateSnapshotMessageSchema,

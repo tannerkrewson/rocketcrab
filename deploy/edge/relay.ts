@@ -1,7 +1,6 @@
 /**
  * Create external-game rooms whose upstream endpoints lack CORS support. Only the
- * fixed endpoints below are reachable; never act as an open proxy. Keep the
- * client RELAY_ENDPOINT_KEYS mirror in sync (worker.test.ts).
+ * fixed endpoints below are reachable; never act as an open proxy.
  *
  * Request: { endpoint, body?, urlId? }. Return upstream JSON, or the final
  * redirect URL as { url } for netgames.io.
@@ -14,7 +13,7 @@ interface RelayEndpoint {
   method: "POST" | "GET";
 }
 
-export const RELAY_ENDPOINTS: Record<string, RelayEndpoint> = {
+const RELAY_ENDPOINTS = {
   "drawphone-new": { url: "https://drawphone.tannerkrewson.com/new", method: "POST" },
   "dpk-new": { url: "https://dpk.tannerkrewson.com/new", method: "POST" },
   "netgamesio-new": { url: "https://netgames.io/games/{urlId}/new", method: "GET" },
@@ -26,7 +25,9 @@ export const RELAY_ENDPOINTS: Record<string, RelayEndpoint> = {
   "snakeout-new": { url: "https://snakeout.tannerkrewson.com/new", method: "POST" },
   "spyfall-new": { url: "https://spyfall.tannerkrewson.com/new", method: "POST" },
   "werewolf-newroom": { url: "https://werewolf.uber.space/newRoom", method: "POST" },
-};
+} satisfies Record<string, RelayEndpoint>;
+
+export type RelayEndpointKey = keyof typeof RELAY_ENDPOINTS;
 
 const URL_ID = /^[A-Za-z0-9-]+$/;
 
@@ -41,7 +42,8 @@ export async function handleRelay(request: Request): Promise<Response> {
     return jsonError(400, "invalid_body", "body must be a JSON object");
   }
   const { endpoint, body, urlId } = envelope as Record<string, unknown>;
-  const entry = typeof endpoint === "string" ? RELAY_ENDPOINTS[endpoint] : undefined;
+  const entry =
+    typeof endpoint === "string" ? RELAY_ENDPOINTS[endpoint as RelayEndpointKey] : undefined;
   if (entry === undefined) {
     return jsonError(404, "unknown_endpoint", `unknown endpoint "${String(endpoint)}"`);
   }

@@ -7,7 +7,7 @@
  * (real parties) must pass the same suite (ADR-0003: the game-facing
  * API behaves identically over both transports).
  *
- * state mode is exercised through the same transport-neutral seam games
+ * the state engine is exercised through the same transport-neutral seam games
  * use in the arena: handlers registered via `nova.defineGame` run
  * in-process (LocalGameExecutor, immer), so the suite covers initial
  * state, revisioned snapshots, per-player views, sequential application,
@@ -320,7 +320,7 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
     });
 
     // ------------------------------------------------------------------
-    // state mode
+    // state and actions
     // ------------------------------------------------------------------
 
     it("creates the initial state and delivers each player's selected view", async () => {
@@ -807,7 +807,7 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
     });
 
     // ------------------------------------------------------------------
-    // ticking games (state mode with a tick)
+    // ticking games
     // ------------------------------------------------------------------
 
     it("ticks on the authority and steps each player by their controls", async () => {
