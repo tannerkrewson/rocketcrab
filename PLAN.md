@@ -214,10 +214,14 @@ green.
       The Firefox tunnel-count assertion also failed on the pre-refactor
       commit in Podman and passed on a native Firefox retry of this step.
       The test-driver lint follow-up also passed `npm run check` (1,269 tests).
-- [ ] **Split the two largest API files.** `packages/nova-api/src/session.ts`
+- [x] **Split the two largest API files.** `packages/nova-api/src/session.ts`
       (~1,750 lines) and `state-engine.ts` (~2,200) along their existing
       sections: lifecycle, authority election, snapshots and deltas, ticks,
       and the byte budget. Pure moves, no behavior change.
+      Evidence: `e3710ab`, `npm run check` passed (1,269 tests) and Chromium
+      passed 31 of 31. Internal base classes keep moved method bodies and
+      their shared state together. A source comparison matched 151 method
+      bodies, with wiring changes for session construction and byte budgeting.
 - [ ] **Drop old tracker IDs.** Test names and comments carry IDs such as
       `(rocketcrab-b73)`, `(2t1.10)` and `(7.43/9fv.11.11)` from trackers
       that no longer exist. Remove them, keeping the descriptive text.
