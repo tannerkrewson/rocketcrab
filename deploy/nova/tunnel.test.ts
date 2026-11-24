@@ -6,7 +6,6 @@ import {
   PAIRED_FRAME,
   PARTNER_WAIT_MS,
   PAIR_LIFETIME_MS,
-  LIFETIME_BYTES_PER_SOCKET,
   TunnelPair,
   sendableCloseCode,
 } from "./tunnel";
@@ -16,6 +15,7 @@ interface Attachment {
   closedByServer: boolean;
   tokens: number;
   lastRefillMs: number;
+  unreservedBytes?: number;
 }
 
 interface FakeSocket {
@@ -253,13 +253,14 @@ describe("TunnelPair relay budget", () => {
     const { typed, pairUp, wake } = setup();
     const { a, b } = await pairUp();
     const bytes = frame(256);
-    // Each wake can use a new reservation only after persisting its charge.
-    for (let i = 1; i < LIFETIME_BYTES_PER_SOCKET / BURST_BYTES; i++) {
-      clock.mockReturnValue(1_000 + i * 1_000);
-      wake().webSocketMessage(typed(a), bytes);
-      expect(b.send).toHaveBeenLastCalledWith(bytes);
-    }
+    a.stored = { ...a.stored!, unreservedBytes: 64 * 1024 };
+    // The woken object has only the persisted allowance. It must reserve from
+    // it before forwarding, and a later wake cannot spend that reservation again.
+    wake().webSocketMessage(typed(a), bytes);
+    expect(b.send).toHaveBeenLastCalledWith(bytes);
+    expect(a.stored).toMatchObject({ unreservedBytes: 0 });
     expect(a.close).not.toHaveBeenCalled();
+    clock.mockReturnValue(2_000);
     wake().webSocketMessage(typed(a), bytes);
     expect(a.close).toHaveBeenCalledWith(1008, "lifetime byte limit");
     expect(b.close).toHaveBeenCalledWith(1008, "lifetime byte limit");
@@ -298,10 +299,10 @@ describe("TunnelPair relay budget", () => {
     vi.spyOn(Date, "now").mockReturnValue(1_000);
     const { pair, typed, pairUp, wake } = setup();
     const { a, b } = await pairUp();
-    // Three 256 KiB frames within 1 s: 768 KiB spent, of which 512 KiB is written.
+    // Three 256 KiB frames within 1 s leave a partially spent reservation.
     for (let i = 0; i < 3; i++) pair.webSocketMessage(typed(a), frame(FRAME_256K));
     const trueRemaining = BURST_BYTES - 3 * FRAME_256K;
-    // The woken object rebuilds from the last write, so it sees the bucket as of 512 KiB spent.
+    // The woken object rebuilds from the last write.
     const woke = wake();
     let accepted = 0;
     for (let i = 0; i < 32 && a.close.mock.calls.length === 0; i++) {

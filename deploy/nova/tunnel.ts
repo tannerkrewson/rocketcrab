@@ -47,7 +47,7 @@ export const PARTNER_WAIT_MS = 30_000;
 export const PAIR_LIFETIME_MS = 6 * 60 * 60 * 1000;
 /** Each direction may forward up to 512 MiB, for a combined 1 GiB cap. */
 export const LIFETIME_BYTES_PER_SOCKET = 512 * 1024 * 1024;
-const LIFETIME_RESERVATION_BYTES = BURST_BYTES;
+const MIN_LIFETIME_RESERVATION_BYTES = 64 * 1024;
 /** Server-to-client text frame sent to both sides once the pair is complete. */
 export const PAIRED_FRAME = "paired";
 const MAX_SOCKETS = 2;
@@ -173,9 +173,8 @@ export class TunnelPair {
         this.write(socket, {
           generation,
           deadline,
-          unreservedBytes: LIFETIME_BYTES_PER_SOCKET - LIFETIME_RESERVATION_BYTES,
+          unreservedBytes: LIFETIME_BYTES_PER_SOCKET,
         });
-        this.bucketOf(socket, now).reservedBytes = LIFETIME_RESERVATION_BYTES;
       }
       try {
         await this.ctx.storage.setAlarm(deadline);
@@ -216,22 +215,29 @@ export class TunnelPair {
       this.closePair(socket, 1008, "rate limit");
       return;
     }
+    let reserve = 0;
     if (att.generation !== null) {
       if (bucket.reservedBytes < charge) {
-        const reserve = Math.min(LIFETIME_RESERVATION_BYTES, att.unreservedBytes);
+        // Small frames reserve less so an idle connection loses little unused
+        // capacity on hibernation. Large frames amortize the attachment write.
+        reserve = Math.min(
+          Math.max(MIN_LIFETIME_RESERVATION_BYTES, charge * 2),
+          att.unreservedBytes,
+        );
         if (!(bucket.reservedBytes + reserve >= charge)) {
           this.closePair(socket, 1008, "lifetime byte limit");
           return;
         }
         bucket.reservedBytes += reserve;
-        this.write(socket, { unreservedBytes: att.unreservedBytes - reserve });
       }
       bucket.reservedBytes -= charge;
     }
     bucket.tokens = tokens - charge;
     bucket.lastRefillMs = now;
     bucket.spentSincePersist += charge;
-    if (
+    if (reserve > 0) {
+      this.write(socket, { unreservedBytes: att.unreservedBytes - reserve });
+    } else if (
       bucket.lastRefillMs - bucket.persistedMs >= PERSIST_INTERVAL_MS ||
       bucket.spentSincePersist >= PERSIST_SPENT_BYTES
     )

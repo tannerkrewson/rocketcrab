@@ -68,6 +68,7 @@ export class SignalHub {
     const attachment = this.sockets.get(socket);
     if (!attachment) return;
     const now = Date.now();
+    if (now - attachment.lastRefillMs >= idleMs) return this.reject(socket, "signaling idle");
     attachment.tokens = Math.min(
       burst,
       attachment.tokens + Math.max(0, now - attachment.lastRefillMs) * refillPerMs,
