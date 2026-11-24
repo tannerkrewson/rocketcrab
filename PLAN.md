@@ -178,11 +178,14 @@ green.
       Evidence: `b5c16dc`, `npm run check` passed (1,270 tests) with two Vitest
       workers after a tick timing failure. Chromium passed 30 of 31 on the
       first run. The tunnel test passed on an isolated retry.
-- [ ] **One frame API call router.** The arena (`lib/arena/engine.ts`) and
+- [x] **One frame API call router.** The arena (`lib/arena/engine.ts`) and
       the party engine (`lib/party/engine-runtime.ts`) each validate a
       frame's `game.apiCall` and route it to the session (ready, dispatch,
       controls, stateResponse) with near-identical code. Extract one router
       both use, keeping only their logging/notice differences as callbacks.
+      Evidence: `943c34b`, `npm run check` passed (1,270 tests) when run without
+      Playwright competing for resources after the tick timing failure recurred.
+      Chromium passed 31 of 31.
 - [ ] **Remove dead and mirrored protocol.** Delete `peer.capabilities`
       (schema and tests; nothing sends or reads it). Let the edge Worker own
       the relay endpoint list and have the app import its type, replacing
