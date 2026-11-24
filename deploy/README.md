@@ -19,14 +19,14 @@ run the Worker first.
 
 | Route                   | Purpose                                                                |
 | ----------------------- | ---------------------------------------------------------------------- |
-| `POST /api/turn`        | Issues a 24-hour Cloudflare Realtime TURN credential.                  |
+| `POST /api/turn`        | Issues a 4-hour Cloudflare Realtime TURN credential after Turnstile.   |
 | `POST /api/relay`       | Creates external-game rooms through a fixed list of upstream URLs.     |
 | `GET /api/signal/:room` | Trystero signaling, one hibernating Durable Object per room.           |
 | `GET /api/tunnel/:pair` | Encrypted WebSocket fallback, one hibernating Durable Object per pair. |
 | `POST /api/log`         | Writes connection and readiness events to Workers Logs.                |
 
 The API checks that browser requests are same-origin. HTTP limits are
-approximate, per IP, route and Cloudflare location: 120/min for TURN and the
+approximate, per IP, route and Cloudflare location: 60/min for TURN and the
 room relay, 2,000/min for signaling, tunnel upgrades and reports. The socket
 handlers also budget signaling messages and tunnel bytes.
 
@@ -77,6 +77,11 @@ npx --yes wrangler@4.161.0 secret put TURN_KEY_API_TOKEN --config deploy/nova/wr
 
 Keep the token in your credential store. Cloudflare returns it when the key is
 created. [Realtime TURN keys](https://developers.cloudflare.com/api/resources/calls/subresources/turn/)
+
+Create an Invisible Turnstile widget for the Nova hostname. Provide its public
+site key as `VITE_TURNSTILE_SITE_KEY` in the Nova build and store its secret as
+`TURNSTILE_SECRET_KEY` on the Worker. Review the privacy requirements for using
+Invisible mode. [Turnstile widget setup](https://developers.cloudflare.com/turnstile/get-started/widget-management/)
 
 ## Monitoring
 

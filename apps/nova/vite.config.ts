@@ -79,12 +79,17 @@ function buildCsp(): string {
   const origin = runtimeOrigin();
   if (origin === "") {
     console.warn(
-      "[nova-csp-meta] VITE_RUNTIME_ORIGIN is not set: frame-src is omitted, so the " +
+      "[nova-csp-meta] VITE_RUNTIME_ORIGIN is not set: frame-src has no runtime origin, so the " +
         "runtime iframe will be blocked by the strict CSP. The deploy script sets " +
         "this for every production deploy (deploy/README.md).",
     );
   }
-  const frameSources = [...(origin === "" ? [] : [origin]), ...EXTERNAL_FRAME_ORIGINS];
+  const challengeOrigin = "https://challenges.cloudflare.com";
+  const frameSources = [
+    ...(origin === "" ? [] : [origin]),
+    challengeOrigin,
+    ...EXTERNAL_FRAME_ORIGINS,
+  ];
   // Explicit same-host WebSocket source for Safari versions where 'self'
   // does not match wss:. The deploy script already pins the app for the runtime.
   const mainOrigin = process.env.VITE_MAIN_ORIGIN?.trim();
@@ -93,7 +98,7 @@ function buildCsp(): string {
     : [];
   const csp = [
     "default-src 'self'",
-    "script-src 'self'",
+    `script-src 'self' ${challengeOrigin}`,
     "style-src 'self' 'unsafe-inline'",
     // Listed games' screenshots on their details pages.
     ["img-src 'self' data: blob:", ...CATALOG_IMAGE_ORIGINS].join(" "),
@@ -105,7 +110,7 @@ function buildCsp(): string {
     "object-src 'none'",
     "base-uri 'self'",
     "form-action 'self'",
-    ...(frameSources.length === 0 ? [] : [`frame-src ${frameSources.join(" ")}`]),
+    `frame-src ${frameSources.join(" ")}`,
   ].join("; ");
   return csp;
 }

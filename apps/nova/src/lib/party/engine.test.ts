@@ -2379,7 +2379,7 @@ describe("party engine — TURN credential minting", () => {
     });
   });
 
-  it("re-mints once less than half the 24 h lease remains, never mutating live peers", async () => {
+  it("re-mints once less than half the 4 h lease remains, never mutating live peers", async () => {
     const world = makeWorld();
     const turnConfig = [{ urls: "turn:one", username: "u1", credential: "c1" }];
     const turnCreds = vi.fn(async (): Promise<TurnCredentialsResult> => ({ ok: true, turnConfig }));
@@ -2387,7 +2387,7 @@ describe("party engine — TURN credential minting", () => {
     await runCreate(player, world);
     expect(turnCreds).toHaveBeenCalledTimes(1);
     await player.engine.leaveParty();
-    world.clock.advance(11 * 60 * 60 * 1000);
+    world.clock.advance(90 * 60 * 1000);
     await runCreate(player, world);
     expect(turnCreds).toHaveBeenCalledTimes(1);
     await player.engine.leaveParty();

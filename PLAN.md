@@ -26,23 +26,11 @@ churn on upgrade), and need no paid always-on server.
 
 ## Before launch
 
-Code-side production hardening (complements the Cloudflare spend controls and
-Workers Paid cutover in [`deploy/README.md`](deploy/README.md)). `Origin` /
-`Sec-Fetch-Site` checks in `deploy/nova/worker.ts` stop cross-site browser
-requests but do not stop non-browser clients from spoofing `Origin`:
-
-- [ ] **Protect `POST /api/turn` (`deploy/nova/turn.ts`, `apps/nova/src/lib/party/turn-creds.ts`, `apps/nova/vite.config.ts`, `deploy/nova/wrangler.toml`)**:
-      Gate `POST /api/turn` with Cloudflare Turnstile in Invisible mode, loaded
-      lazily only on `/party` and executed in the background during name entry
-      or party setup so users see zero challenge UI; if Turnstile fails or is
-      blocked by a restrictive network or privacy extension, fall back cleanly
-      to direct WebRTC / the encrypted tunnel via the existing graceful-degrade
-      path. Verify tokens server-side via Cloudflare's `siteverify` endpoint
-      (checking `success`, `hostname` and `action`; skipped in local dev when
-      `TURNSTILE_SECRET_KEY` is unset), allow `https://challenges.cloudflare.com`
-      in `apps/nova/vite.config.ts` CSP (`script-src` and `frame-src`), lower
-      `MINT_TTL_SECONDS` / `TURN_CREDS_TTL_MS` from 24 h (e.g., to 4 h), and
-      tighten the `/api/turn` rate limit below 120/min/IP.
+- [ ] Provision and validate the Invisible Turnstile widget with the deployment
+      owner. Set its site key for the Nova build and its Worker secret as
+      described in [the deploy runbook](deploy/README.md). Confirm TURN mints
+      on success and that blocked challenges fall back to direct WebRTC or
+      the encrypted tunnel.
 
 ## Real-device checks requiring access or coordination
 
@@ -59,7 +47,7 @@ the README for local devices.
 - [ ] iPhone Safari backgrounded for 1–3 minutes recovers; a locked phone
       and a tab switch recover too.
 - [ ] Exiting a broken game on iPhone returns to a usable lobby.
-- [ ] A party longer than an hour (covers the TURN credential lifetime).
+- [ ] A TURN-backed party that stays connected through the four-hour mint expiry.
 - [ ] Airplane mode and a blocked `/api/signal` show their messages and recover.
 - [ ] Full create → prompt → paste → test → save → party → play on Mobile
       Safari; the master prompt on two AI chat services.

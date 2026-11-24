@@ -11,7 +11,7 @@
     "dev": "concurrently -k -n nova,runtime,api -c blue,magenta,green \"npm run dev --workspace @rocketcrab/nova\" \"npm run dev --workspace @rocketcrab/runtime\" \"npm run dev:api\"",
     "gen-certs": "node scripts/gen-certs.mjs",
     "dev:https": "concurrently -k -n nova,runtime,api -c blue,magenta,green \"npm run dev:https --workspace @rocketcrab/nova -- --host\" \"npm run dev:https --workspace @rocketcrab/runtime -- --host\" \"npm run dev:api -- --local-protocol https --https-key-path .certs/localhost-key.pem --https-cert-path .certs/localhost-cert.pem\"",
-    "dev:api": "npx --yes wrangler@4.161.0 dev --config deploy/nova/wrangler.toml --assets apps/nova/public",
+    "dev:api": "npx --yes wrangler@4.161.0 dev --config deploy/nova/wrangler.toml --var TURNSTILE_REQUIRED:false --assets apps/nova/public",
     "build": "npm run build --workspaces --if-present",
     "format": "oxfmt --write .",
     "format:check": "oxfmt --check .",

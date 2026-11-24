@@ -10,7 +10,7 @@
  * Nova origin (strict main-origin policy):
  *   - index.html carries the build-time CSP meta tag, and _headers carries
  *     the matching policy with `frame-src` pinned to the runtime origin;
- *   - no inline application scripts (`script-src 'self'` must hold);
+ *   - application scripts come from the main origin or Turnstile;
  *   - the referrer meta tag is present (no path/query leakage; invite
  *     secrets already live in URL fragments).
  *
@@ -70,14 +70,24 @@ if (origin === "nova") {
       );
     } else {
       const normalized = new URL(runtimeOrigin).origin;
+      const permissions = /^\s*Permissions-Policy:\s*(.+)$/im.exec(headers)?.[1] ?? "";
+      for (const feature of ["camera", "microphone"]) {
+        expect(
+          `Nova delegates ${feature} to the runtime`,
+          permissions.includes(`${feature}=(self "${normalized}")`),
+        );
+      }
       expect(
-        "CSP frame-src is the configured runtime origin",
+        "CSP frame-src includes the configured runtime origin",
         csp.includes(`frame-src ${normalized}`),
         `expected frame-src ${normalized}`,
       );
     }
     const scriptSrc = /script-src ([^;]+)/.exec(csp)?.[1] ?? "";
-    expect("CSP script-src allows only 'self'", /^'self'$/.test(scriptSrc.trim()));
+    expect(
+      "CSP script-src permits the app and Turnstile",
+      scriptSrc.trim() === "'self' https://challenges.cloudflare.com",
+    );
     expect(
       "CSP has no 'unsafe-inline'/'unsafe-eval' for scripts",
       !/unsafe-inline|unsafe-eval/.test(scriptSrc),
@@ -92,6 +102,10 @@ if (origin === "nova") {
     mainOrigin !== "" &&
       /(?:^|;)\s*frame-ancestors\s+([^;]+)/.exec(headerCsp)?.[1].trim() ===
         new URL(mainOrigin).origin,
+  );
+  expect(
+    "runtime CSP blocks nested frame navigation",
+    /(?:^|;)\s*frame-src\s+'none'\s*(?:;|$)/.test(headerCsp),
   );
   expect("runtime CSP blocks workers", /(?:^|;)\s*worker-src\s+'none'\s*(?:;|$)/.test(headerCsp));
   // Runtime policy comes from the HTTP header, which also controls workers.

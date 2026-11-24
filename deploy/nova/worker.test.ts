@@ -231,7 +231,42 @@ describe("TURN mint", () => {
     expect(await errorCode(await call("/api/turn"))).toBe("worker_misconfigured");
   });
 
-  it("mints a 24 h credential with the secret only in the auth header", async () => {
+  it("requires configured verification when enabled", async () => {
+    const fetchMock = mockFetch(Response.json(ICE));
+    const response = await call("/api/turn", {}, { ...TURN_ENV, TURNSTILE_REQUIRED: "true" });
+    expect(await errorCode(response)).toBe("worker_misconfigured");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("verifies the token, hostname, and action before minting", async () => {
+    const env = { ...TURN_ENV, TURNSTILE_SECRET_KEY: "widget-secret" };
+    const fetchMock = mockFetch(Response.json(ICE));
+    const init = { headers: { "X-Turnstile-Token": "widget-token" } };
+    expect((await call("/api/turn", {}, env)).status).toBe(403);
+    expect(fetchMock).not.toHaveBeenCalled();
+    for (const result of [
+      { success: false },
+      { success: true, hostname: "elsewhere.example", action: "mint_turn" },
+      { success: true, hostname: "rocketcrab.com", action: "something_else" },
+    ]) {
+      fetchMock.mockResolvedValueOnce(Response.json(result));
+      expect((await call("/api/turn", init, env)).status).toBe(403);
+    }
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+    fetchMock.mockResolvedValueOnce(
+      Response.json({ success: true, hostname: "rocketcrab.com", action: "mint_turn" }),
+    );
+    expect((await call("/api/turn", init, env)).status).toBe(200);
+    expect(fetchMock).toHaveBeenNthCalledWith(
+      4,
+      "https://challenges.cloudflare.com/turnstile/v0/siteverify",
+      expect.objectContaining({
+        body: JSON.stringify({ secret: "widget-secret", response: "widget-token" }),
+      }),
+    );
+  });
+
+  it("mints a 4 h credential with the secret only in the auth header", async () => {
     const fetchMock = mockFetch(Response.json(ICE));
     const response = await call("/api/turn", { body: '{"ttl":999999}' }, TURN_ENV);
     expect(response.status).toBe(200);

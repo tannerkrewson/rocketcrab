@@ -2,6 +2,8 @@
  * The engine mints TURN credentials once per party and reuses them on reconnect.
  * Only credential-bearing ICE servers become Trystero's TURN configuration.
  */
+import { consumeTurnToken } from "./turnstile";
+
 /** One ICE server entry in the mint's response (Cloudflare standard shape). */
 export interface TurnCredsIceServer {
   readonly urls: string | string[];
@@ -33,11 +35,11 @@ export type TurnCredentialsResult =
  */
 export const TURN_CREDS_FETCH_TIMEOUT_MS = 4_000;
 /**
- * Match the mint Worker's fixed 24-hour TTL. TURN allocations can continue
+ * Match the mint Worker's fixed 4-hour TTL. TURN allocations can continue
  * through authenticated refreshes, so retain one credential rather than
  * replacing ICE configuration on live connections (best-effort upstream).
  */
-export const TURN_CREDS_TTL_MS = 86_400_000;
+export const TURN_CREDS_TTL_MS = 4 * 60 * 60 * 1000;
 
 /** Injectable fetch + timeout (tests pass a stub fetch / short timeout). */
 export interface TurnCredsFetchOptions {
@@ -87,6 +89,10 @@ export async function fetchTurnCredentials(
 ): Promise<TurnCredentialsResult> {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const timeoutMs = options.timeoutMs ?? TURN_CREDS_FETCH_TIMEOUT_MS;
+  const token = await consumeTurnToken();
+  if (import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() && !token) {
+    return { ok: false, reason: "TURN verification was unavailable." };
+  }
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   try {
@@ -94,7 +100,7 @@ export async function fetchTurnCredentials(
     try {
       response = await fetchImpl("/api/turn", {
         method: "POST",
-        body: "{}",
+        ...(token ? { headers: { "X-Turnstile-Token": token } } : {}),
         signal: controller.signal,
       });
     } catch (error) {

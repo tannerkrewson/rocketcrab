@@ -30,7 +30,7 @@ function responseMock(status: number, body: unknown) {
 }
 
 it("keeps one party credential inside Cloudflare's 48-hour maximum", () => {
-  expect(TURN_CREDS_TTL_MS).toBe(86_400_000);
+  expect(TURN_CREDS_TTL_MS).toBe(14_400_000);
   expect(TURN_CREDS_TTL_MS).toBeLessThanOrEqual(48 * 60 * 60 * 1000);
 });
 

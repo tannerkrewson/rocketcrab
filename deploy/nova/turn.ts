@@ -11,10 +11,11 @@ export interface TurnEnv {
   TURN_KEY_ID?: string;
   /** Cloudflare Realtime TURN key API token (Worker secret). */
   TURN_KEY_API_TOKEN?: string;
+  TURNSTILE_SECRET_KEY?: string;
+  TURNSTILE_REQUIRED?: string;
 }
 
-/** 24 h covers a whole party; Cloudflare allows at most 48 h. */
-export const MINT_TTL_SECONDS = 86_400;
+export const MINT_TTL_SECONDS = 4 * 60 * 60;
 
 interface IceServer {
   urls: string | string[];
@@ -43,11 +44,45 @@ export function dropPort53(servers: IceServer[]): IceServer[] {
   });
 }
 
+async function verifyChallenge(request: Request, secret: string): Promise<boolean> {
+  const token = request.headers.get("X-Turnstile-Token");
+  if (!token || token.length > 2048) return false;
+  try {
+    const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ secret, response: token }),
+      signal: AbortSignal.timeout(3_000),
+    });
+    if (!response.ok) return false;
+    const result = (await response.json()) as {
+      success?: boolean;
+      hostname?: string;
+      action?: string;
+    } | null;
+    return (
+      result?.success === true &&
+      result.hostname === new URL(request.url).hostname &&
+      result.action === "mint_turn"
+    );
+  } catch {
+    return false;
+  }
+}
+
 export async function handleTurn(request: Request, env: TurnEnv): Promise<Response> {
   const keyId = env.TURN_KEY_ID?.trim() ?? "";
   const token = env.TURN_KEY_API_TOKEN?.trim() ?? "";
   if (keyId === "" || token === "") {
     return jsonError(500, "worker_misconfigured", "TURN key secrets are not configured");
+  }
+
+  const turnstileSecret = env.TURNSTILE_SECRET_KEY?.trim();
+  if (!turnstileSecret && env.TURNSTILE_REQUIRED === "true") {
+    return jsonError(500, "worker_misconfigured", "TURN verification is not configured");
+  }
+  if (turnstileSecret && !(await verifyChallenge(request, turnstileSecret))) {
+    return jsonError(403, "verification_failed", "TURN verification failed");
   }
 
   let upstream: Response;
