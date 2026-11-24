@@ -28,6 +28,7 @@ import { actionTimeoutMs, stateResyncMinIntervalMs } from "@rocketcrab/protocol"
 import { InMemoryTransportHub } from "@rocketcrab/testing";
 import { createNovaSession, type NovaSession } from "./session";
 import { STATE_HISTORY_LIMIT as STATE_WINDOW_LIMIT } from "./state-engine";
+import { useRealTime, useSimulatedTime } from "./simulated-time.test-helper";
 import {
   NovaStateEngine,
   stateHashOf,
@@ -195,18 +196,14 @@ async function seedFollower(
 }
 
 beforeEach(() => {
-  // setImmediate stays REAL so tests can yield to the event loop for
-  // real-async steps (crypto digest) while engine timers are faked.
-  vi.useFakeTimers({
-    toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
-  });
+  useSimulatedTime();
 });
 
 afterEach(() => {
   for (const engine of createdEngines.splice(0)) {
     engine.dispose();
   }
-  vi.useRealTimers();
+  useRealTime();
 });
 
 /** Node's real macrotask (NOT faked by the test timers). */
