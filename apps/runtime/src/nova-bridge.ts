@@ -4,7 +4,12 @@
  * `@rocketcrab/nova-api` client) and the schemas the runtime page uses to
  * validate everything that script reports before it reaches the host.
  */
-import { stateResponseSchema, tickRateMax, titleSchema } from "@rocketcrab/protocol";
+import {
+  playerLimitMax,
+  stateResponseSchema,
+  tickRateMax,
+  titleSchema,
+} from "@rocketcrab/protocol";
 import { NOVA_API_VERSION } from "@rocketcrab/nova-api/version";
 import { z } from "zod";
 
@@ -18,12 +23,21 @@ import { z } from "zod";
 export const SUPPORTED_NOVA_API_VERSIONS: readonly number[] = [NOVA_API_VERSION];
 
 /** What the runtime accepts from `nova.defineGame` (protocol keys). */
-export const gameDeclarationSchema = z.object({
-  title: titleSchema.optional(),
-  gameVersion: z.string().min(1).max(32).optional(),
-  apiVersion: z.number().int().min(1).optional(),
-  tickRate: z.number().int().min(1).max(tickRateMax).optional(),
-});
+export const gameDeclarationSchema = z
+  .object({
+    title: titleSchema.optional(),
+    gameVersion: z.string().min(1).max(32).optional(),
+    apiVersion: z.number().int().min(1).optional(),
+    tickRate: z.number().int().min(1).max(tickRateMax).optional(),
+    minPlayers: z.number().int().min(1).max(playerLimitMax).optional(),
+    maxPlayers: z.number().int().min(1).max(playerLimitMax).optional(),
+  })
+  .refine(
+    (options) =>
+      options.minPlayers === undefined ||
+      options.maxPlayers === undefined ||
+      options.minPlayers <= options.maxPlayers,
+  );
 export type GameDeclaration = z.infer<typeof gameDeclarationSchema>;
 
 /**
@@ -130,6 +144,8 @@ export function registrationFields(input: {
   title: string;
   gameVersion?: string;
   tickRate?: number;
+  minPlayers?: number;
+  maxPlayers?: number;
 } {
   return {
     gameId: input.bootstrapGameId,
@@ -138,5 +154,11 @@ export function registrationFields(input: {
       ? { gameVersion: input.declaration.gameVersion }
       : {}),
     ...(input.declaration?.tickRate !== undefined ? { tickRate: input.declaration.tickRate } : {}),
+    ...(input.declaration?.minPlayers !== undefined
+      ? { minPlayers: input.declaration.minPlayers }
+      : {}),
+    ...(input.declaration?.maxPlayers !== undefined
+      ? { maxPlayers: input.declaration.maxPlayers }
+      : {}),
   };
 }

@@ -34,8 +34,9 @@ import {
   defaultRuntimeOrigin,
   isInPartyPhase,
 } from "./engine-utils";
+import type { PlayerLimits } from "./player-limits";
 
-interface PartyGame {
+interface PartyGame extends PlayerLimits {
   readonly gameId: string;
   readonly title: string;
 }

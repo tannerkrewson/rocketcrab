@@ -307,6 +307,8 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
         ...(options.title !== undefined ? { title: options.title } : {}),
         ...(options.version !== undefined ? { version: options.version } : {}),
         ...(options.apiVersion !== undefined ? { apiVersion: options.apiVersion } : {}),
+        ...(options.minPlayers !== undefined ? { minPlayers: options.minPlayers } : {}),
+        ...(options.maxPlayers !== undefined ? { maxPlayers: options.maxPlayers } : {}),
         // A game with a tick always declares its rate, so the host never guesses.
         ...(handlers?.tick !== undefined ? { tickRate: options.tickRate ?? tickRateDefault } : {}),
       };

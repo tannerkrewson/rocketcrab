@@ -6,6 +6,7 @@ import type { ArenaLogEntry } from "../arena/types";
 import { type ClassicGameConnectResult } from "../classic";
 import { type PartyLifecycleSource } from "./lifecycle";
 import type { TurnCredentialsResult } from "./turn-creds";
+import type { PlayerLimits } from "./player-limits";
 
 export interface PartyRuntimeSeams {
   createChannel?: () => { port1: ChannelPort; port2: unknown };
@@ -105,7 +106,10 @@ export interface PartyEngineState {
   readonly role: "creator" | "joiner" | null;
   readonly memberId: MemberId;
   readonly displayName: string;
-  readonly game: { gameId: string; title: string } | null;
+  /** The selected game, with its player limits once they are known. */
+  readonly game: ({ gameId: string; title: string } & PlayerLimits) | null;
+  /** Lobby text when the party is outside the game's player range. */
+  readonly playerLimitNotice: string | null;
   readonly members: readonly PartyMemberView[];
   readonly hostMemberId: MemberId | null;
   readonly amHost: boolean;

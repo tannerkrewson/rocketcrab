@@ -137,6 +137,13 @@ describe("registrationFields", () => {
     ).toEqual({ gameId: "game-1", title: "Game Title", gameVersion: "2.0" });
   });
 
+  it("forwards declared player limits", () => {
+    expect(
+      registrationFields({ ...base, declaration: { title: "T", minPlayers: 2, maxPlayers: 8 } }),
+    ).toEqual({ gameId: "game-1", title: "T", minPlayers: 2, maxPlayers: 8 });
+    expect(gameDeclarationSchema.safeParse({ minPlayers: 3, maxPlayers: 2 }).success).toBe(false);
+  });
+
   it("falls back to host metadata then the default title", () => {
     expect(registrationFields({ ...base, bootstrapTitle: "Host Title" })).toEqual({
       gameId: "game-1",

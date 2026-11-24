@@ -14,6 +14,7 @@ const IDLE_STATE: PartyEngineState = {
   memberId: "member-a",
   displayName: "Player A",
   game: null,
+  playerLimitNotice: null,
   members: [],
   hostMemberId: null,
   amHost: false,

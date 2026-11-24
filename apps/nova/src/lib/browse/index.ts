@@ -1,6 +1,7 @@
 /** Shared listing model for classic external iframe games. */
 
 import { CLASSIC_GAMES, type ClassicGame } from "../classic";
+import { formatPlayerRange } from "../party/player-limits";
 
 export type BrowseEntry = {
   kind: "classic";
@@ -26,7 +27,7 @@ const classicEntries: BrowseEntry[] = CLASSIC_GAMES.map((game: ClassicGame) => (
   author: game.author,
   description: game.description,
   category: game.category,
-  players: game.players,
+  players: game.players ?? formatPlayerRange(game),
   pictures: game.pictures,
   guideUrl: game.guideUrl,
   displayUrlHref: game.displayUrlHref,

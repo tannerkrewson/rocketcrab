@@ -26,6 +26,7 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     memberId: "member-a",
     displayName: "Player A",
     game: { gameId: "game-1", title: "Rocket Rumble" },
+    playerLimitNotice: null,
     members: [
       {
         memberId: "member-a",

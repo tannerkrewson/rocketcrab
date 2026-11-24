@@ -134,8 +134,12 @@ export interface NovaGameDeclaration extends NovaStateHandlers {
   version?: string;
   /** The Nova API version this game targets; defaults to `nova.version`. */
   apiVersion?: number;
-  /** Ticks per second (1..60, default 20). Only used with `tick`. */
+  /** Ticks per second (1..60, default 15). Only used with `tick`. */
   tickRate?: number;
+  /** Fewest players the game supports; the lobby says when the party has fewer. */
+  minPlayers?: number;
+  /** Most players the game supports; the lobby says when the party has more. */
+  maxPlayers?: number;
 }
 
 /**

@@ -110,11 +110,12 @@ launch, and the list format depends on them.
       getter on the client), `NovaGameDeclaration` extends
       `NovaStateHandlers`, and `selectView(state, viewer, context)` gets the
       context of the handler that produced the state. Contract test added.
-- [ ] **Optional player limits.** Add `minPlayers`/`maxPlayers` to
-      `defineGame` for Nova games and to list entries for external games.
-      Show lobby text when the party is out of range. When only the limits
-      are set, derive the shown player count from them instead of the
-      free-text `players` field.
+- [x] **Optional player limits.** `defineGame({ minPlayers, maxPlayers })`
+      travels in `game.registration`; external games use their list entry.
+      Both live on the party's current game, so they reset with it, and the
+      lobby shows `playerLimitNotice` to everyone without blocking start.
+      List entries without `players` text show the range (`2–8`, `3+`).
+      Engine, lobby, API and runtime tests added.
 - [ ] **Redesign external games as `createRoom()` + `joinUrl()`.**
       `createRoom()` returns plain JSON that the host broadcasts.
       `joinUrl(room, { name, isHost })` runs on each player's device, since

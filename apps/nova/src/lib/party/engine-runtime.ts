@@ -6,6 +6,7 @@ import type { FrameStateResponsePayload } from "../arena/state-executor";
 import type { PartyEngineContext } from "./engine-context";
 import type { PartyEngineServices } from "./engine-services";
 import { errorMessage } from "./engine-utils";
+import { playerLimitsOf } from "./player-limits";
 
 const MAX_PARTY_LOG_ENTRIES = 200;
 let partyLogCounter = 0;
@@ -146,6 +147,11 @@ export class PartyRuntime {
       case "registration":
         if (this.reloadPending) break;
         this.state.registered = true;
+        if (this.state.game !== null) {
+          // The game's own declaration is the only source of its player limits.
+          const { gameId, title } = this.state.game;
+          this.state.game = { gameId, title, ...playerLimitsOf(event.message) };
+        }
         this.state.frameTickRate = event.message.tickRate ?? null;
         this.state.session?.setTickRate(this.state.frameTickRate);
         // Registration implies readiness; explicit nova.ready() is idempotent.

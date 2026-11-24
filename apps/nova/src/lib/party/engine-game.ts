@@ -4,6 +4,7 @@ import type { NovaSessionEvent } from "@rocketcrab/nova-api";
 import { createNovaSession } from "@rocketcrab/nova-api";
 import { toApiEvent } from "../arena/api-events";
 import { findClassicGame } from "../classic";
+import { playerLimitsOf } from "./player-limits";
 import { reportConnection } from "../connection-log";
 import { updatePartyDisplayName } from "./identity";
 import { PartyStateExecutor } from "./party-executors";
@@ -62,7 +63,7 @@ export class PartyGameLifecycle {
       // Ignore room creation that finishes after the party changes.
       if (this.state.party !== party) return;
       this.state.classic = { gameId, title: game.name, connectResult };
-      this.state.game = { gameId, title: game.name };
+      this.state.game = { gameId, title: game.name, ...playerLimitsOf(game) };
       this.state.selfVerified = true;
       this.state.selfVerifiedSha256 = null;
       this.state.currentSourceSha256 = null;
@@ -352,7 +353,7 @@ export class PartyGameLifecycle {
               ...(event.host !== undefined ? { host: event.host } : {}),
             },
           };
-          this.state.game = { gameId: event.gameId, title };
+          this.state.game = { gameId: event.gameId, title, ...playerLimitsOf(game) };
           this.state.selfVerified = true;
           this.state.selfVerifiedSha256 = null;
           this.state.currentSourceSha256 = null;

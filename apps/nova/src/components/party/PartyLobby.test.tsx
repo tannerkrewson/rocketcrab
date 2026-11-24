@@ -36,6 +36,7 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     memberId: "member-a",
     displayName: "Player A",
     game: { gameId: "game-1", title: "Rocket Rumble" },
+    playerLimitNotice: null,
     members: [
       {
         memberId: "member-a",
@@ -173,6 +174,21 @@ describe("PartyLobby", () => {
     expect(screen.getByRole("button", { name: /copy url/i })).toBeInTheDocument();
     expect(screen.getByText(/Players \(2\)/)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /leave party/i })).toBeInTheDocument();
+  });
+
+  it("tells everyone when the party is outside the game's player range", async () => {
+    const notice = "This game needs at least 3 players. Invite 1 more.";
+    await renderLobby(
+      makeState({ role: "joiner", amHost: false, playerLimitNotice: notice, canStart: true }),
+    );
+    expect(screen.getByTestId("player-limit-notice")).toHaveTextContent(notice);
+  });
+
+  it("leaves start enabled when the player range is not met", async () => {
+    await renderLobby(
+      makeState({ playerLimitNotice: "This game needs at least 3 players.", canStart: true }),
+    );
+    expect(screen.getByRole("button", { name: /start game/i })).toBeEnabled();
   });
 
   it("shows the start controls to the host only when the party is in the lobby (b73)", async () => {

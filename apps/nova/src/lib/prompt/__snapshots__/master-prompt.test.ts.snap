@@ -109,6 +109,8 @@ the state only changes when someone acts.
 nova.defineGame({
   title: "My Game", // <= 64 chars
   apiVersion: 1, // always include: keeps this game working after API changes
+  minPlayers: 2, // optional: the lobby says when too few players have joined
+  maxPlayers: 8, // optional: the lobby says when too many players have joined
   createInitialState(context) {
     // context.players = everyone, sorted by id (the same on every device).
     return {}; // the starting state (plain JSON)

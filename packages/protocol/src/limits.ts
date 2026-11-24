@@ -108,11 +108,15 @@ export const tickRateMax = 60;
 /** Most a `nova.controls.set` value may serialize to. */
 export const controlsBytes = 1024;
 
+/** Largest player count a game may declare as its minimum or maximum. */
+export const playerLimitMax = 10_000;
+
 /** The complete limits table, typed. */
 export const LIMITS = {
   tickRateDefault,
   tickRateMax,
   controlsBytes,
+  playerLimitMax,
   htmlSourceBytes,
   htmlSourceWarnBytes,
   messageBytesBeforeChunking,

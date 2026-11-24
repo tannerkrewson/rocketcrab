@@ -16,6 +16,7 @@ import {
   isConnectedState,
   defaultBaseUrl,
 } from "./engine-utils";
+import { playerLimitNotice } from "./player-limits";
 
 /** Lobby projections, diagnostics, bounded notices, and snapshot subscriptions. */
 export class PartySnapshot {
@@ -80,6 +81,8 @@ export class PartySnapshot {
       memberId: identity.memberId,
       displayName: identity.displayName,
       game: this.state.game,
+      playerLimitNotice:
+        this.state.game === null ? null : playerLimitNotice(members.length, this.state.game),
       members,
       hostMemberId: party?.hostMemberId ?? null,
       amHost: party?.amHost ?? false,

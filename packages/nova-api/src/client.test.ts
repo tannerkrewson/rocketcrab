@@ -110,6 +110,21 @@ describe("createNovaClient lifecycle", () => {
     );
   });
 
+  it("forwards declared player limits and rejects an inverted range", () => {
+    const { client, backend } = makeClient();
+    let declared: NovaGameDeclaration | undefined;
+    backend.register = (declaration) => {
+      declared = declaration;
+    };
+    client.defineGame({ title: "T", minPlayers: 2, maxPlayers: 6 });
+    expect(declared).toMatchObject({ minPlayers: 2, maxPlayers: 6 });
+    expectNovaError(
+      () => makeClient().client.defineGame({ minPlayers: 5, maxPlayers: 4 }),
+      "invalid_options",
+    );
+    expectNovaError(() => makeClient().client.defineGame({ minPlayers: 0 }), "invalid_options");
+  });
+
   it("rejects invalid registration options", () => {
     const { client } = makeClient();
     expectNovaError(() => client.defineGame({ title: "x".repeat(65) }), "invalid_options");

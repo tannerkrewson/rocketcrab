@@ -111,6 +111,8 @@ function install(): void {
           ...(declaration.version !== undefined ? { gameVersion: declaration.version } : {}),
           ...(declaration.apiVersion !== undefined ? { apiVersion: declaration.apiVersion } : {}),
           ...(declaration.tickRate !== undefined ? { tickRate: declaration.tickRate } : {}),
+          ...(declaration.minPlayers !== undefined ? { minPlayers: declaration.minPlayers } : {}),
+          ...(declaration.maxPlayers !== undefined ? { maxPlayers: declaration.maxPlayers } : {}),
         },
       });
     },

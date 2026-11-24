@@ -330,6 +330,16 @@ export function PartyLobby({
           </Alert.Content>
         </Alert>
       ) : null}
+      {state.playerLimitNotice !== null && state.endedReason === null ? (
+        <Alert status="warning" className="mx-auto w-fit" data-testid="player-limit-notice">
+          <Alert.Indicator />
+          <Alert.Content>
+            <Alert.Description className="text-sm font-semibold">
+              {state.playerLimitNotice}
+            </Alert.Description>
+          </Alert.Content>
+        </Alert>
+      ) : null}
       <details className="glass group rounded-2xl" open>
         <summary className="flex cursor-pointer list-none items-center gap-2 p-4 text-sm font-black text-foreground/60">
           Players ({state.members.length})

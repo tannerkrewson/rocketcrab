@@ -8,7 +8,7 @@ import {
   timestampSchema,
   titleSchema,
 } from "../ids";
-import { htmlSourceSchema, tickRateMax } from "../limits";
+import { htmlSourceSchema, playerLimitMax, tickRateMax } from "../limits";
 import { gameEndReasonSchema } from "./shared";
 
 /**
@@ -259,6 +259,10 @@ export const gameRegistrationMessageSchema = z.object({
   gameVersion: z.string().min(1).max(32).optional(),
   /** Ticks per second, present when the game declared a `tick` handler. */
   tickRate: z.number().int().min(1).max(tickRateMax).optional(),
+  /** Fewest players the game supports, when it declared one. */
+  minPlayers: z.number().int().min(1).max(playerLimitMax).optional(),
+  /** Most players the game supports, when it declared one. */
+  maxPlayers: z.number().int().min(1).max(playerLimitMax).optional(),
 });
 export type GameRegistrationMessage = z.infer<typeof gameRegistrationMessageSchema>;
 

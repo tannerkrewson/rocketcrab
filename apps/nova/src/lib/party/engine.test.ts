@@ -129,7 +129,7 @@ interface HostHarness {
   frames: HTMLIFrameElement[];
   port1: FakePort;
   ready(): void;
-  register(title: string, tickRate?: number): void;
+  register(title: string, tickRate?: number, limits?: Record<string, number>): void;
   apiCall(method: string, payload: unknown): void;
 }
 
@@ -196,7 +196,7 @@ function createHostHarness(): HostHarness {
         status: "ready",
       });
     },
-    register(title: string, tickRate?: number) {
+    register(title: string, tickRate?: number, limits: Record<string, number> = {}) {
       deliver(harness.port1, {
         version: 1,
         runtimeInstanceId: "runtime-1",
@@ -206,6 +206,7 @@ function createHostHarness(): HostHarness {
         gameId: GAME.gameId,
         title,
         ...(tickRate !== undefined ? { tickRate } : {}),
+        ...limits,
       });
     },
     apiCall(method: string, payload: unknown) {
@@ -413,7 +414,7 @@ describe("party engine — two phones end to end", () => {
   });
 });
 
-describe("party engine — game mode and source transitions", () => {
+describe("party engine — game and source transitions", () => {
   function events(player: Player, kind: string): unknown[] {
     return player.harness.port1.sent.filter((message) => {
       const msg = message as { type?: string; event?: { kind?: string } };
@@ -455,6 +456,33 @@ describe("party engine — game mode and source transitions", () => {
         (m) => (m as { event: { request: { kind: string } } }).event.request.kind === "tick",
       ),
     ).toBe(false);
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+  });
+
+  it("reads player limits from the game's registration and reports the range", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    await runCreate(a, world);
+    a.harness.ready();
+    a.harness.register(GAME.title, undefined, { minPlayers: 3, maxPlayers: 4 });
+    await settle(world);
+    expect(a.engine.getState().game).toMatchObject({ minPlayers: 3, maxPlayers: 4 });
+    expect(a.engine.getState().playerLimitNotice).toBe(
+      "This game needs at least 3 players. Invite 2 more.",
+    );
+    const invite = parseInviteFragment(new URL(a.engine.getState().inviteUrl as string).hash)!;
+    const joining = b.engine.joinByInvite({ secret: invite.secret! });
+    await settle(world);
+    await joining;
+    await settle(world);
+    expect(a.engine.getState().playerLimitNotice).toBe(
+      "This game needs at least 3 players. Invite 1 more.",
+    );
+    // Another game resets the limits until it registers its own.
+    await a.engine.selectGame({ ...GAME, gameId: "game_other", title: "Other Game" });
+    expect(a.engine.getState().playerLimitNotice).toBeNull();
     await a.engine.leaveParty();
     await b.engine.leaveParty();
   });
