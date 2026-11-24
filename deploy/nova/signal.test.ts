@@ -15,7 +15,9 @@ function setup() {
     const ws = {
       readyState: 1,
       send: vi.fn(),
-      close: vi.fn(),
+      close: vi.fn(() => {
+        ws.readyState = 3;
+      }),
       serializeAttachment: (value: typeof attachment) => {
         attachment = structuredClone(value);
       },
@@ -24,14 +26,15 @@ function setup() {
     sockets.push(ws);
     return ws;
   }
-  const state = { acceptWebSocket: vi.fn(), getWebSockets: () => sockets };
+  const setAlarm = vi.fn();
+  const state = { acceptWebSocket: vi.fn(), getWebSockets: () => sockets, storage: { setAlarm } };
   const hub = () => new SignalHub(state as unknown as ConstructorParameters<typeof SignalHub>[0]);
   const message = (h: SignalHub, s: ReturnType<typeof socket>, value: unknown) =>
     h.webSocketMessage(
       s as unknown as Parameters<SignalHub["webSocketMessage"]>[0],
       typeof value === "string" ? value : JSON.stringify(value),
     );
-  return { socket, hub, message };
+  return { socket, hub, message, setAlarm };
 }
 
 describe("SignalHub", () => {
@@ -43,13 +46,33 @@ describe("SignalHub", () => {
     const first = hub();
     message(first, a, { type: "subscribe", topic: "room" });
     message(first, b, { type: "subscribe", topic: "room" });
-    message(hub(), a, { type: "publish", topic: "room", payload: { hello: 1 } });
+    const woke = hub();
+    message(woke, a, { type: "publish", topic: "room", payload: { hello: 1 } });
     expect(a.send).toHaveBeenCalledWith('{"topic":"room","payload":{"hello":1}}');
     expect(b.send).toHaveBeenCalledTimes(1);
     expect(c.send).not.toHaveBeenCalled();
-    message(first, b, { type: "unsubscribe", topic: "room" });
-    message(first, a, { type: "publish", topic: "room", payload: "again" });
+    message(woke, b, { type: "unsubscribe", topic: "room" });
+    message(woke, a, { type: "publish", topic: "room", payload: "again" });
     expect(b.send).toHaveBeenCalledTimes(1);
+  });
+
+  it("closes idle sockets after wake and reschedules for active sockets", async () => {
+    const { socket, hub, message, setAlarm } = setup();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    try {
+      const idle = socket();
+      const active = socket();
+      const first = hub();
+      clock.mockReturnValue(2_000);
+      message(first, active, { type: "subscribe", topic: "room" });
+      clock.mockReturnValue(601_000);
+      await hub().alarm();
+      expect(idle.close).toHaveBeenCalledWith(1008, "signaling idle");
+      expect(active.close).not.toHaveBeenCalled();
+      expect(setAlarm).toHaveBeenCalledWith(602_000);
+    } finally {
+      clock.mockRestore();
+    }
   });
 
   it("does not send reserved abnormal close codes", () => {
@@ -65,23 +88,29 @@ describe("SignalHub", () => {
 
   it("enforces topic, message, frame, subscription and token limits", () => {
     const { socket, hub, message } = setup();
-    const h = hub();
     const invalid = socket();
-    message(h, invalid, { type: "subscribe", topic: "bad!" });
+    message(hub(), invalid, { type: "subscribe", topic: "bad!" });
     expect(invalid.close).toHaveBeenCalledWith(1008, "invalid topic");
     const malformed = socket();
-    message(h, malformed, "{");
+    message(hub(), malformed, "{");
     expect(malformed.close).toHaveBeenCalledWith(1008, "invalid message");
     const big = socket();
-    message(h, big, "x".repeat(262145));
+    message(hub(), big, "x".repeat(65_537));
     expect(big.close).toHaveBeenCalledWith(1009, "message too big");
     const limited = socket();
-    for (let i = 0; i < 129; i++) message(h, limited, { type: "subscribe", topic: `t${i}` });
+    const h = hub();
+    const time = Date.now();
+    const clock = vi.spyOn(Date, "now");
+    for (let i = 0; i < 129; i++) {
+      clock.mockReturnValue(time + i * 50);
+      message(h, limited, { type: "subscribe", topic: `t${i}` });
+    }
     expect(limited.close).toHaveBeenCalledWith(1008, "subscription limit exceeded");
-    const clock = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    clock.mockReturnValue(1_000);
     try {
       const rate = socket();
-      for (let i = 0; i < 401; i++) message(h, rate, { type: "unsubscribe", topic: "x" });
+      const rateHub = hub();
+      for (let i = 0; i < 101; i++) message(rateHub, rate, { type: "unsubscribe", topic: "x" });
       expect(rate.close).toHaveBeenCalledWith(1008, "rate limit exceeded");
     } finally {
       clock.mockRestore();

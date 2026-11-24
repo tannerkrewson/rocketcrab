@@ -43,17 +43,6 @@ requests but do not stop non-browser clients from spoofing `Origin`:
       in `apps/nova/vite.config.ts` CSP (`script-src` and `frame-src`), lower
       `MINT_TTL_SECONDS` / `TURN_CREDS_TTL_MS` from 24 h (e.g., to 4 h), and
       tighten the `/api/turn` rate limit below 120/min/IP.
-- [ ] **Harden & simplify `SignalHub` (`deploy/nova/signal.ts`)**:
-      Refactor `SignalHub` to mirror `TunnelPair`'s in-memory cache +
-      attachment persistence + alarm pattern: cap concurrent sockets per room
-      (e.g., 64–128), reduce per-socket budgets from 200 msg/s × 256 KiB to
-      signaling-sized limits (e.g., 20 msg/s refill, 100 burst, 64 KiB max
-      frame), cache `topics` in memory instead of calling
-      `deserializeAttachment()` per subscriber on every publish, and close idle
-      sockets via alarm.
-- [ ] **Bound `TunnelPair` lifetime (`deploy/nova/tunnel.ts`)**:
-      Add a per-pair max lifetime (via the existing Durable Object alarm, e.g.,
-      6 h) and a lifetime byte cap.
 
 ## Real-device checks requiring access or coordination
 

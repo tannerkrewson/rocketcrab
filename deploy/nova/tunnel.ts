@@ -16,8 +16,8 @@
  * interval/spend thresholds. Rebuilding from attachments can over-credit
  * at most about one second of rate (see deploy/README.md).
  *
- * A Durable Object alarm enforces the lone-socket deadline across hibernation;
- * ordinary timers would not survive. Clear it when the second socket joins.
+ * A Durable Object alarm enforces both pairing and lifetime deadlines across
+ * hibernation. Each direction reserves lifetime bytes before forwarding them.
  */
 
 import { jsonError } from "./http";
@@ -44,6 +44,10 @@ const PERSIST_INTERVAL_MS = 1000;
 const PERSIST_SPENT_BYTES = 512 * 1024;
 /** A lone socket is dropped if no partner arrives within this window. */
 export const PARTNER_WAIT_MS = 30_000;
+export const PAIR_LIFETIME_MS = 6 * 60 * 60 * 1000;
+/** Each direction may forward up to 512 MiB, for a combined 1 GiB cap. */
+export const LIFETIME_BYTES_PER_SOCKET = 512 * 1024 * 1024;
+const LIFETIME_RESERVATION_BYTES = BURST_BYTES;
 /** Server-to-client text frame sent to both sides once the pair is complete. */
 export const PAIRED_FRAME = "paired";
 const MAX_SOCKETS = 2;
@@ -58,6 +62,8 @@ interface Attachment {
   /** Token bucket as last written: bytes available as of `lastRefillMs`. */
   tokens: number;
   lastRefillMs: number;
+  deadline: number;
+  unreservedBytes: number;
 }
 
 /** A socket's bucket while the object is awake. */
@@ -67,6 +73,7 @@ interface Bucket {
   /** The `lastRefillMs` last written to the attachment. */
   persistedMs: number;
   spentSincePersist: number;
+  reservedBytes: number;
 }
 
 type TunnelSocket = WebSocket & {
@@ -86,7 +93,14 @@ interface TunnelState {
 declare const WebSocketPair: { new (): { 0: WebSocket; 1: WebSocket } };
 
 /** Stands in for a socket whose attachment is missing: treated as already closed. */
-const DEAD: Attachment = { generation: null, closedByServer: true, tokens: 0, lastRefillMs: 0 };
+const DEAD: Attachment = {
+  generation: null,
+  closedByServer: true,
+  tokens: 0,
+  lastRefillMs: 0,
+  deadline: 0,
+  unreservedBytes: 0,
+};
 
 function attachmentOf(socket: TunnelSocket): Attachment {
   return socket.deserializeAttachment() ?? DEAD;
@@ -132,29 +146,43 @@ export class TunnelPair {
     }
     const pair = new WebSocketPair();
     const server = pair[1] as TunnelSocket;
+    const now = Date.now();
     this.ctx.acceptWebSocket(server);
     server.serializeAttachment({
       generation: null,
       closedByServer: false,
       tokens: BURST_BYTES,
-      lastRefillMs: Date.now(),
+      lastRefillMs: now,
+      deadline: now + PARTNER_WAIT_MS,
+      unreservedBytes: 0,
     });
     if (live.length === 0) {
       // First socket: start the partner clock. Hibernation keeps the alarm.
       try {
-        await this.ctx.storage.setAlarm(Date.now() + PARTNER_WAIT_MS);
+        await this.ctx.storage.setAlarm(now + PARTNER_WAIT_MS);
       } catch (error) {
         this.close(server, 1011, "partner timer unavailable");
         throw error;
       }
     } else {
       // A fresh generation isolates this pair from late close echoes.
-      // If alarm clearing fails, alarm() is harmless while both sockets are live.
       const generation = crypto.randomUUID();
+      const deadline = now + PAIR_LIFETIME_MS;
       const partner = live[0]!;
-      this.write(partner, { generation });
-      this.write(server, { generation });
-      await settle(() => this.ctx.storage.deleteAlarm());
+      for (const socket of [partner, server]) {
+        this.write(socket, {
+          generation,
+          deadline,
+          unreservedBytes: LIFETIME_BYTES_PER_SOCKET - LIFETIME_RESERVATION_BYTES,
+        });
+        this.bucketOf(socket, now).reservedBytes = LIFETIME_RESERVATION_BYTES;
+      }
+      try {
+        await this.ctx.storage.setAlarm(deadline);
+      } catch (error) {
+        this.closePair(server, 1011, "lifetime timer unavailable");
+        throw error;
+      }
       partner.send(PAIRED_FRAME);
       server.send(PAIRED_FRAME);
     }
@@ -177,12 +205,28 @@ export class TunnelPair {
     // Fails closed: a missing or NaN bucket is an empty bucket, and `!(>=)` also
     // refuses NaN.
     const now = Date.now();
+    if (!(now < att.deadline)) {
+      this.closePair(socket, 4408, att.generation === null ? "no partner" : "lifetime limit");
+      return;
+    }
     const bucket = this.bucketOf(socket, now);
     const tokens = refilled(bucket, now);
     const charge = Math.max(MIN_TUNNEL_FRAME_CHARGE, message.byteLength);
     if (!(tokens >= charge)) {
       this.closePair(socket, 1008, "rate limit");
       return;
+    }
+    if (att.generation !== null) {
+      if (bucket.reservedBytes < charge) {
+        const reserve = Math.min(LIFETIME_RESERVATION_BYTES, att.unreservedBytes);
+        if (!(bucket.reservedBytes + reserve >= charge)) {
+          this.closePair(socket, 1008, "lifetime byte limit");
+          return;
+        }
+        bucket.reservedBytes += reserve;
+        this.write(socket, { unreservedBytes: att.unreservedBytes - reserve });
+      }
+      bucket.reservedBytes -= charge;
     }
     bucket.tokens = tokens - charge;
     bucket.lastRefillMs = now;
@@ -217,10 +261,15 @@ export class TunnelPair {
     this.dissolve(socket, 1011, "partner error");
   }
 
-  alarm(): void {
-    const sockets = this.live();
-    if (sockets.length >= MAX_SOCKETS) return;
-    for (const socket of sockets) this.close(socket, 4408, "no partner");
+  async alarm(): Promise<void> {
+    const now = Date.now();
+    let next = Infinity;
+    for (const socket of this.live()) {
+      const { deadline, generation } = attachmentOf(socket);
+      if (now < deadline) next = Math.min(next, deadline);
+      else this.close(socket, 4408, generation === null ? "no partner" : "lifetime limit");
+    }
+    if (Number.isFinite(next)) await this.ctx.storage.setAlarm(next);
   }
 
   /**
@@ -249,8 +298,9 @@ export class TunnelPair {
           lastRefillMs: att.lastRefillMs,
           persistedMs: att.lastRefillMs,
           spentSincePersist: 0,
+          reservedBytes: 0,
         }
-      : { tokens: 0, lastRefillMs: now, persistedMs: now, spentSincePersist: 0 };
+      : { tokens: 0, lastRefillMs: now, persistedMs: now, spentSincePersist: 0, reservedBytes: 0 };
     this.buckets.set(socket, bucket);
     return bucket;
   }

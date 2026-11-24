@@ -5,6 +5,8 @@ import {
   MIN_TUNNEL_FRAME_CHARGE,
   PAIRED_FRAME,
   PARTNER_WAIT_MS,
+  PAIR_LIFETIME_MS,
+  LIFETIME_BYTES_PER_SOCKET,
   TunnelPair,
   sendableCloseCode,
 } from "./tunnel";
@@ -246,6 +248,23 @@ describe("TunnelPair relay budget", () => {
     expect(b.close).toHaveBeenCalledWith(1008, "rate limit");
   });
 
+  it("charges lifetime reservations across wakeups", async () => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    const { typed, pairUp, wake } = setup();
+    const { a, b } = await pairUp();
+    const bytes = frame(256);
+    // Each wake can use a new reservation only after persisting its charge.
+    for (let i = 1; i < LIFETIME_BYTES_PER_SOCKET / BURST_BYTES; i++) {
+      clock.mockReturnValue(1_000 + i * 1_000);
+      wake().webSocketMessage(typed(a), bytes);
+      expect(b.send).toHaveBeenLastCalledWith(bytes);
+    }
+    expect(a.close).not.toHaveBeenCalled();
+    wake().webSocketMessage(typed(a), bytes);
+    expect(a.close).toHaveBeenCalledWith(1008, "lifetime byte limit");
+    expect(b.close).toHaveBeenCalledWith(1008, "lifetime byte limit");
+  });
+
   it("writes the attachment at most once per second per socket", async () => {
     const clock = vi.spyOn(Date, "now").mockReturnValue(1_000);
     const { pair, typed, pairUp } = setup();
@@ -365,7 +384,7 @@ describe("TunnelPair close and error propagation", () => {
 });
 
 describe("TunnelPair pairing over fetch", () => {
-  it("accepts two sockets, starts the partner clock and clears it on pairing", async () => {
+  it("accepts two sockets, replaces the partner deadline with the pair lifetime on pairing", async () => {
     const { connect, storage } = setup();
     const clock = vi.spyOn(Date, "now").mockReturnValue(1_000);
     const first = await connect();
@@ -373,7 +392,7 @@ describe("TunnelPair pairing over fetch", () => {
     expect(storage.setAlarm).toHaveBeenCalledWith(1_000 + PARTNER_WAIT_MS);
     expect(storage.deleteAlarm).not.toHaveBeenCalled();
     await connect();
-    expect(storage.deleteAlarm).toHaveBeenCalledTimes(1);
+    expect(storage.setAlarm).toHaveBeenLastCalledWith(1_000 + PAIR_LIFETIME_MS);
     clock.mockRestore();
   });
 
@@ -398,12 +417,12 @@ describe("TunnelPair pairing over fetch", () => {
     expect(b.send.mock.calls).toEqual([[PAIRED_FRAME], [data]]);
     expect(a.send.mock.calls).toEqual([[PAIRED_FRAME]]);
 
-    woke.alarm();
+    await woke.alarm();
     expect(a.close).not.toHaveBeenCalled();
     expect(b.close).not.toHaveBeenCalled();
     const third = await connect(woke);
     expect(third.response.status).toBe(409);
-    expect(storage.setAlarm).toHaveBeenCalledTimes(1);
+    expect(storage.setAlarm).toHaveBeenCalledTimes(3);
     expect(sockets).toHaveLength(2);
   });
 
@@ -418,7 +437,7 @@ describe("TunnelPair pairing over fetch", () => {
     });
     expect(sockets).toHaveLength(2);
     expect(third.server.close).not.toHaveBeenCalled();
-    expect(storage.setAlarm).toHaveBeenCalledTimes(1);
+    expect(storage.setAlarm).toHaveBeenCalledTimes(2);
   });
 
   it("does not count a listed socket that has already closed toward the limit", async () => {
@@ -446,13 +465,13 @@ describe("TunnelPair pairing over fetch", () => {
     expect(created[0]?.server.close).toHaveBeenCalledWith(1011, "partner timer unavailable");
   });
 
-  it("still pairs when clearing the alarm fails", async () => {
-    const { connect, storage } = setup();
-    await connect();
-    storage.deleteAlarm.mockRejectedValueOnce(new Error("delete down"));
-    const second = await connect();
-    expect(second.response.status).toBe(101);
-    expect(second.server.send.mock.calls).toEqual([[PAIRED_FRAME]]);
+  it("closes both sockets when setting the lifetime alarm fails", async () => {
+    const { connect, created, storage } = setup();
+    const first = await connect();
+    storage.setAlarm.mockRejectedValueOnce(new Error("alarm down"));
+    await expect(connect()).rejects.toThrow("alarm down");
+    expect(first.server.close).toHaveBeenCalledWith(1011, "lifetime timer unavailable");
+    expect(created[1]?.server.close).toHaveBeenCalledWith(1011, "lifetime timer unavailable");
   });
 
   it("refuses a newcomer with a retryable 409 while a paired socket's partner is mid-close", async () => {
@@ -479,18 +498,26 @@ describe("TunnelPair pairing over fetch", () => {
 describe("TunnelPair partner deadline", () => {
   it("closes a lone socket with 4408 when the alarm fires", async () => {
     const { connect, pair } = setup();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(1_000);
     const lone = await connect();
-    pair.alarm();
+    clock.mockReturnValue(1_000 + PARTNER_WAIT_MS);
+    await pair.alarm();
     expect(lone.server.close).toHaveBeenCalledWith(4408, "no partner");
   });
 
-  it("does nothing when the alarm fires after pairing", async () => {
-    const { connect, pair } = setup();
+  it("reevaluates an early alarm and closes the pair at the persisted deadline", async () => {
+    const clock = vi.spyOn(Date, "now").mockReturnValue(1_000);
+    const { connect, wake, storage } = setup();
     const first = await connect();
     const second = await connect();
-    pair.alarm();
+    await wake().alarm();
     expect(first.server.close).not.toHaveBeenCalled();
     expect(second.server.close).not.toHaveBeenCalled();
+    expect(storage.setAlarm).toHaveBeenLastCalledWith(1_000 + PAIR_LIFETIME_MS);
+    clock.mockReturnValue(1_000 + PAIR_LIFETIME_MS);
+    await wake().alarm();
+    expect(first.server.close).toHaveBeenCalledWith(4408, "lifetime limit");
+    expect(second.server.close).toHaveBeenCalledWith(4408, "lifetime limit");
   });
 
   it("clears the alarm when the lone socket leaves first", async () => {
@@ -504,8 +531,10 @@ describe("TunnelPair partner deadline", () => {
 describe("TunnelPair stale close echoes", () => {
   it("ignores the echo of an alarm close, so a later joiner keeps its alarm", async () => {
     const { pair, typed, connect, storage } = setup();
+    const clock = vi.spyOn(Date, "now").mockReturnValue(1_000);
     const a = await connect();
-    pair.alarm();
+    clock.mockReturnValue(1_000 + PARTNER_WAIT_MS);
+    await pair.alarm();
     const b = await connect(); // A is closing, so B is alone and gets its own alarm
     expect(storage.setAlarm).toHaveBeenCalledTimes(2);
     pair.webSocketClose(typed(a.server), 1000, "echo");
