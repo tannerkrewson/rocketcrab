@@ -213,6 +213,7 @@ green.
       Podman suite passed Chromium 31/31, WebKit 31/31, and Firefox 30/31.
       The Firefox tunnel-count assertion also failed on the pre-refactor
       commit in Podman and passed on a native Firefox retry of this step.
+      The test-driver lint follow-up also passed `npm run check` (1,269 tests).
 - [ ] **Split the two largest API files.** `packages/nova-api/src/session.ts`
       (~1,750 lines) and `state-engine.ts` (~2,200) along their existing
       sections: lifecycle, authority election, snapshots and deltas, ticks,

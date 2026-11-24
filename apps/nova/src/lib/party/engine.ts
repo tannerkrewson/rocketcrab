@@ -116,7 +116,7 @@ export class PartyEngine {
 
   /** Typed event and state probes for deterministic engine tests. */
   getTestDriver() {
-    const engine = this;
+    const state = this.state;
     return {
       coordinatorEvent: (event: GameSourceTransferEvent) => this.handleCoordinatorEvent(event),
       sessionEvent: (event: NovaSessionEvent) => this.handleSessionEvent(event),
@@ -124,10 +124,10 @@ export class PartyEngine {
       forgetFrameView: () => this.state.rememberView(null),
       acceptsStartFrom: (memberId: MemberId) => this.acceptStartRequestFrom(memberId),
       get session() {
-        return engine.state.session;
+        return state.session;
       },
       get coordinator() {
-        return engine.state.coordinator;
+        return state.coordinator;
       },
       updateTransfer: (
         memberId: MemberId,
