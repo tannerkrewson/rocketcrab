@@ -16,518 +16,62 @@
  * transport. The state engine adds authority election, action application,
  * the tick and snapshots on top (see the state engine).
  */
-import type {
-  NovaTransport,
-  TransportConnectionState,
-  TransportMessage,
-  TransportPeerInfo,
-} from "@rocketcrab/core";
+import { payloadBytes } from "./game-byte-budget";
+import type { TransportMessage } from "@rocketcrab/core";
 import {
   PROTOCOL_VERSION,
   novaActionSchema,
   actionTimeoutMs,
-  gameBytesBurst,
-  gameBytesPerSecond,
-  gameBytesWarn,
   parsePeerMessage,
   controlsBytes,
-  tickRateDefault,
-  type GameEndReason,
   type PeerMessage,
 } from "@rocketcrab/protocol";
-import {
-  createNovaClient,
-  type NovaClient,
-  type NovaClientBackend,
-  type NovaSessionEvent,
-} from "./client";
 import { NOVA_PROTOCOL_CHANNEL } from "./constants";
 import { NovaError, endedMessage, toErrorCode } from "./errors";
-import { NOVA_API_VERSION } from "./version";
 import {
   buildActionAckMessage,
   buildActionDispatchMessage,
   buildAuthorityAnnounceMessage,
   buildAuthorityElectionMessage,
   buildAuthorityHeartbeatMessage,
-  buildGameEndMessage,
   buildGameControlsMessage,
   buildGameReadyMessage,
-  buildGameStartMessage,
   buildPlayerIdentityMessage,
   buildStateResyncMessage,
   buildStateSnapshotMessage,
   buildStateViewMessage,
   type PeerMessageBase,
 } from "./messages";
-import {
-  NovaStateEngine,
-  type AuthorityAnnounceEnvelope,
-  type AuthorityElectionEnvelope,
-  type AuthorityHeartbeatEnvelope,
-  type StateEngineEvent,
-  type StateEngineHost,
-  type StateResyncEnvelope,
-  type StateSnapshotEnvelope,
-  type StateViewEnvelope,
-} from "./state-engine";
-import { LocalGameExecutor, type NovaStateExecutor } from "./state-executor";
 import type {
-  NovaAction,
-  NovaActionAck,
-  NovaConnectionStatus,
-  NovaGameDeclaration,
-  NovaPlayer,
-  NovaStateDiagnostics,
-  NovaStateHandlers,
-} from "./types";
+  AuthorityAnnounceEnvelope,
+  AuthorityElectionEnvelope,
+  AuthorityHeartbeatEnvelope,
+  StateEngineEvent,
+  StateEngineHost,
+  StateResyncEnvelope,
+  StateSnapshotEnvelope,
+  StateViewEnvelope,
+} from "./state-engine";
+import { LocalGameExecutor } from "./state-executor";
+import type { NovaAction, NovaActionAck, NovaGameDeclaration, NovaStateHandlers } from "./types";
 import { assertStructuredCloneSafe } from "./validation";
+import {
+  type NovaSessionOptions,
+  type BufferedDispatch,
+  dispatchRetryIntervalMs,
+  MAX_BUFFERED_DISPATCHES,
+} from "./session-shared";
+import { SessionLifecycle } from "./session-lifecycle";
 
-/** Options for {@link NovaSession}. */
-export interface NovaSessionOptions {
-  /** The transport-neutral connection this session drives. */
-  readonly transport: NovaTransport;
-
-  readonly room: string;
-  /** Party session id that labels every message this session sends. */
-  readonly sessionId: string;
-  /** This player's identity (ADR-0007 member identity). */
-  readonly player: { readonly memberId: string; readonly displayName?: string };
-  /** The game being played (from the host bootstrap). */
-  readonly game: {
-    readonly gameId: string;
-    readonly title?: string;
-    readonly version?: string;
-  };
-  /**
-   * The state executor. The arena injects a frame executor that
-   * runs the game's handlers inside the authority's runtime frame; when
-   * omitted, handlers registered through `nova.defineGame` run in-process
-   * (contract suite / tests) with the real immer package.
-   */
-  readonly stateExecutor?: NovaStateExecutor;
-  /**
-   * Decides whether a `game.start` request from another member starts the
-   * game. The elected authority asks it for each request; a request it
-   * rejects is ignored and reported as a session error. Omitted means every
-   * admitted member's request is accepted (the arena and tests). The party
-   * engine accepts only the host, once every member has the game source.
-   */
-  readonly acceptStartRequest?: (memberId: string) => boolean;
-  /**
-   * Authority election timings (ADR-0007). Defaults follow the protocol
-   * limits; tests inject small deterministic values with fake timers.
-   */
-  readonly authority?: {
-    /** Authority heartbeat interval. */
-    readonly heartbeatIntervalMs?: number;
-    /** Missing-heartbeat grace period before suspicion. */
-    readonly gracePeriodMs?: number;
-    /** How long an election collects candidates before finalizing. */
-    readonly electionWindowMs?: number;
-    /** How long the winner collects state pushes before restoring. */
-    readonly restoreWindowMs?: number;
-    /** Epoch-ms clock (tests inject a fake). */
-    readonly now?: () => number;
-  };
-}
-
-/** One connected player as tracked by the session (host-side view). */
-export interface NovaSessionPlayer extends NovaPlayer {
-  readonly connectionId: string;
-  readonly ready: boolean;
-  readonly joinedAt: number;
-  /** Authority eligibility (ADR-0007 member identity; all players are eligible). */
-  readonly authorityEligible: boolean;
-}
-
-/** Internal mutable player record (the host-side view is a snapshot). */
-interface PlayerRecord {
-  id: string;
-  name: string;
-  connectionId: string;
-  ready: boolean;
-  joinedAt: number;
-  authorityEligible: boolean;
-}
-function mapConnectionState(state: TransportConnectionState): NovaConnectionStatus {
-  switch (state) {
-    case "idle":
-      return "disconnected";
-    case "joining":
-      return "connecting";
-    case "connected":
-      return "connected";
-    case "suspended":
-      return "suspended";
-    case "disconnected":
-      return "disconnected";
-  }
-}
-
-interface OutboxEntry {
-  build: (base: PeerMessageBase) => PeerMessage;
-  targetMemberId?: string;
-  seq?: number;
-}
-
-/** One action dispatch held or in flight (election buffering). */
-interface BufferedDispatch {
-  readonly actionId: string;
-  readonly type: string;
-  readonly payload: unknown;
-  readonly baseRevision: number;
-  /**
-   * When this dispatch stops being valid, fixed at first dispatch. Every send
-   * carries this same expiry (never a fresh one), so a late copy cannot commit
-   * an action the game was already told timed out.
-   */
-  readonly deadlineMs: number;
-}
-
-/** Interval between re-sends of an unacknowledged dispatch (half its lifetime). */
-const dispatchRetryIntervalMs = actionTimeoutMs / 2;
-
-/**
- * Hard cap on dispatches held while no authority is known. The byte budget
- * alone does not bound this (many tiny dispatches fit inside it), and an
- * overflow is refused at once rather than queued.
- */
-const MAX_BUFFERED_DISPATCHES = 256;
+export type { NovaSessionOptions, NovaSessionPlayer } from "./session-shared";
 
 /** Create a session over a transport and its game-facing client. */
 export function createNovaSession(options: NovaSessionOptions): NovaSession {
   return new NovaSession(options);
 }
 
-export class NovaSession implements NovaClientBackend {
-  readonly transport: NovaTransport;
-  readonly room: string;
-  readonly sessionId: string;
-  readonly game: NovaSessionOptions["game"];
-
-  /** The game-facing API object bound to this session. */
-  readonly client: NovaClient;
-
-  /** The schema-validated registration the game declared (informational). */
-  declaration: NovaGameDeclaration | null = null;
-
-  private readonly engine: NovaStateEngine;
-  private readonly injectedExecutor: NovaStateExecutor | undefined;
-  private stateHandlers: NovaStateHandlers | null = null;
-
-  /** Every player's latest controls (filled on the authority; ticks read it). */
-  private readonly controlsByMember = new Map<string, unknown>();
-  /** This player's controls as last set, and as last sent to the authority. */
-  private myControls: { value: unknown; json: string } | null = null;
-  private sentControlsJson: string | null = null;
-  private controlsTimer: ReturnType<typeof setTimeout> | null = null;
-  /** Controls go out at most once per tick (the game's declared rate). */
-  private controlsIntervalMs = 1000 / tickRateDefault;
-  private readonly acceptStartRequest: (memberId: string) => boolean;
-
-  private readonly selfPlayer: PlayerRecord;
-  private readonly playersMap = new Map<string, PlayerRecord>();
-  private gameByteTokens = gameBytesBurst;
-  private gameByteUpdatedAt = performance.now();
-  private gameByteWarned = false;
-  private readonly listeners = new Set<(event: NovaSessionEvent) => void>();
-  private readonly transportUnsubscribers: Array<() => void> = [];
-  private readonly outbox: OutboxEntry[] = [];
-  /** Dispatches held while no authority is known (election buffering). */
-  private readonly dispatchBuffer: BufferedDispatch[] = [];
-  /** Dispatches sent but not yet acked (re-sent when the authority changes). */
-  private readonly inflightDispatches = new Map<string, BufferedDispatch>();
-  /** Dispatches waiting for an in-flight state delta to settle. */
-  private readonly deltaWaiters: Array<() => void> = [];
-  /** Protocol messages held while a state delta is being verified, in arrival order. */
-  private readonly deferredProtocolMessages: TransportMessage[] = [];
-  /** Ack-timeout re-send timer per in-flight dispatch (cleared on ack). */
-  private readonly dispatchRetryTimers = new Map<string, ReturnType<typeof setTimeout>>();
-  private nextSeq = 0;
-  private readySent = false;
-  private started = false;
-  private startEmitted = false;
-  private ended = false;
-  private status: NovaConnectionStatus = "disconnected";
-  private disposed = false;
-
-  constructor(options: NovaSessionOptions) {
-    this.transport = options.transport;
-    this.room = options.room;
-    this.sessionId = options.sessionId;
-    this.game = options.game;
-    this.injectedExecutor = options.stateExecutor;
-    this.acceptStartRequest = options.acceptStartRequest ?? (() => true);
-    const memberId = options.player.memberId;
-    this.selfPlayer = {
-      id: memberId,
-      name: options.player.displayName ?? memberId,
-      connectionId: this.transport.selfConnectionId,
-      ready: false,
-      joinedAt: Date.now(),
-      authorityEligible: true,
-    };
-    this.client = createNovaClient(this);
-    this.engine = new NovaStateEngine({
-      host: this.engineHost,
-      executor: this.injectedExecutor ?? new LocalGameExecutor(null),
-      selfMemberId: memberId,
-      ...(options.authority?.now !== undefined ? { now: options.authority.now } : {}),
-      ...(options.authority?.heartbeatIntervalMs !== undefined
-        ? { heartbeatIntervalMs: options.authority.heartbeatIntervalMs }
-        : {}),
-      ...(options.authority?.gracePeriodMs !== undefined
-        ? { gracePeriodMs: options.authority.gracePeriodMs }
-        : {}),
-      ...(options.authority?.electionWindowMs !== undefined
-        ? { electionWindowMs: options.authority.electionWindowMs }
-        : {}),
-      ...(options.authority?.restoreWindowMs !== undefined
-        ? { restoreWindowMs: options.authority.restoreWindowMs }
-        : {}),
-    });
-  }
-
-  /** This player's identity (never null — the session knows it). */
-  get player(): NovaPlayer {
-    return { id: this.selfPlayer.id, name: this.selfPlayer.name };
-  }
-
-  /** Every player in the party, self first, then peers in join order. */
-  get players(): readonly NovaPlayer[] {
-    return [this.player, ...[...this.playersMap.values()].map(toNovaPlayer)];
-  }
-
-  /** Host-side view of every connected peer, in join order. */
-  get peerPlayers(): readonly NovaSessionPlayer[] {
-    return [...this.playersMap.values()].map((player) => ({
-      id: player.id,
-      name: player.name,
-      connectionId: player.connectionId,
-      ready: player.ready,
-      joinedAt: player.joinedAt,
-      authorityEligible: player.authorityEligible,
-    }));
-  }
-
-  /** This player's current connection status. */
-  get connectionStatus(): NovaConnectionStatus {
-    return this.status;
-  }
-
-  /** State-size and action-rate diagnostics (host/arena visible). */
-  getStateModeDiagnostics(): NovaStateDiagnostics {
-    return this.engine.getDiagnostics();
-  }
-
-  /**
-   * The replicated canonical state this shell retains for migration
-   * (ADR-0007), or null before the first snapshot. Host-side only — game
-   * frames receive their selected view, never this state.
-   */
-  getCanonicalState(): {
-    state: unknown;
-    revision: number;
-    stateHash: string | null;
-    processedActionIds: readonly string[];
-  } | null {
-    if (this.engine.getCanonicalState() === null) {
-      return null;
-    }
-    return {
-      state: this.engine.getCanonicalState(),
-      revision: this.engine.getRevision(),
-      stateHash: this.engine.getDiagnostics().stateHash,
-      processedActionIds: this.engine.processedActionIds(),
-    };
-  }
-
-  /**
-   * Re-send this session's start request while the authority has not started
-   * the game (a request the authority rejected, for example before every
-   * source was verified). A no-op for the elected authority, which starts the
-   * game itself, and once this session has received the authority's start.
-   */
-  resendStartRequest(): void {
-    if (!this.started || this.startEmitted || this.engine.isAuthorityElect()) return;
-    void this.sendProtocol((base) => buildGameStartMessage(base)).catch((error: unknown) =>
-      this.emitError(error),
-    );
-  }
-
-  /** True once this session broadcast game start. */
-  isStarted(): boolean {
-    return this.started;
-  }
-
-  /**
-   * Read-only diagnostics for stalled starts: whether this session has
-   * requested the start, has emitted it locally, and which member it believes
-   * is the elected authority (null before the game begins).
-   */
-  debugState(): {
-    started: boolean;
-    startEmitted: boolean;
-    isAuthorityElect: boolean;
-    authorityMemberId: string | null;
-  } {
-    return {
-      started: this.started,
-      startEmitted: this.startEmitted,
-      isAuthorityElect: this.engine.isAuthorityElect(),
-      authorityMemberId: this.engine.getAuthorityMemberId(),
-    };
-  }
-
-  /** True once this session broadcast (or observed) game end. */
-  isEnded(): boolean {
-    return this.ended;
-  }
-
-  /** Host-side readiness of one player (by member id). */
-  readyOf(memberId: string): boolean {
-    if (memberId === this.selfPlayer.id) {
-      return this.readySent;
-    }
-    return this.playersMap.get(memberId)?.ready ?? false;
-  }
-
-  /** Subscribe to session events (host-side; the client subscribes itself). */
-  onSessionEvent(handler: (event: NovaSessionEvent) => void): () => void {
-    this.listeners.add(handler);
-    return () => {
-      this.listeners.delete(handler);
-    };
-  }
-
-  /**
-   * Join the party: subscribe to transport events and join the room.
-   * Outgoing messages sent before the join (e.g. `nova.ready()` called by
-   * game code that runs before the host connects) are flushed on connect.
-   */
-  async join(): Promise<void> {
-    this.assertAlive();
-    this.wireTransport();
-    await this.transport.join({ room: this.room, sessionId: this.sessionId });
-  }
-
-  /**
-   * Attach to an ALREADY-JOINED transport. The party layer
-   * joins the private room inside `createParty`/`joinPartyByInvite`, so this
-   * session never calls `transport.join()`; it wires the same listeners
-   * {@link NovaSession.join} would, seeds the connection status from the
-   * transport's current state, and replays the current peers so the session
-   * observes the party state it missed while the transport was being
-   * established (player lists, identity exchange, readiness).
-   */
-  async attach(): Promise<void> {
-    this.assertAlive();
-    this.wireTransport();
-    this.status = mapConnectionState(this.transport.connectionState);
-    this.emit({ type: "connection", status: this.status });
-    for (const peer of this.transport.peers) {
-      this.handlePeerJoined(peer);
-    }
-  }
-
-  /** Leave the party cleanly; pending outgoing messages are discarded. */
-  async leave(): Promise<void> {
-    this.assertAlive();
-    this.outbox.length = 0;
-    this.dispatchBuffer.length = 0;
-    this.inflightDispatches.clear();
-    for (const timer of this.dispatchRetryTimers.values()) {
-      clearTimeout(timer);
-    }
-    this.dispatchRetryTimers.clear();
-    // A left session can deliver nothing, so its tick stops here.
-    this.engine.setTickRate(null);
-    await this.transport.leave();
-  }
-
-  /**
-   * Start the game (host/arena policy, never game code): broadcasts
-   * `game.start`. The fixed initial authority (ADR-0007) first creates the
-   * canonical state and publishes revision 1 + per-player views, then
-   * announces, then broadcasts start — so every frame sees state and the
-   * authority before `nova.onStart` fires. Followers broadcast start but
-   * emit it locally only when the authority's `game.start` (or the catch-up
-   * snapshot, for late joiners) arrives. Idempotent. A start request from
-   * another member, received by the elected authority before it has started,
-   * also calls this (see the `game.start` case).
-   */
-  start(): void {
-    if (this.started) return;
-    this.started = true;
-    this.engine.beginGame();
-    if (this.engine.isAuthorityElect()) {
-      void this.startAsAuthority().catch((error: unknown) => this.emitError(error));
-    } else {
-      void this.sendProtocol((base) => buildGameStartMessage(base)).catch((error: unknown) =>
-        this.emitError(error),
-      );
-    }
-  }
-
-  private async startAsAuthority(): Promise<void> {
-    const initialized = await this.engine.initializeAsAuthority();
-    if (!initialized || this.ended || this.disposed) return;
-    await this.sendProtocol((base) => buildGameStartMessage(base));
-    if (this.startEmitted) return;
-    this.startEmitted = true;
-    this.emit({ type: "start" });
-  }
-
-  /**
-   * End the game (host/arena policy, never game code): broadcasts
-   * `game.end` and fires `nova.onEnd` locally. Idempotent.
-   */
-  end(reason: GameEndReason): void {
-    if (this.ended) return;
-    this.ended = true;
-    this.engine.endGame();
-    void this.sendProtocol((base) => buildGameEndMessage(base, reason)).catch((error: unknown) =>
-      this.emitError(error),
-    );
-    this.emit({ type: "end", reason });
-  }
-
-  /** Tear down the session: unsubscribe, drop the outbox, detach the client. */
-  dispose(): void {
-    if (this.disposed) return;
-    this.disposed = true;
-    this.engine.dispose();
-    if (this.controlsTimer !== null) clearTimeout(this.controlsTimer);
-    for (const unsubscribe of this.transportUnsubscribers) {
-      unsubscribe();
-    }
-    this.transportUnsubscribers.length = 0;
-    this.outbox.length = 0;
-    this.dispatchBuffer.length = 0;
-    this.deferredProtocolMessages.length = 0;
-    for (const resolve of this.deltaWaiters.splice(0)) resolve();
-    this.inflightDispatches.clear();
-    for (const timer of this.dispatchRetryTimers.values()) {
-      clearTimeout(timer);
-    }
-    this.dispatchRetryTimers.clear();
-    this.listeners.clear();
-    this.client.dispose();
-  }
-
-  // ------------------------------------------------------------------
-  // NovaClientBackend (called by the game-facing client)
-  // ------------------------------------------------------------------
-
-  get apiVersion(): number {
-    return NOVA_API_VERSION;
-  }
-
-  get self(): NovaPlayer {
-    return this.player;
-  }
-
+/** Routes game calls and state-engine events over a Nova transport. */
+export class NovaSession extends SessionLifecycle {
   register(declaration: NovaGameDeclaration, handlers?: NovaStateHandlers): void {
     this.assertAlive();
     this.declaration = declaration;
@@ -578,7 +122,7 @@ export class NovaSession implements NovaClientBackend {
       // delta in flight to settle, so an action is never stamped with a stale base.
       await new Promise<void>((resolve) => this.deltaWaiters.push(resolve));
     }
-    this.consumeGameBytes(payloadBytes(action));
+    this.gameByteBudget.consume(payloadBytes(action), (event) => this.emit(event));
     const baseRevision = action.baseRevision ?? this.engine.getRevision();
     const authority = this.engine.getAuthorityMemberId();
     const entry: BufferedDispatch = {
@@ -676,7 +220,7 @@ export class NovaSession implements NovaClientBackend {
   }
 
   /** Send this player's controls to the authority if they changed since the last send. */
-  private flushControls(force = false): void {
+  protected flushControls(force = false): void {
     const mine = this.myControls;
     const authority = this.engine.getAuthorityMemberId();
     if (mine === null || authority === null || authority === this.selfPlayer.id) return;
@@ -703,129 +247,7 @@ export class NovaSession implements NovaClientBackend {
     return controls;
   }
 
-  onEvent(handler: (event: NovaSessionEvent) => void): () => void {
-    return this.onSessionEvent(handler);
-  }
-
-  // ------------------------------------------------------------------
-  // Transport event handling
-  // ------------------------------------------------------------------
-
-  private wireTransport(): void {
-    this.transportUnsubscribers.push(
-      this.transport.on("connection:state", (state) => this.handleConnectionState(state)),
-      this.transport.on("peer:joined", (peer) => this.handlePeerJoined(peer)),
-      this.transport.on("peer:left", (peer) => this.handlePeerLeft(peer)),
-      this.transport.on("peer:reconnected", () => this.handleReconnected()),
-      this.transport.on("message:received", (message) => this.handleMessage(message)),
-    );
-  }
-
-  private handleConnectionState(state: TransportConnectionState): void {
-    this.status = mapConnectionState(state);
-    if (state === "connected") {
-      this.flushOutbox();
-      this.engine.onSelfReconnected();
-    }
-    this.emit({ type: "connection", status: this.status });
-  }
-
-  private handlePeerJoined(peer: TransportPeerInfo): void {
-    const existing = this.playersMap.get(peer.memberId);
-    if (existing !== undefined) {
-      // A reconnect of a known member (peer:left then peer:joined): update
-      // the connection id and treat it as a fresh join.
-      existing.connectionId = peer.connectionId;
-      existing.name = peer.displayName ?? existing.name;
-    } else {
-      this.playersMap.set(peer.memberId, {
-        id: peer.memberId,
-        name: peer.displayName ?? peer.memberId,
-        connectionId: peer.connectionId,
-        ready: false,
-        joinedAt: peer.joinedAt,
-        authorityEligible: true,
-      });
-    }
-    const joined = this.playersMap.get(peer.memberId);
-    if (joined === undefined) return;
-    this.emit({ type: "playerJoined", player: toNovaPlayer(joined) });
-    // The authority dropped this player's controls when the link went down.
-    if (peer.memberId === this.engine.getAuthorityMemberId()) this.flushControls(true);
-    // Identity exchange: tell the new peer who we are, and (if we already
-    // announced ready) that we are ready.
-    void this.sendProtocol(
-      (base) =>
-        buildPlayerIdentityMessage(base, this.selfPlayer.name, this.selfPlayer.authorityEligible),
-      { targetMemberId: peer.memberId },
-    ).catch((error: unknown) => this.emitError(error));
-    if (this.readySent) {
-      void this.sendProtocol((base) => buildGameReadyMessage(base), {
-        targetMemberId: peer.memberId,
-      }).catch((error: unknown) => this.emitError(error));
-    }
-    // Late joins: the authority hands the new shell the current canonical
-    // state (migration copy) and computes the new player's selected view.
-    if (this.started && this.engine.isAuthorityElect()) {
-      if (this.engine.getCanonicalState() !== null) {
-        this.sendCatchUp(peer.memberId, joined.name);
-      }
-    }
-  }
-
-  /** Send the current canonical state + the new player's view. */
-  private sendCatchUp(memberId: string, displayName: string): void {
-    const snapshot = this.engine.getDiagnostics();
-    if (snapshot.revision === 0 || this.engine.getCanonicalState() === null) return;
-    this.sendEngineSnapshot(
-      {
-        revision: snapshot.revision,
-        stateHash: snapshot.stateHash,
-        term: this.engine.getTerm(),
-        authorityMemberId: this.selfPlayer.id,
-        historyMode: "full",
-        baseStateHash: null,
-        stateMode: "full",
-        ops: null,
-        historyComplete: this.engine.isHistoryComplete(),
-        ...this.engine.actionHistory(),
-        state: this.engine.getCanonicalState(),
-        viewIsState: this.engine.viewsAreState(),
-      },
-      memberId,
-    );
-    if (this.engine.viewsAreState()) return; // the snapshot is the joiner's view
-    void this.engine
-      .computeViewFor({ id: memberId, name: displayName })
-      .catch((error: unknown) => this.emitError(error));
-  }
-
-  private handlePeerLeft(peer: TransportPeerInfo): void {
-    const player = this.playersMap.get(peer.memberId);
-    if (player === undefined) return;
-    this.playersMap.delete(peer.memberId);
-    this.controlsByMember.delete(peer.memberId);
-    this.emit({ type: "playerLeft", player: toNovaPlayer(player) });
-    if (this.engine.getAuthorityMemberId() === peer.memberId) {
-      // The authority left: wait for election before applying more actions.
-      // Every shell keeps the last committed state (never corrupted).
-      this.engine.notifyAuthorityLeft();
-    }
-  }
-
-  private handleReconnected(): void {
-    this.selfPlayer.connectionId = this.transport.selfConnectionId;
-    // The transport is already connected again (its rejoin completed before
-    // the reconnected event fires): surface the transient reconnecting state,
-    // then settle on connected so games never see a stuck "reconnecting".
-    this.status = "reconnecting";
-    this.emit({ type: "connection", status: this.status });
-    this.status = "connected";
-    this.emit({ type: "connection", status: this.status });
-    this.engine.onSelfReconnected();
-  }
-
-  private handleMessage(message: TransportMessage): void {
+  protected handleMessage(message: TransportMessage): void {
     if (message.channel !== NOVA_PROTOCOL_CHANNEL) {
       // Games have no channels of their own; ignore anything else.
       return;
@@ -1036,10 +458,6 @@ export class NovaSession implements NovaClientBackend {
     }
   }
 
-  // ------------------------------------------------------------------
-  // Internals
-  // ------------------------------------------------------------------
-
   /**
    * Send one buffered/in-flight dispatch to the current authority. Only the
    * authority applies dispatches (`handleInboundAction`), so the message is
@@ -1144,7 +562,7 @@ export class NovaSession implements NovaClientBackend {
   }
 
   /** The transport-facing half the state engine uses to send and emit. */
-  private get engineHost(): StateEngineHost {
+  protected buildEngineHost(): StateEngineHost {
     return {
       players: () => this.players,
       isConnected: (memberId) => memberId === this.selfPlayer.id || this.playersMap.has(memberId),
@@ -1188,7 +606,7 @@ export class NovaSession implements NovaClientBackend {
   }
 
   /** Send a state snapshot (broadcast, or targeted at one shell). */
-  private sendEngineSnapshot(snapshot: StateSnapshotEnvelope, targetMemberId?: string): void {
+  protected sendEngineSnapshot(snapshot: StateSnapshotEnvelope, targetMemberId?: string): void {
     const seq = this.takeSeq();
     const options: { targetMemberId?: string } = {};
     if (targetMemberId !== undefined) {
@@ -1378,7 +796,7 @@ export class NovaSession implements NovaClientBackend {
   }
 
   /** Send a protocol message, or queue it until the transport connects. */
-  private sendProtocol(
+  protected sendProtocol(
     build: (base: PeerMessageBase) => PeerMessage,
     options: { targetMemberId?: string; seq?: number } = {},
   ): Promise<void> {
@@ -1411,7 +829,7 @@ export class NovaSession implements NovaClientBackend {
     });
   }
 
-  private flushOutbox(): void {
+  protected flushOutbox(): void {
     const pending = this.outbox.splice(0);
     for (const entry of pending) {
       void this.deliverProtocol(entry.build(this.base()), entry).catch((error: unknown) =>
@@ -1419,80 +837,6 @@ export class NovaSession implements NovaClientBackend {
       );
     }
   }
-
-  private connectionIdOf(memberId: string): string | undefined {
-    return this.playersMap.get(memberId)?.connectionId;
-  }
-
-  private playerOf(memberId: string): NovaPlayer {
-    const player = this.playersMap.get(memberId);
-    return player === undefined ? { id: memberId, name: memberId } : toNovaPlayer(player);
-  }
-
-  private emit(event: NovaSessionEvent): void {
-    for (const handler of this.listeners) {
-      handler(event);
-    }
-  }
-
-  private emitError(error: unknown): void {
-    this.emit({
-      type: "error",
-      error: error instanceof NovaError ? error : new NovaError("invalid_options", String(error)),
-    });
-  }
-
-  private consumeGameBytes(bytes: number): void {
-    const now = performance.now();
-    const elapsed = Math.max(0, now - this.gameByteUpdatedAt);
-    this.gameByteTokens = Math.min(
-      gameBytesBurst,
-      this.gameByteTokens + (elapsed * gameBytesPerSecond) / 1000,
-    );
-    this.gameByteUpdatedAt = now;
-    if (this.gameByteTokens < bytes) {
-      throw new NovaError(
-        "rate_limited",
-        "Game bandwidth budget exceeded (256 KiB/s, 1 MiB burst); the send was dropped.",
-      );
-    }
-    this.gameByteTokens -= bytes;
-    if (gameBytesBurst - this.gameByteTokens >= gameBytesWarn && !this.gameByteWarned) {
-      this.gameByteWarned = true;
-      this.emit({
-        type: "bandwidthWarning",
-        message: "Game bandwidth budget is 80% exhausted (256 KiB/s, 1 MiB burst).",
-      });
-    } else if (gameBytesBurst - this.gameByteTokens < gameBytesWarn) {
-      this.gameByteWarned = false;
-    }
-  }
-
-  private assertAlive(): void {
-    if (this.disposed) {
-      throw new NovaError("ended", "NovaSession: session was disposed.");
-    }
-  }
-}
-
-function toNovaPlayer(player: PlayerRecord): NovaPlayer {
-  return { id: player.id, name: player.name };
-}
-
-/**
- * Size of one payload in bytes: byte length for binary payloads, UTF-8
- * serialized size for structured data (the same measurement the transports
- * use for chunking and progress).
- */
-function payloadBytes(payload: unknown): number {
-  if (payload instanceof Uint8Array) {
-    return payload.byteLength;
-  }
-  if (payload instanceof ArrayBuffer) {
-    return payload.byteLength;
-  }
-  const json = JSON.stringify(payload);
-  return new TextEncoder().encode(json ?? "").length;
 }
 
 function assertValidSchema(result: { success: boolean }, message: string): void {
