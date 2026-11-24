@@ -1,6 +1,6 @@
 import type { NovaAction } from "@rocketcrab/nova-api";
 import { RuntimeHostClient, type RuntimeHostEvent } from "../runtime-host";
-import { arenaApiCallSchemas } from "../arena/api-calls";
+import { novaApiCallSchemas } from "@rocketcrab/protocol";
 import type { ArenaLogEntry } from "../arena/types";
 import type { FrameStateResponsePayload } from "../arena/state-executor";
 import type { PartyEngineContext } from "./engine-context";
@@ -243,12 +243,12 @@ export class PartyRuntime {
     const payload = message.payload as Record<string, unknown>;
     switch (message.method) {
       case "ready":
-        if (arenaApiCallSchemas.ready.safeParse(payload).success) {
+        if (novaApiCallSchemas.ready.safeParse(payload).success) {
           session.ready();
         }
         break;
       case "dispatch": {
-        const parsed = arenaApiCallSchemas.dispatch.safeParse(payload);
+        const parsed = novaApiCallSchemas.dispatch.safeParse(payload);
         if (parsed.success) {
           void session
             .dispatch(parsed.data.action as NovaAction, parsed.data.actionId)
@@ -271,7 +271,7 @@ export class PartyRuntime {
         break;
       }
       case "controls.set": {
-        const parsed = arenaApiCallSchemas["controls.set"].safeParse(payload);
+        const parsed = novaApiCallSchemas["controls.set"].safeParse(payload);
         if (parsed.success) {
           try {
             session.setControls(parsed.data.controls);
@@ -284,7 +284,7 @@ export class PartyRuntime {
         break;
       }
       case "stateResponse": {
-        const parsed = arenaApiCallSchemas.stateResponse.safeParse(payload);
+        const parsed = novaApiCallSchemas.stateResponse.safeParse(payload);
         if (parsed.success) {
           this.state.stateExecutor?.handleResponse(parsed.data as FrameStateResponsePayload);
         }

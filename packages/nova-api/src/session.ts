@@ -24,6 +24,7 @@ import type {
 } from "@rocketcrab/core";
 import {
   PROTOCOL_VERSION,
+  novaActionSchema,
   actionTimeoutMs,
   gameBytesBurst,
   gameBytesPerSecond,
@@ -80,7 +81,7 @@ import type {
   NovaStateDiagnostics,
   NovaStateHandlers,
 } from "./types";
-import { assertStructuredCloneSafe, novaActionSchema } from "./validation";
+import { assertStructuredCloneSafe } from "./validation";
 
 /** Options for {@link NovaSession}. */
 export interface NovaSessionOptions {

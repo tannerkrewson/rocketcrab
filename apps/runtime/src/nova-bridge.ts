@@ -4,14 +4,8 @@
  * `@rocketcrab/nova-api` client) and the schemas the runtime page uses to
  * validate everything that script reports before it reaches the host.
  */
-import {
-  playerLimitMax,
-  stateResponseSchema,
-  tickRateMax,
-  titleSchema,
-} from "@rocketcrab/protocol";
 import { NOVA_API_VERSION } from "@rocketcrab/nova-api/version";
-import { z } from "zod";
+import { type RuntimeGameDeclaration } from "@rocketcrab/protocol";
 
 /**
  * Nova API versions this build can execute. The game-facing API version
@@ -21,54 +15,6 @@ import { z } from "zod";
  * with a clear `unsupported` runtime error rather than being guessed at.
  */
 export const SUPPORTED_NOVA_API_VERSIONS: readonly number[] = [NOVA_API_VERSION];
-
-/** What the runtime accepts from `nova.defineGame` (protocol keys). */
-export const gameDeclarationSchema = z
-  .object({
-    title: titleSchema.optional(),
-    gameVersion: z.string().min(1).max(32).optional(),
-    apiVersion: z.number().int().min(1).optional(),
-    tickRate: z.number().int().min(1).max(tickRateMax).optional(),
-    minPlayers: z.number().int().min(1).max(playerLimitMax).optional(),
-    maxPlayers: z.number().int().min(1).max(playerLimitMax).optional(),
-  })
-  .refine(
-    (options) =>
-      options.minPlayers === undefined ||
-      options.maxPlayers === undefined ||
-      options.minPlayers <= options.maxPlayers,
-  );
-export type GameDeclaration = z.infer<typeof gameDeclarationSchema>;
-
-/**
- * Bounded payloads the runtime accepts from forwarded Nova API calls. Each
- * schema mirrors the `@rocketcrab/nova-api` validation schemas, so the runtime
- * boundary never trusts game-supplied call arguments.
- */
-export const novaApiCallSchemas = {
-  ready: z.object({}).strict(),
-  dispatch: z
-    .object({
-      action: z.object({
-        type: z.string().min(1).max(64),
-        payload: z.unknown().optional(),
-        baseRevision: z.number().int().nonnegative().optional(),
-      }),
-      // The frame generates the action id so the host can correlate the
-      // authority's ack back to the dispatch promise.
-      actionId: z.string().min(1).max(64),
-    })
-    .strict(),
-  "controls.set": z.object({ controls: z.unknown() }).strict(),
-  stateResponse: z
-    .object({
-      requestId: z.string().min(1).max(64),
-      result: stateResponseSchema,
-    })
-    .strict(),
-} as const;
-
-export type NovaApiCallMethod = keyof typeof novaApiCallSchemas;
 
 /** The script inlined ahead of every game document (src/frame/entry.ts, bundled). */
 export { default as NOVA_BRIDGE_SCRIPT } from "virtual:nova-frame-script";
@@ -138,7 +84,7 @@ export const DEFAULT_GAME_TITLE = "Untitled game";
 export function registrationFields(input: {
   bootstrapGameId: string;
   bootstrapTitle?: string;
-  declaration?: GameDeclaration;
+  declaration?: RuntimeGameDeclaration;
 }): {
   gameId: string;
   title: string;

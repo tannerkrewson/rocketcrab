@@ -5,6 +5,9 @@
  */
 import {
   parseRuntimeMessage,
+  runtimeGameDeclarationSchema,
+  novaApiCallSchemas,
+  type NovaApiCallMethod,
   type GameApiEventMessage,
   type RuntimeBootstrapMessage,
   type RuntimeErrorMessage,
@@ -23,12 +26,8 @@ import {
 import {
   NOVA_BRIDGE_SCRIPT,
   SUPPORTED_NOVA_API_VERSIONS,
-  gameDeclarationSchema,
-  novaApiCallSchemas,
   registrationFields,
   serializeConsoleArgs,
-  type GameDeclaration,
-  type NovaApiCallMethod,
 } from "./nova-bridge";
 import { RateLimitedSink, createRuntimeLimiters } from "./rate-limiter";
 
@@ -328,12 +327,12 @@ export class RuntimeInstance {
       );
       return;
     }
-    const parsed = gameDeclarationSchema.safeParse(options);
+    const parsed = runtimeGameDeclarationSchema.safeParse(options);
     if (!parsed.success) {
       this.sendError("runtime", "nova.defineGame options failed validation; registration ignored.");
       return;
     }
-    const declaration = parsed.data as GameDeclaration;
+    const declaration = parsed.data;
     if (
       declaration.apiVersion !== undefined &&
       !SUPPORTED_NOVA_API_VERSIONS.includes(declaration.apiVersion)

@@ -9,6 +9,7 @@ import {
   titleSchema,
 } from "../ids";
 import { htmlSourceSchema, playerLimitMax, tickRateMax } from "../limits";
+import { novaActionSchema } from "../nova-api";
 import { gameEndReasonSchema } from "./shared";
 
 /**
@@ -21,38 +22,6 @@ import { gameEndReasonSchema } from "./shared";
  * the same dedicated MessageChannel as every other runtime message and are
  * validated at both ends.
  */
-
-/**
- * Nova API call methods the runtime forwards to the host (the session
- * router). Mirrors `novaApiCallSchemas` in apps/runtime (the runtime
- * validates before forwarding; the host re-validates at its boundary).
- * `stateResponse` carries the authority frame's answer to a
- * `stateRequest` host event.
- */
-export const NOVA_API_CALL_METHODS = [
-  "ready",
-  "dispatch",
-  "controls.set",
-  "stateResponse",
-] as const;
-
-export type NovaApiCallMethod = (typeof NOVA_API_CALL_METHODS)[number];
-
-/**
- * A forwarded Nova API call: the runtime validated the payload already
- * (never trust game input), then forwards it to the host session router. The
- * payload is the same shape the runtime's `novaApiCallSchemas`
- * accepted.
- */
-export const gameApiCallMessageSchema = z
-  .object({
-    ...runtimeEnvelopeFields,
-    type: z.literal("game.apiCall"),
-    method: z.enum(NOVA_API_CALL_METHODS),
-    payload: z.unknown(),
-  })
-  .strict();
-export type GameApiCallMessage = z.infer<typeof gameApiCallMessageSchema>;
 
 /** Connection status values the arena pushes into a frame. */
 export const novaConnectionStatusSchema = z.enum([
@@ -148,6 +117,40 @@ export const stateResponseSchema = z.discriminatedUnion("kind", [
     .strict(),
 ]);
 export type StateResponse = z.infer<typeof stateResponseSchema>;
+
+/** Bounded call payloads validated at both runtime and host boundaries. */
+export const novaApiCallSchemas = {
+  ready: z.object({}).strict(),
+  dispatch: z
+    .object({
+      action: novaActionSchema,
+      // The frame generates the action id so the host can correlate the
+      // authority's ack back to the dispatch promise.
+      actionId: z.string().min(1).max(64),
+    })
+    .strict(),
+  "controls.set": z.object({ controls: z.unknown() }).strict(),
+  stateResponse: z
+    .object({
+      requestId: z.string().min(1).max(64),
+      result: stateResponseSchema,
+    })
+    .strict(),
+} as const;
+
+const novaApiCallMethodSchema = z.object(novaApiCallSchemas).keyof();
+export type NovaApiCallMethod = z.infer<typeof novaApiCallMethodSchema>;
+
+/** A call forwarded from the game frame to the host session. */
+export const gameApiCallMessageSchema = z
+  .object({
+    ...runtimeEnvelopeFields,
+    type: z.literal("game.apiCall"),
+    method: novaApiCallMethodSchema,
+    payload: z.unknown(),
+  })
+  .strict();
+export type GameApiCallMessage = z.infer<typeof gameApiCallMessageSchema>;
 
 /**
  * Action acks pushed into the dispatcher's frame so `nova.dispatch`

@@ -14,6 +14,7 @@ export * from "./ids";
 export * from "./limits";
 export * from "./envelope";
 export * from "./errors";
+export * from "./nova-api";
 export * from "./messages/shared";
 export * from "./messages/peer";
 export * from "./messages/runtime";

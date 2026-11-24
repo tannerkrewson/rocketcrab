@@ -16,16 +16,16 @@
  *   dispatched to the game's handlers inside this context — functions
  *   registered by a game never cross the frame, only data does.
  */
-import { controlsBytes, tickRateDefault } from "@rocketcrab/protocol";
+import {
+  controlsBytes,
+  tickRateDefault,
+  novaActionSchema,
+  novaGameDeclarationSchema,
+} from "@rocketcrab/protocol";
 import { isSupportedApiVersion } from "./version";
 import { NovaError, endedMessage, notStartedMessage, toErrorCode } from "./errors";
 import { newActionId } from "./ids";
-import {
-  assertStructuredCloneSafe,
-  assertValid,
-  novaActionSchema,
-  novaGameDeclarationSchema,
-} from "./validation";
+import { assertStructuredCloneSafe, assertValid } from "./validation";
 import { NOVA_ACTION_TIMEOUT_MS } from "./types";
 import type {
   NovaAction,

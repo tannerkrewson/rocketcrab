@@ -1,11 +1,10 @@
+import { runtimeGameDeclarationSchema, novaApiCallSchemas } from "@rocketcrab/protocol";
 import vm from "node:vm";
 import { describe, expect, it } from "vitest";
 import { NOVA_API_SURFACE } from "@rocketcrab/nova-api";
 import {
   DEFAULT_GAME_TITLE,
   NOVA_BRIDGE_SCRIPT,
-  gameDeclarationSchema,
-  novaApiCallSchemas,
   registrationFields,
   serializeConsoleArgs,
 } from "./nova-bridge";
@@ -19,11 +18,11 @@ describe("NOVA_BRIDGE_SCRIPT", () => {
   });
 });
 
-describe("gameDeclarationSchema", () => {
+describe("runtimeGameDeclarationSchema", () => {
   it("accepts a minimal valid declaration", () => {
-    expect(gameDeclarationSchema.safeParse({}).success).toBe(true);
+    expect(runtimeGameDeclarationSchema.safeParse({}).success).toBe(true);
     expect(
-      gameDeclarationSchema.safeParse({
+      runtimeGameDeclarationSchema.safeParse({
         title: "Card Game",
         gameVersion: "1.2.3",
       }).success,
@@ -31,17 +30,17 @@ describe("gameDeclarationSchema", () => {
   });
 
   it("rejects oversized or malformed metadata", () => {
-    expect(gameDeclarationSchema.safeParse({ title: "x".repeat(65) }).success).toBe(false);
-    expect(gameDeclarationSchema.safeParse({ tickRate: 0 }).success).toBe(false);
-    expect(gameDeclarationSchema.safeParse({ gameVersion: "" }).success).toBe(false);
+    expect(runtimeGameDeclarationSchema.safeParse({ title: "x".repeat(65) }).success).toBe(false);
+    expect(runtimeGameDeclarationSchema.safeParse({ tickRate: 0 }).success).toBe(false);
+    expect(runtimeGameDeclarationSchema.safeParse({ gameVersion: "" }).success).toBe(false);
   });
 
   it("accepts and bounds the declared Nova API version", () => {
-    expect(gameDeclarationSchema.safeParse({ apiVersion: 1 }).success).toBe(true);
-    expect(gameDeclarationSchema.safeParse({ apiVersion: 0 }).success).toBe(false);
-    expect(gameDeclarationSchema.safeParse({ apiVersion: -1 }).success).toBe(false);
-    expect(gameDeclarationSchema.safeParse({ apiVersion: 1.5 }).success).toBe(false);
-    expect(gameDeclarationSchema.safeParse({ apiVersion: "1" }).success).toBe(false);
+    expect(runtimeGameDeclarationSchema.safeParse({ apiVersion: 1 }).success).toBe(true);
+    expect(runtimeGameDeclarationSchema.safeParse({ apiVersion: 0 }).success).toBe(false);
+    expect(runtimeGameDeclarationSchema.safeParse({ apiVersion: -1 }).success).toBe(false);
+    expect(runtimeGameDeclarationSchema.safeParse({ apiVersion: 1.5 }).success).toBe(false);
+    expect(runtimeGameDeclarationSchema.safeParse({ apiVersion: "1" }).success).toBe(false);
   });
 });
 
@@ -141,7 +140,9 @@ describe("registrationFields", () => {
     expect(
       registrationFields({ ...base, declaration: { title: "T", minPlayers: 2, maxPlayers: 8 } }),
     ).toEqual({ gameId: "game-1", title: "T", minPlayers: 2, maxPlayers: 8 });
-    expect(gameDeclarationSchema.safeParse({ minPlayers: 3, maxPlayers: 2 }).success).toBe(false);
+    expect(runtimeGameDeclarationSchema.safeParse({ minPlayers: 3, maxPlayers: 2 }).success).toBe(
+      false,
+    );
   });
 
   it("falls back to host metadata then the default title", () => {
@@ -293,7 +294,7 @@ describe("NOVA_BRIDGE_SCRIPT executed in a frame-like context", () => {
     const declaration = reports.find((r) => r.kind === "defineGame")?.payload as {
       options: unknown;
     };
-    expect(gameDeclarationSchema.parse(declaration.options)).toEqual({
+    expect(runtimeGameDeclarationSchema.parse(declaration.options)).toEqual({
       title: "T",
       gameVersion: "1.0",
       apiVersion: 1,

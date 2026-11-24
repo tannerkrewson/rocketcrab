@@ -14,7 +14,7 @@ import {
   type InMemoryTransport,
 } from "@rocketcrab/testing";
 import { RuntimeHostClient, type ChannelPort, type RuntimeHostEvent } from "../runtime-host";
-import { arenaApiCallSchemas } from "./api-calls";
+import { novaApiCallSchemas } from "@rocketcrab/protocol";
 import { toApiEvent } from "./api-events";
 import {
   createFrameStateExecutor,
@@ -605,7 +605,7 @@ export class ArenaEngine {
     }
     switch (message.method) {
       case "ready": {
-        if (!arenaApiCallSchemas.ready.safeParse(message.payload).success) {
+        if (!novaApiCallSchemas.ready.safeParse(message.payload).success) {
           this.logPlayer(
             runtime.spec.id,
             "error",
@@ -617,7 +617,7 @@ export class ArenaEngine {
         break;
       }
       case "dispatch": {
-        const parsed = arenaApiCallSchemas.dispatch.safeParse(message.payload);
+        const parsed = novaApiCallSchemas.dispatch.safeParse(message.payload);
         if (!parsed.success) {
           this.logPlayer(
             runtime.spec.id,
@@ -641,7 +641,7 @@ export class ArenaEngine {
         break;
       }
       case "controls.set": {
-        const parsed = arenaApiCallSchemas["controls.set"].safeParse(message.payload);
+        const parsed = novaApiCallSchemas["controls.set"].safeParse(message.payload);
         if (!parsed.success) return;
         try {
           session.setControls(parsed.data.controls);
@@ -654,7 +654,7 @@ export class ArenaEngine {
         break;
       }
       case "stateResponse": {
-        const parsed = arenaApiCallSchemas.stateResponse.safeParse(message.payload);
+        const parsed = novaApiCallSchemas.stateResponse.safeParse(message.payload);
         if (!parsed.success) {
           this.logPlayer(
             runtime.spec.id,

@@ -12,34 +12,7 @@
  * and DOM nodes must never cross the frame, and the transport moves plain
  * JSON data.
  */
-import { playerLimitMax, tickRateMax, titleSchema } from "@rocketcrab/protocol";
-import { z } from "zod";
 import { NovaError } from "./errors";
-
-/** Bounded registration options for `nova.defineGame`. */
-export const novaGameDeclarationSchema = z
-  .object({
-    title: titleSchema.optional(),
-    version: z.string().min(1).max(32).optional(),
-    apiVersion: z.number().int().min(1).optional(),
-    tickRate: z.number().int().min(1).max(tickRateMax).optional(),
-    minPlayers: z.number().int().min(1).max(playerLimitMax).optional(),
-    maxPlayers: z.number().int().min(1).max(playerLimitMax).optional(),
-  })
-  .refine(
-    (options) =>
-      options.minPlayers === undefined ||
-      options.maxPlayers === undefined ||
-      options.minPlayers <= options.maxPlayers,
-    { message: "minPlayers must not exceed maxPlayers." },
-  );
-
-/** Bounded action shape for `nova.dispatch`. */
-export const novaActionSchema = z.object({
-  type: z.string().min(1).max(64),
-  payload: z.unknown().optional(),
-  baseRevision: z.number().int().nonnegative().optional(),
-});
 
 /** True when a payload is binary (Uint8Array or ArrayBuffer). */
 export function isBinaryPayload(payload: unknown): boolean {
