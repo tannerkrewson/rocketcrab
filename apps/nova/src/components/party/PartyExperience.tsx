@@ -56,7 +56,6 @@ export function PartyExperience({
       await engine.selectGame({
         gameId: game.id,
         title: game.title,
-        mode: game.mode ?? "state",
         source: game.html,
         apiVersion: PROTOCOL_VERSION,
       });

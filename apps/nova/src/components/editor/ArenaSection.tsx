@@ -133,7 +133,6 @@ export function ArenaSection({ game, source, onDiagnostics }: ArenaSectionProps)
   const recordTestResults = useRecordTestResults();
 
   const gameId = game?.id ?? "draft";
-  const gameMode = game?.mode ?? "state";
 
   const onRunSucceeded = useCallback(
     (_outcome: { runId: number; source: string }) => {
@@ -150,7 +149,6 @@ export function ArenaSection({ game, source, onDiagnostics }: ArenaSectionProps)
   const { state, actions, bindContainer } = useArena({
     source,
     gameId,
-    gameMode,
     gameTitle: game?.title,
     runtimeOrigin: runtimeOriginForMainOrigin(window.location.origin),
     initialPlayers: [
@@ -469,9 +467,7 @@ export function ArenaSection({ game, source, onDiagnostics }: ArenaSectionProps)
       >
         <span className="font-mono">{player.memberId}</span>
         {player.registered ? (
-          <span>
-            “{player.registered.title}” · {player.registered.gameMode} mode
-          </span>
+          <span>“{player.registered.title}”</span>
         ) : player.loadError !== null ? (
           <span className="text-danger">Startup failed: {player.loadError}</span>
         ) : (

@@ -78,7 +78,6 @@ export class DexieGameRepository implements GameRepository {
       sourceHash: await hashSource(input.html),
       sourceBytes: sourceByteLength(input.html),
       ...(input.apiVersion !== undefined ? { apiVersion: input.apiVersion } : {}),
-      ...(input.mode !== undefined ? { mode: input.mode } : {}),
       ...(input.copiedFrom !== undefined ? { copiedFrom: input.copiedFrom } : {}),
       createdAt: now,
       updatedAt: now,
@@ -125,9 +124,6 @@ export class DexieGameRepository implements GameRepository {
     if (input.apiVersion !== undefined) {
       next.apiVersion = input.apiVersion;
     }
-    if (input.mode !== undefined) {
-      next.mode = input.mode;
-    }
     if (input.copiedFrom !== undefined) {
       next.copiedFrom = input.copiedFrom;
     }
@@ -158,7 +154,6 @@ export class DexieGameRepository implements GameRepository {
       sourceHash: existing.sourceHash,
       sourceBytes: existing.sourceBytes,
       ...(existing.apiVersion !== undefined ? { apiVersion: existing.apiVersion } : {}),
-      ...(existing.mode !== undefined ? { mode: existing.mode } : {}),
       createdAt: now,
       updatedAt: now,
     };

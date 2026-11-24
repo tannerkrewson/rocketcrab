@@ -57,7 +57,7 @@ interface HostHarness {
    *  simulated players share the same fake host, so these helpers never
    *  target at(-1) blindly. */
   ready(index: number): void;
-  register(index: number, title: string, gameMode?: string): void;
+  register(index: number, title: string): void;
   runtimeError(index: number, category: string, message: string): void;
   console(index: number, level: string, message: string): void;
 }
@@ -96,7 +96,7 @@ function createHostHarness(): HostHarness {
         status: "ready",
       });
     },
-    register(index: number, title: string, gameMode = "state") {
+    register(index: number, title: string) {
       deliver(harness.channels[index]!.port1, {
         version: 1,
         runtimeInstanceId: "runtime-1",
@@ -105,7 +105,6 @@ function createHostHarness(): HostHarness {
         type: "game.registration",
         gameId: "game-1",
         title,
-        gameMode,
       });
     },
     runtimeError(index: number, category: string, message: string) {
@@ -268,7 +267,6 @@ describe("/editor — a new game", () => {
     expect(games).toHaveLength(1);
     expect(games[0]?.html).toBe(PASTED_SOURCE);
     expect(games[0]?.title).toBe("Card Sharks");
-    expect(games[0]?.mode).toBe("state");
     expect(games[0]?.apiVersion).toBe(1);
     const reopened = await codeEditor();
     expect(reopened.textContent).toContain("cards");

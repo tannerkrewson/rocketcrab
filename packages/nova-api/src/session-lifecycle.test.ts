@@ -27,7 +27,7 @@ function makeTickingSession(
     room: ROOM,
     sessionId: SESSION,
     player: { memberId, displayName },
-    game: { gameId: "game-1", mode: "state", title: "Lifecycle" },
+    game: { gameId: "game-1", title: "Lifecycle" },
   });
   session.client.defineGame({
     title: "Lifecycle",

@@ -48,9 +48,9 @@ describe("GamesDatabase", () => {
     expect(await db.games.count()).toBe(1);
   });
 
-  it("turns saved simulation-mode games into state-mode games", async () => {
-    const legacy = new Dexie(`nova-games-simulation-${Date.now()}`);
-    legacy.version(1).stores({
+  it("drops the mode that older saved games recorded", async () => {
+    const legacy = new Dexie(`nova-games-modes-${Date.now()}`);
+    legacy.version(2).stores({
       games: "id, title, mode, apiVersion, createdAt, updatedAt, lastTestedAt",
     });
     await legacy.open();
@@ -62,7 +62,7 @@ describe("GamesDatabase", () => {
 
     const { db } = createTestGameDatabase(legacy.name);
     await db.open();
-    expect((await db.games.get("drift"))?.mode).toBe("state");
-    expect((await db.games.get("chat"))?.mode).toBe("raw");
+    expect(await db.games.get("drift")).toEqual({ id: "drift", title: "Drift" });
+    expect(await db.games.get("chat")).toEqual({ id: "chat", title: "Chat" });
   });
 });

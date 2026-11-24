@@ -24,7 +24,7 @@ function join(
     room: "arena",
     sessionId: SESSION,
     player: { memberId, displayName },
-    game: { gameId: "game-start", mode: "state", title: "Start Game" },
+    game: { gameId: "game-start", title: "Start Game" },
     ...(acceptStartRequest !== undefined ? { acceptStartRequest } : {}),
   });
   new Function("nova", game === "ticking" ? TICK_EXAMPLE : MINIMAL_GAME_EXAMPLE)(session.client);

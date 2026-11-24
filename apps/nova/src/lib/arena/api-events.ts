@@ -16,8 +16,6 @@ export function toApiEvent(event: NovaSessionEvent): GameApiEvent | null {
       return { kind: "end", reason: event.reason as GameEndReason };
     case "state":
       return { kind: "state", state: event.state };
-    case "rawMessage":
-      return { kind: "rawMessage", channel: event.channel, message: event.message };
     case "error":
       return { kind: "error", code: event.error.code, message: event.error.message };
     case "actionAck":

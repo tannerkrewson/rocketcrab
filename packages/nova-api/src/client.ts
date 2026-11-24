@@ -19,16 +19,12 @@
 import { controlsBytes, tickRateDefault } from "@rocketcrab/protocol";
 import { isSupportedApiVersion } from "./version";
 import { NovaError, endedMessage, notStartedMessage, toErrorCode } from "./errors";
-import { isReservedChannelName } from "./constants";
 import { newActionId } from "./ids";
 import {
   assertStructuredCloneSafe,
   assertValid,
-  isBinaryPayload,
   novaActionSchema,
-  novaChannelNameSchema,
   novaGameDeclarationSchema,
-  novaRawChannelSpecSchema,
 } from "./validation";
 import { NOVA_ACTION_TIMEOUT_MS } from "./types";
 import type {
@@ -38,10 +34,6 @@ import type {
   NovaConnectionStatus,
   NovaGameDeclaration,
   NovaPlayer,
-  NovaRawChannelSpec,
-  NovaRawHandle,
-  NovaRawMessage,
-  NovaRawSendOptions,
   NovaStateHandle,
   NovaStateHandlers,
 } from "./types";
@@ -58,7 +50,6 @@ export type NovaSessionEvent =
   | { type: "start" }
   | { type: "end"; reason: string }
   | { type: "state"; state: unknown }
-  | { type: "rawMessage"; channel: string; message: NovaRawMessage }
   /**
    * The game's authority changed. Games never learn which player is
    * authoritative — the event carries the monotonic term only, and the
@@ -127,12 +118,6 @@ export interface NovaClientBackend {
    * accepted the action for delivery.
    */
   dispatch(action: NovaAction, actionId: string): Promise<void>;
-  /** Declare a raw channel to the party. */
-  createRawChannel(spec: NovaRawChannelSpec): void;
-  /** Close a raw channel and tell the party. */
-  closeRawChannel(name: string): void;
-  /** Send a payload on a raw channel. */
-  sendRaw(name: string, payload: unknown, options?: NovaRawSendOptions): void;
   /** Replace this player's controls (a ticking game's input). */
   setControls(value: unknown): void;
   /** Subscribe to inbound events. Returns an unsubscribe function. */
@@ -200,7 +185,6 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
   const endHandlers = new Set<Handler<string>>();
   const errorHandlers = new Set<Handler<NovaError>>();
   const stateHandlers = new Set<Handler<unknown>>();
-  const rawHandlers = new Map<string, Set<Handler<NovaRawMessage>>>();
 
   let lastControlsJson: string | null = null;
   const unsubscribeEvents = backend.onEvent((event) => {
@@ -251,19 +235,11 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
         stateValue = event.state;
         callSafely(stateHandlers, event.state);
         break;
-      case "rawMessage": {
-        const handlers = rawHandlers.get(event.channel);
-        if (handlers === undefined) {
-          break; // no subscription: drop (documented raw-channel rule)
-        }
-        callSafely(handlers, event.message);
-        break;
-      }
       case "error":
         callSafely(errorHandlers, event.error);
         break;
       case "actionReceived":
-        break; // host-side seam; games never see raw actions
+        break; // host-side seam; games never see incoming actions
       case "actionAck": {
         const entry = pendingDispatches.get(event.ack.actionId);
         if (entry === undefined) {
@@ -303,66 +279,6 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
     },
   };
 
-  const rawHandle: NovaRawHandle = {
-    createChannel(spec) {
-      if (ended) throw new NovaError("ended", endedMessage("raw.createChannel"));
-      if (!started) throw new NovaError("not_started", notStartedMessage("raw.createChannel"));
-      const parsed = novaRawChannelSpecSchema.safeParse(spec);
-      assertValid(parsed.success, "nova.raw.createChannel options failed validation.");
-      if (isReservedChannelName(spec.name)) {
-        throw new NovaError(
-          "reserved_channel",
-          `Raw channel name "${spec.name}" is reserved by the Nova protocol.`,
-        );
-      }
-      backend.createRawChannel(spec);
-    },
-    close(name) {
-      if (ended) throw new NovaError("ended", endedMessage("raw.close"));
-      if (!started) throw new NovaError("not_started", notStartedMessage("raw.close"));
-      assertValid(
-        novaChannelNameSchema.safeParse(name).success,
-        "nova.raw.close: bad channel name.",
-      );
-      backend.closeRawChannel(name);
-    },
-    send(name, payload, options = {}) {
-      if (ended) throw new NovaError("ended", endedMessage("raw.send"));
-      if (!started) throw new NovaError("not_started", notStartedMessage("raw.send"));
-      assertValid(
-        novaChannelNameSchema.safeParse(name).success,
-        "nova.raw.send: bad channel name.",
-      );
-      if (!isBinaryPayload(payload)) {
-        assertStructuredCloneSafe(payload, `nova.raw.send payload on channel "${name}"`);
-      }
-      // The session validates channels, limits, and connectivity asynchronously
-      // (transport send); failures are delivered to `nova.onError` handlers so
-      // games observe them uniformly in the arena, over party transports, and
-      // in-process (every API failure is a stable NovaError).
-      Promise.resolve()
-        .then(() => backend.sendRaw(name, payload, options))
-        .catch((error: unknown) => {
-          callSafely(
-            errorHandlers,
-            error instanceof NovaError ? error : new NovaError("invalid_options", String(error)),
-          );
-        });
-    },
-    onMessage(name, handler) {
-      assertValid(
-        novaChannelNameSchema.safeParse(name).success,
-        "nova.raw.onMessage: bad channel name.",
-      );
-      let handlers = rawHandlers.get(name);
-      if (handlers === undefined) {
-        handlers = new Set();
-        rawHandlers.set(name, handlers);
-      }
-      return addHandler(handlers, handler);
-    },
-  };
-
   const client: NovaClient = {
     version: backend.apiVersion,
     defineGame(options) {
@@ -388,7 +304,6 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
       // only: handler functions stay in this context (never serialized).
       const declaration: NovaGameDeclaration = {
         ...(options.title !== undefined ? { title: options.title } : {}),
-        ...(options.mode !== undefined ? { mode: options.mode } : {}),
         ...(options.version !== undefined ? { version: options.version } : {}),
         ...(options.apiVersion !== undefined ? { apiVersion: options.apiVersion } : {}),
         // A game with a tick always declares its rate, so the host never guesses.
@@ -482,9 +397,6 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
     get state() {
       return stateHandle;
     },
-    get raw() {
-      return rawHandle;
-    },
     controls: {
       set(value: unknown) {
         assertStructuredCloneSafe(value, "nova.controls.set value");
@@ -510,7 +422,6 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
       endHandlers.clear();
       errorHandlers.clear();
       stateHandlers.clear();
-      rawHandlers.clear();
       for (const entry of pendingDispatches.values()) {
         clearTimeout(entry.timer);
         entry.reject(

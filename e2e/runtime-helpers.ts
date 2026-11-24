@@ -18,7 +18,6 @@ export function fixture(name: string): string {
 
 export interface GameInput {
   gameId: string;
-  gameMode: "state" | "raw";
   gameSource: string;
   gameTitle?: string;
   memberId?: string;
@@ -95,7 +94,6 @@ export async function installHarness(page: Page): Promise<void> {
           type: "runtime.bootstrap",
           gameId: game.gameId,
           ...(game.gameTitle !== undefined ? { gameTitle: game.gameTitle } : {}),
-          gameMode: game.gameMode,
           gameSource: game.gameSource,
           player: {
             memberId: game.memberId ?? "member-1",

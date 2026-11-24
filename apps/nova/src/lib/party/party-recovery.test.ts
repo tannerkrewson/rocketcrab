@@ -18,7 +18,7 @@ function input(overrides: Partial<PartyRecoveryInput> = {}): PartyRecoveryInput 
     secret: SECRET,
     memberId: "member-a",
     displayName: "Player A",
-    game: { gameId: "game-1", title: "Rocket Rumble", mode: "state" },
+    game: { gameId: "game-1", title: "Rocket Rumble" },
     ...overrides,
   };
 }
@@ -40,7 +40,6 @@ describe("party recovery record", () => {
     expect(record?.game).toEqual({
       gameId: "game-1",
       title: "Rocket Rumble",
-      mode: "state",
     });
   });
 

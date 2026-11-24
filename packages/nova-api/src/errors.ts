@@ -28,13 +28,9 @@ export const NOVA_ERROR_CODES = {
   invalid_options: "invalid_options",
   /** A payload is not JSON-serializable / structured-clone-compatible. */
   invalid_payload: "invalid_payload",
-  /** A raw channel name is not known to this session. */
-  unknown_channel: "unknown_channel",
-  /** A raw channel name collides with a reserved protocol name. */
-  reserved_channel: "reserved_channel",
   /** A targeted send referenced a player that is not connected. */
   not_connected: "not_connected",
-  /** A raw send exceeded the per-second rate limit. */
+  /** A game exceeded its per-player send budget. */
   rate_limited: "rate_limited",
   /** An inbound protocol message failed validation at the boundary. */
   invalid_message: "invalid_message",

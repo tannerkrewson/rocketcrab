@@ -54,9 +54,6 @@ export const displayNameSchema = z.string().min(1).max(32);
 /** Game title. */
 export const titleSchema = z.string().min(1).max(64);
 
-/** Named raw-mode channel identifier (ADR-0006 raw mode). */
-export const channelNameSchema = z.string().min(1).max(64);
-
 /** SHA-256 digest as 64 lowercase hex characters (ADR-0002). */
 export const sha256Schema = z
   .string()
@@ -73,5 +70,4 @@ export type Timestamp = z.infer<typeof timestampSchema>;
 export type MonotonicSequence = z.infer<typeof monotonicSequenceSchema>;
 export type DisplayName = z.infer<typeof displayNameSchema>;
 export type Title = z.infer<typeof titleSchema>;
-export type ChannelName = z.infer<typeof channelNameSchema>;
 export type Sha256 = z.infer<typeof sha256Schema>;

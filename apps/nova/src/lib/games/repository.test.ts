@@ -20,7 +20,6 @@ describe("DexieGameRepository", () => {
       description: "  Fight in space  ",
       html: "<html><body>hi</body></html>",
       apiVersion: 1,
-      mode: "state",
     });
 
     expect(game.id).toMatch(/^game_[A-Za-z0-9_-]+$/);
@@ -29,7 +28,6 @@ describe("DexieGameRepository", () => {
     expect(game.sourceHash).toBe(await hashSource(game.html));
     expect(game.sourceBytes).toBe(utf8Bytes(game.html));
     expect(game.apiVersion).toBe(1);
-    expect(game.mode).toBe("state");
     expect(game.createdAt).toBeGreaterThan(0);
     expect(game.updatedAt).toBe(game.createdAt);
     expect(game.lastTestedAt).toBeUndefined();
@@ -105,7 +103,6 @@ describe("DexieGameRepository", () => {
       title: "Rockets",
       description: "desc",
       html: "<p>x</p>",
-      mode: "raw",
     });
     await repository.recordTestResults(original.id, { lastTestedAt: 5, lastTestSucceeded: true });
 
@@ -116,7 +113,6 @@ describe("DexieGameRepository", () => {
     expect(copy.html).toBe(original.html);
     expect(copy.sourceHash).toBe(original.sourceHash);
     expect(copy.sourceBytes).toBe(original.sourceBytes);
-    expect(copy.mode).toBe("raw");
     expect(copy.lastTestedAt).toBeUndefined();
     expect(copy.lastTestSucceeded).toBeUndefined();
     expect(copy.createdAt).toBeGreaterThanOrEqual(original.createdAt);

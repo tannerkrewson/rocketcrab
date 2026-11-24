@@ -518,7 +518,6 @@ describe("whole-source requests", () => {
       source: "hello",
       title: "Game",
       apiVersion: 1,
-      mode: "raw",
     });
     await settle(hub);
     await host.leave();
@@ -529,7 +528,7 @@ describe("whole-source requests", () => {
     await settle(hub);
     expect(received(c.events)).toMatchObject([{ source: "hello" }]);
     expect(c.events.find((e) => e.type === "metadata")).toMatchObject({
-      metadata: { gameId: "game", title: "Game", apiVersion: 1, mode: "raw" },
+      metadata: { gameId: "game", title: "Game", apiVersion: 1 },
     });
     expect(completed(b.events, "send")).toHaveLength(1);
   });

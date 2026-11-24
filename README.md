@@ -49,7 +49,7 @@ install tools, understand code, deploy a website, or create a repository.
 - **One game model.** Nova keeps the canonical state and runs the game's
   actions (and, for real-time games, its `tick` with each player's controls)
   on one elected device, replicating the result and migrating if that player
-  leaves. `raw` channels remain for specialized protocols.
+  leaves. Games have no modes and no channels of their own.
 
 ## Workspace layout
 
@@ -104,7 +104,7 @@ canonical index or an ADR:
 - `docs/game-author-debugging.md` — the authoring loop, editor diagnostics,
   common failure messages, and how to debug a real party.
 - `docs/testing/` — milestone findings and checklists, each linked from its
-  owning ADR (e.g. the S4 state-mode vertical slice from ADR-0006).
+  owning ADR (e.g. the S4 vertical slice from ADR-0006).
 - `deploy/cloudflare.md` — runbook and live state for the one Cloudflare
   edge Worker (signaling, fallback tunnel, TURN mint, Classic relay, and
   connection statistics).

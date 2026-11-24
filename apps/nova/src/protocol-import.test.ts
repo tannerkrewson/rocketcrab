@@ -51,7 +51,6 @@ describe("@rocketcrab/protocol shared types in the Nova app", () => {
       sentAt: 1_700_000_000_000,
       type: "runtime.bootstrap",
       gameId: "game-1",
-      gameMode: "state",
       gameSource: "<html></html>",
       player: { memberId: "member-1", displayName: "Alex" },
     };

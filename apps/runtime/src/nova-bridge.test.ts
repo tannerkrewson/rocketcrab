@@ -25,7 +25,6 @@ describe("gameDeclarationSchema", () => {
     expect(
       gameDeclarationSchema.safeParse({
         title: "Card Game",
-        gameMode: "raw",
         gameVersion: "1.2.3",
       }).success,
     ).toBe(true);
@@ -33,7 +32,7 @@ describe("gameDeclarationSchema", () => {
 
   it("rejects oversized or malformed metadata", () => {
     expect(gameDeclarationSchema.safeParse({ title: "x".repeat(65) }).success).toBe(false);
-    expect(gameDeclarationSchema.safeParse({ gameMode: "quantum" }).success).toBe(false);
+    expect(gameDeclarationSchema.safeParse({ tickRate: 0 }).success).toBe(false);
     expect(gameDeclarationSchema.safeParse({ gameVersion: "" }).success).toBe(false);
   });
 
@@ -67,19 +66,6 @@ describe("novaApiCallSchemas", () => {
         result: { kind: "error", ok: false, code: "handler_error", message: "boom" },
       }).success,
     ).toBe(true);
-    expect(
-      novaApiCallSchemas["raw.createChannel"].safeParse({
-        spec: { name: "chat" },
-      }).success,
-    ).toBe(true);
-    expect(
-      novaApiCallSchemas["raw.send"].safeParse({
-        name: "chat",
-        payload: { text: "hi" },
-        options: { to: "member-2" },
-      }).success,
-    ).toBe(true);
-    expect(novaApiCallSchemas["raw.close"].safeParse({ name: "chat" }).success).toBe(true);
     expect(novaApiCallSchemas["controls.set"].safeParse({ controls: { left: true } }).success).toBe(
       true,
     );
@@ -95,11 +81,6 @@ describe("novaApiCallSchemas", () => {
         result: { kind: "state", ok: true, state: {} },
       }).success,
     ).toBe(false);
-    expect(
-      novaApiCallSchemas["raw.createChannel"].safeParse({ spec: { name: "x".repeat(65) } }).success,
-    ).toBe(false);
-    expect(novaApiCallSchemas["raw.send"].safeParse({ name: "chat" }).success).toBe(false);
-    expect(novaApiCallSchemas["raw.close"].safeParse({ name: "x".repeat(65) }).success).toBe(false);
     expect(novaApiCallSchemas["controls.set"].safeParse({ controls: null }).success).toBe(true);
     expect(novaApiCallSchemas["controls.set"].safeParse({ controls: 1, extra: 1 }).success).toBe(
       false,
@@ -144,7 +125,6 @@ describe("serializeConsoleArgs", () => {
 describe("registrationFields", () => {
   const base = {
     bootstrapGameId: "game-1",
-    bootstrapGameMode: "state" as const,
   };
 
   it("prefers the validated game declaration", () => {
@@ -152,28 +132,26 @@ describe("registrationFields", () => {
       registrationFields({
         ...base,
         bootstrapTitle: "Host Title",
-        declaration: { title: "Game Title", gameMode: "raw", gameVersion: "2.0" },
+        declaration: { title: "Game Title", gameVersion: "2.0" },
       }),
-    ).toEqual({ gameId: "game-1", title: "Game Title", gameMode: "raw", gameVersion: "2.0" });
+    ).toEqual({ gameId: "game-1", title: "Game Title", gameVersion: "2.0" });
   });
 
   it("falls back to host metadata then the default title", () => {
     expect(registrationFields({ ...base, bootstrapTitle: "Host Title" })).toEqual({
       gameId: "game-1",
       title: "Host Title",
-      gameMode: "state",
     });
     expect(registrationFields(base)).toEqual({
       gameId: "game-1",
       title: DEFAULT_GAME_TITLE,
-      gameMode: "state",
     });
   });
 
   it("keeps the host-declared gameId", () => {
     const fields = registrationFields({
       ...base,
-      declaration: { title: "Sneaky", gameMode: "state" },
+      declaration: { title: "Sneaky" },
     });
     expect(fields.gameId).toBe("game-1");
   });
@@ -225,16 +203,6 @@ function runBridge(): ExecutedFrame {
 const settle = () => new Promise<void>((resolve) => setTimeout(resolve, 0));
 
 describe("NOVA_BRIDGE_SCRIPT executed in a frame-like context", () => {
-  it("delivers raw messages on channels named like Object.prototype keys", () => {
-    const { bridge } = runBridge();
-    const seen: unknown[] = [];
-    expect(() =>
-      bridge.nova.raw.onMessage("constructor", (m: unknown) => seen.push(m)),
-    ).not.toThrow();
-    bridge.__novaGameBridge.receive("rawMessage", { channel: "constructor", message: 42 });
-    expect(seen).toEqual([42]);
-  });
-
   it("runs onStart handlers once even when the host delivers start twice", () => {
     const { bridge } = runBridge();
     let starts = 0;
@@ -303,19 +271,14 @@ describe("NOVA_BRIDGE_SCRIPT executed in a frame-like context", () => {
 
   it("reports every call in a shape the runtime's schemas accept", async () => {
     const { bridge, reports } = runBridge();
-    bridge.nova.defineGame({ title: "T", mode: "raw", version: "1.0", apiVersion: 1 });
+    bridge.nova.defineGame({ title: "T", version: "1.0", apiVersion: 1 });
     bridge.nova.ready();
     bridge.__novaGameBridge.receive("start", {});
     void bridge.nova.dispatch({ type: "move", payload: { x: 1 } }).catch(() => {});
-    bridge.nova.raw.createChannel({ name: "chat" });
-    bridge.nova.raw.send("chat", { hi: 1 }, { to: "member-2" });
-    bridge.nova.raw.close("chat");
     bridge.nova.controls.set({ jump: true });
     await settle();
     const calls = reports.filter((r) => r.kind in novaApiCallSchemas);
-    expect(calls.map((r) => r.kind).sort()).toEqual(
-      ["dispatch", "raw.close", "raw.createChannel", "raw.send", "ready", "controls.set"].sort(),
-    );
+    expect(calls.map((r) => r.kind).sort()).toEqual(["dispatch", "ready", "controls.set"].sort());
     for (const call of calls) {
       const schema = novaApiCallSchemas[call.kind as keyof typeof novaApiCallSchemas];
       expect(schema.safeParse(call.payload).success, call.kind).toBe(true);
@@ -325,7 +288,6 @@ describe("NOVA_BRIDGE_SCRIPT executed in a frame-like context", () => {
     };
     expect(gameDeclarationSchema.parse(declaration.options)).toEqual({
       title: "T",
-      gameMode: "raw",
       gameVersion: "1.0",
       apiVersion: 1,
     });

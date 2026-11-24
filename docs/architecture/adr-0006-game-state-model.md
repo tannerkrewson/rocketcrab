@@ -1,6 +1,7 @@
-# ADR-0006: State and raw modes
+# ADR-0006: Game state model
 
-- **Status:** Accepted (amended 2026-11-18: simulation mode replaced by ticks)
+- **Status:** Accepted (amended 2026-11-18: simulation mode replaced by ticks;
+  amended 2026-11-24: raw mode removed)
 - **Date:** 2026-08-01
 - **Related:** ADR-0007 (authority), ADR-0010 (trusted friends). The state-mode
   milestone is verified in `docs/testing/state-mode-vertical-slice.md`.
@@ -13,7 +14,7 @@ migration — or those games break in ways their authors cannot debug.
 
 ## Decision
 
-**State mode** is the one game model. Nova keeps a single canonical state
+Nova has one game model. Nova keeps a single canonical state
 (JSON, at most 512 KiB). The elected authority (ADR-0007) runs the game's
 handlers through Immer, and every shell replicates the result (deltas,
 hash-checked), so any player can take over and late joiners catch up.
@@ -29,8 +30,8 @@ hash-checked), so any player can take over and late joiners catch up.
 - A player whose page is hidden is not eligible for authority, and a sitting
   authority hands off at once, because a suspended phone would freeze the game.
 
-**Raw mode** is the escape hatch: named, reliable, ordered channels with no
-shared state, no migration and no catch-up.
+There are no game modes and no game-owned channels. Every game uses this
+model, so `defineGame` declares no mode and saved games record none.
 
 ## Why not a client-side simulation mode
 
@@ -39,6 +40,14 @@ from ordered inputs and corrected drift with authoritative snapshots every
 second. Each game had to queue inputs, serialize and restore its complete
 state, keep held inputs in it, and live with visible snaps; AI-written games
 got each of these wrong. A host-run tick needs none of it.
+
+## Why not a raw-channel mode
+
+Raw mode (removed 2026-11-24) gave games named, reliable, ordered channels
+with no shared state, migration, or catch-up. It doubled the API surface and
+forced a separate session per mode, and a game built on it broke whenever a
+player left or joined late — exactly the distributed work Nova exists to own.
+Ticks and controls cover the real-time cases it was kept for.
 
 ## Tradeoffs
 

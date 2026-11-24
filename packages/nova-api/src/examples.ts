@@ -12,9 +12,9 @@
  * the test arena).
  */
 
-/** The minimal complete game (state mode), used for the <30-line criterion. */
-export const MINIMAL_GAME_EXAMPLE = `// The smallest complete Nova game (state mode).
-nova.defineGame({ title: "Hello Nova", mode: "state" });
+/** The minimal complete game, used for the <30-line criterion. */
+export const MINIMAL_GAME_EXAMPLE = `// The smallest complete Nova game.
+nova.defineGame({ title: "Hello Nova" });
 
 // React to the game starting.
 nova.onStart(function () {
@@ -25,13 +25,12 @@ nova.onStart(function () {
 nova.ready();
 `;
 
-/** A lobby-style state-mode game: players, start, and an action. */
-export const STATE_MODE_EXAMPLE = `// State-mode example: a shared deck; every player draws their own card.
+/** A lobby-style game: players, start, and an action. */
+export const STATE_EXAMPLE = `// State example: a shared deck; every player draws their own card.
 // Nova owns state, action ordering, and per-player views — the game only
 // describes the rules (no networking code).
 nova.defineGame({
   title: "Draw One",
-  mode: "state",
   version: "1.0.0",
   createInitialState: function (context) {
     return { deck: ["ace", "king", "queen", "jack"], hands: {} };
@@ -74,7 +73,7 @@ nova.state.onChange(function (state) {
 nova.ready();
 `;
 
-/** A ticking state-mode game: the authority steps it; players send controls. */
+/** A ticking game: the authority steps it; players send controls. */
 export const TICK_EXAMPLE = `// Ticking example: every player slides a paddle. Nova runs tick on one
 // player's device 15 times a second and sends the state to everyone.
 nova.defineGame({
@@ -97,36 +96,6 @@ nova.state.onChange(function (state) {
 
 nova.onStart(function () {
   nova.controls.set({ dx: 1 }); // hold right
-});
-
-nova.ready();
-`;
-
-/** A raw-mode example: a named channel with JSON and binary messages. */
-export const RAW_MODE_EXAMPLE = `// Raw-mode example: a "chat" channel plus a binary "positions" channel.
-nova.defineGame({ title: "Chatter", mode: "raw" });
-
-nova.onStart(function () {
-  nova.raw.createChannel({ name: "chat" });
-  nova.raw.createChannel({ name: "positions" });
-
-  nova.raw.send("chat", { text: "hello everyone" });
-  nova.raw.send("positions", new Uint8Array([1, 2, 3]));
-  nova.raw.send("chat", { text: "just for Ada" }, { to: "member-2" });
-});
-
-nova.raw.onMessage("chat", function (message) {
-  nova.log(message.from.name + " says: " + message.payload.text);
-});
-
-nova.raw.onMessage("positions", function (message) {
-  // message.payload is a Uint8Array; binary flag is true.
-  nova.log("position bytes: " + message.payload.length);
-});
-
-// Close the chat channel when the game is done with it (A2 lifecycle).
-nova.onEnd(function () {
-  nova.raw.close("chat");
 });
 
 nova.ready();

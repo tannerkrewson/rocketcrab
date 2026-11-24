@@ -9,7 +9,7 @@ import {
   titleSchema,
 } from "../ids";
 import { htmlSourceSchema, tickRateMax } from "../limits";
-import { gameEndReasonSchema, gameModeSchema } from "./shared";
+import { gameEndReasonSchema } from "./shared";
 
 /**
  * Runtime-plane message schemas (host ↔ runtime).
@@ -32,9 +32,6 @@ import { gameEndReasonSchema, gameModeSchema } from "./shared";
 export const NOVA_API_CALL_METHODS = [
   "ready",
   "dispatch",
-  "raw.createChannel",
-  "raw.close",
-  "raw.send",
   "controls.set",
   "stateResponse",
 ] as const;
@@ -180,17 +177,6 @@ export const gameApiEventSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("start") }),
   z.object({ kind: z.literal("end"), reason: gameEndReasonSchema }),
   z.object({ kind: z.literal("state"), state: z.unknown() }),
-  z
-    .object({
-      kind: z.literal("rawMessage"),
-      channel: z.string().min(1).max(64),
-      message: z.object({
-        from: novaPlayerSchema,
-        payload: z.unknown(),
-        binary: z.boolean(),
-      }),
-    })
-    .strict(),
   z.object({
     kind: z.literal("error"),
     code: z.string().min(1).max(64),
@@ -238,7 +224,6 @@ export const runtimeBootstrapMessageSchema = z.object({
   type: z.literal("runtime.bootstrap"),
   gameId: gameIdSchema,
   gameTitle: titleSchema.optional(),
-  gameMode: gameModeSchema,
   gameSource: htmlSourceSchema,
   player: z.object({
     memberId: memberIdSchema,
@@ -269,7 +254,6 @@ export const gameRegistrationMessageSchema = z.object({
   type: z.literal("game.registration"),
   gameId: gameIdSchema,
   title: titleSchema,
-  gameMode: gameModeSchema,
   /** The game's own declared version; distinct from the protocol version. */
   gameVersion: z.string().min(1).max(32).optional(),
   /** Ticks per second, present when the game declared a `tick` handler. */

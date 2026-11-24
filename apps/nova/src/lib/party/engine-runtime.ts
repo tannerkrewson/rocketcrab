@@ -121,7 +121,6 @@ export class PartyRuntime {
     try {
       await client.load({
         gameId: source.gameId,
-        gameMode: source.mode,
         gameSource: source.source,
         player: {
           memberId: this.state.identity.memberId,
@@ -265,55 +264,6 @@ export class PartyRuntime {
         }
         break;
       }
-      case "raw.createChannel": {
-        const parsed = arenaApiCallSchemas["raw.createChannel"].safeParse(payload);
-        if (parsed.success) {
-          try {
-            session.createRawChannel(parsed.data.spec);
-          } catch (error) {
-            this.services().snapshot.addNotice(
-              "error",
-              `nova.raw.createChannel() failed: ${errorMessage(error)}`,
-            );
-          }
-        }
-        break;
-      }
-      case "raw.send": {
-        const parsed = arenaApiCallSchemas["raw.send"].safeParse(payload);
-        if (parsed.success) {
-          void session
-            .sendRaw(parsed.data.name, parsed.data.payload, parsed.data.options ?? {})
-            .catch((error: unknown) => {
-              this.services().snapshot.addNotice(
-                "error",
-                `nova.raw.send() failed: ${errorMessage(error)}`,
-              );
-              const code =
-                error instanceof Error && "code" in error ? String(error.code) : "invalid_options";
-              this.state.runtime?.pushApiEvent({
-                kind: "error",
-                code,
-                message: errorMessage(error),
-              });
-            });
-        }
-        break;
-      }
-      case "raw.close": {
-        const parsed = arenaApiCallSchemas["raw.close"].safeParse(payload);
-        if (parsed.success) {
-          try {
-            session.closeRawChannel(parsed.data.name);
-          } catch (error) {
-            this.services().snapshot.addNotice(
-              "error",
-              `nova.raw.close() failed: ${errorMessage(error)}`,
-            );
-          }
-        }
-        break;
-      }
       case "controls.set": {
         const parsed = arenaApiCallSchemas["controls.set"].safeParse(payload);
         if (parsed.success) {
@@ -338,14 +288,14 @@ export class PartyRuntime {
   }
 
   /**
-   * Deliver start once per registered frame. State-mode games need their view first
+   * Deliver start once per registered frame. Games need their view first
    * because onStart may read state or dispatch an action.
    */
   deliverStartToFrame(): void {
     const runtime = this.state.runtime;
     if (runtime === null || !this.state.registered || !this.state.gameStarted) return;
     if (this.state.frameStartDelivered) return;
-    if (this.state.game?.mode === "state" && this.state.lastStateApiEvent === null) return;
+    if (this.state.lastStateApiEvent === null) return;
     this.state.frameStartDelivered = true;
     runtime.pushApiEvent({ kind: "start" });
   }

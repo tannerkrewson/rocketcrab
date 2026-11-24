@@ -6,7 +6,7 @@
  * Owns player, transport, and session state. UI controls exercise transport
  * operations, including real authority elections on connection loss.
  */
-import type { GameApiCallMessage, GameApiEvent, GameMode } from "@rocketcrab/protocol";
+import type { GameApiCallMessage, GameApiEvent } from "@rocketcrab/protocol";
 import { createNovaSession, type NovaSession, type NovaSessionEvent } from "@rocketcrab/nova-api";
 import {
   InMemoryTransportHub,
@@ -51,7 +51,6 @@ export interface ArenaEngineOptions {
   source: string;
   /** Host-declared game id (saved game id or a draft id). */
   gameId: string;
-  gameMode: GameMode;
   gameTitle?: string;
   runtimeOrigin: string;
   /** Players to create on start (the UI may add more later). */
@@ -387,7 +386,6 @@ export class ArenaEngine {
     try {
       await client.load({
         gameId: this.options.gameId,
-        gameMode: this.options.gameMode,
         gameSource: this.source,
         player: { memberId: runtime.spec.memberId, displayName: runtime.spec.name },
         ...(this.options.gameTitle !== undefined ? { gameTitle: this.options.gameTitle } : {}),
@@ -421,17 +419,10 @@ export class ArenaEngine {
     if (runtime === undefined || this.disposed) return;
     switch (event.type) {
       case "registration":
-        runtime.registered = {
-          title: event.message.title,
-          gameMode: event.message.gameMode,
-        };
+        runtime.registered = { title: event.message.title };
         runtime.tickRate = event.message.tickRate ?? null;
         runtime.runState = "registered";
-        this.logPlayer(
-          id,
-          "info",
-          `Registered as “${event.message.title}” (${event.message.gameMode} mode).`,
-        );
+        this.logPlayer(id, "info", `Registered as “${event.message.title}”.`);
         void this.joinSession(runtime)
           .then(() => {
             if (this.players.get(id) !== runtime) return;
@@ -495,7 +486,6 @@ export class ArenaEngine {
       player: { memberId: runtime.spec.memberId, displayName: runtime.spec.name },
       game: {
         gameId: this.options.gameId,
-        mode: this.options.gameMode,
         ...(this.options.gameTitle !== undefined ? { title: this.options.gameTitle } : {}),
       },
       stateExecutor: runtime.stateExecutor,
@@ -585,7 +575,6 @@ export class ArenaEngine {
           `Action ${event.actionId} rejected (${event.code}): ${event.message}`,
         );
         break;
-      case "rawMessage":
       case "state":
       case "actionReceived":
         break;
@@ -649,66 +638,6 @@ export class ArenaEngine {
             errorMessage: errorMessage(error),
           });
         });
-        break;
-      }
-      case "raw.createChannel": {
-        const parsed = arenaApiCallSchemas["raw.createChannel"].safeParse(message.payload);
-        if (!parsed.success) {
-          this.logPlayer(
-            runtime.spec.id,
-            "error",
-            "nova.raw.createChannel() call failed validation at the host; ignored.",
-          );
-          return;
-        }
-        try {
-          session.createRawChannel(parsed.data.spec);
-        } catch (error) {
-          this.sessionError(runtime.spec.id, error);
-        }
-        break;
-      }
-      case "raw.send": {
-        const parsed = arenaApiCallSchemas["raw.send"].safeParse(message.payload);
-        if (!parsed.success) {
-          this.logPlayer(
-            runtime.spec.id,
-            "error",
-            "nova.raw.send() call failed validation at the host; ignored.",
-          );
-          return;
-        }
-        void session
-          .sendRaw(parsed.data.name, parsed.data.payload, parsed.data.options ?? {})
-          .catch((error: unknown) => {
-            this.sessionError(runtime.spec.id, error);
-            const code =
-              error instanceof Error && "code" in error
-                ? String((error as { code: unknown }).code)
-                : "invalid_options";
-            this.pushApiEvent(runtime.spec.id, {
-              kind: "error",
-              code,
-              message: `nova.raw.send() failed: ${errorMessage(error)}`,
-            });
-          });
-        break;
-      }
-      case "raw.close": {
-        const parsed = arenaApiCallSchemas["raw.close"].safeParse(message.payload);
-        if (!parsed.success) {
-          this.logPlayer(
-            runtime.spec.id,
-            "error",
-            "nova.raw.close() call failed validation at the host; ignored.",
-          );
-          return;
-        }
-        try {
-          session.closeRawChannel(parsed.data.name);
-        } catch (error) {
-          this.sessionError(runtime.spec.id, error);
-        }
         break;
       }
       case "controls.set": {

@@ -89,11 +89,12 @@ Nova. Split them apart:
 API changes come first: they are breaking, they are cheapest before
 launch, and the list format depends on them.
 
-- [ ] **Remove raw mode.** Delete `nova.raw`, replacing the session when the
+- [x] **Remove raw mode.** Delete `nova.raw`, replacing the session when the
       mode changes (`replaceGameSession`), the mode branches in the runtime
       and the engine, `NOVA_MODE_LABELS`, and the raw sample game. Update
       ADR-0006, the AI reference, the master prompt, the README, and the
-      real-device checklist.
+      real-device checklist. `mode` is gone from the protocol, the API and
+      saved games (IndexedDB v3 drops it); `npm run check` passed.
 - [ ] **One source for a game's title.** Read it from the game's
       registration. Stop caching mode and title in saved metadata
       (`EditorPage.tsx`) and in the runtime bootstrap (`nova-bridge.ts`).

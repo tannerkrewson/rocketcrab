@@ -1,5 +1,4 @@
 import type { NovaConnectionStatus } from "@rocketcrab/nova-api";
-import type { GameMode } from "@rocketcrab/protocol";
 
 export type ArenaPlayerRunState =
   | "pending" // added; the UI hasn't mounted its frame container yet
@@ -19,7 +18,6 @@ export interface ArenaLogEntry {
 
 export interface ArenaRegistration {
   readonly title: string;
-  readonly gameMode: GameMode;
 }
 
 export interface ArenaPlayer {

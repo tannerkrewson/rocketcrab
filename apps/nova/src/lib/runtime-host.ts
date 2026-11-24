@@ -18,7 +18,6 @@ import {
   type GameApiEvent,
   type GameLifecycleEventMessage,
   type GameMetadataMessage,
-  type GameMode,
   type GameRegistrationMessage,
   type RuntimeBootstrapMessage,
   type RuntimeConsoleMessage,
@@ -51,7 +50,6 @@ type RuntimeReadinessMessageEvent = Extract<RuntimeMessage, { type: "runtime.rea
 
 export interface LoadGameInput {
   gameId: string;
-  gameMode: GameMode;
   gameSource: string;
   player: { memberId: string; displayName: string };
   gameTitle?: string;
@@ -106,7 +104,6 @@ function buildBootstrapMessage(
     type: "runtime.bootstrap",
     gameId: game.gameId,
     ...(game.gameTitle !== undefined ? { gameTitle: game.gameTitle } : {}),
-    gameMode: game.gameMode,
     gameSource: game.gameSource,
     player: game.player,
     ...(game.permissions !== undefined ? { permissions: game.permissions } : {}),

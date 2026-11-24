@@ -23,9 +23,6 @@ function fakeBackend(): NovaClientBackend {
     dispatch() {
       return Promise.resolve();
     },
-    createRawChannel() {},
-    closeRawChannel() {},
-    sendRaw() {},
     setControls() {},
     onEvent(handler) {
       listeners.add(handler);
@@ -53,9 +50,8 @@ describe("nova-api package surface", () => {
       "NovaStateEngine",
       "LocalGameExecutor",
       "MINIMAL_GAME_EXAMPLE",
-      "STATE_MODE_EXAMPLE",
+      "STATE_EXAMPLE",
       "TICK_EXAMPLE",
-      "RAW_MODE_EXAMPLE",
     ];
     for (const name of expected) {
       expect(api[name as keyof typeof api], `missing export ${name}`).toBeDefined();

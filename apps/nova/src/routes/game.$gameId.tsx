@@ -101,7 +101,6 @@ export function BrowseGamePage() {
       search={{
         browse: partyBrowseBack ? true : undefined,
         gameId: undefined,
-        mode: undefined,
         title: undefined,
       }}
       className={buttonStyles("default", "md", "self-start", true)}
@@ -153,7 +152,7 @@ export function BrowseGamePage() {
       await pick();
       await navigate({
         to: "/party",
-        search: { gameId: undefined, mode: undefined, title: undefined },
+        search: { gameId: undefined, title: undefined },
       });
     } catch (error) {
       toast.danger(`Couldn't select that game: ${errorMessage(error)}`);
@@ -226,7 +225,6 @@ export function BrowseGamePage() {
                       await engine.selectGame({
                         gameId: source.gameId,
                         title: source.title,
-                        mode: source.mode,
                         source: source.source,
                         apiVersion: source.apiVersion ?? PROTOCOL_VERSION,
                       });
@@ -286,7 +284,7 @@ export function BrowseGamePage() {
               {notInParty ? (
                 <Link
                   to="/party"
-                  search={{ gameId: saved.id, mode: saved.mode ?? "state", title: saved.title }}
+                  search={{ gameId: saved.id, title: saved.title }}
                   className={buttonStyles("primary", "lg")}
                   title="Create a party from this game and play it with friends"
                 >
@@ -298,7 +296,6 @@ export function BrowseGamePage() {
                 await engine.selectGame({
                   gameId: saved.id,
                   title: saved.title,
-                  mode: saved.mode ?? "state",
                   source: saved.html,
                   apiVersion: saved.apiVersion ?? PROTOCOL_VERSION,
                 });
@@ -369,7 +366,7 @@ export function BrowseGamePage() {
               // Classic rooms are created in the lobby, so they cannot be preselected via URL.
               <Link
                 to="/party"
-                search={{ gameId: undefined, mode: undefined, title: undefined }}
+                search={{ gameId: undefined, title: undefined }}
                 className={buttonStyles("primary", "lg")}
                 title="Start a party and pick this game in the lobby"
               >

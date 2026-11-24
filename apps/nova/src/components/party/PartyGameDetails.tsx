@@ -1,5 +1,4 @@
 import { Badge } from "../ui/Badge";
-import type { GameMode } from "@rocketcrab/protocol";
 import { BookOpen, X } from "lucide-react";
 import { BROWSE_CATEGORIES, findBrowseGame } from "../../lib/browse";
 import { useSavedGame } from "../../lib/games/queries";
@@ -10,13 +9,13 @@ import { LoadingState } from "../ui/LoadingState";
 
 export interface PartyGameDetailsModalProps {
   /** The game currently selected for the party (saved or prebuilt). */
-  readonly game: { gameId: string; title: string; mode: GameMode } | null;
+  readonly game: { gameId: string; title: string } | null;
   readonly onClose: () => void;
 }
 
 /**
  * In-game details overlay: "About this game" shows the selected game's
- * metadata — title, description, mode, and any how-to-play guide — without
+ * metadata — title, description, and any how-to-play guide — without
  * leaving the party. Saved games come from the IndexedDB repository;
  * prebuilt games from the shared browse model (BrowseEntry).
  *

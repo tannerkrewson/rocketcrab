@@ -6,12 +6,7 @@
  * asserted to stay under the ~30-line acceptance threshold.
  */
 import { describe, expect, it, vi } from "vitest";
-import {
-  MINIMAL_GAME_EXAMPLE,
-  RAW_MODE_EXAMPLE,
-  TICK_EXAMPLE,
-  STATE_MODE_EXAMPLE,
-} from "./examples";
+import { MINIMAL_GAME_EXAMPLE, TICK_EXAMPLE, STATE_EXAMPLE } from "./examples";
 import { createInMemoryHarness } from "./harness";
 import { createNovaSession, type NovaSession } from "./session";
 
@@ -22,9 +17,6 @@ function runExample(
   source: string,
   memberId: string,
   displayName: string,
-  options: {
-    mode?: "state" | "raw";
-  } = {},
 ): NovaSession {
   const transport = harness.createTransport({ memberId, displayName });
   const session = createNovaSession({
@@ -32,7 +24,7 @@ function runExample(
     room: "arena",
     sessionId: SESSION,
     player: { memberId, displayName },
-    game: { gameId: "game-example", mode: options.mode ?? "state", title: "Example Game" },
+    game: { gameId: "game-example", title: "Example Game" },
   });
   // Syntax + behavior: execute the documented source against the real API.
   new Function("nova", source)(session.client);
@@ -79,12 +71,7 @@ describe("documented examples", () => {
   });
 
   it("parses as valid JavaScript", () => {
-    for (const example of [
-      MINIMAL_GAME_EXAMPLE,
-      STATE_MODE_EXAMPLE,
-      TICK_EXAMPLE,
-      RAW_MODE_EXAMPLE,
-    ]) {
+    for (const example of [MINIMAL_GAME_EXAMPLE, STATE_EXAMPLE, TICK_EXAMPLE]) {
       expect(() => new Function("nova", example)).not.toThrow();
     }
   });
@@ -96,7 +83,7 @@ describe("documented examples", () => {
     const bStarted: number[] = [];
     a.client.onStart(() => aStarted.push(1));
     b.client.onStart(() => bStarted.push(1));
-    expect(a.declaration).toEqual({ title: "Hello Nova", mode: "state" });
+    expect(a.declaration).toEqual({ title: "Hello Nova" });
     expect(b.readyOf("member-a")).toBe(true); // ready crossed the transport
     a.start();
     b.start();
@@ -109,8 +96,8 @@ describe("documented examples", () => {
 
   it("state-mode example dispatches actions that the authority applies", async () => {
     const harness = createInMemoryHarness();
-    const a = runExample(harness, STATE_MODE_EXAMPLE, "member-a", "Ada");
-    const b = runExample(harness, STATE_MODE_EXAMPLE, "member-b", "Ben");
+    const a = runExample(harness, STATE_EXAMPLE, "member-a", "Ada");
+    const b = runExample(harness, STATE_EXAMPLE, "member-b", "Ben");
     const entries = logs();
     try {
       await a.join();
@@ -160,26 +147,6 @@ describe("documented examples", () => {
       if (Date.now() > deadline) throw new Error("paddles never moved");
       await flush(harness);
       await new Promise((resolve) => setTimeout(resolve, 10));
-    }
-  });
-
-  it("raw-mode example exchanges chat messages between players", async () => {
-    const harness = createInMemoryHarness();
-    const a = runExample(harness, RAW_MODE_EXAMPLE, "member-a", "Ada");
-    const b = runExample(harness, RAW_MODE_EXAMPLE, "member-b", "Ben");
-    const entries = logs();
-    try {
-      await a.join();
-      await b.join();
-      await flush(harness);
-      a.start();
-      b.start();
-      await flush(harness);
-      const messages = entries.map((args) => args.join(" ")).join("\n");
-      expect(messages).toContain("Ada says: hello everyone");
-      expect(messages).toContain("Ben says: hello everyone");
-    } finally {
-      vi.restoreAllMocks();
     }
   });
 });

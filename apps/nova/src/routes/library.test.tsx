@@ -60,7 +60,6 @@ describe("/library", () => {
       title: "Rocket Rumble",
       description: "Fight in space",
       html: "<p>rockets</p>",
-      mode: "state",
     });
     await gameRepository.create({ title: "Card Sharks", html: "<p>cards</p>" });
 

@@ -4,13 +4,7 @@
  * `@rocketcrab/nova-api` client) and the schemas the runtime page uses to
  * validate everything that script reports before it reaches the host.
  */
-import {
-  gameModeSchema,
-  stateResponseSchema,
-  tickRateMax,
-  titleSchema,
-  type GameMode,
-} from "@rocketcrab/protocol";
+import { stateResponseSchema, tickRateMax, titleSchema } from "@rocketcrab/protocol";
 import { NOVA_API_VERSION } from "@rocketcrab/nova-api/version";
 import { z } from "zod";
 
@@ -26,7 +20,6 @@ export const SUPPORTED_NOVA_API_VERSIONS: readonly number[] = [NOVA_API_VERSION]
 /** What the runtime accepts from `nova.defineGame` (protocol keys). */
 export const gameDeclarationSchema = z.object({
   title: titleSchema.optional(),
-  gameMode: gameModeSchema.optional(),
   gameVersion: z.string().min(1).max(32).optional(),
   apiVersion: z.number().int().min(1).optional(),
   tickRate: z.number().int().min(1).max(tickRateMax).optional(),
@@ -50,29 +43,6 @@ export const novaApiCallSchemas = {
       // The frame generates the action id so the host can correlate the
       // authority's ack back to the dispatch promise.
       actionId: z.string().min(1).max(64),
-    })
-    .strict(),
-  "raw.createChannel": z
-    .object({
-      spec: z.object({
-        name: z.string().min(1).max(64),
-      }),
-    })
-    .strict(),
-  "raw.close": z
-    .object({
-      name: z.string().min(1).max(64),
-    })
-    .strict(),
-  "raw.send": z
-    .object({
-      name: z.string().min(1).max(64),
-      payload: z.unknown(),
-      options: z
-        .object({
-          to: z.string().min(1).max(64).optional(),
-        })
-        .optional(),
     })
     .strict(),
   "controls.set": z.object({ controls: z.unknown() }).strict(),
@@ -153,20 +123,17 @@ export const DEFAULT_GAME_TITLE = "Untitled game";
  */
 export function registrationFields(input: {
   bootstrapGameId: string;
-  bootstrapGameMode: GameMode;
   bootstrapTitle?: string;
   declaration?: GameDeclaration;
 }): {
   gameId: string;
   title: string;
-  gameMode: GameMode;
   gameVersion?: string;
   tickRate?: number;
 } {
   return {
     gameId: input.bootstrapGameId,
     title: input.declaration?.title ?? input.bootstrapTitle ?? DEFAULT_GAME_TITLE,
-    gameMode: input.declaration?.gameMode ?? input.bootstrapGameMode,
     ...(input.declaration?.gameVersion !== undefined
       ? { gameVersion: input.declaration.gameVersion }
       : {}),

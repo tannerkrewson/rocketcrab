@@ -22,7 +22,7 @@ import type { NovaTransport } from "@rocketcrab/core";
 import { PROTOCOL_VERSION, assertPeerMessage } from "@rocketcrab/protocol";
 import { createNovaSession, type NovaSession } from "./session";
 import { buildActionDispatchMessage, type PeerMessageBase } from "./messages";
-import type { NovaPlayer, NovaRawMessage, NovaStateHandlers, NovaTickContext } from "./types";
+import type { NovaPlayer, NovaStateHandlers, NovaTickContext } from "./types";
 
 /** A transport factory plus a deterministic delivery pump (see module docs). */
 export interface NovaTransportHarness {
@@ -105,17 +105,17 @@ async function makePair(
     room: ROOM,
     sessionId: SESSION,
     player: { memberId: "member-a", displayName: "Ada" },
-    game: { gameId: "game-1", mode: "state", title: "Contract Game" },
+    game: { gameId: "game-1", title: "Contract Game" },
   });
   const b = createNovaSession({
     transport: transportB,
     room: ROOM,
     sessionId: SESSION,
     player: { memberId: "member-b", displayName: "Ben" },
-    game: { gameId: "game-1", mode: "state", title: "Contract Game" },
+    game: { gameId: "game-1", title: "Contract Game" },
   });
-  a.client.defineGame({ title: "Contract Game", mode: "state", ...config.handlers });
-  b.client.defineGame({ title: "Contract Game", mode: "state", ...config.handlers });
+  a.client.defineGame({ title: "Contract Game", ...config.handlers });
+  b.client.defineGame({ title: "Contract Game", ...config.handlers });
   config.setup?.(a, b); // subscribe before the first join so no event is missed
   await a.join();
   await b.join();
@@ -163,24 +163,31 @@ async function waitForTicks(
 
 export function runNovaSessionContractTests(harnessFactory: () => NovaTransportHarness): void {
   describe("Nova session contract (transport-neutral)", () => {
-    it("shares a refillable byte budget across raw and actions", async () => {
+    it("charges actions against a refillable per-player byte budget", async () => {
       const { a, b } = await makePair(harnessFactory);
-      a.createRawChannel({ name: "budget" });
-      b.createRawChannel({ name: "budget" });
       const warnings: string[] = [];
       a.onSessionEvent((event) => {
         if (event.type === "bandwidthWarning") warnings.push(event.message);
       });
-      await a.sendRaw("budget", new Uint8Array(900 * 1024));
-      expect(warnings).toHaveLength(1);
-      await expect(
-        a.dispatch({ type: "large", payload: "x".repeat(150 * 1024) }, "budget-action"),
-      ).rejects.toMatchObject({ code: "rate_limited" });
-      await expect(b.sendRaw("budget", new Uint8Array(150 * 1024))).resolves.toBeUndefined();
       const now = performance.now();
-      const clock = vi.spyOn(performance, "now").mockReturnValue(now + 1000);
+      const clock = vi.spyOn(performance, "now").mockReturnValue(now);
       try {
-        await expect(a.sendRaw("budget", new Uint8Array(150 * 1024))).resolves.toBeUndefined();
+        const payload = "x".repeat(15 * 1024);
+        let limited: unknown = null;
+        for (let i = 0; i < 80 && limited === null; i += 1) {
+          await a.dispatch({ type: "large", payload }, `budget-${i}`).catch((error: unknown) => {
+            limited = error;
+          });
+        }
+        expect(warnings).toHaveLength(1);
+        expect(limited).toMatchObject({ code: "rate_limited" });
+        // Each player has their own budget.
+        await expect(b.dispatch({ type: "large", payload }, "budget-b")).resolves.toBeUndefined();
+        // The budget refills over time.
+        clock.mockReturnValue(now + 1000);
+        await expect(
+          a.dispatch({ type: "large", payload }, "budget-refill"),
+        ).resolves.toBeUndefined();
       } finally {
         clock.mockRestore();
       }
@@ -192,8 +199,8 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       expect(b.client.player).toEqual({ id: "member-b", name: "Ben" });
       expect(a.client.version).toBe(1);
       // The declaration is plain data: handler functions never cross.
-      expect(a.declaration).toEqual({ title: "Contract Game", mode: "state" });
-      expect(b.declaration).toEqual({ title: "Contract Game", mode: "state" });
+      expect(a.declaration).toEqual({ title: "Contract Game" });
+      expect(b.declaration).toEqual({ title: "Contract Game" });
     });
 
     it("tracks the player list and fires join/leave subscriptions", async () => {
@@ -233,7 +240,7 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
         room: ROOM,
         sessionId: SESSION,
         player: { memberId: "member-a", displayName: "Ada" },
-        game: { gameId: "game-1", mode: "state" },
+        game: { gameId: "game-1" },
       });
       const statuses: string[] = [];
       session.client.onConnectionChange((status) => statuses.push(status));
@@ -254,14 +261,14 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
         room: ROOM,
         sessionId: SESSION,
         player: { memberId: "member-a", displayName: "Ada" },
-        game: { gameId: "game-1", mode: "state" },
+        game: { gameId: "game-1" },
       });
       const b = createNovaSession({
         transport: transportB,
         room: ROOM,
         sessionId: SESSION,
         player: { memberId: "member-b", displayName: "Ben" },
-        game: { gameId: "game-1", mode: "state" },
+        game: { gameId: "game-1" },
       });
       const aStarted: number[] = [];
       const bStarted: number[] = [];
@@ -506,9 +513,9 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
         room: ROOM,
         sessionId: SESSION,
         player: { memberId: "member-a", displayName: "Ada" },
-        game: { gameId: "game-1", mode: "state", title: "Contract Game" },
+        game: { gameId: "game-1", title: "Contract Game" },
       });
-      a.client.defineGame({ title: "Contract Game", mode: "state", ...contractGameHandlers() });
+      a.client.defineGame({ title: "Contract Game", ...contractGameHandlers() });
       await a.join();
       await settle(harness);
       a.start();
@@ -524,9 +531,9 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
         room: ROOM,
         sessionId: SESSION,
         player: { memberId: "member-c", displayName: "Cara" },
-        game: { gameId: "game-1", mode: "state", title: "Contract Game" },
+        game: { gameId: "game-1", title: "Contract Game" },
       });
-      c.client.defineGame({ title: "Contract Game", mode: "state", ...contractGameHandlers() });
+      c.client.defineGame({ title: "Contract Game", ...contractGameHandlers() });
       const cStarted: number[] = [];
       const cChanges: unknown[] = [];
       c.client.onStart(() => cStarted.push(1));
@@ -581,7 +588,7 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
         room: ROOM,
         sessionId: SESSION,
         player: { memberId: "member-a", displayName: "Ada" },
-        game: { gameId: "game-1", mode: "state" },
+        game: { gameId: "game-1" },
         stateExecutor: executor,
       });
       const b = createNovaSession({
@@ -589,10 +596,10 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
         room: ROOM,
         sessionId: SESSION,
         player: { memberId: "member-b", displayName: "Ben" },
-        game: { gameId: "game-1", mode: "state" },
+        game: { gameId: "game-1" },
       });
-      a.client.defineGame({ title: "Contract Game", mode: "state" });
-      b.client.defineGame({ title: "Contract Game", mode: "state" });
+      a.client.defineGame({ title: "Contract Game" });
+      b.client.defineGame({ title: "Contract Game" });
       await a.join();
       await b.join();
       await settle(harness);
@@ -662,7 +669,7 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
         room: ROOM,
         sessionId: SESSION,
         player: { memberId: "member-a", displayName: "Ada" },
-        game: { gameId: "game-1", mode: "state" },
+        game: { gameId: "game-1" },
         authority,
       });
       const b = createNovaSession({
@@ -670,11 +677,11 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
         room: ROOM,
         sessionId: SESSION,
         player: { memberId: "member-b", displayName: "Ben" },
-        game: { gameId: "game-1", mode: "state" },
+        game: { gameId: "game-1" },
         authority,
       });
-      a.client.defineGame({ title: "Contract Game", mode: "state", ...contractGameHandlers() });
-      b.client.defineGame({ title: "Contract Game", mode: "state", ...contractGameHandlers() });
+      a.client.defineGame({ title: "Contract Game", ...contractGameHandlers() });
+      b.client.defineGame({ title: "Contract Game", ...contractGameHandlers() });
       await a.join();
       await b.join();
       await settle(harness);
@@ -708,102 +715,8 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
     });
 
     // ------------------------------------------------------------------
-    // Raw and protocol boundaries
+    // Protocol boundaries
     // ------------------------------------------------------------------
-
-    it("exchanges raw channel messages, targeted and binary", async () => {
-      const { harness, a, b } = await makePair(harnessFactory);
-      await startBoth({ harness, a, b });
-      const aReceived: NovaRawMessage[] = [];
-      const bReceived: NovaRawMessage[] = [];
-      a.client.raw.createChannel({ name: "chat" });
-      b.client.raw.createChannel({ name: "chat" });
-      a.client.raw.createChannel({ name: "positions" });
-      b.client.raw.createChannel({ name: "positions" });
-      a.client.raw.onMessage("chat", (message) => aReceived.push(message));
-      b.client.raw.onMessage("chat", (message) => bReceived.push(message));
-      a.client.raw.onMessage("positions", (message) => aReceived.push(message));
-      b.client.raw.onMessage("positions", (message) => bReceived.push(message));
-
-      a.client.raw.send("chat", { text: "hello" });
-      b.client.raw.send("chat", { text: "hi" }, { to: "member-a" });
-      a.client.raw.send("positions", new Uint8Array([1, 2, 3]));
-      await settle(harness);
-
-      expect(bReceived[0]?.payload).toEqual({ text: "hello" });
-      expect(bReceived[0]?.binary).toBe(false);
-      expect(bReceived[1]?.binary).toBe(true);
-      const binary = bReceived[1]?.payload;
-      expect(binary instanceof Uint8Array).toBe(true);
-      expect(Array.from(binary as Uint8Array)).toEqual([1, 2, 3]);
-      expect(aReceived).toHaveLength(1); // targeted send only reaches Ada
-      expect(aReceived[0]?.payload).toEqual({ text: "hi" });
-      expect(aReceived[0]?.from).toEqual({ id: "member-b", name: "Ben" });
-    });
-
-    it("re-announces open raw channels to a peer joining mid-game (A2)", async () => {
-      const { harness, a, b } = await makePair(harnessFactory);
-      await startBoth({ harness, a, b });
-      a.client.raw.createChannel({ name: "physics" });
-      await settle(harness);
-
-      // Carol joins after the channel exists: she learns it from the
-      // targeted re-announcement and can receive without declaring it.
-      const transportC = harness.createTransport({ memberId: "member-c", displayName: "Carol" });
-      const c = createNovaSession({
-        transport: transportC,
-        room: ROOM,
-        sessionId: SESSION,
-        player: { memberId: "member-c", displayName: "Carol" },
-        game: { gameId: "game-1", mode: "raw", title: "Raw Game" },
-      });
-      const cMessages: unknown[] = [];
-      c.client.raw.onMessage("physics", (message) => cMessages.push(message.payload));
-      await c.join();
-      await settle(harness);
-      expect(c.getRawDiagnostics().channelCount).toBe(1);
-
-      a.client.raw.send("physics", { x: 1 });
-      await settle(harness);
-      expect(cMessages).toEqual([{ x: 1 }]);
-    });
-
-    it("propagates raw channel close and keeps per-player declarations (A2)", async () => {
-      const { harness, a, b } = await makePair(harnessFactory);
-      await startBoth({ harness, a, b });
-      a.client.raw.createChannel({ name: "chat" });
-      b.client.raw.createChannel({ name: "chat" });
-      await settle(harness);
-
-      const aErrors: Array<{ code: string }> = [];
-      a.client.onError((error) => aErrors.push({ code: error.code }));
-      a.client.raw.close("chat");
-      await settle(harness);
-      // Ada's own sends fail with a clear error; Ben keeps his declaration.
-      a.client.raw.send("chat", "hi");
-      await settle(harness);
-      await flushMacrotasks();
-      expect(aErrors).toEqual([{ code: "unknown_channel" }]);
-      expect(b.getRawDiagnostics().selfDeclaredChannelCount).toBe(1);
-
-      // Ben's channel still works end to end.
-      const aMessages: unknown[] = [];
-      a.client.raw.onMessage("chat", (message) => aMessages.push(message.payload));
-      b.client.raw.send("chat", { text: "still open" });
-      await settle(harness);
-      expect(aMessages).toEqual([{ text: "still open" }]);
-    });
-
-    it("drops peer declarations when the peer closes the channel (A2)", async () => {
-      const { harness, a, b } = await makePair(harnessFactory);
-      await startBoth({ harness, a, b });
-      a.client.raw.createChannel({ name: "chat" });
-      await settle(harness);
-      expect(b.getRawDiagnostics().channelCount).toBe(1);
-      a.client.raw.close("chat");
-      await settle(harness);
-      expect(b.getRawDiagnostics().channelCount).toBe(0);
-    });
 
     it("reports invalid inbound protocol messages as clear errors", async () => {
       const { harness, a, b } = await makePair(harnessFactory);

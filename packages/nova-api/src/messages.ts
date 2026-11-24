@@ -18,8 +18,6 @@ import {
   gameReadyMessageSchema,
   gameStartMessageSchema,
   playerIdentityMessageSchema,
-  rawChannelCloseMessageSchema,
-  rawChannelMetadataMessageSchema,
   stateResyncMessageSchema,
   stateSnapshotMessageSchema,
   stateViewMessageSchema,
@@ -293,36 +291,6 @@ export function buildAuthorityElectionMessage(
         revision: observation.revision,
         ...(observation.stateHash !== undefined ? { stateHash: observation.stateHash } : {}),
       })),
-    }),
-  );
-}
-
-/** Build and validate a `raw.channel` declaration (raw mode). */
-export function buildRawChannelMessage(
-  base: PeerMessageBase,
-  spec: {
-    channelName: string;
-  },
-): PeerMessage {
-  return assertPeerMessage(
-    rawChannelMetadataMessageSchema.parse({
-      ...envelope(base),
-      type: "raw.channel",
-      ...spec,
-    }),
-  );
-}
-
-/** Build and validate a `raw.close` announcement. */
-export function buildRawChannelCloseMessage(
-  base: PeerMessageBase,
-  channelName: string,
-): PeerMessage {
-  return assertPeerMessage(
-    rawChannelCloseMessageSchema.parse({
-      ...envelope(base),
-      type: "raw.close",
-      channelName,
     }),
   );
 }

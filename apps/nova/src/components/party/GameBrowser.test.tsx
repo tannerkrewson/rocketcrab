@@ -100,7 +100,6 @@ describe("GameBrowser exit links (8z9)", () => {
     const game = await gameRepository.create({
       title: "Rocket Rumble",
       html: "<!doctype html><html><body><p>rockets</p></body></html>",
-      mode: "state",
     });
     const router = await renderBrowser({ inParty: true });
 

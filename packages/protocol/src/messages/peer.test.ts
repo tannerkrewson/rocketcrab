@@ -23,8 +23,6 @@ import {
   peerCapabilitiesMessageSchema,
   peerMessagesSchema,
   playerIdentityMessageSchema,
-  rawChannelCloseMessageSchema,
-  rawChannelMetadataMessageSchema,
   stateResyncMessageSchema,
   stateDeltaOpSchema,
   stateSnapshotMessageSchema,
@@ -68,8 +66,6 @@ describe("peer message schemas", () => {
       gameControlsMessageSchema,
       gameStartMessageSchema,
       gameEndMessageSchema,
-      rawChannelMetadataMessageSchema,
-      rawChannelCloseMessageSchema,
       gameSourceMetadataMessageSchema,
       gameSourceAcceptedMessageSchema,
       gameSourceDiscoverMessageSchema,
@@ -124,7 +120,6 @@ describe("peer message schemas", () => {
         basePeer({
           type: "peer.capabilities",
           protocolVersions: [1],
-          gameModes: ["state", "raw"],
           chunkedMessages: true,
           binaryPayloads: true,
         }),
@@ -206,25 +201,12 @@ describe("peer message schemas", () => {
       ),
       gameStartMessageSchema.parse(basePeer({ type: "game.start" })),
       gameEndMessageSchema.parse(basePeer({ type: "game.end", reason: "user_exit" })),
-      rawChannelMetadataMessageSchema.parse(
-        basePeer({
-          type: "raw.channel",
-          channelName: "chat",
-        }),
-      ),
-      rawChannelCloseMessageSchema.parse(
-        basePeer({
-          type: "raw.close",
-          channelName: "chat",
-        }),
-      ),
       gameSourceMetadataMessageSchema.parse(
         basePeer({
           type: "game.source.metadata",
           gameId: "game-1",
           title: "Rocket Rumble",
           apiVersion: 1,
-          mode: "state",
           sourceSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
           sourceSizeBytes: 2048,
         }),
@@ -262,7 +244,7 @@ describe("peer message schemas", () => {
       basePeer({ type: "party.reloadAll", sessionId: "" }),
       basePeer({ type: "player.identity", authorityEligible: "yes" }),
       basePeer({ type: "peer.connectionStatus", status: "connected" }),
-      basePeer({ type: "peer.capabilities", protocolVersions: [], gameModes: [] }),
+      basePeer({ type: "peer.capabilities", protocolVersions: [] }),
       basePeer({
         type: "action.dispatch",
         seq: 1,
@@ -294,14 +276,6 @@ describe("peer message schemas", () => {
       basePeer({ type: "game.controls", seq: "one", controls: {} }),
       basePeer({ type: "game.start", seq: "one" }),
       basePeer({ type: "game.end", reason: "banana" }),
-      basePeer({
-        type: "raw.channel",
-        channelName: "",
-      }),
-      basePeer({
-        type: "raw.close",
-        channelName: "x".repeat(65),
-      }),
       basePeer({
         type: "game.source.metadata",
         gameId: "game-1",

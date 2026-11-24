@@ -92,7 +92,7 @@ export function readyMessage(): Record<string, unknown> {
   };
 }
 
-export function registrationMessage(title: string, gameMode = "state"): Record<string, unknown> {
+export function registrationMessage(title: string): Record<string, unknown> {
   return {
     version: 1,
     runtimeInstanceId: "runtime-1",
@@ -101,7 +101,6 @@ export function registrationMessage(title: string, gameMode = "state"): Record<s
     type: "game.registration",
     gameId: "game-1",
     title,
-    gameMode,
   };
 }
 

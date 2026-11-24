@@ -2,7 +2,7 @@
  * @rocketcrab/nova-api
  *
  * The game-facing Nova API: the small, versioned surface AI-generated
- * games use in every mode, plus the transport-neutral session engine that
+ * games use, plus the transport-neutral session engine that
  * makes it work.
  *
  * - `createNovaClient` builds the exact object games receive as `window.nova`

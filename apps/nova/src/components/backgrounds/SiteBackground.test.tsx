@@ -39,7 +39,7 @@ const IDLE_STATE: PartyEngineState = {
 const IN_GAME_STATE: PartyEngineState = {
   ...IDLE_STATE,
   phase: "playing",
-  game: { gameId: "my-game", title: "My Game", mode: "state" },
+  game: { gameId: "my-game", title: "My Game" },
 };
 
 interface FakeEngine {

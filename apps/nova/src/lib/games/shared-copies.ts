@@ -52,7 +52,6 @@ export async function saveSharedGame(
   const fields = {
     title: shared.title,
     html: shared.source,
-    mode: shared.mode,
     ...(shared.apiVersion !== undefined ? { apiVersion: shared.apiVersion } : {}),
     copiedFrom,
   };

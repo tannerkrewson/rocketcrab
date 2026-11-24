@@ -6,7 +6,6 @@
 import {
   parseRuntimeMessage,
   type GameApiEventMessage,
-  type GameMode,
   type RuntimeBootstrapMessage,
   type RuntimeErrorMessage,
   type RuntimeMessage,
@@ -79,7 +78,6 @@ export class RuntimeInstance {
   private readonly registrationTimeoutMs: number;
   private readonly sessionId: string | undefined;
   private readonly gameId: string;
-  private readonly gameMode: GameMode;
   private readonly gameTitle: string | undefined;
   private readonly allowTokens: readonly string[];
   private readonly consoleSink: RateLimitedSink<{
@@ -105,7 +103,6 @@ export class RuntimeInstance {
     this.registrationTimeoutMs = options.registrationTimeoutMs ?? REGISTRATION_TIMEOUT_MS;
     this.sessionId = options.bootstrap.sessionId;
     this.gameId = options.bootstrap.gameId;
-    this.gameMode = options.bootstrap.gameMode;
     this.gameTitle = options.bootstrap.gameTitle;
     this.allowTokens = options.bootstrap.permissions?.allow ?? [];
     const limiters = createRuntimeLimiters();
@@ -300,9 +297,6 @@ export class RuntimeInstance {
         break;
       case "ready":
       case "dispatch":
-      case "raw.createChannel":
-      case "raw.close":
-      case "raw.send":
       case "controls.set":
       case "stateResponse":
         this.handleApiCall(kind, payload);
@@ -352,7 +346,6 @@ export class RuntimeInstance {
     }
     const fields = registrationFields({
       bootstrapGameId: this.gameId,
-      bootstrapGameMode: this.gameMode,
       bootstrapTitle: this.gameTitle,
       declaration,
     });

@@ -62,7 +62,6 @@ describe("saveSharedGame", () => {
   const source = (html: string, sourceSha256: string): SharedPartyGameSource => ({
     gameId: "game_theirs",
     title: "Their Game",
-    mode: "state",
     apiVersion: 1,
     source: html,
     sourceSha256,

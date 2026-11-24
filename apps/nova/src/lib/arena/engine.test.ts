@@ -37,7 +37,6 @@ function createEngine(
   const engine = new ArenaEngine({
     source: SOURCE,
     gameId: "game-1",
-    gameMode: "state",
     gameTitle: "Rocket Rumble",
     runtimeOrigin: "http://localhost:2723",
     initialPlayers: playerSpecs(2),
@@ -245,39 +244,6 @@ describe("ArenaEngine — happy path", () => {
     }
   });
 
-  it("routes raw channel messages between players", async () => {
-    const harness = createHarness();
-    mountContainers(harness, 2);
-    const engine = createEngine(harness);
-    engine.start();
-    await runToStartWithEngine(engine, harness, 2);
-
-    deliver(
-      harness.channels[0]!.port1,
-      apiCallMessage("raw.createChannel", { spec: { name: "chat" } }),
-    );
-    deliver(
-      harness.channels[0]!.port1,
-      apiCallMessage("raw.send", { name: "chat", payload: { text: "hi" } }),
-    );
-    await vi.waitFor(() => {
-      const events = apiEventsOf(harness, 1);
-      expect(
-        events.some(
-          (event) =>
-            event.kind === "rawMessage" &&
-            event.channel === "chat" &&
-            (event.message.payload as { text?: string }).text === "hi",
-        ),
-      ).toBe(true);
-    });
-    const raw = apiEventsOf(harness, 1).find((event) => event.kind === "rawMessage");
-    expect(raw?.kind === "rawMessage" ? raw.message.from : null).toEqual({
-      id: "member-1",
-      name: "Player 1",
-    });
-  });
-
   it("reports exhausted bandwidth to the frame and arena diagnostics", async () => {
     const harness = createHarness();
     mountContainers(harness, 2);
@@ -285,20 +251,20 @@ describe("ArenaEngine — happy path", () => {
     engine.start();
     await runToStartWithEngine(engine, harness, 2);
     const port = harness.channels[0]!.port1;
-    deliver(port, apiCallMessage("raw.createChannel", { spec: { name: "budget" } }));
-    deliver(port, apiCallMessage("raw.send", { name: "budget", payload: "x".repeat(900 * 1024) }));
-    deliver(
-      port,
-      apiCallMessage("dispatch", {
-        action: { type: "large", payload: "x".repeat(150 * 1024) },
-        actionId: "budget-action",
-      }),
-    );
+    // 15 KiB actions, well past the 1 MiB burst.
+    for (let i = 0; i < 100; i += 1) {
+      deliver(
+        port,
+        apiCallMessage("dispatch", {
+          action: { type: "large", payload: "x".repeat(15 * 1024) },
+          actionId: `budget-${i}`,
+        }),
+      );
+    }
     await vi.waitFor(() => {
       expect(apiEventsOf(harness, 0)).toContainEqual(
         expect.objectContaining({
           kind: "actionAck",
-          actionId: "budget-action",
           status: "rejected",
           errorCode: "rate_limited",
         }),
@@ -307,35 +273,6 @@ describe("ArenaEngine — happy path", () => {
         engine
           .getSnapshot()
           .players[0]?.logs.some((entry) => entry.message.includes("80% exhausted")),
-      ).toBe(true);
-    });
-  });
-
-  it("routes raw channel close between players (A2)", async () => {
-    const harness = createHarness();
-    mountContainers(harness, 2);
-    const engine = createEngine(harness);
-    engine.start();
-    await runToStartWithEngine(engine, harness, 2);
-
-    deliver(
-      harness.channels[0]!.port1,
-      apiCallMessage("raw.createChannel", { spec: { name: "chat" } }),
-    );
-    deliver(harness.channels[0]!.port1, apiCallMessage("raw.close", { name: "chat" }));
-    await vi.waitFor(() => {
-      deliver(
-        harness.channels[0]!.port1,
-        apiCallMessage("raw.send", { name: "chat", payload: "hi" }),
-      );
-      const events = apiEventsOf(harness, 0);
-      expect(
-        events.some(
-          (event) =>
-            event.kind === "error" &&
-            event.code === "unknown_channel" &&
-            String(event.message).includes("raw.send"),
-        ),
       ).toBe(true);
     });
   });
@@ -621,7 +558,6 @@ describe("ArenaEngine — per-player state", () => {
     const engine = new ArenaEngine({
       source: SOURCE,
       gameId: "game-1",
-      gameMode: "state",
       runtimeOrigin: "http://localhost:2723",
       initialPlayers: playerSpecs(2),
       getContainer: (id) => harness.containers.get(id) ?? null,

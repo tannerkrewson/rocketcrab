@@ -19,28 +19,19 @@ import { NovaError } from "./errors";
 /** Bounded registration options for `nova.defineGame`. */
 export const novaGameDeclarationSchema = z.object({
   title: titleSchema.optional(),
-  mode: z.enum(["state", "raw"]).optional(),
   version: z.string().min(1).max(32).optional(),
   apiVersion: z.number().int().min(1).optional(),
   tickRate: z.number().int().min(1).max(tickRateMax).optional(),
 });
 
-/** Bounded action shape for `nova.dispatch` (state mode). */
+/** Bounded action shape for `nova.dispatch`. */
 export const novaActionSchema = z.object({
   type: z.string().min(1).max(64),
   payload: z.unknown().optional(),
   baseRevision: z.number().int().nonnegative().optional(),
 });
 
-/** Bounded raw channel spec for `nova.raw.createChannel`. */
-export const novaRawChannelSpecSchema = z.object({
-  name: z.string().min(1).max(64),
-});
-
-/** Bounded raw channel name for `nova.raw.send` / `onMessage`. */
-export const novaChannelNameSchema = z.string().min(1).max(64);
-
-/** True when a payload is binary and travels on the transport binary path. */
+/** True when a payload is binary (Uint8Array or ArrayBuffer). */
 export function isBinaryPayload(payload: unknown): boolean {
   return payload instanceof Uint8Array || payload instanceof ArrayBuffer;
 }
@@ -48,8 +39,7 @@ export function isBinaryPayload(payload: unknown): boolean {
 /**
  * Require `value` to be structured-clone-compatible AND JSON-serializable
  * (plain data only): throws {@link NovaError} with code `invalid_payload`
- * otherwise. Binary payloads are rejected here — they are only allowed on
- * raw channels. `structuredClone` rejects functions, cycles, and DOM nodes
+ * otherwise. Binary payloads are rejected: game data is JSON. `structuredClone` rejects functions, cycles, and DOM nodes
  * (frame-safety); `JSON.stringify` rejects BigInt and non-serializable
  * values (transport-safety).
  */
@@ -58,10 +48,7 @@ export function assertStructuredCloneSafe(value: unknown, label: string): void {
     return; // optional payloads may be omitted
   }
   if (isBinaryPayload(value)) {
-    throw new NovaError(
-      "invalid_payload",
-      `${label} must be plain data; binary payloads are only allowed on raw channels.`,
-    );
+    throw new NovaError("invalid_payload", `${label} must be plain JSON data, not binary.`);
   }
   try {
     structuredClone(value);

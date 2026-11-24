@@ -57,7 +57,6 @@ function createHarness(
 
 const loadGame = {
   gameId: "game-1",
-  gameMode: "state" as const,
   gameSource: "<!doctype html><html><body>hi</body></html>",
   player: { memberId: "member-1", displayName: "Alex" },
   gameTitle: "Hello Game",
@@ -101,7 +100,6 @@ describe("RuntimeHostClient bootstrap", () => {
     const bootstrap = windowMessages[0]?.data as Record<string, unknown>;
     expect(bootstrap.type).toBe("runtime.bootstrap");
     expect(bootstrap.gameId).toBe("game-1");
-    expect(bootstrap.gameMode).toBe("state");
     expect(port2.sent).toHaveLength(0);
 
     deliver(port1, readyMessage());
@@ -156,7 +154,6 @@ describe("RuntimeHostClient event forwarding", () => {
       type: "game.registration",
       gameId: "game-1",
       title: "Hello Game",
-      gameMode: "state",
       gameVersion: "1.0.0",
     });
     deliver(port1, {
@@ -234,19 +231,6 @@ describe("RuntimeHostClient event forwarding", () => {
       kind: "playerJoined",
       player: { id: "member-2", name: "Blair" },
     });
-    harness.bridge.pushApiEvent({
-      kind: "rawMessage",
-      channel: "chat",
-      message: {
-        from: { id: "member-2", name: "Blair" },
-        payload: new Uint8Array([1, 2]),
-        binary: true,
-      },
-    });
-    const raw = harness.port1.sent.at(-1) as {
-      event: { message: { payload: Uint8Array } };
-    };
-    expect(raw.event.message.payload).toBeInstanceOf(Uint8Array);
     const idle = createHarness();
     idle.bridge.pushApiEvent({ kind: "start" });
     expect(idle.port1.sent).toHaveLength(0);

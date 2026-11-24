@@ -18,34 +18,6 @@ export const arenaApiCallSchemas = {
       actionId: z.string().min(1).max(64),
     })
     .strict(),
-  "raw.createChannel": z
-    .object({
-      spec: z.object({
-        name: z.string().min(1).max(64),
-        reliable: z.boolean().optional(),
-        ordered: z.boolean().optional(),
-        binary: z.boolean().optional(),
-      }),
-    })
-    .strict(),
-  "raw.close": z
-    .object({
-      name: z.string().min(1).max(64),
-    })
-    .strict(),
-  "raw.send": z
-    .object({
-      name: z.string().min(1).max(64),
-      payload: z.unknown(),
-      options: z
-        .object({
-          to: z.string().min(1).max(64).optional(),
-          reliable: z.boolean().optional(),
-          ordered: z.boolean().optional(),
-        })
-        .optional(),
-    })
-    .strict(),
   "controls.set": z.object({ controls: z.unknown() }).strict(),
   stateResponse: z
     .object({

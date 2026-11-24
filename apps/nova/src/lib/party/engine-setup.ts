@@ -62,9 +62,8 @@ export class PartySetup {
         return;
       }
       this.state.pendingSetupTransport = null;
-      // Session mode is immutable, so set the game before attaching the session.
-      this.state.game =
-        input === undefined ? null : { gameId: input.gameId, title: input.title, mode: input.mode };
+      // A session belongs to one game, so set the game before attaching the session.
+      this.state.game = input === undefined ? null : { gameId: input.gameId, title: input.title };
       await this.establish(party);
       if (setup.signal.aborted) return;
       this.state.phase = "lobby";

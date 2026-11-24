@@ -1,4 +1,4 @@
-import { PROTOCOL_VERSION, type GameMode } from "@rocketcrab/protocol";
+import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
 import type { SavedGame } from "@rocketcrab/core";
 import { useBlocker, useCanGoBack, useNavigate, useRouter } from "@tanstack/react-router";
 import {
@@ -122,9 +122,7 @@ export function EditorPage({ game }: { game?: SavedGame }) {
   const [sourceHash, setSourceHash] = useState("");
   const [diagnostics, setDiagnostics] = useState<Diagnostic[]>([]);
   const [consoleEntries, setConsoleEntries] = useState<ConsoleEntry[]>([]);
-  const [registration, setRegistration] = useState<{ gameMode: GameMode; title: string } | null>(
-    null,
-  );
+  const [registration, setRegistration] = useState<{ title: string } | null>(null);
   const [runInfo, setRunInfo] = useState<{
     startedAt: number;
     sourceHash: string;
@@ -213,7 +211,7 @@ export function EditorPage({ game }: { game?: SavedGame }) {
     (event: RuntimeHostEvent) => {
       switch (event.type) {
         case "registration":
-          setRegistration({ gameMode: event.message.gameMode, title: event.message.title });
+          setRegistration({ title: event.message.title });
           // Only runs of the saved source may update that game's test metadata.
           if (game && lastRunSourceRef.current !== null && lastRunSourceRef.current === game.html) {
             recordTestResults.mutate({
@@ -288,7 +286,6 @@ export function EditorPage({ game }: { game?: SavedGame }) {
       try {
         await session.run({
           gameId: game?.id ?? draftGameId(),
-          gameMode: game?.mode ?? "state",
           gameSource: code,
           player: { memberId: "local-creator", displayName: "You" },
           ...(title.trim().length > 0 ? { gameTitle: title.trim() } : {}),
@@ -316,7 +313,7 @@ export function EditorPage({ game }: { game?: SavedGame }) {
         ]);
       }
     },
-    [appendDiagnostics, game?.id, game?.mode, session, title],
+    [appendDiagnostics, game?.id, session, title],
   );
 
   const handleRun = useCallback(() => {
@@ -392,7 +389,6 @@ export function EditorPage({ game }: { game?: SavedGame }) {
         title: nextTitle,
         html: source,
         apiVersion: PROTOCOL_VERSION,
-        ...(registration ? { mode: registration.gameMode } : {}),
       };
       if (game) {
         await updateGame.mutateAsync({ id: game.id, input });
@@ -434,7 +430,6 @@ export function EditorPage({ game }: { game?: SavedGame }) {
         title: `${baseTitle} (copy)`,
         html: source,
         apiVersion: PROTOCOL_VERSION,
-        ...(registration ? { mode: registration.gameMode } : {}),
       });
       toast.success(`Saved a copy as “${created.title}”.`);
       await navigate({
@@ -462,7 +457,6 @@ export function EditorPage({ game }: { game?: SavedGame }) {
       to: "/party",
       search: {
         gameId: id,
-        mode: registration?.gameMode ?? game?.mode ?? "state",
         title: title.trim() || registration?.title || DEFAULT_GAME_TITLE,
       },
       ignoreBlocker: true,

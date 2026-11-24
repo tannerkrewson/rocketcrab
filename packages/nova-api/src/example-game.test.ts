@@ -108,7 +108,7 @@ function addPlayer(
     room: "arena",
     sessionId: "session-s4",
     player: { memberId: player.memberId, displayName: player.name },
-    game: { gameId: "game-nova-quiz", mode: "state", title: "Nova Quiz" },
+    game: { gameId: "game-nova-quiz", title: "Nova Quiz" },
     ...(authority !== undefined ? { authority } : {}),
   });
   world.sessions.push(session);
@@ -249,11 +249,10 @@ afterEach(() => {
 });
 
 describe("the S4 example game document", () => {
-  it("is one complete HTML file with an inline state-mode module script", () => {
+  it("is one complete HTML file with an inline module script", () => {
     expect(GAME_SOURCE).toMatch(/^<!doctype html>/i);
     expect(GAME_SOURCE).toMatch(/<meta name="viewport"/i);
     expect(GAME_SCRIPT).toContain("nova.defineGame({");
-    expect(GAME_SCRIPT).toContain('mode: "state"');
     expect(GAME_SCRIPT).toContain("selectView:");
     expect(GAME_SCRIPT).toContain("actions:");
     expect(GAME_SCRIPT).toContain("nova.ready();");

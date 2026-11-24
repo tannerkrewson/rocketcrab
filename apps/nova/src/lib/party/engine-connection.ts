@@ -445,7 +445,6 @@ export class PartyConnection {
           : {
               gameId: this.state.game.gameId,
               title: this.state.game.title,
-              mode: this.state.game.mode,
             },
     });
   }

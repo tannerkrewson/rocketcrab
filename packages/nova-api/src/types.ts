@@ -3,7 +3,7 @@
  *
  * These types are the contract AI-generated games program against. The API
  * is deliberately small: a handful of concepts (registration, players,
- * lifecycle, state, actions, ticks, controls, raw channels), zero transport or
+ * lifecycle, state, actions, ticks, controls), zero transport or
  * hosting vocabulary, and every value that crosses a boundary is plain,
  * structured-clone-compatible data.
  *
@@ -12,7 +12,7 @@
  * transport is {@link NovaSession}. Public documentation is generated or
  * checked from these source types (see `docs/api/`).
  */
-import { actionTimeoutMs, type GameEndReason, type GameMode } from "@rocketcrab/protocol";
+import { actionTimeoutMs, type GameEndReason } from "@rocketcrab/protocol";
 import type { NovaError } from "./errors";
 
 /**
@@ -126,8 +126,6 @@ export interface NovaStateHandlers {
 export interface NovaGameDeclaration {
   /** Human-readable game title shown in lobbies. */
   title?: string;
-  /** Execution mode (ADR-0006): "state" (default) | "raw". */
-  mode?: GameMode;
   /** The game's own version string (distinct from the Nova API version). */
   version?: string;
   /** The Nova API version this game targets; defaults to `nova.version`. */
@@ -224,93 +222,12 @@ export interface NovaStateDiagnostics {
 /** How long the authority has to apply an action before it times out. */
 export const NOVA_ACTION_TIMEOUT_MS = actionTimeoutMs;
 
-/** Declares a raw-mode channel (ADR-0006 raw mode). Every channel is reliable and ordered. */
-export interface NovaRawChannelSpec {
-  /** Channel name, 1..64 characters; cannot be a reserved protocol name. */
-  readonly name: string;
-}
-
-/** Options for one raw send on a channel. */
-export interface NovaRawSendOptions {
-  /** Target one player by id; omit to broadcast to every connected player. */
-  readonly to?: string;
-}
-
-/** One raw message received on a raw channel. */
-export interface NovaRawMessage {
-  /** The player who sent it. */
-  readonly from: NovaPlayer;
-  /** The payload: JSON data, or binary when `binary` is true. */
-  readonly payload: unknown;
-  /** True when the payload was transferred as binary bytes. */
-  readonly binary: boolean;
-}
-
 /** The `nova.state` handle: read and subscribe to canonical state. */
 export interface NovaStateHandle {
   /** Current canonical state, or null before any state has been received. */
   get(): unknown | null;
   /** Subscribe to state changes. Returns an unsubscribe function. */
   onChange(handler: (state: unknown) => void): () => void;
-}
-
-/** The `nova.raw` handle: raw-mode channels (ADR-0006 raw mode). */
-export interface NovaRawHandle {
-  /**
-   * Declare a raw channel and its delivery guarantees. Call once per
-   * channel after the game starts; peers learn the channel from the
-   * declaration (peers joining later receive open channels again). To
-   * receive, also subscribe with {@link onMessage}.
-   */
-  createChannel(spec: NovaRawChannelSpec): void;
-  /**
-   * Close a raw channel declared with {@link createChannel}. The channel
-   * stops accepting local sends (`unknown_channel` afterwards) and peers
-   * are told the channel closed; a peer that declared the channel itself
-   * keeps its own declaration. The name may be re-opened with a fresh
-   * {@link createChannel}. Idempotent: closing an unknown channel is a
-   * no-op.
-   */
-  close(name: string): void;
-  /**
-   * Send a payload on a channel created with {@link createChannel}.
-   * Broadcasts to every connected player unless `options.to` is set.
-   * Payloads may be JSON data or binary (`Uint8Array`/`ArrayBuffer`).
-   */
-  send(name: string, payload: unknown, options?: NovaRawSendOptions): void;
-  /**
-   * Subscribe to messages on a raw channel. Messages on channels without a
-   * subscription are dropped. Returns an unsubscribe function.
-   */
-  onMessage(name: string, handler: (message: NovaRawMessage) => void): () => void;
-}
-
-/**
- * Raw-mode traffic diagnostics (host/arena visible). Counters reflect
- * this session's raw-channel activity since the last reset; the rate is a
- * sliding 10-second window like state-mode action rates.
- */
-export interface NovaRawDiagnostics {
-  /** Channels currently open on this session (self + peer declarations). */
-  readonly channelCount: number;
-  /** Channels this session declared itself. */
-  readonly selfDeclaredChannelCount: number;
-  /** Raw messages sent by this session. */
-  readonly sentCount: number;
-  /** Raw messages received by this session. */
-  readonly receivedCount: number;
-  /** Bytes sent (payload size; chunked transfers count once). */
-  readonly sentBytes: number;
-  /** Bytes received (payload size; chunked transfers count once). */
-  readonly receivedBytes: number;
-  /** Sends rejected because the payload exceeded `rawMessageBytes`. */
-  readonly oversizedRejections: number;
-  /** Sends rejected because the rate exceeded `rawRatePerSecond`. */
-  readonly rateLimitRejections: number;
-  /** Raw messages sent per second over the last 10-second window. */
-  readonly ratePerSecond: number;
-  /** True when the warn thresholds were crossed on any recent send. */
-  readonly warned: boolean;
 }
 
 /**
@@ -365,8 +282,6 @@ export interface NovaApi {
   dispatch(action: NovaAction): Promise<void>;
   /** Read and subscribe to canonical state (state mode). */
   readonly state: NovaStateHandle;
-  /** Raw-mode channels (raw mode). */
-  readonly raw: NovaRawHandle;
   /**
    * This player's controls for a ticking game: what they are doing right
    * now (buttons held, joystick, pointer). The authority's `tick` reads them

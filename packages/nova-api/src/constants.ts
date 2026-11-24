@@ -19,20 +19,14 @@ export const NOVA_API_SURFACE: readonly string[] = [
   "onError",
   "dispatch",
   "state",
-  "raw",
   "controls",
 ] as const;
 
 /**
  * The reserved transport channel that carries validated protocol messages
- * between sessions. Raw-mode games may not create a channel with this name.
+ * between sessions.
  */
 export const NOVA_PROTOCOL_CHANNEL = "nova.protocol";
-
-/** True when a raw channel name collides with a reserved protocol name. */
-export function isReservedChannelName(name: string): boolean {
-  return name === NOVA_PROTOCOL_CHANNEL;
-}
 
 /** True when an API member name carries a forbidden concept (host/room/…). */
 export function isForbiddenSurfaceName(name: string): boolean {

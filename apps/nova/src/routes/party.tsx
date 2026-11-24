@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { PROTOCOL_VERSION, type GameMode } from "@rocketcrab/protocol";
+import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
 import { PartyExperience } from "../components/party/PartyExperience";
 import { PartyResumeBanner } from "../components/party/PartyResumeBanner";
 import { PartyShellHeader } from "../components/party/PartyShellHeader";
@@ -18,24 +18,16 @@ import { gameRepository } from "../lib/games/instance";
 export const Route = createFileRoute("/party")({
   validateSearch: (search: Record<string, unknown>): PartySearch => ({
     gameId: typeof search.gameId === "string" ? search.gameId : undefined,
-    mode: isGameMode(search.mode) ? search.mode : undefined,
     title: typeof search.title === "string" ? search.title : undefined,
     browse: search.browse === true ? true : undefined,
   }),
   component: PartyPage,
 });
 
-const GAME_MODES: readonly GameMode[] = ["state", "raw"];
-
 interface PartySearch {
   gameId?: string;
-  mode?: GameMode;
   title?: string;
   browse?: boolean;
-}
-
-function isGameMode(value: unknown): value is GameMode {
-  return typeof value === "string" && (GAME_MODES as readonly string[]).includes(value);
 }
 
 function errorMessage(error: unknown): string {
@@ -86,7 +78,6 @@ function PartyPage() {
       void engine.createParty();
       return;
     }
-    const mode = search.mode ?? "state";
     const title = search.title ?? "Untitled game";
     startedRef.current = true;
     setLoadError(null);
@@ -98,7 +89,6 @@ function PartyPage() {
         await engine.createParty({
           gameId,
           title,
-          mode,
           source,
           apiVersion: PROTOCOL_VERSION,
         });
@@ -107,7 +97,7 @@ function PartyPage() {
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [engine, search.gameId, search.mode, search.title, attempt, needsName, importing, invite]);
+  }, [engine, search.gameId, search.title, attempt, needsName, importing, invite]);
 
   const handleRetry = () => {
     startedRef.current = false;

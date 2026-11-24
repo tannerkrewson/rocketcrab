@@ -69,13 +69,6 @@ nova.dispatch({ type: "playCard", payload: { card: "ace" } }); // Promise
 // Resolves once applied; rejects with { code, message }.
 nova.controls.set({ left: true, right: false }); // any time; only changes are sent
 
-// --- Raw messages (rarely needed) ---
-nova.raw.createChannel({ name: "chat" }); // after start; reliable and ordered
-nova.raw.send("chat", { text: "hi" }); // to everyone
-nova.raw.send("chat", "hi", { to: playerId }); // to one player
-nova.raw.onMessage("chat", (message) => {}); // { from, payload, binary }
-nova.raw.close("chat");
-
 // --- Logging and errors ---
 nova.log("anything", value); // shows in the editor's log panel
 nova.onError((error) => {}); // { code, message }
@@ -85,7 +78,7 @@ nova.onError((error) => {}); // { code, message }
 
 1. **`nova.defineGame` first, exactly once; `nova.ready()` once after
    loading.** The game starts when the party starts it; `onStart` tells you.
-2. **Dispatch only after `onStart`.** `dispatch` and the `raw` calls throw
+2. **Dispatch only after `onStart`.** `dispatch` throws
    `not_started` before it and `ended` after `onEnd`. `controls.set` works
    any time.
 3. **Plain JSON in state, payloads and controls**: objects, arrays, strings,
@@ -101,9 +94,9 @@ nova.onError((error) => {}); // { code, message }
    controls and the tick.
 7. **Every `on…` call returns an unsubscribe function.**
 8. **Limits.** State at most 512 KiB, one action payload at most 16 KiB,
-   controls at most 1 KiB, one raw payload at most 1 MiB. Each player shares
-   256 KiB/s across actions and raw sends. Going over rejects the call with
-   `payload_too_large`, `state_too_large` or `rate_limited`.
+   controls at most 1 KiB. Each player's actions share 256 KiB/s. Going over
+   rejects the call with `payload_too_large`, `state_too_large` or
+   `rate_limited`.
 9. **Render immediately; never wait for the party.** In the editor preview
    there is no party: `nova.connectionStatus` stays `"disconnected"` and
    `onStart`, `onPlayerJoin` and `onConnectionChange` never fire. Show a
@@ -252,12 +245,6 @@ What a real-time game must do:
   from time measured locally while away.
 - **Camera and microphone** (`getUserMedia`) work after `onStart`, from a
   tap, with the usual browser prompt.
-
-## Raw messages
-
-Only for data that is not game state, such as voice-like streams or a custom
-protocol. Raw messages have no shared state and no catch-up for late
-joiners. Prefer actions and controls for everything else.
 
 ## Smallest game
 

@@ -39,7 +39,6 @@ vi.mock("./transport-factory", () => ({
 const GAME = {
   gameId: "game_rocket_1",
   title: "Rocket Rumble",
-  mode: "state" as const,
   source: "<!doctype html><html><body><p>rockets</p></body></html>",
 };
 
@@ -130,7 +129,7 @@ interface HostHarness {
   frames: HTMLIFrameElement[];
   port1: FakePort;
   ready(): void;
-  register(title: string, mode?: PartySourceSpec["mode"], tickRate?: number): void;
+  register(title: string, tickRate?: number): void;
   apiCall(method: string, payload: unknown): void;
 }
 
@@ -197,7 +196,7 @@ function createHostHarness(): HostHarness {
         status: "ready",
       });
     },
-    register(title: string, mode: PartySourceSpec["mode"] = "state", tickRate?: number) {
+    register(title: string, tickRate?: number) {
       deliver(harness.port1, {
         version: 1,
         runtimeInstanceId: "runtime-1",
@@ -206,7 +205,6 @@ function createHostHarness(): HostHarness {
         type: "game.registration",
         gameId: GAME.gameId,
         title,
-        gameMode: mode,
         ...(tickRate !== undefined ? { tickRate } : {}),
       });
     },
@@ -434,7 +432,7 @@ describe("party engine — game mode and source transitions", () => {
     await joining;
     for (const player of [a, b]) {
       player.harness.ready();
-      player.harness.register(GAME.title, "state", 30);
+      player.harness.register(GAME.title, 30);
     }
     await settle(world);
     a.engine.startGame();
@@ -461,7 +459,7 @@ describe("party engine — game mode and source transitions", () => {
     await b.engine.leaveParty();
   });
 
-  it("switches to raw and back to a cached state game, and receives edited source under the same ID", async () => {
+  it("switches to another game and back to a cached one, and receives edited source under the same ID", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
     const b = makePlayer(world, "b");
@@ -472,23 +470,13 @@ describe("party engine — game mode and source transitions", () => {
     await joining;
     await registerLocalGame(a, world);
     await registerLocalGame(b, world);
-    await a.engine.selectGame({ ...GAME, gameId: "game_raw", mode: "raw" });
+    await a.engine.selectGame({ ...GAME, gameId: "game_other", title: "Other Game" });
     await settle(world);
-    expect(b.engine.getState().game?.mode).toBe("raw");
-    a.harness.ready();
-    b.harness.ready();
-    a.harness.register(GAME.title, "raw");
-    b.harness.register(GAME.title, "raw");
-    a.harness.apiCall("raw.createChannel", { spec: { name: "chat" } });
-    b.harness.apiCall("raw.createChannel", { spec: { name: "chat" } });
-    await settle(world);
-    b.harness.apiCall("raw.send", { name: "chat", payload: { hello: "raw" } });
-    await settle(world);
-    expect(events(a, "rawMessage")).not.toHaveLength(0);
+    expect(b.engine.getState().game?.gameId).toBe("game_other");
     const framesBeforeCache = b.harness.frames.length;
     await a.engine.selectGame(GAME);
     await settle(world);
-    expect(b.engine.getState().game?.mode).toBe("state");
+    expect(b.engine.getState().game?.gameId).toBe(GAME.gameId);
     expect(b.harness.frames.length).toBeGreaterThan(framesBeforeCache);
     expect(memberOf(b.engine.getState(), b.memberId).transferState).toBe("complete");
     await registerLocalGame(a, world);
@@ -547,7 +535,7 @@ describe("party engine — game mode and source transitions", () => {
     const joining = b.engine.joinByInvite({ secret: invite.secret! });
     await settle(world);
     await joining;
-    await b.engine.selectGame({ ...GAME, gameId: "not-the-hosts-game", mode: "raw" });
+    await b.engine.selectGame({ ...GAME, gameId: "not-the-hosts-game" });
     expect(b.engine.getState().game?.gameId).toBe(GAME.gameId);
     await a.engine.leaveParty();
     await b.engine.leaveParty();
@@ -702,12 +690,11 @@ describe("party engine — readiness and start gating", () => {
     await a.engine.selectGame({
       gameId: GAME.gameId,
       title: GAME.title,
-      mode: GAME.mode,
       source: GAME.source,
     });
     await settle(world);
     state = a.engine.getState();
-    expect(state.game).toEqual({ gameId: GAME.gameId, title: GAME.title, mode: GAME.mode });
+    expect(state.game).toEqual({ gameId: GAME.gameId, title: GAME.title });
     expect(a.harness.frames).toHaveLength(1);
 
     await a.engine.leaveParty();
@@ -1332,7 +1319,6 @@ describe("source verification is keyed by the source hash", () => {
       metadata: {
         gameId,
         title: GAME.title,
-        mode: GAME.mode,
         sourceSha256: "edited-hash",
         sourceSizeBytes: 9,
       },
@@ -1389,7 +1375,6 @@ describe("the party debug snapshot", () => {
 const EXAMPLE_GAME = {
   gameId: "game_nova_quiz_1",
   title: "Nova Quiz",
-  mode: "state" as const,
   source: EXAMPLE_GAME_SOURCE,
 };
 
@@ -1403,7 +1388,6 @@ describe("the S4 example game over the party flow", () => {
     const promise = a.engine.createParty({
       gameId: EXAMPLE_GAME.gameId,
       title: EXAMPLE_GAME.title,
-      mode: EXAMPLE_GAME.mode,
       source: EXAMPLE_GAME.source,
     });
     for (let i = 0; i < 8; i += 1) {
@@ -3326,7 +3310,6 @@ describe("party engine — lifecycle cleanup", () => {
     await a.engine.selectGame({
       gameId: "game_other",
       title: "Other",
-      mode: "state",
       source: "<html>other</html>",
     });
     await settle(world);
@@ -3443,7 +3426,6 @@ describe("party engine — lifecycle cleanup", () => {
       metadata: {
         gameId: GAME.gameId,
         title: GAME.title,
-        mode: GAME.mode,
         sourceSha256: "edited-hash",
         sourceSizeBytes: 9,
       },

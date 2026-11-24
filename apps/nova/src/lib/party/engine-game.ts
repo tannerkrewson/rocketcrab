@@ -33,7 +33,7 @@ export class PartyGameLifecycle {
     if (this.state.phase !== "lobby" || this.state.party === null || !this.state.party.amHost) {
       return;
     }
-    this.state.game = { gameId: input.gameId, title: input.title, mode: input.mode };
+    this.state.game = { gameId: input.gameId, title: input.title };
     this.state.classic = null;
     this.services().runtime.teardownRuntimeFrame();
     // Previous-game verification must not open the new game's start gate.
@@ -62,7 +62,7 @@ export class PartyGameLifecycle {
       // Ignore room creation that finishes after the party changes.
       if (this.state.party !== party) return;
       this.state.classic = { gameId, title: game.name, connectResult };
-      this.state.game = { gameId, title: game.name, mode: "state" };
+      this.state.game = { gameId, title: game.name };
       this.state.selfVerified = true;
       this.state.selfVerifiedSha256 = null;
       this.state.currentSourceSha256 = null;
@@ -222,7 +222,7 @@ export class PartyGameLifecycle {
   }
 
   /**
-   * Session mode is immutable; replace the session before booting a different game.
+   * A session belongs to one game; replace it before booting a different game.
    * Disposal detaches listeners without leaving the transport.
    */
   async replaceGameSession(party: PartySession): Promise<void> {
@@ -246,7 +246,6 @@ export class PartyGameLifecycle {
       },
       game: {
         gameId: this.state.game?.gameId ?? "party",
-        mode: this.state.game?.mode ?? "state",
         ...(this.state.game?.title !== undefined ? { title: this.state.game.title } : {}),
       },
       stateExecutor: this.state.stateExecutor,
@@ -353,7 +352,7 @@ export class PartyGameLifecycle {
               ...(event.host !== undefined ? { host: event.host } : {}),
             },
           };
-          this.state.game = { gameId: event.gameId, title, mode: "state" };
+          this.state.game = { gameId: event.gameId, title };
           this.state.selfVerified = true;
           this.state.selfVerifiedSha256 = null;
           this.state.currentSourceSha256 = null;

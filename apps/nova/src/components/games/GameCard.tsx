@@ -94,7 +94,7 @@ export function GameCard({ game, onDuplicate, onDelete, busy = false }: GameCard
       <div className="button-row">
         <Link
           to="/party"
-          search={{ gameId: game.id, mode: game.mode ?? "state", title: game.title }}
+          search={{ gameId: game.id, title: game.title }}
           className={buttonStyles("primary", "md")}
           title="Start a party with this game"
         >

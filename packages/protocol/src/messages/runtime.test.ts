@@ -59,7 +59,6 @@ describe("runtime message schemas", () => {
         baseRuntime({
           type: "runtime.bootstrap",
           gameId: "game-1",
-          gameMode: "state",
           gameSource: "<html><script>window.nova.register({})</script></html>",
           player: { memberId: "member-1", displayName: "Alex" },
         }),
@@ -70,7 +69,6 @@ describe("runtime message schemas", () => {
           type: "game.registration",
           gameId: "game-1",
           title: "Card Game",
-          gameMode: "state",
         }),
       ),
       gameMetadataMessageSchema.parse(
@@ -122,9 +120,9 @@ describe("runtime message schemas", () => {
 
   it("rejects an invalid example of every runtime message", () => {
     const invalidExamples: unknown[] = [
-      baseRuntime({ type: "runtime.bootstrap", gameId: "game-1", gameMode: "state" }),
+      baseRuntime({ type: "runtime.bootstrap", gameId: "game-1" }),
       baseRuntime({ type: "runtime.ready", status: "not-ready" }),
-      baseRuntime({ type: "game.registration", gameId: "game-1", gameMode: "state" }),
+      baseRuntime({ type: "game.registration", gameId: "game-1" }),
       baseRuntime({ type: "game.metadata", game: { gameId: "game-1" } }),
       baseRuntime({ type: "runtime.error", category: "syntax" }),
       baseRuntime({ type: "game.lifecycle", event: "exploded" }),
@@ -150,7 +148,6 @@ describe("runtime message schemas", () => {
       baseRuntime({
         type: "runtime.bootstrap",
         gameId: "game-1",
-        gameMode: "state",
         gameSource: "x".repeat(htmlSourceBytes + 1),
         player: { memberId: "member-1", displayName: "Alex" },
       }),
@@ -167,14 +164,6 @@ describe("runtime message schemas", () => {
       baseRuntime({ type: "game.apiCall", method: "ready", payload: {} }),
     );
     expect(ready.ok).toBe(true);
-    const rawSend = parseRuntimeMessage(
-      baseRuntime({
-        type: "game.apiCall",
-        method: "raw.send",
-        payload: { name: "chat", payload: { text: "hi" } },
-      }),
-    );
-    expect(rawSend.ok).toBe(true);
     // The authority frame's stateResponse answer parses at the boundary.
     const stateResponse = parseRuntimeMessage(
       baseRuntime({
@@ -214,11 +203,6 @@ describe("runtime message schemas", () => {
       { kind: "start" },
       { kind: "end", reason: "user_exit" },
       { kind: "state", state: { tick: 1 } },
-      {
-        kind: "rawMessage",
-        channel: "chat",
-        message: { from: { id: "member-2", name: "Blair" }, payload: "hi", binary: false },
-      },
       {
         kind: "error",
         code: "not_started",
@@ -270,7 +254,7 @@ describe("runtime message schemas", () => {
       expect(result.ok, JSON.stringify(event)).toBe(true);
     }
     const bad = parseRuntimeMessage(
-      baseRuntime({ type: "game.apiEvent", event: { kind: "rawMessage", channel: "x" } }),
+      baseRuntime({ type: "game.apiEvent", event: { kind: "identity" } }),
     );
     expect(bad.ok).toBe(false);
     const badStatus = parseRuntimeMessage(

@@ -1,4 +1,4 @@
-import type { GameMode, MemberId } from "@rocketcrab/protocol";
+import type { MemberId } from "@rocketcrab/protocol";
 import type { TransportConnectionState } from "@rocketcrab/core";
 import { type PartyTransportFactory, type Scheduler } from "@rocketcrab/party";
 import { type ChannelPort } from "../runtime-host";
@@ -105,7 +105,7 @@ export interface PartyEngineState {
   readonly role: "creator" | "joiner" | null;
   readonly memberId: MemberId;
   readonly displayName: string;
-  readonly game: { gameId: string; title: string; mode: GameMode } | null;
+  readonly game: { gameId: string; title: string } | null;
   readonly members: readonly PartyMemberView[];
   readonly hostMemberId: MemberId | null;
   readonly amHost: boolean;
@@ -173,7 +173,6 @@ export interface PartyEngineConfig {
 export interface SharedPartyGame {
   readonly gameId: string;
   readonly title: string;
-  readonly mode: GameMode;
   readonly apiVersion?: number;
   readonly sourceSha256: string;
   /** Display name of the host who shared it, if known. */
@@ -189,7 +188,6 @@ export interface SharedPartyGameSource extends SharedPartyGame {
 export interface PartySourceSpec {
   readonly gameId: string;
   readonly title: string;
-  readonly mode: GameMode;
   readonly source: string;
   readonly apiVersion?: number;
 }

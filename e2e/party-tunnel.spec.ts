@@ -191,7 +191,7 @@ test("a 3-player party with one tunnelled player plays a state-mode game", async
         ),
       [GAME_ID, NOVA_QUIZ_HTML] as const,
     );
-    await host.page.goto(`/party?gameId=${GAME_ID}&mode=state&title=Nova%20Quiz`);
+    await host.page.goto(`/party?gameId=${GAME_ID}&title=Nova%20Quiz`);
 
     await expect(host.page.getByRole("button", { name: "Copy URL" })).toBeEnabled({
       timeout: 120_000,

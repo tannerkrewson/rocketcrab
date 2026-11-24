@@ -19,7 +19,6 @@ test.describe("runtime bootstrap and game execution", () => {
     await installHarness(page);
     await loadGame(page, {
       gameId: "game-hello",
-      gameMode: "state",
       gameSource: fixture("hello.html"),
       gameTitle: "Host Title",
     });
@@ -34,7 +33,6 @@ test.describe("runtime bootstrap and game execution", () => {
     const events = await harnessEvents(page);
     const registration = events.find((e) => e.type === "game.registration");
     expect(registration?.title).toBe("Hello Game");
-    expect(registration?.gameMode).toBe("state");
     expect(registration?.gameVersion).toBe("1.0.0");
     expect(registration?.gameId).toBe("game-hello");
   });
@@ -44,7 +42,6 @@ test.describe("runtime bootstrap and game execution", () => {
     await installHarness(page);
     await loadGame(page, {
       gameId: "game-remote",
-      gameMode: "state",
       gameSource: fixture("remote.html"),
     });
     await expect
@@ -58,7 +55,6 @@ test.describe("runtime diagnostics", () => {
     await installHarness(page);
     await loadGame(page, {
       gameId: "game-errors",
-      gameMode: "state",
       gameSource: fixture("errors.html"),
     });
 
@@ -98,7 +94,6 @@ test.describe("runtime diagnostics", () => {
     await installHarness(page);
     await loadGame(page, {
       gameId: "game-silent",
-      gameMode: "state",
       gameSource: "<!doctype html><html><body><h1>silent</h1></body></html>",
     });
     await expect
@@ -118,7 +113,6 @@ test.describe("runtime lifecycle controls", () => {
     await installHarness(page);
     await loadGame(page, {
       gameId: "game-hello",
-      gameMode: "state",
       gameSource: fixture("hello.html"),
     });
     await expect.poll(async () => (await gameState(page))?.bootCount).toBe(1);
@@ -142,7 +136,6 @@ test.describe("runtime lifecycle controls", () => {
     await installHarness(page);
     await loadGame(page, {
       gameId: "game-hello",
-      gameMode: "state",
       gameSource: fixture("hello.html"),
     });
     await page.evaluate(() =>
@@ -170,7 +163,6 @@ test.describe("runtime lifecycle controls", () => {
     for (let cycle = 0; cycle < 10; cycle += 1) {
       await loadGame(page, {
         gameId: `game-cycle-${cycle}`,
-        gameMode: "state",
         gameSource: fixture("hello.html"),
       });
       await page.evaluate(() =>
@@ -181,7 +173,6 @@ test.describe("runtime lifecycle controls", () => {
 
     await loadGame(page, {
       gameId: "game-final",
-      gameMode: "state",
       gameSource: fixture("hello.html"),
     });
     await clearHarnessEvents(page);
@@ -206,7 +197,6 @@ test.describe("runtime lifecycle controls", () => {
     await installHarness(page);
     await loadGame(page, {
       gameId: "game-hello",
-      gameMode: "state",
       gameSource: fixture("hello.html"),
     });
     await page.evaluate(() =>
@@ -226,7 +216,6 @@ test.describe("cross-origin isolation", () => {
     await installHarness(page);
     await loadGame(page, {
       gameId: "game-malicious",
-      gameMode: "raw",
       gameSource: fixture("malicious.html"),
     });
     await expect.poll(async () => (await gameState(page))?.malicious).toBeTruthy();
@@ -243,7 +232,6 @@ test.describe("cross-origin isolation", () => {
     await installHarness(page);
     await loadGame(page, {
       gameId: "game-hello",
-      gameMode: "state",
       gameSource: fixture("hello.html"),
     });
     const runtime = page.frames().find((f) => f.url().startsWith(RUNTIME_ORIGIN));
@@ -280,7 +268,6 @@ test.describe("cross-origin isolation", () => {
           sentAt: Date.now(),
           type: "runtime.bootstrap",
           gameId: "evil",
-          gameMode: "state",
           gameSource: "<html></html>",
           player: { memberId: "m", displayName: "Evil" },
         },

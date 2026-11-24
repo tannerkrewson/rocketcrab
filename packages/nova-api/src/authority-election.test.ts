@@ -596,7 +596,7 @@ function makeSession(hub: InMemoryTransportHub, memberId: string): NovaSession {
     room: ROOM,
     sessionId: SESSION,
     player: { memberId, displayName: memberId },
-    game: { gameId: "game-1", mode: "state", title: "S3 Game" },
+    game: { gameId: "game-1", title: "S3 Game" },
     authority: FAST_TIMINGS,
   });
 }
@@ -648,7 +648,7 @@ function trio(sessions: NovaSession[]): [NovaSession, NovaSession, NovaSession] 
 
 async function startParty(hub: InMemoryTransportHub, sessions: NovaSession[]): Promise<void> {
   for (const session of sessions) {
-    session.client.defineGame({ title: "S3 Game", mode: "state", ...s3GameHandlers() });
+    session.client.defineGame({ title: "S3 Game", ...s3GameHandlers() });
     await session.join();
   }
   await pump(hub);
@@ -1515,7 +1515,7 @@ describe("incremental action history over the transport", { timeout: 60_000 }, (
       await applied;
     }
     const late = makeSession(hub, "member-d");
-    late.client.defineGame({ title: "S3 Game", mode: "state", ...s3GameHandlers() });
+    late.client.defineGame({ title: "S3 Game", ...s3GameHandlers() });
     const lateInbound = recordInbound(late);
     await late.join();
     await pumpUntil(
@@ -2337,7 +2337,7 @@ function deltaGameHandlers(): NovaStateHandlers {
 
 async function startDeltaParty(hub: InMemoryTransportHub, sessions: NovaSession[]): Promise<void> {
   for (const session of sessions) {
-    session.client.defineGame({ title: "Delta Game", mode: "state", ...deltaGameHandlers() });
+    session.client.defineGame({ title: "Delta Game", ...deltaGameHandlers() });
     await session.join();
   }
   await pump(hub);
@@ -2533,7 +2533,7 @@ describe("state deltas over the transport", { timeout: 60_000 }, () => {
       await applied;
     }
     const late = makeSession(hub, "member-d");
-    late.client.defineGame({ title: "Delta Game", mode: "state", ...deltaGameHandlers() });
+    late.client.defineGame({ title: "Delta Game", ...deltaGameHandlers() });
     const lateInbound = recordInbound(late);
     await late.join();
     await pumpUntil(

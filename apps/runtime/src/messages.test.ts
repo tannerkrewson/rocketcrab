@@ -20,7 +20,6 @@ describe("runtime message builders", () => {
       buildRegistrationMessage("runtime-1", {
         gameId: "game-1",
         title: "Card Game",
-        gameMode: "state",
         gameVersion: "1.0.0",
       }),
       buildErrorMessage("runtime-1", "syntax", "Unexpected token"),

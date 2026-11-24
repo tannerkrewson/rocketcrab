@@ -44,7 +44,7 @@ test("three players reach the lobby and start the game on every browser", async 
         ),
       [GAME_ID, NOVA_QUIZ_HTML] as const,
     );
-    await host.goto(`/party?gameId=${GAME_ID}&mode=state&title=Lobby%20Quiz`);
+    await host.goto(`/party?gameId=${GAME_ID}&title=Lobby%20Quiz`);
 
     await expect(host.getByRole("button", { name: "Copy URL" })).toBeEnabled({ timeout: 120_000 });
     await host.getByRole("button", { name: "Copy URL" }).click();

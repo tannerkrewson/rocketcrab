@@ -73,7 +73,6 @@ export class PartySource {
         gameId: input.gameId,
         title: input.title,
         apiVersion: input.apiVersion,
-        mode: input.mode,
         source: input.source,
       })
       .then((metadata) => {
@@ -113,7 +112,6 @@ export class PartySource {
     games.set(spec.gameId, {
       gameId: spec.gameId,
       title: spec.title,
-      mode: spec.mode,
       ...(apiVersion !== undefined ? { apiVersion } : {}),
       source: spec.source,
       sourceSha256,
@@ -133,13 +131,11 @@ export class PartySource {
         const game = {
           gameId: event.metadata.gameId,
           title: event.metadata.title ?? "Untitled game",
-          mode: event.metadata.mode ?? "state",
         };
         if (event.metadata.apiVersion !== undefined) {
           this.state.sourceApiVersions.set(game.gameId, event.metadata.apiVersion);
         }
-        const changed =
-          this.state.game?.gameId !== game.gameId || this.state.game.mode !== game.mode;
+        const changed = this.state.game?.gameId !== game.gameId;
         this.state.game = game;
         this.adoptSourceHash(event.metadata.sourceSha256);
         if (changed && this.state.party !== null) {
@@ -242,7 +238,6 @@ export class PartySource {
         this.state.pendingSource = {
           gameId: event.gameId,
           title: this.state.game?.title ?? "Untitled game",
-          mode: this.state.game?.mode ?? "state",
           source: event.source,
         };
         this.rememberShared(this.state.pendingSource, event.sourceSha256);

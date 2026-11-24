@@ -11,7 +11,6 @@ function bootstrapMessage(overrides: Record<string, unknown> = {}): RuntimeBoots
     sentAt: 1_700_000_000_000,
     type: "runtime.bootstrap",
     gameId: "game-1",
-    gameMode: "state",
     gameSource: "<!doctype html><html><body><p>hi</p></body></html>",
     player: { memberId: "member-1", displayName: "Alex" },
     ...overrides,
@@ -203,12 +202,11 @@ describe("RuntimeInstance registration", () => {
   it("forwards a schema-valid defineGame declaration as game.registration", () => {
     const { port } = setup();
     hook().report("defineGame", {
-      options: { title: "Card Game", gameMode: "state", gameVersion: "1.2.0" },
+      options: { title: "Card Game", gameVersion: "1.2.0" },
     });
     const registration = runtimeMessage(port, "game.registration");
     expect(registration?.gameId).toBe("game-1");
     expect(registration?.title).toBe("Card Game");
-    expect(registration?.gameMode).toBe("state");
     expect(registration?.gameVersion).toBe("1.2.0");
     const events = port.sent
       .filter((m) => (m as { type: string }).type === "game.lifecycle")
@@ -216,14 +214,13 @@ describe("RuntimeInstance registration", () => {
     expect(events).toContain("started");
   });
 
-  it("falls back to the host-declared title and mode", () => {
+  it("falls back to the host-declared title", () => {
     const { port } = setup({
-      bootstrap: bootstrapMessage({ gameTitle: "Host Title", gameMode: "raw" }),
+      bootstrap: bootstrapMessage({ gameTitle: "Host Title" }),
     });
     hook().report("defineGame", { options: {} });
     const registration = runtimeMessage(port, "game.registration");
     expect(registration?.title).toBe("Host Title");
-    expect(registration?.gameMode).toBe("raw");
   });
 
   it("uses a safe default title when neither side supplied one", () => {
@@ -236,7 +233,7 @@ describe("RuntimeInstance registration", () => {
   it("rejects untrusted metadata instead of forwarding it", () => {
     const { port } = setup();
     hook().report("defineGame", {
-      options: { title: "x".repeat(200), gameMode: "state" },
+      options: { title: "x".repeat(200) },
     });
     expect(runtimeMessage(port, "game.registration")).toBeUndefined();
     const errors = port.sent.filter((m) => (m as { type: string }).type === "runtime.error");
@@ -427,23 +424,17 @@ describe("RuntimeInstance protocol boundary", () => {
       action: { type: "playCard", payload: { c: 1 } },
       actionId: "action-frame-1",
     });
-    hook().report("raw.createChannel", { spec: { name: "chat" } });
-    hook().report("raw.send", { name: "chat", payload: "hi", options: { to: "member-2" } });
-    hook().report("raw.close", { name: "chat" });
     hook().report("controls.set", { controls: { left: true } });
     hook().report("stateResponse", {
       requestId: "state-1",
       result: { kind: "view", ok: true, view: { hand: "ace" } },
     });
     const calls = port.sent.filter((m) => (m as { type: string }).type === "game.apiCall");
-    expect(calls).toHaveLength(7);
+    expect(calls).toHaveLength(4);
     const byMethod = new Map(calls.map((m) => [(m as { method: string }).method, m]));
     expect([...byMethod.keys()].sort()).toEqual([
       "controls.set",
       "dispatch",
-      "raw.close",
-      "raw.createChannel",
-      "raw.send",
       "ready",
       "stateResponse",
     ]);
@@ -462,14 +453,14 @@ describe("RuntimeInstance protocol boundary", () => {
   it("rejects malformed forwarded Nova API calls without forwarding them", () => {
     const { port } = setup();
     hook().report("dispatch", { action: { type: "" } });
-    hook().report("raw.send", { name: "chat" });
+    hook().report("controls.set", { controls: 1, extra: 1 });
     const errors = port.sent.filter(
       (m) => (m as { type: string }).type === "runtime.error",
     ) as Array<{ category?: string; message?: string }>;
     expect(errors).toHaveLength(2);
     expect(errors[0]?.category).toBe("runtime");
     expect(String(errors[0]?.message)).toContain("nova.dispatch() call failed validation");
-    expect(String(errors[1]?.message)).toContain("nova.raw.send() call failed validation");
+    expect(String(errors[1]?.message)).toContain("nova.controls.set() call failed validation");
   });
 
   it("injects the validated bootstrap player identity into the frame", () => {

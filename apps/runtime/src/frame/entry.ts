@@ -108,7 +108,6 @@ function install(): void {
       report("defineGame", {
         options: {
           ...(declaration.title !== undefined ? { title: declaration.title } : {}),
-          ...(declaration.mode !== undefined ? { gameMode: declaration.mode } : {}),
           ...(declaration.version !== undefined ? { gameVersion: declaration.version } : {}),
           ...(declaration.apiVersion !== undefined ? { apiVersion: declaration.apiVersion } : {}),
           ...(declaration.tickRate !== undefined ? { tickRate: declaration.tickRate } : {}),
@@ -117,14 +116,6 @@ function install(): void {
     },
     ready: () => report("ready", {}),
     dispatch: async (action, actionId) => report("dispatch", { action, actionId }),
-    createRawChannel: (spec) => report("raw.createChannel", { spec: { name: spec.name } }),
-    closeRawChannel: (name) => report("raw.close", { name }),
-    sendRaw: (name, payload, options) =>
-      report("raw.send", {
-        name,
-        payload,
-        options: options?.to !== undefined ? { to: options.to } : {},
-      }),
     setControls: (controls) => report("controls.set", { controls }),
     onEvent(listener) {
       listeners.add(listener);
@@ -214,7 +205,6 @@ function install(): void {
       case "start":
       case "end":
       case "state":
-      case "rawMessage":
         // These host events have the same fields as the client's events.
         emit({ ...p, type: kind } as NovaSessionEvent);
         return;

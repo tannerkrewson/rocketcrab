@@ -1,7 +1,6 @@
 import { z } from "zod";
 import { peerEnvelopeFields } from "../envelope";
 import {
-  channelNameSchema,
   displayNameSchema,
   gameIdSchema,
   memberIdSchema,
@@ -11,7 +10,7 @@ import {
   titleSchema,
 } from "../ids";
 import { stateDeltaMaxDepth, stateDeltaMaxOps, stateHistoryLimit } from "../limits";
-import { gameEndReasonSchema, gameModeSchema } from "./shared";
+import { gameEndReasonSchema } from "./shared";
 
 /**
  * Peer-plane messages (party plane): messages between party members over the
@@ -142,7 +141,6 @@ export const peerCapabilitiesMessageSchema = z.object({
   ...peerEnvelopeFields,
   type: z.literal("peer.capabilities"),
   protocolVersions: z.array(z.number().int().min(1)).min(1),
-  gameModes: z.array(gameModeSchema).min(1),
   chunkedMessages: z.boolean(),
   binaryPayloads: z.boolean(),
   maxMessageBytes: z.number().int().positive().optional(),
@@ -398,36 +396,9 @@ export const gameEndMessageSchema = z.object({
 export type GameEndMessage = z.infer<typeof gameEndMessageSchema>;
 
 /**
- * Raw channel metadata: declares a named raw-mode channel. Every raw channel
- * is reliable and ordered (the party transport offers nothing else). Peers joining mid-game
- * receive the declarations of every open channel (targeted re-announcement
- * on join), so channel lifecycle survives peer joins.
- */
-export const rawChannelMetadataMessageSchema = z.object({
-  ...peerEnvelopeFields,
-  type: z.literal("raw.channel"),
-  channelName: channelNameSchema,
-});
-export type RawChannelMetadataMessage = z.infer<typeof rawChannelMetadataMessageSchema>;
-
-/**
- * Raw channel close: the declaring player closed one of its raw channels.
- * Receivers drop the channel declaration: local
- * sends on it fail with `unknown_channel` unless the receiver declared the
- * channel itself (each player owns its own declarations). The channel name
- * may be re-opened later with a fresh `raw.channel` declaration.
- */
-export const rawChannelCloseMessageSchema = z.object({
-  ...peerEnvelopeFields,
-  type: z.literal("raw.close"),
-  channelName: channelNameSchema,
-});
-export type RawChannelCloseMessage = z.infer<typeof rawChannelCloseMessageSchema>;
-
-/**
  * Game source metadata: the pre-transfer descriptor for a peer-to-peer game
  * source transfer. Receivers can decide to accept before any bytes move.
- * The optional `title`, `apiVersion`, and `mode` fields let the receiver
+ * The optional `title` and `apiVersion` fields let the receiver
  * check runtime compatibility and show lobby UI before any bytes move.
  */
 export const gameSourceMetadataMessageSchema = z.object({
@@ -437,8 +408,6 @@ export const gameSourceMetadataMessageSchema = z.object({
   title: titleSchema.optional(),
   /** Nova API version the game was built against (`nova.defineGame`). */
   apiVersion: z.number().int().min(1).optional(),
-  /** Execution mode the host will launch (state / raw). */
-  mode: gameModeSchema.optional(),
   sourceSha256: sha256Schema,
   sourceSizeBytes: z.number().int().nonnegative(),
 });
@@ -484,8 +453,6 @@ export const peerMessagesSchema = z.discriminatedUnion("type", [
   gameControlsMessageSchema,
   gameStartMessageSchema,
   gameEndMessageSchema,
-  rawChannelMetadataMessageSchema,
-  rawChannelCloseMessageSchema,
   gameSourceMetadataMessageSchema,
   gameSourceAcceptedMessageSchema,
   gameSourceDiscoverMessageSchema,

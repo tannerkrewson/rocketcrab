@@ -25,7 +25,7 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     role: "creator",
     memberId: "member-a",
     displayName: "Player A",
-    game: { gameId: "game-1", title: "Rocket Rumble", mode: "state" },
+    game: { gameId: "game-1", title: "Rocket Rumble" },
     members: [
       {
         memberId: "member-a",
@@ -316,7 +316,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
   });
 
   it("opens About this game from the menu (9fv.11.11)", async () => {
-    const state = makeState({ game: { gameId: "drawphone", title: "Drawphone", mode: "state" } });
+    const state = makeState({ game: { gameId: "drawphone", title: "Drawphone" } });
     await renderShell(state);
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     await userEvent.click(screen.getByRole("menuitem", { name: /about this game/i }));

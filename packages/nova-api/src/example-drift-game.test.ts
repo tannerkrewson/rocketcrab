@@ -23,7 +23,7 @@ function player(hub: InMemoryTransportHub, memberId: string): NovaSession {
     room: "drift",
     sessionId: "drift",
     player: { memberId, displayName: memberId },
-    game: { gameId: "nova-drift", mode: "state", title: "Nova Drift" },
+    game: { gameId: "nova-drift", title: "Nova Drift" },
   });
   sessions.push(session);
   new Function("nova", SCRIPT)(session.client);

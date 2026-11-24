@@ -1,4 +1,4 @@
-import type { ConnectionId, GameId, GameMode, MemberId, Sha256 } from "@rocketcrab/protocol";
+import type { ConnectionId, GameId, MemberId, Sha256 } from "@rocketcrab/protocol";
 import {
   PROTOCOL_VERSION,
   gameSourceMetadataMessageSchema,
@@ -21,7 +21,6 @@ export interface GameSourceInfo {
   readonly gameId: GameId;
   readonly title?: string;
   readonly apiVersion?: number;
-  readonly mode?: GameMode;
   readonly source: string;
   readonly sourceSha256?: Sha256;
   readonly sourceSizeBytes?: number;
@@ -30,7 +29,6 @@ export interface GameSourceMetadataInfo {
   readonly gameId: GameId;
   readonly title?: string;
   readonly apiVersion?: number;
-  readonly mode?: GameMode;
   readonly sourceSha256: Sha256;
   readonly sourceSizeBytes: number;
 }
@@ -541,7 +539,6 @@ export class GameSourceCoordinator {
       sourceSizeBytes: parsed.sourceSizeBytes,
       ...(parsed.title !== undefined ? { title: parsed.title } : {}),
       ...(parsed.apiVersion !== undefined ? { apiVersion: parsed.apiVersion } : {}),
-      ...(parsed.mode !== undefined ? { mode: parsed.mode } : {}),
     };
   }
   private cache(source: RegisteredSource): void {
@@ -657,8 +654,7 @@ function sameMetadata(a: GameSourceMetadataInfo, b: GameSourceMetadataInfo): boo
     a.sourceSha256 === b.sourceSha256 &&
     a.sourceSizeBytes === b.sourceSizeBytes &&
     a.title === b.title &&
-    a.apiVersion === b.apiVersion &&
-    a.mode === b.mode
+    a.apiVersion === b.apiVersion
   );
 }
 function identity(metadata: GameSourceMetadataInfo) {

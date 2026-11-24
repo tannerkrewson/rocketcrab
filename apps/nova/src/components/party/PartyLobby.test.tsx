@@ -35,7 +35,7 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     role: "creator",
     memberId: "member-a",
     displayName: "Player A",
-    game: { gameId: "game-1", title: "Rocket Rumble", mode: "state" },
+    game: { gameId: "game-1", title: "Rocket Rumble" },
     members: [
       {
         memberId: "member-a",
@@ -422,7 +422,6 @@ describe("PartyLobby", () => {
     const game = await gameRepository.create({
       title: "Rocket Rumble",
       html: "<!doctype html><html><body><p>rockets</p></body></html>",
-      mode: "state",
     });
     await renderLobby(state);
     await userEvent.click(screen.getByRole("button", { name: /browse games/i }));
@@ -725,9 +724,8 @@ describe("PartyLobby", () => {
       title: "Rocket Rumble",
       description: "Blast off with friends.",
       html: "<!doctype html><html><body><p>rockets</p></body></html>",
-      mode: "state",
     });
-    const state = makeState({ game: { gameId: game.id, title: game.title, mode: "state" } });
+    const state = makeState({ game: { gameId: game.id, title: game.title } });
     const onLeave = vi.fn();
     const { router } = await renderLobby(state, { onLeave });
     const detailsLink = screen.getByRole("link", { name: /what is rocket rumble\?/i });
@@ -740,7 +738,7 @@ describe("PartyLobby", () => {
   });
 
   it("navigates prebuilt games from What is GameName? to shared details", async () => {
-    const state = makeState({ game: { gameId: "drawphone", title: "Drawphone", mode: "state" } });
+    const state = makeState({ game: { gameId: "drawphone", title: "Drawphone" } });
     const { router } = await renderLobby(state);
     const detailsLink = screen.getByRole("link", { name: /what is drawphone\?/i });
     expect(detailsLink.getAttribute("href")).toBe("/game/drawphone?from=party");

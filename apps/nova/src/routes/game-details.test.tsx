@@ -140,12 +140,11 @@ beforeEach(async () => {
 });
 
 describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () => {
-  it("renders saved-game details from the repository (title, mode, description)", async () => {
+  it("renders saved-game details from the repository (title, description)", async () => {
     const game = await gameRepository.create({
       title: "Rocket Rumble",
       description: "Blast off with friends.",
       html: SAVED_HTML,
-      mode: "raw",
     });
     renderAt(`/game/${game.id}`);
 
@@ -154,9 +153,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     expect(screen.getByText("Blast off with friends.")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /select game/i })).not.toBeInTheDocument();
     const start = screen.getByRole("link", { name: /Start party/ });
-    expect(start.getAttribute("href")).toBe(
-      `/party?gameId=${game.id}&mode=raw&title=Rocket+Rumble`,
-    );
+    expect(start.getAttribute("href")).toBe(`/party?gameId=${game.id}&title=Rocket+Rumble`);
     const edit = screen.getByRole("link", { name: "Edit game" });
     expect(edit.getAttribute("href")).toBe(`/games/${game.id}/edit`);
     const back = screen.getByRole("link", { name: "Back to games" });
@@ -170,7 +167,6 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     const game = await gameRepository.create({
       title: "Rocket Rumble",
       html: SAVED_HTML,
-      mode: "state",
     });
     const router = renderAt(`/game/${game.id}`);
 
@@ -181,7 +177,6 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
       expect(stubEngine.selectGame).toHaveBeenCalledWith({
         gameId: game.id,
         title: "Rocket Rumble",
-        mode: "state",
         source: SAVED_HTML,
         apiVersion: 1,
       }),
@@ -235,7 +230,6 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
       title: "Rocket Rumble",
       description: "Blast off with friends.",
       html: SAVED_HTML,
-      mode: "state",
     });
     const router = renderAt(`/game/${game.id}?from=party`);
 
@@ -254,7 +248,6 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     const game = await gameRepository.create({
       title: "Rocket Rumble",
       html: SAVED_HTML,
-      mode: "state",
     });
     const router = renderAt(`/game/${game.id}?from=party`);
 

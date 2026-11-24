@@ -1,5 +1,3 @@
-import type { GameMode } from "@rocketcrab/protocol";
-
 /**
  * Where a game saved from a party came from. Lets a later party offer the
  * sharer's newer version: an unedited copy updates in place; an edited copy
@@ -27,8 +25,6 @@ export interface SavedGame {
   sourceHash: string;
   /** Nova runtime bridge API version the game was built against. */
   apiVersion?: number;
-  /** Default execution mode (ADR-0006 state / simulation / raw). */
-  mode?: GameMode;
   /** Epoch-millisecond timestamp of creation. */
   createdAt: number;
   /** Epoch-millisecond timestamp of the last edit (not of test runs). */
@@ -80,7 +76,6 @@ export interface CreateSavedGameInput {
   description?: string;
   html: string;
   apiVersion?: number;
-  mode?: GameMode;
   copiedFrom?: SavedGameOrigin;
 }
 
@@ -94,7 +89,6 @@ export interface UpdateSavedGameInput {
   description?: string;
   html?: string;
   apiVersion?: number;
-  mode?: GameMode;
   copiedFrom?: SavedGameOrigin;
 }
 

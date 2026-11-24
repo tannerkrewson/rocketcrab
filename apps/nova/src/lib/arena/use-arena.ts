@@ -1,6 +1,5 @@
 /** One arena engine per mount, with stable controls and per-player container bindings. */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import type { GameMode } from "@rocketcrab/protocol";
 import { ArenaEngine, type ArenaSeams } from "./engine";
 import type { ArenaRunOutcome, ArenaState } from "./types";
 import type { InMemoryHubOptions } from "@rocketcrab/testing";
@@ -8,7 +7,6 @@ import type { InMemoryHubOptions } from "@rocketcrab/testing";
 export interface UseArenaOptions {
   source: string;
   gameId: string;
-  gameMode: GameMode;
   gameTitle?: string;
   runtimeOrigin: string;
   initialPlayers: Array<{ id: string; name: string; memberId: string }>;
@@ -40,7 +38,6 @@ export function useArena(options: UseArenaOptions) {
     const engine = new ArenaEngine({
       source: optionsRef.current.source,
       gameId: optionsRef.current.gameId,
-      gameMode: optionsRef.current.gameMode,
       gameTitle: optionsRef.current.gameTitle,
       runtimeOrigin: optionsRef.current.runtimeOrigin,
       initialPlayers: optionsRef.current.initialPlayers,

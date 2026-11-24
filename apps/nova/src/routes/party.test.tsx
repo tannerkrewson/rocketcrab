@@ -195,7 +195,6 @@ describe("/party", () => {
     const game = await gameRepository.create({
       title: "Rocket Rumble",
       html: SAVED_HTML,
-      mode: "state",
     });
     renderParty(`/party?gameId=${game.id}&mode=state&title=${encodeURIComponent(game.title)}`);
     await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledTimes(1));
@@ -203,7 +202,6 @@ describe("/party", () => {
       expect.objectContaining({
         gameId: game.id,
         title: "Rocket Rumble",
-        mode: "state",
         source: SAVED_HTML,
         apiVersion: 1,
       }),
@@ -229,7 +227,7 @@ describe("/party", () => {
       secret,
       memberId: "member-a",
       displayName: "Player A",
-      game: { gameId: "game-1", title: "Rocket Rumble", mode: "state" },
+      game: { gameId: "game-1", title: "Rocket Rumble" },
     });
     renderParty("/party");
     expect(await screen.findByTestId("party-resume-banner")).toBeInTheDocument();

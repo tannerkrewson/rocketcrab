@@ -35,7 +35,6 @@ function bootstrapMessage(overrides: Record<string, unknown> = {}): RuntimeBoots
     sentAt: 1_700_000_000_000,
     type: "runtime.bootstrap",
     gameId: "game-1",
-    gameMode: "state",
     gameSource: "<!doctype html><html><body><p>hi</p></body></html>",
     player: { memberId: "member-1", displayName: "Alex" },
     ...overrides,

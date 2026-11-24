@@ -1,4 +1,3 @@
-import type { GameMode } from "@rocketcrab/protocol";
 import { sessionSecretSchema } from "@rocketcrab/protocol";
 
 export const PARTY_RECOVERY_KEY = "nova:party:recovery:v1";
@@ -19,7 +18,6 @@ export interface PartyRecoveryRecord {
   readonly game: {
     readonly gameId: string;
     readonly title: string;
-    readonly mode: GameMode;
   } | null;
 }
 
@@ -99,18 +97,10 @@ export function parsePartyRecovery(raw: string): PartyRecoveryRecord | null {
   let game: PartyRecoveryRecord["game"] = null;
   if (record.game !== null && record.game !== undefined) {
     const gameRecord = record.game as Record<string, unknown>;
-    if (
-      typeof gameRecord.gameId !== "string" ||
-      typeof gameRecord.title !== "string" ||
-      typeof gameRecord.mode !== "string"
-    ) {
+    if (typeof gameRecord.gameId !== "string" || typeof gameRecord.title !== "string") {
       return null;
     }
-    game = {
-      gameId: gameRecord.gameId,
-      title: gameRecord.title,
-      mode: gameRecord.mode as GameMode,
-    };
+    game = { gameId: gameRecord.gameId, title: gameRecord.title };
   }
   return {
     version: PARTY_RECOVERY_VERSION,

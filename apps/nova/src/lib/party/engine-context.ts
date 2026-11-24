@@ -1,4 +1,4 @@
-import type { GameApiEvent, GameMode, MemberId } from "@rocketcrab/protocol";
+import type { GameApiEvent, MemberId } from "@rocketcrab/protocol";
 import type { TransportConnectionState } from "@rocketcrab/core";
 import type {
   GameSourceCoordinator,
@@ -38,7 +38,6 @@ import {
 interface PartyGame {
   readonly gameId: string;
   readonly title: string;
-  readonly mode: GameMode;
 }
 
 /** Send-side entries describe remote members; receive-side entries describe self. */
