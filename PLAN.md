@@ -10,31 +10,27 @@ churn on upgrade), and need no paid always-on server.
 
 ## Before beta
 
-- [ ] **Runtime sandbox & camera/mic policy (`apps/runtime`, `apps/nova`)**:
-      Move the inner game iframe (`apps/runtime/src/main.ts`) from same-origin
-      `about:blank` + `doc.write` + `window.parent.__novaRuntime` globals to an
-      opaque-origin `srcdoc` iframe (`sandbox="allow-scripts allow-pointer-lock allow-fullscreen"`,
-      omitting `allow-same-origin`) talking to `apps/runtime` over a dedicated
-      `MessageChannel`. Add `frame-src 'none'` to the runtime CSP
-      (`apps/runtime/vite.config.ts`), and recreate the outer runtime iframe on
-      each `RuntimeHostClient.load()` instead of reusing it
-      (`apps/nova/src/lib/runtime-host.ts`). Resolve the camera/microphone
-      contradiction: `apps/nova/vite.config.ts` currently sends
-      `Permissions-Policy: camera=(), microphone=()`, blocking `getUserMedia`
-      in production despite `runtime-host.ts`, `nova-api-reference.md` and the
-      Mobile Safari check expecting it, and opaque origins cannot call
-      `getUserMedia`. Either drop camera/mic support from `runtime-host.ts`,
-      `apps/runtime`, `nova-api-reference.md` and the Mobile Safari check
-      (simplest; keeps strict per-game opaque isolation), or delegate
-      `Permissions-Policy` to the runtime origin and gate `allow-same-origin` +
-      `allow="camera; microphone"` behind an explicit per-game user opt-in.
+- [ ] **Runtime isolation & camera/mic delegation (`apps/runtime`, `apps/nova`)**:
+      Keep `allow-same-origin` on the inner game iframe so `getUserMedia`
+      (camera & microphone) works for games, and harden the boundaries around
+      it:
+      update `apps/nova/vite.config.ts` `Permissions-Policy` from
+      `camera=(), microphone=()` to delegate `camera` and `microphone` to the
+      configured runtime origin (matching `runtime-host.ts` and
+      `apps/runtime/vite.config.ts`); recreate the outer runtime iframe on
+      every `RuntimeHostClient.load()` instead of reusing it
+      (`apps/nova/src/lib/runtime-host.ts`) so a previous game cannot leave
+      hooks on `window.parent` for the next game; add `frame-src 'none'` to the
+      runtime CSP (`apps/runtime/vite.config.ts`); and explicitly tell AI game
+      builders in `apps/nova/src/lib/prompt/master-prompt.ts` (alongside
+      `nova-api-reference.md`) that games can use the camera and microphone.
 - [ ] **Sandbox external game iframes (`apps/nova/src/components/party/ExternalGameFrame.tsx`)**:
-      Add `sandbox="allow-scripts allow-same-origin allow-forms"` (omitting
-      `allow-top-navigation`, `allow-top-navigation-by-user-activation`,
-      `allow-popups` and `allow-downloads`) so a compromised or expired
-      third-party game domain cannot navigate the Nova tab or spawn
-      popups/downloads. Verify listed external games still work and opt
-      individual catalog entries into extra tokens only where needed.
+      Add a single uniform
+      `sandbox="allow-scripts allow-same-origin allow-forms allow-modals"`
+      across all external games (blocking `allow-top-navigation`,
+      `allow-top-navigation-by-user-activation`, `allow-popups` and
+      `allow-downloads` without per-game overrides) and verify the listed
+      external games still work.
 - [ ] **Peer-envelope verification & `NovaSession` authorization (`packages/protocol`, `packages/party`, `packages/nova-api`)**:
       Extract a shared peer-envelope verification helper (checking `sessionId`,
       `senderMemberId` and `senderConnectionId` against the transport envelope)
@@ -47,13 +43,15 @@ churn on upgrade), and need no paid always-on server.
       Fix `acceptMetadata` so only `party.hostMemberId` can select or replace a
       game's `(gameId, sourceSha256)`; non-host peers may only serve cached
       copies matching both `gameId` and the host-pinned `sourceSha256`.
-- [ ] **Unforgeable party identity (`packages/trystero-transport/src/trystero-transport.ts`)**:
-      Evaluate replacing the custom self-asserted `memberId` handshake
-      (`identity: "none"` + `nova.identity` userState) with Trystero 0.27's
-      built-in cryptographic `userId` (keeping an injectable/ephemeral key for
-      multi-tab tests); at minimum reject duplicate `memberId` claims
-      (including `selfMemberId`) during admission so peers cannot impersonate
-      the host (`hostMemberId`) or other players.
+- [ ] **Unforgeable party identity (`packages/trystero-transport`, `apps/nova/src/lib/party/identity.ts`)**:
+      Adopt Trystero 0.27's built-in cryptographic `userId` instead of
+      `identity: "none"` + self-asserted `memberId`: derive `memberId` directly
+      from Trystero's verified `userId`, slim `nova.identity` userState down to
+      `transportVersion` and `displayName` (rejecting duplicate `memberId`s if
+      two connections share one), simplify `apps/nova/src/lib/party/identity.ts`
+      to persist only the display name, support passing `createUserIdentity()`
+      for ephemeral multi-instance tests, and verify Safari Private Mode
+      behavior when IndexedDB is restricted.
 - [ ] **Prompt XSS hygiene & recovery TTL**:
       Add a rule to `apps/nova/src/lib/prompt/nova-api-reference.md` to render
       `player.name` and other player strings with `textContent` rather than
@@ -70,11 +68,18 @@ Workers Paid cutover in [`deploy/README.md`](deploy/README.md)). `Origin` /
 `Sec-Fetch-Site` checks in `deploy/nova/worker.ts` stop cross-site browser
 requests but do not stop non-browser clients from spoofing `Origin`:
 
-- [ ] **Protect `POST /api/turn` (`deploy/nova/turn.ts`, `apps/nova/src/lib/party/turn-creds.ts`, `deploy/nova/wrangler.toml`)**:
-      Gate `POST /api/turn` with Cloudflare Turnstile (invisible/managed mode,
-      gracefully degrading to direct/tunnel if blocked on restrictive
-      networks), lower `MINT_TTL_SECONDS` / `TURN_CREDS_TTL_MS` from 24 h
-      (e.g., to 4 h), and tighten the `/api/turn` rate limit below 120/min/IP.
+- [ ] **Protect `POST /api/turn` (`deploy/nova/turn.ts`, `apps/nova/src/lib/party/turn-creds.ts`, `apps/nova/vite.config.ts`, `deploy/nova/wrangler.toml`)**:
+      Gate `POST /api/turn` with Cloudflare Turnstile in Invisible mode, loaded
+      lazily only on `/party` and executed in the background during name entry
+      or party setup so users see zero challenge UI; if Turnstile fails or is
+      blocked by a restrictive network or privacy extension, fall back cleanly
+      to direct WebRTC / the encrypted tunnel via the existing graceful-degrade
+      path. Verify tokens server-side via Cloudflare's `siteverify` endpoint
+      (checking `success`, `hostname` and `action`; skipped in local dev when
+      `TURNSTILE_SECRET_KEY` is unset), allow `https://challenges.cloudflare.com`
+      in `apps/nova/vite.config.ts` CSP (`script-src` and `frame-src`), lower
+      `MINT_TTL_SECONDS` / `TURN_CREDS_TTL_MS` from 24 h (e.g., to 4 h), and
+      tighten the `/api/turn` rate limit below 120/min/IP.
 - [ ] **Harden & simplify `SignalHub` (`deploy/nova/signal.ts`)**:
       Refactor `SignalHub` to mirror `TunnelPair`'s in-memory cache +
       attachment persistence + alarm pattern: cap concurrent sockets per room
@@ -118,8 +123,8 @@ the README for local devices.
 - [ ] Mobile Safari layout: portrait and landscape, collapsing browser
       chrome, safe areas, and the on-screen keyboard in the lobby, editor and
       play shell. Swiping over the lobby welcome card scrolls the page. Game
-      audio starts after a tap, and (if camera/mic support is kept) camera
-      permission prompts reach the game frame and the game receives any denial.
+      audio starts after a tap, camera permission prompts reach the game frame,
+      and the game receives any denial.
 - [ ] Turn-based and ticking sample games; authority migration; link and QR
       joins.
 - [ ] Drift on real phones: late join, a host that switches apps, and a host
@@ -147,6 +152,9 @@ the README for local devices.
   without a per-pair ephemeral DH exchange, and `TunnelPair` pairs the first
   two sockets per `pairId`, so a malicious peer inside the same party could
   derive or disrupt another pair's tunnel.
-- Game HTML runs with `default-src *` on the isolated runtime origin (so CDN
-  libraries and assets work) and pre-boots in the lobby for readiness, so
-  untrusted game code can phone home to external servers.
+- Shared runtime origin: untrusted game HTML is isolated from `rocketcrab.com`
+  on a separate registrable domain, but all games run on that shared runtime
+  origin with `allow-same-origin` and `default-src *` (so camera/mic and remote
+  CDN libraries work) and pre-boot in the lobby for readiness. As a result,
+  games share runtime-origin storage and any camera/mic permission grant across
+  games, and can phone home to external servers.
