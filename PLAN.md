@@ -175,7 +175,7 @@ green.
       duplicated min ≤ max player check. Define each once in
       `@rocketcrab/protocol` and import it everywhere. The runtime's
       protocol-key renames (`version` → `gameVersion`) stay a thin mapping.
-      Evidence: `b5c16dc`, `npm run check` passed (1,270 tests) with two Vitest
+      Verified in `b5c16dc`. `npm run check` passed (1,270 tests) with two Vitest
       workers after a tick timing failure. Chromium passed 30 of 31 on the
       first run. The tunnel test passed on an isolated retry.
 - [x] **One frame API call router.** The arena (`lib/arena/engine.ts`) and
@@ -183,7 +183,7 @@ green.
       frame's `game.apiCall` and route it to the session (ready, dispatch,
       controls, stateResponse) with near-identical code. Extract one router
       both use, keeping only their logging/notice differences as callbacks.
-      Evidence: `943c34b`, `npm run check` passed (1,270 tests) when run without
+      Verified in `943c34b`. `npm run check` passed (1,270 tests) when run without
       Playwright competing for resources after the tick timing failure recurred.
       Chromium passed 31 of 31.
 - [x] **Remove dead and mirrored protocol.** Delete `peer.capabilities`
@@ -191,7 +191,7 @@ green.
       the relay endpoint list and have the app import its type, replacing
       `RELAY_ENDPOINT_KEYS` and the test that keeps the copies equal. Replace
       leftover "state mode"/"state-mode" wording in comments.
-      Evidence: `011f2a0`, `npm run check` passed (1,269 tests) and Chromium
+      Verified in `011f2a0`. `npm run check` passed (1,269 tests) and Chromium
       passed 31 of 31.
 - [x] **Rewrite the party engine as an explicit state machine.** Today seven
       collaborators (setup, connection, game, runtime, source, snapshot,
@@ -206,7 +206,7 @@ green.
       (`handleCoordinatorEvent`). Keep `PartyEngineState` and the
       `engine.test.ts` behavior as the contract; run the full browser suite,
       including WebKit, before ticking.
-      Evidence: `56d8df5`, `npm run check` passed (1,269 tests, including 116 engine
+      Verified in `56d8df5`. `npm run check` passed (1,269 tests, including 116 engine
       tests) with Node 24 and one Vitest worker after timing failures on earlier
       runs. One engine owns effects, and the model controls phase, source,
       registration, and start delivery. Tests use a typed driver. The full
@@ -218,13 +218,17 @@ green.
       (~1,750 lines) and `state-engine.ts` (~2,200) along their existing
       sections: lifecycle, authority election, snapshots and deltas, ticks,
       and the byte budget. Pure moves, no behavior change.
-      Evidence: `e3710ab`, `npm run check` passed (1,269 tests) and Chromium
+      Verified in `e3710ab`. `npm run check` passed (1,269 tests) and Chromium
       passed 31 of 31. Internal base classes keep moved method bodies and
       their shared state together. A source comparison matched 151 method
       bodies, with wiring changes for session construction and byte budgeting.
-- [ ] **Drop old tracker IDs.** Test names and comments carry IDs such as
+- [x] **Drop old tracker IDs.** Test names and comments carry IDs such as
       `(rocketcrab-b73)`, `(2t1.10)` and `(7.43/9fv.11.11)` from trackers
       that no longer exist. Remove them, keeping the descriptive text.
+      Verified in `ee87d94`. `npm run check` passed (1,269 tests). Removed IDs
+      from 98 test and suite titles and two Safari checklist references.
+      Browser coverage carries forward from step 5 because these edits only
+      change test names and documentation.
 
 ## 3. Before beta
 
