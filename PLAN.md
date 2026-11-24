@@ -10,8 +10,91 @@ churn on upgrade), and need no paid always-on server.
 
 ## Before beta
 
+- [ ] **Runtime sandbox & camera/mic policy (`apps/runtime`, `apps/nova`)**:
+      Move the inner game iframe (`apps/runtime/src/main.ts`) from same-origin
+      `about:blank` + `doc.write` + `window.parent.__novaRuntime` globals to an
+      opaque-origin `srcdoc` iframe (`sandbox="allow-scripts allow-pointer-lock allow-fullscreen"`,
+      omitting `allow-same-origin`) talking to `apps/runtime` over a dedicated
+      `MessageChannel`. Add `frame-src 'none'` to the runtime CSP
+      (`apps/runtime/vite.config.ts`), and recreate the outer runtime iframe on
+      each `RuntimeHostClient.load()` instead of reusing it
+      (`apps/nova/src/lib/runtime-host.ts`). Resolve the camera/microphone
+      contradiction: `apps/nova/vite.config.ts` currently sends
+      `Permissions-Policy: camera=(), microphone=()`, blocking `getUserMedia`
+      in production despite `runtime-host.ts`, `nova-api-reference.md` and the
+      Mobile Safari check expecting it, and opaque origins cannot call
+      `getUserMedia`. Either drop camera/mic support from `runtime-host.ts`,
+      `apps/runtime`, `nova-api-reference.md` and the Mobile Safari check
+      (simplest; keeps strict per-game opaque isolation), or delegate
+      `Permissions-Policy` to the runtime origin and gate `allow-same-origin` +
+      `allow="camera; microphone"` behind an explicit per-game user opt-in.
+- [ ] **Sandbox external game iframes (`apps/nova/src/components/party/ExternalGameFrame.tsx`)**:
+      Add `sandbox="allow-scripts allow-same-origin allow-forms"` (omitting
+      `allow-top-navigation`, `allow-top-navigation-by-user-activation`,
+      `allow-popups` and `allow-downloads`) so a compromised or expired
+      third-party game domain cannot navigate the Nova tab or spawn
+      popups/downloads. Verify listed external games still work and opt
+      individual catalog entries into extra tokens only where needed.
+- [ ] **Peer-envelope verification & `NovaSession` authorization (`packages/protocol`, `packages/party`, `packages/nova-api`)**:
+      Extract a shared peer-envelope verification helper (checking `sessionId`,
+      `senderMemberId` and `senderConnectionId` against the transport envelope)
+      and use it in both `PartySession.receive()` and
+      `NovaSession.handleMessage()` (`packages/nova-api/src/session.ts`). In
+      `NovaSession`, also bound `deferredProtocolMessages`, restrict
+      `state.view` and `action.ack` to the current authority, and restrict
+      `game.end` to the host/authority.
+- [ ] **Host-pinned game sources (`apps/nova/src/lib/party/engine.ts`)**:
+      Fix `acceptMetadata` so only `party.hostMemberId` can select or replace a
+      game's `(gameId, sourceSha256)`; non-host peers may only serve cached
+      copies matching both `gameId` and the host-pinned `sourceSha256`.
+- [ ] **Unforgeable party identity (`packages/trystero-transport/src/trystero-transport.ts`)**:
+      Evaluate replacing the custom self-asserted `memberId` handshake
+      (`identity: "none"` + `nova.identity` userState) with Trystero 0.27's
+      built-in cryptographic `userId` (keeping an injectable/ephemeral key for
+      multi-tab tests); at minimum reject duplicate `memberId` claims
+      (including `selfMemberId`) during admission so peers cannot impersonate
+      the host (`hostMemberId`) or other players.
+- [ ] **Prompt XSS hygiene & recovery TTL**:
+      Add a rule to `apps/nova/src/lib/prompt/nova-api-reference.md` to render
+      `player.name` and other player strings with `textContent` rather than
+      interpolating into `innerHTML`. Expire `nova:party:recovery:v1` secrets
+      in `apps/nova/src/lib/party/party-recovery.ts` after 24 hours (`savedAt`)
+      instead of keeping them in `localStorage` indefinitely.
 - [ ] After the real-device checks below, evaluate room, link and game
       recovery before consolidating any other retry paths.
+
+## Before launch
+
+Code-side production hardening (complements the Cloudflare spend controls and
+Workers Paid cutover in [`deploy/README.md`](deploy/README.md)). `Origin` /
+`Sec-Fetch-Site` checks in `deploy/nova/worker.ts` stop cross-site browser
+requests but do not stop non-browser clients from spoofing `Origin`:
+
+- [ ] **Protect `POST /api/turn` (`deploy/nova/turn.ts`, `apps/nova/src/lib/party/turn-creds.ts`, `deploy/nova/wrangler.toml`)**:
+      Gate `POST /api/turn` with Cloudflare Turnstile (invisible/managed mode,
+      gracefully degrading to direct/tunnel if blocked on restrictive
+      networks), lower `MINT_TTL_SECONDS` / `TURN_CREDS_TTL_MS` from 24 h
+      (e.g., to 4 h), and tighten the `/api/turn` rate limit below 120/min/IP.
+- [ ] **Harden & simplify `SignalHub` (`deploy/nova/signal.ts`)**:
+      Refactor `SignalHub` to mirror `TunnelPair`'s in-memory cache +
+      attachment persistence + alarm pattern: cap concurrent sockets per room
+      (e.g., 64–128), reduce per-socket budgets from 200 msg/s × 256 KiB to
+      signaling-sized limits (e.g., 20 msg/s refill, 100 burst, 64 KiB max
+      frame), cache `topics` in memory instead of calling
+      `deserializeAttachment()` per subscriber on every publish, and close idle
+      sockets via alarm.
+- [ ] **Bound `TunnelPair` lifetime (`deploy/nova/tunnel.ts`)**:
+      Add a per-pair max lifetime (via the existing Durable Object alarm, e.g.,
+      6 h) and a lifetime byte cap.
+- [ ] **Harden `POST /api/relay` & API response headers (`deploy/nova/relay.ts`, `deploy/nova/http.ts`)**:
+      Move `log.ts`'s streaming body-size limiter into a shared helper in
+      `http.ts` and apply request/response caps + `AbortSignal.timeout` in
+      `relay.ts`; check `Object.hasOwn(RELAY_ENDPOINTS, endpoint)`; allowlist
+      the 7 `netgames.io` `urlId` values and verify the final redirect stays on
+      `https://netgames.io`; constrain forwarded POST bodies (`ooc-rocketcrab`
+      to `{ game, version: 1 }`, empty body for the rest). Add
+      `Cache-Control: no-store` and `X-Content-Type-Options: nosniff` in
+      `http.ts` for all `/api/*` JSON responses.
 
 ## Real-device checks requiring access or coordination
 
@@ -28,15 +111,15 @@ the README for local devices.
 - [ ] iPhone Safari backgrounded for 1–3 minutes recovers; a locked phone
       and a tab switch recover too.
 - [ ] Exiting a broken game on iPhone returns to a usable lobby.
-- [ ] A party longer than an hour (one 24 h TURN credential).
+- [ ] A party longer than an hour (covers the TURN credential lifetime).
 - [ ] Airplane mode and a blocked `/api/signal` show their messages and recover.
 - [ ] Full create → prompt → paste → test → save → party → play on Mobile
       Safari; the master prompt on two AI chat services.
 - [ ] Mobile Safari layout: portrait and landscape, collapsing browser
       chrome, safe areas, and the on-screen keyboard in the lobby, editor and
       play shell. Swiping over the lobby welcome card scrolls the page. Game
-      audio starts after a tap, camera permission prompts reach the game
-      frame, and the game receives any denial.
+      audio starts after a tap, and (if camera/mic support is kept) camera
+      permission prompts reach the game frame and the game receives any denial.
 - [ ] Turn-based and ticking sample games; authority migration; link and QR
       joins.
 - [ ] Drift on real phones: late join, a host that switches apps, and a host
@@ -57,3 +140,13 @@ the README for local devices.
   exposes no named pre-connection event.
 - Networks that block WebSockets to Cloudflare can't connect at all, and
   can report it only if the HTTP `/log` endpoint is reachable.
+- Trusted-friends party model: canonical game state (`state.snapshot`, before
+  `selectView`) is replicated to every peer's shell for serverless authority
+  migration, so a player with DevTools can read hidden state (cards/roles).
+  Tunnel fallback keys derive from the shared `partySecret` + SDP fingerprints
+  without a per-pair ephemeral DH exchange, and `TunnelPair` pairs the first
+  two sockets per `pairId`, so a malicious peer inside the same party could
+  derive or disrupt another pair's tunnel.
+- Game HTML runs with `default-src *` on the isolated runtime origin (so CDN
+  libraries and assets work) and pre-boots in the lobby for readiness, so
+  untrusted game code can phone home to external servers.
