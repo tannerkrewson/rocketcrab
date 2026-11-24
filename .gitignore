@@ -28,6 +28,5 @@ test-results/
 .pi/
 .pi-subagents/
 
-# Wrangler local state and dry-run bundles
+# Wrangler local state
 .wrangler/
-deploy/edge/.build/

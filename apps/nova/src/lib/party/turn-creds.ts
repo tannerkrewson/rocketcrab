@@ -1,18 +1,7 @@
 /**
- * Client of the TURN credential mint (deploy/edge/turn.ts, `POST
- * {VITE_EDGE_ORIGIN}/turn`). The engine mints once per party at join time
- * and reuses the 24 h credential for reconnects.
- *
- * Never blocks a party: {@link fetchTurnCredentials} never throws, and any
- * failure (unconfigured build, network, HTTP, timeout, bad body) returns
- * `{ ok: false, reason }` so the party proceeds without TURN.
- *
- * Only credential-bearing entries become `turnConfig`: Trystero spreads
- * `rtcConfig` over the whole peer config, so passing the mint's plain STUN
- * entries would replace the TURN servers merged into `iceServers`.
+ * The engine mints TURN credentials once per party and reuses them on reconnect.
+ * Only credential-bearing ICE servers become Trystero's TURN configuration.
  */
-import { edgeOrigin } from "../edge";
-
 /** One ICE server entry in the mint's response (Cloudflare standard shape). */
 export interface TurnCredsIceServer {
   readonly urls: string | string[];
@@ -58,10 +47,6 @@ export interface TurnCredsFetchOptions {
   timeoutMs?: number;
 }
 
-export function turnCredsConfigured(): boolean {
-  return edgeOrigin() !== "";
-}
-
 /**
  * True when the entry carries short-lived TURN credentials (the point of
  * the mint). Plain STUN entries (no username/credential) are dropped — see
@@ -95,23 +80,11 @@ function isAuthenticatedIceServer(entry: unknown): entry is TurnCredsIceServer {
 /**
  * Fetch short-lived TURN credentials from the mint at party-join time.
  *
- * TOTAL (never throws): every failure mode (unconfigured build, network
- * error, HTTP error, timeout, malformed body) resolves to
- * `{ ok: false, reason }` so the party always proceeds without TURN. The
- * request is a simple cross-origin POST (no custom headers) so the browser
- * sends no CORS preflight; the Origin header rides along automatically and
- * the mint 403s anything not allowlisted.
+ * A failed mint returns a reason and the party proceeds without TURN.
  */
 export async function fetchTurnCredentials(
   options: TurnCredsFetchOptions = {},
 ): Promise<TurnCredentialsResult> {
-  const base = edgeOrigin();
-  if (base === "") {
-    return {
-      ok: false,
-      reason: "VITE_EDGE_ORIGIN is not set in this build.",
-    };
-  }
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const timeoutMs = options.timeoutMs ?? TURN_CREDS_FETCH_TIMEOUT_MS;
   const controller = new AbortController();
@@ -119,7 +92,7 @@ export async function fetchTurnCredentials(
   try {
     let response: Response;
     try {
-      response = await fetchImpl(`${base}/turn`, {
+      response = await fetchImpl("/api/turn", {
         method: "POST",
         body: "{}",
         signal: controller.signal,

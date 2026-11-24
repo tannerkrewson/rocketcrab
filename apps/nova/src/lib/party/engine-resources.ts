@@ -65,7 +65,7 @@ export class PartyResources extends PartyEngineModel {
   readonly lifecycle: PartyLifecycleSource;
 
   readonly now: () => number;
-  turnStatus: "configured" | "unavailable" | "disabled" | null = null;
+  turnStatus: "configured" | "unavailable" | null = null;
   readonly peerLink: PeerLinkAlert;
   /** Members removed by a kick: their leave is already announced, so skip the "left" notice. */
   readonly removedMemberIds = new Set<MemberId>();

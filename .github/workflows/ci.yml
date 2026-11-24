@@ -45,13 +45,12 @@ jobs:
       - name: Unit tests
         run: npm run test
 
-      # Bundles the Worker exactly as `npm run edge:deploy` would, without
-      # uploading, so a broken wrangler.toml or import fails CI.
-      - name: Edge Worker bundle check
-        run: npm run edge:check
+      # Verify the same app bundle and Worker config used for the beta deploy.
+      - name: Nova Worker deployment check
+        run: npm run check:deploy
 
-      - name: Build
-        run: npm run build
+      - name: Build runtime
+        run: npm run build --workspace @rocketcrab/runtime
 
       - name: Bundle-size report (warn-only)
         run: npm run bundle:size

@@ -1,8 +1,4 @@
-/**
- * WebSocket URLs on the Nova edge Worker. Both signaling (`/signal/:room`) and
- * the WebRTC fallback tunnel (`/tunnel/:pairId`) hang off the same
- * origin as `VITE_EDGE_ORIGIN`, with the scheme mapped http→ws and https→wss.
- */
+/** Signaling and tunnel WebSockets on the Nova API origin. */
 
 const PAIR_ID_PATTERN = /^[0-9a-f]{64}$/;
 
@@ -21,5 +17,5 @@ export function edgeSocketUrl(edgeOrigin: string, path: string): string {
 export function tunnelUrl(edgeOrigin: string, pairId: string): string {
   if (!PAIR_ID_PATTERN.test(pairId))
     throw new Error("Tunnel pair ID must be 64 lowercase hex characters.");
-  return edgeSocketUrl(edgeOrigin, `/tunnel/${pairId}`);
+  return edgeSocketUrl(edgeOrigin, `/api/tunnel/${pairId}`);
 }

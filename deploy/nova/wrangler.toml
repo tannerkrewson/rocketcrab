@@ -1,4 +1,5 @@
 name = "rocketcrab-nova"
+main = "worker.ts"
 compatibility_date = "2026-08-01"
 workers_dev = true
 preview_urls = false
@@ -6,3 +7,44 @@ preview_urls = false
 [assets]
 directory = "../../apps/nova/dist"
 not_found_handling = "single-page-application"
+run_worker_first = ["/api", "/api/*"]
+
+[[durable_objects.bindings]]
+name = "SIGNAL_HUB"
+class_name = "SignalHub"
+
+[[durable_objects.bindings]]
+name = "TUNNEL_PAIR"
+class_name = "TunnelPair"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SignalHub", "TunnelPair"]
+
+[dev]
+port = 2724
+inspector_port = 2727
+
+# Per-IP, per-route limits. Counters are approximate and per Cloudflare
+# location: a backstop, not the abuse defence (that is the same-origin check plus
+# the per-socket budgets in signal.ts and tunnel.ts).
+# Strict: /api/turn and /api/relay. One TURN mint per player per party.
+[[ratelimits]]
+name = "RATE_LIMITER"
+namespace_id = "1001"
+simple = { limit = 120, period = 60 }
+
+# Bulk: /api/signal, /api/tunnel, /api/log. Sized for a big party behind one school or
+# carrier-NAT address where WebRTC is blocked: every player opens a tunnel to
+# each of up to nine direct neighbours and logs each attempt.
+[[ratelimits]]
+name = "BULK_RATE_LIMITER"
+namespace_id = "1002"
+simple = { limit = 2000, period = 60 }
+
+# Keep console.log output (including turn_cred_mint lines) in Workers Logs.
+[observability]
+enabled = true
+
+# Secrets (never in this file): TURN_KEY_ID, TURN_KEY_API_TOKEN.
+# Set with `npx wrangler secret put <NAME> --config deploy/nova/wrangler.toml`.

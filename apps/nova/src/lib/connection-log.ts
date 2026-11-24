@@ -1,5 +1,4 @@
 import { version } from "../../package.json";
-import { edgeOrigin } from "./edge";
 
 const outcomes = [
   "direct",
@@ -83,7 +82,6 @@ export function networkFamily(
 export function reportConnection(attempt: ConnectionAttempt): boolean {
   try {
     if (
-      !edgeOrigin() ||
       typeof navigator === "undefined" ||
       typeof navigator.sendBeacon !== "function" ||
       !(outcomes as readonly unknown[]).includes(attempt.outcome) ||
@@ -109,7 +107,7 @@ export function reportConnection(attempt: ConnectionAttempt): boolean {
       network: networkFamily(connection),
       app_version: version,
     };
-    return navigator.sendBeacon(`${edgeOrigin()}/log`, JSON.stringify(event));
+    return navigator.sendBeacon("/api/log", JSON.stringify(event));
   } catch {
     return false;
   }

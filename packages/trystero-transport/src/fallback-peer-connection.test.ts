@@ -19,7 +19,7 @@ import { TUNNEL_FRAME_OVERHEAD_BYTES } from "./tunnel-crypto";
 const SECRET = "A".repeat(43) as SessionSecret;
 const ROOM = "party:" + "c".repeat(64);
 const MAX_PAYLOAD = 262144 - TUNNEL_FRAME_OVERHEAD_BYTES;
-/** The edge's per-socket budget (deploy/edge/tunnel.ts), simulated in FakeSocket. */
+/** The edge's per-socket budget (deploy/nova/tunnel.ts), simulated in FakeSocket. */
 const SERVER_RATE_BYTES_PER_SECOND = 512 * 1024;
 const SERVER_BURST_BYTES = 4 * 1024 * 1024;
 

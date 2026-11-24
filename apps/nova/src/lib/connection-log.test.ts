@@ -14,7 +14,6 @@ const attempt: ConnectionAttempt = {
 };
 
 afterEach(() => {
-  vi.unstubAllEnvs();
   vi.unstubAllGlobals();
 });
 
@@ -31,7 +30,6 @@ describe("connection reporting", () => {
   });
 
   it("sends only schema fields, never caller extras or raw navigator data", () => {
-    vi.stubEnv("VITE_EDGE_ORIGIN", "https://edge.example/");
     const sendBeacon = vi.fn(() => true);
     vi.stubGlobal("navigator", {
       sendBeacon,
@@ -41,7 +39,7 @@ describe("connection reporting", () => {
     expect(reportConnection({ ...attempt, room_id: "secret" } as ConnectionAttempt)).toBe(true);
     expect(sendBeacon).toHaveBeenCalledOnce();
     const [url, body] = sendBeacon.mock.calls[0] as unknown as [string, string];
-    expect(url).toBe("https://edge.example/log");
+    expect(url).toBe("/api/log");
     expect(JSON.parse(body)).toEqual({
       ...attempt,
       browser: "safari-ios",
@@ -53,7 +51,6 @@ describe("connection reporting", () => {
   });
 
   it("sends the unknown outcome and still rejects unrecognised outcomes", () => {
-    vi.stubEnv("VITE_EDGE_ORIGIN", "https://edge.example");
     const sendBeacon = vi.fn(() => true);
     vi.stubGlobal("navigator", { sendBeacon, userAgent: "" });
     expect(reportConnection({ ...attempt, outcome: "unknown" })).toBe(true);
@@ -65,7 +62,6 @@ describe("connection reporting", () => {
   });
 
   it("rejects invalid data and handles unavailable or failing beacons", () => {
-    vi.stubEnv("VITE_EDGE_ORIGIN", "https://edge.example");
     const sendBeacon = vi.fn(() => false);
     vi.stubGlobal("navigator", { sendBeacon, userAgent: "" });
     for (const ms of [-1, 3600001, 1.5, NaN, Infinity])
@@ -83,8 +79,6 @@ describe("connection reporting", () => {
     });
     expect(reportConnection(attempt)).toBe(false);
     vi.stubGlobal("navigator", {});
-    expect(reportConnection(attempt)).toBe(false);
-    vi.stubEnv("VITE_EDGE_ORIGIN", "");
     expect(reportConnection(attempt)).toBe(false);
   });
 });

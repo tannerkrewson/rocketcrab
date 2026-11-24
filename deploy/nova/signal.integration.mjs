@@ -16,9 +16,9 @@ if (
 ) {
   throw new Error("SIGNAL_TEST_ORIGIN must be a local HTTP origin");
 }
-const origin = "http://localhost:2722";
+const origin = parsedBase.origin;
 const wsBase = base.replace(/^http/, "ws");
-const url = `${wsBase}/signal/${randomBytes(16).toString("hex")}`;
+const url = `${wsBase}/api/signal/${randomBytes(16).toString("hex")}`;
 const connect = (target = url, requestOrigin = origin) =>
   new WebSocket(target, { origin: requestOrigin });
 const send = (socket, value) => socket.send(JSON.stringify(value));
@@ -67,10 +67,10 @@ test(
       (await fetch(url.replace(/^ws/, "http"), { headers: { Origin: origin } })).status,
       426,
     );
-    assert.equal(await rejected(`${wsBase}/signal/invalid`, origin), 404);
+    assert.equal(await rejected(`${wsBase}/api/signal/invalid`, origin), 404);
     const a = connect(),
       b = connect(),
-      other = connect(`${wsBase}/signal/${randomBytes(16).toString("hex")}`);
+      other = connect(`${wsBase}/api/signal/${randomBytes(16).toString("hex")}`);
     const sockets = [a, b, other];
     try {
       await Promise.all(sockets.map((socket) => once(socket, "open")));
@@ -129,8 +129,8 @@ test(
     timeout: 30000,
   },
   async () => {
-    const tunnelUrl = (pairId) => `${wsBase}/tunnel/${pairId}`;
-    assert.equal(await rejected(`${wsBase}/tunnel/${"A".repeat(64)}`, origin), 404);
+    const tunnelUrl = (pairId) => `${wsBase}/api/tunnel/${pairId}`;
+    assert.equal(await rejected(`${wsBase}/api/tunnel/${"A".repeat(64)}`, origin), 404);
 
     const pairOne = tunnelUrl(randomBytes(32).toString("hex"));
     const a = connect(pairOne),
@@ -194,7 +194,7 @@ function closeFrame(socket) {
 }
 
 async function openPair() {
-  const url = `${wsBase}/tunnel/${randomBytes(32).toString("hex")}`;
+  const url = `${wsBase}/api/tunnel/${randomBytes(32).toString("hex")}`;
   const a = connect(url),
     b = connect(url);
   // Collect from the start: `paired` arrives right after the upgrade, before `open` resolves.

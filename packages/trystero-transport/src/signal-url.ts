@@ -11,5 +11,5 @@ export async function signalUrl(
   const roomKey = Array.from(new Uint8Array(digest).slice(0, 16), (byte) =>
     byte.toString(16).padStart(2, "0"),
   ).join("");
-  return edgeSocketUrl(edgeOrigin, `/signal/${roomKey}`);
+  return edgeSocketUrl(edgeOrigin, `/api/signal/${roomKey}`);
 }

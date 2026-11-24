@@ -1,17 +1,4 @@
-/**
- * Nova edge Worker — the only server-side code Nova runs.
- *
- * Browser endpoints:
- *   POST /turn          mint a Cloudflare Realtime TURN credential (turn.ts)
- *   POST /              external-game room-creation CORS relay (relay.ts)
- *   POST /log           privacy-limited connection events (log.ts)
- *   GET /signal/:room   WebSocket signaling through a per-room Durable Object
- *   GET /tunnel/:pair   WebSocket fallback tunnel between two peers (tunnel.ts)
- *
- * Known routes enforce an Origin allowlist and per-IP rate limiting.
- * Configuration lives in wrangler.toml; the TURN key is a Worker secret.
- * See deploy/README.md.
- */
+// Nova party API. Cloudflare serves static assets outside /api.
 import { jsonError } from "./http";
 import { handleRelay } from "./relay";
 import { handleLog } from "./log";
@@ -29,8 +16,6 @@ interface ObjectNamespace {
 }
 
 export interface EdgeEnv extends TurnEnv {
-  /** Comma-separated exact origins allowed to call the Worker. */
-  ORIGIN_ALLOWLIST?: string;
   /** Per-IP limit for costly routes: `/turn` and the room relay. */
   RATE_LIMITER?: RateLimitBinding;
   /**
@@ -47,34 +32,17 @@ type Handler = (request: Request, env: EdgeEnv) => Promise<Response>;
 type Limiter = "RATE_LIMITER" | "BULK_RATE_LIMITER";
 
 const ROUTES: Record<string, { handler: Handler; key: string; limiter: Limiter }> = {
-  "/turn": { handler: handleTurn, key: "turn", limiter: "RATE_LIMITER" },
-  "/log": { handler: handleLog, key: "log", limiter: "BULK_RATE_LIMITER" },
-  "/": { handler: handleRelay, key: "relay", limiter: "RATE_LIMITER" },
+  "/api/turn": { handler: handleTurn, key: "turn", limiter: "RATE_LIMITER" },
+  "/api/log": { handler: handleLog, key: "log", limiter: "BULK_RATE_LIMITER" },
+  "/api/relay": { handler: handleRelay, key: "relay", limiter: "RATE_LIMITER" },
 };
 
 const SOCKET_ROUTES: { pattern: RegExp; key: string; binding: "SIGNAL_HUB" | "TUNNEL_PAIR" }[] = [
-  { pattern: /^\/signal\/([0-9a-f]{32})$/, key: "signal", binding: "SIGNAL_HUB" },
-  { pattern: /^\/tunnel\/([0-9a-f]{64})$/, key: "tunnel", binding: "TUNNEL_PAIR" },
+  { pattern: /^\/api\/signal\/([0-9a-f]{32})$/, key: "signal", binding: "SIGNAL_HUB" },
+  { pattern: /^\/api\/tunnel\/([0-9a-f]{64})$/, key: "tunnel", binding: "TUNNEL_PAIR" },
 ];
 
 const RATE_LIMIT_PERIOD_SECONDS = 60;
-
-export function parseAllowlist(raw: string | undefined): string[] {
-  return (raw ?? "")
-    .split(",")
-    .map((entry) => entry.trim().replace(/\/+$/, ""))
-    .filter((entry) => entry !== "");
-}
-
-function corsHeaders(origin: string): Record<string, string> {
-  return {
-    "Access-Control-Allow-Origin": origin,
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-    "Access-Control-Allow-Headers": "Content-Type",
-    "Access-Control-Max-Age": "86400",
-    Vary: "Origin",
-  };
-}
 
 /**
  * True when the request may proceed. A missing binding (unit tests) or a
@@ -103,7 +71,8 @@ function rateLimited(): Response {
 }
 
 async function route(request: Request, env: EdgeEnv): Promise<Response> {
-  const path = new URL(request.url).pathname.replace(/(.)\/+$/, "$1");
+  const url = new URL(request.url);
+  const path = url.pathname.replace(/(.)\/+$/, "$1");
   const target = ROUTES[path];
   const socket = SOCKET_ROUTES.map((r) => ({ ...r, match: r.pattern.exec(path) })).find(
     (r) => r.match !== null,
@@ -111,10 +80,16 @@ async function route(request: Request, env: EdgeEnv): Promise<Response> {
   if (target === undefined && socket === undefined)
     return jsonError(404, "not_found", `no route for ${path}`);
 
-  // No CORS headers on a rejected origin, so other sites cannot read it.
-  const origin = request.headers.get("Origin")?.trim().replace(/\/+$/, "") ?? "";
-  if (origin === "" || !parseAllowlist(env.ORIGIN_ALLOWLIST).includes(origin)) {
-    return jsonError(403, "origin_not_allowed", "request Origin is missing or not allowlisted");
+  const origin = request.headers.get("Origin");
+  // A no-referrer beacon can send a null Origin. Fetch Metadata still
+  // identifies it as same-origin. WebSocket upgrades carry an exact Origin.
+  const sameOrigin =
+    origin === url.origin ||
+    (socket === undefined &&
+      (origin === null || origin === "null") &&
+      request.headers.get("Sec-Fetch-Site") === "same-origin");
+  if (!sameOrigin) {
+    return jsonError(403, "origin_not_allowed", "same-origin request required");
   }
 
   if (socket !== undefined) {
@@ -127,19 +102,10 @@ async function route(request: Request, env: EdgeEnv): Promise<Response> {
     return namespace.get(namespace.idFromName(socket.match![1]!)).fetch(request);
   }
 
-  let response: Response;
-  if (request.method === "OPTIONS") {
-    response = new Response(null, { status: 204 });
-  } else if (request.method !== "POST") {
-    response = jsonError(405, "method_not_allowed", `method ${request.method} is not allowed`);
-  } else {
-    response = (await withinRateLimit(request, env[target!.limiter], target!.key))
-      ? await target!.handler(request, env)
-      : rateLimited();
-  }
-  for (const [name, value] of Object.entries(corsHeaders(origin)))
-    response.headers.set(name, value);
-  return response;
+  if (request.method !== "POST") return jsonError(405, "method_not_allowed", "POST required");
+  return (await withinRateLimit(request, env[target!.limiter], target!.key))
+    ? target!.handler(request, env)
+    : rateLimited();
 }
 
 export default { fetch: route };

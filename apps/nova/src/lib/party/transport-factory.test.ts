@@ -100,16 +100,6 @@ describe("createTrysteroPartyTransportFactory", () => {
     expect(second.turnConfig).toBe(TURN_CONFIG);
   });
 
-  it("passes the configured edge origin to both room transports", () => {
-    vi.stubEnv("VITE_EDGE_ORIGIN", "https://edge.example");
-    const factory = createTrysteroPartyTransportFactory();
-    factory.createPrivateTransport({ memberId: "m1", password: "pw", secret: SECRET });
-    factory.createPrivateTransport({ memberId: "m2", password: "pw", secret: SECRET });
-    for (const options of mocks.constructed as Array<Record<string, unknown>>) {
-      expect(options.edgeOrigin).toBe("https://edge.example");
-    }
-  });
-
   it("threads an onJoinError observer to BOTH transports", () => {
     const onJoinError = vi.fn();
     const factory = createTrysteroPartyTransportFactory({ onJoinError });
@@ -196,7 +186,6 @@ describe("connection outcome beacons", () => {
   }
 
   it("gives each transport an outcome hook that posts one allowlisted beacon", () => {
-    vi.stubEnv("VITE_EDGE_ORIGIN", "https://edge.example");
     const sendBeacon = vi.fn(() => true);
     vi.stubGlobal("navigator", {
       sendBeacon,
@@ -222,7 +211,7 @@ describe("connection outcome beacons", () => {
 
     expect(sendBeacon).toHaveBeenCalledOnce();
     const [url, body] = sendBeacon.mock.calls[0] as unknown as [string, string];
-    expect(url).toBe("https://edge.example/log");
+    expect(url).toBe("/api/log");
     const event = JSON.parse(body) as Record<string, unknown>;
     expect(event).toEqual({
       outcome: "tunnel",
@@ -245,18 +234,13 @@ describe("connection outcome beacons", () => {
     }
   });
 
-  it("is a no-op without VITE_EDGE_ORIGIN, and never throws into the transport", () => {
+  it("never throws into the transport when sending a beacon fails", () => {
     const sendBeacon = vi.fn(() => {
       throw new Error("blocked");
     });
     vi.stubGlobal("navigator", { sendBeacon, userAgent: "" });
-    vi.stubEnv("VITE_EDGE_ORIGIN", "");
     const factory = createTrysteroPartyTransportFactory();
     factory.createPrivateTransport({ memberId: "m1", password: "pw", secret: SECRET });
-    expect(() => outcomeHook()({ outcome: "failed", msToConnect: 0 })).not.toThrow();
-    expect(sendBeacon).not.toHaveBeenCalled();
-
-    vi.stubEnv("VITE_EDGE_ORIGIN", "https://edge.example");
     expect(() => outcomeHook()({ outcome: "failed", msToConnect: 0 })).not.toThrow();
     expect(sendBeacon).toHaveBeenCalledOnce();
   });

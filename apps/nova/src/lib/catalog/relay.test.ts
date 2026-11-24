@@ -14,22 +14,16 @@ function stubFetch(ok: boolean, status: number, body: unknown) {
 describe("relayRequest", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
   });
 
-  it("throws a clear error when the build sets no edge origin", async () => {
-    await expect(relayRequest("drawphone-new")).rejects.toThrow(/VITE_EDGE_ORIGIN/);
-  });
-
-  it("POSTs the endpoint envelope to the edge origin and parses the JSON", async () => {
-    vi.stubEnv("VITE_EDGE_ORIGIN", "https://edge.example.net/");
+  it("POSTs the endpoint envelope to the same-origin room API and parses the JSON", async () => {
     const fetchMock = stubFetch(true, 200, { gameCode: "ABC123" });
 
     expect(await relayRequest("drawphone-new")).toEqual({ gameCode: "ABC123" });
     await relayRequest("netgamesio-new", { urlId: "avalon" });
     await relayRequest("ooc-rocketcrab", { body: { game: "story" } });
 
-    expect(fetchMock.mock.calls[0]![0]).toBe("https://edge.example.net/");
+    expect(fetchMock.mock.calls[0]![0]).toBe("/api/relay");
     expect(fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init?.body)))).toEqual([
       { endpoint: "drawphone-new" },
       { endpoint: "netgamesio-new", urlId: "avalon" },
@@ -38,7 +32,6 @@ describe("relayRequest", () => {
   });
 
   it("surfaces the Worker's structured error message", async () => {
-    vi.stubEnv("VITE_EDGE_ORIGIN", "https://edge.example.net");
     stubFetch(false, 502, { error: { code: "upstream_error", message: "upstream HTTP 500" } });
     await expect(relayRequest("snakeout-new")).rejects.toThrow(/upstream HTTP 500/);
     stubFetch(false, 503, "not json");

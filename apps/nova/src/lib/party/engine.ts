@@ -30,7 +30,6 @@ import {
 } from "./connection-errors";
 import { createTrysteroPartyTransportFactory } from "./transport-factory";
 import {
-  turnCredsConfigured,
   TURN_CREDS_TTL_MS,
   type TurnCredentialsResult,
   type TurnServerConfigLike,
@@ -440,10 +439,6 @@ export class PartyEngine {
         this.state.peerLink.failed();
       },
     };
-    if (!turnCredsConfigured()) {
-      this.state.turnStatus = "disabled";
-      return createTrysteroPartyTransportFactory(options);
-    }
     const result = await this.fetchTurnCredentialsOnce();
     if (result.ok) {
       this.state.turnStatus = "configured";

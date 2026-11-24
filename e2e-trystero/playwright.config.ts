@@ -29,7 +29,10 @@ export default defineConfig({
   webServer: [
     {
       command:
-        "npm run edge:dev -- --port 2726 --inspector-port 2728 --var ORIGIN_ALLOWLIST:http://localhost:2725,https://localhost:2725",
+        "npm run dev:api -- --port 2726 --inspector-port 2728" +
+        (hasCerts
+          ? " --local-protocol https --https-key-path e2e-trystero/certs/key.pem --https-cert-path e2e-trystero/certs/cert.pem"
+          : ""),
       cwd: path.join(here, ".."),
       port: 2726,
       reuseExistingServer: !process.env.CI,

@@ -13,7 +13,6 @@ const env = {
   ...process.env,
   VITE_RUNTIME_ORIGIN: origins.runtime,
   VITE_MAIN_ORIGIN: origins.nova,
-  VITE_EDGE_ORIGIN: origins.edge,
 };
 function run(command, args) {
   const result = spawnSync(command, args, { env, stdio: "inherit" });
@@ -30,4 +29,11 @@ run("node", [
   "--main-origin",
   origins.nova,
 ]);
-run("npx", ["--yes", "wrangler@4.161.0", "deploy", "--config", `deploy/${target}/wrangler.toml`]);
+run("npx", [
+  "--yes",
+  "wrangler@4.161.0",
+  "deploy",
+  "--config",
+  `deploy/${target}/wrangler.toml`,
+  ...(process.argv.includes("--dry-run") ? ["--dry-run"] : []),
+]);

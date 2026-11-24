@@ -4,7 +4,7 @@ test("a blocked signaling connection warns and recovers automatically", async ({
   test.setTimeout(60_000);
   let blocked = true;
   let attempts = 0;
-  await page.routeWebSocket(/\/signal\//, (socket) => {
+  await page.routeWebSocket(/\/api\/signal\//, (socket) => {
     attempts++;
     if (blocked) socket.close();
     else socket.connectToServer();

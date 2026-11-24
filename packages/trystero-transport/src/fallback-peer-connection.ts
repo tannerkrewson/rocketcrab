@@ -25,14 +25,14 @@ import { selectedCandidateOutcome } from "./selected-candidate-outcome";
 
 /**
  * Client-side cap on a whole binary frame. The edge accepts up to 262208
- * bytes (MAX_TUNNEL_FRAME_BYTES in deploy/edge/tunnel.ts); this stays at the
+ * bytes (MAX_TUNNEL_FRAME_BYTES in deploy/nova/tunnel.ts); this stays at the
  * stricter 256 KiB so a frame is never rejected by the server.
  */
 export const TUNNEL_MAX_FRAME_BYTES = 262144;
 /**
  * Client-side pacing of tunnel frames, in wire bytes (payload + 29). The edge
  * gives each socket a 512 KiB/s refill and a 4 MiB burst, and closes the pair
- * with 1008 when its bucket empties (deploy/edge/tunnel.ts RATE_BYTES_PER_SECOND
+ * with 1008 when its bucket empties (deploy/nova/tunnel.ts RATE_BYTES_PER_SECOND
  * and BURST_BYTES). These sit below both, so repeated 2 MiB game-source
  * transfers never empty the server's bucket.
  */
@@ -123,7 +123,7 @@ export interface ConnectionOutcomeInfo {
   readonly msToConnect: number;
 }
 
-/** The connection-log schema's ceiling for ms_to_connect (deploy/edge/log.ts). */
+/** The connection-log schema's ceiling for ms_to_connect (deploy/nova/log.ts). */
 export const MAX_CONNECT_MS = 3600000;
 
 export interface FallbackPeerConnectionOptions {

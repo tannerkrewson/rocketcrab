@@ -80,11 +80,9 @@ describe("external games data", () => {
 describe("external room creation", () => {
   afterEach(() => {
     vi.unstubAllGlobals();
-    vi.unstubAllEnvs();
   });
 
   function relayReturning(body: unknown) {
-    vi.stubEnv("VITE_EDGE_ORIGIN", "https://relay.example.net");
     const fetchMock = vi.fn(async (_url: RequestInfo | URL, _init?: RequestInit) => ({
       ok: true,
       status: 200,
@@ -97,12 +95,11 @@ describe("external room creation", () => {
   // The production CSP allows the edge relay plus CATALOG_CONNECT_ORIGINS, so a
   // game that fetches anything else would fail only in a deployed build.
   it("only fetches origins the CSP's connect-src allows", async () => {
-    vi.stubEnv("VITE_EDGE_ORIGIN", "https://relay.example.net");
     const fetched: string[] = [];
     vi.stubGlobal(
       "fetch",
       vi.fn(async (url: RequestInfo | URL) => {
-        fetched.push(new URL(String(url)).origin);
+        fetched.push(new URL(String(url), location.origin).origin);
         throw new Error("no network in tests");
       }),
     );
@@ -111,7 +108,7 @@ describe("external room creation", () => {
     }
     expect(fetched.length).toBeGreaterThan(0);
     for (const origin of new Set(fetched)) {
-      expect(["https://relay.example.net", ...CATALOG_CONNECT_ORIGINS]).toContain(origin);
+      expect([location.origin, ...CATALOG_CONNECT_ORIGINS]).toContain(origin);
     }
   });
 
@@ -125,7 +122,6 @@ describe("external room creation", () => {
   });
 
   it("surfaces a readable error when the relay fails", async () => {
-    vi.stubEnv("VITE_EDGE_ORIGIN", "https://relay.example.net");
     vi.stubGlobal(
       "fetch",
       vi.fn(async () => ({ ok: false, status: 503 })),

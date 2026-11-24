@@ -2053,6 +2053,13 @@ describe("party engine — external games, kick, and reload", () => {
 // Exercise default-factory TURN setup without opening real Trystero rooms.
 
 describe("party engine — TURN credential minting", () => {
+  beforeEach(() => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 503 })),
+    );
+  });
+
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
@@ -2068,27 +2075,6 @@ describe("party engine — TURN credential minting", () => {
     // Explicit undefined bypasses makePlayer's default transportFactory.
     return makePlayer(world, "host", { transportFactory: undefined, ...overrides });
   }
-
-  it("env unset → no mint fetch, no TURN wiring, no notice (works as today)", async () => {
-    const world = makeWorld();
-    const fetchSpy = vi.fn();
-    vi.stubGlobal("fetch", fetchSpy);
-    // No VITE_EDGE_ORIGIN stub → unconfigured build; the real mint
-    // client short-circuits before touching fetch.
-    const player = makeDefaultFactoryPlayer(world);
-    await runCreate(player, world);
-
-    expect(fetchSpy).not.toHaveBeenCalled();
-    expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenCalledWith({
-      onJoinError: expect.any(Function),
-      onTunnel: expect.any(Function),
-      onTunnelFailure: expect.any(Function),
-    });
-    const state = player.engine.getState();
-    expect(state.phase).toBe("lobby");
-    expect(state.notices.some((notice) => notice.message.includes("TURN"))).toBe(false);
-    expect(state.diagnostics?.turn).toBe("disabled");
-  });
 
   it.each(["room-full", "decrypt-failed"] as const)(
     "reports %s only after the join fails and resets it on retry",
@@ -2274,7 +2260,6 @@ describe("party engine — TURN credential minting", () => {
   });
 
   it("mint success → turnConfig baked into the default factory + configured diagnostic", async () => {
-    vi.stubEnv("VITE_EDGE_ORIGIN", "https://turn-creds.example.workers.dev");
     const world = makeWorld();
     const turnConfig = [
       {
@@ -2301,7 +2286,6 @@ describe("party engine — TURN credential minting", () => {
   });
 
   it("mint failure (network/403/5xx/timeout) → party still creates WITHOUT TURN, TURN state in diagnostics only", async () => {
-    vi.stubEnv("VITE_EDGE_ORIGIN", "https://turn-creds.example.workers.dev");
     const world = makeWorld();
     const player = makeDefaultFactoryPlayer(world, {
       turnCreds: async (): Promise<TurnCredentialsResult> => ({
@@ -2323,7 +2307,6 @@ describe("party engine — TURN credential minting", () => {
   });
 
   it("mints ONCE and reuses the cached turnConfig across setup attempts", async () => {
-    vi.stubEnv("VITE_EDGE_ORIGIN", "https://turn-creds.example.workers.dev");
     const world = makeWorld();
     const turnConfig = [
       {
@@ -2352,7 +2335,6 @@ describe("party engine — TURN credential minting", () => {
   });
 
   it("re-mints once less than half the 24 h lease remains, never mutating live peers", async () => {
-    vi.stubEnv("VITE_EDGE_ORIGIN", "https://turn-creds.example.workers.dev");
     const world = makeWorld();
     const turnConfig = [{ urls: "turn:one", username: "u1", credential: "c1" }];
     const turnCreds = vi.fn(async (): Promise<TurnCredentialsResult> => ({ ok: true, turnConfig }));
@@ -2376,7 +2358,6 @@ describe("party engine — TURN credential minting", () => {
   });
 
   it("does not mint when the transport factory is injected (tests/embedders)", async () => {
-    vi.stubEnv("VITE_EDGE_ORIGIN", "https://turn-creds.example.workers.dev");
     const world = makeWorld();
     const turnCreds = vi.fn(async (): Promise<TurnCredentialsResult> => ({
       ok: true,
@@ -2432,7 +2413,6 @@ describe("party engine — signaling outage setup", () => {
   }
 
   it("warns after five seconds, retries one join at a time, and recovers", async () => {
-    vi.stubEnv("VITE_EDGE_ORIGIN", "https://edge.example");
     const sendBeacon = vi.fn(() => true);
     vi.stubGlobal("navigator", { ...globalThis.navigator, sendBeacon, userAgent: "" });
     const world = makeWorld();

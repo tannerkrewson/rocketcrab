@@ -61,10 +61,10 @@ export interface PartyDiagnostics {
   readonly lastQuality: Array<{ memberId: string; pingMs: number | null; sampledAt: number }>;
   /**
    * "configured" means minted credentials are in use; "unavailable" means minting
-   * failed and transport continued without TURN. "disabled" means no mint origin;
-   * null means setup has not attempted minting or uses an injected factory.
+   * failed and transport continued without TURN. A null value means setup has
+   * yet to attempt minting or uses an injected factory.
    */
-  readonly turn: "configured" | "unavailable" | "disabled" | null;
+  readonly turn: "configured" | "unavailable" | null;
 }
 
 export interface PartyNotice {

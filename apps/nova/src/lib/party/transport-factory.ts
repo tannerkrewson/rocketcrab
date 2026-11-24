@@ -7,14 +7,13 @@ import {
   type TunnelStartInfo,
 } from "@rocketcrab/trystero-transport";
 import type { TurnServerConfigLike } from "./turn-creds";
-import { edgeOrigin } from "../edge";
 import { reportConnection } from "../connection-log";
 
 /** Options closed over by the factory at construction time (sync methods). */
 export interface TrysteroPartyTransportFactoryOptions {
   /**
    * Minted short-lived TURN servers (Trystero `TurnServerConfig` shape).
-   * Omit for builds without VITE_EDGE_ORIGIN or after a mint failure
+   * Omit after a mint failure
    * (graceful degradation: the party proceeds without TURN).
    */
   readonly turnConfig?: readonly TurnServerConfigLike[];
@@ -38,8 +37,7 @@ export function forceTunnelForTests(): boolean {
 }
 
 /**
- * Send one allowlisted connection-log beacon per peer attempt. No-op without
- * the edge origin or sendBeacon; never throw into the transport. error_code
+ * Send one connection-log beacon per peer attempt. error_code
  * stays empty because peer attempts have no typed room error of their own.
  */
 function reportAttemptOutcome(info: ConnectionOutcomeInfo): void {
@@ -61,7 +59,6 @@ export function createTrysteroPartyTransportFactory(
     const transport = new TrysteroTransport({
       memberId: identity.memberId,
       displayName: identity.displayName,
-      edgeOrigin: edgeOrigin(),
       ...("password" in identity ? { password: identity.password } : {}),
       partySecret: identity.secret,
       forceRelayOnlyNoServers: forceTunnelForTests(),

@@ -1,7 +1,7 @@
 /**
  * Three isolated browser contexts play nova-quiz with one player's WebRTC
  * forced onto edge tunnels. Requires the root dev stack: Nova on 2722,
- * runtime on 2723, and edge on 2724.
+ * runtime on 2723. Vite proxies /api to the local Worker.
  */
 import {
   expect,
@@ -53,7 +53,7 @@ async function newPlayer(browser: Browser, forced: boolean): Promise<Player> {
   const pairedAt: number[] = [];
   const pairedSockets: string[] = [];
   page.on("websocket", (socket: WebSocket) => {
-    if (!socket.url().includes("/tunnel/")) return;
+    if (!socket.url().includes("/api/tunnel/")) return;
     tunnelSockets.push(socket.url());
     socket.on("framereceived", (frame) => {
       if (frame.payload !== "paired") return;

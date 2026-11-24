@@ -14,6 +14,13 @@ export default defineConfig({
   server: {
     port: 2725,
     strictPort: true,
+    proxy: {
+      "/api": {
+        target: hasCerts ? "https://127.0.0.1:2726" : "http://127.0.0.1:2726",
+        secure: false,
+        ws: true,
+      },
+    },
     host: true, // bind 0.0.0.0 so a physical phone on the LAN can reach it
     ...(hasCerts
       ? {

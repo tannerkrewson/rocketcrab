@@ -13,7 +13,7 @@ const event = {
 const origin = "https://rocketcrab.com";
 function call(body: string, env: EdgeEnv, headers: Record<string, string> = {}) {
   return edge.fetch(
-    new Request("https://edge.example/log", {
+    new Request("https://rocketcrab.com/api/log", {
       method: "POST",
       headers: {
         Origin: origin,
@@ -34,14 +34,14 @@ describe("connection events", () => {
     async (outcome) => {
       const log = vi.spyOn(console, "log").mockImplementation(() => {});
       const payload = { ...event, outcome };
-      expect((await call(JSON.stringify(payload), { ORIGIN_ALLOWLIST: origin })).status).toBe(204);
+      expect((await call(JSON.stringify(payload), {})).status).toBe(204);
       expect(log).toHaveBeenCalledExactlyOnceWith({ event: "nova_connection", ...payload });
     },
   );
 
   it("rejects invalid, identifying, missing and oversized data", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {});
-    const env = { ORIGIN_ALLOWLIST: origin };
+    const env = {};
     for (const body of [
       "oops",
       "[]",
@@ -62,7 +62,7 @@ describe("connection events", () => {
 
   it("gates origin and rate limits independently", async () => {
     const limit = vi.fn(async () => ({ success: false }));
-    const env = { ORIGIN_ALLOWLIST: origin, BULK_RATE_LIMITER: { limit } };
+    const env = { BULK_RATE_LIMITER: { limit } };
     expect(
       (await call(JSON.stringify(event), env, { Origin: "https://evil.example" })).status,
     ).toBe(403);

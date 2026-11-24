@@ -759,7 +759,7 @@ export class TrysteroTransport implements NovaTransport {
     ) {
       return undefined;
     }
-    const edgeOrigin = this.options.edgeOrigin ?? DEFAULT_EDGE_ORIGIN;
+    const edgeOrigin = this.options.edgeOrigin ?? DEFAULT_API_ORIGIN;
     return createFallbackPeerConnectionClass({
       NativePeerConnection: globalThis.RTCPeerConnection,
       WebSocketImpl: globalThis.WebSocket,
@@ -802,7 +802,7 @@ export class TrysteroTransport implements NovaTransport {
     });
     try {
       return await Promise.race([
-        signalUrl(this.options.edgeOrigin ?? DEFAULT_EDGE_ORIGIN, this.appId, roomName),
+        signalUrl(this.options.edgeOrigin ?? DEFAULT_API_ORIGIN, this.appId, roomName),
         interrupted,
       ]);
     } finally {
@@ -1460,8 +1460,7 @@ function parseAckPayload(data: unknown): { connectionId: string; reply: boolean 
  */
 const IDENTITY_ACK_RETRANSMIT_MS = 2_000;
 
-/** Edge origin when the caller does not configure one (local `npm run dev`). */
-const DEFAULT_EDGE_ORIGIN = "http://localhost:2724";
+const DEFAULT_API_ORIGIN = globalThis.location?.origin ?? "http://localhost:2724";
 
 /** Trystero action namespace (well under Trystero's 32-byte type limit). */
 const ACTION_NAMESPACE = "nova";
@@ -1503,7 +1502,7 @@ export interface TrysteroTransportOptions {
   readonly appId?: string;
   /** Environment flags used to derive the default appId (tests override). */
   readonly env?: AppIdEnvironment;
-  /** Edge Worker origin used for room-scoped signaling. */
+  /** Override the same-origin Nova API for non-browser hosts. */
   readonly edgeOrigin?: string;
   /** TURN configuration, passed through to Trystero. Credentials come from the caller. */
   readonly turnConfig?: readonly TurnServerConfig[];

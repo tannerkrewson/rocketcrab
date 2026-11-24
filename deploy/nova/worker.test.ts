@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MINT_TTL_SECONDS, dropPort53, isPort53IceUrl } from "./turn";
-import edge, { type EdgeEnv, parseAllowlist } from "./worker";
+import edge, { type EdgeEnv } from "./worker";
 
 const ORIGIN = "https://rocketcrab.com";
-const BASE_ENV: EdgeEnv = { ORIGIN_ALLOWLIST: `${ORIGIN},http://localhost:2722` };
+const BASE_ENV: EdgeEnv = {};
 const TURN_ENV: EdgeEnv = { ...BASE_ENV, TURN_KEY_ID: "key-id", TURN_KEY_API_TOKEN: "secret" };
 
 function call(path: string, init: RequestInit & { origin?: string | null } = {}, env = BASE_ENV) {
@@ -11,13 +11,13 @@ function call(path: string, init: RequestInit & { origin?: string | null } = {},
   if (init.origin !== null) headers.set("Origin", init.origin ?? ORIGIN);
   headers.set("CF-Connecting-IP", "203.0.113.7");
   return edge.fetch(
-    new Request(`https://edge.example${path}`, { method: "POST", ...init, headers }),
+    new Request(`https://rocketcrab.com${path}`, { method: "POST", ...init, headers }),
     env,
   );
 }
 
 function relay(body: unknown, env = BASE_ENV) {
-  return call("/", { body: JSON.stringify(body) }, env);
+  return call("/api/relay", { body: JSON.stringify(body) }, env);
 }
 
 async function errorCode(response: Response) {
@@ -37,36 +37,42 @@ afterEach(() => vi.unstubAllGlobals());
 describe("gate", () => {
   it("rejects missing and unlisted origins without CORS headers", async () => {
     for (const origin of [null, "https://evil.example"]) {
-      const response = await call("/turn", { origin }, TURN_ENV);
+      const response = await call("/api/turn", { origin }, TURN_ENV);
       expect(response.status).toBe(403);
       expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
     }
   });
 
-  it("rejects everything when the allowlist is unset", async () => {
-    expect((await call("/", {}, {})).status).toBe(403);
+  it("accepts same-origin no-referrer beacons without enabling CORS", async () => {
+    const sameOrigin = await call("/api/log", {
+      origin: "null",
+      headers: { "Sec-Fetch-Site": "same-origin" },
+      body: "{}",
+    });
+    expect(sameOrigin.status).toBe(400);
+    const crossOrigin = await call("/api/log", {
+      origin: "null",
+      headers: { "Sec-Fetch-Site": "cross-site" },
+      body: "{}",
+    });
+    expect(crossOrigin.status).toBe(403);
   });
 
-  it("normalizes allowlist entries and tolerates a trailing slash on Origin", async () => {
-    expect(parseAllowlist(" https://a.example/ ,, https://b.example")).toEqual([
-      "https://a.example",
-      "https://b.example",
-    ]);
-    const response = await call("/", { origin: `${ORIGIN}/`, body: "{}" });
-    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(ORIGIN);
-  });
-
-  it("answers preflight with CORS headers echoing the origin", async () => {
-    const response = await call("/turn", { method: "OPTIONS" });
-    expect(response.status).toBe(204);
-    expect(response.headers.get("Access-Control-Allow-Origin")).toBe(ORIGIN);
-    expect(response.headers.get("Vary")).toBe("Origin");
+  it("does not accept a foreign Origin or answer CORS preflights", async () => {
+    const foreign = await call("/api/turn", {
+      origin: "https://elsewhere.example",
+      headers: { "Sec-Fetch-Site": "same-origin" },
+    });
+    expect(foreign.status).toBe(403);
+    const preflight = await call("/api/turn", { method: "OPTIONS" });
+    expect(preflight.status).toBe(405);
+    expect(preflight.headers.get("Access-Control-Allow-Origin")).toBeNull();
   });
 
   it("allows only POST and known paths", async () => {
-    expect((await call("/", { method: "GET" })).status).toBe(405);
+    expect((await call("/api/relay", { method: "GET" })).status).toBe(405);
     expect((await call("/nope")).status).toBe(404);
-    expect((await call("/turn/")).status).toBe(500);
+    expect((await call("/api/turn/")).status).toBe(500);
   });
 
   it("rate limits per route and IP with Retry-After", async () => {
@@ -81,12 +87,12 @@ describe("gate", () => {
       },
     };
     const fetchMock = mockFetch(new Response("{}"));
-    const turn = await call("/turn", {}, { ...TURN_ENV, RATE_LIMITER: env.RATE_LIMITER });
+    const turn = await call("/api/turn", {}, { ...TURN_ENV, RATE_LIMITER: env.RATE_LIMITER });
     const roomRelay = await relay({ endpoint: "spyfall-new" }, env);
     for (const response of [turn, roomRelay]) {
       expect(response.status).toBe(429);
       expect(response.headers.get("Retry-After")).toBe("60");
-      expect(response.headers.get("Access-Control-Allow-Origin")).toBe(ORIGIN);
+      expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
     }
     expect(keys).toEqual(["turn:203.0.113.7", "relay:203.0.113.7"]);
     expect(fetchMock).not.toHaveBeenCalled();
@@ -107,9 +113,9 @@ describe("gate", () => {
       TUNNEL_PAIR: forward,
     };
     const upgrade = { method: "GET", headers: { Upgrade: "websocket" } };
-    expect((await call(`/signal/${"a".repeat(32)}`, upgrade, env)).status).toBe(200);
-    expect((await call(`/tunnel/${"b".repeat(64)}`, upgrade, env)).status).toBe(200);
-    expect((await call("/log", { body: "{}" }, env)).status).not.toBe(429);
+    expect((await call(`/api/signal/${"a".repeat(32)}`, upgrade, env)).status).toBe(200);
+    expect((await call(`/api/tunnel/${"b".repeat(64)}`, upgrade, env)).status).toBe(200);
+    expect((await call("/api/log", { body: "{}" }, env)).status).not.toBe(429);
     expect(strict).not.toHaveBeenCalled();
     expect(bulk.mock.calls.map(([arg]) => arg.key)).toEqual([
       "signal:203.0.113.7",
@@ -164,7 +170,7 @@ describe("external-game room relay", () => {
 
   it("rejects bad envelopes and unknown endpoints without fetching", async () => {
     const fetchMock = mockFetch(new Response("{}"));
-    expect(await errorCode(await call("/", { body: "nope" }))).toBe("invalid_json");
+    expect(await errorCode(await call("/api/relay", { body: "nope" }))).toBe("invalid_json");
     expect(await errorCode(await relay([1]))).toBe("invalid_body");
     expect(await errorCode(await relay({ endpoint: "https://evil.example" }))).toBe(
       "unknown_endpoint",
@@ -194,12 +200,12 @@ describe("TURN mint", () => {
   };
 
   it("fails loudly without secrets", async () => {
-    expect(await errorCode(await call("/turn"))).toBe("worker_misconfigured");
+    expect(await errorCode(await call("/api/turn"))).toBe("worker_misconfigured");
   });
 
   it("mints a 24 h credential with the secret only in the auth header", async () => {
     const fetchMock = mockFetch(Response.json(ICE));
-    const response = await call("/turn", { body: '{"ttl":999999}' }, TURN_ENV);
+    const response = await call("/api/turn", { body: '{"ttl":999999}' }, TURN_ENV);
     expect(response.status).toBe(200);
     const body = await response.text();
     expect(body).not.toContain("secret");
@@ -226,11 +232,11 @@ describe("TURN mint", () => {
 
   it("maps upstream failures to 502", async () => {
     mockFetch(new Error("offline"));
-    expect(await errorCode(await call("/turn", {}, TURN_ENV))).toBe("upstream_unavailable");
+    expect(await errorCode(await call("/api/turn", {}, TURN_ENV))).toBe("upstream_unavailable");
     mockFetch(new Response("", { status: 401 }));
-    expect(await errorCode(await call("/turn", {}, TURN_ENV))).toBe("upstream_error");
+    expect(await errorCode(await call("/api/turn", {}, TURN_ENV))).toBe("upstream_error");
     mockFetch(Response.json({ nope: true }));
-    expect(await errorCode(await call("/turn", {}, TURN_ENV))).toBe("upstream_invalid");
+    expect(await errorCode(await call("/api/turn", {}, TURN_ENV))).toBe("upstream_invalid");
   });
 
   it("compares ports exactly when dropping port 53", () => {
@@ -261,39 +267,41 @@ describe("tunnel route", () => {
   it("rejects pair IDs that are not 64 lowercase hex characters", async () => {
     const { env, fetch } = tunnelEnv();
     for (const id of ["a".repeat(63), "a".repeat(65), "A".repeat(64), "g".repeat(64)]) {
-      expect((await call(`/tunnel/${id}`, UPGRADE, env)).status).toBe(404);
+      expect((await call(`/api/tunnel/${id}`, UPGRADE, env)).status).toBe(404);
     }
     expect(fetch).not.toHaveBeenCalled();
   });
 
   it("rejects non-GET and non-upgrade requests before reaching the object", async () => {
     const { env, fetch } = tunnelEnv();
-    expect((await call(`/tunnel/${PAIR}`, { ...UPGRADE, method: "POST" }, env)).status).toBe(405);
-    expect((await call(`/tunnel/${PAIR}`, { method: "GET" }, env)).status).toBe(426);
+    expect((await call(`/api/tunnel/${PAIR}`, { ...UPGRADE, method: "POST" }, env)).status).toBe(
+      405,
+    );
+    expect((await call(`/api/tunnel/${PAIR}`, { method: "GET" }, env)).status).toBe(426);
     expect(fetch).not.toHaveBeenCalled();
   });
 
   it("requires an allowlisted Origin, and a missing Origin is refused too", async () => {
     const { env, fetch } = tunnelEnv();
     const response = await call(
-      `/tunnel/${PAIR}`,
+      `/api/tunnel/${PAIR}`,
       { ...UPGRADE, origin: "https://evil.example" },
       env,
     );
     expect(response.status).toBe(403);
     expect(response.headers.get("Access-Control-Allow-Origin")).toBeNull();
-    expect((await call(`/tunnel/${PAIR}`, { ...UPGRADE, origin: null }, env)).status).toBe(403);
+    expect((await call(`/api/tunnel/${PAIR}`, { ...UPGRADE, origin: null }, env)).status).toBe(403);
     expect(fetch).not.toHaveBeenCalled();
   });
 
   it("rate limits per IP with the tunnel key and forwards the rest to the pair object", async () => {
     const { env, idFromName, fetch, limit } = tunnelEnv();
-    expect(await (await call(`/tunnel/${PAIR}`, UPGRADE, env)).text()).toBe("forwarded");
+    expect(await (await call(`/api/tunnel/${PAIR}`, UPGRADE, env)).text()).toBe("forwarded");
     expect(idFromName).toHaveBeenCalledWith(PAIR);
     expect(limit).toHaveBeenCalledWith({ key: "tunnel:203.0.113.7" });
 
     limit.mockResolvedValueOnce({ success: false });
-    const limited = await call(`/tunnel/${PAIR}`, UPGRADE, env);
+    const limited = await call(`/api/tunnel/${PAIR}`, UPGRADE, env);
     expect(limited.status).toBe(429);
     expect(limited.headers.get("Retry-After")).toBe("60");
     expect(fetch).toHaveBeenCalledTimes(1);
@@ -301,7 +309,7 @@ describe("tunnel route", () => {
 
   it("returns 503 when the Durable Object binding is missing", async () => {
     const { env } = tunnelEnv({ TUNNEL_PAIR: undefined });
-    const response = await call(`/tunnel/${PAIR}`, UPGRADE, env);
+    const response = await call(`/api/tunnel/${PAIR}`, UPGRADE, env);
     expect(response.status).toBe(503);
     expect(await errorCode(response)).toBe("unavailable");
   });

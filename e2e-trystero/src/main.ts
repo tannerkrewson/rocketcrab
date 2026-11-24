@@ -126,7 +126,6 @@ async function enterRoom(options: JoinOptions): Promise<string> {
   const sessionId = `${SESSION_PREFIX}${options.room}`;
   const next = new TrysteroTransport({
     memberId: state.selfMemberId,
-    edgeOrigin: "http://localhost:2726",
     displayName: `player-${state.selfMemberId.slice(-4)}`,
     appId: options.appId,
     relayConnectTimeoutMs: options.relayConnectTimeoutMs ?? 10_000,

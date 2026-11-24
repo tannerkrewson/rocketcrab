@@ -82,9 +82,12 @@ function buildCsp(): string {
     ...(runtimeOrigin === "" ? [] : [runtimeOrigin]),
     ...EXTERNAL_FRAME_ORIGINS,
   ];
-  // Nova edge Worker (room relay + TURN mint), when the build sets one.
-  const edgeOrigin = process.env.VITE_EDGE_ORIGIN?.trim() ?? "";
-  const edgeConnectSrc = edgeOrigin === "" ? "" : ` ${new URL(edgeOrigin).origin}`;
+  // Explicit same-host WebSocket source for Safari versions where 'self'
+  // does not match wss:. The deploy script already pins the app for the runtime.
+  const mainOrigin = process.env.VITE_MAIN_ORIGIN?.trim();
+  const socketSource = mainOrigin
+    ? [new URL(mainOrigin).origin.replace(/^http/, "ws") + "/api/"]
+    : [];
   const csp = [
     "default-src 'self'",
     "script-src 'self'",
@@ -93,7 +96,7 @@ function buildCsp(): string {
     ["img-src 'self' data: blob:", ...CATALOG_IMAGE_ORIGINS].join(" "),
     "font-src 'self' data:",
     // Listed games' direct room creation and hosted Nova games' HTML.
-    [`connect-src 'self' wss: ws:${edgeConnectSrc}`, ...CATALOG_CONNECT_ORIGINS].join(" "),
+    ["connect-src 'self'", ...socketSource, ...CATALOG_CONNECT_ORIGINS].join(" "),
     "media-src 'self' blob:",
     "worker-src 'self' blob:",
     "object-src 'none'",
@@ -122,5 +125,12 @@ export default defineConfig(({ mode }) => ({
     port: 2722,
     strictPort: true,
     https: httpsServerConfig(mode),
+    proxy: {
+      "^/api(?:/|$)": {
+        target: mode === "https" ? "https://127.0.0.1:2724" : "http://127.0.0.1:2724",
+        secure: false, // The local Worker uses a development certificate.
+        ws: true,
+      },
+    },
   },
 }));

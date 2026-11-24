@@ -96,27 +96,28 @@ describe("signal routing", () => {
     const fetch = vi.fn(async () => new Response("forwarded"));
     const limit = vi.fn(async () => ({ success: true }));
     const env: EdgeEnv = {
-      ORIGIN_ALLOWLIST: "https://app.example",
       SIGNAL_HUB: { idFromName, get: () => ({ fetch }) },
       BULK_RATE_LIMITER: { limit },
     };
     const call = (path: string, init: RequestInit = {}) =>
-      edge.fetch(new Request(`https://edge.example${path}`, init), env);
+      edge.fetch(new Request(`https://app.example${path}`, init), env);
     const headers = {
       Origin: "https://app.example",
       Upgrade: "websocket",
       "CF-Connecting-IP": "1.2.3.4",
     };
-    expect((await call(`/signal/${key}`, { headers: { Upgrade: "websocket" } })).status).toBe(403);
-    expect((await call(`/signal/${key}`, { method: "POST", headers })).status).toBe(405);
-    expect((await call(`/signal/${key}`, { headers: { Origin: headers.Origin } })).status).toBe(
+    expect((await call(`/api/signal/${key}`, { headers: { Upgrade: "websocket" } })).status).toBe(
+      403,
+    );
+    expect((await call(`/api/signal/${key}`, { method: "POST", headers })).status).toBe(405);
+    expect((await call(`/api/signal/${key}`, { headers: { Origin: headers.Origin } })).status).toBe(
       426,
     );
-    expect((await call("/signal/not-valid", { headers })).status).toBe(404);
-    expect(await (await call(`/signal/${key}`, { headers })).text()).toBe("forwarded");
+    expect((await call("/api/signal/not-valid", { headers })).status).toBe(404);
+    expect(await (await call(`/api/signal/${key}`, { headers })).text()).toBe("forwarded");
     expect(idFromName).toHaveBeenCalledWith(key);
     expect(limit).toHaveBeenCalledWith({ key: "signal:1.2.3.4" });
     limit.mockResolvedValueOnce({ success: false });
-    expect((await call(`/signal/${key}`, { headers })).status).toBe(429);
+    expect((await call(`/api/signal/${key}`, { headers })).status).toBe(429);
   });
 });
