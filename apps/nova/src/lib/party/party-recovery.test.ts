@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it } from "vitest";
 import {
+  PARTY_RECOVERY_KEY,
   PARTY_RECOVERY_VERSION,
   clearPartyRecovery,
   parsePartyRecovery,
@@ -30,7 +31,7 @@ beforeEach(() => {
 describe("party recovery record", () => {
   it("round-trips a record through localStorage", () => {
     expect(savePartyRecovery(input(), () => 1_700_000_000_000)).toBe(true);
-    const record = readPartyRecovery();
+    const record = readPartyRecovery(() => 1_700_000_000_000);
     expect(record).not.toBeNull();
     expect(record?.version).toBe(PARTY_RECOVERY_VERSION);
     expect(record?.savedAt).toBe(1_700_000_000_000);
@@ -47,6 +48,14 @@ describe("party recovery record", () => {
     savePartyRecovery(input({ game: null }));
     const record = readPartyRecovery();
     expect(record?.game).toBeNull();
+  });
+
+  it("removes the stored secret at the 24-hour limit", () => {
+    const ttl = 24 * 60 * 60 * 1_000;
+    savePartyRecovery(input(), () => 1);
+    expect(readPartyRecovery(() => ttl)).not.toBeNull();
+    expect(readPartyRecovery(() => ttl + 1)).toBeNull();
+    expect(window.localStorage.getItem(PARTY_RECOVERY_KEY)).toBeNull();
   });
 
   it("clear removes the record", () => {

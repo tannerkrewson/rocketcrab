@@ -10,27 +10,8 @@ churn on upgrade), and need no paid always-on server.
 
 ## Before beta
 
-- [ ] **Runtime isolation & camera/mic delegation (`apps/runtime`, `apps/nova`)**:
-      Keep `allow-same-origin` on the inner game iframe so `getUserMedia`
-      (camera & microphone) works for games, and harden the boundaries around
-      it:
-      update `apps/nova/vite.config.ts` `Permissions-Policy` from
-      `camera=(), microphone=()` to delegate `camera` and `microphone` to the
-      configured runtime origin (matching `runtime-host.ts` and
-      `apps/runtime/vite.config.ts`); recreate the outer runtime iframe on
-      every `RuntimeHostClient.load()` instead of reusing it
-      (`apps/nova/src/lib/runtime-host.ts`) so a previous game cannot leave
-      hooks on `window.parent` for the next game; add `frame-src 'none'` to the
-      runtime CSP (`apps/runtime/vite.config.ts`); and explicitly tell AI game
-      builders in `apps/nova/src/lib/prompt/master-prompt.ts` (alongside
-      `nova-api-reference.md`) that games can use the camera and microphone.
-- [ ] **Sandbox external game iframes (`apps/nova/src/components/party/ExternalGameFrame.tsx`)**:
-      Add a single uniform
-      `sandbox="allow-scripts allow-same-origin allow-forms allow-modals"`
-      across all external games (blocking `allow-top-navigation`,
-      `allow-top-navigation-by-user-activation`, `allow-popups` and
-      `allow-downloads` without per-game overrides) and verify the listed
-      external games still work.
+- [ ] Verify the external game catalog in a coordinated multiplayer pass with
+      the uniform iframe sandbox enabled.
 - [ ] **Peer-envelope verification & `NovaSession` authorization (`packages/protocol`, `packages/party`, `packages/nova-api`)**:
       Extract a shared peer-envelope verification helper (checking `sessionId`,
       `senderMemberId` and `senderConnectionId` against the transport envelope)
@@ -52,12 +33,6 @@ churn on upgrade), and need no paid always-on server.
       to persist only the display name, support passing `createUserIdentity()`
       for ephemeral multi-instance tests, and verify Safari Private Mode
       behavior when IndexedDB is restricted.
-- [ ] **Prompt XSS hygiene & recovery TTL**:
-      Add a rule to `apps/nova/src/lib/prompt/nova-api-reference.md` to render
-      `player.name` and other player strings with `textContent` rather than
-      interpolating into `innerHTML`. Expire `nova:party:recovery:v1` secrets
-      in `apps/nova/src/lib/party/party-recovery.ts` after 24 hours (`savedAt`)
-      instead of keeping them in `localStorage` indefinitely.
 - [ ] After the real-device checks below, evaluate room, link and game
       recovery before consolidating any other retry paths.
 

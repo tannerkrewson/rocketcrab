@@ -72,6 +72,7 @@ and keep the rules inside the handlers.
 - **Show every phase**: what a player sees before the game starts, while
   waiting for others, during play, and when it ends, including how to play
   again (an action that resets the state).
+- Games can request camera and microphone access via navigator.mediaDevices.getUserMedia.
 - **Fail visibly**: if something the game needs is missing (camera, WebGL, a
   CDN), show a clear message on screen instead of failing silently.
 

@@ -43,6 +43,7 @@ export function ExternalGameFrame({
       title={title}
       src={frame.src}
       className="h-full w-full border-0"
+      sandbox="allow-scripts allow-same-origin allow-forms allow-modals"
       referrerPolicy="no-referrer"
     />
   );

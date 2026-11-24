@@ -1,5 +1,7 @@
 # Nova API — AI Quick Reference
 
+Render player.name and other player-provided strings with `textContent`. Keep player input out of HTML strings passed to `innerHTML`. Games can request camera and microphone access via `navigator.mediaDevices.getUserMedia`. Handle permission denial in the game.
+
 The compact reference for AI-built Nova games; the master prompt embeds this
 file verbatim. `window.nova` already exists when your game's code runs, and it
 behaves the same in the editor's test arena and in real parties.

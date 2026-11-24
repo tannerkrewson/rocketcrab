@@ -232,12 +232,8 @@ export class RuntimeHostClient {
    */
   async load(game: LoadGameInput): Promise<void> {
     this.lastGame = game;
-    // Install the fresh channel handler before bootstrap so no runtime reply is missed.
-    if (this.port) {
-      this.port.onmessage = null;
-      this.port.onmessageerror = null;
-      this.port.close();
-    }
+    this.stopHeartbeat();
+    this.teardownFrame();
     const channel = this.createChannel();
     this.port = channel.port1;
     this.port.onmessage = (event: MessageEvent) => this.handleMessage(event.data);
@@ -248,13 +244,21 @@ export class RuntimeHostClient {
     this.missedPongs = 0;
     this.unresponsive = false;
 
-    const frame = await this.ensureFrame();
-    frame.contentWindow?.postMessage(
-      buildBootstrapMessage(game, this.runtimeInstanceId, this.sessionId),
-      this.runtimeOrigin,
-      [channel.port2 as Transferable],
-    );
-    await this.waitForReady();
+    const instanceId = this.runtimeInstanceId;
+    try {
+      const frame = await this.createFrame();
+      if (this.runtimeInstanceId !== instanceId) return;
+      frame.contentWindow?.postMessage(
+        buildBootstrapMessage(game, instanceId, game.sessionId),
+        this.runtimeOrigin,
+        [channel.port2 as Transferable],
+      );
+      await this.waitForReady();
+    } catch (error) {
+      if (this.runtimeInstanceId !== instanceId) return;
+      this.teardownFrame();
+      throw error;
+    }
   }
 
   /** Parent-controlled reload: re-run the current game in a clean frame. */
@@ -326,10 +330,7 @@ export class RuntimeHostClient {
     this.teardownFrame();
   }
 
-  private async ensureFrame(): Promise<HTMLIFrameElement> {
-    if (this.iframe) {
-      return this.iframe;
-    }
+  private async createFrame(): Promise<HTMLIFrameElement> {
     const iframe = document.createElement("iframe");
     // Allow runtime scripts and same-origin access without parent navigation.
     // Permission delegation passes through to the nested game frame.
@@ -339,14 +340,9 @@ export class RuntimeHostClient {
     iframe.setAttribute("title", "game runtime");
     iframe.style.cssText = "width:100%;height:100%;border:0;display:block";
     this.iframe = iframe;
-    this.container.appendChild(iframe);
     iframe.src = `${this.runtimeOrigin}/`;
-    try {
-      await this.waitForFrameLoad(iframe);
-    } catch (error) {
-      this.iframe = null;
-      throw error;
-    }
+    this.container.appendChild(iframe);
+    await this.waitForFrameLoad(iframe);
     return iframe;
   }
 
@@ -455,6 +451,13 @@ export class RuntimeHostClient {
   }
 
   private teardownFrame(): void {
+    if (this.readyTimer !== undefined) {
+      window.clearTimeout(this.readyTimer);
+      this.readyTimer = undefined;
+    }
+    const resolve = this.readyResolver;
+    this.readyResolver = null;
+    resolve?.();
     if (this.port) {
       this.port.onmessage = null;
       this.port.onmessageerror = null;

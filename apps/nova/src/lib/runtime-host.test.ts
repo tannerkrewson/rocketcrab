@@ -114,8 +114,8 @@ describe("RuntimeHostClient bootstrap", () => {
     await expect(loadPromise).rejects.toThrow(/bootstrap timed out/);
   });
 
-  it("replaces the previous channel on a fresh bootstrap", async () => {
-    const { bridge, port1, windowMessages } = createHarness();
+  it("replaces the previous frame and channel on a fresh bootstrap", async () => {
+    const { bridge, port1, frames, windowMessages } = createHarness();
     const first = bridge.load(loadGame);
     await flush();
     deliver(port1, readyMessage());
@@ -125,6 +125,8 @@ describe("RuntimeHostClient bootstrap", () => {
     const second = bridge.load({ ...loadGame, gameId: "game-2" });
     await flush();
     expect(port1.closed).toBe(true);
+    expect(frames).toHaveLength(2);
+    expect(frames[0]?.isConnected).toBe(false);
     await vi.waitFor(() => expect(windowMessages).toHaveLength(2));
     const bootstrap = windowMessages.at(-1)?.data as Record<string, unknown>;
     expect(bootstrap.gameId).toBe("game-2");

@@ -3,6 +3,7 @@ import { sessionSecretSchema } from "@rocketcrab/protocol";
 export const PARTY_RECOVERY_KEY = "nova:party:recovery:v1";
 /** Record schema version; bumping it invalidates old records. */
 export const PARTY_RECOVERY_VERSION = 1;
+const RECOVERY_TTL_MS = 24 * 60 * 60 * 1_000;
 
 export interface PartyRecoveryRecord {
   readonly version: typeof PARTY_RECOVERY_VERSION;
@@ -45,13 +46,18 @@ export function savePartyRecovery(
   }
 }
 
-export function readPartyRecovery(): PartyRecoveryRecord | null {
+export function readPartyRecovery(now: () => number = Date.now): PartyRecoveryRecord | null {
   try {
     const raw = window.localStorage.getItem(PARTY_RECOVERY_KEY);
     if (raw === null) {
       return null;
     }
-    return parsePartyRecovery(raw);
+    const record = parsePartyRecovery(raw);
+    if (record === null || now() - record.savedAt >= RECOVERY_TTL_MS) {
+      clearPartyRecovery();
+      return null;
+    }
+    return record;
   } catch {
     return null;
   }

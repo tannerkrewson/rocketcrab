@@ -59,29 +59,32 @@ function cspMetaPlugin(): Plugin {
       };
     },
     generateBundle() {
+      const origin = runtimeOrigin();
+      const mediaAllowlist = origin ? `(self "${origin}")` : "()";
       this.emitFile({
         type: "asset",
         fileName: "_headers",
-        source: `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  X-Frame-Options: DENY\n  Cross-Origin-Opener-Policy: same-origin\n  Permissions-Policy: camera=(), microphone=(), geolocation=(), payment=(), usb=()\n  Content-Security-Policy: ${buildCsp()}; frame-ancestors 'none'\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n`,
+        source: `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  X-Frame-Options: DENY\n  Cross-Origin-Opener-Policy: same-origin\n  Permissions-Policy: camera=${mediaAllowlist}, microphone=${mediaAllowlist}, geolocation=(), payment=(), usb=()\n  Content-Security-Policy: ${buildCsp()}; frame-ancestors 'none'\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n`,
       });
     },
   };
 }
 
+function runtimeOrigin(): string {
+  const rawOrigin = process.env.VITE_RUNTIME_ORIGIN?.trim();
+  return rawOrigin ? new URL(rawOrigin).origin : "";
+}
+
 function buildCsp(): string {
-  const rawOrigin = process.env.VITE_RUNTIME_ORIGIN?.trim() ?? "";
-  if (rawOrigin === "") {
+  const origin = runtimeOrigin();
+  if (origin === "") {
     console.warn(
       "[nova-csp-meta] VITE_RUNTIME_ORIGIN is not set: frame-src is omitted, so the " +
         "runtime iframe will be blocked by the strict CSP. The deploy script sets " +
         "this for every production deploy (deploy/README.md).",
     );
   }
-  const runtimeOrigin = rawOrigin === "" ? "" : new URL(rawOrigin).origin;
-  const frameSources = [
-    ...(runtimeOrigin === "" ? [] : [runtimeOrigin]),
-    ...EXTERNAL_FRAME_ORIGINS,
-  ];
+  const frameSources = [...(origin === "" ? [] : [origin]), ...EXTERNAL_FRAME_ORIGINS];
   // Explicit same-host WebSocket source for Safari versions where 'self'
   // does not match wss:. The deploy script already pins the app for the runtime.
   const mainOrigin = process.env.VITE_MAIN_ORIGIN?.trim();

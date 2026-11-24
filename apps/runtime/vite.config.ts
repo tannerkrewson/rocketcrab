@@ -32,7 +32,7 @@ function runtimeHeaders(): Plugin {
       this.emitFile({
         type: "asset",
         fileName: "_headers",
-        source: `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  Cross-Origin-Opener-Policy: same-origin\n  Permissions-Policy: camera=(self), microphone=(self), clipboard-read=(), clipboard-write=(), fullscreen=(self)\n  Content-Security-Policy: default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors ${mainOrigin}; object-src 'none'; worker-src 'none'; base-uri 'self'\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n`,
+        source: `/*\n  X-Content-Type-Options: nosniff\n  Referrer-Policy: no-referrer\n  Cross-Origin-Opener-Policy: same-origin\n  Permissions-Policy: camera=(self), microphone=(self), clipboard-read=(), clipboard-write=(), fullscreen=(self)\n  Content-Security-Policy: default-src * data: blob: 'unsafe-inline' 'unsafe-eval'; frame-ancestors ${mainOrigin}; frame-src 'none'; object-src 'none'; worker-src 'none'; base-uri 'self'\n/assets/*\n  Cache-Control: public, max-age=31536000, immutable\n`,
       });
     },
   };

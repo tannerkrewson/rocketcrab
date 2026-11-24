@@ -37,7 +37,6 @@ function createFrameFactory(): FrameFactory {
       frame.setAttribute("allow", [...allow].join("; "));
       frame.allowFullscreen = true;
       frame.setAttribute("title", "game sandbox");
-      frame.src = "about:blank";
       container.replaceChildren(frame);
       const doc = frame.contentDocument;
       if (doc) {
