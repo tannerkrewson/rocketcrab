@@ -321,7 +321,15 @@ export function GameBrowser({
           soft
           className="self-start"
           onClick={handleBack}
-          title={compact ? "Back to lobby" : "Back to home"}
+          title={
+            showingList
+              ? "Back to categories"
+              : onPick !== undefined || onPickSaved !== undefined
+                ? "Back to the game"
+                : compact
+                  ? "Back to lobby"
+                  : "Back to home"
+          }
         >
           <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           Back

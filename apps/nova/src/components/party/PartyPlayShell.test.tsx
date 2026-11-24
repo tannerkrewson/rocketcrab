@@ -120,7 +120,9 @@ async function renderShell(
 describe("PartyPlayShell in-game chrome", () => {
   it("shows the Rocketcrab wordmark in the top bar", async () => {
     await renderShell(makeState());
-    expect(screen.getByTestId("browser-brand-row")).toHaveTextContent("rocketcrab.com");
+    expect(screen.getByRole("button", { name: "Copy the invite link" })).toHaveTextContent(
+      "rocketcrab.com",
+    );
     expect(screen.queryByText("Rocket Rumble")).not.toBeInTheDocument();
     expect(screen.queryByText("connected")).not.toBeInTheDocument();
     expect(screen.queryByLabelText("Party code ABCD")).not.toBeInTheDocument();
@@ -131,7 +133,7 @@ describe("PartyPlayShell in-game chrome", () => {
     await userEvent.click(screen.getByRole("button", { name: /hide the top bar/i }));
     expect(screen.getByRole("button", { name: /show the top bar/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /menu/i })).not.toBeInTheDocument();
-    expect(screen.queryByTestId("browser-brand-row")).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Copy the invite link" })).not.toBeInTheDocument();
     await userEvent.click(screen.getByRole("button", { name: /show the top bar/i }));
     expect(screen.getByRole("button", { name: /menu/i })).toBeInTheDocument();
   });
@@ -278,7 +280,11 @@ describe("PartyPlayShell in-game chrome", () => {
     await userEvent.click(screen.getByRole("menuitem", { name: /browse games/i }));
     expect(screen.queryByRole("menu", { name: /game menu/i })).not.toBeInTheDocument();
     expect(screen.getByRole("dialog", { name: "Pick a game" })).toBeInTheDocument();
-    await userEvent.click(screen.getByRole("button", { name: /back to the game/i }));
+    await userEvent.click(
+      within(screen.getByRole("dialog", { name: "Pick a game" })).getByRole("button", {
+        name: "Back",
+      }),
+    );
     expect(screen.queryByRole("dialog", { name: "Pick a game" })).not.toBeInTheDocument();
   });
 
@@ -304,7 +310,10 @@ describe("PartyPlayShell in-game chrome", () => {
         play: expect.objectContaining({ kind: "external" }),
       }),
     );
-    await userEvent.click(screen.getByRole("button", { name: /back to the game/i }));
+    const back = within(browse).getByRole("button", { name: "Back" });
+    await userEvent.click(back);
+    expect(within(browse).getByRole("region", { name: "Categories" })).toBeInTheDocument();
+    await userEvent.click(back);
     expect(screen.queryByRole("dialog", { name: "Pick a game" })).not.toBeInTheDocument();
   });
 
@@ -329,15 +338,14 @@ describe("PartyPlayShell in-game chrome", () => {
     expect(screen.queryByRole("dialog", { name: "About Drawphone" })).not.toBeInTheDocument();
   });
 
-  it("copies the invite URL from the game menu", async () => {
+  it("copies the invite URL from the wordmark", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText },
       configurable: true,
     });
     await renderShell(makeState());
-    await userEvent.click(screen.getByRole("button", { name: "Menu" }));
-    await userEvent.click(screen.getByRole("menuitem", { name: "Copy invite link" }));
+    await userEvent.click(screen.getByRole("button", { name: "Copy the invite link" }));
     expect(writeText).toHaveBeenCalledWith(
       "http://localhost:2722/join#code=abcd&secret=invite-secret",
     );

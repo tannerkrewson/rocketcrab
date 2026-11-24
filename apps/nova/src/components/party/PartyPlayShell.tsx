@@ -1,9 +1,6 @@
 import {
   ArrowLeft,
   BookOpen,
-  ChevronDown,
-  ChevronUp,
-  Copy,
   Eraser,
   Gamepad2,
   Menu,
@@ -20,7 +17,6 @@ import { writeToClipboard } from "../../lib/editor/clipboard";
 import { clearBrowseContext } from "../../lib/browse/back-context";
 import { cn } from "../../lib/cn";
 import type { PartyEngineState } from "../../lib/party/engine";
-import { BrandHeader } from "../layout/BrandHeader";
 import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { GameBrowser } from "./GameBrowser";
@@ -98,24 +94,36 @@ export function PartyPlayShell({
   return (
     <div className="fixed inset-0 z-40 flex flex-col bg-black" data-testid="party-play-view">
       {!barHidden ? (
-        <header className="relative z-50 flex items-center gap-2 bg-overlay px-3 pb-2 pt-safe">
+        <header className="relative z-50 grid grid-cols-[1fr_auto_1fr] items-center gap-2 bg-overlay px-3 pb-2 pt-safe">
           <Button
             size="sm"
             variant="tertiary"
-            className="shrink-0"
+            className="justify-self-start"
             onClick={() => setBarHidden(true)}
             aria-label="Hide the top bar"
             title="Hide the top bar"
           >
-            <ChevronUp className="size-4" aria-hidden="true" />
+            <img src="/rocketcrab-logo-no-glow.svg" alt="" width={26} height={26} />
           </Button>
 
-          <BrandHeader className="mx-auto" />
+          <Button
+            variant="tertiary"
+            size="sm"
+            className="h-auto px-0 font-title text-lg font-black whitespace-nowrap md:text-xl"
+            onPress={() => void copyInvite()}
+            disabled={state.inviteUrl === null}
+            title="Copy the invite link"
+            aria-label="Copy the invite link"
+          >
+            <span>
+              rocketcrab<span className="text-primary">.com</span>
+            </span>
+          </Button>
 
           <Button
             size="sm"
             variant="tertiary"
-            className="shrink-0"
+            className="justify-self-end"
             aria-label="Menu"
             aria-expanded={menuOpen}
             onClick={() => setPanel(menuOpen ? null : "menu")}
@@ -139,21 +147,6 @@ export function PartyPlayShell({
                 >
                   <Users className="h-4 w-4" aria-hidden="true" />
                   Players
-                </button>
-              </li>
-              <li>
-                <button
-                  type="button"
-                  role="menuitem"
-                  className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold hover:bg-surface-secondary disabled:opacity-50"
-                  disabled={state.inviteUrl === null}
-                  onClick={() => {
-                    setPanel(null);
-                    void copyInvite();
-                  }}
-                >
-                  <Copy className="size-4" aria-hidden="true" />
-                  Copy invite link
                 </button>
               </li>
               {/* Host only: replacing the game ends it for every player. */}
@@ -410,15 +403,6 @@ export function PartyPlayShell({
               aria-label="Pick a game"
             >
               <div className="flex items-center gap-2 bg-surface-secondary px-3 py-2">
-                <Button
-                  variant="default"
-                  size="md"
-                  onClick={() => setPanel(null)}
-                  aria-label="Back to the game"
-                >
-                  <ArrowLeft className="h-4 w-4" aria-hidden="true" />
-                  Back
-                </Button>
                 <p className="font-black">Pick a game</p>
               </div>
               <div className="min-h-0 overflow-y-auto p-3 md:p-4">
@@ -445,7 +429,7 @@ export function PartyPlayShell({
           aria-label="Show the top bar"
           title="Show the top bar"
         >
-          <ChevronDown className="size-4" aria-hidden="true" />
+          <img src="/rocketcrab-logo-no-glow.svg" alt="" width={28} height={28} />
         </Button>
       ) : null}
 

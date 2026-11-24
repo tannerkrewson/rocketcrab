@@ -12,8 +12,6 @@ churn on upgrade), and need no paid always-on server.
 
 - [ ] Surface game selection failures as temporary toasts and keep the game
       library open so the host can retry or choose another game.
-- [ ] Restore the in-game Rocketcrab logo as the hide and show control.
-- [ ] Use one Back control in the in-game game picker.
 
 ## Before beta
 
