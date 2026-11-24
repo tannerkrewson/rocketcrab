@@ -733,9 +733,14 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       // immediately (the connection dropped), elects itself deterministically,
       // restores the replicated state, and continues the game.
       await a.leave();
-      await settle(harness);
-      expect(b.getStateModeDiagnostics().authorityMemberId).toBeNull(); // electing
-      expect(b.getStateModeDiagnostics().electionInProgress).toBe(true);
+      // In-memory delivery starts the election on drain. Observe it before
+      // yielding to timers, so a busy event loop can't skip the short window.
+      harness.drain();
+      await vi.waitFor(() => expect(b.getStateModeDiagnostics().electionInProgress).toBe(true), {
+        timeout: 5_000,
+        interval: 5,
+      });
+      expect(b.getStateModeDiagnostics().authorityMemberId).toBeNull();
       // A dispatch during the election buffers and completes after migration.
       const dispatched = b.client.dispatch({ type: "drawCard" });
       await vi.waitFor(
