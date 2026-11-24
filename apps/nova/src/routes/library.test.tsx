@@ -26,7 +26,7 @@ beforeEach(async () => {
 });
 
 describe("/library", () => {
-  it("shows the empty state with only the header New-game CTA (2t1.5/ini)", async () => {
+  it("shows the empty state with only the header New-game CTA", async () => {
     renderLibrary();
     expect(await screen.findByText("No saved games yet")).toBeInTheDocument();
     const ctas = screen.getAllByRole("link", { name: "New game" });
@@ -35,7 +35,7 @@ describe("/library", () => {
     expect(screen.queryByText(/Games are saved right in this browser/)).not.toBeInTheDocument();
   });
 
-  it("shows ONE back button and a New-game action in the header (2t1.5)", async () => {
+  it("shows ONE back button and a New-game action in the header", async () => {
     await gameRepository.create({ title: "Rockets", html: "<p>a</p>" });
     renderLibrary();
 

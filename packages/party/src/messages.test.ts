@@ -11,7 +11,7 @@ describe("party control channel", () => {
     expect(PARTY_CONTROL_CHANNEL).toMatch(/^nova\./u);
   });
 
-  it("builds a validated party.rename announcement (7.25)", () => {
+  it("builds a validated party.rename announcement", () => {
     const message = buildPartyRenameMessage(
       {
         sessionId: "session-1",

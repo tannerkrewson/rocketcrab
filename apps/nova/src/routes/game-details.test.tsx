@@ -137,7 +137,7 @@ beforeEach(async () => {
   await gameRepository.clear();
 });
 
-describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () => {
+describe("/game/:gameId — saved games and party selection", () => {
   it("renders saved-game details from the repository (title, description)", async () => {
     const game = await gameRepository.create({
       title: "Rocket Rumble",
@@ -160,7 +160,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     expect(screen.getByTestId("browser-brand-row")).toHaveTextContent("rocketcrab.com");
   });
 
-  it("selects a saved game for the active party and returns to the lobby (10.9)", async () => {
+  it("selects a saved game for the active party and returns to the lobby", async () => {
     stubs.mode = "lobby";
     const game = await gameRepository.create({
       title: "Rocket Rumble",
@@ -183,7 +183,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     expect(screen.queryByRole("button", { name: /select game/i })).not.toBeInTheDocument();
   });
 
-  it("selects an external game for the active party (10.9)", async () => {
+  it("selects an external game for the active party", async () => {
     stubs.mode = "lobby";
     const router = renderAt("/game/drawphone");
 
@@ -196,7 +196,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
   });
 
-  it("shares the party shell header (unlinked brand row) while in a lobby (5cl.8)", async () => {
+  it("shares the party shell header (unlinked brand row) while in a lobby", async () => {
     stubs.mode = "lobby";
     renderAt("/game/drawphone?from=party-browse");
 
@@ -211,7 +211,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     expect(select.className).toContain("button--primary");
   });
 
-  it("tells a guest that the host picks when they press Select game (2t1.10)", async () => {
+  it("tells a guest that the host picks when they press Select game", async () => {
     stubs.mode = "guest";
     renderAt("/game/drawphone");
 
@@ -260,7 +260,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     expect(stubEngine.leaveParty).toHaveBeenCalledTimes(1);
   });
 
-  it("offers a same-size primary Start-party CTA for external games outside a party (2t1.10)", async () => {
+  it("offers a same-size primary Start-party CTA for external games outside a party", async () => {
     renderAt("/game/drawphone");
 
     const start = await screen.findByRole("link", { name: "Start party" });

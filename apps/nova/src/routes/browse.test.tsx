@@ -27,7 +27,7 @@ beforeEach(() => {
 });
 
 describe("/browse", () => {
-  it("shows only the category cards by default — no game list, no All-games box (10.9/2t1.1)", async () => {
+  it("shows only the category cards by default — no game list, no All-games box", async () => {
     renderAt("/browse");
     expect(await screen.findByRole("heading", { name: "Games" })).toBeInTheDocument();
     expect(screen.getByTestId("browser-brand-row")).toHaveTextContent("rocketcrab.com");
@@ -38,7 +38,7 @@ describe("/browse", () => {
     expect(screen.queryByText("Drawphone")).not.toBeInTheDocument();
   });
 
-  it("renders the search input with its magnifier icon — no empty gap (3wf)", async () => {
+  it("renders the search input with its magnifier icon — no empty gap", async () => {
     renderAt("/browse");
     const searchbox = await screen.findByRole("searchbox", { name: "Search games" });
     expect(searchbox).toHaveClass("pl-10");
@@ -77,7 +77,7 @@ describe("/browse", () => {
     expect(screen.getByRole("button", { name: /back/i })).toBeInTheDocument();
   });
 
-  it("returns to the category cards from an open category via the unified back (2t1.1)", async () => {
+  it("returns to the category cards from an open category via the unified back", async () => {
     renderAt("/browse");
     await screen.findByRole("button", { name: /Trivia/ });
     await userEvent.click(screen.getByRole("button", { name: /Trivia/ }));
@@ -88,7 +88,7 @@ describe("/browse", () => {
     expect(screen.queryByText("Protobowl")).not.toBeInTheDocument();
   });
 
-  it("navigates home from the top-level back button (2t1.1)", async () => {
+  it("navigates home from the top-level back button", async () => {
     const router = renderAt("/browse");
     await screen.findByRole("button", { name: /back/i });
 
@@ -96,13 +96,13 @@ describe("/browse", () => {
     await waitFor(() => expect(router.state.location.pathname).toBe("/"));
   });
 
-  it("links the My games box to the library page (5cl.12)", async () => {
+  it("links the My games box to the library page", async () => {
     renderAt("/browse");
     const myGames = await screen.findByRole("link", { name: /My games/ });
     expect(myGames.getAttribute("href")).toBe("/library");
   });
 
-  it("returns to the category from the details page's back button (5cl.7)", async () => {
+  it("returns to the category from the details page's back button", async () => {
     const router = renderAt("/browse");
     await screen.findByRole("button", { name: /Drawing/ });
     await userEvent.click(screen.getByRole("button", { name: /Drawing/ }));
@@ -142,7 +142,7 @@ describe("/game/:gameId", () => {
     expect(screen.getByTestId("browser-brand-row")).toHaveTextContent("rocketcrab.com");
   });
 
-  it("puts the facts and actions above the screenshots and the About text (l41)", async () => {
+  it("puts the facts and actions above the screenshots and the About text", async () => {
     renderAt("/game/drawphone");
     await screen.findByRole("heading", { name: "Drawphone" });
 

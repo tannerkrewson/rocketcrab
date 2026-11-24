@@ -183,7 +183,7 @@ describe("/party", () => {
     expect(stubEngine.createParty).not.toHaveBeenCalled();
   });
 
-  it("starts the party as soon as the name is entered (rocketcrab-9j3)", async () => {
+  it("starts the party as soon as the name is entered", async () => {
     renderParty("/party");
     fireEvent.change(await screen.findByLabelText("Enter your name here"), {
       target: { value: "Ada" },
@@ -193,7 +193,7 @@ describe("/party", () => {
     await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledWith());
   });
 
-  it("skips the entry page for a returning player with a saved name (7.37)", async () => {
+  it("skips the entry page for a returning player with a saved name", async () => {
     updatePartyDisplayName("Ada");
     renderParty("/party");
     await waitFor(() => expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada"));
@@ -304,7 +304,7 @@ describe("/party", () => {
     expect(stubEngine.createParty).not.toHaveBeenCalled();
   });
 
-  describe("host URL normalization to /<code> (rocketcrab-r0f)", () => {
+  describe("host URL normalization to /<code>", () => {
     it("replaces /party with /<code> once a party is active", async () => {
       updatePartyDisplayName("Ada");
       const router = renderParty("/party");
@@ -317,7 +317,7 @@ describe("/party", () => {
       );
     });
 
-    it("keeps /party?browse=true in browse mode (5cl.7 back-to-category entry)", async () => {
+    it("keeps /party?browse=true in browse mode (back-to-category entry)", async () => {
       stubs.started = true;
       const router = renderParty("/party?browse=true");
       // The router serializes the boolean as ?browse=true; ?browse=1 does not round-trip.

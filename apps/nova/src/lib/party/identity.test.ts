@@ -33,13 +33,13 @@ describe("party identity", () => {
     expect(localPartyIdentity()).toEqual(first);
   });
 
-  it("uses the saved player name as the display name (7.5)", () => {
+  it("uses the saved player name as the display name", () => {
     setSavedPlayerName("Ada");
     expect(localPartyIdentity().displayName).toBe("Ada");
     expect(getSavedPlayerName()).toBe("Ada");
   });
 
-  it("generates a fallback name when the player never set one (7.5)", () => {
+  it("generates a fallback name when the player never set one", () => {
     expect(getSavedPlayerName()).toBeNull();
     expect(localPartyIdentity().displayName).toMatch(/^Player [A-F0-9]{4}$/);
   });

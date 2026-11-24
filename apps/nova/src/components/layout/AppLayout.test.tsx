@@ -86,7 +86,7 @@ describe("AppLayout", () => {
     expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "molten");
   });
 
-  it("shows the background on every page when no game is live (5cl.4/22n)", async () => {
+  it("shows the background on every page when no game is live", async () => {
     renderAt("/");
     await screen.findByRole("heading", { name: "rocketcrab.com" });
     expect(screen.getByTestId("app-background")).toBeInTheDocument();
@@ -96,7 +96,7 @@ describe("AppLayout", () => {
     expect(screen.getByTestId("app-background")).toBeInTheDocument();
   });
 
-  it("links the library page back home and to build (2t1.5)", async () => {
+  it("links the library page back home and to build", async () => {
     renderAt("/library");
     await screen.findByRole("heading", { name: "My games" });
 
@@ -110,7 +110,7 @@ describe("AppLayout", () => {
     expect(screen.queryByRole("link", { name: /Browse games/ })).not.toBeInTheDocument();
   });
 
-  it("gives every content page an explicit way back home (11.1/2t1.1)", async () => {
+  it("gives every content page an explicit way back home", async () => {
     for (const [path, heading] of [
       ["/browse", "Games"],
       ["/library", "My games"],

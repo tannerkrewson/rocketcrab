@@ -68,8 +68,8 @@ beforeEach(async () => {
   leavePartyMock.mockClear();
 });
 
-describe("GameBrowser exit links (8z9)", () => {
-  it("asks 'Leave the party?' before New game in party mode, and leaves first (8z9)", async () => {
+describe("GameBrowser exit links", () => {
+  it("asks 'Leave the party?' before New game in party mode, and leaves first", async () => {
     const router = await renderBrowser({ inParty: true });
 
     await userEvent.click(screen.getByRole("button", { name: /My games/ }));
@@ -113,7 +113,7 @@ describe("GameBrowser exit links (8z9)", () => {
     expect(leavePartyMock).not.toHaveBeenCalled();
   });
 
-  it("does not prompt outside a party — New game stays a plain link (8z9)", async () => {
+  it("does not prompt outside a party — New game stays a plain link", async () => {
     const router = await renderBrowser({ inParty: false });
 
     await userEvent.click(screen.getByRole("button", { name: /My games/ }));

@@ -36,7 +36,7 @@ afterEach(() => {
 });
 
 describe("/build — page 1 (hero)", () => {
-  it("opens with one cohesive 'Introducing Nova' hero card and three steps (gmo)", async () => {
+  it("opens with one cohesive 'Introducing Nova' hero card and three steps", async () => {
     renderBuild();
 
     const hero = await screen.findByTestId("build-hero");
@@ -72,7 +72,7 @@ describe("/build — page 1 (hero)", () => {
     expect(within(items[2]!).getByText("Paste it in the editor")).toBeInTheDocument();
   });
 
-  it("no longer offers the start-another-way row (9fv.11.14)", async () => {
+  it("no longer offers the start-another-way row", async () => {
     renderBuild();
 
     await screen.findByRole("heading", { name: "Introducing Nova" });

@@ -118,7 +118,7 @@ describe("/", () => {
     );
   });
 
-  it("styles the party buttons solid primary and the stack as glass (2t1.8/5cl.5)", async () => {
+  it("styles the party buttons solid primary and the stack as glass", async () => {
     renderHome();
     const primaryRow = await screen.findByRole("region", { name: "Start or join a party" });
     for (const button of Array.from(primaryRow.children)) {
@@ -142,7 +142,7 @@ describe("/", () => {
     );
   });
 
-  it("no longer shows the Recent games section (7.35)", async () => {
+  it("no longer shows the Recent games section", async () => {
     renderHome();
     await screen.findByRole("heading", { name: "rocketcrab.com" });
     expect(screen.queryByRole("heading", { name: "Recent games" })).not.toBeInTheDocument();
@@ -150,13 +150,13 @@ describe("/", () => {
     expect(screen.queryByText("No games yet")).not.toBeInTheDocument();
   });
 
-  it("renders the title in the Inconsolata Variable brand font (9fv.11.5)", async () => {
+  it("renders the title in the Inconsolata Variable brand font", async () => {
     renderHome();
     const title = await screen.findByRole("heading", { name: "rocketcrab.com" });
     expect(title).toHaveClass("font-title");
   });
 
-  it("leaves any active party when the homepage is shown (8z9)", async () => {
+  it("leaves any active party when the homepage is shown", async () => {
     partyStub.party.active = true;
     renderHome();
     await screen.findByRole("heading", { name: "rocketcrab.com" });

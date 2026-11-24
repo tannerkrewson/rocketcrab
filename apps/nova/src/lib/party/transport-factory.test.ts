@@ -110,7 +110,7 @@ describe("createTrysteroPartyTransportFactory", () => {
     }
   });
 
-  it("threads an onJoinError observer to BOTH transports (5cl.1)", () => {
+  it("threads an onJoinError observer to BOTH transports", () => {
     const onJoinError = vi.fn();
     const factory = createTrysteroPartyTransportFactory({ onJoinError });
     factory.createPrivateTransport({

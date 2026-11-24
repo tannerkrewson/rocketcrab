@@ -142,7 +142,7 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
 }
 
 describe("PartyLobby", () => {
-  it("lists players with connection + transfer states only (10.8/11.9)", async () => {
+  it("lists players with connection + transfer states only", async () => {
     await renderLobby(makeState());
     const rowA = screen.getByTestId("party-member-member-a");
     const rowB = screen.getByTestId("party-member-member-b");
@@ -161,7 +161,7 @@ describe("PartyLobby", () => {
     expect(within(rowB).queryByTitle("Not ready")).not.toBeInTheDocument();
   });
 
-  it("hides the start controls from joiners — start is host-only (rocketcrab-b73)", async () => {
+  it("hides the start controls from joiners — start is host-only", async () => {
     const state = makeState({ role: "joiner", amHost: false, canForceStart: true });
     await renderLobby(state);
     expect(screen.queryByRole("button", { name: /start game/i })).not.toBeInTheDocument();
@@ -189,12 +189,12 @@ describe("PartyLobby", () => {
     expect(screen.getByRole("button", { name: /start game/i })).toBeEnabled();
   });
 
-  it("shows the start controls to the host only when the party is in the lobby (b73)", async () => {
+  it("shows the start controls to the host only when the party is in the lobby", async () => {
     await renderLobby(makeState());
     expect(screen.queryByText(/not in the lobby yet/i)).not.toBeInTheDocument();
   });
 
-  it("labels a host peer's tile 'Host', never 'Greeter' (rocketcrab-rfk)", async () => {
+  it("labels a host peer's tile 'Host', never 'Greeter'", async () => {
     const state = makeState({
       role: "joiner",
       members: [
@@ -249,14 +249,14 @@ describe("PartyLobby", () => {
     expect(within(rowB).getByText("retries exhausted")).toBeInTheDocument();
   });
 
-  it("shows no greeter/authority badges and no connection diagnostics (10.7)", async () => {
+  it("shows no greeter/authority badges and no connection diagnostics", async () => {
     await renderLobby(makeState());
     expect(screen.queryByText(/Greeter:/)).not.toBeInTheDocument();
     expect(screen.queryByText(/Authority \(diagnostic\)/)).not.toBeInTheDocument();
     expect(screen.queryByText("Connection diagnostics")).not.toBeInTheDocument();
   });
 
-  it("does not show the pick-a-game blocker text near the buttons (10.7)", async () => {
+  it("does not show the pick-a-game blocker text near the buttons", async () => {
     const state = makeState({
       game: null,
       canStart: false,
@@ -267,7 +267,7 @@ describe("PartyLobby", () => {
     expect(screen.queryByText(/pick a game before starting/i)).not.toBeInTheDocument();
   });
 
-  it("shows the start-blocked reason as a styled outline alert when a game is selected (10.7)", async () => {
+  it("shows the start-blocked reason as a styled outline alert when a game is selected", async () => {
     const state = makeState({
       startBlockedReason: "Waiting for every player's game to load and register.",
     });
@@ -277,7 +277,7 @@ describe("PartyLobby", () => {
     expect(within(alert).getByText(/waiting for every player/i)).toBeInTheDocument();
   });
 
-  it("shows ONE compact notice banner with the latest non-membership notice (11.8/2z9)", async () => {
+  it("shows ONE compact notice banner with the latest non-membership notice", async () => {
     const state = makeState({
       canStart: true,
       startBlockedReason: null,
@@ -296,7 +296,7 @@ describe("PartyLobby", () => {
     expect(toastMock.warning).not.toHaveBeenCalled();
   });
 
-  it("toasts a removed-notice instead of showing it as a banner alert (2z9)", async () => {
+  it("toasts a removed-notice instead of showing it as a banner alert", async () => {
     const state = makeState({
       canStart: true,
       startBlockedReason: null,
@@ -311,7 +311,7 @@ describe("PartyLobby", () => {
     expect(within(screen.getByRole("alert")).getByText("The game started.")).toBeInTheDocument();
   });
 
-  it("does not re-toast a membership notice on ordinary re-renders (2z9 dedupe)", async () => {
+  it("does not re-toast a membership notice on ordinary re-renders (dedupe)", async () => {
     const state = makeState({
       canStart: true,
       startBlockedReason: null,
@@ -329,7 +329,7 @@ describe("PartyLobby", () => {
     expect(toastMock.info).toHaveBeenCalledTimes(1);
   });
 
-  it("shows NO game-ended alert after a game ends — the ended banner is gone (5cl.9)", async () => {
+  it("shows NO game-ended alert after a game ends — the ended banner is gone", async () => {
     const state = makeState({
       endedReason: "host_closed",
       canStart: false,
@@ -350,7 +350,7 @@ describe("PartyLobby", () => {
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
-  it("places the action row above the players box and leave at the bottom (10.7)", async () => {
+  it("places the action row above the players box and leave at the bottom", async () => {
     await renderLobby(makeState());
     const browse = screen.getByRole("button", { name: /browse games/i });
     const start = screen.getByRole("button", { name: /start game/i });
@@ -411,7 +411,7 @@ describe("PartyLobby", () => {
     expect(onLeave).toHaveBeenCalled();
   });
 
-  it("browses games with the shared browse UI when the party has none (7.6/7.43)", async () => {
+  it("browses games with the shared browse UI when the party has none", async () => {
     const state = makeState({
       game: null,
       canStart: false,
@@ -431,7 +431,7 @@ describe("PartyLobby", () => {
     expect(screen.queryByRole("button", { name: /back to lobby/i })).not.toBeInTheDocument();
   });
 
-  it("links a saved game to its details page instead of picking it (10.9)", async () => {
+  it("links a saved game to its details page instead of picking it", async () => {
     const state = makeState({ game: null, canStart: false, canForceStart: false });
     const game = await gameRepository.create({
       title: "Rocket Rumble",
@@ -445,7 +445,7 @@ describe("PartyLobby", () => {
     expect(savedLink.tagName.toLowerCase()).toBe("a");
   });
 
-  it("links a listed game to its details page instead of picking it (10.9)", async () => {
+  it("links a listed game to its details page instead of picking it", async () => {
     const state = makeState({ game: null, canStart: false, canForceStart: false });
     await renderLobby(state);
     await userEvent.click(screen.getByRole("button", { name: /browse games/i }));
@@ -455,14 +455,14 @@ describe("PartyLobby", () => {
     expect(protobowl.getAttribute("href")).toBe("/game/protobowl?from=party-browse");
   });
 
-  it("tells joiners the party is waiting when it has no game — naming the host (2t1.9/5cl.9)", async () => {
+  it("tells joiners the party is waiting when it has no game — naming the host", async () => {
     const state = makeState({ role: "joiner", amHost: false, game: null });
     await renderLobby(state);
     expect(screen.getByText("Waiting for Player A to select a game")).toBeInTheDocument();
     expect(screen.queryByText("No game selected yet")).not.toBeInTheDocument();
   });
 
-  it("renames on the same name screen as first entry, without leaving the lobby (2t1.9)", async () => {
+  it("renames on the same name screen as first entry, without leaving the lobby", async () => {
     const onEditName = vi.fn();
     await renderLobby(makeState(), { onEditName });
     expect(screen.queryByLabelText("Enter your name here")).not.toBeInTheDocument();
@@ -494,12 +494,12 @@ describe("PartyLobby", () => {
     expect(screen.queryByText(/you haven't set a name yet/i)).not.toBeInTheDocument();
   });
 
-  it("does not prompt for a name once one is saved (2t1.9)", async () => {
+  it("does not prompt for a name once one is saved", async () => {
     await renderLobby(makeState());
     expect(screen.queryByLabelText("Set your name")).not.toBeInTheDocument();
   });
 
-  it("labels the leave button End party when alone in the party (2t1.9)", async () => {
+  it("labels the leave button End party when alone in the party", async () => {
     const state = makeState({
       members: [makeState().members[0] as PartyMemberView],
     });
@@ -508,7 +508,7 @@ describe("PartyLobby", () => {
     expect(screen.queryByRole("button", { name: /leave party/i })).not.toBeInTheDocument();
   });
 
-  it("shows NO ended banner and disables start after a game ends (5cl.9)", async () => {
+  it("shows NO ended banner and disables start after a game ends", async () => {
     const state = makeState({
       endedReason: "host_closed",
       canStart: false,
@@ -525,7 +525,7 @@ describe("PartyLobby", () => {
     expect(screen.getByRole("button", { name: /start game/i })).toBeDisabled();
   });
 
-  it("shows a host-only kick button that confirms before removing the member (7.29/2z9)", async () => {
+  it("shows a host-only kick button that confirms before removing the member", async () => {
     const state = makeState({
       members: [
         {
@@ -565,7 +565,7 @@ describe("PartyLobby", () => {
     expect(onKickMember).toHaveBeenCalledWith("member-b");
   });
 
-  it("hides the kick button from joiners (7.29)", async () => {
+  it("hides the kick button from joiners", async () => {
     const state = makeState({
       role: "joiner",
       members: [
@@ -599,7 +599,7 @@ describe("PartyLobby", () => {
     expect(screen.queryByRole("button", { name: /kick/i })).not.toBeInTheDocument();
   });
 
-  it("shows the invite card with Copy URL + QR and no code/URL text (10.5/11.6)", async () => {
+  it("shows the invite card with Copy URL + QR and no code/URL text", async () => {
     await renderLobby(makeState());
     expect(screen.getByText("Get your friends to join!")).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /copy url/i })).toBeInTheDocument();
@@ -612,7 +612,7 @@ describe("PartyLobby", () => {
     expect(screen.queryByLabelText("Party invite QR code")).not.toBeInTheDocument();
   });
 
-  it("shares the invite URL through the native share sheet when supported (rocketcrab-ucz)", async () => {
+  it("shares the invite URL through the native share sheet when supported", async () => {
     const share = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "canShare", {
       value: vi.fn(() => true),
@@ -632,7 +632,7 @@ describe("PartyLobby", () => {
     Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
   });
 
-  it("hides the native Share button when canShare rejects the URL (rocketcrab-ucz)", async () => {
+  it("hides the native Share button when canShare rejects the URL", async () => {
     Object.defineProperty(navigator, "canShare", {
       value: vi.fn(() => false),
       configurable: true,
@@ -647,7 +647,7 @@ describe("PartyLobby", () => {
     Object.defineProperty(navigator, "share", { value: undefined, configurable: true });
   });
 
-  it("copies the invite URL from the Copy URL button (10.5)", async () => {
+  it("copies the invite URL from the Copy URL button", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText },
@@ -659,7 +659,7 @@ describe("PartyLobby", () => {
     Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
   });
 
-  it("offers no separate Copy short link affordance — copying is always the long URL (5cl.2)", async () => {
+  it("offers no separate Copy short link affordance — copying is always the long URL", async () => {
     await renderLobby(makeState());
     expect(screen.queryByRole("button", { name: /copy short link/i })).not.toBeInTheDocument();
     expect(screen.queryByText(/easy to type or read aloud/i)).not.toBeInTheDocument();
@@ -668,7 +668,7 @@ describe("PartyLobby", () => {
     expect(screen.queryByText(/invite-secret/)).not.toBeInTheDocument();
   });
 
-  it("opens the QR code in a modal without the invite secret (10.5)", async () => {
+  it("opens the QR code in a modal without the invite secret", async () => {
     await renderLobby(makeState());
     await userEvent.click(screen.getByRole("button", { name: /qr code/i }));
     const dialog = screen.getByRole("dialog", { name: "Party QR code" });
@@ -679,7 +679,7 @@ describe("PartyLobby", () => {
     expect(screen.queryByLabelText("Party invite QR code")).not.toBeInTheDocument();
   });
 
-  it("shows the welcome card with the selected game for the host (10.6)", async () => {
+  it("shows the welcome card with the selected game for the host", async () => {
     await renderLobby(makeState());
     const welcome = screen.getByLabelText("Welcome");
     expect(within(welcome).getByText("Welcome to rocketcrab!")).toBeInTheDocument();
@@ -693,7 +693,7 @@ describe("PartyLobby", () => {
     ).toBeInTheDocument();
   });
 
-  it("shows the guest welcome copy when a game is selected — naming the host (10.6/rocketcrab-ack)", async () => {
+  it("shows the guest welcome copy when a game is selected — naming the host", async () => {
     const state = makeState({
       role: "joiner",
       members: [
@@ -724,7 +724,7 @@ describe("PartyLobby", () => {
     expect(within(welcome).queryByText(/as the host/i)).not.toBeInTheDocument();
   });
 
-  it("shows the welcome card without a game selected (2t1.9)", async () => {
+  it("shows the welcome card without a game selected", async () => {
     const state = makeState({ game: null });
     await renderLobby(state);
     const welcome = screen.getByLabelText("Welcome");

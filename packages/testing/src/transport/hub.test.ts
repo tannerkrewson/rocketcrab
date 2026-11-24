@@ -23,7 +23,7 @@ function collectMessages(
 }
 
 describe("InMemoryTransportHub — messaging", () => {
-  it("drops in-flight messages to a reconnected transport's old connection so the new stream is never corrupted (9fv.4.5)", async () => {
+  it("drops in-flight messages to a reconnected transport's old connection so the new stream is never corrupted", async () => {
     // A receiver reconnect restarts its ordered stream at 1. Drop in-flight
     // messages stamped for the old connection so their stale stamps cannot
     // advance expectedSeq past the new stream and suppress fresh messages.

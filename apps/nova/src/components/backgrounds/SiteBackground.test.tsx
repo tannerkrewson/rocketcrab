@@ -75,7 +75,7 @@ function renderBackground(engine?: PartyEngine) {
   return render(<SiteBackground engine={engine} />);
 }
 
-describe("SiteBackground (22n)", () => {
+describe("SiteBackground", () => {
   it("renders the background when no party game is live (idle engine)", () => {
     const { engine } = makeEngine(IDLE_STATE);
     renderBackground(engine);

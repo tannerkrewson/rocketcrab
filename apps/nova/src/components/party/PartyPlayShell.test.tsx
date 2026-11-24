@@ -117,7 +117,7 @@ async function renderShell(
   return { props, ...result };
 }
 
-describe("PartyPlayShell in-game chrome (7.38)", () => {
+describe("PartyPlayShell in-game chrome", () => {
   it("shows the Rocketcrab wordmark in the top bar", async () => {
     await renderShell(makeState());
     expect(screen.getByTestId("browser-brand-row")).toHaveTextContent("rocketcrab.com");
@@ -126,7 +126,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(screen.queryByLabelText("Party code ABCD")).not.toBeInTheDocument();
   });
 
-  it("collapses and reopens the top bar using its toggle (7.38)", async () => {
+  it("collapses and reopens the top bar using its toggle", async () => {
     await renderShell(makeState());
     await userEvent.click(screen.getByRole("button", { name: /hide the top bar/i }));
     expect(screen.getByRole("button", { name: /show the top bar/i })).toBeInTheDocument();
@@ -182,7 +182,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(screen.queryByRole("menuitem", { name: /reload all/i })).not.toBeInTheDocument();
   });
 
-  it("renames the emergency teardown to Exit to lobby and confirms (7.38)", async () => {
+  it("renames the emergency teardown to Exit to lobby and confirms", async () => {
     const onEndGame = vi.fn();
     await renderShell(makeState(), { onEndGame });
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
@@ -193,7 +193,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(onEndGame).toHaveBeenCalledTimes(1);
   });
 
-  it("lets the host kick a member from the Players popup after confirming (7.29/7.38/2z9)", async () => {
+  it("lets the host kick a member from the Players popup after confirming", async () => {
     const onKickMember = vi.fn();
     await renderShell(makeState(), { onKickMember });
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
@@ -208,7 +208,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(onKickMember).toHaveBeenCalledWith("member-b");
   });
 
-  it("cancels the kick confirmation without removing anyone (2z9)", async () => {
+  it("cancels the kick confirmation without removing anyone", async () => {
     const onKickMember = vi.fn();
     await renderShell(makeState(), { onKickMember });
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
@@ -224,7 +224,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(screen.getByRole("dialog", { name: "Players" })).toBeInTheDocument();
   });
 
-  it("shows the players list as a compact popup that never covers the game frame (7.45)", async () => {
+  it("shows the players list as a compact popup that never covers the game frame", async () => {
     await renderShell(makeState());
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
@@ -235,7 +235,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(screen.getByRole("button", { name: /menu/i })).toBeInTheDocument();
   });
 
-  it("dismisses the players popup on outside click, Escape, and Back (7.45)", async () => {
+  it("dismisses the players popup on outside click, Escape, and Back", async () => {
     await renderShell(makeState());
     const openPopup = async () => {
       await userEvent.click(screen.getByRole("button", { name: /menu/i }));
@@ -265,7 +265,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("opens only one panel at a time (7.38)", async () => {
+  it("opens only one panel at a time", async () => {
     await renderShell(makeState());
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     expect(screen.getByRole("menu", { name: /game menu/i })).toBeInTheDocument();
@@ -282,7 +282,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(screen.queryByRole("dialog", { name: "Pick a game" })).not.toBeInTheDocument();
   });
 
-  it("browses games from the menu and picks from the shared browse UI (7.43/9fv.11.11)", async () => {
+  it("browses games from the menu and picks from the shared browse UI", async () => {
     const onPickGame = vi.fn();
     const onPickPrebuilt = vi.fn();
     await renderShell(makeState(), { onPickGame, onPickPrebuilt });
@@ -308,7 +308,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(screen.queryByRole("dialog", { name: "Pick a game" })).not.toBeInTheDocument();
   });
 
-  it("closes the in-game browse panel from the browser's unified back (2t1.1)", async () => {
+  it("closes the in-game browse panel from the browser's unified back", async () => {
     await renderShell(makeState());
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     await userEvent.click(screen.getByRole("menuitem", { name: /browse games/i }));
@@ -317,7 +317,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(screen.queryByRole("dialog", { name: "Pick a game" })).not.toBeInTheDocument();
   });
 
-  it("opens About this game from the menu (9fv.11.11)", async () => {
+  it("opens About this game from the menu", async () => {
     const state = makeState({ game: { kind: "nova", gameId: "drawphone", title: "Drawphone" } });
     await renderShell(state);
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
@@ -329,7 +329,7 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     expect(screen.queryByRole("dialog", { name: "About Drawphone" })).not.toBeInTheDocument();
   });
 
-  it("copies the invite URL from the game menu (9fv.11.11 / nil)", async () => {
+  it("copies the invite URL from the game menu", async () => {
     const writeText = vi.fn().mockResolvedValue(undefined);
     Object.defineProperty(navigator, "clipboard", {
       value: { writeText },

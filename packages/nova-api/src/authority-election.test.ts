@@ -427,7 +427,7 @@ describe(
       expect(host.acks.filter((ack) => ack.ack.actionId === "act-dup")).toHaveLength(1);
     });
 
-    it("drops a commit raced by an authority change silently instead of acking invalid_state (7.30)", async () => {
+    it("drops a commit raced by an authority change silently instead of acking invalid_state", async () => {
       // Deferred digest: the commit waits on our gate, so the authority
       // change lands deterministically inside the state-hash window.
       let releaseDigest!: () => void;
@@ -984,7 +984,7 @@ describe(
       expect(a.getCanonicalState()?.state).toEqual(b.getCanonicalState()?.state);
     });
 
-    it("reconnects the authority mid-campaign with a committed action and converges (7.31)", async () => {
+    it("reconnects the authority mid-campaign with a committed action and converges", async () => {
       // Reconnect the authority during a local dispatch. It misses the peer
       // campaign, so winner-wait re-election must converge the party and
       // re-send the action rather than reject it as invalid_state.

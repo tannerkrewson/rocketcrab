@@ -589,8 +589,8 @@ describe("party engine — game and source transitions", () => {
   });
 });
 
-describe("party engine — join loading stages (rocketcrab-erx / rocketcrab-5ae)", () => {
-  it("keeps a joiner on loading then errors when no peer can be reached (5ae)", async () => {
+describe("party engine — join loading stages", () => {
+  it("keeps a joiner on loading then errors when no peer can be reached", async () => {
     const world = makeWorld();
     // An empty private room has no host; signaling alone must not satisfy the peer gate.
     const b = makePlayer(world, "b", { peerConnectTimeoutMs: 1_000 });
@@ -615,7 +615,7 @@ describe("party engine — join loading stages (rocketcrab-erx / rocketcrab-5ae)
     );
   });
 
-  it("lets a Cancel during the peer wait return to idle without an error (5ae)", async () => {
+  it("lets a Cancel during the peer wait return to idle without an error", async () => {
     const world = makeWorld();
     const b = makePlayer(world, "b", { peerConnectTimeoutMs: 5_000 });
     const joinPromise = b.engine.joinByInvite({ secret: "F".repeat(43) });
@@ -715,7 +715,7 @@ describe("party engine — readiness and start gating", () => {
     );
   });
 
-  it("creates a party without a game; the lobby blocks start until one is picked (7.6)", async () => {
+  it("creates a party without a game; the lobby blocks start until one is picked", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
     const promise = a.engine.createParty();
@@ -751,7 +751,7 @@ describe("party engine — readiness and start gating", () => {
     );
   });
 
-  it("setDisplayName updates the local display name (7.5)", async () => {
+  it("setDisplayName updates the local display name", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
     await runCreate(a, world);
@@ -766,7 +766,7 @@ describe("party engine — readiness and start gating", () => {
   });
 });
 
-describe("party engine — restart after exiting to the lobby (2t1.4)", () => {
+describe("party engine — restart after exiting to the lobby", () => {
   it("can start the game again after exiting to the lobby from a game", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
@@ -819,7 +819,7 @@ describe("party engine — restart after exiting to the lobby (2t1.4)", () => {
     );
   });
 
-  it("reboots the runtime frame when the container is rebound after a phase flip (2t1.6)", async () => {
+  it("reboots the runtime frame when the container is rebound after a phase flip", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
     await runCreate(a, world);
@@ -1191,7 +1191,7 @@ describe("party engine — source re-request while a member's source waits", () 
 });
 
 describe("party engine — lobby notices", () => {
-  it("dedupes identical notices instead of piling up alerts (11.8)", async () => {
+  it("dedupes identical notices instead of piling up alerts", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
     const b = makePlayer(world, "b");
@@ -1213,7 +1213,7 @@ describe("party engine — lobby notices", () => {
     ).toHaveLength(1);
   });
 
-  it("skips the joined/removed notices while a member still has the id-like name (2z9)", async () => {
+  it("skips the joined/removed notices while a member still has the id-like name", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
     // The handshake falls back to member ids for unnamed players; keep those ids out of notices.
@@ -1778,7 +1778,7 @@ describe("party engine — M1 local recovery record", () => {
   });
 });
 
-describe("party engine — session events reach game frames (7.26)", () => {
+describe("party engine — session events reach game frames", () => {
   it("forwards identity/connection/roster/start/end apiEvents to each game frame", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
@@ -1849,7 +1849,7 @@ describe("party engine — session events reach game frames (7.26)", () => {
   });
 });
 
-describe("party engine — frame state executor + rebooted-frame replay (5cl.14)", () => {
+describe("party engine — frame state executor + rebooted-frame replay", () => {
   const apiEventsOf = (player: Player) =>
     player.harness.port1.sent
       .filter((message) => (message as { type?: string }).type === "game.apiEvent")
@@ -1903,7 +1903,7 @@ describe("party engine — frame state executor + rebooted-frame replay (5cl.14)
   });
 });
 
-describe("party engine — rename announcements (7.25)", () => {
+describe("party engine — rename announcements", () => {
   it("broadcasts a display-name change; peers' member view updates without a rejoin", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
@@ -1934,7 +1934,7 @@ describe("party engine — rename announcements (7.25)", () => {
   });
 });
 
-describe("party engine — external games, kick, and reload (7.7.4, 7.29)", () => {
+describe("party engine — external games, kick, and reload", () => {
   it("shares an external room: the host creates it once, the joiner joins the same room", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
@@ -2052,7 +2052,7 @@ describe("party engine — external games, kick, and reload (7.7.4, 7.29)", () =
 
 // Exercise default-factory TURN setup without opening real Trystero rooms.
 
-describe("party engine — TURN credential minting (rocketcrab-23s)", () => {
+describe("party engine — TURN credential minting", () => {
   afterEach(() => {
     vi.unstubAllEnvs();
     vi.unstubAllGlobals();
@@ -2954,7 +2954,7 @@ describe("party engine — signaling while waiting for a peer", () => {
   });
 });
 
-describe("party engine — relay diagnostics surfacing (rocketcrab-ont.1)", () => {
+describe("party engine — relay diagnostics surfacing", () => {
   /** A Trystero-shaped diagnostics snapshot (duck-typed by the engine). */
   function makeRelaySnapshot() {
     return {
