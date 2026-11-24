@@ -298,9 +298,9 @@ export function PartyLobby({
           <Button
             variant="primary"
             size="lg"
-            aria-disabled={!state.canStart || undefined}
+            aria-label={state.canStart ? undefined : "Start game requirements"}
             aria-haspopup={state.canStart ? undefined : "dialog"}
-            className={!state.canStart ? "pointer-events-auto" : undefined}
+            className={!state.canStart ? "opacity-60" : undefined}
             onPress={() => {
               if (state.canStart) onStart(false);
               else setStartHelpOpen(true);

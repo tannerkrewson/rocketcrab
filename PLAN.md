@@ -8,23 +8,8 @@ Goals: it must work on any network (corporate, school, hotel, carrier NAT,
 mixed), stay simple yet robust, use Trystero as far as it fits (pinned; fix
 churn on upgrade), and need no paid always-on server.
 
-## Party and editor usability
-
-- [ ] Surface game selection failures as temporary toasts and keep the game
-      library open so the host can retry or choose another game.
-
 ## Before beta
 
-- [ ] Investigate the extra Firefox fallback socket in the three-player
-      tunnel test (`e2e/party-tunnel.spec.ts`): the quiz completes, then the
-      socket-count assertion fails. It also fails on `bb6521a`, before the
-      party engine rewrite, so it predates it.
-- [ ] `packages/nova-api/src/contract-suite.ts` "continues after the
-      authority leaves" runs on real timers with 40 ms election windows (the
-      suite is shared with the real Trystero transport, so it can't use fake
-      timers). It failed once under heavy machine load. Make its timing
-      tolerant without slowing the suite, or give the in-memory run
-      simulated time while the Trystero run keeps real timers.
 - [ ] After the real-device checks below, evaluate room, link and game
       recovery before consolidating any other retry paths.
 
@@ -48,9 +33,10 @@ the README for local devices.
 - [ ] Full create → prompt → paste → test → save → party → play on Mobile
       Safari; the master prompt on two AI chat services.
 - [ ] Mobile Safari layout: portrait and landscape, collapsing browser
-      chrome, safe areas and the on-screen keyboard in the lobby, editor and
-      play shell. Game audio starts after a tap; camera permission prompts
-      reach the game frame and a denial reaches the game.
+      chrome, safe areas, and the on-screen keyboard in the lobby, editor and
+      play shell. Swiping over the lobby welcome card scrolls the page. Game
+      audio starts after a tap, camera permission prompts reach the game
+      frame, and the game receives any denial.
 - [ ] Turn-based and ticking sample games; authority migration; link and QR
       joins.
 - [ ] Drift on real phones: late join, a host that switches apps, and a host

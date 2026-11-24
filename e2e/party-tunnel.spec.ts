@@ -29,7 +29,9 @@ interface Player {
   page: Page;
   /** Epoch ms of each `paired` frame received on a tunnel socket. */
   pairedAt: number[];
-  /** `/tunnel/` WebSocket URLs this page opened (one per tunnelled pair). */
+  /** URLs of sockets that received the edge's pairing confirmation. */
+  pairedSockets: string[];
+  /** All tunnel connection attempts, including retries and abandoned attempts. */
   tunnelSockets: string[];
 }
 
@@ -49,14 +51,17 @@ async function newPlayer(browser: Browser, forced: boolean): Promise<Player> {
   const page = await context.newPage();
   const tunnelSockets: string[] = [];
   const pairedAt: number[] = [];
+  const pairedSockets: string[] = [];
   page.on("websocket", (socket: WebSocket) => {
     if (!socket.url().includes("/tunnel/")) return;
     tunnelSockets.push(socket.url());
     socket.on("framereceived", (frame) => {
-      if (frame.payload === "paired") pairedAt.push(Date.now());
+      if (frame.payload !== "paired") return;
+      pairedAt.push(Date.now());
+      pairedSockets.push(socket.url());
     });
   });
-  return { context, page, tunnelSockets, pairedAt };
+  return { context, page, tunnelSockets, pairedAt, pairedSockets };
 }
 
 /** The game frame inside one player's page (re-resolved after reloads). */
@@ -225,7 +230,7 @@ test("a 3-player party with one tunnelled player plays a state-mode game", async
     });
     console.log(`JOIN_TO_PAIRED_MS ${JSON.stringify(pairedMs)}`);
 
-    const startButton = host.page.getByRole("button", { name: "Start game" });
+    const startButton = host.page.getByRole("button", { name: "Start game", exact: true });
     await expect(startButton).toBeEnabled({ timeout: 180_000 });
     await startButton.click();
     await expectPlayViewOnAll(pages);
@@ -264,9 +269,18 @@ test("a 3-player party with one tunnelled player plays a state-mode game", async
       for (const row of rows) expect(row).toContain("chose");
     }
 
-    expect(forced.tunnelSockets).toHaveLength(2);
-    expect(host.tunnelSockets).toHaveLength(1);
-    expect(joiner.tunnelSockets).toHaveLength(1);
+    // WebSocket creation includes failed dial attempts. Check successful pairings
+    // on both ends so a retry can't look like an extra tunnel.
+    test.info().annotations.push({
+      type: "tunnel-attempts",
+      description: players.map((player) => player.tunnelSockets.length).join(","),
+    });
+    expect(host.pairedSockets).toHaveLength(1);
+    expect(joiner.pairedSockets).toHaveLength(1);
+    expect(host.pairedSockets[0]).not.toBe(joiner.pairedSockets[0]);
+    expect([...forced.pairedSockets].sort()).toEqual(
+      [...host.pairedSockets, ...joiner.pairedSockets].sort(),
+    );
   } finally {
     for (const player of players) await player.context.close();
   }

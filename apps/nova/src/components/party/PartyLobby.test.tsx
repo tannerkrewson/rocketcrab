@@ -361,11 +361,11 @@ describe("PartyLobby", () => {
     expect(players.compareDocumentPosition(leave) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
-  it("disables start while players are not ready and enables it when they are", async () => {
+  it("offers start requirements while players are waiting and starts once they are ready", async () => {
     const blocked = await renderLobby(makeState());
     expect(blocked.getByRole("button", { name: /start game/i })).toHaveAttribute(
-      "aria-disabled",
-      "true",
+      "aria-haspopup",
+      "dialog",
     );
 
     const ready = makeState({
@@ -510,7 +510,7 @@ describe("PartyLobby", () => {
     expect(screen.queryByRole("button", { name: /leave party/i })).not.toBeInTheDocument();
   });
 
-  it("shows NO ended banner and disables start after a game ends", async () => {
+  it("offers start requirements after a game ends", async () => {
     const state = makeState({
       endedReason: "host_closed",
       canStart: false,
@@ -525,8 +525,8 @@ describe("PartyLobby", () => {
     ).not.toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /start game/i })).toHaveAttribute(
-      "aria-disabled",
-      "true",
+      "aria-haspopup",
+      "dialog",
     );
   });
 

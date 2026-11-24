@@ -66,7 +66,7 @@ test("three players reach the lobby and start the game on every browser", async 
       });
     }
 
-    const startButton = host.getByRole("button", { name: "Start game" });
+    const startButton = host.getByRole("button", { name: "Start game", exact: true });
     await expect(startButton).toBeEnabled({ timeout: 180_000 });
     await startButton.click();
     await expectPlayViewOnAll(pages);
