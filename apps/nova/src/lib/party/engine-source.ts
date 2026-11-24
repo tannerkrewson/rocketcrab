@@ -135,11 +135,12 @@ export class PartySource {
         if (event.metadata.apiVersion !== undefined) {
           this.state.sourceApiVersions.set(game.gameId, event.metadata.apiVersion);
         }
-        const changed = this.state.game?.gameId !== game.gameId;
-        this.state.game = game;
+        const current = this.state.game;
+        const changed = current?.kind !== "nova" || current.gameId !== game.gameId;
+        // A repeated announcement keeps what registration added (player limits).
+        this.state.game = changed ? { kind: "nova", ...game } : { ...current, title: game.title };
         this.adoptSourceHash(event.metadata.sourceSha256);
         if (changed && this.state.party !== null) {
-          this.state.external = null;
           this.state.selfVerified = false;
           this.services().runtime.teardownRuntimeFrame();
           // attach() wires listeners synchronously, before subsequent source or registration events.
@@ -336,14 +337,6 @@ export class PartySource {
       detail: error.message,
     });
     this.services().snapshot.addNotice("error", error.message);
-  }
-
-  /** Shared by the UI and session start gates so source requirements agree. */
-  allSourcesVerified(members: readonly PartyMemberView[], externalActive: boolean): boolean {
-    return (
-      externalActive ||
-      (members.length > 0 && members.every((member) => this.isSourceVerified(member.memberId)))
-    );
   }
 
   /** Verification is hash-specific: edits under the same game id must be verified again. */

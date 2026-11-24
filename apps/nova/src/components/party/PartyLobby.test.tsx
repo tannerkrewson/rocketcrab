@@ -35,7 +35,7 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     role: "creator",
     memberId: "member-a",
     displayName: "Player A",
-    game: { gameId: "game-1", title: "Rocket Rumble" },
+    game: { kind: "nova", gameId: "game-1", title: "Rocket Rumble" },
     playerLimitNotice: null,
     members: [
       {
@@ -72,9 +72,7 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     canForceStart: false,
     startBlockedReason: "Waiting for every player's game to load and register.",
     endedReason: null,
-    externalGame: null,
     removedReason: null,
-    externalFrameEpoch: 0,
     diagnostics: null,
     notices: [],
     runtimeLogs: [],
@@ -741,7 +739,7 @@ describe("PartyLobby", () => {
       description: "Blast off with friends.",
       html: "<!doctype html><html><body><p>rockets</p></body></html>",
     });
-    const state = makeState({ game: { gameId: game.id, title: game.title } });
+    const state = makeState({ game: { kind: "nova", gameId: game.id, title: game.title } });
     const onLeave = vi.fn();
     const { router } = await renderLobby(state, { onLeave });
     const detailsLink = screen.getByRole("link", { name: /what is rocket rumble\?/i });
@@ -754,7 +752,7 @@ describe("PartyLobby", () => {
   });
 
   it("navigates prebuilt games from What is GameName? to shared details", async () => {
-    const state = makeState({ game: { gameId: "drawphone", title: "Drawphone" } });
+    const state = makeState({ game: { kind: "nova", gameId: "drawphone", title: "Drawphone" } });
     const { router } = await renderLobby(state);
     const detailsLink = screen.getByRole("link", { name: /what is drawphone\?/i });
     expect(detailsLink.getAttribute("href")).toBe("/game/drawphone?from=party");

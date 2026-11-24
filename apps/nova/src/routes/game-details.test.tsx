@@ -28,9 +28,7 @@ const IDLE_STATE: PartyEngineState = {
   canForceStart: false,
   startBlockedReason: null,
   endedReason: null,
-  externalGame: null,
   removedReason: null,
-  externalFrameEpoch: 0,
   diagnostics: null,
   notices: [],
   runtimeLogs: [],
@@ -101,7 +99,6 @@ const { stubEngine, stubs } = vi.hoisted(() => {
       isActive: vi.fn(() => stubs.mode !== "idle"),
       setContainer: vi.fn(),
       selectGame: vi.fn(async () => undefined),
-      selectExternalGame: vi.fn(async () => undefined),
       leaveParty: vi.fn(async () => undefined),
     },
   };
@@ -186,14 +183,16 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     expect(screen.queryByRole("button", { name: /select game/i })).not.toBeInTheDocument();
   });
 
-  it("selects an external game for the active party via selectExternalGame (10.9)", async () => {
+  it("selects an external game for the active party (10.9)", async () => {
     stubs.mode = "lobby";
     const router = renderAt("/game/drawphone");
 
     const select = await screen.findByRole("button", { name: /select game/i });
     await userEvent.click(select);
 
-    await vi.waitFor(() => expect(stubEngine.selectExternalGame).toHaveBeenCalledWith("drawphone"));
+    await vi.waitFor(() =>
+      expect(stubEngine.selectGame).toHaveBeenCalledWith({ kind: "external", gameId: "drawphone" }),
+    );
     await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
   });
 
@@ -221,7 +220,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     await userEvent.click(screen.getByRole("button", { name: /select game/i }));
     const dialog = screen.getByRole("dialog", { name: "Only the host picks" });
     expect(dialog).toHaveTextContent("Drawphone");
-    expect(stubEngine.selectExternalGame).not.toHaveBeenCalled();
+    expect(stubEngine.selectGame).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Got it" }));
   });
 

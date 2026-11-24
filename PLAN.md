@@ -143,15 +143,18 @@ launch, and the list format depends on them.
       is empty until the first game is published. ADR-0002 and the README
       describe it. Relative assets (a bootstrap `baseUrl` written as
       `<base href>`) remain a later option.
-- [ ] **Remove Classic/Nova wording from the UI.** One list in the browser,
-      details page, and lobby, with source badges instead of engine labels.
-- [ ] **Merge the engine's game state.** Replace `state.game` plus
-      `state.classicGame` with one `game: { kind: "nova" | "external", … }`
-      and one `selectGame(selection)`. Give each engine a small adapter for
-      readiness, reload, and frame ownership. Remove the special cases:
-      `classicActive` shortcuts in `engine-snapshot.ts`, the "Classic game
-      ready" status text, `classicFrameEpoch`, and the split where the
-      engine owns the Nova frame but the UI owns the external iframe.
+- [x] **Remove Classic/Nova wording from the UI.** The browser already
+      groups by source (My games, Friends' games "shared by Sam", listed
+      games "by author"); the last "shared this Nova game" strings now say
+      "shared this game". Build-page branding stays.
+- [x] **Merge the engine's game state.** `state.game` is
+      `{ kind: "nova" } | { kind: "external", room, creatorMemberId,
+      frameEpoch }` with player limits on both; `selectGame(selection)`
+      takes either. `PartyGameKinds` gives each kind an adapter for member
+      readiness, source verification and reload, so the snapshot and start
+      gate no longer check the kind; `externalGame`, `externalFrameEpoch`
+      and `selectExternalGame` are gone. Repeated source announcements keep
+      registered limits (regression test added).
 
 ## 2. Before beta
 

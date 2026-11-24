@@ -190,7 +190,7 @@ export function PartyPlayShell({
                 </button>
               </li>
               {/* External iframes do not emit runtime console logs. */}
-              {state.externalGame === null && state.game !== null ? (
+              {state.game?.kind === "nova" ? (
                 <li>
                   <button
                     type="button"

@@ -103,21 +103,22 @@ export function PartyExperience({
   const playing = state.phase === "playing";
 
   // Keep the lobby runtime invisible but mounted so readiness can complete.
+  const external = state.game?.kind === "external" ? state.game : null;
   const frameArea =
-    state.externalGame !== null ? (
+    external !== null ? (
       playing ? (
         <div
           data-testid="party-external-frame"
-          aria-label={state.externalGame.title}
+          aria-label={external.title}
           className="h-full w-full overflow-hidden bg-black"
         >
           <ExternalGameFrame
-            key={`${state.externalGame.gameId}|${JSON.stringify(state.externalGame.room)}|${state.externalFrameEpoch}`}
-            gameId={state.externalGame.gameId}
-            title={state.externalGame.title}
-            room={state.externalGame.room}
+            key={`${external.gameId}|${JSON.stringify(external.room)}|${external.frameEpoch}`}
+            gameId={external.gameId}
+            title={external.title}
+            room={external.room}
             displayName={state.displayName}
-            isHost={state.externalGame.creatorMemberId === state.memberId}
+            isHost={external.creatorMemberId === state.memberId}
           />
         </div>
       ) : null

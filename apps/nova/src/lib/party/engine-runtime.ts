@@ -147,10 +147,10 @@ export class PartyRuntime {
       case "registration":
         if (this.reloadPending) break;
         this.state.registered = true;
-        if (this.state.game !== null) {
+        if (this.state.game?.kind === "nova") {
           // The game's own declaration is the only source of its player limits.
           const { gameId, title } = this.state.game;
-          this.state.game = { gameId, title, ...playerLimitsOf(event.message) };
+          this.state.game = { kind: "nova", gameId, title, ...playerLimitsOf(event.message) };
         }
         this.state.frameTickRate = event.message.tickRate ?? null;
         this.state.session?.setTickRate(this.state.frameTickRate);

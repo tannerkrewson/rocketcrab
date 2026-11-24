@@ -8,7 +8,7 @@ import { playerLimitsOf } from "./player-limits";
 import { reportConnection } from "../connection-log";
 import { updatePartyDisplayName } from "./identity";
 import { PartyStateExecutor } from "./party-executors";
-import type { PartySourceSpec } from "./engine-types";
+import type { PartyGameSelection } from "./engine-types";
 import type { PartyEngineContext, ExternalAnnouncement } from "./engine-context";
 import type { PartyEngineServices } from "./engine-services";
 import {
@@ -26,16 +26,21 @@ export class PartyGameLifecycle {
     private readonly state: PartyEngineContext,
     private readonly services: () => Pick<
       PartyEngineServices,
-      "runtime" | "snapshot" | "source" | "connection"
+      "runtime" | "snapshot" | "source" | "connection" | "kinds"
     >,
   ) {}
 
-  async selectGame(input: PartySourceSpec): Promise<void> {
+  /** Host-only, in the lobby: a Nova game's source, or an external game by id. */
+  async selectGame(selection: PartyGameSelection): Promise<void> {
+    if (selection.kind === "external") {
+      await this.selectExternalGame(selection.gameId);
+      return;
+    }
     if (this.state.phase !== "lobby" || this.state.party === null || !this.state.party.amHost) {
       return;
     }
-    this.state.game = { gameId: input.gameId, title: input.title };
-    this.state.external = null;
+    const { kind: _kind, ...input } = selection;
+    this.state.game = { kind: "nova", gameId: input.gameId, title: input.title };
     this.services().runtime.teardownRuntimeFrame();
     // Previous-game verification must not open the new game's start gate.
     this.state.selfVerified = false;
@@ -46,8 +51,8 @@ export class PartyGameLifecycle {
     this.services().source.registerSource(input);
   }
 
-  /** Host-only, in the lobby. Create one external room and share it with all players. */
-  async selectExternalGame(gameId: string): Promise<void> {
+  /** Create one external room and share it with all players. */
+  private async selectExternalGame(gameId: string): Promise<void> {
     if (this.state.phase !== "lobby" || this.state.party === null || !this.state.party?.amHost) {
       return;
     }
@@ -62,13 +67,15 @@ export class PartyGameLifecycle {
       const room = await game.play.createRoom();
       // Ignore room creation that finishes after the party changes.
       if (this.state.party !== party) return;
-      this.state.external = {
+      this.state.game = {
+        kind: "external",
         gameId,
         title: game.name,
         room,
         creatorMemberId: this.state.identity.memberId,
+        frameEpoch: 0,
+        ...playerLimitsOf(game),
       };
-      this.state.game = { gameId, title: game.name, ...playerLimitsOf(game) };
       this.state.selfVerified = true;
       this.state.selfVerifiedSha256 = null;
       this.state.currentSourceSha256 = null;
@@ -87,12 +94,7 @@ export class PartyGameLifecycle {
   }
 
   reloadMyGame(): void {
-    if (this.state.external !== null) {
-      // External iframes are remounted by the UI keyed on this epoch.
-      this.state.externalFrameEpoch += 1;
-    } else {
-      this.services().runtime.reloadRuntimeFrame();
-    }
+    this.services().kinds.current().reload();
     this.services().snapshot.emit();
   }
 
@@ -283,8 +285,8 @@ export class PartyGameLifecycle {
   }
 
   private externalAnnouncement(): ExternalAnnouncement {
-    const external = this.state.external;
-    if (external === null) {
+    const external = this.state.game;
+    if (external?.kind !== "external") {
       throw new Error("externalAnnouncement called with no external game selected");
     }
     return {
@@ -295,7 +297,11 @@ export class PartyGameLifecycle {
   }
 
   askForExternalRoom(): void {
-    if (this.state.party?.amHost || this.state.party === null || this.state.external !== null) {
+    if (
+      this.state.party?.amHost ||
+      this.state.party === null ||
+      this.state.game?.kind === "external"
+    ) {
       return;
     }
     void this.state.party.requestExternalRoom().catch(() => undefined);
@@ -330,19 +336,21 @@ export class PartyGameLifecycle {
           break;
         }
         const title = game.name;
-        const current = this.state.external;
+        const current = this.state.game;
         if (
-          current === null ||
+          current?.kind !== "external" ||
           current.gameId !== event.gameId ||
           !sameRoom(current.room, event.room)
         ) {
-          this.state.external = {
+          this.state.game = {
+            kind: "external",
             gameId: event.gameId,
             title,
             room: event.room,
             creatorMemberId: event.creatorMemberId,
+            frameEpoch: 0,
+            ...playerLimitsOf(game),
           };
-          this.state.game = { gameId: event.gameId, title, ...playerLimitsOf(game) };
           this.state.selfVerified = true;
           this.state.selfVerifiedSha256 = null;
           this.state.currentSourceSha256 = null;
@@ -353,7 +361,11 @@ export class PartyGameLifecycle {
         break;
       }
       case "externalRoomRequest":
-        if (this.state.party?.amHost && this.state.external !== null && this.state.party !== null) {
+        if (
+          this.state.party?.amHost &&
+          this.state.game?.kind === "external" &&
+          this.state.party !== null
+        ) {
           void this.state.party
             .announceExternalRoom(this.externalAnnouncement())
             .catch(() => undefined);
@@ -378,11 +390,7 @@ export class PartyGameLifecycle {
         break;
       }
       case "reloadAll":
-        if (this.state.external !== null) {
-          this.state.externalFrameEpoch += 1;
-        } else {
-          this.services().runtime.reloadRuntimeFrame();
-        }
+        this.services().kinds.current().reload();
         this.services().snapshot.emit();
         break;
       case "host":
@@ -479,10 +487,9 @@ export class PartyGameLifecycle {
   /** Use the same source-verification gate as the lobby, and accept requests only from the host. */
   acceptStartRequestFrom(memberId: MemberId): boolean {
     if (this.state.party?.hostMemberId !== memberId) return false;
-    return this.services().source.allSourcesVerified(
-      this.services().snapshot.buildMembers(),
-      this.state.external !== null,
-    );
+    return this.services()
+      .kinds.current()
+      .allSourcesVerified(this.services().snapshot.buildMembers());
   }
 }
 

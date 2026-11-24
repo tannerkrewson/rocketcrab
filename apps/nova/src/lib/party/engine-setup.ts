@@ -63,7 +63,8 @@ export class PartySetup {
       }
       this.state.pendingSetupTransport = null;
       // A session belongs to one game, so set the game before attaching the session.
-      this.state.game = input === undefined ? null : { gameId: input.gameId, title: input.title };
+      this.state.game =
+        input === undefined ? null : { kind: "nova", gameId: input.gameId, title: input.title };
       await this.establish(party);
       if (setup.signal.aborted) return;
       this.state.phase = "lobby";

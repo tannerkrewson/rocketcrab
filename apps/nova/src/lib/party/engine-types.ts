@@ -96,6 +96,32 @@ export type PartyPhase =
  */
 export type JoinStage = "discovering" | "connecting" | null;
 
+/** A Nova game: its HTML runs in Nova's runtime on every device. */
+export interface NovaPartyGame extends PlayerLimits {
+  readonly kind: "nova";
+  readonly gameId: string;
+  readonly title: string;
+}
+
+/** An external game: one room on the game's own server, embedded by iframe. */
+export interface ExternalPartyGame extends PlayerLimits {
+  readonly kind: "external";
+  readonly gameId: string;
+  readonly title: string;
+  readonly room: ExternalRoom;
+  /** The member who created the room; they join as the external game's host. */
+  readonly creatorMemberId: string;
+  /** Increments to remount the external iframe (reload). */
+  readonly frameEpoch: number;
+}
+
+export type PartyGame = NovaPartyGame | ExternalPartyGame;
+
+/** What a host can pick: a Nova game's source, or an external game by id. */
+export type PartyGameSelection =
+  | (PartySourceSpec & { readonly kind?: "nova" })
+  | { readonly kind: "external"; readonly gameId: string };
+
 export interface PartyEngineState {
   readonly phase: PartyPhase;
   /** Human-readable progress for the creating/joining phases. */
@@ -107,7 +133,7 @@ export interface PartyEngineState {
   readonly memberId: MemberId;
   readonly displayName: string;
   /** The selected game, with its player limits once they are known. */
-  readonly game: ({ gameId: string; title: string } & PlayerLimits) | null;
+  readonly game: PartyGame | null;
   /** Lobby text when the party is outside the game's player range. */
   readonly playerLimitNotice: string | null;
   readonly members: readonly PartyMemberView[];
@@ -121,18 +147,8 @@ export interface PartyEngineState {
   readonly canForceStart: boolean;
   readonly startBlockedReason: string | null;
   readonly endedReason: string | null;
-  /** One host-created external room shared by URL spec; null for Nova API games. */
-  readonly externalGame: {
-    readonly gameId: string;
-    readonly title: string;
-    readonly room: ExternalRoom;
-    /** The member who created the room; they join as the external game's host. */
-    readonly creatorMemberId: string;
-  } | null;
   /** Non-null when the host removed this member from the party. */
   readonly removedReason: string | null;
-  /** Increment to remount the external iframe. */
-  readonly externalFrameEpoch: number;
   readonly diagnostics: PartyDiagnostics | null;
   readonly signalingOutage?: boolean;
   readonly notices: readonly PartyNotice[];

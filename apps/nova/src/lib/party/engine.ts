@@ -18,6 +18,7 @@ import type {
   PartyEngineConfig,
   PartyEngineState,
   PartyPhase,
+  PartyGameSelection,
   PartySourceSpec,
   SharedPartyGameSource,
 } from "./engine-types";
@@ -29,6 +30,7 @@ import { PartyGameLifecycle } from "./engine-game";
 import { PartyRuntime } from "./engine-runtime";
 import { PartySource } from "./engine-source";
 import { PartySnapshot } from "./engine-snapshot";
+import { PartyGameKinds } from "./engine-kinds";
 
 export type {
   PartyRuntimeSeams,
@@ -42,6 +44,10 @@ export type {
   PartyEngineState,
   PartyEngineConfig,
   PartySourceSpec,
+  PartyGame,
+  PartyGameSelection,
+  NovaPartyGame,
+  ExternalPartyGame,
   SharedPartyGame,
   SharedPartyGameSource,
 } from "./engine-types";
@@ -62,6 +68,7 @@ export class PartyEngine {
       runtime: new PartyRuntime(this.state, services),
       source: new PartySource(this.state, services),
       snapshot: new PartySnapshot(this.state, services),
+      kinds: new PartyGameKinds(this.state, services),
     };
     if (import.meta.env.DEV || import.meta.env.MODE === "test") {
       (globalThis as { __NOVA_PARTY_DEBUG__?: () => unknown }).__NOVA_PARTY_DEBUG__ = () =>
@@ -98,18 +105,14 @@ export class PartyEngine {
     return this.services.setup.joinByInvite(input);
   }
 
-  selectGame(input: PartySourceSpec): Promise<void> {
-    return this.services.game.selectGame(input);
+  /** Host-only, in the lobby: a Nova game's source, or an external game by id. */
+  selectGame(selection: PartyGameSelection): Promise<void> {
+    return this.services.game.selectGame(selection);
   }
 
   /** The verified source of a Nova game shared in this party, to save a copy. */
   sharedGameSource(gameId: string): SharedPartyGameSource | undefined {
     return this.services.source.sharedGameSource(gameId);
-  }
-
-  /** Host-only, in the lobby. Create one external room and share its URL spec with all players. */
-  selectExternalGame(gameId: string): Promise<void> {
-    return this.services.game.selectExternalGame(gameId);
   }
 
   reloadMyGame(): void {

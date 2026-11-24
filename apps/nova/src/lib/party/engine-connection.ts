@@ -129,7 +129,6 @@ export class PartyConnection {
     this.state.sourceApiVersions.clear();
     this.state.runtimeLogs = [];
     this.state.game = null;
-    this.state.external = null;
     this.state.transfers.clear();
     this.state.verifiedSha256.clear();
     this.state.selfVerified = false;

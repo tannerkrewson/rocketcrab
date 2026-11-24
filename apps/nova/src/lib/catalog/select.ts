@@ -19,11 +19,11 @@ export async function hostedNovaSourceSpec(game: NovaCatalogGame) {
  * saved game.
  */
 export async function selectCatalogGame(
-  engine: Pick<PartyEngine, "selectExternalGame" | "selectGame">,
+  engine: Pick<PartyEngine, "selectGame">,
   game: CatalogGame,
 ): Promise<void> {
   if (game.play.kind === "external") {
-    await engine.selectExternalGame(game.id);
+    await engine.selectGame({ kind: "external", gameId: game.id });
     return;
   }
   await engine.selectGame(await hostedNovaSourceSpec(game as NovaCatalogGame));

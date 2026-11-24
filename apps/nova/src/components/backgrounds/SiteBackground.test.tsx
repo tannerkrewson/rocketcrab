@@ -25,9 +25,7 @@ const IDLE_STATE: PartyEngineState = {
   canForceStart: false,
   startBlockedReason: null,
   endedReason: null,
-  externalGame: null,
   removedReason: null,
-  externalFrameEpoch: 0,
   diagnostics: null,
   notices: [],
   runtimeLogs: [],
@@ -40,7 +38,7 @@ const IDLE_STATE: PartyEngineState = {
 const IN_GAME_STATE: PartyEngineState = {
   ...IDLE_STATE,
   phase: "playing",
-  game: { gameId: "my-game", title: "My Game" },
+  game: { kind: "nova", gameId: "my-game", title: "My Game" },
 };
 
 interface FakeEngine {

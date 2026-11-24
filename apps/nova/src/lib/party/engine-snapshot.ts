@@ -26,23 +26,18 @@ export class PartySnapshot {
 
   constructor(
     private readonly state: PartyEngineContext,
-    private readonly services: () => Pick<PartyEngineServices, "source">,
+    private readonly services: () => Pick<PartyEngineServices, "kinds" | "source">,
   ) {}
 
   getState(): PartyEngineState {
     const party = this.state.party;
     const identity = this.state.identity;
     const members = this.buildMembers();
-    // External room announcements replace source transfer and runtime registration.
-    const externalActive = this.state.external !== null;
-    const allReady =
-      externalActive || (members.length > 0 && members.every((member) => member.ready));
-    const allVerified = this.services().source.allSourcesVerified(members, externalActive);
-    const anyFailed = externalActive
-      ? false
-      : members.some(
-          (member) => member.transferState === "failed" || member.transferState === "incompatible",
-        );
+    const allReady = members.length > 0 && members.every((member) => member.ready);
+    const allVerified = this.services().kinds.current().allSourcesVerified(members);
+    const anyFailed = members.some(
+      (member) => member.transferState === "failed" || member.transferState === "incompatible",
+    );
     const ended = this.state.session?.isEnded() ?? false;
     const inLobby = this.state.phase === "lobby";
 
@@ -95,17 +90,7 @@ export class PartySnapshot {
         inLobby && this.state.game !== null && !ended && !anyFailed && allVerified && !allReady,
       startBlockedReason,
       endedReason: this.state.endedReason,
-      externalGame:
-        this.state.external === null
-          ? null
-          : {
-              gameId: this.state.external.gameId,
-              title: this.state.external.title,
-              room: this.state.external.room,
-              creatorMemberId: this.state.external.creatorMemberId,
-            },
       removedReason: this.state.removedReason,
-      externalFrameEpoch: this.state.externalFrameEpoch,
       runtimeLogs: this.state.runtimeLogs,
       diagnostics: this.buildDiagnostics(),
       signalingOutage: this.state.signalingOutageVisible,
@@ -194,38 +179,7 @@ export class PartySnapshot {
     const members: PartyMemberView[] = [];
     for (const memberId of memberIds) {
       const peer = peers.find((candidate) => candidate.memberId === memberId);
-      const transfer = this.state.transfers.get(memberId);
       const isSelf = memberId === identity.memberId;
-      let transferState: PartyMemberView["transferState"];
-      let transferProgress: number | null;
-      let transferDetail: string | null;
-      if (this.state.external !== null) {
-        transferState = "complete";
-        transferProgress = 1;
-        transferDetail = "Game ready";
-      } else if (isSelf) {
-        if (this.services().source.isSourceVerified(memberId)) {
-          transferState = "complete";
-          transferProgress = 1;
-          transferDetail = "You have the game";
-        } else if (transfer !== undefined) {
-          transferState = transfer.state;
-          transferProgress = transfer.fraction;
-          transferDetail = transfer.detail;
-        } else {
-          transferState = "waiting";
-          transferProgress = null;
-          transferDetail = null;
-        }
-      } else if (transfer !== undefined) {
-        transferState = transfer.state;
-        transferProgress = transfer.fraction;
-        transferDetail = transfer.detail;
-      } else {
-        transferState = "waiting";
-        transferProgress = null;
-        transferDetail = null;
-      }
       members.push({
         memberId,
         displayName: this.displayNameOf(memberId),
@@ -233,11 +187,7 @@ export class PartySnapshot {
         connectionId: peer?.connectionId ?? null,
         connected: isSelf ? isConnectedState(this.state.connectionState) : peer !== undefined,
         isHost: memberId === party?.hostMemberId,
-        transferState,
-        transferProgress,
-        transferDetail,
-        ready:
-          this.state.external !== null ? true : (this.state.session?.readyOf(memberId) ?? false),
+        ...this.services().kinds.current().memberStatus(memberId),
       });
     }
     return members;

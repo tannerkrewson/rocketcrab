@@ -9,7 +9,6 @@ import type {
 import type { createNovaSession } from "@rocketcrab/nova-api";
 import type { RuntimeHostClient } from "../runtime-host";
 import type { ArenaLogEntry } from "../arena/types";
-import type { ExternalRoom } from "../catalog";
 import { localPartyIdentity } from "./identity";
 import { browserLifecycleSource, type PartyLifecycleSource } from "./lifecycle";
 import { SignalingOutage } from "./signaling-outage";
@@ -34,12 +33,7 @@ import {
   defaultRuntimeOrigin,
   isInPartyPhase,
 } from "./engine-utils";
-import type { PlayerLimits } from "./player-limits";
-
-interface PartyGame extends PlayerLimits {
-  readonly gameId: string;
-  readonly title: string;
-}
+import type { PartyGame } from "./engine-types";
 
 /** Send-side entries describe remote members; receive-side entries describe self. */
 export interface TransferState {
@@ -48,14 +42,6 @@ export interface TransferState {
   totalBytes: number;
   state: PartyMemberView["transferState"];
   detail: string | null;
-}
-
-interface ExternalSelection {
-  readonly gameId: string;
-  readonly title: string;
-  readonly room: ExternalRoom;
-  /** The member who created the room; they join as the external game's host. */
-  readonly creatorMemberId: string;
 }
 
 export type ExternalAnnouncement = Parameters<PartySession["announceExternalRoom"]>[0];
@@ -121,8 +107,6 @@ export class PartyEngineContext {
   readonly sharedGames = new Map<string, SharedPartyGameSource>();
   /** apiVersion from the latest source metadata, per game id. */
   readonly sourceApiVersions = new Map<string, number>();
-  external: ExternalSelection | null = null;
-  externalFrameEpoch = 0;
   removedReason: string | null = null;
   frameStarted = false;
   registered = false;

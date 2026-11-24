@@ -61,19 +61,15 @@ describe("fetchHostedNovaSource", () => {
 
 describe("selectCatalogGame", () => {
   it("creates a room for an external game", async () => {
-    const engine = { selectExternalGame: vi.fn(async () => {}), selectGame: vi.fn(async () => {}) };
+    const engine = { selectGame: vi.fn(async () => {}) };
     await selectCatalogGame(engine, findCatalogGame("protobowl")!);
-    expect(engine.selectExternalGame).toHaveBeenCalledWith("protobowl");
-    expect(engine.selectGame).not.toHaveBeenCalled();
+    expect(engine.selectGame).toHaveBeenCalledWith({ kind: "external", gameId: "protobowl" });
   });
 
   it("shares a hosted Nova game like a saved one", async () => {
     vi.stubGlobal("fetch", respond(HTML));
     try {
-      const engine = {
-        selectExternalGame: vi.fn(async () => {}),
-        selectGame: vi.fn(async () => {}),
-      };
+      const engine = { selectGame: vi.fn(async () => {}) };
       await selectCatalogGame(engine, GAME);
       expect(engine.selectGame).toHaveBeenCalledWith({
         gameId: "hosted-quiz",
