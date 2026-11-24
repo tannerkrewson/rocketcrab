@@ -5,7 +5,7 @@
  * Request: { endpoint, body?, urlId? }. Return upstream JSON, or the final
  * redirect URL as { url } for netgames.io.
  */
-import { json, jsonError } from "./http";
+import { BodyTooLargeError, json, jsonError, readBodyText } from "./http";
 
 interface RelayEndpoint {
   url: string;
@@ -29,13 +29,43 @@ const RELAY_ENDPOINTS = {
 
 export type RelayEndpointKey = keyof typeof RELAY_ENDPOINTS;
 
-const URL_ID = /^[A-Za-z0-9-]+$/;
+const NETGAMES_ORIGIN = "https://netgames.io";
+const NETGAMES_IDS = new Set([
+  "avalon",
+  "love-letter",
+  "spyfall",
+  "secret-hitler",
+  "codewords",
+  "onu-werewolf",
+  "enigma",
+]);
+const OOC_GAMES = new Set(["story", "redacted", "recipe"]);
+const REQUEST_BYTES = 1024;
+const RESPONSE_BYTES = 64 * 1024;
+const TIMEOUT_MS = 5_000;
+
+async function getNetgamesRoom(url: string, signal: AbortSignal): Promise<string> {
+  for (let redirects = 0; redirects <= 3; redirects++) {
+    const response = await fetch(url, { redirect: "manual", signal });
+    void response.body?.cancel().catch(() => undefined);
+    if (response.ok) return url;
+    const location = response.headers.get("Location");
+    if (![301, 302, 303, 307, 308].includes(response.status) || !location) break;
+    const next = new URL(location, url);
+    if (next.origin !== NETGAMES_ORIGIN || next.username || next.password) break;
+    url = next.href;
+  }
+  throw new Error("Invalid room redirect");
+}
 
 export async function handleRelay(request: Request): Promise<Response> {
   let envelope: unknown;
   try {
-    envelope = await request.json();
-  } catch {
+    envelope = JSON.parse(await readBodyText(request.body, REQUEST_BYTES));
+  } catch (error) {
+    if (error instanceof BodyTooLargeError) {
+      return jsonError(413, "too_large", "request too large");
+    }
     return jsonError(400, "invalid_json", "invalid JSON body");
   }
   if (typeof envelope !== "object" || envelope === null || Array.isArray(envelope)) {
@@ -43,33 +73,45 @@ export async function handleRelay(request: Request): Promise<Response> {
   }
   const { endpoint, body, urlId } = envelope as Record<string, unknown>;
   const entry =
-    typeof endpoint === "string" ? RELAY_ENDPOINTS[endpoint as RelayEndpointKey] : undefined;
+    typeof endpoint === "string" && Object.hasOwn(RELAY_ENDPOINTS, endpoint)
+      ? RELAY_ENDPOINTS[endpoint as RelayEndpointKey]
+      : undefined;
   if (entry === undefined) {
-    return jsonError(404, "unknown_endpoint", `unknown endpoint "${String(endpoint)}"`);
+    return jsonError(404, "unknown_endpoint", "unknown endpoint");
   }
 
   let url = entry.url;
   if (url.includes("{urlId}")) {
-    if (typeof urlId !== "string" || !URL_ID.test(urlId)) {
+    if (typeof urlId !== "string" || !NETGAMES_IDS.has(urlId)) {
       return jsonError(400, "invalid_params", "invalid endpoint params");
     }
     url = url.replace("{urlId}", urlId);
   }
 
+  let postBody: string | undefined;
+  if (endpoint === "ooc-rocketcrab") {
+    const game =
+      typeof body === "object" && body !== null ? (body as { game?: unknown }).game : null;
+    if (typeof game !== "string" || !OOC_GAMES.has(game)) {
+      return jsonError(400, "invalid_params", "invalid endpoint params");
+    }
+    postBody = JSON.stringify({ game, version: 1 });
+  }
+
   try {
-    const upstream =
-      entry.method === "GET"
-        ? await fetch(url, { redirect: "follow" })
-        : await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(body ?? {}),
-          });
+    const signal = AbortSignal.timeout(TIMEOUT_MS);
+    if (entry.method === "GET") return json(200, { url: await getNetgamesRoom(url, signal) });
+    const upstream = await fetch(url, {
+      method: "POST",
+      redirect: "error",
+      signal,
+      ...(postBody ? { headers: { "Content-Type": "application/json" }, body: postBody } : {}),
+    });
     if (!upstream.ok) {
+      void upstream.body?.cancel().catch(() => undefined);
       return jsonError(502, "upstream_error", `upstream HTTP ${upstream.status}`);
     }
-    if (entry.method === "GET") return json(200, { url: upstream.url });
-    const text = await upstream.text();
+    const text = await readBodyText(upstream.body, RESPONSE_BYTES);
     try {
       return json(200, JSON.parse(text));
     } catch {

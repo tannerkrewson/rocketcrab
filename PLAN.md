@@ -54,15 +54,6 @@ requests but do not stop non-browser clients from spoofing `Origin`:
 - [ ] **Bound `TunnelPair` lifetime (`deploy/nova/tunnel.ts`)**:
       Add a per-pair max lifetime (via the existing Durable Object alarm, e.g.,
       6 h) and a lifetime byte cap.
-- [ ] **Harden `POST /api/relay` & API response headers (`deploy/nova/relay.ts`, `deploy/nova/http.ts`)**:
-      Move `log.ts`'s streaming body-size limiter into a shared helper in
-      `http.ts` and apply request/response caps + `AbortSignal.timeout` in
-      `relay.ts`; check `Object.hasOwn(RELAY_ENDPOINTS, endpoint)`; allowlist
-      the 7 `netgames.io` `urlId` values and verify the final redirect stays on
-      `https://netgames.io`; constrain forwarded POST bodies (`ooc-rocketcrab`
-      to `{ game, version: 1 }`, empty body for the rest). Add
-      `Cache-Control: no-store` and `X-Content-Type-Options: nosniff` in
-      `http.ts` for all `/api/*` JSON responses.
 
 ## Real-device checks requiring access or coordination
 

@@ -1,4 +1,4 @@
-import { jsonError } from "./http";
+import { BodyTooLargeError, jsonError, readBodyText } from "./http";
 
 const outcomes = [
   "direct",
@@ -58,29 +58,9 @@ const fields = [
 const MAX_BYTES = 1024;
 
 export async function handleLog(request: Request): Promise<Response> {
-  // Bound streamed bodies even when Content-Length is absent or false.
-  const reader = request.body?.getReader();
-  if (!reader) return jsonError(400, "invalid_body", "event required");
-  const chunks: Uint8Array[] = [];
-  let size = 0;
+  if (!request.body) return jsonError(400, "invalid_body", "event required");
   try {
-    while (true) {
-      const { value, done } = await reader.read();
-      if (done) break;
-      size += value.byteLength;
-      if (size > MAX_BYTES) {
-        await reader.cancel();
-        return jsonError(413, "too_large", "event too large");
-      }
-      chunks.push(value);
-    }
-    const bytes = new Uint8Array(size);
-    let offset = 0;
-    for (const chunk of chunks) {
-      bytes.set(chunk, offset);
-      offset += chunk.length;
-    }
-    const value: unknown = JSON.parse(new TextDecoder("utf-8", { fatal: true }).decode(bytes));
+    const value: unknown = JSON.parse(await readBodyText(request.body, MAX_BYTES));
     if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error();
     const event = value as Record<string, unknown>;
     const member = (list: string[], item: unknown) =>
@@ -103,7 +83,8 @@ export async function handleLog(request: Request): Promise<Response> {
       throw new Error();
     console.log({ event: "nova_connection", ...event });
     return new Response(null, { status: 204 });
-  } catch {
+  } catch (error) {
+    if (error instanceof BodyTooLargeError) return jsonError(413, "too_large", "event too large");
     return jsonError(400, "invalid_body", "invalid event");
   }
 }

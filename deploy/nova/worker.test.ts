@@ -135,14 +135,19 @@ describe("gate", () => {
 });
 
 describe("external-game room relay", () => {
-  it("forwards POST bodies to the fixed endpoint and passes JSON through", async () => {
+  it("forwards the supported game and fixed version and passes JSON through", async () => {
     const fetchMock = mockFetch(Response.json({ gameCode: "ABCD" }));
-    const response = await relay({ endpoint: "ooc-rocketcrab", body: { game: "x" } });
+    const response = await relay({
+      endpoint: "ooc-rocketcrab",
+      body: { game: "story", version: 20, extra: "ignored" },
+    });
     expect(await response.json()).toEqual({ gameCode: "ABCD" });
     expect(fetchMock).toHaveBeenCalledWith("https://outofcontext.party/api/v1/rocketcrab", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: '{"game":"x"}',
+      body: '{"game":"story","version":1}',
+      redirect: "error",
+      signal: expect.any(AbortSignal),
     });
   });
 
@@ -152,26 +157,49 @@ describe("external-game room relay", () => {
   });
 
   it("follows netgames.io redirects and validates the game id", async () => {
-    const upstream = new Response("");
-    Object.defineProperty(upstream, "url", { value: "https://netgames.io/games/x/ROOM" });
-    const fetchMock = mockFetch(upstream);
-    const response = await relay({ endpoint: "netgamesio-new", urlId: "werewolf" });
-    expect(await response.json()).toEqual({ url: "https://netgames.io/games/x/ROOM" });
-    expect(fetchMock).toHaveBeenCalledWith("https://netgames.io/games/werewolf/new", {
-      redirect: "follow",
+    const fetchMock = mockFetch(new Response(""));
+    fetchMock.mockResolvedValueOnce(Response.redirect("https://netgames.io/games/avalon/ROOM"));
+    const response = await relay({ endpoint: "netgamesio-new", urlId: "avalon" });
+    expect(await response.json()).toEqual({ url: "https://netgames.io/games/avalon/ROOM" });
+    expect(fetchMock).toHaveBeenCalledWith("https://netgames.io/games/avalon/new", {
+      redirect: "manual",
+      signal: expect.any(AbortSignal),
     });
 
-    for (const urlId of [undefined, "../admin", "a/b"]) {
+    for (const urlId of [undefined, "../admin", "a/b", "unlisted"]) {
       expect(await errorCode(await relay({ endpoint: "netgamesio-new", urlId }))).toBe(
         "invalid_params",
       );
     }
   });
 
+  it("does not follow a redirect leaving the allowlisted origin", async () => {
+    const fetchMock = mockFetch(Response.redirect("https://elsewhere.example/room"));
+    const response = await relay({ endpoint: "netgamesio-new", urlId: "avalon" });
+    expect(response.status).toBe(502);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("caps relay bodies and sends uncached JSON", async () => {
+    const fetchMock = mockFetch(new Response("x".repeat(65_537)));
+    const tooLarge = await relay({ endpoint: "spyfall-new", body: "x".repeat(1_024) });
+    expect(tooLarge.status).toBe(413);
+    expect(fetchMock).not.toHaveBeenCalled();
+    const upstreamTooLarge = await relay({ endpoint: "spyfall-new", body: { extra: true } });
+    expect(upstreamTooLarge.status).toBe(502);
+    expect(upstreamTooLarge.headers.get("Cache-Control")).toBe("no-store");
+    expect(upstreamTooLarge.headers.get("X-Content-Type-Options")).toBe("nosniff");
+    expect(fetchMock.mock.calls[0]).toEqual([
+      "https://spyfall.tannerkrewson.com/new",
+      { method: "POST", redirect: "error", signal: expect.any(AbortSignal) },
+    ]);
+  });
+
   it("rejects bad envelopes and unknown endpoints without fetching", async () => {
     const fetchMock = mockFetch(new Response("{}"));
     expect(await errorCode(await call("/api/relay", { body: "nope" }))).toBe("invalid_json");
     expect(await errorCode(await relay([1]))).toBe("invalid_body");
+    expect(await errorCode(await relay({ endpoint: "toString" }))).toBe("unknown_endpoint");
     expect(await errorCode(await relay({ endpoint: "https://evil.example" }))).toBe(
       "unknown_endpoint",
     );
