@@ -38,6 +38,10 @@ install tools, understand code, deploy a website, or create a repository.
 - **One self-contained HTML document per game.** Generated games are ordinary
   HTML that may use remote scripts, ESM imports, assets, HTTP requests, and
   browser APIs. Nova does not proxy or rewrite them.
+- **One game list.** Nova's built-in list mixes external games (their own
+  servers, embedded by iframe) and hosted Nova games (one HTML file, for
+  example on GitHub Pages, that the host downloads and shares like a saved
+  game). Players see one list; `apps/nova/src/lib/catalog` holds it.
 - **Browser-local storage only.** Saved games live in IndexedDB on Nova's main
   origin. No accounts, no cloud sync, no public catalog.
 - **Trystero for all real peer-to-peer transport.** A transport-neutral interface

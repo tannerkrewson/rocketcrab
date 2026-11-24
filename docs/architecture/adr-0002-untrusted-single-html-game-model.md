@@ -37,6 +37,16 @@ trivial to move around, while remaining powerful enough for real games.
 The game HTML is untrusted (see `docs/architecture/threat-model.md`) and runs
 only inside the isolated runtime origin (ADR-0001).
 
+**The HTML can come from three places, and nothing after that differs**
+(amended 2026-11-24): pasted into the editor and saved (ADR-0005), shared by
+another player in the party, or listed in Nova's built-in game list as a
+hosted file (`apps/nova/src/lib/catalog/nova-games.ts`, for example on
+GitHub Pages). For a hosted game only the host downloads the file; the party
+then hashes and transfers that exact string as for any other game, so a
+deploy in the middle of a party cannot split versions. Hosted games are one
+self-contained file for now: relative asset paths would resolve against the
+runtime origin, not the file's own site.
+
 ## Alternatives considered
 
 1. **Custom cartridge language or binary format.** Rejected: requires a

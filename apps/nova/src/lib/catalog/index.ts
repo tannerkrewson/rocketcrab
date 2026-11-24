@@ -32,7 +32,7 @@ export const CATALOG_CONNECT_ORIGINS: readonly string[] = [
   ...new Set([
     ...EXTERNAL_GAMES.flatMap((game) => game.play.connectOrigins ?? []),
     ...NOVA_GAMES.flatMap((game) =>
-      /^https:\/\//.test(game.play.url) ? [new URL(game.play.url).origin] : [],
+      game.play.url.startsWith("https://") ? [new URL(game.play.url).origin] : [],
     ),
   ]),
 ];

@@ -132,6 +132,20 @@ vi.mock("../lib/party/engine", async (importOriginal) => {
   };
 });
 
+vi.mock("../lib/catalog/nova-games", () => ({
+  NOVA_GAMES: [
+    {
+      id: "hosted-quiz",
+      name: "Hosted Quiz",
+      author: "Someone",
+      description: "A quiz on GitHub Pages.",
+      difficulty: "easy",
+      genres: ["trivia"],
+      play: { kind: "nova", url: "https://someone.github.io/quiz/index.html" },
+    },
+  ],
+}));
+
 function renderParty(entry: string) {
   cleanup();
   const router = createRouter({
@@ -197,7 +211,7 @@ describe("/party", () => {
       title: "Rocket Rumble",
       html: SAVED_HTML,
     });
-    renderParty(`/party?gameId=${game.id}&mode=state&title=${encodeURIComponent(game.title)}`);
+    renderParty(`/party?gameId=${game.id}&title=${encodeURIComponent(game.title)}`);
     await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledTimes(1));
     expect(stubEngine.createParty).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -207,6 +221,25 @@ describe("/party", () => {
         apiVersion: 1,
       }),
     );
+  });
+
+  it("creates a party from a hosted Nova game by downloading it", async () => {
+    updatePartyDisplayName("Ada");
+    const fetchMock = vi.fn(async (_url: string) => new Response(SAVED_HTML, { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    try {
+      renderParty("/party?gameId=hosted-quiz&title=Hosted%20Quiz");
+      await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledTimes(1));
+      expect(fetchMock.mock.calls[0]![0]).toBe("https://someone.github.io/quiz/index.html");
+      expect(stubEngine.createParty).toHaveBeenCalledWith({
+        gameId: "hosted-quiz",
+        title: "Hosted Quiz",
+        source: SAVED_HTML,
+        apiVersion: 1,
+      });
+    } finally {
+      vi.unstubAllGlobals();
+    }
   });
 
   it("prefers the editor's handed-off source over the saved game", async () => {

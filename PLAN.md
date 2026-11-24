@@ -135,12 +135,14 @@ launch, and the list format depends on them.
       listing plus `play: external | nova`. `category` became `difficulty`
       and `genres` (no `netgamesio` box); link text is derived from
       `displayUrlHref`; the player count falls back to the limits.
-- [ ] **Hosted Nova games.** Fetch the entry's URL in the list module, not
-      the engine (2 MiB limit, readable errors), then call `selectGame`.
-      Build the main origin's `connect-src` from the list the same way
-      `frame-src` is built from `CLASSIC_FRAME_ORIGINS`. Support single-file
-      games first; relative assets can come later through a `baseUrl` in
-      the bootstrap that the runtime writes as `<base href>`.
+- [x] **Hosted Nova games.** `NOVA_GAMES` entries point at one HTML file
+      (HTTPS, or a path on Nova's origin). `fetchHostedNovaSource` downloads
+      it on the host only (2 MiB limit, readable errors) and
+      `selectCatalogGame` hands it to `selectGame`; `/party?gameId=` starts a
+      party from one directly. `connect-src` is built from the list. The list
+      is empty until the first game is published. ADR-0002 and the README
+      describe it. Relative assets (a bootstrap `baseUrl` written as
+      `<base href>`) remain a later option.
 - [ ] **Remove Classic/Nova wording from the UI.** One list in the browser,
       details page, and lobby, with source badges instead of engine labels.
 - [ ] **Merge the engine's game state.** Replace `state.game` plus

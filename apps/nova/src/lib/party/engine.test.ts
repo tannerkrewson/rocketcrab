@@ -431,6 +431,11 @@ describe("party engine — game and source transitions", () => {
     const joining = b.engine.joinByInvite({ secret: invite.secret! });
     await settle(world);
     await joining;
+    // B boots its frame once the source arrives, which can take a moment under load.
+    await vi.waitFor(async () => {
+      await settle(world);
+      expect(b.harness.frames.length).toBeGreaterThan(0);
+    });
     for (const player of [a, b]) {
       player.harness.ready();
       player.harness.register(GAME.title, 30);
