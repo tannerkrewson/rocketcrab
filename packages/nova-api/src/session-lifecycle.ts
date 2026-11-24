@@ -162,8 +162,8 @@ export abstract class SessionLifecycle implements NovaClientBackend {
   }
 
   /**
-   * The replicated canonical state this shell retains for migration
-   * (ADR-0007), or null before the first snapshot. Host-side only — game
+   * The replicated canonical state this shell retains for migration,
+   * or null before the first snapshot. Host-side only — game
    * frames receive their selected view, never this state.
    */
   getCanonicalState(): {
@@ -288,7 +288,7 @@ export abstract class SessionLifecycle implements NovaClientBackend {
 
   /**
    * Start the game (host/arena policy, never game code): broadcasts
-   * `game.start`. The fixed initial authority (ADR-0007) first creates the
+   * `game.start`. The fixed initial authority first creates the
    * canonical state and publishes revision 1 + per-player views, then
    * announces, then broadcasts start — so every frame sees state and the
    * authority before `nova.onStart` fires. Followers broadcast start but

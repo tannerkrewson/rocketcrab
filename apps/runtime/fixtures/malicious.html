@@ -33,7 +33,7 @@
       } catch (e) {
         window.__malicious.disableStop = "blocked:" + e.name;
       }
-      // Same-origin with the runtime page is expected and allowed (ADR-0008):
+      // Same-origin with the runtime page is expected and allowed:
       window.__malicious.runtimePageDom =
         typeof window.parent.document.getElementById === "function";
     </script>

@@ -1,8 +1,8 @@
 /**
  * @rocketcrab/core
  *
- * Transport-neutral Nova transport interfaces (ADR-0003) and the shared
- * game-repository contract (ADR-0005). These contracts are React-free and
+ * Transport-neutral Nova transport interfaces and the shared
+ * game-repository contract. These contracts are React-free and
  * never expose Trystero to generated games.
  */
 export * from "./repository";

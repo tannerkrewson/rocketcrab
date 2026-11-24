@@ -36,7 +36,7 @@ export type PartyContextMessage = z.infer<typeof partyContextMessageSchema>;
 
 /**
  * Player identity: a member announces or updates their profile to the party
- * (ADR-0007 member identity: stable member ID, connection ID, display name,
+ * (stable member ID, connection ID, display name,
  * authority eligibility).
  */
 export const playerIdentityMessageSchema = z.object({
@@ -136,7 +136,7 @@ export const connectionStatusMessageSchema = z.object({
 export type ConnectionStatusMessage = z.infer<typeof connectionStatusMessageSchema>;
 
 /**
- * Action dispatch (ADR-0006): an ordered action with a base
+ * Action dispatch: an ordered action with a base
  * revision, deduplication ID, and timeout. Payload size is bounded by
  * `actionPayloadBytes` at the serialization boundary.
  */
@@ -205,9 +205,9 @@ export function stateDeltaOpsFit(ops: unknown): boolean {
 
 /**
  * State snapshot: canonical replicated state with the conflict-reconciliation
- * envelope fields (ADR-0007: revision, term, authority member ID, state hash,
- * recent processed action IDs). Inspectable by party peers by design
- * (ADR-0010). Size is bounded by `stateSnapshotBytes` at the serialization
+ * envelope fields (revision, term, authority member ID, state hash,
+ * recent processed action IDs). Inspectable by party peers by design.
+ * Size is bounded by `stateSnapshotBytes` at the serialization
  * boundary.
  */
 export const stateSnapshotMessageSchema = z.object({
@@ -279,7 +279,7 @@ export type StateResyncMessage = z.infer<typeof stateResyncMessageSchema>;
 
 /**
  * State view: the per-player view delivered to a specific member; non-
- * authority frames receive only their selected view (ADR-0006).
+ * authority frames receive only their selected view.
  */
 export const stateViewMessageSchema = z.object({
   ...peerEnvelopeFields,
@@ -293,8 +293,8 @@ export const stateViewMessageSchema = z.object({
 export type StateViewMessage = z.infer<typeof stateViewMessageSchema>;
 
 /**
- * Authority announcement: a term claim including term and state revision
- * (ADR-0007). Conflicting announcements reconcile deterministically.
+ * Authority announcement: a term claim including term and state revision.
+ * Conflicting announcements reconcile deterministically.
  */
 export const authorityAnnouncementMessageSchema = z.object({
   ...peerEnvelopeFields,
@@ -308,7 +308,7 @@ export const authorityAnnouncementMessageSchema = z.object({
 });
 export type AuthorityAnnouncementMessage = z.infer<typeof authorityAnnouncementMessageSchema>;
 
-/** Authority heartbeat: liveness for the current term (ADR-0007). */
+/** Authority heartbeat: liveness for the current term. */
 export const authorityHeartbeatMessageSchema = z.object({
   ...peerEnvelopeFields,
   seq: monotonicSequenceSchema,
@@ -322,7 +322,7 @@ export type AuthorityHeartbeatMessage = z.infer<typeof authorityHeartbeatMessage
 
 /**
  * Authority election: a candidate term with observed membership and state
- * observations so peers elect deterministically (ADR-0007). Terms are
+ * observations so peers elect deterministically. Terms are
  * monotonic.
  */
 export const authorityElectionMessageSchema = z.object({

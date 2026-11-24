@@ -1,6 +1,6 @@
 /**
- * Mobile Safari may freeze timers, kill WebRTC, or reload a background page
- * (ADR-0012). Drive recovery from visibility, page, and network events rather
+ * Mobile Safari may freeze timers, kill WebRTC, or reload a background page.
+ * Drive recovery from visibility, page, and network events rather
  * than assuming connections survive. Browser and in-memory implementations
  * share an event surface; every subscription returns a cleanup function.
  */

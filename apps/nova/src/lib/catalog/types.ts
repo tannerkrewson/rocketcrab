@@ -3,7 +3,7 @@
  * `play` says how it runs. External games bring their own server: the
  * host creates one room and every player loads the game's site in an
  * iframe. Nova games run in Nova's isolated runtime from HTML the host
- * fetches from `url` (ADR-0002).
+ * fetches from `url`.
  */
 import type { ExternalRoom } from "@rocketcrab/protocol";
 

@@ -9,9 +9,9 @@ export interface PartyRecoveryRecord {
   /** Epoch-ms time the record was written. */
   readonly savedAt: number;
   readonly role: "creator" | "joiner";
-  /** Party session secret (ADR-0011); derives the private room. */
+  /** Party session secret; derives the private room. */
   readonly secret: string;
-  /** This player's stable member identity (ADR-0007). */
+  /** This player's stable member identity. */
   readonly memberId: string;
   readonly displayName: string;
   /** What the party was playing, when known. */

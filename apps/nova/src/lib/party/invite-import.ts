@@ -1,6 +1,6 @@
 /**
  * Import invite secrets into session memory and strip their URL fragment
- * before rendering (ADR-0011). A page-level guard prevents StrictMode's
+ * before rendering. A page-level guard prevents StrictMode's
  * double effect run from joining twice.
  */
 import { parseInviteFragment } from "@rocketcrab/party";
@@ -32,7 +32,7 @@ export function importInviteFromLocation(location: InviteImportLocation): Import
     };
   }
   if (location.hash.length > 0) {
-    // A fragment with no valid invite data: drop it (ADR-0011 hygiene).
+    // A fragment with no valid invite data: drop it.
     history.replaceState(null, "", location.pathname + location.search);
   }
   return null;

@@ -1,6 +1,6 @@
 /**
  * Authority handlers execute in the runtime frame, while the host retains
- * canonical state (ADR-0006). Forward stateRequest events into the frame
+ * canonical state. Forward stateRequest events into the frame
  * and correlate stateResponse calls with pending engine requests.
  *
  * Drop late responses and fail timed-out requests with execution_timeout

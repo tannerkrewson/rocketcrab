@@ -1,6 +1,6 @@
 /**
  * Rate-limit console and error reports per runtime instance so a buggy or
- * malicious game cannot flood the host channel (threat model T10/T11).
+ * malicious game cannot flood the host channel.
  */
 import { errorReportRatePerSecond, runtimeLogRatePerSecond } from "@rocketcrab/protocol";
 

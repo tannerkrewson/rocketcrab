@@ -226,7 +226,7 @@ export abstract class StateEngineLifecycle {
 
   /**
    * Mark the game as begun; the lowest connected eligible member becomes the
-   * deterministic initial authority (ADR-0007). A session that already saw
+   * deterministic initial authority. A session that already saw
    * the authority (late joiner) defers to the announced member; the initial
    * authority is never derived from a late joiner's own view.
    */

@@ -1,9 +1,9 @@
 /**
- * Secret-free game execution origin (ADR-0001, ADR-0008). Accept bootstrap
+ * Secret-free game execution origin. Accept bootstrap
  * only from the embedding main-origin page and use its dedicated channel,
  * and run HTML in a same-origin sandboxed frame with the Nova bridge.
  * Forward validated reports and honor parent-controlled reload/destroy.
- * Visibility events support Mobile Safari recovery (ADR-0012).
+ * Visibility events support Mobile Safari recovery.
  */
 import { parseRuntimeMessage } from "@rocketcrab/protocol";
 import { mainOriginForRuntimeOrigin } from "./origins";
@@ -90,7 +90,7 @@ function handleBootstrap(event: MessageEvent): void {
 
 window.addEventListener("message", handleBootstrap);
 
-// Page-level visibility listeners outlive instances and support Safari recovery (ADR-0012).
+// Page-level visibility listeners outlive instances and support Safari recovery.
 document.addEventListener("visibilitychange", () => {
   activeInstance?.pageVisibilityChanged(document.hidden);
 });

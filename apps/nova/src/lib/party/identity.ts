@@ -1,4 +1,4 @@
-/** Stable browser identity survives reloads so peers recognize rejoining players (ADR-0007, ADR-0012). */
+/** Stable browser identity survives reloads so peers recognize rejoining players. */
 
 const MEMBER_PREFIX = "member-";
 const IDENTITY_KEY = "nova:party:identity:v1";
@@ -46,7 +46,7 @@ function readStoredIdentity(): PartyIdentity | null {
   }
 }
 
-/** Reuse the persisted member id and prefer a saved name over a generated one (ADR-0007). */
+/** Reuse the persisted member id and prefer a saved name over a generated one. */
 export function localPartyIdentity(): PartyIdentity {
   if (cachedIdentity === null) {
     cachedIdentity = readStoredIdentity();

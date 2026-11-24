@@ -1,7 +1,7 @@
 import type { ConnectionId, MemberId, MessageId, SessionId, Timestamp } from "@rocketcrab/protocol";
 
 /**
- * Transport-neutral message and event types (ADR-0003).
+ * Transport-neutral message and event types.
  *
  * The transport layer moves payloads between party connections and reports
  * lifecycle events. It is deliberately agnostic about payload contents: the
@@ -15,10 +15,10 @@ import type { ConnectionId, MemberId, MessageId, SessionId, Timestamp } from "@r
  * TrysteroTransport.
  */
 
-/** Delivery reliability for a transport message (ADR-0006 raw mode). */
+/** Delivery reliability for a transport message. */
 export type TransportReliability = "reliable" | "unreliable";
 
-/** Ordering guarantee for a transport message (ADR-0006 raw mode). */
+/** Ordering guarantee for a transport message. */
 export type TransportOrdering = "ordered" | "unordered";
 
 /**
@@ -30,19 +30,19 @@ export type TransportConnectionState =
   | "idle" // created but not joined
   | "joining" // join in progress (simulated discovery latency)
   | "connected" // joined to a session; messages flow
-  | "suspended" // background suspension or dropped connection (threat T15)
+  | "suspended" // background suspension or dropped connection
   | "disconnected"; // left cleanly
 
 /**
  * Payload carried by a transport message: a structured protocol message
- * (plain JSON object, validated at the protocol boundary per threat T10) or a
- * raw binary blob (ADR-0006 raw mode, game-source chunks).
+ * (plain JSON object, validated at the protocol boundary) or a
+ * raw binary blob (game-source chunks).
  */
 export type TransportPayload = unknown;
 
 /** Simulated or real peer identity as observed by a transport. */
 export interface TransportPeerInfo {
-  /** Stable per-player identity within a party (ADR-0007). */
+  /** Stable per-player identity within a party. */
   readonly memberId: MemberId;
   /** Connection identity; changes when the peer reconnects. */
   readonly connectionId: ConnectionId;
@@ -61,7 +61,7 @@ export interface TransportPeerInfo {
 export interface TransportMessage {
   /** Protocol version, when the sender knows it (`version`). */
   readonly version?: number;
-  /** Party session ID (private room session once admitted, ADR-0004). */
+  /** Party session ID (private room session once admitted). */
   readonly sessionId: SessionId;
   /** Named channel (raw-mode channel or protocol namespace). */
   readonly channel: string;
@@ -126,7 +126,7 @@ export interface TransportSendOptions {
   readonly version?: number;
   /**
    * True when the payload is a raw binary blob. Binary payloads bypass
-   * protocol validation (ADR-0006 raw mode); structured payloads are checked
+   * protocol validation; structured payloads are checked
    * by the hub's validator when one is configured.
    */
   readonly binary?: boolean;
@@ -169,9 +169,9 @@ export interface TransportReconnectEvent {
 
 /** Transport event map: handlers receive exactly one payload per event. */
 export interface TransportEventMap {
-  /** A peer joined the session (post-admission join; ADR-0004). */
+  /** A peer joined the session (post-admission join). */
   "peer:joined": (peer: TransportPeerInfo) => void;
-  /** A peer left, or its connection dropped (suspend / timeout; T15). */
+  /** A peer left, or its connection dropped (suspend / timeout). */
   "peer:left": (peer: TransportPeerInfo) => void;
   /** This transport's own connection was re-established (new connection ID). */
   "peer:reconnected": (event: TransportReconnectEvent) => void;

@@ -53,7 +53,7 @@ import {
 
 /**
  * Trystero transport: the real-party implementation of the transport-neutral
- * {@link NovaTransport} interface (ADR-0003), built on Trystero 0.27.0's
+ * {@link NovaTransport} interface, built on Trystero 0.27.0's
  * self-hosted WebSocket relay strategy.
  *
  * Game-facing code never sees this class: it is the production twin of
@@ -61,7 +61,7 @@ import {
  * pass the same contract suite, so the Nova API behaves identically in the
  * local test arena and over real parties.
  *
- * Design decisions (see ADR-0003):
+ * Design decisions:
  * - **Room-scoped signaling** through the configured edge Worker.
  * - **Environment-specific appId** (`rocketcrab-nova-v027-dev` / `-prod`,
  *   `app-id.ts`) so dev and prod rooms never collide.
@@ -79,8 +79,7 @@ import {
  *   the join-time relay-reachability check.
  * - **TURN configuration stays a hook** (`turnConfig` option; credentials are
  *   never hardcoded here).
- * - **Every long-running listener has explicit cleanup** (engineering rule
- *   22): `leave()`/`suspend()`/failed joins detach room + action handlers,
+ * - **Every long-running listener has explicit cleanup**: `leave()`/`suspend()`/failed joins detach room + action handlers,
  *   stop the relay monitor, and call `room.leave()`.
  *
  * Differences from InMemoryTransport (documented, not silent):
@@ -462,7 +461,7 @@ export class TrysteroTransport implements NovaTransport {
     await this.rejoinRoom(generation, oldConnectionId, "disconnected");
   }
 
-  /** Drop the connection (Mobile Safari backgrounding; threat T15). */
+  /** Drop the connection (Mobile Safari backgrounding). */
   async suspend(): Promise<void> {
     if (this.connectionState !== "connected") {
       throw new TrysteroJoinError({
@@ -1102,7 +1101,7 @@ export class TrysteroTransport implements NovaTransport {
   private handleActionMessage(data: unknown, context: MessageContext): void {
     const envelope = parseWireEnvelope(context.metadata);
     if (envelope === null) {
-      return; // malformed metadata: drop (threat model T10)
+      return; // malformed metadata: drop
     }
     const identity = this.identityByPeerId.get(context.peerId);
     if (!identity || this.rejectedPeers.has(context.peerId)) return;
@@ -1477,7 +1476,7 @@ function isPeerDisconnectedError(error: unknown): boolean {
   );
 }
 
-/** Optional structured-payload validator (protocol boundary, threat T10). */
+/** Optional structured-payload validator (protocol boundary). */
 export type PayloadValidator = (payload: unknown) => { ok: true } | { ok: false; error: string };
 
 /** Injectable scheduler: run `callback` after `delayMs`; return a cancel fn. */
@@ -1492,7 +1491,7 @@ function defaultScheduler(callback: () => void, delayMs: number): () => void {
 
 /** Options for {@link TrysteroTransport}. */
 export interface TrysteroTransportOptions {
-  /** Stable per-player identity (ADR-0007); assigned by the layer above. */
+  /** Stable per-player identity; assigned by the layer above. */
   readonly memberId: MemberId;
   /** Optional player-facing name, announced to peers. */
   readonly displayName?: string;
@@ -1511,7 +1510,7 @@ export interface TrysteroTransportOptions {
   /** Extra RTC configuration (e.g. STUN servers). */
   readonly rtcConfig?: RTCConfiguration;
   /**
-   * Party session secret (ADR-0004). Tunnel keys are derived from it. Without
+   * Party session secret. Tunnel keys are derived from it. Without
    * it, joins use plain WebRTC with no tunnel fallback.
    */
   readonly partySecret?: SessionSecret;
@@ -1544,7 +1543,7 @@ export interface TrysteroTransportOptions {
   readonly now?: () => number;
   /** Injectable scheduler. Defaults to `setTimeout`. */
   readonly schedule?: Scheduler;
-  /** Optional structured-payload validator (threat T10 parity with the hub). */
+  /** Optional structured-payload validator (parity with the hub). */
   readonly validate?: PayloadValidator;
   /** Join-error observer (post-resolve errors; diagnostics telemetry). */
   readonly onJoinError?: (error: TrysteroJoinError) => void;

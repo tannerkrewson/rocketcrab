@@ -402,7 +402,7 @@ export abstract class StateEngineElection extends StateEngineSnapshots {
   /**
    * Wait for an elected winner's announcement; re-elect when it never
    * materializes (the winner may have missed the campaigns while it was
-   * reconnecting, or a partition hid it — ADR-0007: no stalled party).
+   * reconnecting, or a partition hid it; a party must never stall).
    */
   private armWinnerWaitTimer(): void {
     this.clearWinnerWaitTimer();
@@ -486,7 +486,7 @@ export abstract class StateEngineElection extends StateEngineSnapshots {
   }
 
   /**
-   * Deterministic same-revision conflict resolution (ADR-0007): the
+   * Deterministic same-revision conflict resolution: the
    * majority-matching hash wins; a tie falls to the hash reported by the
    * lowest member id. Returns the winning hash, or our own hash when there
    * are no observations (stable default: keep the current state).

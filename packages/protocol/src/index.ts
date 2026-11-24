@@ -6,8 +6,6 @@
  * frame (apps/runtime), and the core engines (packages/core). Dependency-light
  * by design: zod only, no React, pure data + zod (no transforms or custom
  * callbacks embedded in schemas).
- *
- * See `versioning.md` in this package for the backward-compatibility policy.
  */
 export * from "./version";
 export * from "./ids";

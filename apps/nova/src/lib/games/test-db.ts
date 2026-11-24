@@ -3,7 +3,7 @@ import { GamesDatabase } from "./db";
 import { DexieGameRepository } from "./repository";
 
 /**
- * Test-database helpers backed by fake-indexeddb (ADR-0013 stack). Each call
+ * Test-database helpers backed by fake-indexeddb. Each call
  * creates a uniquely named in-memory database; every database created through
  * these helpers is deleted after its test so tests never leak or collide.
  */

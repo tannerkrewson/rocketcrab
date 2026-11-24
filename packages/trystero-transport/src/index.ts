@@ -2,10 +2,9 @@
  * @rocketcrab/trystero-transport
  *
  * The real-party implementation of the transport-neutral NovaTransport
- * interface (ADR-0003) behind Trystero's WebSocket relay strategy. This is the ONLY
+ * interface behind Trystero's WebSocket relay strategy. This is the ONLY
  * package allowed to import Trystero (enforced by the root oxlint
- * `no-restricted-imports` rule); generated games never see it (engineering
- * rule 1).
+ * `no-restricted-imports` rule); generated games never see it.
  *
  * The adapter mirrors `InMemoryTransport` (@rocketcrab/testing) and must
  * pass the same contract suite, so the game-facing Nova API behaves

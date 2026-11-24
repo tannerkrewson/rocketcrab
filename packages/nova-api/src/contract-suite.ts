@@ -4,7 +4,7 @@
  * `runNovaSessionContractTests` runs the same two-player game scenarios
  * against any {@link NovaTransport} implementation provided by a harness.
  * InMemoryTransport (the test arena) and TrysteroTransport
- * (real parties) must pass the same suite (ADR-0003: the game-facing
+ * (real parties) must pass the same suite (the game-facing
  * API behaves identically over both transports).
  *
  * the state engine is exercised through the same transport-neutral seam games
@@ -731,7 +731,7 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
 
       // The authority closes its tab: the remaining member suspects
       // immediately (the connection dropped), elects itself deterministically,
-      // restores the replicated state, and continues the game (ADR-0007).
+      // restores the replicated state, and continues the game.
       await a.leave();
       await settle(harness);
       expect(b.getStateModeDiagnostics().authorityMemberId).toBeNull(); // electing

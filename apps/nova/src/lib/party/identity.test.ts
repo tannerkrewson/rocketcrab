@@ -7,7 +7,7 @@ import {
   updatePartyDisplayName,
 } from "./identity";
 
-/** Persist identity across reloads (ADR-0007, ADR-0012), separately from the chosen name. */
+/** Persist identity across reloads, separately from the chosen name. */
 describe("party identity", () => {
   beforeEach(() => {
     resetPartyIdentityForTests();

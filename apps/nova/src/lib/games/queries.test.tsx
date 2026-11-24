@@ -13,7 +13,7 @@ import {
   useUpdateGame,
 } from "./queries";
 
-/** Saved-game query tests over fake-indexeddb (ADR-0013), not live peer state. */
+/** Saved-game query tests over fake-indexeddb, not live peer state. */
 
 function makeWrapper() {
   const queryClient = new QueryClient({

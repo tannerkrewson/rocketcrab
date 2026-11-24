@@ -8,7 +8,7 @@ import {
   type PartyRecoveryInput,
 } from "./party-recovery";
 
-/** Recovery records contain no game source (ADR-0005); rejoin fetches it from peers. */
+/** Recovery records contain no game source; rejoin fetches it from peers. */
 
 const SECRET = "A".repeat(43); // valid unpadded base64url session secret
 

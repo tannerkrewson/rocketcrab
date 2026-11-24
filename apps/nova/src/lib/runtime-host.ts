@@ -1,12 +1,11 @@
 /**
  * Validated RPC over a dedicated MessageChannel to the separate runtime
- * origin (ADR-0001). Bootstrap checks the exact origin and transfers a fresh
+ * origin. Bootstrap checks the exact origin and transfers a fresh
  * channel per instance; inbound messages pass parseRuntimeMessage.
  *
  * The shell owns frame lifecycle and heartbeat health, including background
- * suspension (ADR-0012). Parent-controlled teardown remains outside game
+ * suspension. Parent-controlled teardown remains outside game
  * code's control. Never pass main-origin credentials to the runtime.
- * See apps/runtime/README.md for the handshake design.
  */
 import {
   PROTOCOL_VERSION,
@@ -197,7 +196,7 @@ export class RuntimeHostClient {
         return { port1: channel.port1, port2: channel.port2 };
       });
     // Backgrounded Safari suspends timers: pause missed-pong accounting
-    // while hidden and ping immediately on return (ADR-0012).
+    // while hidden and ping immediately on return.
     if (typeof window !== "undefined") {
       const onVisibility = (): void => this.setPageVisibility(document.hidden);
       const onPageHide = (): void => this.setPageVisibility(true);
@@ -266,7 +265,7 @@ export class RuntimeHostClient {
   /**
    * Parent-controlled destroy: ask the runtime to tear the game down, then
    * hard-remove the runtime frame and the channel (the stop control lives
-   * outside the frame and cannot be disabled by game code — T6/T21).
+   * outside the frame and cannot be disabled by game code).
    */
   destroy(reason: "user_exit" | "host_closed" | "error" = "user_exit"): void {
     this.stopHeartbeat();
@@ -285,7 +284,7 @@ export class RuntimeHostClient {
     }
   }
 
-  /** Composed pause/suspend diagnostics for the shell (ADR-0012). */
+  /** Composed pause/suspend diagnostics for the shell. */
   diagnose(): RuntimeDiagnostic {
     return {
       ready: this.ready,
@@ -434,7 +433,7 @@ export class RuntimeHostClient {
   private startHeartbeat(): void {
     this.stopHeartbeat();
     if (this.pageHidden) {
-      // Timers are unreliable while backgrounded; resume on visibility return (ADR-0012).
+      // Timers are unreliable while backgrounded; resume on visibility return.
       return;
     }
     this.heartbeatTimer = window.setInterval(() => {

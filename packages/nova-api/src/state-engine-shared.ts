@@ -249,7 +249,7 @@ export async function stateHashOf(value: unknown): Promise<string> {
 }
 
 /**
- * Deterministic announcement reconciliation (ADR-0007): at the same term the
+ * Deterministic announcement reconciliation: at the same term the
  * announcement with the higher state revision wins; equal revisions fall to
  * the lower member id. Both sides compute the same result, so a partition
  * merge converges on exactly one authority.

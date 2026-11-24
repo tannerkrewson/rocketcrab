@@ -281,7 +281,7 @@ describe("the S4 example game document", () => {
     expect(GAME_SCRIPT).toContain("actions:");
     expect(GAME_SCRIPT).toContain("nova.ready();");
     // Acceptance: the example uses only the Nova API — no direct peer-to-peer
-    // transport usage and no remote dependency imports (ADR-0003, rule 1).
+    // transport usage and no remote dependency imports.
     expect(GAME_SOURCE).not.toMatch(
       /(?:from|require\()\s*["'](?:@)?trystero|@trystero-p2p|createTrysteroTransport|trystero\./iu,
     );
@@ -454,7 +454,7 @@ describe("private views (selectView)", () => {
   });
 });
 
-describe("authority migration mid-game (ADR-0007)", () => {
+describe("authority migration mid-game", () => {
   it("continues the game after the authority's connection drops", { timeout: 25_000 }, async () => {
     config({ answerMs: 60_000, resultsMs: 60_000, rounds: 2 });
     const world = makeWorld();

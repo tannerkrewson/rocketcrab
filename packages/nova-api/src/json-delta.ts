@@ -1,5 +1,5 @@
 /**
- * Structural diff and patch for plain JSON state (ADR-0007 state deltas).
+ * Structural diff and patch for plain JSON state.
  *
  * `diffJson(prev, next)` returns the operations that turn `prev` into `next`,
  * and `applyJsonPatch(value, ops)` applies them without mutating `value`.

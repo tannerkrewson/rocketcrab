@@ -5,7 +5,7 @@
  * Games register handler functions (`createInitialState`,
  * `actions`, `selectView`) that never cross a frame boundary — Nova shells
  * retain the canonical state, and the current authority's runtime executes
- * action handlers through Immer (ADR-0006). The engine therefore never
+ * action handlers through Immer. The engine therefore never
  * calls game functions directly; it calls an executor:
  *
  * - {@link LocalGameExecutor} runs handlers that were registered in-process
@@ -89,7 +89,7 @@ function failure(code: string, error: unknown): { ok: false; code: string; messa
 
 /**
  * The in-process executor: runs handlers registered through the arena
- * client with the real immer package (`immer@11.1.15`, ADR-0006). Used by
+ * client with the real immer package (`immer@11.1.15`). Used by
  * the contract suite and any host that keeps handlers in-process; the
  * arena's real games run their handlers in the frame through the frame
  * executor instead.

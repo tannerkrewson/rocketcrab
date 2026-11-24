@@ -9,7 +9,7 @@ import {
 import { gameRepository } from "./instance";
 
 /**
- * Browser-local saved-game queries (ADR-0005). Live peer state belongs to
+ * Browser-local saved-game queries. Live peer state belongs to
  * the party engines and shell, never TanStack Query.
  *
  * Mutations invalidate the current tab's queries. Refetch-on-focus picks

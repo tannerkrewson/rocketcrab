@@ -28,7 +28,7 @@ describe("PartyInviteQr", () => {
     expect(pathData.length).toBeGreaterThan(500);
   });
 
-  it("never renders the full invite URL as text (ADR-0011)", () => {
+  it("never renders the full invite URL as text", () => {
     const { container } = render(
       <PartyInviteQr inviteUrl={INVITE_URL} label="nova.example/abcd" />,
     );

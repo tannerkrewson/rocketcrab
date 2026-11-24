@@ -2,8 +2,7 @@
  * Outgoing peer-plane message construction for the Nova session.
  *
  * Every message the session sends is built from its Zod schema and validated
- * with `assertPeerMessage` before it touches the transport (threat model
- * T10; never emit an unvalidated message or accept `any` at the boundary).
+ * with `assertPeerMessage` before it touches the transport (never emit an unvalidated message or accept `any` at the boundary).
  */
 import {
   PROTOCOL_VERSION,

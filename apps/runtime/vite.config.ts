@@ -16,7 +16,7 @@ function httpsServerConfig(mode: string) {
   }
   if (!existsSync(CERT) || !existsSync(KEY)) {
     throw new Error(
-      "Local HTTPS certs are missing. Run `npm run gen-certs` first (see docs/architecture/deployment.md).",
+      "Local HTTPS certs are missing. Run `npm run gen-certs` first (see deploy/README.md).",
     );
   }
   return { key: KEY, cert: CERT };

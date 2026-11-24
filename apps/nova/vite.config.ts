@@ -26,21 +26,20 @@ function httpsServerConfig(mode: string) {
   }
   if (!existsSync(CERT) || !existsSync(KEY)) {
     throw new Error(
-      "Local HTTPS certs are missing. Run `npm run gen-certs` first (see docs/architecture/deployment.md).",
+      "Local HTTPS certs are missing. Run `npm run gen-certs` first (see deploy/README.md).",
     );
   }
   return { key: KEY, cert: CERT };
 }
 
 /**
- * Strict SPA CSP shared by index.html and Cloudflare asset headers
- * (ADR-0001, ADR-0008).
+ * Strict SPA CSP shared by index.html and Cloudflare asset headers.
  *
  * Only the configured runtime origin and static EXTERNAL_FRAME_ORIGINS
  * allowlist can be framed. Missing VITE_RUNTIME_ORIGIN intentionally blocks
  * the runtime instead of weakening the policy. The separate runtime origin
  * has no CSP meta tag so game HTML retains ordinary web capabilities
- * (docs/architecture/deployment.md).
+ * (deploy/README.md).
  */
 function cspMetaPlugin(): Plugin {
   return {
@@ -75,7 +74,7 @@ function buildCsp(): string {
     console.warn(
       "[nova-csp-meta] VITE_RUNTIME_ORIGIN is not set: frame-src is omitted, so the " +
         "runtime iframe will be blocked by the strict CSP. The deploy script sets " +
-        "this for every production deploy (docs/architecture/deployment.md).",
+        "this for every production deploy (deploy/README.md).",
     );
   }
   const runtimeOrigin = rawOrigin === "" ? "" : new URL(rawOrigin).origin;

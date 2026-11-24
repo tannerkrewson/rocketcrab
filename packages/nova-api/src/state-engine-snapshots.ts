@@ -314,7 +314,7 @@ export abstract class StateEngineSnapshots extends StateEngineLifecycle {
   /**
    * Push our replicated state to `authorityMemberId` when it is strictly
    * higher (or conflicts at the same revision): the elected authority
-   * restores the highest valid replicated state (ADR-0007).
+   * restores the highest valid replicated state.
    */
   protected maybePushTo(
     authorityMemberId: string,

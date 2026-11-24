@@ -392,7 +392,7 @@ describe("party engine — two phones end to end", () => {
     expect(b.harness.frames[0]?.isConnected).toBe(false);
   });
 
-  it("joins by invite link secret without the four-letter code (ADR-0011)", async () => {
+  it("joins by invite link secret without the four-letter code", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
     const b = makePlayer(world, "b");
@@ -1477,7 +1477,7 @@ describe("the S4 example game over the party flow", () => {
   });
 });
 
-// Mobile Safari lifecycle resilience (ADR-0012).
+// Mobile Safari lifecycle resilience.
 
 /** Simulate an iOS-killed WebRTC link: state still says connected, but pings never answer. */
 class StalePingTransport implements NovaTransport {

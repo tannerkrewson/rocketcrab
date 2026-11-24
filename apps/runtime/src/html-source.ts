@@ -1,5 +1,5 @@
 /**
- * Observable HTML-source checks (ADR-0002 single-HTML model). The runtime never sanitizes or rewrites game HTML; it only
+ * Observable HTML-source checks. The runtime never sanitizes or rewrites game HTML; it only
  * classifies what it can observe so the host can diagnose failures.
  */
 

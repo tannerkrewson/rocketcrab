@@ -57,8 +57,8 @@ function toRepositoryError(error: unknown, operation: string): GameRepositoryErr
 }
 
 /**
- * Dexie-backed {@link GameRepository} over the main-origin IndexedDB database
- * (ADR-0005). Games are never uploaded anywhere: this class only ever talks
+ * Dexie-backed {@link GameRepository} over the main-origin IndexedDB database.
+ * Games are never uploaded anywhere: this class only ever talks
  * to the browser's local database.
  */
 export class DexieGameRepository implements GameRepository {

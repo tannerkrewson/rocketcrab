@@ -14,7 +14,7 @@
  *
  * Awake buckets live in memory and are persisted on close or traffic-driven
  * interval/spend thresholds. Rebuilding from attachments can over-credit
- * at most about one second of rate (see deploy/cloudflare.md).
+ * at most about one second of rate (see deploy/README.md).
  *
  * A Durable Object alarm enforces the lone-socket deadline across hibernation;
  * ordinary timers would not survive. Clear it when the second socket joins.

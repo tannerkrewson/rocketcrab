@@ -1,5 +1,5 @@
 /**
- * Authority election tests (ADR-0007).
+ * Authority election tests.
  *
  * - Engine unit tests: heartbeats, grace, deterministic election, monotonic
  *   terms, announcement reconciliation, same-revision state conflict

@@ -12,7 +12,7 @@ export interface NovaSessionOptions {
   readonly room: string;
   /** Party session id that labels every message this session sends. */
   readonly sessionId: string;
-  /** This player's identity (ADR-0007 member identity). */
+  /** This player's identity. */
   readonly player: { readonly memberId: string; readonly displayName?: string };
   /** The game being played (from the host bootstrap). */
   readonly game: {
@@ -36,7 +36,7 @@ export interface NovaSessionOptions {
    */
   readonly acceptStartRequest?: (memberId: string) => boolean;
   /**
-   * Authority election timings (ADR-0007). Defaults follow the protocol
+   * Authority election timings. Defaults follow the protocol
    * limits; tests inject small deterministic values with fake timers.
    */
   readonly authority?: {
@@ -58,7 +58,7 @@ export interface NovaSessionPlayer extends NovaPlayer {
   readonly connectionId: string;
   readonly ready: boolean;
   readonly joinedAt: number;
-  /** Authority eligibility (ADR-0007 member identity; all players are eligible). */
+  /** Authority eligibility (all players are eligible). */
   readonly authorityEligible: boolean;
 }
 

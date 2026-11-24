@@ -18,7 +18,7 @@ export function nowSentAt(): number {
   return Date.now();
 }
 
-/** Unique action id for one `action.dispatch` (deduplication, ADR-0006). */
+/** Unique action id for one `action.dispatch` (deduplication). */
 export function newActionId(): string {
   return `action-${newMessageId()}`;
 }

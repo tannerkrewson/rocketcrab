@@ -2,7 +2,7 @@
  * Structural validation for game-facing API inputs.
  *
  * The game-facing API validates every input with the same bounded Zod
- * schemas used at the protocol boundary (threat model T10 — no `any`, never
+ * schemas used at the protocol boundary (no `any`, never
  * trust game-supplied values). The runtime
  * frame re-validates everything at its own boundary; these schemas give the
  * game an immediate, clear error before anything crosses a trust boundary.

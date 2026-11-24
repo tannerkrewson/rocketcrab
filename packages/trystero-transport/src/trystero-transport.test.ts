@@ -1012,7 +1012,7 @@ describe("TrysteroTransport peer mapping", () => {
     },
   );
 
-  it("fails the peer when the identity handshake is malformed (T10)", async () => {
+  it("fails the peer when the identity handshake is malformed", async () => {
     const onJoinError = vi.fn();
     const { adapter, clock } = setup({ onJoinError });
     const room = makeFakeRoom();
@@ -1291,7 +1291,7 @@ describe("TrysteroTransport send", () => {
     ).rejects.toMatchObject({ category: "not_connected" });
   });
 
-  it("validates structured payloads when a validator is configured (T10)", async () => {
+  it("validates structured payloads when a validator is configured", async () => {
     const { adapter, clock } = setup({
       validate: (payload: unknown) =>
         typeof payload === "string" ? { ok: true } : { ok: false, error: "not a string" },
@@ -1410,7 +1410,7 @@ describe("TrysteroTransport message delivery", () => {
     expect(received[0]!.payload).not.toBe(bytes);
   });
 
-  it("drops messages with malformed metadata (T10)", async () => {
+  it("drops messages with malformed metadata", async () => {
     const { adapter, room } = await joinedWithPeer();
     const received: TransportMessage[] = [];
     adapter.on("message:received", (message) => {
@@ -1566,7 +1566,7 @@ describe("TrysteroTransport relay diagnostics", () => {
     expect(changes).toEqual([false, true, false]);
   });
 
-  it("stops polling after leave (engineering rule 22 cleanup)", async () => {
+  it("stops polling after leave", async () => {
     const { adapter, clock } = setup();
     mocks.joinRoom.mockReturnValue(makeFakeRoom());
     mocks.relaySockets[RELAY] = { readyState: 1 };

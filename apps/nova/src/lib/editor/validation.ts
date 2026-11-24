@@ -4,7 +4,7 @@ import { sourceByteLength } from "../games/hashing";
 /**
  * Mirror runtime HTML-source checks before starting a run. Hard failures
  * block execution; warnings remain visible. Detect observable failures,
- * not game correctness (ADR-0002; apps/runtime/src/html-source.ts).
+ * not game correctness (apps/runtime/src/html-source.ts).
  */
 
 export type SourceIssueCode = "empty" | "missing_structure" | "oversized_source" | "source_size";

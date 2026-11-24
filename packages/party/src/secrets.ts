@@ -2,12 +2,12 @@ import type { SessionId, SessionSecret } from "@rocketcrab/protocol";
 import { sessionSecretSchema } from "@rocketcrab/protocol";
 
 /**
- * Party session secrets and derivation (ADR-0004, ADR-0011).
+ * Party session secrets and derivation.
  *
  * The creator generates one 32-byte CSPRNG session secret. Everything about
  * the private party room is DERIVED from that secret with Web Crypto
  * (SHA-256 with domain-separated labels), so the secret is the only private
- * material friends share, solely through private invite fragments (ADR-0011).
+ * material friends share, solely through private invite fragments.
  * Every side derives the room/password/session locally.
  *
  * Derivation scheme: for each label L,

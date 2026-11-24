@@ -214,7 +214,7 @@ export type GameApiEventMessage = z.infer<typeof gameApiEventMessageSchema>;
  * the protocol version, message type, runtime instance ID, unique message
  * ID, and timestamp. Unlike peer messages there are no member/connection IDs:
  * the runtime frame is not a party member, it is an isolated execution
- * context (ADR-0001, ADR-0008).
+ * context.
  */
 
 /**
@@ -270,7 +270,7 @@ export const gameRegistrationMessageSchema = z.object({
 export type GameRegistrationMessage = z.infer<typeof gameRegistrationMessageSchema>;
 
 /**
- * Game metadata: the descriptor for a saved game (ADR-0005 local storage)
+ * Game metadata: the descriptor for a saved game
  * shared between host contexts, and the same descriptor embedded as a
  * runtime-plane message when the host hands metadata to the runtime or test
  * arena.
@@ -345,7 +345,7 @@ export type GameLifecycleEventMessage = z.infer<typeof gameLifecycleEventMessage
 /**
  * End-game request: the host asks the runtime to tear the game down (the
  * Emergency Stop control lives outside the frame and cannot be disabled by
- * game code — threat model T6/T21).
+ * game code).
  */
 export const endGameRequestMessageSchema = z.object({
   ...runtimeEnvelopeFields,
@@ -356,7 +356,7 @@ export type EndGameRequestMessage = z.infer<typeof endGameRequestMessageSchema>;
 
 /**
  * Runtime heartbeat ping: the host asks the runtime to confirm liveness
- * (threat model T6 — a wedged runtime must be visible
+ * (a wedged runtime must be visible
  * to the shell).
  */
 export const runtimePingMessageSchema = z

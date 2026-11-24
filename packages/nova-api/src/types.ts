@@ -25,7 +25,7 @@ export type NovaConnectionStatus =
   | "suspended" // the connection dropped (e.g. backgrounded) and may resume
   | "disconnected"; // not connected
 
-/** One player in the game. `id` is stable for the whole party (ADR-0007). */
+/** One player in the game. `id` is stable for the whole party. */
 export interface NovaPlayer {
   /** Stable per-player id. */
   readonly id: string;
@@ -70,7 +70,7 @@ export interface NovaTickContext extends NovaGameContext {
 export type NovaTickHandler = (draft: any, context: NovaTickContext) => void | unknown;
 
 /**
- * One action handler (ADR-0006): validate and mutate the Immer
+ * One action handler: validate and mutate the Immer
  * draft. May also return a new state to replace the draft (Immer recipe
  * semantics). Handlers may be synchronous or async; Nova applies them on the
  * current authority's runtime and Nova owns ordering, deduplication, and
@@ -94,7 +94,7 @@ export interface NovaStateActions {
 }
 
 /**
- * Handler functions (ADR-0006). These are the only functions in
+ * Handler functions. These are the only functions in
  * the game contract; they stay inside the game's own context (the frame or
  * the in-process client) and are never serialized across a boundary.
  */
@@ -113,7 +113,7 @@ export interface NovaStateHandlers {
   /**
    * Select the view one player sees. Defaults to the full state when
    * omitted. Runs on the authority; every frame receives only its selected
-   * view (ADR-0006). `context` is the one the handler that produced this
+   * view. `context` is the one the handler that produced this
    * state received.
    */
   selectView?(state: unknown, viewer: NovaPlayer, context: NovaGameContext): unknown;
@@ -143,7 +143,7 @@ export interface NovaGameDeclaration extends NovaStateHandlers {
 
 /**
  * One dispatched action. Nova owns action ordering,
- * deduplication, and application (ADR-0006); the game only describes the
+ * deduplication, and application; the game only describes the
  * action.
  */
 export interface NovaAction {
@@ -182,7 +182,7 @@ export interface NovaActionAck {
 /**
  * State-size and action-rate diagnostics (host/arena visible). Values reflect
  * the last committed canonical state and expose election state so the arena can
- * force and display migration (ADR-0007).
+ * force and display migration.
  */
 export interface NovaStateDiagnostics {
   /** Current canonical revision (0 before the first snapshot). */
@@ -193,7 +193,7 @@ export interface NovaStateDiagnostics {
   readonly stateHash: string | null;
   /** The current authority's member id, or null when none is known. */
   readonly authorityMemberId: string | null;
-  /** Current authority term (monotonic; ADR-0007). */
+  /** Current authority term (monotonic). */
   readonly term: number;
   /** True while this shell is campaigning (election in progress). */
   readonly electionInProgress: boolean;

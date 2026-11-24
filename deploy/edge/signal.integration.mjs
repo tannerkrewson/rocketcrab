@@ -1,4 +1,4 @@
-// Run against a separately started local `wrangler dev` (see deploy/cloudflare.md).
+// Run against a separately started local `wrangler dev` (see deploy/README.md).
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
 import { once } from "node:events";

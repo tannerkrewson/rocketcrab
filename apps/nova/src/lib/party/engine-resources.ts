@@ -48,7 +48,7 @@ type LastSetup =
   | { kind: "create"; input: PartySourceSpec | undefined }
   | { kind: "join-invite"; input: { secret: string } };
 
-/** A stable member identity (ADR-0007); defaults to the page identity. */
+/** A stable member identity; defaults to the page identity. */
 interface PartyMemberIdentity {
   readonly memberId: string;
   displayName: string;

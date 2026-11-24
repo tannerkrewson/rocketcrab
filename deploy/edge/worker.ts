@@ -10,7 +10,7 @@
  *
  * Known routes enforce an Origin allowlist and per-IP rate limiting.
  * Configuration lives in wrangler.toml; the TURN key is a Worker secret.
- * See deploy/cloudflare.md.
+ * See deploy/README.md.
  */
 import { jsonError } from "./http";
 import { handleRelay } from "./relay";

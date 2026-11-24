@@ -1,15 +1,15 @@
 import { QRCodeSVG } from "qrcode.react";
 
 export interface PartyInviteQrProps {
-  /** Full invite URL (session secret lives in the fragment; ADR-0011). */
+  /** Full invite URL (session secret lives in the fragment). */
   readonly inviteUrl: string;
   readonly size?: number;
   readonly className?: string;
-  /** Safe text label only; the full secret-bearing URL belongs in the QR (ADR-0011). */
+  /** Safe text label only; the full secret-bearing URL belongs in the QR. */
   readonly label?: string;
 }
 
-/** Encode the fragment-secret invite without rendering its URL as text (ADR-0011). */
+/** Encode the fragment-secret invite without rendering its URL as text. */
 export function PartyInviteQr({ inviteUrl, size = 176, className, label }: PartyInviteQrProps) {
   return (
     <div className={className}>

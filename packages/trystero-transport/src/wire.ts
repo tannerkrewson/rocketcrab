@@ -79,7 +79,7 @@ const IDENTITY_VALIDATOR = {
 
 /**
  * Validate an identity payload received from a peer. The adapter never
- * trusts peer input (threat model T10); malformed identities are rejected
+ * trusts peer input; malformed identities are rejected
  * and reported as structured join errors.
  */
 export function parseIdentityPayload(value: unknown): IdentityPayload | null {
@@ -117,7 +117,7 @@ export function parseIdentityPayload(value: unknown): IdentityPayload | null {
 
 /**
  * Validate the wire envelope decoded from received metadata. Returns null
- * for malformed metadata (dropped, never delivered — T10).
+ * for malformed metadata (dropped, never delivered).
  */
 export function parseWireEnvelope(value: unknown): WireEnvelope | null {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
@@ -172,7 +172,7 @@ export function parseWireEnvelope(value: unknown): WireEnvelope | null {
   });
 }
 
-/** True when the payload is a raw binary blob (ADR-0006 raw mode). */
+/** True when the payload is a raw binary blob (game-source chunks). */
 export function isBinaryPayload(payload: unknown): boolean {
   return payload instanceof Uint8Array || payload instanceof ArrayBuffer;
 }

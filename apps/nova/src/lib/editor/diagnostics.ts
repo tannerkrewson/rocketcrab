@@ -2,7 +2,7 @@ import type { RuntimeConsoleMessage, RuntimeErrorMessage } from "@rocketcrab/pro
 import type { RuntimeHostEvent } from "../runtime-host";
 import type { SourceIssue } from "./validation";
 
-/** Normalize observable runtime diagnostics for the UI and report; never prove game correctness (ADR-0002). */
+/** Normalize observable runtime diagnostics for the UI and report; never prove game correctness. */
 
 export type DiagnosticSeverity = "error" | "warning" | "info";
 

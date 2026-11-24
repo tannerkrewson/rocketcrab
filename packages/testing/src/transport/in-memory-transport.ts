@@ -18,7 +18,7 @@ import type { RequiredFaultProfile } from "./faults";
 /**
  * In-memory transport: one simulated player connection driven by an
  * {@link InMemoryTransportHub}. Implements the transport-neutral
- * {@link NovaTransport} interface (ADR-0003) so the game-facing Nova API
+ * {@link NovaTransport} interface so the game-facing Nova API
  * behaves identically in the local test arena and over a real party
  * transport. No WebRTC, no Trystero.
  *
@@ -233,7 +233,7 @@ export class InMemoryTransport implements NovaTransport, InMemoryPeer {
     this.emit("message:lost", message);
   }
 
-  /** Emit a `message:invalid` (validation failure, threat T10). */
+  /** Emit a `message:invalid` (validation failure). */
   emitInvalid(message: TransportMessage, reason: string): void {
     this.emit("message:invalid", message, reason);
   }

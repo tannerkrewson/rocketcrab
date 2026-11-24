@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * Protocol limits (threat-model rows T10/T11).
+ * Protocol limits.
  *
  * Byte-based limits are enforced at serialization boundaries (the host bridge
  * and the transport adapters) because Zod cannot measure the serialized size
@@ -14,7 +14,7 @@ import { z } from "zod";
 /** Warn when usage reaches this fraction of a hard limit. */
 export const LIMIT_WARN_FRACTION = 0.8;
 
-/** Hard cap on a game's complete HTML source document (ADR-0002). */
+/** Hard cap on a game's complete HTML source document. */
 export const htmlSourceBytes = 2 * 1024 * 1024; // 2 MiB
 export const htmlSourceWarnBytes = Math.floor(htmlSourceBytes * LIMIT_WARN_FRACTION);
 
@@ -22,11 +22,11 @@ export const htmlSourceWarnBytes = Math.floor(htmlSourceBytes * LIMIT_WARN_FRACT
 export const messageBytesBeforeChunking = 64 * 1024; // 64 KiB
 export const messageWarnBytes = Math.floor(messageBytesBeforeChunking * LIMIT_WARN_FRACTION);
 
-/** Hard cap on one canonical state snapshot (ADR-0006). */
+/** Hard cap on one canonical state snapshot. */
 export const stateSnapshotBytes = 512 * 1024; // 512 KiB
 export const stateSnapshotWarnBytes = Math.floor(stateSnapshotBytes * LIMIT_WARN_FRACTION);
 
-/** Hard cap on one action payload (ADR-0006). */
+/** Hard cap on one action payload. */
 export const actionPayloadBytes = 16 * 1024; // 16 KiB
 export const actionPayloadWarnBytes = Math.floor(actionPayloadBytes * LIMIT_WARN_FRACTION);
 
@@ -59,12 +59,12 @@ export const handshakeTimeoutMs = 30_000;
 
 /**
  * Time the authority has to apply a submitted action before the action times
- * out (ADR-0006: action timeouts and deduplication).
+ * out (action timeouts and deduplication).
  */
 export const actionTimeoutMs = 10_000;
 
 /**
- * Processed action IDs a state snapshot carries (ADR-0007 deduplication
+ * Processed action IDs a state snapshot carries (the deduplication
  * window). Snapshots broadcast only the IDs added since the previous
  * broadcast; full history travels only for late joiners, restores and resync.
  */
@@ -78,7 +78,7 @@ export const stateHistoryLimit = 256;
 export const stateResyncMinIntervalMs = 1_000;
 
 /**
- * Largest state delta a commit may carry (ADR-0007 state deltas). A commit
+ * Largest state delta a commit may carry. A commit
  * whose diff needs more operations, or a deeper path, is sent as a full state.
  */
 export const stateDeltaMaxOps = 512;
@@ -86,14 +86,14 @@ export const stateDeltaMaxOps = 512;
 export const stateDeltaMaxDepth = 32;
 
 /**
- * Authority heartbeat interval (ADR-0007). The current authority
+ * Authority heartbeat interval. The current authority
  * broadcasts one heartbeat per interval so followers can detect silent loss;
  * missing heartbeats begin the grace period.
  */
 export const authorityHeartbeatIntervalMs = 1_000;
 
 /**
- * Authority grace period (ADR-0007): how long a follower waits without a
+ * Authority grace period: how long a follower waits without a
  * heartbeat (or announcement/snapshot from the authority) before suspecting
  * the authority and starting an election.
  */
@@ -145,7 +145,7 @@ export const LIMITS = {
 export type Limits = typeof LIMITS;
 
 /**
- * Game source bounded by the HTML source hard limit (ADR-0002: a game is one
+ * Game source bounded by the HTML source hard limit (a game is one
  * complete HTML document stored as a string).
  */
 export const htmlSourceSchema = z

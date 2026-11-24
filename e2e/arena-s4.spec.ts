@@ -1,17 +1,10 @@
 /**
  * Play the quiz in four real runtime frames over in-memory transports,
  * including authority migration, suspension, and state catch-up.
- * Physical-device coverage lives in docs/testing/state-mode-vertical-slice.md.
- * Set CAPTURE_S4_SCREENSHOTS=1 to capture documentation screenshots.
  */
 import { expect, test, type Frame, type Page } from "@playwright/test";
 import { clickInGame, gameState, NOVA_QUIZ_HTML, waitForGameState } from "./quiz-frame-helpers";
-import { mkdirSync } from "node:fs";
-import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { openEditorWithSource } from "./editor-helpers";
-
-const dirname = path.dirname(fileURLToPath(import.meta.url));
 
 const PLAYER_IDS = ["player-1", "player-2", "player-3", "player-4"];
 
@@ -59,13 +52,6 @@ async function authorityPlayerId(page: Page): Promise<string | null> {
   return null;
 }
 
-async function capture(page: Page, name: string): Promise<void> {
-  if (process.env.CAPTURE_S4_SCREENSHOTS !== "1") return;
-  const dir = path.join(dirname, "..", "docs", "testing", "screenshots");
-  mkdirSync(dir, { recursive: true });
-  await page.screenshot({ path: path.join(dir, name), fullPage: false });
-}
-
 async function openArenaWithFourPlayers(page: Page): Promise<void> {
   await openEditorWithSource(page, NOVA_QUIZ_HTML);
   // Run rebuilds the arena; add players only once that first run settles.
@@ -91,7 +77,6 @@ test.describe("S4 arena — four simulated players play Nova Quiz", () => {
     let state = await waitForGameState(player1, (s) => s.phase === "question");
     expect(state.roundChip).toMatch(/^Round 1 of /u);
     const round1Quizmaster = quizmasterPlayerId(state.quizmaster);
-    await capture(page, "arena-round-1.png");
 
     // Answer controls reject spectators, so clicking every frame is safe.
     for (const playerId of PLAYER_IDS) {
@@ -103,7 +88,6 @@ test.describe("S4 arena — four simulated players play Nova Quiz", () => {
     state = await waitForGameState(player1, (s) => s.phase === "revealed");
     expect(state.answersList).toBe(true);
     expect(state.scores).toContain("Player");
-    await capture(page, "arena-round-1-revealed.png");
 
     await clickInGame(await runtimeFrameOf(page, round1Quizmaster), '[data-action="next"]');
     state = await waitForGameState(player1, (s) => s.phase === "question");
@@ -129,7 +113,6 @@ test.describe("S4 arena — four simulated players play Nova Quiz", () => {
     await expect(suspendedCard.getByText("Suspended", { exact: true })).toBeVisible({
       timeout: 10_000,
     });
-    await capture(page, "arena-authority-suspended.png");
 
     await expect
       .poll(async () => authorityPlayerId(page), { timeout: 30_000 })
@@ -160,7 +143,6 @@ test.describe("S4 arena — four simulated players play Nova Quiz", () => {
       (s) => s.phase === "revealed" && s.roundChip?.startsWith("Round 2") === true,
     );
     expect(reconnected.answersList).toBe(true);
-    await capture(page, "arena-reconnected-caught-up.png");
 
     await clickInGame(await runtimeFrameOf(page, round2Quizmaster), '[data-action="next"]');
     const round3 = await waitForGameState(
@@ -168,6 +150,5 @@ test.describe("S4 arena — four simulated players play Nova Quiz", () => {
       (s) => s.phase === "question",
     );
     expect(round3.roundChip).toMatch(/^Round 3 of /u);
-    await capture(page, "arena-round-3.png");
   });
 });

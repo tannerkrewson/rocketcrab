@@ -11,7 +11,7 @@ import { SUPPORTED_PROTOCOL_VERSIONS, isSupportedProtocolVersion } from "./versi
 /**
  * Protocol boundary parsing.
  *
- * Every external message is validated at the boundary (threat model T10):
+ * Every external message is validated at the boundary:
  * no `any` is accepted, unknown protocol versions
  * fail with a useful error, and unknown message types fail with the list of
  * supported types.

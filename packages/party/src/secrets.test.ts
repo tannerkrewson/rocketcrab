@@ -4,7 +4,7 @@ import { SESSION_SECRET_BYTES, deriveSessionMaterial, generateSessionSecret } fr
 
 const SECRET = "A".repeat(43);
 
-describe("session secrets (ADR-0011)", () => {
+describe("session secrets", () => {
   it("generates 32-byte CSPRNG secrets in unpadded base64url", () => {
     for (let i = 0; i < 20; i += 1) {
       const secret = generateSessionSecret();

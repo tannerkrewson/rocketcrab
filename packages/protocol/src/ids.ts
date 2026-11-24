@@ -9,7 +9,7 @@ import { z } from "zod";
  * that IDs are non-empty, bounded, and never `any`.
  */
 
-/** Stable per-player identity within a party (ADR-0007). */
+/** Stable per-player identity within a party. */
 export const memberIdSchema = z.string().min(1).max(64);
 
 /** Identifies a specific connection of a member; changes on reconnect. */
@@ -30,8 +30,7 @@ export const gameIdSchema = z.string().min(1).max(64);
 export const runtimeInstanceIdSchema = z.string().min(1).max(64);
 
 /**
- * The 32-byte party session secret as unpadded base64url (43 characters;
- * ADR-0011). Generated with Web Crypto (CSPRNG), carried in invite-link
+ * The 32-byte party session secret as unpadded base64url (43 characters). Generated with Web Crypto (CSPRNG), carried in invite-link
  * fragments only — never in
  * game runtime messages or the game DOM.
  */
@@ -54,7 +53,7 @@ export const displayNameSchema = z.string().min(1).max(32);
 /** Game title. */
 export const titleSchema = z.string().min(1).max(64);
 
-/** SHA-256 digest as 64 lowercase hex characters (ADR-0002). */
+/** SHA-256 digest as 64 lowercase hex characters. */
 export const sha256Schema = z
   .string()
   .regex(/^[0-9a-f]{64}$/, "Expected a 64-character lowercase hex SHA-256 digest.");

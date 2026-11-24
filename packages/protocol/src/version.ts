@@ -6,8 +6,10 @@ import { z } from "zod";
  *
  * The protocol version is a single integer carried in the `version` field of
  * every envelope. Unknown versions are rejected with a useful error rather
- * than guessed at. See `versioning.md` in this package for the full
- * backward-compatibility policy.
+ * than guessed at. Within a version, only additive changes are allowed: an
+ * optional field, or a new message type that old receivers reject loudly.
+ * New enum values, removals, renames and newly required fields need a bump;
+ * keep an old version in SUPPORTED_PROTOCOL_VERSIONS only while it still parses.
  */
 
 /** Current protocol version understood by this build of the package. */

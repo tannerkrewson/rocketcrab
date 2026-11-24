@@ -38,7 +38,7 @@ function errorMessage(error: unknown): string {
 
 /**
  * The party entry point. A plain visit starts your own party; a link with an
- * invite fragment (`/party#secret=…`, ADR-0011) joins a friend's. Either way
+ * invite fragment (`/party#secret=…`) joins a friend's. Either way
  * a player without a saved name names themselves first.
  */
 function PartyPage() {

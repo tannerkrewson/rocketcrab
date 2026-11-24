@@ -6,7 +6,7 @@ import { joinRoomUrl, postJson, randomRoomId, rocketcrabUrl, roomField } from ".
  * External games: each runs on its own server. Room creation runs in the
  * browser, or through the scoped edge relay when the upstream sends no CORS
  * headers. frameOrigins supplies the strict main-origin CSP allowlist
- * (ADR-0001; apps/nova/vite.config.ts).
+ * (apps/nova/vite.config.ts).
  */
 
 function origins(displayUrlHref: string, ...extra: string[]): string[] {

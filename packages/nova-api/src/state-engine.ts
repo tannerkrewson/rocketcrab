@@ -17,12 +17,12 @@
  *   and replication of the canonical state to every party shell;
  * - per-player views (only the player's selected view reaches its frame);
  * - state-size and action-rate diagnostics;
- * - automatic authority election and migration (ADR-0007).
+ * - automatic authority election and migration.
  *
  * ## Authority election and migration
  *
  * Game code never knows which peer executes authoritative transitions. The
- * engine implements the ADR-0007 protocol over the term + revision + hash
+ * engine implements authority election and replication over the term + revision + hash
  * model (no quorum; trusted-friend scale):
  *
  * - **Member identity** comes from the session (stable member id, connection
@@ -52,7 +52,7 @@
  *   authority is known; the new authority queues actions received before its
  *   restore completed and deduplicates against the restored processed-action
  *   history and its own queue, so no action commits twice after migration.
- * - **Conflict reconciliation** (ADR-0007): state envelopes carry revision,
+ * - **Conflict reconciliation**: state envelopes carry revision,
  *   term, authority member id, state hash, and recent processed action ids.
  *   At the same revision with conflicting hashes the engine prefers the
  *   majority-matching hash (vote counts from snapshots, announcements, and
@@ -369,7 +369,7 @@ export class NovaStateEngine extends StateEngineTicks {
       // state-hash digest: drop the result silently, exactly like the
       // post-handler check above. The dispatcher re-sends once the new
       // authority is announced and deduplication applies the action
-      // exactly once (ADR-0007). The action was never invalid, so it must
+      // exactly once. The action was never invalid, so it must
       // not be acked as invalid_state.
       return true;
     }
@@ -385,7 +385,7 @@ export class NovaStateEngine extends StateEngineTicks {
    * Commit a new canonical state: revision, hash, snapshot, views. The
    * committed action (when given) is recorded in the history BEFORE the
    * snapshot is published, so the replicated `processedActionIds` are
-   * complete and a re-sent action is deduplicated after migration (ADR-0007:
+   * complete and a re-sent action is deduplicated after migration (
    * no action commits twice).
    */
   protected async commit(
@@ -399,7 +399,7 @@ export class NovaStateEngine extends StateEngineTicks {
     if (this.authorityMemberId !== this.selfMemberId || !this.restoreDone) return false;
     // Hash BEFORE mutating revision/canonical: a catch-up snapshot read
     // mid-commit must never observe the new revision with the old hash
-    // (ADR-0007: state envelopes carry consistent revision + hash).
+    // (state envelopes carry consistent revision + hash).
     const stateHash = await this.stateHashImpl(state);
     if (this.disposed) return false;
     if (this.authorityMemberId !== this.selfMemberId || !this.restoreDone) return false;

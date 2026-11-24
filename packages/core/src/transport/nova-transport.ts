@@ -10,7 +10,7 @@ import type {
 } from "./transport-types";
 
 /**
- * Transport-neutral Nova transport (ADR-0003).
+ * Transport-neutral Nova transport.
  *
  * The single interface shared by InMemoryTransport (local test arena) and
  * TrysteroTransport (real parties). Generated games never see this interface;
@@ -19,13 +19,12 @@ import type {
  *
  * The interface is React-free and does not reference Trystero: no room
  * objects, no peer objects, no relay configuration. Lifecycle events
- * (join/leave/reconnect/suspension) match what a real transport produces
- * (threat-model T15).
+ * (join/leave/reconnect/suspension) match what a real transport produces.
  */
 export interface NovaTransport {
   /** Transport implementation identity, e.g. "in-memory" | "trystero". */
   readonly kind: string;
-  /** Stable per-player identity within the party (ADR-0007). */
+  /** Stable per-player identity within the party. */
   readonly selfMemberId: MemberId;
   /** Current connection identity; changes when the transport reconnects. */
   readonly selfConnectionId: ConnectionId;
@@ -66,7 +65,7 @@ export interface NovaTransport {
   reconnect(): Promise<void>;
 
   /**
-   * Simulate background suspension (Mobile Safari backgrounding; T15).
+   * Simulate background suspension (Mobile Safari backgrounding).
    * The connection drops: peers observe `peer:left`, the local state becomes
    * "suspended", and incoming messages are buffered or dropped per the fault
    * profile. `resume()` reconnects.

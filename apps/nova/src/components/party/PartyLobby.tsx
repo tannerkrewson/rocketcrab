@@ -208,7 +208,7 @@ export function PartyLobby({
   return (
     <div className="mx-auto flex w-full max-w-xl flex-col gap-4">
       {/* Render only safe invite text; the secret remains in the URL fragment
-          and is encoded by the QR, never printed on the page (ADR-0011). */}
+          and is encoded by the QR, never printed on the page. */}
 
       <section
         aria-label="Invite your friends"

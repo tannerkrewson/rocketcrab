@@ -23,7 +23,7 @@ export interface TurnCredsIceServer {
 /**
  * A TURN server the transport accepts via its `turnConfig` hook (Trystero's
  * `TurnServerConfig` shape). Defined locally on purpose — apps/nova may not
- * import `trystero` (ADR-0003; enforced by the root oxlint rule); the shape
+ * import `trystero` (enforced by the root oxlint rule); the shape
  * is structurally identical to what `@rocketcrab/trystero-transport`
  * accepts.
  */

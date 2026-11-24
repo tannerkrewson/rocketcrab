@@ -23,7 +23,7 @@ import { InMemoryTransport } from "./in-memory-transport";
  * delivery, and link faults — latency, jitter, loss, duplication, reordering,
  * background suspension — without any WebRTC or Trystero code, so the local
  * test arena can run several players on one page through the same
- * transport-neutral Nova interface (ADR-0003) a real party uses.
+ * transport-neutral Nova interface a real party uses.
  *
  * Determinism: the hub owns a single seeded PRNG (mulberry32) and every
  * random decision (IDs, jitter, loss, duplication, reordering) draws from it
@@ -32,7 +32,7 @@ import { InMemoryTransport } from "./in-memory-transport";
  * and fast-check property runs free of real timers.
  */
 
-/** Result of the optional payload validator (protocol boundary, threat T10). */
+/** Result of the optional payload validator (protocol boundary). */
 export type PayloadValidatorResult = { ok: true } | { ok: false; error: string };
 
 /** Validates structured payloads at send time when configured. */
@@ -61,7 +61,7 @@ export interface InMemoryHubOptions {
   /**
    * Optional validator for structured payloads. When set, every non-binary
    * send is validated first; invalid payloads reject the send and emit
-   * `message:invalid` (threat T10 — the transport never bypasses the runtime
+   * `message:invalid` (the transport never bypasses the runtime
    * protocol).
    */
   validate?: PayloadValidator;
@@ -70,7 +70,7 @@ export interface InMemoryHubOptions {
 }
 
 export interface CreateInMemoryTransportOptions {
-  /** Stable per-player identity (ADR-0007); the arena assigns one per frame. */
+  /** Stable per-player identity; the arena assigns one per frame. */
   memberId: MemberId;
   /** Connection identity; generated deterministically when omitted. */
   connectionId?: ConnectionId;

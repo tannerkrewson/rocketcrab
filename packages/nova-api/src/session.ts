@@ -97,7 +97,7 @@ export class NovaSession extends SessionLifecycle {
    * Dispatch one action: validate, assign the base revision, and
    * either apply locally (this session is the current authority), send the
    * action to the authority, or — when no authority is known (election in
-   * progress) — buffer it until the new authority is announced (ADR-0007:
+   * progress) — buffer it until the new authority is announced (
    * actions buffer during election). In-flight dispatches are re-sent when
    * the authority changes so an action whose ack was lost in a migration is
    * applied exactly once (history + queue deduplication). Resolves once the
@@ -137,7 +137,7 @@ export class NovaSession extends SessionLifecycle {
       // Track it in-flight so that if the authority steps down mid-commit
       // (the async state-hash digest can race a peer campaign), the action
       // is re-sent to the new authority by flushDispatchBuffer and applied
-      // exactly once (deduplication on the new authority; ADR-0007). The
+      // exactly once (deduplication on the new authority). The
       // local ack (any status) removes the entry.
       this.trackInflight(entry);
       this.engine.handleLocalAction({

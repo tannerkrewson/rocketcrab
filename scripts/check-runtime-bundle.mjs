@@ -5,7 +5,7 @@
  *
  * Scans the built apps/runtime bundle for strings that must never appear:
  * the local game database (dexie — U2), the peer transport (Trystero — P1),
- * and party/session secrets (ADR-0011). Runs after `vite build` via the
+ * and party/session secrets. Runs after `vite build` via the
  * runtime package's build script; fails the build on a hit.
  *
  * Note: the runtime origin may legitimately contain the protocol schemas

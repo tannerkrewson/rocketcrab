@@ -8,13 +8,13 @@
         "paths": [
           {
             "name": "trystero",
-            "message": "Trystero may only be imported by @rocketcrab/trystero-transport (P1 adapter). Games and the core/arena never see Trystero (ADR-0003, engineering rule 1)."
+            "message": "Trystero may only be imported by @rocketcrab/trystero-transport. Games and the core/arena never see Trystero."
           }
         ],
         "patterns": [
           {
             "group": ["@trystero-p2p/*"],
-            "message": "Trystero internals may only be imported by @rocketcrab/trystero-transport (P1 adapter)."
+            "message": "Trystero internals may only be imported by @rocketcrab/trystero-transport."
           }
         ]
       }

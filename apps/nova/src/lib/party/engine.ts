@@ -194,7 +194,7 @@ export class PartyEngine {
     }
   }
 
-  /** Join a party from an invite-link secret (ADR-0011). */
+  /** Join a party from an invite-link secret. */
   async joinByInvite(input: { secret: string }): Promise<void> {
     if (this.state.leaveInFlight !== null && !(await this.waitForLeaveBeforeSetup())) return;
     if (this.rejectUnsafeSetup()) return;
@@ -2294,7 +2294,7 @@ export class PartyEngine {
 
   /**
    * Until the state engine announces authority, show its first-ready-member fallback.
-   * Greeter status is a separate role (ADR-0007), never an authority signal.
+   * Greeter status is a separate role, never an authority signal.
    */
   private computeAuthorityMemberId(members: readonly PartyMemberView[]): MemberId | null {
     const engineAuthority = this.state.session?.getStateModeDiagnostics().authorityMemberId ?? null;

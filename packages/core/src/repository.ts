@@ -13,8 +13,7 @@ export interface SavedGameOrigin {
 }
 
 /**
- * A saved user-created game, persisted in IndexedDB on Nova's main origin
- * (ADR-0005).
+ * A saved user-created game, persisted in IndexedDB on Nova's main origin.
  */
 export interface SavedGame {
   id: string;
@@ -106,7 +105,7 @@ export interface TestResultsInput {
 }
 
 /**
- * Browser-local game repository (ADR-0005). Persistence lives in IndexedDB on
+ * Browser-local game repository. Persistence lives in IndexedDB on
  * the main origin; implementations must never upload game source anywhere and
  * must never destroy the prior saved version on a failed write.
  */

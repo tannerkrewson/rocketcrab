@@ -20,7 +20,7 @@ function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "Something went wrong.";
 }
 
-/** Local game library backed by IndexedDB (ADR-0005). */
+/** Local game library backed by IndexedDB. */
 export function LibraryPage() {
   const gamesQuery = useSavedGames();
   const deleteGame = useDeleteGame();

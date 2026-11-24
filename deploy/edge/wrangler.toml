@@ -1,6 +1,6 @@
 # Nova edge Worker: TURN mint, external-game room relay, signaling, tunnel, log.
 # This file is the single source of truth for the deployed Worker.
-# Deploy with `npm run edge:deploy`; see deploy/cloudflare.md.
+# Deploy with `npm run edge:deploy`; see deploy/README.md.
 name = "rocketcrab-edge"
 main = "worker.ts"
 compatibility_date = "2026-08-01"

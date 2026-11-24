@@ -133,7 +133,7 @@ describe("FrameStateExecutor", () => {
     }
   });
 
-  it("drops late responses to settled or timed-out requests (rule 22)", async () => {
+  it("drops late responses to settled or timed-out requests", async () => {
     const { executor, pushed } = makeHarness(50);
     const promise = executor.computeView({ state: {}, viewer: PLAYER_A, context: VIEW_CONTEXT });
     const event = pushed[0];

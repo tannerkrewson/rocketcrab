@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /**
- * Static-deploy verification (M2; docs/architecture/deployment.md).
+ * Static-deploy verification (deploy/README.md).
  *
  * Checks a built origin's dist output against the deployment requirements
  * before it is published. Runs after `vite build` in the static deploy scripts
@@ -12,13 +12,13 @@
  *     the matching policy with `frame-src` pinned to the runtime origin;
  *   - no inline application scripts (`script-src 'self'` must hold);
  *   - the referrer meta tag is present (no path/query leakage; invite
- *     secrets already live in URL fragments, ADR-0011).
+ *     secrets already live in URL fragments).
  *
  * Runtime origin (permissive policy, compensating controls):
  *   - NO CSP meta (game HTML keeps ordinary web capabilities);
  *   - the referrer meta tag is present;
  *   - the bundle registers no service worker (no persistent network
- *     control over game traffic, ADR-0008).
+ *     control over game traffic).
  *
  * Usage:
  *   node scripts/verify-static-deploy.mjs --origin nova|runtime --runtime-origin <origin> --main-origin <origin>

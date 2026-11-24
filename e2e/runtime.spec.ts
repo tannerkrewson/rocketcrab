@@ -206,7 +206,7 @@ test.describe("cross-origin isolation", () => {
     expect(m.topStorage).toContain("blocked");
     expect(m.topNav).toContain("blocked");
     expect(m.disableStop).toContain("blocked");
-    expect(m.runtimePageDom).toBe(true); // same-origin with the runtime page (ADR-0008)
+    expect(m.runtimePageDom).toBe(true); // same-origin with the runtime page
     expect(page.url()).toBe(NOVA_ORIGIN + "/");
   });
 

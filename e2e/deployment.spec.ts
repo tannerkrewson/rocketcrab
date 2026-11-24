@@ -1,9 +1,9 @@
 import { expect, test } from "@playwright/test";
 
 /**
- * Static deployment properties: keep invite secrets in fragments (ADR-0011)
+ * Static deployment properties: keep invite secrets in fragments
  * and exercise SPA route reloads. Local routing does not prove production
- * asset fallback configuration; see docs/architecture/deployment.md.
+ * asset fallback configuration; see deploy/README.md.
  */
 test.describe("static deployment properties", () => {
   test("invite fragment is never sent in any HTTP request", async ({ page }) => {

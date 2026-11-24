@@ -605,7 +605,7 @@ describe("PartyLobby", () => {
     expect(screen.getByRole("button", { name: /copy url/i })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: /qr code/i })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /^share$/i })).not.toBeInTheDocument();
-    // Do not render the full secret-bearing invite URL (ADR-0011).
+    // Do not render the full secret-bearing invite URL.
     expect(screen.queryByText(`${window.location.host}/abcd`)).not.toBeInTheDocument();
     expect(screen.queryByText(INVITE_URL)).not.toBeInTheDocument();
     expect(screen.queryByText(/invite-secret/)).not.toBeInTheDocument();
