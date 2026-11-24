@@ -14,6 +14,7 @@
  * Timing is accelerated through the documented test seam
  * (`globalThis.__novaQuizConfig`), which nothing sets in a real browser.
  */
+import { createHash } from "node:crypto";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InMemoryTransportHub, type InMemoryTransport } from "@rocketcrab/testing";
 // The single-file example game, verbatim (Vite ?raw import; the tests
@@ -116,10 +117,33 @@ function addPlayer(
   return session;
 }
 
+/**
+ * Timers and Date.now() are faked, so the game's deadlines, the session's
+ * heartbeats and the hub's delivery all run on simulated time.
+ */
+async function tick(ms: number): Promise<void> {
+  await vi.advanceTimersByTimeAsync(ms);
+}
+
+/** Pump simulated time until a promise that waits on timers settles. */
+async function pumpUntil<T>(world: World, promise: Promise<T>): Promise<T> {
+  let done = false;
+  void promise.then(
+    () => (done = true),
+    () => (done = true),
+  );
+  const deadline = Date.now() + 10_000;
+  while (!done && Date.now() < deadline) {
+    world.hub.drain();
+    await tick(20);
+  }
+  return promise;
+}
+
 async function settle(world: World, ms: number): Promise<void> {
   const deadline = Date.now() + ms;
   while (Date.now() < deadline) {
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await tick(20);
     world.hub.drain();
   }
   world.hub.drain();
@@ -128,7 +152,7 @@ async function settle(world: World, ms: number): Promise<void> {
 /** Join every session and start the game (arena policy: the host starts). */
 async function playToStart(world: World): Promise<void> {
   for (const session of world.sessions) {
-    await session.join();
+    await pumpUntil(world, session.join());
   }
   await settle(world, 120);
   for (const session of world.sessions) {
@@ -159,7 +183,7 @@ async function waitForView(
         `Timed out waiting for the view predicate (phase=${JSON.stringify(view?.phase)} round=${JSON.stringify(view?.round)} revealed=${JSON.stringify(view?.revealed)}).`,
       );
     }
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await tick(20);
   }
 }
 
@@ -170,17 +194,16 @@ async function dispatchSettled(
   action: NovaAction,
 ): Promise<void> {
   const promise = session.client.dispatch(action);
+  let settled = false;
+  void promise.then(
+    () => (settled = true),
+    () => (settled = true),
+  );
   const deadline = Date.now() + 3000;
   for (;;) {
     world.hub.drain();
-    const settled = await Promise.race([
-      promise.then(
-        () => true,
-        () => true,
-      ),
-      new Promise<false>((resolve) => setTimeout(() => resolve(false), 15)),
-    ]);
-    if (settled === true) {
+    await tick(15);
+    if (settled) {
       // Surface rejection codes (stable NovaError codes) instead of hiding
       // them: a rejected action usually means a stale race that the next
       // view settles, but the migration test must not silently swallow.
@@ -218,7 +241,7 @@ async function waitForConnection(
         `Timed out waiting for ${session.self.id} to reconnect (status=${session.connectionStatus}).`,
       );
     }
-    await new Promise((resolve) => setTimeout(resolve, 20));
+    await tick(20);
   }
 }
 
@@ -234,10 +257,22 @@ function config(overrides: { answerMs?: number; resultsMs?: number; rounds?: num
 }
 
 beforeEach(() => {
+  vi.useFakeTimers({
+    toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+  });
+  // WebCrypto resolves off the fake clock, which would let simulated time run
+  // ahead of the state-hash digest; the same SHA-256 resolves on a microtask.
+  vi.spyOn(crypto.subtle, "digest").mockImplementation(async (_algorithm, data) => {
+    const bytes = createHash("sha256")
+      .update(new Uint8Array(data as ArrayBuffer))
+      .digest();
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  });
   config({ answerMs: 2000, resultsMs: 1200, rounds: 2 });
 });
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.restoreAllMocks();
   delete (globalThis as Record<string, unknown>).__novaQuizConfig;
   for (const world of worlds.splice(0)) {
@@ -361,9 +396,7 @@ describe("four players play full rounds (arena-style)", () => {
         (v) => v.phase === "question" && v.round === question.round,
       );
     }
-    await new Promise((resolve) =>
-      setTimeout(resolve, Math.max(0, question.deadline - Date.now()) + 100),
-    );
+    await tick(Math.max(0, question.deadline - Date.now()) + 100);
 
     // The losing auto-reveals are rejected with the stable, actionable code.
     await waitForView(world, a, (v) => v.phase === "revealed");
@@ -464,7 +497,7 @@ describe("authority migration mid-game (ADR-0007)", () => {
     // exactly like the arena's "Authority loss" control over a real link.
     const authorityIndex = world.sessions.findIndex((s) => s.self.id === before.authorityMemberId);
     world.transports[authorityIndex]!.faultProfile.rejoinDelayMs = 800;
-    await world.transports[authorityIndex]!.reconnect();
+    await pumpUntil(world, world.transports[authorityIndex]!.reconnect());
     await settle(world, 400);
 
     // A new authority was elected at a higher term.
@@ -509,7 +542,7 @@ describe("reconnect and late join", () => {
 
     // Dana joins mid-round: she spectates the current question.
     const d = addPlayer(world, PLAYERS[3]!);
-    await d.join();
+    await pumpUntil(world, d.join());
     await settle(world, 250);
     const spectatorView = await waitForView(world, d, (v) => v.round === 1);
     expect(spectatorView.spectator).toBe(true);
@@ -563,7 +596,7 @@ describe("reconnect and late join", () => {
 
     // Dana reconnects: the authority hands her the current canonical state
     // (late-join catch-up), so her frame shows the live round.
-    await d.join();
+    await pumpUntil(world, d.join());
     await settle(world, 250);
     const dView = await waitForView(world, d, (v) => v.round === 2);
     expect(dView.phase).toBe("question");

@@ -3,7 +3,8 @@
  * script drives real sessions over the in-memory transport. The DOM half is
  * guarded, so the same source runs here, in the arena and in parties.
  */
-import { afterEach, describe, expect, it } from "vitest";
+import { createHash } from "node:crypto";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { InMemoryTransportHub } from "@rocketcrab/testing";
 import GAME_SOURCE from "../../testing/fixtures/games/nova-drift.html?raw";
 import { createNovaSession, type NovaSession } from "./session";
@@ -12,7 +13,24 @@ const SCRIPT = /<script type="module">([\s\S]*?)<\/script>/u.exec(GAME_SOURCE)?.
 const hubs: InMemoryTransportHub[] = [];
 const sessions: NovaSession[] = [];
 
+// Simulated time: the game's tick loop, the session's timers and the hub's
+// delivery all run on the fake clock. WebCrypto would resolve off that clock,
+// so the state-hash digest uses the same SHA-256 on a microtask.
+beforeEach(() => {
+  vi.useFakeTimers({
+    toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval", "Date"],
+  });
+  vi.spyOn(crypto.subtle, "digest").mockImplementation(async (_algorithm, data) => {
+    const bytes = createHash("sha256")
+      .update(new Uint8Array(data as ArrayBuffer))
+      .digest();
+    return bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.byteLength);
+  });
+});
+
 afterEach(() => {
+  vi.useRealTimers();
+  vi.restoreAllMocks();
   for (const session of sessions.splice(0)) session.dispose();
   for (const hub of hubs.splice(0)) hub.dispose();
 });
@@ -43,7 +61,7 @@ async function until(hub: InMemoryTransportHub, condition: () => boolean, what: 
   while (!condition()) {
     if (Date.now() > deadline) throw new Error(`timed out waiting for ${what}`);
     hub.drain();
-    await new Promise((resolve) => setTimeout(resolve, 10));
+    await vi.advanceTimersByTimeAsync(10);
   }
 }
 
