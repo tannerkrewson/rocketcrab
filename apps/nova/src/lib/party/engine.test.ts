@@ -18,7 +18,7 @@ import {
 import { createMemoryLifecycleSource } from "./lifecycle";
 import { clearPartyRecovery, readPartyRecovery } from "./party-recovery";
 import type { TurnCredentialsResult } from "./turn-creds";
-import { CLASSIC_GAMES, type ClassicGameConnectResult } from "../classic";
+import { EXTERNAL_GAMES, type ExternalRoom } from "../catalog";
 
 /**
  * The default-factory path is mocked so the TURN acceptance tests can
@@ -1930,8 +1930,8 @@ describe("party engine — rename announcements (7.25)", () => {
   });
 });
 
-describe("party engine — classic games, kick, and reload (7.7.4, 7.29)", () => {
-  it("shares a classic room: the host creates it once, the joiner builds the same room", async () => {
+describe("party engine — external games, kick, and reload (7.7.4, 7.29)", () => {
+  it("shares an external room: the host creates it once, the joiner joins the same room", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
     const b = makePlayer(world, "b");
@@ -1945,12 +1945,13 @@ describe("party engine — classic games, kick, and reload (7.7.4, 7.29)", () =>
     await promise;
     const code = parseInviteFragment(new URL(a.engine.getState().inviteUrl!).hash)!.secret;
 
-    await a.engine.selectClassicGame("protobowl");
+    await a.engine.selectExternalGame("protobowl");
     await settle(world);
     const aState = a.engine.getState();
     expect(aState.phase).toBe("lobby");
-    expect(aState.classicGame?.gameId).toBe("protobowl");
-    expect(aState.classicGame?.connectResult.player.url).toContain("https://protobowl.com/");
+    expect(aState.externalGame?.gameId).toBe("protobowl");
+    expect(aState.externalGame?.room.url).toContain("https://protobowl.com/");
+    expect(aState.externalGame?.creatorMemberId).toBe(a.memberId);
     expect(aState.game?.title).toBe("Protobowl");
     expect(aState.canStart).toBe(true);
 
@@ -1962,11 +1963,17 @@ describe("party engine — classic games, kick, and reload (7.7.4, 7.29)", () =>
 
     const bState = b.engine.getState();
     expect(bState.phase).toBe("lobby");
-    expect(bState.classicGame?.gameId).toBe("protobowl");
-    expect(bState.classicGame?.connectResult.player.url).toBe(
-      aState.classicGame?.connectResult.player.url,
-    );
+    expect(bState.externalGame?.gameId).toBe("protobowl");
+    expect(bState.externalGame?.room).toEqual(aState.externalGame?.room);
+    // The room's creator joins as the external game's host, on every device.
+    expect(bState.externalGame?.creatorMemberId).toBe(a.memberId);
     expect(bState.canStart).toBe(true);
+
+    // Picking the same game again makes a new room, and the joiner follows it.
+    await a.engine.selectExternalGame("protobowl");
+    await settle(world);
+    expect(a.engine.getState().externalGame?.room).not.toEqual(aState.externalGame?.room);
+    expect(b.engine.getState().externalGame?.room).toEqual(a.engine.getState().externalGame?.room);
 
     a.engine.startGame();
     await settle(world);
@@ -3389,27 +3396,27 @@ describe("party engine — lifecycle cleanup", () => {
     expect(player.engine.getState().phase).toBe("lobby");
   });
 
-  it("a classic game whose room finishes creating after the party is left does not reach the next party", async () => {
+  it("an external game whose room finishes creating after the party is left does not reach the next party", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
     await runCreate(a, world);
-    const classic = CLASSIC_GAMES[0]!;
-    let finishConnect!: (result: ClassicGameConnectResult) => void;
-    const connect = vi.spyOn(classic, "connectToGame").mockImplementation(
+    const external = EXTERNAL_GAMES[0]!;
+    let finishConnect!: (room: ExternalRoom) => void;
+    const connect = vi.spyOn(external.play, "createRoom").mockImplementation(
       () =>
-        new Promise<ClassicGameConnectResult>((resolve) => {
+        new Promise<ExternalRoom>((resolve) => {
           finishConnect = resolve;
         }),
     );
 
-    const pick = a.engine.selectClassicGame(classic.id);
+    const pick = a.engine.selectExternalGame(external.id);
     await a.engine.leaveParty();
-    finishConnect({ player: { url: "https://classic.example/player" } });
+    finishConnect({ url: "https://external.example/player" });
     await pick;
     await settle(world);
     connect.mockRestore();
 
-    expect(a.engine.getState().classicGame).toBeNull();
+    expect(a.engine.getState().externalGame).toBeNull();
     expect(a.engine.getState().game).toBeNull();
     expect(a.engine.getState().notices.some((n) => n.level === "error")).toBe(false);
   });

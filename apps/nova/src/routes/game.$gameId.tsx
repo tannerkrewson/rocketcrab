@@ -15,7 +15,8 @@ import { SaveSharedGame } from "../components/party/SaveSharedGame";
 import { sharedGameStatus } from "../lib/games/shared-copies";
 import { useSavedGame, useSavedGames } from "../lib/games/queries";
 import type { SharedPartyGame } from "../lib/party/engine";
-import { BROWSE_CATEGORIES, findBrowseGame, type BrowseCategory } from "../lib/browse";
+import { categoriesOf, displayUrlText, findCatalogGame, playerCountText } from "../lib/catalog";
+import { selectCatalogGame } from "../lib/catalog/select";
 import { readBrowseContext } from "../lib/browse/back-context";
 import { usePartyEngine } from "../lib/party/use-party";
 
@@ -36,13 +37,8 @@ function isGameDetailOrigin(value: unknown): value is GameDetailOrigin {
   return value === "party" || value === "party-browse";
 }
 
-/** A classic game's categories as the browser shows them (emoji + label). */
-function categoryChips(categories: readonly string[]): BrowseCategory[] {
-  return BROWSE_CATEGORIES.filter((category) => categories.includes(category.match));
-}
-
 /**
- * Classic descriptions are indented template literals with hard-wrapped
+ * Listed descriptions are often indented template literals with hard-wrapped
  * lines: rejoin each paragraph so it wraps to the page instead.
  */
 function paragraphs(text: string): string[] {
@@ -57,7 +53,7 @@ function errorMessage(error: unknown): string {
 }
 
 /**
- * Shared details for classic and saved games. Hosts can select a game for
+ * Shared details for listed and saved games. Hosts can select a game for
  * their waiting party; players outside a party can start one. Guests
  * cannot change the party's game.
  */
@@ -65,7 +61,7 @@ export function BrowseGamePage() {
   const { gameId } = Route.useParams();
   const { from } = Route.useSearch();
   const navigate = useNavigate();
-  const prebuilt = findBrowseGame(gameId);
+  const prebuilt = findCatalogGame(gameId);
   const savedQuery = useSavedGame(prebuilt === undefined ? gameId : "");
   const { state, engine } = usePartyEngine();
   const [selecting, setSelecting] = useState(false);
@@ -335,6 +331,8 @@ export function BrowseGamePage() {
   }
 
   const hasLinks = Boolean(prebuilt.displayUrlHref || prebuilt.donationUrlHref);
+  const players = playerCountText(prebuilt);
+  const hosted = prebuilt.play.kind === "nova";
   return (
     <GamePageLayout header={header} backLink={backLink}>
       <GameHero
@@ -342,18 +340,18 @@ export function BrowseGamePage() {
         byline={
           <>
             by {prebuilt.author}
-            {prebuilt.basedOnName ? <> · based on {prebuilt.basedOnName}</> : null}
+            {prebuilt.basedOn?.game ? <> · based on {prebuilt.basedOn.game}</> : null}
           </>
         }
         facts={
           <>
-            {prebuilt.players ? (
+            {players ? (
               <Badge size="md">
                 <Users className="h-3.5 w-3.5" aria-hidden="true" />
-                {prebuilt.players} players
+                {players} players
               </Badge>
             ) : null}
-            {categoryChips(prebuilt.category).map((category) => (
+            {categoriesOf(prebuilt).map((category) => (
               <Badge key={category.id} size="md">
                 <span aria-hidden="true">{category.emoji}</span> {category.label}
               </Badge>
@@ -363,19 +361,28 @@ export function BrowseGamePage() {
         actions={
           <>
             {notInParty ? (
-              // Classic rooms are created in the lobby, so they cannot be preselected via URL.
+              // External rooms are created in the lobby, so only hosted Nova games
+              // can be preselected via URL.
               <Link
                 to="/party"
-                search={{ gameId: undefined, title: undefined }}
+                search={
+                  hosted
+                    ? { gameId: prebuilt.id, title: prebuilt.name }
+                    : { gameId: undefined, title: undefined }
+                }
                 className={buttonStyles("primary", "lg")}
-                title="Start a party and pick this game in the lobby"
+                title={
+                  hosted
+                    ? "Create a party with this game"
+                    : "Start a party and pick this game in the lobby"
+                }
               >
                 <PartyPopper className="h-4 w-4" aria-hidden="true" />
                 Start party
               </Link>
             ) : null}
             {selectForParty(async () => {
-              await engine.selectClassicGame(prebuilt.id);
+              await selectCatalogGame(engine, prebuilt);
             })}
             {prebuilt.guideUrl ? (
               <a
@@ -406,7 +413,7 @@ export function BrowseGamePage() {
           <div className="flex flex-wrap gap-x-5 gap-y-2 pt-1 text-sm font-semibold">
             {prebuilt.displayUrlHref ? (
               <ExternalTextLink href={prebuilt.displayUrlHref}>
-                {prebuilt.displayUrlText ?? prebuilt.displayUrlHref}
+                {displayUrlText(prebuilt)}
               </ExternalTextLink>
             ) : null}
             {prebuilt.donationUrlHref ? (

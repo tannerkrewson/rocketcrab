@@ -1,37 +1,64 @@
-import type { ClassicGame } from "./types";
+import type { ExternalCatalogGame, ExternalPlay } from "./types";
 import { relayRequest, type RelayEndpointKey } from "./relay";
-import { postJson, randomRoomId } from "./url";
+import { joinRoomUrl, postJson, randomRoomId, rocketcrabUrl, roomField } from "./join-url";
 
 /**
- * Classic external iframe games. Room creation runs in the browser or
- * through the scoped edge relay when upstream CORS policies require it.
- * frameOrigins supplies the strict main-origin CSP allowlist (ADR-0001;
- * apps/nova/vite.config.ts).
+ * External games: each runs on its own server. Room creation runs in the
+ * browser, or through the scoped edge relay when the upstream sends no CORS
+ * headers. frameOrigins supplies the strict main-origin CSP allowlist
+ * (ADR-0001; apps/nova/vite.config.ts).
  */
 
 function origins(displayUrlHref: string, ...extra: string[]): string[] {
   return [...new Set([new URL(displayUrlHref).origin, ...extra])];
 }
 
-const protobowl: ClassicGame = {
+/**
+ * A game whose relay endpoint returns `{ gameCode }` and whose page takes
+ * the code as one query parameter on a fixed URL.
+ */
+function relayCodeGame(input: {
+  readonly frameOrigins: readonly string[];
+  readonly endpoint: RelayEndpointKey;
+  readonly base: string;
+  readonly param: string;
+  readonly label: string;
+}): ExternalPlay {
+  return {
+    kind: "external",
+    frameOrigins: input.frameOrigins,
+    // The endpoint sends no CORS headers, so create rooms through the edge relay.
+    createRoom: async () => {
+      const { gameCode } = await relayRequest<{ gameCode?: string }>(input.endpoint);
+      if (typeof gameCode !== "string") {
+        throw new Error(`${input.label} didn't return a game code.`);
+      }
+      return { code: gameCode };
+    },
+    joinUrl: (room, player) =>
+      rocketcrabUrl(input.base, player, { params: { [input.param]: roomField(room, "code") } }),
+  };
+}
+
+const protobowl: ExternalCatalogGame = {
   id: "protobowl",
-  kind: "classic",
   name: "Protobowl",
   author: "Kevin Kwok",
   description: "Quizbowl practice",
-  displayUrlText: "protobowl.com",
   displayUrlHref: "https://protobowl.com/",
-  category: ["trivia", "medium"],
+  difficulty: "medium",
+  genres: ["trivia"],
   players: "1+",
-  frameOrigins: origins("https://protobowl.com/"),
-  connectToGame: async () => ({
-    player: { url: `https://protobowl.com/rocketcrab-${randomRoomId()}` },
-  }),
+  play: {
+    kind: "external",
+    frameOrigins: origins("https://protobowl.com/"),
+    createRoom: async () => ({ url: `https://protobowl.com/rocketcrab-${randomRoomId()}` }),
+    joinUrl: joinRoomUrl,
+  },
 };
 
-const setwithfriends: ClassicGame = {
+const setwithfriends: ExternalCatalogGame = {
   id: "setwithfriends",
-  kind: "classic",
   name: "Set with Friends",
   author: "Eric Zhang & Cynthia Du",
   basedOn: {
@@ -41,41 +68,48 @@ const setwithfriends: ClassicGame = {
     bggId: 1198,
   },
   description: "Find the triplets!",
-  displayUrlText: "setwithfriends.com",
   displayUrlHref: "https://setwithfriends.com/",
-  category: ["easy"],
-  frameOrigins: origins("https://setwithfriends.com/"),
-  connectToGame: async () => {
-    const roomName = `rocketcrab-${Math.random().toString(36).substring(8)}`;
-    const auth = await fetch(
-      "https://www.googleapis.com/identitytoolkit/v3/relyingparty/signupNewUser?key=AIzaSyCeKQ4rauZ_fq1rEIPJ8m5XfppwjtmTZBY",
-      {
-        method: "POST",
-        body: JSON.stringify({ returnSecureToken: true }),
-        headers: {
-          "content-type": "application/json",
-          referer: "https://setwithfriends.com/",
+  difficulty: "easy",
+  genres: [],
+  play: {
+    kind: "external",
+    frameOrigins: origins("https://setwithfriends.com/"),
+    connectOrigins: [
+      "https://www.googleapis.com",
+      "https://us-central1-setwithfriends.cloudfunctions.net",
+    ],
+    createRoom: async () => {
+      const roomName = `rocketcrab-${Math.random().toString(36).substring(8)}`;
+      const auth = await fetch(
+        "https://www.googleapis.com/identitytoolkit/v3/relyingparty/signupNewUser?key=AIzaSyCeKQ4rauZ_fq1rEIPJ8m5XfppwjtmTZBY",
+        {
+          method: "POST",
+          body: JSON.stringify({ returnSecureToken: true }),
+          headers: {
+            "content-type": "application/json",
+            referer: "https://setwithfriends.com/",
+          },
         },
-      },
-    );
-    const { idToken } = (await auth.json()) as { idToken?: string };
-    if (typeof idToken !== "string") {
-      throw new Error("Set with Friends rejected the room request.");
-    }
-    await fetch("https://us-central1-setwithfriends.cloudfunctions.net/createGame", {
-      method: "POST",
-      body: JSON.stringify({ data: { gameId: roomName, access: "private" } }),
-      headers: {
-        authorization: `Bearer ${idToken}`,
-        "content-type": "application/json",
-      },
-    });
-    return { player: { url: `https://setwithfriends.com/room/${roomName}` } };
+      );
+      const { idToken } = (await auth.json()) as { idToken?: string };
+      if (typeof idToken !== "string") {
+        throw new Error("Set with Friends rejected the room request.");
+      }
+      await fetch("https://us-central1-setwithfriends.cloudfunctions.net/createGame", {
+        method: "POST",
+        body: JSON.stringify({ data: { gameId: roomName, access: "private" } }),
+        headers: {
+          authorization: `Bearer ${idToken}`,
+          "content-type": "application/json",
+        },
+      });
+      return { url: `https://setwithfriends.com/room/${roomName}` };
+    },
+    joinUrl: joinRoomUrl,
   },
 };
 
-const drawphoneBase: Omit<ClassicGame, "id" | "name" | "frameOrigins" | "connectToGame"> = {
-  kind: "classic",
+const drawphoneBase: Omit<ExternalCatalogGame, "id" | "name" | "play"> = {
   author: "Tanner Krewson",
   description: `In Drawphone, there are no winners... only losers! Players
         take turns drawing pictures and guessing what those pictures are. If
@@ -86,7 +120,6 @@ const drawphoneBase: Omit<ClassicGame, "id" | "name" | "frameOrigins" | "connect
 
         Drawphone was inspired by Evan Brumley's 2015 online Spyfall
         implementation, Jackbox Games's Drawful, and Telestrations.`,
-  displayUrlText: "drawphone.tannerkrewson.com",
   displayUrlHref: "https://drawphone.tannerkrewson.com/",
   donationUrlText: "Buy Tanner a taco!",
   donationUrlHref: "https://www.buymeacoffee.com/tannerkrewson",
@@ -97,55 +130,53 @@ const drawphoneBase: Omit<ClassicGame, "id" | "name" | "frameOrigins" | "connect
     "https://i.imgur.com/14aDZKn.png",
     "https://i.imgur.com/CwsMi5k.png",
   ],
-  category: ["drawing", "easy"],
+  difficulty: "easy",
+  genres: ["drawing"],
   players: "1+",
   minPlayers: 1,
   maxPlayers: Number.POSITIVE_INFINITY,
 };
 
-const drawphoneConnect =
-  (baseUrl: string, relayEndpoint: RelayEndpointKey) =>
-  async (): Promise<{ player: { url: string; customQueryParams: { code: string } } }> => {
-    // The endpoint sends no CORS headers, so create rooms through the edge relay.
-    const { gameCode } = await relayRequest<{ gameCode?: string }>(relayEndpoint);
-    if (typeof gameCode !== "string") {
-      throw new Error("Drawphone didn't return a game code.");
-    }
-    return {
-      player: {
-        url: baseUrl,
-        customQueryParams: { code: gameCode },
-      },
-    };
-  };
+const drawphoneOrigins = origins(
+  "https://drawphone.tannerkrewson.com/",
+  "https://dpk.tannerkrewson.com",
+);
 
-const drawphone: ClassicGame = {
+const drawphone: ExternalCatalogGame = {
   ...drawphoneBase,
   id: "drawphone",
   name: "Drawphone",
-  frameOrigins: origins("https://drawphone.tannerkrewson.com/", "https://dpk.tannerkrewson.com"),
-  connectToGame: drawphoneConnect("https://drawphone.tannerkrewson.com/", "drawphone-new"),
+  play: relayCodeGame({
+    frameOrigins: drawphoneOrigins,
+    endpoint: "drawphone-new",
+    base: "https://drawphone.tannerkrewson.com/",
+    param: "code",
+    label: "Drawphone",
+  }),
 };
 
-const drawphoneKids: ClassicGame = {
+const drawphoneKids: ExternalCatalogGame = {
   ...drawphoneBase,
   id: "drawphone-kids",
   name: "Drawphone for Kids",
   description:
     drawphoneBase.description +
     "\n\nNOTE: Age-restricted word packs are removed from Drawphone for Kids. Players can still draw and guess unrestricted.",
-  frameOrigins: origins("https://drawphone.tannerkrewson.com/", "https://dpk.tannerkrewson.com"),
-  connectToGame: drawphoneConnect("https://dpk.tannerkrewson.com/", "dpk-new"),
+  play: relayCodeGame({
+    frameOrigins: drawphoneOrigins,
+    endpoint: "dpk-new",
+    base: "https://dpk.tannerkrewson.com/",
+    param: "code",
+    label: "Drawphone",
+  }),
 };
 
-const fishbowl: ClassicGame = {
+const fishbowl: ExternalCatalogGame = {
   id: "fishbowl",
-  kind: "classic",
   name: "Fishbowl",
   author: "Avi Moondra",
   description:
     "Fishbowl is a virtual version of a fun (and mostly hilarious) guessing game, designed for any group of all ages! You'll need at least 4 to play, but it only gets more fun with more players. Hop on a video call, and play through rounds of Taboo, Charades, and Password.",
-  displayUrlText: "fishbowl-game.com",
   displayUrlHref: "https://fishbowl-game.com/",
   donationUrlText: "Buy Avi a coffee!",
   donationUrlHref: "https://www.buymeacoffee.com/fishbowlgame",
@@ -160,31 +191,35 @@ const fishbowl: ClassicGame = {
     "https://i.imgur.com/OtRqoy5.jpg",
     "https://i.imgur.com/DPCalID.jpg",
   ],
-  category: ["easy"],
+  difficulty: "easy",
+  genres: [],
   players: "4+",
-  renameParams: { rocketcrab: "hideshare" },
-  frameOrigins: origins("https://fishbowl-game.com/"),
-  connectToGame: async () => {
-    const newGameUrl = "https://fishbowl-graphql.onrender.com/v1/graphql";
-    const {
-      data: {
-        newGame: { join_code: joinCode },
-      },
-    } = await postJson<{
-      data: { newGame: { join_code: string } };
-    }>(newGameUrl, {
-      query: "mutation  {\n  newGame {\n    join_code\n  }\n}\n",
-      variables: null,
-    });
-    return {
-      player: { url: `https://fishbowl-game.com/game/${joinCode}/lobby` },
-    };
+  play: {
+    kind: "external",
+    frameOrigins: origins("https://fishbowl-game.com/"),
+    connectOrigins: ["https://fishbowl-graphql.onrender.com"],
+    createRoom: async () => {
+      const newGameUrl = "https://fishbowl-graphql.onrender.com/v1/graphql";
+      const {
+        data: {
+          newGame: { join_code: joinCode },
+        },
+      } = await postJson<{
+        data: { newGame: { join_code: string } };
+      }>(newGameUrl, {
+        query: "mutation  {\n  newGame {\n    join_code\n  }\n}\n",
+        variables: null,
+      });
+      return { url: `https://fishbowl-game.com/game/${joinCode}/lobby` };
+    },
+    // Fishbowl reads `hideshare` where other games read `rocketcrab`.
+    joinUrl: (room, player) =>
+      rocketcrabUrl(roomField(room, "url"), player, { rename: { rocketcrab: "hideshare" } }),
   },
 };
 
-const justone: ClassicGame = {
+const justone: ExternalCatalogGame = {
   id: "justone",
-  kind: "classic",
   name: "Just One",
   author: "CJ Quines",
   basedOn: {
@@ -199,9 +234,9 @@ const justone: ClassicGame = {
         cancelled! Everyone writes one-word clues to help a guesser guess their
         mystery word. The catch: you can't show the guesser clues that two or
         more people write.`,
-  displayUrlText: "just1.herokuapp.com",
   displayUrlHref: "https://just1.herokuapp.com/",
-  category: ["easy"],
+  difficulty: "easy",
+  genres: [],
   players: "1+",
   pictures: [
     "https://i.imgur.com/KX3Sjsi.jpg",
@@ -210,15 +245,18 @@ const justone: ClassicGame = {
     "https://i.imgur.com/hMeiX8k.jpg",
     "https://i.imgur.com/plGWABz.jpg",
   ],
-  frameOrigins: origins("https://just1.herokuapp.com/"),
-  connectToGame: async () => ({
-    player: { url: `https://just1.herokuapp.com/room/rocketcrab-${randomRoomId()}` },
-  }),
+  play: {
+    kind: "external",
+    frameOrigins: origins("https://just1.herokuapp.com/"),
+    createRoom: async () => ({
+      url: `https://just1.herokuapp.com/room/rocketcrab-${randomRoomId()}`,
+    }),
+    joinUrl: joinRoomUrl,
+  },
 };
 
-const longwave: ClassicGame = {
+const longwave: ExternalCatalogGame = {
   id: "longwave",
-  kind: "classic",
   name: "Longwave",
   author: "Evan Bailey & Margarethe Schoen",
   basedOn: {
@@ -229,9 +267,9 @@ const longwave: ClassicGame = {
   },
   description:
     "Wavelength is a social guessing game where two teams compete to read each other's minds. It's a thrilling experience of TALKING and THINKING and HIGH FIVING that anyone can play—but it also has some of that deep word game sorcery, like Codenames, where your decisions feel tense, strategic, meaningful.",
-  displayUrlText: "longwave.web.app",
   displayUrlHref: "https://longwave.web.app/",
-  category: ["easy"],
+  difficulty: "easy",
+  genres: [],
   players: "2-12+",
   guideUrl: "https://www.ultraboardgames.com/wavelength/game-rules.php",
   pictures: [
@@ -241,10 +279,12 @@ const longwave: ClassicGame = {
     "https://i.imgur.com/cuGMgKv.jpg",
     "https://i.imgur.com/u36UW03.jpg",
   ],
-  frameOrigins: origins("https://longwave.web.app/"),
-  connectToGame: async () => ({
-    player: { url: `https://longwave.web.app/rocketcrab-${randomRoomId()}` },
-  }),
+  play: {
+    kind: "external",
+    frameOrigins: origins("https://longwave.web.app/"),
+    createRoom: async () => ({ url: `https://longwave.web.app/rocketcrab-${randomRoomId()}` }),
+    joinUrl: joinRoomUrl,
+  },
 };
 
 /** Room creation redirects to the new room; use the final response URL. */
@@ -254,43 +294,54 @@ function netgamesioGame(
     name,
     description,
     basedOn,
-    category,
+    difficulty,
+    genres,
     players,
     guideUrl,
     pictures,
   }: Pick<
-    ClassicGame,
-    "name" | "description" | "basedOn" | "category" | "players" | "guideUrl" | "pictures"
+    ExternalCatalogGame,
+    | "name"
+    | "description"
+    | "basedOn"
+    | "difficulty"
+    | "genres"
+    | "players"
+    | "guideUrl"
+    | "pictures"
   >,
-): ClassicGame {
+): ExternalCatalogGame {
   return {
     id: `netgamesio-${urlId}`,
-    kind: "classic",
     name,
     author: "Luke Tsekouras",
     basedOn,
     description,
-    displayUrlText: "netgames.io",
     displayUrlHref: "https://netgames.io/",
     donationUrlText: "Buy Luke a coffee!",
     donationUrlHref: "https://www.buymeacoffee.com/lukegt",
-    category,
+    difficulty,
+    genres,
     players,
     ...(guideUrl ? { guideUrl } : {}),
     ...(pictures ? { pictures } : {}),
-    frameOrigins: origins("https://netgames.io/"),
-    // The redirect has no CORS headers; the scoped relay follows it server-side.
-    connectToGame: async () => {
-      const { url } = await relayRequest<{ url: string }>("netgamesio-new", { urlId });
-      if (typeof url !== "string") {
-        throw new Error("netgames.io couldn't create a room.");
-      }
-      return { player: { url } };
+    play: {
+      kind: "external",
+      frameOrigins: origins("https://netgames.io/"),
+      // The redirect has no CORS headers; the scoped relay follows it server-side.
+      createRoom: async () => {
+        const { url } = await relayRequest<{ url: string }>("netgamesio-new", { urlId });
+        if (typeof url !== "string") {
+          throw new Error("netgames.io couldn't create a room.");
+        }
+        return { url };
+      },
+      joinUrl: joinRoomUrl,
     },
   };
 }
 
-const netgamesioGames: ClassicGame[] = [
+const netgamesioGames: ExternalCatalogGame[] = [
   netgamesioGame("avalon", {
     name: "Avalon",
     description:
@@ -301,7 +352,8 @@ const netgamesioGames: ClassicGame[] = [
       link: "https://indieboardsandcards.com/index.php/our-games/the-resistance-avalon/",
       bggId: 128882,
     },
-    category: ["netgamesio", "medium"],
+    difficulty: "medium",
+    genres: [],
     players: "5-10",
     guideUrl: "https://www.ultraboardgames.com/avalon/game-rules.php",
     pictures: [
@@ -323,7 +375,8 @@ const netgamesioGames: ClassicGame[] = [
       link: "https://www.zmangames.com/en/games/love-letter/",
       bggId: 129622,
     },
-    category: ["netgamesio", "medium"],
+    difficulty: "medium",
+    genres: [],
     players: "2-4",
     guideUrl: "https://www.ultraboardgames.com/love-letter/game-rules.php",
     pictures: [
@@ -344,7 +397,8 @@ const netgamesioGames: ClassicGame[] = [
       link: "https://www.cryptozoic.com/spyfall",
       bggId: 166384,
     },
-    category: ["netgamesio", "medium"],
+    difficulty: "medium",
+    genres: [],
     players: "3+",
     guideUrl: "https://www.ultraboardgames.com/spyfall/game-rules.php",
     pictures: [
@@ -366,7 +420,8 @@ const netgamesioGames: ClassicGame[] = [
       link: "https://www.secrethitler.com/",
       bggId: 188834,
     },
-    category: ["netgamesio", "hard"],
+    difficulty: "hard",
+    genres: [],
     players: "5-10",
     guideUrl: "https://www.ultraboardgames.com/secret-hitler/game-rules.php",
     pictures: [
@@ -388,7 +443,8 @@ const netgamesioGames: ClassicGame[] = [
       link: "https://codenamesgame.com/",
       bggId: 178900,
     },
-    category: ["netgamesio", "medium"],
+    difficulty: "medium",
+    genres: [],
     players: "4+",
     guideUrl: "https://www.ultraboardgames.com/codenames/game-rules.php",
     pictures: [
@@ -411,7 +467,8 @@ const netgamesioGames: ClassicGame[] = [
       link: "https://beziergames.com/collections/all-uw-titles/products/one-night-ultimate-werewolf",
       bggId: 147949,
     },
-    category: ["netgamesio", "medium"],
+    difficulty: "medium",
+    genres: [],
     players: "3-18",
     guideUrl: "https://www.ultraboardgames.com/one-night-ultimate-werewolf/game-rules.php",
     pictures: [
@@ -434,7 +491,8 @@ const netgamesioGames: ClassicGame[] = [
       link: "https://iellousa.com/products/decrypto",
       bggId: 225694,
     },
-    category: ["netgamesio", "hard"],
+    difficulty: "hard",
+    genres: [],
     players: "4+",
     guideUrl: "https://www.ultraboardgames.com/enigma/game-rules.php",
     pictures: [
@@ -454,45 +512,56 @@ function outOfContextGame(
     name,
     description,
     basedOn,
-    category,
+    difficulty,
+    genres,
     players,
     minPlayers,
     pictures,
   }: Pick<
-    ClassicGame,
-    "name" | "description" | "basedOn" | "category" | "players" | "minPlayers" | "pictures"
+    ExternalCatalogGame,
+    | "name"
+    | "description"
+    | "basedOn"
+    | "difficulty"
+    | "genres"
+    | "players"
+    | "minPlayers"
+    | "pictures"
   >,
-): ClassicGame {
+): ExternalCatalogGame {
   const origin = "https://outofcontext.party";
   return {
     id: `ooc-${game}`,
-    kind: "classic",
     name,
     author: "Isaac Hirschfeld",
     basedOn,
     description,
-    displayUrlText: "outofcontext.party",
     displayUrlHref: origin + "/",
     minPlayers,
     maxPlayers: 255,
-    category,
+    difficulty,
+    genres,
     players,
     ...(pictures ? { pictures } : {}),
-    frameOrigins: origins(origin + "/"),
-    // The upstream returns no CORS headers, so use the scoped relay.
-    connectToGame: async () => {
-      const { code } = await relayRequest<{ code?: string }>("ooc-rocketcrab", {
-        body: { game, version: 1 },
-      });
-      if (typeof code !== "string") {
-        throw new Error("outofcontext.party didn't return a room code.");
-      }
-      return { player: { url: `${origin}/lobby/${code}` } };
+    play: {
+      kind: "external",
+      frameOrigins: origins(origin + "/"),
+      // The upstream returns no CORS headers, so use the scoped relay.
+      createRoom: async () => {
+        const { code } = await relayRequest<{ code?: string }>("ooc-rocketcrab", {
+          body: { game, version: 1 },
+        });
+        if (typeof code !== "string") {
+          throw new Error("outofcontext.party didn't return a room code.");
+        }
+        return { url: `${origin}/lobby/${code}` };
+      },
+      joinUrl: joinRoomUrl,
     },
   };
 }
 
-const outOfContextGames: ClassicGame[] = [
+const outOfContextGames: ExternalCatalogGame[] = [
   outOfContextGame("story", {
     name: "Raconteur",
     description: `Collaborate in writing stories one line at a time with
@@ -508,7 +577,8 @@ const outOfContextGames: ClassicGame[] = [
       game: "Consequences, FoldingStory",
       link: "https://en.wikipedia.org/wiki/Consequences_(game)",
     },
-    category: ["writing", "easy"],
+    difficulty: "easy",
+    genres: ["writing"],
     minPlayers: 2,
     players: "2+",
     pictures: [
@@ -528,7 +598,8 @@ const outOfContextGames: ClassicGame[] = [
             be played after a familiarity with no context line-by-line
             stories is established.`,
     basedOn: null,
-    category: ["writing", "medium"],
+    difficulty: "medium",
+    genres: ["writing"],
     minPlayers: 4,
     players: "4+",
     pictures: [
@@ -549,7 +620,8 @@ const outOfContextGames: ClassicGame[] = [
             any context, and potential hazards without context. This mixture
             of randomness and context tends to be awfully delicious.`,
     basedOn: null,
-    category: ["writing", "medium"],
+    difficulty: "medium",
+    genres: ["writing"],
     minPlayers: 2,
     players: "2+",
     pictures: [
@@ -562,18 +634,17 @@ const outOfContextGames: ClassicGame[] = [
   }),
 ];
 
-const qwiqwit: ClassicGame = {
+const qwiqwit: ExternalCatalogGame = {
   id: "qwiqwit",
-  kind: "classic",
   name: "QwiqWit",
   author: "Paul Wind & TypesInCode",
   description:
     "In QwiqWit, there's no right or wrong answers. Just enter what you think is funny. Your answers will go head-to-head against other players. The rest of the players in the room will vote on their favorite answer. Be sure to vote! It could be worth extra points (eventually).",
-  displayUrlText: "qwiqwit.com",
   displayUrlHref: "https://www.qwiqwit.com/",
   donationUrlText: "Buy the developers a coffee!",
   donationUrlHref: "https://www.buymeacoffee.com/qwiqwit",
-  category: ["easy"],
+  difficulty: "easy",
+  genres: [],
   players: "3-25",
   pictures: [
     "https://i.imgur.com/5mX4zf7.jpg",
@@ -581,15 +652,16 @@ const qwiqwit: ClassicGame = {
     "https://i.imgur.com/690VrZJ.jpg",
     "https://i.imgur.com/X4BZKmA.jpg",
   ],
-  frameOrigins: origins("https://www.qwiqwit.com/"),
-  connectToGame: async () => ({
-    player: { url: `https://www.qwiqwit.com/autojoin/${randomRoomId()}` },
-  }),
+  play: {
+    kind: "external",
+    frameOrigins: origins("https://www.qwiqwit.com/"),
+    createRoom: async () => ({ url: `https://www.qwiqwit.com/autojoin/${randomRoomId()}` }),
+    joinUrl: joinRoomUrl,
+  },
 };
 
-const secrethitlerDuc: ClassicGame = {
+const secrethitlerDuc: ExternalCatalogGame = {
   id: "secrethitler-duc",
-  kind: "classic",
   name: "Secret Hitler",
   author: "Duc Ngo Viet",
   basedOn: {
@@ -600,7 +672,6 @@ const secrethitlerDuc: ClassicGame = {
   },
   description:
     "Secret Hitler is a social deduction game for 5-10 people about finding and stopping the Secret Hitler. Players are secretly divided into two teams: the liberals, who have a majority, and the fascists, who are hidden to everyone but each other. If the liberals can learn to trust each other, they have enough votes to control the elections and save the day. But the fascists will say whatever it takes to get elected, advance their agenda, and win the game.",
-  displayUrlText: "secret-hitler.com",
   displayUrlHref: "https://secret-hitler.com/",
   donationUrlText: "Buy ducci a coffee!",
   donationUrlHref: "https://www.buymeacoffee.com/ducci",
@@ -611,29 +682,22 @@ const secrethitlerDuc: ClassicGame = {
     "https://i.imgur.com/dZ0J1GS.jpg",
     "https://i.imgur.com/W6T40Ot.jpg",
   ],
-  category: ["hard"],
+  difficulty: "hard",
+  genres: [],
   players: "5-10",
   minPlayers: 5,
   maxPlayers: 10,
-  frameOrigins: origins("https://secret-hitler.com/"),
-  // The Netlify function sends no CORS headers, so use the scoped relay.
-  connectToGame: async () => {
-    const { gameCode } = await relayRequest<{ gameCode?: string }>("secret-hitler-netlify");
-    if (typeof gameCode !== "string") {
-      throw new Error("Secret Hitler didn't return a room code.");
-    }
-    return {
-      player: {
-        url: "https://secret-hitler.com/",
-        customQueryParams: { roomId: gameCode },
-      },
-    };
-  },
+  play: relayCodeGame({
+    frameOrigins: origins("https://secret-hitler.com/"),
+    endpoint: "secret-hitler-netlify",
+    base: "https://secret-hitler.com/",
+    param: "roomId",
+    label: "Secret Hitler",
+  }),
 };
 
-const snakeout: ClassicGame = {
+const snakeout: ExternalCatalogGame = {
   id: "snakeout",
-  kind: "classic",
   name: "Snakeout",
   author: "Tanner Krewson",
   basedOn: {
@@ -649,7 +713,6 @@ const snakeout: ClassicGame = {
         are, and the snakes must try to keep the loyalists from figuring out
         their identity. The game is separated into five missions. The first
         team to "win" three missions wins the game.`,
-  displayUrlText: "snakeout.tannerkrewson.com",
   displayUrlHref: "https://snakeout.tannerkrewson.com/",
   donationUrlText: "Buy Tanner a taco!",
   donationUrlHref: "https://www.buymeacoffee.com/tannerkrewson",
@@ -662,27 +725,20 @@ const snakeout: ClassicGame = {
     "https://i.imgur.com/w568hdf.jpg",
     "https://i.imgur.com/00tlDOB.jpg",
   ],
-  category: ["medium"],
+  difficulty: "medium",
+  genres: [],
   players: "5-10",
-  frameOrigins: origins("https://snakeout.tannerkrewson.com/"),
-  // Room creation sends no CORS headers, so use the scoped relay.
-  connectToGame: async () => {
-    const { gameCode } = await relayRequest<{ gameCode?: string }>("snakeout-new");
-    if (typeof gameCode !== "string") {
-      throw new Error("Snakeout didn't return a room code.");
-    }
-    return {
-      player: {
-        url: "https://snakeout.tannerkrewson.com/",
-        customQueryParams: { code: gameCode },
-      },
-    };
-  },
+  play: relayCodeGame({
+    frameOrigins: origins("https://snakeout.tannerkrewson.com/"),
+    endpoint: "snakeout-new",
+    base: "https://snakeout.tannerkrewson.com/",
+    param: "code",
+    label: "Snakeout",
+  }),
 };
 
-const tkSpyfall: ClassicGame = {
+const tkSpyfall: ExternalCatalogGame = {
   id: "tk-spyfall",
-  kind: "classic",
   name: "Spyfall",
   author: "Tanner Krewson",
   basedOn: {
@@ -705,28 +761,33 @@ const tkSpyfall: ClassicGame = {
         yell out at any time during the round, but loses if they guess wrong.
         The spy also wins if the other players unanimously accuse someone else,
         or cannot unanimously decide on someone to accuse.`,
-  displayUrlText: "spyfall.tannerkrewson.com",
   displayUrlHref: "https://spyfall.tannerkrewson.com/",
   donationUrlText: "Buy Tanner a taco!",
   donationUrlHref: "https://www.buymeacoffee.com/tannerkrewson",
   guideUrl: "https://spyfall.tannerkrewson.com/how-to-play",
-  category: ["medium"],
+  difficulty: "medium",
+  genres: [],
   players: "4+",
   minPlayers: 1,
   maxPlayers: Number.POSITIVE_INFINITY,
   pictures: ["https://i.imgur.com/gAYGUUC.jpg", "https://i.imgur.com/8VMpYns.jpg"],
-  frameOrigins: origins("https://spyfall.tannerkrewson.com/"),
-  // Room creation sends no CORS headers, so use the scoped relay.
-  connectToGame: async () => {
-    const { gameCode } = await relayRequest<{ gameCode?: string }>("spyfall-new");
-    if (!gameCode) throw new Error("Failed to create Spyfall game");
-    return { player: { url: `https://spyfall.tannerkrewson.com/${gameCode}` } };
+  play: {
+    kind: "external",
+    frameOrigins: origins("https://spyfall.tannerkrewson.com/"),
+    // Room creation sends no CORS headers, so use the scoped relay.
+    createRoom: async () => {
+      const { gameCode } = await relayRequest<{ gameCode?: string }>("spyfall-new");
+      if (typeof gameCode !== "string") {
+        throw new Error("Spyfall didn't return a game code.");
+      }
+      return { url: `https://spyfall.tannerkrewson.com/${gameCode}` };
+    },
+    joinUrl: joinRoomUrl,
   },
 };
 
-const werewolfnight: ClassicGame = {
+const werewolfnight: ExternalCatalogGame = {
   id: "werewolfnight",
-  kind: "classic",
   name: "werewolf-night.com",
   author: "Duc Ngo Viet",
   basedOn: {
@@ -740,7 +801,6 @@ const werewolfnight: ClassicGame = {
     While the villagers do not know who the werewolves are, the werewolves try to remain undiscovered
     and eliminate one villager after the other.
     one by one...`,
-  displayUrlText: "werewolf-night.com",
   displayUrlHref: "https://werewolf-night.com/",
   donationUrlText: "Buy ducci a coffee!",
   donationUrlHref: "https://www.buymeacoffee.com/ducci",
@@ -751,27 +811,21 @@ const werewolfnight: ClassicGame = {
     "https://i.imgur.com/96lH5JJ.jpg",
     "https://i.imgur.com/17PUnb0.jpg",
   ],
-  category: ["hard"],
+  difficulty: "hard",
+  genres: [],
   players: "5-16",
   minPlayers: 5,
   maxPlayers: 16,
-  frameOrigins: origins("https://werewolf-night.com/"),
-  // Room creation sends no CORS headers, so use the scoped relay.
-  connectToGame: async () => {
-    const { gameCode } = await relayRequest<{ gameCode?: string }>("werewolf-newroom");
-    if (typeof gameCode !== "string") {
-      throw new Error("werewolf-night.com didn't return a room code.");
-    }
-    return {
-      player: {
-        url: "https://werewolf-night.com/game",
-        customQueryParams: { roomId: gameCode },
-      },
-    };
-  },
+  play: relayCodeGame({
+    frameOrigins: origins("https://werewolf-night.com/"),
+    endpoint: "werewolf-newroom",
+    base: "https://werewolf-night.com/game",
+    param: "roomId",
+    label: "werewolf-night.com",
+  }),
 };
 
-export const CLASSIC_GAMES: readonly ClassicGame[] = [
+export const EXTERNAL_GAMES: readonly ExternalCatalogGame[] = [
   protobowl,
   setwithfriends,
   drawphone,
@@ -787,19 +841,3 @@ export const CLASSIC_GAMES: readonly ClassicGame[] = [
   tkSpyfall,
   werewolfnight,
 ];
-
-/** Unique iframe origins across all classic games (CSP frame-src allowlist). */
-export const CLASSIC_FRAME_ORIGINS: readonly string[] = [
-  ...new Set(CLASSIC_GAMES.flatMap((game) => game.frameOrigins)),
-];
-
-/** Unique origins of classic games' screenshots (CSP img-src allowlist). */
-export const CLASSIC_IMAGE_ORIGINS: readonly string[] = [
-  ...new Set(
-    CLASSIC_GAMES.flatMap((game) => (game.pictures ?? []).map((url) => new URL(url).origin)),
-  ),
-];
-
-export function findClassicGame(id: string): ClassicGame | undefined {
-  return CLASSIC_GAMES.find((game) => game.id === id);
-}

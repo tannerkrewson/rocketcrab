@@ -1,18 +1,18 @@
 import { ArrowLeft, PartyPopper } from "lucide-react";
 import { Alert } from "@heroui/react";
-import { useMemo } from "react";
 import { toast } from "../../lib/toast";
 import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
 import { cn } from "../../lib/cn";
 import { usePartyEngine } from "../../lib/party/use-party";
 import type { PartyEngineState } from "../../lib/party/engine";
 import { SIGNALING_OUTAGE_MESSAGE } from "../../lib/party/signaling-outage";
-import { buildClassicGameUrl, findClassicGame } from "../../lib/classic";
-import type { BrowseEntry } from "../../lib/browse";
+import type { CatalogGame } from "../../lib/catalog";
+import { selectCatalogGame } from "../../lib/catalog/select";
 import { gameRepository } from "../../lib/games/instance";
 import { Button } from "../ui/Button";
 import { ErrorPanel } from "../ui/ErrorPanel";
 import { LoadingState } from "../ui/LoadingState";
+import { ExternalGameFrame } from "./ExternalGameFrame";
 import { PartyLobby } from "./PartyLobby";
 import { PartyPlayShell } from "./PartyPlayShell";
 import { PartyReconnectScreen } from "./PartyReconnectScreen";
@@ -64,9 +64,12 @@ export function PartyExperience({
     }
   };
 
-  // Create each classic room once on the host and share its URL through the party plane.
-  const handlePickPrebuilt = async (entry: BrowseEntry) => {
-    await engine.selectClassicGame(entry.id);
+  const handlePickPrebuilt = async (entry: CatalogGame) => {
+    try {
+      await selectCatalogGame(engine, entry);
+    } catch (error) {
+      toast.danger(`Couldn't load that game: ${errorMessage(error)}`);
+    }
   };
 
   /**
@@ -99,41 +102,23 @@ export function PartyExperience({
 
   const playing = state.phase === "playing";
 
-  const classicUrl = useMemo(() => {
-    const classic = state.classicGame;
-    if (classic === null) {
-      return null;
-    }
-    const game = findClassicGame(classic.gameId);
-    return buildClassicGameUrl(
-      classic.connectResult,
-      { renameParams: game?.renameParams },
-      { name: state.displayName, isHost: state.role === "creator" },
-    );
-  }, [state.classicGame, state.displayName, state.role]);
-
   // Keep the lobby runtime invisible but mounted so readiness can complete.
   const frameArea =
-    state.classicGame !== null ? (
+    state.externalGame !== null ? (
       playing ? (
         <div
-          data-testid="party-classic-frame"
-          aria-label="Classic game"
+          data-testid="party-external-frame"
+          aria-label={state.externalGame.title}
           className="h-full w-full overflow-hidden bg-black"
         >
-          {classicUrl !== null ? (
-            <iframe
-              key={state.classicFrameEpoch}
-              title={state.classicGame.title}
-              src={classicUrl}
-              className="h-full w-full border-0"
-              referrerPolicy="no-referrer"
-            />
-          ) : (
-            <div className="flex h-full items-center justify-center p-4 text-center text-sm font-semibold text-foreground/60">
-              Waiting for the host&apos;s room…
-            </div>
-          )}
+          <ExternalGameFrame
+            key={`${state.externalGame.gameId}|${JSON.stringify(state.externalGame.room)}|${state.externalFrameEpoch}`}
+            gameId={state.externalGame.gameId}
+            title={state.externalGame.title}
+            room={state.externalGame.room}
+            displayName={state.displayName}
+            isHost={state.externalGame.creatorMemberId === state.memberId}
+          />
         </div>
       ) : null
     ) : (
@@ -217,7 +202,7 @@ function renderPhase(
   engine: ReturnType<typeof usePartyEngine>["engine"],
   handleLeave: () => Promise<void>,
   handlePickGame: (gameId: string) => Promise<void>,
-  handlePickPrebuilt: (entry: BrowseEntry) => Promise<void>,
+  handlePickPrebuilt: (entry: CatalogGame) => Promise<void>,
   handleEditName: (name: string) => void,
   handleKickMember: (memberId: string) => void,
   onLeft?: () => void,

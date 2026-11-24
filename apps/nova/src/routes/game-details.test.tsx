@@ -28,9 +28,9 @@ const IDLE_STATE: PartyEngineState = {
   canForceStart: false,
   startBlockedReason: null,
   endedReason: null,
-  classicGame: null,
+  externalGame: null,
   removedReason: null,
-  classicFrameEpoch: 0,
+  externalFrameEpoch: 0,
   diagnostics: null,
   notices: [],
   runtimeLogs: [],
@@ -101,7 +101,7 @@ const { stubEngine, stubs } = vi.hoisted(() => {
       isActive: vi.fn(() => stubs.mode !== "idle"),
       setContainer: vi.fn(),
       selectGame: vi.fn(async () => undefined),
-      selectClassicGame: vi.fn(async () => undefined),
+      selectExternalGame: vi.fn(async () => undefined),
       leaveParty: vi.fn(async () => undefined),
     },
   };
@@ -186,14 +186,14 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     expect(screen.queryByRole("button", { name: /select game/i })).not.toBeInTheDocument();
   });
 
-  it("selects a classic game for the active party via selectClassicGame (10.9)", async () => {
+  it("selects an external game for the active party via selectExternalGame (10.9)", async () => {
     stubs.mode = "lobby";
     const router = renderAt("/game/drawphone");
 
     const select = await screen.findByRole("button", { name: /select game/i });
     await userEvent.click(select);
 
-    await vi.waitFor(() => expect(stubEngine.selectClassicGame).toHaveBeenCalledWith("drawphone"));
+    await vi.waitFor(() => expect(stubEngine.selectExternalGame).toHaveBeenCalledWith("drawphone"));
     await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
   });
 
@@ -221,7 +221,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     await userEvent.click(screen.getByRole("button", { name: /select game/i }));
     const dialog = screen.getByRole("dialog", { name: "Only the host picks" });
     expect(dialog).toHaveTextContent("Drawphone");
-    expect(stubEngine.selectClassicGame).not.toHaveBeenCalled();
+    expect(stubEngine.selectExternalGame).not.toHaveBeenCalled();
     await userEvent.click(screen.getByRole("button", { name: "Got it" }));
   });
 
@@ -261,7 +261,7 @@ describe("/game/:gameId — saved games and party selection (10.9/2t1.10)", () =
     expect(stubEngine.leaveParty).toHaveBeenCalledTimes(1);
   });
 
-  it("offers a same-size primary Start-party CTA for classic games outside a party (2t1.10)", async () => {
+  it("offers a same-size primary Start-party CTA for external games outside a party (2t1.10)", async () => {
     renderAt("/game/drawphone");
 
     const start = await screen.findByRole("link", { name: "Start party" });

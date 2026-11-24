@@ -1,12 +1,12 @@
-import type { ClassicUrlSpecMessage, MemberId, SessionSecret } from "@rocketcrab/protocol";
+import type { ExternalRoom, MemberId, SessionSecret } from "@rocketcrab/protocol";
 import { sessionSecretSchema } from "@rocketcrab/protocol";
 import type { NovaTransport, TransportMessage } from "@rocketcrab/core";
 import { deriveSessionMaterial, generateSessionSecret, type SessionMaterial } from "./secrets";
 import {
   PARTY_CONTROL_CHANNEL,
   buildPartyContextMessage,
-  buildPartyClassicRoomMessage,
-  buildPartyClassicRoomRequestMessage,
+  buildPartyExternalRoomMessage,
+  buildPartyExternalRoomRequestMessage,
   buildPartyKickMessage,
   buildPartyReloadAllMessage,
   buildPartyRenameMessage,
@@ -37,13 +37,13 @@ export type PartyEvent =
     }
   | { readonly type: "memberRenamed"; readonly memberId: MemberId; readonly displayName: string }
   | {
-      readonly type: "classicRoom";
+      readonly type: "externalRoom";
       readonly gameId: string;
-      readonly player: ClassicUrlSpecMessage;
-      readonly host?: Partial<ClassicUrlSpecMessage>;
+      readonly room: ExternalRoom;
+      readonly creatorMemberId: MemberId;
       readonly senderMemberId: MemberId;
     }
-  | { readonly type: "classicRoomRequest"; readonly senderMemberId: MemberId }
+  | { readonly type: "externalRoomRequest"; readonly senderMemberId: MemberId }
   | {
       readonly type: "kick";
       readonly targetMemberId: MemberId;
@@ -197,22 +197,22 @@ export class PartySession {
       payload: buildPartyRenameMessage(this.base(), { displayName }),
     });
   }
-  async announceClassicRoom(input: {
+  async announceExternalRoom(input: {
     gameId: string;
-    player: ClassicUrlSpecMessage;
-    host?: Partial<ClassicUrlSpecMessage>;
+    room: ExternalRoom;
+    creatorMemberId: string;
   }): Promise<void> {
     if (!this.amHost || this.disposed) return;
     await this.privateTransport.send({
       channel: PARTY_CONTROL_CHANNEL,
-      payload: buildPartyClassicRoomMessage(this.base(), input),
+      payload: buildPartyExternalRoomMessage(this.base(), input),
     });
   }
-  async requestClassicRoom(): Promise<void> {
+  async requestExternalRoom(): Promise<void> {
     if (this.disposed) return;
     await this.privateTransport.send({
       channel: PARTY_CONTROL_CHANNEL,
-      payload: buildPartyClassicRoomRequestMessage(this.base()),
+      payload: buildPartyExternalRoomRequestMessage(this.base()),
     });
   }
   /** Cooperative removal only: a reusable invite cannot permanently exclude its holder. */
@@ -274,16 +274,16 @@ export class PartySession {
           displayName: value.displayName,
         });
         break;
-      case "party.classicRoom.request":
-        this.emit({ type: "classicRoomRequest", senderMemberId: message.senderMemberId });
+      case "party.externalRoom.request":
+        this.emit({ type: "externalRoomRequest", senderMemberId: message.senderMemberId });
         break;
-      case "party.classicRoom":
+      case "party.externalRoom":
         if (message.senderMemberId !== this.hostMemberId) return;
         this.emit({
-          type: "classicRoom",
+          type: "externalRoom",
           gameId: value.gameId,
-          player: value.player,
-          ...(value.host !== undefined ? { host: value.host } : {}),
+          room: value.room,
+          creatorMemberId: value.creatorMemberId,
           senderMemberId: message.senderMemberId,
         });
         break;

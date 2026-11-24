@@ -33,12 +33,12 @@ export class PartySnapshot {
     const party = this.state.party;
     const identity = this.state.identity;
     const members = this.buildMembers();
-    // Classic room announcements replace source transfer and runtime registration.
-    const classicActive = this.state.classic !== null;
+    // External room announcements replace source transfer and runtime registration.
+    const externalActive = this.state.external !== null;
     const allReady =
-      classicActive || (members.length > 0 && members.every((member) => member.ready));
-    const allVerified = this.services().source.allSourcesVerified(members, classicActive);
-    const anyFailed = classicActive
+      externalActive || (members.length > 0 && members.every((member) => member.ready));
+    const allVerified = this.services().source.allSourcesVerified(members, externalActive);
+    const anyFailed = externalActive
       ? false
       : members.some(
           (member) => member.transferState === "failed" || member.transferState === "incompatible",
@@ -95,16 +95,17 @@ export class PartySnapshot {
         inLobby && this.state.game !== null && !ended && !anyFailed && allVerified && !allReady,
       startBlockedReason,
       endedReason: this.state.endedReason,
-      classicGame:
-        this.state.classic === null
+      externalGame:
+        this.state.external === null
           ? null
           : {
-              gameId: this.state.classic.gameId,
-              title: this.state.classic.title,
-              connectResult: this.state.classic.connectResult,
+              gameId: this.state.external.gameId,
+              title: this.state.external.title,
+              room: this.state.external.room,
+              creatorMemberId: this.state.external.creatorMemberId,
             },
       removedReason: this.state.removedReason,
-      classicFrameEpoch: this.state.classicFrameEpoch,
+      externalFrameEpoch: this.state.externalFrameEpoch,
       runtimeLogs: this.state.runtimeLogs,
       diagnostics: this.buildDiagnostics(),
       signalingOutage: this.state.signalingOutageVisible,
@@ -198,10 +199,10 @@ export class PartySnapshot {
       let transferState: PartyMemberView["transferState"];
       let transferProgress: number | null;
       let transferDetail: string | null;
-      if (this.state.classic !== null) {
+      if (this.state.external !== null) {
         transferState = "complete";
         transferProgress = 1;
-        transferDetail = "Classic game ready";
+        transferDetail = "Game ready";
       } else if (isSelf) {
         if (this.services().source.isSourceVerified(memberId)) {
           transferState = "complete";
@@ -236,7 +237,7 @@ export class PartySnapshot {
         transferProgress,
         transferDetail,
         ready:
-          this.state.classic !== null ? true : (this.state.session?.readyOf(memberId) ?? false),
+          this.state.external !== null ? true : (this.state.session?.readyOf(memberId) ?? false),
       });
     }
     return members;

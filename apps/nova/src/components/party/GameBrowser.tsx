@@ -10,11 +10,11 @@ import { ErrorPanel } from "../ui/ErrorPanel";
 import { LoadingState } from "../ui/LoadingState";
 import {
   BROWSE_CATEGORIES,
-  BROWSE_GAMES,
+  CATALOG_GAMES,
   categoryCount,
   type BrowseCategory,
-  type BrowseEntry,
-} from "../../lib/browse";
+  type CatalogGame,
+} from "../../lib/catalog";
 import {
   clearBrowseContext,
   readBrowseContext,
@@ -26,7 +26,7 @@ import type { SharedPartyGame } from "../../lib/party/engine";
 
 export interface GameBrowserProps {
   /** Pick mode selects directly instead of opening details; used by the in-game browse panel. */
-  onPick?: (entry: BrowseEntry) => void;
+  onPick?: (entry: CatalogGame) => void;
   /**
    * Pick mode: clicking a saved game in the "My games" category calls this
    * with the game id instead of linking to the game detail page.
@@ -60,7 +60,7 @@ function isBrowseView(value: string | null | undefined): value is BrowseView {
   );
 }
 
-function matchesQuery(game: BrowseEntry, query: string): boolean {
+function matchesQuery(game: CatalogGame, query: string): boolean {
   if (query === "") return true;
   const haystack = `${game.name} ${game.author} ${game.description}`.toLowerCase();
   return haystack.includes(query.toLowerCase());
@@ -73,8 +73,8 @@ function GameCard({
   onOpen,
   detailOrigin,
 }: {
-  game: BrowseEntry;
-  onPick?: (entry: BrowseEntry) => void;
+  game: CatalogGame;
+  onPick?: (entry: CatalogGame) => void;
   onOpen?: () => void;
   detailOrigin?: "party-browse";
 }) {
@@ -215,7 +215,7 @@ function CategoryCard({
 }
 
 /**
- * Shared classic and saved-game browser. Browse mode opens details; pick
+ * Shared browser for listed and saved games. Browse mode opens details; pick
  * mode selects directly. Persist category/query before details navigation
  * so Back restores the same list even when the lobby browser remounts.
  */
@@ -244,9 +244,11 @@ export function GameBrowser({
 
   const prebuiltGames = useMemo(() => {
     const inCategory =
-      view === null || view === "mine"
-        ? BROWSE_GAMES
-        : BROWSE_GAMES.filter((game) => game.category.includes(view));
+      view === null || view === "mine" || view === "friends"
+        ? CATALOG_GAMES
+        : CATALOG_GAMES.filter(
+            (game) => BROWSE_CATEGORIES.find((box) => box.id === view)?.matches(game) ?? false,
+          );
     return inCategory.filter((game) => matchesQuery(game, query));
   }, [view, query]);
 
@@ -365,7 +367,7 @@ export function GameBrowser({
               key={box.id}
               emoji={box.emoji}
               label={box.label}
-              count={categoryCount(box.match, BROWSE_GAMES)}
+              count={categoryCount(box, CATALOG_GAMES)}
               onClick={() => setView(box.id)}
             />
           ))}

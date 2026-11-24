@@ -4,7 +4,7 @@ import { Button } from "../ui/Button";
 
 export interface ScreenshotCarouselProps {
   /** Portrait screenshot image URLs, in display order. */
-  images: string[];
+  images: readonly string[];
   /** Game name, used for the screenshot alt text. */
   gameName: string;
 }

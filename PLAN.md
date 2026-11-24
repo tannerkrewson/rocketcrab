@@ -116,23 +116,25 @@ launch, and the list format depends on them.
       lobby shows `playerLimitNotice` to everyone without blocking start.
       List entries without `players` text show the range (`2–8`, `3+`).
       Engine, lobby, API and runtime tests added.
-- [ ] **Redesign external games as `createRoom()` + `joinUrl()`.**
-      `createRoom()` returns plain JSON that the host broadcasts.
-      `joinUrl(room, { name, isHost })` runs on each player's device, since
-      every client already ships the list code. This replaces `renameParams`,
-      `customQueryParams`, `afterQueryParams`, and the host-override merge
-      while keeping what they could do, including host-only URLs.
-      `party.classicRoom` then carries only the room JSON. Rename Classic to
-      external in the code in the same step.
-- [ ] **Fix two likely external-game bugs** (`PartyExperience.tsx`):
-      renaming during a game changes the iframe URL and reloads the game,
-      and `isHost` uses `role === "creator"` instead of the current
-      `hostMemberId`. Reproduce each one in a test first.
-- [ ] **One list entry type.** Merge `ClassicGame` and `BrowseEntry` into
-      one entry with shared metadata plus
-      `play: { kind: "external", … } | { kind: "nova", url }`. Split
-      `category` into difficulty and genre, and drop the `netgamesio`
-      provider category. Derive `displayUrlText` from `displayUrlHref`.
+- [x] **Redesign external games as `createRoom()` + `joinUrl()`.**
+      `createRoom()` returns plain JSON; `joinUrl(room, { name, isHost })`
+      runs on each device through `rocketcrabUrl` (renamed and extra
+      parameters, a hash, host-only values all still possible).
+      `party.externalRoom` carries only `{ gameId, room, creatorMemberId }`,
+      and frames are checked against the game's `frameOrigins`. Classic is
+      renamed external in the code. Built together with the list entry type
+      below to avoid converting the 22 entries twice.
+- [x] **Fix two likely external-game bugs.** `ExternalGameFrame` builds its
+      URL once per mount, so renaming no longer reloads the game, and the
+      host flag goes to the room's creator (`creatorMemberId`), which stays
+      right when host controls move. Also fixed: a guest now follows a new
+      room when the host re-picks the same game, and the built CSP lacked
+      `connect-src` for the hosts Fishbowl and Set with Friends fetch.
+      Component and engine tests added.
+- [x] **One list entry type.** `lib/catalog`: `CatalogGame` is the shared
+      listing plus `play: external | nova`. `category` became `difficulty`
+      and `genres` (no `netgamesio` box); link text is derived from
+      `displayUrlHref`; the player count falls back to the limits.
 - [ ] **Hosted Nova games.** Fetch the entry's URL in the list module, not
       the engine (2 MiB limit, readable errors), then call `selectGame`.
       Build the main origin's `connect-src` from the list the same way

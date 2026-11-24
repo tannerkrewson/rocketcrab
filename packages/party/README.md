@@ -7,7 +7,7 @@ and [ADR-0011](../../docs/architecture/adr-0011-secrets-and-invite-link-handling
 - `secrets.ts`: 32-byte CSPRNG secret; domain-separated room/password/session derivation.
 - `invite.ts`: fragment-only invite URLs, no codes or admission.
 - `session.ts`: one private transport, automatic membership, name updates, shell
-  control succession, cooperative kick/reload, and classic-room announcements.
+  control succession, cooperative kick/reload, and external-room announcements.
 - `messages.ts`: validated private control messages, isolated from game APIs.
 - `game-source.ts`: one binary request response, exact UTF-8 size and SHA-256
   verification, a cache of at most eight 2 MiB documents, and a verified-acceptance
@@ -29,7 +29,7 @@ protocol was added. Metadata/discovery remain small schema-validated shell
 controls, separate from game state/actions and invisible to game frames.
 
 The creator owns shell controls while connected; otherwise the lowest connected
-member ID owns them. This does not elect game authority or migrate a classic
+member ID owns them. This does not elect game authority or migrate an external
 provider's host role. Every participant keeps the private room joinable and can
 serve verified game HTML to later participants. An empty party is not persisted.
 

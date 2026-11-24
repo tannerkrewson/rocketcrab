@@ -1,5 +1,5 @@
 /**
- * Create Classic rooms whose upstream endpoints lack CORS support. Only the
+ * Create external-game rooms whose upstream endpoints lack CORS support. Only the
  * fixed endpoints below are reachable; never act as an open proxy. Keep the
  * client RELAY_ENDPOINT_KEYS mirror in sync (worker.test.ts).
  *

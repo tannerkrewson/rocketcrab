@@ -9,14 +9,14 @@ a separate site from the app.
 | Route               | Purpose                                                                      |
 | ------------------- | ---------------------------------------------------------------------------- |
 | `POST /turn`        | Issues a 24-hour Realtime TURN credential.                                   |
-| `POST /`            | Creates Classic rooms using a fixed list of upstream endpoints.              |
+| `POST /`            | Creates external-game rooms using a fixed list of upstream endpoints.        |
 | `GET /signal/:room` | Trystero signaling. One hibernating Durable Object per room.                 |
 | `GET /tunnel/:pair` | Encrypted WebSocket fallback. One hibernating Durable Object per pair.       |
 | `POST /log`         | Validates and writes client connection and readiness events to Workers Logs. |
 
 Every route requires an allowed Origin. The Origin check restricts browser
 callers. The HTTP limiters are approximate, per IP, route, and Cloudflare
-location. `/turn` and Classic allow 120 per minute. Signaling upgrades, tunnel
+location. `/turn` and the room relay allow 120 per minute. Signaling upgrades, tunnel
 upgrades, and reports allow 2,000 per minute per route. The socket handlers
 also limit signaling messages and tunnel traffic. A tunnel frame spends at
 least 256 bytes of its sender's budget so tiny messages still have a cost.
@@ -97,7 +97,7 @@ service until midnight UTC. Check account usage before inviting a wider beta.
   first edge deploy (`--secrets-file`). The key was checked against the
   Realtime API first. Later redeploys keep them.
 - Edge smoke checks passed. `/turn` returns 403 without an allowed Origin and
-  STUN/TURN servers with one. Classic room creation returns a `gameCode`.
+  STUN/TURN servers with one. External-game room creation returns a `gameCode`.
   Signal and tunnel WebSockets open. The limiter returned 429 after about
   100 requests on one connection. Counts are per Cloudflare machine, so
   requests spread over many connections were not throttled at 300+.

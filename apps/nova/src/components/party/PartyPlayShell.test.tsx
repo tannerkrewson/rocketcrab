@@ -62,9 +62,9 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     canForceStart: false,
     startBlockedReason: null,
     endedReason: null,
-    classicGame: null,
+    externalGame: null,
     removedReason: null,
-    classicFrameEpoch: 0,
+    externalFrameEpoch: 0,
     diagnostics: null,
     notices: [],
     runtimeLogs: [],
@@ -301,7 +301,10 @@ describe("PartyPlayShell in-game chrome (7.38)", () => {
     const protobowl = within(browse).getByRole("button", { name: /Protobowl/ });
     await userEvent.click(protobowl);
     expect(onPickPrebuilt).toHaveBeenCalledWith(
-      expect.objectContaining({ kind: "classic", id: "protobowl" }),
+      expect.objectContaining({
+        id: "protobowl",
+        play: expect.objectContaining({ kind: "external" }),
+      }),
     );
     await userEvent.click(screen.getByRole("button", { name: /back to the game/i }));
     expect(screen.queryByRole("dialog", { name: "Pick a game" })).not.toBeInTheDocument();

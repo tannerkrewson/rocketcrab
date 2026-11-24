@@ -18,7 +18,7 @@ import {
  * The party's state executor: the NovaSession runs the game's state handlers
  * IN the runtime frame. The engine forwards `stateRequest` apiEvents into the
  * frame and correlates the `stateResponse` apiCalls back. When no runtime frame
- * exists (classic games, whose iframe the UI embeds directly, or a frame that
+ * exists (external games, whose iframe the UI embeds directly, or a frame that
  * failed to boot), requests fall back to no-op semantics (empty `{}` state, no
  * views) so the start flow still completes instead of timing out on the frame
  * executor. `runtime()` is read at call time so a rebooted frame is always the

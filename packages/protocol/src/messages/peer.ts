@@ -63,41 +63,40 @@ export const partyRenameMessageSchema = z.object({
 export type PartyRenameMessage = z.infer<typeof partyRenameMessageSchema>;
 
 /**
- * Classic external iframe game URL spec: the embeddable room URL
- * plus optional per-game query/hash extras (classic `ConnectedGameURL`).
+ * One room on an external game's own server, as that game's `createRoom`
+ * returned it: a few short strings (a URL, a code). Every player builds
+ * their own frame URL from it with the game's `joinUrl`.
  */
-export const classicUrlSpecMessageSchema = z.object({
-  url: z.string().min(1).max(2048),
-  customQueryParams: z.record(z.string(), z.string()).optional(),
-  afterQueryParams: z.string().max(512).optional(),
-});
-export type ClassicUrlSpecMessage = z.infer<typeof classicUrlSpecMessageSchema>;
+export const externalRoomSchema = z
+  .record(z.string().min(1).max(32), z.string().max(2048))
+  .refine((room) => Object.keys(room).length <= 16, "An external room has at most 16 fields.");
+export type ExternalRoom = z.infer<typeof externalRoomSchema>;
 
 /**
- * Classic room: the host created a room on an external service and shares
- * the URL spec so every player embeds the SAME room with their own
- * rocketcrab/name/ishost params. The optional `host` overrides are
- * merged only for the host's own frame.
+ * External room: the member who created a room on an external game's
+ * server shares it so every player joins the SAME room. `creatorMemberId`
+ * names that member, who joins as the external game's host; it can differ
+ * from the sender when a later Nova host re-announces the room.
  */
-export const partyClassicRoomMessageSchema = z.object({
+export const partyExternalRoomMessageSchema = z.object({
   ...peerEnvelopeFields,
-  type: z.literal("party.classicRoom"),
+  type: z.literal("party.externalRoom"),
   gameId: gameIdSchema,
-  player: classicUrlSpecMessageSchema,
-  host: classicUrlSpecMessageSchema.partial().optional(),
+  room: externalRoomSchema,
+  creatorMemberId: memberIdSchema,
 });
-export type PartyClassicRoomMessage = z.infer<typeof partyClassicRoomMessageSchema>;
+export type PartyExternalRoomMessage = z.infer<typeof partyExternalRoomMessageSchema>;
 
 /**
- * Classic room request: a late joiner (or a reconnecting member) asks the
- * party for the current classic room. The host re-announces the
- * `party.classicRoom` message in reply.
+ * External room request: a late joiner (or a reconnecting member) asks the
+ * party for the current external room. The host re-announces the
+ * `party.externalRoom` message in reply.
  */
-export const partyClassicRoomRequestMessageSchema = z.object({
+export const partyExternalRoomRequestMessageSchema = z.object({
   ...peerEnvelopeFields,
-  type: z.literal("party.classicRoom.request"),
+  type: z.literal("party.externalRoom.request"),
 });
-export type PartyClassicRoomRequestMessage = z.infer<typeof partyClassicRoomRequestMessageSchema>;
+export type PartyExternalRoomRequestMessage = z.infer<typeof partyExternalRoomRequestMessageSchema>;
 
 /**
  * Party kick: the host removes a member from the party. Broadcast so the
@@ -114,7 +113,7 @@ export type PartyKickMessage = z.infer<typeof partyKickMessageSchema>;
 
 /**
  * Reload every player's game frame. Sent by the host;
- * each member re-runs its own frame (runtime.reload or a classic iframe
+ * each member re-runs its own frame (runtime.reload or an external iframe
  * remount).
  */
 export const partyReloadAllMessageSchema = z.object({
@@ -435,8 +434,8 @@ export const peerMessagesSchema = z.discriminatedUnion("type", [
   partyContextMessageSchema,
   playerIdentityMessageSchema,
   partyRenameMessageSchema,
-  partyClassicRoomMessageSchema,
-  partyClassicRoomRequestMessageSchema,
+  partyExternalRoomMessageSchema,
+  partyExternalRoomRequestMessageSchema,
   partyKickMessageSchema,
   partyReloadAllMessageSchema,
   connectionStatusMessageSchema,

@@ -6,7 +6,11 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import type { Plugin } from "vite";
 import { defineConfig } from "vite";
-import { CLASSIC_FRAME_ORIGINS, CLASSIC_IMAGE_ORIGINS } from "./src/lib/classic/games";
+import {
+  CATALOG_CONNECT_ORIGINS,
+  CATALOG_IMAGE_ORIGINS,
+  EXTERNAL_FRAME_ORIGINS,
+} from "./src/lib/catalog";
 
 // Local HTTPS dev certs (scripts/gen-certs.mjs). `npm run dev:https` starts
 // the dev server with `--mode https`; the server uses HTTPS only then, so
@@ -32,7 +36,7 @@ function httpsServerConfig(mode: string) {
  * Strict SPA CSP shared by index.html and Cloudflare asset headers
  * (ADR-0001, ADR-0008).
  *
- * Only the configured runtime origin and static CLASSIC_FRAME_ORIGINS
+ * Only the configured runtime origin and static EXTERNAL_FRAME_ORIGINS
  * allowlist can be framed. Missing VITE_RUNTIME_ORIGIN intentionally blocks
  * the runtime instead of weakening the policy. The separate runtime origin
  * has no CSP meta tag so game HTML retains ordinary web capabilities
@@ -75,18 +79,22 @@ function buildCsp(): string {
     );
   }
   const runtimeOrigin = rawOrigin === "" ? "" : new URL(rawOrigin).origin;
-  const frameSources = [...(runtimeOrigin === "" ? [] : [runtimeOrigin]), ...CLASSIC_FRAME_ORIGINS];
-  // Nova edge Worker (Classic relay + TURN mint), when the build sets one.
+  const frameSources = [
+    ...(runtimeOrigin === "" ? [] : [runtimeOrigin]),
+    ...EXTERNAL_FRAME_ORIGINS,
+  ];
+  // Nova edge Worker (room relay + TURN mint), when the build sets one.
   const edgeOrigin = process.env.VITE_EDGE_ORIGIN?.trim() ?? "";
   const edgeConnectSrc = edgeOrigin === "" ? "" : ` ${new URL(edgeOrigin).origin}`;
   const csp = [
     "default-src 'self'",
     "script-src 'self'",
     "style-src 'self' 'unsafe-inline'",
-    // Classic games' screenshots on their details pages.
-    ["img-src 'self' data: blob:", ...CLASSIC_IMAGE_ORIGINS].join(" "),
+    // Listed games' screenshots on their details pages.
+    ["img-src 'self' data: blob:", ...CATALOG_IMAGE_ORIGINS].join(" "),
     "font-src 'self' data:",
-    `connect-src 'self' wss: ws:${edgeConnectSrc}`,
+    // Listed games' direct room creation and hosted Nova games' HTML.
+    [`connect-src 'self' wss: ws:${edgeConnectSrc}`, ...CATALOG_CONNECT_ORIGINS].join(" "),
     "media-src 'self' blob:",
     "worker-src 'self' blob:",
     "object-src 'none'",

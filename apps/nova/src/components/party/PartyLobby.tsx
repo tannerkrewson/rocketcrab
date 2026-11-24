@@ -113,7 +113,7 @@ export function PartyLobby({
 
   // A Nova game from someone else can be saved to this player's games.
   const sharedGame =
-    state.game === null || state.classicGame !== null
+    state.game === null || state.externalGame !== null
       ? undefined
       : state.sharedGames.find((game) => game.gameId === state.game?.gameId);
 

@@ -15,7 +15,7 @@ import {
 import { Badge } from "../ui/Badge";
 import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "../../lib/toast";
-import type { BrowseEntry } from "../../lib/browse";
+import type { CatalogGame } from "../../lib/catalog";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import { clearBrowseContext } from "../../lib/browse/back-context";
 import { cn } from "../../lib/cn";
@@ -28,7 +28,7 @@ import { PartyGameDetailsModal } from "./PartyGameDetails";
 
 export interface PartyPlayShellProps {
   state: PartyEngineState;
-  /** The game frame area (the Nova runtime container or classic iframe). */
+  /** The game frame area (the Nova runtime container or an external iframe). */
   children: ReactNode;
   onEndGame: () => void;
   onLeave: () => void;
@@ -38,8 +38,8 @@ export interface PartyPlayShellProps {
   /** Host-only: remove a member after confirmation. */
   onKickMember: (memberId: string) => void;
   onPickGame: (gameId: string) => void;
-  /** Pick a classic external game for the party. */
-  onPickPrebuilt: (entry: BrowseEntry) => void;
+  /** Pick a listed game for the party. */
+  onPickPrebuilt: (entry: CatalogGame) => void;
   onClearLogs?: () => void;
 }
 
@@ -189,8 +189,8 @@ export function PartyPlayShell({
                   About this game
                 </button>
               </li>
-              {/* Classic iframes do not emit runtime console logs. */}
-              {state.classicGame === null && state.game !== null ? (
+              {/* External iframes do not emit runtime console logs. */}
+              {state.externalGame === null && state.game !== null ? (
                 <li>
                   <button
                     type="button"

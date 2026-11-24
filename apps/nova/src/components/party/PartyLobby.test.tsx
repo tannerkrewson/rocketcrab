@@ -72,9 +72,9 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     canForceStart: false,
     startBlockedReason: "Waiting for every player's game to load and register.",
     endedReason: null,
-    classicGame: null,
+    externalGame: null,
     removedReason: null,
-    classicFrameEpoch: 0,
+    externalFrameEpoch: 0,
     diagnostics: null,
     notices: [],
     runtimeLogs: [],
@@ -447,7 +447,7 @@ describe("PartyLobby", () => {
     expect(savedLink.tagName.toLowerCase()).toBe("a");
   });
 
-  it("links a classic game to its details page instead of picking it (10.9)", async () => {
+  it("links a listed game to its details page instead of picking it (10.9)", async () => {
     const state = makeState({ game: null, canStart: false, canForceStart: false });
     await renderLobby(state);
     await userEvent.click(screen.getByRole("button", { name: /browse games/i }));

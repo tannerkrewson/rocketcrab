@@ -139,7 +139,7 @@ export class PartySource {
         this.state.game = game;
         this.adoptSourceHash(event.metadata.sourceSha256);
         if (changed && this.state.party !== null) {
-          this.state.classic = null;
+          this.state.external = null;
           this.state.selfVerified = false;
           this.services().runtime.teardownRuntimeFrame();
           // attach() wires listeners synchronously, before subsequent source or registration events.
@@ -339,9 +339,9 @@ export class PartySource {
   }
 
   /** Shared by the UI and session start gates so source requirements agree. */
-  allSourcesVerified(members: readonly PartyMemberView[], classicActive: boolean): boolean {
+  allSourcesVerified(members: readonly PartyMemberView[], externalActive: boolean): boolean {
     return (
-      classicActive ||
+      externalActive ||
       (members.length > 0 && members.every((member) => this.isSourceVerified(member.memberId)))
     );
   }

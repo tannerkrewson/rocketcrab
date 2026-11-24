@@ -167,4 +167,4 @@ application, and run in CI.
 - Shell-host succession (P2) is separate from authority migration — party
   shell controls and game authority are different roles. The original creator
   keeps shell controls while connected; otherwise the lowest connected member
-  hosts. Classic external-game provider hosts are not claimed to migrate.
+  hosts. External-game provider hosts are not claimed to migrate.

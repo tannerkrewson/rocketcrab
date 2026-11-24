@@ -9,7 +9,7 @@ import type {
 import type { createNovaSession } from "@rocketcrab/nova-api";
 import type { RuntimeHostClient } from "../runtime-host";
 import type { ArenaLogEntry } from "../arena/types";
-import type { ClassicGameConnectResult } from "../classic";
+import type { ExternalRoom } from "../catalog";
 import { localPartyIdentity } from "./identity";
 import { browserLifecycleSource, type PartyLifecycleSource } from "./lifecycle";
 import { SignalingOutage } from "./signaling-outage";
@@ -50,13 +50,15 @@ export interface TransferState {
   detail: string | null;
 }
 
-interface ClassicSelection {
+interface ExternalSelection {
   readonly gameId: string;
   readonly title: string;
-  readonly connectResult: ClassicGameConnectResult;
+  readonly room: ExternalRoom;
+  /** The member who created the room; they join as the external game's host. */
+  readonly creatorMemberId: string;
 }
 
-export type ClassicAnnouncement = Parameters<PartySession["announceClassicRoom"]>[0];
+export type ExternalAnnouncement = Parameters<PartySession["announceExternalRoom"]>[0];
 
 interface PartyEngineDefaults {
   /** Injected factory (tests/embedders) or null → build the Trystero factory lazily. */
@@ -119,8 +121,8 @@ export class PartyEngineContext {
   readonly sharedGames = new Map<string, SharedPartyGameSource>();
   /** apiVersion from the latest source metadata, per game id. */
   readonly sourceApiVersions = new Map<string, number>();
-  classic: ClassicSelection | null = null;
-  classicFrameEpoch = 0;
+  external: ExternalSelection | null = null;
+  externalFrameEpoch = 0;
   removedReason: string | null = null;
   frameStarted = false;
   registered = false;

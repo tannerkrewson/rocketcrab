@@ -3,13 +3,13 @@ import { PartyError, type PartyEvent, type PartySession } from "@rocketcrab/part
 import type { NovaSessionEvent } from "@rocketcrab/nova-api";
 import { createNovaSession } from "@rocketcrab/nova-api";
 import { toApiEvent } from "../arena/api-events";
-import { findClassicGame } from "../classic";
+import { findExternalGame } from "../catalog";
 import { playerLimitsOf } from "./player-limits";
 import { reportConnection } from "../connection-log";
 import { updatePartyDisplayName } from "./identity";
 import { PartyStateExecutor } from "./party-executors";
 import type { PartySourceSpec } from "./engine-types";
-import type { PartyEngineContext, ClassicAnnouncement } from "./engine-context";
+import type { PartyEngineContext, ExternalAnnouncement } from "./engine-context";
 import type { PartyEngineServices } from "./engine-services";
 import {
   START_RETRY_INTERVAL_MS,
@@ -35,7 +35,7 @@ export class PartyGameLifecycle {
       return;
     }
     this.state.game = { gameId: input.gameId, title: input.title };
-    this.state.classic = null;
+    this.state.external = null;
     this.services().runtime.teardownRuntimeFrame();
     // Previous-game verification must not open the new game's start gate.
     this.state.selfVerified = false;
@@ -46,31 +46,36 @@ export class PartyGameLifecycle {
     this.services().source.registerSource(input);
   }
 
-  /** Host-only, in the lobby. Create one external room and share its URL spec with all players. */
-  async selectClassicGame(gameId: string): Promise<void> {
+  /** Host-only, in the lobby. Create one external room and share it with all players. */
+  async selectExternalGame(gameId: string): Promise<void> {
     if (this.state.phase !== "lobby" || this.state.party === null || !this.state.party?.amHost) {
       return;
     }
-    const game = findClassicGame(gameId);
+    const game = findExternalGame(gameId);
     if (game === undefined) {
-      this.services().snapshot.addNotice("error", `Unknown classic game "${gameId}".`);
+      this.services().snapshot.addNotice("error", `Unknown game "${gameId}".`);
       this.services().snapshot.emit();
       return;
     }
     const party = this.state.party;
     try {
-      const connectResult = await game.connectToGame();
+      const room = await game.play.createRoom();
       // Ignore room creation that finishes after the party changes.
       if (this.state.party !== party) return;
-      this.state.classic = { gameId, title: game.name, connectResult };
+      this.state.external = {
+        gameId,
+        title: game.name,
+        room,
+        creatorMemberId: this.state.identity.memberId,
+      };
       this.state.game = { gameId, title: game.name, ...playerLimitsOf(game) };
       this.state.selfVerified = true;
       this.state.selfVerifiedSha256 = null;
       this.state.currentSourceSha256 = null;
       this.state.registered = true;
-      // The UI embeds classic games directly; do not keep a Nova runtime alongside them.
+      // The UI embeds external games directly; do not keep a Nova runtime alongside them.
       this.services().runtime.teardownRuntimeFrame();
-      await this.state.party.announceClassicRoom(this.classicAnnouncement());
+      await this.state.party.announceExternalRoom(this.externalAnnouncement());
     } catch (error) {
       if (this.state.party !== party) return;
       this.services().snapshot.addNotice(
@@ -82,9 +87,9 @@ export class PartyGameLifecycle {
   }
 
   reloadMyGame(): void {
-    if (this.state.classic !== null) {
-      // Classic iframes are remounted by the UI keyed on this epoch.
-      this.state.classicFrameEpoch += 1;
+    if (this.state.external !== null) {
+      // External iframes are remounted by the UI keyed on this epoch.
+      this.state.externalFrameEpoch += 1;
     } else {
       this.services().runtime.reloadRuntimeFrame();
     }
@@ -277,43 +282,23 @@ export class PartyGameLifecycle {
     });
   }
 
-  private classicAnnouncement(): ClassicAnnouncement {
-    const classic = this.state.classic;
-    if (classic === null) {
-      throw new Error("classicAnnouncement called with no classic game selected");
+  private externalAnnouncement(): ExternalAnnouncement {
+    const external = this.state.external;
+    if (external === null) {
+      throw new Error("externalAnnouncement called with no external game selected");
     }
-    const specOf = (spec: {
-      url?: string;
-      customQueryParams?: Record<string, string>;
-      afterQueryParams?: string;
-    }) => ({
-      ...(spec.url !== undefined ? { url: spec.url } : {}),
-      ...(spec.customQueryParams !== undefined
-        ? { customQueryParams: spec.customQueryParams }
-        : {}),
-      ...(spec.afterQueryParams !== undefined ? { afterQueryParams: spec.afterQueryParams } : {}),
-    });
-    const result = classic.connectResult;
     return {
-      gameId: classic.gameId,
-      player: {
-        url: result.player.url,
-        ...(result.player.customQueryParams !== undefined
-          ? { customQueryParams: result.player.customQueryParams }
-          : {}),
-        ...(result.player.afterQueryParams !== undefined
-          ? { afterQueryParams: result.player.afterQueryParams }
-          : {}),
-      },
-      ...(result.host !== undefined ? { host: specOf(result.host) } : {}),
+      gameId: external.gameId,
+      room: external.room,
+      creatorMemberId: external.creatorMemberId,
     };
   }
 
-  askForClassicRoom(): void {
-    if (this.state.party?.amHost || this.state.party === null || this.state.classic !== null) {
+  askForExternalRoom(): void {
+    if (this.state.party?.amHost || this.state.party === null || this.state.external !== null) {
       return;
     }
-    void this.state.party.requestClassicRoom().catch(() => undefined);
+    void this.state.party.requestExternalRoom().catch(() => undefined);
   }
 
   handlePartyEvent(event: PartyEvent): void {
@@ -330,28 +315,32 @@ export class PartyGameLifecycle {
         // Names come from the party layer; invalidate the projected member view.
         this.services().snapshot.emit();
         break;
-      case "classicRoom": {
+      case "externalRoom": {
         if (this.state.party?.amHost) {
           break;
         }
-        const game = findClassicGame(event.gameId);
-        const title = game?.name ?? "Classic game";
-        if (this.state.classic === null || this.state.classic.gameId !== event.gameId) {
-          this.state.classic = {
+        const game = findExternalGame(event.gameId);
+        if (game === undefined) {
+          // A newer build's game this one doesn't list; it can't be embedded here.
+          this.services().snapshot.addNotice(
+            "error",
+            "The host picked a game this version of Rocketcrab doesn't have. Reload to update.",
+          );
+          this.services().snapshot.emit();
+          break;
+        }
+        const title = game.name;
+        const current = this.state.external;
+        if (
+          current === null ||
+          current.gameId !== event.gameId ||
+          !sameRoom(current.room, event.room)
+        ) {
+          this.state.external = {
             gameId: event.gameId,
             title,
-            connectResult: {
-              player: {
-                url: event.player.url,
-                ...(event.player.customQueryParams !== undefined
-                  ? { customQueryParams: event.player.customQueryParams }
-                  : {}),
-                ...(event.player.afterQueryParams !== undefined
-                  ? { afterQueryParams: event.player.afterQueryParams }
-                  : {}),
-              },
-              ...(event.host !== undefined ? { host: event.host } : {}),
-            },
+            room: event.room,
+            creatorMemberId: event.creatorMemberId,
           };
           this.state.game = { gameId: event.gameId, title, ...playerLimitsOf(game) };
           this.state.selfVerified = true;
@@ -363,10 +352,10 @@ export class PartyGameLifecycle {
         this.services().snapshot.emit();
         break;
       }
-      case "classicRoomRequest":
-        if (this.state.party?.amHost && this.state.classic !== null && this.state.party !== null) {
+      case "externalRoomRequest":
+        if (this.state.party?.amHost && this.state.external !== null && this.state.party !== null) {
           void this.state.party
-            .announceClassicRoom(this.classicAnnouncement())
+            .announceExternalRoom(this.externalAnnouncement())
             .catch(() => undefined);
         }
         break;
@@ -389,8 +378,8 @@ export class PartyGameLifecycle {
         break;
       }
       case "reloadAll":
-        if (this.state.classic !== null) {
-          this.state.classicFrameEpoch += 1;
+        if (this.state.external !== null) {
+          this.state.externalFrameEpoch += 1;
         } else {
           this.services().runtime.reloadRuntimeFrame();
         }
@@ -398,7 +387,7 @@ export class PartyGameLifecycle {
         break;
       case "host":
         this.services().snapshot.emit();
-        this.askForClassicRoom();
+        this.askForExternalRoom();
         break;
       case "error": {
         const error = event.error;
@@ -492,7 +481,15 @@ export class PartyGameLifecycle {
     if (this.state.party?.hostMemberId !== memberId) return false;
     return this.services().source.allSourcesVerified(
       this.services().snapshot.buildMembers(),
-      this.state.classic !== null,
+      this.state.external !== null,
     );
   }
+}
+
+function sameRoom(
+  a: Readonly<Record<string, string>>,
+  b: Readonly<Record<string, string>>,
+): boolean {
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((key) => a[key] === b[key]);
 }

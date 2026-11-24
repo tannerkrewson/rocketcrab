@@ -4,11 +4,11 @@ import {
   parsePeerMessage,
   partyContextMessageSchema,
   partyRenameMessageSchema,
-  partyClassicRoomMessageSchema,
-  partyClassicRoomRequestMessageSchema,
+  partyExternalRoomMessageSchema,
+  partyExternalRoomRequestMessageSchema,
   partyKickMessageSchema,
   partyReloadAllMessageSchema,
-  type ClassicUrlSpecMessage,
+  type ExternalRoom,
   type ParseResult,
   type PeerMessage,
 } from "@rocketcrab/protocol";
@@ -72,32 +72,28 @@ export function buildPartyRenameMessage(
   );
 }
 
-/** Build and validate a `party.classicRoom` announcement (private room). */
-export function buildPartyClassicRoomMessage(
+/** Build and validate a `party.externalRoom` announcement (private room). */
+export function buildPartyExternalRoomMessage(
   base: PartyControlBase,
-  input: {
-    gameId: string;
-    player: ClassicUrlSpecMessage;
-    host?: Partial<ClassicUrlSpecMessage>;
-  },
+  input: { gameId: string; room: ExternalRoom; creatorMemberId: string },
 ): PeerMessage {
   return assertPeerMessage(
-    partyClassicRoomMessageSchema.parse({
+    partyExternalRoomMessageSchema.parse({
       ...envelope(base),
-      type: "party.classicRoom",
+      type: "party.externalRoom",
       gameId: input.gameId,
-      player: input.player,
-      ...(input.host !== undefined ? { host: input.host } : {}),
+      room: input.room,
+      creatorMemberId: input.creatorMemberId,
     }),
   );
 }
 
-/** Build and validate a `party.classicRoom.request` (private room). */
-export function buildPartyClassicRoomRequestMessage(base: PartyControlBase): PeerMessage {
+/** Build and validate a `party.externalRoom.request` (private room). */
+export function buildPartyExternalRoomRequestMessage(base: PartyControlBase): PeerMessage {
   return assertPeerMessage(
-    partyClassicRoomRequestMessageSchema.parse({
+    partyExternalRoomRequestMessageSchema.parse({
       ...envelope(base),
-      type: "party.classicRoom.request",
+      type: "party.externalRoom.request",
     }),
   );
 }

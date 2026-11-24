@@ -14,6 +14,8 @@ import { takePartySource } from "../lib/party/source-handoff";
 import { getSavedPlayerName } from "../lib/party/identity";
 import { importInviteFromLocation, type ImportedInvite } from "../lib/party/invite-import";
 import { gameRepository } from "../lib/games/instance";
+import { findCatalogGame, type NovaCatalogGame } from "../lib/catalog";
+import { hostedNovaSourceSpec } from "../lib/catalog/select";
 
 export const Route = createFileRoute("/party")({
   validateSearch: (search: Record<string, unknown>): PartySearch => ({
@@ -83,8 +85,13 @@ function PartyPage() {
     setLoadError(null);
     void (async () => {
       try {
-        // The editor may hand over source via sessionStorage; otherwise load
-        // the saved game from IndexedDB.
+        // A hosted Nova game from the list is downloaded; the editor may hand
+        // over source via sessionStorage; otherwise load the saved game.
+        const listed = findCatalogGame(gameId);
+        if (listed?.play.kind === "nova") {
+          await engine.createParty(await hostedNovaSourceSpec(listed as NovaCatalogGame));
+          return;
+        }
         const source = takePartySource(gameId) ?? (await gameRepository.read(gameId)).html;
         await engine.createParty({
           gameId,

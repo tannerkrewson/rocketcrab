@@ -108,8 +108,8 @@ export class PartyEngine {
   }
 
   /** Host-only, in the lobby. Create one external room and share its URL spec with all players. */
-  selectClassicGame(gameId: string): Promise<void> {
-    return this.services.game.selectClassicGame(gameId);
+  selectExternalGame(gameId: string): Promise<void> {
+    return this.services.game.selectExternalGame(gameId);
   }
 
   reloadMyGame(): void {

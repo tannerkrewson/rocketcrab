@@ -3,7 +3,7 @@
  *
  * Browser endpoints:
  *   POST /turn          mint a Cloudflare Realtime TURN credential (turn.ts)
- *   POST /              Classic room-creation CORS relay (relay.ts)
+ *   POST /              external-game room-creation CORS relay (relay.ts)
  *   POST /log           privacy-limited connection events (log.ts)
  *   GET /signal/:room   WebSocket signaling through a per-room Durable Object
  *   GET /tunnel/:pair   WebSocket fallback tunnel between two peers (tunnel.ts)
@@ -31,7 +31,7 @@ interface ObjectNamespace {
 export interface EdgeEnv extends TurnEnv {
   /** Comma-separated exact origins allowed to call the Worker. */
   ORIGIN_ALLOWLIST?: string;
-  /** Per-IP limit for costly routes: `/turn` and the Classic relay. */
+  /** Per-IP limit for costly routes: `/turn` and the room relay. */
   RATE_LIMITER?: RateLimitBinding;
   /**
    * Per-IP limit for cheap, high-volume routes: `/signal`, `/tunnel`, `/log`.

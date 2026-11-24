@@ -37,7 +37,7 @@ cooperative UI policy, not consensus or authorization against malicious friends.
 Game authority retains its independent term/revision/history safety protections.
 
 Shell controls include selecting games, asking participants to leave, and
-reloading frames. Classic games' external-provider host roles do **not** migrate
+reloading frames. External games' provider host roles do **not** migrate
 as a consequence of a Nova shell handoff. A successor can select a new external
 room, but cannot promise continuation of an external game that needs its host.
 

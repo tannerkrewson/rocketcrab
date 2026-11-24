@@ -1,6 +1,6 @@
 /**
- * Client for the Classic room-creation relay on the Nova edge Worker
- * (deploy/edge/relay.ts). Classic games whose servers send no CORS headers
+ * Client for the external-game room-creation relay on the Nova edge Worker
+ * (deploy/edge/relay.ts). External games whose servers send no CORS headers
  * create rooms through it; builds without VITE_EDGE_ORIGIN get a readable
  * error instead of a confusing CORS failure.
  */

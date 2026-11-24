@@ -3,7 +3,7 @@ import type { TransportConnectionState } from "@rocketcrab/core";
 import { type PartyTransportFactory, type Scheduler } from "@rocketcrab/party";
 import { type ChannelPort } from "../runtime-host";
 import type { ArenaLogEntry } from "../arena/types";
-import { type ClassicGameConnectResult } from "../classic";
+import type { ExternalRoom } from "../catalog";
 import { type PartyLifecycleSource } from "./lifecycle";
 import type { TurnCredentialsResult } from "./turn-creds";
 import type { PlayerLimits } from "./player-limits";
@@ -122,15 +122,17 @@ export interface PartyEngineState {
   readonly startBlockedReason: string | null;
   readonly endedReason: string | null;
   /** One host-created external room shared by URL spec; null for Nova API games. */
-  readonly classicGame: {
+  readonly externalGame: {
     readonly gameId: string;
     readonly title: string;
-    readonly connectResult: ClassicGameConnectResult;
+    readonly room: ExternalRoom;
+    /** The member who created the room; they join as the external game's host. */
+    readonly creatorMemberId: string;
   } | null;
   /** Non-null when the host removed this member from the party. */
   readonly removedReason: string | null;
-  /** Increment to remount the classic iframe. */
-  readonly classicFrameEpoch: number;
+  /** Increment to remount the external iframe. */
+  readonly externalFrameEpoch: number;
   readonly diagnostics: PartyDiagnostics | null;
   readonly signalingOutage?: boolean;
   readonly notices: readonly PartyNotice[];

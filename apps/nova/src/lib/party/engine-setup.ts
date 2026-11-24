@@ -151,7 +151,7 @@ export class PartySetup {
             `Could not ask the party for the game: ${errorMessage(error)}`,
           ),
         );
-      this.services().game.askForClassicRoom();
+      this.services().game.askForExternalRoom();
     } catch (error) {
       if (!setup.signal.aborted) {
         reportConnection({

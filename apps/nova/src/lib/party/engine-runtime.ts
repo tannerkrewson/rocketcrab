@@ -65,7 +65,7 @@ export class PartyRuntime {
     });
   }
 
-  /** Classic games use the UI-owned iframe; keep the party and coordinator alive. */
+  /** External games use the UI-owned iframe; keep the party and coordinator alive. */
   teardownRuntimeFrame(): void {
     this.state.runtime?.destroy("user_exit");
     this.state.runtime = null;

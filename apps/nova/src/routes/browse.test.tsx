@@ -32,7 +32,8 @@ describe("/browse", () => {
     expect(await screen.findByRole("heading", { name: "Games" })).toBeInTheDocument();
     expect(screen.getByTestId("browser-brand-row")).toHaveTextContent("rocketcrab.com");
     expect(screen.getByRole("link", { name: /My games/ })).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /netgames\.io/ })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /Trivia/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /netgames\.io/ })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /All games/ })).not.toBeInTheDocument();
     expect(screen.queryByText("Drawphone")).not.toBeInTheDocument();
   });
@@ -46,7 +47,7 @@ describe("/browse", () => {
     expect(wrapper.querySelector("svg.lucide-search")).not.toBeNull();
   });
 
-  it("lists classic games in their category boxes, without a jargon badge", async () => {
+  it("lists external games in their category boxes, without a jargon badge", async () => {
     renderAt("/browse");
     await userEvent.click(await screen.findByRole("button", { name: /Drawing/ }));
     expect(screen.getByText("Drawphone")).toBeInTheDocument();
@@ -65,12 +66,12 @@ describe("/browse", () => {
     expect(screen.queryByRole("link", { name: /My games/ })).not.toBeInTheDocument();
   });
 
-  it("filters games by category box and shows only the list (netgames.io)", async () => {
+  it("filters games by category box and shows only the list (Trivia)", async () => {
     renderAt("/browse");
-    await screen.findByRole("button", { name: /netgames\.io/ });
-    await userEvent.click(screen.getByRole("button", { name: /netgames\.io/ }));
+    await screen.findByRole("button", { name: /Trivia/ });
+    await userEvent.click(screen.getByRole("button", { name: /Trivia/ }));
 
-    expect(screen.getByText("Avalon")).toBeInTheDocument();
+    expect(screen.getByText("Protobowl")).toBeInTheDocument();
     expect(screen.queryByText("Drawphone")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /My games/ })).not.toBeInTheDocument();
     expect(screen.getByRole("button", { name: /back/i })).toBeInTheDocument();
@@ -78,13 +79,13 @@ describe("/browse", () => {
 
   it("returns to the category cards from an open category via the unified back (2t1.1)", async () => {
     renderAt("/browse");
-    await screen.findByRole("button", { name: /netgames\.io/ });
-    await userEvent.click(screen.getByRole("button", { name: /netgames\.io/ }));
-    expect(screen.getByText("Avalon")).toBeInTheDocument();
+    await screen.findByRole("button", { name: /Trivia/ });
+    await userEvent.click(screen.getByRole("button", { name: /Trivia/ }));
+    expect(screen.getByText("Protobowl")).toBeInTheDocument();
 
     await userEvent.click(screen.getByRole("button", { name: /back/i }));
     expect(screen.getByRole("link", { name: /My games/ })).toBeInTheDocument();
-    expect(screen.queryByText("Avalon")).not.toBeInTheDocument();
+    expect(screen.queryByText("Protobowl")).not.toBeInTheDocument();
   });
 
   it("navigates home from the top-level back button (2t1.1)", async () => {
@@ -123,7 +124,7 @@ describe("/browse", () => {
 });
 
 describe("/game/:gameId", () => {
-  it("shows the classic detail: author, players, categories, actions, description", async () => {
+  it("shows the external game detail: author, players, categories, actions, description", async () => {
     renderAt("/game/drawphone");
 
     expect(await screen.findByRole("heading", { name: "Drawphone" })).toBeInTheDocument();

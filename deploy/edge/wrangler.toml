@@ -1,4 +1,4 @@
-# Nova edge Worker: TURN mint, Classic CORS relay, signaling, tunnel, log.
+# Nova edge Worker: TURN mint, external-game room relay, signaling, tunnel, log.
 # This file is the single source of truth for the deployed Worker.
 # Deploy with `npm run edge:deploy`; see deploy/cloudflare.md.
 name = "rocketcrab-edge"
@@ -36,7 +36,7 @@ ORIGIN_ALLOWLIST = "https://rocketcrab.com,https://rocketcrab-nova.tannerkrewson
 # Per-IP, per-route limits. Counters are approximate and per Cloudflare
 # location: a backstop, not the abuse defence (that is the Origin gate plus
 # the per-socket budgets in signal.ts and tunnel.ts).
-# Strict: /turn and the Classic relay. One TURN mint per player per party.
+# Strict: /turn and the room relay. One TURN mint per player per party.
 [[ratelimits]]
 name = "RATE_LIMITER"
 namespace_id = "1001"

@@ -1,6 +1,11 @@
 import { Badge } from "../ui/Badge";
 import { BookOpen, X } from "lucide-react";
-import { BROWSE_CATEGORIES, findBrowseGame } from "../../lib/browse";
+import {
+  categoriesOf,
+  findCatalogGame,
+  playerCountText,
+  type CatalogGame,
+} from "../../lib/catalog";
 import { useSavedGame } from "../../lib/games/queries";
 import { usePartyEngine } from "../../lib/party/use-party";
 import { SaveSharedGame } from "./SaveSharedGame";
@@ -17,7 +22,7 @@ export interface PartyGameDetailsModalProps {
  * In-game details overlay: "About this game" shows the selected game's
  * metadata — title, description, and any how-to-play guide — without
  * leaving the party. Saved games come from the IndexedDB repository;
- * prebuilt games from the shared browse model (BrowseEntry).
+ * listed games from the catalog.
  *
  * The overlay lives inside PartyPlayShell, so the running game stays mounted
  * underneath it and the emergency controls remain outside the game frame.
@@ -26,7 +31,7 @@ export function PartyGameDetailsModal({ game, onClose }: PartyGameDetailsModalPr
   if (game === null) {
     return null;
   }
-  const prebuilt = findBrowseGame(game.gameId);
+  const prebuilt = findCatalogGame(game.gameId);
   return (
     <div
       className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
@@ -57,23 +62,23 @@ export function PartyGameDetailsModal({ game, onClose }: PartyGameDetailsModalPr
   );
 }
 
-function PrebuiltDetails({ game }: { game: NonNullable<ReturnType<typeof findBrowseGame>> }) {
+function PrebuiltDetails({ game }: { game: CatalogGame }) {
+  const categories = categoriesOf(game);
+  const players = playerCountText(game);
   return (
     <div className="flex flex-col gap-3">
-      {game.category.length > 0 ? (
+      {categories.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
-          {BROWSE_CATEGORIES.filter((category) => game.category.includes(category.match)).map(
-            (category) => (
-              <Badge key={category.id}>
-                <span aria-hidden="true">{category.emoji}</span> {category.label}
-              </Badge>
-            ),
-          )}
+          {categories.map((category) => (
+            <Badge key={category.id}>
+              <span aria-hidden="true">{category.emoji}</span> {category.label}
+            </Badge>
+          ))}
         </div>
       ) : null}
       <p className="whitespace-pre-line text-sm text-foreground/80">{game.description}</p>
-      {game.players !== undefined ? (
-        <p className="text-sm font-semibold text-foreground/60">{game.players} players</p>
+      {players !== undefined ? (
+        <p className="text-sm font-semibold text-foreground/60">{players} players</p>
       ) : null}
       {game.guideUrl !== undefined ? (
         <div className="flex flex-col gap-1">

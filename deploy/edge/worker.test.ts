@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { RELAY_ENDPOINT_KEYS } from "../../apps/nova/src/lib/classic/relay";
+import { RELAY_ENDPOINT_KEYS } from "../../apps/nova/src/lib/catalog/relay";
 import { RELAY_ENDPOINTS } from "./relay";
 import { MINT_TTL_SECONDS, dropPort53, isPort53IceUrl } from "./turn";
 import edge, { type EdgeEnv, parseAllowlist } from "./worker";
@@ -84,8 +84,8 @@ describe("gate", () => {
     };
     const fetchMock = mockFetch(new Response("{}"));
     const turn = await call("/turn", {}, { ...TURN_ENV, RATE_LIMITER: env.RATE_LIMITER });
-    const classic = await relay({ endpoint: "spyfall-new" }, env);
-    for (const response of [turn, classic]) {
+    const roomRelay = await relay({ endpoint: "spyfall-new" }, env);
+    for (const response of [turn, roomRelay]) {
       expect(response.status).toBe(429);
       expect(response.headers.get("Retry-After")).toBe("60");
       expect(response.headers.get("Access-Control-Allow-Origin")).toBe(ORIGIN);
@@ -130,7 +130,7 @@ describe("gate", () => {
   });
 });
 
-describe("Classic relay", () => {
+describe("external-game room relay", () => {
   it("matches the client's endpoint list", () => {
     expect(Object.keys(RELAY_ENDPOINTS).sort()).toEqual([...RELAY_ENDPOINT_KEYS].sort());
   });

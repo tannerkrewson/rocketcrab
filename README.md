@@ -28,7 +28,7 @@ install tools, understand code, deploy a website, or create a repository.
   origins; there is no room server, database, or game-state storage on the
   server. One Cloudflare edge Worker, which is not deployed yet
   (`deploy/cloudflare.md`), does the server-side work: it mints optional TURN
-  credentials (`/turn`), relays Classic room creation, carries WebRTC
+  credentials (`/turn`), relays external-game room creation, carries WebRTC
   signaling and the encrypted fallback tunnel through two Durable Object
   classes, and accepts privacy-limited connection statistics (`/log`). The
   origins below are placeholders; the beta origins are in `deploy/origins.json`.
@@ -106,7 +106,7 @@ canonical index or an ADR:
 - `docs/testing/` — milestone findings and checklists, each linked from its
   owning ADR (e.g. the S4 vertical slice from ADR-0006).
 - `deploy/cloudflare.md` — runbook and live state for the one Cloudflare
-  edge Worker (signaling, fallback tunnel, TURN mint, Classic relay, and
+  edge Worker (signaling, fallback tunnel, TURN mint, external-game room relay, and
   connection statistics).
 
 ## Getting started

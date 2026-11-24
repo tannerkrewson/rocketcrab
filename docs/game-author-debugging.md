@@ -59,7 +59,7 @@ version even when the game ID is unchanged.
   authority when the current authority is backgrounded or disconnects; games
   should not depend on the creator remaining authoritative.
 - **In-party "Logs"** — open **Menu → Logs** in the play shell to see your own
-  game's console output (Nova-mode games only; Classic games run in their own
+  game's console output (Nova games only; external games run in their own
   frame). **Connection diagnostics** is in the party lobby, not the play shell.
 
 ## Connection diagnostics (parties)

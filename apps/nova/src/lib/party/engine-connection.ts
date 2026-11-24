@@ -129,7 +129,7 @@ export class PartyConnection {
     this.state.sourceApiVersions.clear();
     this.state.runtimeLogs = [];
     this.state.game = null;
-    this.state.classic = null;
+    this.state.external = null;
     this.state.transfers.clear();
     this.state.verifiedSha256.clear();
     this.state.selfVerified = false;
@@ -414,7 +414,7 @@ export class PartyConnection {
             `Could not ask the party for the game: ${errorMessage(error)}`,
           ),
         );
-      this.services().game.askForClassicRoom();
+      this.services().game.askForExternalRoom();
     }
   }
 
