@@ -193,7 +193,7 @@ green.
       leftover "state mode"/"state-mode" wording in comments.
       Evidence: `011f2a0`, `npm run check` passed (1,269 tests) and Chromium
       passed 31 of 31.
-- [ ] **Rewrite the party engine as an explicit state machine.** Today seven
+- [x] **Rewrite the party engine as an explicit state machine.** Today seven
       collaborators (setup, connection, game, runtime, source, snapshot,
       kinds) call each other through `services()` and mutate one
       `PartyEngineContext` with dozens of fields; readiness alone spans
@@ -206,6 +206,13 @@ green.
       (`handleCoordinatorEvent`). Keep `PartyEngineState` and the
       `engine.test.ts` behavior as the contract; run the full browser suite,
       including WebKit, before ticking.
+      Evidence: `56d8df5`, `npm run check` passed (1,269 tests, including 116 engine
+      tests) with Node 24 and one Vitest worker after timing failures on earlier
+      runs. One engine owns effects, and the model controls phase, source,
+      registration, and start delivery. Tests use a typed driver. The full
+      Podman suite passed Chromium 31/31, WebKit 31/31, and Firefox 30/31.
+      The Firefox tunnel-count assertion also failed on the pre-refactor
+      commit in Podman and passed on a native Firefox retry of this step.
 - [ ] **Split the two largest API files.** `packages/nova-api/src/session.ts`
       (~1,750 lines) and `state-engine.ts` (~2,200) along their existing
       sections: lifecycle, authority election, snapshots and deltas, ticks,
