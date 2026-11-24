@@ -1997,6 +1997,51 @@ describe("party engine — external games, kick, and reload", () => {
     await settle(world);
   });
 
+  it("replaces a running game and starts the next one for everyone", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    const invite = await runCreate(a, world);
+    await registerLocalGame(a, world);
+    const { join, settled } = startJoin(b, world, invite);
+    await settled;
+    await join;
+    await settle(world);
+    await registerLocalGame(b, world);
+    a.engine.startGame();
+    await settle(world);
+
+    const states = () => [a.engine.getState(), b.engine.getState()];
+    expect(states().map((state) => state.phase)).toEqual(["playing", "playing"]);
+
+    await a.engine.selectGame({ kind: "external", gameId: "protobowl" });
+    await settle(world);
+    for (const state of states()) {
+      expect(state.phase).toBe("playing");
+      expect(state.game).toMatchObject({ kind: "external", gameId: "protobowl" });
+      expect(state.switchingGame).toBe(false);
+    }
+
+    const next = { ...GAME, gameId: "game_next", title: "Next Game", source: "<html>next</html>" };
+    await a.engine.selectGame(next);
+    await settle(world);
+    for (const state of states()) {
+      expect(state.switchingGame).toBe(true);
+      expect(state.game?.gameId).toBe(next.gameId);
+    }
+    await registerLocalGame(a, world);
+    expect(a.engine.getState().switchingGame).toBe(true);
+    await registerLocalGame(b, world);
+    await settle(world);
+    for (const state of states()) {
+      expect(state.phase).toBe("playing");
+      expect(state.game?.gameId).toBe(next.gameId);
+      expect(state.switchingGame).toBe(false);
+    }
+    await a.engine.leaveParty();
+    await b.engine.leaveParty();
+  });
+
   it("kicks a member: the kicked member sees a removed state and can dismiss it", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");

@@ -1,5 +1,6 @@
 import { Badge } from "../ui/Badge";
-import { BookOpen, X } from "lucide-react";
+import { useState } from "react";
+import { BookOpen, Gamepad2 } from "lucide-react";
 import {
   categoriesOf,
   findCatalogGame,
@@ -8,57 +9,78 @@ import {
 } from "../../lib/catalog";
 import { useSavedGame } from "../../lib/games/queries";
 import { usePartyEngine } from "../../lib/party/use-party";
+import { ScreenshotCarousel } from "../games/ScreenshotCarousel";
 import { SaveSharedGame } from "./SaveSharedGame";
 import { Button } from "../ui/Button";
 import { LoadingState } from "../ui/LoadingState";
+import { Dialog } from "../ui/Dialog";
+import { toast } from "../../lib/toast";
+import { errorMessage } from "../../lib/party/engine-utils";
 
 export interface PartyGameDetailsModalProps {
   /** The game currently selected for the party (saved or prebuilt). */
   readonly game: { gameId: string; title: string } | null;
   readonly onClose: () => void;
+  readonly onSwitch?: () => Promise<void>;
 }
 
-/**
- * In-game details overlay: "About this game" shows the selected game's
- * metadata — title, description, and any how-to-play guide — without
- * leaving the party. Saved games come from the IndexedDB repository;
- * listed games from the catalog.
- *
- * The overlay lives inside PartyPlayShell, so the running game stays mounted
- * underneath it and the emergency controls remain outside the game frame.
- */
-export function PartyGameDetailsModal({ game, onClose }: PartyGameDetailsModalProps) {
-  if (game === null) {
-    return null;
-  }
+/** Game info stays over the play shell so browsing never unmounts the frame. */
+export function PartyGameDetailsModal({ game, onClose, onSwitch }: PartyGameDetailsModalProps) {
+  const [confirming, setConfirming] = useState(false);
+  const [switching, setSwitching] = useState(false);
+  if (game === null) return null;
   const prebuilt = findCatalogGame(game.gameId);
+
+  const confirmSwitch = async () => {
+    if (onSwitch === undefined || switching) return;
+    setSwitching(true);
+    try {
+      await onSwitch();
+    } catch (error) {
+      toast.danger(`Couldn't switch games: ${errorMessage(error)}`);
+      setSwitching(false);
+    }
+  };
+
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label={`About ${game.title}`}
+    <Dialog
+      open
+      title={confirming ? `Switch to ${game.title}?` : `About ${game.title}`}
+      onClose={() => {
+        if (switching) return;
+        if (confirming) setConfirming(false);
+        else onClose();
+      }}
+      className="sm:max-w-lg"
     >
-      <div className="flex max-h-[80vh] w-full max-w-md flex-col gap-4 overflow-y-auto rounded-2xl bg-overlay p-5 shadow-overlay">
-        <div className="flex items-start justify-between gap-2">
-          <h2 className="text-xl font-black">{game.title}</h2>
-          <Button
-            variant="default"
-            soft
-            size="md"
-            onClick={onClose}
-            aria-label="Close game details"
-          >
-            <X className="h-4 w-4" aria-hidden="true" />
-          </Button>
+      {confirming ? (
+        <div className="flex flex-col gap-4">
+          <p>This ends the current game for everyone and starts {game.title}.</p>
+          <div className="button-row self-end">
+            <Button variant="tertiary" disabled={switching} onPress={() => setConfirming(false)}>
+              Cancel
+            </Button>
+            <Button variant="primary" disabled={switching} onPress={() => void confirmSwitch()}>
+              {switching ? "Switching games…" : "Switch game"}
+            </Button>
+          </div>
         </div>
-        {prebuilt !== undefined ? (
-          <PrebuiltDetails game={prebuilt} />
-        ) : (
-          <SavedGameDetails gameId={game.gameId} />
-        )}
-      </div>
-    </div>
+      ) : (
+        <div className="flex flex-col gap-4">
+          {prebuilt !== undefined ? (
+            <PrebuiltDetails game={prebuilt} />
+          ) : (
+            <SavedGameDetails gameId={game.gameId} />
+          )}
+          {onSwitch !== undefined ? (
+            <Button variant="primary" className="self-end" onPress={() => setConfirming(true)}>
+              <Gamepad2 className="size-4" aria-hidden="true" />
+              Switch game
+            </Button>
+          ) : null}
+        </div>
+      )}
+    </Dialog>
   );
 }
 
@@ -67,6 +89,7 @@ function PrebuiltDetails({ game }: { game: CatalogGame }) {
   const players = playerCountText(game);
   return (
     <div className="flex flex-col gap-3">
+      <p className="text-sm text-foreground/60">by {game.author}</p>
       {categories.length > 0 ? (
         <div className="flex flex-wrap gap-1.5">
           {categories.map((category) => (
@@ -75,6 +98,9 @@ function PrebuiltDetails({ game }: { game: CatalogGame }) {
             </Badge>
           ))}
         </div>
+      ) : null}
+      {game.pictures && game.pictures.length > 0 ? (
+        <ScreenshotCarousel images={game.pictures} gameName={game.name} />
       ) : null}
       <p className="whitespace-pre-line text-sm text-foreground/80">{game.description}</p>
       {players !== undefined ? (

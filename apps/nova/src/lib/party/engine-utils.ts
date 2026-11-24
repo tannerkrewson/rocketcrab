@@ -61,6 +61,10 @@ export function defaultBaseUrl(): string {
 
 export function isInPartyPhase(phase: PartyPhase): boolean {
   return (
-    phase === "lobby" || phase === "starting" || phase === "playing" || phase === "reconnecting"
+    phase === "lobby" ||
+    phase === "starting" ||
+    phase === "switching" ||
+    phase === "playing" ||
+    phase === "reconnecting"
   );
 }

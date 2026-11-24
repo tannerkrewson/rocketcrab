@@ -85,8 +85,7 @@ async function renderShell(
     onReloadMyGame: handlers.onReloadMyGame ?? vi.fn(),
     onReloadAllGames: handlers.onReloadAllGames ?? vi.fn(),
     onKickMember: handlers.onKickMember ?? vi.fn(),
-    onPickGame: handlers.onPickGame ?? vi.fn(),
-    onPickPrebuilt: handlers.onPickPrebuilt ?? vi.fn(),
+    onSwitchGame: handlers.onSwitchGame ?? vi.fn(async () => {}),
   };
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false } },
@@ -255,10 +254,10 @@ describe("PartyPlayShell in-game chrome", () => {
     expect(screen.queryByRole("dialog", { name: "Players" })).not.toBeInTheDocument();
   });
 
-  it("hides kick and Browse games from joiners", async () => {
+  it("lets joiners browse and hides kick controls", async () => {
     await renderShell(makeState({ role: "joiner", amHost: false }));
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
-    expect(screen.queryByRole("menuitem", { name: /browse games/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("menuitem", { name: /browse games/i })).toBeInTheDocument();
     await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
     const players = screen.getByRole("dialog", { name: "Players" });
     expect(within(players).queryByRole("button", { name: /kick/i })).not.toBeInTheDocument();
@@ -288,33 +287,42 @@ describe("PartyPlayShell in-game chrome", () => {
     expect(screen.queryByRole("dialog", { name: "Pick a game" })).not.toBeInTheDocument();
   });
 
-  it("browses games from the menu and picks from the shared browse UI", async () => {
-    const onPickGame = vi.fn();
-    const onPickPrebuilt = vi.fn();
-    await renderShell(makeState(), { onPickGame, onPickPrebuilt });
+  it("opens a game's details and switches only after the host confirms", async () => {
+    const onSwitchGame = vi.fn(async () => {});
+    await renderShell(makeState(), { onSwitchGame });
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     await userEvent.click(screen.getByRole("menuitem", { name: /browse games/i }));
     const browse = screen.getByRole("dialog", { name: "Pick a game" });
-    expect(browse).toHaveClass("max-h-[calc(100%-1.5rem)]");
-    expect(browse).toHaveClass("w-[min(42rem,calc(100%-1.5rem))]");
-    expect(screen.getByTestId("browse-panel-backdrop")).toBeInTheDocument();
-    expect(screen.getByTestId("game-frame")).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /menu/i })).toBeInTheDocument();
-    expect(within(browse).getByRole("searchbox", { name: "Search games" })).toBeInTheDocument();
     await userEvent.click(within(browse).getByRole("button", { name: /Trivia/ }));
-    const protobowl = within(browse).getByRole("button", { name: /Protobowl/ });
-    await userEvent.click(protobowl);
-    expect(onPickPrebuilt).toHaveBeenCalledWith(
-      expect.objectContaining({
-        id: "protobowl",
-        play: expect.objectContaining({ kind: "external" }),
+    await userEvent.click(within(browse).getByRole("button", { name: /Protobowl/ }));
+
+    const details = screen.getByRole("dialog", { name: "About Protobowl" });
+    expect(onSwitchGame).not.toHaveBeenCalled();
+    await userEvent.click(within(details).getByRole("button", { name: "Switch game" }));
+    const confirmation = screen.getByRole("dialog", { name: "Switch to Protobowl?" });
+    expect(onSwitchGame).not.toHaveBeenCalled();
+    await userEvent.click(within(confirmation).getByRole("button", { name: "Cancel" }));
+    expect(screen.getByRole("dialog", { name: "About Protobowl" })).toBeInTheDocument();
+    expect(onSwitchGame).not.toHaveBeenCalled();
+
+    await userEvent.click(within(details).getByRole("button", { name: "Switch game" }));
+    await userEvent.click(
+      within(screen.getByRole("dialog", { name: "Switch to Protobowl?" })).getByRole("button", {
+        name: "Switch game",
       }),
     );
-    const back = within(browse).getByRole("button", { name: "Back" });
-    await userEvent.click(back);
-    expect(within(browse).getByRole("region", { name: "Categories" })).toBeInTheDocument();
-    await userEvent.click(back);
-    expect(screen.queryByRole("dialog", { name: "Pick a game" })).not.toBeInTheDocument();
+    expect(onSwitchGame).toHaveBeenCalledWith("protobowl");
+  });
+
+  it("lets a guest open a game from the in-game library", async () => {
+    await renderShell(makeState({ amHost: false }));
+    await userEvent.click(screen.getByRole("button", { name: /menu/i }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /browse games/i }));
+    const browse = screen.getByRole("dialog", { name: "Pick a game" });
+    await userEvent.click(within(browse).getByRole("button", { name: /Trivia/ }));
+    await userEvent.click(within(browse).getByRole("button", { name: /Protobowl/ }));
+    const details = screen.getByRole("dialog", { name: "About Protobowl" });
+    expect(within(details).queryByRole("button", { name: "Switch game" })).not.toBeInTheDocument();
   });
 
   it("closes the in-game browse panel from the browser's unified back", async () => {
@@ -334,7 +342,7 @@ describe("PartyPlayShell in-game chrome", () => {
     const dialog = screen.getByRole("dialog", { name: "About Drawphone" });
     expect(within(dialog).getByText(/In Drawphone, there are no winners/)).toBeInTheDocument();
     expect(screen.getByTestId("game-frame")).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole("button", { name: /close game details/i }));
+    await userEvent.click(within(dialog).getByRole("button", { name: /close dialog/i }));
     expect(screen.queryByRole("dialog", { name: "About Drawphone" })).not.toBeInTheDocument();
   });
 

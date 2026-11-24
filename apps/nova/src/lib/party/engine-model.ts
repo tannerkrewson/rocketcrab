@@ -149,6 +149,11 @@ export class PartyEngineModel {
     this.verifiedHashes.clear();
   }
 
+  beginSwitch(): void {
+    this.gameState.run = { status: "waiting" };
+    this.location = { phase: "switching" };
+  }
+
   requestStart(): void {
     this.gameState.run = { status: "starting" };
     this.location = { phase: "starting" };

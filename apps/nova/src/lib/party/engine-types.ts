@@ -85,6 +85,7 @@ export type PartyPhase =
   | "joining"
   | "lobby"
   | "starting"
+  | "switching"
   | "playing"
   | "reconnecting"
   | "removed"
@@ -124,6 +125,7 @@ export type PartyGameSelection =
 
 export interface PartyEngineState {
   readonly phase: PartyPhase;
+  readonly switchingGame?: boolean;
   /** Human-readable progress for the creating/joining phases. */
   readonly phaseDetail: string | null;
   readonly joinStage: JoinStage;

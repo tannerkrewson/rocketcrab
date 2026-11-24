@@ -25,13 +25,8 @@ import { sharedGameStatus } from "../../lib/games/shared-copies";
 import type { SharedPartyGame } from "../../lib/party/engine";
 
 export interface GameBrowserProps {
-  /** Pick mode selects directly instead of opening details; used by the in-game browse panel. */
-  onPick?: (entry: CatalogGame) => void;
-  /**
-   * Pick mode: clicking a saved game in the "My games" category calls this
-   * with the game id instead of linking to the game detail page.
-   */
-  onPickSaved?: (gameId: string) => void;
+  /** Open details inside the play shell instead of navigating away. */
+  onShowDetails?: (game: { gameId: string; title: string }) => void;
   /** Tighter vertical rhythm for embedded use (lobby / in-game panels). */
   compact?: boolean;
   /**
@@ -69,12 +64,12 @@ function matchesQuery(game: CatalogGame, query: string): boolean {
 /** onOpen records the category before details navigation so Back can restore it. */
 function GameCard({
   game,
-  onPick,
+  onShowDetails,
   onOpen,
   detailOrigin,
 }: {
   game: CatalogGame;
-  onPick?: (entry: CatalogGame) => void;
+  onShowDetails?: GameBrowserProps["onShowDetails"];
   onOpen?: () => void;
   detailOrigin?: "party-browse";
 }) {
@@ -91,12 +86,12 @@ function GameCard({
     </>
   );
 
-  if (onPick !== undefined) {
+  if (onShowDetails !== undefined) {
     return (
       <button
         key={game.id}
         type="button"
-        onClick={() => onPick(game)}
+        onClick={() => onShowDetails({ gameId: game.id, title: game.name })}
         className="group flex w-full items-center justify-between gap-3 glass rounded-2xl px-4 py-3 text-left transition-colors hover:bg-surface-tertiary"
       >
         {body}
@@ -119,12 +114,12 @@ function GameCard({
 
 function SavedGameRow({
   game,
-  onPickSaved,
+  onShowDetails,
   onOpen,
   detailOrigin,
 }: {
   game: SavedGame;
-  onPickSaved?: (gameId: string) => void;
+  onShowDetails?: GameBrowserProps["onShowDetails"];
   onOpen?: () => void;
   detailOrigin?: "party-browse";
 }) {
@@ -140,12 +135,12 @@ function SavedGameRow({
     </>
   );
 
-  if (onPickSaved !== undefined) {
+  if (onShowDetails !== undefined) {
     return (
       <button
         key={game.id}
         type="button"
-        onClick={() => onPickSaved(game.id)}
+        onClick={() => onShowDetails({ gameId: game.id, title: game.title })}
         className="group flex w-full items-center justify-between gap-3 glass rounded-2xl px-4 py-3 text-left transition-colors hover:bg-surface-tertiary"
       >
         {body}
@@ -220,8 +215,7 @@ function CategoryCard({
  * so Back restores the same list even when the lobby browser remounts.
  */
 export function GameBrowser({
-  onPick,
-  onPickSaved,
+  onShowDetails,
   compact = false,
   onBack,
   initialView,
@@ -258,10 +252,10 @@ export function GameBrowser({
     return savedGames.filter((game) => game.title.toLowerCase().includes(needle));
   }, [savedGames, query]);
 
-  // Friends' Nova games shared in this party (lobby browsing only).
-  const browsingLobby = inParty && compact && onPick === undefined && onPickSaved === undefined;
+  // Friends' Nova games shared in this party.
+  const browsingParty = inParty && compact;
   const friendsGames = useMemo(() => {
-    if (!browsingLobby) return [];
+    if (!browsingParty) return [];
     const needle = query.toLowerCase();
     return partyState.sharedGames.filter(
       (game) =>
@@ -269,7 +263,7 @@ export function GameBrowser({
         !savedGames.some((saved) => saved.id === game.gameId) &&
         game.title.toLowerCase().includes(needle),
     );
-  }, [browsingLobby, partyState.sharedGames, savedGames, query]);
+  }, [browsingParty, partyState.sharedGames, savedGames, query]);
 
   const showingList = view !== null || query !== "";
   const savedCount = savedGamesQuery.isLoading ? null : savedGames.length;
@@ -324,7 +318,7 @@ export function GameBrowser({
           title={
             showingList
               ? "Back to categories"
-              : onPick !== undefined || onPickSaved !== undefined
+              : onShowDetails !== undefined
                 ? "Back to the game"
                 : compact
                   ? "Back to lobby"
@@ -388,6 +382,7 @@ export function GameBrowser({
             <FriendsGamesList
               games={friendsGames}
               savedGames={savedGames}
+              onShowDetails={onShowDetails}
               onOpen={recordPosition}
             />
           ) : view === "mine" ? (
@@ -401,7 +396,7 @@ export function GameBrowser({
                   : "Something went wrong."
               }
               games={savedMatches}
-              onPickSaved={onPickSaved}
+              onShowDetails={onShowDetails}
               onOpen={recordPosition}
               inParty={inParty}
               onExitRequest={requestExit}
@@ -416,7 +411,7 @@ export function GameBrowser({
               <GameCard
                 key={game.id}
                 game={game}
-                onPick={onPick}
+                onShowDetails={onShowDetails}
                 onOpen={recordPosition}
                 detailOrigin={compact ? "party-browse" : undefined}
               />
@@ -459,7 +454,7 @@ function SavedGamesList({
   isError,
   errorMessage,
   games,
-  onPickSaved,
+  onShowDetails,
   onOpen,
   inParty,
   onExitRequest,
@@ -470,7 +465,7 @@ function SavedGamesList({
   isError: boolean;
   errorMessage: string;
   games: readonly SavedGame[];
-  onPickSaved?: (gameId: string) => void;
+  onShowDetails?: GameBrowserProps["onShowDetails"];
   onOpen: () => void;
   inParty?: boolean;
   onExitRequest?: () => void;
@@ -508,7 +503,7 @@ function SavedGamesList({
         <li key={game.id}>
           <SavedGameRow
             game={game}
-            onPickSaved={onPickSaved}
+            onShowDetails={onShowDetails}
             onOpen={onOpen}
             detailOrigin={detailOrigin}
           />
@@ -523,10 +518,12 @@ function FriendsGamesList({
   games,
   savedGames,
   onOpen,
+  onShowDetails,
 }: {
   games: readonly SharedPartyGame[];
   savedGames: readonly SavedGame[];
   onOpen: () => void;
+  onShowDetails?: GameBrowserProps["onShowDetails"];
 }) {
   if (games.length === 0) {
     return (
@@ -539,30 +536,43 @@ function FriendsGamesList({
     <ul className="flex flex-col gap-2">
       {games.map((game) => {
         const status = sharedGameStatus(savedGames, game).kind;
+        const row = (
+          <>
+            <span className="flex min-w-0 flex-col gap-1">
+              <span className="truncate font-black">{game.title}</span>
+              <span className="text-sm font-medium text-foreground/50">
+                {game.sharedBy !== null ? `shared by ${game.sharedBy}` : "Shared in this party"}
+              </span>
+            </span>
+            <span className="flex shrink-0 items-center gap-2">
+              {status === "saved" ? <Badge>Saved</Badge> : null}
+              {status === "update" ? <Badge color="accent">Update</Badge> : null}
+              <ArrowRight
+                className="h-5 w-5 text-foreground/40 transition-transform group-hover:translate-x-1 group-hover:text-primary"
+                aria-hidden="true"
+              />
+            </span>
+          </>
+        );
+        const className =
+          "group flex w-full items-center justify-between gap-3 glass rounded-2xl px-4 py-3 text-left transition-colors hover:bg-surface-tertiary";
         return (
           <li key={game.gameId}>
-            <Link
-              to="/game/$gameId"
-              params={{ gameId: game.gameId }}
-              search={{ from: "party-browse" }}
-              onClick={onOpen}
-              className="group flex items-center justify-between gap-3 glass rounded-2xl px-4 py-3 transition-colors hover:bg-surface-tertiary"
-            >
-              <span className="flex min-w-0 flex-col gap-1">
-                <span className="truncate font-black">{game.title}</span>
-                <span className="text-sm font-medium text-foreground/50">
-                  {game.sharedBy !== null ? `shared by ${game.sharedBy}` : "Shared in this party"}
-                </span>
-              </span>
-              <span className="flex shrink-0 items-center gap-2">
-                {status === "saved" ? <Badge>Saved</Badge> : null}
-                {status === "update" ? <Badge color="accent">Update</Badge> : null}
-                <ArrowRight
-                  className="h-5 w-5 text-foreground/40 transition-transform group-hover:translate-x-1 group-hover:text-primary"
-                  aria-hidden="true"
-                />
-              </span>
-            </Link>
+            {onShowDetails ? (
+              <button type="button" className={className} onClick={() => onShowDetails(game)}>
+                {row}
+              </button>
+            ) : (
+              <Link
+                to="/game/$gameId"
+                params={{ gameId: game.gameId }}
+                search={{ from: "party-browse" }}
+                onClick={onOpen}
+                className={className}
+              >
+                {row}
+              </Link>
+            )}
           </li>
         );
       })}

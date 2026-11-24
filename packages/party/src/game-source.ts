@@ -116,6 +116,7 @@ export interface GameSourceCoordinatorOptions {
   readonly transport: NovaTransport;
   readonly supportedApiVersions?: readonly number[];
   readonly compatibilityCheck?: GameSourceCompatibilityCheck;
+  readonly acceptMetadata?: (metadata: GameSourceMetadataInfo, from: MemberId) => boolean;
   readonly onEvent?: (event: GameSourceTransferEvent) => void;
 }
 interface RegisteredSource {
@@ -138,6 +139,7 @@ interface ReceiveTransfer {
 export class GameSourceCoordinator {
   private readonly transport: NovaTransport;
   private readonly compatibilityCheck: GameSourceCompatibilityCheck;
+  private readonly acceptMetadata: NonNullable<GameSourceCoordinatorOptions["acceptMetadata"]>;
   private readonly listeners = new Set<(event: GameSourceTransferEvent) => void>();
   private readonly sources = new Map<GameId, RegisteredSource>();
   private readonly offered = new Map<ConnectionId, GameSourceMetadataInfo>();
@@ -156,6 +158,7 @@ export class GameSourceCoordinator {
 
   constructor(options: GameSourceCoordinatorOptions) {
     this.transport = options.transport;
+    this.acceptMetadata = options.acceptMetadata ?? (() => true);
     this.compatibilityCheck =
       options.compatibilityCheck ??
       ((metadata) =>
@@ -265,6 +268,12 @@ export class GameSourceCoordinator {
     await this.announce();
     return metadata;
   }
+  /** Stop advertising a Nova source when the party picks an external game. */
+  clearSelection(): void {
+    this.currentGameId = null;
+    this.cancelAll("selection_changed");
+  }
+
   hasSource(gameId: GameId): boolean {
     return this.sources.has(gameId);
   }
@@ -373,6 +382,7 @@ export class GameSourceCoordinator {
     }
     if (control.type !== "game.source.metadata") return;
     const metadata = this.metadata(control);
+    if (!this.acceptMetadata(metadata, message.senderMemberId)) return;
     if (metadata.sourceSizeBytes > htmlSourceBytes)
       throw new GameSourceError("too_large", "Announced source exceeds the hard limit.");
     // Remember matching announcements even while compatibility is pending. Do

@@ -1,4 +1,3 @@
-import { useRef } from "react";
 import { ArrowLeft, PartyPopper } from "lucide-react";
 import { Alert } from "@heroui/react";
 import { toast } from "../../lib/toast";
@@ -7,7 +6,7 @@ import { cn } from "../../lib/cn";
 import { usePartyEngine } from "../../lib/party/use-party";
 import type { PartyEngineState } from "../../lib/party/engine";
 import { SIGNALING_OUTAGE_MESSAGE } from "../../lib/party/signaling-outage";
-import type { CatalogGame } from "../../lib/catalog";
+import { findCatalogGame } from "../../lib/catalog";
 import { selectCatalogGame } from "../../lib/catalog/select";
 import { gameRepository } from "../../lib/games/instance";
 import { Button } from "../ui/Button";
@@ -21,10 +20,6 @@ import { PartyReconnectScreen } from "./PartyReconnectScreen";
 import { PartyShellHeader } from "./PartyShellHeader";
 import { PeerLinkAlert } from "./PeerLinkAlert";
 
-function errorMessage(error: unknown): string {
-  return error instanceof Error ? error.message : "Something went wrong.";
-}
-
 /**
  * Party lifecycle view. The lobby boots the runtime invisibly for readiness;
  * the playing view places controls above the game, outside its frame.
@@ -37,13 +32,13 @@ export function PartyExperience({
   initialBrowse?: boolean;
 }) {
   const { state, engine, bindContainer } = usePartyEngine();
-  const picking = useRef(false);
 
   const handleLeave = async () => {
     // Failed setup has no party to leave, so do not toast that the player left.
     const wasInParty =
       state.phase === "lobby" ||
       state.phase === "starting" ||
+      state.phase === "switching" ||
       state.phase === "playing" ||
       state.phase === "reconnecting";
     await engine.leaveParty();
@@ -53,36 +48,28 @@ export function PartyExperience({
     onLeft?.();
   };
 
-  const handlePickGame = async (gameId: string) => {
-    try {
-      const game = await gameRepository.read(gameId);
-      await engine.selectGame({
-        gameId: game.id,
-        title: game.title,
-        source: game.html,
-        apiVersion: PROTOCOL_VERSION,
-      });
-    } catch (error) {
-      toast.danger(`Couldn't load that game: ${errorMessage(error)}`);
+  const handleSwitchGame = async (gameId: string) => {
+    const catalogGame = findCatalogGame(gameId);
+    if (catalogGame !== undefined) {
+      await selectCatalogGame(engine, catalogGame);
+      return;
     }
-  };
-
-  const handlePickPrebuilt = async (entry: CatalogGame) => {
-    try {
-      await selectCatalogGame(engine, entry);
-    } catch (error) {
-      toast.danger(`Couldn't load that game: ${errorMessage(error)}`);
-    }
-  };
-
-  const handlePickFromInGame = async (pick: () => Promise<void>) => {
-    if (picking.current) return;
-    picking.current = true;
-    try {
-      await pick();
-    } finally {
-      picking.current = false;
-    }
+    const saved = await gameRepository.read(gameId).catch(() => {
+      const shared = engine.sharedGameSource(gameId);
+      if (shared === undefined) throw new Error("The game isn't on this device.");
+      return {
+        id: shared.gameId,
+        title: shared.title,
+        html: shared.source,
+        apiVersion: shared.apiVersion,
+      };
+    });
+    await engine.selectGame({
+      gameId: saved.id,
+      title: saved.title,
+      source: saved.html,
+      apiVersion: saved.apiVersion ?? PROTOCOL_VERSION,
+    });
   };
 
   const handleKickMember = (memberId: string) => {
@@ -144,7 +131,7 @@ export function PartyExperience({
       />
     );
 
-  if (playing) {
+  if (playing || state.switchingGame) {
     return (
       <PartyPlayShell
         state={state}
@@ -153,14 +140,20 @@ export function PartyExperience({
         onReloadMyGame={handleReloadMyGame}
         onReloadAllGames={handleReloadAllGames}
         onKickMember={handleKickMember}
-        onPickGame={(gameId) => void handlePickFromInGame(() => handlePickGame(gameId))}
-        onPickPrebuilt={(entry) => void handlePickFromInGame(() => handlePickPrebuilt(entry))}
+        onSwitchGame={handleSwitchGame}
         onClearLogs={() => engine.clearRuntimeLogs()}
       >
         <div className="relative h-full w-full">
           {state.signalingOutage ? <SignalingOutageAlert /> : null}
           {peerLinkAlert}
           {frameArea}
+          {state.switchingGame ? (
+            <div className="absolute inset-0 grid place-items-center bg-black">
+              <LoadingState
+                label={state.game ? "Loading " + state.game.title + "…" : "Switching games…"}
+              />
+            </div>
+          ) : null}
         </div>
       </PartyPlayShell>
     );
@@ -240,6 +233,7 @@ function renderPhase(
         />
       );
     case "playing":
+    case "switching":
       return null;
     case "reconnecting":
       return (

@@ -12,7 +12,6 @@ import {
 import { Badge } from "../ui/Badge";
 import { useEffect, useState, type ReactNode } from "react";
 import { toast } from "../../lib/toast";
-import type { CatalogGame } from "../../lib/catalog";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import { clearBrowseContext } from "../../lib/browse/back-context";
 import { cn } from "../../lib/cn";
@@ -33,9 +32,7 @@ export interface PartyPlayShellProps {
   onReloadAllGames: () => void;
   /** Host-only: remove a member after confirmation. */
   onKickMember: (memberId: string) => void;
-  onPickGame: (gameId: string) => void;
-  /** Pick a listed game for the party. */
-  onPickPrebuilt: (entry: CatalogGame) => void;
+  onSwitchGame: (gameId: string) => Promise<void>;
   onClearLogs?: () => void;
 }
 
@@ -44,8 +41,7 @@ type PlayShellPanel = "menu" | "players" | "browse" | "logs" | null;
 
 /**
  * In-game controls stay outside the game frame so game code cannot disable
- * emergency teardown. Overlays keep the game mounted beneath them. Only
- * the host may browse and replace the game, which ends it for everyone.
+ * emergency teardown. Everyone can browse while the game remains mounted.
  */
 export function PartyPlayShell({
   state,
@@ -54,20 +50,20 @@ export function PartyPlayShell({
   onReloadMyGame,
   onReloadAllGames,
   onKickMember,
-  onPickGame,
-  onPickPrebuilt,
+  onSwitchGame,
   onClearLogs,
 }: PartyPlayShellProps) {
   const [barHidden, setBarHidden] = useState(false);
   const [panel, setPanel] = useState<PlayShellPanel>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [confirmKickMemberId, setConfirmKickMemberId] = useState<string | null>(null);
+  const [libraryGame, setLibraryGame] = useState<{ gameId: string; title: string } | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [confirmReloadMine, setConfirmReloadMine] = useState(false);
   const [confirmReloadAll, setConfirmReloadAll] = useState(false);
 
   useEffect(() => {
-    if (panel === null) {
+    if (panel === null || libraryGame !== null) {
       return;
     }
     const onKeyDown = (event: KeyboardEvent) => {
@@ -77,7 +73,14 @@ export function PartyPlayShell({
     };
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [panel]);
+  }, [panel, libraryGame]);
+
+  useEffect(() => {
+    if (!state.switchingGame) return;
+    setPanel(null);
+    setLibraryGame(null);
+    setDetailsOpen(false);
+  }, [state.switchingGame]);
 
   const copyInvite = async () => {
     if (state.inviteUrl === null) return;
@@ -149,24 +152,21 @@ export function PartyPlayShell({
                   Players
                 </button>
               </li>
-              {/* Host only: replacing the game ends it for every player. */}
-              {state.amHost ? (
-                <li>
-                  <button
-                    type="button"
-                    role="menuitem"
-                    className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold hover:bg-surface-secondary"
-                    onClick={() => {
-                      // Always open at the top-level menu.
-                      clearBrowseContext();
-                      setPanel("browse");
-                    }}
-                  >
-                    <Gamepad2 className="h-4 w-4" aria-hidden="true" />
-                    Browse games
-                  </button>
-                </li>
-              ) : null}
+              <li>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold hover:bg-surface-secondary disabled:opacity-50"
+                  disabled={state.switchingGame}
+                  onClick={() => {
+                    clearBrowseContext();
+                    setPanel("browse");
+                  }}
+                >
+                  <Gamepad2 className="h-4 w-4" aria-hidden="true" />
+                  Browse games
+                </button>
+              </li>
               <li>
                 <button
                   type="button"
@@ -389,7 +389,7 @@ export function PartyPlayShell({
 
         {/* Bound the browser overlay so the running game stays mounted and
              emergency controls remain usable above it. */}
-        {panel === "browse" ? (
+        {panel === "browse" && !state.switchingGame ? (
           <>
             <div
               className="absolute inset-0 z-40"
@@ -408,8 +408,7 @@ export function PartyPlayShell({
               <div className="min-h-0 overflow-y-auto p-3 md:p-4">
                 <GameBrowser
                   compact
-                  onPick={onPickPrebuilt}
-                  onPickSaved={onPickGame}
+                  onShowDetails={setLibraryGame}
                   // Close the panel; fallback navigation to the current party route would be a no-op.
                   onBack={() => setPanel(null)}
                   inParty
@@ -431,6 +430,23 @@ export function PartyPlayShell({
         >
           <img src="/rocketcrab-logo-no-glow.svg" alt="" width={28} height={28} />
         </Button>
+      ) : null}
+
+      {libraryGame !== null && !state.switchingGame ? (
+        <PartyGameDetailsModal
+          key={libraryGame.gameId}
+          game={libraryGame}
+          onClose={() => setLibraryGame(null)}
+          onSwitch={
+            state.amHost && libraryGame.gameId !== state.game?.gameId
+              ? async () => {
+                  await onSwitchGame(libraryGame.gameId);
+                  setLibraryGame(null);
+                  setPanel(null);
+                }
+              : undefined
+          }
+        />
       ) : null}
 
       {detailsOpen ? (

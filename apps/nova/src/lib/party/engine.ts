@@ -511,6 +511,15 @@ export class PartyEngine {
     ];
     this.state.coordinator = new GameSourceCoordinator({
       transport: party.privateTransport,
+      acceptMetadata: (metadata, from) => {
+        const current = this.state.game;
+        // Peers can offer a cached copy, but only the host changes an active game.
+        return (
+          current === null ||
+          (current.kind === "nova" && current.gameId === metadata.gameId) ||
+          from === party.hostMemberId
+        );
+      },
     });
     this.state.unsubCoordinator = this.state.coordinator.subscribe((event) =>
       this.handleCoordinatorEvent(event),
@@ -738,6 +747,7 @@ export class PartyEngine {
       return;
     }
     this.state.leaving = true;
+    this.stopGameSwitch();
     if (!preserveSetup) {
       this.state.setupAbort?.abort();
       this.state.setupAbort = null;
@@ -1052,7 +1062,8 @@ export class PartyEngine {
       this.state.reconnectAttempts = 0;
       this.cancelReconnectRetry();
       // Followers receive start without setting session.isStarted().
-      this.state.returnToLobbyOrGame();
+      if (this.cancelGameSwitch !== null) this.state.transitionPhase({ phase: "switching" });
+      else this.state.returnToLobbyOrGame();
       this.emit();
       void this.state.coordinator
         ?.refresh()
@@ -1096,6 +1107,26 @@ export class PartyEngine {
   // Game and session lifecycle
 
   private startRetryRemainingMs = 0;
+  private cancelGameSwitch: (() => void) | null = null;
+
+  private beginGameSwitch(): void {
+    this.stopGameSwitch();
+    this.state.beginSwitch();
+    this.cancelGameSwitch = this.state.schedule(() => {
+      this.stopGameSwitch();
+      this.state.timeOutStart();
+      this.addNotice(
+        "warn",
+        "The new game took too long to start. Try starting it from the lobby.",
+      );
+      this.emit();
+    }, START_RETRY_TIMEOUT_MS);
+  }
+
+  private stopGameSwitch(): void {
+    this.cancelGameSwitch?.();
+    this.cancelGameSwitch = null;
+  }
 
   /** The host can pick a game in the lobby or replace a running game. */
   async selectGame(selection: PartyGameSelection): Promise<void> {
@@ -1108,16 +1139,25 @@ export class PartyEngine {
       await this.selectExternalGame(party, selection.gameId);
       return;
     }
-    if (this.state.phase === "playing") this.endGame("host_closed");
+    if (this.state.phase === "playing") this.beginGameSwitch();
     const { kind: _kind, ...input } = selection;
     this.state.selectGame({ kind: "nova", gameId: input.gameId, title: input.title });
     this.teardownRuntimeFrame();
     // Previous-game verification must not open the new game's start gate.
     this.state.resetSource();
-    await this.replaceGameSession(party);
-    if (this.state.party !== party) return;
-    this.emit();
-    await this.registerSource(input);
+    try {
+      await this.replaceGameSession(party);
+      if (this.state.party !== party) return;
+      this.emit();
+      await this.registerSource(input);
+    } catch (error) {
+      if (this.state.party === party && this.cancelGameSwitch !== null) {
+        this.stopGameSwitch();
+        this.state.timeOutStart();
+        this.emit();
+      }
+      throw error;
+    }
   }
 
   /** Create one external room and share it with all players. */
@@ -1125,16 +1165,18 @@ export class PartyEngine {
     const game = findExternalGame(gameId);
     if (game === undefined) throw new Error(`Unknown game "${gameId}".`);
 
+    const phase = this.state.phase;
     try {
       const room = await game.play.createRoom();
       if (this.state.party !== party || !party.amHost || this.state.leaving) return;
-      if (this.state.phase === "playing") this.endGame("host_closed");
-      if (this.state.phase !== "lobby") {
-        throw new Error("Wait for the party to return to the lobby, then try again.");
+      if (this.state.phase !== phase) {
+        throw new Error("The party changed while setting up the room. Try again.");
       }
       const announcement = { gameId, room, creatorMemberId: this.state.identity.memberId };
       await party.announceExternalRoom(announcement);
       if (this.state.party !== party || this.state.leaving) return;
+      const switching = this.state.phase === "playing";
+      if (switching) this.beginGameSwitch();
       this.state.selectGame({
         kind: "external",
         ...announcement,
@@ -1142,11 +1184,13 @@ export class PartyEngine {
         frameEpoch: 0,
         ...playerLimitsOf(game),
       });
+      this.state.coordinator?.clearSelection();
       this.state.resetSource();
+      this.teardownRuntimeFrame();
+      if (switching) await this.replaceGameSession(party);
+      if (this.state.party !== party || this.state.leaving) return;
       this.state.verifyLocalSource(null);
       this.state.registerFrame(this.state.frameTickRate);
-      // The UI embeds external games directly; do not keep a Nova runtime alongside them.
-      this.teardownRuntimeFrame();
       this.emit();
     } catch (error) {
       if (this.state.party !== party || this.state.leaving) return;
@@ -1253,6 +1297,7 @@ export class PartyEngine {
     }
     this.startRetryRemainingMs -= START_RETRY_INTERVAL_MS;
     if (this.startRetryRemainingMs <= 0) {
+      this.stopGameSwitch();
       this.state.timeOutStart();
       this.addNotice("warn", START_GIVE_UP_MESSAGE);
       this.emit();
@@ -1386,6 +1431,8 @@ export class PartyEngine {
           current.gameId !== event.gameId ||
           !sameRoom(current.room, event.room)
         ) {
+          const switching = this.state.phase === "playing";
+          if (switching) this.beginGameSwitch();
           this.state.selectGame({
             kind: "external",
             gameId: event.gameId,
@@ -1395,6 +1442,17 @@ export class PartyEngine {
             frameEpoch: 0,
             ...playerLimitsOf(game),
           });
+          this.state.coordinator?.clearSelection();
+          this.teardownRuntimeFrame();
+          if (switching && this.state.party !== null) {
+            void this.replaceGameSession(this.state.party).catch((error: unknown) => {
+              this.addNotice(
+                "error",
+                `The game session could not be configured: ${errorMessage(error)}`,
+              );
+              this.emit();
+            });
+          }
           this.state.resetSource();
           this.state.verifyLocalSource(null);
           this.state.registerFrame(this.state.frameTickRate);
@@ -1459,6 +1517,7 @@ export class PartyEngine {
         this.state.connectionState = "connected";
         break;
       case "start":
+        this.stopGameSwitch();
         this.stopStartRetry();
         // A late start supersedes the retry-timeout warning.
         this.state.notices = this.state.notices.filter(
@@ -1476,6 +1535,7 @@ export class PartyEngine {
         this.emit();
         break;
       case "end":
+        this.stopGameSwitch();
         this.stopStartRetry();
         this.state.receiveEnd(event.reason);
         this.addNotice(
@@ -1769,7 +1829,11 @@ export class PartyEngine {
     const waiting = state.members.some(
       (member) => !member.isSelf && member.transferState === "waiting",
     );
-    if (!waiting || state.phase !== "lobby" || this.state.party === null) {
+    if (
+      !waiting ||
+      (state.phase !== "lobby" && state.phase !== "switching") ||
+      this.state.party === null
+    ) {
       this.stopSourceRetransmit();
       return;
     }
@@ -1783,7 +1847,12 @@ export class PartyEngine {
       const waiting = state.members.some(
         (member) => !member.isSelf && member.transferState === "waiting",
       );
-      if (!waiting || state.phase !== "lobby" || this.state.party === null) return;
+      if (
+        !waiting ||
+        (state.phase !== "lobby" && state.phase !== "switching") ||
+        this.state.party === null
+      )
+        return;
       void this.state.coordinator
         ?.refresh()
         .catch((error: unknown) =>
@@ -1862,6 +1931,7 @@ export class PartyEngine {
         }
         const current = this.state.game;
         const changed = current?.kind !== "nova" || current.gameId !== game.gameId;
+        if (changed && this.state.phase === "playing") this.beginGameSwitch();
         // A repeated announcement keeps what registration added (player limits).
         this.state.selectGame(
           changed ? { kind: "nova", ...game } : { ...current, title: game.title },
@@ -1935,6 +2005,7 @@ export class PartyEngine {
         break;
       }
       case "received": {
+        if (this.state.game?.kind !== "nova" || this.state.game.gameId !== event.gameId) break;
         if (
           this.state.pendingSource !== null &&
           this.state.pendingSource.source !== event.source &&
@@ -2119,7 +2190,7 @@ export class PartyEngine {
       (member) => member.transferState === "failed" || member.transferState === "incompatible",
     );
     const ended = this.state.session?.isEnded() ?? false;
-    const inLobby = this.state.phase === "lobby";
+    const canRequestStart = this.state.phase === "lobby" || this.state.phase === "switching";
 
     // Only lobby UI offers start; blocked reasons describe game gates rather than phase.
     let startBlockedReason: string | null = null;
@@ -2147,6 +2218,7 @@ export class PartyEngine {
 
     return {
       phase: this.state.phase,
+      switchingGame: this.cancelGameSwitch !== null,
       phaseDetail: this.state.phaseDetail,
       joinStage: this.state.joinStage,
       reconnectAttempts: this.state.reconnectAttempts,
@@ -2163,9 +2235,19 @@ export class PartyEngine {
       inviteUrl: this.buildInviteUrl(),
       connectionState: this.state.connectionState,
       canStart:
-        inLobby && this.state.game !== null && !ended && !anyFailed && allVerified && allReady,
+        canRequestStart &&
+        this.state.game !== null &&
+        !ended &&
+        !anyFailed &&
+        allVerified &&
+        allReady,
       canForceStart:
-        inLobby && this.state.game !== null && !ended && !anyFailed && allVerified && !allReady,
+        canRequestStart &&
+        this.state.game !== null &&
+        !ended &&
+        !anyFailed &&
+        allVerified &&
+        !allReady,
       startBlockedReason,
       endedReason: this.state.endedReason,
       removedReason: this.state.removedReason,
@@ -2373,6 +2455,11 @@ export class PartyEngine {
     this.syncSourceRetransmit(state);
     for (const handler of this.listeners) {
       handler(state);
+    }
+    if (state.switchingGame && state.amHost && state.canStart) {
+      queueMicrotask(() => {
+        if (this.cancelGameSwitch !== null && this.getState().canStart) this.startGame();
+      });
     }
   }
 }

@@ -29,6 +29,7 @@ function HomeComponent() {
     const wasInParty =
       state.phase === "lobby" ||
       state.phase === "starting" ||
+      state.phase === "switching" ||
       state.phase === "playing" ||
       state.phase === "reconnecting";
     void engine.leaveParty().then(() => {
