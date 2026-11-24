@@ -14,9 +14,9 @@ is recorded in git history, not here.
 
 Working rules:
 
-- Branch `nova`; one conventional commit per step; `npm run check` before
-  every commit, plus `npm run test:e2e` for transport/party changes (WebKit
-  needs the pinned Playwright 1.62.1 Podman image on this host).
+- Branch `nova`; one conventional commit per step. Run `npm run test:e2e`
+  for transport/party changes (WebKit needs the pinned Playwright 1.62.1
+  Podman image on this host).
 - **Stop and ask the owner** before a first deploy of a Worker, any
   `wrangler delete`, a plan change, custom domains/DNS, or anything touching
   `rocketcrab.com`. Redeploys of an approved Worker are fine.
@@ -222,10 +222,3 @@ Record results here and in the [Mobile Safari checklist](docs/testing/mobile-saf
   exposes no named pre-connection event.
 - **Networks that block WebSockets to Cloudflare** cannot connect at all. They
   can report a signaling failure only when the HTTP logging endpoint remains reachable.
-
-## Cleanup for the owner
-
-- [ ] Delete the 46 local `work/*` branches left by the earlier agents. Each
-      one's changes are already on `nova` (checked with `git cherry`; the
-      tunnel-server commits were squashed with identical content):
-      `git branch --list 'work/*' --format='%(refname:short)' | xargs git branch -D`
