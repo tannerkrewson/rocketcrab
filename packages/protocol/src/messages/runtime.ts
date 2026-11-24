@@ -101,6 +101,7 @@ export const stateRequestSchema = z.discriminatedUnion("kind", [
       kind: z.literal("computeView"),
       state: z.unknown(),
       viewer: novaPlayerSchema,
+      context: z.unknown(),
     })
     .strict(),
   z

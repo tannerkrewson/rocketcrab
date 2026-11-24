@@ -63,7 +63,11 @@ export class PartyStateExecutor implements NovaStateExecutor {
     return this.runtime() !== null ? this.frame.tick(input) : this.local.tick(input);
   }
 
-  computeView(input: { state: unknown; viewer: NovaPlayer }): Promise<NovaStateViewResult> {
+  computeView(input: {
+    state: unknown;
+    viewer: NovaPlayer;
+    context: NovaGameContext;
+  }): Promise<NovaStateViewResult> {
     return this.runtime() !== null ? this.frame.computeView(input) : this.local.computeView(input);
   }
 

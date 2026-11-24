@@ -126,7 +126,7 @@ nova.defineGame({
     // context.controls[playerId] = that player's latest controls (or undefined).
   },
   // Only when players must not see everything (hidden hands, secret roles):
-  selectView(state, viewer) {
+  selectView(state, viewer, context) {
     return state; // what this one player may see
   },
 });

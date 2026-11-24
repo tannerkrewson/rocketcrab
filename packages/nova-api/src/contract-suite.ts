@@ -347,6 +347,7 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
 
     it("gives handlers a context that is the same on every device", async () => {
       const contexts: Array<Record<string, unknown>> = [];
+      const viewContexts: Array<{ viewer: string; players: number }> = [];
       const { harness, a, b } = await makePair(harnessFactory, {
         handlers: {
           createInitialState: (context) => {
@@ -358,6 +359,10 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
               contexts.push({ ...context });
               draft.n += 1;
             },
+          },
+          selectView: (state, viewer, context) => {
+            viewContexts.push({ viewer: viewer.id, players: context.players.length });
+            return state;
           },
         },
       });
@@ -374,6 +379,9 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       expect(Object.keys(contexts[1]!).sort()).toEqual(["actor", "now", "players", "revision"]);
       expect(contexts[1]!.actor).toEqual({ id: "member-b", name: "Ben" });
       expect(contexts[1]!.players).toEqual(players);
+      // selectView gets the same context, for every viewer.
+      expect(viewContexts).toContainEqual({ viewer: "member-a", players: 2 });
+      expect(viewContexts).toContainEqual({ viewer: "member-b", players: 2 });
     });
 
     it("applies actions on the authority and updates every player's view", async () => {

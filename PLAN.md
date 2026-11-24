@@ -106,9 +106,10 @@ launch, and the list format depends on them.
       each player join, so no join order is shared. `nova.players` keeps
       this player first, as the AI reference documents. State-engine and
       contract tests cover both.
-- [ ] **Small API fixes.** Make `NovaApi.connectionStatus` read-only, have
-      `NovaGameDeclaration` extend `NovaStateHandlers` instead of copying
-      its fields, and pass the context to `selectView`.
+- [x] **Small API fixes.** `NovaApi.connectionStatus` is read-only (a
+      getter on the client), `NovaGameDeclaration` extends
+      `NovaStateHandlers`, and `selectView(state, viewer, context)` gets the
+      context of the handler that produced the state. Contract test added.
 - [ ] **Optional player limits.** Add `minPlayers`/`maxPlayers` to
       `defineGame` for Nova games and to list entries for external games.
       Show lobby text when the party is out of range. When only the limits

@@ -1234,7 +1234,11 @@ export class NovaStateEngine {
     if (this.disposed || this.canonical === null) return;
     if (this.authorityMemberId !== this.selfMemberId) return;
     const result = await this.withExecutorTimeout(
-      this.executor.computeView({ state: this.canonical, viewer }),
+      this.executor.computeView({
+        state: this.canonical,
+        viewer,
+        context: this.contextFor(this.revision),
+      }),
     );
     if (this.disposed) return;
     if (!result.ok) {

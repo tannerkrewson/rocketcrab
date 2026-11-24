@@ -95,7 +95,7 @@ export interface NovaStateActions {
 }
 
 /**
- * State-mode handler functions (ADR-0006). These are the only functions in
+ * Handler functions (ADR-0006). These are the only functions in
  * the game contract; they stay inside the game's own context (the frame or
  * the in-process client) and are never serialized across a boundary.
  */
@@ -114,33 +114,26 @@ export interface NovaStateHandlers {
   /**
    * Select the view one player sees. Defaults to the full state when
    * omitted. Runs on the authority; every frame receives only its selected
-   * view (ADR-0006).
+   * view (ADR-0006). `context` is the one the handler that produced this
+   * state received.
    */
-  selectView?(state: unknown, viewer: NovaPlayer): unknown;
+  selectView?(state: unknown, viewer: NovaPlayer, context: NovaGameContext): unknown;
   /** Runs on the authority `tickRate` times a second once the game starts. */
   tick?: NovaTickHandler;
 }
 
 /**
  * Registration options for `nova.defineGame`. Everything here is plain data
- * (it crosses the runtime frame boundary) except the optional state-mode
- * handler functions, which Nova keeps in the game's own context.
+ * (it crosses the runtime frame boundary) except the optional handler
+ * functions, which Nova keeps in the game's own context.
  */
-export interface NovaGameDeclaration {
+export interface NovaGameDeclaration extends NovaStateHandlers {
   /** Human-readable game title shown in lobbies. */
   title?: string;
   /** The game's own version string (distinct from the Nova API version). */
   version?: string;
   /** The Nova API version this game targets; defaults to `nova.version`. */
   apiVersion?: number;
-  /** State mode: build the initial canonical state (defaults to `{}`). */
-  createInitialState?(context: NovaGameContext): unknown;
-  /** State mode: the action table (Immer recipes). */
-  actions?: NovaStateActions;
-  /** State mode: select the view one player sees (defaults to full state). */
-  selectView?(state: unknown, viewer: NovaPlayer): unknown;
-  /** State mode: advance the game by one step, `tickRate` times a second. */
-  tick?: NovaTickHandler;
   /** Ticks per second (1..60, default 20). Only used with `tick`. */
   tickRate?: number;
 }
@@ -262,7 +255,7 @@ export interface NovaApi {
   /** Every player in the game: this player first, then the others as they joined. */
   readonly players: readonly NovaPlayer[];
   /** This player's connection status. Updated as the party connects. */
-  connectionStatus: NovaConnectionStatus;
+  readonly connectionStatus: NovaConnectionStatus;
   /** Subscribe to player joins. Returns an unsubscribe function. */
   onPlayerJoin(handler: (player: NovaPlayer) => void): () => void;
   /** Subscribe to player leaves. Returns an unsubscribe function. */

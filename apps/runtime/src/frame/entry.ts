@@ -131,6 +131,7 @@ function install(): void {
       const result = await executor.computeView({
         state: request.state,
         viewer: request.viewer as NovaPlayer,
+        context,
       });
       respond(
         result.ok

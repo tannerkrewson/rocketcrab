@@ -73,7 +73,11 @@ export interface NovaStateExecutor {
   }): Promise<NovaStateStateResult>;
 
   /** Compute one player's view of `state` (late joiners). */
-  computeView(input: { state: unknown; viewer: NovaPlayer }): Promise<NovaStateViewResult>;
+  computeView(input: {
+    state: unknown;
+    viewer: NovaPlayer;
+    context: NovaGameContext;
+  }): Promise<NovaStateViewResult>;
 }
 
 /** Wrap a throwing handler call into a rejected result with a stable code. */
@@ -107,7 +111,7 @@ export class LocalGameExecutor implements NovaStateExecutor {
           ? {}
           : await this.handlers.createInitialState(input.context);
       assertStructuredCloneSafe(state, "createInitialState result");
-      return await this.withViews(state, input.viewers);
+      return await this.withViews(state, input.viewers, input.context);
     } catch (error) {
       return failure("initial_state_error", error);
     }
@@ -134,7 +138,7 @@ export class LocalGameExecutor implements NovaStateExecutor {
         handler(draft, input.context, input.payload),
       );
       assertStructuredCloneSafe(next, "action result state");
-      return await this.withViews(next, input.viewers);
+      return await this.withViews(next, input.viewers, input.context);
     } catch (error) {
       return failure("handler_error", error);
     }
@@ -156,18 +160,22 @@ export class LocalGameExecutor implements NovaStateExecutor {
         next = await produce(next, (draft: unknown) => handler(draft, input.context));
       }
       assertStructuredCloneSafe(next, "tick result state");
-      return await this.withViews(next, input.viewers);
+      return await this.withViews(next, input.viewers, input.context);
     } catch (error) {
       return failure("handler_error", error);
     }
   }
 
-  async computeView(input: { state: unknown; viewer: NovaPlayer }): Promise<NovaStateViewResult> {
+  async computeView(input: {
+    state: unknown;
+    viewer: NovaPlayer;
+    context: NovaGameContext;
+  }): Promise<NovaStateViewResult> {
     try {
       const view =
         this.handlers?.selectView === undefined
           ? input.state
-          : await this.handlers.selectView(input.state, input.viewer);
+          : await this.handlers.selectView(input.state, input.viewer, input.context);
       assertStructuredCloneSafe(view, "selectView result");
       return { ok: true, view };
     } catch (error) {
@@ -178,22 +186,24 @@ export class LocalGameExecutor implements NovaStateExecutor {
   private async withViews(
     state: unknown,
     viewers: readonly NovaPlayer[],
+    context: NovaGameContext,
   ): Promise<NovaStateStateResult> {
     if (this.handlers?.selectView === undefined) {
       return { ok: true, state, views: {}, viewIsState: true };
     }
-    return { ok: true, state, views: await this.computeViews(state, viewers) };
+    return { ok: true, state, views: await this.computeViews(state, viewers, context) };
   }
 
   private async computeViews(
     state: unknown,
     viewers: readonly NovaPlayer[],
+    context: NovaGameContext,
   ): Promise<NovaStateViews> {
     const views: NovaStateViews = {};
     for (const viewer of viewers) {
       // A view failure for one player never fails the action: that player
       // simply keeps its previous view and the host surfaces an error.
-      const result = await this.computeView({ state, viewer });
+      const result = await this.computeView({ state, viewer, context });
       if (result.ok) {
         views[viewer.id] = result.view;
       } else {

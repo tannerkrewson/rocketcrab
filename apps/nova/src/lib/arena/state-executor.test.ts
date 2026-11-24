@@ -27,6 +27,8 @@ function answer(harness: Harness, result: unknown, index = harness.pushed.length
   harness.executor.handleResponse({ requestId: event.requestId, result: result as never });
 }
 
+const VIEW_CONTEXT = { players: [PLAYER_A, PLAYER_B], revision: 1, now: 1 };
+
 describe("FrameStateExecutor", () => {
   it("sends createInitialState and correlates the response", async () => {
     const { executor, pushed } = makeHarness();
@@ -92,7 +94,11 @@ describe("FrameStateExecutor", () => {
 
   it("sends computeView for late joiners", async () => {
     const { executor, pushed } = makeHarness();
-    const promise = executor.computeView({ state: { count: 3 }, viewer: PLAYER_B });
+    const promise = executor.computeView({
+      state: { count: 3 },
+      viewer: PLAYER_B,
+      context: VIEW_CONTEXT,
+    });
     const event = pushed[0];
     expect(event?.kind).toBe("stateRequest");
     if (event?.kind !== "stateRequest") return;
@@ -103,7 +109,7 @@ describe("FrameStateExecutor", () => {
 
   it("forwards stable rejection codes from the frame", async () => {
     const { executor, pushed } = makeHarness();
-    const promise = executor.computeView({ state: {}, viewer: PLAYER_A });
+    const promise = executor.computeView({ state: {}, viewer: PLAYER_A, context: VIEW_CONTEXT });
     answer(
       { executor, pushed },
       { kind: "error", ok: false, code: "view_error", message: "no view for you" },
@@ -119,7 +125,7 @@ describe("FrameStateExecutor", () => {
     vi.useFakeTimers();
     try {
       const { executor } = makeHarness(50);
-      const promise = executor.computeView({ state: {}, viewer: PLAYER_A });
+      const promise = executor.computeView({ state: {}, viewer: PLAYER_A, context: VIEW_CONTEXT });
       await vi.advanceTimersByTimeAsync(60);
       await expect(promise).resolves.toMatchObject({ ok: false, code: "execution_timeout" });
     } finally {
@@ -129,7 +135,7 @@ describe("FrameStateExecutor", () => {
 
   it("drops late responses to settled or timed-out requests (rule 22)", async () => {
     const { executor, pushed } = makeHarness(50);
-    const promise = executor.computeView({ state: {}, viewer: PLAYER_A });
+    const promise = executor.computeView({ state: {}, viewer: PLAYER_A, context: VIEW_CONTEXT });
     const event = pushed[0];
     if (event?.kind !== "stateRequest") return;
     executor.handleResponse({
@@ -147,7 +153,7 @@ describe("FrameStateExecutor", () => {
 
   it("settles pending requests as failed when disposed", async () => {
     const { executor } = makeHarness();
-    const promise = executor.computeView({ state: {}, viewer: PLAYER_A });
+    const promise = executor.computeView({ state: {}, viewer: PLAYER_A, context: VIEW_CONTEXT });
     executor.dispose();
     await expect(promise).resolves.toMatchObject({ ok: false, code: "execution_failed" });
   });

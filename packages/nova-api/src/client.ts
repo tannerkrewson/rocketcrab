@@ -186,6 +186,7 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
   const errorHandlers = new Set<Handler<NovaError>>();
   const stateHandlers = new Set<Handler<unknown>>();
 
+  let connectionStatus: NovaConnectionStatus = "disconnected";
   let lastControlsJson: string | null = null;
   const unsubscribeEvents = backend.onEvent((event) => {
     switch (event.type) {
@@ -204,7 +205,7 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
         break;
       }
       case "connection":
-        client.connectionStatus = event.status;
+        connectionStatus = event.status;
         callSafely(connectionHandlers, event.status);
         break;
       case "start":
@@ -342,7 +343,9 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
     get players() {
       return [...players];
     },
-    connectionStatus: "disconnected",
+    get connectionStatus() {
+      return connectionStatus;
+    },
     onPlayerJoin(handler) {
       return addHandler(joinHandlers, handler);
     },

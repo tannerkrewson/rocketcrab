@@ -233,7 +233,12 @@ describe("runtime message schemas", () => {
       {
         kind: "stateRequest",
         requestId: "state-3",
-        request: { kind: "computeView", state: {}, viewer: { id: "member-2", name: "Blair" } },
+        request: {
+          kind: "computeView",
+          state: {},
+          viewer: { id: "member-2", name: "Blair" },
+          context: { players: [], revision: 1, now: 1 },
+        },
       },
       {
         kind: "actionAck",

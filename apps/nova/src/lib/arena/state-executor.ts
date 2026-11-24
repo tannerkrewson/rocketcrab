@@ -96,11 +96,16 @@ export class FrameStateExecutor implements NovaStateExecutor {
     });
   }
 
-  computeView(input: { state: unknown; viewer: NovaPlayer }): Promise<NovaStateViewResult> {
+  computeView(input: {
+    state: unknown;
+    viewer: NovaPlayer;
+    context: NovaGameContext;
+  }): Promise<NovaStateViewResult> {
     return this.request<NovaStateViewResult>({
       kind: "computeView",
       state: input.state,
       viewer: input.viewer,
+      context: input.context,
     });
   }
 
