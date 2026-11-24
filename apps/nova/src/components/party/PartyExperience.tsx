@@ -11,6 +11,7 @@ import type { CatalogGame } from "../../lib/catalog";
 import { selectCatalogGame } from "../../lib/catalog/select";
 import { gameRepository } from "../../lib/games/instance";
 import { Button } from "../ui/Button";
+import { Card } from "../ui/Card";
 import { ErrorPanel } from "../ui/ErrorPanel";
 import { LoadingState } from "../ui/LoadingState";
 import { ExternalGameFrame } from "./ExternalGameFrame";
@@ -208,19 +209,23 @@ function renderPhase(
     case "creating":
     case "joining":
       return (
-        <div className="mx-auto flex w-full max-w-md flex-col items-center gap-3 pb-10 pt-14 text-center sm:pt-20">
+        <Card
+          className="mx-auto mt-14 mb-10 max-w-md text-center sm:mt-20"
+          actions={
+            <Button variant="tertiary" className="mx-auto" onPress={() => void handleLeave()}>
+              Cancel
+            </Button>
+          }
+        >
           {state.signalingOutage ? (
             <ErrorPanel
               title="Connection interrupted"
               message={SIGNALING_OUTAGE_MESSAGE + " We'll keep trying to connect."}
             />
           ) : (
-            <LoadingState label={state.phaseDetail ?? "Connecting…"} className="p-0" />
+            <LoadingState label={state.phaseDetail ?? "Connecting…"} className="p-4" />
           )}
-          <Button variant="tertiary" onPress={() => void handleLeave()}>
-            Cancel
-          </Button>
-        </div>
+        </Card>
       );
     case "lobby":
     case "starting":
