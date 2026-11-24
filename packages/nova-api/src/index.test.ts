@@ -3,7 +3,7 @@
  * manifest, the game-facing object exposes exactly the documented surface,
  * and the surface carries no game-hosting, deployment, authority, or
  * transport concepts. The docs markdown itself is written from these source
- * types (see docs/api/), and the runtime bridge parity test asserts that
+ * types (see the API reference), and the runtime bridge parity test asserts that
  * the injected `window.nova`
  * script exposes the same surface manifest.
  */

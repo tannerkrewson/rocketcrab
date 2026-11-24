@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import reference from "../../../../../docs/api/nova-api-ai-reference.md?raw";
+import reference from "./nova-api-reference.md?raw";
 import { buildMasterPrompt, buildMasterPromptWithGame } from "./master-prompt";
 
 /**

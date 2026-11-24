@@ -9,8 +9,7 @@
  *
  * The concrete object games receive (`window.nova`) is built by
  * {@link createNovaClient}; the host-side engine that drives it over the
- * transport is {@link NovaSession}. Public documentation is generated or
- * checked from these source types (see `docs/api/`).
+ * transport is {@link NovaSession}.
  */
 import { actionTimeoutMs, type GameEndReason } from "@rocketcrab/protocol";
 import type { NovaError } from "./errors";

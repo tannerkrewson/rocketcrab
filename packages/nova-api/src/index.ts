@@ -12,7 +12,7 @@
  *   transport-neutral `NovaTransport` (InMemoryTransport in the test arena,
  *   TrysteroTransport for real parties) — the same game code works in
  *   test and party transports.
- * - All types are documented from source (see `docs/api/`); the API has no
+ * - The API has no
  *   Trystero terminology, no hosting or deployment concepts, no authority
  *   roles, and only structured-clone-compatible data crosses boundaries.
  */

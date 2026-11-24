@@ -1,9 +1,9 @@
 /**
  * Copyable game-building instructions plus the API reference embedded
- * verbatim from docs/api/nova-api-ai-reference.md. Keep API rules in that
+ * verbatim from nova-api-reference.md. Keep API rules in that
  * single source; the snapshot pins the complete generated prompt.
  */
-import novaApiReference from "../../../../../docs/api/nova-api-ai-reference.md?raw";
+import novaApiReference from "./nova-api-reference.md?raw";
 
 export function buildMasterPrompt(): string {
   return `# Nova Master Prompt

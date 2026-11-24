@@ -1,8 +1,8 @@
 /**
  * Canonical API usage examples.
  *
- * These strings are the JavaScript examples shown in `docs/api/` and the
- * AI-oriented reference. They are exported so tests can verify them against
+ * These strings are the JavaScript examples shown in the AI-oriented API
+ * reference (`apps/nova/src/lib/prompt/nova-api-reference.md`). They are exported so tests can verify them against
  * the real API: every example is executed against a session-backed `nova`
  * client in `examples.test.ts`, and the minimal game is asserted to stay
  * under the ~30-line acceptance threshold.
