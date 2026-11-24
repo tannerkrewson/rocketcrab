@@ -18,9 +18,8 @@ test("a blocked signaling connection warns and recovers automatically", async ({
   await expect(warning).toBeVisible();
   await expect(page.getByText("Creating your private party…")).toBeHidden();
   await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
-  // Stay offline past the adapter's normal 15 s join deadline, so recovery
-  // exercises setup retry rather than just the socket's initial backoff.
-  await page.waitForTimeout(16_000);
+  // Retrying past the join deadline is covered with fake clocks in the engine
+  // and transport unit tests; here the real socket only has to come back.
   expect(attempts).toBeGreaterThan(0);
   await expect(warning).toBeVisible();
   blocked = false;

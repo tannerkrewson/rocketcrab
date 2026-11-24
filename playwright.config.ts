@@ -3,6 +3,8 @@ import { defineConfig, devices } from "@playwright/test";
 // E2E smoke tests: the Nova home page renders, and the separate runtime
 // origin (apps/runtime, dev port 2723) serves its page. The root `dev`
 // script starts both apps via concurrently, matching local development.
+const CHROMIUM_ONLY = ["**/connection-errors.spec.ts", "**/signaling-outage.spec.ts"];
+
 export default defineConfig({
   testDir: "./e2e",
   fullyParallel: true,
@@ -19,10 +21,21 @@ export default defineConfig({
     trace: "on-first-retry",
     navigationTimeout: 30_000,
   },
+  // Error and outage handling is app logic over the same signaling socket in
+  // every browser, so it runs once; specs that touch WebRTC, frames, the
+  // sandbox, or layout run in all three engines.
   projects: [
     { name: "chromium", use: { ...devices["Desktop Chrome"] } },
-    { name: "firefox", use: { ...devices["Desktop Firefox"] } },
-    { name: "webkit", use: { ...devices["Desktop Safari"] } },
+    {
+      name: "firefox",
+      use: { ...devices["Desktop Firefox"] },
+      testIgnore: CHROMIUM_ONLY,
+    },
+    {
+      name: "webkit",
+      use: { ...devices["Desktop Safari"] },
+      testIgnore: CHROMIUM_ONLY,
+    },
   ],
   // Bound parallel browser memory use locally and in CI.
   workers: 3,

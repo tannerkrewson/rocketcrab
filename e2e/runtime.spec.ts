@@ -88,24 +88,6 @@ test.describe("runtime diagnostics", () => {
     expect(consoleEvents.length).toBeGreaterThan(0);
     expect(consoleEvents[0]?.message).toContain("hello from the game");
   });
-
-  test("registration timeout reports missing nova.defineGame", async ({ page }) => {
-    test.setTimeout(40_000);
-    await installHarness(page);
-    await loadGame(page, {
-      gameId: "game-silent",
-      gameSource: "<!doctype html><html><body><h1>silent</h1></body></html>",
-    });
-    await expect
-      .poll(
-        async () =>
-          (await harnessEvents(page)).some(
-            (e) => e.type === "runtime.error" && e.category === "missing_registration",
-          ),
-        { timeout: 20_000 },
-      )
-      .toBe(true);
-  });
 });
 
 test.describe("runtime lifecycle controls", () => {

@@ -338,4 +338,57 @@ describe("/party", () => {
       expect(router.state.location.pathname).toBe("/party");
     });
   });
+
+  // The engine classifies setup failures (engine.test.ts, fake clock); these
+  // cover how each classified state reads and what its buttons do.
+  describe("setup failures and outages", () => {
+    const JOIN_ERROR_STATE: PartyEngineState = {
+      ...IDLE_STATE,
+      phase: "error",
+      lastError: "Couldn't reach anyone in this party.",
+      setupFailureCode: null,
+    };
+
+    it("keeps a signaling outage a warning with a Cancel button, not a failure", async () => {
+      stubs.state = { ...CREATING_STATE, signalingOutage: true };
+      renderParty("/party");
+      expect(
+        await screen.findByText(
+          "Can't reach Rocketcrab's servers. Check your internet connection. We'll keep trying to connect.",
+        ),
+      ).toBeInTheDocument();
+      expect(screen.queryByText("Creating party…")).not.toBeInTheDocument();
+      fireEvent.click(screen.getByRole("button", { name: "Cancel" }));
+      await waitFor(() => expect(stubEngine.leaveParty).toHaveBeenCalled());
+    });
+
+    it("shows a generic join timeout without blaming a peer report", async () => {
+      stubs.state = JOIN_ERROR_STATE;
+      renderParty("/party");
+      expect(await screen.findByText("The party couldn't be set up")).toBeInTheDocument();
+      expect(screen.getByText(/Couldn't reach anyone in this party\./)).toBeInTheDocument();
+      expect(screen.queryByText(/this may not be why/)).not.toBeInTheDocument();
+    });
+
+    it.each([
+      ["room-full", "A player reported the party may be full"],
+      ["decrypt-failed", "A message from a player couldn't be decrypted"],
+    ] as const)("qualifies a %s report as a possible cause only", async (code, message) => {
+      stubs.state = { ...JOIN_ERROR_STATE, setupFailureCode: code };
+      renderParty("/party");
+      expect(await screen.findByText("Couldn't connect to the party")).toBeInTheDocument();
+      const detail = screen.getByText(new RegExp(message));
+      expect(detail).toHaveTextContent("Couldn't reach anyone in this party.");
+      expect(detail).toHaveTextContent("this may not be why you couldn't connect");
+    });
+
+    it("retries setup from Try again and dismisses the error from Back", async () => {
+      stubs.state = JOIN_ERROR_STATE;
+      renderParty("/party");
+      fireEvent.click(await screen.findByRole("button", { name: "Try again" }));
+      expect(stubEngine.retrySetup).toHaveBeenCalledOnce();
+      fireEvent.click(screen.getByRole("button", { name: "Back" }));
+      expect(stubEngine.dismissError).toHaveBeenCalledOnce();
+    });
+  });
 });
