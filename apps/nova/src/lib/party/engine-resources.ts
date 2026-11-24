@@ -1,4 +1,4 @@
-import type { GameApiEvent, MemberId } from "@rocketcrab/protocol";
+import type { MemberId } from "@rocketcrab/protocol";
 import type { TransportConnectionState } from "@rocketcrab/core";
 import type {
   GameSourceCoordinator,
@@ -19,10 +19,7 @@ import { fetchTurnCredentials, type TurnCredentialsResult } from "./turn-creds";
 import type {
   PartyRuntimeSeams,
   PartySecretDerivation,
-  PartyMemberView,
   PartyNotice,
-  PartyPhase,
-  JoinStage,
   PartyEngineConfig,
   PartySourceSpec,
   SharedPartyGameSource,
@@ -33,16 +30,7 @@ import {
   defaultRuntimeOrigin,
   isInPartyPhase,
 } from "./engine-utils";
-import type { PartyGame } from "./engine-types";
-
-/** Send-side entries describe remote members; receive-side entries describe self. */
-export interface TransferState {
-  fraction: number;
-  bytesTransferred: number;
-  totalBytes: number;
-  state: PartyMemberView["transferState"];
-  detail: string | null;
-}
+import { PartyEngineModel } from "./engine-model";
 
 export type ExternalAnnouncement = Parameters<PartySession["announceExternalRoom"]>[0];
 
@@ -66,8 +54,8 @@ interface PartyMemberIdentity {
   displayName: string;
 }
 
-/** Shared party/session state; collaborator-local timers, caches, and subscriptions stay with their owner. */
-export class PartyEngineContext {
+/** Transport, runtime, and page resources owned by the engine. */
+export class PartyResources extends PartyEngineModel {
   readonly defaults: PartyEngineDefaults;
   identity: PartyMemberIdentity;
   readonly schedule: Scheduler;
@@ -102,29 +90,12 @@ export class PartyEngineContext {
 
   runtime: RuntimeHostClient | null = null;
   container: HTMLElement | null = null;
-  pendingSource: PartySourceSpec | null = null;
   /** Verified Nova games shared this session, oldest first (bounded). */
   readonly sharedGames = new Map<string, SharedPartyGameSource>();
   /** apiVersion from the latest source metadata, per game id. */
   readonly sourceApiVersions = new Map<string, number>();
   removedReason: string | null = null;
-  frameStarted = false;
-  registered = false;
-  /** Start is delivered once per frame, even when the session survives a reboot. */
-  frameStartDelivered = false;
-
   stateExecutor: PartyStateExecutor | null = null;
-  /** Replay this view when a container rebind boots a new frame after the initial state event. */
-  lastStateApiEvent: GameApiEvent | null = null;
-
-  transfers = new Map<MemberId, TransferState>();
-  game: PartyGame | null = null;
-  selfVerified = false;
-  selfVerifiedSha256: string | null = null;
-  /** Only verification for this hash counts toward the start gate. */
-  currentSourceSha256: string | null = null;
-  verifiedSha256 = new Map<MemberId, string>();
-  endedReason: string | null = null;
   leaving = false;
   notices: PartyNotice[] = [];
   lastError: string | null = null;
@@ -135,19 +106,12 @@ export class PartyEngineContext {
   lastSetup: LastSetup | null = null;
   runtimeLogs: ArenaLogEntry[] = [];
 
-  phase: PartyPhase = "idle";
-  phaseDetail: string | null = null;
-  joinStage: JoinStage = null;
   connectionState: TransportConnectionState = "idle";
-  /** Unlike session.isStarted(), this also tracks starts received by followers. */
-  gameStarted = false;
-  /** Ticks per second the running game frame declared (null: no tick). */
-  frameTickRate: number | null = null;
-  startGaveUp = false;
 
   reconnectAttempts = 0;
 
   constructor(config: PartyEngineConfig, onChange: () => void) {
+    super();
     this.defaults = {
       transportFactory: config.transportFactory ?? null,
       turnCreds: config.turnCreds ?? fetchTurnCredentials,

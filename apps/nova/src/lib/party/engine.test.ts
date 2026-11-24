@@ -1,7 +1,9 @@
+import type { NovaSessionEvent } from "@rocketcrab/nova-api";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import EXAMPLE_GAME_SOURCE from "../../../../../packages/testing/fixtures/games/nova-quiz.html?raw";
 import {
   GameSourceCoordinator,
+  type GameSourceTransferEvent,
   parseInviteFragment,
   type PartyTransportFactory,
 } from "@rocketcrab/party";
@@ -486,7 +488,7 @@ describe("party engine — game and source transitions", () => {
       "This game needs at least 3 players. Invite 1 more.",
     );
     // A repeated announcement of the same game keeps the registered limits.
-    (a.engine as unknown as { handleCoordinatorEvent(e: unknown): void }).handleCoordinatorEvent({
+    a.engine.getTestDriver().coordinatorEvent({
       type: "metadata",
       metadata: {
         gameId: GAME.gameId,
@@ -897,10 +899,8 @@ describe("party engine — start delivery to a frame instance", () => {
   }
 
   /** Session events are fed straight to the engine, as the session would emit them. */
-  function emitSessionEvent(player: Player, event: unknown): void {
-    (player.engine as unknown as { handleSessionEvent(event: unknown): void }).handleSessionEvent(
-      event,
-    );
+  function emitSessionEvent(player: Player, event: NovaSessionEvent): void {
+    player.engine.getTestDriver().sessionEvent(event);
   }
 
   function frameEvents(player: Player): Array<{ kind: string }> {
@@ -931,7 +931,7 @@ describe("party engine — start delivery to a frame instance", () => {
     const world = makeWorld();
     const { a, b } = await playingPair(world);
     // The game started, but this player has no state yet.
-    (b.engine as unknown as { lastStateApiEvent: unknown }).lastStateApiEvent = null;
+    b.engine.getTestDriver().forgetFrameView();
     b.engine.setContainer(null);
     b.engine.setContainer(b.container);
     await settle(world);
@@ -953,10 +953,9 @@ describe("party engine — start delivery to a frame instance", () => {
   it("accepts a start request only from the host", async () => {
     const world = makeWorld();
     const { a, b } = await playingPair(world);
-    const gate = (a.engine as unknown as { acceptStartRequestFrom(id: string): boolean })
-      .acceptStartRequestFrom;
-    expect(gate.call(a.engine, a.memberId)).toBe(true);
-    expect(gate.call(a.engine, b.memberId)).toBe(false);
+    const { acceptsStartFrom } = a.engine.getTestDriver();
+    expect(acceptsStartFrom(a.memberId)).toBe(true);
+    expect(acceptsStartFrom(b.memberId)).toBe(false);
 
     await a.engine.leaveParty();
     await b.engine.leaveParty();
@@ -1057,7 +1056,7 @@ describe("party engine — host start-request retry", () => {
   }
 
   function sessionOf(player: Player) {
-    return (player.engine as unknown as { session: { resendStartRequest(): void } }).session;
+    return player.engine.getTestDriver().session!;
   }
 
   it("re-sends the start request every 2 s while the authority has not started", async () => {
@@ -1088,7 +1087,7 @@ describe("party engine — host start-request retry", () => {
       "Couldn't start the game. Try again.",
     );
 
-    (b.engine as unknown as { handleSessionEvent(e: unknown): void }).handleSessionEvent({
+    b.engine.getTestDriver().sessionEvent({
       type: "start",
     });
     expect(b.engine.getState().notices.map((notice) => notice.message)).not.toContain(
@@ -1109,7 +1108,7 @@ describe("party engine — host start-request retry", () => {
     world.clock.advance(2_000);
     expect(resend).toHaveBeenCalledTimes(1);
 
-    (b.engine as unknown as { handleSessionEvent(e: unknown): void }).handleSessionEvent({
+    b.engine.getTestDriver().sessionEvent({
       type: "start",
     });
     world.clock.advance(60_000);
@@ -1173,21 +1172,15 @@ describe("party engine — source re-request while a member's source waits", () 
     await joinPromise;
     await settle(world);
 
-    const engine = a.engine as unknown as {
-      coordinator: { refresh(): Promise<void> } | null;
-      transfers: Map<string, { state: string; fraction: number; detail: string | null }>;
-      emit(): void;
-    };
-    const refresh = vi.spyOn(engine.coordinator!, "refresh").mockResolvedValue(undefined);
-    engine.transfers.delete(b.memberId);
-    engine.emit();
+    const driver = a.engine.getTestDriver();
+    const refresh = vi.spyOn(driver.coordinator!, "refresh").mockResolvedValue(undefined);
+    driver.updateTransfer(b.memberId, null);
     world.clock.advance(2_000);
     expect(refresh).toHaveBeenCalledTimes(1);
     world.clock.advance(2_000);
     expect(refresh).toHaveBeenCalledTimes(2);
 
-    engine.transfers.set(b.memberId, { state: "complete", fraction: 1, detail: null });
-    engine.emit();
+    driver.updateTransfer(b.memberId, { state: "complete", fraction: 1, detail: null });
     world.clock.advance(10_000);
     expect(refresh).toHaveBeenCalledTimes(2);
 
@@ -1354,10 +1347,8 @@ describe("source verification is keyed by the source hash", () => {
     expect(memberOf(b.engine.getState(), a.memberId).transferState).toBe("complete");
     expect(b.engine.getState().canStart).toBe(true);
 
-    const coordinatorEvent = (event: unknown) =>
-      (b.engine as unknown as { handleCoordinatorEvent(e: unknown): void }).handleCoordinatorEvent(
-        event,
-      );
+    const coordinatorEvent = (event: GameSourceTransferEvent) =>
+      b.engine.getTestDriver().coordinatorEvent(event);
     const gameId = GAME.gameId;
     coordinatorEvent({
       type: "metadata",
@@ -1606,11 +1597,7 @@ describe("party engine — M1 lifecycle: backgrounding, resume, and F11 rejoin",
     a.engine.startGame();
     await settle(world);
     const authority = (player: Player) =>
-      (
-        player.engine as unknown as {
-          session: { getStateModeDiagnostics(): { authorityMemberId: string | null } };
-        }
-      ).session.getStateModeDiagnostics().authorityMemberId;
+      player.engine.getTestDriver().session!.getStateModeDiagnostics().authorityMemberId;
     expect(authority(b)).toBe(a.memberId);
 
     lifecycle.hide(); // the host switches apps
@@ -3477,10 +3464,8 @@ describe("party engine — lifecycle cleanup", () => {
     await settle(world);
     expect(memberOf(b.engine.getState(), a.memberId).transferState).toBe("complete");
 
-    const coordinatorEvent = (event: unknown) =>
-      (b.engine as unknown as { handleCoordinatorEvent(e: unknown): void }).handleCoordinatorEvent(
-        event,
-      );
+    const coordinatorEvent = (event: GameSourceTransferEvent) =>
+      b.engine.getTestDriver().coordinatorEvent(event);
     coordinatorEvent({
       type: "metadata",
       metadata: {
@@ -3509,9 +3494,17 @@ describe("party engine — lifecycle cleanup", () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
     await runCreate(a, world);
-    (a.engine as unknown as { handleHostEvent(e: unknown): void }).handleHostEvent({
+    a.engine.getTestDriver().hostEvent({
       type: "console",
-      message: { level: "log", message: "from the first party" },
+      message: {
+        type: "runtime.console",
+        version: 1,
+        messageId: "message-console",
+        sentAt: 0,
+        runtimeInstanceId: "runtime-console",
+        level: "log",
+        message: "from the first party",
+      },
     });
     expect(a.engine.getState().runtimeLogs).toHaveLength(1);
 
