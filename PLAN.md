@@ -10,10 +10,6 @@ churn on upgrade), and need no paid always-on server.
 
 ## Before beta
 
-- [ ] With owner approval, configure TURN secrets and deploy the combined
-      Nova Worker to the beta hostname. Verify the new API in a live party
-      before retiring the old Edge Worker. See deploy/README.md.
-
 - [ ] After the real-device checks below, evaluate room, link and game
       recovery before consolidating any other retry paths.
 

@@ -97,18 +97,19 @@ secrets.
 
 ## Live state
 
-- 2026-11-18, with owner approval: first deploy of all three Workers on
-  workers.dev (edge `7cb56dab`, runtime `fa44334c`, app `68431c6c`). The edge
-  migrations created `SignalHub` and `TunnelPair`. `TURN_KEY_ID` and
-  `TURN_KEY_API_TOKEN` are set.
-- Edge smoke checks passed, including signal and tunnel sockets. The limiter
-  returned 429 after about 100 requests on one connection; counts are per
-  Cloudflare machine.
-- Live headers match both `_headers` files. A two-browser Chromium party on
-  the live app reached the lobby and started a game; Workers Logs showed
-  `turn_cred_mint`, `direct`, `lobby-ready` and `game-ready`.
-- 2026-11-18, with owner approval: deleted the old `rocketcrab-cors-relay`
-  and `curly-dream-16c4` Workers.
+- 2026-11-24: migrated beta to two Workers. Nova version `fdcab6fb` serves
+  the app and same-origin party API from commit `976fdd6`. Its SQLite-backed
+  Durable Objects are `SignalHub` and `TunnelPair`. The runtime remains
+  deployed at version `64058c32`.
+- Nova uses the dedicated Realtime TURN key `rocketcrab-nova-beta-turn`.
+  The key ID and bearer token are stored as Worker secrets. Verified the
+  live deep link, runtime CSP, TURN origin check and minting, Drawphone room
+  relay, tunnel pairing and binary forwarding, and a two-browser Nova Quiz
+  party with connection logs.
+- Deleted `rocketcrab-edge` after validation and confirmed that its old
+  Durable Object namespaces and hostname are inactive. Retired the
+  `rocketcrab` TURN key and the superseded `rocketcrab-nova-beta` key.
+  Rechecked TURN minting after cleanup.
 
 ## Before launch
 
@@ -167,7 +168,7 @@ npx --yes wrangler@4.161.0 delete --config deploy/nova/wrangler.toml
 npx --yes wrangler@4.161.0 delete --config deploy/runtime/wrangler.toml
 ```
 
-In Cloudflare Realtime → TURN, delete the dedicated beta key after confirming
+In Cloudflare Realtime → TURN, delete `rocketcrab-nova-beta-turn` after confirming
 that it has no other consumers. Delete any TURN API token created solely to
 administer this beta. Verify both Worker scripts and Nova's `SignalHub` and
 `TunnelPair` namespaces are gone, the beta URLs are inactive, and the beta
