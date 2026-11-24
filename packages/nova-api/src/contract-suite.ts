@@ -307,14 +307,16 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       a.client.onEnd((reason) => aEnded.push(reason));
       b.client.onEnd((reason) => bEnded.push(reason));
 
-      b.end("user_exit");
+      a.start();
+      await settle(harness);
+      a.end("user_exit");
       await settle(harness);
       expect(aEnded).toEqual(["user_exit"]);
       expect(bEnded).toEqual(["user_exit"]);
       expect(a.isEnded()).toBe(true);
       expect(b.isEnded()).toBe(true);
       // Idempotent: a second end is ignored.
-      a.end("error");
+      b.end("error");
       await settle(harness);
       expect(aEnded).toEqual(["user_exit"]);
     });

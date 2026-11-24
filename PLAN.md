@@ -12,18 +12,6 @@ churn on upgrade), and need no paid always-on server.
 
 - [ ] Verify the external game catalog in a coordinated multiplayer pass with
       the uniform iframe sandbox enabled.
-- [ ] **Peer-envelope verification & `NovaSession` authorization (`packages/protocol`, `packages/party`, `packages/nova-api`)**:
-      Extract a shared peer-envelope verification helper (checking `sessionId`,
-      `senderMemberId` and `senderConnectionId` against the transport envelope)
-      and use it in both `PartySession.receive()` and
-      `NovaSession.handleMessage()` (`packages/nova-api/src/session.ts`). In
-      `NovaSession`, also bound `deferredProtocolMessages`, restrict
-      `state.view` and `action.ack` to the current authority, and restrict
-      `game.end` to the host/authority.
-- [ ] **Host-pinned game sources (`apps/nova/src/lib/party/engine.ts`)**:
-      Fix `acceptMetadata` so only `party.hostMemberId` can select or replace a
-      game's `(gameId, sourceSha256)`; non-host peers may only serve cached
-      copies matching both `gameId` and the host-pinned `sourceSha256`.
 - [ ] **Unforgeable party identity (`packages/trystero-transport`, `apps/nova/src/lib/party/identity.ts`)**:
       Adopt Trystero 0.27's built-in cryptographic `userId` instead of
       `identity: "none"` + self-asserted `memberId`: derive `memberId` directly

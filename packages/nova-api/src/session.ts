@@ -23,6 +23,7 @@ import {
   novaActionSchema,
   actionTimeoutMs,
   parsePeerMessage,
+  verifyPeerEnvelope,
   controlsBytes,
   type PeerMessage,
 } from "@rocketcrab/protocol";
@@ -62,6 +63,8 @@ import {
   MAX_BUFFERED_DISPATCHES,
 } from "./session-shared";
 import { SessionLifecycle } from "./session-lifecycle";
+
+const MAX_DEFERRED_PROTOCOL_MESSAGES = 32;
 
 export type { NovaSessionOptions, NovaSessionPlayer } from "./session-shared";
 
@@ -248,14 +251,16 @@ export class NovaSession extends SessionLifecycle {
   }
 
   protected handleMessage(message: TransportMessage): void {
-    if (message.channel !== NOVA_PROTOCOL_CHANNEL) {
+    if (message.channel !== NOVA_PROTOCOL_CHANNEL || message.sessionId !== this.sessionId) {
       // Games have no channels of their own; ignore anything else.
       return;
     }
     if (this.engine.isDeltaPending()) {
       // A delta's hash is still being checked: the view and acks that follow
       // it must not reach the game before the state they belong to.
-      this.deferredProtocolMessages.push(message);
+      if (this.deferredProtocolMessages.length < MAX_DEFERRED_PROTOCOL_MESSAGES) {
+        this.deferredProtocolMessages.push(message);
+      }
       return;
     }
     const parsed = parsePeerMessage(message.payload);
@@ -270,6 +275,8 @@ export class NovaSession extends SessionLifecycle {
       return;
     }
     const peerMessage = parsed.value;
+    if (!verifyPeerEnvelope(peerMessage, message, this.sessionId)) return;
+    const fromAuthority = peerMessage.senderMemberId === this.engine.getAuthorityMemberId();
     switch (peerMessage.type) {
       case "player.identity": {
         const player = this.playersMap.get(peerMessage.senderMemberId);
@@ -342,6 +349,7 @@ export class NovaSession extends SessionLifecycle {
         }
         break;
       case "game.end":
+        if (!fromAuthority && !this.isHost(peerMessage.senderMemberId)) break;
         if (!this.ended) {
           this.ended = true;
           this.engine.endGame();
@@ -374,6 +382,7 @@ export class NovaSession extends SessionLifecycle {
         });
         break;
       case "action.ack":
+        if (!fromAuthority) break;
         this.noteActionAck(peerMessage.actionId);
         this.emit({
           type: "actionAck",
@@ -423,7 +432,7 @@ export class NovaSession extends SessionLifecycle {
         });
         break;
       case "state.view":
-        if (peerMessage.forMemberId === this.selfPlayer.id) {
+        if (fromAuthority && peerMessage.forMemberId === this.selfPlayer.id) {
           this.emit({ type: "state", state: peerMessage.view });
         }
         break;

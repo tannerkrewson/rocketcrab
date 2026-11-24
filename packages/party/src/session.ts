@@ -1,5 +1,5 @@
 import type { ExternalRoom, MemberId, SessionSecret } from "@rocketcrab/protocol";
-import { sessionSecretSchema } from "@rocketcrab/protocol";
+import { sessionSecretSchema, verifyPeerEnvelope } from "@rocketcrab/protocol";
 import type { NovaTransport, TransportMessage } from "@rocketcrab/core";
 import { deriveSessionMaterial, generateSessionSecret, type SessionMaterial } from "./secrets";
 import {
@@ -243,12 +243,7 @@ export class PartySession {
     const parsed = parsePartyControlMessage(message.payload);
     if (!parsed.ok) return;
     const value = parsed.value;
-    if (
-      value.sessionId !== this.material.sessionId ||
-      value.senderMemberId !== message.senderMemberId ||
-      value.senderConnectionId !== message.senderConnectionId
-    )
-      return;
+    if (!verifyPeerEnvelope(value, message, this.material.sessionId)) return;
     if (
       !this.privateTransport.peers.some(
         (peer) =>

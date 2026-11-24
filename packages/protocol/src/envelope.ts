@@ -42,6 +42,21 @@ export const peerEnvelopeFields = {
 export const peerEnvelopeSchema = z.object(peerEnvelopeFields);
 export type PeerEnvelope = z.infer<typeof peerEnvelopeSchema>;
 
+type PeerSender = Pick<PeerEnvelope, "sessionId" | "senderMemberId" | "senderConnectionId">;
+
+export function verifyPeerEnvelope(
+  payload: PeerSender,
+  transport: PeerSender,
+  sessionId: string,
+): boolean {
+  return (
+    payload.sessionId === sessionId &&
+    transport.sessionId === sessionId &&
+    payload.senderMemberId === transport.senderMemberId &&
+    payload.senderConnectionId === transport.senderConnectionId
+  );
+}
+
 /** Fields common to every host ↔ runtime message envelope. */
 export const runtimeEnvelopeFields = {
   version: protocolVersionSchema,

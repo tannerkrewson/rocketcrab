@@ -66,6 +66,7 @@ export abstract class SessionLifecycle implements NovaClientBackend {
   protected controlsTimer: ReturnType<typeof setTimeout> | null = null;
   /** Controls go out at most once per tick (the game's declared rate). */
   protected controlsIntervalMs = 1000 / tickRateDefault;
+  protected readonly isHost: (memberId: string) => boolean;
   protected readonly acceptStartRequest: (memberId: string) => boolean;
 
   protected readonly selfPlayer: PlayerRecord;
@@ -98,6 +99,7 @@ export abstract class SessionLifecycle implements NovaClientBackend {
     this.sessionId = options.sessionId;
     this.game = options.game;
     this.injectedExecutor = options.stateExecutor;
+    this.isHost = options.isHost ?? (() => false);
     this.acceptStartRequest = options.acceptStartRequest ?? (() => true);
     const memberId = options.player.memberId;
     this.selfPlayer = {

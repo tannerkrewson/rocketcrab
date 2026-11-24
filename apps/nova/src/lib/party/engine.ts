@@ -513,11 +513,11 @@ export class PartyEngine {
       transport: party.privateTransport,
       acceptMetadata: (metadata, from) => {
         const current = this.state.game;
-        // Peers can offer a cached copy, but only the host changes an active game.
         return (
-          current === null ||
-          (current.kind === "nova" && current.gameId === metadata.gameId) ||
-          from === party.hostMemberId
+          from === party.hostMemberId ||
+          (current?.kind === "nova" &&
+            current.gameId === metadata.gameId &&
+            this.state.currentSourceSha256 === metadata.sourceSha256)
         );
       },
     });
@@ -1335,6 +1335,7 @@ export class PartyEngine {
     this.state.stateExecutor?.dispose();
     this.state.stateExecutor = new PartyStateExecutor(() => this.state.runtime);
     const session = createNovaSession({
+      isHost: (memberId) => party.hostMemberId === memberId,
       acceptStartRequest: (memberId) => this.acceptStartRequestFrom(memberId),
       transport: party.privateTransport,
       room: party.material.roomId,
@@ -1495,6 +1496,12 @@ export class PartyEngine {
         this.emit();
         break;
       case "host":
+        if (event.hostMemberId !== null && this.state.currentSourceSha256 === null) {
+          void this.state.coordinator?.refresh().catch((error: unknown) => {
+            this.addNotice("error", errorMessage(error));
+            this.emit();
+          });
+        }
         this.emit();
         this.askForExternalRoom();
         break;
@@ -1922,6 +1929,7 @@ export class PartyEngine {
   private handleCoordinatorEvent(event: GameSourceTransferEvent): void {
     switch (event.type) {
       case "metadata": {
+        if (event.fromMemberId !== this.state.party?.hostMemberId) break;
         const game = {
           gameId: event.metadata.gameId,
           title: event.metadata.title ?? "Untitled game",
@@ -2005,7 +2013,12 @@ export class PartyEngine {
         break;
       }
       case "received": {
-        if (this.state.game?.kind !== "nova" || this.state.game.gameId !== event.gameId) break;
+        if (
+          this.state.game?.kind !== "nova" ||
+          this.state.game.gameId !== event.gameId ||
+          this.state.currentSourceSha256 !== event.sourceSha256
+        )
+          break;
         if (
           this.state.pendingSource !== null &&
           this.state.pendingSource.source !== event.source &&
@@ -2020,7 +2033,6 @@ export class PartyEngine {
             this.emit();
           });
         }
-        this.state.adoptSourceHash(event.sourceSha256, this.state.identity.memberId);
         this.state.verifyLocalSource(event.sourceSha256);
         this.state.recordTransfer(this.state.identity.memberId, {
           state: "complete",
