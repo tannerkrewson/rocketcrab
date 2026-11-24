@@ -31,7 +31,7 @@ Working rules:
 | -------------- | ----------------------------------------------------------------------- | --------------------------------- |
 | App            | `apps/nova/dist`                                                        | Worker `rocketcrab-nova` (assets) |
 | Game runtime   | `apps/runtime/dist`, untrusted game HTML in an iframe, a different site | Worker `rocketcrab-runtime`       |
-| Edge           | `/turn`, `/` Classic relay, `/signal/:room`, `/tunnel/:pair`, `/log`    | Worker `rocketcrab-edge`          |
+| Edge           | `/turn`, `/` room relay, `/signal/:room`, `/tunnel/:pair`, `/log`       | Worker `rocketcrab-edge`          |
 | P2P            | Trystero 0.27 (`ws-relay`), `scale()` mesh up to 10, overlay beyond     | browser                           |
 | Hard networks  | Cloudflare Realtime TURN, credentials from `/turn`                      | managed                           |
 | WebRTC blocked | Per-pair encrypted WebSocket tunnel via `rtcPolyfill`                   | browser + `/tunnel`               |
@@ -155,6 +155,10 @@ launch, and the list format depends on them.
       gate no longer check the kind; `externalGame`, `externalFrameEpoch`
       and `selectExternalGame` are gone. Repeated source announcements keep
       registered limits (regression test added).
+
+Section 1 verified 2026-11-24: `npm run check` passed, and the browser
+suite passed on Chromium and Firefox (31 each). WebKit and the Trystero
+transport suite were not run; the transport itself did not change.
 
 ## 2. Before beta
 
