@@ -88,6 +88,7 @@ export type {
   ExternalPartyGame,
   SharedPartyGame,
   SharedPartyGameSource,
+  OfferedPartyGame,
 } from "./engine-types";
 
 function sameRoom(

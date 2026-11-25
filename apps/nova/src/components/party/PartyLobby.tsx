@@ -13,6 +13,7 @@ import { NameEntry } from "./NameEntry";
 import { Dialog } from "../ui/Dialog";
 import { PartyInviteQr } from "./PartyInviteQr";
 import { SaveSharedGame } from "./SaveSharedGame";
+import { ShareGamesCard } from "./ShareGamesCard";
 import { clearBrowseContext } from "../../lib/browse/back-context";
 
 export interface PartyLobbyProps {
@@ -237,6 +238,7 @@ export function PartyLobby({
           ) : null}
         </div>
       </section>
+      <ShareGamesCard />
       <section
         aria-label={playedTitle !== null ? "Thanks for playing" : "Welcome"}
         className="glass flex flex-col items-center justify-center gap-3 rounded-2xl p-5 text-center"
@@ -289,7 +291,8 @@ export function PartyLobby({
         )}
       </section>
 
-      <section className="button-row self-center">
+      {/* Wraps on phones once Start anyway joins the row. */}
+      <section className="flex flex-wrap justify-center gap-2">
         {/* Everyone can browse; only the host can pick (guests are told so). */}
         <Button
           variant="secondary"

@@ -29,7 +29,8 @@ export function SaveSharedGame({
   const queryClient = useQueryClient();
   const gamesQuery = useSavedGames();
   const [saving, setSaving] = useState(false);
-  if (gamesQuery.data === undefined || game.sharedBySelf) return null;
+  // The owner can choose not to let players keep copies.
+  if (gamesQuery.data === undefined || game.sharedBySelf || !game.saveable) return null;
   const status = sharedGameStatus(gamesQuery.data, game);
   if (status.kind === "own") return null;
 

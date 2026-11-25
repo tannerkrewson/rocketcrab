@@ -22,7 +22,8 @@ import {
 } from "../../lib/browse/back-context";
 import { useSavedGames } from "../../lib/games/queries";
 import { sharedGameStatus } from "../../lib/games/shared-copies";
-import type { SharedPartyGame } from "../../lib/party/engine";
+import type { OfferedPartyGame, SharedPartyGame } from "../../lib/party/engine";
+import { toast } from "../../lib/toast";
 
 export interface GameBrowserProps {
   /** Open details inside the play shell instead of navigating away. */
@@ -264,6 +265,29 @@ export function GameBrowser({
         game.title.toLowerCase().includes(needle),
     );
   }, [browsingParty, partyState.sharedGames, savedGames, query]);
+  // Games guests offered; only the host can pick them.
+  const offeredGames = useMemo(() => {
+    if (!browsingParty || !partyState.amHost) return [];
+    const needle = query.toLowerCase();
+    return partyState.offeredGames.filter(
+      (game) =>
+        game.title.toLowerCase().includes(needle) &&
+        !friendsGames.some((shared) => shared.gameId === game.gameId),
+    );
+  }, [browsingParty, partyState.amHost, partyState.offeredGames, friendsGames, query]);
+  const [picking, setPicking] = useState<string | null>(null);
+  const pickOffered = async (game: OfferedPartyGame) => {
+    if (picking !== null) return;
+    setPicking(game.gameId);
+    try {
+      await engine.selectOfferedGame(game.memberId, game.gameId);
+      onBack?.();
+    } catch (error) {
+      toast.danger(`Couldn't pick that game: ${error instanceof Error ? error.message : error}`);
+    } finally {
+      setPicking(null);
+    }
+  };
 
   const showingList = view !== null || query !== "";
   const savedCount = savedGamesQuery.isLoading ? null : savedGames.length;
@@ -356,11 +380,11 @@ export function GameBrowser({
           ) : (
             <CategoryCard emoji="📦" label="My games" count={savedCount} href="/library" />
           )}
-          {friendsGames.length > 0 ? (
+          {friendsGames.length + offeredGames.length > 0 ? (
             <CategoryCard
               emoji="🤝"
               label="Friends' games"
-              count={friendsGames.length}
+              count={friendsGames.length + offeredGames.length}
               onClick={() => setView("friends")}
             />
           ) : null}
@@ -381,6 +405,9 @@ export function GameBrowser({
           {view === "friends" ? (
             <FriendsGamesList
               games={friendsGames}
+              offered={offeredGames}
+              picking={picking}
+              onPickOffered={(game) => void pickOffered(game)}
               savedGames={savedGames}
               onShowDetails={onShowDetails}
               onOpen={recordPosition}
@@ -516,16 +543,22 @@ function SavedGamesList({
 /** Games friends shared in this party; each opens its details to save it. */
 function FriendsGamesList({
   games,
+  offered,
+  picking,
+  onPickOffered,
   savedGames,
   onOpen,
   onShowDetails,
 }: {
   games: readonly SharedPartyGame[];
+  offered: readonly OfferedPartyGame[];
+  picking: string | null;
+  onPickOffered: (game: OfferedPartyGame) => void;
   savedGames: readonly SavedGame[];
   onOpen: () => void;
   onShowDetails?: GameBrowserProps["onShowDetails"];
 }) {
-  if (games.length === 0) {
+  if (games.length + offered.length === 0) {
     return (
       <p className="glass rounded-2xl p-6 text-center text-foreground/70">
         No friends&apos; games match.
@@ -534,6 +567,27 @@ function FriendsGamesList({
   }
   return (
     <ul className="flex flex-col gap-2">
+      {offered.map((game) => (
+        <li key={`${game.memberId}:${game.gameId}`}>
+          <button
+            type="button"
+            disabled={picking !== null}
+            onClick={() => onPickOffered(game)}
+            className="group flex w-full items-center justify-between gap-3 glass rounded-2xl px-4 py-3 text-left transition-colors hover:bg-surface-tertiary disabled:opacity-60"
+          >
+            <span className="flex min-w-0 flex-col gap-1">
+              <span className="truncate font-black">{game.title}</span>
+              <span className="text-sm font-medium text-foreground/50">
+                {picking === game.gameId ? "Getting the game…" : `shared by ${game.sharedBy}`}
+              </span>
+            </span>
+            <ArrowRight
+              className="h-5 w-5 shrink-0 text-foreground/40 transition-transform group-hover:translate-x-1 group-hover:text-primary"
+              aria-hidden="true"
+            />
+          </button>
+        </li>
+      ))}
       {games.map((game) => {
         const status = sharedGameStatus(savedGames, game).kind;
         const row = (
