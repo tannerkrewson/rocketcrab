@@ -118,6 +118,15 @@ async function renderShell(
 }
 
 describe("PartyPlayShell in-game chrome", () => {
+  it("lets every player open the invite card from the menu", async () => {
+    await renderShell(makeState({ role: "joiner", amHost: false }));
+    await userEvent.click(screen.getByRole("button", { name: /menu/i }));
+    await userEvent.click(screen.getByRole("menuitem", { name: /invite friends/i }));
+    const dialog = await screen.findByRole("dialog", { name: "Get your friends to join!" });
+    expect(within(dialog).getByRole("button", { name: /copy url/i })).toBeInTheDocument();
+    expect(within(dialog).getByRole("button", { name: /qr code/i })).toBeInTheDocument();
+  });
+
   it("shows the Rocketcrab wordmark in the top bar", async () => {
     await renderShell(makeState());
     expect(screen.getByRole("button", { name: "Copy the invite link" })).toHaveTextContent(

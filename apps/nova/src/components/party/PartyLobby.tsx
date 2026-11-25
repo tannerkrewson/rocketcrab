@@ -1,9 +1,8 @@
 import { Link } from "@tanstack/react-router";
-import { Copy, Gamepad2, LogOut, Pencil, Play, QrCode, Share2, X } from "lucide-react";
+import { Gamepad2, LogOut, Pencil, Play, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "@heroui/react";
 import { toast } from "../../lib/toast";
-import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState, PartyMemberView, PartyNotice } from "../../lib/party/engine";
 import { InstallAppButton } from "../layout/InstallAppButton";
 import { useAppInstallAvailable } from "../../lib/app-install";
@@ -11,7 +10,7 @@ import { Button, buttonStyles } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
 import { NameEntry } from "./NameEntry";
 import { Dialog } from "../ui/Dialog";
-import { PartyInviteQr } from "./PartyInviteQr";
+import { PartyInvite } from "./PartyInvite";
 import { SaveSharedGame } from "./SaveSharedGame";
 import { ShareGamesCard } from "./ShareGamesCard";
 import { clearBrowseContext } from "../../lib/browse/back-context";
@@ -80,22 +79,6 @@ function toastNotice(notice: PartyNotice): void {
   else toast.info(notice.message);
 }
 
-function canNativeShare(url: string | null): boolean {
-  if (
-    url === null ||
-    typeof navigator === "undefined" ||
-    typeof navigator.share !== "function" ||
-    typeof navigator.canShare !== "function"
-  ) {
-    return false;
-  }
-  try {
-    return navigator.canShare({ url });
-  } catch {
-    return false;
-  }
-}
-
 /** Lobby controls and player state; internal host/authority roles stay in diagnostics. */
 export function PartyLobby({
   state,
@@ -110,7 +93,6 @@ export function PartyLobby({
   const [startHelpOpen, setStartHelpOpen] = useState(false);
   const [kickPending, setKickPending] = useState<string | null>(null);
   const [browsing, setBrowsing] = useState(initialBrowsing);
-  const [qrOpen, setQrOpen] = useState(false);
   const [renaming, setRenaming] = useState(false);
 
   // A Nova game from someone else can be saved to this player's games.
@@ -146,28 +128,6 @@ export function PartyLobby({
     }
     toastedNoticeIds.current = new Set(state.notices.map((notice) => notice.id));
   }, [state.notices, state.endedReason]);
-
-  const copyInvite = async () => {
-    if (state.inviteUrl === null) return;
-    const ok = await writeToClipboard(state.inviteUrl);
-    if (ok) {
-      toast.success("Invite link copied.");
-    } else {
-      toast.danger("Couldn't copy the link — try again.");
-    }
-  };
-
-  const shareInvite = async () => {
-    if (state.inviteUrl === null || typeof navigator.share !== "function") return;
-    try {
-      await navigator.share({ title: "Play rocketcrab with me!", url: state.inviteUrl });
-    } catch {
-      // The user dismissed the sheet or the platform refused — the lobby's
-      // Copy URL affordance stays available either way.
-    }
-  };
-
-  const showShareButton = canNativeShare(state.inviteUrl);
 
   if (renaming) {
     return (
@@ -208,34 +168,7 @@ export function PartyLobby({
         className="glass flex flex-col items-center gap-3 rounded-2xl p-5 text-center"
       >
         <h2 className="text-lg font-black">Get your friends to join!</h2>
-        <div className="button-row">
-          <Button variant="primary" size="md" onClick={() => void copyInvite()}>
-            <Copy className="h-4 w-4" aria-hidden="true" />
-            Copy URL
-          </Button>
-          <Button
-            variant="default"
-            soft
-            size="md"
-            onClick={() => setQrOpen(true)}
-            disabled={state.inviteUrl === null}
-          >
-            <QrCode className="h-4 w-4" aria-hidden="true" />
-            QR Code
-          </Button>
-          {showShareButton ? (
-            <Button
-              variant="default"
-              soft
-              size="md"
-              onClick={() => void shareInvite()}
-              title="Share the invite link with a friend"
-            >
-              <Share2 className="h-4 w-4" aria-hidden="true" />
-              Share
-            </Button>
-          ) : null}
-        </div>
+        <PartyInvite inviteUrl={state.inviteUrl} />
       </section>
       <ShareGamesCard />
       <section
@@ -430,19 +363,6 @@ export function PartyLobby({
         </Button>
       </div>
 
-      <Dialog
-        open={qrOpen && state.inviteUrl !== null}
-        onClose={() => setQrOpen(false)}
-        title="Scan to join the party"
-        className="max-w-md"
-      >
-        <div className="flex flex-col items-center gap-3 pb-2">
-          {state.inviteUrl !== null ? <PartyInviteQr inviteUrl={state.inviteUrl} /> : null}
-          <p className="text-center text-sm text-foreground/70">
-            Point a phone&apos;s camera at the code, then tap the link that appears.
-          </p>
-        </div>
-      </Dialog>
       {kickPending !== null ? (
         <PartyKickConfirm
           memberName={

@@ -7,6 +7,7 @@ import {
   OctagonX,
   RotateCcw,
   Terminal,
+  UserPlus,
   Users,
 } from "lucide-react";
 import { Badge } from "../ui/Badge";
@@ -20,6 +21,7 @@ import { Button } from "../ui/Button";
 import { Dialog } from "../ui/Dialog";
 import { GameBrowser } from "./GameBrowser";
 import { PartyGameDetailsModal } from "./PartyGameDetails";
+import { PartyInvite } from "./PartyInvite";
 
 export interface PartyPlayShellProps {
   state: PartyEngineState;
@@ -61,6 +63,7 @@ export function PartyPlayShell({
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [confirmReloadMine, setConfirmReloadMine] = useState(false);
   const [confirmReloadAll, setConfirmReloadAll] = useState(false);
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   useEffect(() => {
     if (panel === null || libraryGame !== null) {
@@ -141,6 +144,20 @@ export function PartyPlayShell({
               role="menu"
               aria-label="Game menu"
             >
+              <li>
+                <button
+                  type="button"
+                  role="menuitem"
+                  className="flex w-full items-center gap-2 rounded-2xl px-3 py-2 text-sm font-bold hover:bg-surface-secondary"
+                  onClick={() => {
+                    setPanel(null);
+                    setInviteOpen(true);
+                  }}
+                >
+                  <UserPlus className="h-4 w-4" aria-hidden="true" />
+                  Invite friends
+                </button>
+              </li>
               <li>
                 <button
                   type="button"
@@ -483,6 +500,16 @@ export function PartyPlayShell({
         </div>
       ) : null}
 
+      <Dialog
+        open={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        title="Get your friends to join!"
+        className="max-w-md"
+      >
+        <div className="flex justify-center pb-2">
+          <PartyInvite inviteUrl={state.inviteUrl} />
+        </div>
+      </Dialog>
       <Dialog
         open={confirmReloadMine}
         onClose={() => setConfirmReloadMine(false)}
