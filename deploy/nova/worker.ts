@@ -1,7 +1,9 @@
 // Nova party API. Cloudflare serves static assets outside /api.
-import { jsonError } from "./http";
+import { handleCodeClaim, handleCodeLookup, type CodeEnv } from "./code";
+import { jsonError, type ObjectNamespace } from "./http";
 import { handleRelay } from "./relay";
 import { handleTurn, type TurnEnv } from "./turn";
+export { PartyCode } from "./code";
 export { SignalHub } from "./signal";
 export { TunnelPair } from "./tunnel";
 
@@ -9,13 +11,8 @@ export interface RateLimitBinding {
   limit(options: { key: string }): Promise<{ success: boolean }>;
 }
 
-interface ObjectNamespace {
-  idFromName(name: string): unknown;
-  get(id: unknown): { fetch(request: Request): Promise<Response> };
-}
-
-export interface EdgeEnv extends TurnEnv {
-  /** Per-IP limit for costly routes: `/turn` and the room relay. */
+export interface EdgeEnv extends TurnEnv, CodeEnv {
+  /** Per-IP limit for costly or guessable routes: `/turn`, the room relay and party codes. */
   RATE_LIMITER?: RateLimitBinding;
   /**
    * Per-IP limit for cheap, high-volume routes: `/signal`, `/tunnel`.
@@ -33,6 +30,9 @@ type Limiter = "RATE_LIMITER" | "BULK_RATE_LIMITER";
 const ROUTES: Record<string, { handler: Handler; key: string; limiter: Limiter }> = {
   "/api/turn": { handler: handleTurn, key: "turn", limiter: "RATE_LIMITER" },
   "/api/relay": { handler: handleRelay, key: "relay", limiter: "RATE_LIMITER" },
+  // Separate keys: members' renewals never spend a guesser-facing lookup budget.
+  "/api/code/claim": { handler: handleCodeClaim, key: "code-claim", limiter: "RATE_LIMITER" },
+  "/api/code/lookup": { handler: handleCodeLookup, key: "code-lookup", limiter: "RATE_LIMITER" },
 };
 
 const SOCKET_ROUTES: { pattern: RegExp; key: string; binding: "SIGNAL_HUB" | "TUNNEL_PAIR" }[] = [

@@ -20,9 +20,13 @@ class_name = "SignalHub"
 name = "TUNNEL_PAIR"
 class_name = "TunnelPair"
 
+[[durable_objects.bindings]]
+name = "PARTY_CODE"
+class_name = "PartyCode"
+
 [[migrations]]
 tag = "v1"
-new_sqlite_classes = ["SignalHub", "TunnelPair"]
+new_sqlite_classes = ["SignalHub", "TunnelPair", "PartyCode"]
 
 [dev]
 port = 2724
@@ -31,7 +35,8 @@ inspector_port = 2727
 # Per-IP, per-route limits. Counters are approximate and per Cloudflare
 # location: a backstop, not the abuse defence (that is the same-origin check plus
 # the per-socket budgets in signal.ts and tunnel.ts).
-# Strict: /api/turn and /api/relay. One TURN mint per player per party.
+# Strict: /api/turn, /api/relay and /api/code/*. One TURN mint per player per
+# party; party-code lookups are guessable, so they stay strict too.
 [[ratelimits]]
 name = "RATE_LIMITER"
 namespace_id = "1001"

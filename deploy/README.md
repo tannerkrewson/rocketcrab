@@ -17,17 +17,19 @@ serves the legacy site until the production cutover.
 Nova serves SPA assets directly from Workers Assets. Requests under `/api`
 run the Worker first.
 
-| Route                   | Purpose                                                                |
-| ----------------------- | ---------------------------------------------------------------------- |
-| `POST /api/turn`        | Issues a 4-hour Cloudflare Realtime TURN credential after Turnstile.   |
-| `POST /api/relay`       | Creates external-game rooms through a fixed list of upstream URLs.     |
-| `GET /api/signal/:room` | Trystero signaling, one hibernating Durable Object per room.           |
-| `GET /api/tunnel/:pair` | Encrypted WebSocket fallback, one hibernating Durable Object per pair. |
+| Route                   | Purpose                                                                   |
+| ----------------------- | ------------------------------------------------------------------------- |
+| `POST /api/turn`        | Issues a 4-hour Cloudflare Realtime TURN credential after Turnstile.      |
+| `POST /api/relay`       | Creates external-game rooms through a fixed list of upstream URLs.        |
+| `GET /api/signal/:room` | Trystero signaling, one hibernating Durable Object per room.              |
+| `GET /api/tunnel/:pair` | Encrypted WebSocket fallback, one hibernating Durable Object per pair.    |
+| `POST /api/code/claim`  | Claims or renews a party's four-letter code, one Durable Object per code. |
+| `POST /api/code/lookup` | Resolves a live four-letter code to its party's invite secret.            |
 
 The API checks that browser requests are same-origin. HTTP limits are
-approximate, per IP, route and Cloudflare location: 60/min for TURN and the
-room relay, 2,000/min for signaling and tunnel upgrades. The socket
-handlers also budget signaling messages and tunnel bytes.
+approximate, per IP, route and Cloudflare location: 60/min for TURN, the
+room relay and each party-code route, 2,000/min for signaling and tunnel
+upgrades. The socket handlers also budget signaling messages and tunnel bytes.
 
 The runtime must be on a different **site** (registrable domain) from the
 app, not just a different origin: same-site hosting let a looping game wedge
