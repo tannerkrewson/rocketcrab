@@ -18,10 +18,15 @@ const env = {
   // Public; the widget allows rocketcrab.com.
   VITE_TURNSTILE_SITE_KEY: process.env.VITE_TURNSTILE_SITE_KEY ?? "0x4AAAAAAGSaDzKBab6kyegY",
 };
-if (target === "nova") {
-  const revision = spawnSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf8" });
-  if (revision.status === 0) env.VITE_APP_VERSION = revision.stdout.trim();
-}
+const git = (...args) => spawnSync("git", args, { encoding: "utf8" });
+const head = git("rev-parse", "HEAD");
+const sha = head.status === 0 ? head.stdout.trim() : null;
+if (target === "nova" && sha !== null) env.VITE_APP_VERSION = sha.slice(0, 7);
+// Tag the Worker version with the commit it was built from, so
+// scripts/deploy-changed.mjs knows what each Worker runs. A build with
+// uncommitted changes gets no tag, so the next CI deploy replaces it.
+const clean = git("status", "--porcelain").stdout === "";
+const tag = sha !== null && clean ? ["--tag", sha] : [];
 function run(command, args) {
   const result = spawnSync(command, args, { env, stdio: "inherit" });
   if (result.error) throw result.error;
@@ -43,5 +48,5 @@ run("npx", [
   "deploy",
   "--config",
   `deploy/${target}/wrangler.toml`,
-  ...(process.argv.includes("--dry-run") ? ["--dry-run"] : []),
+  ...(process.argv.includes("--dry-run") ? ["--dry-run"] : tag),
 ]);
