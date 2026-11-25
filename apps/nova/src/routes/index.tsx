@@ -62,15 +62,14 @@ function HomeComponent() {
         </Link>
         <a
           href="mailto:tannerkrewson@gmail.com?subject=rocketcrab%20support"
-          className="glass flex w-full items-center gap-4 rounded-2xl px-5 py-3.5 text-left text-sm font-semibold transition-transform active:scale-[0.98] motion-reduce:transition-none"
+          className="glass mx-auto flex max-w-full items-center gap-4 rounded-2xl px-5 py-3 text-left text-sm font-semibold transition-transform active:scale-[0.98] motion-reduce:transition-none"
         >
           <Mail className="size-5 shrink-0" aria-hidden="true" />
-          <span className="flex-1">
-            Enjoy the new rocketcrab!
-            <br />
-            Email me if you have issues.
+          <span className="flex flex-col">
+            <span>Enjoy the new rocketcrab!</span>
+            <span>Email me if you have issues.</span>
+            <span className="self-end text-foreground/70">-Tanner</span>
           </span>
-          <span className="shrink-0 self-end">-Tanner</span>
         </a>
       </div>
 
