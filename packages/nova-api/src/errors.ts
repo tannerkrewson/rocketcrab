@@ -1,0 +1,102 @@
+/**
+ * Nova API errors.
+ *
+ * Every failure the game-facing API produces is a {@link NovaError} with a
+ * stable machine-readable `code`, so games can react to failures and the
+ * runtime can surface them clearly.
+ */
+
+/** Stable error codes of the Nova API. */
+export const NOVA_ERROR_CODES = {
+  /** `nova.defineGame` targets an API version this build cannot serve. */
+  unsupported_api_version: "unsupported_api_version",
+  /** A method that does not exist on this API version was invoked. */
+  unknown_method: "unknown_method",
+  /** `nova.defineGame` was called more than once. */
+  already_registered: "already_registered",
+  /** A call requires `nova.defineGame` to have run first. */
+  not_registered: "not_registered",
+  /** `nova.ready` was called more than once. */
+  already_ready: "already_ready",
+  /** A call is only available after the game starts (see `nova.onStart`). */
+  not_started: "not_started",
+  /** A lifecycle transition was attempted after the game already started. */
+  already_started: "already_started",
+  /** A call is not available after the game ended. */
+  ended: "ended",
+  /** Options or arguments failed structural validation. */
+  invalid_options: "invalid_options",
+  /** A payload is not JSON-serializable / structured-clone-compatible. */
+  invalid_payload: "invalid_payload",
+  /** A targeted send referenced a player that is not connected. */
+  not_connected: "not_connected",
+  /** A game exceeded its per-player send budget. */
+  rate_limited: "rate_limited",
+  /** An inbound protocol message failed validation at the boundary. */
+  invalid_message: "invalid_message",
+  /** The host cannot perform the requested operation in this build. */
+  unsupported: "unsupported",
+  /** A dispatched action was based on an outdated state revision. */
+  stale_revision: "stale_revision",
+  /** A dispatched action was not applied before its deadline. */
+  timed_out: "timed_out",
+  /** The action type has no registered handler. */
+  unknown_action: "unknown_action",
+  /** The action payload exceeded the size limit. */
+  payload_too_large: "payload_too_large",
+  /** Applying the action produced an oversized canonical state. */
+  state_too_large: "state_too_large",
+  /** An action handler produced a non-plain-data state. */
+  invalid_state: "invalid_state",
+  /** No authority is active, so the action cannot be applied. */
+  no_authority: "no_authority",
+  /** The game ended before the action could be applied. */
+  game_ended: "game_ended",
+  /** An action handler threw. */
+  handler_error: "handler_error",
+  /** A player's view could not be computed. */
+  view_error: "view_error",
+  /** The initial state could not be created. */
+  initial_state_error: "initial_state_error",
+  /** The authority runtime did not answer in time. */
+  execution_timeout: "execution_timeout",
+  /** The authority runtime failed while executing. */
+  execution_failed: "execution_failed",
+  /** A restored replicated state failed its hash check. */
+  invalid_snapshot: "invalid_snapshot",
+} as const;
+
+export type NovaErrorCode = (typeof NOVA_ERROR_CODES)[keyof typeof NOVA_ERROR_CODES];
+
+/** A Nova API failure with a stable `code` and a human-readable message. */
+export class NovaError extends Error {
+  readonly code: NovaErrorCode;
+
+  constructor(code: NovaErrorCode, message: string) {
+    super(message);
+    this.name = "NovaError";
+    this.code = code;
+  }
+}
+
+/** Error message for calls gated on registration (lifecycle). */
+export function notRegisteredMessage(method: string): string {
+  return `nova.${method}() must be called after nova.defineGame().`;
+}
+
+/** Error message for calls gated on game start (lifecycle). */
+export function notStartedMessage(method: string): string {
+  return `nova.${method}() is only available after the game starts (see nova.onStart).`;
+}
+
+/** Error message for calls after the game ended (lifecycle). */
+export function endedMessage(method: string): string {
+  return `nova.${method}() is not available after the game ended.`;
+}
+
+/** A known error code, or `invalid_options` for anything unrecognised. */
+export function toErrorCode(code: string | undefined): NovaErrorCode {
+  return code !== undefined && code in NOVA_ERROR_CODES
+    ? (code as NovaErrorCode)
+    : "invalid_options";
+}

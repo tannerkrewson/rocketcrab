@@ -1,0 +1,475 @@
+@import "tailwindcss";
+@import "@heroui/styles";
+
+/*
+ * Rocketcrab theme on top of HeroUI v3. The app is dark-only: index.html
+ * puts `.dark` on <html>, so HeroUI's dark theme applies and the overrides
+ * below sit on the same selector to win the cascade.
+ *
+ * HeroUI owns every component's visuals; this file only re-points its color
+ * tokens. Two brand colors drive everything:
+ *   --rocket  rocket red, the site-wide brand (HeroUI accent, `primary`)
+ *   --nova    deep Nova blue, the brand inside `.theme-nova` (build/editor)
+ * `--brand` is whichever applies; `secondary` is always Nova blue.
+ * The WebGL backgrounds (components/backgrounds) use the same hues, so keep
+ * their hex palettes in sync when these change.
+ */
+@theme inline {
+  --font-sans: "Mukta", ui-sans-serif, system-ui, sans-serif;
+  --font-title: "Inconsolata Variable", ui-monospace, "SFMono-Regular", Menlo, Consolas, monospace;
+
+  --color-primary: var(--brand);
+  --color-primary-foreground: oklch(99% 0 0);
+  --color-secondary: var(--nova);
+  --color-secondary-foreground: oklch(99% 0 0);
+  --color-nova-text: var(--nova-text);
+}
+
+@layer base {
+  .dark,
+  [data-theme="dark"] {
+    --rocket: oklch(60% 0.24 29);
+    --nova: oklch(55% 0.21 264);
+    /* Light enough to read on black and over the Nova background. */
+    --nova-text: oklch(80% 0.12 262);
+    --brand: var(--rocket);
+
+    --accent: var(--rocket);
+    /* Crimson, so destructive buttons don't read as the red brand accent. */
+    --danger: oklch(58% 0.22 27);
+
+    /* Near-black page (SiteBackground paints a warm gradient over it). Cards
+       and buttons are neutral dark glass: mostly opaque hue-free grays, so
+       the red background can't tint them warm, with a faint top highlight
+       and no outline. No backdrop blur — re-blurring an
+       animated full-screen canvas every frame is too costly on phones.
+       Overlays (dialogs, menus) stay opaque for legibility. */
+    --background: oklch(0% 0 0);
+    /* A faint cool tint offsets the red that shows through. */
+    --surface: oklch(16% 0.008 255 / 0.74);
+    --surface-secondary: oklch(100% 0 0 / 0.075);
+    --surface-tertiary: oklch(100% 0 0 / 0.125);
+    /* Frosted like the buttons: a soft inner rim, a top edge, and a sheen. */
+    --surface-shadow:
+      inset 0 0 6px 1px oklch(100% 0 0 / 0.06), inset 0 1px 0 0 oklch(100% 0 0 / 0.1),
+      0 12px 32px -16px oklch(0% 0 0 / 0.7);
+    --surface-sheen: linear-gradient(oklch(100% 0 0 / 0.06), transparent 3.5rem);
+    --overlay: oklch(23% 0 0);
+    --overlay-shadow: inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 24px 48px -12px oklch(0% 0 0 / 0.8);
+    --default: oklch(28% 0 0 / 0.9);
+    --default-hover: oklch(33% 0 0 / 0.95);
+    --field-background: oklch(100% 0 0 / 0.1);
+    --segment: oklch(100% 0 0 / 0.16);
+    --border: oklch(100% 0 0 / 0.12);
+    --separator: oklch(100% 0 0 / 0.08);
+    --muted: oklch(72% 0 0);
+  }
+
+  /* Nova's deep blue replaces the accent inside this subtree. HeroUI derives
+     hover/soft/focus colors from --accent where they are declared (the root),
+     so they are re-derived here too. */
+  .theme-nova {
+    --brand: var(--nova);
+    --accent: var(--nova);
+    --focus: var(--nova);
+    --accent-hover: color-mix(in oklab, var(--nova) 90%, var(--accent-foreground) 10%);
+    --accent-soft: color-mix(in oklab, var(--nova) 12%, transparent);
+    --accent-soft-hover: color-mix(in oklab, var(--nova) 16%, transparent);
+    --accent-soft-foreground: color-mix(in oklab, var(--nova) 65%, var(--foreground) 35%);
+  }
+}
+
+@layer base {
+  html {
+    color-scheme: only dark;
+    /* Keep font scaling predictable on mobile; avoid iOS zoom jumps. */
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+  }
+
+  /* Visible, consistent keyboard focus everywhere. */
+  :focus-visible {
+    outline: 3px solid var(--focus);
+    outline-offset: 2px;
+    border-radius: 4px;
+  }
+
+  /* Respect reduced-motion preferences project-wide. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
+}
+
+/* The flame sits alone in a box below the nozzle (viewBox -8 -8 144 144:
+   x 41-95, y from 87.5), clear of the legs. */
+.rc-logo-body {
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% 100%,
+    65.97% 100%,
+    65.97% 66.32%,
+    34.03% 66.32%,
+    34.03% 100%,
+    0 100%
+  );
+}
+
+.rc-logo-flame {
+  clip-path: inset(66.32% 34.03% 0 34.03%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .rc-logo-launch .rc-logo-flame {
+    animation: rc-logo-flame 3s both;
+  }
+
+  @keyframes rc-logo-flame {
+    0% {
+      opacity: 1;
+    }
+    6%,
+    88% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
+  .rc-logo-launch {
+    position: relative;
+    z-index: 1;
+    pointer-events: none;
+    animation: rc-logo-launch 3s both;
+  }
+
+  .rc-logo-launch::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    /* Starts at the nozzle; the resting flame fades out as this grows. */
+    top: 64%;
+    left: 32%;
+    width: 36%;
+    height: 5rem;
+    border-radius: 35% 35% 100% 100%;
+    background: linear-gradient(#fff5c2, #ffc04b 24%, #ff5529 60%, transparent);
+    filter: drop-shadow(0 0 0.4rem #ff7437);
+    transform-origin: top;
+    animation: rc-logo-exhaust 3s both;
+  }
+
+  @keyframes rc-logo-launch {
+    0%,
+    20% {
+      transform: translate3d(0, 0, 0);
+      opacity: 1;
+      animation-timing-function: cubic-bezier(0.55, 0, 0.85, 0.42);
+    }
+    80% {
+      transform: translate3d(0, calc(-100dvh - 3rem), 0) scale(0.8);
+      opacity: 1;
+      animation-timing-function: steps(1, jump-start);
+    }
+    81%,
+    88% {
+      transform: translate3d(0, 0, 0);
+      opacity: 0;
+      animation-timing-function: ease-out;
+    }
+    100% {
+      transform: translate3d(0, 0, 0);
+      opacity: 1;
+    }
+  }
+
+  @keyframes rc-logo-exhaust {
+    0% {
+      transform: scaleY(0.12);
+      opacity: 0;
+    }
+    20% {
+      transform: scale(0.72, 0.36);
+      opacity: 1;
+    }
+    58% {
+      transform: scale(1, 1.15);
+      opacity: 1;
+    }
+    80%,
+    100% {
+      transform: scale(0.55, 0.9);
+      opacity: 0;
+    }
+  }
+}
+
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@utility pt-safe {
+  /* Never flush with the top edge — at least 0.5rem even without a notch. */
+  padding-top: max(0.5rem, env(safe-area-inset-top));
+}
+
+/* Glass card for raw markup; HeroUI Card/Alert get the same look from the
+   --surface/--surface-shadow tokens. */
+@utility glass {
+  background-color: var(--surface);
+  background-image: var(--surface-sheen);
+  box-shadow: var(--surface-shadow);
+}
+
+.card--default {
+  background-image: var(--surface-sheen);
+}
+
+/* Button groups: every button in the group is as wide as the widest label
+   needs (no extra side padding), so the group lines up without stretching.
+   The group itself is only as wide as its buttons. */
+@utility button-row {
+  display: inline-grid;
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  gap: 0.5rem;
+  & > * {
+    width: 100%;
+  }
+}
+
+@utility button-stack {
+  display: inline-grid;
+  gap: 0.5rem;
+  & > * {
+    width: 100%;
+  }
+}
+
+/* The frosted finish shared by buttons and card-shaped links: a soft white
+   glow along the top edge (the design's 160x80 shape, 142.86% wide,
+   centered 16px from the top) and an inner rim. */
+:root {
+  --frost-glow-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='80' viewBox='0 0 160 80' preserveAspectRatio='none'%3E%3Cfilter id='b' x='0' y='0' width='160' height='80' filterUnits='userSpaceOnUse'%3E%3CfeGaussianBlur stdDeviation='12'/%3E%3C/filter%3E%3Cpath filter='url(%23b)' fill='white' d='M24 24C24 24 55.13 56 80.31 56C105.28 55.81 136 24 136 24H24Z'/%3E%3C/svg%3E");
+}
+
+@utility frosted {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  box-shadow: inset 0 0 6px 2px var(--frost-rim, oklch(100% 0 0 / 0.16));
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--frost-glow-image) 50% -24px / 142.86% 80px no-repeat;
+    opacity: var(--frost-glow, 0.2);
+    pointer-events: none;
+  }
+}
+
+/* Frosted pill buttons: a translucent fill, a soft inner rim, and a glow
+   along the top edge that fades out while pressed. Each variant sets its
+   fill, rim, and glow strength. No backdrop blur: re-blurring the animated
+   background under every button is too costly on phones. */
+.button {
+  --button-rim: oklch(100% 0 0 / 0.16);
+  --button-glow: 0.2;
+  height: 2.5rem;
+  padding-inline: 1.125rem;
+  border-radius: 9999px;
+  font-size: 15px;
+  line-height: 1.5rem;
+  box-shadow: inset 0 0 6px 2px var(--button-rim);
+  overflow: hidden;
+  transition:
+    box-shadow 240ms ease,
+    color 240ms ease,
+    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--frost-glow-image) 50% -24px / 142.86% 80px no-repeat;
+    opacity: var(--button-glow);
+    transition: opacity 240ms ease;
+    pointer-events: none;
+  }
+
+  @media (hover: hover) {
+    &:hover,
+    &[data-hovered="true"] {
+      box-shadow:
+        inset 0 0 6px 2px var(--button-rim),
+        0 2px 20px 3px oklch(100% 0 0 / 0.2);
+    }
+  }
+
+  &:active,
+  &[data-pressed="true"] {
+    transform: translateY(1px) scale(0.96);
+    transition-duration: 240ms, 240ms, 90ms;
+    box-shadow:
+      inset 0 0 6px 2px var(--button-rim),
+      0 2px 20px 3px oklch(100% 0 0 / 0.2);
+    &::before {
+      opacity: 0;
+    }
+  }
+
+  &:focus-visible,
+  &[data-focus-visible="true"] {
+    outline: 2px solid oklch(100% 0 0 / 0.8);
+    outline-offset: 4px;
+  }
+
+  &:disabled,
+  &[aria-disabled="true"],
+  &[data-disabled="true"] {
+    opacity: 1;
+    --button-bg: oklch(100% 0 0 / 0.1);
+    --button-bg-hover: var(--button-bg);
+    --button-fg: oklch(100% 0 0 / 0.5);
+    box-shadow: inset 0 0 13px 0 oklch(100% 0 0 / 0.1);
+    &::before {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &,
+    &::before {
+      transition-duration: 1ms;
+    }
+    &:active,
+    &[data-pressed="true"] {
+      transform: none;
+    }
+  }
+}
+
+.button--lg {
+  height: 3rem;
+  padding-inline: 1.375rem;
+}
+
+.button--sm {
+  height: 2rem;
+  padding-inline: 0.875rem;
+  font-size: 14px;
+}
+
+.button--icon-only {
+  width: 2.5rem;
+  padding: 0;
+  &.button--lg {
+    width: 3rem;
+  }
+  &.button--sm {
+    width: 2rem;
+  }
+}
+
+.button--primary,
+.button--danger {
+  /* Solid and vivid, matching the ".com" red: white in the fill, rim, or
+     glow washes red out to pink, so keep the rim faint and the glow low.
+     Mixing with white in oklch keeps the hue and more of the chroma. */
+  --button-bg: var(--accent);
+  --button-bg-hover: var(--button-bg);
+  --button-bg-pressed: var(--button-bg);
+  --button-fg: oklch(99% 0 0);
+  --button-rim: color-mix(in oklch, var(--accent) 85%, white);
+  --button-glow: 0.08;
+}
+
+.button--danger {
+  --accent: var(--danger);
+}
+
+.button--secondary,
+.button--tertiary {
+  --button-bg: oklch(28% 0 0 / 0.85);
+  --button-bg-hover: var(--button-bg);
+  --button-bg-pressed: var(--button-bg);
+  /* HeroUI draws accent-colored text here; keep plain white. */
+  --button-fg: var(--foreground);
+}
+
+.button--outline {
+  --button-bg: oklch(100% 0 0 / 0.06);
+  --button-bg-hover: var(--button-bg);
+  --button-bg-pressed: var(--button-bg);
+  border: 0;
+}
+
+/* The design's original white pill, for the few invitations that should
+   stand out from everything else on the page. */
+.button--white {
+  --button-bg: rgb(211 221 228 / 0.85);
+  --button-bg-hover: var(--button-bg);
+  --button-bg-pressed: var(--button-bg);
+  --button-fg: #000;
+  --button-rim: #fff;
+  --button-glow: 1;
+}
+
+.rc-molten-red {
+  background-image:
+    radial-gradient(140% 80% at 50% 115%, #4a0410 0%, #1c0106 45%, transparent 75%),
+    radial-gradient(120% 60% at 50% -15%, #2a0309 0%, transparent 60%);
+}
+
+.rc-molten-blue {
+  background-image:
+    radial-gradient(140% 80% at 50% 115%, #142a78 0%, #0a1435 45%, transparent 75%),
+    radial-gradient(120% 60% at 50% -15%, #182f76 0%, transparent 60%);
+}
+
+/* The homepage Nova card: a small blue nebula with a few stars. */
+.rc-nova-card {
+  background-color: #070c24;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 28%, rgb(255 255 255 / 0.7), transparent),
+    radial-gradient(1px 1px at 26% 78%, rgb(255 255 255 / 0.5), transparent),
+    radial-gradient(1px 1px at 71% 18%, rgb(255 255 255 / 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 88% 64%, rgb(255 255 255 / 0.55), transparent),
+    radial-gradient(1px 1px at 54% 88%, rgb(255 255 255 / 0.4), transparent),
+    radial-gradient(60% 90% at 82% 10%, oklch(62% 0.21 268 / 0.9), transparent 70%),
+    radial-gradient(55% 80% at 12% 100%, oklch(55% 0.16 235 / 0.55), transparent 70%),
+    radial-gradient(70% 120% at 45% 50%, oklch(35% 0.14 285 / 0.6), transparent 75%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    inset 0 0 0 1px rgb(255 255 255 / 0.06);
+}
+
+/* Fade the molten background in when it mounts. */
+@keyframes rc-fade-in {
+  from {
+    opacity: 0;
+  }
+}
+
+.rc-bg-in {
+  animation: rc-fade-in 900ms ease-out both;
+}
+
+/* The lobby's invisible runtime frame must never take vertical space. */
+[data-testid="party-frame"].invisible {
+  height: 0;
+}

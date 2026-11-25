@@ -1,0 +1,65 @@
+<!doctype html>
+<!-- Dark-only: HeroUI reads `.dark`/data-theme before any script runs. -->
+<html lang="en" class="dark" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="referrer" content="no-referrer" />
+    <meta name="color-scheme" content="dark" />
+    <meta name="theme-color" content="#000000" />
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <link rel="icon" href="/rocketcrab-logo.svg" type="image/svg+xml" />
+    <link rel="icon" href="/favicon-32.png" sizes="32x32" type="image/png" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="apple-mobile-web-app-title" content="rocketcrab" />
+    <title>Rocketcrab Nova</title>
+    <style>
+      /* Shown only if the app hasn't started after a few seconds; React replaces #root's contents. */
+      html {
+        background: #000;
+        color: #fff;
+      }
+      #boot-notice {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 12px;
+        max-width: 22rem;
+        margin: 20vh auto 0;
+        padding: 0 16px;
+        text-align: center;
+        font:
+          16px/1.5 system-ui,
+          sans-serif;
+        opacity: 0;
+        animation: boot-notice 0s 6s forwards;
+      }
+      #boot-notice h1 {
+        margin: 0;
+        font-size: 1.25rem;
+      }
+      #boot-notice p {
+        margin: 0;
+        color: rgb(255 255 255 / 0.7);
+      }
+      @keyframes boot-notice {
+        to {
+          opacity: 1;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root">
+      <div id="boot-notice">
+        <img src="/rocketcrab-logo.svg" alt="" width="96" height="96" />
+        <h1>Rocketcrab is taking a while to load</h1>
+        <p>
+          If it doesn't appear, check your connection or turn off content blockers for this site,
+          then reload the page.
+        </p>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

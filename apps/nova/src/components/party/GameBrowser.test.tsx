@@ -1,0 +1,125 @@
+import {
+  Outlet,
+  RouterProvider,
+  createMemoryHistory,
+  createRouter,
+  createRootRoute,
+  createRoute,
+} from "@tanstack/react-router";
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { ComponentProps, ReactNode } from "react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { gameRepository } from "../../lib/games/instance";
+import { GameBrowser } from "./GameBrowser";
+
+/** Builder actions must confirm and leave an active party before navigating. */
+
+const { leavePartyMock } = vi.hoisted(() => ({
+  leavePartyMock: vi.fn(async () => undefined),
+}));
+
+vi.mock("../../lib/party/use-party", () => ({
+  usePartyEngine: () => ({
+    state: { phase: "lobby", sharedGames: [] },
+    engine: { leaveParty: leavePartyMock },
+  }),
+}));
+
+async function renderBrowser(
+  props: Partial<ComponentProps<typeof GameBrowser>> & { inParty?: boolean } = {},
+) {
+  cleanup();
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  const rootRoute = createRootRoute({ component: () => <Outlet /> });
+  const buildRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/build",
+    component: () => null,
+  });
+  const editRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/games/$gameId/edit",
+    component: () => null,
+  });
+  const browserRoute = createRoute({
+    getParentRoute: () => rootRoute,
+    path: "/",
+    component: () => <GameBrowser compact {...props} />,
+  });
+  const routeTree = rootRoute.addChildren([buildRoute, editRoute, browserRoute]);
+  const router = createRouter({
+    routeTree,
+    history: createMemoryHistory({ initialEntries: ["/"] }),
+  });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
+  );
+  const result = render(<RouterProvider router={router} />, { wrapper });
+  await result.findByRole("searchbox", { name: "Search games" });
+  return router;
+}
+
+beforeEach(async () => {
+  await gameRepository.clear();
+  leavePartyMock.mockClear();
+});
+
+describe("GameBrowser exit links", () => {
+  it("asks 'Leave the party?' before New game in party mode, and leaves first", async () => {
+    const router = await renderBrowser({ inParty: true });
+
+    await userEvent.click(screen.getByRole("button", { name: /My games/ }));
+    const newGame = await screen.findByRole("button", { name: "New game" });
+    await userEvent.click(newGame);
+
+    const dialog = screen.getByRole("dialog", { name: "Leave the party?" });
+    expect(within(dialog).getByText(/you'll leave this party first/)).toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/");
+    expect(leavePartyMock).not.toHaveBeenCalled();
+
+    await userEvent.click(within(dialog).getByRole("button", { name: "Stay in party" }));
+    expect(screen.queryByRole("dialog")).not.toBeInTheDocument();
+    expect(router.state.location.pathname).toBe("/");
+    expect(leavePartyMock).not.toHaveBeenCalled();
+
+    await userEvent.click(screen.getByRole("button", { name: "New game" }));
+    await userEvent.click(
+      within(screen.getByRole("dialog", { name: "Leave the party?" })).getByRole("button", {
+        name: "Leave party",
+      }),
+    );
+    await waitFor(() => expect(router.state.location.pathname).toBe("/build"));
+    expect(leavePartyMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not render an editor action in saved-game rows", async () => {
+    const game = await gameRepository.create({
+      title: "Rocket Rumble",
+      html: "<!doctype html><html><body><p>rockets</p></body></html>",
+    });
+    const router = await renderBrowser({ inParty: true });
+
+    await userEvent.click(screen.getByRole("button", { name: /My games/ }));
+    const detailsLink = await screen.findByRole("link", { name: /Rocket Rumble/ });
+    expect(detailsLink.getAttribute("href")).toBe(`/game/${game.id}?from=party-browse`);
+    expect(screen.queryByRole("link", { name: /open in editor/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /open in editor/i })).not.toBeInTheDocument();
+
+    expect(router.state.location.pathname).toBe("/");
+    expect(leavePartyMock).not.toHaveBeenCalled();
+  });
+
+  it("does not prompt outside a party — New game stays a plain link", async () => {
+    const router = await renderBrowser({ inParty: false });
+
+    await userEvent.click(screen.getByRole("button", { name: /My games/ }));
+    const newGameLink = await screen.findByRole("link", { name: "New game" });
+    expect(newGameLink.getAttribute("href")).toBe("/build");
+    expect(leavePartyMock).not.toHaveBeenCalled();
+    expect(router.state.location.pathname).toBe("/");
+  });
+});

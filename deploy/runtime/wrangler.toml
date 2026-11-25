@@ -1,0 +1,8 @@
+name = "rocketcrab-runtime"
+compatibility_date = "2026-08-01"
+workers_dev = true
+preview_urls = false
+
+[assets]
+directory = "../../apps/runtime/dist"
+not_found_handling = "404-page"

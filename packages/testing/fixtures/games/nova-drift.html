@@ -1,0 +1,254 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>Nova Drift</title>
+    <style>
+      /* Nova Drift: a complete ticking example game. Every player steers a
+         shared puck; Nova runs the game on one device and keeps every
+         screen in step, with no networking code. */
+      :root {
+        --bg: #0f1220;
+        --card: #1a1f35;
+        --ink: #f2f4ff;
+        --muted: #98a0c0;
+        --accent: #7c6cff;
+        --good: #2dd4a7;
+        --bad: #ff6b81;
+        --warn: #ffc857;
+        --line: #2e3657;
+        --radius: 16px;
+      }
+      * {
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        margin: 0;
+        padding: 0;
+      }
+      body {
+        background: var(--bg);
+        color: var(--ink);
+        font-family:
+          system-ui,
+          -apple-system,
+          "Segoe UI",
+          Roboto,
+          sans-serif;
+        min-height: 100vh;
+        display: flex;
+        justify-content: center;
+      }
+      #drift-app {
+        width: 100%;
+        max-width: 520px;
+        padding: max(12px, env(safe-area-inset-top)) 14px max(20px, env(safe-area-inset-bottom));
+        display: flex;
+        flex-direction: column;
+        gap: 12px;
+      }
+      header.top {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        flex-wrap: wrap;
+      }
+      header.top h1 {
+        font-size: 20px;
+        margin: 0;
+      }
+      .status {
+        color: var(--muted);
+        font-size: 13px;
+        margin-left: auto;
+      }
+      canvas.field {
+        width: 100%;
+        aspect-ratio: 16 / 10;
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: var(--radius);
+        touch-action: none;
+      }
+      .legend {
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.5;
+      }
+      .hint {
+        color: var(--accent);
+        font-size: 13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="drift-app">
+      <header class="top">
+        <h1>Nova Drift</h1>
+        <span class="status" id="status">connecting…</span>
+      </header>
+      <canvas class="field" id="field" width="800" height="500"></canvas>
+      <p class="legend">
+        Steer the puck with the <b>arrow keys</b> (or <b>WASD</b>), or hold a finger on the field.
+        Everyone steers the same puck; Nova runs the game on one device and keeps every screen in
+        step.
+      </p>
+      <p class="hint" id="hint">waiting for the game to start…</p>
+    </div>
+    <script type="module">
+      // Nova Drift: every player steers one shared puck. Nova runs `tick` on
+      // one player's device 15 times a second and sends the state to
+      // everyone; each player only reports what they are pressing.
+      var SPEED = 240; // px per second at full tilt
+
+      nova.defineGame({
+        title: "Nova Drift",
+        version: "2.0.0",
+        createInitialState: function () {
+          return { puck: { x: 400, y: 250 } };
+        },
+        tick: function (state, context) {
+          var dx = 0;
+          var dy = 0;
+          context.players.forEach(function (player) {
+            var controls = context.controls[player.id];
+            if (!controls) return;
+            dx += controls.dx;
+            dy += controls.dy;
+          });
+          var length = Math.max(1, Math.hypot(dx, dy));
+          state.puck.x = clamp(state.puck.x + (dx / length) * SPEED * context.dt, 18, 782);
+          state.puck.y = clamp(state.puck.y + (dy / length) * SPEED * context.dt, 18, 482);
+        },
+      });
+
+      // Drawing interpolates from the previous state to the latest one, so
+      // the puck glides at 60 fps between the 15 updates a second.
+      var shown = { x: 400, y: 250 };
+      var from = { x: 400, y: 250 };
+      var to = { x: 400, y: 250 };
+      var changedAt = 0;
+      nova.state.onChange(function (state) {
+        from = { x: shown.x, y: shown.y };
+        to = state.puck;
+        changedAt = now();
+      });
+
+      // What this player is pressing, from the keyboard or a finger.
+      var keys = {};
+      var finger = null;
+      function updateControls() {
+        var dx = (keys.right ? 1 : 0) - (keys.left ? 1 : 0);
+        var dy = (keys.down ? 1 : 0) - (keys.up ? 1 : 0);
+        if (finger !== null) {
+          var fx = finger.x - shown.x;
+          var fy = finger.y - shown.y;
+          dx = Math.abs(fx) > 20 ? Math.sign(fx) : 0;
+          dy = Math.abs(fy) > 20 ? Math.sign(fy) : 0;
+        }
+        nova.controls.set({ dx: dx, dy: dy }); // Nova sends only changes
+      }
+
+      var keymap = {
+        ArrowLeft: "left",
+        a: "left",
+        ArrowRight: "right",
+        d: "right",
+        ArrowUp: "up",
+        w: "up",
+        ArrowDown: "down",
+        s: "down",
+      };
+
+      if (typeof document !== "undefined") {
+        document.addEventListener("keydown", function (event) {
+          var key = keymap[event.key];
+          if (key === undefined) return;
+          event.preventDefault();
+          keys[key] = true;
+          updateControls();
+        });
+        document.addEventListener("keyup", function (event) {
+          var key = keymap[event.key];
+          if (key === undefined) return;
+          delete keys[key];
+          updateControls();
+        });
+        // Switching apps or tabs swallows the keyup.
+        window.addEventListener("blur", function () {
+          keys = {};
+          finger = null;
+          updateControls();
+        });
+
+        var field = document.getElementById("field");
+        var fieldPoint = function (event) {
+          var rect = field.getBoundingClientRect();
+          return {
+            x: ((event.clientX - rect.left) / rect.width) * 800,
+            y: ((event.clientY - rect.top) / rect.height) * 500,
+          };
+        };
+        field.addEventListener("pointerdown", function (event) {
+          field.setPointerCapture(event.pointerId);
+          finger = fieldPoint(event);
+          updateControls();
+        });
+        field.addEventListener("pointermove", function (event) {
+          if (!field.hasPointerCapture(event.pointerId)) return;
+          finger = fieldPoint(event);
+          updateControls();
+        });
+        var lift = function () {
+          finger = null;
+          updateControls();
+        };
+        field.addEventListener("pointerup", lift);
+        field.addEventListener("pointercancel", lift);
+
+        var context = field.getContext("2d");
+        var draw = function () {
+          var t = Math.min(1, (now() - changedAt) / (1000 / 15));
+          shown = { x: from.x + (to.x - from.x) * t, y: from.y + (to.y - from.y) * t };
+          context.clearRect(0, 0, 800, 500);
+          context.fillStyle = "#7c6cff";
+          context.beginPath();
+          context.arc(shown.x, shown.y, 18, 0, Math.PI * 2);
+          context.fill();
+          if (finger !== null) updateControls(); // keep steering as the puck moves
+          requestAnimationFrame(draw);
+        };
+        if (context) requestAnimationFrame(draw);
+      }
+
+      nova.onStart(function () {
+        setText("status", "playing");
+        setText(
+          "hint",
+          "Arrow keys or WASD steer the puck. On a phone, hold a finger on the field.",
+        );
+      });
+
+      nova.onConnectionChange(function (status) {
+        setText("status", status);
+      });
+
+      function now() {
+        return typeof performance !== "undefined" ? performance.now() : Date.now();
+      }
+
+      function clamp(value, min, max) {
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function setText(id, text) {
+        var el = typeof document !== "undefined" ? document.getElementById(id) : null;
+        if (el) el.textContent = String(text);
+      }
+
+      nova.ready();
+    </script>
+  </body>
+</html>

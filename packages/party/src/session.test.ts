@@ -1,0 +1,211 @@
+import { describe, expect, it } from "vitest";
+import { InMemoryTransportHub } from "@rocketcrab/testing";
+import {
+  createParty,
+  joinPartyByInvite,
+  type PartyTransportFactory,
+  type PartyEvent,
+} from "./session";
+import {
+  PARTY_CONTROL_CHANNEL,
+  buildPartyKickMessage,
+  buildPartyReloadAllMessage,
+} from "./messages";
+
+function world() {
+  const hub = new InMemoryTransportHub({ schedule: () => () => undefined });
+  const passwords: string[] = [];
+  const factory: PartyTransportFactory = {
+    createPrivateTransport(identity) {
+      passwords.push(identity.password);
+      return hub.createTransport(identity);
+    },
+  };
+  const derive = async (secret: string) => ({
+    secret,
+    roomId: `party:${secret}`,
+    password: `password:${secret}`,
+    sessionId: `session:${secret}`,
+  });
+  const settle = async () => {
+    for (let i = 0; i < 8; i++) {
+      hub.drain();
+      await Promise.resolve();
+    }
+  };
+  return { hub, factory, passwords, derive, settle };
+}
+describe("private party sessions", () => {
+  it("delivers a member's offered games, including to members who join later", async () => {
+    const w = world();
+    const host = await createParty({
+      memberId: "host",
+      transportFactory: w.factory,
+      derive: w.derive,
+    });
+    const guest = await joinPartyByInvite({
+      memberId: "guest",
+      secret: host.secret,
+      transportFactory: w.factory,
+      derive: w.derive,
+    });
+    await w.settle();
+    const offers: PartyEvent[] = [];
+    host.onEvent((event) => event.type === "games" && offers.push(event));
+    const game = {
+      gameId: "game-1",
+      title: "Rocket Rumble",
+      sourceSha256: "0".repeat(64),
+      sourceSizeBytes: 10,
+      saveable: false,
+    };
+    await guest.announceGames([game]);
+    await w.settle();
+    expect(offers).toEqual([{ type: "games", memberId: "guest", games: [game] }]);
+
+    const late = await joinPartyByInvite({
+      memberId: "late",
+      secret: host.secret,
+      transportFactory: w.factory,
+      derive: w.derive,
+    });
+    const lateOffers: PartyEvent[] = [];
+    late.onEvent((event) => event.type === "games" && lateOffers.push(event));
+    await w.settle();
+    expect(lateOffers).toContainEqual({ type: "games", memberId: "guest", games: [game] });
+    await Promise.all([host.leave(), guest.leave(), late.leave()]);
+  });
+
+  it("creates exactly one transport per participant, automatically joins and deterministically hands off shell controls", async () => {
+    const w = world();
+    const a = await createParty({
+      memberId: "z-creator",
+      transportFactory: w.factory,
+      derive: w.derive,
+    });
+    const b = await joinPartyByInvite({
+      memberId: "b",
+      secret: a.secret,
+      transportFactory: w.factory,
+      derive: w.derive,
+    });
+    const c = await joinPartyByInvite({
+      memberId: "c",
+      secret: a.secret,
+      transportFactory: w.factory,
+      derive: w.derive,
+    });
+    await w.settle();
+    expect(w.passwords).toHaveLength(3);
+    expect(new Set(w.passwords).size).toBe(1);
+    expect([a.hostMemberId, b.hostMemberId, c.hostMemberId]).toEqual([
+      a.memberId,
+      a.memberId,
+      a.memberId,
+    ]);
+    await a.leave();
+    await w.settle();
+    expect(b.amHost).toBe(true);
+    expect(c.hostMemberId).toBe("b");
+    const d = await joinPartyByInvite({
+      memberId: "d",
+      secret: a.secret,
+      transportFactory: w.factory,
+      derive: w.derive,
+    });
+    await w.settle();
+    expect(d.hostMemberId).toBe("b");
+    await b.leave();
+    await w.settle();
+    expect(c.amHost).toBe(true);
+    expect(d.hostMemberId).toBe("c");
+    await c.leave();
+    await d.leave();
+    await w.settle();
+    const stale = await joinPartyByInvite({
+      memberId: "stale",
+      secret: a.secret,
+      transportFactory: w.factory,
+      derive: w.derive,
+    });
+    await w.settle();
+    expect(stale.privateTransport.peers).toEqual([]);
+    expect(stale.hostMemberId).toBeNull(); // cannot silently recreate an ended party
+    await stale.leave();
+  });
+  it("ignores non-host controls, wrong-session and forged sender envelopes", async () => {
+    const w = world();
+    const a = await createParty({ memberId: "a", transportFactory: w.factory, derive: w.derive });
+    const b = await joinPartyByInvite({
+      memberId: "b",
+      secret: a.secret,
+      transportFactory: w.factory,
+      derive: w.derive,
+    });
+    await w.settle();
+    const events: PartyEvent[] = [];
+    a.onEvent((e) => events.push(e));
+    const base = {
+      sessionId: a.material.sessionId,
+      senderMemberId: b.memberId,
+      senderConnectionId: b.privateTransport.selfConnectionId,
+    };
+    await b.privateTransport.send({
+      channel: PARTY_CONTROL_CHANNEL,
+      payload: buildPartyKickMessage(base, { targetMemberId: a.memberId }),
+    });
+    await b.privateTransport.send({
+      channel: PARTY_CONTROL_CHANNEL,
+      payload: buildPartyReloadAllMessage({ ...base, senderMemberId: a.memberId }),
+    });
+    await b.privateTransport.send({
+      channel: PARTY_CONTROL_CHANNEL,
+      payload: buildPartyReloadAllMessage({ ...base, sessionId: "wrong-session" }),
+    });
+    await w.settle();
+    expect(events).toEqual([]);
+    const received: PartyEvent[] = [];
+    b.onEvent((e) => received.push(e));
+    await a.kickMember(b.memberId, "Leave for now. The invite remains reusable.");
+    await w.settle();
+    expect(received).toContainEqual(
+      expect.objectContaining({ type: "kick", targetMemberId: b.memberId }),
+    );
+    await a.leave();
+    await b.leave();
+  });
+  it("shares and preserves a failed transport teardown across leave callers", async () => {
+    const w = world();
+    const party = await createParty({
+      memberId: "a",
+      transportFactory: w.factory,
+      derive: w.derive,
+    });
+    let rejectLeave!: (error: Error) => void;
+    let calls = 0;
+    party.privateTransport.leave = () => {
+      calls++;
+      return new Promise<void>((_resolve, reject) => {
+        rejectLeave = reject;
+      });
+    };
+    const first = party.leave();
+    const second = party.leave();
+    const firstError = expect(first).rejects.toThrow("teardown failed");
+    const secondError = expect(second).rejects.toThrow("teardown failed");
+    await Promise.resolve();
+    expect(calls).toBe(1);
+    rejectLeave(new Error("teardown failed"));
+    await Promise.all([firstError, secondError]);
+    await expect(party.leave()).rejects.toThrow("teardown failed");
+    expect(calls).toBe(1);
+  });
+
+  it("rejects malformed invites before allocating resources without echoing secrets", async () => {
+    const w = world();
+    await expect(
+      joinPartyByInvite({ memberId: "b", secret: "never-log-me", transportFactory: w.factory }),
+    ).rejects.toThrow("This invite link is invalid");
+    expect(w.passwords).toEqual([]);
+  });
+});

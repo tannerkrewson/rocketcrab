@@ -1,0 +1,93 @@
+import type { ConnectionId, MemberId, SessionId } from "@rocketcrab/protocol";
+import type {
+  TransportConnectionState,
+  TransportEventMap,
+  TransportJoinRequest,
+  TransportPeerInfo,
+  TransportSendOptions,
+  TransportRequestOptions,
+  TransportRequestHandler,
+} from "./transport-types";
+
+/**
+ * Transport-neutral Nova transport.
+ *
+ * The single interface shared by InMemoryTransport (local test arena) and
+ * TrysteroTransport (real parties). Generated games never see this interface;
+ * the game-facing Nova API sits above it. Both implementations must pass the
+ * same contract suite.
+ *
+ * The interface is React-free and does not reference Trystero: no room
+ * objects, no peer objects, no relay configuration. Lifecycle events
+ * (join/leave/reconnect/suspension) match what a real transport produces.
+ */
+export interface NovaTransport {
+  /** Transport implementation identity, e.g. "in-memory" | "trystero". */
+  readonly kind: string;
+  /** Stable per-player identity within the party. */
+  readonly selfMemberId: MemberId;
+  /** Current connection identity; changes when the transport reconnects. */
+  readonly selfConnectionId: ConnectionId;
+  readonly connectionState: TransportConnectionState;
+  /**
+   * The session this transport is joined to (the join request's sessionId),
+   * or null before join completes / after leave. Labels every message this
+   * transport sends (peer-envelope compatibility).
+   */
+  readonly sessionId: SessionId | null;
+  /** Peers currently connected, in join order. */
+  readonly peers: readonly TransportPeerInfo[];
+
+  /**
+   * Subscribe to a transport event. Returns an unsubscribe function; calling
+   * it removes this handler.
+   */
+  on<K extends keyof TransportEventMap>(event: K, handler: TransportEventMap[K]): () => void;
+
+  /**
+   * Join a session room. Resolves once connected (after any simulated
+   * discovery latency). Rejects when the transport is not idle.
+   */
+  join(request: TransportJoinRequest): Promise<void>;
+
+  /**
+   * Leave the session cleanly. Connected peers observe `peer:left`; pending
+   * outgoing messages are discarded. Resolves when the leave completes.
+   */
+  leave(): Promise<void>;
+
+  /**
+   * Simulate a dropped connection and re-establishment (rejoin). The
+   * member keeps its `memberId` and receives a fresh `connectionId`; peers
+   * observe `peer:left` (old connection) then `peer:joined` (new connection),
+   * and the local transport emits `peer:reconnected`.
+   */
+  reconnect(): Promise<void>;
+
+  /**
+   * Simulate background suspension (Mobile Safari backgrounding).
+   * The connection drops: peers observe `peer:left`, the local state becomes
+   * "suspended", and incoming messages are buffered or dropped per the fault
+   * profile. `resume()` reconnects.
+   */
+  suspend(): Promise<void>;
+
+  /** Reconnect after {@link NovaTransport.suspend} (fresh connection ID). */
+  resume(): Promise<void>;
+
+  /**
+   * Send a message: broadcast to every connected peer, or targeted at one
+   * connection. Resolves when the message is accepted by the transport
+   * (scheduled or fully queued), not when it is received. Rejects when the
+   * transport is not connected or the payload fails validation.
+   */
+  send(options: TransportSendOptions): Promise<void>;
+  /** Directed request with a bounded response. One active request per peer /
+   * channel (so upstream receive progress can be associated without custom IDs).
+   * Rejects on timeout, disconnect, cancellation or receiver refusal. No retries.
+   * Trystero supplies the production request protocol; the in-memory adapter
+   * exercises its fault-injected counterpart. Not exposed to game frames. */
+  request(options: TransportRequestOptions): Promise<unknown>;
+  /** Register one private-shell responder; returns an idempotent unsubscribe. */
+  handleRequest(channel: string, handler: TransportRequestHandler): () => void;
+}

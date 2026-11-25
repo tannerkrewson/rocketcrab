@@ -1,0 +1,358 @@
+/** Editor-route integration tests exercise the live arena through fake runtime hosts. */
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { RouterProvider, createMemoryHistory, createRouter } from "@tanstack/react-router";
+import { render, screen, waitFor, within, fireEvent } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import type { ReactNode } from "react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { gameRepository } from "../../lib/games/instance";
+import { routeTree } from "../../routeTree.gen";
+import {
+  apiCallMessage,
+  createHarness,
+  deliver,
+  readyMessage,
+  registrationMessage,
+  runtimeErrorMessage,
+  runToStart,
+  type ArenaHarness,
+} from "../../lib/arena/test-harness";
+import { EditorRuntimeSeamsContext } from "./EditorPage";
+
+const SOURCE =
+  "<!doctype html><html><head><title>Rocket Rumble</title></head><body><p>rockets</p></body></html>";
+const PASTED_SOURCE =
+  "<!doctype html><html><head><title>Card Sharks</title></head><body><p>cards</p></body></html>";
+
+function renderEditor(initialEntries: string[], harness: ArenaHarness) {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  const router = createRouter({
+    routeTree,
+    history: createMemoryHistory({ initialEntries }),
+  });
+  const wrapper = ({ children }: { children: ReactNode }) => (
+    <QueryClientProvider client={queryClient}>
+      <EditorRuntimeSeamsContext.Provider value={harness.seams}>
+        {children}
+      </EditorRuntimeSeamsContext.Provider>
+    </QueryClientProvider>
+  );
+  return render(<RouterProvider router={router} />, { wrapper });
+}
+
+function mockClipboard(text: string) {
+  const readText = vi.fn().mockResolvedValue(text);
+  Object.defineProperty(navigator, "clipboard", {
+    value: { readText, writeText: vi.fn().mockResolvedValue(undefined) },
+    configurable: true,
+  });
+}
+
+async function openArena() {
+  return within(await screen.findByTestId("arena-section"));
+}
+
+async function desktopLayout() {
+  return within(await screen.findByTestId("arena-desktop"));
+}
+
+async function gridLayout() {
+  return within(await screen.findByTestId("arena-grid"));
+}
+
+/** Bootstraps posted for one arena player (memberId-tagged). */
+function arenaBootstraps(harness: ArenaHarness, memberId: string) {
+  return harness.windowMessages
+    .map((message) => message.data as Record<string, unknown>)
+    .filter(
+      (message) =>
+        message.type === "runtime.bootstrap" &&
+        (message.player as { memberId?: string })?.memberId === memberId,
+    );
+}
+
+/** Only the single-player runtime session's bootstraps (local-creator). */
+function runtimeBootstraps(harness: ArenaHarness) {
+  return arenaBootstraps(harness, "local-creator");
+}
+
+beforeEach(async () => {
+  await gameRepository.clear();
+  sessionStorage.clear();
+  window.localStorage.clear();
+  // The tutorial modal would hide the page from queries; tests open it explicitly.
+  window.localStorage.setItem("nova:editor-tutorial-dismissed:v1", "1");
+  document.body.innerHTML = "";
+});
+
+afterEach(() => {
+  document.body.innerHTML = "";
+});
+
+describe("ArenaSection — desktop grid", () => {
+  it("runs two simulated players to a passing test and persists the result", async () => {
+    const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
+    const harness = createHarness();
+    renderEditor([`/games/${game.id}/edit`], harness);
+    await openArena();
+
+    const grid = await gridLayout();
+    expect(grid.getByText("Player 1")).toBeInTheDocument();
+    expect(grid.getByText("Player 2")).toBeInTheDocument();
+    expect(grid.getAllByTestId(/arena-frame-/)).toHaveLength(2);
+
+    await runToStart(harness.channels, 2);
+    await waitFor(() => expect(screen.getByText("Test passed")).toBeInTheDocument());
+
+    await vi.waitFor(async () => {
+      const saved = await gameRepository.read(game.id);
+      expect(saved.lastTestSucceeded).toBe(true);
+      expect(saved.lastTestedAt).toBeDefined();
+    });
+    const bootstraps = harness.windowMessages
+      .map((message) => message.data as Record<string, unknown>)
+      .filter((message) => message.type === "runtime.bootstrap");
+    expect(bootstraps).toHaveLength(2);
+    expect(
+      new Set(bootstraps.map((bootstrap) => (bootstrap.player as { memberId: string }).memberId))
+        .size,
+    ).toBe(2);
+  });
+
+  it("resizes every frame's width with the shared horizontal drag handle", async () => {
+    const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
+    const harness = createHarness();
+    renderEditor([`/games/${game.id}/edit`], harness);
+    await openArena();
+    const grid = await gridLayout();
+    await runToStart(harness.channels, 2);
+
+    expect(grid.getByTestId("arena-player-player-1").style.width).toBe("");
+
+    const handle = grid.getByRole("separator", {
+      name: /Resize Player 1's game frame width/,
+    });
+    fireEvent.pointerDown(handle, { clientX: 300, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientX: 400, clientY: 0 });
+    fireEvent.pointerUp(window);
+    await waitFor(() => {
+      expect(grid.getByTestId("arena-player-player-1").style.width).toBe("580px");
+    });
+    expect(grid.getByTestId("arena-player-player-2").style.width).toBe("580px");
+
+    const heightHandle = grid.getByRole("separator", {
+      name: /Resize Player 1's game frame$/,
+    });
+    const frame = grid.getByTestId("arena-frame-player-1");
+    const initialHeight = Number.parseInt(frame.style.height, 10);
+    fireEvent.pointerDown(heightHandle, { clientY: 400, pointerId: 2 });
+    fireEvent.pointerMove(window, { clientY: 550, clientX: 400 });
+    fireEvent.pointerUp(window);
+    await waitFor(() => {
+      expect(frame.style.height).toBe(`${initialHeight + 150}px`);
+    });
+  });
+
+  it("drops the window drag listeners when the arena unmounts mid-drag", async () => {
+    const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
+    const harness = createHarness();
+    const { unmount } = renderEditor([`/games/${game.id}/edit`], harness);
+    await openArena();
+    const grid = await gridLayout();
+    await runToStart(harness.channels, 2);
+
+    fireEvent.pointerDown(grid.getByRole("separator", { name: /Resize Player 1's game frame$/ }), {
+      clientY: 400,
+      pointerId: 2,
+    });
+    const removeListener = vi.spyOn(window, "removeEventListener");
+    unmount();
+
+    // The pointer never comes up here, so the drag must release its own
+    // window listeners instead of calling setState on an unmounted arena.
+    expect(removeListener).toHaveBeenCalledWith("pointermove", expect.any(Function));
+    expect(removeListener).toHaveBeenCalledWith("pointerup", expect.any(Function));
+    removeListener.mockRestore();
+  });
+
+  it("shows per-player connection badges and per-player controls", async () => {
+    const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
+    const harness = createHarness();
+    renderEditor([`/games/${game.id}/edit`], harness);
+    await openArena();
+    await runToStart(harness.channels, 2);
+    const playerCard = within(screen.getByTestId("arena-player-player-1"));
+    // Connection controls live behind Advanced; Remove and Authority are always shown.
+    expect(playerCard.queryByRole("button", { name: /Disconnect/ })).not.toBeInTheDocument();
+    expect(playerCard.getByRole("button", { name: /Remove Player 1/ })).toBeInTheDocument();
+    await userEvent.click((await desktopLayout()).getByRole("button", { name: /^Advanced$/ }));
+    await waitFor(() => expect(playerCard.getAllByText("Connected").length).toBeGreaterThan(0));
+    expect(playerCard.getByRole("button", { name: /Disconnect/ })).toBeInTheDocument();
+    expect(playerCard.getByRole("button", { name: /Suspend/ })).toBeInTheDocument();
+    expect(playerCard.getByRole("button", { name: /Remove Player 1/ })).toBeInTheDocument();
+    expect(playerCard.getByText("Authority")).toBeInTheDocument();
+
+    await userEvent.click(playerCard.getByRole("button", { name: /Disconnect/ }));
+    await waitFor(() => expect(playerCard.getAllByText("Disconnected").length).toBeGreaterThan(0));
+    expect(playerCard.getByRole("button", { name: /Reconnect/ })).toBeInTheDocument();
+    await userEvent.click(playerCard.getByRole("button", { name: /Reconnect/ }));
+    await waitFor(() => expect(playerCard.getAllByText("Connected").length).toBeGreaterThan(0));
+  });
+
+  it("adds a player from the shared toolbar with a distinct identity", async () => {
+    const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
+    const harness = createHarness();
+    renderEditor([`/games/${game.id}/edit`], harness);
+    await openArena();
+    const desktop = await desktopLayout();
+    await runToStart(harness.channels, 2);
+
+    await userEvent.click(desktop.getByRole("button", { name: /Add player/ }));
+    const grid = await gridLayout();
+    await waitFor(() => expect(grid.getByText("Player 3")).toBeInTheDocument());
+
+    await vi.waitFor(() => expect(harness.channels.length).toBe(3));
+    deliver(harness.channels[2]!.port1, readyMessage());
+    deliver(harness.channels[2]!.port1, registrationMessage("Game 3"));
+    deliver(harness.channels[2]!.port1, apiCallMessage("ready", {}));
+    await waitFor(() => expect(screen.getByText("Test passed")).toBeInTheDocument());
+    expect(screen.getByText("member-3")).toBeInTheDocument();
+  });
+
+  it("attributes runtime errors to the correct player's logs", async () => {
+    const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
+    const harness = createHarness();
+    renderEditor([`/games/${game.id}/edit`], harness);
+    await openArena();
+    await runToStart(harness.channels, 2);
+
+    deliver(harness.channels[1]!.port1, runtimeErrorMessage("syntax", "Oops in player 2"));
+    const player1 = screen.getByTestId("arena-logs-player-1");
+    const player2 = screen.getByTestId("arena-logs-player-2");
+    await waitFor(() => expect(player2).toHaveTextContent("Oops in player 2"));
+    expect(player1).not.toHaveTextContent("Oops in player 2");
+  });
+
+  it("mounts every player's game frame inside the shared grid (player 2 regression)", async () => {
+    // Desktop and mobile must share one frame binding per player; duplicate
+    // bindings let hidden cards steal the visible player's container.
+    const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
+    const harness = createHarness();
+    renderEditor([`/games/${game.id}/edit`], harness);
+    await openArena();
+    const grid = await gridLayout();
+    await runToStart(harness.channels, 2);
+
+    for (const id of ["player-1", "player-2"]) {
+      expect(grid.getByTestId(`arena-frame-${id}`).querySelector("iframe")).not.toBeNull();
+    }
+    expect(harness.frames).toHaveLength(2);
+    for (const frame of harness.frames) {
+      expect(frame.closest('[data-testid="arena-grid"]')).not.toBeNull();
+    }
+  });
+
+  it("applies the shared latency control (behind Advanced)", async () => {
+    const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
+    const harness = createHarness();
+    renderEditor([`/games/${game.id}/edit`], harness);
+    await openArena();
+    const desktop = await desktopLayout();
+    await runToStart(harness.channels, 2);
+
+    expect(desktop.queryByLabelText("Artificial latency")).not.toBeInTheDocument();
+    await userEvent.click(desktop.getByRole("button", { name: /^Advanced$/ }));
+
+    const latency = desktop.getByLabelText("Artificial latency");
+    fireEvent.change(latency, { target: { value: "300" } });
+    await waitFor(() => expect(desktop.getByText("Latency 300ms")).toBeInTheDocument());
+  });
+
+  it("removes a player and stops its frame, staying mounted", async () => {
+    const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
+    const harness = createHarness();
+    renderEditor([`/games/${game.id}/edit`], harness);
+    const section = await openArena();
+    await runToStart(harness.channels, 2);
+
+    await userEvent.click(section.getByRole("button", { name: /Remove Player 2/ }));
+    const grid = within(await screen.findByTestId("arena-grid"));
+    await waitFor(() =>
+      expect(grid.queryByTestId("arena-player-player-2")).not.toBeInTheDocument(),
+    );
+    expect(grid.getByTestId("arena-player-player-1")).toBeInTheDocument();
+    expect(screen.getByTestId("arena-section")).toBeInTheDocument();
+  });
+});
+
+describe("ArenaSection — phone layout", () => {
+  it("switches among four simulated players with tabs, all frames mounted", async () => {
+    const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
+    const harness = createHarness();
+    renderEditor([`/games/${game.id}/edit`], harness);
+    await openArena();
+    const desktop = await desktopLayout();
+    await runToStart(harness.channels, 2);
+    for (const name of ["Player 3", "Player 4"]) {
+      await userEvent.click(desktop.getByRole("button", { name: /Add player/ }));
+      await vi.waitFor(() => expect(harness.channels.length).toBeGreaterThanOrEqual(3));
+      const index = harness.channels.length - 1;
+      deliver(harness.channels[index]!.port1, readyMessage());
+      deliver(harness.channels[index]!.port1, registrationMessage(name));
+      deliver(harness.channels[index]!.port1, apiCallMessage("ready", {}));
+    }
+
+    const mobile = within(await screen.findByTestId("arena-mobile"));
+    const tabs = within(mobile.getByRole("tablist", { name: "Simulated players" }));
+    for (const name of ["Player 1", "Player 2", "Player 3", "Player 4"]) {
+      expect(tabs.getByRole("tab", { name })).toBeInTheDocument();
+    }
+    expect(tabs.getByRole("tab", { name: "Player 1" })).toHaveAttribute("aria-selected", "true");
+    // On phones only the active card is visible; the rest stay mounted with
+    // a max-md:hidden class so switching tabs never reloads a frame.
+    expect(screen.getByTestId("arena-card-player-1").className).not.toContain("max-md:hidden");
+    expect(screen.getByTestId("arena-card-player-2").className).toContain("max-md:hidden");
+    await userEvent.click(tabs.getByRole("tab", { name: "Player 4" }));
+    expect(tabs.getByRole("tab", { name: "Player 4" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByTestId("arena-card-player-4").className).not.toContain("max-md:hidden");
+    expect(screen.getAllByTestId(/arena-frame-/)).toHaveLength(4);
+    expect(mobile.getByRole("button", { name: /Add player/ })).toBeInTheDocument();
+  });
+});
+
+describe("ArenaSection — source handoff and re-testing", () => {
+  it("pasting re-tests the arena with the new source without touching the saved copy", async () => {
+    const game = await gameRepository.create({ title: "Rocket Rumble", html: SOURCE });
+    mockClipboard(PASTED_SOURCE);
+    const harness = createHarness();
+    renderEditor([`/games/${game.id}/edit`], harness);
+
+    await runToStart(harness.channels, 2);
+    await waitFor(() => expect(screen.getByText("Test passed")).toBeInTheDocument());
+
+    // Paste replaces the code and runs it at once (no separate Run step).
+    await userEvent.click(screen.getByRole("button", { name: /^Paste game$/ }));
+    await vi.waitFor(() => expect(runtimeBootstraps(harness)).toHaveLength(1));
+    const runtimeIndex = harness.channels.length - 1;
+    deliver(harness.channels[runtimeIndex]!.port1, readyMessage());
+    await vi.waitFor(() => {
+      const restarts = arenaBootstraps(harness, "member-1");
+      expect(restarts.at(-1)?.gameSource).toBe(PASTED_SOURCE);
+    });
+    expect(screen.queryByRole("button", { name: /^Run$/ })).not.toBeInTheDocument();
+    const saved = await gameRepository.read(game.id);
+    expect(saved.html).toBe(SOURCE);
+    expect(sessionStorage.getItem("nova:arena-source:v1")).toBeNull();
+  });
+
+  it("starts a new game on an empty paste prompt instead of an empty arena", async () => {
+    const harness = createHarness();
+    renderEditor(["/editor"], harness);
+
+    expect(await screen.findByTestId("editor-empty-state")).toBeInTheDocument();
+    expect(screen.queryByTestId("arena-section")).not.toBeInTheDocument();
+    expect(harness.channels).toHaveLength(0);
+  });
+});

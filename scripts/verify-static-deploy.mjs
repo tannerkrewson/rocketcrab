@@ -1,0 +1,200 @@
+#!/usr/bin/env node
+/**
+ * Static-deploy verification (deploy/README.md).
+ *
+ * Checks a built origin's dist output against the deployment requirements
+ * before it is published. Runs after `vite build` in the static deploy scripts
+ * and locally via `npm run verify:deploy`. Exit code 0 keeps
+ * the deploy going; a non-zero exit aborts it.
+ *
+ * Nova origin (strict main-origin policy):
+ *   - index.html carries the build-time CSP meta tag, and _headers carries
+ *     the matching policy with `frame-src` pinned to the runtime origin;
+ *   - application scripts come from the main origin, Turnstile, or configured analytics providers;
+ *   - the referrer meta tag is present (no path/query leakage; invite
+ *     secrets already live in URL fragments).
+ *
+ * Runtime origin (permissive policy, compensating controls):
+ *   - NO CSP meta (game HTML keeps ordinary web capabilities);
+ *   - the referrer meta tag is present;
+ *   - the bundle registers no service worker (no persistent network
+ *     control over game traffic).
+ *
+ * Usage:
+ *   node scripts/verify-static-deploy.mjs --origin nova|runtime --runtime-origin <origin> --main-origin <origin>
+ */
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+import { fileURLToPath } from "node:url";
+
+const args = parseArgs(process.argv.slice(2));
+const origin = args.origin;
+const runtimeOrigin = args.runtimeOrigin ?? "";
+const mainOrigin = args.mainOrigin ?? "";
+if (origin !== "nova" && origin !== "runtime") {
+  fail(`--origin must be "nova" or "runtime" (got "${origin}")`);
+}
+
+const DIST = fileURLToPath(new URL(`../apps/${origin}/dist`, import.meta.url));
+const indexHtml = readFile(join(DIST, "index.html"), `${origin} index.html`);
+const errors = [];
+const headers = readFile(join(DIST, "_headers"), `${origin} _headers`);
+const headerCsp = /^\s*Content-Security-Policy:\s*(.+)$/im.exec(headers)?.[1] ?? "";
+
+/** Record a check result and remember failures (exit non-zero at the end). */
+function expect(description, condition, detail = "") {
+  console.log(`${condition ? "ok" : "FAIL"}  ${description}${detail ? `: ${detail}` : ""}`);
+  if (!condition) {
+    errors.push(description);
+  }
+}
+
+expect("CSP response header present", headerCsp !== "");
+if (origin === "nova") {
+  expect("main CSP denies framing", /(?:^|;)\s*frame-ancestors\s+'none'\s*(?:;|$)/.test(headerCsp));
+  // Strict main-origin policy: CSP delivered as a build-time meta tag.
+  const cspMatch = /<meta[^>]*http-equiv="Content-Security-Policy"[^>]*>/i.exec(indexHtml);
+  expect("CSP meta tag present", cspMatch !== null);
+  if (cspMatch !== null) {
+    const contentMatch = /content="([^"]*)"/i.exec(cspMatch[0]);
+    const csp = decodeHtmlEntities(contentMatch?.[1] ?? "");
+    expect(
+      "header CSP matches meta plus frame-ancestors",
+      headerCsp === `${csp}; frame-ancestors 'none'`,
+    );
+    if (runtimeOrigin === "") {
+      expect(
+        "runtime origin supplied for a nova deploy",
+        false,
+        "pass --runtime-origin (the workflow input) — it is baked into the CSP frame-src",
+      );
+    } else {
+      const normalized = new URL(runtimeOrigin).origin;
+      const permissions = /^\s*Permissions-Policy:\s*(.+)$/im.exec(headers)?.[1] ?? "";
+      for (const feature of ["camera", "microphone"]) {
+        expect(
+          `Nova delegates ${feature} to the runtime`,
+          permissions.includes(`${feature}=(self "${normalized}")`),
+        );
+      }
+      expect(
+        "CSP frame-src includes the configured runtime origin",
+        csp.includes(`frame-src ${normalized}`),
+        `expected frame-src ${normalized}`,
+      );
+    }
+    const scriptSrc = /script-src ([^;]+)/.exec(csp)?.[1] ?? "";
+    const expectsAnalytics = /^G-[A-Z0-9]+$/.test(process.env.VITE_GA_MEASUREMENT_ID?.trim() ?? "");
+    const tagSource = expectsAnalytics ? " https://www.googletagmanager.com" : "";
+    const expectsClarity = /^[a-z0-9]+$/.test(process.env.VITE_CLARITY_PROJECT_ID?.trim() ?? "");
+    const claritySource = expectsClarity ? " https://*.clarity.ms" : "";
+    expect(
+      "CSP script-src permits only the app and configured external scripts",
+      scriptSrc.trim() === `'self' https://challenges.cloudflare.com${tagSource}${claritySource}`,
+    );
+    for (const directive of ["connect-src", "img-src"]) {
+      const sources = new RegExp(`(?:^|;)\\s*${directive} ([^;]+)`)
+        .exec(csp)?.[1]
+        .trim()
+        .split(/\s+/);
+      expect(
+        `CSP ${directive} permits Clarity when configured`,
+        sources?.includes("https://*.clarity.ms") === expectsClarity,
+      );
+    }
+    expect(
+      "CSP has no 'unsafe-inline'/'unsafe-eval' for scripts",
+      !/unsafe-inline|unsafe-eval/.test(scriptSrc),
+    );
+  }
+  const inlineScript = /<script(?![^>]*\bsrc=)[^>]*>/i.exec(indexHtml);
+  expect("no inline application scripts", inlineScript === null, inlineScript?.[0] ?? "");
+  expect("referrer meta (no-referrer)", isNoReferrerMeta(indexHtml));
+} else {
+  expect(
+    "runtime CSP permits only the main origin to frame it",
+    mainOrigin !== "" &&
+      /(?:^|;)\s*frame-ancestors\s+([^;]+)/.exec(headerCsp)?.[1].trim() ===
+        new URL(mainOrigin).origin,
+  );
+  expect(
+    "runtime CSP blocks nested frame navigation",
+    /(?:^|;)\s*frame-src\s+'none'\s*(?:;|$)/.test(headerCsp),
+  );
+  expect("runtime CSP blocks workers", /(?:^|;)\s*worker-src\s+'none'\s*(?:;|$)/.test(headerCsp));
+  // Runtime policy comes from the HTTP header, which also controls workers.
+  expect(
+    "runtime has NO CSP meta (permissive by design)",
+    !/<meta[^>]*http-equiv="Content-Security-Policy"[^>]*>/i.test(indexHtml),
+  );
+  expect("referrer meta (no-referrer)", isNoReferrerMeta(indexHtml));
+  const swHits = scanForServiceWorker(DIST);
+  expect("no service worker registration in the bundle", swHits.length === 0, swHits.join(", "));
+}
+
+if (errors.length > 0) {
+  console.error(
+    `\nverify-static-deploy: ${errors.length} check(s) failed for the ${origin} origin`,
+  );
+  process.exit(1);
+}
+console.log(`\nverify-static-deploy: ${origin} origin OK`);
+
+function isNoReferrerMeta(html) {
+  return /<meta[^>]*name="referrer"[^>]*content="no-referrer"/i.test(html);
+}
+
+/** Decode the numeric/entity escapes Vite emits inside HTML attributes. */
+function decodeHtmlEntities(value) {
+  return value
+    .replaceAll("&#39;", "'")
+    .replaceAll("&quot;", '"')
+    .replaceAll("&lt;", "<")
+    .replaceAll("&gt;", ">")
+    .replaceAll("&amp;", "&");
+}
+
+function scanForServiceWorker(dist) {
+  const hits = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir)) {
+      const full = join(dir, entry);
+      if (statSync(full).isDirectory()) {
+        walk(full);
+      } else if (
+        entry.endsWith(".js") &&
+        /serviceWorker\.register/.test(readFileSync(full, "utf8"))
+      ) {
+        hits.push(entry);
+      }
+    }
+  };
+  walk(dist);
+  return hits;
+}
+
+function readFile(file, label) {
+  if (!existsSync(file)) {
+    fail(`${label} missing: ${file}`);
+  }
+  return readFileSync(file, "utf8");
+}
+
+function fail(message) {
+  console.error(`verify-static-deploy: ${message}`);
+  process.exit(1);
+}
+
+function parseArgs(argv) {
+  const out = {};
+  for (let i = 0; i < argv.length; i++) {
+    const arg = argv[i];
+    if (arg === "--origin" || arg === "--runtime-origin" || arg === "--main-origin") {
+      const key =
+        arg === "--origin" ? "origin" : arg === "--runtime-origin" ? "runtimeOrigin" : "mainOrigin";
+      out[key] = argv[i + 1] ?? "";
+      i += 1;
+    }
+  }
+  return out;
+}

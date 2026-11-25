@@ -1,0 +1,21 @@
+pre-commit:
+  parallel: true
+  commands:
+    format-check:
+      glob: "*.{js,jsx,ts,tsx,json,css,html,md,yml,yaml}"
+      run: npm exec -- oxfmt --check --no-error-on-unmatched-pattern {staged_files}
+    lint:
+      glob: "*.{js,jsx,ts,tsx}"
+      run: npm exec -- oxlint {staged_files}
+
+pre-push:
+  parallel: true
+  commands:
+    lint:
+      run: npm run lint
+    typecheck:
+      run: npm run typecheck
+    test:
+      run: npm run test
+    build:
+      run: npm run build

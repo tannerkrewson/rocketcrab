@@ -1,0 +1,434 @@
+import { z } from "zod";
+import { runtimeEnvelopeFields } from "../envelope";
+import {
+  displayNameSchema,
+  gameIdSchema,
+  memberIdSchema,
+  sha256Schema,
+  timestampSchema,
+  titleSchema,
+} from "../ids";
+import { htmlSourceSchema, playerLimitMax, tickRateMax } from "../limits";
+import { novaActionSchema } from "../nova-api";
+import { gameEndReasonSchema } from "./shared";
+
+/**
+ * Runtime-plane message schemas (host ↔ runtime).
+ *
+ * Session-router messages connect the test arena and real parties through
+ * the runtime protocol: `game.apiCall` carries a validated Nova API call from the game
+ * frame (via the runtime) to the host's session router, and `game.apiEvent`
+ * carries a session event from the host back into the frame. Both travel on
+ * the same dedicated MessageChannel as every other runtime message and are
+ * validated at both ends.
+ */
+
+/** Connection status values the arena pushes into a frame. */
+export const novaConnectionStatusSchema = z.enum([
+  "connecting",
+  "connected",
+  "reconnecting",
+  "suspended",
+  "disconnected",
+]);
+export type NovaConnectionStatus = z.infer<typeof novaConnectionStatusSchema>;
+
+/** One player as the host pushes it into a frame (`NovaPlayer` shape). */
+export const novaPlayerSchema = z.object({
+  id: memberIdSchema,
+  name: displayNameSchema,
+});
+export type NovaPlayer = z.infer<typeof novaPlayerSchema>;
+
+/**
+ * State requests the host sends into the authority's game frame
+ * (`stateRequest` apiEvent): create the initial state, apply one action to
+ * the canonical state, or compute one player's view. The game's handler
+ * functions live in the frame; only plain data crosses the boundary.
+ */
+export const stateRequestSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("createInitialState"),
+      context: z.unknown(),
+      viewers: z.array(novaPlayerSchema),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("applyAction"),
+      actionId: z.string().min(1).max(64),
+      actionType: z.string().min(1).max(64),
+      payload: z.unknown(),
+      state: z.unknown(),
+      context: z.unknown(),
+      viewers: z.array(novaPlayerSchema),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("computeView"),
+      state: z.unknown(),
+      viewer: novaPlayerSchema,
+      context: z.unknown(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("tick"),
+      state: z.unknown(),
+      context: z.unknown(),
+      steps: z.number().int().min(1).max(tickRateMax),
+      viewers: z.array(novaPlayerSchema),
+    })
+    .strict(),
+]);
+export type StateRequest = z.infer<typeof stateRequestSchema>;
+
+/**
+ * The frame's answer to a `stateRequest`: the new canonical state plus
+ * every player's view, one player's view, or a stable rejection.
+ */
+export const stateResponseSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      kind: z.literal("state"),
+      ok: z.literal(true),
+      state: z.unknown(),
+      views: z.record(memberIdSchema, z.unknown()),
+      /** The game has no selectView, so `views` is empty: each view is the state. */
+      viewIsState: z.literal(true).optional(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("view"),
+      ok: z.literal(true),
+      view: z.unknown(),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal("error"),
+      ok: z.literal(false),
+      code: z.string().min(1).max(64),
+      message: z.string().max(256),
+    })
+    .strict(),
+]);
+export type StateResponse = z.infer<typeof stateResponseSchema>;
+
+/** Bounded call payloads validated at both runtime and host boundaries. */
+export const novaApiCallSchemas = {
+  ready: z.object({}).strict(),
+  dispatch: z
+    .object({
+      action: novaActionSchema,
+      // The frame generates the action id so the host can correlate the
+      // authority's ack back to the dispatch promise.
+      actionId: z.string().min(1).max(64),
+    })
+    .strict(),
+  "controls.set": z.object({ controls: z.unknown() }).strict(),
+  stateResponse: z
+    .object({
+      requestId: z.string().min(1).max(64),
+      result: stateResponseSchema,
+    })
+    .strict(),
+} as const;
+
+const novaApiCallMethodSchema = z.object(novaApiCallSchemas).keyof();
+export type NovaApiCallMethod = z.infer<typeof novaApiCallMethodSchema>;
+
+/** A call forwarded from the game frame to the host session. */
+export const gameApiCallMessageSchema = z
+  .object({
+    ...runtimeEnvelopeFields,
+    type: z.literal("game.apiCall"),
+    method: novaApiCallMethodSchema,
+    payload: z.unknown(),
+  })
+  .strict();
+export type GameApiCallMessage = z.infer<typeof gameApiCallMessageSchema>;
+
+/**
+ * Action acks pushed into the dispatcher's frame so `nova.dispatch`
+ * promises resolve when the authority applies or rejects the action.
+ */
+export const actionAckEventSchema = z
+  .object({
+    kind: z.literal("actionAck"),
+    actionId: z.string().min(1).max(64),
+    status: z.enum(["accepted", "rejected", "superseded"]),
+    revision: z.number().int().nonnegative().optional(),
+    errorCode: z.string().min(1).max(64).optional(),
+    errorMessage: z.string().max(256).optional(),
+  })
+  .strict();
+export type ActionAckEvent = z.infer<typeof actionAckEventSchema>;
+
+/**
+ * A session event pushed from the host into one runtime frame. Plain data
+ * only (functions registered by a game never cross the frame); the bridge
+ * dispatches each kind to the matching `window.nova` handler list.
+ */
+export const gameApiEventSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("identity"), player: novaPlayerSchema }),
+  z.object({ kind: z.literal("playerJoined"), player: novaPlayerSchema }),
+  z.object({ kind: z.literal("playerLeft"), player: novaPlayerSchema }),
+  z.object({ kind: z.literal("connection"), status: novaConnectionStatusSchema }),
+  z.object({ kind: z.literal("start") }),
+  z.object({ kind: z.literal("end"), reason: gameEndReasonSchema }),
+  z.object({ kind: z.literal("state"), state: z.unknown() }),
+  z.object({
+    kind: z.literal("error"),
+    code: z.string().min(1).max(64),
+    message: z.string().min(1).max(512),
+  }),
+  z
+    .object({
+      kind: z.literal("stateRequest"),
+      requestId: z.string().min(1).max(64),
+      request: stateRequestSchema,
+    })
+    .strict(),
+  actionAckEventSchema,
+]);
+export type GameApiEvent = z.infer<typeof gameApiEventSchema>;
+
+/** Host → runtime: push one session event into the game frame. */
+export const gameApiEventMessageSchema = z
+  .object({
+    ...runtimeEnvelopeFields,
+    type: z.literal("game.apiEvent"),
+    event: gameApiEventSchema,
+  })
+  .strict();
+export type GameApiEventMessage = z.infer<typeof gameApiEventMessageSchema>;
+
+/**
+ * Runtime-plane messages (host ↔ runtime): messages between the Nova shell
+ * and the runtime frame over the dedicated MessageChannel. Every schema extends
+ * the runtime envelope, so each message carries
+ * the protocol version, message type, runtime instance ID, unique message
+ * ID, and timestamp. Unlike peer messages there are no member/connection IDs:
+ * the runtime frame is not a party member, it is an isolated execution
+ * context.
+ */
+
+/**
+ * Runtime bootstrap: the host hands a game document to the runtime frame for
+ * execution. Carries the full untrusted HTML
+ * source, bounded by `htmlSourceBytes`, plus the player's identity and any
+ * delegated permissions (`allow` must be carried at every iframe hop).
+ */
+export const runtimeBootstrapMessageSchema = z.object({
+  ...runtimeEnvelopeFields,
+  type: z.literal("runtime.bootstrap"),
+  gameId: gameIdSchema,
+  gameTitle: titleSchema.optional(),
+  gameSource: htmlSourceSchema,
+  player: z.object({
+    memberId: memberIdSchema,
+    displayName: displayNameSchema,
+  }),
+  permissions: z
+    .object({
+      allow: z.array(z.string().min(1).max(32)),
+    })
+    .optional(),
+});
+export type RuntimeBootstrapMessage = z.infer<typeof runtimeBootstrapMessageSchema>;
+
+/** Runtime readiness: the runtime processed the bootstrap and is ready. */
+export const runtimeReadinessMessageSchema = z.object({
+  ...runtimeEnvelopeFields,
+  type: z.literal("runtime.ready"),
+  status: z.literal("ready"),
+});
+export type RuntimeReadinessMessage = z.infer<typeof runtimeReadinessMessageSchema>;
+
+/**
+ * Game registration: the game (via the Nova API bridge) declares itself to
+ * the runtime, which forwards the registration to the host.
+ */
+export const gameRegistrationMessageSchema = z.object({
+  ...runtimeEnvelopeFields,
+  type: z.literal("game.registration"),
+  gameId: gameIdSchema,
+  title: titleSchema,
+  /** The game's own declared version; distinct from the protocol version. */
+  gameVersion: z.string().min(1).max(32).optional(),
+  /** Ticks per second, present when the game declared a `tick` handler. */
+  tickRate: z.number().int().min(1).max(tickRateMax).optional(),
+  /** Fewest players the game supports, when it declared one. */
+  minPlayers: z.number().int().min(1).max(playerLimitMax).optional(),
+  /** Most players the game supports, when it declared one. */
+  maxPlayers: z.number().int().min(1).max(playerLimitMax).optional(),
+});
+export type GameRegistrationMessage = z.infer<typeof gameRegistrationMessageSchema>;
+
+/**
+ * Game metadata: the descriptor for a saved game
+ * shared between host contexts, and the same descriptor embedded as a
+ * runtime-plane message when the host hands metadata to the runtime or test
+ * arena.
+ */
+export const gameMetadataSchema = z.object({
+  gameId: gameIdSchema,
+  title: titleSchema,
+  description: z.string().max(512).optional(),
+  createdAtMs: timestampSchema,
+  updatedAtMs: timestampSchema,
+  sourceSha256: sha256Schema,
+  sourceSizeBytes: z.number().int().nonnegative(),
+});
+export type GameMetadata = z.infer<typeof gameMetadataSchema>;
+
+export const gameMetadataMessageSchema = z.object({
+  ...runtimeEnvelopeFields,
+  type: z.literal("game.metadata"),
+  game: gameMetadataSchema,
+});
+export type GameMetadataMessage = z.infer<typeof gameMetadataMessageSchema>;
+
+/**
+ * Runtime error: an observable failure report from the runtime (categories:
+ * empty source, missing structure/registration, oversized source,
+ * syntax errors, remote load failures). Rate-limited by
+ * `errorReportRatePerSecond`.
+ */
+export const runtimeErrorMessageSchema = z.object({
+  ...runtimeEnvelopeFields,
+  type: z.literal("runtime.error"),
+  category: z.enum([
+    "empty_source",
+    "invalid_html",
+    "missing_registration",
+    "oversized_source",
+    "syntax",
+    "remote_load",
+    "game",
+    "runtime",
+    "crash",
+    "security",
+    "unsupported",
+  ]),
+  message: z.string().min(1).max(512),
+  details: z.record(z.string(), z.unknown()).optional(),
+  stack: z.string().max(4096).optional(),
+});
+export type RuntimeErrorMessage = z.infer<typeof runtimeErrorMessageSchema>;
+
+/**
+ * Game lifecycle event: load / reload / destroy / suspend / resume / restore.
+ */
+export const gameLifecycleEventMessageSchema = z.object({
+  ...runtimeEnvelopeFields,
+  type: z.literal("game.lifecycle"),
+  event: z.enum([
+    "created",
+    "loaded",
+    "started",
+    "paused",
+    "resumed",
+    "suspended",
+    "restored",
+    "reloaded",
+    "destroyed",
+  ]),
+  detail: z.string().max(256).optional(),
+});
+export type GameLifecycleEventMessage = z.infer<typeof gameLifecycleEventMessageSchema>;
+
+/**
+ * End-game request: the host asks the runtime to tear the game down (the
+ * Emergency Stop control lives outside the frame and cannot be disabled by
+ * game code).
+ */
+export const endGameRequestMessageSchema = z.object({
+  ...runtimeEnvelopeFields,
+  type: z.literal("game.end"),
+  reason: gameEndReasonSchema,
+});
+export type EndGameRequestMessage = z.infer<typeof endGameRequestMessageSchema>;
+
+/**
+ * Runtime heartbeat ping: the host asks the runtime to confirm liveness
+ * (a wedged runtime must be visible
+ * to the shell).
+ */
+export const runtimePingMessageSchema = z
+  .object({
+    ...runtimeEnvelopeFields,
+    type: z.literal("runtime.ping"),
+  })
+  .strict();
+export type RuntimePingMessage = z.infer<typeof runtimePingMessageSchema>;
+
+/** Runtime heartbeat pong: the runtime's liveness reply to `runtime.ping`. */
+export const runtimePongMessageSchema = z
+  .object({
+    ...runtimeEnvelopeFields,
+    type: z.literal("runtime.pong"),
+  })
+  .strict();
+export type RuntimePongMessage = z.infer<typeof runtimePongMessageSchema>;
+
+/**
+ * Reload request: the host asks the runtime to re-run the current game in a
+ * completely fresh frame (same source, clean state).
+ */
+export const runtimeReloadMessageSchema = z
+  .object({
+    ...runtimeEnvelopeFields,
+    type: z.literal("runtime.reload"),
+  })
+  .strict();
+export type RuntimeReloadMessage = z.infer<typeof runtimeReloadMessageSchema>;
+
+/**
+ * Console capture: a rate-limited console entry from the game frame
+ * (runtime error-panel diagnostics). Entries are capped by
+ * `runtimeLogRatePerSecond`; the runtime reports how many entries it
+ * dropped since the previous forwarded entry.
+ */
+export const runtimeConsoleMessageSchema = z
+  .object({
+    ...runtimeEnvelopeFields,
+    type: z.literal("runtime.console"),
+    level: z.enum(["debug", "log", "info", "warn", "error"]),
+    message: z.string().min(1).max(1024),
+    /** Serialized, truncated console arguments. */
+    details: z.string().max(4096).optional(),
+    /** Console entries dropped by the runtime rate limiter since this entry. */
+    dropped: z.number().int().nonnegative().optional(),
+  })
+  .strict();
+export type RuntimeConsoleMessage = z.infer<typeof runtimeConsoleMessageSchema>;
+
+/** Every runtime-plane message schema, discriminated by `type`. */
+export const runtimeMessagesSchema = z.discriminatedUnion("type", [
+  runtimeBootstrapMessageSchema,
+  runtimeReadinessMessageSchema,
+  gameRegistrationMessageSchema,
+  gameMetadataMessageSchema,
+  runtimeErrorMessageSchema,
+  gameLifecycleEventMessageSchema,
+  endGameRequestMessageSchema,
+  runtimePingMessageSchema,
+  runtimePongMessageSchema,
+  runtimeReloadMessageSchema,
+  runtimeConsoleMessageSchema,
+  gameApiCallMessageSchema,
+  gameApiEventMessageSchema,
+]);
+
+/** All runtime-plane message type strings, for useful unknown-type errors. */
+export const RUNTIME_MESSAGE_TYPES: readonly string[] = runtimeMessagesSchema.options.map(
+  (option) => option.shape.type.value,
+);
+
+/** Any valid runtime-plane message. */
+export type RuntimeMessage = z.infer<typeof runtimeMessagesSchema>;

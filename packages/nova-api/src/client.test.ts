@@ -1,0 +1,328 @@
+import { describe, expect, it, vi } from "vitest";
+import {
+  createNovaClient,
+  type NovaClient,
+  type NovaClientBackend,
+  type NovaSessionEvent,
+} from "./client";
+import { NovaError } from "./errors";
+import type { NovaGameDeclaration, NovaPlayer } from "./types";
+
+/** A recording backend for client-only tests. */
+function makeClient(overrides: Partial<NovaClientBackend> = {}): {
+  client: NovaClient;
+  backend: NovaClientBackend;
+  calls: string[];
+  emit: (event: NovaSessionEvent) => void;
+  /** The actionId the last dispatch passed to the backend. */
+  lastActionId: () => string | null;
+  /** Settle the last dispatch with an authority ack. */
+  ackLastDispatch: (status: "accepted" | "rejected" | "superseded", extra?: object) => void;
+} {
+  const calls: string[] = [];
+  let lastActionIdValue: string | null = null;
+  const listeners = new Set<(event: NovaSessionEvent) => void>();
+  const emit = (event: NovaSessionEvent): void => {
+    for (const listener of listeners) {
+      listener(event);
+    }
+  };
+  const backend: NovaClientBackend = {
+    apiVersion: 1,
+    self: { id: "member-a", name: "Ada" },
+    register() {
+      calls.push("register");
+    },
+    ready() {
+      calls.push("ready");
+    },
+    dispatch(_action, actionId) {
+      calls.push("dispatch");
+      lastActionIdValue = actionId;
+      return Promise.resolve();
+    },
+    setControls() {
+      calls.push("setControls");
+    },
+    onEvent(handler) {
+      listeners.add(handler);
+      return () => {
+        listeners.delete(handler);
+      };
+    },
+    ...overrides,
+  };
+  return {
+    client: createNovaClient(backend),
+    backend,
+    calls,
+    emit,
+    lastActionId: () => lastActionIdValue,
+    ackLastDispatch: (status, extra = {}) => {
+      const actionId = lastActionIdValue;
+      if (actionId === null) {
+        throw new Error("no dispatch recorded");
+      }
+      emit({ type: "actionAck", ack: { actionId, status, ...extra } });
+    },
+  };
+}
+
+function expectNovaError(fn: () => unknown, code: string): void {
+  try {
+    fn();
+    expect.unreachable("expected a NovaError");
+  } catch (error) {
+    expect(error).toBeInstanceOf(NovaError);
+    expect((error as NovaError).code).toBe(code);
+  }
+}
+
+describe("createNovaClient lifecycle", () => {
+  it("registers a valid game and forwards it to the backend", () => {
+    const { client, calls } = makeClient();
+    expect(client.version).toBe(1);
+    client.defineGame({ title: "My Game", version: "1.0.0" });
+    expect(calls).toEqual(["register"]);
+    expectNovaError(() => client.defineGame({}), "already_registered");
+  });
+
+  it("rejects unknown API versions safely", () => {
+    const { client } = makeClient();
+    expectNovaError(() => client.defineGame({ apiVersion: 99 }), "unsupported_api_version");
+    expectNovaError(() => client.defineGame({ apiVersion: 2 }), "unsupported_api_version");
+  });
+
+  it("declares a tick and its rate, and forwards controls", () => {
+    const { client, calls, backend } = makeClient();
+    let declared: NovaGameDeclaration | undefined;
+    backend.register = (declaration) => {
+      declared = declaration;
+    };
+    client.defineGame({ title: "T", tick() {} });
+    expect(declared?.tickRate).toBe(15); // a tick always declares its rate
+    client.controls.set({ left: true });
+    expect(calls).toContain("setControls");
+    expectNovaError(() => makeClient().client.defineGame({ tickRate: 0 }), "invalid_options");
+    expectNovaError(
+      () => makeClient().client.defineGame({ tick: 5 as unknown as () => void }),
+      "invalid_options",
+    );
+  });
+
+  it("forwards declared player limits and rejects an inverted range", () => {
+    const { client, backend } = makeClient();
+    let declared: NovaGameDeclaration | undefined;
+    backend.register = (declaration) => {
+      declared = declaration;
+    };
+    client.defineGame({ title: "T", minPlayers: 2, maxPlayers: 6 });
+    expect(declared).toMatchObject({ minPlayers: 2, maxPlayers: 6 });
+    expectNovaError(
+      () => makeClient().client.defineGame({ minPlayers: 5, maxPlayers: 4 }),
+      "invalid_options",
+    );
+    expectNovaError(() => makeClient().client.defineGame({ minPlayers: 0 }), "invalid_options");
+  });
+
+  it("rejects invalid registration options", () => {
+    const { client } = makeClient();
+    expectNovaError(() => client.defineGame({ title: "x".repeat(65) }), "invalid_options");
+    expectNovaError(() => client.defineGame({ tickRate: 0 }), "invalid_options");
+    expectNovaError(() => client.defineGame({ version: "" }), "invalid_options");
+  });
+
+  it("calls fail clearly before readiness", () => {
+    const { client, calls } = makeClient();
+    // Before registration.
+    expectNovaError(() => client.ready(), "not_registered");
+    expectNovaError(() => client.dispatch({ type: "x" }), "not_started");
+
+    // After registration, before start.
+    client.defineGame({ title: "T" });
+    expect(calls).toEqual(["register"]);
+    expectNovaError(() => client.dispatch({ type: "x" }), "not_started");
+    client.ready();
+    expect(calls).toEqual(["register", "ready"]);
+    expectNovaError(() => client.ready(), "already_ready");
+  });
+
+  it("allows dispatch after start", async () => {
+    const { client, calls, emit, ackLastDispatch } = makeClient();
+    client.defineGame({ title: "T" });
+    client.ready();
+    emit({ type: "start" });
+    // Dispatch resolves only when the authority acks.
+    const dispatched = client.dispatch({ type: "playCard", payload: { card: "ace" } });
+    await Promise.resolve(); // let the backend record the action id
+    ackLastDispatch("accepted", { revision: 2 });
+    await dispatched;
+    expect(calls).toEqual(["register", "ready", "dispatch"]);
+  });
+
+  it("rejects invalid actions and payloads", async () => {
+    const { client, emit } = makeClient();
+    client.defineGame({ title: "T" });
+    client.ready();
+    emit({ type: "start" });
+    expectNovaError(() => client.dispatch({ type: "" }), "invalid_options");
+    expectNovaError(
+      () => client.dispatch({ type: "x", payload: { fn: (): void => undefined } }),
+      "invalid_payload",
+    );
+    const circular: Record<string, unknown> = {};
+    circular.self = circular;
+    expectNovaError(() => client.dispatch({ type: "x", payload: circular }), "invalid_payload");
+  });
+
+  it("rejects a dispatched action when the authority rejects it", async () => {
+    const { client, emit, ackLastDispatch } = makeClient();
+    client.defineGame({ title: "T" });
+    client.ready();
+    emit({ type: "start" });
+    const dispatched = client.dispatch({ type: "bad" });
+    await Promise.resolve(); // let the backend record the action id
+    ackLastDispatch("rejected", { errorCode: "unknown_action", errorMessage: "no such handler" });
+    await expect(dispatched).rejects.toMatchObject({
+      code: "unknown_action",
+      message: "no such handler",
+    });
+  });
+
+  it("times out a dispatch that never receives an ack", async () => {
+    vi.useFakeTimers();
+    try {
+      const { client, emit } = makeClient();
+      client.defineGame({ title: "T" });
+      client.ready();
+      emit({ type: "start" });
+      const dispatched = client.dispatch({ type: "slow" });
+      const assertion = expect(dispatched).rejects.toMatchObject({ code: "timed_out" });
+      await vi.advanceTimersByTimeAsync(15_000);
+      await assertion;
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it("registers state-mode handlers and delivers each view to onChange", async () => {
+    const { client, emit, calls } = makeClient();
+    const stateChanges: unknown[] = [];
+    client.defineGame({
+      title: "T",
+      createInitialState: () => ({ count: 0 }),
+      actions: {
+        bump: (draft: { count: number }) => {
+          draft.count += 1;
+        },
+      },
+      selectView: (state: { count: number }) => ({ count: state.count }),
+    });
+    expect(calls).toEqual(["register"]);
+    client.ready();
+    emit({ type: "start" });
+    client.state.onChange((state) => stateChanges.push(state));
+    emit({ type: "state", state: { count: 1 } });
+    emit({ type: "state", state: { count: 2 } });
+    expect(stateChanges).toEqual([{ count: 1 }, { count: 2 }]);
+  });
+
+  it("rejects non-function state-mode handlers", () => {
+    const { client } = makeClient();
+    expectNovaError(
+      () =>
+        client.defineGame({ title: "T", createInitialState: "nope" as unknown as () => unknown }),
+      "invalid_options",
+    );
+    expectNovaError(
+      () =>
+        client.defineGame({
+          title: "T",
+          actions: { bad: 42 as unknown as (draft: unknown) => void },
+        }),
+      "invalid_options",
+    );
+  });
+
+  it("rejects binary and oversized payloads", () => {
+    const { client, emit } = makeClient();
+    client.defineGame({ title: "T" });
+    client.ready();
+    emit({ type: "start" });
+    expectNovaError(
+      () => client.dispatch({ type: "x", payload: new Uint8Array([1]) }),
+      "invalid_payload",
+    );
+    expectNovaError(() => client.controls.set(new Uint8Array([1])), "invalid_payload");
+    expectNovaError(() => client.controls.set({ big: "x".repeat(2000) }), "payload_too_large");
+  });
+
+  it("fails clearly after the game ended", () => {
+    const { client, emit } = makeClient();
+    client.defineGame({ title: "T" });
+    client.ready();
+    emit({ type: "start" });
+    emit({ type: "end", reason: "user_exit" });
+    expectNovaError(() => client.dispatch({ type: "x" }), "ended");
+    expectNovaError(() => client.ready(), "ended");
+  });
+
+  it("updates state, players, and connection status from events", () => {
+    const { client, emit } = makeClient();
+    const stateChanges: unknown[] = [];
+    client.state.onChange((state) => stateChanges.push(state));
+    const joined: NovaPlayer[] = [];
+    client.onPlayerJoin((player) => joined.push(player));
+    const statuses: string[] = [];
+    client.onConnectionChange((status) => statuses.push(status));
+
+    emit({ type: "connection", status: "connecting" });
+    emit({ type: "connection", status: "connected" });
+    emit({ type: "playerJoined", player: { id: "member-b", name: "Ben" } });
+    emit({ type: "start" });
+    emit({ type: "state", state: { deck: ["ace"] } });
+    emit({ type: "playerLeft", player: { id: "member-b", name: "Ben" } });
+
+    expect(client.connectionStatus).toBe("connected");
+    expect(statuses).toEqual(["connecting", "connected"]);
+    expect(client.players).toEqual([{ id: "member-a", name: "Ada" }]);
+    expect(joined).toEqual([{ id: "member-b", name: "Ben" }]);
+    expect(client.state.get()).toEqual({ deck: ["ace"] });
+    expect(stateChanges).toEqual([{ deck: ["ace"] }]);
+  });
+
+  it("fires onStart before dispatch becomes available and ignores host-only events", () => {
+    const { client, emit } = makeClient();
+    const started: number[] = [];
+    client.onStart(() => started.push(1));
+    client.defineGame({ title: "T" });
+    client.ready();
+    emit({ type: "actionReceived", action: { type: "x" } }); // host-only: ignored
+    emit({ type: "start" });
+    expect(started).toHaveLength(1);
+    expect(() => client.dispatch({ type: "x" })).not.toThrow();
+  });
+
+  it("forwards errors to onError handlers and disposes cleanly", () => {
+    const { client, emit } = makeClient();
+    const errors: NovaError[] = [];
+    client.onError((error) => errors.push(error));
+    const problem = new NovaError("not_connected", "boom");
+    emit({ type: "error", error: problem });
+    expect(errors).toEqual([problem]);
+    client.dispose();
+    emit({ type: "start" });
+    expectNovaError(() => client.dispatch({ type: "x" }), "not_started");
+  });
+
+  it("logs through the console", () => {
+    const { client } = makeClient();
+    const spy = vi.spyOn(console, "log").mockImplementation(() => {});
+    try {
+      client.log("hello", 42);
+      expect(spy).toHaveBeenCalledWith("hello", 42);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+});
