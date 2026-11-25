@@ -1,4 +1,4 @@
-import type { ExternalRoom, MemberId, SessionSecret } from "@rocketcrab/protocol";
+import type { ExternalRoom, MemberId, OfferedGame, SessionSecret } from "@rocketcrab/protocol";
 import { sessionSecretSchema, verifyPeerEnvelope } from "@rocketcrab/protocol";
 import type { NovaTransport, TransportMessage } from "@rocketcrab/core";
 import { deriveSessionMaterial, generateSessionSecret, type SessionMaterial } from "./secrets";
@@ -7,6 +7,7 @@ import {
   buildPartyContextMessage,
   buildPartyExternalRoomMessage,
   buildPartyExternalRoomRequestMessage,
+  buildPartyGamesMessage,
   buildPartyKickMessage,
   buildPartyReloadAllMessage,
   buildPartyRenameMessage,
@@ -36,6 +37,7 @@ export type PartyEvent =
       readonly displayName?: string;
     }
   | { readonly type: "memberRenamed"; readonly memberId: MemberId; readonly displayName: string }
+  | { readonly type: "games"; readonly memberId: MemberId; readonly games: readonly OfferedGame[] }
   | {
       readonly type: "externalRoom";
       readonly gameId: string;
@@ -88,6 +90,7 @@ export class PartySession {
   private readonly listeners = new Set<(event: PartyEvent) => void>();
   private readonly unsubscribers: Array<() => void> = [];
   private readonly renamedNames = new Map<MemberId, string>();
+  private offeredGames: readonly OfferedGame[] = [];
 
   constructor(config: {
     role: "creator" | "joiner";
@@ -112,6 +115,9 @@ export class PartySession {
         });
         this.emit({ type: "host", hostMemberId: this.hostMemberId });
         void this.announceContext().catch((error) => this.emit({ type: "error", error }));
+        // A new member (possibly the next host) has not seen this player's offer.
+        if (this.offeredGames.length > 0)
+          void this.sendGames().catch((error) => this.emit({ type: "error", error }));
       }),
       this.privateTransport.on("peer:left", (peer) => {
         const displayName = this.renamedNames.get(peer.memberId) ?? peer.displayName;
@@ -197,6 +203,18 @@ export class PartySession {
       payload: buildPartyRenameMessage(this.base(), { displayName }),
     });
   }
+  /** Offer this player's games to the host; replaces any earlier offer. */
+  async announceGames(games: readonly OfferedGame[]): Promise<void> {
+    if (this.disposed) return;
+    this.offeredGames = games;
+    await this.sendGames();
+  }
+  private async sendGames(): Promise<void> {
+    await this.privateTransport.send({
+      channel: PARTY_CONTROL_CHANNEL,
+      payload: buildPartyGamesMessage(this.base(), { games: this.offeredGames }),
+    });
+  }
   async announceExternalRoom(input: {
     gameId: string;
     room: ExternalRoom;
@@ -268,6 +286,9 @@ export class PartySession {
           memberId: message.senderMemberId,
           displayName: value.displayName,
         });
+        break;
+      case "party.games":
+        this.emit({ type: "games", memberId: message.senderMemberId, games: value.games });
         break;
       case "party.externalRoom.request":
         this.emit({ type: "externalRoomRequest", senderMemberId: message.senderMemberId });

@@ -9,7 +9,12 @@ import {
   timestampSchema,
   titleSchema,
 } from "../ids";
-import { stateDeltaMaxDepth, stateDeltaMaxOps, stateHistoryLimit } from "../limits";
+import {
+  offeredGamesMax,
+  stateDeltaMaxDepth,
+  stateDeltaMaxOps,
+  stateHistoryLimit,
+} from "../limits";
 import { gameEndReasonSchema } from "./shared";
 
 /**
@@ -61,6 +66,30 @@ export const partyRenameMessageSchema = z.object({
   displayName: displayNameSchema,
 });
 export type PartyRenameMessage = z.infer<typeof partyRenameMessageSchema>;
+
+/** One of a member's own games, offered for the host to pick. */
+export const offeredGameSchema = z.object({
+  gameId: gameIdSchema,
+  title: titleSchema,
+  apiVersion: z.number().int().min(1).optional(),
+  sourceSha256: sha256Schema,
+  sourceSizeBytes: z.number().int().nonnegative(),
+  /** Whether players may save a copy to their own games. */
+  saveable: z.boolean(),
+});
+export type OfferedGame = z.infer<typeof offeredGameSchema>;
+
+/**
+ * A member's offered games. Each message replaces the sender's previous list
+ * (empty withdraws them). Sources stay with the sender until the host fetches
+ * one on the `nova.source` channel by game ID and hash.
+ */
+export const partyGamesMessageSchema = z.object({
+  ...peerEnvelopeFields,
+  type: z.literal("party.games"),
+  games: z.array(offeredGameSchema).max(offeredGamesMax),
+});
+export type PartyGamesMessage = z.infer<typeof partyGamesMessageSchema>;
 
 /**
  * One room on an external game's own server, as that game's `createRoom`
@@ -398,6 +427,8 @@ export const gameSourceMetadataMessageSchema = z.object({
   apiVersion: z.number().int().min(1).optional(),
   sourceSha256: sha256Schema,
   sourceSizeBytes: z.number().int().nonnegative(),
+  /** False when the game's owner chose not to let players save copies. */
+  saveable: z.boolean().optional(),
 });
 export type GameSourceMetadataMessage = z.infer<typeof gameSourceMetadataMessageSchema>;
 
@@ -423,6 +454,7 @@ export const peerMessagesSchema = z.discriminatedUnion("type", [
   partyContextMessageSchema,
   playerIdentityMessageSchema,
   partyRenameMessageSchema,
+  partyGamesMessageSchema,
   partyExternalRoomMessageSchema,
   partyExternalRoomRequestMessageSchema,
   partyKickMessageSchema,

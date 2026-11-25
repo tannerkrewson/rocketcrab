@@ -18,6 +18,9 @@ export const LIMIT_WARN_FRACTION = 0.8;
 export const htmlSourceBytes = 2 * 1024 * 1024; // 2 MiB
 export const htmlSourceWarnBytes = Math.floor(htmlSourceBytes * LIMIT_WARN_FRACTION);
 
+/** Most games one member can offer the host at once (`party.games`). */
+export const offeredGamesMax = 50;
+
 /** Largest single protocol message sent before the sender must chunk it. */
 export const messageBytesBeforeChunking = 64 * 1024; // 64 KiB
 export const messageWarnBytes = Math.floor(messageBytesBeforeChunking * LIMIT_WARN_FRACTION);

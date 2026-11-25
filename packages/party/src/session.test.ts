@@ -36,6 +36,46 @@ function world() {
   return { hub, factory, passwords, derive, settle };
 }
 describe("private party sessions", () => {
+  it("delivers a member's offered games, including to members who join later", async () => {
+    const w = world();
+    const host = await createParty({
+      memberId: "host",
+      transportFactory: w.factory,
+      derive: w.derive,
+    });
+    const guest = await joinPartyByInvite({
+      memberId: "guest",
+      secret: host.secret,
+      transportFactory: w.factory,
+      derive: w.derive,
+    });
+    await w.settle();
+    const offers: PartyEvent[] = [];
+    host.onEvent((event) => event.type === "games" && offers.push(event));
+    const game = {
+      gameId: "game-1",
+      title: "Rocket Rumble",
+      sourceSha256: "0".repeat(64),
+      sourceSizeBytes: 10,
+      saveable: false,
+    };
+    await guest.announceGames([game]);
+    await w.settle();
+    expect(offers).toEqual([{ type: "games", memberId: "guest", games: [game] }]);
+
+    const late = await joinPartyByInvite({
+      memberId: "late",
+      secret: host.secret,
+      transportFactory: w.factory,
+      derive: w.derive,
+    });
+    const lateOffers: PartyEvent[] = [];
+    late.onEvent((event) => event.type === "games" && lateOffers.push(event));
+    await w.settle();
+    expect(lateOffers).toContainEqual({ type: "games", memberId: "guest", games: [game] });
+    await Promise.all([host.leave(), guest.leave(), late.leave()]);
+  });
+
   it("creates exactly one transport per participant, automatically joins and deterministically hands off shell controls", async () => {
     const w = world();
     const a = await createParty({

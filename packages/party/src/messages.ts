@@ -4,11 +4,13 @@ import {
   parsePeerMessage,
   partyContextMessageSchema,
   partyRenameMessageSchema,
+  partyGamesMessageSchema,
   partyExternalRoomMessageSchema,
   partyExternalRoomRequestMessageSchema,
   partyKickMessageSchema,
   partyReloadAllMessageSchema,
   type ExternalRoom,
+  type OfferedGame,
   type ParseResult,
   type PeerMessage,
 } from "@rocketcrab/protocol";
@@ -69,6 +71,16 @@ export function buildPartyRenameMessage(
       type: "party.rename",
       displayName: input.displayName,
     }),
+  );
+}
+
+/** Build and validate a `party.games` offer, replacing the sender's last one. */
+export function buildPartyGamesMessage(
+  base: PartyControlBase,
+  input: { games: readonly OfferedGame[] },
+): PeerMessage {
+  return assertPeerMessage(
+    partyGamesMessageSchema.parse({ ...envelope(base), type: "party.games", games: input.games }),
   );
 }
 

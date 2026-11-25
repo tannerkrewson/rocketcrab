@@ -24,6 +24,8 @@ export interface GameSourceInfo {
   readonly source: string;
   readonly sourceSha256?: Sha256;
   readonly sourceSizeBytes?: number;
+  /** False when the owner chose not to let players save copies. */
+  readonly saveable?: boolean;
 }
 export interface GameSourceMetadataInfo {
   readonly gameId: GameId;
@@ -31,6 +33,7 @@ export interface GameSourceMetadataInfo {
   readonly apiVersion?: number;
   readonly sourceSha256: Sha256;
   readonly sourceSizeBytes: number;
+  readonly saveable?: boolean;
 }
 export interface GameSourceTransferProgress {
   readonly direction: "send" | "receive";
@@ -70,6 +73,7 @@ export type GameSourceTransferEvent =
       readonly gameId: GameId;
       readonly sourceSha256: Sha256;
       readonly source: string;
+      readonly saveable?: boolean;
     }
   | ({ readonly type: "verificationFailed"; readonly errorMessage: string } & TransferIdentity)
   // An announcer's copy matched the verified source held here and was
@@ -147,6 +151,8 @@ export class GameSourceCoordinator {
   private readonly acceptMetadata: NonNullable<GameSourceCoordinatorOptions["acceptMetadata"]>;
   private readonly listeners = new Set<(event: GameSourceTransferEvent) => void>();
   private readonly sources = new Map<GameId, RegisteredSource>();
+  // A member's offered games, served on request but never selected or announced.
+  private offeredSources = new Map<string, Uint8Array>();
   private readonly offered = new Map<ConnectionId, GameSourceMetadataInfo>();
   private readonly unsubscribers: Array<() => void>;
   private incoming: ReceiveTransfer | null = null;
@@ -186,6 +192,8 @@ export class GameSourceCoordinator {
         if (!payload || typeof payload !== "object")
           throw new GameSourceError("invalid_message", "Invalid source request.");
         const request = payload as { gameId?: unknown; sourceSha256?: unknown };
+        const offeredBytes = this.offeredSources.get(`${request.gameId}:${request.sourceSha256}`);
+        if (offeredBytes) return offeredBytes;
         const cached =
           typeof request.gameId === "string" ? this.sources.get(request.gameId) : undefined;
         if (!cached || cached.metadata.sourceSha256 !== request.sourceSha256)
@@ -239,6 +247,50 @@ export class GameSourceCoordinator {
   }
 
   async setSource(info: GameSourceInfo): Promise<GameSourceMetadataInfo> {
+    const { metadata, bytes } = await this.prepare(info);
+    this.cancelAll("source_replaced");
+    this.offered.clear();
+    this.cache({ metadata, source: info.source, bytes });
+    this.currentGameId = metadata.gameId;
+    this.selectedMetadata = metadata;
+    if (bytes.byteLength >= htmlSourceWarnBytes)
+      this.emit({
+        type: "warning",
+        gameId: info.gameId,
+        sourceSizeBytes: bytes.byteLength,
+        message: `Game source is ${bytes.byteLength} bytes. Large games transfer slower.`,
+      });
+    await this.announce();
+    return metadata;
+  }
+  /** Serve these sources to the host on request, replacing any earlier offer. */
+  async offer(sources: readonly GameSourceInfo[]): Promise<GameSourceMetadataInfo[]> {
+    const prepared = await Promise.all(sources.map((info) => this.prepare(info)));
+    this.offeredSources = new Map(
+      prepared.map(({ metadata, bytes }) => [`${metadata.gameId}:${metadata.sourceSha256}`, bytes]),
+    );
+    return prepared.map(({ metadata }) => metadata);
+  }
+  /** Download and verify a source another member offered. */
+  async fetchSource(
+    connectionId: ConnectionId,
+    metadata: GameSourceMetadataInfo,
+    signal?: AbortSignal,
+  ): Promise<string> {
+    this.assertAlive();
+    const payload = await this.transport.request({
+      channel: GAME_SOURCE_CHANNEL,
+      payload: identity(metadata),
+      targetConnectionId: connectionId,
+      timeoutMs: 120_000,
+      maxResponseBytes: metadata.sourceSizeBytes,
+      ...(signal !== undefined ? { signal } : {}),
+    });
+    return verifiedSource(payload, metadata);
+  }
+  private async prepare(
+    info: GameSourceInfo,
+  ): Promise<{ metadata: GameSourceMetadataInfo; bytes: Uint8Array }> {
     this.assertAlive();
     const bytes = new TextEncoder().encode(info.source);
     if (bytes.byteLength > htmlSourceBytes)
@@ -258,21 +310,10 @@ export class GameSourceCoordinator {
         "hash_mismatch",
         "Precomputed source hash/size does not match the HTML.",
       );
-    const metadata = this.metadata({ ...info, sourceSha256, sourceSizeBytes: bytes.byteLength });
-    this.cancelAll("source_replaced");
-    this.offered.clear();
-    this.cache({ metadata, source: info.source, bytes });
-    this.currentGameId = metadata.gameId;
-    this.selectedMetadata = metadata;
-    if (bytes.byteLength >= htmlSourceWarnBytes)
-      this.emit({
-        type: "warning",
-        gameId: info.gameId,
-        sourceSizeBytes: bytes.byteLength,
-        message: `Game source is ${bytes.byteLength} bytes. Large games transfer slower.`,
-      });
-    await this.announce();
-    return metadata;
+    return {
+      metadata: this.metadata({ ...info, sourceSha256, sourceSizeBytes: bytes.byteLength }),
+      bytes,
+    };
   }
   /** Stop advertising a Nova source when the party picks an external game. */
   clearSelection(): void {
@@ -501,28 +542,9 @@ export class GameSourceCoordinator {
         },
       });
       if (this.incoming !== transfer || transfer.controller.signal.aborted || this.disposed) return;
-      if (
-        !(payload instanceof Uint8Array) ||
-        payload.byteLength !== metadata.sourceSizeBytes ||
-        payload.byteLength > htmlSourceBytes
-      )
-        throw new GameSourceError(
-          "hash_mismatch",
-          "Source byte count does not match the announcement.",
-        );
-      let source: string;
-      try {
-        source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(payload);
-      } catch {
-        throw new GameSourceError("hash_mismatch", "Source is not valid UTF-8.");
-      }
-      if ((await hashSource(source)) !== metadata.sourceSha256)
-        throw new GameSourceError(
-          "hash_mismatch",
-          "Source SHA-256 does not match the announcement.",
-        );
+      const source = await verifiedSource(payload, metadata);
       if (this.incoming !== transfer || transfer.controller.signal.aborted || this.disposed) return;
-      this.cache({ metadata, source, bytes: payload });
+      this.cache({ metadata, source, bytes: payload as Uint8Array });
       this.currentGameId = metadata.gameId;
       selection.verified = true;
       this.emit({
@@ -530,6 +552,7 @@ export class GameSourceCoordinator {
         fromMemberId: transfer.memberId,
         ...identity(metadata),
         source,
+        ...(metadata.saveable !== undefined ? { saveable: metadata.saveable } : {}),
       });
       this.emit({
         type: "complete",
@@ -566,6 +589,7 @@ export class GameSourceCoordinator {
       sourceSizeBytes: parsed.sourceSizeBytes,
       ...(parsed.title !== undefined ? { title: parsed.title } : {}),
       ...(parsed.apiVersion !== undefined ? { apiVersion: parsed.apiVersion } : {}),
+      ...(parsed.saveable !== undefined ? { saveable: parsed.saveable } : {}),
     };
   }
   private cache(source: RegisteredSource): void {
@@ -683,6 +707,27 @@ function sameMetadata(a: GameSourceMetadataInfo, b: GameSourceMetadataInfo): boo
     a.title === b.title &&
     a.apiVersion === b.apiVersion
   );
+}
+/** Check a transferred source against the size and hash it was announced with. */
+async function verifiedSource(payload: unknown, metadata: GameSourceMetadataInfo): Promise<string> {
+  if (
+    !(payload instanceof Uint8Array) ||
+    payload.byteLength !== metadata.sourceSizeBytes ||
+    payload.byteLength > htmlSourceBytes
+  )
+    throw new GameSourceError(
+      "hash_mismatch",
+      "Source byte count does not match the announcement.",
+    );
+  let source: string;
+  try {
+    source = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true }).decode(payload);
+  } catch {
+    throw new GameSourceError("hash_mismatch", "Source is not valid UTF-8.");
+  }
+  if ((await hashSource(source)) !== metadata.sourceSha256)
+    throw new GameSourceError("hash_mismatch", "Source SHA-256 does not match the announcement.");
+  return source;
 }
 function identity(metadata: GameSourceMetadataInfo) {
   return { gameId: metadata.gameId, sourceSha256: metadata.sourceSha256 };

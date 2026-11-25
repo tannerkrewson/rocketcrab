@@ -16,6 +16,7 @@ import {
   gameSourceDiscoverMessageSchema,
   partyContextMessageSchema,
   partyRenameMessageSchema,
+  partyGamesMessageSchema,
   partyExternalRoomMessageSchema,
   partyExternalRoomRequestMessageSchema,
   partyKickMessageSchema,
@@ -46,6 +47,7 @@ describe("peer message schemas", () => {
     const schemas = [
       partyContextMessageSchema,
       partyRenameMessageSchema,
+      partyGamesMessageSchema,
       partyExternalRoomMessageSchema,
       partyExternalRoomRequestMessageSchema,
       partyKickMessageSchema,
@@ -83,6 +85,21 @@ describe("peer message schemas", () => {
         basePeer({
           type: "party.rename",
           displayName: "Renamed Alex",
+        }),
+      ),
+      partyGamesMessageSchema.parse(
+        basePeer({
+          type: "party.games",
+          games: [
+            {
+              gameId: "game-1",
+              title: "Rocket Rumble",
+              apiVersion: 1,
+              sourceSha256: "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+              sourceSizeBytes: 1200,
+              saveable: false,
+            },
+          ],
         }),
       ),
       partyExternalRoomMessageSchema.parse(
@@ -221,6 +238,7 @@ describe("peer message schemas", () => {
       // Wrong payload types, missing required fields, and bad values.
       basePeer({ type: "party.context", creatorMemberId: "" }),
       basePeer({ type: "party.rename", displayName: "" }),
+      basePeer({ type: "party.games", games: [{ gameId: "game-1", title: "No hash" }] }),
       basePeer({
         type: "party.externalRoom",
         gameId: "protobowl",

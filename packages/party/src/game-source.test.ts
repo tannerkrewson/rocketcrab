@@ -742,3 +742,34 @@ describe("validation, compatibility and cleanup", () => {
     expect(received(replacement.events)).toMatchObject([{ source: "changed" }]);
   });
 });
+
+describe("offered games", () => {
+  it("serves an offered source to the host without selecting or announcing it", async () => {
+    const { hub, host, joiner } = await world();
+    const hostSide = coordinator(host);
+    const joinerSide = coordinator(joiner);
+    const [offered] = await joinerSide.instance.offer([
+      { gameId: "mine", title: "Mine", source: "<p>mine</p>", saveable: false },
+    ]);
+    await settle(hub);
+    expect(hostSide.events.some((event) => event.type === "metadata")).toBe(false);
+    expect(offered).toMatchObject({ gameId: "mine", saveable: false });
+
+    const fetching = hostSide.instance.fetchSource(joiner.selfConnectionId, offered!);
+    await settle(hub);
+    await expect(fetching).resolves.toBe("<p>mine</p>");
+    expect(joinerSide.events.some((event) => event.type === "transferStart")).toBe(false);
+  });
+
+  it("refuses a source that is no longer offered", async () => {
+    const { hub, host, joiner } = await world();
+    const hostSide = coordinator(host);
+    const joinerSide = coordinator(joiner);
+    const [offered] = await joinerSide.instance.offer([{ gameId: "mine", source: "<p>mine</p>" }]);
+    await joinerSide.instance.offer([]);
+    const fetching = hostSide.instance.fetchSource(joiner.selfConnectionId, offered!);
+    void fetching.catch(() => undefined);
+    await settle(hub);
+    await expect(fetching).rejects.toThrow();
+  });
+});
