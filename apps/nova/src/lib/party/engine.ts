@@ -185,6 +185,7 @@ export class PartyEngine {
       await this.establish(party);
       if (setup.signal.aborted) return;
       this.state.transitionPhase({ phase: "lobby" });
+      this.state.partyCode.start(party.secret);
 
       this.state.lastSetup = null;
       this.saveRecovery();
@@ -260,6 +261,7 @@ export class PartyEngine {
         signaling_ok: this.state.signalingConnected === true,
       });
       this.state.transitionPhase({ phase: "lobby" });
+      this.state.partyCode.start(party.secret);
 
       this.state.lastSetup = null;
       this.saveRecovery();
@@ -769,6 +771,7 @@ export class PartyEngine {
       () => false,
     );
     this.stopObservingSignaling();
+    this.state.partyCode.stop();
     this.state.runtime?.destroy("user_exit");
     this.state.runtime = null;
     this.state.resetFrame();
@@ -2296,6 +2299,7 @@ export class PartyEngine {
       amHost: party?.amHost ?? false,
       authorityMemberId: this.computeAuthorityMemberId(members),
       inviteUrl: this.buildInviteUrl(),
+      partyCode: this.state.partyCode.code,
       connectionState: this.state.connectionState,
       canStart: canRequestStart && this.state.game !== null && !ended && hostReady,
       startBlockedReason,

@@ -26,6 +26,7 @@ const IDLE_STATE: PartyEngineState = {
   amHost: false,
   authorityMemberId: null,
   inviteUrl: null,
+  partyCode: null,
   connectionState: "idle",
   canStart: false,
   startBlockedReason: null,

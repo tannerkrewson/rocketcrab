@@ -6,6 +6,7 @@ import type { ArenaLogEntry } from "../arena/types";
 import type { ExternalRoom } from "../catalog";
 import { type PartyLifecycleSource } from "./lifecycle";
 import type { TurnCredentialsResult } from "./turn-creds";
+import type { ClaimPartyCode } from "./party-code";
 import type { PlayerLimits } from "./player-limits";
 
 export interface PartyRuntimeSeams {
@@ -144,6 +145,8 @@ export interface PartyEngineState {
   /** Current internal authority — DIAGNOSTIC ONLY. */
   readonly authorityMemberId: MemberId | null;
   readonly inviteUrl: string | null;
+  /** This party's four-letter code once claimed (`rocketcrab.com/abcd`). */
+  readonly partyCode: string | null;
   readonly connectionState: TransportConnectionState;
   readonly canStart: boolean;
   readonly startBlockedReason: string | null;
@@ -190,6 +193,11 @@ export interface PartyEngineConfig {
    * because injected factories own transport construction.
    */
   turnCreds?: () => Promise<TurnCredentialsResult>;
+  /**
+   * Override party-code claims; null disables codes. Defaults to the Worker,
+   * or to null when transportFactory is injected.
+   */
+  partyCode?: ClaimPartyCode | null;
 }
 
 /**

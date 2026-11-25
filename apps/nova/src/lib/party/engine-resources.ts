@@ -16,6 +16,7 @@ import type { PartyStateExecutor } from "./party-executors";
 import { PeerLinkAlert } from "./peer-link-alert";
 import { reportConnection } from "../connection-analytics";
 import { fetchTurnCredentials, type TurnCredentialsResult } from "./turn-creds";
+import { claimPartyCode, PartyCodeLease } from "./party-code";
 import type {
   PartyRuntimeSeams,
   PartySecretDerivation,
@@ -73,6 +74,7 @@ export class PartyResources extends PartyEngineModel {
   party: PartySession | null = null;
   signalingOutageVisible = false;
   readonly signalingOutage: SignalingOutage;
+  readonly partyCode: PartyCodeLease;
   unsubscribeSignaling: (() => void) | null = null;
   setupAbort: AbortController | null = null;
   pendingSetupTransport: { leave(): Promise<void> } | null = null;
@@ -144,6 +146,16 @@ export class PartyResources extends PartyEngineModel {
         });
       onChange();
     });
+    // Like TURN, injected transports (tests) skip the network unless given a claim.
+    this.partyCode = new PartyCodeLease(
+      this.schedule,
+      config.partyCode !== undefined
+        ? config.partyCode
+        : config.transportFactory === undefined
+          ? claimPartyCode
+          : null,
+      onChange,
+    );
     this.now = config.now ?? (() => Date.now());
     this.derive = config.derive;
     this.diagnosticsProvider = config.diagnostics;

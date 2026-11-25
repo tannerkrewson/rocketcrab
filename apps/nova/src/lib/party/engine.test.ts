@@ -419,6 +419,31 @@ describe("party engine — two phones end to end", () => {
   });
 });
 
+describe("party engine — four-letter party code", () => {
+  it("shows every member the same claimed code and drops it on leave", async () => {
+    const world = makeWorld();
+    const claim = vi.fn(async (secret: string) => `code-${secret.slice(0, 4)}`);
+    const a = makePlayer(world, "a", { partyCode: claim });
+    const b = makePlayer(world, "b", { partyCode: claim });
+
+    const secret = await runCreate(a, world);
+    await flush();
+    expect(claim).toHaveBeenCalledWith(secret);
+    expect(a.engine.getState().partyCode).toBe(`code-${secret.slice(0, 4)}`);
+
+    const { join, settled } = startJoin(b, world, secret);
+    await settled;
+    await settle(world);
+    await join;
+    await flush();
+    expect(b.engine.getState().partyCode).toBe(a.engine.getState().partyCode);
+
+    await a.engine.leaveParty();
+    expect(a.engine.getState().partyCode).toBeNull();
+    await b.engine.leaveParty();
+  });
+});
+
 describe("party engine — game and source transitions", () => {
   function events(player: Player, kind: string): unknown[] {
     return player.harness.port1.sent.filter((message) => {

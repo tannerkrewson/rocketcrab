@@ -57,6 +57,7 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     amHost: overrides.amHost ?? overrides.role !== "joiner",
     authorityMemberId: "member-a",
     inviteUrl: "http://localhost:2722/join#code=abcd&secret=invite-secret",
+    partyCode: null,
     connectionState: "connected",
     canStart: false,
     startBlockedReason: null,
