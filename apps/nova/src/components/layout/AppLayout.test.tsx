@@ -29,7 +29,7 @@ beforeEach(() => {
 describe("AppLayout", () => {
   it("credits the author and links GitHub at the bottom of every page", async () => {
     renderAt("/about");
-    await screen.findByRole("heading", { name: "Coming soon" });
+    await screen.findByRole("heading", { name: "About" });
 
     const footer = screen.getByRole("contentinfo");
     expect(footer).toHaveTextContent("rocketcrab by Tanner Krewson");
@@ -49,7 +49,7 @@ describe("AppLayout", () => {
 
   it("renders no navbar or wordmark bar on any page", async () => {
     renderAt("/about");
-    await screen.findByRole("heading", { name: "Coming soon" });
+    await screen.findByRole("heading", { name: "About" });
 
     expect(screen.queryByRole("banner")).not.toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Rocketcrab home/ })).not.toBeInTheDocument();
@@ -59,7 +59,7 @@ describe("AppLayout", () => {
 
   it("layers the page content above the site background", async () => {
     renderAt("/about");
-    await screen.findByRole("heading", { name: "Coming soon" });
+    await screen.findByRole("heading", { name: "About" });
 
     // Check stacking classes, not just DOM presence: a negative-z layer can hide behind the shell.
     expect(screen.getByTestId("app-background")).toHaveClass("z-0");
@@ -77,7 +77,7 @@ describe("AppLayout", () => {
     expect(screen.getByTestId("brand-logo")).toHaveAttribute("src", "/rocketcrab-logo-nova.svg");
 
     renderAt("/about");
-    await screen.findByRole("heading", { name: "Coming soon" });
+    await screen.findByRole("heading", { name: "About" });
     expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "molten");
 
     // A game's details keep the lobby's background.
@@ -96,7 +96,7 @@ describe("AppLayout", () => {
     expect(screen.getByTestId("app-background")).toBeInTheDocument();
 
     renderAt("/about");
-    await screen.findByRole("heading", { name: "Coming soon" });
+    await screen.findByRole("heading", { name: "About" });
     expect(screen.getByTestId("app-background")).toBeInTheDocument();
   });
 
@@ -118,7 +118,7 @@ describe("AppLayout", () => {
     for (const [path, heading] of [
       ["/browse", "Games"],
       ["/library", "My games"],
-      ["/about", "Coming soon"],
+      ["/about", "About"],
     ] as const) {
       renderAt(path);
       await screen.findByRole("heading", { name: heading });

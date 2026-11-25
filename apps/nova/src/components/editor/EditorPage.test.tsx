@@ -510,7 +510,7 @@ describe("/games/:id/edit — saved games", () => {
     await userEvent.click(screen.getByRole("button", { name: "Back" }));
     const dialog = await screen.findByRole("dialog", { name: "Save your changes?" });
     await userEvent.click(within(dialog).getByRole("button", { name: "Don't save" }));
-    expect(await screen.findByRole("heading", { name: "Coming soon" })).toBeInTheDocument();
+    expect(await screen.findByRole("heading", { name: "About" })).toBeInTheDocument();
     expect((await gameRepository.read(game.id)).html).toBe(SAVED_SOURCE);
   });
 
