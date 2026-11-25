@@ -63,25 +63,28 @@ function HomeComponent() {
         </Link>
       </section>
 
-      <section aria-label="Start or join a party" className="button-row">
-        <Button
-          variant="primary"
-          size="lg"
-          onClick={() => {
-            clarityEvent("join_help_opened");
-            setJoinHelpOpen(true);
-          }}
-        >
-          Join party
-        </Button>
-        <Link
-          to="/party"
-          onClick={() => clarityEvent("start_party_clicked")}
-          className={buttonStyles("primary", "lg")}
-        >
-          Start party
-        </Link>
-      </section>
+      <div className="flex flex-col items-center gap-3">
+        <section aria-label="Start or join a party" className="button-row">
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={() => {
+              clarityEvent("join_help_opened");
+              setJoinHelpOpen(true);
+            }}
+          >
+            Join party
+          </Button>
+          <Link
+            to="/party"
+            onClick={() => clarityEvent("start_party_clicked")}
+            className={buttonStyles("primary", "lg")}
+          >
+            Start party
+          </Link>
+        </section>
+        <InstallAppButton />
+      </div>
 
       <section aria-label="More" className="button-stack">
         <Link to="/build" className={MORE_LINK}>
@@ -101,9 +104,6 @@ function HomeComponent() {
           About
         </Link>
       </section>
-
-      {/* Last, so it appears without shifting the buttons above. */}
-      <InstallAppButton />
 
       <a
         href="mailto:tannerkrewson@gmail.com?subject=Rocketcrab%20support"

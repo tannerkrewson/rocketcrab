@@ -341,6 +341,7 @@ export function PartyLobby({
           </Alert.Content>
         </Alert>
       ) : null}
+      <InstallAppButton className="self-center" />
       <details className="glass group rounded-2xl" open>
         <summary className="flex cursor-pointer list-none items-center gap-2 p-4 text-sm font-black text-foreground/60">
           Players ({state.members.length})
@@ -432,8 +433,7 @@ export function PartyLobby({
           </Alert.Content>
         </Alert>
       ) : null}
-      <div className="flex flex-wrap justify-center gap-2">
-        <InstallAppButton size="md" />
+      <div className="flex justify-center">
         <Button variant="default" soft size="md" onClick={onLeave}>
           <LogOut className="h-4 w-4" aria-hidden="true" />
           {state.members.length === 1 ? "End party" : "Leave party"}

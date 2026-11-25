@@ -13,7 +13,12 @@ export function InstallAppButton({
   if (!available) return null;
   return (
     <Button variant="accent" size={size} className={className} onClick={installApp}>
-      <img src="/icon-192.png" alt="" className="size-6 rounded-md" />
+      {/* Larger than an icon, so the crab overhangs the label line slightly. */}
+      <img
+        src="/rocketcrab-logo-no-glow.svg"
+        alt=""
+        className={size === "lg" ? "-my-2 size-9" : "-my-2 size-8"}
+      />
       Get the app
     </Button>
   );
