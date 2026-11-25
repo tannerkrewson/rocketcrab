@@ -78,10 +78,6 @@ the README for local devices.
 
 ## Maintenance
 
-- A test in `npm test` failed once in the pre-push hook (lefthook runs lint,
-  typecheck, build and test in parallel) and passed on a rerun and when run
-  alone; the hook output was cut off before the failing test. Find it, e.g.
-  by looping `npx lefthook run pre-push`, and make it robust to load.
 - Make Nova's Vite config import graph compatible with the native config loader
   before upgrading to a Vite release that defaults to it.
 - On a real iPhone, scroll a long page (home with "Get the app", the lobby)

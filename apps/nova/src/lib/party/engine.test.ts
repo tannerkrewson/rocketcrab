@@ -2545,14 +2545,19 @@ describe("party engine — signaling outage setup", () => {
     world.clock.advance(1);
     await flush();
     expect(player.engine.getState().signalingOutage).toBe(true);
-    expect(track).toHaveBeenCalledExactlyOnceWith(
-      "connection_result",
-      expect.objectContaining({
-        outcome: "failed",
-        error_code: "relay-failed",
-        signaling_status: "unavailable",
-      }),
-    );
+    // Only connection results: under load the runtime's real-time watchdog
+    // can also report an unrelated `party_issue`.
+    const results = vi.mocked(track).mock.calls.filter(([name]) => name === "connection_result");
+    expect(results).toEqual([
+      [
+        "connection_result",
+        expect.objectContaining({
+          outcome: "failed",
+          error_code: "relay-failed",
+          signaling_status: "unavailable",
+        }),
+      ],
+    ]);
     relay.connect();
     expect(player.engine.getState().signalingOutage).toBe(false);
     world.clock.advance(1_000);
