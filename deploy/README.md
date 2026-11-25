@@ -204,6 +204,13 @@ secrets.
   Durable Object namespaces and the `rocketcrab` Turnstile widget, so there
   was nothing stale to remove. The owner joined a party by code through
   Turnstile on real devices.
+- 2026-11-25: the account is on Workers Paid. Spend policies (Billing →
+  Spend Management) email the owner's login address at $10 and block usage at
+  $100 a month, separately for Workers and Durable Objects. A block stops
+  every Worker request or pauses Durable Objects account-wide until the next
+  billing period, so raise the limit rather than wait if one fires. The
+  account budget alert (Notifications) emails at $20 of total spend, the only
+  coverage for Realtime TURN, which has no spending limit.
 - Verified a two-browser party joined by code through `/join`, and
   `/transfer/drawphone` creating a Drawphone room through `/api/relay`
   (Drawphone, Drawphone for Kids, Spyfall, Snakeout and Werewolf relays
@@ -211,14 +218,10 @@ secrets.
 
 ## Before launch
 
-- [ ] **Owner:** configure the Realtime usage alert and Workers/Durable
-      Objects spending controls, and confirm the notification destination.
-      A spend block can interrupt parties.
 - [ ] Live smoke test: run a game in the editor on the deployed app and
       runtime; play with two real devices and confirm GA Realtime receives page
       views, game start and end, TURN configuration, connection outcomes,
       and lobby and game readiness.
-- [ ] Switch to Workers Paid ($5/month).
 
 ## Production cutover
 
