@@ -248,6 +248,29 @@
   }
 }
 
+/* The frosted finish shared by buttons and card-shaped links: a soft white
+   glow along the top edge (the design's 160x80 shape, 142.86% wide,
+   centered 16px from the top) and an inner rim. */
+:root {
+  --frost-glow-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='80' viewBox='0 0 160 80' preserveAspectRatio='none'%3E%3Cfilter id='b' x='0' y='0' width='160' height='80' filterUnits='userSpaceOnUse'%3E%3CfeGaussianBlur stdDeviation='12'/%3E%3C/filter%3E%3Cpath filter='url(%23b)' fill='white' d='M24 24C24 24 55.13 56 80.31 56C105.28 55.81 136 24 136 24H24Z'/%3E%3C/svg%3E");
+}
+
+@utility frosted {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  box-shadow: inset 0 0 6px 2px var(--frost-rim, oklch(100% 0 0 / 0.16));
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: var(--frost-glow-image) 50% -24px / 142.86% 80px no-repeat;
+    opacity: var(--frost-glow, 0.2);
+    pointer-events: none;
+  }
+}
+
 /* Frosted pill buttons: a translucent fill, a soft inner rim, and a glow
    along the top edge that fades out while pressed. Each variant sets its
    fill, rim, and glow strength. No backdrop blur: re-blurring the animated
@@ -272,9 +295,7 @@
     position: absolute;
     inset: 0;
     z-index: -1;
-    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='80' viewBox='0 0 160 80' preserveAspectRatio='none'%3E%3Cfilter id='b' x='0' y='0' width='160' height='80' filterUnits='userSpaceOnUse'%3E%3CfeGaussianBlur stdDeviation='12'/%3E%3C/filter%3E%3Cpath filter='url(%23b)' fill='white' d='M24 24C24 24 55.13 56 80.31 56C105.28 55.81 136 24 136 24H24Z'/%3E%3C/svg%3E")
-      /* The design's 160x80 glow, 142.86% wide, centered 16px from the top. */ 50% -24px / 142.86%
-      80px no-repeat;
+    background: var(--frost-glow-image) 50% -24px / 142.86% 80px no-repeat;
     opacity: var(--button-glow);
     transition: opacity 240ms ease;
     pointer-events: none;

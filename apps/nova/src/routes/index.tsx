@@ -52,7 +52,7 @@ function HomeComponent() {
         <Link
           to="/build"
           data-testid="nova-card"
-          className="relative mt-4 -mb-1 block w-full max-w-md overflow-hidden rounded-2xl bg-[#060b1f] rc-molten-blue px-6 py-4 text-center transition-transform active:scale-[0.98] motion-reduce:transition-none"
+          className="frosted mt-4 block w-full max-w-md rounded-2xl bg-[#060b1f] rc-molten-blue px-6 py-4 text-center transition-transform [--frost-glow:0.35] [--frost-rim:color-mix(in_oklch,var(--nova)_65%,white)] active:scale-[0.98] motion-reduce:transition-none"
         >
           <span className="relative block text-lg font-black [text-shadow:0_1px_12px_rgb(0_0_0/0.8)]">
             Introducing <span className="text-nova-text">Nova</span>
@@ -61,6 +61,13 @@ function HomeComponent() {
             Build your own games and play them with friends, instantly.
           </span>
         </Link>
+        <a
+          href="mailto:tannerkrewson@gmail.com?subject=Rocketcrab%20support"
+          className="frosted flex w-full max-w-md items-center justify-center gap-3 rounded-2xl bg-default px-6 py-4 text-center text-sm font-semibold transition-transform active:scale-[0.98] motion-reduce:transition-none"
+        >
+          <Mail className="size-5 shrink-0" aria-hidden="true" />
+          <span>Enjoy the new Rocketcrab! Email me if you have issues -Tanner</span>
+        </a>
       </section>
 
       <div className="flex flex-col items-center gap-3">
@@ -104,14 +111,6 @@ function HomeComponent() {
           About
         </Link>
       </section>
-
-      <a
-        href="mailto:tannerkrewson@gmail.com?subject=Rocketcrab%20support"
-        className={buttonStyles("tertiary", "md", "w-full max-w-md")}
-      >
-        <Mail className="size-4" aria-hidden="true" />
-        Having issues? Email Tanner
-      </a>
 
       <Dialog open={joinHelpOpen} onClose={() => setJoinHelpOpen(false)} title="Join a party">
         <div className="flex flex-col gap-4">
