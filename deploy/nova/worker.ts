@@ -57,6 +57,7 @@ async function withinRateLimit(
   try {
     return (await binding.limit({ key: `${route}:${ip}` })).success;
   } catch {
+    console.error({ event: "rate_limiter_unavailable", route });
     return true;
   }
 }
@@ -95,7 +96,10 @@ async function route(request: Request, env: EdgeEnv): Promise<Response> {
       return jsonError(426, "upgrade_required", "WebSocket upgrade required");
     if (!(await withinRateLimit(request, env.BULK_RATE_LIMITER, socket.key))) return rateLimited();
     const namespace = env[socket.binding];
-    if (!namespace) return jsonError(503, "unavailable", `${socket.key} unavailable`);
+    if (!namespace) {
+      console.error({ event: "socket_binding_missing", route: socket.key });
+      return jsonError(503, "unavailable", `${socket.key} unavailable`);
+    }
     return namespace.get(namespace.idFromName(socket.match![1]!)).fetch(request);
   }
 

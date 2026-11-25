@@ -108,6 +108,7 @@ export async function handleRelay(request: Request): Promise<Response> {
       ...(postBody ? { headers: { "Content-Type": "application/json" }, body: postBody } : {}),
     });
     if (!upstream.ok) {
+      console.error({ event: "relay_upstream_error", endpoint, status: upstream.status });
       void upstream.body?.cancel().catch(() => undefined);
       return jsonError(502, "upstream_error", `upstream HTTP ${upstream.status}`);
     }
@@ -118,6 +119,7 @@ export async function handleRelay(request: Request): Promise<Response> {
       return json(200, { raw: text });
     }
   } catch {
+    console.error({ event: "relay_upstream_unavailable", endpoint });
     return jsonError(502, "upstream_unavailable", "upstream endpoint is unavailable");
   }
 }

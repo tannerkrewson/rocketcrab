@@ -54,7 +54,10 @@ async function verifyChallenge(request: Request, secret: string): Promise<boolea
       body: JSON.stringify({ secret, response: token }),
       signal: AbortSignal.timeout(3_000),
     });
-    if (!response.ok) return false;
+    if (!response.ok) {
+      console.error({ event: "turnstile_upstream_error", status: response.status });
+      return false;
+    }
     const result = (await response.json()) as {
       success?: boolean;
       hostname?: string;
@@ -66,6 +69,7 @@ async function verifyChallenge(request: Request, secret: string): Promise<boolea
       result.action === "mint_turn"
     );
   } catch {
+    console.error({ event: "turnstile_upstream_unavailable" });
     return false;
   }
 }
@@ -74,11 +78,13 @@ export async function handleTurn(request: Request, env: TurnEnv): Promise<Respon
   const keyId = env.TURN_KEY_ID?.trim() ?? "";
   const token = env.TURN_KEY_API_TOKEN?.trim() ?? "";
   if (keyId === "" || token === "") {
+    console.error({ event: "turn_secrets_missing" });
     return jsonError(500, "worker_misconfigured", "TURN key secrets are not configured");
   }
 
   const turnstileSecret = env.TURNSTILE_SECRET_KEY?.trim();
   if (!turnstileSecret && env.TURNSTILE_REQUIRED === "true") {
+    console.error({ event: "turnstile_secret_missing" });
     return jsonError(500, "worker_misconfigured", "TURN verification is not configured");
   }
   if (turnstileSecret && !(await verifyChallenge(request, turnstileSecret))) {
@@ -96,14 +102,17 @@ export async function handleTurn(request: Request, env: TurnEnv): Promise<Respon
       },
     );
   } catch {
+    console.error({ event: "turn_upstream_unavailable" });
     return jsonError(502, "upstream_unavailable", "TURN credentials service is unavailable");
   }
   if (!upstream.ok) {
+    console.error({ event: "turn_upstream_error", status: upstream.status });
     return jsonError(502, "upstream_error", `TURN credentials service returned ${upstream.status}`);
   }
 
   const body = (await upstream.json().catch(() => null)) as { iceServers?: unknown } | null;
   if (!Array.isArray(body?.iceServers)) {
+    console.error({ event: "turn_upstream_invalid" });
     return jsonError(502, "upstream_invalid", "TURN credentials service returned bad JSON");
   }
 

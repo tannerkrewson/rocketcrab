@@ -46,7 +46,10 @@ namespace_id = "1002"
 simple = { limit = 2000, period = 60 }
 
 [observability]
-enabled = false
+enabled = true
+
+[observability.logs]
+invocation_logs = false
 
 # Secrets (never in this file): TURN_KEY_ID, TURN_KEY_API_TOKEN, TURNSTILE_SECRET_KEY.
 # Set with `npx wrangler secret put <NAME> --config deploy/nova/wrangler.toml`.
