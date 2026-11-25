@@ -63,43 +63,34 @@ function HomeComponent() {
         </Link>
         <a
           href="mailto:tannerkrewson@gmail.com?subject=Rocketcrab%20support"
-          className="glass flex w-full max-w-md items-center gap-4 rounded-2xl px-5 py-3.5 text-left transition-transform active:scale-[0.98] motion-reduce:transition-none"
+          className="glass flex w-full max-w-md items-center gap-4 rounded-2xl px-5 py-3.5 text-left font-semibold transition-transform active:scale-[0.98] motion-reduce:transition-none"
         >
-          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
-            <Mail className="size-5" aria-hidden="true" />
-          </span>
-          <span className="flex min-w-0 flex-col">
-            <span className="font-bold">Enjoy the new Rocketcrab!</span>
-            <span className="text-sm text-foreground/70">
-              Email me if you have issues{" "}
-              <span className="font-semibold text-foreground/90">-Tanner</span>
-            </span>
-          </span>
+          <Mail className="size-5 shrink-0" aria-hidden="true" />
+          <span>Enjoy the new Rocketcrab! Email me if you have issues -Tanner</span>
         </a>
       </section>
 
-      <div className="flex flex-col items-center gap-3">
-        <section aria-label="Start or join a party" className="button-row">
-          <Button
-            variant="primary"
-            size="lg"
-            onClick={() => {
-              clarityEvent("join_help_opened");
-              setJoinHelpOpen(true);
-            }}
-          >
-            Join party
-          </Button>
-          <Link
-            to="/party"
-            onClick={() => clarityEvent("start_party_clicked")}
-            className={buttonStyles("primary", "lg")}
-          >
-            Start party
-          </Link>
-        </section>
-        <InstallAppButton />
-      </div>
+      <section aria-label="Start or join a party" className="button-row">
+        <Button
+          variant="primary"
+          size="lg"
+          onClick={() => {
+            clarityEvent("join_help_opened");
+            setJoinHelpOpen(true);
+          }}
+        >
+          Join party
+        </Button>
+        <Link
+          to="/party"
+          onClick={() => clarityEvent("start_party_clicked")}
+          className={buttonStyles("primary", "lg")}
+        >
+          Start party
+        </Link>
+      </section>
+
+      <InstallAppButton />
 
       <section aria-label="More" className="button-stack">
         <Link to="/build" className={MORE_LINK}>
