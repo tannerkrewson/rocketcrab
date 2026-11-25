@@ -29,6 +29,16 @@ churn on upgrade), and need no paid always-on server.
       `turn_cred_mint` outcome `configured`, and a blocked challenge falls back
       to direct WebRTC or the encrypted tunnel. Headless Playwright never
       passes the challenge, so automated runs skip TURN.
+- [ ] Renew the party code from the host only. Every member's
+      `PartyCodeLease` (`apps/nova/src/lib/party/party-code.ts`) posts
+      `/api/code/claim` every 3 minutes, so Worker and Durable Object requests
+      grow with party size and dominate a player's usage (the free plan's
+      100k requests a day fail parties once spent). Let only the authority
+      claim and renew, publish the code in the replicated party state for
+      everyone else to show, and have a new authority take over the lease on
+      migration; the 10-minute TTL covers the handover.
+- [ ] Check `rocketcrab.com` and the beta on iOS Safari with content blockers
+      on: the app loads, and parties work without analytics or Turnstile.
 - [ ] After the first production deploy, watch a Clarity recording of a party
       from an eligible region and confirm names, game titles and the invite
       QR code are masked.

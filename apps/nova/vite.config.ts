@@ -149,6 +149,17 @@ export default defineConfig(({ mode }) => ({
     tailwindcss(),
     cspMetaPlugin(),
   ],
+  build: {
+    rolldownOptions: {
+      // Hash-only names: content blockers drop files named like trackers
+      // (a shared chunk once took the name `clarity-*.js` and blanked the app).
+      output: {
+        entryFileNames: "assets/[hash].js",
+        chunkFileNames: "assets/[hash].js",
+        assetFileNames: "assets/[hash][extname]",
+      },
+    },
+  },
   server: {
     port: 2722,
     strictPort: true,
