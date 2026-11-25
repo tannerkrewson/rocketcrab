@@ -248,7 +248,8 @@ Set `workers_dev = false` and keep `preview_urls = false` in
 `deploy/nova/wrangler.toml`, then redeploy Nova. Keep the runtime's
 `workers_dev = true`: its workers.dev hostname is the production runtime.
 Verify that `rocketcrab.com` still works and the Nova beta URL stops serving
-Rocketcrab. The production Workers and their Durable
+Rocketcrab. Then remove `rocketcrab.tannerkrewson.workers.dev` from the
+Turnstile widget's hostnames, and from this file. The production Workers and their Durable
 Objects remain in use. If production switched to a separate TURN key, delete
 the beta key after beta traffic has drained. [Disable workers.dev](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/#disabling-workersdev)
 
