@@ -331,7 +331,7 @@ describe("PartyLobby", () => {
     // Toggling a local modal must not retrigger an already-seen membership toast.
     await userEvent.click(screen.getByRole("button", { name: /qr code/i }));
     await userEvent.click(
-      within(screen.getByRole("dialog", { name: "Party QR code" })).getByRole("button", {
+      within(screen.getByRole("dialog", { name: "Scan to join the party" })).getByRole("button", {
         name: /close/i,
       }),
     );
@@ -685,9 +685,8 @@ describe("PartyLobby", () => {
   it("opens the QR code in a modal without the invite secret", async () => {
     await renderLobby(makeState());
     await userEvent.click(screen.getByRole("button", { name: /qr code/i }));
-    const dialog = screen.getByRole("dialog", { name: "Party QR code" });
+    const dialog = screen.getByRole("dialog", { name: "Scan to join the party" });
     expect(within(dialog).getByLabelText("Party invite QR code")).toBeInTheDocument();
-    expect(within(dialog).getByText("Scan to join the party")).toBeInTheDocument();
     expect(screen.queryByText(/invite-secret/)).not.toBeInTheDocument();
     await userEvent.click(within(dialog).getByRole("button", { name: /close/i }));
     expect(screen.queryByLabelText("Party invite QR code")).not.toBeInTheDocument();

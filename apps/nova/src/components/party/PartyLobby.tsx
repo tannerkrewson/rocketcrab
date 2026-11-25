@@ -463,22 +463,19 @@ export function PartyLobby({
         </Button>
       </div>
 
-      {qrOpen && state.inviteUrl !== null ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Party QR code"
-        >
-          <div className="flex w-full max-w-sm flex-col items-center gap-4 rounded-2xl bg-overlay p-5 shadow-overlay">
-            <p className="font-black">Scan to join the party</p>
-            <PartyInviteQr inviteUrl={state.inviteUrl} size={200} />
-            <Button variant="default" soft onClick={() => setQrOpen(false)}>
-              Close
-            </Button>
-          </div>
+      <Dialog
+        open={qrOpen && state.inviteUrl !== null}
+        onClose={() => setQrOpen(false)}
+        title="Scan to join the party"
+        className="max-w-md"
+      >
+        <div className="flex flex-col items-center gap-3 pb-2">
+          {state.inviteUrl !== null ? <PartyInviteQr inviteUrl={state.inviteUrl} /> : null}
+          <p className="text-center text-sm text-foreground/70">
+            Point a phone&apos;s camera at the code, then tap the link that appears.
+          </p>
         </div>
-      ) : null}
+      </Dialog>
       {forceDialog ? (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
