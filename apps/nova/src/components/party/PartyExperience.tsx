@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { ArrowLeft, PartyPopper } from "lucide-react";
 import { Alert } from "@heroui/react";
 import { toast } from "../../lib/toast";
@@ -89,6 +90,18 @@ export function PartyExperience({
 
   const playing = state.phase === "playing";
 
+  // Remember the game that just ended, so the lobby can thank the players.
+  const [played, setPlayed] = useState<{ gameId: string; title: string } | null>(null);
+  const current = playing && state.game !== null ? state.game : null;
+  const [round, setRound] = useState<{ gameId: string; title: string } | null>(null);
+  if (current !== null && round?.gameId !== current.gameId) {
+    setRound({ gameId: current.gameId, title: current.title });
+    setPlayed(null);
+  } else if (round !== null && state.phase === "lobby") {
+    setPlayed(round);
+    setRound(null);
+  }
+
   // Keep the lobby runtime invisible but mounted so readiness can complete.
   const external = state.game?.kind === "external" ? state.game : null;
   const frameArea =
@@ -173,6 +186,7 @@ export function PartyExperience({
         handleKickMember,
         onLeft,
         initialBrowse,
+        played !== null && state.game?.gameId === played.gameId ? played.title : null,
       )}
     </div>
   );
@@ -197,6 +211,7 @@ function renderPhase(
   handleKickMember: (memberId: string) => void,
   onLeft?: () => void,
   initialBrowse = false,
+  playedTitle: string | null = null,
 ) {
   switch (state.phase) {
     case "creating":
@@ -230,6 +245,7 @@ function renderPhase(
           onKickMember={handleKickMember}
           onEditName={handleEditName}
           initialBrowsing={initialBrowse}
+          playedTitle={playedTitle}
         />
       );
     case "playing":

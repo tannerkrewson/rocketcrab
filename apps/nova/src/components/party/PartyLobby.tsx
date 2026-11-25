@@ -6,6 +6,7 @@ import { toast } from "../../lib/toast";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState, PartyMemberView, PartyNotice } from "../../lib/party/engine";
 import { InstallAppButton } from "../layout/InstallAppButton";
+import { useAppInstallAvailable } from "../../lib/app-install";
 import { Button, buttonStyles } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
 import { NameEntry } from "./NameEntry";
@@ -24,6 +25,8 @@ export interface PartyLobbyProps {
   onEditName: (name: string) => void;
   /** Restore browse mode when returning from game details. */
   initialBrowsing?: boolean;
+  /** Title of the game the party just finished, while it is still selected. */
+  playedTitle?: string | null;
 }
 
 function roleLabels(member: PartyMemberView, isCreator: boolean): string {
@@ -105,7 +108,9 @@ export function PartyLobby({
   onKickMember,
   onEditName,
   initialBrowsing = false,
+  playedTitle = null,
 }: PartyLobbyProps) {
+  const installAvailable = useAppInstallAvailable();
   const [startHelpOpen, setStartHelpOpen] = useState(false);
   const [forceDialog, setForceDialog] = useState(false);
   const [kickPending, setKickPending] = useState<string | null>(null);
@@ -247,11 +252,25 @@ export function PartyLobby({
         </div>
       </section>
       <section
-        aria-label="Welcome"
-        className="glass flex min-h-40 flex-col items-center justify-center gap-3 rounded-2xl p-5 text-center"
+        aria-label={playedTitle !== null ? "Thanks for playing" : "Welcome"}
+        className="glass flex flex-col items-center justify-center gap-3 rounded-2xl p-5 text-center"
       >
-        <h2 className="text-xl font-black">Welcome to rocketcrab!</h2>
-        {state.game !== null ? (
+        {playedTitle !== null ? (
+          <>
+            <h2 className="text-xl font-black">
+              Thanks for playing <span className="text-primary">{playedTitle}</span> on rocketcrab!
+            </h2>
+            <p className="text-sm text-foreground/70">
+              {installAvailable
+                ? `Get the app to play ${playedTitle} and more, right from your home screen.`
+                : "Play it again, or browse for your next game."}
+            </p>
+            <div className="flex flex-wrap justify-center gap-2">
+              <InstallAppButton />
+              {sharedGame !== undefined ? <SaveSharedGame game={sharedGame} /> : null}
+            </div>
+          </>
+        ) : state.game !== null ? (
           <>
             <p className="text-sm font-semibold text-foreground/70">
               {state.amHost ? "You've selected" : `${hostName ?? "The host"} has selected`}
@@ -262,7 +281,8 @@ export function PartyLobby({
                 ? "As the host, you have to start the game!"
                 : "Waiting for the host to start the game…"}
             </p>
-            <div className="button-row items-start">
+            {/* Wraps on narrow phones instead of squeezing both labels. */}
+            <div className="flex flex-wrap justify-center gap-2">
               <Link
                 to="/game/$gameId"
                 params={{ gameId: state.game.gameId }}
@@ -276,7 +296,10 @@ export function PartyLobby({
             </div>
           </>
         ) : (
-          <p className="text-sm font-semibold text-foreground/70">{noGameMessage}</p>
+          <>
+            <h2 className="text-xl font-black">Welcome to rocketcrab!</h2>
+            <p className="text-sm font-semibold text-foreground/70">{noGameMessage}</p>
+          </>
         )}
       </section>
 
@@ -341,7 +364,7 @@ export function PartyLobby({
           </Alert.Content>
         </Alert>
       ) : null}
-      <InstallAppButton className="self-center" />
+      {playedTitle === null ? <InstallAppButton className="self-center" /> : null}
       <details className="glass group rounded-2xl" open>
         <summary className="flex cursor-pointer list-none items-center gap-2 p-4 text-sm font-black text-foreground/60">
           Players ({state.members.length})

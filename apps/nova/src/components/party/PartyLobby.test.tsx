@@ -693,10 +693,10 @@ describe("PartyLobby", () => {
     expect(screen.queryByLabelText("Party invite QR code")).not.toBeInTheDocument();
   });
 
-  it("shows the welcome card with the selected game for the host", async () => {
+  it("shows the selected game for the host without the welcome heading", async () => {
     await renderLobby(makeState());
     const welcome = screen.getByLabelText("Welcome");
-    expect(within(welcome).getByText("Welcome to rocketcrab!")).toBeInTheDocument();
+    expect(within(welcome).queryByText("Welcome to rocketcrab!")).not.toBeInTheDocument();
     expect(within(welcome).getByText("You've selected")).toBeInTheDocument();
     expect(within(welcome).getByText("Rocket Rumble")).toBeInTheDocument();
     expect(
@@ -705,6 +705,14 @@ describe("PartyLobby", () => {
     expect(
       within(welcome).getByRole("link", { name: /what is rocket rumble\?/i }),
     ).toBeInTheDocument();
+  });
+
+  it("thanks the players after a game and offers what to do next", async () => {
+    await renderLobby(makeState(), { playedTitle: "Rocket Rumble" });
+    const thanks = screen.getByLabelText("Thanks for playing");
+    expect(thanks).toHaveTextContent("Thanks for playing Rocket Rumble on rocketcrab!");
+    expect(thanks).toHaveTextContent("Play it again, or browse for your next game.");
+    expect(screen.queryByLabelText("Welcome")).not.toBeInTheDocument();
   });
 
   it("shows the guest welcome copy when a game is selected — naming the host", async () => {

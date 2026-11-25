@@ -1,6 +1,6 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createMemoryHistory, createRouter } from "@tanstack/react-router";
-import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { gameRepository } from "../lib/games/instance";
@@ -381,6 +381,32 @@ describe("/party", () => {
       const detail = screen.getByText(new RegExp(message));
       expect(detail).toHaveTextContent("Couldn't reach anyone in this party.");
       expect(detail).toHaveTextContent("this may not be why you couldn't connect");
+    });
+
+    it("thanks the players for the game that just ended", async () => {
+      const lobby: PartyEngineState = {
+        ...ACTIVE_STATE,
+        game: { kind: "nova", gameId: "game-1", title: "Rocket Rumble" },
+      } as PartyEngineState;
+      const publish = (state: PartyEngineState) =>
+        act(() => {
+          stubs.state = state;
+          for (const handler of stubs.handlers) handler(state);
+        });
+      stubs.state = lobby;
+      renderParty("/party");
+      expect(await screen.findByLabelText("Welcome")).toBeInTheDocument();
+      publish({ ...lobby, phase: "playing" });
+      publish(lobby);
+      expect(await screen.findByLabelText("Thanks for playing")).toHaveTextContent(
+        "Thanks for playing Rocket Rumble on rocketcrab!",
+      );
+      // Picking another game returns to the regular card.
+      publish({
+        ...lobby,
+        game: { kind: "nova", gameId: "game-2", title: "Other" },
+      } as PartyEngineState);
+      expect(await screen.findByLabelText("Welcome")).toBeInTheDocument();
     });
 
     it("retries setup from Try again and dismisses the error from Back", async () => {
