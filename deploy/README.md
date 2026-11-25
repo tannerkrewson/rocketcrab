@@ -6,13 +6,15 @@ the `wrangler.toml` files (dashboard, secrets, account) under **Live state**.
 
 ## Deployment targets
 
-| Worker                              | Config                         | Beta origin                                            |
+| Worker                              | Config                         | Origin                                                 |
 | ----------------------------------- | ------------------------------ | ------------------------------------------------------ |
-| App and party API (`rocketcrab`)    | `deploy/nova/wrangler.toml`    | `https://rocketcrab.tannerkrewson.workers.dev`         |
+| App and party API (`rocketcrab`)    | `deploy/nova/wrangler.toml`    | `https://rocketcrab.com` (Custom Domain)               |
 | Game runtime (`rocketcrab-runtime`) | `deploy/runtime/wrangler.toml` | `https://rocketcrab-runtime.tannerkrewson.workers.dev` |
 
-Cloudflare account `f82d64d09da6cb5a0afa0120033a7e13`. `rocketcrab.com`
-serves the legacy site until the production cutover.
+Cloudflare account `f82d64d09da6cb5a0afa0120033a7e13`. The app also still
+answers on its beta URL, `https://rocketcrab.tannerkrewson.workers.dev`,
+until **Retire the beta URLs** below. `kids.rocketcrab.com` still serves the
+legacy app.
 
 Nova serves SPA assets directly from Workers Assets. Requests under `/api`
 run the Worker first.
@@ -204,6 +206,17 @@ secrets.
   Durable Object namespaces and the `rocketcrab` Turnstile widget, so there
   was nothing stale to remove. The owner joined a party by code through
   Turnstile on real devices.
+- 2026-11-25 cutover: the runtime (version `8c870f1e`) frames only
+  `https://rocketcrab.com`, and `rocketcrab.com` is a Custom Domain of the
+  `rocketcrab` Worker (version `39f38beb`). Its legacy proxied A record to
+  the Dokku host `134.209.222.77` was deleted; the Custom Domain API refuses
+  `override_existing_dns_record` for such records, so the swap was a delete
+  followed at once by the attach. The pre-cutover zone export is in
+  `~/code/rocketcrab-cutover-backup/` on Gerald. Rollback: detach the Custom
+  Domain, recreate the proxied A record `rocketcrab.com` → `134.209.222.77`,
+  and set `deploy/origins.json` back to the beta URL before redeploying the
+  runtime. `rocketcrab.com` serves Nova, `/api/turn` and `/api/code/lookup`
+  answer 403 without Turnstile, and code claims work.
 - 2026-11-25: the account is on Workers Paid. Spend policies (Billing →
   Spend Management) email the owner's login address at $10 and block usage at
   $100 a month, separately for Workers and Durable Objects. A block stops
@@ -224,6 +237,8 @@ secrets.
       and lobby and game readiness.
 
 ## Production cutover
+
+Steps 1–3 are done (see **Live state**).
 
 1. Save the existing `rocketcrab.com` DNS records and any Worker, Pages or
    redirect bindings that serve the legacy app. Agree on a cutover window.
