@@ -105,10 +105,10 @@ the README for local devices.
 
 ## Maintenance
 
-- Snakeout sends every player to `/transfer/snakeout/<uuid>/?name=` with
-  the requesting player's name, so everyone's name step is prefilled with
-  that one name. Fix in Snakeout (`src/server/app/game.js`): send each
-  player their own name.
+- Snakeout's in-game "transfer to Rocketcrab" sends every player to
+  `/transfer/snakeout/<uuid>/`, which Nova dropped (each player now gets the
+  404). Change Snakeout (`src/server/app/game.js`) to link players to
+  `https://rocketcrab.com/join`, or remove the button.
 - Local `npm run dev` can't reach external game servers through
   `/api/relay` (the Worker's fetch fails with `relay_upstream_unavailable`,
   while curl from the host succeeds), so external games can't be picked

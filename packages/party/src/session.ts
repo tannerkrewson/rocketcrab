@@ -326,8 +326,6 @@ export class PartySession {
 export interface CreatePartyOptions extends PartyIdentity {
   readonly transportFactory: PartyTransportFactory;
   readonly derive?: (secret: SessionSecret) => Promise<SessionMaterial>;
-  /** Create with this secret instead of a fresh one (external-game transfers). */
-  readonly secret?: SessionSecret;
 }
 export interface JoinByInviteOptions extends CreatePartyOptions {
   readonly secret: string;
@@ -355,7 +353,7 @@ async function enter(
   return session;
 }
 export async function createParty(options: CreatePartyOptions): Promise<PartySession> {
-  return enter(options, options.secret ?? generateSessionSecret(), "creator");
+  return enter(options, generateSessionSecret(), "creator");
 }
 export async function joinPartyByInvite(options: JoinByInviteOptions): Promise<PartySession> {
   const secret = sessionSecretSchema.safeParse(options.secret);

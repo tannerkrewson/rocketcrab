@@ -3,10 +3,6 @@
  * secret. One PartyCode Durable Object per code holds the secret while members
  * keep renewing it, so the Worker learns the secret of every party that shows
  * a code. Invite links and QR codes never come through here.
- *
- * The same objects also gather an external game's players into one party:
- * `/transfer/<game>/<key>` sends them all with one key, the first arrival's
- * secret wins, and everyone after joins it.
  */
 import { json, jsonError, readBodyText, type ObjectNamespace } from "./http";
 
@@ -74,8 +70,6 @@ const BLOCKED = new Set([
 ]);
 const SECRET = /^[A-Za-z0-9_-]{43}$/;
 const CODE = /^[a-z]{4}$/;
-// External games send a UUID; the legacy server accepted any key of 10+ characters.
-const TRANSFER_KEY = /^[A-Za-z0-9_-]{10,64}$/;
 const REQUEST_BYTES = 256;
 const encoder = new TextEncoder();
 
@@ -180,23 +174,4 @@ export async function handleCodeLookup(request: Request, env: CodeEnv): Promise<
   const response = await stub(env, code).fetch(new Request("https://party-code/"));
   if (response.status !== 200) return jsonError(404, "code_not_found", "no party has that code");
   return json(200, { secret: await response.text() });
-}
-
-/** `{key, secret}` → `{secret, created}`: the party every player sent with this key shares. */
-export async function handleTransfer(request: Request, env: CodeEnv): Promise<Response> {
-  const fields = await readFields(request);
-  const key = text(fields.key);
-  const secret = text(fields.secret);
-  if (key === null || !TRANSFER_KEY.test(key) || secret === null || !SECRET.test(secret)) {
-    return jsonError(400, "invalid_transfer", "key and secret are required");
-  }
-  if (!env.PARTY_CODE) return unavailable();
-  const party = stub(env, `transfer:${key}`);
-  const claimed = await party.fetch(
-    new Request("https://party-code/", { method: "PUT", body: secret }),
-  );
-  if (claimed.status === 204) return json(200, { secret, created: true });
-  const existing = await party.fetch(new Request("https://party-code/"));
-  if (existing.status !== 200) return jsonError(503, "transfer_unavailable", "try again");
-  return json(200, { secret: await existing.text(), created: false });
 }

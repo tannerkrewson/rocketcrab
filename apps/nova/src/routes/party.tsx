@@ -5,7 +5,7 @@ import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
 import { PartyExperience } from "../components/party/PartyExperience";
 import { PartyResumeBanner } from "../components/party/PartyResumeBanner";
 import { PartyShellHeader } from "../components/party/PartyShellHeader";
-import { MAX_PLAYER_NAME_LENGTH, NameEntry } from "../components/party/NameEntry";
+import { NameEntry } from "../components/party/NameEntry";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
 import { LoadingState } from "../components/ui/LoadingState";
 import { buttonStyles } from "../components/ui/Button";
@@ -28,7 +28,6 @@ export const Route = createFileRoute("/party")({
     gameId: typeof search.gameId === "string" ? search.gameId : undefined,
     title: typeof search.title === "string" ? search.title : undefined,
     browse: search.browse === true ? true : undefined,
-    name: typeof search.name === "string" ? search.name : undefined,
   }),
   component: PartyPage,
 });
@@ -37,8 +36,6 @@ interface PartySearch {
   gameId?: string;
   title?: string;
   browse?: boolean;
-  /** Prefills the name step; external games send their player's name. */
-  name?: string;
 }
 
 function errorMessage(error: unknown): string {
@@ -48,8 +45,7 @@ function errorMessage(error: unknown): string {
 /**
  * The party entry point. A plain visit starts your own party; a link with an
  * invite fragment (`/party#secret=…`) or a party code (`/abcd`) joins a
- * friend's, and an external game's transfer does whichever comes first.
- * Either way a player without a saved name names themselves first.
+ * friend's. Either way a player without a saved name names themselves first.
  */
 function PartyPage() {
   const search = Route.useSearch();
@@ -78,18 +74,17 @@ function PartyPage() {
     if (startedRef.current || engine.isActive() || needsName || importing) {
       return;
     }
-    if (invite !== null && invite.create !== true) {
+    if (invite !== null) {
       startedRef.current = true;
       void engine.joinByInvite(invite);
       return;
     }
-    const secret = invite?.secret;
     const gameId = search.gameId;
     if (gameId === undefined) {
       startedRef.current = true;
       const savedName = getSavedPlayerName();
       if (savedName !== null) engine.setDisplayName(savedName);
-      void engine.createParty(undefined, secret);
+      void engine.createParty();
       return;
     }
     const title = search.title ?? "Untitled game";
@@ -101,12 +96,12 @@ function PartyPage() {
         // over source via sessionStorage; otherwise load the saved game.
         const listed = findCatalogGame(gameId);
         if (listed?.play.kind === "nova") {
-          await engine.createParty(await hostedNovaSourceSpec(listed as NovaCatalogGame), secret);
+          await engine.createParty(await hostedNovaSourceSpec(listed as NovaCatalogGame));
           return;
         }
         if (listed?.play.kind === "external") {
-          // An external game's own Start party button lands here with it picked.
-          await engine.createParty(undefined, secret);
+          // External games' Start party links (/transfer/<id>) land here.
+          await engine.createParty();
           if (engine.isActive()) {
             void selectCatalogGame(engine, listed).catch((error: unknown) =>
               toast.danger(`Couldn't select ${listed.name}: ${errorMessage(error)}`),
@@ -115,15 +110,12 @@ function PartyPage() {
           return;
         }
         const source = takePartySource(gameId) ?? (await gameRepository.read(gameId)).html;
-        await engine.createParty(
-          {
-            gameId,
-            title,
-            source,
-            apiVersion: PROTOCOL_VERSION,
-          },
-          secret,
-        );
+        await engine.createParty({
+          gameId,
+          title,
+          source,
+          apiVersion: PROTOCOL_VERSION,
+        });
       } catch (error) {
         setLoadError(errorMessage(error));
       }
@@ -134,8 +126,7 @@ function PartyPage() {
   // Once the party exists it lives in the engine. Drop the starting game from
   // the URL: it can name a private game, and session replay records the URL.
   const created = state.phase === "lobby";
-  const startingGame =
-    search.gameId !== undefined || search.title !== undefined || search.name !== undefined;
+  const startingGame = search.gameId !== undefined || search.title !== undefined;
   useEffect(() => {
     if (created && startingGame) {
       void navigate({ to: "/party", search: { browse: search.browse }, replace: true });
@@ -176,7 +167,6 @@ function PartyPage() {
     const joining = invite !== null;
     return (
       <NameEntry
-        initialName={search.name?.trim().slice(0, MAX_PLAYER_NAME_LENGTH)}
         description={
           joining
             ? "Your friends will see this in the party."

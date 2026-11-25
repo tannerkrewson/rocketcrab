@@ -25,13 +25,11 @@ run the Worker first.
 | `GET /api/tunnel/:pair` | Encrypted WebSocket fallback, one hibernating Durable Object per pair.    |
 | `POST /api/code/claim`  | Claims or renews a party's four-letter code, one Durable Object per code. |
 | `POST /api/code/lookup` | Resolves a live four-letter code to its party's invite secret.            |
-| `POST /api/transfer`    | Gathers an external game's players, sent with one key, into one party.    |
 
 The API checks that browser requests are same-origin. HTTP limits are
 approximate, per IP, route and Cloudflare location: 60/min for TURN, the
-room relay, transfers and each party-code route, 2,000/min for signaling and
-tunnel upgrades. The socket handlers also budget signaling messages and tunnel
-bytes.
+room relay and each party-code route, 2,000/min for signaling and tunnel
+upgrades. The socket handlers also budget signaling messages and tunnel bytes.
 
 The runtime must be on a different **site** (registrable domain) from the
 app, not just a different origin: same-site hosting let a looping game wedge

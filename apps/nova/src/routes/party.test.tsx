@@ -131,14 +131,10 @@ vi.mock("../lib/party/engine", async (importOriginal) => {
   };
 });
 
-const { lookupPartyCode, transferParty } = vi.hoisted(() => ({
-  lookupPartyCode: vi.fn<(code: string) => Promise<string | null>>(),
-  transferParty: vi.fn<(key: string) => Promise<{ secret: string; created: boolean }>>(),
-}));
+const lookupPartyCode = vi.hoisted(() => vi.fn<(code: string) => Promise<string | null>>());
 vi.mock("../lib/party/party-code", async (importOriginal) => ({
   ...(await importOriginal<typeof import("../lib/party/party-code")>()),
   lookupPartyCode,
-  transferParty,
 }));
 
 vi.mock("../lib/catalog/nova-games", () => ({
@@ -201,14 +197,14 @@ describe("/party", () => {
     });
     fireEvent.click(screen.getByRole("button", { name: "Start party" }));
     expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada");
-    await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledWith(undefined, undefined));
+    await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledWith());
   });
 
   it("skips the entry page for a returning player with a saved name", async () => {
     updatePartyDisplayName("Ada");
     renderParty("/party");
     await waitFor(() => expect(stubEngine.setDisplayName).toHaveBeenCalledWith("Ada"));
-    await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledWith(undefined, undefined));
+    await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledWith());
     expect(await screen.findByText("Welcome to rocketcrab!")).toBeInTheDocument();
     expect(screen.getByTestId("app-background")).toHaveAttribute("data-variant", "molten");
     expect(screen.queryByRole("heading", { name: "What's your name?" })).not.toBeInTheDocument();
@@ -229,7 +225,6 @@ describe("/party", () => {
         source: SAVED_HTML,
         apiVersion: 1,
       }),
-      undefined,
     );
     // The private game leaves the URL once the party exists, so replay can record it.
     await waitFor(() => expect(router.state.location.href).toBe("/party"));
@@ -244,15 +239,12 @@ describe("/party", () => {
       renderParty("/party?gameId=hosted-quiz&title=Hosted%20Quiz");
       await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledTimes(1));
       expect(fetchMock.mock.calls[0]![0]).toBe("https://someone.github.io/quiz/index.html");
-      expect(stubEngine.createParty).toHaveBeenCalledWith(
-        {
-          gameId: "hosted-quiz",
-          title: "Hosted Quiz",
-          source: SAVED_HTML,
-          apiVersion: 1,
-        },
-        undefined,
-      );
+      expect(stubEngine.createParty).toHaveBeenCalledWith({
+        gameId: "hosted-quiz",
+        title: "Hosted Quiz",
+        source: SAVED_HTML,
+        apiVersion: 1,
+      });
     } finally {
       vi.unstubAllGlobals();
     }
@@ -267,7 +259,6 @@ describe("/party", () => {
     await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledTimes(1));
     expect(stubEngine.createParty).toHaveBeenCalledWith(
       expect.objectContaining({ gameId: game.id, source: unsaved }),
-      undefined,
     );
   });
 
@@ -466,44 +457,21 @@ describe("/$code", () => {
 });
 
 describe("external-game links", () => {
-  const KEY = "3f2c8f0e-5b8e-4a5e-9a51-2b7f0c1d9e11";
-
   it("/transfer/drawphone starts a party with Drawphone picked", async () => {
     updatePartyDisplayName("Ada");
     const router = renderParty("/transfer/drawphone");
     await waitFor(() =>
       expect(stubEngine.selectGame).toHaveBeenCalledWith({ kind: "external", gameId: "drawphone" }),
     );
-    expect(stubEngine.createParty).toHaveBeenCalledWith(undefined, undefined);
+    expect(stubEngine.createParty).toHaveBeenCalledWith();
     await waitFor(() => expect(router.state.location.href).toBe("/party"));
   });
 
-  it("gathers players sent with one key: the first creates, the rest join", async () => {
-    const secret = "G".repeat(43);
-    transferParty.mockResolvedValue({ secret, created: true });
+  it("/transfer with an unknown game starts a plain party", async () => {
     updatePartyDisplayName("Ada");
-    renderParty(`/transfer/snakeout/${KEY}/`);
-    await waitFor(() =>
-      expect(stubEngine.selectGame).toHaveBeenCalledWith({ kind: "external", gameId: "snakeout" }),
-    );
-    expect(transferParty).toHaveBeenCalledWith(KEY);
-    expect(stubEngine.createParty).toHaveBeenCalledWith(undefined, secret);
-
-    vi.clearAllMocks();
-    stubs.started = false;
-    resetInviteImportForTests();
-    transferParty.mockResolvedValue({ secret, created: false });
-    renderParty(`/transfer/snakeout/${KEY}`);
-    await waitFor(() => expect(stubEngine.joinByInvite).toHaveBeenCalledWith({ secret }));
-    expect(stubEngine.createParty).not.toHaveBeenCalled();
+    renderParty("/transfer/not-a-game/");
+    await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledWith());
     expect(stubEngine.selectGame).not.toHaveBeenCalled();
-  });
-
-  it("prefills the name an external game sends", async () => {
-    transferParty.mockResolvedValue({ secret: "H".repeat(43), created: false });
-    renderParty(`/transfer/snakeout/${KEY}/?name=Sam`);
-    expect(await screen.findByLabelText("Enter your name here")).toHaveValue("Sam");
-    expect(stubEngine.joinByInvite).not.toHaveBeenCalled();
   });
 
   it("/join opens home's party-code box", async () => {

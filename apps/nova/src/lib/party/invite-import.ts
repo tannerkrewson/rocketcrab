@@ -9,12 +9,9 @@ import { parseInviteFragment } from "@rocketcrab/party";
 let inviteHandled = false;
 let handedOff: ImportedInvite | null = null;
 
-/**
- * Queue an invite for the next `/party` mount: party-code joins, and
- * external-game transfers, whose first arrival creates the party instead.
- */
-export function handOffInvite(secret: string, create = false): void {
-  handedOff = create ? { secret, create: true } : { secret };
+/** Queue an invite for the next `/party` mount (party-code joins). */
+export function handOffInvite(secret: string): void {
+  handedOff = { secret };
 }
 
 /** True while an invite waits in the URL fragment or a handoff. */
@@ -24,8 +21,6 @@ export function invitePending(location: Pick<InviteImportLocation, "hash">): boo
 
 export interface ImportedInvite {
   readonly secret: string;
-  /** Create the party with this secret rather than join it. */
-  readonly create?: true;
 }
 
 /** The URL parts the importer needs (decoupled from window for tests). */

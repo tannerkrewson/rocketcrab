@@ -155,18 +155,14 @@ export class PartyEngine {
 
   private readonly joinErrorNoticesShown = new Set<string>();
 
-  /**
-   * An omitted source opens an empty lobby; a supplied source is announced
-   * immediately. A supplied secret (external-game transfers) replaces the
-   * fresh one.
-   */
-  async createParty(input?: PartySourceSpec, secret?: string): Promise<void> {
+  /** An omitted source opens an empty lobby; a supplied source is announced immediately. */
+  async createParty(input?: PartySourceSpec): Promise<void> {
     if (this.state.leaveInFlight !== null && !(await this.waitForLeaveBeforeSetup())) return;
     if (this.rejectUnsafeSetup()) return;
     this.prepareSetup();
     const setup = this.state.setupAbort!;
     const identity = this.state.identity;
-    this.state.lastSetup = { kind: "create", input, secret };
+    this.state.lastSetup = { kind: "create", input };
     this.state.transitionPhase({ phase: "creating", detail: "Creating your private party…" });
     this.state.lastError = null;
     this.emit();
@@ -174,7 +170,6 @@ export class PartyEngine {
       const party = await createParty({
         memberId: identity.memberId,
         displayName: identity.displayName,
-        ...(secret !== undefined ? { secret } : {}),
         transportFactory: this.observeSignaling(await this.resolveTransportFactory(), setup),
         ...(this.state.derive !== undefined ? { derive: this.state.derive } : {}),
       });
@@ -298,7 +293,7 @@ export class PartyEngine {
       return;
     }
     if (last.kind === "create") {
-      void this.createParty(last.input, last.secret);
+      void this.createParty(last.input);
     } else {
       void this.joinByInvite(last.input);
     }

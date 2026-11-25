@@ -20,8 +20,8 @@ import { Route as LibraryRouteImport } from './routes/library'
 import { Route as PartyRouteImport } from './routes/party'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as GameGameIdRouteImport } from './routes/game.$gameId'
+import { Route as TransferGameIdRouteImport } from './routes/transfer.$gameId'
 import { Route as GamesGameIdEditRouteImport } from './routes/games/$gameId/edit'
-import { Route as TransferGameIdChar123KeyChar125RouteImport } from './routes/transfer.$gameId.{-$key}'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -78,17 +78,16 @@ const GameGameIdRoute = GameGameIdRouteImport.update({
   path: '/game/$gameId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TransferGameIdRoute = TransferGameIdRouteImport.update({
+  id: '/transfer/$gameId',
+  path: '/transfer/$gameId',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GamesGameIdEditRoute = GamesGameIdEditRouteImport.update({
   id: '/games/$gameId/edit',
   path: '/games/$gameId/edit',
   getParentRoute: () => rootRouteImport,
 } as any)
-const TransferGameIdChar123KeyChar125Route =
-  TransferGameIdChar123KeyChar125RouteImport.update({
-    id: '/transfer/$gameId/{-$key}',
-    path: '/transfer/$gameId/{-$key}',
-    getParentRoute: () => rootRouteImport,
-  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -102,8 +101,8 @@ export interface FileRoutesByFullPath {
   '/party': typeof PartyRoute
   '/privacy': typeof PrivacyRoute
   '/game/$gameId': typeof GameGameIdRoute
+  '/transfer/$gameId': typeof TransferGameIdRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
-  '/transfer/$gameId/{-$key}': typeof TransferGameIdChar123KeyChar125Route
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -117,8 +116,8 @@ export interface FileRoutesByTo {
   '/party': typeof PartyRoute
   '/privacy': typeof PrivacyRoute
   '/game/$gameId': typeof GameGameIdRoute
+  '/transfer/$gameId': typeof TransferGameIdRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
-  '/transfer/$gameId/{-$key}': typeof TransferGameIdChar123KeyChar125Route
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -133,8 +132,8 @@ export interface FileRoutesById {
   '/party': typeof PartyRoute
   '/privacy': typeof PrivacyRoute
   '/game/$gameId': typeof GameGameIdRoute
+  '/transfer/$gameId': typeof TransferGameIdRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
-  '/transfer/$gameId/{-$key}': typeof TransferGameIdChar123KeyChar125Route
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -150,8 +149,8 @@ export interface FileRouteTypes {
     | '/party'
     | '/privacy'
     | '/game/$gameId'
+    | '/transfer/$gameId'
     | '/games/$gameId/edit'
-    | '/transfer/$gameId/{-$key}'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -165,8 +164,8 @@ export interface FileRouteTypes {
     | '/party'
     | '/privacy'
     | '/game/$gameId'
+    | '/transfer/$gameId'
     | '/games/$gameId/edit'
-    | '/transfer/$gameId/{-$key}'
   id:
     | '__root__'
     | '/'
@@ -180,8 +179,8 @@ export interface FileRouteTypes {
     | '/party'
     | '/privacy'
     | '/game/$gameId'
+    | '/transfer/$gameId'
     | '/games/$gameId/edit'
-    | '/transfer/$gameId/{-$key}'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -196,8 +195,8 @@ export interface RootRouteChildren {
   PartyRoute: typeof PartyRoute
   PrivacyRoute: typeof PrivacyRoute
   GameGameIdRoute: typeof GameGameIdRoute
+  TransferGameIdRoute: typeof TransferGameIdRoute
   GamesGameIdEditRoute: typeof GamesGameIdEditRoute
-  TransferGameIdChar123KeyChar125Route: typeof TransferGameIdChar123KeyChar125Route
 }
 
 declare module '@tanstack/react-router' {
@@ -279,18 +278,18 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GameGameIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/transfer/$gameId': {
+      id: '/transfer/$gameId'
+      path: '/transfer/$gameId'
+      fullPath: '/transfer/$gameId'
+      preLoaderRoute: typeof TransferGameIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/games/$gameId/edit': {
       id: '/games/$gameId/edit'
       path: '/games/$gameId/edit'
       fullPath: '/games/$gameId/edit'
       preLoaderRoute: typeof GamesGameIdEditRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/transfer/$gameId/{-$key}': {
-      id: '/transfer/$gameId/{-$key}'
-      path: '/transfer/$gameId/{-$key}'
-      fullPath: '/transfer/$gameId/{-$key}'
-      preLoaderRoute: typeof TransferGameIdChar123KeyChar125RouteImport
       parentRoute: typeof rootRouteImport
     }
   }
@@ -308,8 +307,8 @@ const rootRouteChildren: RootRouteChildren = {
   PartyRoute: PartyRoute,
   PrivacyRoute: PrivacyRoute,
   GameGameIdRoute: GameGameIdRoute,
+  TransferGameIdRoute: TransferGameIdRoute,
   GamesGameIdEditRoute: GamesGameIdEditRoute,
-  TransferGameIdChar123KeyChar125Route: TransferGameIdChar123KeyChar125Route,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
