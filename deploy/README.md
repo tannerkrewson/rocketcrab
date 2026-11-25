@@ -119,6 +119,12 @@ strings, invite fragments, or private game IDs.
   (`configured`) or unavailable. Cached reuses do not generate an event.
   This client count represents observed results and can miss blocked GA
   requests or clients that disconnect before receiving the credentials.
+- Legacy app events (before cutover) store their name in Event Category and
+  a value as the event name. Compare `game_start` with Event Category
+  `Party-Game`, whose event name is the title-cased Game ID. Compare Players
+  at game start with Event Category `Party-numberOfPlayers`. Engagement rate
+  before 2024-10-28 is not comparable because `user_engagement` was not
+  collected.
 
 Cloudflare Workers Logs captures Nova backend errors. Request invocation logs
 are disabled. Search for `rate_limiter_unavailable`, `turn_upstream_error`, or
