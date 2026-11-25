@@ -1,8 +1,8 @@
 /**
  * Four-letter party codes: `rocketcrab.com/abcd` resolves to a party's invite
- * secret. One PartyCode Durable Object per code holds the secret while members
- * keep renewing it, so the Worker learns the secret of every party that shows
- * a code. Invite links and QR codes never come through here.
+ * secret. One PartyCode Durable Object per code holds the secret while the
+ * host keeps renewing it. Every party claims a code, so the Worker learns
+ * every party's secret, even one joined only by invite link or QR code.
  */
 import { json, jsonError, readBodyText, type ObjectNamespace } from "./http";
 import { checkTurnstile, type TurnstileEnv } from "./turnstile";

@@ -266,7 +266,7 @@ npx --yes wrangler@4.161.0 delete --config deploy/runtime/wrangler.toml
 
 In Cloudflare Realtime → TURN, delete `rocketcrab-turn` after confirming
 that it has no other consumers. Delete any TURN API token created solely to
-administer this beta. Verify both Worker scripts and Nova's `SignalHub` and
-`TunnelPair` namespaces are gone, the beta URLs are inactive, and the beta
+administer this beta. Verify both Worker scripts and Nova's `SignalHub`,
+`TunnelPair` and `PartyCode` namespaces are gone, the beta URLs are inactive, and the beta
 key is absent. Leave account-wide workers.dev settings and other applications'
 resources in place. [Wrangler delete](https://developers.cloudflare.com/workers/wrangler/commands/workers/#delete)

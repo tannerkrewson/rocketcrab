@@ -7,8 +7,10 @@ import { sessionSecretSchema } from "@rocketcrab/protocol";
  * The creator generates one 32-byte CSPRNG session secret. Everything about
  * the private party room is DERIVED from that secret with Web Crypto
  * (SHA-256 with domain-separated labels), so the secret is the only private
- * material friends share, solely through private invite fragments.
- * Every side derives the room/password/session locally.
+ * material friends share: through invite fragments, which never leave the
+ * browser, or through a four-letter party code, which means the Worker holds
+ * the secret while the code is live (deploy/nova/code.ts). Every side derives
+ * the room/password/session locally.
  *
  * Derivation scheme: for each label L,
  * `material = SHA-256(label || 0x00 || secret)`. The 0x00 separator keeps
