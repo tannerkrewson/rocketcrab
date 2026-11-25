@@ -29,6 +29,22 @@ churn on upgrade), and need no paid always-on server.
       described in [the deploy runbook](deploy/README.md). Confirm TURN mints
       on success and that blocked challenges fall back to direct WebRTC or
       the encrypted tunnel.
+- [ ] After the first production deploy, watch a Clarity recording of a party
+      from an eligible region and confirm names, game titles and the invite
+      QR code are masked.
+- [ ] Analytics: send real time to ready on `connection_result` `game-ready`
+      (`ms_to_connect` is always 0).
+- [ ] Analytics: give `join-failed` an `error_code` (expired invite, host
+      gone, timeout, blocked network). Today it is always empty.
+- [ ] Analytics: give player-visible notices stable codes and send
+      `notice_shown {code}`. Code-only notices could then be unmasked in
+      Clarity with `data-clarity-unmask`; many notices embed names, titles or
+      game text today.
+- [ ] Analytics: report Core Web Vitals to GA with the `web-vitals` library,
+      and send `app_error {route, error_name}` for uncaught errors and
+      rejections, without messages.
+- [ ] Analytics: add `invite_share {method}`, an `end_reason` on `game_end`,
+      and editor and library events.
 
 ## Real-device checks requiring access or coordination
 
