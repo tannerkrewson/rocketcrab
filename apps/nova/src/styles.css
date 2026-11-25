@@ -387,14 +387,15 @@
 
 .button--primary,
 .button--danger {
-  /* Solid and vivid: white in the fill, rim, or glow washes red out to pink.
+  /* Solid and vivid, matching the ".com" red: white in the fill, rim, or
+     glow washes red out to pink, so keep the rim faint and the glow low.
      Mixing with white in oklch keeps the hue and more of the chroma. */
   --button-bg: var(--accent);
   --button-bg-hover: var(--button-bg);
   --button-bg-pressed: var(--button-bg);
   --button-fg: oklch(99% 0 0);
-  --button-rim: color-mix(in oklch, var(--accent) 65%, white);
-  --button-glow: 0.2;
+  --button-rim: color-mix(in oklch, var(--accent) 85%, white);
+  --button-glow: 0.08;
 }
 
 .button--danger {
