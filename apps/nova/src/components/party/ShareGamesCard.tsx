@@ -78,7 +78,9 @@ export function ShareGamesCard() {
           <Switch.Thumb />
         </Switch.Control>
         <Switch.Content>
-          <Label className="text-sm">Let players save copies</Label>
+          <Label className="text-sm">
+            Let players save your {selected.length > 1 ? "games" : "game"} to their library
+          </Label>
         </Switch.Content>
       </Switch>
       <div className="flex flex-wrap justify-center gap-2">
