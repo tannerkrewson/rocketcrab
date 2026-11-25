@@ -59,7 +59,10 @@ export function PartyPlayShell({
   const [panel, setPanel] = useState<PlayShellPanel>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [confirmKickMemberId, setConfirmKickMemberId] = useState<string | null>(null);
-  const [libraryGame, setLibraryGame] = useState<{ gameId: string; title: string } | null>(null);
+  const [libraryGame, setLibraryGame] = useState<{
+    gameId: string;
+    title: string;
+  } | null>(null);
   const [detailsOpen, setDetailsOpen] = useState(false);
   const [confirmReloadMine, setConfirmReloadMine] = useState(false);
   const [confirmReloadAll, setConfirmReloadAll] = useState(false);
@@ -101,30 +104,27 @@ export function PartyPlayShell({
     <div className="fixed inset-0 z-40 flex flex-col bg-black" data-testid="party-play-view">
       {!barHidden ? (
         <header className="relative z-50 grid grid-cols-[1fr_auto_1fr] items-center gap-2 bg-overlay px-3 pb-2 pt-safe">
-          <Button
-            size="sm"
-            variant="tertiary"
-            className="justify-self-start"
+          {/* Logo and title are plain controls; only Menu looks like a button. */}
+          <button
+            type="button"
+            className="justify-self-start rounded-full transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-focus"
             onClick={() => setBarHidden(true)}
             aria-label="Hide the top bar"
             title="Hide the top bar"
           >
-            <img src="/rocketcrab-logo-no-glow.svg" alt="" width={26} height={26} />
-          </Button>
+            <img src="/rocketcrab-logo-no-glow.svg" alt="" width={34} height={34} />
+          </button>
 
-          <Button
-            variant="tertiary"
-            size="sm"
-            className="h-auto px-0 font-title text-lg font-black whitespace-nowrap md:text-xl"
-            onPress={() => void copyInvite()}
+          <button
+            type="button"
+            className="rounded-lg font-title text-xl font-black leading-none whitespace-nowrap transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-focus disabled:opacity-60"
+            onClick={() => void copyInvite()}
             disabled={state.inviteUrl === null}
             title="Copy the invite link"
             aria-label="Copy the invite link"
           >
-            <span>
-              rocketcrab<span className="text-primary">.com</span>
-            </span>
-          </Button>
+            rocketcrab<span className="text-primary">.com</span>
+          </button>
 
           <Button
             size="sm"
@@ -316,7 +316,8 @@ export function PartyPlayShell({
                           soft
                           onClick={() => setConfirmKickMemberId(member.memberId)}
                         >
-                          Kick<span className="sr-only"> {member.displayName}</span>
+                          Kick
+                          <span className="sr-only"> {member.displayName}</span>
                         </Button>
                       ) : null}
                     </li>
