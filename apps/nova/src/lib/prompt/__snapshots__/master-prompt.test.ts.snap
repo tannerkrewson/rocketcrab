@@ -41,7 +41,6 @@ in one sentence:
   Held input goes in controls, one-off events are actions, and the screen
   glides between states as in the real-time example.
 - **Hidden information** (hands, secret roles): add \`selectView\`.
-- **Raw messages**: only for data that is not game state; almost never.
 
 Then plan the state: one plain JSON object that holds everything needed to
 continue the game on another device, such as players, positions, scores,
@@ -50,24 +49,9 @@ and keep the rules inside the handlers.
 
 ## 3. Build it
 
-- **Phones first**: one-column layout, large tap targets, readable text,
-  \`env(safe-area-inset-*)\` margins. Real-time games need on-screen touch
-  controls; keyboard support is a bonus. Desktop should still work.
-- **One self-contained document**: all custom HTML, CSS and JavaScript in one
-  file. Prefer a game that runs from that file alone. Use remote libraries,
-  fonts or images when they materially help, and pin dependencies to an exact
-  version. Never require npm, command-line tools,
-  hosting, a repository or extra files.
-- **Only the documented API**, following every rule in the reference.
-- **Players come and go**: handle joins, leaves and late joiners in the state
-  (the tick or an action adds and removes players); recover from a rejected
-  action; show this player's connection status.
-- **Show every phase**: what a player sees before the game starts, while
-  waiting for others, during play, and when it ends, including how to play
-  again (an action that resets the state).
-- Games can request camera and microphone access via navigator.mediaDevices.getUserMedia.
-- **Fail visibly**: if something the game needs is missing (camera, WebGL, a
-  CDN), show a clear message on screen instead of failing silently.
+Follow every rule in the reference, including "Building a good Nova game".
+The game must run from the one file you deliver: never require npm,
+command-line tools, hosting, a repository or extra files.
 
 ## 4. Deliver
 
@@ -78,20 +62,18 @@ End with the complete HTML document in a single fenced code block tagged
 
 ## The Nova API reference
 
-# Nova API — AI Quick Reference
+# Nova API reference
 
-Render player.name and other player-provided strings with \`textContent\`. Keep player input out of HTML strings passed to \`innerHTML\`. Games can request camera and microphone access via \`navigator.mediaDevices.getUserMedia\`. Handle permission denial in the game.
-
-The compact reference for AI-built Nova games; the master prompt embeds this
-file verbatim. \`window.nova\` already exists when your game's code runs, and it
-behaves the same in the editor's test arena and in real parties.
+\`window.nova\` already exists when your game's code runs, and it behaves the
+same in the editor's test arena and in real parties.
 
 ## How a Nova game works
 
 Nova keeps one copy of the game's state. Your handlers (\`createInitialState\`,
 \`actions\`, \`tick\`) run on one player's device, which Nova picks and replaces
 if that player leaves. Every player receives each new state through
-\`nova.state.onChange\` and draws it. Players change the state in two ways:
+\`nova.state.onChange\` and draws it; a player who joins late gets the current
+state. Players change the state in two ways:
 
 - **Actions** (\`nova.dispatch\`) for things that happen once: play a card,
   answer, vote, jump, shoot, buy. Nova applies each one exactly once, in order.
@@ -228,10 +210,6 @@ function draw() {
 }
 \`\`\`
 
-Nova guarantees: actions apply one at a time, in order, exactly once; a
-rejected action changes nothing; a player who joins late gets the current
-state.
-
 ## Real-time example
 
 \`\`\`js
@@ -305,9 +283,6 @@ What a real-time game must do:
   live only in a local variable.
 - **Read players from \`context.players\` in \`tick\`**: add an entity for a new
   player and delete the entities of players who left.
-- **Use controls for held input and actions for one-off events.** Put the
-  current direction or buttons in controls; a jump, shot or purchase is an
-  action.
 - **Draw every animation frame**, gliding between the last two states as
   above. New states arrive \`tickRate\` times a second plus network delay
   (often 50–200 ms), so never move things only when a state arrives.
@@ -317,19 +292,33 @@ What a real-time game must do:
   screen at once, put its position in controls, and have \`tick\` copy that
   position into the state. Everything else follows the state.
 
+## Building a good Nova game
+
+- **One self-contained HTML document.** Remote libraries, fonts and images
+  are fine when they help; pin exact versions.
+- **Phones first.** Most players are on phones: touch controls, large tap
+  targets, \`env(safe-area-inset-*)\` margins. Desktop should still work.
+- **Players come and go.** Handle joins, leaves and late joiners in the
+  state, recover from a rejected action, and show this player's connection
+  status.
+- **Show every phase**: before the start, waiting for others, playing, and the
+  end, with a way to play again (an action that resets the state).
+- **Fail visibly.** If something the game needs is missing (camera, WebGL, a
+  CDN), say so on screen.
+- **Player names are untrusted.** Render them with \`textContent\`, never inside
+  \`innerHTML\`.
+
 ## Phones and browsers
 
-- **Sound starts after a tap.** Create or resume the \`AudioContext\` inside a
-  tap or click handler, never on load, and show a "tap for sound" hint. The
-  iPhone silent switch still mutes it.
-- **Touch first.** No hover-only or keyboard-only controls; buttons at least
-  44 px. Fullscreen, pointer lock and tilt (device orientation) do not work.
+- **Sound starts after a tap**, and a "tap for sound" hint helps. The iPhone
+  silent switch mutes it.
+- **Fullscreen, pointer lock and tilt (device orientation) do not work.**
 - **The page can freeze.** A backgrounded phone stops timers and animation
   frames, and Nova moves the game to another device. When the page comes
   back it gets the current state through \`onChange\`; draw from that, never
   from time measured locally while away.
 - **Camera and microphone** (\`getUserMedia\`) work after \`onStart\`, from a
-  tap, with the usual browser prompt.
+  tap. Handle the player denying permission.
 
 ## Smallest game
 

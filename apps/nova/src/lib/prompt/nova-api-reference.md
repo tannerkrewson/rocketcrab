@@ -1,17 +1,15 @@
-# Nova API — AI Quick Reference
+# Nova API reference
 
-Render player.name and other player-provided strings with `textContent`. Keep player input out of HTML strings passed to `innerHTML`. Games can request camera and microphone access via `navigator.mediaDevices.getUserMedia`. Handle permission denial in the game.
-
-The compact reference for AI-built Nova games; the master prompt embeds this
-file verbatim. `window.nova` already exists when your game's code runs, and it
-behaves the same in the editor's test arena and in real parties.
+`window.nova` already exists when your game's code runs, and it behaves the
+same in the editor's test arena and in real parties.
 
 ## How a Nova game works
 
 Nova keeps one copy of the game's state. Your handlers (`createInitialState`,
 `actions`, `tick`) run on one player's device, which Nova picks and replaces
 if that player leaves. Every player receives each new state through
-`nova.state.onChange` and draws it. Players change the state in two ways:
+`nova.state.onChange` and draws it; a player who joins late gets the current
+state. Players change the state in two ways:
 
 - **Actions** (`nova.dispatch`) for things that happen once: play a card,
   answer, vote, jump, shoot, buy. Nova applies each one exactly once, in order.
@@ -148,10 +146,6 @@ function draw() {
 }
 ```
 
-Nova guarantees: actions apply one at a time, in order, exactly once; a
-rejected action changes nothing; a player who joins late gets the current
-state.
-
 ## Real-time example
 
 ```js
@@ -225,9 +219,6 @@ What a real-time game must do:
   live only in a local variable.
 - **Read players from `context.players` in `tick`**: add an entity for a new
   player and delete the entities of players who left.
-- **Use controls for held input and actions for one-off events.** Put the
-  current direction or buttons in controls; a jump, shot or purchase is an
-  action.
 - **Draw every animation frame**, gliding between the last two states as
   above. New states arrive `tickRate` times a second plus network delay
   (often 50–200 ms), so never move things only when a state arrives.
@@ -237,19 +228,33 @@ What a real-time game must do:
   screen at once, put its position in controls, and have `tick` copy that
   position into the state. Everything else follows the state.
 
+## Building a good Nova game
+
+- **One self-contained HTML document.** Remote libraries, fonts and images
+  are fine when they help; pin exact versions.
+- **Phones first.** Most players are on phones: touch controls, large tap
+  targets, `env(safe-area-inset-*)` margins. Desktop should still work.
+- **Players come and go.** Handle joins, leaves and late joiners in the
+  state, recover from a rejected action, and show this player's connection
+  status.
+- **Show every phase**: before the start, waiting for others, playing, and the
+  end, with a way to play again (an action that resets the state).
+- **Fail visibly.** If something the game needs is missing (camera, WebGL, a
+  CDN), say so on screen.
+- **Player names are untrusted.** Render them with `textContent`, never inside
+  `innerHTML`.
+
 ## Phones and browsers
 
-- **Sound starts after a tap.** Create or resume the `AudioContext` inside a
-  tap or click handler, never on load, and show a "tap for sound" hint. The
-  iPhone silent switch still mutes it.
-- **Touch first.** No hover-only or keyboard-only controls; buttons at least
-  44 px. Fullscreen, pointer lock and tilt (device orientation) do not work.
+- **Sound starts after a tap**, and a "tap for sound" hint helps. The iPhone
+  silent switch mutes it.
+- **Fullscreen, pointer lock and tilt (device orientation) do not work.**
 - **The page can freeze.** A backgrounded phone stops timers and animation
   frames, and Nova moves the game to another device. When the page comes
   back it gets the current state through `onChange`; draw from that, never
   from time measured locally while away.
 - **Camera and microphone** (`getUserMedia`) work after `onStart`, from a
-  tap, with the usual browser prompt.
+  tap. Handle the player denying permission.
 
 ## Smallest game
 

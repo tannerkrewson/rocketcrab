@@ -24,7 +24,7 @@ describe("master prompt", () => {
   it("keeps the interview, phones-first, one-document and single-code-block rules", () => {
     expect(normalized).toContain("Never write code before you understand the game");
     expect(normalized).toContain("Phones first");
-    expect(normalized).toContain("One self-contained document");
+    expect(normalized).toContain("One self-contained HTML document");
     expect(normalized).toContain("single fenced code block tagged `html`");
     expect(normalized).toContain("Prefer this whenever the game can work this way");
     expect(normalized).toContain("Held input goes in controls");

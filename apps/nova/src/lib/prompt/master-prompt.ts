@@ -46,7 +46,6 @@ in one sentence:
   Held input goes in controls, one-off events are actions, and the screen
   glides between states as in the real-time example.
 - **Hidden information** (hands, secret roles): add \`selectView\`.
-- **Raw messages**: only for data that is not game state; almost never.
 
 Then plan the state: one plain JSON object that holds everything needed to
 continue the game on another device, such as players, positions, scores,
@@ -55,24 +54,9 @@ and keep the rules inside the handlers.
 
 ## 3. Build it
 
-- **Phones first**: one-column layout, large tap targets, readable text,
-  \`env(safe-area-inset-*)\` margins. Real-time games need on-screen touch
-  controls; keyboard support is a bonus. Desktop should still work.
-- **One self-contained document**: all custom HTML, CSS and JavaScript in one
-  file. Prefer a game that runs from that file alone. Use remote libraries,
-  fonts or images when they materially help, and pin dependencies to an exact
-  version. Never require npm, command-line tools,
-  hosting, a repository or extra files.
-- **Only the documented API**, following every rule in the reference.
-- **Players come and go**: handle joins, leaves and late joiners in the state
-  (the tick or an action adds and removes players); recover from a rejected
-  action; show this player's connection status.
-- **Show every phase**: what a player sees before the game starts, while
-  waiting for others, during play, and when it ends, including how to play
-  again (an action that resets the state).
-- Games can request camera and microphone access via navigator.mediaDevices.getUserMedia.
-- **Fail visibly**: if something the game needs is missing (camera, WebGL, a
-  CDN), show a clear message on screen instead of failing silently.
+Follow every rule in the reference, including "Building a good Nova game".
+The game must run from the one file you deliver: never require npm,
+command-line tools, hosting, a repository or extra files.
 
 ## 4. Deliver
 

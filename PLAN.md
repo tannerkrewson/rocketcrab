@@ -25,6 +25,13 @@ churn on upgrade), and need no paid always-on server.
       loads, and parties work without analytics or Turnstile.
 - [ ] Watch a Clarity recording of a party from an eligible region and
       confirm names, game titles and the invite QR code are masked.
+- [ ] `packages/nova-api/src/examples.ts` says its strings are the examples in
+      `nova-api-reference.md`, but they have drifted (different games, no
+      `apiVersion`). Run the reference's own code blocks against the API in a
+      test instead, and drop the duplicate strings.
+- [ ] The reference says fullscreen and pointer lock don't work, but the
+      runtime frame's sandbox allows both. Check on real devices and correct
+      the reference or the sandbox.
 
 ## Real-device checks requiring access or coordination
 

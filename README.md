@@ -65,4 +65,5 @@ e2e/, e2e-trystero/        Playwright suites
 ```
 
 The game-facing API reference, which the master prompt embeds, is
-`apps/nova/src/lib/prompt/nova-api-reference.md`.
+`apps/nova/src/lib/prompt/nova-api-reference.md`. To port an existing game
+and list it in the catalog, see `apps/nova/src/lib/catalog/hosted-nova-games.md`.
