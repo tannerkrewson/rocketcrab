@@ -95,8 +95,7 @@ The Nova deploy uses the existing Rocketcrab GA4 web stream
 (`G-V569CH5H2D`). Set `VITE_GA_MEASUREMENT_ID` to an empty value to disable
 it for a deployment, or use a separate stream for test collection. The tag
 runs on the configured Nova origin. It sends route names without query
-strings, invite fragments, or private game IDs. GA reporting fields include
-`app_variant = nova` on Nova's explicit events.
+strings, invite fragments, or private game IDs.
 
 - Use `page_view` for page traffic and `party_create` for lobbies opened.
 - Use `game_start` for games launched, grouped by Game ID and Game kind.
@@ -107,12 +106,12 @@ strings, invite fragments, or private game IDs. GA reporting fields include
   Play duration includes time spent reconnecting and can be missing if the
   host's browser is killed. External game time measures the Rocketcrab
   play screen since third-party gameplay occurs inside an iframe.
-- Use `nova_connection` for connection paths and join readiness,
-  `nova_tunnel` for fallback attempts and terminal failures, and
+- Use `connection_result` for connection paths and join readiness,
+  `tunnel_result` for fallback attempts and terminal failures, and
   `party_issue` for player-visible reconnects and game errors. A signaling
-  outage is a `nova_connection` failure with the reason `relay-failed`.
+  outage is a `connection_result` failure with the reason `relay-failed`.
   Break down by outcome, reason, signaling status, browser family, network,
-  and Nova revision.
+  and App version.
   Connection counts are per client and peer attempt, so a pair can report on
   both devices.
 - Use `turn_cred_mint` to see whether fresh TURN credentials were usable

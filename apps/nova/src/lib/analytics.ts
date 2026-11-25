@@ -45,7 +45,6 @@ export function trackPage(routeId: string, gameId?: string): void {
       send_page_view: false,
       allow_google_signals: false,
       allow_ad_personalization_signals: false,
-      app_variant: "nova",
     });
     const script = document.createElement("script");
     script.async = true;
@@ -64,7 +63,7 @@ export function trackPage(routeId: string, gameId?: string): void {
 
 export function track(event: string, params: Parameters = {}): void {
   try {
-    tag?.("event", event, { ...params, app_variant: "nova" });
+    tag?.("event", event, params);
   } catch {
     // A tag failure cannot interrupt gameplay.
   }

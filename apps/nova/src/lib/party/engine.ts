@@ -437,12 +437,12 @@ export class PartyEngine {
       },
       onTunnel: (info) => {
         if (this.state.activeErrorScope !== scope || setup?.signal.aborted) return;
-        track("nova_tunnel", { outcome: "fallback", error_code: info.reason });
+        track("tunnel_result", { outcome: "fallback", error_code: info.reason });
         this.state.peerLink.switched();
       },
       onTunnelFailure: (info) => {
         if (this.state.activeErrorScope !== scope || setup?.signal.aborted) return;
-        track("nova_tunnel", { outcome: "failed", error_code: info.reason });
+        track("tunnel_result", { outcome: "failed", error_code: info.reason });
         this.state.peerLink.failed();
       },
     };

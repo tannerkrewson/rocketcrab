@@ -65,13 +65,13 @@ export function reportConnection(attempt: ConnectionAttempt): void {
   const connection = (
     navigator as Navigator & { connection?: { effectiveType?: unknown; type?: unknown } }
   ).connection;
-  track("nova_connection", {
+  track("connection_result", {
     outcome: attempt.outcome,
     error_code: attempt.error_code || undefined,
     ms_to_connect: attempt.ms_to_connect > 0 ? attempt.ms_to_connect : undefined,
     signaling_status: attempt.signaling_ok ? "available" : "unavailable",
     browser_family: browserFamily(navigator.userAgent),
     network: networkFamily(connection),
-    nova_version: import.meta.env.VITE_NOVA_VERSION || version,
+    app_version: import.meta.env.VITE_APP_VERSION || version,
   });
 }

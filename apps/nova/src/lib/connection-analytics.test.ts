@@ -44,14 +44,14 @@ describe("connection reporting", () => {
       ms_to_connect: 812,
       room_id: "secret",
     } as ConnectionAttempt);
-    expect(track).toHaveBeenCalledExactlyOnceWith("nova_connection", {
+    expect(track).toHaveBeenCalledExactlyOnceWith("connection_result", {
       outcome: "tunnel",
       error_code: undefined,
       ms_to_connect: 812,
       signaling_status: "available",
       browser_family: "safari-ios",
       network: "4g",
-      nova_version: expect.stringMatching(/^\d+\.\d+\.\d+$/),
+      app_version: expect.stringMatching(/^\d+\.\d+\.\d+$/),
     });
   });
 
@@ -63,7 +63,7 @@ describe("connection reporting", () => {
       signaling_ok: false,
     });
     expect(track).toHaveBeenCalledExactlyOnceWith(
-      "nova_connection",
+      "connection_result",
       expect.objectContaining({
         outcome: "failed",
         error_code: "relay-failed",

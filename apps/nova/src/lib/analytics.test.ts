@@ -77,7 +77,7 @@ it("counts one host game across reconnects and reports the duration at its end",
   publish({ ...state, phase: "lobby" });
 
   expect(events().filter(([event]) => event.startsWith("game_"))).toEqual([
-    ["game_start", { app_variant: "nova", game_id: "custom", game_kind: "nova", party_size: 2 }],
-    ["game_end", { app_variant: "nova", game_id: "custom", game_kind: "nova", play_seconds: 30 }],
+    ["game_start", { game_id: "custom", game_kind: "nova", party_size: 2 }],
+    ["game_end", { game_id: "custom", game_kind: "nova", play_seconds: 30 }],
   ]);
 });

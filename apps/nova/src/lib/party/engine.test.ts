@@ -2474,12 +2474,12 @@ describe("party engine — signaling outage setup", () => {
     world.clock.advance(4_999);
     await flush();
     expect(player.engine.getState().signalingOutage).toBe(false);
-    expect(track).not.toHaveBeenCalledWith("nova_connection", expect.anything());
+    expect(track).not.toHaveBeenCalledWith("connection_result", expect.anything());
     world.clock.advance(1);
     await flush();
     expect(player.engine.getState().signalingOutage).toBe(true);
     expect(track).toHaveBeenCalledExactlyOnceWith(
-      "nova_connection",
+      "connection_result",
       expect.objectContaining({
         outcome: "failed",
         error_code: "relay-failed",
