@@ -59,7 +59,6 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     inviteUrl: "http://localhost:2722/join#code=abcd&secret=invite-secret",
     connectionState: "connected",
     canStart: false,
-    canForceStart: false,
     startBlockedReason: null,
     endedReason: null,
     removedReason: null,

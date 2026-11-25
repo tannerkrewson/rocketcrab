@@ -703,7 +703,7 @@ describe("party engine — readiness and start gating", () => {
     expect(latest!.canStart).toBe(true);
   });
 
-  it("prevents starting until every player is ready; force-start works once verified", async () => {
+  it("lets the host start while a guest's game is still loading", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");
     const b = makePlayer(world, "b");
@@ -717,12 +717,9 @@ describe("party engine — readiness and start gating", () => {
     await settle(world);
     expect(memberOf(b.engine.getState(), b.memberId).transferState).toBe("complete");
 
-    const blocked = a.engine.getState();
-    expect(blocked.canStart).toBe(false);
-    expect(blocked.canForceStart).toBe(true);
-    expect(blocked.startBlockedReason).toMatch(/load and register/i);
-
-    a.engine.startGame(true);
+    // The guest's game has not registered yet; it joins the started game once it does.
+    expect(a.engine.getState().canStart).toBe(true);
+    a.engine.startGame();
     await settle(world);
     expect(a.engine.getState().phase).toBe("playing");
     expect(b.engine.getState().phase).toBe("playing");
@@ -743,8 +740,8 @@ describe("party engine — readiness and start gating", () => {
 
     const state = a.engine.getState();
     expect(state.members).toHaveLength(2);
-    expect(state.canStart).toBe(false);
-    expect(state.startBlockedReason).toMatch(/load and register/i);
+    expect(state.canStart).toBe(true);
+    expect(state.startBlockedReason).toBeNull();
 
     await a.engine.leaveParty();
     await b.engine.leaveParty();
@@ -770,7 +767,6 @@ describe("party engine — readiness and start gating", () => {
     expect(state.role).toBe("creator");
     expect(state.game).toBeNull();
     expect(state.canStart).toBe(false);
-    expect(state.canForceStart).toBe(false);
     expect(state.startBlockedReason).toMatch(/pick a game/i);
 
     await a.engine.selectGame({
@@ -1418,7 +1414,7 @@ describe("source verification is keyed by the source hash", () => {
     });
     expect(memberOf(b.engine.getState(), a.memberId).transferState).toBe("complete");
     // The new source reboots this player's frame, which must register again.
-    expect(b.engine.getState().startBlockedReason).toMatch(/load and register/i);
+    expect(b.engine.getState().canStart).toBe(false);
     await registerLocalGame(b, world);
     await settle(world);
     expect(b.engine.getState().canStart).toBe(true);
@@ -2067,8 +2063,10 @@ describe("party engine — external games, kick, and reload", () => {
       expect(state.switchingGame).toBe(true);
       expect(state.game?.gameId).toBe(next.gameId);
     }
+    // The switch starts once the host's game loads; b joins when its own does.
     await registerLocalGame(a, world);
-    expect(a.engine.getState().switchingGame).toBe(true);
+    await settle(world);
+    expect(a.engine.getState().switchingGame).toBe(false);
     await registerLocalGame(b, world);
     await settle(world);
     for (const state of states()) {
@@ -3432,7 +3430,6 @@ describe("party engine — lifecycle cleanup", () => {
     expect(setSource).toHaveBeenCalledTimes(1);
     setSource.mockRestore();
 
-    expect(a.engine.getState().canForceStart).toBe(false);
     expect(a.engine.getState().canStart).toBe(false);
   });
 

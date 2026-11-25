@@ -69,7 +69,6 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     inviteUrl: INVITE_URL,
     connectionState: "connected",
     canStart: false,
-    canForceStart: false,
     startBlockedReason: "Waiting for every player's game to load and register.",
     endedReason: null,
     removedReason: null,
@@ -179,10 +178,9 @@ describe("PartyLobby", () => {
   });
 
   it("hides the start controls from joiners — start is host-only", async () => {
-    const state = makeState({ role: "joiner", amHost: false, canForceStart: true });
+    const state = makeState({ role: "joiner", amHost: false });
     await renderLobby(state);
     expect(screen.queryByRole("button", { name: /start game/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /start anyway/i })).not.toBeInTheDocument();
     // Guests can still browse; picking is explained on the game's page.
     expect(screen.getByRole("button", { name: /browse games/i })).toBeInTheDocument();
     expect(screen.queryByRole("alert")).not.toBeInTheDocument();
@@ -277,7 +275,6 @@ describe("PartyLobby", () => {
     const state = makeState({
       game: null,
       canStart: false,
-      canForceStart: false,
       startBlockedReason: "Pick a game before starting the party.",
     });
     await renderLobby(state);
@@ -345,7 +342,6 @@ describe("PartyLobby", () => {
     const state = makeState({
       endedReason: "host_closed",
       canStart: false,
-      canForceStart: false,
       startBlockedReason: "The game ended; leave the party to play again.",
       notices: [
         { id: "notice-1", level: "info", message: "Player B joined the party." },
@@ -404,18 +400,7 @@ describe("PartyLobby", () => {
     const start = readyLobby.getByRole("button", { name: /start game/i });
     expect(start).not.toBeDisabled();
     await userEvent.click(start);
-    expect(onStart).toHaveBeenCalledWith(false);
-  });
-
-  it("offers force-start once the source is verified and confirms first", async () => {
-    const state = makeState({ canForceStart: true });
-    const onStart = vi.fn();
-    await renderLobby(state, { onStart });
-    await userEvent.click(screen.getByRole("button", { name: /start anyway/i }));
-    const dialog = screen.getByRole("dialog");
-    expect(within(dialog).getByText(/start before everyone is ready/i)).toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole("button", { name: "Start anyway" }));
-    expect(onStart).toHaveBeenCalledWith(true);
+    expect(onStart).toHaveBeenCalledOnce();
   });
 
   it("calls the leave callback", async () => {
@@ -429,7 +414,6 @@ describe("PartyLobby", () => {
     const state = makeState({
       game: null,
       canStart: false,
-      canForceStart: false,
       startBlockedReason: "Pick a game before starting the party.",
     });
     await renderLobby(state);
@@ -446,7 +430,7 @@ describe("PartyLobby", () => {
   });
 
   it("links a saved game to its details page instead of picking it", async () => {
-    const state = makeState({ game: null, canStart: false, canForceStart: false });
+    const state = makeState({ game: null, canStart: false });
     const game = await gameRepository.create({
       title: "Rocket Rumble",
       html: "<!doctype html><html><body><p>rockets</p></body></html>",
@@ -460,7 +444,7 @@ describe("PartyLobby", () => {
   });
 
   it("links a listed game to its details page instead of picking it", async () => {
-    const state = makeState({ game: null, canStart: false, canForceStart: false });
+    const state = makeState({ game: null, canStart: false });
     await renderLobby(state);
     await userEvent.click(screen.getByRole("button", { name: /browse games/i }));
     expect(screen.queryByTestId("browser-brand-row")).not.toBeInTheDocument();
@@ -526,7 +510,6 @@ describe("PartyLobby", () => {
     const state = makeState({
       endedReason: "host_closed",
       canStart: false,
-      canForceStart: false,
       startBlockedReason: "The game ended; leave the party to play again.",
     });
     await renderLobby(state);

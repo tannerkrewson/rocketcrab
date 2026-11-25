@@ -1,5 +1,5 @@
 import { Link } from "@tanstack/react-router";
-import { Copy, Gamepad2, LogOut, PartyPopper, Pencil, Play, QrCode, Share2, X } from "lucide-react";
+import { Copy, Gamepad2, LogOut, Pencil, Play, QrCode, Share2, X } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { Alert } from "@heroui/react";
 import { toast } from "../../lib/toast";
@@ -18,7 +18,7 @@ import { clearBrowseContext } from "../../lib/browse/back-context";
 
 export interface PartyLobbyProps {
   state: PartyEngineState;
-  onStart: (force: boolean) => void;
+  onStart: () => void;
   onLeave: () => void;
   /** Host-only removal; callers must confirm first. */
   onKickMember: (memberId: string) => void;
@@ -108,7 +108,6 @@ export function PartyLobby({
 }: PartyLobbyProps) {
   const installAvailable = useAppInstallAvailable();
   const [startHelpOpen, setStartHelpOpen] = useState(false);
-  const [forceDialog, setForceDialog] = useState(false);
   const [kickPending, setKickPending] = useState<string | null>(null);
   const [browsing, setBrowsing] = useState(initialBrowsing);
   const [qrOpen, setQrOpen] = useState(false);
@@ -291,7 +290,6 @@ export function PartyLobby({
         )}
       </section>
 
-      {/* Wraps on phones once Start anyway joins the row. */}
       <section className="flex flex-wrap justify-center gap-2">
         {/* Everyone can browse; only the host can pick (guests are told so). */}
         <Button
@@ -315,18 +313,12 @@ export function PartyLobby({
             aria-haspopup={state.canStart ? undefined : "dialog"}
             className={!state.canStart ? "opacity-60" : undefined}
             onPress={() => {
-              if (state.canStart) onStart(false);
+              if (state.canStart) onStart();
               else setStartHelpOpen(true);
             }}
           >
             <Play className="h-5 w-5" aria-hidden="true" />
             Start game
-          </Button>
-        ) : null}
-        {state.amHost && state.canForceStart ? (
-          <Button variant="default" soft size="lg" onClick={() => setForceDialog(true)}>
-            <PartyPopper className="h-5 w-5" aria-hidden="true" />
-            Start anyway
           </Button>
         ) : null}
       </section>
@@ -451,36 +443,6 @@ export function PartyLobby({
           </p>
         </div>
       </Dialog>
-      {forceDialog ? (
-        <div
-          className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-          role="dialog"
-          aria-modal="true"
-          aria-label="Start before everyone is ready"
-        >
-          <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl bg-overlay p-5 shadow-overlay">
-            <p className="font-black">Start before everyone is ready?</p>
-            <p className="text-sm text-foreground/70">
-              Every player has the game, but not everyone has reported ready. Starting now means
-              some players may miss the start signal. They can still rejoin.
-            </p>
-            <div className="button-row self-end">
-              <Button variant="default" soft onClick={() => setForceDialog(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  setForceDialog(false);
-                  onStart(true);
-                }}
-              >
-                Start anyway
-              </Button>
-            </div>
-          </div>
-        </div>
-      ) : null}
       {kickPending !== null ? (
         <PartyKickConfirm
           memberName={

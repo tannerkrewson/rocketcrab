@@ -26,7 +26,6 @@ const IDLE_STATE: PartyEngineState = {
   inviteUrl: null,
   connectionState: "idle",
   canStart: false,
-  canForceStart: false,
   startBlockedReason: null,
   endedReason: null,
   removedReason: null,
@@ -65,7 +64,6 @@ const LOBBY_STATE: PartyEngineState = {
   inviteUrl: "http://localhost:2722/join#code=rcrb&secret=invite-secret",
   connectionState: "connected",
   canStart: false,
-  canForceStart: false,
   startBlockedReason: "Pick a game before starting the party.",
 };
 

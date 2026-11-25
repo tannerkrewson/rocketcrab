@@ -240,7 +240,7 @@ function renderPhase(
       return (
         <PartyLobby
           state={state}
-          onStart={(force) => engine.startGame(force)}
+          onStart={() => engine.startGame()}
           onLeave={() => void handleLeave()}
           onKickMember={handleKickMember}
           onEditName={handleEditName}

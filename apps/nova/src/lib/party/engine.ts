@@ -1269,15 +1269,10 @@ export class PartyEngine {
   }
 
   /** Force bypasses readiness, never source verification. */
-  startGame(force = false): void {
+  startGame(): void {
     if (!this.state.party?.amHost) return;
     const state = this.getState();
-    if (!force && !state.canStart) {
-      this.addNotice("warn", state.startBlockedReason ?? "The party is not ready to start.");
-      this.emit();
-      return;
-    }
-    if (force && !state.canForceStart && !state.canStart) {
+    if (!state.canStart) {
       this.addNotice("warn", state.startBlockedReason ?? "The party is not ready to start.");
       this.emit();
       return;
@@ -2267,11 +2262,10 @@ export class PartyEngine {
     const party = this.state.party;
     const identity = this.state.identity;
     const members = this.buildMembers();
-    const allReady = members.length > 0 && members.every((member) => member.ready);
-    const allVerified = this.allSourcesVerified(members);
-    const anyFailed = members.some(
-      (member) => member.transferState === "failed" || member.transferState === "incompatible",
-    );
+    // Only the host's own game must be running; everyone else joins the
+    // started game as soon as theirs loads, like a player joining mid-game.
+    const self = members.find((member) => member.isSelf);
+    const hostReady = self !== undefined && self.ready && this.allSourcesVerified([self]);
     const ended = this.state.session?.isEnded() ?? false;
     const canRequestStart = this.state.phase === "lobby" || this.state.phase === "switching";
 
@@ -2281,22 +2275,8 @@ export class PartyEngine {
       startBlockedReason = "Pick a game before starting the party.";
     } else if (ended) {
       startBlockedReason = "The game ended; leave the party to play again.";
-    } else if (anyFailed) {
-      const failed = members.find(
-        (member) => member.transferState === "failed" || member.transferState === "incompatible",
-      );
-      startBlockedReason =
-        failed === undefined
-          ? "A player could not receive the game."
-          : `${failed.displayName} could not receive the game${failed.transferDetail === null ? "." : ` (${failed.transferDetail}).`}`;
-    } else if (!allVerified) {
-      const waiting = members.find((member) => !this.isSourceVerified(member.memberId));
-      startBlockedReason =
-        waiting === undefined
-          ? "Waiting for the game to reach every player."
-          : `Waiting for ${waiting.displayName} to receive the game.`;
-    } else if (!allReady) {
-      startBlockedReason = "Waiting for every player's game to load and register.";
+    } else if (!hostReady) {
+      startBlockedReason = "Your game is still loading.";
     }
 
     return {
@@ -2317,20 +2297,7 @@ export class PartyEngine {
       authorityMemberId: this.computeAuthorityMemberId(members),
       inviteUrl: this.buildInviteUrl(),
       connectionState: this.state.connectionState,
-      canStart:
-        canRequestStart &&
-        this.state.game !== null &&
-        !ended &&
-        !anyFailed &&
-        allVerified &&
-        allReady,
-      canForceStart:
-        canRequestStart &&
-        this.state.game !== null &&
-        !ended &&
-        !anyFailed &&
-        allVerified &&
-        !allReady,
+      canStart: canRequestStart && this.state.game !== null && !ended && hostReady,
       startBlockedReason,
       endedReason: this.state.endedReason,
       removedReason: this.state.removedReason,

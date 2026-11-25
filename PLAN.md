@@ -89,9 +89,9 @@ the README for local devices.
 - The animated site background stops at one viewport height, so long pages
   (home with the install button, the lobby) show a hard edge into plain black
   near the bottom. Make it cover the full page or fade out smoothly.
-- Move the lobby's remaining hand-rolled modals (Start anyway confirmation,
-  kick confirmation) onto the shared `Dialog`, as the QR code now is, so every
-  dialog closes with Escape or a backdrop tap and looks the same.
+- Move the lobby's remaining hand-rolled modal (kick confirmation) onto the
+  shared `Dialog`, as the QR code now is, so every dialog closes with Escape or
+  a backdrop tap and looks the same.
 - After launch, confirm on a real iPhone and Android phone that "Get the app"
   appears, its dialog or prompt works, and the installed app opens full screen
   with the black icon.

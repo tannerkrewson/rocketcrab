@@ -146,7 +146,6 @@ export interface PartyEngineState {
   readonly inviteUrl: string | null;
   readonly connectionState: TransportConnectionState;
   readonly canStart: boolean;
-  readonly canForceStart: boolean;
   readonly startBlockedReason: string | null;
   readonly endedReason: string | null;
   /** Non-null when the host removed this member from the party. */
