@@ -24,7 +24,7 @@ import {
 } from "@rocketcrab/party";
 import { track } from "../analytics";
 import { observePartyAnalytics } from "./party-analytics";
-import { reportConnection } from "../connection-analytics";
+import { reportConnection, type ConnectionAttempt } from "../connection-analytics";
 import {
   connectionErrorCategory,
   connectionErrorMessage,
@@ -276,7 +276,7 @@ export class PartyEngine {
       if (!setup.signal.aborted) {
         reportConnection({
           outcome: "join-failed",
-          error_code: "",
+          error_code: this.joinFailureCode(error),
           ms_to_connect: Math.round(performance.now() - startedAt),
           signaling_ok: this.state.signalingConnected === true,
         });
@@ -548,6 +548,19 @@ export class PartyEngine {
       return [];
     }
     return [transport.onRelayStateChange(() => this.emit())];
+  }
+
+  /** A bounded analytics category for a failed join. */
+  private joinFailureCode(error: unknown): ConnectionAttempt["error_code"] {
+    const code = typeof error === "object" && error !== null && "code" in error ? error.code : null;
+    if (code === "room-full" || code === "decrypt-failed") return code;
+    if (error instanceof PartyError && error.code === "peer_unreachable") {
+      return (
+        this.state.observedJoinFailure ??
+        (this.state.signalingConnected === false ? "relay-failed" : "host-unreachable")
+      );
+    }
+    return this.state.signalingConnected === false ? "relay-failed" : "";
   }
 
   private failSetup(error: unknown): void {
@@ -1123,6 +1136,8 @@ export class PartyEngine {
 
   private startRetryRemainingMs = 0;
   private cancelGameSwitch: (() => void) | null = null;
+  /** When this host asked the party to start, to time `game-ready`. */
+  private startRequestedAt: number | null = null;
 
   private beginGameSwitch(): void {
     this.stopGameSwitch();
@@ -1281,6 +1296,7 @@ export class PartyEngine {
       return;
     }
     this.state.requestStart();
+    this.startRequestedAt = performance.now();
     this.emit();
     this.state.session?.start();
     this.beginStartRetry();
@@ -1553,9 +1569,14 @@ export class PartyEngine {
         reportConnection({
           outcome: "game-ready",
           error_code: "",
-          ms_to_connect: 0,
+          // Only the host requests the start, so only it can time it.
+          ms_to_connect:
+            this.startRequestedAt === null
+              ? 0
+              : Math.round(performance.now() - this.startRequestedAt),
           signaling_ok: this.state.signalingConnected === true,
         });
+        this.startRequestedAt = null;
 
         this.addNotice("info", "The game started.");
         this.emit();

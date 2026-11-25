@@ -26,7 +26,8 @@ export type ConnectionAttempt = {
     | "lobby-ready"
     | "join-failed"
     | "game-ready";
-  error_code: "" | "relay-failed";
+  /** Why a join failed; `relay-failed` also marks a signaling outage. */
+  error_code: "" | "relay-failed" | "room-full" | "decrypt-failed" | "host-unreachable";
   ms_to_connect: number;
   signaling_ok: boolean;
 };

@@ -666,6 +666,7 @@ describe("party engine — join loading stages", () => {
   it("keeps a joiner on loading then errors when no peer can be reached", async () => {
     const world = makeWorld();
     // An empty private room has no host; signaling alone must not satisfy the peer gate.
+    vi.mocked(track).mockClear();
     const b = makePlayer(world, "b", { peerConnectTimeoutMs: 1_000 });
     const joinPromise = b.engine.joinByInvite({ secret: "E".repeat(43) });
     await settle(world);
@@ -683,6 +684,10 @@ describe("party engine — join loading stages", () => {
     await joinPromise;
     expect(b.engine.getState().phase).toBe("error");
     expect(b.engine.getState().lastError).toMatch(/couldn't reach anyone/i);
+    expect(track).toHaveBeenCalledWith(
+      "connection_result",
+      expect.objectContaining({ outcome: "join-failed", error_code: "host-unreachable" }),
+    );
     expect(world.hub.roomNames().every((room) => world.hub.membersOf(room).length === 0)).toBe(
       true,
     );

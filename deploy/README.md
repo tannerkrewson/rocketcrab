@@ -131,6 +131,10 @@ strings, invite fragments, or private game IDs.
   `tunnel_result` for fallback attempts and terminal failures, and
   `party_issue` for player-visible reconnects and game errors. A signaling
   outage is a `connection_result` failure with the reason `relay-failed`.
+  `join-failed` carries an `error_code`: `host-unreachable` (the invite or
+  code reached no one), `room-full`, `decrypt-failed` or `relay-failed`.
+  `game-ready` times the host's start request to the game starting; other
+  players leave it empty.
   Break down by outcome, reason, signaling status, browser family, network,
   and App version.
   Connection counts are per client and peer attempt, so a pair can report on
