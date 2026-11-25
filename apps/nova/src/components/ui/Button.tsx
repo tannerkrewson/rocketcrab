@@ -3,8 +3,10 @@ import { buttonVariants } from "@heroui/styles";
 import { cn } from "../../lib/cn";
 
 /**
- * Nova button intents, mapped onto HeroUI's semantic variants. The accent is
- * rocket red; `info` is the same button in Nova blue (`.theme-nova`).
+ * Nova button intents, mapped onto HeroUI's semantic variants. `primary` is
+ * the brand color, `info` is the same button in Nova blue (`.theme-nova`),
+ * and `accent` is the white pill for invitations that should stand out.
+ * styles.css gives every variant the frosted pill look.
  */
 export type ButtonVariant =
   | "primary"
@@ -40,6 +42,14 @@ function heroVariant(variant: ButtonVariant, soft: boolean): HeroVariant {
   }
 }
 
+function intentClass(variant: ButtonVariant) {
+  return cn(
+    "font-bold",
+    variant === "info" && "theme-nova",
+    variant === "accent" && "button--white",
+  );
+}
+
 export interface ButtonProps extends Omit<
   HeroButtonProps,
   "variant" | "size" | "className" | "children"
@@ -71,7 +81,7 @@ export function Button({
       variant={heroVariant(variant, soft)}
       size={size}
       isDisabled={disabled ?? props.isDisabled}
-      className={cn("font-bold", variant === "info" && "theme-nova", className)}
+      className={cn(intentClass(variant), className)}
       {...props}
     />
   );
@@ -88,8 +98,7 @@ export function buttonStyles(
   soft = false,
 ) {
   return cn(
-    "font-bold",
-    variant === "info" && "theme-nova",
+    intentClass(variant),
     buttonVariants({ variant: heroVariant(variant, soft), size }),
     className,
   );

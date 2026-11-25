@@ -211,10 +211,151 @@
   }
 }
 
-/* HeroUI's "secondary" button draws accent-colored text on a gray fill;
-   keep the glass fill with plain white text instead. */
-.button--secondary {
+/* Frosted pill buttons: a translucent fill, a soft inner rim, and a glow
+   along the top edge that fades out while pressed. Each variant sets its
+   fill, rim, and glow strength. No backdrop blur: re-blurring the animated
+   background under every button is too costly on phones. */
+.button {
+  --button-rim: oklch(100% 0 0 / 0.16);
+  --button-glow: 0.2;
+  height: 2.5rem;
+  padding-inline: 1.125rem;
+  border-radius: 9999px;
+  font-size: 15px;
+  line-height: 1.5rem;
+  box-shadow: inset 0 0 6px 2px var(--button-rim);
+  overflow: hidden;
+  transition:
+    box-shadow 240ms ease,
+    color 240ms ease,
+    transform 180ms cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  &::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='80' viewBox='0 0 160 80' preserveAspectRatio='none'%3E%3Cfilter id='b' x='0' y='0' width='160' height='80' filterUnits='userSpaceOnUse'%3E%3CfeGaussianBlur stdDeviation='12'/%3E%3C/filter%3E%3Cpath filter='url(%23b)' fill='white' d='M24 24C24 24 55.13 56 80.31 56C105.28 55.81 136 24 136 24H24Z'/%3E%3C/svg%3E")
+      /* The design's 160x80 glow, 142.86% wide, centered 16px from the top. */ 50% -24px / 142.86%
+      80px no-repeat;
+    opacity: var(--button-glow);
+    transition: opacity 240ms ease;
+    pointer-events: none;
+  }
+
+  @media (hover: hover) {
+    &:hover,
+    &[data-hovered="true"] {
+      box-shadow:
+        inset 0 0 6px 2px var(--button-rim),
+        0 2px 20px 3px oklch(100% 0 0 / 0.2);
+    }
+  }
+
+  &:active,
+  &[data-pressed="true"] {
+    transform: translateY(1px) scale(0.96);
+    transition-duration: 240ms, 240ms, 90ms;
+    box-shadow:
+      inset 0 0 6px 2px var(--button-rim),
+      0 2px 20px 3px oklch(100% 0 0 / 0.2);
+    &::before {
+      opacity: 0;
+    }
+  }
+
+  &:focus-visible,
+  &[data-focus-visible="true"] {
+    outline: 2px solid oklch(100% 0 0 / 0.8);
+    outline-offset: 4px;
+  }
+
+  &:disabled,
+  &[aria-disabled="true"],
+  &[data-disabled="true"] {
+    opacity: 1;
+    --button-bg: oklch(100% 0 0 / 0.1);
+    --button-bg-hover: var(--button-bg);
+    --button-fg: oklch(100% 0 0 / 0.5);
+    box-shadow: inset 0 0 13px 0 oklch(100% 0 0 / 0.1);
+    &::before {
+      display: none;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    &,
+    &::before {
+      transition-duration: 1ms;
+    }
+    &:active,
+    &[data-pressed="true"] {
+      transform: none;
+    }
+  }
+}
+
+.button--lg {
+  height: 3rem;
+  padding-inline: 1.375rem;
+}
+
+.button--sm {
+  height: 2rem;
+  padding-inline: 0.875rem;
+  font-size: 14px;
+}
+
+.button--icon-only {
+  width: 2.5rem;
+  padding: 0;
+  &.button--lg {
+    width: 3rem;
+  }
+  &.button--sm {
+    width: 2rem;
+  }
+}
+
+.button--primary,
+.button--danger {
+  --button-bg: color-mix(in oklab, var(--accent) 90%, transparent);
+  --button-bg-hover: var(--button-bg);
+  --button-bg-pressed: var(--button-bg);
+  --button-fg: oklch(99% 0 0);
+  --button-rim: color-mix(in oklab, var(--accent) 55%, white);
+  --button-glow: 0.35;
+}
+
+.button--danger {
+  --accent: var(--danger);
+}
+
+.button--secondary,
+.button--tertiary {
+  --button-bg: oklch(28% 0 0 / 0.85);
+  --button-bg-hover: var(--button-bg);
+  --button-bg-pressed: var(--button-bg);
+  /* HeroUI draws accent-colored text here; keep plain white. */
   --button-fg: var(--foreground);
+}
+
+.button--outline {
+  --button-bg: oklch(100% 0 0 / 0.06);
+  --button-bg-hover: var(--button-bg);
+  --button-bg-pressed: var(--button-bg);
+  border: 0;
+}
+
+/* The design's original white pill, for the few invitations that should
+   stand out from everything else on the page. */
+.button--white {
+  --button-bg: rgb(211 221 228 / 0.85);
+  --button-bg-hover: var(--button-bg);
+  --button-bg-pressed: var(--button-bg);
+  --button-fg: #000;
+  --button-rim: #fff;
+  --button-glow: 1;
 }
 
 .rc-molten-red {
