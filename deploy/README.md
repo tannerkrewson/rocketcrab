@@ -139,6 +139,10 @@ strings, invite fragments, or private game IDs.
   and App version.
   Connection counts are per client and peer attempt, so a pair can report on
   both devices.
+- Use `web_vital` for Core Web Vitals (`metric` LCP, INP, CLS, FCP or TTFB,
+  `value` in ms or CLS in thousandths, `rating`, `route`) and `app_error`
+  for uncaught errors and rejections (`route`, `error_name`, at most ten per
+  page load; never messages).
 - Use `turn_cred_mint` to see whether fresh TURN credentials were usable
   (`configured`) or unavailable. Cached reuses do not generate an event.
   This client count represents observed results and can miss blocked GA

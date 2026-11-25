@@ -39,6 +39,7 @@
     "react": "19.3.1",
     "react-dom": "19.3.1",
     "tailwind-merge": "3.7.0",
+    "web-vitals": "6.2.3",
     "zod": "4.6.7"
   },
   "devDependencies": {

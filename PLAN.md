@@ -29,9 +29,6 @@ churn on upgrade), and need no paid always-on server.
       `notice_shown {code}`. Code-only notices could then be unmasked in
       Clarity with `data-clarity-unmask`; many notices embed names, titles or
       game text today.
-- [ ] Analytics: report Core Web Vitals to GA with the `web-vitals` library,
-      and send `app_error {route, error_name}` for uncaught errors and
-      rejections, without messages.
 - [ ] Analytics: add `invite_share {method}`, an `end_reason` on `game_end`,
       and editor and library events.
 

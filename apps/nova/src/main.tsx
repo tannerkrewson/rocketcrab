@@ -13,11 +13,13 @@ import "@fontsource/mukta/800.css";
 import "@fontsource-variable/inconsolata";
 import { trackPage } from "./lib/analytics";
 import { prepareAppInstall } from "./lib/app-install";
+import { startAppHealthReporting } from "./lib/app-health";
 import { guardReplayNavigation, startClarity } from "./lib/clarity";
 import { routeTree } from "./routeTree.gen";
 import "./styles.css";
 
 prepareAppInstall();
+startAppHealthReporting();
 
 const queryClient = new QueryClient();
 

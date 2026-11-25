@@ -62,6 +62,11 @@ export function trackPage(routeId: string, gameId?: string): void {
   tag?.("event", "page_view", page);
 }
 
+/** The current page's route template (`/party`, `/game/local`), as sent with page views. */
+export function currentRoute(): string | undefined {
+  return pageLocation === undefined ? undefined : new URL(pageLocation).pathname;
+}
+
 export function track(event: string, params: Parameters = {}): void {
   try {
     tag?.("event", event, params);
