@@ -15,7 +15,7 @@ const env = {
   VITE_MAIN_ORIGIN: origins.nova,
   VITE_GA_MEASUREMENT_ID: process.env.VITE_GA_MEASUREMENT_ID ?? "G-V569CH5H2D",
   VITE_CLARITY_PROJECT_ID: process.env.VITE_CLARITY_PROJECT_ID ?? "zix4dzz9v4",
-  // Public; the widget allows rocketcrab.com and the workers.dev beta.
+  // Public; the widget allows rocketcrab.com.
   VITE_TURNSTILE_SITE_KEY: process.env.VITE_TURNSTILE_SITE_KEY ?? "0x4AAAAAAGSaDzKBab6kyegY",
 };
 if (target === "nova") {

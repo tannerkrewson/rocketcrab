@@ -45,7 +45,7 @@ jobs:
       - name: Unit tests
         run: npm run test
 
-      # Verify the same app bundle and Worker config used for the beta deploy.
+      # Verify the same app bundle and Worker config used for the production deploy.
       - name: Nova Worker deployment check
         run: npm run check:deploy
 

@@ -1,14 +1,14 @@
 # Plan
 
-Remaining engineering work and release checks. Production infrastructure,
-launch steps and the deploy approval rules live in
+Remaining engineering work and release checks. Production infrastructure
+and the deploy approval rules live in
 [`deploy/README.md`](deploy/README.md). Finished work lives in git history.
 
 Goals: it must work on any network (corporate, school, hotel, carrier NAT,
 mixed), stay simple yet robust, use Trystero as far as it fits (pinned; fix
 churn on upgrade), and need no paid always-on server.
 
-## Before beta
+## Open work
 
 - [ ] Verify the external game catalog in a coordinated multiplayer pass with
       the uniform iframe sandbox enabled.
@@ -22,19 +22,8 @@ churn on upgrade), and need no paid always-on server.
 - [ ] After the real-device checks below, evaluate room, link and game
       recovery before consolidating any other retry paths.
 
-## Before launch
-
-- [ ] Validate Turnstile on real browsers: a party on the beta and on
-      `rocketcrab.com` gets `/api/turn` 200 and GA Realtime shows
-      `turn_cred_mint` outcome `configured`, and a blocked challenge falls back
-      to direct WebRTC or the encrypted tunnel. Opening `rocketcrab.com/<code>`
-      joins (passed on the beta 2026-11-25), and with
-      `challenges.cloudflare.com` blocked it shows the "Couldn't check this
-      browser" notice. Headless Playwright never passes the challenge, so
-      automated runs skip TURN and builds without a site key skip both.
-- [ ] Check `rocketcrab.com` and the beta on iOS Safari with content blockers
-      on: the app loads, and parties work without analytics or Turnstile.
-- [ ] After the first production deploy, watch a Clarity recording of a party
+- [ ] Check `rocketcrab.com` on iOS Safari with content blockers on: the app loads, and parties work without analytics or Turnstile.
+- [ ] Watch a Clarity recording of a party
       from an eligible region and confirm names, game titles and the invite
       QR code are masked.
 - [ ] Analytics: send real time to ready on `connection_result` `game-ready`
@@ -94,11 +83,6 @@ the README for local devices.
   typecheck, build and test in parallel) and passed on a rerun and when run
   alone; the hook output was cut off before the failing test. Find it, e.g.
   by looping `npx lefthook run pre-push`, and make it robust to load.
-- Snakeout's in-game "transfer to Rocketcrab" sends every player to
-  `/transfer/snakeout/<uuid>/`, which Nova dropped (each player now gets the
-  404). Change Snakeout (`src/server/app/game.js`) to link players to
-  `https://rocketcrab.com/join`, or remove the button.
-
 - `e2e/smoke.spec.ts` "launches on the home and Nova pages" fails on
   Chromium and Firefox: the logo never gets `rc-logo-launch` after the click.
   Seen 2026-11-25; unrelated to party codes.
@@ -140,10 +124,7 @@ the README for local devices.
   same-site with every other `*.tannerkrewson.workers.dev` hostname: it can
   set cookies there and send same-site requests to them. Never host another
   app on this account's workers.dev subdomain (keep `workers_dev` and
-  `preview_urls` off elsewhere). The beta app on
-  `rocketcrab.tannerkrewson.workers.dev` is same-site with the runtime too;
-  only `rocketcrab.com` gets the cross-site isolation `deploy/README.md`
-  describes.
+  `preview_urls` off elsewhere).
 - Party codes: the Worker stores each party's raw `partySecret` in its
   `PartyCode` Durable Object while the code is live (and up to 10 minutes
   after the last renewal), so the Worker could join any party or derive its

@@ -11,10 +11,10 @@ the `wrangler.toml` files (dashboard, secrets, account) under **Live state**.
 | App and party API (`rocketcrab`)    | `deploy/nova/wrangler.toml`    | `https://rocketcrab.com` (Custom Domain)               |
 | Game runtime (`rocketcrab-runtime`) | `deploy/runtime/wrangler.toml` | `https://rocketcrab-runtime.tannerkrewson.workers.dev` |
 
-Cloudflare account `f82d64d09da6cb5a0afa0120033a7e13`. The app also still
-answers on its beta URL, `https://rocketcrab.tannerkrewson.workers.dev`,
-until **Retire the beta URLs** below. `kids.rocketcrab.com` still serves the
-legacy app.
+Cloudflare account `f82d64d09da6cb5a0afa0120033a7e13`, zone `rocketcrab.com`.
+The app has no workers.dev URL. A Redirect Rule sends `kids.rocketcrab.com`
+(a proxied placeholder `AAAA 100::` record) to `https://rocketcrab.com/` with
+a 301: Nova has no kids mode.
 
 Nova serves SPA assets directly from Workers Assets. Requests under `/api`
 run the Worker first.
@@ -63,7 +63,7 @@ page and checking for `turn_cred_mint` with outcome `configured` in GA Realtime.
 The requests below should return 403 after Turnstile has been configured.
 
 ```sh
-APP=https://rocketcrab.tannerkrewson.workers.dev
+APP=https://rocketcrab.com
 curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$APP/api/turn"  # 403
 curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$APP/api/turn" -H "Origin: $APP"  # 403
 curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$APP/api/code/lookup" -H "Origin: $APP" -d '{"code":"abcd"}'  # 403
@@ -104,8 +104,8 @@ one. Rotating it moves every live party to a new code at its next renewal
 openssl rand -base64 32 | npx --yes wrangler@4.161.0 secret put CODE_HMAC_SECRET --config deploy/nova/wrangler.toml
 ```
 
-The Invisible Turnstile widget `rocketcrab` allows `rocketcrab.com` and
-`rocketcrab.tannerkrewson.workers.dev`. `scripts/deploy-static.mjs` builds in
+The Invisible Turnstile widget `rocketcrab` allows `rocketcrab.com`.
+`scripts/deploy-static.mjs` builds in
 its public site key; its secret is `TURNSTILE_SECRET_KEY` on the Worker. Review the privacy requirements for using
 Invisible mode. [Turnstile widget setup](https://developers.cloudflare.com/turnstile/get-started/widget-management/)
 
@@ -177,8 +177,13 @@ the event name. Compare classic game IDs to the lowercase Nova catalog
 slugs where the same game is offered. Keep browser-history page-view
 measurement disabled on this stream because Nova sends its own page views.
 
-Workers Free and Durable Objects Free have daily limits that stop service
-until midnight UTC; check usage before a wider beta.
+The account is on Workers Paid. Spend policies (Billing → Spend Management)
+email the owner's login address at $10 and block usage at $100 a month,
+separately for Workers and Durable Objects. A block stops every Worker
+request or pauses Durable Objects account-wide until the next billing
+period, so raise the limit rather than wait if one fires. The account budget
+alert (Notifications) emails at $20 of total spend, the only coverage for
+Realtime TURN, which has no spending limit.
 
 To stop TURN issuance, remove the `TURN_KEY_API_TOKEN` secret (direct
 connections and the tunnel keep working). Revoke an issued credential with
@@ -187,111 +192,18 @@ secrets.
 
 ## Live state
 
-- 2026-11-25: replaced the `rocketcrab-nova` Worker with `rocketcrab`
-  (`https://rocketcrab.tannerkrewson.workers.dev`), version `7db13cb7`, so
-  one `v1` migration creates `SignalHub`, `TunnelPair` and `PartyCode`. The
-  runtime, version `9e4578c0`, frames only the new origin. The old Worker
-  and its hostname are deleted.
-- The app uses the Realtime TURN key `rocketcrab-turn`; its ID and bearer
-  token are Worker secrets, and the key mints credentials when called
-  directly. The Turnstile widget `rocketcrab` is live: its secret is on the
-  Worker, the app build carries its site key, and `/api/turn` answers 403
-  without a passing check. A real browser minting TURN is still unverified.
-- 2026-11-25: `CODE_HMAC_SECRET` set, then Nova deployed as version
-  `5af34f98` with keyed party codes, Turnstile on `/api/code/lookup`, IPv6
-  /64 rate limits and host-only code renewal. `/api/turn` and
-  `/api/code/lookup` answer 403 without a valid token, and repeated claims
-  for one secret return the same code. The runtime was unchanged and stays
-  at `9e4578c0`. The account holds only the two Workers, their three
-  Durable Object namespaces and the `rocketcrab` Turnstile widget, so there
-  was nothing stale to remove. The owner joined a party by code through
-  Turnstile on real devices.
-- 2026-11-25 cutover: the runtime (version `8c870f1e`) frames only
-  `https://rocketcrab.com`, and `rocketcrab.com` is a Custom Domain of the
-  `rocketcrab` Worker (version `39f38beb`). Its legacy proxied A record to
-  the Dokku host `134.209.222.77` was deleted; the Custom Domain API refuses
-  `override_existing_dns_record` for such records, so the swap was a delete
-  followed at once by the attach. The pre-cutover zone export is in
-  `~/code/rocketcrab-cutover-backup/` on Gerald. Rollback: detach the Custom
-  Domain, recreate the proxied A record `rocketcrab.com` → `134.209.222.77`,
-  and set `deploy/origins.json` back to the beta URL before redeploying the
-  runtime. `rocketcrab.com` serves Nova, `/api/turn` and `/api/code/lookup`
-  answer 403 without Turnstile, and code claims work.
-- 2026-11-25: the account is on Workers Paid. Spend policies (Billing →
-  Spend Management) email the owner's login address at $10 and block usage at
-  $100 a month, separately for Workers and Durable Objects. A block stops
-  every Worker request or pauses Durable Objects account-wide until the next
-  billing period, so raise the limit rather than wait if one fires. The
-  account budget alert (Notifications) emails at $20 of total spend, the only
-  coverage for Realtime TURN, which has no spending limit.
-- Verified a two-browser party joined by code through `/join`, and
-  `/transfer/drawphone` creating a Drawphone room through `/api/relay`
-  (Drawphone, Drawphone for Kids, Spyfall, Snakeout and Werewolf relays
-  answer).
-
-## Before launch
-
-- [ ] Live smoke test: run a game in the editor on the deployed app and
-      runtime; play with two real devices and confirm GA Realtime receives page
-      views, game start and end, TURN configuration, connection outcomes,
-      and lobby and game readiness.
-
-## Production cutover
-
-Steps 1–3 are done (see **Live state**).
-
-1. Save the existing `rocketcrab.com` DNS records and any Worker, Pages or
-   redirect bindings that serve the legacy app. Agree on a cutover window.
-2. Set `nova` in `deploy/origins.json` to `https://rocketcrab.com` (the
-   runtime keeps its workers.dev origin). Deploy the runtime and confirm its
-   `frame-ancestors` header allows `https://rocketcrab.com`. From here the
-   beta app can no longer frame Nova games.
-3. Resolve any conflicting legacy DNS or product binding for
-   `rocketcrab.com`, then add its Custom Domain to `deploy/nova/wrangler.toml`
-   (a `[[routes]]` entry with `custom_domain = true`) and deploy Nova. The app
-   and `/api` move together. Keep the legacy app deployment available during
-   validation. [Cloudflare Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)
-4. Verify the production editor and cross-site game frame, TURN minting and
-   a party on two networks, including tunnel fallback. If validation fails,
-   detach the Nova Custom Domain and restore the recorded legacy binding and
-   DNS. An ordinary code rollback can restore an earlier version on the
-   same domains if the Durable Object configuration matches.
-5. Once the production setup works, follow **Retire the beta URLs** below.
-6. Retire `kids.rocketcrab.com`. Nova has no kids mode; the legacy app
-   served it as a Next.js locale domain. GA showed about 180 multiplayer
-   game starts in the year before November 2026, falling to a few per month.
-   Remove its legacy hosting binding, then replace its DNS record with a
-   Cloudflare Redirect Rule that sends it to `https://rocketcrab.com` with a
-   301, so old links keep working. Confirm it no longer serves the legacy app.
-
-## Beta teardown
-
-### Retire the beta URLs after launch
-
-Set `workers_dev = false` and keep `preview_urls = false` in
-`deploy/nova/wrangler.toml`, then redeploy Nova. Keep the runtime's
-`workers_dev = true`: its workers.dev hostname is the production runtime.
-Verify that `rocketcrab.com` still works and the Nova beta URL stops serving
-Rocketcrab. Then remove `rocketcrab.tannerkrewson.workers.dev` from the
-Turnstile widget's hostnames, and from this file. The production Workers and their Durable
-Objects remain in use. If production switched to a separate TURN key, delete
-the beta key after beta traffic has drained. [Disable workers.dev](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/#disabling-workersdev)
-
-### Remove a beta-only deployment entirely
-
-Confirm both Workers serve only the beta URLs and have no production custom
-domains or consumers. Deletion ends active parties and removes the Workers'
-secrets and Durable Object data. Run these from the repo root with the beta
-Cloudflare account selected:
-
-```sh
-npx --yes wrangler@4.161.0 delete --config deploy/nova/wrangler.toml
-npx --yes wrangler@4.161.0 delete --config deploy/runtime/wrangler.toml
-```
-
-In Cloudflare Realtime → TURN, delete `rocketcrab-turn` after confirming
-that it has no other consumers. Delete any TURN API token created solely to
-administer this beta. Verify both Worker scripts and Nova's `SignalHub`,
-`TunnelPair` and `PartyCode` namespaces are gone, the beta URLs are inactive, and the beta
-key is absent. Leave account-wide workers.dev settings and other applications'
-resources in place. [Wrangler delete](https://developers.cloudflare.com/workers/wrangler/commands/workers/#delete)
+- `rocketcrab.com` serves Nova since 2026-11-25. The app Worker
+  `rocketcrab` (Custom Domain `rocketcrab.com`) holds `SignalHub`,
+  `TunnelPair` and `PartyCode` from one `v1` migration and the secrets
+  `TURN_KEY_ID`, `TURN_KEY_API_TOKEN` (Realtime TURN key `rocketcrab-turn`),
+  `TURNSTILE_SECRET_KEY` and `CODE_HMAC_SECRET`. The runtime frames only
+  `https://rocketcrab.com`.
+- Rocketcrab Classic is the `classic` branch and the `rocketcrab-classic`
+  tag. It ran on the Dokku host `134.209.222.77` behind proxied A records for
+  `rocketcrab.com` and `kids.rocketcrab.com`; the pre-cutover zone export is
+  in `~/code/rocketcrab-cutover-backup/` on Gerald. To roll back while that
+  host still runs it: detach the Custom Domain, recreate the proxied A record
+  `rocketcrab.com` → `134.209.222.77`, and delete the kids Redirect Rule and
+  restore its A record. Cloudflare refuses `override_existing_dns_record` for
+  records like these, so a domain swap is a delete followed at once by the
+  attach.
