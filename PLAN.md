@@ -32,28 +32,6 @@ churn on upgrade), and need no paid always-on server.
       `challenges.cloudflare.com` blocked it shows the "Couldn't check this
       browser" notice. Headless Playwright never passes the challenge, so
       automated runs skip TURN and builds without a site key skip both.
-- [ ] Renew the party code from the host only. Every member's
-      `PartyCodeLease` (`apps/nova/src/lib/party/party-code.ts`) posts
-      `/api/code/claim` every 3 minutes, so Worker and Durable Object requests
-      grow with party size and dominate a player's usage (the free plan's
-      100k requests a day fail parties once spent). A big party behind one
-      school NAT also shares one claim rate-limit bucket. Let only the
-      authority claim and renew, publish the code in the replicated party
-      state for everyone else to show, and have a new authority take over the
-      lease on migration; the 10-minute TTL covers the handover. Keep the code
-      live for the whole party, games included: friends join mid-game from
-      the header.
-- [ ] Fix the comments the party codes made wrong: `deploy/nova/code.ts`'s
-      header says invite links and QR codes never come through `PartyCode`,
-      but every party claims a code, so the Worker learns every party's
-      secret; `packages/party/src/secrets.ts` says the secret is shared
-      solely through private invite fragments. Add `PartyCode` to the
-      namespaces the teardown checklist in `deploy/README.md` verifies are
-      gone.
-- [ ] At cutover, after setting `workers_dev = false` on
-      `deploy/nova/wrangler.toml`, remove
-      `rocketcrab.tannerkrewson.workers.dev` from the Turnstile widget's
-      hostnames and from `deploy/README.md`.
 - [ ] Check `rocketcrab.com` and the beta on iOS Safari with content blockers
       on: the app loads, and parties work without analytics or Turnstile.
 - [ ] After the first production deploy, watch a Clarity recording of a party

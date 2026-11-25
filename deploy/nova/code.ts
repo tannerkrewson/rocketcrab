@@ -30,7 +30,7 @@ interface CodeState {
   };
 }
 
-/** Members renew every few minutes; a code lapses this long after the last renewal. */
+/** The host renews every few minutes; a code lapses this long after the last renewal. */
 export const CODE_TTL_MS = 10 * 60 * 1000;
 // No i, o or l: they read and type like 1, 0 and each other.
 const ALPHABET = "abcdefghjkmnpqrstuvwxyz";

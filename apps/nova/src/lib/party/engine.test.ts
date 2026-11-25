@@ -420,15 +420,16 @@ describe("party engine — two phones end to end", () => {
 });
 
 describe("party engine — four-letter party code", () => {
-  it("shows every member the same claimed code and drops it on leave", async () => {
+  it("shows every member the same claimed code, renewed by the host only, and drops it on leave", async () => {
     const world = makeWorld();
-    const claim = vi.fn(async (secret: string) => `code-${secret.slice(0, 4)}`);
-    const a = makePlayer(world, "a", { partyCode: claim });
-    const b = makePlayer(world, "b", { partyCode: claim });
+    const claimA = vi.fn(async (secret: string) => `code-${secret.slice(0, 4)}`);
+    const claimB = vi.fn(async (secret: string) => `code-${secret.slice(0, 4)}`);
+    const a = makePlayer(world, "a", { partyCode: claimA });
+    const b = makePlayer(world, "b", { partyCode: claimB });
 
     const secret = await runCreate(a, world);
     await flush();
-    expect(claim).toHaveBeenCalledWith(secret);
+    expect(claimA).toHaveBeenCalledWith(secret);
     expect(a.engine.getState().partyCode).toBe(`code-${secret.slice(0, 4)}`);
 
     const { join, settled } = startJoin(b, world, secret);
@@ -437,9 +438,16 @@ describe("party engine — four-letter party code", () => {
     await join;
     await flush();
     expect(b.engine.getState().partyCode).toBe(a.engine.getState().partyCode);
+    expect(b.engine.getState().amHost).toBe(false);
+    expect(claimB).toHaveBeenCalledTimes(1);
 
     await a.engine.leaveParty();
     expect(a.engine.getState().partyCode).toBeNull();
+    // The remaining member becomes host and takes over the lease at once.
+    await settle(world);
+    await flush();
+    expect(b.engine.getState().amHost).toBe(true);
+    expect(claimB).toHaveBeenCalledTimes(2);
     await b.engine.leaveParty();
   });
 });

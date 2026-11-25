@@ -185,7 +185,7 @@ export class PartyEngine {
       await this.establish(party);
       if (setup.signal.aborted) return;
       this.state.transitionPhase({ phase: "lobby" });
-      this.state.partyCode.start(party.secret);
+      this.state.partyCode.start(party.secret, party.amHost);
 
       this.state.lastSetup = null;
       this.saveRecovery();
@@ -261,7 +261,7 @@ export class PartyEngine {
         signaling_ok: this.state.signalingConnected === true,
       });
       this.state.transitionPhase({ phase: "lobby" });
-      this.state.partyCode.start(party.secret);
+      this.state.partyCode.start(party.secret, party.amHost);
 
       this.state.lastSetup = null;
       this.saveRecovery();
@@ -1513,6 +1513,8 @@ export class PartyEngine {
         this.emit();
         break;
       case "host":
+        // Only the host renews the party code; a new host takes it over.
+        this.state.partyCode.setRenewing(this.state.party?.amHost ?? false);
         if (event.hostMemberId !== null && this.state.currentSourceSha256 === null) {
           void this.state.coordinator?.refresh().catch((error: unknown) => {
             this.addNotice("error", errorMessage(error));

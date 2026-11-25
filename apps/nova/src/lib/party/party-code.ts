@@ -1,12 +1,13 @@
 /**
  * Four-letter party codes (`rocketcrab.com/abcd`). The Worker maps a code to
- * the party's invite secret while members keep renewing it; every member
- * derives the same code, so the party protocol carries nothing extra.
+ * the party's invite secret while the host keeps renewing it. A claim is
+ * idempotent, so other members claim once to learn the code and the party
+ * protocol carries nothing extra.
  */
 import type { Scheduler } from "@rocketcrab/party";
 import { consumeChallengeToken, turnstileEnabled } from "./turnstile";
 
-/** Members renew well inside the Worker's 10-minute lease. */
+/** The host renews well inside the Worker's 10-minute lease. */
 export const PARTY_CODE_RENEW_MS = 3 * 60 * 1000;
 const RETRY_MS = 30 * 1000;
 const TIMEOUT_MS = 5_000;
@@ -113,13 +114,17 @@ export async function lookupPartyCode(code: string): Promise<string | null> {
 }
 
 /**
- * Keeps this member's party code claimed while it is in the party. A failed
- * renewal keeps showing the last code (it outlives a few missed renewals)
- * and retries sooner.
+ * This member's view of the party code. The host renews it; everyone else
+ * claims until they know it, then stops, so requests don't grow with party
+ * size. A failed renewal keeps showing the last code (it outlives a few
+ * missed renewals) and retries sooner. A new host takes over at once.
  */
 export class PartyCodeLease {
   code: string | null = null;
   private secret: string | null = null;
+  private renewing = false;
+  /** Bumped per claim, so only the latest claim schedules the next one. */
+  private generation = 0;
   private cancelTimer: (() => void) | null = null;
 
   constructor(
@@ -128,38 +133,68 @@ export class PartyCodeLease {
     private readonly onChange: () => void,
   ) {}
 
-  start(secret: string): void {
-    if (this.claim === null || this.secret === secret) return;
+  start(secret: string, renew: boolean): void {
+    if (this.claim === null) return;
+    if (this.secret === secret) return this.setRenewing(renew);
     this.stop();
     this.secret = secret;
-    void this.renew(secret);
+    this.renewing = renew;
+    void this.claimNow();
+  }
+
+  /** True while this member is the host. */
+  setRenewing(renew: boolean): void {
+    if (this.secret === null || renew === this.renewing) return;
+    this.renewing = renew;
+    if (renew) {
+      void this.claimNow();
+    } else {
+      this.cancel();
+      this.scheduleNext();
+    }
   }
 
   stop(): void {
     this.secret = null;
-    this.cancelTimer?.();
-    this.cancelTimer = null;
+    this.renewing = false;
+    this.cancel();
     if (this.code !== null) {
       this.code = null;
       this.onChange();
     }
   }
 
-  private async renew(secret: string): Promise<void> {
+  private cancel(): void {
+    this.generation++;
+    this.cancelTimer?.();
+    this.cancelTimer = null;
+  }
+
+  private async claimNow(): Promise<void> {
+    this.cancel();
+    const { generation, secret } = this;
     let code: string | null;
     try {
-      code = await this.claim!(secret);
+      code = await this.claim!(secret!);
     } catch {
       code = null;
     }
-    if (this.secret !== secret) return;
+    if (this.generation !== generation) return;
     if (code !== null && code !== this.code) {
       this.code = code;
       this.onChange();
     }
+    this.scheduleNext(code === null);
+  }
+
+  private scheduleNext(failed = this.code === null): void {
+    if (!this.renewing && this.code !== null) return;
+    const generation = this.generation;
     this.cancelTimer = this.schedule(
-      () => void this.renew(secret),
-      code === null ? RETRY_MS : PARTY_CODE_RENEW_MS,
+      () => {
+        if (this.generation === generation) void this.claimNow();
+      },
+      failed ? RETRY_MS : PARTY_CODE_RENEW_MS,
     );
   }
 }

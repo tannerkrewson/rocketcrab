@@ -75,7 +75,7 @@ describe("party code text", () => {
 });
 
 describe("PartyCodeLease", () => {
-  it("claims once per secret, renews, and keeps the last code through a failed renewal", async () => {
+  it("as host, claims once per secret, renews, and keeps the last code through a failed renewal", async () => {
     const { schedule, runNext } = fakeSchedule();
     const onChange = vi.fn();
     const claim = vi
@@ -85,8 +85,8 @@ describe("PartyCodeLease", () => {
       .mockResolvedValueOnce("abcd");
     const lease = new PartyCodeLease(schedule, claim, onChange);
 
-    lease.start("secret");
-    lease.start("secret");
+    lease.start("secret", true);
+    lease.start("secret", true);
     await flush();
     expect(claim).toHaveBeenCalledTimes(1);
     expect(lease.code).toBe("abcd");
@@ -102,6 +102,43 @@ describe("PartyCodeLease", () => {
     expect(onChange).toHaveBeenCalledTimes(1);
   });
 
+  it("as a member, claims until it knows the code, then stops", async () => {
+    const { schedule, runNext, pending } = fakeSchedule();
+    const claim = vi
+      .fn<(secret: string) => Promise<string | null>>()
+      .mockRejectedValueOnce(new Error("offline"))
+      .mockResolvedValue("abcd");
+    const lease = new PartyCodeLease(schedule, claim, vi.fn());
+    lease.start("secret", false);
+    await flush();
+    expect(lease.code).toBeNull();
+    expect(runNext()).toBeLessThan(PARTY_CODE_RENEW_MS);
+    await flush();
+    expect(lease.code).toBe("abcd");
+    expect(pending()).toBe(0);
+    expect(claim).toHaveBeenCalledTimes(2);
+  });
+
+  it("takes over renewal at once on becoming host and stops on handing it off", async () => {
+    const { schedule, runNext, pending } = fakeSchedule();
+    const claim = vi.fn(async () => "abcd");
+    const lease = new PartyCodeLease(schedule, claim, vi.fn());
+    lease.start("secret", false);
+    await flush();
+    expect(pending()).toBe(0);
+
+    lease.start("secret", true);
+    await flush();
+    expect(claim).toHaveBeenCalledTimes(2);
+    expect(runNext()).toBe(PARTY_CODE_RENEW_MS);
+    await flush();
+    expect(claim).toHaveBeenCalledTimes(3);
+
+    lease.setRenewing(false);
+    expect(pending()).toBe(0);
+    expect(lease.code).toBe("abcd");
+  });
+
   it("stops renewing and clears the code on stop, ignoring a late claim", async () => {
     const { schedule, pending } = fakeSchedule();
     let resolve!: (code: string) => void;
@@ -110,7 +147,7 @@ describe("PartyCodeLease", () => {
       () => new Promise((done) => (resolve = done)),
       vi.fn(),
     );
-    lease.start("secret");
+    lease.start("secret", true);
     lease.stop();
     resolve("abcd");
     await flush();
@@ -121,7 +158,7 @@ describe("PartyCodeLease", () => {
   it("does nothing without a claim function", () => {
     const { schedule, pending } = fakeSchedule();
     const lease = new PartyCodeLease(schedule, null, vi.fn());
-    lease.start("secret");
+    lease.start("secret", true);
     expect(pending()).toBe(0);
     expect(lease.code).toBeNull();
   });
