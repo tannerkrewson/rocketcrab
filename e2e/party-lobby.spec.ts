@@ -1,6 +1,7 @@
 /**
  * Direct-WebRTC lobby-to-start control for party-tunnel.spec.ts. Separate
  * party-flow failures from tunnel failures, without retries hiding stalls.
+ * Players join by invite link and by party code.
  */
 import { expect, test, type Browser, type BrowserContext, type Page } from "@playwright/test";
 import {
@@ -64,8 +65,13 @@ test("three players reach the lobby and start the game on every browser", async 
       })
       .toContain("/party#secret=");
 
+    // The third player types the lobby's four-letter code instead.
+    const address = host.getByRole("button", { name: "Copy the party link" });
+    await expect(address).toHaveText(/rocketcrab\.com\/[a-z]{4}$/, { timeout: 30_000 });
+    const code = (await address.textContent())!.slice(-4);
+
     await joiner.goto(invite);
-    await third.goto(invite);
+    await third.goto(`/${code}`);
     for (const page of [host, joiner, third]) {
       await expect(page.locator('[data-testid^="party-member-"]')).toHaveCount(3, {
         timeout: 120_000,

@@ -10,32 +10,15 @@ churn on upgrade), and need no paid always-on server.
 
 ## Four-letter party codes
 
-Bring back `rocketcrab.com/abcd` alongside the private invite link and QR
-code, which stay unchanged. Codes are a convenience with a known tradeoff:
-the Worker learns each party's secret, and a code is guessable while live.
+Built: `PartyCode` Durable Object, `/api/code/claim` and `/api/code/lookup`,
+engine renewal, the `/$code` route, home code entry and the party address.
 
-- [ ] `PartyCode` Durable Object, one instance per code, stores
-      `{secret, expiresAt}` (10-minute TTL) and deletes itself by alarm.
-      `POST /api/code/claim {secret}` walks 8 codes derived from the secret
-      (SHA-256, alphabet without i/o/l, blocked words skipped) and claims the
-      first one that is free, expired or already this secret's.
-      `POST /api/code/lookup {code}` returns the secret while live. Both use
-      the strict per-IP limiter under separate keys; POST so every browser
-      sends `Origin`.
-- [ ] Every member's engine claims after reaching the lobby and renews every
-      3 minutes, so all members show the same code and it lapses about 10
-      minutes after everyone leaves. No party-protocol change.
-- [ ] `/$code` route looks the code up, hands the secret to `/party` in
-      memory (never in the URL) and joins. Home's Join party dialog takes a
-      code. GA reports the route template; Clarity never records `/$code`;
-      no code in attributes.
-- [ ] Lobby header shows `rocketcrab.com/abcd` (tap copies the short link)
-      with the phonetic spelling below; the in-game bar shows the same
-      address.
 - [ ] Reset the beta `rocketcrab-nova` Worker (owner approval): delete it,
       redeploy with `SignalHub`, `TunnelPair` and `PartyCode` in the single
-      `v1` migration, re-put `TURN_KEY_ID` and `TURN_KEY_API_TOKEN`, then
-      rerun the deploy checks and record it under Live state.
+      `v1` migration (already in `wrangler.toml`), re-put `TURN_KEY_ID` and
+      `TURN_KEY_API_TOKEN`, then rerun the deploy checks, confirm a code join
+      on the beta URL, and record it under Live state. A plain redeploy
+      fails until then: the deployed `v1` lacks `PartyCode`.
 
 ## Before beta
 
@@ -112,6 +95,10 @@ the README for local devices.
 - [ ] A friend beta without coaching.
 
 ## Maintenance
+
+- [ ] `e2e/smoke.spec.ts` "launches on the home and Nova pages" fails on
+      Chromium and Firefox: the logo never gets `rc-logo-launch` after the
+      click. Seen 2026-11-25; unrelated to party codes.
 
 - Make Nova's Vite config import graph compatible with the native config loader
   before upgrading to a Vite release that defaults to it.
