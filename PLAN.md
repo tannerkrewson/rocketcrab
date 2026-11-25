@@ -8,18 +8,6 @@ Goals: it must work on any network (corporate, school, hotel, carrier NAT,
 mixed), stay simple yet robust, use Trystero as far as it fits (pinned; fix
 churn on upgrade), and need no paid always-on server.
 
-## Four-letter party codes
-
-Built: `PartyCode` Durable Object, `/api/code/claim` and `/api/code/lookup`,
-engine renewal, the `/$code` route, home code entry and the party address.
-
-- [ ] Reset the beta `rocketcrab-nova` Worker (owner approval): delete it,
-      redeploy with `SignalHub`, `TunnelPair` and `PartyCode` in the single
-      `v1` migration (already in `wrangler.toml`), re-put `TURN_KEY_ID` and
-      `TURN_KEY_API_TOKEN`, then rerun the deploy checks, confirm a code join
-      on the beta URL, and record it under Live state. A plain redeploy
-      fails until then: the deployed `v1` lacks `PartyCode`.
-
 ## Before beta
 
 - [ ] Verify the external game catalog in a coordinated multiplayer pass with
@@ -36,13 +24,13 @@ engine renewal, the `/$code` route, home code entry and the party address.
 
 ## Before launch
 
-- [ ] Add `https://rocketcrab.com` to the Turnstile widget's hostnames when
-      provisioning it, alongside the beta hostname.
 - [ ] Provision and validate the Invisible Turnstile widget with the deployment
-      owner. Set its site key for the Nova build and its Worker secret as
-      described in [the deploy runbook](deploy/README.md). Confirm TURN mints
-      on success and that blocked challenges fall back to direct WebRTC or
-      the encrypted tunnel.
+      owner, for both `rocketcrab.tannerkrewson.workers.dev` and
+      `rocketcrab.com`. Until then the beta's `/api/turn` answers 500 and
+      parties run without TURN. Set its site key for the app build and its
+      Worker secret as described in [the deploy runbook](deploy/README.md).
+      Confirm TURN mints on success and that blocked challenges fall back to
+      direct WebRTC or the encrypted tunnel.
 - [ ] After the first production deploy, watch a Clarity recording of a party
       from an eligible region and confirm names, game titles and the invite
       QR code are masked.
@@ -103,10 +91,6 @@ the README for local devices.
   `/transfer/snakeout/<uuid>/`, which Nova dropped (each player now gets the
   404). Change Snakeout (`src/server/app/game.js`) to link players to
   `https://rocketcrab.com/join`, or remove the button.
-- Local `npm run dev` can't reach external game servers through
-  `/api/relay` (the Worker's fetch fails with `relay_upstream_unavailable`,
-  while curl from the host succeeds), so external games can't be picked
-  locally. Deployed beta relays work.
 
 - `e2e/smoke.spec.ts` "launches on the home and Nova pages" fails on
   Chromium and Firefox: the logo never gets `rc-logo-launch` after the click.

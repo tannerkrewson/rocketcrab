@@ -171,7 +171,7 @@ describe("external-game room relay", () => {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: '{"game":"story","version":1}',
-      redirect: "error",
+      redirect: "manual",
       signal: expect.any(AbortSignal),
     });
   });
@@ -198,6 +198,13 @@ describe("external-game room relay", () => {
     }
   });
 
+  it("never follows a POST endpoint's redirect", async () => {
+    mockFetch(Response.redirect("https://elsewhere.example/room"));
+    const response = await relay({ endpoint: "spyfall-new" });
+    expect(response.status).toBe(502);
+    expect(await errorCode(response)).toBe("upstream_error");
+  });
+
   it("does not follow a redirect leaving the allowlisted origin", async () => {
     const fetchMock = mockFetch(Response.redirect("https://elsewhere.example/room"));
     const response = await relay({ endpoint: "netgamesio-new", urlId: "avalon" });
@@ -216,7 +223,7 @@ describe("external-game room relay", () => {
     expect(upstreamTooLarge.headers.get("X-Content-Type-Options")).toBe("nosniff");
     expect(fetchMock.mock.calls[0]).toEqual([
       "https://spyfall.tannerkrewson.com/new",
-      { method: "POST", redirect: "error", signal: expect.any(AbortSignal) },
+      { method: "POST", redirect: "manual", signal: expect.any(AbortSignal) },
     ]);
   });
 

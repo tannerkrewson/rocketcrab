@@ -103,7 +103,8 @@ export async function handleRelay(request: Request): Promise<Response> {
     if (entry.method === "GET") return json(200, { url: await getNetgamesRoom(url, signal) });
     const upstream = await fetch(url, {
       method: "POST",
-      redirect: "error",
+      // Workers reject "error"; a redirect comes back as a non-OK status instead.
+      redirect: "manual",
       signal,
       ...(postBody ? { headers: { "Content-Type": "application/json" }, body: postBody } : {}),
     });
@@ -118,8 +119,8 @@ export async function handleRelay(request: Request): Promise<Response> {
     } catch {
       return json(200, { raw: text });
     }
-  } catch {
-    console.error({ event: "relay_upstream_unavailable", endpoint });
+  } catch (error) {
+    console.error({ event: "relay_upstream_unavailable", endpoint, error: String(error) });
     return jsonError(502, "upstream_unavailable", "upstream endpoint is unavailable");
   }
 }

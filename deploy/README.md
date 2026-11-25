@@ -6,10 +6,10 @@ the `wrangler.toml` files (dashboard, secrets, account) under **Live state**.
 
 ## Deployment targets
 
-| Worker                 | Config                         | Beta origin                                            |
-| ---------------------- | ------------------------------ | ------------------------------------------------------ |
-| Nova app and party API | `deploy/nova/wrangler.toml`    | `https://rocketcrab-nova.tannerkrewson.workers.dev`    |
-| Game runtime           | `deploy/runtime/wrangler.toml` | `https://rocketcrab-runtime.tannerkrewson.workers.dev` |
+| Worker                              | Config                         | Beta origin                                            |
+| ----------------------------------- | ------------------------------ | ------------------------------------------------------ |
+| App and party API (`rocketcrab`)    | `deploy/nova/wrangler.toml`    | `https://rocketcrab.tannerkrewson.workers.dev`         |
+| Game runtime (`rocketcrab-runtime`) | `deploy/runtime/wrangler.toml` | `https://rocketcrab-runtime.tannerkrewson.workers.dev` |
 
 Cloudflare account `f82d64d09da6cb5a0afa0120033a7e13`. `rocketcrab.com`
 serves the legacy site until the production cutover.
@@ -61,7 +61,7 @@ page and checking for `turn_cred_mint` with outcome `configured` in GA Realtime.
 Both requests below should return 403 after Turnstile has been configured.
 
 ```sh
-APP=https://rocketcrab-nova.tannerkrewson.workers.dev
+APP=https://rocketcrab.tannerkrewson.workers.dev
 curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$APP/api/turn"  # 403
 curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$APP/api/turn" -H "Origin: $APP"  # 403
 ```
@@ -171,19 +171,21 @@ secrets.
 
 ## Live state
 
-- 2026-11-24: migrated beta to two Workers. Nova version `fdcab6fb` serves
-  the app and same-origin party API from commit `976fdd6`. Its SQLite-backed
-  Durable Objects are `SignalHub` and `TunnelPair`. The runtime remains
-  deployed at version `64058c32`.
-- Nova uses the dedicated Realtime TURN key `rocketcrab-nova-beta-turn`.
-  The key ID and bearer token are stored as Worker secrets. Verified the
-  live deep link, runtime CSP, TURN origin check and minting, Drawphone room
-  relay, tunnel pairing and binary forwarding, and a two-browser Nova Quiz
-  party with connection logs.
-- Deleted `rocketcrab-edge` after validation and confirmed that its old
-  Durable Object namespaces and hostname are inactive. Retired the
-  `rocketcrab` TURN key and the superseded `rocketcrab-nova-beta` key.
-  Rechecked TURN minting after cleanup.
+- 2026-11-25: replaced the `rocketcrab-nova` Worker with `rocketcrab`
+  (`https://rocketcrab.tannerkrewson.workers.dev`), version `beb73eba`, so
+  one `v1` migration creates `SignalHub`, `TunnelPair` and `PartyCode`. The
+  runtime, version `9e4578c0`, frames only the new origin. The old Worker
+  and its hostname are deleted.
+- The app uses the Realtime TURN key `rocketcrab-turn`; its ID and bearer
+  token are Worker secrets, and the key mints credentials when called
+  directly. `/api/turn` answers 500 `worker_misconfigured` until the
+  Turnstile secret exists, because `TURNSTILE_REQUIRED` is `"true"`, so
+  parties run without TURN for now.
+- Verified a two-browser party joined by code through `/join`, and
+  `/transfer/drawphone` creating a Drawphone room through `/api/relay`
+  (Drawphone, Drawphone for Kids, Spyfall, Snakeout and Werewolf relays
+  answer).
+- Owner: delete the old `rocketcrab-nova-beta-turn` key in Realtime → TURN.
 
 ## Before launch
 
@@ -246,7 +248,7 @@ npx --yes wrangler@4.161.0 delete --config deploy/nova/wrangler.toml
 npx --yes wrangler@4.161.0 delete --config deploy/runtime/wrangler.toml
 ```
 
-In Cloudflare Realtime → TURN, delete `rocketcrab-nova-beta-turn` after confirming
+In Cloudflare Realtime → TURN, delete `rocketcrab-turn` after confirming
 that it has no other consumers. Delete any TURN API token created solely to
 administer this beta. Verify both Worker scripts and Nova's `SignalHub` and
 `TunnelPair` namespaces are gone, the beta URLs are inactive, and the beta
