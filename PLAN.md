@@ -96,10 +96,9 @@ the README for local devices.
 
 ## Maintenance
 
-- [ ] `e2e/smoke.spec.ts` "launches on the home and Nova pages" fails on
-      Chromium and Firefox: the logo never gets `rc-logo-launch` after the
-      click. Seen 2026-11-25; unrelated to party codes.
-
+- `e2e/smoke.spec.ts` "launches on the home and Nova pages" fails on
+  Chromium and Firefox: the logo never gets `rc-logo-launch` after the click.
+  Seen 2026-11-25; unrelated to party codes.
 - Make Nova's Vite config import graph compatible with the native config loader
   before upgrading to a Vite release that defaults to it.
 - The animated site background stops at one viewport height, so long pages
