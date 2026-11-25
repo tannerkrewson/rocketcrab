@@ -14,12 +14,14 @@ import "@fontsource-variable/inconsolata";
 import { trackPage } from "./lib/analytics";
 import { prepareAppInstall } from "./lib/app-install";
 import { startAppHealthReporting } from "./lib/app-health";
+import { handleStaleBuilds } from "./lib/stale-build";
 import { guardReplayNavigation, startClarity } from "./lib/clarity";
 import { routeTree } from "./routeTree.gen";
 import "./styles.css";
 
 prepareAppInstall();
 startAppHealthReporting();
+handleStaleBuilds();
 
 const queryClient = new QueryClient();
 
