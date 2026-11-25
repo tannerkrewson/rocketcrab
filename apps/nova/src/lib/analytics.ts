@@ -1,4 +1,5 @@
 import { findCatalogGame } from "./catalog";
+import { clarityEvent, clarityTag } from "./clarity";
 
 const measurementId = import.meta.env.VITE_GA_MEASUREMENT_ID?.trim();
 export const analyticsEnabled =
@@ -58,7 +59,7 @@ export function trackPage(routeId: string, gameId?: string): void {
     tag?.("set", page);
   }
   pageLocation = location;
-  track("page_view", page);
+  tag?.("event", "page_view", page);
 }
 
 export function track(event: string, params: Parameters = {}): void {
@@ -67,4 +68,7 @@ export function track(event: string, params: Parameters = {}): void {
   } catch {
     // A tag failure cannot interrupt gameplay.
   }
+  // Mark replays too, so recordings can be filtered by party outcomes.
+  clarityEvent(typeof params.outcome === "string" ? `${event}:${params.outcome}` : event);
+  if (typeof params.game_id === "string") clarityTag("game_id", params.game_id);
 }

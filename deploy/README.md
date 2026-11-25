@@ -141,10 +141,11 @@ leaves those pages, so catalog, library, and editor pages are never recorded.
 The project must keep strict masking (Settings → Masking). Strict masking hides
 text but records attributes, so recorded screens must keep names, titles, and
 invite secrets out of attributes; the party component tests check this.
-Use Clarity's heatmaps and filter recordings by the Smart Events
-`start_party_clicked`, `join_help_opened`, `browse_games_clicked`, and
-`open_editor_clicked`. These are clicks on public pages. GA4 measures the
-resulting gameplay and connection outcomes.
+Use Clarity's heatmaps and filter recordings by custom events. Public pages
+send `start_party_clicked`, `join_help_opened`, `browse_games_clicked`, and
+`open_editor_clicked`. Every GA4 event sent while recording is mirrored as
+`event` or `event:outcome`, such as `connection_result:join-failed` or
+`party_issue:reconnecting`. Recordings with a game carry a `game_id` tag.
 
 The project needs cookies enabled by default in Settings → Setup. Verify a
 test visit from an eligible location under Recordings after deployment.

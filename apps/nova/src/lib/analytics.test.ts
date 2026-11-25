@@ -1,5 +1,8 @@
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { PartyEngineState } from "./party/engine-types";
+import { clarityEvent, clarityTag } from "./clarity";
+
+vi.mock("./clarity", () => ({ clarityEvent: vi.fn(), clarityTag: vi.fn() }));
 
 type TagWindow = Window & { dataLayer?: IArguments[] };
 
@@ -99,4 +102,16 @@ it("counts one host game across reconnects and reports the duration at its end",
     ["game_start", { game_id: "custom", game_kind: "nova", party_size: 2 }],
     ["game_end", { game_id: "custom", game_kind: "nova", play_seconds: 30 }],
   ]);
+});
+
+it("marks replays with party outcomes and the listed game", async () => {
+  vi.clearAllMocks();
+  const { track } = await import("./analytics");
+  track("party_issue", { outcome: "reconnecting", error_code: "" });
+  track("game_start", { game_id: "drawphone", game_kind: "external", party_size: 3 });
+  expect(vi.mocked(clarityEvent).mock.calls).toEqual([
+    ["party_issue:reconnecting"],
+    ["game_start"],
+  ]);
+  expect(clarityTag).toHaveBeenCalledExactlyOnceWith("game_id", "drawphone");
 });

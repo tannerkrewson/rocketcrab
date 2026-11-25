@@ -134,6 +134,11 @@ export function clarityEvent(name: string): void {
   if (recording) clarity("event", name);
 }
 
+/** Label the current recording. Values must be bounded and never private. */
+export function clarityTag(key: string, value: string): void {
+  if (recording) clarity("set", key, value);
+}
+
 declare global {
   interface Window {
     clarity?: (command: string, ...args: unknown[]) => void;
