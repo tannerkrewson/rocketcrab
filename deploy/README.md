@@ -46,10 +46,19 @@ the app origin and allows no workers.
 
 ## Deploying
 
+Pushes to `main` deploy themselves: after the CI checks pass, the `deploy`
+job runs `scripts/deploy-changed.mjs`, which deploys each Worker whose
+inputs changed since the commit its live version is tagged with, runtime
+first. Docs, tests and CI config never trigger a deploy, and the app Worker
+is skipped when only the runtime changed: every app deploy restarts its
+Durable Objects, so live parties briefly reconnect signaling and the tunnel.
+A tab opened before a deploy reloads once when it can't load a page file
+that deploy replaced (`apps/nova/src/lib/stale-build.ts`).
+
 Ask the owner before the first deploy of a Worker, deleting a Worker,
-changing plans or DNS, or touching `rocketcrab.com`.
-Routine redeploys of the approved configurations use the npm scripts pinned
-to Wrangler 4.161.0:
+changing plans or DNS, or touching `rocketcrab.com`. Manual deploys use the
+npm scripts pinned to Wrangler 4.161.0, and tag the Worker version with the
+commit when the working tree is clean:
 
 ```sh
 npm run check:deploy     # builds Nova, checks CSP, dry-runs the combined Worker
@@ -217,6 +226,13 @@ secrets.
   `TURN_KEY_ID`, `TURN_KEY_API_TOKEN` (Realtime TURN key `rocketcrab-turn`),
   `TURNSTILE_SECRET_KEY` and `CODE_HMAC_SECRET`. The runtime frames only
   `https://rocketcrab.com`.
+- CI deploys with the Cloudflare API token `rocketcrab GitHub Actions deploy`
+  (id `041821140fee0c1bf55a2c3b3412e90a`): Workers Scripts Write and
+  Account Settings Read on the account, Workers Routes Write and Zone Read
+  on `rocketcrab.com`. It is the repo secret `CLOUDFLARE_API_TOKEN` and, on
+  Gerald, in the GNOME keyring (`secret-tool lookup service cloudflare kind
+  ci-deploy-token`). Rotate it by rolling it under My Profile → API Tokens
+  and updating both.
 - rocketcrab Classic is the `classic` branch and the `rocketcrab-classic`
   tag. It ran on the Dokku host `134.209.222.77` behind proxied A records for
   `rocketcrab.com` and `kids.rocketcrab.com`; the pre-cutover zone export is
