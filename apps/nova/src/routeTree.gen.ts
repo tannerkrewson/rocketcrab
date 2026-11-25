@@ -16,6 +16,7 @@ import { Route as BuildRouteImport } from './routes/build'
 import { Route as EditorRouteImport } from './routes/editor'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as PartyRouteImport } from './routes/party'
+import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as GameGameIdRouteImport } from './routes/game.$gameId'
 import { Route as GamesGameIdEditRouteImport } from './routes/games/$gameId/edit'
 
@@ -54,6 +55,11 @@ const PartyRoute = PartyRouteImport.update({
   path: '/party',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const GameGameIdRoute = GameGameIdRouteImport.update({
   id: '/game/$gameId',
   path: '/game/$gameId',
@@ -73,6 +79,7 @@ export interface FileRoutesByFullPath {
   '/editor': typeof EditorRoute
   '/library': typeof LibraryRoute
   '/party': typeof PartyRoute
+  '/privacy': typeof PrivacyRoute
   '/game/$gameId': typeof GameGameIdRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
 }
@@ -84,6 +91,7 @@ export interface FileRoutesByTo {
   '/editor': typeof EditorRoute
   '/library': typeof LibraryRoute
   '/party': typeof PartyRoute
+  '/privacy': typeof PrivacyRoute
   '/game/$gameId': typeof GameGameIdRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
 }
@@ -96,6 +104,7 @@ export interface FileRoutesById {
   '/editor': typeof EditorRoute
   '/library': typeof LibraryRoute
   '/party': typeof PartyRoute
+  '/privacy': typeof PrivacyRoute
   '/game/$gameId': typeof GameGameIdRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
 }
@@ -109,6 +118,7 @@ export interface FileRouteTypes {
     | '/editor'
     | '/library'
     | '/party'
+    | '/privacy'
     | '/game/$gameId'
     | '/games/$gameId/edit'
   fileRoutesByTo: FileRoutesByTo
@@ -120,6 +130,7 @@ export interface FileRouteTypes {
     | '/editor'
     | '/library'
     | '/party'
+    | '/privacy'
     | '/game/$gameId'
     | '/games/$gameId/edit'
   id:
@@ -131,6 +142,7 @@ export interface FileRouteTypes {
     | '/editor'
     | '/library'
     | '/party'
+    | '/privacy'
     | '/game/$gameId'
     | '/games/$gameId/edit'
   fileRoutesById: FileRoutesById
@@ -143,6 +155,7 @@ export interface RootRouteChildren {
   EditorRoute: typeof EditorRoute
   LibraryRoute: typeof LibraryRoute
   PartyRoute: typeof PartyRoute
+  PrivacyRoute: typeof PrivacyRoute
   GameGameIdRoute: typeof GameGameIdRoute
   GamesGameIdEditRoute: typeof GamesGameIdEditRoute
 }
@@ -198,6 +211,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PartyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/game/$gameId': {
       id: '/game/$gameId'
       path: '/game/$gameId'
@@ -223,6 +243,7 @@ const rootRouteChildren: RootRouteChildren = {
   EditorRoute: EditorRoute,
   LibraryRoute: LibraryRoute,
   PartyRoute: PartyRoute,
+  PrivacyRoute: PrivacyRoute,
   GameGameIdRoute: GameGameIdRoute,
   GamesGameIdEditRoute: GamesGameIdEditRoute,
 }

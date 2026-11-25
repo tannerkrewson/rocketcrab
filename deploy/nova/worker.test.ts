@@ -34,6 +34,32 @@ function mockFetch(response: Response | Error) {
 
 afterEach(() => vi.unstubAllGlobals());
 
+it.each([
+  ["US", "NY", "", 204],
+  ["CA", "ON", "", 204],
+  ["CA", "QC", "", 403],
+  ["CA", undefined, "", 403],
+  ["GB", undefined, "", 403],
+  ["FR", undefined, "", 403],
+  ["CH", undefined, "", 403],
+  ["US", "NY", "1", 403],
+  [undefined, undefined, "", 403],
+] as const)(
+  "checks replay eligibility for %s %s with GPC %s",
+  async (country, regionCode, gpc, status) => {
+    const request = new Request(`${ORIGIN}/api/replay`, {
+      headers: { "Sec-Fetch-Site": "same-origin", "Sec-GPC": gpc },
+    });
+    const response = await edge.fetch(
+      Object.assign(request, { cf: { country, regionCode } }),
+      BASE_ENV,
+    );
+    expect(response.status).toBe(status);
+    expect(response.headers.get("Cache-Control")).toBe("no-store");
+    expect(await response.text()).toBe("");
+  },
+);
+
 describe("gate", () => {
   it("rejects missing and unlisted origins without CORS headers", async () => {
     for (const origin of [null, "https://evil.example"]) {

@@ -2,7 +2,7 @@ const projectId = import.meta.env.VITE_CLARITY_PROJECT_ID?.trim() ?? "";
 const preferenceKey = "nova:session-replay";
 const publicPaths = new Set(["/", "/build", "/about"]);
 
-export const clarityEnabled =
+const clarityEnabled =
   import.meta.env.PROD &&
   /^[a-z0-9]+$/.test(projectId) &&
   typeof window !== "undefined" &&
@@ -23,64 +23,57 @@ export const clarityPublicDocument =
 let sdk: typeof import("@microsoft/clarity").default | undefined;
 let starting = false;
 
-export function getClarityPreference(): boolean | null {
-  if (!clarityEnabled) return null;
+export function replayOptedOut(): boolean {
   try {
-    const value = window.localStorage.getItem(preferenceKey);
-    return value === null ? null : value === "allowed";
+    return window.localStorage.getItem(preferenceKey) === "declined";
   } catch {
-    return null;
+    return true;
   }
 }
 
-export function setClarityPreference(allowed: boolean): boolean {
-  if (!clarityEnabled) return false;
+export function setReplayOptOut(optedOut: boolean): boolean {
   try {
-    window.localStorage.setItem(preferenceKey, allowed ? "allowed" : "declined");
+    if (optedOut) window.localStorage.setItem(preferenceKey, "declined");
+    else window.localStorage.removeItem(preferenceKey);
+    return true;
   } catch {
-    if (!allowed && sdk) stopClarity();
     return false;
   }
-  if (allowed) startClarity();
-  else if (sdk) stopClarity();
-  return true;
 }
 
-function stopClarity(): void {
-  try {
-    sdk?.consentV2({ ad_Storage: "denied", analytics_Storage: "denied" });
-  } catch {
-    // Reload even if the tag has failed.
-  }
-  window.location.reload();
-}
-
-export function startClarity(): void {
-  if (!clarityPublicDocument || !isPublicPage() || getClarityPreference() !== true || starting)
-    return;
+export async function startClarity(): Promise<void> {
+  if (!clarityPublicDocument || !isPublicPage() || replayOptedOut() || starting) return;
   starting = true;
-  void import("@microsoft/clarity")
-    .then(({ default: clarity }) => {
-      if (!isPublicPage() || getClarityPreference() !== true) {
-        starting = false;
-        return;
-      }
-      clarity.init(projectId);
-      clarity.consentV2({ ad_Storage: "denied", analytics_Storage: "granted" });
-      sdk = clarity;
-      document.getElementById("clarity-script")?.addEventListener("error", () => (sdk = undefined));
-
-      const checkPreference = () => {
-        if (sdk && getClarityPreference() !== true) stopClarity();
-      };
-      window.addEventListener("storage", (event) => {
-        if (event.key === preferenceKey || event.key === null) checkPreference();
-      });
-      window.addEventListener("pageshow", checkPreference);
-    })
-    .catch(() => {
-      // A blocked tag or SDK failure cannot interrupt the app.
+  try {
+    const eligibility = await fetch("/api/replay", {
+      mode: "same-origin",
+      credentials: "omit",
+      cache: "no-store",
     });
+    if (eligibility.status !== 204) return;
+
+    const { default: clarity } = await import("@microsoft/clarity");
+    if (!isPublicPage() || replayOptedOut()) return;
+    // Use the project's normal first-party cookies in eligible regions.
+    clarity.init(projectId);
+    sdk = clarity;
+    document.getElementById("clarity-script")?.addEventListener("error", () => (sdk = undefined));
+
+    const checkPreference = () => {
+      if (!sdk || !replayOptedOut()) return;
+      try {
+        sdk.consentV2({ ad_Storage: "denied", analytics_Storage: "denied" });
+      } finally {
+        window.location.reload();
+      }
+    };
+    window.addEventListener("storage", (event) => {
+      if (event.key === preferenceKey || event.key === null) checkPreference();
+    });
+    window.addEventListener("pageshow", checkPreference);
+  } catch {
+    // Replay can fail independently of the app and GA.
+  }
 }
 
 export function trackClarityAction(

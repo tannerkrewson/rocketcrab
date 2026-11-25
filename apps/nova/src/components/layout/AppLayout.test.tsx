@@ -40,6 +40,10 @@ describe("AppLayout", () => {
     const github = within(footer).getByRole("link", { name: "View on GitHub" });
     expect(github).toHaveAttribute("href", "https://github.com/tannerkrewson/rocketcrab");
     expect(github).toHaveAttribute("target", "_blank");
+    expect(within(footer).getByRole("link", { name: "Privacy" })).toHaveAttribute(
+      "href",
+      "/privacy",
+    );
     expect(screen.queryByText(/party games for phones/)).not.toBeInTheDocument();
   });
 

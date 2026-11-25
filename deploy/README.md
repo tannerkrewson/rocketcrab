@@ -126,18 +126,19 @@ are disabled. Search for `rate_limiter_unavailable`, `turn_upstream_error`, or
 
 Nova deploys use Microsoft Clarity project `zix4dzz9v4`. Set
 `VITE_CLARITY_PROJECT_ID` to an empty value to disable replay for a deployment.
-Replay is opt-in and runs on home, about, and the Nova introduction. The footer
-has replay settings for revisiting consent. A fresh document separates replay
-from party, catalog, library, and editor pages that can contain private data.
+Cookie-based replay runs by default on home, about, and the Nova introduction
+for visitors in the US and Canada outside Québec. The Worker checks eligibility
+without returning the visitor's location and skips replay for Global Privacy
+Control. The footer's Privacy link lets visitors turn off replay in their
+browser. A fresh document separates replay from party, catalog, library, and
+editor pages that can contain private data.
 Use Clarity's heatmaps and filter recordings by the Smart Events
 `start_party_clicked`, `join_help_opened`, `browse_games_clicked`, and
 `open_editor_clicked`. These are clicks on public pages. GA4 measures the
 resulting gameplay and connection outcomes.
 
-Before deploying with Clarity enabled, use the project's Settings → Setup to
-turn off cookies by default (Consent Mode). Keep conservative masking in
-Settings → Masking and verify a consenting test session under Recordings.
-[Microsoft Clarity consent settings](https://learn.microsoft.com/en-us/clarity/setup-and-installation/consent-mode)
+The project needs cookies enabled by default in Settings → Setup. Verify a
+test visit from an eligible location under Recordings after deployment.
 
 Classic Rocketcrab's GA4 reports use `event_category = Party-Game` with the
 game ID as the event name, and `Party-numberOfPlayers` with the count as

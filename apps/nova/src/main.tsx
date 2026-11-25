@@ -21,7 +21,7 @@ const queryClient = new QueryClient();
 const router = createRouter({ routeTree });
 
 router.subscribe("onResolved", () => {
-  startClarity();
+  void startClarity();
   const match = router.state.matches.at(-1);
   if (match !== undefined) {
     trackPage(

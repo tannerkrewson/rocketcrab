@@ -1,6 +1,7 @@
+import { Link } from "@tanstack/react-router";
+import { clarityPublicDocument } from "../../lib/clarity";
 import type { PartyEngine } from "../../lib/party/engine";
 import { usePartyEngine } from "../../lib/party/use-party";
-import { SessionReplaySettings } from "./SessionReplaySettings";
 
 export const AUTHOR_URL = "https://tannerkrewson.com";
 export const GITHUB_URL = "https://github.com/tannerkrewson/rocketcrab";
@@ -19,7 +20,6 @@ export function SiteFooter({ engine }: { engine?: PartyEngine }) {
   if (state.phase === "playing") return null;
   return (
     <footer className="relative z-10 flex flex-col items-center gap-1 px-4 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-4 text-center text-sm text-foreground/55">
-      <SessionReplaySettings />
       <p>
         rocketcrab by{" "}
         <a href={AUTHOR_URL} target="_blank" rel="noopener noreferrer" className={LINK}>
@@ -30,6 +30,12 @@ export function SiteFooter({ engine }: { engine?: PartyEngine }) {
         <a href={GITHUB_URL} target="_blank" rel="noopener noreferrer" className={LINK}>
           View on GitHub
         </a>
+        <span className="mx-2" aria-hidden="true">
+          ·
+        </span>
+        <Link to="/privacy" reloadDocument={clarityPublicDocument} className={LINK}>
+          Privacy
+        </Link>
       </p>
     </footer>
   );

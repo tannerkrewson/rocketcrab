@@ -71,11 +71,12 @@ function rateLimited(): Response {
 async function route(request: Request, env: EdgeEnv): Promise<Response> {
   const url = new URL(request.url);
   const path = url.pathname.replace(/(.)\/+$/, "$1");
+  const replay = path === "/api/replay";
   const target = ROUTES[path];
   const socket = SOCKET_ROUTES.map((r) => ({ ...r, match: r.pattern.exec(path) })).find(
     (r) => r.match !== null,
   );
-  if (target === undefined && socket === undefined)
+  if (!replay && target === undefined && socket === undefined)
     return jsonError(404, "not_found", `no route for ${path}`);
 
   const origin = request.headers.get("Origin");
@@ -88,6 +89,19 @@ async function route(request: Request, env: EdgeEnv): Promise<Response> {
       request.headers.get("Sec-Fetch-Site") === "same-origin");
   if (!sameOrigin) {
     return jsonError(403, "origin_not_allowed", "same-origin request required");
+  }
+
+  if (replay) {
+    if (request.method !== "GET") return jsonError(405, "method_not_allowed", "GET required");
+    const { country, regionCode } =
+      (request as Request & { cf?: { country?: string; regionCode?: string } }).cf ?? {};
+    const eligible =
+      (country === "US" || (country === "CA" && !!regionCode && regionCode !== "QC")) &&
+      request.headers.get("Sec-GPC") !== "1";
+    return new Response(null, {
+      status: eligible ? 204 : 403,
+      headers: { "Cache-Control": "no-store" },
+    });
   }
 
   if (socket !== undefined) {
