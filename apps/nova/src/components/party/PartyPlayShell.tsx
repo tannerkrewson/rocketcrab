@@ -1,3 +1,4 @@
+import { track } from "../../lib/analytics";
 import {
   ArrowLeft,
   BookOpen,
@@ -95,6 +96,7 @@ export function PartyPlayShell({
     if (state.inviteUrl === null) return;
     const ok = await writeToClipboard(state.inviteUrl);
     if (ok) {
+      track("invite_share", { method: "copy-link" });
       toast.success("Invite link copied.");
     } else {
       toast.danger("Couldn't copy the invite link.");

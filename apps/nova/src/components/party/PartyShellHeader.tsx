@@ -1,3 +1,4 @@
+import { track } from "../../lib/analytics";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import { partyCodeUrl, phoneticCode } from "../../lib/party/party-code";
 import { toast } from "../../lib/toast";
@@ -5,8 +6,10 @@ import { BrandHeader } from "../layout/BrandHeader";
 import { BrandLogo } from "../layout/BrandLogo";
 
 export async function copyPartyCodeUrl(code: string): Promise<void> {
-  if (await writeToClipboard(partyCodeUrl(code))) toast.success("Party link copied.");
-  else toast.danger("Couldn't copy the link — try again.");
+  if (await writeToClipboard(partyCodeUrl(code))) {
+    track("invite_share", { method: "copy-code-link" });
+    toast.success("Party link copied.");
+  } else toast.danger("Couldn't copy the link — try again.");
 }
 
 /** The compact brand row for party pages without an address (name step, loading). */

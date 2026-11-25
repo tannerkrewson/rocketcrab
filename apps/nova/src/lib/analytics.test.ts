@@ -96,11 +96,14 @@ it("counts one host game across reconnects and reports the duration at its end",
   publish({ ...state, phase: "reconnecting" });
   publish({ ...state, phase: "playing" });
   clock.mockReturnValue(31_000);
-  publish({ ...state, phase: "lobby" });
+  publish({ ...state, phase: "lobby", endedReason: "host_closed" });
 
   expect(events().filter(([event]) => event.startsWith("game_"))).toEqual([
     ["game_start", { game_id: "custom", game_kind: "nova", party_size: 2 }],
-    ["game_end", { game_id: "custom", game_kind: "nova", play_seconds: 30 }],
+    [
+      "game_end",
+      { game_id: "custom", game_kind: "nova", play_seconds: 30, end_reason: "host_closed" },
+    ],
   ]);
 });
 

@@ -1,3 +1,4 @@
+import { track } from "../../lib/analytics";
 import { Check, ClipboardCopy, ClipboardPaste, FileUp, ScrollText } from "lucide-react";
 import { useMemo, useState } from "react";
 import { writeToClipboard } from "../../lib/editor/clipboard";
@@ -18,6 +19,7 @@ export function EditorEmptyState({
 
   const copyPrompt = async () => {
     if (await writeToClipboard(prompt)) {
+      track("editor_action", { action: "copy-prompt" });
       setCopied(true);
     } else {
       toast.danger("Couldn't copy the prompt. Open the full prompt to copy it manually.");

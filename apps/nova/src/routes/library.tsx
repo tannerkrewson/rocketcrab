@@ -1,3 +1,4 @@
+import { track } from "../lib/analytics";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { toast } from "../lib/toast";
@@ -37,7 +38,10 @@ export function LibraryPage() {
     duplicateGame.mutate(
       { id },
       {
-        onSuccess: (game) => toast.success(`Duplicated as “${game.title}”.`),
+        onSuccess: (game) => {
+          track("library_action", { action: "duplicate" });
+          toast.success(`Duplicated as “${game.title}”.`);
+        },
         onError: (error) => toast.danger(errorMessage(error)),
       },
     );
@@ -48,7 +52,10 @@ export function LibraryPage() {
     const game = pendingDelete;
     setPendingDelete(null);
     deleteGame.mutate(game.id, {
-      onSuccess: () => toast.success(`Deleted “${game.title}”.`),
+      onSuccess: () => {
+        track("library_action", { action: "delete" });
+        toast.success(`Deleted “${game.title}”.`);
+      },
       onError: (error) => toast.danger(errorMessage(error)),
     });
   };

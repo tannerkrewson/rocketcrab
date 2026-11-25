@@ -1,3 +1,4 @@
+import { track } from "../../lib/analytics";
 import { Copy, QrCode, Share2 } from "lucide-react";
 import { useState } from "react";
 import { writeToClipboard } from "../../lib/editor/clipboard";
@@ -31,14 +32,17 @@ export function PartyInvite({ inviteUrl }: { readonly inviteUrl: string | null }
 
   const copyInvite = async () => {
     if (inviteUrl === null) return;
-    if (await writeToClipboard(inviteUrl)) toast.success("Invite link copied.");
-    else toast.danger("Couldn't copy the link — try again.");
+    if (await writeToClipboard(inviteUrl)) {
+      track("invite_share", { method: "copy-link" });
+      toast.success("Invite link copied.");
+    } else toast.danger("Couldn't copy the link — try again.");
   };
 
   const shareInvite = async () => {
     if (inviteUrl === null || typeof navigator.share !== "function") return;
     try {
       await navigator.share({ title: "Play rocketcrab with me!", url: inviteUrl });
+      track("invite_share", { method: "native-share" });
     } catch {
       // The user dismissed the sheet or the platform refused; Copy URL remains.
     }
@@ -55,7 +59,10 @@ export function PartyInvite({ inviteUrl }: { readonly inviteUrl: string | null }
           variant="default"
           soft
           size="md"
-          onClick={() => setQrOpen(true)}
+          onClick={() => {
+            track("invite_share", { method: "qr" });
+            setQrOpen(true);
+          }}
           disabled={inviteUrl === null}
         >
           <QrCode className="h-4 w-4" aria-hidden="true" />

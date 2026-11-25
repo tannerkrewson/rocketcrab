@@ -8,7 +8,8 @@ export function observePartyAnalytics(engine: {
   if (!analyticsEnabled) return;
   let previousPhase: PartyEngineState["phase"] = "idle";
   let round: { game: string; kind: "nova" | "external"; startedAt: number | null } | null = null;
-  const finish = () => {
+  /** `end_reason` is the protocol's game-end reason, or how the round was cut short. */
+  const finish = (endReason: string) => {
     const ended = round;
     round = null;
     if (ended?.startedAt == null) return;
@@ -16,11 +17,12 @@ export function observePartyAnalytics(engine: {
       game_id: findCatalogGame(ended.game)?.id ?? "custom",
       game_kind: ended.kind,
       play_seconds: Math.round((performance.now() - ended.startedAt) / 1000),
+      end_reason: endReason,
     });
   };
 
   window.addEventListener("pagehide", (event) => {
-    if (!event.persisted) finish();
+    if (!event.persisted) finish("page-closed");
   });
 
   engine.onState((state) => {
@@ -36,11 +38,10 @@ export function observePartyAnalytics(engine: {
       }
     }
 
-    if (
-      round !== null &&
-      (round.game !== game?.gameId || (phase !== "playing" && phase !== "reconnecting"))
-    ) {
-      finish();
+    if (round !== null && game !== null && round.game !== game.gameId) {
+      finish("switched");
+    } else if (round !== null && phase !== "playing" && phase !== "reconnecting") {
+      finish(phase === "lobby" ? (state.endedReason ?? "ended") : "left");
     }
     if (round === null && phase === "playing" && game !== null) {
       // Remember the round on followers too, so promotion during a reconnect doesn't count it again.

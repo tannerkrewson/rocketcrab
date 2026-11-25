@@ -1,3 +1,4 @@
+import { track } from "../../lib/analytics";
 import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
 import type { SavedGame } from "@rocketcrab/core";
 import { useBlocker, useCanGoBack, useNavigate, useRouter } from "@tanstack/react-router";
@@ -344,6 +345,7 @@ export function EditorPage({ game }: { game?: SavedGame }) {
         toast.info("Your clipboard is empty. Copy your game's HTML first.");
         return;
       }
+      track("editor_action", { action: "paste" });
       loadGame(text, "Pasted. Testing it now.");
     } catch {
       toast.danger(
@@ -367,6 +369,7 @@ export function EditorPage({ game }: { game?: SavedGame }) {
           toast.info("That file is empty.");
           return;
         }
+        track("editor_action", { action: "upload" });
         loadGame(text, `Loaded ${file.name}. Testing it now.`);
       } catch {
         toast.danger("Couldn't read that file. Try again or paste the HTML instead.");
@@ -407,6 +410,7 @@ export function EditorPage({ game }: { game?: SavedGame }) {
   const handleSave = useCallback(async () => {
     const id = await persist();
     if (id === null) return;
+    track("editor_action", { action: game ? "save" : "save-new" });
     if (game) {
       toast.success("Saved.");
       return;
@@ -431,6 +435,7 @@ export function EditorPage({ game }: { game?: SavedGame }) {
         html: source,
         apiVersion: PROTOCOL_VERSION,
       });
+      track("editor_action", { action: "save-copy" });
       toast.success(`Saved a copy as “${created.title}”.`);
       await navigate({
         to: "/games/$gameId/edit",
@@ -453,6 +458,7 @@ export function EditorPage({ game }: { game?: SavedGame }) {
     }
     const id = !game || dirty ? await persist() : game.id;
     if (id === null) return;
+    track("editor_action", { action: "play-with-friends" });
     await navigate({
       to: "/party",
       search: {

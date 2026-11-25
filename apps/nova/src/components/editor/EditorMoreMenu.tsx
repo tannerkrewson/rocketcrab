@@ -1,3 +1,4 @@
+import { track } from "../../lib/analytics";
 import { CopyPlus, Ellipsis, FileUp, ScrollText, Undo2 } from "lucide-react";
 import { useRef, type ReactNode } from "react";
 import { toast } from "../../lib/toast";
@@ -52,10 +53,15 @@ export function EditorMoreMenu({
   const detailsRef = useRef<HTMLDetailsElement | null>(null);
   const close = () => detailsRef.current?.removeAttribute("open");
 
-  const copy = async (text: string, successMessage: string) => {
+  const copy = async (
+    text: string,
+    successMessage: string,
+    action: "copy-prompt" | "copy-prompt-with-game",
+  ) => {
     close();
     const ok = await writeToClipboard(text);
     if (ok) {
+      track("editor_action", { action });
       toast.success(successMessage);
     } else {
       toast.danger("Couldn't copy the prompt — your browser may need clipboard permission.");
@@ -87,7 +93,9 @@ export function EditorMoreMenu({
         </Item>
         <Item
           icon={<ScrollText className="h-4 w-4" aria-hidden="true" />}
-          onClick={() => void copy(buildMasterPrompt(), "AI prompt copied to your clipboard.")}
+          onClick={() =>
+            void copy(buildMasterPrompt(), "AI prompt copied to your clipboard.", "copy-prompt")
+          }
         >
           Copy AI prompt
         </Item>
@@ -98,6 +106,7 @@ export function EditorMoreMenu({
               void copy(
                 buildMasterPromptWithGame(source, title),
                 "AI prompt with your game copied to your clipboard.",
+                "copy-prompt-with-game",
               )
             }
           >

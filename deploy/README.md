@@ -139,6 +139,13 @@ strings, invite fragments, or private game IDs.
   and App version.
   Connection counts are per client and peer attempt, so a pair can report on
   both devices.
+- Use `invite_share` for how hosts share (`method` copy-link, copy-code-link,
+  qr or native-share), `editor_action` for the build funnel (`action`
+  copy-prompt, copy-prompt-with-game, paste, upload, save-new, save,
+  save-copy or play-with-friends) and `library_action` (`action` duplicate or
+  delete). `game_end` carries `end_reason`: the game's own reason
+  (`host_closed`, `user_exit`, `error`), or `switched`, `left` or
+  `page-closed`.
 - Use `web_vital` for Core Web Vitals (`metric` LCP, INP, CLS, FCP or TTFB,
   `value` in ms or CLS in thousandths, `rating`, `route`) and `app_error`
   for uncaught errors and rejections (`route`, `error_name`, at most ten per
