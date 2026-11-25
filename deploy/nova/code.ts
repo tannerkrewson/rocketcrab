@@ -80,7 +80,7 @@ const encoder = new TextEncoder();
 export async function codeCandidates(secret: string): Promise<string[]> {
   const digest = await crypto.subtle.digest(
     "SHA-256",
-    encoder.encode(`nova-party-code\0${secret}`),
+    encoder.encode(`rocketcrab-party-code\0${secret}`),
   );
   const words = new DataView(digest);
   const codes: string[] = [];

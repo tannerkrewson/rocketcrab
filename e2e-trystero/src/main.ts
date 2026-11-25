@@ -95,7 +95,7 @@ function payloadSize(payload: unknown): number {
 
 const state: HarnessState = {
   ready: false,
-  appId: "rocketcrab-nova-dev",
+  appId: "rocketcrab-dev",
   selfMemberId: `member-${Math.random().toString(36).slice(2, 10)}`,
   selfConnectionId: null,
   connectionState: "idle",

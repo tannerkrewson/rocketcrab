@@ -60,9 +60,9 @@ export async function deriveSessionMaterial(secret: SessionSecret): Promise<Sess
       `Party session secret is malformed (expected ${SESSION_SECRET_BYTES} bytes of unpadded base64url).`,
     );
   }
-  const roomId = await deriveHex("nova-party-room", secret);
-  const password = await deriveBase64Url("nova-party-password", secret);
-  const sessionId = await deriveHex("nova-party-session", secret);
+  const roomId = await deriveHex("rocketcrab-party-room", secret);
+  const password = await deriveBase64Url("rocketcrab-party-password", secret);
+  const sessionId = await deriveHex("rocketcrab-party-session", secret);
   return { secret, roomId: `party:${roomId}`, password, sessionId };
 }
 

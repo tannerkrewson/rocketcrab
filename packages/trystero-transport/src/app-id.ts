@@ -6,20 +6,21 @@
  * the same appId or they will never discover each other. The default is
  * therefore environment-scoped, never per-machine:
  *
- * - `rocketcrab-nova-v027-dev` — dev/test builds (Vite `import.meta.env.DEV`).
- * - `rocketcrab-nova-v027-prod` — production builds (Vite `import.meta.env.PROD`).
+ * - `rocketcrab-dev` — dev/test builds (Vite `import.meta.env.DEV`).
+ * - `rocketcrab` — production builds (Vite `import.meta.env.PROD`).
  *
- * The version separates Trystero 0.27's incompatible wire protocol from 0.26.
+ * If a Trystero upgrade changes its wire protocol, give both IDs a version
+ * suffix (`rocketcrab-2`) so old and new builds never share rooms.
  *
  * Callers can pin an explicit appId (e.g. for e2e runs) via the adapter
  * options; `resolveAppId` is pure so tests stay deterministic.
  */
 
 /** App ID used by development and test builds. */
-export const DEV_APP_ID = "rocketcrab-nova-v027-dev";
+export const DEV_APP_ID = "rocketcrab-dev";
 
 /** App ID used by production builds. */
-export const PROD_APP_ID = "rocketcrab-nova-v027-prod";
+export const PROD_APP_ID = "rocketcrab";
 
 /** Environment flags the appId resolution understands. */
 export interface AppIdEnvironment {

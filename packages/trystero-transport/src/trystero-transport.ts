@@ -64,7 +64,7 @@ import {
  *
  * Design decisions:
  * - **Room-scoped signaling** through the configured edge Worker.
- * - **Environment-specific appId** (`rocketcrab-nova-v027-dev` / `-prod`,
+ * - **Environment-specific appId** (`rocketcrab-dev` / `rocketcrab`,
  *   `app-id.ts`) so dev and prod rooms never collide.
  * - **Identity admission**: Trystero verifies the user ID used as the Nova member
  *   ID. User state carries the connection generation and display name. A bilateral ack gates
@@ -1508,7 +1508,7 @@ export interface TrysteroTransportOptions {
   readonly displayName?: string;
   /**
    * Trystero appId override. Defaults to the environment-specific ID
-   * (`rocketcrab-nova-v027-dev` / `-prod`); every peer in a party must use the
+   * (`rocketcrab-dev` / `rocketcrab`); every peer in a party must use the
    * same appId.
    */
   readonly appId?: string;

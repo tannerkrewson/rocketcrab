@@ -2,9 +2,7 @@ import { describe, expect, it } from "vitest";
 import { DEV_APP_ID, PROD_APP_ID, resolveAppId } from "./app-id";
 
 describe("resolveAppId", () => {
-  it("isolates the 0.27 wire protocol from the previous default rooms", () => {
-    expect(DEV_APP_ID).not.toBe("rocketcrab-nova-dev");
-    expect(PROD_APP_ID).not.toBe("rocketcrab-nova-prod");
+  it("keeps dev and prod rooms apart", () => {
     expect(DEV_APP_ID).not.toBe(PROD_APP_ID);
   });
 

@@ -277,9 +277,9 @@ describe("TrysteroTransport construction", () => {
 
   it("defaults the appId to the environment-specific dev ID", () => {
     const { adapter } = setup();
-    expect(adapter.appId).toBe("rocketcrab-nova-v027-dev");
+    expect(adapter.appId).toBe("rocketcrab-dev");
     const prod = new TrysteroTransport({ env: { PROD: true } });
-    expect(prod.appId).toBe("rocketcrab-nova-v027-prod");
+    expect(prod.appId).toBe("rocketcrab");
     const explicit = new TrysteroTransport({ appId: "rocketcrab-e2e" });
     expect(explicit.appId).toBe("rocketcrab-e2e");
   });
@@ -422,7 +422,7 @@ describe("TrysteroTransport join", () => {
     expect(mocks.joinRoom).toHaveBeenCalledTimes(1);
     const [config, roomName] = mocks.joinRoom.mock.calls[0]!;
     expect(roomName).toBe("ROOM");
-    expect(config.appId).toBe("rocketcrab-nova-v027-dev");
+    expect(config.appId).toBe("rocketcrab-dev");
     expect(config.relayConfig).toEqual({ urls: [RELAY] });
     expect(config.maxReceiveBytes).toBe(8 * 1024 * 1024);
     expect(config.use).toEqual([{ name: "scale", config: { maxDirectPeers: 9 } }]);
