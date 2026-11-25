@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 /**
- * Protocol versioning for all rocketcrab Nova cross-context and peer
+ * Protocol versioning for all rocketcrab nova cross-context and peer
  * messages.
  *
  * The protocol version is a single integer carried in the `version` field of

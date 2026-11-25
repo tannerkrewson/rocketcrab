@@ -1,4 +1,4 @@
-# rocketcrab Nova
+# rocketcrab nova
 
 Make and play multiplayer party games with friends, on any device. Copy
 Nova's master prompt into any AI chat, describe a game, paste the single HTML

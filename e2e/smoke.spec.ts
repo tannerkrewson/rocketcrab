@@ -56,5 +56,5 @@ test("runtime origin serves its isolated page", async ({ request }) => {
   const response = await request.get("http://localhost:2723/");
   expect(response.ok()).toBeTruthy();
   const html = await response.text();
-  expect(html).toContain("rocketcrab Nova Runtime");
+  expect(html).toContain("rocketcrab nova runtime");
 });

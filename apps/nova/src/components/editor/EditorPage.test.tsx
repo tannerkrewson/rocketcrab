@@ -577,7 +577,7 @@ describe("problem report and prompts", () => {
     await userEvent.click(problems.getByRole("button", { name: /Copy for AI/ }));
     await vi.waitFor(() => expect(writeText).toHaveBeenCalled());
     const report = writeText.mock.calls.at(-1)?.[0] as string;
-    expect(report).toContain("rocketcrab Nova — game diagnostic report");
+    expect(report).toContain("rocketcrab nova — game diagnostic report");
     expect(report).toMatch(/Source SHA-256: [0-9a-f]{64}/);
     expect(report).toContain("syntax");
     expect(report).toContain("Unexpected token");

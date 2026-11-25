@@ -180,7 +180,7 @@ export interface DiagnosticReportInput {
 /** Plain-text diagnostics for pasting back into an AI chat. */
 export function buildDiagnosticReport(input: DiagnosticReportInput): string {
   const lines: string[] = [
-    "rocketcrab Nova — game diagnostic report",
+    "rocketcrab nova — game diagnostic report",
     `Generated: ${new Date().toISOString()}`,
     `Game: ${input.title}`,
     `Saved: ${input.saved ? "yes" : "no (unsaved draft)"}`,

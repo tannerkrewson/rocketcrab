@@ -27,7 +27,7 @@ function AboutPage() {
         </p>
         <p>
           In 2026, powerful AI coding tools allowed me to rebuild rocketcrab into{" "}
-          <span className="font-bold text-nova-text">rocketcrab Nova</span>, which allows you to
+          <span className="font-bold text-nova-text">rocketcrab nova</span>, which allows you to
           create your own games and play them with your friends instantly! In addition, rocketcrab
           was rewritten using{" "}
           <a href="https://trystero.dev/" className={LINK}>
