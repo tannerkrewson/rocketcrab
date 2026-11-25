@@ -86,6 +86,12 @@ the README for local devices.
 
 - Make Nova's Vite config import graph compatible with the native config loader
   before upgrading to a Vite release that defaults to it.
+- The animated site background stops at one viewport height, so long pages
+  (home with the install button, the lobby) show a hard edge into plain black
+  near the bottom. Make it cover the full page or fade out smoothly.
+- After launch, confirm on a real iPhone and Android phone that "Get the app"
+  appears, its dialog or prompt works, and the installed app opens full screen
+  with the black icon.
 
 ## Known limits
 
