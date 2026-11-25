@@ -96,8 +96,36 @@ Open Workers & Pages → `rocketcrab-nova` → Observability. Filter the `event`
 for `nova_connection`: transport outcomes (`direct`, `turn`, `tunnel`,
 `failed`, `unknown`) and product outcomes (`lobby-ready`, `join-failed`,
 `game-ready`) are separate events. Payloads carry no names, room IDs or
-player IDs. `turn_cred_mint` logs TURN issuance. This is the only analytics
-Nova has.
+player IDs. `turn_cred_mint` logs TURN issuance.
+
+The Nova deploy uses the existing Rocketcrab GA4 web stream
+(`G-V569CH5H2D`). Set `VITE_GA_MEASUREMENT_ID` to an empty value to disable
+it for a deployment, or use a separate stream for test collection. The tag
+runs on the configured Nova origin. It sends route names without query
+strings, invite fragments, or private game IDs. GA reporting fields include
+`app_variant = nova` on Nova's explicit events.
+
+- Use `page_view` for page traffic and `party_create` for lobbies opened.
+- Use `game_start` for games launched, grouped by Game ID and Game kind.
+  Players at game start counts connected party members. Divide its sum by
+  `game_start` event count to get average party size.
+- Use `game_end` for observed play duration (Play duration divided by
+  `game_end` count). These events come from the host who started the game.
+  Play duration includes time spent reconnecting and can be missing if the
+  host's browser is killed. External game time measures the Rocketcrab
+  play screen since third-party gameplay occurs inside an iframe.
+- Use `nova_connection` for connection paths and join readiness,
+  `nova_tunnel` for fallback attempts and terminal failures, and
+  `party_issue` for player-visible reconnects, outages, and game errors.
+  Break down by Connection or issue outcome and Connection reason.
+  Connection counts are per client and peer attempt, so a pair can report on
+  both devices.
+
+Classic Rocketcrab's GA4 reports use `event_category = Party-Game` with the
+game ID as the event name, and `Party-numberOfPlayers` with the count as
+the event name. Compare classic game IDs to the lowercase Nova catalog
+slugs where the same game is offered. Keep browser-history page-view
+measurement disabled on this stream because Nova sends its own page views.
 
 Workers Free and Durable Objects Free have daily limits that stop service
 until midnight UTC; check usage before a wider beta.
@@ -128,12 +156,10 @@ secrets.
 - [ ] **Owner:** configure the Realtime usage alert and Workers/Durable
       Objects spending controls, and confirm the notification destination.
       A spend block can interrupt parties.
-- [ ] Decide whether launch needs product analytics beyond the Workers Logs
-      events above (for example parties started, games played). Nothing else
-      is collected today.
 - [ ] Live smoke test: run a game in the editor on the deployed app and
       runtime; play with two real devices and confirm Workers Logs shows
-      lobby and game readiness next to transport outcomes.
+      lobby and game readiness next to transport outcomes. Confirm GA Realtime
+      receives a page view, game start and end, and a connection outcome.
 - [ ] Switch to Workers Paid ($5/month).
 
 ## Production cutover

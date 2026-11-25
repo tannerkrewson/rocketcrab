@@ -96,15 +96,25 @@ function buildCsp(): string {
   const socketSource = mainOrigin
     ? [new URL(mainOrigin).origin.replace(/^http/, "ws") + "/api/"]
     : [];
+  const analyticsEnabled =
+    /^G-[A-Z0-9]+$/.test(process.env.VITE_GA_MEASUREMENT_ID?.trim() ?? "") && Boolean(mainOrigin);
+  const tagOrigin = analyticsEnabled ? ["https://www.googletagmanager.com"] : [];
+  const analyticsOrigins = analyticsEnabled ? [...tagOrigin, "https://*.google-analytics.com"] : [];
   const csp = [
     "default-src 'self'",
-    `script-src 'self' ${challengeOrigin}`,
+    ["script-src 'self'", challengeOrigin, ...tagOrigin].join(" "),
     "style-src 'self' 'unsafe-inline'",
     // Listed games' screenshots on their details pages.
-    ["img-src 'self' data: blob:", ...CATALOG_IMAGE_ORIGINS].join(" "),
+    ["img-src 'self' data: blob:", ...CATALOG_IMAGE_ORIGINS, ...analyticsOrigins].join(" "),
     "font-src 'self' data:",
     // Listed games' direct room creation and hosted Nova games' HTML.
-    ["connect-src 'self'", ...socketSource, ...CATALOG_CONNECT_ORIGINS].join(" "),
+    [
+      "connect-src 'self'",
+      ...socketSource,
+      ...CATALOG_CONNECT_ORIGINS,
+      ...analyticsOrigins,
+      ...(analyticsEnabled ? ["https://www.google.com", "https://analytics.google.com"] : []),
+    ].join(" "),
     "media-src 'self' blob:",
     "worker-src 'self' blob:",
     "object-src 'none'",

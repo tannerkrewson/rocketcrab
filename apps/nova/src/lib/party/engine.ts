@@ -22,13 +22,18 @@ import {
   type GameSourceTransferEvent,
   buildInviteUrl,
 } from "@rocketcrab/party";
+import { track } from "../analytics";
+import { observePartyAnalytics } from "./party-analytics";
 import { reportConnection } from "../connection-log";
 import {
   connectionErrorCategory,
   connectionErrorMessage,
   roomErrorCategory,
 } from "./connection-errors";
-import { createTrysteroPartyTransportFactory } from "./transport-factory";
+import {
+  createTrysteroPartyTransportFactory,
+  type TrysteroPartyTransportFactoryOptions,
+} from "./transport-factory";
 import {
   TURN_CREDS_TTL_MS,
   type TurnCredentialsResult,
@@ -411,7 +416,7 @@ export class PartyEngine {
     const setup = this.state.setupAbort;
     const scope = {};
     this.state.activeErrorScope = scope;
-    const options = {
+    const options: TrysteroPartyTransportFactoryOptions = {
       onJoinError: (error: unknown) => {
         if (this.state.activeErrorScope !== scope || setup?.signal.aborted) return;
         if (
@@ -430,12 +435,14 @@ export class PartyEngine {
         }
         this.handleJoinErrorNotice(error);
       },
-      onTunnel: () => {
+      onTunnel: (info) => {
         if (this.state.activeErrorScope !== scope || setup?.signal.aborted) return;
+        track("nova_tunnel", { outcome: "fallback", error_code: info.reason });
         this.state.peerLink.switched();
       },
-      onTunnelFailure: () => {
+      onTunnelFailure: (info) => {
         if (this.state.activeErrorScope !== scope || setup?.signal.aborted) return;
+        track("nova_tunnel", { outcome: "failed", error_code: info.reason });
         this.state.peerLink.failed();
       },
     };
@@ -1299,6 +1306,7 @@ export class PartyEngine {
     if (this.startRetryRemainingMs <= 0) {
       this.stopGameSwitch();
       this.state.timeOutStart();
+      track("party_issue", { outcome: "start-timeout" });
       this.addNotice("warn", START_GIVE_UP_MESSAGE);
       this.emit();
       return;
@@ -1687,6 +1695,7 @@ export class PartyEngine {
       this.state.runtime = null;
       this.state.resetFrame();
       const message = errorMessage(error);
+      track("party_issue", { outcome: "runtime-load-failed" });
       this.addNotice("error", `Your game could not start: ${message}`);
       this.emit();
     }
@@ -1720,10 +1729,12 @@ export class PartyEngine {
         this.emit();
         break;
       case "fatal":
+        track("party_issue", { outcome: "runtime-fatal" });
         this.addNotice("error", event.message);
         this.emit();
         break;
       case "unresponsive":
+        track("party_issue", { outcome: "runtime-unresponsive" });
         this.addNotice("warn", "Your game stopped answering — it may be wedged.");
         this.emit();
         break;
@@ -2477,3 +2488,4 @@ export class PartyEngine {
 }
 
 export const partyEngine = new PartyEngine();
+observePartyAnalytics(partyEngine);

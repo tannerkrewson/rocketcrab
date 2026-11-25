@@ -1,3 +1,4 @@
+import { track } from "./analytics";
 import { version } from "../../package.json";
 
 const outcomes = [
@@ -83,7 +84,6 @@ export function reportConnection(attempt: ConnectionAttempt): boolean {
   try {
     if (
       typeof navigator === "undefined" ||
-      typeof navigator.sendBeacon !== "function" ||
       !(outcomes as readonly unknown[]).includes(attempt.outcome) ||
       !(errors as readonly unknown[]).includes(attempt.error_code) ||
       !Number.isInteger(attempt.ms_to_connect) ||
@@ -107,7 +107,12 @@ export function reportConnection(attempt: ConnectionAttempt): boolean {
       network: networkFamily(connection),
       app_version: version,
     };
-    return navigator.sendBeacon("/api/log", JSON.stringify(event));
+    track("nova_connection", {
+      ...event,
+      // Failed attempts have no successful connect time.
+      ...(event.ms_to_connect === 0 ? { ms_to_connect: undefined } : {}),
+    });
+    return navigator.sendBeacon?.("/api/log", JSON.stringify(event)) ?? false;
   } catch {
     return false;
   }

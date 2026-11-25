@@ -10,7 +10,7 @@
  * Nova origin (strict main-origin policy):
  *   - index.html carries the build-time CSP meta tag, and _headers carries
  *     the matching policy with `frame-src` pinned to the runtime origin;
- *   - application scripts come from the main origin or Turnstile;
+ *   - application scripts come from the main origin, Turnstile, or the configured Google tag;
  *   - the referrer meta tag is present (no path/query leakage; invite
  *     secrets already live in URL fragments).
  *
@@ -84,9 +84,11 @@ if (origin === "nova") {
       );
     }
     const scriptSrc = /script-src ([^;]+)/.exec(csp)?.[1] ?? "";
+    const expectsAnalytics = /^G-[A-Z0-9]+$/.test(process.env.VITE_GA_MEASUREMENT_ID?.trim() ?? "");
+    const tagSource = expectsAnalytics ? " https://www.googletagmanager.com" : "";
     expect(
-      "CSP script-src permits the app and Turnstile",
-      scriptSrc.trim() === "'self' https://challenges.cloudflare.com",
+      "CSP script-src permits only the app and configured external scripts",
+      scriptSrc.trim() === `'self' https://challenges.cloudflare.com${tagSource}`,
     );
     expect(
       "CSP has no 'unsafe-inline'/'unsafe-eval' for scripts",

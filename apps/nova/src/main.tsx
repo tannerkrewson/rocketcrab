@@ -11,12 +11,25 @@ import "@fontsource/mukta/700.css";
 import "@fontsource/mukta/800.css";
 // The brand title uses Inconsolata; the rest of the UI uses Mukta.
 import "@fontsource-variable/inconsolata";
+import { trackPage } from "./lib/analytics";
 import { routeTree } from "./routeTree.gen";
 import "./styles.css";
 
 const queryClient = new QueryClient();
 
 const router = createRouter({ routeTree });
+
+router.subscribe("onResolved", () => {
+  const match = router.state.matches.at(-1);
+  if (match !== undefined) {
+    trackPage(
+      match.status === "notFound" || ("globalNotFound" in match && match.globalNotFound)
+        ? "__root__"
+        : match.routeId,
+      "gameId" in match.params ? match.params.gameId : undefined,
+    );
+  }
+});
 
 declare module "@tanstack/react-router" {
   interface Register {

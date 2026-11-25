@@ -13,6 +13,7 @@ const env = {
   ...process.env,
   VITE_RUNTIME_ORIGIN: origins.runtime,
   VITE_MAIN_ORIGIN: origins.nova,
+  VITE_GA_MEASUREMENT_ID: process.env.VITE_GA_MEASUREMENT_ID ?? "G-V569CH5H2D",
 };
 function run(command, args) {
   const result = spawnSync(command, args, { env, stdio: "inherit" });
