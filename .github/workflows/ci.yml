@@ -4,6 +4,8 @@ on:
   push:
     branches: [main]
   pull_request:
+  # Rerun checks and the deploy on demand.
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -110,7 +112,7 @@ jobs:
   deploy:
     name: Deploy changed Workers
     needs: checks
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     concurrency:
