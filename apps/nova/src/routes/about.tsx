@@ -26,14 +26,19 @@ function AboutPage() {
           for the server because people kept playing!
         </p>
         <p>
-          In 2026, powerful AI coding tools allowed me to rebuild Rocketcrab in{" "}
-          <span className="font-bold text-nova-text">Rocketcrab Nova</span>, which allows users to
-          create their own games and play them with their friends instantly! In addition, Rocketcrab
+          In 2026, powerful AI coding tools allowed me to rebuild Rocketcrab into{" "}
+          <span className="font-bold text-nova-text">Rocketcrab Nova</span>, which allows you to
+          create your own games and play them with your friends instantly! In addition, Rocketcrab
           was rewritten using{" "}
           <a href="https://trystero.dev/" className={LINK}>
             Trystero
           </a>{" "}
-          peer-to-peer networking and does not require a server anymore!
+          peer-to-peer networking and does not require a server anymore! The new rocketcrab remains
+          free and{" "}
+          <a href="https://github.com/tannerkrewson/rocketcrab" className={LINK}>
+            open source
+          </a>{" "}
+          under the MIT license.
         </p>
         <p className="font-bold text-foreground">
           Enjoy!

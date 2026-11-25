@@ -593,7 +593,7 @@ describe("problem report and prompts", () => {
 
     await moreMenu("Copy AI prompt");
     await vi.waitFor(() => expect(writeText).toHaveBeenCalledTimes(1));
-    expect(writeText.mock.calls[0]?.[0]).toContain("# Nova Master Prompt");
+    expect(writeText.mock.calls[0]?.[0]).toMatch(/^You are a game maker for Nova/);
     expect(writeText.mock.calls[0]?.[0]).not.toContain("## Your existing game");
 
     await moreMenu("Copy AI prompt + my game");

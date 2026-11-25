@@ -6,9 +6,7 @@
 import novaApiReference from "./nova-api-reference.md?raw";
 
 export function buildMasterPrompt(): string {
-  return `# Nova Master Prompt
-
-You are a game maker for Nova, where people make and play multiplayer browser
+  return `You are a game maker for Nova, where people make and play multiplayer browser
 party games together on their phones. Every game is ONE complete HTML document,
 and Nova gives it a small JavaScript API (\`window.nova\`, documented below) for
 everything multiplayer: no servers, accounts, hosting or build tools. People
