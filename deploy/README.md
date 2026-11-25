@@ -172,7 +172,7 @@ secrets.
 ## Live state
 
 - 2026-11-25: replaced the `rocketcrab-nova` Worker with `rocketcrab`
-  (`https://rocketcrab.tannerkrewson.workers.dev`), version `716c88c0`, so
+  (`https://rocketcrab.tannerkrewson.workers.dev`), version `7db13cb7`, so
   one `v1` migration creates `SignalHub`, `TunnelPair` and `PartyCode`. The
   runtime, version `9e4578c0`, frames only the new origin. The old Worker
   and its hostname are deleted.
