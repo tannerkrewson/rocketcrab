@@ -87,9 +87,11 @@ the README for local devices.
   Seen 2026-11-25; unrelated to party codes.
 - Make Nova's Vite config import graph compatible with the native config loader
   before upgrading to a Vite release that defaults to it.
-- The animated site background stops at one viewport height, so long pages
-  (home with the install button, the lobby) show a hard edge into plain black
-  near the bottom. Make it cover the full page or fade out smoothly.
+- On a real iPhone, scroll a long page (home with "Get the app", the lobby)
+  to the bottom and confirm the animated background reaches the bottom edge.
+  It used to stop short with a hard edge into black; the fixed background
+  layer is now `100lvh` tall so toolbar collapse can't expose it. If it still
+  shows, extend the layer below the viewport or set `overscroll-behavior-y`.
 - After launch, confirm on a real iPhone and Android phone that "Get the app"
   appears, its dialog or prompt works, and the installed app opens full screen
   with the black icon.

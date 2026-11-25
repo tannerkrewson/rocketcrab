@@ -109,7 +109,9 @@ export function SiteBackground({
       aria-hidden="true"
       data-testid="app-background"
       data-variant={variant}
-      className="pointer-events-none fixed inset-0 z-0 bg-black"
+      // The large viewport height doesn't change as mobile browser toolbars
+      // collapse on scroll, so the canvas never lags behind and bares black.
+      className="pointer-events-none fixed inset-x-0 top-0 z-0 h-lvh bg-black"
     >
       <div className="rc-bg-in absolute inset-0">
         <MoltenBackground blue={variant === "nova"} />
