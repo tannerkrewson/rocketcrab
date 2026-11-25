@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { MINT_TTL_SECONDS, dropPort53, isPort53IceUrl } from "./turn";
-import edge, { type EdgeEnv } from "./worker";
+import edge, { rateLimitClient, type EdgeEnv } from "./worker";
 
 const ORIGIN = "https://rocketcrab.com";
 const BASE_ENV: EdgeEnv = {};
@@ -147,6 +147,18 @@ describe("gate", () => {
       "signal:203.0.113.7",
       "tunnel:203.0.113.7",
     ]);
+  });
+
+  it.each([
+    ["203.0.113.7", "203.0.113.7"],
+    ["::ffff:203.0.113.7", "203.0.113.7"],
+    ["2001:db8:a:b:1:2:3:4", "2001:db8:a:b::/64"],
+    ["2001:DB8:000a:b:ffff::1", "2001:db8:a:b::/64"],
+    ["2001:db8::1", "2001:db8:0:0::/64"],
+    ["2001:db8::a:b:c:d:e", "2001:db8:0:a::/64"],
+    ["::1", "0:0:0:0::/64"],
+  ])("counts %s as rate-limit client %s", (ip, client) => {
+    expect(rateLimitClient(ip)).toBe(client);
   });
 
   it("fails open when the rate limiter itself fails", async () => {

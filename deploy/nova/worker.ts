@@ -12,10 +12,10 @@ export interface RateLimitBinding {
 }
 
 export interface EdgeEnv extends TurnEnv, CodeEnv {
-  /** Per-IP limit for costly or guessable routes: `/turn`, the room relay and party codes. */
+  /** Per-client limit for costly or guessable routes: `/turn`, the room relay and party codes. */
   RATE_LIMITER?: RateLimitBinding;
   /**
-   * Per-IP limit for cheap, high-volume routes: `/signal`, `/tunnel`.
+   * Per-client limit for cheap, high-volume routes: `/signal`, `/tunnel`.
    * A whole school behind one NAT address, every player tunnelling to up to
    * nine neighbours, must fit under it.
    */
@@ -43,6 +43,26 @@ const SOCKET_ROUTES: { pattern: RegExp; key: string; binding: "SIGNAL_HUB" | "TU
 const RATE_LIMIT_PERIOD_SECONDS = 60;
 
 /**
+ * The rate-limit client for an address. One IPv6 subscriber or VPS holds a
+ * whole /64, so IPv6 counts by its /64 prefix; IPv4 (mapped too) per address.
+ */
+export function rateLimitClient(ip: string): string {
+  if (!ip.includes(":")) return ip;
+  if (ip.includes(".")) return ip.slice(ip.lastIndexOf(":") + 1);
+  const split = (part: string) => (part === "" ? [] : part.split(":"));
+  const [head = "", tail] = ip.toLowerCase().split("::");
+  const groups = split(head);
+  if (tail !== undefined) {
+    const rest = split(tail);
+    groups.push(...Array<string>(Math.max(0, 8 - groups.length - rest.length)).fill("0"), ...rest);
+  }
+  return `${groups
+    .slice(0, 4)
+    .map((group) => group.replace(/^0+(?=.)/, ""))
+    .join(":")}::/64`;
+}
+
+/**
  * True when the request may proceed. A missing binding (unit tests) or a
  * binding failure fails open: a rate-limiter outage must never block a join.
  */
@@ -55,7 +75,7 @@ async function withinRateLimit(
   // Keys are per route, so one route's traffic never spends another's budget.
   const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
   try {
-    return (await binding.limit({ key: `${route}:${ip}` })).success;
+    return (await binding.limit({ key: `${route}:${rateLimitClient(ip)}` })).success;
   } catch {
     console.error({ event: "rate_limiter_unavailable", route });
     return true;

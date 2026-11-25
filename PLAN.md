@@ -69,11 +69,6 @@ churn on upgrade), and need no paid always-on server.
       moves every live party to a new code on its next renewal (shown codes
       change; invite links are unaffected). Add the secret to the comment at
       the end of `deploy/nova/wrangler.toml` and to `deploy/README.md`.
-- [ ] Security: bucket the rate limiter by IPv6 `/64`. `withinRateLimit`
-      (`deploy/nova/worker.ts`) keys on the raw `CF-Connecting-IP`, so one
-      machine rotating addresses inside its `/64` gets unlimited buckets on
-      every route, including `/api/code/*` and `/api/relay` (which creates
-      rooms on the external game servers). Keep IPv4 as is.
 - [ ] Security: `handleCodeLookup` validates `/^[a-z]{4}$/`, so lookups with
       `i`, `o`, `l` or a `BLOCKED` word wake a `PartyCode` Durable Object
       that can never hold a code. Reject anything `codeCandidates` can't
