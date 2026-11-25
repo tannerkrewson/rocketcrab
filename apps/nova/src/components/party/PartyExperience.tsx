@@ -18,7 +18,7 @@ import { ExternalGameFrame } from "./ExternalGameFrame";
 import { PartyLobby } from "./PartyLobby";
 import { PartyPlayShell } from "./PartyPlayShell";
 import { PartyReconnectScreen } from "./PartyReconnectScreen";
-import { PartyShellHeader } from "./PartyShellHeader";
+import { PartyAddressHeader, PartyShellHeader } from "./PartyShellHeader";
 import { PeerLinkAlert } from "./PeerLinkAlert";
 
 /**
@@ -174,8 +174,10 @@ export function PartyExperience({
 
   return (
     <div className="flex flex-col gap-4">
-      {shellShown || settingUp ? (
-        <PartyShellHeader code={shellShown ? state.partyCode : null} />
+      {shellShown ? (
+        <PartyAddressHeader code={state.partyCode} />
+      ) : settingUp ? (
+        <PartyShellHeader />
       ) : null}
       {shellShown && state.signalingOutage ? <SignalingOutageAlert /> : null}
       {shellShown ? peerLinkAlert : null}

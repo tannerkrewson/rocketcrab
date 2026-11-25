@@ -3,7 +3,7 @@ import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-ro
 import { ArrowLeft } from "lucide-react";
 import { useEffect } from "react";
 import { PartyCodeForm } from "../components/party/PartyCodeForm";
-import { PartyShellHeader } from "../components/party/PartyShellHeader";
+import { PartyAddressHeader } from "../components/party/PartyShellHeader";
 import { buttonStyles } from "../components/ui/Button";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
 import { LoadingState } from "../components/ui/LoadingState";
@@ -51,7 +51,7 @@ function PartyCodeJoin({ code }: { code: string }) {
 
   return (
     <div className="flex flex-col gap-4">
-      <PartyShellHeader code={code} />
+      <PartyAddressHeader code={code} />
       {lookup.isError ? (
         <ErrorPanel
           className="mx-auto w-full max-w-sm"

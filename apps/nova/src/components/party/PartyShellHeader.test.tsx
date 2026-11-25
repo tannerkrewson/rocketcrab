@@ -1,7 +1,7 @@
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
-import { PartyShellHeader } from "./PartyShellHeader";
+import { PartyAddressHeader, PartyShellHeader } from "./PartyShellHeader";
 
 vi.mock("../../lib/toast", () => ({ toast: { success: vi.fn(), danger: vi.fn() } }));
 
@@ -14,7 +14,7 @@ it("shows the rocketcrab.com brand row, never invite credentials", () => {
 it("shows the party code as an address with its spelling, and copies it", async () => {
   const writeText = vi.fn().mockResolvedValue(undefined);
   Object.defineProperty(navigator, "clipboard", { value: { writeText }, configurable: true });
-  const { container } = render(<PartyShellHeader code="abcd" />);
+  const { container } = render(<PartyAddressHeader code="abcd" />);
   const address = screen.getByRole("button", { name: "Copy the party link" });
   expect(address).toHaveTextContent("rocketcrab.com/abcd");
   expect(screen.getByText("(alpha bravo charlie delta)")).toBeVisible();
@@ -26,4 +26,10 @@ it("shows the party code as an address with its spelling, and copies it", async 
   await userEvent.click(address);
   expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/abcd`);
   Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+});
+
+it("shows the bare brand until the party has a code", () => {
+  render(<PartyAddressHeader code={null} />);
+  expect(screen.getByText(/rocketcrab/)).toHaveTextContent("rocketcrab.com");
+  expect(screen.queryByRole("button", { name: "Copy the party link" })).not.toBeInTheDocument();
 });
