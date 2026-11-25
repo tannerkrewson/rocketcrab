@@ -298,9 +298,8 @@ export function PartyPlayShell({
                           variant="danger"
                           soft
                           onClick={() => setConfirmKickMemberId(member.memberId)}
-                          title={`Remove ${member.displayName} from the party`}
                         >
-                          Kick
+                          Kick<span className="sr-only"> {member.displayName}</span>
                         </Button>
                       ) : null}
                     </li>

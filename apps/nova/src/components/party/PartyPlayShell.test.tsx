@@ -200,6 +200,11 @@ describe("PartyPlayShell in-game chrome", () => {
     await userEvent.click(screen.getByRole("button", { name: /menu/i }));
     await userEvent.click(screen.getByRole("menuitem", { name: /players/i }));
     const players = screen.getByRole("dialog", { name: "Players" });
+    // Session replay masks page text but records attributes as-is.
+    const attributes = [...document.body.querySelectorAll("*")].flatMap((element) =>
+      [...element.attributes].map((attribute) => attribute.value),
+    );
+    expect(attributes.filter((value) => /Player [AB]/.test(value))).toEqual([]);
     const kick = within(players).getByRole("button", { name: /kick/i });
     await userEvent.click(kick);
     expect(onKickMember).not.toHaveBeenCalled();

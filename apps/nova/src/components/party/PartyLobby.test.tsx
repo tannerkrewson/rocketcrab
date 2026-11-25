@@ -142,6 +142,15 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
 }
 
 describe("PartyLobby", () => {
+  it("keeps player names and the invite secret out of attributes", async () => {
+    // Session replay masks page text but records attributes as-is.
+    const { container } = await renderLobby(makeState());
+    const attributes = [...container.querySelectorAll("*")].flatMap((element) =>
+      [...element.attributes].map((attribute) => attribute.value),
+    );
+    expect(attributes.filter((value) => /Player [AB]|invite-secret/.test(value))).toEqual([]);
+  });
+
   it("lists players with connection + transfer states only", async () => {
     await renderLobby(makeState());
     const rowA = screen.getByTestId("party-member-member-a");

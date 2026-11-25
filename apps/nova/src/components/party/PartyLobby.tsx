@@ -43,7 +43,7 @@ function transferIndicator(member: PartyMemberView) {
           aria-valuemin={0}
           aria-valuemax={100}
           aria-valuenow={Math.round((member.transferProgress ?? 0) * 100)}
-          aria-label={`Game transfer progress for ${member.displayName}`}
+          aria-label="Game transfer progress"
           className="h-1.5 w-16 overflow-hidden rounded-full bg-surface-tertiary"
         >
           <div
@@ -405,9 +405,9 @@ export function PartyLobby({
                         size="sm"
                         soft
                         onClick={() => setKickPending(member.memberId)}
-                        aria-label={`Kick ${member.displayName}`}
                       >
                         <X className="h-3 w-3" aria-hidden="true" />
+                        <span className="sr-only">Kick {member.displayName}</span>
                       </Button>
                     ) : null}
                   </div>
