@@ -67,6 +67,7 @@ describe("saveSharedGame", () => {
     sourceSha256,
     sharedBy: "Ada",
     sharedBySelf: false,
+    saveable: true,
   });
 
   it("creates a copy that remembers where it came from", async () => {

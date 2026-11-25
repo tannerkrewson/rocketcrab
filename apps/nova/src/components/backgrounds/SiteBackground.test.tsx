@@ -39,6 +39,8 @@ const IDLE_STATE: PartyEngineState = {
   lastError: null,
   peerLink: null,
   sharedGames: [],
+  offeredGames: [],
+  myOffer: null,
 };
 
 const IN_GAME_STATE: PartyEngineState = {

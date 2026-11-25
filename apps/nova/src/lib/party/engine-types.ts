@@ -159,6 +159,10 @@ export interface PartyEngineState {
   readonly peerLink: PeerLinkStatus;
   /** Nova games shared in this party session, most recent first. */
   readonly sharedGames: readonly SharedPartyGame[];
+  /** Games other members offered for the host to pick. */
+  readonly offeredGames: readonly OfferedPartyGame[];
+  /** This player's answer to the share prompt, or null before answering. */
+  readonly myOffer: { readonly gameIds: readonly string[]; readonly saveable: boolean } | null;
   readonly runtimeLogs: readonly ArenaLogEntry[];
 }
 
@@ -203,6 +207,8 @@ export interface SharedPartyGame {
   readonly sharedBy: string | null;
   /** True when this player shared it (it is already theirs). */
   readonly sharedBySelf: boolean;
+  /** Whether its owner lets players save a copy. */
+  readonly saveable: boolean;
 }
 
 export interface SharedPartyGameSource extends SharedPartyGame {
@@ -214,4 +220,14 @@ export interface PartySourceSpec {
   readonly title: string;
   readonly source: string;
   readonly apiVersion?: number;
+  /** False when the game's owner doesn't let players save copies. */
+  readonly saveable?: boolean;
+}
+
+/** A game another member offered for the host to pick. */
+export interface OfferedPartyGame {
+  readonly memberId: MemberId;
+  readonly sharedBy: string;
+  readonly gameId: string;
+  readonly title: string;
 }

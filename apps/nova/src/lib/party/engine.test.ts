@@ -540,6 +540,43 @@ describe("party engine — game and source transitions", () => {
     await b.engine.leaveParty();
   });
 
+  it("lets a guest offer games for the host to pick, honoring the save choice", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    await runCreate(a, world);
+    const invite = parseInviteFragment(new URL(a.engine.getState().inviteUrl as string).hash)!;
+    const joining = b.engine.joinByInvite({ secret: invite.secret! });
+    await settle(world);
+    await joining;
+
+    // runCreate already shared GAME; the guest offers one of their own.
+    const MINE = { gameId: "game_guest_1", title: "Guest Game", source: "<p>guest</p>" };
+    await b.engine.shareGames([MINE], false);
+    await settle(world);
+    expect(b.engine.getState().myOffer).toEqual({ gameIds: [MINE.gameId], saveable: false });
+    expect(a.engine.getState().offeredGames).toEqual([
+      expect.objectContaining({ memberId: b.memberId, gameId: MINE.gameId, title: MINE.title }),
+    ]);
+
+    const picking = a.engine.selectOfferedGame(b.memberId, MINE.gameId);
+    await settle(world);
+    await picking;
+    await settle(world);
+    expect(a.engine.getState().game).toMatchObject({ kind: "nova", gameId: MINE.gameId });
+    expect(b.engine.getState().game).toMatchObject({ kind: "nova", gameId: MINE.gameId });
+    expect(a.engine.getState().sharedGames[0]).toMatchObject({
+      sharedBySelf: false,
+      saveable: false,
+    });
+    expect(b.engine.getState().sharedGames[0]).toMatchObject({ sharedBySelf: true });
+
+    await b.engine.leaveParty();
+    await settle(world);
+    expect(a.engine.getState().offeredGames).toEqual([]);
+    await a.engine.leaveParty();
+  });
+
   it("remembers each verified game for the session so guests can save it", async () => {
     const world = makeWorld();
     const a = makePlayer(world, "a");

@@ -69,6 +69,8 @@ function makeState(overrides: Partial<PartyEngineState> = {}): PartyEngineState 
     lastError: null,
     peerLink: null,
     sharedGames: [],
+    offeredGames: [],
+    myOffer: null,
     ...overrides,
   };
 }

@@ -1,4 +1,4 @@
-import type { MemberId } from "@rocketcrab/protocol";
+import type { MemberId, OfferedGame } from "@rocketcrab/protocol";
 import type { TransportConnectionState } from "@rocketcrab/core";
 import type {
   GameSourceCoordinator,
@@ -94,6 +94,12 @@ export class PartyResources extends PartyEngineModel {
   readonly sharedGames = new Map<string, SharedPartyGameSource>();
   /** apiVersion from the latest source metadata, per game id. */
   readonly sourceApiVersions = new Map<string, number>();
+  /** Whether each game's owner lets players save copies (absent means yes). */
+  readonly sourceSaveable = new Map<string, boolean>();
+  /** Games other members offered for the host to pick. */
+  readonly offers = new Map<MemberId, readonly OfferedGame[]>();
+  /** This player's answer to the share prompt, once given. */
+  myOffer: { readonly gameIds: readonly string[]; readonly saveable: boolean } | null = null;
   removedReason: string | null = null;
   stateExecutor: PartyStateExecutor | null = null;
   leaving = false;

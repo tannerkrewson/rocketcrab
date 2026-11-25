@@ -802,6 +802,9 @@ export class PartyEngine {
     this.state.rememberView(null);
     this.state.sharedGames.clear();
     this.state.sourceApiVersions.clear();
+    this.state.sourceSaveable.clear();
+    this.state.offers.clear();
+    this.state.myOffer = null;
     this.state.runtimeLogs = [];
     this.state.clearGame();
     this.state.notices = [];
@@ -1413,7 +1416,13 @@ export class PartyEngine {
         this.emit();
         break;
       case "memberLeft":
+        this.state.offers.delete(event.memberId);
         this.noteMemberLeft(event.memberId, event.displayName);
+        this.emit();
+        break;
+      case "games":
+        if (event.games.length === 0) this.state.offers.delete(event.memberId);
+        else this.state.offers.set(event.memberId, event.games);
         this.emit();
         break;
       case "memberRenamed":
@@ -1891,11 +1900,13 @@ export class PartyEngine {
     if (coordinator === null) throw new Error("The party can't share the game right now.");
     this.state.stageSource(input);
     void this.maybeBootFrame();
+    this.state.sourceSaveable.set(input.gameId, input.saveable ?? true);
     const metadata = await coordinator.setSource({
       gameId: input.gameId,
       title: input.title,
       apiVersion: input.apiVersion,
       source: input.source,
+      ...(input.saveable === false ? { saveable: false } : {}),
     });
     if (this.state.coordinator !== coordinator || this.state.leaving) return;
     this.state.adoptSourceHash(metadata.sourceSha256, this.state.identity.memberId);
@@ -1911,6 +1922,52 @@ export class PartyEngine {
     this.emit();
   }
 
+  /** Offer some of this player's games for the host to pick; replaces any earlier offer. */
+  async shareGames(games: readonly PartySourceSpec[], saveable: boolean): Promise<void> {
+    const party = this.state.party;
+    const coordinator = this.state.coordinator;
+    if (party === null || coordinator === null) {
+      throw new Error("The party can't share games right now.");
+    }
+    const offered = await coordinator.offer(games.map((game) => ({ ...game, saveable })));
+    await party.announceGames(
+      offered.map((metadata, index) => ({
+        gameId: metadata.gameId,
+        title: (metadata.title ?? games[index]!.title).slice(0, 64) || "Untitled game",
+        ...(metadata.apiVersion !== undefined ? { apiVersion: metadata.apiVersion } : {}),
+        sourceSha256: metadata.sourceSha256,
+        sourceSizeBytes: metadata.sourceSizeBytes,
+        saveable,
+      })),
+    );
+    this.state.myOffer = { gameIds: games.map((game) => game.gameId), saveable };
+    this.emit();
+  }
+
+  /** Remember that this player chose not to share games. */
+  declineSharing(): void {
+    this.state.myOffer = { gameIds: [], saveable: true };
+    this.emit();
+  }
+
+  /** As host, fetch a game another member offered and select it for the party. */
+  async selectOfferedGame(memberId: MemberId, gameId: string): Promise<void> {
+    const party = this.state.party;
+    const offer = this.state.offers.get(memberId)?.find((game) => game.gameId === gameId);
+    const peer = party?.privateTransport.peers.find((candidate) => candidate.memberId === memberId);
+    if (!party?.amHost || this.state.coordinator === null || offer === undefined || !peer) {
+      throw new Error("That game isn't available anymore.");
+    }
+    const source = await this.state.coordinator.fetchSource(peer.connectionId, offer);
+    await this.selectGame({
+      gameId: offer.gameId,
+      title: offer.title,
+      source,
+      ...(offer.apiVersion !== undefined ? { apiVersion: offer.apiVersion } : {}),
+      saveable: offer.saveable,
+    });
+  }
+
   /** The verified source of a game shared this session, to save a copy. */
   sharedGameSource(gameId: string): SharedPartyGameSource | undefined {
     return this.state.sharedGames.get(gameId);
@@ -1918,7 +1975,13 @@ export class PartyEngine {
 
   /** Keep a verified game (newest version per game id) for this session. */
   private rememberShared(spec: PartySourceSpec, sourceSha256: string): void {
-    const hostId = this.state.party?.hostMemberId ?? null;
+    // Credit the member who offered the game, else the host who picked it.
+    const offeredBy = this.state.myOffer?.gameIds.includes(spec.gameId)
+      ? this.state.identity.memberId
+      : [...this.state.offers].find(([, games]) =>
+          games.some((game) => game.gameId === spec.gameId),
+        )?.[0];
+    const sharerId = offeredBy ?? this.state.party?.hostMemberId ?? null;
     const games = this.state.sharedGames;
     games.delete(spec.gameId);
     const apiVersion = spec.apiVersion ?? this.state.sourceApiVersions.get(spec.gameId);
@@ -1928,8 +1991,9 @@ export class PartyEngine {
       ...(apiVersion !== undefined ? { apiVersion } : {}),
       source: spec.source,
       sourceSha256,
-      sharedBy: hostId === null ? null : this.displayNameOf(hostId),
-      sharedBySelf: hostId === this.state.identity.memberId,
+      sharedBy: sharerId === null ? null : this.displayNameOf(sharerId),
+      sharedBySelf: sharerId === this.state.identity.memberId,
+      saveable: this.state.sourceSaveable.get(spec.gameId) ?? true,
     });
     while (games.size > MAX_SHARED_GAMES) {
       const oldest = games.keys().next().value;
@@ -1949,6 +2013,7 @@ export class PartyEngine {
         if (event.metadata.apiVersion !== undefined) {
           this.state.sourceApiVersions.set(game.gameId, event.metadata.apiVersion);
         }
+        this.state.sourceSaveable.set(game.gameId, event.metadata.saveable ?? true);
         const current = this.state.game;
         const changed = current?.kind !== "nova" || current.gameId !== game.gameId;
         if (changed && this.state.phase === "playing") this.beginGameSwitch();
@@ -2278,6 +2343,15 @@ export class PartyEngine {
       sharedGames: [...this.state.sharedGames.values()]
         .reverse()
         .map(({ source: _source, ...game }) => game),
+      offeredGames: [...this.state.offers].flatMap(([memberId, games]) =>
+        games.map((game) => ({
+          memberId,
+          sharedBy: this.displayNameOf(memberId),
+          gameId: game.gameId,
+          title: game.title,
+        })),
+      ),
+      myOffer: this.state.myOffer,
     };
   }
 
