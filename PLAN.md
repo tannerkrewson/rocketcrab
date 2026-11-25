@@ -36,6 +36,15 @@ engine renewal, the `/$code` route, home code entry and the party address.
 
 ## Before launch
 
+- [ ] Let the runtime accept more than one app origin. `apps/runtime` builds
+      `frame-ancestors` and its postMessage check from the single
+      `VITE_MAIN_ORIGIN`, and `deploy/origins.json` holds one `nova` origin,
+      yet cutover step 2 in `deploy/README.md` says to allow both the beta
+      and `https://rocketcrab.com`. Make `origins.json` take a list so the
+      production runtime domain can serve the beta app before cutover and
+      both during it.
+- [ ] Add `https://rocketcrab.com` to the Turnstile widget's hostnames when
+      provisioning it, alongside the beta hostname.
 - [ ] Provision and validate the Invisible Turnstile widget with the deployment
       owner. Set its site key for the Nova build and its Worker secret as
       described in [the deploy runbook](deploy/README.md). Confirm TURN mints
@@ -95,6 +104,15 @@ the README for local devices.
 - [ ] A friend beta without coaching.
 
 ## Maintenance
+
+- Snakeout sends every player to `/transfer/snakeout/<uuid>/?name=` with
+  the requesting player's name, so everyone's name step is prefilled with
+  that one name. Fix in Snakeout (`src/server/app/game.js`): send each
+  player their own name.
+- Local `npm run dev` can't reach external game servers through
+  `/api/relay` (the Worker's fetch fails with `relay_upstream_unavailable`,
+  while curl from the host succeeds), so external games can't be picked
+  locally. Deployed beta relays work.
 
 - `e2e/smoke.spec.ts` "launches on the home and Nova pages" fails on
   Chromium and Firefox: the logo never gets `rc-logo-launch` after the click.
