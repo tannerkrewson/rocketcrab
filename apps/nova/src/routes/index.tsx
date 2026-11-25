@@ -52,21 +52,29 @@ function HomeComponent() {
         <Link
           to="/build"
           data-testid="nova-card"
-          className="frosted mt-4 block w-full max-w-md rounded-2xl bg-[#060b1f] rc-molten-blue px-6 py-4 text-center transition-transform [--frost-glow:0.35] [--frost-rim:color-mix(in_oklch,var(--nova)_65%,white)] active:scale-[0.98] motion-reduce:transition-none"
+          className="rc-nova-card mt-4 block w-full max-w-md overflow-hidden rounded-2xl px-6 py-4 text-center transition-transform active:scale-[0.98] motion-reduce:transition-none"
         >
-          <span className="relative block text-lg font-black [text-shadow:0_1px_12px_rgb(0_0_0/0.8)]">
+          <span className="block text-lg font-black [text-shadow:0_1px_12px_rgb(0_0_0/0.6)]">
             Introducing <span className="text-nova-text">Nova</span>
           </span>
-          <span className="relative block text-sm text-foreground/85 [text-shadow:0_1px_8px_rgb(0_0_0/0.8)]">
+          <span className="block text-sm text-foreground/85 [text-shadow:0_1px_8px_rgb(0_0_0/0.6)]">
             Build your own games and play them with friends, instantly.
           </span>
         </Link>
         <a
           href="mailto:tannerkrewson@gmail.com?subject=Rocketcrab%20support"
-          className="frosted flex w-full max-w-md items-center justify-center gap-3 rounded-2xl bg-default px-6 py-4 text-center text-sm font-semibold transition-transform active:scale-[0.98] motion-reduce:transition-none"
+          className="glass flex w-full max-w-md items-center gap-4 rounded-2xl px-5 py-3.5 text-left transition-transform active:scale-[0.98] motion-reduce:transition-none"
         >
-          <Mail className="size-5 shrink-0" aria-hidden="true" />
-          <span>Enjoy the new Rocketcrab! Email me if you have issues -Tanner</span>
+          <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/15 text-primary">
+            <Mail className="size-5" aria-hidden="true" />
+          </span>
+          <span className="flex min-w-0 flex-col">
+            <span className="font-bold">Enjoy the new Rocketcrab!</span>
+            <span className="text-sm text-foreground/70">
+              Email me if you have issues{" "}
+              <span className="font-semibold text-foreground/90">-Tanner</span>
+            </span>
+          </span>
         </a>
       </section>
 

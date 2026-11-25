@@ -440,6 +440,24 @@
     radial-gradient(120% 60% at 50% -15%, #182f76 0%, transparent 60%);
 }
 
+/* The homepage Nova card: a small blue nebula with a few stars. */
+.rc-nova-card {
+  background-color: #070c24;
+  background-image:
+    radial-gradient(1.5px 1.5px at 12% 28%, rgb(255 255 255 / 0.7), transparent),
+    radial-gradient(1px 1px at 26% 78%, rgb(255 255 255 / 0.5), transparent),
+    radial-gradient(1px 1px at 71% 18%, rgb(255 255 255 / 0.6), transparent),
+    radial-gradient(1.5px 1.5px at 88% 64%, rgb(255 255 255 / 0.55), transparent),
+    radial-gradient(1px 1px at 54% 88%, rgb(255 255 255 / 0.4), transparent),
+    radial-gradient(60% 90% at 82% 10%, oklch(62% 0.21 268 / 0.9), transparent 70%),
+    radial-gradient(55% 80% at 12% 100%, oklch(55% 0.16 235 / 0.55), transparent 70%),
+    radial-gradient(70% 120% at 45% 50%, oklch(35% 0.14 285 / 0.6), transparent 75%);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.14),
+    inset 0 0 0 1px rgb(255 255 255 / 0.06),
+    0 12px 48px -10px oklch(58% 0.21 266 / 0.75);
+}
+
 /* Fade the molten background in when it mounts. */
 @keyframes rc-fade-in {
   from {
