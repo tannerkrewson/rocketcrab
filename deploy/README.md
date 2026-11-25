@@ -172,7 +172,7 @@ secrets.
 ## Live state
 
 - 2026-11-25: replaced the `rocketcrab-nova` Worker with `rocketcrab`
-  (`https://rocketcrab.tannerkrewson.workers.dev`), version `beb73eba`, so
+  (`https://rocketcrab.tannerkrewson.workers.dev`), version `1cd65736`, so
   one `v1` migration creates `SignalHub`, `TunnelPair` and `PartyCode`. The
   runtime, version `9e4578c0`, frames only the new origin. The old Worker
   and its hostname are deleted.
@@ -185,7 +185,6 @@ secrets.
   `/transfer/drawphone` creating a Drawphone room through `/api/relay`
   (Drawphone, Drawphone for Kids, Spyfall, Snakeout and Werewolf relays
   answer).
-- Owner: delete the old `rocketcrab-nova-beta-turn` key in Realtime → TURN.
 
 ## Before launch
 
