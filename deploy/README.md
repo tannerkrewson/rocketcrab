@@ -23,11 +23,10 @@ run the Worker first.
 | `POST /api/relay`       | Creates external-game rooms through a fixed list of upstream URLs.     |
 | `GET /api/signal/:room` | Trystero signaling, one hibernating Durable Object per room.           |
 | `GET /api/tunnel/:pair` | Encrypted WebSocket fallback, one hibernating Durable Object per pair. |
-| `POST /api/log`         | Writes connection and readiness events to Workers Logs.                |
 
 The API checks that browser requests are same-origin. HTTP limits are
 approximate, per IP, route and Cloudflare location: 60/min for TURN and the
-room relay, 2,000/min for signaling, tunnel upgrades and reports. The socket
+room relay, 2,000/min for signaling and tunnel upgrades. The socket
 handlers also budget signaling messages and tunnel bytes.
 
 The runtime must be on a different **site** (registrable domain) from the
@@ -54,8 +53,8 @@ npm run deploy:nova      # builds and deploys the app and party API together
 
 After deploying, verify the app and runtime headers, open a deep link, and run
 a game in the editor. Confirm TURN minting by joining from the deployed party
-page and checking for `turn_cred_mint` in Workers Logs. Both requests below
-should return 403 after Turnstile has been configured.
+page and checking for `turn_cred_mint` with outcome `configured` in GA Realtime.
+Both requests below should return 403 after Turnstile has been configured.
 
 ```sh
 APP=https://rocketcrab-nova.tannerkrewson.workers.dev
@@ -92,12 +91,6 @@ Invisible mode. [Turnstile widget setup](https://developers.cloudflare.com/turns
 
 ## Monitoring
 
-Open Workers & Pages → `rocketcrab-nova` → Observability. Filter the `event` field
-for `nova_connection`: transport outcomes (`direct`, `turn`, `tunnel`,
-`failed`, `unknown`) and product outcomes (`lobby-ready`, `join-failed`,
-`game-ready`) are separate events. Payloads carry no names, room IDs or
-player IDs. `turn_cred_mint` logs TURN issuance.
-
 The Nova deploy uses the existing Rocketcrab GA4 web stream
 (`G-V569CH5H2D`). Set `VITE_GA_MEASUREMENT_ID` to an empty value to disable
 it for a deployment, or use a separate stream for test collection. The tag
@@ -116,10 +109,16 @@ strings, invite fragments, or private game IDs. GA reporting fields include
   play screen since third-party gameplay occurs inside an iframe.
 - Use `nova_connection` for connection paths and join readiness,
   `nova_tunnel` for fallback attempts and terminal failures, and
-  `party_issue` for player-visible reconnects, outages, and game errors.
-  Break down by Connection or issue outcome and Connection reason.
+  `party_issue` for player-visible reconnects and game errors. A signaling
+  outage is a `nova_connection` failure with the reason `relay-failed`.
+  Break down by outcome, reason, signaling status, browser family, network,
+  and Nova revision.
   Connection counts are per client and peer attempt, so a pair can report on
   both devices.
+- Use `turn_cred_mint` to see whether fresh TURN credentials were usable
+  (`configured`) or unavailable. Cached reuses do not generate an event.
+  This client count represents observed results and can miss blocked GA
+  requests or clients that disconnect before receiving the credentials.
 
 Classic Rocketcrab's GA4 reports use `event_category = Party-Game` with the
 game ID as the event name, and `Party-numberOfPlayers` with the count as
@@ -157,9 +156,9 @@ secrets.
       Objects spending controls, and confirm the notification destination.
       A spend block can interrupt parties.
 - [ ] Live smoke test: run a game in the editor on the deployed app and
-      runtime; play with two real devices and confirm Workers Logs shows
-      lobby and game readiness next to transport outcomes. Confirm GA Realtime
-      receives a page view, game start and end, and a connection outcome.
+      runtime; play with two real devices and confirm GA Realtime receives page
+      views, game start and end, TURN configuration, connection outcomes,
+      and lobby and game readiness.
 - [ ] Switch to Workers Paid ($5/month).
 
 ## Production cutover

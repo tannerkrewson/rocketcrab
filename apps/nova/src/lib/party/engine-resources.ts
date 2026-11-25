@@ -14,7 +14,7 @@ import { browserLifecycleSource, type PartyLifecycleSource } from "./lifecycle";
 import { SignalingOutage } from "./signaling-outage";
 import type { PartyStateExecutor } from "./party-executors";
 import { PeerLinkAlert } from "./peer-link-alert";
-import { reportConnection } from "../connection-log";
+import { reportConnection } from "../connection-analytics";
 import { fetchTurnCredentials, type TurnCredentialsResult } from "./turn-creds";
 import type {
   PartyRuntimeSeams,
@@ -128,7 +128,7 @@ export class PartyResources extends PartyEngineModel {
     );
     this.signalingOutage = new SignalingOutage(this.schedule, (visible) => {
       this.signalingOutageVisible = visible;
-      // Log once per visible outage; peer-attempt logs cannot capture signaling failures.
+      // Report once per visible outage; peer attempts cannot capture signaling failures.
       if (visible)
         reportConnection({
           outcome: "failed",

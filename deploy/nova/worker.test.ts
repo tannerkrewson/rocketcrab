@@ -43,17 +43,17 @@ describe("gate", () => {
     }
   });
 
-  it("accepts same-origin no-referrer beacons without enabling CORS", async () => {
-    const sameOrigin = await call("/api/log", {
+  it("accepts same-origin no-referrer requests without enabling CORS", async () => {
+    const sameOrigin = await call("/api/relay", {
       origin: "null",
       headers: { "Sec-Fetch-Site": "same-origin" },
-      body: "{}",
+      body: "invalid JSON",
     });
     expect(sameOrigin.status).toBe(400);
-    const crossOrigin = await call("/api/log", {
+    const crossOrigin = await call("/api/relay", {
       origin: "null",
       headers: { "Sec-Fetch-Site": "cross-site" },
-      body: "{}",
+      body: "invalid JSON",
     });
     expect(crossOrigin.status).toBe(403);
   });
@@ -98,7 +98,7 @@ describe("gate", () => {
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("charges signal, tunnel and log to the bulk budget, never the strict one", async () => {
+  it("charges signal and tunnel to the bulk budget, never the strict one", async () => {
     const strict = vi.fn(async () => ({ success: false }));
     const bulk = vi.fn(async (_options: { key: string }) => ({ success: true }));
     const forward = {
@@ -115,12 +115,11 @@ describe("gate", () => {
     const upgrade = { method: "GET", headers: { Upgrade: "websocket" } };
     expect((await call(`/api/signal/${"a".repeat(32)}`, upgrade, env)).status).toBe(200);
     expect((await call(`/api/tunnel/${"b".repeat(64)}`, upgrade, env)).status).toBe(200);
-    expect((await call("/api/log", { body: "{}" }, env)).status).not.toBe(429);
+    expect((await call("/api/log", { body: "{}" }, env)).status).toBe(404);
     expect(strict).not.toHaveBeenCalled();
     expect(bulk.mock.calls.map(([arg]) => arg.key)).toEqual([
       "signal:203.0.113.7",
       "tunnel:203.0.113.7",
-      "log:203.0.113.7",
     ]);
   });
 

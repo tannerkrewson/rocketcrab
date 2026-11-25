@@ -15,6 +15,10 @@ const env = {
   VITE_MAIN_ORIGIN: origins.nova,
   VITE_GA_MEASUREMENT_ID: process.env.VITE_GA_MEASUREMENT_ID ?? "G-V569CH5H2D",
 };
+if (target === "nova") {
+  const revision = spawnSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf8" });
+  if (revision.status === 0) env.VITE_NOVA_VERSION = revision.stdout.trim();
+}
 function run(command, args) {
   const result = spawnSync(command, args, { env, stdio: "inherit" });
   if (result.error) throw result.error;

@@ -1,7 +1,6 @@
 // Nova party API. Cloudflare serves static assets outside /api.
 import { jsonError } from "./http";
 import { handleRelay } from "./relay";
-import { handleLog } from "./log";
 import { handleTurn, type TurnEnv } from "./turn";
 export { SignalHub } from "./signal";
 export { TunnelPair } from "./tunnel";
@@ -19,7 +18,7 @@ export interface EdgeEnv extends TurnEnv {
   /** Per-IP limit for costly routes: `/turn` and the room relay. */
   RATE_LIMITER?: RateLimitBinding;
   /**
-   * Per-IP limit for cheap, high-volume routes: `/signal`, `/tunnel`, `/log`.
+   * Per-IP limit for cheap, high-volume routes: `/signal`, `/tunnel`.
    * A whole school behind one NAT address, every player tunnelling to up to
    * nine neighbours, must fit under it.
    */
@@ -33,7 +32,6 @@ type Limiter = "RATE_LIMITER" | "BULK_RATE_LIMITER";
 
 const ROUTES: Record<string, { handler: Handler; key: string; limiter: Limiter }> = {
   "/api/turn": { handler: handleTurn, key: "turn", limiter: "RATE_LIMITER" },
-  "/api/log": { handler: handleLog, key: "log", limiter: "BULK_RATE_LIMITER" },
   "/api/relay": { handler: handleRelay, key: "relay", limiter: "RATE_LIMITER" },
 };
 
@@ -58,8 +56,7 @@ async function withinRateLimit(
   const ip = request.headers.get("CF-Connecting-IP") ?? "unknown";
   try {
     return (await binding.limit({ key: `${route}:${ip}` })).success;
-  } catch (error) {
-    console.log(`edge: rate limiter failed open: ${String(error)}`);
+  } catch {
     return true;
   }
 }
@@ -81,7 +78,7 @@ async function route(request: Request, env: EdgeEnv): Promise<Response> {
     return jsonError(404, "not_found", `no route for ${path}`);
 
   const origin = request.headers.get("Origin");
-  // A no-referrer beacon can send a null Origin. Fetch Metadata still
+  // A no-referrer request can send a null Origin. Fetch Metadata still
   // identifies it as same-origin. WebSocket upgrades carry an exact Origin.
   const sameOrigin =
     origin === url.origin ||

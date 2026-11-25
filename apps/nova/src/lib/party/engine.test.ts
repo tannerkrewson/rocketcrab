@@ -21,6 +21,9 @@ import { createMemoryLifecycleSource } from "./lifecycle";
 import { clearPartyRecovery, readPartyRecovery } from "./party-recovery";
 import type { TurnCredentialsResult } from "./turn-creds";
 import { EXTERNAL_GAMES, type ExternalRoom } from "../catalog";
+import { track } from "../analytics";
+
+vi.mock("../analytics", () => ({ analyticsEnabled: false, track: vi.fn() }));
 
 /**
  * The default-factory path is mocked so the TURN acceptance tests can
@@ -2359,6 +2362,7 @@ describe("party engine — TURN credential minting", () => {
         credential: "c1",
       },
     ];
+    vi.mocked(track).mockClear();
     const turnCreds = vi.fn(async (): Promise<TurnCredentialsResult> => ({
       ok: true,
       turnConfig,
@@ -2370,6 +2374,9 @@ describe("party engine — TURN credential minting", () => {
     await player.engine.leaveParty();
     await runCreate(player, world);
     expect(turnCreds).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(track).mock.calls.filter(([event]) => event === "turn_cred_mint")).toEqual([
+      ["turn_cred_mint", { outcome: "configured" }],
+    ]);
     expect(transportFactoryMocks.createTrysteroPartyTransportFactory).toHaveBeenLastCalledWith({
       onJoinError: expect.any(Function),
       onTunnel: expect.any(Function),
@@ -2457,8 +2464,7 @@ describe("party engine — signaling outage setup", () => {
   }
 
   it("warns after five seconds, retries one join at a time, and recovers", async () => {
-    const sendBeacon = vi.fn(() => true);
-    vi.stubGlobal("navigator", { ...globalThis.navigator, sendBeacon, userAgent: "" });
+    vi.mocked(track).mockClear();
     const world = makeWorld();
     const relay = failingRelay(world, "relay_unreachable");
     const player = makePlayer(world, "host");
@@ -2468,17 +2474,18 @@ describe("party engine — signaling outage setup", () => {
     world.clock.advance(4_999);
     await flush();
     expect(player.engine.getState().signalingOutage).toBe(false);
-    expect(sendBeacon).not.toHaveBeenCalled();
+    expect(track).not.toHaveBeenCalledWith("nova_connection", expect.anything());
     world.clock.advance(1);
     await flush();
     expect(player.engine.getState().signalingOutage).toBe(true);
-    expect(sendBeacon).toHaveBeenCalledOnce();
-    const [, body] = sendBeacon.mock.calls[0] as unknown as [string, string];
-    expect(JSON.parse(body)).toMatchObject({
-      outcome: "failed",
-      error_code: "relay-failed",
-      signaling_ok: false,
-    });
+    expect(track).toHaveBeenCalledExactlyOnceWith(
+      "nova_connection",
+      expect.objectContaining({
+        outcome: "failed",
+        error_code: "relay-failed",
+        signaling_status: "unavailable",
+      }),
+    );
     relay.connect();
     expect(player.engine.getState().signalingOutage).toBe(false);
     world.clock.advance(1_000);

@@ -7,7 +7,7 @@ import {
   type TunnelStartInfo,
 } from "@rocketcrab/trystero-transport";
 import type { TurnServerConfigLike } from "./turn-creds";
-import { reportConnection } from "../connection-log";
+import { reportConnection } from "../connection-analytics";
 
 /** Options closed over by the factory at construction time (sync methods). */
 export interface TrysteroPartyTransportFactoryOptions {
@@ -37,8 +37,7 @@ export function forceTunnelForTests(): boolean {
 }
 
 /**
- * Send one connection-log beacon per peer attempt. error_code
- * stays empty because peer attempts have no typed room error of their own.
+ * Report one outcome per peer attempt. Peer attempts have no typed room error.
  */
 function reportAttemptOutcome(info: ConnectionOutcomeInfo): void {
   reportConnection({

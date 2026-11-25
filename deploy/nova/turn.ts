@@ -107,13 +107,5 @@ export async function handleTurn(request: Request, env: TurnEnv): Promise<Respon
     return jsonError(502, "upstream_invalid", "TURN credentials service returned bad JSON");
   }
 
-  // Credentials are never logged; this line feeds Workers Logs usage review.
-  console.log(
-    JSON.stringify({
-      event: "turn_cred_mint",
-      ip: request.headers.get("CF-Connecting-IP"),
-      origin: request.headers.get("Origin"),
-    }),
-  );
   return json(200, { iceServers: dropPort53(body.iceServers as IceServer[]) });
 }

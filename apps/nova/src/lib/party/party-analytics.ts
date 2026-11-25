@@ -7,7 +7,6 @@ export function observePartyAnalytics(engine: {
 }): void {
   if (!analyticsEnabled) return;
   let previousPhase: PartyEngineState["phase"] = "idle";
-  let signalingOutage = false;
   let round: { game: string; kind: "nova" | "external"; startedAt: number | null } | null = null;
   const finish = () => {
     const ended = round;
@@ -35,10 +34,6 @@ export function observePartyAnalytics(engine: {
         });
       }
     }
-    if (state.signalingOutage && !signalingOutage) {
-      track("party_issue", { outcome: "signaling-outage" });
-    }
-    signalingOutage = state.signalingOutage === true;
 
     if (
       round !== null &&

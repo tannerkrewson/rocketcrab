@@ -63,5 +63,9 @@ export function trackPage(routeId: string, gameId?: string): void {
 }
 
 export function track(event: string, params: Parameters = {}): void {
-  tag?.("event", event, { ...params, app_variant: "nova" });
+  try {
+    tag?.("event", event, { ...params, app_variant: "nova" });
+  } catch {
+    // A tag failure cannot interrupt gameplay.
+  }
 }

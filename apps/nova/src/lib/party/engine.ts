@@ -24,7 +24,7 @@ import {
 } from "@rocketcrab/party";
 import { track } from "../analytics";
 import { observePartyAnalytics } from "./party-analytics";
-import { reportConnection } from "../connection-log";
+import { reportConnection } from "../connection-analytics";
 import {
   connectionErrorCategory,
   connectionErrorMessage,
@@ -498,6 +498,7 @@ export class PartyEngine {
     }
     const requestedAt = this.state.now();
     const result = await this.state.defaults.turnCreds();
+    track("turn_cred_mint", { outcome: result.ok ? "configured" : "unavailable" });
     if (result.ok) {
       this.turnCredsCache = {
         turnConfig: result.turnConfig,

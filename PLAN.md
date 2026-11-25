@@ -78,7 +78,7 @@ the README for local devices.
 - Peer-link messages are generic ("Connecting to a player…"): Trystero
   exposes no named pre-connection event.
 - Networks that block WebSockets to Cloudflare can't connect at all, and
-  can report it only if the HTTP `/log` endpoint is reachable.
+  can report the failure only if the browser can reach Google Analytics.
 - Trusted-friends party model: canonical game state (`state.snapshot`, before
   `selectView`) is replicated to every peer's shell for serverless authority
   migration, so a player with DevTools can read hidden state (cards/roles).

@@ -37,17 +37,16 @@ name = "RATE_LIMITER"
 namespace_id = "1001"
 simple = { limit = 60, period = 60 }
 
-# Bulk: /api/signal, /api/tunnel, /api/log. Sized for a big party behind one school or
+# Bulk: /api/signal and /api/tunnel. Sized for a big party behind one school or
 # carrier-NAT address where WebRTC is blocked: every player opens a tunnel to
-# each of up to nine direct neighbours and logs each attempt.
+# each of up to nine direct neighbours.
 [[ratelimits]]
 name = "BULK_RATE_LIMITER"
 namespace_id = "1002"
 simple = { limit = 2000, period = 60 }
 
-# Keep console.log output (including turn_cred_mint lines) in Workers Logs.
 [observability]
-enabled = true
+enabled = false
 
 # Secrets (never in this file): TURN_KEY_ID, TURN_KEY_API_TOKEN, TURNSTILE_SECRET_KEY.
 # Set with `npx wrangler secret put <NAME> --config deploy/nova/wrangler.toml`.

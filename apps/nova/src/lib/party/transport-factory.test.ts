@@ -1,6 +1,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { createTrysteroPartyTransportFactory, forceTunnelForTests } from "./transport-factory";
 
+import { reportConnection } from "../connection-analytics";
+
+vi.mock("../connection-analytics", () => ({ reportConnection: vi.fn() }));
+
 /** Assert factory options through a transport mock without opening real Trystero rooms. */
 
 const mocks = vi.hoisted(() => ({
@@ -172,75 +176,25 @@ describe("tunnel fallback wiring", () => {
   });
 });
 
-describe("connection outcome beacons", () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  function outcomeHook(index = 0): (info: { outcome: string; msToConnect: number }) => void {
-    const options = mocks.constructed[index] as {
-      onOutcome: (info: { outcome: string; msToConnect: number }) => void;
-    };
-    return options.onOutcome;
+it("reports the outcome from each transport without including room or peer metadata", () => {
+  const factory = createTrysteroPartyTransportFactory();
+  for (const memberId of ["m1", "m2"]) {
+    factory.createPrivateTransport({ memberId, password: "pw", secret: SECRET });
   }
-
-  it("gives each transport an outcome hook that posts one allowlisted beacon", () => {
-    const sendBeacon = vi.fn(() => true);
-    vi.stubGlobal("navigator", {
-      sendBeacon,
-      userAgent: "iPhone Safari/605 private-agent",
-      connection: { effectiveType: "4g" },
+  expect(mocks.constructed).toHaveLength(2);
+  for (const options of mocks.constructed) {
+    (options as { onOutcome: (info: { outcome: string; msToConnect: number }) => void }).onOutcome({
+      outcome: "tunnel",
+      msToConnect: 812,
     });
-    const factory = createTrysteroPartyTransportFactory();
-    factory.createPrivateTransport({
-      memberId: "member-secret-7",
-      displayName: "Private Name",
-      password: "room-pass",
-      secret: SECRET,
-    });
-    factory.createPrivateTransport({ memberId: "m2", password: "pw", secret: SECRET });
-    expect(mocks.constructed).toHaveLength(2);
-    expect(
-      mocks.constructed.every(
-        (o) => typeof (o as { onOutcome?: unknown }).onOutcome === "function",
-      ),
-    ).toBe(true);
-
-    outcomeHook()({ outcome: "tunnel", msToConnect: 812 });
-
-    expect(sendBeacon).toHaveBeenCalledOnce();
-    const [url, body] = sendBeacon.mock.calls[0] as unknown as [string, string];
-    expect(url).toBe("/api/log");
-    const event = JSON.parse(body) as Record<string, unknown>;
-    expect(event).toEqual({
+  }
+  expect(reportConnection).toHaveBeenCalledTimes(2);
+  for (const count of [1, 2]) {
+    expect(reportConnection).toHaveBeenNthCalledWith(count, {
       outcome: "tunnel",
       error_code: "",
       ms_to_connect: 812,
       signaling_ok: true,
-      browser: "safari-ios",
-      network: "4g",
-      app_version: expect.stringMatching(/^\d+\.\d+\.\d+$/),
     });
-    // Nothing identifying: names, room or peer ids, the password, the secret, or raw UA.
-    for (const secret of [
-      "member-secret-7",
-      "Private Name",
-      "room-pass",
-      SECRET,
-      "private-agent",
-    ]) {
-      expect(body).not.toContain(secret);
-    }
-  });
-
-  it("never throws into the transport when sending a beacon fails", () => {
-    const sendBeacon = vi.fn(() => {
-      throw new Error("blocked");
-    });
-    vi.stubGlobal("navigator", { sendBeacon, userAgent: "" });
-    const factory = createTrysteroPartyTransportFactory();
-    factory.createPrivateTransport({ memberId: "m1", password: "pw", secret: SECRET });
-    expect(() => outcomeHook()({ outcome: "failed", msToConnect: 0 })).not.toThrow();
-    expect(sendBeacon).toHaveBeenCalledOnce();
-  });
+  }
 });
