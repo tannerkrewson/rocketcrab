@@ -2,7 +2,7 @@
 @import "@heroui/styles";
 
 /*
- * Rocketcrab theme on top of HeroUI v3. The app is dark-only: index.html
+ * rocketcrab theme on top of HeroUI v3. The app is dark-only: index.html
  * puts `.dark` on <html>, so HeroUI's dark theme applies and the overrides
  * below sit on the same selector to win the cascade.
  *

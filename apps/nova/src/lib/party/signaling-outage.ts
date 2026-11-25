@@ -1,7 +1,7 @@
 import type { Scheduler } from "@rocketcrab/party";
 
 export const SIGNALING_OUTAGE_MESSAGE =
-  "Can't reach Rocketcrab's servers. Check your internet connection.";
+  "Can't reach rocketcrab's servers. Check your internet connection.";
 
 /** Tracks continuous loss of our own signaling connection, not peer health. */
 export class SignalingOutage {

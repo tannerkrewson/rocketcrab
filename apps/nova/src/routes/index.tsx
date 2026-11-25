@@ -74,12 +74,12 @@ function HomeComponent() {
           </span>
         </Link>
         <a
-          href="mailto:tannerkrewson@gmail.com?subject=Rocketcrab%20support"
+          href="mailto:tannerkrewson@gmail.com?subject=rocketcrab%20support"
           className="glass flex w-full items-center gap-4 rounded-2xl px-5 py-3.5 text-left text-sm font-semibold transition-transform active:scale-[0.98] motion-reduce:transition-none"
         >
           <Mail className="size-5 shrink-0" aria-hidden="true" />
           <span className="flex-1">
-            Enjoy the new Rocketcrab!
+            Enjoy the new rocketcrab!
             <br />
             Email me if you have issues.
           </span>

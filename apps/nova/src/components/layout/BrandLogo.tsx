@@ -26,7 +26,7 @@ export function BrandLogo({ nova = false }: { nova?: boolean }) {
   return (
     <button
       type="button"
-      aria-label="Launch Rocketcrab"
+      aria-label="Launch rocketcrab"
       className="block size-14 shrink-0 cursor-pointer touch-manipulation"
       onClick={() => setLaunching(true)}
     >

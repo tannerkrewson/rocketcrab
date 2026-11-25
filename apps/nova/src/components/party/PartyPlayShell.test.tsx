@@ -128,7 +128,7 @@ describe("PartyPlayShell in-game chrome", () => {
     expect(within(dialog).getByRole("button", { name: /qr code/i })).toBeInTheDocument();
   });
 
-  it("shows the Rocketcrab wordmark in the top bar", async () => {
+  it("shows the rocketcrab wordmark in the top bar", async () => {
     await renderShell(makeState());
     expect(screen.getByRole("button", { name: "Copy the invite link" })).toHaveTextContent(
       "rocketcrab.com",

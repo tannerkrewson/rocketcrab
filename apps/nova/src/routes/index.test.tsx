@@ -143,7 +143,7 @@ describe("/", () => {
     renderHome();
     const title = await screen.findByRole("heading", { name: "rocketcrab.com" });
     expect(title).not.toHaveAttribute("tabindex");
-    expect(screen.getByRole("button", { name: "Launch Rocketcrab" })).toContainElement(
+    expect(screen.getByRole("button", { name: "Launch rocketcrab" })).toContainElement(
       screen.getByTestId("brand-logo"),
     );
   });

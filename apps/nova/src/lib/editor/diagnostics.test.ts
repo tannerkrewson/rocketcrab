@@ -130,7 +130,7 @@ describe("buildDiagnosticReport", () => {
       ],
       consoleEntries: [{ id: "c1", level: "log", message: "hello", timestamp: 1_700_000_000_003 }],
     });
-    expect(report).toContain("Rocketcrab Nova — game diagnostic report");
+    expect(report).toContain("rocketcrab Nova — game diagnostic report");
     expect(report).toContain("Game: Rocket Rumble");
     expect(report).toContain("Saved: yes");
     expect(report).toContain(`Source SHA-256: ${"a".repeat(64)}`);

@@ -1437,7 +1437,7 @@ export class PartyEngine {
           // A newer build's game this one doesn't list; it can't be embedded here.
           this.addNotice(
             "error",
-            "The host picked a game this version of Rocketcrab doesn't have. Reload to update.",
+            "The host picked a game this version of rocketcrab doesn't have. Reload to update.",
           );
           this.emit();
           break;

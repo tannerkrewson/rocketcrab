@@ -28,7 +28,7 @@ test("starting a party leaves the crab on the launch pad", async ({ page }) => {
 test("launches on the home and Nova pages, then returns for another launch", async ({ page }) => {
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/");
-  const launch = page.getByRole("button", { name: "Launch Rocketcrab" });
+  const launch = page.getByRole("button", { name: "Launch rocketcrab" });
   const crab = page.getByTestId("brand-logo").locator("..");
   await launch.click();
   await expect(crab).toHaveClass(/rc-logo-launch/);
@@ -55,5 +55,5 @@ test("runtime origin serves its isolated page", async ({ request }) => {
   const response = await request.get("http://localhost:2723/");
   expect(response.ok()).toBeTruthy();
   const html = await response.text();
-  expect(html).toContain("Rocketcrab Nova Runtime");
+  expect(html).toContain("rocketcrab Nova Runtime");
 });

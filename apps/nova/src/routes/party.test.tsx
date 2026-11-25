@@ -362,7 +362,7 @@ describe("/party", () => {
       renderParty("/party");
       expect(
         await screen.findByText(
-          "Can't reach Rocketcrab's servers. Check your internet connection. We'll keep trying to connect.",
+          "Can't reach rocketcrab's servers. Check your internet connection. We'll keep trying to connect.",
         ),
       ).toBeInTheDocument();
       expect(screen.queryByText("Creating party…")).not.toBeInTheDocument();

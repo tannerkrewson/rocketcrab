@@ -111,7 +111,7 @@ Invisible mode. [Turnstile widget setup](https://developers.cloudflare.com/turns
 
 ## Monitoring
 
-The Nova deploy uses the existing Rocketcrab GA4 web stream
+The Nova deploy uses the existing rocketcrab GA4 web stream
 (`G-V569CH5H2D`). Set `VITE_GA_MEASUREMENT_ID` to an empty value to disable
 it for a deployment, or use a separate stream for test collection. The tag
 runs on the configured Nova origin. It sends route names without query
@@ -125,7 +125,7 @@ strings, invite fragments, or private game IDs.
 - Use `game_end` for observed play duration (Play duration divided by
   `game_end` count). These events come from the host who started the game.
   Play duration includes time spent reconnecting and can be missing if the
-  host's browser is killed. External game time measures the Rocketcrab
+  host's browser is killed. External game time measures the rocketcrab
   play screen since third-party gameplay occurs inside an iframe.
 - Use `connection_result` for connection paths and join readiness,
   `tunnel_result` for fallback attempts and terminal failures, and
@@ -171,7 +171,7 @@ send `start_party_clicked`, `join_help_opened`, `browse_games_clicked`, and
 The project needs cookies enabled by default in Settings → Setup. Verify a
 test visit from an eligible location under Recordings after deployment.
 
-Classic Rocketcrab's GA4 reports use `event_category = Party-Game` with the
+Classic rocketcrab's GA4 reports use `event_category = Party-Game` with the
 game ID as the event name, and `Party-numberOfPlayers` with the count as
 the event name. Compare classic game IDs to the lowercase Nova catalog
 slugs where the same game is offered. Keep browser-history page-view
@@ -198,7 +198,7 @@ secrets.
   `TURN_KEY_ID`, `TURN_KEY_API_TOKEN` (Realtime TURN key `rocketcrab-turn`),
   `TURNSTILE_SECRET_KEY` and `CODE_HMAC_SECRET`. The runtime frames only
   `https://rocketcrab.com`.
-- Rocketcrab Classic is the `classic` branch and the `rocketcrab-classic`
+- rocketcrab Classic is the `classic` branch and the `rocketcrab-classic`
   tag. It ran on the Dokku host `134.209.222.77` behind proxied A records for
   `rocketcrab.com` and `kids.rocketcrab.com`; the pre-cutover zone export is
   in `~/code/rocketcrab-cutover-backup/` on Gerald. To roll back while that

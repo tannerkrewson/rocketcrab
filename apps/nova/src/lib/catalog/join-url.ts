@@ -13,8 +13,8 @@ export interface RocketcrabUrlOptions {
 }
 
 /**
- * The Rocketcrab join convention: `?rocketcrab=true&name=…&ishost=…`, which
- * games built for Rocketcrab read to skip their own lobby.
+ * The rocketcrab join convention: `?rocketcrab=true&name=…&ishost=…`, which
+ * games built for rocketcrab read to skip their own lobby.
  */
 export function rocketcrabUrl(
   base: string,
@@ -43,7 +43,7 @@ export function roomField(room: ExternalRoom, key: string): string {
   return value;
 }
 
-/** The common case: the room is a URL, joined with the Rocketcrab parameters. */
+/** The common case: the room is a URL, joined with the rocketcrab parameters. */
 export function joinRoomUrl(room: ExternalRoom, player: ExternalPlayer): string {
   return rocketcrabUrl(roomField(room, "url"), player);
 }

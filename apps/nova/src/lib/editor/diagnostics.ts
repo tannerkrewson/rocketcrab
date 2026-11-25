@@ -56,7 +56,7 @@ export const RUNTIME_ERROR_CATEGORIES: Record<
   remote_load: {
     label: "Remote resource failed",
     severity: "warning",
-    hint: "A CDN/asset did not load. Rocketcrab does not proxy the web, so check the URL and your connection.",
+    hint: "A CDN/asset did not load. rocketcrab does not proxy the web, so check the URL and your connection.",
   },
   game: {
     label: "Game error",
@@ -180,7 +180,7 @@ export interface DiagnosticReportInput {
 /** Plain-text diagnostics for pasting back into an AI chat. */
 export function buildDiagnosticReport(input: DiagnosticReportInput): string {
   const lines: string[] = [
-    "Rocketcrab Nova — game diagnostic report",
+    "rocketcrab Nova — game diagnostic report",
     `Generated: ${new Date().toISOString()}`,
     `Game: ${input.title}`,
     `Saved: ${input.saved ? "yes" : "no (unsaved draft)"}`,

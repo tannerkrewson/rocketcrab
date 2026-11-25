@@ -21,14 +21,14 @@ function AboutPage() {
       <article className="glass mx-auto flex w-full max-w-xl flex-col gap-4 rounded-2xl p-6 text-lg leading-relaxed text-foreground/85 sm:p-8">
         <h1 className="text-3xl font-black text-foreground">About</h1>
         <p>
-          I created Rocketcrab in 2020 as a unique way for friends to play many different games with
+          I created rocketcrab in 2020 as a unique way for friends to play many different games with
           each other easily. I mostly abandoned it since then, but I kept paying the monthly bill
           for the server because people kept playing!
         </p>
         <p>
-          In 2026, powerful AI coding tools allowed me to rebuild Rocketcrab into{" "}
-          <span className="font-bold text-nova-text">Rocketcrab Nova</span>, which allows you to
-          create your own games and play them with your friends instantly! In addition, Rocketcrab
+          In 2026, powerful AI coding tools allowed me to rebuild rocketcrab into{" "}
+          <span className="font-bold text-nova-text">rocketcrab Nova</span>, which allows you to
+          create your own games and play them with your friends instantly! In addition, rocketcrab
           was rewritten using{" "}
           <a href="https://trystero.dev/" className={LINK}>
             Trystero

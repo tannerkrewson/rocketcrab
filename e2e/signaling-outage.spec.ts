@@ -13,7 +13,7 @@ test("a blocked signaling connection warns and recovers automatically", async ({
   await page.getByLabel("Enter your name here").fill("Host");
   await page.getByRole("button", { name: "Start party", exact: true }).click();
   const warning = page.getByText(
-    "Can't reach Rocketcrab's servers. Check your internet connection. We'll keep trying to connect.",
+    "Can't reach rocketcrab's servers. Check your internet connection. We'll keep trying to connect.",
   );
   await expect(warning).toBeVisible();
   await expect(page.getByText("Creating your private party…")).toBeHidden();

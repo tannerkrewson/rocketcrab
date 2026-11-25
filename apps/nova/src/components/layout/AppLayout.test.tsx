@@ -52,7 +52,7 @@ describe("AppLayout", () => {
     await screen.findByRole("heading", { name: "About" });
 
     expect(screen.queryByRole("banner")).not.toBeInTheDocument();
-    expect(screen.queryByRole("link", { name: /Rocketcrab home/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("link", { name: /rocketcrab home/ })).not.toBeInTheDocument();
     expect(screen.queryByText("🦀")).not.toBeInTheDocument();
     expect(screen.queryByText("🚀")).not.toBeInTheDocument();
   });
@@ -125,7 +125,7 @@ describe("AppLayout", () => {
       const brand = screen.getByTestId("browser-brand-row");
       expect(brand).toHaveTextContent("rocketcrab.com");
       expect(within(brand).queryByRole("link")).not.toBeInTheDocument();
-      const launch = within(brand).getByRole("button", { name: "Launch Rocketcrab" });
+      const launch = within(brand).getByRole("button", { name: "Launch rocketcrab" });
       expect(within(launch).getByTestId("brand-logo")).toHaveAttribute("height", "56");
       if (path === "/browse") {
         await userEvent.click(screen.getByRole("button", { name: "Back" }));

@@ -33,7 +33,7 @@ export function trackPage(routeId: string, gameId?: string): void {
     }
   }
 
-  const page = { page_location: location, page_referrer: referrer, page_title: "Rocketcrab" };
+  const page = { page_location: location, page_referrer: referrer, page_title: "rocketcrab" };
   if (pageLocation === undefined) {
     const globals = window as Window & { dataLayer?: unknown[] };
     const queue = (globals.dataLayer ??= []);

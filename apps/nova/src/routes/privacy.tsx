@@ -17,7 +17,7 @@ function PrivacyPage() {
       </Link>
       <h1 className="text-3xl font-black">Privacy</h1>
       <p>
-        Rocketcrab uses Google Analytics to count visits, games played, party sizes, and whether
+        rocketcrab uses Google Analytics to count visits, games played, party sizes, and whether
         connections work.
       </p>
       <p>
