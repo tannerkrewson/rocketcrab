@@ -209,7 +209,7 @@ describe("/party", () => {
       title: "Rocket Rumble",
       html: SAVED_HTML,
     });
-    renderParty(`/party?gameId=${game.id}&title=${encodeURIComponent(game.title)}`);
+    const router = renderParty(`/party?gameId=${game.id}&title=${encodeURIComponent(game.title)}`);
     await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledTimes(1));
     expect(stubEngine.createParty).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -219,6 +219,9 @@ describe("/party", () => {
         apiVersion: 1,
       }),
     );
+    // The private game leaves the URL once the party exists, so replay can record it.
+    await waitFor(() => expect(router.state.location.href).toBe("/party"));
+    expect(stubEngine.createParty).toHaveBeenCalledTimes(1);
   });
 
   it("creates a party from a hosted Nova game by downloading it", async () => {

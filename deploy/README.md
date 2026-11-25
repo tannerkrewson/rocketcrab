@@ -133,10 +133,11 @@ are disabled. Search for `rate_limiter_unavailable`, `turn_upstream_error`, or
 Nova deploys use Microsoft Clarity project `zix4dzz9v4`. Set
 `VITE_CLARITY_PROJECT_ID` to an empty value to disable replay for a deployment.
 Cookie-based replay runs by default on home, about, the Nova introduction, and
-the party screen for listed games, for visitors in the US and Canada outside
+the party screen, for visitors in the US and Canada outside
 Québec. The Worker checks eligibility without returning the visitor's location
 and skips replay for Global Privacy Control. The footer's Privacy link lets
-visitors turn off replay in their browser. Clarity stops before the router
+visitors turn off replay in their browser. Once a party exists, its URL drops
+the starting game, which can be private. Clarity stops before the router
 leaves those pages, so catalog, library, and editor pages are never recorded.
 The project must keep strict masking (Settings → Masking). Strict masking hides
 text but records attributes, so recorded screens must keep names, titles, and

@@ -45,7 +45,7 @@ function errorMessage(error: unknown): string {
 function PartyPage() {
   const search = Route.useSearch();
   const navigate = useNavigate();
-  const { engine } = usePartyEngine();
+  const { engine, state } = usePartyEngine();
   const startedRef = useRef(false);
   const [attempt, setAttempt] = useState(0);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -107,6 +107,16 @@ function PartyPage() {
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [engine, search.gameId, search.title, attempt, needsName, importing, invite]);
+
+  // Once the party exists it lives in the engine. Drop the starting game from
+  // the URL: it can name a private game, and session replay records the URL.
+  const created = state.phase === "lobby";
+  const startingGame = search.gameId !== undefined || search.title !== undefined;
+  useEffect(() => {
+    if (created && startingGame) {
+      void navigate({ to: "/party", search: { browse: search.browse }, replace: true });
+    }
+  }, [created, startingGame, search.browse, navigate]);
 
   const handleRetry = () => {
     startedRef.current = false;
