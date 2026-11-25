@@ -52,6 +52,25 @@ it("does not start the tag outside the configured origin", async () => {
   expect((window as TagWindow).dataLayer).toBeUndefined();
 });
 
+it("counts lobbies created and joined", async () => {
+  const { trackPage } = await import("./analytics");
+  const { observePartyAnalytics } = await import("./party/party-analytics");
+  const onState = vi.fn<(handler: (state: PartyEngineState) => void) => () => void>();
+  trackPage("/party");
+  observePartyAnalytics({ onState });
+  const [publish] = onState.mock.calls[0]!;
+  const state = { game: null, members: [] } as unknown as PartyEngineState;
+
+  for (const phase of ["creating", "lobby", "idle", "joining", "lobby", "reconnecting", "lobby"])
+    publish({ ...state, phase } as PartyEngineState);
+
+  expect(
+    events()
+      .map(([event]) => event)
+      .filter((event) => event === "party_create" || event === "party_join"),
+  ).toEqual(["party_create", "party_join"]);
+});
+
 it("counts one host game across reconnects and reports the duration at its end", async () => {
   const { trackPage } = await import("./analytics");
   const { observePartyAnalytics } = await import("./party/party-analytics");

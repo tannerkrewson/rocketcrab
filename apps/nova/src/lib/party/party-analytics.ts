@@ -27,6 +27,7 @@ export function observePartyAnalytics(engine: {
     const { phase, game } = state;
     if (phase !== previousPhase) {
       if (phase === "lobby" && previousPhase === "creating") track("party_create");
+      if (phase === "lobby" && previousPhase === "joining") track("party_join");
       if (phase === "reconnecting" || phase === "error") {
         track("party_issue", {
           outcome: phase,

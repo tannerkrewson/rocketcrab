@@ -97,7 +97,8 @@ it for a deployment, or use a separate stream for test collection. The tag
 runs on the configured Nova origin. It sends route names without query
 strings, invite fragments, or private game IDs.
 
-- Use `page_view` for page traffic and `party_create` for lobbies opened.
+- Use `page_view` for page traffic, `party_create` for lobbies opened, and
+  `party_join` for invitees who reached a lobby.
 - Use `game_start` for games launched, grouped by Game ID and Game kind.
   Players at game start counts connected party members. Divide its sum by
   `game_start` event count to get average party size.
