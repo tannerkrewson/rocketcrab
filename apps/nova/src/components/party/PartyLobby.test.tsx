@@ -560,8 +560,7 @@ describe("PartyLobby", () => {
     const kick = screen.getByRole("button", { name: /kick/i });
     await userEvent.click(kick);
     expect(onKickMember).not.toHaveBeenCalled();
-    const confirm = screen.getByRole("dialog", { name: /kick a player/i });
-    expect(within(confirm).getByText(/Kick Bree from the party\?/)).toBeInTheDocument();
+    const confirm = await screen.findByRole("dialog", { name: "Kick Bree from the party?" });
     await userEvent.click(within(confirm).getByRole("button", { name: /^kick player$/i }));
     expect(onKickMember).toHaveBeenCalledWith("member-b");
   });

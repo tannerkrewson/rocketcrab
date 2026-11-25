@@ -92,6 +92,12 @@ export function PartyLobby({
   const installAvailable = useAppInstallAvailable();
   const [startHelpOpen, setStartHelpOpen] = useState(false);
   const [kickPending, setKickPending] = useState<string | null>(null);
+  // Kept after closing so the title doesn't change while the dialog animates out.
+  const kickNameRef = useRef("");
+  if (kickPending !== null) {
+    kickNameRef.current =
+      state.members.find((member) => member.memberId === kickPending)?.displayName ?? kickPending;
+  }
   const [browsing, setBrowsing] = useState(initialBrowsing);
   const [renaming, setRenaming] = useState(false);
 
@@ -363,56 +369,33 @@ export function PartyLobby({
         </Button>
       </div>
 
-      {kickPending !== null ? (
-        <PartyKickConfirm
-          memberName={
-            state.members.find((member) => member.memberId === kickPending)?.displayName ??
-            kickPending
-          }
-          onCancel={() => setKickPending(null)}
-          onConfirm={() => {
-            setKickPending(null);
-            onKickMember(kickPending);
-          }}
-        />
-      ) : null}
-    </div>
-  );
-}
-
-function PartyKickConfirm({
-  memberName,
-  onCancel,
-  onConfirm,
-}: {
-  memberName: string;
-  onCancel: () => void;
-  onConfirm: () => void;
-}) {
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4"
-      role="dialog"
-      aria-modal="true"
-      aria-label="Kick a player from the party"
-    >
-      <div className="flex w-full max-w-sm flex-col gap-4 rounded-2xl bg-overlay p-5 shadow-overlay">
-        <p className="font-black">Kick {memberName} from the party?</p>
-        <p className="text-sm">
-          This removes them for now, not permanently. They can rejoin with the same private invite.
-        </p>
-        <p className="text-sm text-foreground/70">
-          {memberName} will be removed from the party and will have to rejoin with the invite link.
-        </p>
-        <div className="button-row self-end">
-          <Button variant="default" soft onClick={onCancel}>
-            Cancel
-          </Button>
-          <Button variant="danger" onClick={onConfirm}>
-            Kick player
-          </Button>
+      <Dialog
+        open={kickPending !== null}
+        onClose={() => setKickPending(null)}
+        title={`Kick ${kickNameRef.current} from the party?`}
+        className="max-w-sm"
+      >
+        <div className="flex flex-col gap-4">
+          <p className="text-sm text-foreground/80">
+            This removes them for now, not permanently: they can rejoin with the invite link or
+            party code.
+          </p>
+          <div className="button-row self-end">
+            <Button variant="default" soft onClick={() => setKickPending(null)}>
+              Cancel
+            </Button>
+            <Button
+              variant="danger"
+              onClick={() => {
+                if (kickPending !== null) onKickMember(kickPending);
+                setKickPending(null);
+              }}
+            >
+              Kick player
+            </Button>
+          </div>
         </div>
-      </div>
+      </Dialog>
     </div>
   );
 }
