@@ -6,10 +6,10 @@ import {
   createRootRoute,
   createRoute,
 } from "@tanstack/react-router";
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { gameRepository } from "../../lib/games/instance";
 import type { PartyEngineState } from "../../lib/party/engine";
@@ -19,7 +19,7 @@ import { PartyLobby, type PartyLobbyProps } from "./PartyLobby";
 import type { PartyMemberView } from "../../lib/party/engine";
 
 const { toastMock } = vi.hoisted(() => ({
-  toastMock: { success: vi.fn(), error: vi.fn(), warning: vi.fn(), info: vi.fn() },
+  toastMock: { success: vi.fn(), danger: vi.fn(), warning: vi.fn(), info: vi.fn() },
 }));
 
 vi.mock("../../lib/toast", () => ({ toast: toastMock }));
@@ -89,13 +89,14 @@ beforeEach(async () => {
   resetPartyIdentityForTests();
   setSavedPlayerName("Player A");
   toastMock.success.mockClear();
-  toastMock.error.mockClear();
+  toastMock.danger.mockClear();
   toastMock.warning.mockClear();
   toastMock.info.mockClear();
 });
 
 async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobbyProps> = {}) {
   cleanup(); // isolate: some tests render the lobby twice
+  let setLobbyState: (next: PartyEngineState) => void = () => undefined;
   const queryClient = new QueryClient();
   const lobby = (props: PartyLobbyProps) => (
     <PartyLobby
@@ -126,7 +127,11 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
   const lobbyRoute = createRoute({
     getParentRoute: () => rootRoute,
     path: "/",
-    component: () => lobby({ state, ...handlers } as PartyLobbyProps),
+    component: function LobbyWithState() {
+      const [current, setCurrent] = useState(state);
+      setLobbyState = setCurrent;
+      return lobby({ ...handlers, state: current } as PartyLobbyProps);
+    },
   });
   const routeTree = rootRoute.addChildren([libraryRoute, joinRoute, gameDetailsRoute, lobbyRoute]);
   const router = createRouter({
@@ -138,7 +143,8 @@ async function renderLobby(state: PartyEngineState, handlers: Partial<PartyLobby
   );
   const result = render(<RouterProvider router={router} />, { wrapper });
   await result.findByRole("button", { name: /copy url/i });
-  return { ...result, router };
+  const update = (next: PartyEngineState) => act(() => setLobbyState(next));
+  return { ...result, router, update };
 }
 
 describe("PartyLobby", () => {
@@ -286,38 +292,33 @@ describe("PartyLobby", () => {
     expect(onStart).not.toHaveBeenCalled();
   });
 
-  it("shows ONE compact notice banner with the latest non-membership notice", async () => {
+  it("toasts only the latest notice when the lobby opens, with no banner", async () => {
     const state = makeState({
       canStart: true,
       startBlockedReason: null,
       notices: [
         { id: "notice-1", level: "error", message: "Player B could not receive the game." },
         { id: "notice-2", level: "warn", message: "Player C is reconnecting." },
-        { id: "notice-3", level: "info", message: "Player B joined the party." },
       ],
     });
     await renderLobby(state);
-    const alerts = screen.getAllByRole("alert");
-    expect(alerts).toHaveLength(1);
-    expect(within(alerts[0]!).getByText("Player C is reconnecting.")).toBeInTheDocument();
-    expect(screen.queryByText("Player B joined the party.")).not.toBeInTheDocument();
-    expect(toastMock.info).toHaveBeenCalledWith("Player B joined the party.");
-    expect(toastMock.warning).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+    expect(toastMock.warning).toHaveBeenCalledExactlyOnceWith("Player C is reconnecting.");
+    expect(toastMock.danger).not.toHaveBeenCalled();
   });
 
-  it("toasts a removed-notice instead of showing it as a banner alert", async () => {
-    const state = makeState({
-      canStart: true,
-      startBlockedReason: null,
+  it("toasts each new notice at its level", async () => {
+    const state = makeState({ canStart: true, startBlockedReason: null, notices: [] });
+    const { update } = await renderLobby(state);
+    update({
+      ...state,
       notices: [
         { id: "notice-1", level: "warn", message: "Player B was removed from the party." },
-        { id: "notice-2", level: "info", message: "The game started." },
+        { id: "notice-2", level: "info", message: "Player C joined the party." },
       ],
     });
-    await renderLobby(state);
-    expect(screen.queryByText("Player B was removed from the party.")).not.toBeInTheDocument();
     expect(toastMock.warning).toHaveBeenCalledWith("Player B was removed from the party.");
-    expect(within(screen.getByRole("alert")).getByText("The game started.")).toBeInTheDocument();
+    expect(toastMock.info).toHaveBeenCalledWith("Player C joined the party.");
   });
 
   it("does not re-toast a membership notice on ordinary re-renders (dedupe)", async () => {

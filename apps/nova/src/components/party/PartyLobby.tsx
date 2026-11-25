@@ -73,16 +73,11 @@ function isEndedNotice(message: string): boolean {
   return message.startsWith("The game ended");
 }
 
-/** Membership notices use temporary toasts rather than persistent alerts. */
-function isMembershipNotice(message: string): boolean {
-  return message.endsWith("joined the party.") || message.endsWith("was removed from the party.");
+function toastNotice(notice: PartyNotice): void {
+  if (notice.level === "error") toast.danger(notice.message);
+  else if (notice.level === "warn") toast.warning(notice.message);
+  else toast.info(notice.message);
 }
-
-const NOTICE_ALERT_STATUS: Record<PartyNotice["level"], "danger" | "warning" | "accent"> = {
-  error: "danger",
-  warn: "warning",
-  info: "accent",
-};
 
 function canNativeShare(url: string | null): boolean {
   if (
@@ -134,32 +129,23 @@ export function PartyLobby({
         : `Waiting for ${hostName} to select a game`;
   }
 
-  // Keep only the latest relevant notice; membership changes toast separately.
-  const latestNotice =
-    state.endedReason !== null || state.notices.length === 0
-      ? null
-      : ([...state.notices]
-          .reverse()
-          .find(
-            (notice) => !isEndedNotice(notice.message) && !isMembershipNotice(notice.message),
-          ) ?? null);
-
-  // Remember toasted ids so local re-renders cannot repeat membership notifications.
-  const toastedNoticeIds = useRef<readonly string[]>([]);
+  // Party notices go to the global toasts. Remember toasted ids so re-renders
+  // never repeat one. On mount (say, back from a game) only the latest shows.
+  const toastedNoticeIds = useRef<ReadonlySet<string> | null>(null);
   useEffect(() => {
-    for (const notice of state.notices) {
-      if (toastedNoticeIds.current.includes(notice.id)) continue;
-      if (!isMembershipNotice(notice.message)) continue;
-      toastedNoticeIds.current = [...toastedNoticeIds.current, notice.id];
-      if (notice.level === "error") {
-        toast.danger(notice.message);
-      } else if (notice.level === "warn") {
-        toast.warning(notice.message);
-      } else {
-        toast.info(notice.message);
-      }
+    const relevant = state.notices.filter((notice) => !isEndedNotice(notice.message));
+    if (toastedNoticeIds.current === null) {
+      const latest = state.endedReason === null ? relevant.at(-1) : undefined;
+      if (latest !== undefined) toastNotice(latest);
+      toastedNoticeIds.current = new Set(state.notices.map((notice) => notice.id));
+      return;
     }
-  }, [state.notices]);
+    const seen = new Set(toastedNoticeIds.current);
+    for (const notice of relevant) {
+      if (!seen.has(notice.id)) toastNotice(notice);
+    }
+    toastedNoticeIds.current = new Set(state.notices.map((notice) => notice.id));
+  }, [state.notices, state.endedReason]);
 
   const copyInvite = async () => {
     if (state.inviteUrl === null) return;
@@ -258,11 +244,11 @@ export function PartyLobby({
         {playedTitle !== null ? (
           <>
             <h2 className="text-xl font-black">
-              Thanks for playing <span className="text-primary">{playedTitle}</span> on rocketcrab!
+              Thanks for playing {playedTitle} on <span className="text-primary">rocketcrab</span>!
             </h2>
             <p className="text-sm text-foreground/70">
               {installAvailable
-                ? `Get the app to play ${playedTitle} and more, right from your home screen.`
+                ? "Get the app to play it and many more games anytime."
                 : "Play it again, or browse for your next game."}
             </p>
             <div className="flex flex-wrap justify-center gap-2">
@@ -442,20 +428,6 @@ export function PartyLobby({
           </ul>
         </div>
       </details>
-      {latestNotice !== null ? (
-        <Alert
-          status={NOTICE_ALERT_STATUS[latestNotice.level]}
-          role="alert"
-          className="mx-auto w-fit"
-        >
-          <Alert.Indicator />
-          <Alert.Content>
-            <Alert.Description className="text-sm font-semibold">
-              {latestNotice.message}
-            </Alert.Description>
-          </Alert.Content>
-        </Alert>
-      ) : null}
       <div className="flex justify-center">
         <Button variant="default" soft size="md" onClick={onLeave}>
           <LogOut className="h-4 w-4" aria-hidden="true" />

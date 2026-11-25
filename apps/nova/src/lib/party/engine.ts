@@ -2015,12 +2015,6 @@ export class PartyEngine {
         } else {
           this.state.markSourceVerified(event.memberId, "Game received", event.sourceSha256);
         }
-        this.addNotice(
-          "info",
-          event.direction === "send"
-            ? `${this.displayNameOf(target)} received the game.`
-            : "You received the game.",
-        );
         this.emit();
         break;
       }
@@ -2059,7 +2053,6 @@ export class PartyEngine {
         };
         this.state.stageSource(source);
         this.rememberShared(source, event.sourceSha256);
-        this.addNotice("info", "You received the game — starting it now.");
         this.emit();
         void this.maybeBootFrame();
         break;

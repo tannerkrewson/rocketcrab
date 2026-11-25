@@ -708,7 +708,6 @@ describe("party engine — readiness and start gating", () => {
     expect(state.members).toHaveLength(2);
     expect(state.canStart).toBe(false);
     expect(state.startBlockedReason).toMatch(/load and register/i);
-    expect(state.notices.some((notice) => notice.level === "info")).toBe(true);
 
     await a.engine.leaveParty();
     await b.engine.leaveParty();
