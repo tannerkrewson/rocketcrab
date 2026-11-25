@@ -662,6 +662,23 @@ describe("party engine — game and source transitions", () => {
   });
 });
 
+describe("party engine — notice analytics", () => {
+  it("reports warnings by stable code, never by message", async () => {
+    const world = makeWorld();
+    const host = makePlayer(world, "host");
+    await runCreate(host, world);
+    vi.mocked(track).mockClear();
+    // No game is picked, so the start is blocked with a warning.
+    host.engine.startGame();
+    const notice = host.engine.getState().notices.at(-1);
+    expect(notice).toMatchObject({ level: "warn", code: "start-blocked" });
+    expect(vi.mocked(track).mock.calls.filter(([name]) => name === "notice_shown")).toEqual([
+      ["notice_shown", { code: "start-blocked", level: "warn" }],
+    ]);
+    await host.engine.leaveParty();
+  });
+});
+
 describe("party engine — join loading stages", () => {
   it("keeps a joiner on loading then errors when no peer can be reached", async () => {
     const world = makeWorld();

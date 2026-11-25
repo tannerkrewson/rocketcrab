@@ -25,10 +25,6 @@ churn on upgrade), and need no paid always-on server.
       loads, and parties work without analytics or Turnstile.
 - [ ] Watch a Clarity recording of a party from an eligible region and
       confirm names, game titles and the invite QR code are masked.
-- [ ] Analytics: give player-visible notices stable codes and send
-      `notice_shown {code}`. Code-only notices could then be unmasked in
-      Clarity with `data-clarity-unmask`; many notices embed names, titles or
-      game text today.
 
 ## Real-device checks requiring access or coordination
 

@@ -146,6 +146,10 @@ strings, invite fragments, or private game IDs.
   delete). `game_end` carries `end_reason`: the game's own reason
   (`host_closed`, `user_exit`, `error`), or `switched`, `left` or
   `page-closed`.
+- Use `notice_shown` for the warnings and errors players see (`code`, a
+  stable name such as `start-blocked` or `runtime-unresponsive` from
+  `addNotice` in `apps/nova/src/lib/party/engine.ts`, and `level`). Info
+  notices aren't sent.
 - Use `web_vital` for Core Web Vitals (`metric` LCP, INP, CLS, FCP or TTFB,
   `value` in ms or CLS in thousandths, `rating`, `route`) and `app_error`
   for uncaught errors and rejections (`route`, `error_name`, at most ten per

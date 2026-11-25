@@ -193,7 +193,11 @@ export class PartyEngine {
       if (input !== undefined) {
         void this.registerSource(input).catch((error: unknown) => {
           if (this.state.party !== party) return;
-          this.addNotice("error", `Could not register the game: ${errorMessage(error)}`);
+          this.addNotice(
+            "error",
+            "register-failed",
+            `Could not register the game: ${errorMessage(error)}`,
+          );
           this.emit();
         });
       }
@@ -269,7 +273,11 @@ export class PartyEngine {
       void this.state.coordinator
         ?.refresh()
         .catch((error: unknown) =>
-          this.addNotice("warn", `Could not ask the party for the game: ${errorMessage(error)}`),
+          this.addNotice(
+            "warn",
+            "game-request-failed",
+            `Could not ask the party for the game: ${errorMessage(error)}`,
+          ),
         );
       this.askForExternalRoom();
     } catch (error) {
@@ -469,6 +477,7 @@ export class PartyEngine {
       this.joinErrorNoticesShown.add(category);
       this.addNotice(
         "warn",
+        "incompatible-version",
         "Incompatible Nova version. Everyone should update/reload Nova and rejoin the party.",
       );
       this.emit();
@@ -486,7 +495,15 @@ export class PartyEngine {
           : category === "password_mismatch"
             ? "A message from another player couldn't be decrypted. It may be damaged or use a different invite; you may still be connected to the party."
             : connectionErrorMessage(error);
-      this.addNotice("warn", message);
+      this.addNotice(
+        "warn",
+        category === "room_full"
+          ? "peer-room-full"
+          : category === "password_mismatch"
+            ? "peer-decrypt-failed"
+            : "peer-connection-error",
+        message,
+      );
       this.emit();
     }
   }
@@ -891,7 +908,11 @@ export class PartyEngine {
       // Transport state events settle the phase after a successful attempt.
     } catch (error) {
       if (this.state.leaving || this.state.party !== party) return;
-      this.addNotice("error", `Reconnect failed: ${connectionErrorMessage(error)}`);
+      this.addNotice(
+        "error",
+        "reconnect-failed",
+        `Reconnect failed: ${connectionErrorMessage(error)}`,
+      );
       this.state.transitionPhase({
         phase: "reconnecting",
         detail: `Reconnect failed (attempt ${this.state.reconnectAttempts}) — will retry automatically.`,
@@ -954,7 +975,7 @@ export class PartyEngine {
     if (this.state.leaving || this.state.phase !== "reconnecting") {
       return;
     }
-    this.addNotice("info", "You're back online — reconnecting.");
+    this.addNotice("info", "back-online", "You're back online — reconnecting.");
     void this.reconnect();
   }
 
@@ -1012,6 +1033,7 @@ export class PartyEngine {
       return;
     this.addNotice(
       "warn",
+      "background-reconnect",
       "Your phone's connection went quiet in the background — reconnecting with a fresh connection.",
     );
     this.enterReconnecting("Your connection went quiet in the background. Reconnecting…");
@@ -1055,7 +1077,7 @@ export class PartyEngine {
       if (this.state.leaving || this.state.phase !== "reconnecting") {
         return;
       }
-      this.addNotice("info", "Retrying the connection automatically…");
+      this.addNotice("info", "retrying", "Retrying the connection automatically…");
       void this.reconnect();
     }, delayMs);
   }
@@ -1097,7 +1119,11 @@ export class PartyEngine {
       void this.state.coordinator
         ?.refresh()
         .catch((error: unknown) =>
-          this.addNotice("warn", `Could not ask the party for the game: ${errorMessage(error)}`),
+          this.addNotice(
+            "warn",
+            "game-request-failed",
+            `Could not ask the party for the game: ${errorMessage(error)}`,
+          ),
         );
       this.askForExternalRoom();
     }
@@ -1147,6 +1173,7 @@ export class PartyEngine {
       this.state.timeOutStart();
       this.addNotice(
         "warn",
+        "switch-timeout",
         "The new game took too long to start. Try starting it from the lobby.",
       );
       this.emit();
@@ -1256,7 +1283,11 @@ export class PartyEngine {
       .catch(() => undefined);
     this.state.removedMemberIds.add(memberId);
     if (this.hasDisplayName(memberId)) {
-      this.addNotice("warn", `${this.displayNameOf(memberId)} was removed from the party.`);
+      this.addNotice(
+        "warn",
+        "member-removed",
+        `${this.displayNameOf(memberId)} was removed from the party.`,
+      );
     }
     this.emit();
   }
@@ -1291,7 +1322,11 @@ export class PartyEngine {
     if (!this.state.party?.amHost) return;
     const state = this.getState();
     if (!state.canStart) {
-      this.addNotice("warn", state.startBlockedReason ?? "The party is not ready to start.");
+      this.addNotice(
+        "warn",
+        "start-blocked",
+        state.startBlockedReason ?? "The party is not ready to start.",
+      );
       this.emit();
       return;
     }
@@ -1326,7 +1361,7 @@ export class PartyEngine {
       this.stopGameSwitch();
       this.state.timeOutStart();
       track("party_issue", { outcome: "start-timeout" });
-      this.addNotice("warn", START_GIVE_UP_MESSAGE);
+      this.addNotice("warn", "start-timeout", START_GIVE_UP_MESSAGE);
       this.emit();
       return;
     }
@@ -1394,7 +1429,11 @@ export class PartyEngine {
         return;
       }
       void this.replaceGameSession(this.state.party).catch((error: unknown) => {
-        this.addNotice("error", `The game session could not be reset: ${errorMessage(error)}`);
+        this.addNotice(
+          "error",
+          "session-reset-failed",
+          `The game session could not be reset: ${errorMessage(error)}`,
+        );
         this.emit();
       });
       this.emit();
@@ -1453,6 +1492,7 @@ export class PartyEngine {
           // A newer build's game this one doesn't list; it can't be embedded here.
           this.addNotice(
             "error",
+            "unknown-game",
             "The host picked a game this version of rocketcrab doesn't have. Reload to update.",
           );
           this.emit();
@@ -1482,6 +1522,7 @@ export class PartyEngine {
             void this.replaceGameSession(this.state.party).catch((error: unknown) => {
               this.addNotice(
                 "error",
+                "session-config-failed",
                 `The game session could not be configured: ${errorMessage(error)}`,
               );
               this.emit();
@@ -1490,7 +1531,7 @@ export class PartyEngine {
           this.state.resetSource();
           this.state.verifyLocalSource(null);
           this.state.registerFrame(this.state.frameTickRate);
-          this.addNotice("info", `${title} has been selected for the party.`);
+          this.addNotice("info", "game-selected", `${title} has been selected for the party.`);
         }
         this.emit();
         break;
@@ -1509,13 +1550,14 @@ export class PartyEngine {
       case "kick": {
         if (event.targetMemberId === this.state.identity.memberId) {
           this.state.removedReason = event.reason ?? "The host removed you from the party.";
-          this.addNotice("error", this.state.removedReason);
+          this.addNotice("error", "you-were-removed", this.state.removedReason);
           this.emit();
           void this.leaveParty("removed");
         } else if (this.hasDisplayName(event.targetMemberId)) {
           this.state.removedMemberIds.add(event.targetMemberId);
           this.addNotice(
             "warn",
+            "member-removed",
             `${this.displayNameOf(event.targetMemberId)} was removed from the party.`,
           );
           this.emit();
@@ -1533,7 +1575,7 @@ export class PartyEngine {
         this.state.partyCode.setRenewing(this.state.party?.amHost ?? false);
         if (event.hostMemberId !== null && this.state.currentSourceSha256 === null) {
           void this.state.coordinator?.refresh().catch((error: unknown) => {
-            this.addNotice("error", errorMessage(error));
+            this.addNotice("error", "game-request-failed", errorMessage(error));
             this.emit();
           });
         }
@@ -1546,7 +1588,7 @@ export class PartyEngine {
           this.enterReconnecting("The party connection was lost.");
           return;
         }
-        this.addNotice("error", errorMessage(error));
+        this.addNotice("error", "party-error", errorMessage(error));
         this.emit();
         break;
       }
@@ -1578,7 +1620,7 @@ export class PartyEngine {
         });
         this.startRequestedAt = null;
 
-        this.addNotice("info", "The game started.");
+        this.addNotice("info", "game-started", "The game started.");
         this.emit();
         break;
       case "end":
@@ -1587,6 +1629,7 @@ export class PartyEngine {
         this.state.receiveEnd(event.reason);
         this.addNotice(
           "info",
+          "game-ended",
           `The game ended${event.reason === undefined ? "." : ` (${event.reason}).`}`,
         );
         this.emit();
@@ -1597,10 +1640,14 @@ export class PartyEngine {
         this.emit();
         break;
       case "bandwidthWarning":
-        this.addNotice("warn", event.message);
+        this.addNotice("warn", "bandwidth-warning", event.message);
         break;
       case "error":
-        this.addNotice("error", `Nova error (${event.error.code}): ${event.error.message}`);
+        this.addNotice(
+          "error",
+          "nova-error",
+          `Nova error (${event.error.code}): ${event.error.message}`,
+        );
         this.emit();
         break;
       case "ready":
@@ -1660,12 +1707,17 @@ export class PartyEngine {
     }
     this.addNotice(
       "warn",
+      "runtime-suspended",
       "Your game's runtime was suspended while the page was away — reloading it.",
     );
     this.emit();
     this.state.resetFrame();
     void runtime.restart().catch((error: unknown) => {
-      this.addNotice("error", `The game could not be reloaded: ${errorMessage(error)}`);
+      this.addNotice(
+        "error",
+        "game-reload-failed",
+        `The game could not be reloaded: ${errorMessage(error)}`,
+      );
       this.emit();
     });
   }
@@ -1728,7 +1780,7 @@ export class PartyEngine {
       this.state.resetFrame();
       const message = errorMessage(error);
       track("party_issue", { outcome: "runtime-load-failed" });
-      this.addNotice("error", `Your game could not start: ${message}`);
+      this.addNotice("error", "game-start-failed", `Your game could not start: ${message}`);
       this.emit();
     }
   }
@@ -1756,31 +1808,44 @@ export class PartyEngine {
       case "error":
         this.addNotice(
           "error",
+          "runtime-error",
           `Runtime error (${event.message.category}): ${event.message.message}`,
         );
         this.emit();
         break;
       case "fatal":
         track("party_issue", { outcome: "runtime-fatal" });
-        this.addNotice("error", event.message);
+        this.addNotice("error", "runtime-fatal", event.message);
         this.emit();
         break;
       case "unresponsive":
         track("party_issue", { outcome: "runtime-unresponsive" });
-        this.addNotice("warn", "Your game stopped answering — it may be wedged.");
+        this.addNotice(
+          "warn",
+          "runtime-unresponsive",
+          "Your game stopped answering — it may be wedged.",
+        );
         this.emit();
         break;
       case "responsive":
-        this.addNotice("info", "Your game is responsive again.");
+        this.addNotice("info", "runtime-responsive", "Your game is responsive again.");
         this.emit();
         break;
       case "port-closed":
-        this.addNotice("warn", "Your game's runtime channel closed — reloading it.");
+        this.addNotice(
+          "warn",
+          "runtime-channel-closed",
+          "Your game's runtime channel closed — reloading it.",
+        );
         this.emit();
         if (this.state.runtime !== null && !this.state.leaving) {
           this.state.resetFrame();
           void this.state.runtime.restart().catch((error: unknown) => {
-            this.addNotice("error", `The game could not be reloaded: ${errorMessage(error)}`);
+            this.addNotice(
+              "error",
+              "game-reload-failed",
+              `The game could not be reloaded: ${errorMessage(error)}`,
+            );
             this.emit();
           });
         }
@@ -1824,7 +1889,7 @@ export class PartyEngine {
     routeFrameApiCall(message, session, {
       onFailure: (method, message) => {
         if (method === "dispatch") {
-          this.addNotice("error", `nova.dispatch() failed: ${message}`);
+          this.addNotice("error", "dispatch-failed", `nova.dispatch() failed: ${message}`);
         }
       },
       onStateResponse: (payload) => this.state.stateExecutor?.handleResponse(payload),
@@ -1906,7 +1971,11 @@ export class PartyEngine {
       void this.state.coordinator
         ?.refresh()
         .catch((error: unknown) =>
-          this.addNotice("warn", `Could not ask the party for the game: ${errorMessage(error)}`),
+          this.addNotice(
+            "warn",
+            "game-request-failed",
+            `Could not ask the party for the game: ${errorMessage(error)}`,
+          ),
         );
       this.armSourceRetransmit();
     }, SOURCE_RETRANSMIT_INTERVAL_MS);
@@ -2051,6 +2120,7 @@ export class PartyEngine {
           void this.replaceGameSession(this.state.party).catch((error: unknown) => {
             this.addNotice(
               "error",
+              "session-config-failed",
               `The game session could not be configured: ${errorMessage(error)}`,
             );
             this.emit();
@@ -2121,6 +2191,7 @@ export class PartyEngine {
           void this.replaceGameSession(this.state.party).catch((error: unknown) => {
             this.addNotice(
               "error",
+              "session-config-failed",
               `The updated game session could not be configured: ${errorMessage(error)}`,
             );
             this.emit();
@@ -2157,6 +2228,7 @@ export class PartyEngine {
         });
         this.addNotice(
           "error",
+          "game-verification-failed",
           `Game verification failed for ${this.displayNameOf(this.state.identity.memberId)}: ${event.errorMessage}`,
         );
         this.emit();
@@ -2171,6 +2243,7 @@ export class PartyEngine {
         });
         this.addNotice(
           "warn",
+          "transfer-cancelled",
           `Game transfer ${event.direction} for ${this.displayNameOf(target)} was cancelled${event.reason === undefined ? "." : ` (${event.reason}).`}`,
         );
         this.emit();
@@ -2182,12 +2255,16 @@ export class PartyEngine {
           fraction: null,
           detail: event.reason,
         });
-        this.addNotice("error", `This build cannot run the game: ${event.reason}`);
+        this.addNotice(
+          "error",
+          "game-unsupported",
+          `This build cannot run the game: ${event.reason}`,
+        );
         this.emit();
         break;
       }
       case "warning": {
-        this.addNotice("warn", event.message);
+        this.addNotice("warn", "coordinator-warning", event.message);
         this.emit();
         break;
       }
@@ -2230,7 +2307,7 @@ export class PartyEngine {
       fraction: null,
       detail: error.message,
     });
-    this.addNotice("error", error.message);
+    this.addNotice("error", "transfer-failed", error.message);
   }
 
   private isSourceVerified(memberId: MemberId): boolean {
@@ -2408,7 +2485,7 @@ export class PartyEngine {
   private noteMemberLeft(memberId: MemberId, displayName: string | undefined): void {
     if (this.state.removedMemberIds.delete(memberId)) return;
     if (displayName === undefined || displayName === memberId) return;
-    this.addNotice("info", leftNoticeMessage(displayName));
+    this.addNotice("info", "member-left", leftNoticeMessage(displayName));
   }
 
   private dropLeftNotice(displayName: string | undefined): void {
@@ -2521,7 +2598,12 @@ export class PartyEngine {
     return typeof getter === "function" ? (getter.call(transport) as unknown) : null;
   }
 
-  private addNotice(level: PartyNotice["level"], message: string): void {
+  /**
+   * `code` is a stable kebab-case name for analytics; the message may embed
+   * names, titles or game text and never leaves the device.
+   */
+  private addNotice(level: PartyNotice["level"], code: string, message: string): void {
+    if (level !== "info") track("notice_shown", { code, level });
     // Move repeats to the newest slot instead of accumulating duplicate alerts.
     const duplicateIndex = this.state.notices.findIndex(
       (notice) => notice.message === message && notice.level === level,
@@ -2533,7 +2615,7 @@ export class PartyEngine {
             ...this.state.notices.slice(0, duplicateIndex),
             ...this.state.notices.slice(duplicateIndex + 1),
           ];
-    this.state.notices = [...deduped, makeNotice(level, message)].slice(-MAX_NOTICES);
+    this.state.notices = [...deduped, makeNotice(level, code, message)].slice(-MAX_NOTICES);
   }
 
   private emit(): void {

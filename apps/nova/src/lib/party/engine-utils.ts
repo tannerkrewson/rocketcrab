@@ -18,9 +18,13 @@ export function errorMessage(error: unknown): string {
 
 let noticeCounter = 0;
 
-export function makeNotice(level: PartyNotice["level"], message: string): PartyNotice {
+export function makeNotice(
+  level: PartyNotice["level"],
+  code: string,
+  message: string,
+): PartyNotice {
   noticeCounter += 1;
-  return { id: `notice-${noticeCounter}`, level, message };
+  return { id: `notice-${noticeCounter}`, level, code, message };
 }
 
 export function leftNoticeMessage(displayName: string): string {

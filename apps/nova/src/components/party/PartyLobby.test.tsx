@@ -297,8 +297,13 @@ describe("PartyLobby", () => {
       canStart: true,
       startBlockedReason: null,
       notices: [
-        { id: "notice-1", level: "error", message: "Player B could not receive the game." },
-        { id: "notice-2", level: "warn", message: "Player C is reconnecting." },
+        {
+          id: "notice-1",
+          level: "error",
+          code: "test",
+          message: "Player B could not receive the game.",
+        },
+        { id: "notice-2", level: "warn", code: "test", message: "Player C is reconnecting." },
       ],
     });
     await renderLobby(state);
@@ -313,8 +318,13 @@ describe("PartyLobby", () => {
     update({
       ...state,
       notices: [
-        { id: "notice-1", level: "warn", message: "Player B was removed from the party." },
-        { id: "notice-2", level: "info", message: "Player C joined the party." },
+        {
+          id: "notice-1",
+          level: "warn",
+          code: "test",
+          message: "Player B was removed from the party.",
+        },
+        { id: "notice-2", level: "info", code: "test", message: "Player C joined the party." },
       ],
     });
     expect(toastMock.warning).toHaveBeenCalledWith("Player B was removed from the party.");
@@ -325,7 +335,9 @@ describe("PartyLobby", () => {
     const state = makeState({
       canStart: true,
       startBlockedReason: null,
-      notices: [{ id: "notice-1", level: "info", message: "Player B joined the party." }],
+      notices: [
+        { id: "notice-1", level: "info", code: "test", message: "Player B joined the party." },
+      ],
     });
     await renderLobby(state);
     expect(toastMock.info).toHaveBeenCalledTimes(1);
@@ -345,9 +357,9 @@ describe("PartyLobby", () => {
       canStart: false,
       startBlockedReason: "The game ended; leave the party to play again.",
       notices: [
-        { id: "notice-1", level: "info", message: "Player B joined the party." },
-        { id: "notice-2", level: "info", message: "The game started." },
-        { id: "notice-3", level: "info", message: "The game ended (host_closed)." },
+        { id: "notice-1", level: "info", code: "test", message: "Player B joined the party." },
+        { id: "notice-2", level: "info", code: "test", message: "The game started." },
+        { id: "notice-3", level: "info", code: "test", message: "The game ended (host_closed)." },
       ],
     });
     await renderLobby(state);

@@ -71,6 +71,8 @@ export interface PartyDiagnostics {
 export interface PartyNotice {
   readonly id: string;
   readonly level: "info" | "warn" | "error";
+  /** Stable kebab-case name, sent to analytics instead of the message. */
+  readonly code: string;
   readonly message: string;
 }
 
