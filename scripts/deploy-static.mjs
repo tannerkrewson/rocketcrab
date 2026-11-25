@@ -14,6 +14,7 @@ const env = {
   VITE_RUNTIME_ORIGIN: origins.runtime,
   VITE_MAIN_ORIGIN: origins.nova,
   VITE_GA_MEASUREMENT_ID: process.env.VITE_GA_MEASUREMENT_ID ?? "G-V569CH5H2D",
+  VITE_CLARITY_PROJECT_ID: process.env.VITE_CLARITY_PROJECT_ID ?? "zix4dzz9v4",
 };
 if (target === "nova") {
   const revision = spawnSync("git", ["rev-parse", "--short", "HEAD"], { encoding: "utf8" });

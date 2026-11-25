@@ -10,7 +10,7 @@
  * Nova origin (strict main-origin policy):
  *   - index.html carries the build-time CSP meta tag, and _headers carries
  *     the matching policy with `frame-src` pinned to the runtime origin;
- *   - application scripts come from the main origin, Turnstile, or the configured Google tag;
+ *   - application scripts come from the main origin, Turnstile, or configured analytics providers;
  *   - the referrer meta tag is present (no path/query leakage; invite
  *     secrets already live in URL fragments).
  *
@@ -86,10 +86,22 @@ if (origin === "nova") {
     const scriptSrc = /script-src ([^;]+)/.exec(csp)?.[1] ?? "";
     const expectsAnalytics = /^G-[A-Z0-9]+$/.test(process.env.VITE_GA_MEASUREMENT_ID?.trim() ?? "");
     const tagSource = expectsAnalytics ? " https://www.googletagmanager.com" : "";
+    const expectsClarity = /^[a-z0-9]+$/.test(process.env.VITE_CLARITY_PROJECT_ID?.trim() ?? "");
+    const claritySource = expectsClarity ? " https://*.clarity.ms" : "";
     expect(
       "CSP script-src permits only the app and configured external scripts",
-      scriptSrc.trim() === `'self' https://challenges.cloudflare.com${tagSource}`,
+      scriptSrc.trim() === `'self' https://challenges.cloudflare.com${tagSource}${claritySource}`,
     );
+    for (const directive of ["connect-src", "img-src"]) {
+      const sources = new RegExp(`(?:^|;)\\s*${directive} ([^;]+)`)
+        .exec(csp)?.[1]
+        .trim()
+        .split(/\s+/);
+      expect(
+        `CSP ${directive} permits Clarity when configured`,
+        sources?.includes("https://*.clarity.ms") === expectsClarity,
+      );
+    }
     expect(
       "CSP has no 'unsafe-inline'/'unsafe-eval' for scripts",
       !/unsafe-inline|unsafe-eval/.test(scriptSrc),

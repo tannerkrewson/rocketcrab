@@ -2,6 +2,7 @@ import { createFileRoute, Link, redirect } from "@tanstack/react-router";
 import { ArrowLeft, Bot, ClipboardPaste, Sparkles } from "lucide-react";
 import { buttonStyles } from "../components/ui/Button";
 import { BrandLogo } from "../components/layout/BrandLogo";
+import { clarityPublicDocument, trackClarityAction } from "../lib/clarity";
 
 export const Route = createFileRoute("/build")({
   validateSearch: (search: Record<string, unknown>): { page?: "prompt" } => ({
@@ -44,6 +45,8 @@ export function BuildPage() {
           </p>
           <Link
             to="/editor"
+            reloadDocument={clarityPublicDocument}
+            onClick={() => trackClarityAction("open_editor_clicked")}
             className={buttonStyles(
               "info",
               "lg",

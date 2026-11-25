@@ -19,6 +19,7 @@
     "@fontsource/mukta": "5.3.0",
     "@heroui/react": "3.2.6",
     "@heroui/styles": "3.2.6",
+    "@microsoft/clarity": "1.0.2",
     "@rocketcrab/core": "0.0.0",
     "@rocketcrab/nova-api": "0.0.0",
     "@rocketcrab/party": "0.0.0",
