@@ -46,7 +46,7 @@ interface PartyEngineDefaults {
 
 /** Retained for the error screen's retry action. */
 type LastSetup =
-  | { kind: "create"; input: PartySourceSpec | undefined }
+  | { kind: "create"; input: PartySourceSpec | undefined; secret?: string }
   | { kind: "join-invite"; input: { secret: string } };
 
 /** A stable member identity; defaults to the page identity. */

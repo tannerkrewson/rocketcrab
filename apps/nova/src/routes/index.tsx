@@ -1,4 +1,4 @@
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Mail } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "../lib/toast";
@@ -14,12 +14,20 @@ import { clarityEvent } from "../lib/clarity";
 const MORE_LINK = buttonStyles("default", "lg", undefined, true);
 
 export const Route = createFileRoute("/")({
+  // `/join` opens home with the party-code box showing.
+  validateSearch: (search: Record<string, unknown>): { join?: true } =>
+    search.join === true ? { join: true } : {},
   component: HomeComponent,
 });
 
 function HomeComponent() {
-  // Joining needs a friend's invite link, so Join party explains how to get one.
-  const [joinHelpOpen, setJoinHelpOpen] = useState(false);
+  const search = Route.useSearch();
+  const navigate = useNavigate();
+  const [joinHelpOpen, setJoinHelpOpen] = useState(search.join === true);
+  const closeJoin = () => {
+    setJoinHelpOpen(false);
+    if (search.join) void navigate({ to: "/", search: {}, replace: true });
+  };
 
   // Visiting home must leave any active party, including via the browser Back button.
   const { state, engine } = usePartyEngine();
@@ -122,7 +130,7 @@ function HomeComponent() {
         </section>
       </div>
 
-      <Dialog open={joinHelpOpen} onClose={() => setJoinHelpOpen(false)} title="Join a party">
+      <Dialog open={joinHelpOpen} onClose={closeJoin} title="Join a party">
         <div className="flex flex-col gap-4">
           <p className="leading-relaxed text-foreground/80">
             Enter the code shown on your friend&apos;s screen, scan their QR code with your

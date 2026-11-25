@@ -15,11 +15,13 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as BrowseRouteImport } from './routes/browse'
 import { Route as BuildRouteImport } from './routes/build'
 import { Route as EditorRouteImport } from './routes/editor'
+import { Route as JoinRouteImport } from './routes/join'
 import { Route as LibraryRouteImport } from './routes/library'
 import { Route as PartyRouteImport } from './routes/party'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as GameGameIdRouteImport } from './routes/game.$gameId'
 import { Route as GamesGameIdEditRouteImport } from './routes/games/$gameId/edit'
+import { Route as TransferGameIdChar123KeyChar125RouteImport } from './routes/transfer.$gameId.{-$key}'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -51,6 +53,11 @@ const EditorRoute = EditorRouteImport.update({
   path: '/editor',
   getParentRoute: () => rootRouteImport,
 } as any)
+const JoinRoute = JoinRouteImport.update({
+  id: '/join',
+  path: '/join',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LibraryRoute = LibraryRouteImport.update({
   id: '/library',
   path: '/library',
@@ -76,6 +83,12 @@ const GamesGameIdEditRoute = GamesGameIdEditRouteImport.update({
   path: '/games/$gameId/edit',
   getParentRoute: () => rootRouteImport,
 } as any)
+const TransferGameIdChar123KeyChar125Route =
+  TransferGameIdChar123KeyChar125RouteImport.update({
+    id: '/transfer/$gameId/{-$key}',
+    path: '/transfer/$gameId/{-$key}',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -84,11 +97,13 @@ export interface FileRoutesByFullPath {
   '/browse': typeof BrowseRoute
   '/build': typeof BuildRoute
   '/editor': typeof EditorRoute
+  '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
   '/party': typeof PartyRoute
   '/privacy': typeof PrivacyRoute
   '/game/$gameId': typeof GameGameIdRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
+  '/transfer/$gameId/{-$key}': typeof TransferGameIdChar123KeyChar125Route
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -97,11 +112,13 @@ export interface FileRoutesByTo {
   '/browse': typeof BrowseRoute
   '/build': typeof BuildRoute
   '/editor': typeof EditorRoute
+  '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
   '/party': typeof PartyRoute
   '/privacy': typeof PrivacyRoute
   '/game/$gameId': typeof GameGameIdRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
+  '/transfer/$gameId/{-$key}': typeof TransferGameIdChar123KeyChar125Route
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -111,11 +128,13 @@ export interface FileRoutesById {
   '/browse': typeof BrowseRoute
   '/build': typeof BuildRoute
   '/editor': typeof EditorRoute
+  '/join': typeof JoinRoute
   '/library': typeof LibraryRoute
   '/party': typeof PartyRoute
   '/privacy': typeof PrivacyRoute
   '/game/$gameId': typeof GameGameIdRoute
   '/games/$gameId/edit': typeof GamesGameIdEditRoute
+  '/transfer/$gameId/{-$key}': typeof TransferGameIdChar123KeyChar125Route
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -126,11 +145,13 @@ export interface FileRouteTypes {
     | '/browse'
     | '/build'
     | '/editor'
+    | '/join'
     | '/library'
     | '/party'
     | '/privacy'
     | '/game/$gameId'
     | '/games/$gameId/edit'
+    | '/transfer/$gameId/{-$key}'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -139,11 +160,13 @@ export interface FileRouteTypes {
     | '/browse'
     | '/build'
     | '/editor'
+    | '/join'
     | '/library'
     | '/party'
     | '/privacy'
     | '/game/$gameId'
     | '/games/$gameId/edit'
+    | '/transfer/$gameId/{-$key}'
   id:
     | '__root__'
     | '/'
@@ -152,11 +175,13 @@ export interface FileRouteTypes {
     | '/browse'
     | '/build'
     | '/editor'
+    | '/join'
     | '/library'
     | '/party'
     | '/privacy'
     | '/game/$gameId'
     | '/games/$gameId/edit'
+    | '/transfer/$gameId/{-$key}'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -166,11 +191,13 @@ export interface RootRouteChildren {
   BrowseRoute: typeof BrowseRoute
   BuildRoute: typeof BuildRoute
   EditorRoute: typeof EditorRoute
+  JoinRoute: typeof JoinRoute
   LibraryRoute: typeof LibraryRoute
   PartyRoute: typeof PartyRoute
   PrivacyRoute: typeof PrivacyRoute
   GameGameIdRoute: typeof GameGameIdRoute
   GamesGameIdEditRoute: typeof GamesGameIdEditRoute
+  TransferGameIdChar123KeyChar125Route: typeof TransferGameIdChar123KeyChar125Route
 }
 
 declare module '@tanstack/react-router' {
@@ -217,6 +244,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof EditorRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/join': {
+      id: '/join'
+      path: '/join'
+      fullPath: '/join'
+      preLoaderRoute: typeof JoinRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/library': {
       id: '/library'
       path: '/library'
@@ -252,6 +286,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof GamesGameIdEditRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/transfer/$gameId/{-$key}': {
+      id: '/transfer/$gameId/{-$key}'
+      path: '/transfer/$gameId/{-$key}'
+      fullPath: '/transfer/$gameId/{-$key}'
+      preLoaderRoute: typeof TransferGameIdChar123KeyChar125RouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -262,11 +303,13 @@ const rootRouteChildren: RootRouteChildren = {
   BrowseRoute: BrowseRoute,
   BuildRoute: BuildRoute,
   EditorRoute: EditorRoute,
+  JoinRoute: JoinRoute,
   LibraryRoute: LibraryRoute,
   PartyRoute: PartyRoute,
   PrivacyRoute: PrivacyRoute,
   GameGameIdRoute: GameGameIdRoute,
   GamesGameIdEditRoute: GamesGameIdEditRoute,
+  TransferGameIdChar123KeyChar125Route: TransferGameIdChar123KeyChar125Route,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

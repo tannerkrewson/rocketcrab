@@ -3,7 +3,7 @@
  * the party's invite secret while members keep renewing it; every member
  * derives the same code, so the party protocol carries nothing extra.
  */
-import type { Scheduler } from "@rocketcrab/party";
+import { generateSessionSecret, type Scheduler } from "@rocketcrab/party";
 
 /** Members renew well inside the Worker's 10-minute lease. */
 export const PARTY_CODE_RENEW_MS = 3 * 60 * 1000;
@@ -91,6 +91,28 @@ export const claimPartyCode: ClaimPartyCode = async (secret) => {
 export async function lookupPartyCode(code: string): Promise<string | null> {
   const body = (await postCode("/api/code/lookup", { code })) as { secret?: unknown } | null;
   return typeof body?.secret === "string" ? body.secret : null;
+}
+
+/** External-game key format: a UUID, or any 10–64 URL-safe characters (legacy). */
+export function isTransferKey(key: string): boolean {
+  return /^[A-Za-z0-9_-]{10,64}$/.test(key);
+}
+
+/**
+ * The party for players an external game sent with one key: the first
+ * arrival creates it with the secret proposed here, the rest join it.
+ */
+export async function transferParty(
+  key: string,
+): Promise<{ readonly secret: string; readonly created: boolean }> {
+  const body = (await postCode("/api/transfer", { key, secret: generateSessionSecret() })) as {
+    secret?: unknown;
+    created?: unknown;
+  } | null;
+  if (typeof body?.secret !== "string" || typeof body.created !== "boolean") {
+    throw new PartyCodeError(502);
+  }
+  return { secret: body.secret, created: body.created };
 }
 
 /**
