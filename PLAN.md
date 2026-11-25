@@ -90,6 +90,10 @@ the README for local devices.
 
 ## Maintenance
 
+- A test in `npm test` failed once in the pre-push hook (lefthook runs lint,
+  typecheck, build and test in parallel) and passed on a rerun and when run
+  alone; the hook output was cut off before the failing test. Find it, e.g.
+  by looping `npx lefthook run pre-push`, and make it robust to load.
 - Snakeout's in-game "transfer to Rocketcrab" sends every player to
   `/transfer/snakeout/<uuid>/`, which Nova dropped (each player now gets the
   404). Change Snakeout (`src/server/app/game.js`) to link players to
