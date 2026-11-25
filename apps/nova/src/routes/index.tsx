@@ -3,6 +3,7 @@ import { Mail } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "../lib/toast";
 import { BrandLogo } from "../components/layout/BrandLogo";
+import { InstallAppButton } from "../components/layout/InstallAppButton";
 import { Button, buttonStyles } from "../components/ui/Button";
 import { Dialog } from "../components/ui/Dialog";
 import { usePartyEngine } from "../lib/party/use-party";
@@ -100,6 +101,9 @@ function HomeComponent() {
           About
         </Link>
       </section>
+
+      {/* Last, so it appears without shifting the buttons above. */}
+      <InstallAppButton />
 
       <a
         href="mailto:tannerkrewson@gmail.com?subject=Rocketcrab%20support"

@@ -5,6 +5,7 @@ import { Alert } from "@heroui/react";
 import { toast } from "../../lib/toast";
 import { writeToClipboard } from "../../lib/editor/clipboard";
 import type { PartyEngineState, PartyMemberView, PartyNotice } from "../../lib/party/engine";
+import { InstallAppButton } from "../layout/InstallAppButton";
 import { Button, buttonStyles } from "../ui/Button";
 import { GameBrowser } from "./GameBrowser";
 import { NameEntry } from "./NameEntry";
@@ -431,7 +432,8 @@ export function PartyLobby({
           </Alert.Content>
         </Alert>
       ) : null}
-      <div className="flex justify-center">
+      <div className="flex flex-wrap justify-center gap-2">
+        <InstallAppButton size="md" />
         <Button variant="default" soft size="md" onClick={onLeave}>
           <LogOut className="h-4 w-4" aria-hidden="true" />
           {state.members.length === 1 ? "End party" : "Leave party"}
