@@ -33,10 +33,70 @@ churn on upgrade), and need no paid always-on server.
       `PartyCodeLease` (`apps/nova/src/lib/party/party-code.ts`) posts
       `/api/code/claim` every 3 minutes, so Worker and Durable Object requests
       grow with party size and dominate a player's usage (the free plan's
-      100k requests a day fail parties once spent). Let only the authority
-      claim and renew, publish the code in the replicated party state for
-      everyone else to show, and have a new authority take over the lease on
-      migration; the 10-minute TTL covers the handover.
+      100k requests a day fail parties once spent). A big party behind one
+      school NAT also shares one claim rate-limit bucket. Let only the
+      authority claim and renew, publish the code in the replicated party
+      state for everyone else to show, and have a new authority take over the
+      lease on migration; the 10-minute TTL covers the handover. Keep the code
+      live for the whole party, games included: friends join mid-game from
+      the header.
+- [ ] Security: require Invisible Turnstile on `/api/code/lookup`, as
+      `/api/turn` does (`verifyChallenge` in `deploy/nova/turn.ts`; share it
+      rather than copy it). Four-letter codes leave 279,805 possibilities and
+      a lookup returns the raw `partySecret`, so without a bot check a script
+      (or a proxy pool) can sweep the space and join live parties, read
+      replicated hidden state and receive private custom game HTML. Keep four
+      letters; Turnstile, not code length, is the fix. Turnstile tokens are
+      single-use: the `/$code` route (`apps/nova/src/routes/$code.tsx`, which
+      already primes a challenge) needs its own token for the lookup, with a
+      distinct `action`, and `/api/turn` then needs a fresh one; rework
+      `apps/nova/src/lib/party/turnstile.ts` so a consumed token is never
+      reused. Fail closed like `/api/turn` (`TURNSTILE_REQUIRED`). When the
+      challenge fails or is blocked (content blockers, filtered networks),
+      show a clear message on `/$code`: party codes need a quick security
+      check this browser or network blocked; ask the host for the invite
+      link or QR code instead. Keep the rate limit as a backstop.
+- [ ] Security: derive party codes with `HMAC-SHA256` keyed by a new Worker
+      secret `CODE_HMAC_SECRET` instead of unkeyed SHA-256 (`codeCandidates`
+      in `deploy/nova/code.ts`). Today anyone can grind a secret whose first
+      candidate is a chosen code (`crab`, `abcd`, a code just seen in a
+      stream or chat, one that lapsed) in well under a second and squat it,
+      so mistyped codes and stale links land in an attacker's party, which
+      can push arbitrary game HTML to them. HMAC keeps the derivation
+      deterministic, so every authority still lands on the same code with no
+      protocol change. Missing secret: `/api/code/claim` fails closed with
+      503 in production; local dev reads it from `.dev.vars`. Rotating it
+      moves every live party to a new code on its next renewal (shown codes
+      change; invite links are unaffected). Add the secret to the comment at
+      the end of `deploy/nova/wrangler.toml` and to `deploy/README.md`.
+- [ ] Security: bucket the rate limiter by IPv6 `/64`. `withinRateLimit`
+      (`deploy/nova/worker.ts`) keys on the raw `CF-Connecting-IP`, so one
+      machine rotating addresses inside its `/64` gets unlimited buckets on
+      every route, including `/api/code/*` and `/api/relay` (which creates
+      rooms on the external game servers). Keep IPv4 as is.
+- [ ] Security: `handleCodeLookup` validates `/^[a-z]{4}$/`, so lookups with
+      `i`, `o`, `l` or a `BLOCKED` word wake a `PartyCode` Durable Object
+      that can never hold a code. Reject anything `codeCandidates` can't
+      produce before calling the stub (export one `isPossibleCode` from
+      `deploy/nova/code.ts`).
+- [ ] Clear the in-memory invite handoff when it isn't consumed.
+      `handedOff` in `apps/nova/src/lib/party/invite-import.ts` is cleared
+      only when `/party` imports it, so a `/$code` → `/party` navigation that
+      is cancelled or redirected leaves it set, and a later "Start party"
+      joins that looked-up party instead of creating one. Consume it only on
+      the navigation it was set for (e.g. pass it in router state, or clear
+      it when `/$code` unmounts without navigating to `/party`).
+- [ ] Fix the comments the party codes made wrong: `deploy/nova/code.ts`'s
+      header says invite links and QR codes never come through `PartyCode`,
+      but every party claims a code, so the Worker learns every party's
+      secret; `packages/party/src/secrets.ts` says the secret is shared
+      solely through private invite fragments. Add `PartyCode` to the
+      namespaces the teardown checklist in `deploy/README.md` verifies are
+      gone.
+- [ ] At cutover, after setting `workers_dev = false` on
+      `deploy/nova/wrangler.toml`, remove
+      `rocketcrab.tannerkrewson.workers.dev` from the Turnstile widget's
+      hostnames and from `deploy/README.md`.
 - [ ] Check `rocketcrab.com` and the beta on iOS Safari with content blockers
       on: the app loads, and parties work without analytics or Turnstile.
 - [ ] After the first production deploy, watch a Clarity recording of a party
@@ -136,3 +196,22 @@ the README for local devices.
   CDN libraries work) and pre-boot in the lobby for readiness. As a result,
   games share runtime-origin storage and any camera/mic permission grant across
   games, and can phone home to external servers.
+- The runtime's site is `tannerkrewson.workers.dev` (the Public Suffix List
+  lists `workers.dev`, not `*.workers.dev`), so untrusted game HTML is
+  same-site with every other `*.tannerkrewson.workers.dev` hostname: it can
+  set cookies there and send same-site requests to them. Never host another
+  app on this account's workers.dev subdomain (keep `workers_dev` and
+  `preview_urls` off elsewhere). The beta app on
+  `rocketcrab.tannerkrewson.workers.dev` is same-site with the runtime too;
+  only `rocketcrab.com` gets the cross-site isolation `deploy/README.md`
+  describes.
+- Party codes: the Worker stores each party's raw `partySecret` in its
+  `PartyCode` Durable Object while the code is live (and up to 10 minutes
+  after the last renewal), so the Worker could join any party or derive its
+  room password and tunnel keys. The code also travels in the URL path
+  (`rocketcrab.com/abcd`), reaching edge logs, link unfurlers and history
+  while it is live, unlike the `#secret=` fragment of invite links.
+- `/transfer/$gameId` starts a party, and for most external games a relay
+  room, without a click, so any site can trigger that for a returning
+  player. It adds nothing a script calling `/api/relay` directly couldn't
+  do; the per-IP (and per-`/64`) limit on `/api/relay` is the mitigation.
