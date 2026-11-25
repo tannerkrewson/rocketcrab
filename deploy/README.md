@@ -88,9 +88,9 @@ npx --yes wrangler@4.161.0 secret put TURN_KEY_API_TOKEN --config deploy/nova/wr
 Keep the token in your credential store. Cloudflare returns it when the key is
 created. [Realtime TURN keys](https://developers.cloudflare.com/api/resources/calls/subresources/turn/)
 
-Create an Invisible Turnstile widget for the Nova hostname. Provide its public
-site key as `VITE_TURNSTILE_SITE_KEY` in the Nova build and store its secret as
-`TURNSTILE_SECRET_KEY` on the Worker. Review the privacy requirements for using
+The Invisible Turnstile widget `rocketcrab` allows `rocketcrab.com` and
+`rocketcrab.tannerkrewson.workers.dev`. `scripts/deploy-static.mjs` builds in
+its public site key; its secret is `TURNSTILE_SECRET_KEY` on the Worker. Review the privacy requirements for using
 Invisible mode. [Turnstile widget setup](https://developers.cloudflare.com/turnstile/get-started/widget-management/)
 
 ## Monitoring
@@ -172,15 +172,15 @@ secrets.
 ## Live state
 
 - 2026-11-25: replaced the `rocketcrab-nova` Worker with `rocketcrab`
-  (`https://rocketcrab.tannerkrewson.workers.dev`), version `1cd65736`, so
+  (`https://rocketcrab.tannerkrewson.workers.dev`), version `716c88c0`, so
   one `v1` migration creates `SignalHub`, `TunnelPair` and `PartyCode`. The
   runtime, version `9e4578c0`, frames only the new origin. The old Worker
   and its hostname are deleted.
 - The app uses the Realtime TURN key `rocketcrab-turn`; its ID and bearer
   token are Worker secrets, and the key mints credentials when called
-  directly. `/api/turn` answers 500 `worker_misconfigured` until the
-  Turnstile secret exists, because `TURNSTILE_REQUIRED` is `"true"`, so
-  parties run without TURN for now.
+  directly. The Turnstile widget `rocketcrab` is live: its secret is on the
+  Worker, the app build carries its site key, and `/api/turn` answers 403
+  without a passing check. A real browser minting TURN is still unverified.
 - Verified a two-browser party joined by code through `/join`, and
   `/transfer/drawphone` creating a Drawphone room through `/api/relay`
   (Drawphone, Drawphone for Kids, Spyfall, Snakeout and Werewolf relays

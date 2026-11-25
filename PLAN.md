@@ -24,13 +24,11 @@ churn on upgrade), and need no paid always-on server.
 
 ## Before launch
 
-- [ ] Provision and validate the Invisible Turnstile widget with the deployment
-      owner, for both `rocketcrab.tannerkrewson.workers.dev` and
-      `rocketcrab.com`. Until then the beta's `/api/turn` answers 500 and
-      parties run without TURN. Set its site key for the app build and its
-      Worker secret as described in [the deploy runbook](deploy/README.md).
-      Confirm TURN mints on success and that blocked challenges fall back to
-      direct WebRTC or the encrypted tunnel.
+- [ ] Validate Turnstile on real browsers: a party on the beta and on
+      `rocketcrab.com` gets `/api/turn` 200 and GA Realtime shows
+      `turn_cred_mint` outcome `configured`, and a blocked challenge falls back
+      to direct WebRTC or the encrypted tunnel. Headless Playwright never
+      passes the challenge, so automated runs skip TURN.
 - [ ] After the first production deploy, watch a Clarity recording of a party
       from an eligible region and confirm names, game titles and the invite
       QR code are masked.
