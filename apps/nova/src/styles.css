@@ -28,7 +28,7 @@
 @layer base {
   .dark,
   [data-theme="dark"] {
-    --rocket: oklch(60% 0.22 30);
+    --rocket: oklch(60% 0.24 29);
     --nova: oklch(55% 0.21 264);
     /* Light enough to read on black and over the Nova background. */
     --nova-text: oklch(80% 0.12 262);
@@ -319,12 +319,14 @@
 
 .button--primary,
 .button--danger {
-  --button-bg: color-mix(in oklab, var(--accent) 90%, transparent);
+  /* Solid and vivid: white in the fill, rim, or glow washes red out to pink.
+     Mixing with white in oklch keeps the hue and more of the chroma. */
+  --button-bg: var(--accent);
   --button-bg-hover: var(--button-bg);
   --button-bg-pressed: var(--button-bg);
   --button-fg: oklch(99% 0 0);
-  --button-rim: color-mix(in oklab, var(--accent) 55%, white);
-  --button-glow: 0.35;
+  --button-rim: color-mix(in oklch, var(--accent) 65%, white);
+  --button-glow: 0.2;
 }
 
 .button--danger {
