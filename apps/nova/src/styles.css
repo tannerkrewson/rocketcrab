@@ -106,7 +106,43 @@
   }
 }
 
+/* The flame sits alone in a box below the nozzle (viewBox -8 -8 144 144:
+   x 41-95, y from 87.5), clear of the legs. */
+.rc-logo-body {
+  clip-path: polygon(
+    0 0,
+    100% 0,
+    100% 100%,
+    65.97% 100%,
+    65.97% 66.32%,
+    34.03% 66.32%,
+    34.03% 100%,
+    0 100%
+  );
+}
+
+.rc-logo-flame {
+  clip-path: inset(66.32% 34.03% 0 34.03%);
+}
+
 @media (prefers-reduced-motion: no-preference) {
+  .rc-logo-launch .rc-logo-flame {
+    animation: rc-logo-flame 3s both;
+  }
+
+  @keyframes rc-logo-flame {
+    0% {
+      opacity: 1;
+    }
+    6%,
+    88% {
+      opacity: 0;
+    }
+    100% {
+      opacity: 1;
+    }
+  }
+
   .rc-logo-launch {
     position: relative;
     z-index: 1;
@@ -118,7 +154,8 @@
     content: "";
     position: absolute;
     z-index: -1;
-    top: 76%;
+    /* Starts at the nozzle; the resting flame fades out as this grows. */
+    top: 64%;
     left: 32%;
     width: 36%;
     height: 5rem;

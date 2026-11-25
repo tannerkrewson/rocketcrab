@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 export function BrandLogo({ nova = false }: { nova?: boolean }) {
   const [launching, setLaunching] = useState(false);
   const crabRef = useRef<HTMLSpanElement>(null);
+  const logo = nova ? "/rocketcrab-logo-nova.svg" : "/rocketcrab-logo-no-glow.svg";
 
   useEffect(() => {
     if (!launching) return;
@@ -30,15 +31,27 @@ export function BrandLogo({ nova = false }: { nova?: boolean }) {
       onClick={() => setLaunching(true)}
     >
       <span ref={crabRef} className={launching ? "block rc-logo-launch" : "block"}>
-        <img
-          src={nova ? "/rocketcrab-logo-nova.svg" : "/rocketcrab-logo-no-glow.svg"}
-          alt=""
-          draggable={false}
-          className="block size-14"
-          width={56}
-          height={56}
-          data-testid="brand-logo"
-        />
+        {/* The same mark twice: the crab without its resting flame, and the
+            flame alone, so the flame can fade as the launch exhaust takes over. */}
+        <span className="relative block size-14">
+          <img
+            src={logo}
+            alt=""
+            draggable={false}
+            className="rc-logo-body block size-14"
+            width={56}
+            height={56}
+            data-testid="brand-logo"
+          />
+          <img
+            src={logo}
+            alt=""
+            draggable={false}
+            className="rc-logo-flame absolute inset-0 block size-14"
+            width={56}
+            height={56}
+          />
+        </span>
       </span>
     </button>
   );
