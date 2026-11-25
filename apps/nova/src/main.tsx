@@ -12,13 +12,14 @@ import "@fontsource/mukta/800.css";
 // The brand title uses Inconsolata; the rest of the UI uses Mukta.
 import "@fontsource-variable/inconsolata";
 import { trackPage } from "./lib/analytics";
-import { startClarity } from "./lib/clarity";
+import { guardReplayNavigation, startClarity } from "./lib/clarity";
 import { routeTree } from "./routeTree.gen";
 import "./styles.css";
 
 const queryClient = new QueryClient();
 
 const router = createRouter({ routeTree });
+guardReplayNavigation(router.history);
 
 router.subscribe("onResolved", () => {
   void startClarity();

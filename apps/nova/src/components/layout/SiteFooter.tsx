@@ -1,5 +1,4 @@
 import { Link } from "@tanstack/react-router";
-import { clarityPublicDocument } from "../../lib/clarity";
 import type { PartyEngine } from "../../lib/party/engine";
 import { usePartyEngine } from "../../lib/party/use-party";
 
@@ -33,7 +32,7 @@ export function SiteFooter({ engine }: { engine?: PartyEngine }) {
         <span className="mx-2" aria-hidden="true">
           ·
         </span>
-        <Link to="/privacy" reloadDocument={clarityPublicDocument} className={LINK}>
+        <Link to="/privacy" className={LINK}>
           Privacy
         </Link>
       </p>

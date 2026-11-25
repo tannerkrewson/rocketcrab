@@ -1,27 +1,51 @@
+import type { RouterHistory } from "@tanstack/react-router";
+import { findCatalogGame } from "./catalog";
+
 const projectId = import.meta.env.VITE_CLARITY_PROJECT_ID?.trim() ?? "";
 const preferenceKey = "nova:session-replay";
 const publicPaths = new Set(["/", "/build", "/about"]);
+const partySearch = new Set(["gameId", "title", "browse"]);
 
 const clarityEnabled =
   import.meta.env.PROD &&
   /^[a-z0-9]+$/.test(projectId) &&
   typeof window !== "undefined" &&
-  window.location.origin === import.meta.env.VITE_MAIN_ORIGIN;
-
-function isPublicPage(): boolean {
-  const { pathname, search, hash } = window.location;
-  return publicPaths.has(pathname) && !search && !hash;
-}
-
-// The hosted script can read URLs and the DOM. Keep it in documents opened on
-// public pages. Links from those pages into the app use a fresh document.
-export const clarityPublicDocument =
-  clarityEnabled &&
-  isPublicPage() &&
+  window.location.origin === import.meta.env.VITE_MAIN_ORIGIN &&
+  // Replay records the referrer; a same-origin one can carry a private path.
   (!document.referrer || /^https?:\/\/[^/?#]+\/$/.test(document.referrer));
 
-let sdk: typeof import("@microsoft/clarity").default | undefined;
-let starting = false;
+/**
+ * Replay records public pages and the party screen for listed games only.
+ * The Clarity project uses strict masking, so page text is hidden, but
+ * attributes are recorded as-is: never put names or secrets in them there.
+ */
+export function replayAllowed({
+  pathname,
+  search,
+  hash,
+}: Pick<Location, "pathname" | "search" | "hash">): boolean {
+  if (hash) return false;
+  if (publicPaths.has(pathname)) return !search;
+  if (pathname !== "/party") return false;
+  const params = new URLSearchParams(search);
+  const gameId = params.get("gameId");
+  return (
+    [...params.keys()].every((key) => partySearch.has(key)) &&
+    (gameId === null || findCatalogGame(gameId) !== undefined)
+  );
+}
+
+let recording = false;
+// Eligibility is checked once per document.
+let attempted = false;
+
+function clarity(command: string, ...args: unknown[]): void {
+  try {
+    window.clarity?.(command, ...args);
+  } catch {
+    // Recording is optional.
+  }
+}
 
 export function replayOptedOut(): boolean {
   try {
@@ -41,9 +65,17 @@ export function setReplayOptOut(optedOut: boolean): boolean {
   }
 }
 
+/** Record the current page when replay allows it. Call after each navigation. */
 export async function startClarity(): Promise<void> {
-  if (!clarityPublicDocument || !isPublicPage() || replayOptedOut() || starting) return;
-  starting = true;
+  if (!clarityEnabled || recording || replayOptedOut() || !replayAllowed(window.location)) return;
+  if (window.clarity !== undefined) {
+    // Resume after leaving an unrecorded page.
+    recording = true;
+    clarity("start");
+    return;
+  }
+  if (attempted) return;
+  attempted = true;
   try {
     const eligibility = await fetch("/api/replay", {
       mode: "same-origin",
@@ -52,20 +84,19 @@ export async function startClarity(): Promise<void> {
     });
     if (eligibility.status !== 204) return;
 
-    const { default: clarity } = await import("@microsoft/clarity");
-    if (!isPublicPage() || replayOptedOut()) return;
+    const { default: sdk } = await import("@microsoft/clarity");
+    if (!replayAllowed(window.location) || replayOptedOut()) return;
     // Use the project's normal first-party cookies in eligible regions.
-    clarity.init(projectId);
-    sdk = clarity;
-    document.getElementById("clarity-script")?.addEventListener("error", () => (sdk = undefined));
+    sdk.init(projectId);
+    recording = true;
+    document.getElementById("clarity-script")?.addEventListener("error", () => {
+      recording = false;
+    });
 
     const checkPreference = () => {
-      if (!sdk || !replayOptedOut()) return;
-      try {
-        sdk.consentV2({ ad_Storage: "denied", analytics_Storage: "denied" });
-      } finally {
-        window.location.reload();
-      }
+      if (!replayOptedOut()) return;
+      clarity("consentV2", { ad_Storage: "denied", analytics_Storage: "denied" });
+      window.location.reload();
     };
     window.addEventListener("storage", (event) => {
       if (event.key === preferenceKey || event.key === null) checkPreference();
@@ -76,16 +107,35 @@ export async function startClarity(): Promise<void> {
   }
 }
 
-export function trackClarityAction(
-  action:
-    | "start_party_clicked"
-    | "join_help_opened"
-    | "browse_games_clicked"
-    | "open_editor_clicked",
-): void {
-  try {
-    sdk?.event(action);
-  } catch {
-    // Recording is optional.
+function stopBefore(next: Pick<Location, "pathname" | "search" | "hash">): void {
+  if (!recording || replayAllowed(next)) return;
+  recording = false;
+  clarity("stop");
+}
+
+/**
+ * Clarity restarts itself on every URL change, so it must stop before the
+ * router leaves a recorded page. Back and forward change the URL first, so a
+ * capturing listener stops it before Clarity's own popstate handler runs.
+ */
+export function guardReplayNavigation(history: RouterHistory): void {
+  history.block({
+    blockerFn: ({ nextLocation }) => {
+      stopBefore(nextLocation);
+      return false;
+    },
+    enableBeforeUnload: false,
+  });
+  window.addEventListener("popstate", () => stopBefore(window.location), { capture: true });
+}
+
+/** Mark a moment in the current recording so replays can be filtered by it. */
+export function clarityEvent(name: string): void {
+  if (recording) clarity("event", name);
+}
+
+declare global {
+  interface Window {
+    clarity?: (command: string, ...args: unknown[]) => void;
   }
 }

@@ -132,12 +132,15 @@ are disabled. Search for `rate_limiter_unavailable`, `turn_upstream_error`, or
 
 Nova deploys use Microsoft Clarity project `zix4dzz9v4`. Set
 `VITE_CLARITY_PROJECT_ID` to an empty value to disable replay for a deployment.
-Cookie-based replay runs by default on home, about, and the Nova introduction
-for visitors in the US and Canada outside Québec. The Worker checks eligibility
-without returning the visitor's location and skips replay for Global Privacy
-Control. The footer's Privacy link lets visitors turn off replay in their
-browser. A fresh document separates replay from party, catalog, library, and
-editor pages that can contain private data.
+Cookie-based replay runs by default on home, about, the Nova introduction, and
+the party screen for listed games, for visitors in the US and Canada outside
+Québec. The Worker checks eligibility without returning the visitor's location
+and skips replay for Global Privacy Control. The footer's Privacy link lets
+visitors turn off replay in their browser. Clarity stops before the router
+leaves those pages, so catalog, library, and editor pages are never recorded.
+The project must keep strict masking (Settings → Masking). Strict masking hides
+text but records attributes, so recorded screens must keep names, titles, and
+invite secrets out of attributes; the party component tests check this.
 Use Clarity's heatmaps and filter recordings by the Smart Events
 `start_party_clicked`, `join_help_opened`, `browse_games_clicked`, and
 `open_editor_clicked`. These are clicks on public pages. GA4 measures the

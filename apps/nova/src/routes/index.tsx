@@ -6,7 +6,7 @@ import { BrandLogo } from "../components/layout/BrandLogo";
 import { Button, buttonStyles } from "../components/ui/Button";
 import { Dialog } from "../components/ui/Dialog";
 import { usePartyEngine } from "../lib/party/use-party";
-import { clarityPublicDocument, trackClarityAction } from "../lib/clarity";
+import { clarityEvent } from "../lib/clarity";
 
 /** The secondary menu: glass buttons sized to the longest label (button-stack). */
 const MORE_LINK = buttonStyles("default", "lg", undefined, true);
@@ -67,7 +67,7 @@ function HomeComponent() {
           variant="primary"
           size="lg"
           onClick={() => {
-            trackClarityAction("join_help_opened");
+            clarityEvent("join_help_opened");
             setJoinHelpOpen(true);
           }}
         >
@@ -75,8 +75,7 @@ function HomeComponent() {
         </Button>
         <Link
           to="/party"
-          reloadDocument={clarityPublicDocument}
-          onClick={() => trackClarityAction("start_party_clicked")}
+          onClick={() => clarityEvent("start_party_clicked")}
           className={buttonStyles("primary", "lg")}
         >
           Start party
@@ -87,13 +86,12 @@ function HomeComponent() {
         <Link to="/build" className={MORE_LINK}>
           Build a game
         </Link>
-        <Link to="/library" reloadDocument={clarityPublicDocument} className={MORE_LINK}>
+        <Link to="/library" className={MORE_LINK}>
           My games
         </Link>
         <Link
           to="/browse"
-          reloadDocument={clarityPublicDocument}
-          onClick={() => trackClarityAction("browse_games_clicked")}
+          onClick={() => clarityEvent("browse_games_clicked")}
           className={MORE_LINK}
         >
           Browse games
