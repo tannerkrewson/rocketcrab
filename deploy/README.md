@@ -33,8 +33,10 @@ upgrades. The socket handlers also budget signaling messages and tunnel bytes.
 
 The runtime must be on a different **site** (registrable domain) from the
 app, not just a different origin: same-site hosting let a looping game wedge
-the app's tab. `workers.dev` is on the Public Suffix List, so the beta
-hostnames qualify; a `rocketcrab.com` subdomain would not. The app's Vite
+the app's tab. `workers.dev` is on the Public Suffix List, so the runtime
+stays on `rocketcrab-runtime.tannerkrewson.workers.dev` in production; a
+`rocketcrab.com` subdomain would not qualify. A network that blocks
+`*.workers.dev` blocks Nova-made games but not the app or external games. The app's Vite
 plugin writes a strict CSP into `index.html` and `dist/_headers`, with
 `frame-src`, `img-src` and `connect-src` derived from the game list
 (`apps/nova/src/lib/catalog`). The runtime denies framing by anything but
@@ -196,19 +198,17 @@ secrets.
 
 ## Production cutover
 
-1. Add a Cloudflare zone for a separate registrable runtime domain. Choose a
-   hostname there and configure it as a Custom Domain in
-   `deploy/runtime/wrangler.toml`. Add a `[[routes]]` entry with the hostname
-   as `pattern` and `custom_domain = true`. [Cloudflare Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)
-2. Save the existing `rocketcrab.com` DNS records and any Worker, Pages or
+1. Save the existing `rocketcrab.com` DNS records and any Worker, Pages or
    redirect bindings that serve the legacy app. Agree on a cutover window.
-   Prepare the runtime build to allow the production app by setting both
-   HTTPS origins in `deploy/origins.json`. Deploy the runtime and confirm its
-   `frame-ancestors` header allows `https://rocketcrab.com`.
+2. Set `nova` in `deploy/origins.json` to `https://rocketcrab.com` (the
+   runtime keeps its workers.dev origin). Deploy the runtime and confirm its
+   `frame-ancestors` header allows `https://rocketcrab.com`. From here the
+   beta app can no longer frame Nova games.
 3. Resolve any conflicting legacy DNS or product binding for
    `rocketcrab.com`, then add its Custom Domain to `deploy/nova/wrangler.toml`
-   and deploy Nova. The app and `/api` move together. Keep the legacy app
-   deployment available during validation.
+   (a `[[routes]]` entry with `custom_domain = true`) and deploy Nova. The app
+   and `/api` move together. Keep the legacy app deployment available during
+   validation. [Cloudflare Custom Domains](https://developers.cloudflare.com/workers/configuration/routing/custom-domains/)
 4. Verify the production editor and cross-site game frame, TURN minting and
    a party on two networks, including tunnel fallback. If validation fails,
    detach the Nova Custom Domain and restore the recorded legacy binding and
@@ -226,9 +226,11 @@ secrets.
 
 ### Retire the beta URLs after launch
 
-Set `workers_dev = false` and keep `preview_urls = false` in both Worker configs,
-then redeploy both. Verify that the custom domains still work and that both
-beta URLs stop serving Rocketcrab. The production Workers and their Durable
+Set `workers_dev = false` and keep `preview_urls = false` in
+`deploy/nova/wrangler.toml`, then redeploy Nova. Keep the runtime's
+`workers_dev = true`: its workers.dev hostname is the production runtime.
+Verify that `rocketcrab.com` still works and the Nova beta URL stops serving
+Rocketcrab. The production Workers and their Durable
 Objects remain in use. If production switched to a separate TURN key, delete
 the beta key after beta traffic has drained. [Disable workers.dev](https://developers.cloudflare.com/workers/configuration/routing/workers-dev/#disabling-workersdev)
 

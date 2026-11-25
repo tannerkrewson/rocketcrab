@@ -36,13 +36,6 @@ engine renewal, the `/$code` route, home code entry and the party address.
 
 ## Before launch
 
-- [ ] Let the runtime accept more than one app origin. `apps/runtime` builds
-      `frame-ancestors` and its postMessage check from the single
-      `VITE_MAIN_ORIGIN`, and `deploy/origins.json` holds one `nova` origin,
-      yet cutover step 2 in `deploy/README.md` says to allow both the beta
-      and `https://rocketcrab.com`. Make `origins.json` take a list so the
-      production runtime domain can serve the beta app before cutover and
-      both during it.
 - [ ] Add `https://rocketcrab.com` to the Turnstile widget's hostnames when
       provisioning it, alongside the beta hostname.
 - [ ] Provision and validate the Invisible Turnstile widget with the deployment
@@ -76,7 +69,8 @@ the README for local devices.
 - [ ] Desktop Wi-Fi ↔ iPhone on cellular; two phones on different carriers;
       connected for more than a minute.
 - [ ] A school/corporate network or a UDP-blocking VPN lands on TURN or the
-      tunnel. Note whether that network blocks `*.workers.dev`.
+      tunnel. Note whether that network blocks `*.workers.dev`, which hosts
+      the production runtime (Nova-made games).
 - [ ] Four mixed devices; a phone leaves and rejoins.
 - [ ] A 2 MiB game source over cellular and over the tunnel.
 - [ ] iPhone Safari backgrounded for 1–3 minutes recovers; a locked phone
