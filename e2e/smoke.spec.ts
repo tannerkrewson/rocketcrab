@@ -29,7 +29,8 @@ test("launches on the home and Nova pages, then returns for another launch", asy
   await page.emulateMedia({ reducedMotion: "no-preference" });
   await page.goto("/");
   const launch = page.getByRole("button", { name: "Launch rocketcrab" });
-  const crab = page.getByTestId("brand-logo").locator("..");
+  // The launching element is the button's direct child; it wraps the crab and its flame.
+  const crab = launch.locator(":scope > span");
   await launch.click();
   await expect(crab).toHaveClass(/rc-logo-launch/);
   await expect(page).toHaveURL(/\/$/);

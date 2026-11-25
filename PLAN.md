@@ -82,9 +82,6 @@ the README for local devices.
   typecheck, build and test in parallel) and passed on a rerun and when run
   alone; the hook output was cut off before the failing test. Find it, e.g.
   by looping `npx lefthook run pre-push`, and make it robust to load.
-- `e2e/smoke.spec.ts` "launches on the home and Nova pages" fails on
-  Chromium and Firefox: the logo never gets `rc-logo-launch` after the click.
-  Seen 2026-11-25; unrelated to party codes.
 - Make Nova's Vite config import graph compatible with the native config loader
   before upgrading to a Vite release that defaults to it.
 - On a real iPhone, scroll a long page (home with "Get the app", the lobby)
