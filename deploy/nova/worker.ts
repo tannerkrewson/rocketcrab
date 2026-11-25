@@ -1,5 +1,5 @@
 // Nova party API. Cloudflare serves static assets outside /api.
-import { handleCodeClaim, handleCodeLookup, type CodeEnv } from "./code";
+import { handleCodeClaim, handleCodeLookup, handleTransfer, type CodeEnv } from "./code";
 import { jsonError, type ObjectNamespace } from "./http";
 import { handleRelay } from "./relay";
 import { handleTurn, type TurnEnv } from "./turn";
@@ -33,6 +33,7 @@ const ROUTES: Record<string, { handler: Handler; key: string; limiter: Limiter }
   // Separate keys: members' renewals never spend a guesser-facing lookup budget.
   "/api/code/claim": { handler: handleCodeClaim, key: "code-claim", limiter: "RATE_LIMITER" },
   "/api/code/lookup": { handler: handleCodeLookup, key: "code-lookup", limiter: "RATE_LIMITER" },
+  "/api/transfer": { handler: handleTransfer, key: "transfer", limiter: "RATE_LIMITER" },
 };
 
 const SOCKET_ROUTES: { pattern: RegExp; key: string; binding: "SIGNAL_HUB" | "TUNNEL_PAIR" }[] = [

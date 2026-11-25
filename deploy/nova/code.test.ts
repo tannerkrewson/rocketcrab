@@ -153,3 +153,38 @@ describe("party codes", () => {
     expect(response.status).toBe(403);
   });
 });
+
+describe("external-game transfers", () => {
+  const KEY = "3f2c8f0e-5b8e-4a5e-9a51-2b7f0c1d9e11";
+
+  async function transfer(key: string, secret: string, env: EdgeEnv) {
+    const response = await post("/api/transfer", { key, secret }, env);
+    return { status: response.status, body: await response.json() };
+  }
+
+  it("gives the first arrival's party to everyone sent with the same key", async () => {
+    const { namespace } = codeNamespace();
+    const env: EdgeEnv = { PARTY_CODE: namespace };
+    expect(await transfer(KEY, SECRET_A, env)).toEqual({
+      status: 200,
+      body: { secret: SECRET_A, created: true },
+    });
+    expect(await transfer(KEY, SECRET_B, env)).toEqual({
+      status: 200,
+      body: { secret: SECRET_A, created: false },
+    });
+    // Transfer keys never collide with four-letter codes.
+    expect((await transfer("abcdabcdab", SECRET_B, env)).body).toEqual({
+      secret: SECRET_B,
+      created: true,
+    });
+  });
+
+  it("rejects short keys and bad secrets", async () => {
+    const { namespace, ids } = codeNamespace();
+    const env: EdgeEnv = { PARTY_CODE: namespace };
+    expect((await transfer("short", SECRET_A, env)).status).toBe(400);
+    expect((await transfer(KEY, "nope", env)).status).toBe(400);
+    expect(ids).toEqual([]);
+  });
+});
