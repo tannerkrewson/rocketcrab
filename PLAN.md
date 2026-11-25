@@ -28,7 +28,7 @@ churn on upgrade), and need no paid always-on server.
       `rocketcrab.com` gets `/api/turn` 200 and GA Realtime shows
       `turn_cred_mint` outcome `configured`, and a blocked challenge falls back
       to direct WebRTC or the encrypted tunnel. Opening `rocketcrab.com/<code>`
-      joins (the `code_lookup` challenge passes), and with
+      joins (passed on the beta 2026-11-25), and with
       `challenges.cloudflare.com` blocked it shows the "Couldn't check this
       browser" notice. Headless Playwright never passes the challenge, so
       automated runs skip TURN and builds without a site key skip both.

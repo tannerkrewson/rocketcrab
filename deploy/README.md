@@ -202,8 +202,8 @@ secrets.
   for one secret return the same code. The runtime was unchanged and stays
   at `9e4578c0`. The account holds only the two Workers, their three
   Durable Object namespaces and the `rocketcrab` Turnstile widget, so there
-  was nothing stale to remove. A real browser joining by code through
-  Turnstile is still unverified.
+  was nothing stale to remove. The owner joined a party by code through
+  Turnstile on real devices.
 - Verified a two-browser party joined by code through `/join`, and
   `/transfer/drawphone` creating a Drawphone room through `/api/relay`
   (Drawphone, Drawphone for Kids, Spyfall, Snakeout and Werewolf relays
