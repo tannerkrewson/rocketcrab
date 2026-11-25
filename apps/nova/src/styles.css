@@ -45,10 +45,15 @@
        animated full-screen canvas every frame is too costly on phones.
        Overlays (dialogs, menus) stay opaque for legibility. */
     --background: oklch(0% 0 0);
-    --surface: oklch(21% 0 0 / 0.85);
+    /* A faint cool tint offsets the red that shows through. */
+    --surface: oklch(16% 0.008 255 / 0.74);
     --surface-secondary: oklch(100% 0 0 / 0.075);
     --surface-tertiary: oklch(100% 0 0 / 0.125);
-    --surface-shadow: inset 0 1px 0 0 oklch(100% 0 0 / 0.07), 0 12px 32px -16px oklch(0% 0 0 / 0.7);
+    /* Frosted like the buttons: a soft inner rim, a top edge, and a sheen. */
+    --surface-shadow:
+      inset 0 0 6px 1px oklch(100% 0 0 / 0.06), inset 0 1px 0 0 oklch(100% 0 0 / 0.1),
+      0 12px 32px -16px oklch(0% 0 0 / 0.7);
+    --surface-sheen: linear-gradient(oklch(100% 0 0 / 0.06), transparent 3.5rem);
     --overlay: oklch(23% 0 0);
     --overlay-shadow: inset 0 1px 0 0 oklch(100% 0 0 / 0.08), 0 24px 48px -12px oklch(0% 0 0 / 0.8);
     --default: oklch(28% 0 0 / 0.9);
@@ -224,7 +229,12 @@
    --surface/--surface-shadow tokens. */
 @utility glass {
   background-color: var(--surface);
+  background-image: var(--surface-sheen);
   box-shadow: var(--surface-shadow);
+}
+
+.card--default {
+  background-image: var(--surface-sheen);
 }
 
 /* Button groups: every button in the group is as wide as the widest label
