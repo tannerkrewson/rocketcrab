@@ -195,6 +195,15 @@ secrets.
   directly. The Turnstile widget `rocketcrab` is live: its secret is on the
   Worker, the app build carries its site key, and `/api/turn` answers 403
   without a passing check. A real browser minting TURN is still unverified.
+- 2026-11-25: `CODE_HMAC_SECRET` set, then Nova deployed as version
+  `5af34f98` with keyed party codes, Turnstile on `/api/code/lookup`, IPv6
+  /64 rate limits and host-only code renewal. `/api/turn` and
+  `/api/code/lookup` answer 403 without a valid token, and repeated claims
+  for one secret return the same code. The runtime was unchanged and stays
+  at `9e4578c0`. The account holds only the two Workers, their three
+  Durable Object namespaces and the `rocketcrab` Turnstile widget, so there
+  was nothing stale to remove. A real browser joining by code through
+  Turnstile is still unverified.
 - Verified a two-browser party joined by code through `/join`, and
   `/transfer/drawphone` creating a Drawphone room through `/api/relay`
   (Drawphone, Drawphone for Kids, Spyfall, Snakeout and Werewolf relays
@@ -202,9 +211,6 @@ secrets.
 
 ## Before launch
 
-- [ ] **Owner:** set the `CODE_HMAC_SECRET` Worker secret (see
-      [Party-code secret](#party-code-secret)) before the next Nova Worker
-      deploy; until then the new Worker hands out no party codes.
 - [ ] **Owner:** configure the Realtime usage alert and Workers/Durable
       Objects spending controls, and confirm the notification destination.
       A spend block can interrupt parties.
