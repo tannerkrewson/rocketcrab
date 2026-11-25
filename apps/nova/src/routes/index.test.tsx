@@ -81,27 +81,16 @@ describe("/", () => {
     renderHome();
     const primaryRow = await screen.findByRole("region", { name: "Start or join a party" });
     expect(primaryRow).toBeInTheDocument();
-    const join = within(primaryRow).getByRole("button", { name: "Join party" });
+    const join = within(primaryRow).getByRole("link", { name: "Join party" });
     expect(
       join.compareDocumentPosition(within(primaryRow).getByRole("link", { name: "Start party" })),
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
-  it("takes a party code in the join popup, with no start-party button", async () => {
+  it("opens the join page from Join party", async () => {
     const { router } = renderHome();
-    await userEvent.click(await screen.findByRole("button", { name: "Join party" }));
-    const dialog = await screen.findByRole("dialog", { name: "Join a party" });
-    expect(within(dialog).getByText(/invite link/)).toBeInTheDocument();
-    expect(within(dialog).queryByRole("link", { name: /start/i })).not.toBeInTheDocument();
-    const join = within(dialog).getByRole("button", { name: "Join party" });
-    const input = within(dialog).getByLabelText("Party code");
-    // Letters only, lowercased, four at most.
-    await userEvent.type(input, "Ab1c");
-    expect(input).toHaveValue("abc");
-    expect(join).toBeDisabled();
-    await userEvent.type(input, "D");
-    await userEvent.click(join);
-    await waitFor(() => expect(router.state.location.pathname).toBe("/abcd"));
+    await userEvent.click(await screen.findByRole("link", { name: "Join party" }));
+    await waitFor(() => expect(router.state.location.pathname).toBe("/join"));
   });
 
   it("lists the secondary actions column below the primaries", async () => {

@@ -33,7 +33,7 @@ export function PartyCodeForm({ backAction }: { backAction?: ReactNode }) {
         autoCorrect="off"
         autoComplete="off"
         spellCheck={false}
-        // The dialog exists to collect this one field.
+        // The page exists to collect this one field.
         // oxlint-disable-next-line jsx-a11y/no-autofocus
         autoFocus
       />

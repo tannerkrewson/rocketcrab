@@ -1,12 +1,10 @@
-import { Link, createFileRoute, useNavigate } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { Mail } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef } from "react";
 import { toast } from "../lib/toast";
 import { BrandLogo } from "../components/layout/BrandLogo";
 import { InstallAppButton } from "../components/layout/InstallAppButton";
-import { Button, buttonStyles } from "../components/ui/Button";
-import { PartyCodeForm } from "../components/party/PartyCodeForm";
-import { Dialog } from "../components/ui/Dialog";
+import { buttonStyles } from "../components/ui/Button";
 import { usePartyEngine } from "../lib/party/use-party";
 import { clarityEvent } from "../lib/clarity";
 
@@ -14,21 +12,10 @@ import { clarityEvent } from "../lib/clarity";
 const MORE_LINK = buttonStyles("default", "lg", undefined, true);
 
 export const Route = createFileRoute("/")({
-  // `/join` opens home with the party-code box showing.
-  validateSearch: (search: Record<string, unknown>): { join?: true } =>
-    search.join === true ? { join: true } : {},
   component: HomeComponent,
 });
 
 function HomeComponent() {
-  const search = Route.useSearch();
-  const navigate = useNavigate();
-  const [joinHelpOpen, setJoinHelpOpen] = useState(search.join === true);
-  const closeJoin = () => {
-    setJoinHelpOpen(false);
-    if (search.join) void navigate({ to: "/", search: {}, replace: true });
-  };
-
   // Visiting home must leave any active party, including via the browser Back button.
   const { state, engine } = usePartyEngine();
   const leftRef = useRef(false);
@@ -89,16 +76,13 @@ function HomeComponent() {
 
       <div className="flex flex-col items-center gap-6">
         <section aria-label="Start or join a party" className="button-row">
-          <Button
-            variant="primary"
-            size="lg"
-            onClick={() => {
-              clarityEvent("join_help_opened");
-              setJoinHelpOpen(true);
-            }}
+          <Link
+            to="/join"
+            onClick={() => clarityEvent("join_help_opened")}
+            className={buttonStyles("primary", "lg")}
           >
             Join party
-          </Button>
+          </Link>
           <Link
             to="/party"
             onClick={() => clarityEvent("start_party_clicked")}
@@ -129,16 +113,6 @@ function HomeComponent() {
           </Link>
         </section>
       </div>
-
-      <Dialog open={joinHelpOpen} onClose={closeJoin} title="Join a party">
-        <div className="flex flex-col gap-4">
-          <p className="leading-relaxed text-foreground/80">
-            Enter the code shown on your friend&apos;s screen, scan their QR code with your
-            phone&apos;s camera, or open the invite link they sent you.
-          </p>
-          <PartyCodeForm />
-        </div>
-      </Dialog>
     </div>
   );
 }

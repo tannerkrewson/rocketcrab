@@ -1,6 +1,7 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { RouterProvider, createMemoryHistory, createRouter } from "@tanstack/react-router";
 import { act, cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ReactNode } from "react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { gameRepository } from "../lib/games/instance";
@@ -474,10 +475,20 @@ describe("external-game links", () => {
     expect(stubEngine.selectGame).not.toHaveBeenCalled();
   });
 
-  it("/join opens home's party-code box", async () => {
+  it("/join takes a party code and opens its page", async () => {
     const router = renderParty("/join");
-    expect(await screen.findByRole("dialog", { name: "Join a party" })).toBeVisible();
-    expect(screen.getByLabelText("Party code")).toBeVisible();
-    expect(router.state.location.pathname).toBe("/");
+    expect(await screen.findByRole("heading", { name: "Join a party" })).toBeVisible();
+    expect(screen.getByText(/invite link/)).toBeVisible();
+    expect(screen.queryByRole("link", { name: /start/i })).not.toBeInTheDocument();
+    expect(screen.getByRole("link", { name: "Back" })).toHaveAttribute("href", "/");
+    const join = screen.getByRole("button", { name: "Join party" });
+    const input = screen.getByLabelText("Party code");
+    // Letters only, lowercased, four at most.
+    await userEvent.type(input, "Ab1c");
+    expect(input).toHaveValue("abc");
+    expect(join).toBeDisabled();
+    await userEvent.type(input, "D");
+    await userEvent.click(join);
+    await waitFor(() => expect(router.state.location.pathname).toBe("/abcd"));
   });
 });
