@@ -201,6 +201,12 @@ secrets.
    DNS. An ordinary code rollback can restore an earlier version on the
    same domains if the Durable Object configuration matches.
 5. Once the production setup works, follow **Retire the beta URLs** below.
+6. Retire `kids.rocketcrab.com`. Nova has no kids mode; the legacy app
+   served it as a Next.js locale domain. GA showed about 180 multiplayer
+   game starts in the year before November 2026, falling to a few per month.
+   Remove its legacy hosting binding, then replace its DNS record with a
+   Cloudflare Redirect Rule that sends it to `https://rocketcrab.com` with a
+   301, so old links keep working. Confirm it no longer serves the legacy app.
 
 ## Beta teardown
 
