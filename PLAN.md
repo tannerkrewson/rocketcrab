@@ -56,24 +56,6 @@ churn on upgrade), and need no paid always-on server.
       show a clear message on `/$code`: party codes need a quick security
       check this browser or network blocked; ask the host for the invite
       link or QR code instead. Keep the rate limit as a backstop.
-- [ ] Security: derive party codes with `HMAC-SHA256` keyed by a new Worker
-      secret `CODE_HMAC_SECRET` instead of unkeyed SHA-256 (`codeCandidates`
-      in `deploy/nova/code.ts`). Today anyone can grind a secret whose first
-      candidate is a chosen code (`crab`, `abcd`, a code just seen in a
-      stream or chat, one that lapsed) in well under a second and squat it,
-      so mistyped codes and stale links land in an attacker's party, which
-      can push arbitrary game HTML to them. HMAC keeps the derivation
-      deterministic, so every authority still lands on the same code with no
-      protocol change. Missing secret: `/api/code/claim` fails closed with
-      503 in production; local dev reads it from `.dev.vars`. Rotating it
-      moves every live party to a new code on its next renewal (shown codes
-      change; invite links are unaffected). Add the secret to the comment at
-      the end of `deploy/nova/wrangler.toml` and to `deploy/README.md`.
-- [ ] Security: `handleCodeLookup` validates `/^[a-z]{4}$/`, so lookups with
-      `i`, `o`, `l` or a `BLOCKED` word wake a `PartyCode` Durable Object
-      that can never hold a code. Reject anything `codeCandidates` can't
-      produce before calling the stub (export one `isPossibleCode` from
-      `deploy/nova/code.ts`).
 - [ ] Clear the in-memory invite handoff when it isn't consumed.
       `handedOff` in `apps/nova/src/lib/party/invite-import.ts` is cleared
       only when `/party` imports it, so a `/$code` → `/party` navigation that

@@ -57,5 +57,6 @@ enabled = true
 [observability.logs]
 invocation_logs = false
 
-# Secrets (never in this file): TURN_KEY_ID, TURN_KEY_API_TOKEN, TURNSTILE_SECRET_KEY.
+# Secrets (never in this file): TURN_KEY_ID, TURN_KEY_API_TOKEN, TURNSTILE_SECRET_KEY,
+# CODE_HMAC_SECRET.
 # Set with `npx wrangler secret put <NAME> --config deploy/nova/wrangler.toml`.

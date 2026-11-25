@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { CODE_TTL_MS, PartyCode, codeCandidates } from "./code";
+import { CODE_TTL_MS, PartyCode, codeCandidates as derive } from "./code";
 import edge, { type EdgeEnv } from "./worker";
 
 const ORIGIN = "https://rocketcrab.com";
 const SECRET_A = "A".repeat(43);
 const SECRET_B = "B".repeat(43);
+const KEY = "test-key";
+const codeCandidates = (secret: string) => derive(secret, KEY);
 
 /** PartyCode objects over in-memory storage, keyed by code like the real namespace. */
 function codeNamespace() {
@@ -67,12 +69,16 @@ describe("codeCandidates", () => {
     expect(new Set(codes).size).toBe(codes.length);
     for (const code of codes) expect(code).toMatch(/^[a-hjkmnp-z]{4}$/);
   });
+
+  it("depends on the Worker's key, so codes can't be ground offline", async () => {
+    expect(await derive(SECRET_A, "other-key")).not.toEqual(await codeCandidates(SECRET_A));
+  });
 });
 
 describe("party codes", () => {
   it("gives every member the same code and resolves it to the secret", async () => {
     const { namespace } = codeNamespace();
-    const env: EdgeEnv = { PARTY_CODE: namespace };
+    const env: EdgeEnv = { PARTY_CODE: namespace, CODE_HMAC_SECRET: KEY };
     const first = await claim(SECRET_A, env);
     expect(first.status).toBe(200);
     expect(first.body.code).toBe((await codeCandidates(SECRET_A))[0]);
@@ -84,7 +90,7 @@ describe("party codes", () => {
 
   it("moves a colliding party to its next code", async () => {
     const { namespace } = codeNamespace();
-    const env: EdgeEnv = { PARTY_CODE: namespace };
+    const env: EdgeEnv = { PARTY_CODE: namespace, CODE_HMAC_SECRET: KEY };
     const [taken, next] = await codeCandidates(SECRET_A);
     // Another party already holds this party's first code.
     await namespace.get(taken).fetch(new Request("https://x/", { method: "PUT", body: SECRET_B }));
@@ -95,7 +101,7 @@ describe("party codes", () => {
   it("expires codes that stop being renewed and frees them by alarm", async () => {
     vi.useFakeTimers();
     const { namespace, objects, alarms } = codeNamespace();
-    const env: EdgeEnv = { PARTY_CODE: namespace };
+    const env: EdgeEnv = { PARTY_CODE: namespace, CODE_HMAC_SECRET: KEY };
     const { code } = (await claim(SECRET_A, env)).body;
     expect(alarms.get(code!)).toBe(Date.now() + CODE_TTL_MS);
 
@@ -116,17 +122,25 @@ describe("party codes", () => {
 
   it("rejects malformed input before touching a code object", async () => {
     const { namespace, ids } = codeNamespace();
-    const env: EdgeEnv = { PARTY_CODE: namespace };
+    const env: EdgeEnv = { PARTY_CODE: namespace, CODE_HMAC_SECRET: KEY };
     expect((await post("/api/code/claim", { secret: "short" }, env)).status).toBe(400);
     expect((await post("/api/code/claim", "not json", env)).status).toBe(400);
     expect((await post("/api/code/lookup", { code: "abc1" }, env)).status).toBe(400);
     expect((await post("/api/code/lookup", { code: "x".repeat(300) }, env)).status).toBe(400);
+    // Letters and words codes never use.
+    expect((await lookup("ilox", env)).status).toBe(404);
+    expect((await lookup("join", env)).status).toBe(404);
     expect(ids).toEqual([]);
     expect((await lookup("zzzz", env)).status).toBe(404);
   });
 
-  it("answers 503 without the binding and rate limits claims and lookups separately", async () => {
-    expect((await claim(SECRET_A, {})).status).toBe(503);
+  it("answers 503 without the binding or key and rate limits claims and lookups separately", async () => {
+    expect((await claim(SECRET_A, { CODE_HMAC_SECRET: KEY })).status).toBe(503);
+    const { namespace, ids } = codeNamespace();
+    expect((await claim(SECRET_A, { PARTY_CODE: namespace, CODE_HMAC_SECRET: " " })).status).toBe(
+      503,
+    );
+    expect(ids).toEqual([]);
     const keys: string[] = [];
     const env: EdgeEnv = {
       RATE_LIMITER: {

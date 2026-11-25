@@ -8,6 +8,11 @@ import { json, jsonError, readBodyText, type ObjectNamespace } from "./http";
 
 export interface CodeEnv {
   PARTY_CODE?: ObjectNamespace;
+  /**
+   * Keys code derivation (Worker secret), so nobody can grind a secret that
+   * lands on a chosen code. Rotating it moves live parties to new codes.
+   */
+  CODE_HMAC_SECRET?: string;
 }
 
 interface Entry {
@@ -69,17 +74,30 @@ const BLOCKED = new Set([
   "play",
 ]);
 const SECRET = /^[A-Za-z0-9_-]{43}$/;
-const CODE = /^[a-z]{4}$/;
+const CODE = /^[a-hjkmnp-z]{4}$/;
 const REQUEST_BYTES = 256;
 const encoder = new TextEncoder();
 
+/** True for a code `codeCandidates` can produce. */
+export function isPossibleCode(code: string): boolean {
+  return CODE.test(code) && !BLOCKED.has(code);
+}
+
 /**
- * Up to eight codes derived from the secret, in claim order. Every member
- * derives the same list, so they all land on the same code.
+ * Up to eight codes derived from the secret, in claim order. Every claimant
+ * derives the same list under the same key, so they all land on the same code.
  */
-export async function codeCandidates(secret: string): Promise<string[]> {
-  const digest = await crypto.subtle.digest(
-    "SHA-256",
+export async function codeCandidates(secret: string, hmacKey: string): Promise<string[]> {
+  const key = await crypto.subtle.importKey(
+    "raw",
+    encoder.encode(hmacKey),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const digest = await crypto.subtle.sign(
+    "HMAC",
+    key,
     encoder.encode(`rocketcrab-party-code\0${secret}`),
   );
   const words = new DataView(digest);
@@ -143,8 +161,8 @@ function stub(env: CodeEnv, code: string) {
   return env.PARTY_CODE!.get(env.PARTY_CODE!.idFromName(code));
 }
 
-function unavailable(): Response {
-  console.error({ event: "code_binding_missing" });
+function unavailable(event: string): Response {
+  console.error({ event });
   return jsonError(503, "unavailable", "party codes unavailable");
 }
 
@@ -154,8 +172,10 @@ export async function handleCodeClaim(request: Request, env: CodeEnv): Promise<R
   if (secret === null || !SECRET.test(secret)) {
     return jsonError(400, "invalid_secret", "secret must be a party secret");
   }
-  if (!env.PARTY_CODE) return unavailable();
-  for (const code of await codeCandidates(secret)) {
+  if (!env.PARTY_CODE) return unavailable("code_binding_missing");
+  const hmacKey = env.CODE_HMAC_SECRET?.trim();
+  if (!hmacKey) return unavailable("code_secret_missing");
+  for (const code of await codeCandidates(secret, hmacKey)) {
     const response = await stub(env, code).fetch(
       new Request("https://party-code/", { method: "PUT", body: secret }),
     );
@@ -167,10 +187,12 @@ export async function handleCodeClaim(request: Request, env: CodeEnv): Promise<R
 /** `{code}` → `{secret}` while the code is live. */
 export async function handleCodeLookup(request: Request, env: CodeEnv): Promise<Response> {
   const code = text((await readFields(request)).code)?.toLowerCase() ?? null;
-  if (code === null || !CODE.test(code)) {
+  if (code === null || !/^[a-z]{4}$/.test(code)) {
     return jsonError(400, "invalid_code", "code must be four letters");
   }
-  if (!env.PARTY_CODE) return unavailable();
+  // Codes that can never be handed out don't wake a Durable Object.
+  if (!isPossibleCode(code)) return jsonError(404, "code_not_found", "no party has that code");
+  if (!env.PARTY_CODE) return unavailable("code_binding_missing");
   const response = await stub(env, code).fetch(new Request("https://party-code/"));
   if (response.status !== 200) return jsonError(404, "code_not_found", "no party has that code");
   return json(200, { secret: await response.text() });

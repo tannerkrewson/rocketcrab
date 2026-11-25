@@ -88,6 +88,19 @@ npx --yes wrangler@4.161.0 secret put TURN_KEY_API_TOKEN --config deploy/nova/wr
 Keep the token in your credential store. Cloudflare returns it when the key is
 created. [Realtime TURN keys](https://developers.cloudflare.com/api/resources/calls/subresources/turn/)
 
+### Party-code secret
+
+`CODE_HMAC_SECRET` keys the derivation of four-letter party codes, so no one
+can find a party secret that lands on a chosen code. Without it,
+`/api/code/claim` answers 503 and parties show no code. Set a random value
+before deploying code that needs it; `npm run dev:api` passes a fixed local
+one. Rotating it moves every live party to a new code at its next renewal
+(invite links keep working).
+
+```sh
+openssl rand -base64 32 | npx --yes wrangler@4.161.0 secret put CODE_HMAC_SECRET --config deploy/nova/wrangler.toml
+```
+
 The Invisible Turnstile widget `rocketcrab` allows `rocketcrab.com` and
 `rocketcrab.tannerkrewson.workers.dev`. `scripts/deploy-static.mjs` builds in
 its public site key; its secret is `TURNSTILE_SECRET_KEY` on the Worker. Review the privacy requirements for using
@@ -188,6 +201,9 @@ secrets.
 
 ## Before launch
 
+- [ ] **Owner:** set the `CODE_HMAC_SECRET` Worker secret (see
+      [Party-code secret](#party-code-secret)) before the next Nova Worker
+      deploy; until then the new Worker hands out no party codes.
 - [ ] **Owner:** configure the Realtime usage alert and Workers/Durable
       Objects spending controls, and confirm the notification destination.
       A spend block can interrupt parties.
