@@ -14,6 +14,14 @@ export function handOffInvite(secret: string): void {
   handedOff = { secret };
 }
 
+/**
+ * Drop a handoff `/party` never took, e.g. when its navigation was
+ * superseded, so a later "Start party" doesn't join that party instead.
+ */
+export function discardInviteHandoff(): void {
+  handedOff = null;
+}
+
 /** True while an invite waits in the URL fragment or a handoff. */
 export function invitePending(location: Pick<InviteImportLocation, "hash">): boolean {
   return handedOff !== null || location.hash.length > 0;

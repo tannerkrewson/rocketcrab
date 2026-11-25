@@ -43,13 +43,6 @@ churn on upgrade), and need no paid always-on server.
       lease on migration; the 10-minute TTL covers the handover. Keep the code
       live for the whole party, games included: friends join mid-game from
       the header.
-- [ ] Clear the in-memory invite handoff when it isn't consumed.
-      `handedOff` in `apps/nova/src/lib/party/invite-import.ts` is cleared
-      only when `/party` imports it, so a `/$code` → `/party` navigation that
-      is cancelled or redirected leaves it set, and a later "Start party"
-      joins that looked-up party instead of creating one. Consume it only on
-      the navigation it was set for (e.g. pass it in router state, or clear
-      it when `/$code` unmounts without navigating to `/party`).
 - [ ] Fix the comments the party codes made wrong: `deploy/nova/code.ts`'s
       header says invite links and QR codes never come through `PartyCode`,
       but every party claims a code, so the Worker learns every party's

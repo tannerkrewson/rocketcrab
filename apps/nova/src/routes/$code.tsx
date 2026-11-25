@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, notFound, useNavigate, useRouter } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { useEffect } from "react";
 import { PartyCodeForm } from "../components/party/PartyCodeForm";
@@ -8,7 +8,7 @@ import { buttonStyles } from "../components/ui/Button";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
 import { LoadingState } from "../components/ui/LoadingState";
 import { primeChallenge } from "../lib/party/turnstile";
-import { handOffInvite } from "../lib/party/invite-import";
+import { discardInviteHandoff, handOffInvite } from "../lib/party/invite-import";
 import { PartyCodeError, lookupPartyCode, normalizePartyCode } from "../lib/party/party-code";
 
 /**
@@ -34,6 +34,7 @@ function isVerificationBlocked(error: unknown): boolean {
 
 function PartyCodeJoin({ code }: { code: string }) {
   const navigate = useNavigate();
+  const router = useRouter();
   const lookup = useQuery({
     queryKey: ["party-code", code],
     queryFn: () => lookupPartyCode(code),
@@ -51,8 +52,10 @@ function PartyCodeJoin({ code }: { code: string }) {
   useEffect(() => {
     if (typeof secret !== "string") return;
     handOffInvite(secret);
-    void navigate({ to: "/party", replace: true });
-  }, [secret, navigate]);
+    void navigate({ to: "/party", replace: true }).finally(() => {
+      if (router.state.location.pathname !== "/party") discardInviteHandoff();
+    });
+  }, [secret, navigate, router]);
 
   return (
     <div className="flex flex-col gap-4">
