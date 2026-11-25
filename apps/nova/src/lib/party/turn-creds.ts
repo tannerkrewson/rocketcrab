@@ -2,7 +2,7 @@
  * The engine mints TURN credentials once per party and reuses them on reconnect.
  * Only credential-bearing ICE servers become Trystero's TURN configuration.
  */
-import { consumeTurnToken } from "./turnstile";
+import { consumeChallengeToken, turnstileEnabled } from "./turnstile";
 
 /** One ICE server entry in the mint's response (Cloudflare standard shape). */
 export interface TurnCredsIceServer {
@@ -89,8 +89,8 @@ export async function fetchTurnCredentials(
 ): Promise<TurnCredentialsResult> {
   const fetchImpl = options.fetchImpl ?? globalThis.fetch;
   const timeoutMs = options.timeoutMs ?? TURN_CREDS_FETCH_TIMEOUT_MS;
-  const token = await consumeTurnToken();
-  if (import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim() && !token) {
+  const token = await consumeChallengeToken("mint_turn");
+  if (turnstileEnabled && !token) {
     return { ok: false, reason: "TURN verification was unavailable." };
   }
   const controller = new AbortController();

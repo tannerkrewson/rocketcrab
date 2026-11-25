@@ -27,8 +27,11 @@ churn on upgrade), and need no paid always-on server.
 - [ ] Validate Turnstile on real browsers: a party on the beta and on
       `rocketcrab.com` gets `/api/turn` 200 and GA Realtime shows
       `turn_cred_mint` outcome `configured`, and a blocked challenge falls back
-      to direct WebRTC or the encrypted tunnel. Headless Playwright never
-      passes the challenge, so automated runs skip TURN.
+      to direct WebRTC or the encrypted tunnel. Opening `rocketcrab.com/<code>`
+      joins (the `code_lookup` challenge passes), and with
+      `challenges.cloudflare.com` blocked it shows the "Couldn't check this
+      browser" notice. Headless Playwright never passes the challenge, so
+      automated runs skip TURN and builds without a site key skip both.
 - [ ] Renew the party code from the host only. Every member's
       `PartyCodeLease` (`apps/nova/src/lib/party/party-code.ts`) posts
       `/api/code/claim` every 3 minutes, so Worker and Durable Object requests
@@ -40,22 +43,6 @@ churn on upgrade), and need no paid always-on server.
       lease on migration; the 10-minute TTL covers the handover. Keep the code
       live for the whole party, games included: friends join mid-game from
       the header.
-- [ ] Security: require Invisible Turnstile on `/api/code/lookup`, as
-      `/api/turn` does (`verifyChallenge` in `deploy/nova/turn.ts`; share it
-      rather than copy it). Four-letter codes leave 279,805 possibilities and
-      a lookup returns the raw `partySecret`, so without a bot check a script
-      (or a proxy pool) can sweep the space and join live parties, read
-      replicated hidden state and receive private custom game HTML. Keep four
-      letters; Turnstile, not code length, is the fix. Turnstile tokens are
-      single-use: the `/$code` route (`apps/nova/src/routes/$code.tsx`, which
-      already primes a challenge) needs its own token for the lookup, with a
-      distinct `action`, and `/api/turn` then needs a fresh one; rework
-      `apps/nova/src/lib/party/turnstile.ts` so a consumed token is never
-      reused. Fail closed like `/api/turn` (`TURNSTILE_REQUIRED`). When the
-      challenge fails or is blocked (content blockers, filtered networks),
-      show a clear message on `/$code`: party codes need a quick security
-      check this browser or network blocked; ask the host for the invite
-      link or QR code instead. Keep the rate limit as a backstop.
 - [ ] Clear the in-memory invite handoff when it isn't consumed.
       `handedOff` in `apps/nova/src/lib/party/invite-import.ts` is cleared
       only when `/party` imports it, so a `/$code` → `/party` navigation that

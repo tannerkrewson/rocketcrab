@@ -9,7 +9,7 @@ import { NameEntry } from "../components/party/NameEntry";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
 import { LoadingState } from "../components/ui/LoadingState";
 import { buttonStyles } from "../components/ui/Button";
-import { primeTurnChallenge } from "../lib/party/turnstile";
+import { primeChallenge } from "../lib/party/turnstile";
 import { usePartyEngine } from "../lib/party/use-party";
 import { takePartySource } from "../lib/party/source-handoff";
 import { getSavedPlayerName } from "../lib/party/identity";
@@ -62,7 +62,7 @@ function PartyPage() {
   const [invite, setInvite] = useState<ImportedInvite | null>(null);
   const [importing, setImporting] = useState(() => invitePending(window.location));
   useEffect(() => {
-    primeTurnChallenge();
+    primeChallenge("mint_turn");
     // StrictMode re-runs this; the importer returns null the second time, so
     // only ever store a real invite.
     const imported = importInviteFromLocation(window.location);

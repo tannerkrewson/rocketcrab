@@ -1,10 +1,21 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   PARTY_CODE_RENEW_MS,
+  PartyCodeError,
   PartyCodeLease,
+  lookupPartyCode,
   normalizePartyCode,
   phoneticCode,
 } from "./party-code";
+
+const challenge = vi.hoisted(() => ({ token: null as string | null }));
+vi.mock("./turnstile", () => ({
+  turnstileEnabled: true,
+  consumeChallengeToken: async (action: string) =>
+    action === "code_lookup" ? challenge.token : null,
+}));
+
+afterEach(() => vi.unstubAllGlobals());
 
 function fakeSchedule() {
   const timers: Array<{ callback: () => void; delayMs: number; active: boolean }> = [];
@@ -26,6 +37,33 @@ function fakeSchedule() {
 }
 
 const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+describe("lookupPartyCode", () => {
+  it("sends a code-lookup token and resolves the secret", async () => {
+    challenge.token = "lookup-token";
+    const fetchMock = vi.fn(async (_path: string, _init: RequestInit) =>
+      Response.json({ secret: "s" }),
+    );
+    vi.stubGlobal("fetch", fetchMock);
+    expect(await lookupPartyCode("abcd")).toBe("s");
+    const headers = new Headers(fetchMock.mock.calls[0]![1].headers);
+    expect(headers.get("X-Turnstile-Token")).toBe("lookup-token");
+  });
+
+  it("reports a blocked check without asking the Worker, and a rejected one", async () => {
+    const fetchMock = vi.fn(async () => new Response(null, { status: 403 }));
+    vi.stubGlobal("fetch", fetchMock);
+    challenge.token = null;
+    const blocked = await lookupPartyCode("abcd").catch((error: unknown) => error);
+    expect(blocked).toBeInstanceOf(PartyCodeError);
+    expect((blocked as PartyCodeError).verificationBlocked).toBe(true);
+    expect(fetchMock).not.toHaveBeenCalled();
+
+    challenge.token = "stale";
+    const rejected = await lookupPartyCode("abcd").catch((error: unknown) => error);
+    expect((rejected as PartyCodeError).verificationBlocked).toBe(true);
+  });
+});
 
 describe("party code text", () => {
   it("normalizes typed codes and spells them phonetically", () => {

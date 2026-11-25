@@ -4,6 +4,7 @@
  * derives the same code, so the party protocol carries nothing extra.
  */
 import type { Scheduler } from "@rocketcrab/party";
+import { consumeChallengeToken, turnstileEnabled } from "./turnstile";
 
 /** Members renew well inside the Worker's 10-minute lease. */
 export const PARTY_CODE_RENEW_MS = 3 * 60 * 1000;
@@ -58,13 +59,17 @@ const NATO: Readonly<Record<string, string>> = {
   z: "zulu",
 };
 
-async function postCode(path: string, body: unknown): Promise<unknown> {
+async function postCode(
+  path: string,
+  body: unknown,
+  headers: Record<string, string> = {},
+): Promise<unknown> {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   try {
     const response = await fetch(path, {
       method: "POST",
-      headers: { "Content-Type": "application/json" },
+      headers: { "Content-Type": "application/json", ...headers },
       body: JSON.stringify(body),
       signal: controller.signal,
     });
@@ -80,6 +85,11 @@ export class PartyCodeError extends Error {
   constructor(readonly status: number) {
     super(`Party code request failed with HTTP ${status}.`);
   }
+
+  /** The browser or network blocked the Turnstile check a lookup needs. */
+  get verificationBlocked(): boolean {
+    return this.status === 403;
+  }
 }
 
 export const claimPartyCode: ClaimPartyCode = async (secret) => {
@@ -87,9 +97,18 @@ export const claimPartyCode: ClaimPartyCode = async (secret) => {
   return typeof body?.code === "string" ? body.code : null;
 };
 
-/** The secret behind a live code, or null when no party has it. Throws on network failure. */
+/**
+ * The secret behind a live code, or null when no party has it. Throws on
+ * network failure, or a `PartyCodeError` with `verificationBlocked`.
+ */
 export async function lookupPartyCode(code: string): Promise<string | null> {
-  const body = (await postCode("/api/code/lookup", { code })) as { secret?: unknown } | null;
+  const token = await consumeChallengeToken("code_lookup");
+  if (turnstileEnabled && !token) throw new PartyCodeError(403);
+  const body = (await postCode(
+    "/api/code/lookup",
+    { code },
+    token ? { "X-Turnstile-Token": token } : {},
+  )) as { secret?: unknown } | null;
   return typeof body?.secret === "string" ? body.secret : null;
 }
 

@@ -5,8 +5,9 @@
  * a code. Invite links and QR codes never come through here.
  */
 import { json, jsonError, readBodyText, type ObjectNamespace } from "./http";
+import { checkTurnstile, type TurnstileEnv } from "./turnstile";
 
-export interface CodeEnv {
+export interface CodeEnv extends TurnstileEnv {
   PARTY_CODE?: ObjectNamespace;
   /**
    * Keys code derivation (Worker secret), so nobody can grind a secret that
@@ -184,8 +185,13 @@ export async function handleCodeClaim(request: Request, env: CodeEnv): Promise<R
   return jsonError(503, "code_unavailable", "no party code is free for this party");
 }
 
-/** `{code}` → `{secret}` while the code is live. */
+/**
+ * `{code}` → `{secret}` while the code is live. Behind Turnstile: four letters
+ * are few enough for a script to sweep, and the secret joins the party.
+ */
 export async function handleCodeLookup(request: Request, env: CodeEnv): Promise<Response> {
+  const rejected = await checkTurnstile(request, env, "code_lookup");
+  if (rejected) return rejected;
   const code = text((await readFields(request)).code)?.toLowerCase() ?? null;
   if (code === null || !/^[a-z]{4}$/.test(code)) {
     return jsonError(400, "invalid_code", "code must be four letters");

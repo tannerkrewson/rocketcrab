@@ -58,7 +58,10 @@ async function lookup(code: string, env: EdgeEnv) {
   return { status: response.status, body: (await response.json()) as { secret?: string } };
 }
 
-afterEach(() => vi.useRealTimers());
+afterEach(() => {
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 describe("codeCandidates", () => {
   it("derives the same distinct four-letter codes for a secret, never i, o or l", async () => {
@@ -153,6 +156,39 @@ describe("party codes", () => {
     expect((await claim(SECRET_A, env)).status).toBe(429);
     expect((await lookup("abcd", env)).status).toBe(429);
     expect(keys).toEqual(["code-claim:203.0.113.7", "code-lookup:203.0.113.7"]);
+  });
+
+  it("requires a code-lookup Turnstile token when configured", async () => {
+    const { namespace, ids } = codeNamespace();
+    const env: EdgeEnv = { PARTY_CODE: namespace, CODE_HMAC_SECRET: KEY };
+    const { code } = (await claim(SECRET_A, env)).body;
+    const verifyLookup = (headers: Record<string, string>, gate: EdgeEnv) =>
+      edge.fetch(
+        new Request(`${ORIGIN}/api/code/lookup`, {
+          method: "POST",
+          headers: { Origin: ORIGIN, ...headers },
+          body: JSON.stringify({ code }),
+        }),
+        { ...env, ...gate },
+      );
+    expect((await verifyLookup({}, { TURNSTILE_REQUIRED: "true" })).status).toBe(500);
+
+    const siteverify = vi.fn(async () =>
+      Response.json({ success: true, hostname: "rocketcrab.com", action: "mint_turn" }),
+    );
+    vi.stubGlobal("fetch", siteverify);
+    const gate = { TURNSTILE_SECRET_KEY: "widget-secret" };
+    const lookups = ids.length;
+    expect((await verifyLookup({}, gate)).status).toBe(403);
+    // A TURN token can't be spent on a lookup.
+    expect((await verifyLookup({ "X-Turnstile-Token": "t" }, gate)).status).toBe(403);
+    expect(ids.length).toBe(lookups);
+
+    siteverify.mockResolvedValueOnce(
+      Response.json({ success: true, hostname: "rocketcrab.com", action: "code_lookup" }),
+    );
+    const found = await verifyLookup({ "X-Turnstile-Token": "t" }, gate);
+    expect(await found.json()).toEqual({ secret: SECRET_A });
   });
 
   it("requires a same-origin request", async () => {

@@ -1,7 +1,20 @@
+/**
+ * Invisible Turnstile challenges. Each action gets its own single-use token:
+ * `mint_turn` for `/api/turn` (optional: a party falls back to direct WebRTC
+ * or the tunnel without it) and `code_lookup` for `/api/code/lookup`
+ * (required: without it a four-letter code can't be resolved).
+ */
 const SITE_KEY = import.meta.env.VITE_TURNSTILE_SITE_KEY?.trim();
 const SCRIPT_URL = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";
-const TIMEOUT_MS = 2_500;
 const TOKEN_MAX_AGE_MS = 4 * 60 * 1000;
+
+export type ChallengeAction = "mint_turn" | "code_lookup";
+
+/** Give up on a challenge after this long: TURN has fallbacks, a code lookup doesn't. */
+const TIMEOUT_MS: Record<ChallengeAction, number> = { mint_turn: 2_500, code_lookup: 10_000 };
+
+/** True when this build verifies requests; without it the Worker doesn't either. */
+export const turnstileEnabled = !!SITE_KEY;
 
 interface Turnstile {
   render(
@@ -23,16 +36,35 @@ function api(): Turnstile | undefined {
   return (window as Window & { turnstile?: Turnstile }).turnstile;
 }
 
+let loading: Promise<Turnstile | undefined> | undefined;
+
+/** Load the script once for every challenge; a failed load is retried next time. */
+function loadApi(): Promise<Turnstile | undefined> {
+  if (api()) return Promise.resolve(api());
+  loading ??= new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = SCRIPT_URL;
+    script.async = true;
+    script.onload = () => resolve(api());
+    script.onerror = () => {
+      script.remove();
+      loading = undefined;
+      resolve(undefined);
+    };
+    document.head.append(script);
+  });
+  return loading;
+}
+
 interface Challenge {
   startedAt: number;
   token: Promise<string | null>;
 }
 
-let pending: Challenge | undefined;
+const pending = new Map<ChallengeAction, Challenge>();
 
-function startChallenge(sitekey: string): Promise<string | null> {
+function startChallenge(sitekey: string, action: ChallengeAction): Promise<string | null> {
   return new Promise((resolve) => {
-    let script: HTMLScriptElement | undefined;
     let widget: string | undefined;
     const container = document.createElement("div");
     let done = false;
@@ -40,7 +72,6 @@ function startChallenge(sitekey: string): Promise<string | null> {
       if (done) return;
       done = true;
       window.clearTimeout(timer);
-      script?.remove();
       if (widget !== undefined) {
         try {
           api()?.remove(widget);
@@ -51,14 +82,15 @@ function startChallenge(sitekey: string): Promise<string | null> {
       container.remove();
       resolve(token);
     };
-    const timer = window.setTimeout(() => finish(null), TIMEOUT_MS);
-    const render = (): void => {
+    const timer = window.setTimeout(() => finish(null), TIMEOUT_MS[action]);
+    void loadApi().then((turnstile) => {
       if (done) return;
+      if (!turnstile) return finish(null);
       try {
         document.body.append(container);
-        widget = api()?.render(container, {
+        widget = turnstile.render(container, {
           sitekey,
-          action: "mint_turn",
+          action,
           "response-field": false,
           retry: "never",
           callback: (token) => finish(token),
@@ -69,33 +101,25 @@ function startChallenge(sitekey: string): Promise<string | null> {
       } catch {
         finish(null);
       }
-    };
-    if (api()) {
-      render();
-    } else {
-      script = document.createElement("script");
-      script.src = SCRIPT_URL;
-      script.async = true;
-      script.onload = render;
-      script.onerror = () => finish(null);
-      document.head.append(script);
-    }
+    });
   });
 }
 
-/** Start the invisible challenge while the player enters their name or joins. */
-export function primeTurnChallenge(): void {
-  if (!SITE_KEY || (pending && Date.now() - pending.startedAt < TOKEN_MAX_AGE_MS)) return;
-  pending = { startedAt: Date.now(), token: startChallenge(SITE_KEY) };
+/** Start a challenge early, e.g. while the player enters their name or joins. */
+export function primeChallenge(action: ChallengeAction): void {
+  const challenge = pending.get(action);
+  if (!SITE_KEY || (challenge && Date.now() - challenge.startedAt < TOKEN_MAX_AGE_MS)) return;
+  pending.set(action, { startedAt: Date.now(), token: startChallenge(SITE_KEY, action) });
 }
 
-export async function consumeTurnToken(): Promise<string | null> {
-  primeTurnChallenge();
-  const challenge = pending;
+/** A fresh token for one request, or null when the challenge failed or is off. */
+export async function consumeChallengeToken(action: ChallengeAction): Promise<string | null> {
+  primeChallenge(action);
+  const challenge = pending.get(action);
   if (!challenge) return null;
   const token = await challenge.token;
   // Concurrent callers must never submit the same single-use token twice.
-  if (pending !== challenge) return null;
-  pending = undefined;
+  if (pending.get(action) !== challenge) return null;
+  pending.delete(action);
   return token;
 }

@@ -7,9 +7,9 @@ import { PartyAddressHeader } from "../components/party/PartyShellHeader";
 import { buttonStyles } from "../components/ui/Button";
 import { ErrorPanel } from "../components/ui/ErrorPanel";
 import { LoadingState } from "../components/ui/LoadingState";
-import { primeTurnChallenge } from "../lib/party/turnstile";
+import { primeChallenge } from "../lib/party/turnstile";
 import { handOffInvite } from "../lib/party/invite-import";
-import { lookupPartyCode, normalizePartyCode } from "../lib/party/party-code";
+import { PartyCodeError, lookupPartyCode, normalizePartyCode } from "../lib/party/party-code";
 
 /**
  * `rocketcrab.com/abcd`: look the party code up, then join on `/party` with
@@ -28,12 +28,17 @@ function PartyCodePage() {
   return <PartyCodeJoin key={code} code={code} />;
 }
 
+function isVerificationBlocked(error: unknown): boolean {
+  return error instanceof PartyCodeError && error.verificationBlocked;
+}
+
 function PartyCodeJoin({ code }: { code: string }) {
   const navigate = useNavigate();
   const lookup = useQuery({
     queryKey: ["party-code", code],
     queryFn: () => lookupPartyCode(code),
-    retry: 1,
+    // A blocked check fails the same way again; let the player retry by hand.
+    retry: (failures, error) => failures < 1 && !isVerificationBlocked(error),
     gcTime: 0,
     refetchOnWindowFocus: false,
   });
@@ -41,7 +46,7 @@ function PartyCodeJoin({ code }: { code: string }) {
 
   useEffect(() => {
     // Warm the TURN challenge while the lookup runs, as /party does.
-    primeTurnChallenge();
+    primeChallenge("mint_turn");
   }, []);
   useEffect(() => {
     if (typeof secret !== "string") return;
@@ -52,7 +57,14 @@ function PartyCodeJoin({ code }: { code: string }) {
   return (
     <div className="flex flex-col gap-4">
       <PartyAddressHeader code={code} />
-      {lookup.isError ? (
+      {lookup.isError && isVerificationBlocked(lookup.error) ? (
+        <ErrorPanel
+          className="mx-auto w-full max-w-sm"
+          title="Couldn't check this browser"
+          message="Party codes need a quick security check, and this browser or network blocked it. Ask the host for the invite link or QR code instead."
+          onRetry={() => void lookup.refetch()}
+        />
+      ) : lookup.isError ? (
         <ErrorPanel
           className="mx-auto w-full max-w-sm"
           title="Couldn't reach rocketcrab"

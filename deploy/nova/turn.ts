@@ -5,14 +5,13 @@
  * reconnects (apps/nova/src/lib/party/turn-creds.ts).
  */
 import { json, jsonError } from "./http";
+import { checkTurnstile, type TurnstileEnv } from "./turnstile";
 
-export interface TurnEnv {
+export interface TurnEnv extends TurnstileEnv {
   /** Cloudflare Realtime TURN key id (Worker secret). */
   TURN_KEY_ID?: string;
   /** Cloudflare Realtime TURN key API token (Worker secret). */
   TURN_KEY_API_TOKEN?: string;
-  TURNSTILE_SECRET_KEY?: string;
-  TURNSTILE_REQUIRED?: string;
 }
 
 export const MINT_TTL_SECONDS = 4 * 60 * 60;
@@ -44,36 +43,6 @@ export function dropPort53(servers: IceServer[]): IceServer[] {
   });
 }
 
-async function verifyChallenge(request: Request, secret: string): Promise<boolean> {
-  const token = request.headers.get("X-Turnstile-Token");
-  if (!token || token.length > 2048) return false;
-  try {
-    const response = await fetch("https://challenges.cloudflare.com/turnstile/v0/siteverify", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ secret, response: token }),
-      signal: AbortSignal.timeout(3_000),
-    });
-    if (!response.ok) {
-      console.error({ event: "turnstile_upstream_error", status: response.status });
-      return false;
-    }
-    const result = (await response.json()) as {
-      success?: boolean;
-      hostname?: string;
-      action?: string;
-    } | null;
-    return (
-      result?.success === true &&
-      result.hostname === new URL(request.url).hostname &&
-      result.action === "mint_turn"
-    );
-  } catch {
-    console.error({ event: "turnstile_upstream_unavailable" });
-    return false;
-  }
-}
-
 export async function handleTurn(request: Request, env: TurnEnv): Promise<Response> {
   const keyId = env.TURN_KEY_ID?.trim() ?? "";
   const token = env.TURN_KEY_API_TOKEN?.trim() ?? "";
@@ -82,14 +51,8 @@ export async function handleTurn(request: Request, env: TurnEnv): Promise<Respon
     return jsonError(500, "worker_misconfigured", "TURN key secrets are not configured");
   }
 
-  const turnstileSecret = env.TURNSTILE_SECRET_KEY?.trim();
-  if (!turnstileSecret && env.TURNSTILE_REQUIRED === "true") {
-    console.error({ event: "turnstile_secret_missing" });
-    return jsonError(500, "worker_misconfigured", "TURN verification is not configured");
-  }
-  if (turnstileSecret && !(await verifyChallenge(request, turnstileSecret))) {
-    return jsonError(403, "verification_failed", "TURN verification failed");
-  }
+  const rejected = await checkTurnstile(request, env, "mint_turn");
+  if (rejected) return rejected;
 
   let upstream: Response;
   try {

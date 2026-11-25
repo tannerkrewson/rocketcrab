@@ -24,7 +24,7 @@ run the Worker first.
 | `GET /api/signal/:room` | Trystero signaling, one hibernating Durable Object per room.              |
 | `GET /api/tunnel/:pair` | Encrypted WebSocket fallback, one hibernating Durable Object per pair.    |
 | `POST /api/code/claim`  | Claims or renews a party's four-letter code, one Durable Object per code. |
-| `POST /api/code/lookup` | Resolves a live four-letter code to its party's invite secret.            |
+| `POST /api/code/lookup` | Resolves a live four-letter code to its party's secret after Turnstile.   |
 
 The API checks that browser requests are same-origin. HTTP limits are
 approximate, per IPv4 address or IPv6 /64, route and Cloudflare location:
@@ -58,12 +58,13 @@ npm run deploy:nova      # builds and deploys the app and party API together
 After deploying, verify the app and runtime headers, open a deep link, and run
 a game in the editor. Confirm TURN minting by joining from the deployed party
 page and checking for `turn_cred_mint` with outcome `configured` in GA Realtime.
-Both requests below should return 403 after Turnstile has been configured.
+The requests below should return 403 after Turnstile has been configured.
 
 ```sh
 APP=https://rocketcrab.tannerkrewson.workers.dev
 curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$APP/api/turn"  # 403
 curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$APP/api/turn" -H "Origin: $APP"  # 403
+curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$APP/api/code/lookup" -H "Origin: $APP" -d '{"code":"abcd"}'  # 403
 ```
 
 For local protocol checks, use separate Worker storage so the integration
