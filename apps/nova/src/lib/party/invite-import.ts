@@ -1,11 +1,23 @@
 /**
  * Import invite secrets into session memory and strip their URL fragment
  * before rendering. A page-level guard prevents StrictMode's
- * double effect run from joining twice.
+ * double effect run from joining twice. A party code's secret arrives by
+ * in-memory handoff instead, so it never touches the URL.
  */
 import { parseInviteFragment } from "@rocketcrab/party";
 
 let inviteHandled = false;
+let handedOff: ImportedInvite | null = null;
+
+/** Queue an invite for the next `/party` mount (party-code joins). */
+export function handOffInvite(secret: string): void {
+  handedOff = { secret };
+}
+
+/** True while an invite waits in the URL fragment or a handoff. */
+export function invitePending(location: Pick<InviteImportLocation, "hash">): boolean {
+  return handedOff !== null || location.hash.length > 0;
+}
 
 export interface ImportedInvite {
   readonly secret: string;
@@ -20,6 +32,11 @@ export interface InviteImportLocation {
 
 /** Import an invite fragment once per page load; null when none applies. */
 export function importInviteFromLocation(location: InviteImportLocation): ImportedInvite | null {
+  if (handedOff !== null) {
+    const invite = handedOff;
+    handedOff = null;
+    return invite;
+  }
   if (inviteHandled) {
     return null;
   }
@@ -41,4 +58,5 @@ export function importInviteFromLocation(location: InviteImportLocation): Import
 /** Test-only reset so each test imports the fragment fresh. */
 export function resetInviteImportForTests(): void {
   inviteHandled = false;
+  handedOff = null;
 }

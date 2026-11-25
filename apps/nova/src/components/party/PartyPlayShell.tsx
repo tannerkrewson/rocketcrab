@@ -22,6 +22,7 @@ import { Dialog } from "../ui/Dialog";
 import { GameBrowser } from "./GameBrowser";
 import { PartyGameDetailsModal } from "./PartyGameDetails";
 import { PartyInvite } from "./PartyInvite";
+import { copyPartyCodeUrl } from "./PartyShellHeader";
 
 export interface PartyPlayShellProps {
   state: PartyEngineState;
@@ -88,7 +89,9 @@ export function PartyPlayShell({
     setDetailsOpen(false);
   }, [state.switchingGame]);
 
-  const copyInvite = async () => {
+  // The bar shows the party's address; tapping copies what it shows.
+  const copyAddress = async () => {
+    if (state.partyCode !== null) return copyPartyCodeUrl(state.partyCode);
     if (state.inviteUrl === null) return;
     const ok = await writeToClipboard(state.inviteUrl);
     if (ok) {
@@ -118,12 +121,13 @@ export function PartyPlayShell({
           <button
             type="button"
             className="rounded-lg font-title text-xl font-black leading-none whitespace-nowrap transition-opacity hover:opacity-80 focus-visible:outline-2 focus-visible:outline-focus disabled:opacity-60"
-            onClick={() => void copyInvite()}
+            onClick={() => void copyAddress()}
             disabled={state.inviteUrl === null}
-            title="Copy the invite link"
-            aria-label="Copy the invite link"
+            title={state.partyCode === null ? "Copy the invite link" : "Copy the party link"}
+            aria-label={state.partyCode === null ? "Copy the invite link" : "Copy the party link"}
           >
             rocketcrab<span className="text-primary">.com</span>
+            {state.partyCode === null ? null : `/${state.partyCode}`}
           </button>
 
           <Button

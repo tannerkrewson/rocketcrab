@@ -375,4 +375,22 @@ describe("PartyPlayShell in-game chrome", () => {
     );
     Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
   });
+
+  it("shows and copies the party's short address once it has a code", async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(navigator, "clipboard", {
+      value: { writeText },
+      configurable: true,
+    });
+    await renderShell(makeState({ partyCode: "rcxq" }));
+    const address = screen.getByRole("button", { name: "Copy the party link" });
+    expect(address).toHaveTextContent("rocketcrab.com/rcxq");
+    const attributes = [...document.body.querySelectorAll("*")].flatMap((element) =>
+      [...element.attributes].map((attribute) => attribute.value),
+    );
+    expect(attributes.filter((value) => value.includes("rcxq"))).toEqual([]);
+    await userEvent.click(address);
+    expect(writeText).toHaveBeenCalledWith(`${window.location.origin}/rcxq`);
+    Object.defineProperty(navigator, "clipboard", { value: undefined, configurable: true });
+  });
 });

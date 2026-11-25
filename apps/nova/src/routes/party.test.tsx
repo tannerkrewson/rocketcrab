@@ -131,6 +131,12 @@ vi.mock("../lib/party/engine", async (importOriginal) => {
   };
 });
 
+const lookupPartyCode = vi.hoisted(() => vi.fn<(code: string) => Promise<string | null>>());
+vi.mock("../lib/party/party-code", async (importOriginal) => ({
+  ...(await importOriginal<typeof import("../lib/party/party-code")>()),
+  lookupPartyCode,
+}));
+
 vi.mock("../lib/catalog/nova-games", () => ({
   NOVA_GAMES: [
     {
@@ -418,5 +424,34 @@ describe("/party", () => {
       fireEvent.click(screen.getByRole("button", { name: "Back" }));
       expect(stubEngine.dismissError).toHaveBeenCalledOnce();
     });
+  });
+});
+
+describe("/$code", () => {
+  it("looks the code up and joins on /party without the secret in the URL", async () => {
+    const secret = "F".repeat(43);
+    lookupPartyCode.mockResolvedValue(secret);
+    updatePartyDisplayName("Ada");
+    const router = renderParty("/ABCD");
+    await waitFor(() => expect(stubEngine.joinByInvite).toHaveBeenCalledWith({ secret }));
+    expect(lookupPartyCode).toHaveBeenCalledWith("abcd");
+    expect(router.state.location.pathname).toBe("/party");
+    expect(router.state.location.href).not.toContain(secret);
+    expect(stubEngine.createParty).not.toHaveBeenCalled();
+  });
+
+  it("spells out a code no party has and offers another try", async () => {
+    lookupPartyCode.mockResolvedValue(null);
+    renderParty("/abcd");
+    expect(await screen.findByRole("heading", { name: "No party has this code" })).toBeVisible();
+    expect(screen.getByText("(alpha bravo charlie delta)")).toBeVisible();
+    expect(screen.getByLabelText("Party code")).toBeVisible();
+    expect(stubEngine.joinByInvite).not.toHaveBeenCalled();
+  });
+
+  it("treats other single-segment paths as not found", async () => {
+    renderParty("/abcde");
+    expect(await screen.findByRole("heading", { name: "Lost in space" })).toBeInTheDocument();
+    expect(lookupPartyCode).not.toHaveBeenCalled();
   });
 });

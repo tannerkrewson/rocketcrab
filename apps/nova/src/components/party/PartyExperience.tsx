@@ -174,7 +174,9 @@ export function PartyExperience({
 
   return (
     <div className="flex flex-col gap-4">
-      {shellShown || settingUp ? <PartyShellHeader /> : null}
+      {shellShown || settingUp ? (
+        <PartyShellHeader code={shellShown ? state.partyCode : null} />
+      ) : null}
       {shellShown && state.signalingOutage ? <SignalingOutageAlert /> : null}
       {shellShown ? peerLinkAlert : null}
       {frameArea}

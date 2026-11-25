@@ -13,7 +13,11 @@ import { primeTurnChallenge } from "../lib/party/turnstile";
 import { usePartyEngine } from "../lib/party/use-party";
 import { takePartySource } from "../lib/party/source-handoff";
 import { getSavedPlayerName } from "../lib/party/identity";
-import { importInviteFromLocation, type ImportedInvite } from "../lib/party/invite-import";
+import {
+  importInviteFromLocation,
+  invitePending,
+  type ImportedInvite,
+} from "../lib/party/invite-import";
 import { gameRepository } from "../lib/games/instance";
 import { findCatalogGame, type NovaCatalogGame } from "../lib/catalog";
 import { hostedNovaSourceSpec } from "../lib/catalog/select";
@@ -39,7 +43,8 @@ function errorMessage(error: unknown): string {
 
 /**
  * The party entry point. A plain visit starts your own party; a link with an
- * invite fragment (`/party#secret=…`) joins a friend's. Either way
+ * invite fragment (`/party#secret=…`) or a party code (`/abcd`) joins a
+ * friend's. Either way
  * a player without a saved name names themselves first.
  */
 function PartyPage() {
@@ -55,7 +60,7 @@ function PartyPage() {
   // load, then held here. Until the import effect runs, a fragment in the URL
   // means an invite is probably on its way, so nothing starts yet.
   const [invite, setInvite] = useState<ImportedInvite | null>(null);
-  const [importing, setImporting] = useState(() => window.location.hash.length > 0);
+  const [importing, setImporting] = useState(() => invitePending(window.location));
   useEffect(() => {
     primeTurnChallenge();
     // StrictMode re-runs this; the importer returns null the second time, so

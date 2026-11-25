@@ -37,7 +37,7 @@ function renderHome() {
     history: createMemoryHistory({ initialEntries: ["/"] }),
   });
   const wrapper = ({ children }: { children: ReactNode }) => <>{children}</>;
-  return render(<RouterProvider router={router} />, { wrapper });
+  return { router, ...render(<RouterProvider router={router} />, { wrapper }) };
 }
 
 beforeEach(() => {
@@ -87,15 +87,21 @@ describe("/", () => {
     ).toBe(Node.DOCUMENT_POSITION_FOLLOWING);
   });
 
-  it("explains how to join in a popup, with no start-party button", async () => {
-    renderHome();
+  it("takes a party code in the join popup, with no start-party button", async () => {
+    const { router } = renderHome();
     await userEvent.click(await screen.findByRole("button", { name: "Join party" }));
     const dialog = await screen.findByRole("dialog", { name: "Join a party" });
     expect(within(dialog).getByText(/invite link/)).toBeInTheDocument();
     expect(within(dialog).queryByRole("link", { name: /start/i })).not.toBeInTheDocument();
-    expect(within(dialog).queryByRole("button", { name: /start/i })).not.toBeInTheDocument();
-    await userEvent.click(within(dialog).getByRole("button", { name: "Got it" }));
-    await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
+    const join = within(dialog).getByRole("button", { name: "Join party" });
+    const input = within(dialog).getByLabelText("Party code");
+    // Letters only, lowercased, four at most.
+    await userEvent.type(input, "Ab1c");
+    expect(input).toHaveValue("abc");
+    expect(join).toBeDisabled();
+    await userEvent.type(input, "D");
+    await userEvent.click(join);
+    await waitFor(() => expect(router.state.location.pathname).toBe("/abcd"));
   });
 
   it("lists the secondary actions column below the primaries", async () => {

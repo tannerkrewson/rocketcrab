@@ -5,6 +5,7 @@ import { toast } from "../lib/toast";
 import { BrandLogo } from "../components/layout/BrandLogo";
 import { InstallAppButton } from "../components/layout/InstallAppButton";
 import { Button, buttonStyles } from "../components/ui/Button";
+import { PartyCodeForm } from "../components/party/PartyCodeForm";
 import { Dialog } from "../components/ui/Dialog";
 import { usePartyEngine } from "../lib/party/use-party";
 import { clarityEvent } from "../lib/clarity";
@@ -124,13 +125,10 @@ function HomeComponent() {
       <Dialog open={joinHelpOpen} onClose={() => setJoinHelpOpen(false)} title="Join a party">
         <div className="flex flex-col gap-4">
           <p className="leading-relaxed text-foreground/80">
-            Ask a friend who&apos;s already in the party to send you their invite link, or scan the
-            QR code on their screen with your phone&apos;s camera. Opening the link takes you
-            straight into their party.
+            Enter the code shown on your friend&apos;s screen, scan their QR code with your
+            phone&apos;s camera, or open the invite link they sent you.
           </p>
-          <Button variant="primary" className="self-end" onClick={() => setJoinHelpOpen(false)}>
-            Got it
-          </Button>
+          <PartyCodeForm />
         </div>
       </Dialog>
     </div>

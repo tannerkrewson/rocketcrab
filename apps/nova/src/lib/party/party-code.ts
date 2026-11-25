@@ -19,6 +19,11 @@ export function normalizePartyCode(input: string): string | null {
   return /^[a-z]{4}$/.test(code) ? code : null;
 }
 
+/** The short link a code opens, on this deployment's origin. */
+export function partyCodeUrl(code: string): string {
+  return `${window.location.origin}/${code}`;
+}
+
 /** NATO spelling, for reading a code aloud: "abcd" → "alpha bravo charlie delta". */
 export function phoneticCode(code: string): string {
   return [...code].map((letter) => NATO[letter] ?? letter).join(" ");
