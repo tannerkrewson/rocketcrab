@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [nova]
+    branches: [main]
   pull_request:
 
 permissions:
