@@ -42,17 +42,20 @@ function HomeComponent() {
   }, [engine, state.phase]);
 
   return (
-    <div className="flex min-h-[calc(100dvh-16rem)] flex-col items-center justify-center gap-10">
+    <div className="flex min-h-[calc(100dvh-16rem)] flex-col items-center justify-center gap-8">
       <section className="flex flex-col items-center gap-3 text-center">
         <BrandLogo />
         <h1 className="font-title text-[2.5rem] font-black leading-none text-foreground sm:text-5xl">
           rocketcrab<span className="text-primary">.com</span>
         </h1>
         <p className="text-lg text-foreground/70">party games for phones</p>
+      </section>
+
+      <div className="flex w-full max-w-md flex-col gap-4">
         <Link
           to="/build"
           data-testid="nova-card"
-          className="rc-nova-card mt-4 block w-full max-w-md overflow-hidden rounded-2xl px-6 py-4 text-center transition-transform active:scale-[0.98] motion-reduce:transition-none"
+          className="rc-nova-card block w-full overflow-hidden rounded-2xl px-6 py-4 text-center transition-transform active:scale-[0.98] motion-reduce:transition-none"
         >
           <span className="block text-lg font-black [text-shadow:0_1px_12px_rgb(0_0_0/0.6)]">
             Introducing <span className="text-nova-text">Nova</span>
@@ -63,53 +66,60 @@ function HomeComponent() {
         </Link>
         <a
           href="mailto:tannerkrewson@gmail.com?subject=Rocketcrab%20support"
-          className="glass flex w-full max-w-md items-center gap-4 rounded-2xl px-5 py-3.5 text-left font-semibold transition-transform active:scale-[0.98] motion-reduce:transition-none"
+          className="glass flex w-full items-center gap-4 rounded-2xl px-5 py-3.5 text-left text-sm font-semibold transition-transform active:scale-[0.98] motion-reduce:transition-none"
         >
           <Mail className="size-5 shrink-0" aria-hidden="true" />
-          <span>Enjoy the new Rocketcrab! Email me if you have issues -Tanner</span>
+          <span className="flex-1">
+            Enjoy the new Rocketcrab!
+            <br />
+            Email me if you have issues.
+          </span>
+          <span className="shrink-0 self-end">-Tanner</span>
         </a>
-      </section>
+      </div>
 
-      <section aria-label="Start or join a party" className="button-row">
-        <Button
-          variant="primary"
-          size="lg"
-          onClick={() => {
-            clarityEvent("join_help_opened");
-            setJoinHelpOpen(true);
-          }}
-        >
-          Join party
-        </Button>
-        <Link
-          to="/party"
-          onClick={() => clarityEvent("start_party_clicked")}
-          className={buttonStyles("primary", "lg")}
-        >
-          Start party
-        </Link>
-      </section>
+      <div className="flex flex-col items-center gap-6">
+        <section aria-label="Start or join a party" className="button-row">
+          <Button
+            variant="primary"
+            size="lg"
+            onClick={() => {
+              clarityEvent("join_help_opened");
+              setJoinHelpOpen(true);
+            }}
+          >
+            Join party
+          </Button>
+          <Link
+            to="/party"
+            onClick={() => clarityEvent("start_party_clicked")}
+            className={buttonStyles("primary", "lg")}
+          >
+            Start party
+          </Link>
+        </section>
 
-      <InstallAppButton />
+        <InstallAppButton />
 
-      <section aria-label="More" className="button-stack">
-        <Link to="/build" className={MORE_LINK}>
-          Build a game
-        </Link>
-        <Link to="/library" className={MORE_LINK}>
-          My games
-        </Link>
-        <Link
-          to="/browse"
-          onClick={() => clarityEvent("browse_games_clicked")}
-          className={MORE_LINK}
-        >
-          Browse games
-        </Link>
-        <Link to="/about" className={MORE_LINK}>
-          About
-        </Link>
-      </section>
+        <section aria-label="More" className="button-stack">
+          <Link to="/build" className={MORE_LINK}>
+            Build a game
+          </Link>
+          <Link to="/library" className={MORE_LINK}>
+            My games
+          </Link>
+          <Link
+            to="/browse"
+            onClick={() => clarityEvent("browse_games_clicked")}
+            className={MORE_LINK}
+          >
+            Browse games
+          </Link>
+          <Link to="/about" className={MORE_LINK}>
+            About
+          </Link>
+        </section>
+      </div>
 
       <Dialog open={joinHelpOpen} onClose={() => setJoinHelpOpen(false)} title="Join a party">
         <div className="flex flex-col gap-4">
