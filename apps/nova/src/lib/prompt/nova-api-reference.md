@@ -60,7 +60,7 @@ nova.onConnectionChange((status) => {});
 // "connecting" | "connected" | "reconnecting" | "suspended" | "disconnected"
 
 // --- Players ---
-nova.player; // { id, name } for this player, or null
+nova.player; // { id, name } for this player, or null; id survives reloads
 nova.players; // everyone, this player first, then join order
 nova.onPlayerJoin((player) => {});
 nova.onPlayerLeave((player) => {});
@@ -217,8 +217,6 @@ What a real-time game must do:
 - **Keep everything in the state**: positions, velocities, scores, timers
   (count down with `context.dt`), the current round. Nothing that matters may
   live only in a local variable.
-- **Read players from `context.players` in `tick`**: add an entity for a new
-  player and delete the entities of players who left.
 - **Draw every animation frame**, gliding between the last two states as
   above. New states arrive `tickRate` times a second plus network delay
   (often 50–200 ms), so never move things only when a state arrives.
@@ -234,9 +232,14 @@ What a real-time game must do:
   are fine when they help; pin exact versions.
 - **Phones first.** Most players are on phones: touch controls, large tap
   targets, `env(safe-area-inset-*)` margins. Desktop should still work.
-- **Players come and go.** Handle joins, leaves and late joiners in the
-  state, recover from a rejected action, and show this player's connection
-  status.
+- **Players come and go.** A player's `id` stays the same when they reload
+  or reconnect in the same browser, so key per-player state by `id` and give a
+  returning player their seat back. `onPlayerJoin` and `onPlayerLeave` run in
+  each player's browser, not in the handlers: to change the state when
+  players join or leave, compare `context.players` with the state in `tick`
+  (a turn-based game can use `tickRate: 1`; a tick that changes nothing sends
+  nothing). Recover from a rejected action, and show this player's
+  connection status.
 - **Show every phase**: before the start, waiting for others, playing, and the
   end, with a way to play again (an action that resets the state).
 - **Fail visibly.** If something the game needs is missing (camera, WebGL, a

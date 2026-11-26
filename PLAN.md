@@ -25,6 +25,34 @@ churn on upgrade), and need no paid always-on server.
       loads, and parties work without analytics or Turnstile.
 - [ ] Watch a Clarity recording of a party from an eligible region and
       confirm names, game titles and the invite QR code are masked.
+- [ ] Game API additions. Nova is in production and people's saved games
+      run on it, so every change must be additive: optional handlers and
+      fields that existing `apiVersion: 1` games never see, existing
+      `context.players`/`onPlayerJoin`/`onPlayerLeave` behavior unchanged,
+      and no new peer message or history entry that an older shell in the same
+      party rejects or fails to replay (gate on what peers support, or keep
+      the wire format). A breaking change needs `apiVersion: 2` with v1
+      behavior kept. Update `nova-api-reference.md` (and the master prompt
+      snapshot) with each addition, and drop the `tickRate: 1` workaround it
+      currently suggests for turn-based join/leave handling.
+  - `playerJoined(state, context, player)` / `playerLeft(state, context,
+    player)` in `defineGame`, run only by the authority as ordered,
+    exactly-once history entries. Drive them by roster diff, not transport
+    events: store the roster the game was last told about with the canonical
+    state (so it migrates), and whenever the connected players differ, run
+    the handlers for the difference. A new authority then reports the old
+    authority's leave. `playerLeft` waits a grace period (about 20–30 s) and
+    a return within it cancels the leave; `context.players` stays "connected
+    now". Player ids already survive reloads (Trystero's persistent
+    `userId`); add an e2e that reloads a player mid-game and checks the same
+    id comes back.
+  - `context.leaderId` in handlers and `nova.leaderId` on the client: the
+    party host (`PartySession.hostMemberId`), filled in by the authority so a
+    client can't claim it, for host-only game settings (e.g. an 18+ word
+    pack). Call it "leader" in the API so `isForbiddenSurfaceName` keeps
+    "host" out of the game surface. The reference must say it is a person,
+    not where the game runs, and that it is cooperative, not a security
+    boundary.
 - [ ] `packages/nova-api/src/examples.ts` says its strings are the examples in
       `nova-api-reference.md`, but they have drifted (different games, no
       `apiVersion`). Run the reference's own code blocks against the API in a
