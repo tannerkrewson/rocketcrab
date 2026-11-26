@@ -983,8 +983,11 @@ describe("party engine — start delivery to a frame instance", () => {
     await settle(world);
     await registerLocalGame(b, world);
     a.engine.startGame();
-    await settle(world);
-    expect(b.engine.getState().phase).toBe("playing");
+    await vi.waitFor(async () => {
+      // The initial snapshot waits for WebCrypto, which can outlast one drain.
+      await settle(world);
+      expect(b.engine.getState().phase).toBe("playing");
+    });
     return { a, b };
   }
 
