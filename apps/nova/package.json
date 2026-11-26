@@ -18,7 +18,7 @@
     "@fontsource-variable/inconsolata": "5.3.0",
     "@fontsource/mukta": "5.3.0",
     "@heroui/react": "3.2.6",
-    "@heroui/styles": "3.2.6",
+    "@heroui/styles": "3.2.8",
     "@khmyznikov/pwa-install": "0.7.0",
     "@microsoft/clarity": "1.0.2",
     "@rocketcrab/core": "0.0.0",
