@@ -96,6 +96,7 @@ describe("RuntimeHostClient bootstrap", () => {
     await flush();
     expect(frames).toHaveLength(1);
     expect(frames[0]?.getAttribute("sandbox")).toContain("allow-scripts");
+    expect(frames[0]?.getAttribute("sandbox")).toContain("allow-downloads");
     await vi.waitFor(() => expect(windowMessages).toHaveLength(1));
     const bootstrap = windowMessages[0]?.data as Record<string, unknown>;
     expect(bootstrap.type).toBe("runtime.bootstrap");

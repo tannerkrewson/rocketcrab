@@ -29,7 +29,7 @@ function createFrameFactory(): FrameFactory {
       // No allow-top-navigation: the game must not navigate the Nova tab.
       frame.setAttribute(
         "sandbox",
-        "allow-scripts allow-same-origin allow-pointer-lock allow-fullscreen",
+        "allow-scripts allow-same-origin allow-pointer-lock allow-fullscreen allow-downloads",
       );
       // Permissions must be delegated at every iframe hop: use the base set
       // plus whatever the host delegated in the bootstrap.

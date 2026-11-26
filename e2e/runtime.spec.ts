@@ -37,6 +37,30 @@ test.describe("runtime bootstrap and game execution", () => {
     expect(registration?.gameId).toBe("game-hello");
   });
 
+  test("a game can download a generated file", async ({ page }) => {
+    await installHarness(page);
+    await loadGame(page, {
+      gameId: "game-download",
+      gameSource: `<!doctype html>
+        <a id="export" download="scores.txt">Download scores</a>
+        <script>
+          document.getElementById("export").href = URL.createObjectURL(
+            new Blob(["Score: 10"], { type: "text/plain" }),
+          );
+        </script>`,
+    });
+
+    const downloadEvent = page.waitForEvent("download");
+    await page
+      .frameLocator(`iframe[src="${RUNTIME_ORIGIN}/"]`)
+      .frameLocator('iframe[title="game sandbox"]')
+      .getByRole("link", { name: "Download scores" })
+      .click();
+    const download = await downloadEvent;
+    expect(download.suggestedFilename()).toBe("scores.txt");
+    expect(await download.failure()).toBeNull();
+  });
+
   test("remote dependencies run without rewriting", async ({ page }) => {
     test.setTimeout(90_000);
     await installHarness(page);

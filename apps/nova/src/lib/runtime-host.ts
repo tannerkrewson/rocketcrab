@@ -343,7 +343,8 @@ export class RuntimeHostClient {
     const iframe = document.createElement("iframe");
     // Allow runtime scripts and same-origin access without parent navigation.
     // Permission delegation passes through to the nested game frame.
-    iframe.setAttribute("sandbox", "allow-scripts allow-same-origin");
+    // Sandbox restrictions are inherited, so game downloads need both frames to allow them.
+    iframe.setAttribute("sandbox", "allow-scripts allow-same-origin allow-downloads");
     iframe.setAttribute("allow", "camera; microphone; fullscreen");
     iframe.allowFullscreen = true;
     iframe.setAttribute("title", "game runtime");
