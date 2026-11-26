@@ -11,10 +11,7 @@ import {
   authorityHeartbeatIntervalMs,
   errorReportRatePerSecond,
   errorReportWarnRatePerSecond,
-  gameBytesBurst,
-  gameFileBytes,
   gameFilesTotalBytes,
-  gameFileTimeoutMs,
   handshakeTimeoutMs,
   htmlSourceBytes,
   htmlSourceSchema,
@@ -53,9 +50,8 @@ describe("protocol limits", () => {
     expect(errorReportWarnRatePerSecond).toBeLessThan(errorReportRatePerSecond);
   });
 
-  it("admits one maximum-size file per burst and budgets a full session at 500 kbit/s", () => {
-    expect(gameFileBytes).toBeLessThanOrEqual(Math.min(gameBytesBurst, gameFilesTotalBytes));
-    expect((gameFilesTotalBytes * 8 * 1000) / 500_000).toBeLessThan(gameFileTimeoutMs);
+  it("gives shared files the game source's budget", () => {
+    expect(gameFilesTotalBytes).toBe(htmlSourceBytes);
   });
 
   it("exports the complete typed limits table", () => {

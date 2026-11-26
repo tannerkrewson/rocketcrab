@@ -38,12 +38,21 @@ export const gameBytesPerSecond = 256 * 1024;
 export const gameBytesBurst = 1024 * 1024;
 export const gameBytesWarn = Math.floor(gameBytesBurst * LIMIT_WARN_FRACTION);
 
-/** Initial shared-file budgets. At 500 kbit/s, 1 MiB takes about 17 s before overhead. */
-export const gameFileBytes = 256 * 1024;
-export const gameFilesTotalBytes = 1024 * 1024;
-/** Bound requests and metadata even when files are empty or tiny. */
-export const gameFilesMax = 32;
-export const gameFileTimeoutMs = 30_000;
+/** Largest request payload a peer accepts (replies carry bulk data instead). */
+export const requestPayloadBytes = 16 * 1024;
+
+/** Time allowed for one bulk transfer (a game source, a batch of shared files). */
+export const transferTimeoutMs = 120_000;
+
+/**
+ * Total shared-file bytes per game session, counting each file's transfer
+ * header. A player arriving mid-game (late join, reload, new authority) must
+ * fetch every file the state references, and every device holds them all:
+ * the same burden as downloading the game itself, which Nova already asks of
+ * every player. So files get the game source's budget. The state limit bounds
+ * how many refs exist, and the per-player byte rate bounds upload churn.
+ */
+export const gameFilesTotalBytes = htmlSourceBytes;
 
 /** Maximum actions dispatched per second per player. */
 export const actionRatePerSecond = 20;
@@ -149,10 +158,9 @@ export const LIMITS = {
   gameBytesPerSecond,
   gameBytesBurst,
   gameBytesWarn,
-  gameFileBytes,
+  requestPayloadBytes,
+  transferTimeoutMs,
   gameFilesTotalBytes,
-  gameFilesMax,
-  gameFileTimeoutMs,
   runtimeLogRatePerSecond,
   runtimeLogWarnRatePerSecond,
   errorReportRatePerSecond,

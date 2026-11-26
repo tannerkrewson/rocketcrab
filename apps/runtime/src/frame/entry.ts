@@ -17,7 +17,7 @@ import type {
 import { NOVA_API_VERSION } from "@rocketcrab/nova-api/version";
 import {
   PROTOCOL_VERSION,
-  gameFileTimeoutMs,
+  transferTimeoutMs,
   type FileResult,
   type GameApiEvent,
 } from "@rocketcrab/protocol";
@@ -112,6 +112,8 @@ function install(): void {
   ): Promise<FileResult> {
     const requestId = crypto.randomUUID();
     return new Promise((resolve, reject) => {
+      // The shell settles every file call within transferTimeoutMs; this
+      // catches an older shell that dropped a call it doesn't accept.
       const timer = setTimeout(() => {
         fileRequests.delete(requestId);
         reject(
@@ -120,7 +122,7 @@ function install(): void {
             "Shared files did not respond. Check your connection and reload Nova to update.",
           ),
         );
-      }, gameFileTimeoutMs + 2000);
+      }, transferTimeoutMs + 2000);
       fileRequests.set(requestId, (result) => {
         clearTimeout(timer);
         fileRequests.delete(requestId);

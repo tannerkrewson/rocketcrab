@@ -6,6 +6,7 @@ import {
   gameSourceDiscoverMessageSchema,
   htmlSourceBytes,
   htmlSourceWarnBytes,
+  transferTimeoutMs,
   parsePeerMessage,
   type PeerMessage,
 } from "@rocketcrab/protocol";
@@ -282,7 +283,7 @@ export class GameSourceCoordinator {
       channel: GAME_SOURCE_CHANNEL,
       payload: identity(metadata),
       targetConnectionId: connectionId,
-      timeoutMs: 120_000,
+      timeoutMs: transferTimeoutMs,
       maxResponseBytes: metadata.sourceSizeBytes,
       ...(signal !== undefined ? { signal } : {}),
     });
@@ -522,7 +523,7 @@ export class GameSourceCoordinator {
         channel: GAME_SOURCE_CHANNEL,
         payload: identity(metadata),
         targetConnectionId: transfer.connectionId,
-        timeoutMs: 120_000,
+        timeoutMs: transferTimeoutMs,
         maxResponseBytes: metadata.sourceSizeBytes,
         signal: transfer.controller.signal,
         onProgress: (fraction) => {

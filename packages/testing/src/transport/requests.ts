@@ -1,3 +1,4 @@
+import { requestPayloadBytes, transferTimeoutMs } from "@rocketcrab/protocol";
 import type {
   NovaTransport,
   TransportRequestHandler,
@@ -75,7 +76,7 @@ export class MemoryRequests {
       };
       const timer = setTimeout(
         () => fail(new Error("Request timed out.")),
-        options.timeoutMs ?? 120_000,
+        options.timeoutMs ?? transferTimeoutMs,
       );
       const abort = () => fail(new Error("Request aborted."));
       options.signal?.addEventListener("abort", abort, { once: true });
@@ -138,7 +139,7 @@ export class MemoryRequests {
       if (
         !handler ||
         this.incoming.size > 32 ||
-        new TextEncoder().encode(JSON.stringify(request.payload)).byteLength > 16 * 1024
+        new TextEncoder().encode(JSON.stringify(request.payload)).byteLength > requestPayloadBytes
       )
         throw new Error("Rejected request.");
       response = await handler(request.payload, {

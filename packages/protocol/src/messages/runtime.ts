@@ -8,7 +8,7 @@ import {
   timestampSchema,
   titleSchema,
 } from "../ids";
-import { gameFileBytes, htmlSourceSchema, playerLimitMax, tickRateMax } from "../limits";
+import { gameFilesTotalBytes, htmlSourceSchema, playerLimitMax, tickRateMax } from "../limits";
 import { gameFileRefSchema, gameFileTypeSchema, novaActionSchema } from "../nova-api";
 import { gameEndReasonSchema } from "./shared";
 
@@ -127,7 +127,7 @@ const gameFileDataSchema = z
     bytes: z.custom<ArrayBuffer>((value) => {
       try {
         // The untrusted game and runtime bridge have different ArrayBuffer constructors.
-        return arrayBufferByteLength.call(value) <= gameFileBytes;
+        return arrayBufferByteLength.call(value) <= gameFilesTotalBytes;
       } catch {
         return false;
       }

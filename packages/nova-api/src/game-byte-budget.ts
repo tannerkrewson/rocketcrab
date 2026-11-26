@@ -12,13 +12,7 @@ export class GameByteBudget {
     bytes: number,
     emit: (event: Extract<NovaSessionEvent, { type: "bandwidthWarning" }>) => void,
   ): void {
-    const now = performance.now();
-    const elapsed = Math.max(0, now - this.gameByteUpdatedAt);
-    this.gameByteTokens = Math.min(
-      gameBytesBurst,
-      this.gameByteTokens + (elapsed * gameBytesPerSecond) / 1000,
-    );
-    this.gameByteUpdatedAt = now;
+    this.refill();
     if (this.gameByteTokens < bytes) {
       throw new NovaError(
         "rate_limited",
@@ -35,6 +29,32 @@ export class GameByteBudget {
     } else if (gameBytesBurst - this.gameByteTokens < gameBytesWarn) {
       this.gameByteWarned = false;
     }
+  }
+
+  /**
+   * Shared files may be larger than the burst: one is admitted whenever the
+   * bucket is out of debt, and the debt is repaid at the same rate.
+   */
+  debtMs(): number {
+    this.refill();
+    return this.gameByteTokens > 0
+      ? 0
+      : Math.ceil(((1 - this.gameByteTokens) / gameBytesPerSecond) * 1000);
+  }
+
+  borrow(bytes: number): void {
+    this.refill();
+    this.gameByteTokens -= bytes;
+  }
+
+  private refill(): void {
+    const now = performance.now();
+    const elapsed = Math.max(0, now - this.gameByteUpdatedAt);
+    this.gameByteTokens = Math.min(
+      gameBytesBurst,
+      this.gameByteTokens + (elapsed * gameBytesPerSecond) / 1000,
+    );
+    this.gameByteUpdatedAt = now;
   }
 }
 

@@ -172,10 +172,10 @@ nova.onError((error) => {}); // { code, message }
    controls and the tick.
 7. **Every \`on…\` call returns an unsubscribe function.**
 8. **Limits.** State at most 512 KiB, one action payload at most 16 KiB,
-   controls at most 1 KiB. Each player's actions and file uploads share
-   256 KiB/s with a 1 MiB burst. Going over
-   rejects the call with \`payload_too_large\`, \`state_too_large\` or
-   \`rate_limited\`.
+   controls at most 1 KiB. Each player may send 256 KiB/s of actions with a
+   1 MiB burst. File uploads average 256 KiB/s: after a large one, the next
+   upload waits. Going over rejects the call with \`payload_too_large\`,
+   \`state_too_large\` or \`rate_limited\`.
 9. **Render immediately; never wait for the party.** In the editor preview
    there is no party: \`nova.connectionStatus\` stays \`"disconnected"\` and
    \`onStart\`, \`onPlayerJoin\` and \`onConnectionChange\` never fire. Show a
@@ -199,9 +199,10 @@ their refs as string values in state. Upload from the game's UI after
   element or other local use. Call \`URL.revokeObjectURL(url)\` when done.
   Keep refs in state so late joiners and returning players can fetch them.
   Removing all occurrences of a ref frees its cached file.
-- Files are limited to 256 KiB each and 32 distinct files totaling 1 MiB
-  per session, including recent uploads that are waiting for a state ref.
-  Resize or compress captured media before uploading. Catch \`NovaError\`
+- All of a game's files together are limited to 2 MiB, the same as a game's
+  HTML, including recent uploads that are waiting for a state ref. Any
+  number of files fits within that. Upload compact formats (compressed SVG,
+  WebP, Opus) and resize captured media first. Catch \`NovaError\`
   and show a message if an upload or fetch fails. An unavailable file or
   older party build can cause \`file_unavailable\`.
 - Every party member can receive shared files, even when \`selectView\`

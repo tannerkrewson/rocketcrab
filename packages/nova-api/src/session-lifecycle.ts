@@ -113,11 +113,8 @@ export abstract class SessionLifecycle implements NovaClientBackend {
       joinedAt: Date.now(),
       authorityEligible: true,
     };
-    this.files = new GameFiles(
-      this.transport,
-      this.game.gameId,
-      () => this.engine.getAuthorityMemberId(),
-      (bytes) => this.gameByteBudget.consume(bytes, (event) => this.emit(event)),
+    this.files = new GameFiles(this.transport, this.game.gameId, () =>
+      this.engine.getAuthorityMemberId(),
     );
     this.client = createNovaClient(this);
     this.engine = new NovaStateEngine({

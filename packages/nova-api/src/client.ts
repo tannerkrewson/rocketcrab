@@ -18,9 +18,8 @@
  */
 import {
   controlsBytes,
-  gameFileBytes,
+  gameFilesTotalBytes,
   gameFileRefSchema,
-  gameFilesMax,
   gameFileTypeSchema,
   tickRateDefault,
   novaActionSchema,
@@ -296,25 +295,17 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
     },
   };
 
-  let fileCalls = 0;
   async function useFiles<T>(run: (files: NonNullable<NovaClientBackend["files"]>) => Promise<T>) {
-    let active = false;
     try {
       if (ended || disposed) throw new NovaError("ended", "This game session has ended.");
       if (backend.files === undefined)
         throw new NovaError("unsupported", "Shared files are unavailable in this build.");
-      if (fileCalls >= gameFilesMax)
-        throw new NovaError("rate_limited", "Too many shared file requests are pending.");
-      fileCalls++;
-      active = true;
       return await run(backend.files);
     } catch (cause) {
       const error =
         cause instanceof NovaError ? cause : new NovaError("file_unavailable", String(cause));
       callSafely(errorHandlers, error);
       throw error;
-    } finally {
-      if (active) fileCalls--;
     }
   }
 
@@ -323,8 +314,8 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
       useFiles(async (files) => {
         if (!(blob instanceof Blob))
           throw new NovaError("invalid_options", "nova.files.put() expects a Blob.");
-        if (blob.size > gameFileBytes)
-          throw new NovaError("payload_too_large", "Shared files can be at most 256 KiB.");
+        if (blob.size > gameFilesTotalBytes)
+          throw new NovaError("payload_too_large", "A shared file can be at most 2 MiB.");
         if (!gameFileTypeSchema.safeParse(blob.type).success)
           throw new NovaError("invalid_options", "The shared file's MIME type is too long.");
         return files.put({ bytes: await blob.arrayBuffer(), mimeType: blob.type });

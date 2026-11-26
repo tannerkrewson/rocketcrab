@@ -28,7 +28,7 @@ import type {
   SessionSecret,
   Timestamp,
 } from "@rocketcrab/protocol";
-import { LIMITS } from "@rocketcrab/protocol";
+import { LIMITS, requestPayloadBytes, transferTimeoutMs } from "@rocketcrab/protocol";
 import type {
   NovaTransport,
   TransportConnectionState,
@@ -218,7 +218,7 @@ export class TrysteroTransport implements NovaTransport {
     try {
       return await this.requestAction(options.channel).request(options.payload as DataPayload, {
         target: peerId,
-        timeoutMs: options.timeoutMs ?? 120_000,
+        timeoutMs: options.timeoutMs ?? transferTimeoutMs,
         ...(options.signal ? { signal: options.signal } : {}),
       });
     } finally {
@@ -240,7 +240,7 @@ export class TrysteroTransport implements NovaTransport {
           context.kind === "response"
             ? (this.pendingRequests.get(channel + ":" + context.peerId)?.maxResponseBytes ??
               2 * 1024 * 1024)
-            : 16 * 1024;
+            : requestPayloadBytes;
         return context.byteLength <= limit;
       }),
       action.onReceiveProgress((fraction, context) => {
