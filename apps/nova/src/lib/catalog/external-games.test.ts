@@ -23,8 +23,8 @@ function game(id: string) {
 }
 
 describe("external games data", () => {
-  it("lists every external game (20) with unique ids", () => {
-    expect(EXTERNAL_GAMES.length).toBe(20);
+  it("lists every external game (19) with unique ids", () => {
+    expect(EXTERNAL_GAMES.length).toBe(19);
     const ids = EXTERNAL_GAMES.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).toEqual(expect.arrayContaining(["protobowl", "netgamesio-avalon", "ooc-story"]));
@@ -140,6 +140,15 @@ describe("external room creation", () => {
     });
   });
 
+  it("keeps the existing Spyfall transfer ID and uses hosted Nova play", () => {
+    expect(findExternalGame("tk-spyfall")).toBeUndefined();
+    expect(findCatalogGame("tk-spyfall")?.play).toEqual({
+      kind: "nova",
+      url: "https://www.tannerkrewson.com/spyfall/game.html",
+    });
+    expect(CATALOG_CONNECT_ORIGINS).toContain("https://www.tannerkrewson.com");
+  });
+
   it("outofcontext.party and netgames.io return URL rooms from the relay", async () => {
     let fetchMock = relayReturning({ code: "RC42" });
     expect(await game("ooc-story").play.createRoom()).toEqual({
@@ -163,9 +172,6 @@ describe("external room creation", () => {
     relayReturning({ gameCode: "XYZ9" });
     const join = async (id: string) =>
       game(id).play.joinUrl(await game(id).play.createRoom(), { name: "Al", isHost: true });
-    expect(await join("tk-spyfall")).toBe(
-      "https://spyfall.tannerkrewson.com/XYZ9?rocketcrab=true&name=Al&ishost=true",
-    );
     expect(await join("werewolfnight")).toBe(
       "https://werewolf-night.com/game?rocketcrab=true&name=Al&ishost=true&roomId=XYZ9",
     );
