@@ -27,6 +27,7 @@ const offerReply = z.union([
 
 type FileData = { bytes: ArrayBuffer; mimeType: string };
 type StoredFile = FileData & { expiry?: ReturnType<typeof setTimeout> };
+type FileRead = { ref: string; signal: AbortSignal; changed?: () => void };
 type RequestContext = Parameters<TransportRequestHandler>[1];
 
 function unavailable() {
@@ -101,7 +102,7 @@ export class GameFiles implements NonNullable<NovaClientBackend["files"]> {
   private readonly entries = new Map<string, StoredFile>();
   private readonly uploadBudgets = new Map<string, GameByteBudget>();
   private readonly reservations = new Map<string, number>();
-  private readonly listeners = new Set<() => void>();
+  private readonly reads = new Set<FileRead>();
   private readonly stop = new AbortController();
   private readonly unsubscribers: (() => void)[] = [];
   private refs = new Set<string>();
@@ -194,21 +195,28 @@ export class GameFiles implements NonNullable<NovaClientBackend["files"]> {
 
   async get(ref: string): Promise<FileData> {
     this.assertOpen();
-    if (this.listeners.size >= gameFilesMax)
+    if (this.reads.size >= gameFilesMax)
       throw new NovaError("rate_limited", "Too many shared file requests are pending.");
     const signal = AbortSignal.any([this.stop.signal, AbortSignal.timeout(gameFileTimeoutMs)]);
-    let wasReferenced = this.refs.has(ref);
-    if (this.failed.delete(ref)) this.fetchNext();
-    while (!signal.aborted) {
-      const file = this.entries.get(ref);
-      // Keep the verified cache buffer owned by the shell when the caller transfers its copy.
-      if (file) return { bytes: file.bytes.slice(0), mimeType: file.mimeType };
-      if (this.failed.has(ref) || (wasReferenced && !this.refs.has(ref))) break;
-      wasReferenced ||= this.refs.has(ref);
-      await this.waitForChange(signal);
+    const read: FileRead = { ref, signal };
+    this.reads.add(read);
+    try {
+      let wasReferenced = this.refs.has(ref);
+      this.failed.delete(ref);
+      this.fetchNext();
+      while (!signal.aborted) {
+        const file = this.entries.get(ref);
+        // Keep the verified cache buffer owned by the shell when the caller transfers its copy.
+        if (file) return { bytes: file.bytes.slice(0), mimeType: file.mimeType };
+        if (this.failed.has(ref) || (wasReferenced && !this.refs.has(ref))) break;
+        wasReferenced ||= this.refs.has(ref);
+        await this.waitForChange(read);
+      }
+      this.assertOpen();
+      throw unavailable();
+    } finally {
+      this.reads.delete(read);
     }
-    this.assertOpen();
-    throw unavailable();
   }
 
   /** Recheck after the state hash completes, immediately before committing. */
@@ -346,7 +354,12 @@ export class GameFiles implements NonNullable<NovaClientBackend["files"]> {
 
   private fetchNext(): void {
     if (this.stop.signal.aborted || this.downloading) return;
-    const ref = [...this.refs].find((ref) => !this.entries.has(ref) && !this.failed.has(ref));
+    const needsDownload = (ref: string) => !this.entries.has(ref) && !this.failed.has(ref);
+    // Let the current transfer finish and serve active reads before background replication.
+    const requested = [...this.reads].find(
+      ({ ref, signal }) => !signal.aborted && this.refs.has(ref) && needsDownload(ref),
+    );
+    const ref = requested?.ref ?? [...this.refs].find(needsDownload);
     if (ref === undefined) return;
     const controller = new AbortController();
     const generation = this.peerGeneration;
@@ -399,18 +412,18 @@ export class GameFiles implements NonNullable<NovaClientBackend["files"]> {
   }
 
   private notifyChange(): void {
-    for (const changed of this.listeners) changed();
+    for (const read of this.reads) read.changed?.();
   }
 
-  private waitForChange(signal: AbortSignal): Promise<void> {
+  private waitForChange(read: FileRead): Promise<void> {
     return new Promise((resolve) => {
       const done = () => {
-        this.listeners.delete(done);
-        signal.removeEventListener("abort", done);
+        delete read.changed;
+        read.signal.removeEventListener("abort", done);
         resolve();
       };
-      this.listeners.add(done);
-      signal.addEventListener("abort", done, { once: true });
+      read.changed = done;
+      read.signal.addEventListener("abort", done, { once: true });
     });
   }
 }

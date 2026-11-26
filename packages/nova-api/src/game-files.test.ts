@@ -99,6 +99,39 @@ describe("shared file cache", () => {
     );
   });
 
+  it("lets a rejoining player read their turn file ahead of queued gallery files", async () => {
+    const { join, deliver } = setup();
+    const authority = await join("member-a");
+    const put = (text: string) =>
+      authority.store.put({ bytes: new TextEncoder().encode(text).buffer, mimeType: "text/plain" });
+    const first = await put("first");
+    const gallery = await put("gallery");
+    const turn = await put("current turn");
+    const refs = new Set([first, gallery, turn]);
+    authority.store.updateRefs(refs);
+
+    const rejoining = await join("member-b");
+    const request = vi.spyOn(rejoining.transport, "request");
+    const requestedRefs = () =>
+      request.mock.calls.map(([call]) => (call.payload as { ref: string }).ref);
+    rejoining.store.updateRefs(refs);
+    expect(requestedRefs()).toEqual([first]);
+
+    const readTurn = Promise.all([rejoining.store.get(turn), rejoining.store.get(turn)]).then(
+      (results) => {
+        for (const result of results)
+          expect(new TextDecoder().decode(result.bytes)).toBe("current turn");
+        expect(rejoining.store.canCommit(new Set([first, turn]))).toBe(true);
+        expect(rejoining.store.canCommit(new Set([gallery]))).toBe(false);
+      },
+    );
+    expect(requestedRefs()).toEqual([first]);
+
+    await Promise.all([deliver(), readTurn]);
+    expect(requestedRefs()).toEqual([first, turn, gallery]);
+    expect(rejoining.store.canCommit(refs)).toBe(true);
+  });
+
   it("skips a corrupt new authority and fetches from another peer", async () => {
     const { join, deliver, handover } = setup();
     const original = await join("member-a");
