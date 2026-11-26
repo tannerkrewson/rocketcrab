@@ -27,11 +27,13 @@ export function ScreenshotCarousel({ images, gameName }: ScreenshotCarouselProps
 
   useEffect(() => {
     const row = rowRef.current;
-    if (row === null || typeof ResizeObserver === "undefined") return;
+    if (row === null) return;
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
     const observer = new ResizeObserver(measure);
     observer.observe(row);
     return () => observer.disconnect();
-  }, [measure]);
+  }, [images.length, measure]);
 
   if (images.length === 0) {
     return null;
@@ -51,13 +53,12 @@ export function ScreenshotCarousel({ images, gameName }: ScreenshotCarouselProps
         className="mx-auto flex w-max max-w-full snap-x snap-mandatory gap-3 overflow-x-auto rounded-2xl [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
       >
         {images.map((src, index) => (
-          <li key={src} className="h-80 shrink-0 snap-center sm:h-96">
+          <li key={src} className="aspect-[9/16] h-80 shrink-0 snap-center sm:h-96">
             <img
               src={src}
               alt={`${gameName} screenshot ${index + 1}`}
               loading="lazy"
-              onLoad={measure}
-              className="h-full w-auto min-w-24 rounded-2xl bg-surface-secondary object-contain"
+              className="h-full w-full rounded-2xl bg-surface-secondary object-contain"
             />
           </li>
         ))}
