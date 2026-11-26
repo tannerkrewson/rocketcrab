@@ -145,6 +145,7 @@ nova.onPlayerLeave((player) => {});
 nova.state.get(); // the latest state (or your view), or null before start
 nova.state.onChange((state) => {}); // a new state arrived
 nova.controls.set({ left: true, right: false }); // any time; only changes are sent
+// nova.files.put(blob), nova.files.get(ref), nova.files.url(ref) return promises.
 
 // --- Logging and errors ---
 nova.log("anything", 42); // shows in the editor's log panel
@@ -171,7 +172,8 @@ nova.onError((error) => {}); // { code, message }
    controls and the tick.
 7. **Every \`on…\` call returns an unsubscribe function.**
 8. **Limits.** State at most 512 KiB, one action payload at most 16 KiB,
-   controls at most 1 KiB. Each player's actions share 256 KiB/s. Going over
+   controls at most 1 KiB. Each player's actions and file uploads share
+   256 KiB/s with a 1 MiB burst. Going over
    rejects the call with \`payload_too_large\`, \`state_too_large\` or
    \`rate_limited\`.
 9. **Render immediately; never wait for the party.** In the editor preview
@@ -180,6 +182,30 @@ nova.onError((error) => {}); // { code, message }
    working screen at once (menu, board, or "waiting for players"). A
    connection indicator is a small chip over a working screen, never a
    blank screen with a spinner.
+
+## Shared files
+
+Put pictures, audio and other large write-once data in \`nova.files\`. Keep
+their refs as string values in state. Upload from the game's UI after
+\`onStart\`, await the upload, then dispatch an action that stores the ref.
+
+- \`await nova.files.put(blob)\` stores an immutable copy and returns a
+  \`nova-file:<sha256 hex>\` ref. Uploads with the same bytes share a ref and
+  keep the first stored MIME type. A file must make it into state within
+  10 seconds of upload to stay available. A commit referencing a missing
+  file is rejected with \`invalid_state\`.
+- \`await nova.files.get(ref)\` waits for a local copy and returns a \`Blob\`.
+  \`await nova.files.url(ref)\` returns an object URL for an image, audio
+  element or other local use. Call \`URL.revokeObjectURL(url)\` when done.
+  Keep refs in state so late joiners and returning players can fetch them.
+  Removing all occurrences of a ref frees its cached file.
+- Files are limited to 256 KiB each and 32 distinct files totaling 1 MiB
+  per session, including recent uploads that are waiting for a state ref.
+  Resize or compress captured media before uploading. Catch \`NovaError\`
+  and show a message if an upload or fetch fails. An unavailable file or
+  older party build can cause \`file_unavailable\`.
+- Every party member can receive shared files, even when \`selectView\`
+  hides their refs. Files live in players' memory for the game session.
 
 ## Turn-based example
 

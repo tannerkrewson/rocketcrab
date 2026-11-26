@@ -31,90 +31,9 @@ churn on upgrade), and need no paid always-on server.
 - [ ] Watch a Clarity recording of a party from an eligible region and
       confirm names, game titles and the invite QR code are masked.
 - [ ] The reference says fullscreen and pointer lock don't work, but the
-      runtime frame's sandbox allows both. Check on real devices and correct
-      the reference or the sandbox.
-
-## Shared files for games
-
-Canonical state is serialized on every commit and resent whole on late
-join, reload, resync and authority handover, so it is the wrong home for
-large, write-once data like pictures or recordings. Today a game has nowhere
-else to put it, and no single state limit suits both that and a ticking
-game. Add immutable, content-addressed files that travel peer to peer
-beside the state. No server stores them.
-
-1. **Measure first; derive limits from budgets.** None of the current byte
-   limits in `packages/protocol/src/limits.ts` (state, action payload, the
-   per-player byte bucket in `game-byte-budget.ts`) comes from a stated
-   budget. Choose the budgets: the weakest supported phone, the slowest
-   supported link (cellular over TURN and over the tunnel) and how long a
-   reload or late join may take. Measure on those devices and links:
-   commit cost (serialize, delta, frame round trip) and full-snapshot resend
-   time by state size; fetch time and memory by total file bytes. Then:
-   - The state limit is the largest state that meets the commit and resend
-     budgets.
-   - Fit an action and its envelope in one Trystero inline action frame.
-     The pinned 0.27 transport uses a 16 KiB inline frame budget including
-     framing and metadata. The unused Nova `messageBytesBeforeChunking`
-     constant is 64 KiB and does not control this. Keep the 16 KiB payload
-     cap for API v1, where a full-size action can already be chunked.
-   - The per-file and per-session file limits come from memory on the
-     weakest phone (every device holds every referenced file) and the
-     late-join fetch budget. The byte bucket must admit one maximum-size
-     file.
-
-   Write each budget beside its limit in `limits.ts`, and add tests that
-   check the limits stay within the budgets where that's measurable in CI.
-   If a measured limit is lower than today's, keep the old limit for
-   `apiVersion: 1` games (see Compatibility in `AGENTS.md`).
-
-2. **API (additive):**
-   - `nova.files.put(blob) → Promise<ref>` resolves once the authority holds
-     the bytes.
-   - `nova.files.get(ref) → Promise<Blob>` and `nova.files.url(ref) →
-     Promise<string>` (an object URL) wait for the local copy, and reject
-     with a visible `NovaError` if it can't be fetched.
-   - A ref is the string `nova-file:<sha256 hex>` of the bytes. Games store
-     refs in state through ordinary actions.
-   - Add `files` to `NOVA_API_SURFACE` and the contract suite.
-3. **Transfer:**
-   - Reuse the transport's binary request channel and checks that already
-     serve game HTML by `sourceSha256` (`packages/party/src/game-source.ts`).
-   - Every receiver checks the SHA-256 (`crypto.subtle`). Uploads are
-     charged to the sender's byte budget.
-   - The frame passes the bytes to the shell as a transferred `ArrayBuffer`,
-     and the shell hashes and sends them.
-4. **Lifecycle (state decides which files exist):**
-   - The engine finds refs by scanning the canonical state for the
-     `nova-file:` prefix.
-   - The authority keeps an upload unreferenced for `actionTimeoutMs`, then
-     drops it.
-   - A commit whose state references a file the authority doesn't hold
-     fails with a `stateError`. The canonical state never references a
-     missing file.
-   - On each snapshot, every device fetches the referenced files it lacks,
-     from the authority first and then any other peer, and drops files no
-     longer referenced.
-   - Late joiners, reloads and a new authority fetch the same way. A new
-     authority serves what it has, and its peers fetch the rest from
-     others.
-5. **Every executor:**
-   - Party sessions, the editor arena (one in-memory store shared by its
-     players) and `LocalGameExecutor` tests.
-   - Older shells in a mixed party neither serve nor fetch files; their
-     `nova.files.url` rejects visibly and other peers serve the files
-     instead.
-6. **Docs:**
-   - In `nova-api-reference.md`, add the API, the limits, and one rule:
-     pictures, audio and other large write-once data go in files, and state
-     holds their refs.
-   - Note in Known limits that files, like canonical state, reach every
-     peer.
-7. **Tests:**
-   - Unit: put/get, hash rejection, unreferenced expiry, a commit
-     referencing a missing file, and fetch after authority handover.
-   - e2e: a two-player party where one player puts a file and the other
-     reloads and still shows it.
+      runtime requests both. Chromium reports the `allow-fullscreen` sandbox
+      token as invalid. Check on real devices and correct the reference or
+      the sandbox and permission delegation.
 
 ## Real-device checks requiring access or coordination
 
@@ -129,6 +48,13 @@ the README for local devices.
       the production runtime (Nova-made games).
 - [ ] Four mixed devices; a phone leaves and rejoins.
 - [ ] A 2 MiB game source over cellular and over the tunnel.
+- [ ] Validate Nova's state and shared-file budgets on the weakest supported
+      phone over cellular TURN and the tunnel. Measure commit cost, snapshot
+      resend, file fetch time and peak memory on reload and late join. The
+      initial shared-file caps are 256 KiB per file and 1 MiB per session.
+      Keep API v1 state and action limits if measurements call for smaller
+      limits in a future API version. For an inline action in Trystero 0.27,
+      budget 16 KiB including framing and metadata.
 - [ ] iPhone Safari backgrounded for 1–3 minutes recovers; a locked phone
       and a tab switch recover too.
 - [ ] Exiting a broken game on iPhone returns to a usable lobby.
@@ -188,6 +114,8 @@ the README for local devices.
 - Trusted-friends party model: canonical game state (`state.snapshot`, before
   `selectView`) is replicated to every peer's shell for serverless authority
   migration, so a player with DevTools can read hidden state (cards/roles).
+  Referenced shared files also reach every peer. They are held in memory
+  during the game and are lost if no connected peer retains them.
   Tunnel fallback keys derive from the shared `partySecret` + SDP fingerprints
   without a per-pair ephemeral DH exchange, and `TunnelPair` pairs the first
   two sockets per `pairId`, so a malicious peer inside the same party could

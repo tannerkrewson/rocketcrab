@@ -26,7 +26,10 @@ const GAME_ID = "game_reload_seats";
 const PARTY_ORIGIN = "http://localhost:2722";
 
 const SEATS_HTML = `<!doctype html>
-<html><body><pre id="state"></pre><script>
+<html><body><pre id="state"></pre><button id="share">Share picture</button><img id="picture">
+<p id="file-error"></p><script>
+const picture = document.getElementById("picture");
+const fileError = document.getElementById("file-error");
 nova.defineGame({
   title: "Seats",
   apiVersion: 1,
@@ -39,9 +42,33 @@ nova.defineGame({
     state.seats = state.seats.filter((id) => id !== player.id);
     state.log.push("left " + player.id);
   },
+  actions: {
+    share(state, context, ref) {
+      state.picture = ref;
+    },
+  },
 });
-nova.state.onChange((state) => {
+document.getElementById("share").onclick = async () => {
+  try {
+    // Larger than a Trystero action frame so this exercises binary chunking.
+    const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="23" height="23">' +
+      '<rect width="23" height="23" fill="green"/><!--' + " ".repeat(48 * 1024) + '--></svg>';
+    const ref = await nova.files.put(new Blob([svg], { type: "image/svg+xml" }));
+    await nova.dispatch({ type: "share", payload: ref });
+  } catch (error) {
+    fileError.textContent = error.message;
+  }
+};
+let pictureRef;
+nova.state.onChange(async (state) => {
   document.getElementById("state").textContent = JSON.stringify(state);
+  if (!state.picture || state.picture === pictureRef) return;
+  pictureRef = state.picture;
+  try {
+    picture.src = await nova.files.url(pictureRef);
+  } catch (error) {
+    fileError.textContent = error.message;
+  }
 });
 nova.ready();
 </script></body></html>`;
@@ -51,10 +78,18 @@ interface Seats {
   log: string[];
 }
 
-async function newPlayer(browser: Browser): Promise<{ context: BrowserContext; page: Page }> {
+async function newPlayer(
+  browser: Browser,
+  forceTunnel = false,
+): Promise<{ context: BrowserContext; page: Page }> {
   const context = await browser.newContext({ baseURL: PARTY_ORIGIN });
   await recordCopiedInvites(context);
   await seedPlayerName(context, `Player ${Math.random().toString(36).slice(2, 6)}`);
+  if (forceTunnel) {
+    await context.addInitScript(() => {
+      (window as { __NOVA_TEST_FORCE_TUNNEL__?: boolean }).__NOVA_TEST_FORCE_TUNNEL__ = true;
+    });
+  }
   return { context, page: await context.newPage() };
 }
 
@@ -71,9 +106,9 @@ async function readGame(page: Page): Promise<{ id: string | null; state: Seats |
   const frame = await gameFrame(page);
   return frame
     .evaluate(() => {
-      const api = (window as unknown as { __runtimeApi: { getGameWindow(): Window | null } })
+      const api = (window as unknown as { __runtimeApi?: { getGameWindow(): Window | null } })
         .__runtimeApi;
-      const game = api.getGameWindow() as (Window & { nova?: { player?: { id: string } } }) | null;
+      const game = api?.getGameWindow() as (Window & { nova?: { player?: { id: string } } }) | null;
       const text = game?.document.getElementById("state")?.textContent ?? "";
       return {
         id: game?.nova?.player?.id ?? null,
@@ -83,9 +118,27 @@ async function readGame(page: Page): Promise<{ id: string | null; state: Seats |
     .catch(() => null);
 }
 
-test("a player who reloads mid-game keeps their id and seat", async ({ browser }) => {
+async function expectSharedPicture(page: Page): Promise<void> {
+  await expect
+    .poll(
+      async () =>
+        (await gameFrame(page)).evaluate(() => {
+          const api = (window as unknown as { __runtimeApi?: { getGameWindow(): Window | null } })
+            .__runtimeApi;
+          const doc = api?.getGameWindow()?.document;
+          return {
+            width: doc?.querySelector<HTMLImageElement>("#picture")?.naturalWidth,
+            error: doc?.getElementById("file-error")?.textContent,
+          };
+        }),
+      { timeout: 45_000 },
+    )
+    .toEqual({ width: 23, error: "" });
+}
+
+async function verifyReload(browser: Browser, forceTunnel: boolean): Promise<void> {
   test.setTimeout(300_000);
-  const players = [await newPlayer(browser), await newPlayer(browser)];
+  const players = [await newPlayer(browser), await newPlayer(browser, forceTunnel)];
   const [host, joiner] = players.map((player) => player.page) as [Page, Page];
   const pages = [
     { page: host, label: "host" },
@@ -113,6 +166,19 @@ test("a player who reloads mid-game keeps their id and seat", async ({ browser }
         timeout: 120_000,
       });
     }
+    if (forceTunnel) {
+      await expect
+        .poll(
+          () =>
+            joiner.evaluate(() => {
+              const debug = (window as { __NOVA_PARTY_DEBUG__?: () => { relayedPeers: number } })
+                .__NOVA_PARTY_DEBUG__;
+              return debug?.().relayedPeers ?? 0;
+            }),
+          { timeout: 30_000 },
+        )
+        .toBeGreaterThan(0);
+    }
     const startButton = host.getByRole("button", { name: "Start game", exact: true });
     await expect(startButton).toBeEnabled({ timeout: 180_000 });
     await startButton.click();
@@ -126,6 +192,14 @@ test("a player who reloads mid-game keeps their id and seat", async ({ browser }
       .poll(async () => (await readGame(host))?.state?.seats.includes(before!), { timeout: 60_000 })
       .toBe(true);
 
+    await (
+      await gameFrame(joiner)
+    ).evaluate(() => {
+      const api = (window as unknown as { __runtimeApi?: { getGameWindow(): Window | null } })
+        .__runtimeApi;
+      api?.getGameWindow()?.document.getElementById("share")?.click();
+    });
+    await Promise.all([expectSharedPicture(host), expectSharedPicture(joiner)]);
     await joiner.reload();
     await expectPlayViewOnAll(pages);
     await expect.poll(async () => (await readGame(joiner))?.id, { timeout: 120_000 }).toBe(before);
@@ -134,7 +208,9 @@ test("a player who reloads mid-game keeps their id and seat", async ({ browser }
         timeout: 60_000,
       })
       .toBe(true);
+    await expectSharedPicture(joiner);
 
+    if (forceTunnel) return;
     // Past the grace period, the host's game never saw the reload as a leave.
     await host.waitForTimeout(playerLeaveGraceMs + 5_000);
     const after = await readGame(host);
@@ -143,4 +219,16 @@ test("a player who reloads mid-game keeps their id and seat", async ({ browser }
   } finally {
     for (const player of players) await player.context.close();
   }
+}
+
+test("a player who reloads mid-game keeps their id, seat and shared picture", async ({
+  browser,
+}) => {
+  await verifyReload(browser, false);
+});
+
+test("a player who reloads over a tunnel can still fetch the shared picture", async ({
+  browser,
+}) => {
+  await verifyReload(browser, true);
 });
