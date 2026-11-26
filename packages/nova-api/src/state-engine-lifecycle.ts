@@ -353,6 +353,7 @@ export abstract class StateEngineLifecycle {
       revision,
       now: this.now(),
       ...(actor !== undefined ? { actor } : {}),
+      leaderId: this.host.leaderId(),
     };
   }
 

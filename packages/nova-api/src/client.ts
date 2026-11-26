@@ -47,6 +47,8 @@ export type NovaSessionEvent =
   | { type: "playerJoined"; player: NovaPlayer }
   | { type: "playerLeft"; player: NovaPlayer }
   | { type: "connection"; status: NovaConnectionStatus }
+  /** The party leader changed (a person, not where the game runs). */
+  | { type: "leader"; leaderId: string | null }
   | { type: "start" }
   | { type: "end"; reason: string }
   | { type: "state"; state: unknown }
@@ -187,6 +189,7 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
   const stateHandlers = new Set<Handler<unknown>>();
 
   let connectionStatus: NovaConnectionStatus = "disconnected";
+  let leaderId: string | null = null;
   let lastControlsJson: string | null = null;
   const unsubscribeEvents = backend.onEvent((event) => {
     switch (event.type) {
@@ -207,6 +210,9 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
       case "connection":
         connectionStatus = event.status;
         callSafely(connectionHandlers, event.status);
+        break;
+      case "leader":
+        leaderId = event.leaderId;
         break;
       case "start":
         // The host sends start once per frame; a repeat must not re-run onStart.
@@ -347,6 +353,9 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
     },
     get connectionStatus() {
       return connectionStatus;
+    },
+    get leaderId() {
+      return leaderId;
     },
     onPlayerJoin(handler) {
       return addHandler(joinHandlers, handler);

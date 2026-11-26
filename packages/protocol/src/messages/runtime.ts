@@ -178,6 +178,7 @@ export const gameApiEventSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("playerJoined"), player: novaPlayerSchema }),
   z.object({ kind: z.literal("playerLeft"), player: novaPlayerSchema }),
   z.object({ kind: z.literal("connection"), status: novaConnectionStatusSchema }),
+  z.object({ kind: z.literal("leader"), leaderId: memberIdSchema.nullable() }),
   z.object({ kind: z.literal("start") }),
   z.object({ kind: z.literal("end"), reason: gameEndReasonSchema }),
   z.object({ kind: z.literal("state"), state: z.unknown() }),

@@ -53,6 +53,12 @@ export interface NovaGameContext {
   readonly now: number;
   /** The player who dispatched the action (actions only). */
   readonly actor?: NovaPlayer;
+  /**
+   * The party's leader (the person who runs the party), or null when not
+   * known. Not where the game runs. Check it in actions that only the leader
+   * may take, such as changing the game's settings.
+   */
+  readonly leaderId: string | null;
 }
 
 /** What a `tick` handler receives on top of the usual context. */
@@ -277,6 +283,11 @@ export interface NovaApi {
   readonly players: readonly NovaPlayer[];
   /** This player's connection status. Updated as the party connects. */
   readonly connectionStatus: NovaConnectionStatus;
+  /**
+   * The party leader's player id, or null when not known. It changes only
+   * when the leader leaves or returns, so read it when drawing.
+   */
+  readonly leaderId: string | null;
   /** Subscribe to player joins. Returns an unsubscribe function. */
   onPlayerJoin(handler: (player: NovaPlayer) => void): () => void;
   /** Subscribe to player leaves. Returns an unsubscribe function. */

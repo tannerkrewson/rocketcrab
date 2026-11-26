@@ -31,6 +31,9 @@ const PLAYERS: NovaPlayer[] = [
 
 /** A recording host: every send/event is captured for assertions. */
 class RecordingHost implements StateEngineHost {
+  leaderId(): string | null {
+    return null;
+  }
   controls(): Record<string, unknown> {
     return {};
   }

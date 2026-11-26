@@ -226,6 +226,7 @@ function install(): void {
       case "playerJoined":
       case "playerLeft":
       case "connection":
+      case "leader":
       case "start":
       case "end":
       case "state":

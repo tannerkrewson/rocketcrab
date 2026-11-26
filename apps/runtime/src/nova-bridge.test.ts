@@ -293,6 +293,13 @@ describe("NOVA_BRIDGE_SCRIPT executed in a frame-like context", () => {
     expect(stateOf("dispatched")).toEqual({ spoofed: true });
   });
 
+  it("reports the party leader the host pushes", () => {
+    const { bridge } = runBridge();
+    expect(bridge.nova.leaderId).toBeNull();
+    bridge.__novaGameBridge.receive("leader", { leaderId: "member-b" });
+    expect(bridge.nova.leaderId).toBe("member-b");
+  });
+
   it("exposes the whole API surface", () => {
     const { bridge } = runBridge();
     for (const member of NOVA_API_SURFACE) expect(member in bridge.nova, member).toBe(true);

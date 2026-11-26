@@ -36,7 +36,8 @@ nova.defineGame({
   },
   actions: {
     playCard(state, context, payload) {
-      // Validate, then change `state` in place. context.actor = who acted.
+      // Validate, then change `state` in place. context.actor = who acted;
+      // context.leaderId = the party leader's id, or null.
       // Throw an Error to reject the action; nothing changes.
     },
   },
@@ -66,6 +67,7 @@ nova.onConnectionChange((status) => {});
 // --- Players ---
 nova.player; // { id, name } for this player, or null; id survives reloads
 nova.players; // everyone, this player first, then join order
+nova.leaderId; // the party leader's id (a person, not where the game runs), or null
 nova.onPlayerJoin((player) => {});
 nova.onPlayerLeave((player) => {});
 
@@ -253,6 +255,10 @@ What a real-time game must do:
   player's connection status.
 - **Show every phase**: before the start, waiting for others, playing, and the
   end, with a way to play again (an action that resets the state).
+- **Leader-only settings** (word packs, rounds, difficulty): show the controls
+  only when `nova.player.id === nova.leaderId`, and reject the action unless
+  `context.actor.id === context.leaderId`. This keeps settings with the
+  person running the party; it is not a security boundary.
 - **Fail visibly.** If something the game needs is missing (camera, WebGL, a
   CDN), say so on screen.
 - **Player names are untrusted.** Render them with `textContent`, never inside

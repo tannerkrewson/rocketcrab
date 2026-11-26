@@ -37,13 +37,6 @@ churn on upgrade), and need no paid always-on server.
   - Player ids already survive reloads (Trystero's persistent `userId`);
     add an e2e that reloads a player mid-game and checks the same id comes
     back and `playerLeft` never runs for them.
-  - `context.leaderId` in handlers and `nova.leaderId` on the client: the
-    party host (`PartySession.hostMemberId`), filled in by the authority so a
-    client can't claim it, for host-only game settings (e.g. an 18+ word
-    pack). Call it "leader" in the API so `isForbiddenSurfaceName` keeps
-    "host" out of the game surface. The reference must say it is a person,
-    not where the game runs, and that it is cooperative, not a security
-    boundary.
 - [ ] `packages/nova-api/src/examples.ts` says its strings are the examples in
       `nova-api-reference.md`, but they have drifted (different games, no
       `apiVersion`). Run the reference's own code blocks against the API in a

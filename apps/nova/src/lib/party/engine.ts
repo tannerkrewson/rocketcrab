@@ -1573,6 +1573,7 @@ export class PartyEngine {
       case "host":
         // Only the host renews the party code; a new host takes it over.
         this.state.partyCode.setRenewing(this.state.party?.amHost ?? false);
+        this.state.session?.refreshLeader();
         if (event.hostMemberId !== null && this.state.currentSourceSha256 === null) {
           void this.state.coordinator?.refresh().catch((error: unknown) => {
             this.addNotice("error", "game-request-failed", errorMessage(error));
@@ -1919,6 +1920,7 @@ export class PartyEngine {
     }
     runtime.pushApiEvent({ kind: "identity", player: session.player });
     runtime.pushApiEvent({ kind: "connection", status: session.connectionStatus });
+    runtime.pushApiEvent({ kind: "leader", leaderId: session.leaderId() });
     for (const player of session.players) {
       runtime.pushApiEvent({ kind: "playerJoined", player });
     }

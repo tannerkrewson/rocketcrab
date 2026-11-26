@@ -35,7 +35,11 @@ export interface NovaSessionOptions {
    * engine accepts only the host, once every member has the game source.
    */
   readonly acceptStartRequest?: (memberId: string) => boolean;
-  /** The party host may end the game even when another member owns state. */
+  /**
+   * The party host: it may end the game even when another member owns
+   * state, and games see it as `leaderId`. Call `refreshLeader()` when the
+   * answer changes for reasons other than a player joining or leaving.
+   */
   readonly isHost?: (memberId: string) => boolean;
   /**
    * Authority election timings. Defaults follow the protocol

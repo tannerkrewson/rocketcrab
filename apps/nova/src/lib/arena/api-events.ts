@@ -10,6 +10,8 @@ export function toApiEvent(event: NovaSessionEvent): GameApiEvent | null {
       return { kind: "playerLeft", player: event.player };
     case "connection":
       return { kind: "connection", status: event.status };
+    case "leader":
+      return { kind: "leader", leaderId: event.leaderId };
     case "start":
       return { kind: "start" };
     case "end":

@@ -578,6 +578,7 @@ export class NovaSession extends SessionLifecycle {
   protected buildEngineHost(): StateEngineHost {
     return {
       players: () => this.players,
+      leaderId: () => this.leaderId(),
       isConnected: (memberId) => memberId === this.selfPlayer.id || this.playersMap.has(memberId),
       selfConnected: () => this.transport.connectionState === "connected",
       eligibleMemberIds: () =>

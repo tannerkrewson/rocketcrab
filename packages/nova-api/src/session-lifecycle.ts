@@ -91,6 +91,7 @@ export abstract class SessionLifecycle implements NovaClientBackend {
   protected startEmitted = false;
   protected ended = false;
   private status: NovaConnectionStatus = "disconnected";
+  private lastLeaderId: string | null = null;
   protected disposed = false;
 
   constructor(options: NovaSessionOptions) {
@@ -154,6 +155,19 @@ export abstract class SessionLifecycle implements NovaClientBackend {
       joinedAt: player.joinedAt,
       authorityEligible: player.authorityEligible,
     }));
+  }
+
+  /** The connected player who is the party host (`leaderId` to games), or null. */
+  leaderId(): string | null {
+    return this.players.find((player) => this.isHost(player.id))?.id ?? null;
+  }
+
+  /** Tell the game when the leader changed; the session calls it on joins and leaves. */
+  refreshLeader(): void {
+    const leaderId = this.leaderId();
+    if (leaderId === this.lastLeaderId) return;
+    this.lastLeaderId = leaderId;
+    this.emit({ type: "leader", leaderId });
   }
 
   /** This player's current connection status. */
@@ -255,6 +269,7 @@ export abstract class SessionLifecycle implements NovaClientBackend {
     this.assertAlive();
     this.wireTransport();
     await this.transport.join({ room: this.room, sessionId: this.sessionId });
+    this.refreshLeader();
   }
 
   /**
@@ -274,6 +289,7 @@ export abstract class SessionLifecycle implements NovaClientBackend {
     for (const peer of this.transport.peers) {
       this.handlePeerJoined(peer);
     }
+    this.refreshLeader();
   }
 
   /** Leave the party cleanly; pending outgoing messages are discarded. */
@@ -411,6 +427,8 @@ export abstract class SessionLifecycle implements NovaClientBackend {
     }
     const joined = this.playersMap.get(peer.memberId);
     if (joined === undefined) return;
+    // The game sees the new leader before the join that changed it.
+    this.refreshLeader();
     this.emit({ type: "playerJoined", player: toNovaPlayer(joined) });
     this.engine.reconcileRoster();
     // The authority dropped this player's controls when the link went down.
@@ -469,6 +487,7 @@ export abstract class SessionLifecycle implements NovaClientBackend {
     if (player === undefined) return;
     this.playersMap.delete(peer.memberId);
     this.controlsByMember.delete(peer.memberId);
+    this.refreshLeader();
     this.emit({ type: "playerLeft", player: toNovaPlayer(player) });
     this.engine.reconcileRoster();
     if (this.engine.getAuthorityMemberId() === peer.memberId) {

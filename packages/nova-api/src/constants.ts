@@ -11,6 +11,7 @@ export const NOVA_API_SURFACE: readonly string[] = [
   "player",
   "players",
   "connectionStatus",
+  "leaderId",
   "onPlayerJoin",
   "onPlayerLeave",
   "onConnectionChange",

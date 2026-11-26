@@ -139,6 +139,8 @@ export interface StateEngineHost {
   selfConnected(): boolean;
   /** Member ids of every connected member eligible for authority. */
   eligibleMemberIds(): readonly string[];
+  /** The party leader's member id, or null when not known. */
+  leaderId(): string | null;
   /** Each connected player's latest controls (a ticking game's input). */
   controls(): Readonly<Record<string, unknown>>;
   /** Send one action ack to a member (targeted). */

@@ -376,9 +376,15 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
         { id: "member-b", name: "Ben" },
       ];
       expect(contexts).toHaveLength(2);
-      expect(Object.keys(contexts[0]!).sort()).toEqual(["now", "players", "revision"]);
+      expect(Object.keys(contexts[0]!).sort()).toEqual(["leaderId", "now", "players", "revision"]);
       expect(contexts[0]!.players).toEqual(players);
-      expect(Object.keys(contexts[1]!).sort()).toEqual(["actor", "now", "players", "revision"]);
+      expect(Object.keys(contexts[1]!).sort()).toEqual([
+        "actor",
+        "leaderId",
+        "now",
+        "players",
+        "revision",
+      ]);
       expect(contexts[1]!.actor).toEqual({ id: "member-b", name: "Ben" });
       expect(contexts[1]!.players).toEqual(players);
       // selectView gets the same context, for every viewer.

@@ -134,3 +134,56 @@ describe("membership handlers", () => {
     expect(seatsOf(b).log).toEqual([]);
   });
 });
+
+describe("leaderId", () => {
+  it("names the party host to handlers and clients, and follows a new host", async () => {
+    const hub = new InMemoryTransportHub();
+    hubs.push(hub);
+    // The creator (b) leads while connected, then the lowest remaining id.
+    let creatorHere = true;
+    const isHost = (id: string) => (creatorHere ? id === "member-b" : id === "member-a");
+    const leaders: Array<string | null> = [];
+    const players = ["member-a", "member-b"].map((memberId) => {
+      const session = createNovaSession({
+        transport: hub.createTransport({ memberId, displayName: memberId }),
+        room: "leader",
+        sessionId: "leader",
+        player: { memberId, displayName: memberId },
+        game: { gameId: "leader" },
+        isHost,
+      });
+      sessions.push(session);
+      session.client.defineGame({
+        createInitialState: () => ({ pack: "family" }),
+        actions: {
+          setPack(state: { pack: string }, context, pack: string) {
+            if (context.actor?.id !== context.leaderId) throw new Error("Only the leader.");
+            leaders.push(context.leaderId);
+            state.pack = pack;
+          },
+        },
+      });
+      return session;
+    });
+    const [a, b] = players as [NovaSession, NovaSession];
+    for (const session of players) await session.join();
+    await settle(hub, 50);
+    for (const session of players) session.start();
+    await settle(hub, 200);
+    expect(a.client.leaderId).toBe("member-b");
+    expect(b.client.leaderId).toBe("member-b");
+
+    const refused = a.client.dispatch({ type: "setPack", payload: "adult" }).catch(() => "refused");
+    await settle(hub, 100);
+    expect(await refused).toBe("refused");
+    void b.client.dispatch({ type: "setPack", payload: "party" });
+    await settle(hub, 100);
+    expect(leaders).toEqual(["member-b"]);
+    expect((a.getCanonicalState()?.state as { pack: string }).pack).toBe("party");
+
+    creatorHere = false;
+    await b.leave();
+    await settle(hub, 100);
+    expect(a.client.leaderId).toBe("member-a");
+  });
+});

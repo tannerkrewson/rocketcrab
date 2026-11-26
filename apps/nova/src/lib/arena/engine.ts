@@ -476,6 +476,8 @@ export class ArenaEngine {
       this.pushApiEvent(runtime.spec.id, event),
     );
     const session = createNovaSession({
+      // The first arena player leads, like the party host who created a party.
+      isHost: (memberId) => this.players.values().next().value?.spec.memberId === memberId,
       transport,
       room: this.room,
       sessionId: this.sessionId,
