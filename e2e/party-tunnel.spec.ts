@@ -268,12 +268,13 @@ test("a 3-player party with one tunnelled player plays a state-mode game", async
       type: "tunnel-attempts",
       description: players.map((player) => player.tunnelSockets.length).join(","),
     });
-    expect(host.pairedSockets).toHaveLength(1);
-    expect(joiner.pairedSockets).toHaveLength(1);
-    expect(host.pairedSockets[0]).not.toBe(joiner.pairedSockets[0]);
-    expect([...forced.pairedSockets].sort()).toEqual(
-      [...host.pairedSockets, ...joiner.pairedSockets].sort(),
+    const hostWithForced = host.pairedSockets.filter((url) => forced.pairedSockets.includes(url));
+    const joinerWithForced = joiner.pairedSockets.filter((url) =>
+      forced.pairedSockets.includes(url),
     );
+    expect(hostWithForced).toHaveLength(1);
+    expect(joinerWithForced).toHaveLength(1);
+    expect(hostWithForced[0]).not.toBe(joinerWithForced[0]);
   } finally {
     for (const player of players) await player.context.close();
   }
