@@ -66,10 +66,11 @@
  * configurable so tests use fake timers and deterministic fast runs.
  */
 import { actionPayloadBytes } from "@rocketcrab/protocol";
-import type { NovaActionAck, NovaActionStatus } from "./types";
+import type { NovaActionAck, NovaActionStatus, NovaPlayer } from "./types";
 import {
   type PendingAction,
   type ProcessedActionRecord,
+  compareById,
   serializedBytesSync,
 } from "./state-engine-shared";
 import { StateEngineTicks } from "./state-engine-ticks";
@@ -92,6 +93,11 @@ export type {
 
 /** Applies ordered actions and commits authoritative state. */
 export class NovaStateEngine extends StateEngineTicks {
+  /** Authority side: when each told-about player was first seen gone. */
+  private readonly absentSince = new Map<string, number>();
+  private rosterTimer: ReturnType<typeof setTimeout> | null = null;
+  private membershipSeq = 0;
+
   /**
    * Initialize as the authority: create the initial canonical state,
    * commit revision 1, distribute views, announce, and start heartbeats.
@@ -114,6 +120,8 @@ export class NovaStateEngine extends StateEngineTicks {
     const result = await this.withExecutorTimeout(
       this.executor.createInitialState({ context, viewers: this.viewers() }),
     );
+    // The players in createInitialState's context are the ones the game knows.
+    this.roster = context.players;
     if (!result.ok) {
       this.host.emit({ type: "stateError", code: result.code, message: result.message });
       return false;
@@ -128,7 +136,145 @@ export class NovaStateEngine extends StateEngineTicks {
     }
     this.announce();
     this.startHeartbeats();
+    this.reconcileRoster();
     return true;
+  }
+
+  /**
+   * Authority side: queue the game's playerJoined/playerLeft for every
+   * difference between the connected players and the roster the game was
+   * told about. A leave waits `playerLeaveGraceMs` from when this authority
+   * first saw the player gone, and a return within it cancels the leave. The
+   * session calls this whenever players connect or disconnect.
+   */
+  reconcileRoster(): void {
+    this.clearRosterTimer();
+    if (
+      this.disposed ||
+      !this.started ||
+      this.ended ||
+      this.authorityMemberId !== this.selfMemberId ||
+      !this.restoreDone ||
+      this.canonical === null
+    ) {
+      this.absentSince.clear();
+      return;
+    }
+    const connected = new Map(this.host.players().map((player) => [player.id, player]));
+    if (this.roster === null) {
+      // An older authority kept no roster: take the current players as told.
+      this.roster = [...connected.values()].sort(compareById);
+      this.absentSince.clear();
+      return;
+    }
+    const queued = new Set(this.queue.flatMap((item) => item.membership?.player.id ?? []));
+    const told = new Set(this.roster.map((player) => player.id));
+    const now = this.now();
+    let nextLeaveAt = Infinity;
+    let added = false;
+    for (const [id, player] of connected) {
+      this.absentSince.delete(id);
+      if (!told.has(id) && !queued.has(id)) {
+        this.queueMembership("joined", player);
+        added = true;
+      }
+    }
+    for (const player of this.roster) {
+      if (connected.has(player.id) || queued.has(player.id)) continue;
+      const since = this.absentSince.get(player.id) ?? now;
+      this.absentSince.set(player.id, since);
+      const leaveAt = since + this.playerLeaveGraceMs;
+      if (leaveAt <= now) {
+        this.queueMembership("left", player);
+        added = true;
+      } else {
+        nextLeaveAt = Math.min(nextLeaveAt, leaveAt);
+      }
+    }
+    for (const id of this.absentSince.keys()) {
+      if (!told.has(id)) this.absentSince.delete(id);
+    }
+    if (nextLeaveAt !== Infinity) {
+      this.rosterTimer = setTimeout(() => {
+        this.rosterTimer = null;
+        this.reconcileRoster();
+      }, nextLeaveAt - now);
+    }
+    if (added) this.processQueue();
+  }
+
+  protected clearRosterTimer(): void {
+    if (this.rosterTimer !== null) {
+      clearTimeout(this.rosterTimer);
+      this.rosterTimer = null;
+    }
+  }
+
+  private queueMembership(kind: "joined" | "left", player: NovaPlayer): void {
+    this.membershipSeq += 1;
+    this.queue.push({
+      actionId: `nova-membership-${this.membershipSeq}`,
+      senderMemberId: this.selfMemberId,
+      seq: 0,
+      type: kind,
+      payload: null,
+      baseRevision: this.revision,
+      sentAt: this.now(),
+      membership: { kind, player },
+    });
+  }
+
+  /**
+   * Tell the game one player joined or left. The roster records the change
+   * even when the game has no handler or the handler throws, so it is told
+   * once; it commits only when the handler produced a valid state.
+   */
+  private async applyMembership(
+    item: PendingAction & { membership: NonNullable<PendingAction["membership"]> },
+  ): Promise<void> {
+    const { kind, player } = item.membership;
+    const roster = this.roster ?? [];
+    const connected = this.host.players().some((other) => other.id === player.id);
+    const told = roster.some((other) => other.id === player.id);
+    // The player came back (or left again) while this waited in the queue.
+    if (kind === "joined" ? !connected || told : connected || !told) return;
+    const nextRoster =
+      kind === "joined"
+        ? [...roster, player].sort(compareById)
+        : roster.filter((other) => other.id !== player.id);
+    const apply = this.executor.applyMembership?.bind(this.executor);
+    const termAtStart = this.term;
+    const result =
+      apply === undefined
+        ? { ok: false as const, code: "unknown_action", message: "" }
+        : await this.withExecutorTimeout(
+            apply({
+              kind,
+              player,
+              state: this.canonical,
+              context: this.contextFor(this.revision),
+              viewers: this.viewers(),
+            }),
+          );
+    if (this.disposed) return;
+    if (
+      this.authorityMemberId !== this.selfMemberId ||
+      this.term !== termAtStart ||
+      !this.restoreDone
+    ) {
+      return; // the next authority reports this change from its own roster
+    }
+    const problem = !result.ok
+      ? result.code === "unknown_action"
+        ? null
+        : { code: result.code, message: result.message }
+      : this.stateProblem(result.state, kind === "joined" ? "playerJoined" : "playerLeft");
+    this.roster = nextRoster;
+    if (problem !== null) {
+      this.host.emit({ type: "stateError", ...problem });
+      return;
+    }
+    if (result.ok) await this.commit(result);
   }
 
   /**
@@ -302,6 +448,11 @@ export class NovaStateEngine extends StateEngineTicks {
         const steps = this.pendingTicks;
         this.pendingTicks = 0;
         await this.applyTick(steps);
+        continue;
+      }
+      if (item.membership !== undefined) {
+        await this.applyMembership({ ...item, membership: item.membership });
+        if (this.queue[0] === item) this.queue.shift();
         continue;
       }
       const handled = await this.applyOne(item);

@@ -14,6 +14,7 @@ import {
   stateDeltaMaxDepth,
   stateDeltaMaxOps,
   stateHistoryLimit,
+  stateRosterMax,
 } from "../limits";
 import { gameEndReasonSchema } from "./shared";
 
@@ -288,6 +289,15 @@ export const stateSnapshotMessageSchema = z.object({
   state: z.unknown().optional(),
   /** The game has no selectView: every frame's view is this state, so no per-player views follow. */
   viewIsState: z.literal(true).optional(),
+  /**
+   * The players the game's playerJoined/playerLeft handlers have been told
+   * about, so a new authority reports the difference. Absent from older
+   * senders; a receiver then treats the roster as unknown.
+   */
+  roster: z
+    .array(z.object({ id: memberIdSchema, name: displayNameSchema }))
+    .max(stateRosterMax)
+    .optional(),
 });
 export type StateSnapshotMessage = z.infer<typeof stateSnapshotMessageSchema>;
 export type StateActionRejection = NonNullable<StateSnapshotMessage["actionRejections"]>[number];

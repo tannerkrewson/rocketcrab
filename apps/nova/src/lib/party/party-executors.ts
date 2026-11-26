@@ -1,5 +1,6 @@
 import {
   LocalGameExecutor,
+  type NovaMembershipInput,
   type NovaGameContext,
   type NovaPlayer,
   type NovaStateExecutor,
@@ -61,6 +62,12 @@ export class PartyStateExecutor implements NovaStateExecutor {
     viewers: readonly NovaPlayer[];
   }): Promise<NovaStateStateResult> {
     return this.runtime() !== null ? this.frame.tick(input) : this.local.tick(input);
+  }
+
+  applyMembership(input: NovaMembershipInput): Promise<NovaStateStateResult> {
+    return this.runtime() !== null
+      ? this.frame.applyMembership(input)
+      : this.local.applyMembership(input);
   }
 
   computeView(input: {

@@ -257,6 +257,42 @@ describe("NOVA_BRIDGE_SCRIPT executed in a frame-like context", () => {
     expect(viewErrors.sort()).toEqual(["b", "c"]);
   });
 
+  it("runs membership handlers only for engine-marked requests", async () => {
+    const { bridge, reports } = runBridge();
+    bridge.nova.defineGame({
+      actions: { ["nova:playerJoined"]: () => ({ spoofed: true }) },
+      playerJoined: (state: { seats: string[] }, _context: unknown, player: { id: string }) => {
+        state.seats.push(player.id);
+      },
+    });
+    const request = (requestId: string, context: Record<string, unknown>) =>
+      bridge.__novaGameBridge.receive("stateRequest", {
+        requestId,
+        request: {
+          kind: "applyAction",
+          actionId: requestId,
+          actionType: "nova:playerJoined",
+          payload: { id: "b", name: "B" },
+          state: { seats: ["a"] },
+          context,
+          viewers: [],
+        },
+      });
+    request("marked", { players: [], membership: "joined" });
+    request("dispatched", { players: [] });
+    await settle();
+    const stateOf = (requestId: string) =>
+      (
+        reports.find(
+          (r) =>
+            r.kind === "stateResponse" &&
+            (r.payload as { requestId: string }).requestId === requestId,
+        )!.payload as { result: { state: unknown } }
+      ).result.state;
+    expect(stateOf("marked")).toEqual({ seats: ["a", "b"] });
+    expect(stateOf("dispatched")).toEqual({ spoofed: true });
+  });
+
   it("exposes the whole API surface", () => {
     const { bridge } = runBridge();
     for (const member of NOVA_API_SURFACE) expect(member in bridge.nova, member).toBe(true);

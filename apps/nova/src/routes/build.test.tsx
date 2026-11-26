@@ -94,7 +94,7 @@ describe("Build to editor", () => {
     const empty = within(await startBuilding());
 
     await userEvent.click(empty.getByText(/Show the full prompt/));
-    expect(empty.getByText(/Nova API — AI Quick Reference/)).toBeVisible();
+    expect(empty.getByText(/Nova API reference/)).toBeVisible();
     expect(empty.getByRole("button", { name: "Paste game" })).toBeVisible();
     expect(empty.getByRole("button", { name: "Upload HTML file" })).toBeVisible();
   });

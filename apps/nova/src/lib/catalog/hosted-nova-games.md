@@ -10,8 +10,9 @@ game with its own server) and listing it in Nova's catalog.
 - The game server goes away. Its authoritative logic becomes
   `createInitialState`, `actions` and, if anything moves on its own, `tick`.
   Its messages from clients become actions or controls; its broadcasts
-  become `nova.state.onChange`. Server-only secrets (hands, roles) become
-  `selectView`.
+  become `nova.state.onChange`; its join, leave and reconnect handling
+  becomes `playerJoined` and `playerLeft`. Server-only secrets (hands, roles)
+  become `selectView`.
 - Delete room codes, lobbies, join and name screens, sockets and reconnect
   logic: the Nova party does all of that. Players and names come from
   `nova.players`.

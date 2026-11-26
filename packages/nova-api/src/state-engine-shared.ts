@@ -22,6 +22,8 @@ export interface PendingAction {
   readonly baseRevision: number;
   readonly sentAt: number;
   readonly expiresAtMs?: number;
+  /** Set for a player joining or leaving: runs the game's membership handler, not an action. */
+  readonly membership?: { readonly kind: "joined" | "left"; readonly player: NovaPlayer };
 }
 
 /** One processed-action record (dedup + ack replay, bounded). */
@@ -49,6 +51,8 @@ export interface StateSnapshotEnvelope {
   readonly actionRejections?: readonly StateActionRejection[];
   readonly state: unknown;
   readonly viewIsState: boolean;
+  /** The players the game has been told about; null when unknown. */
+  readonly roster: readonly NovaPlayer[] | null;
 }
 
 /** A request for a full snapshot after a gap in the authority's stream (state.resync). */
@@ -80,6 +84,8 @@ export interface InboundSnapshot {
   readonly state?: unknown;
   /** Every frame's view is the canonical state (the game has no selectView). */
   readonly viewIsState?: boolean;
+  /** The players the game has been told about. Absent from older senders. */
+  readonly roster?: readonly NovaPlayer[];
   /** The transport sender (for targeted convergence re-sends). */
   readonly senderMemberId?: string;
 }
@@ -207,6 +213,8 @@ export interface NovaStateEngineOptions {
   electionWindowMs?: number;
   /** How long the winner collects state pushes before restoring. */
   restoreWindowMs?: number;
+  /** How long a player stays gone before the game's playerLeft runs. */
+  playerLeaveGraceMs?: number;
   /**
    * SHA-256 state digest (tests inject a deferred implementation to race
    * authority loss against the commit window deterministically). Defaults
@@ -232,6 +240,7 @@ export interface RestoreBackup {
   readonly revision: number;
   readonly stateHash: string | null;
   readonly history: ReadonlyMap<string, ProcessedActionRecord>;
+  readonly roster: readonly NovaPlayer[] | null;
 }
 
 /** Serialize a value and measure its size in bytes (UTF-8). */

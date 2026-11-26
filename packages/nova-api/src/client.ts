@@ -446,9 +446,19 @@ function extractStateHandlers(options: NovaGameDeclaration): NovaStateHandlers |
     options.createInitialState !== undefined ||
     options.actions !== undefined ||
     options.selectView !== undefined ||
-    options.tick !== undefined;
+    options.tick !== undefined ||
+    options.playerJoined !== undefined ||
+    options.playerLeft !== undefined;
   if (!declared) return undefined;
   const handlers: NovaStateHandlers = {};
+  for (const name of ["playerJoined", "playerLeft"] as const) {
+    const handler = options[name];
+    if (handler === undefined) continue;
+    if (typeof handler !== "function") {
+      throw new NovaError("invalid_options", `nova.defineGame: ${name} must be a function.`);
+    }
+    handlers[name] = handler;
+  }
   if (options.createInitialState !== undefined) {
     if (typeof options.createInitialState !== "function") {
       throw new NovaError(

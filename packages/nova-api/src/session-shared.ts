@@ -50,6 +50,8 @@ export interface NovaSessionOptions {
     readonly electionWindowMs?: number;
     /** How long the winner collects state pushes before restoring. */
     readonly restoreWindowMs?: number;
+    /** How long a player stays gone before the game's playerLeft runs. */
+    readonly playerLeaveGraceMs?: number;
     /** Epoch-ms clock (tests inject a fake). */
     readonly now?: () => number;
   };

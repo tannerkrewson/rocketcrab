@@ -2,6 +2,7 @@ import {
   actionTimeoutMs,
   authorityGracePeriodMs,
   authorityHeartbeatIntervalMs,
+  playerLeaveGraceMs,
   stateSnapshotBytes,
   type StateActionRejection,
 } from "@rocketcrab/protocol";
@@ -37,6 +38,7 @@ export abstract class StateEngineLifecycle {
   protected readonly gracePeriodMs: number;
   protected readonly electionWindowMs: number;
   protected readonly restoreWindowMs: number;
+  protected readonly playerLeaveGraceMs: number;
   protected readonly stateHashImpl: (value: unknown) => Promise<string>;
 
   protected canonical: unknown | null = null;
@@ -96,6 +98,12 @@ export abstract class StateEngineLifecycle {
   protected lastCommitAt: number | null = null;
   /** The game has no selectView, so views are the canonical state itself. */
   protected viewIsState = false;
+  /**
+   * The players the game's membership handlers have been told about, sorted
+   * by id, replicated with every snapshot so a new authority reports the
+   * difference. Null when unknown (no state yet, or an older authority).
+   */
+  protected roster: readonly NovaPlayer[] | null = null;
   /** Ticks per second once the game declared a `tick` handler. */
   protected tickRate: number | null = null;
   protected tickTimer: ReturnType<typeof setTimeout> | null = null;
@@ -120,6 +128,7 @@ export abstract class StateEngineLifecycle {
     this.gracePeriodMs = options.gracePeriodMs ?? authorityGracePeriodMs;
     this.electionWindowMs = options.electionWindowMs ?? 500;
     this.restoreWindowMs = options.restoreWindowMs ?? 500;
+    this.playerLeaveGraceMs = options.playerLeaveGraceMs ?? playerLeaveGraceMs;
     this.stateHashImpl = options.stateHash ?? stateHashOf;
   }
 
@@ -175,6 +184,11 @@ export abstract class StateEngineLifecycle {
 
   getCanonicalState(): unknown {
     return this.canonical;
+  }
+
+  /** The players the game's membership handlers were told about, or null when unknown. */
+  getRoster(): readonly NovaPlayer[] | null {
+    return this.roster;
   }
 
   /** The processed action ids shipped in snapshots (bounded, oldest first). */

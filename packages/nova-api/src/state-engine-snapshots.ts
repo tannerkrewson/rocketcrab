@@ -183,6 +183,7 @@ export abstract class StateEngineSnapshots extends StateEngineLifecycle {
     this.revision = message.revision;
     this.stateHash = message.stateHash;
     this.viewIsState = message.viewIsState === true;
+    this.roster = message.roster ?? null;
     if (this.viewIsState && message.authorityMemberId !== this.selfMemberId) {
       this.host.emit({ type: "viewFromState", state: this.canonical });
     }
@@ -238,6 +239,7 @@ export abstract class StateEngineSnapshots extends StateEngineLifecycle {
       // converges on the adopted state.
       this.broadcastSnapshot(false);
       this.announce();
+      this.reconcileRoster();
     }
   }
 
@@ -399,6 +401,7 @@ export abstract class StateEngineSnapshots extends StateEngineLifecycle {
       // A delta has no state: the key is absent on the wire, not null.
       state: delta ? undefined : this.canonical,
       viewIsState: this.viewIsState,
+      roster: this.roster,
     };
   }
 
@@ -435,4 +438,5 @@ export abstract class StateEngineSnapshots extends StateEngineLifecycle {
   ): void;
   protected abstract resolveRevisionConflict(revision: number): string | null;
   abstract announce(): void;
+  abstract reconcileRoster(): void;
 }

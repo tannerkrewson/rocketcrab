@@ -119,7 +119,25 @@ export interface NovaStateHandlers {
   selectView?(state: unknown, viewer: NovaPlayer, context: NovaGameContext): unknown;
   /** Runs on the authority `tickRate` times a second once the game starts. */
   tick?: NovaTickHandler;
+  /**
+   * A player joined after the initial state was created (players present then
+   * are in `createInitialState`'s `context.players`). Runs once, in order with
+   * actions, on whichever device holds the game.
+   */
+  playerJoined?: NovaMembershipHandler;
+  /**
+   * A player has been gone for the leave grace period (a return within it
+   * never reaches the game). Runs once, in order with actions.
+   */
+  playerLeft?: NovaMembershipHandler;
 }
+
+/** A membership handler: change the Immer draft for one player who joined or left. */
+export type NovaMembershipHandler = (
+  draft: any,
+  context: NovaGameContext,
+  player: NovaPlayer,
+) => void | unknown;
 
 /**
  * Registration options for `nova.defineGame`. Everything here is plain data

@@ -12,13 +12,15 @@ import {
   type StateRequest,
   type StateResponse,
 } from "@rocketcrab/protocol";
-import type {
-  NovaGameContext,
-  NovaPlayer,
-  NovaStateExecutor,
-  NovaStateStateResult,
-  NovaStateViewResult,
-  NovaTickContext,
+import {
+  MEMBERSHIP_ACTION_TYPES,
+  type NovaGameContext,
+  type NovaMembershipInput,
+  type NovaPlayer,
+  type NovaStateExecutor,
+  type NovaStateStateResult,
+  type NovaStateViewResult,
+  type NovaTickContext,
 } from "@rocketcrab/nova-api";
 
 interface PendingRequest {
@@ -92,6 +94,18 @@ export class FrameStateExecutor implements NovaStateExecutor {
       state: input.state,
       context: input.context,
       steps: input.steps,
+      viewers: [...input.viewers],
+    });
+  }
+
+  applyMembership(input: NovaMembershipInput): Promise<NovaStateStateResult> {
+    return this.request<NovaStateStateResult>({
+      kind: "applyAction",
+      actionId: `membership-${crypto.randomUUID()}`,
+      actionType: MEMBERSHIP_ACTION_TYPES[input.kind],
+      payload: input.player,
+      state: input.state,
+      context: { ...input.context, membership: input.kind },
       viewers: [...input.viewers],
     });
   }

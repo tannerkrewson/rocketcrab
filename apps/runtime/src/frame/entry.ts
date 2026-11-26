@@ -6,11 +6,12 @@
  */
 import { createNovaClient, type NovaSessionEvent } from "@rocketcrab/nova-api/client";
 import { NovaError, toErrorCode } from "@rocketcrab/nova-api/errors";
-import { LocalGameExecutor } from "@rocketcrab/nova-api/state-executor";
+import { LocalGameExecutor, MEMBERSHIP_ACTION_TYPES } from "@rocketcrab/nova-api/state-executor";
 import type {
   NovaGameContext,
   NovaPlayer,
   NovaStateHandlers,
+  NovaStateStateResult,
   NovaTickContext,
 } from "@rocketcrab/nova-api";
 import { NOVA_API_VERSION } from "@rocketcrab/nova-api/version";
@@ -127,6 +128,18 @@ function install(): void {
 
   async function answerStateRequest(requestId: string, request: Record<string, unknown>) {
     const respond = (result: unknown) => report("stateResponse", { requestId, result });
+    const respondState = (result: NovaStateStateResult) =>
+      respond(
+        result.ok
+          ? {
+              ok: true,
+              kind: "state",
+              state: result.state,
+              views: result.views,
+              ...(result.viewIsState === true ? { viewIsState: true } : {}),
+            }
+          : { ok: false, kind: "error", code: result.code, message: result.message },
+      );
     const context = request.context as NovaGameContext;
     const viewers = (request.viewers ?? []) as NovaPlayer[];
     if (request.kind === "computeView") {
@@ -139,6 +152,24 @@ function install(): void {
         result.ok
           ? { ok: true, kind: "view", view: result.view }
           : { ok: false, kind: "error", code: result.code, message: result.message },
+      );
+      return;
+    }
+    // A membership change arrives as an applyAction the engine marked (see MEMBERSHIP_ACTION_TYPES).
+    const { membership, ...gameContext } = context as NovaGameContext & { membership?: unknown };
+    if (
+      request.kind === "applyAction" &&
+      (membership === "joined" || membership === "left") &&
+      request.actionType === MEMBERSHIP_ACTION_TYPES[membership]
+    ) {
+      respondState(
+        await executor.applyMembership({
+          kind: membership,
+          player: request.payload as NovaPlayer,
+          state: request.state,
+          context: gameContext,
+          viewers,
+        }),
       );
       return;
     }
@@ -162,17 +193,7 @@ function install(): void {
                 viewers,
               })
             : { ok: false as const, code: "invalid_request", message: "Unknown state request." };
-    respond(
-      result.ok
-        ? {
-            ok: true,
-            kind: "state",
-            state: result.state,
-            views: result.views,
-            ...(result.viewIsState === true ? { viewIsState: true } : {}),
-          }
-        : { ok: false, kind: "error", code: result.code, message: result.message },
-    );
+    respondState(result);
   }
 
   function receive(kind: string, raw: unknown): void {

@@ -416,6 +416,7 @@ export class NovaSession extends SessionLifecycle {
             : {}),
           state: peerMessage.state,
           ...(peerMessage.viewIsState === true ? { viewIsState: true } : {}),
+          ...(peerMessage.roster !== undefined ? { roster: peerMessage.roster } : {}),
           senderMemberId: peerMessage.senderMemberId,
         });
         if (!this.startEmitted) {
@@ -641,6 +642,7 @@ export class NovaSession extends SessionLifecycle {
           ...(snapshot.actionRejections ? { actionRejections: snapshot.actionRejections } : {}),
           state: snapshot.state,
           ...(snapshot.viewIsState ? { viewIsState: true as const } : {}),
+          ...(snapshot.roster !== null ? { roster: snapshot.roster } : {}),
         }),
       options,
     ).catch((error: unknown) => this.emitError(error));

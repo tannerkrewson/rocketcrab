@@ -31,7 +31,7 @@ nova.defineGame({
   minPlayers: 2, // optional: the lobby says when too few players have joined
   maxPlayers: 8, // optional: the lobby says when too many players have joined
   createInitialState(context) {
-    // context.players = everyone, sorted by id (the same on every device).
+    // context.players = everyone connected, sorted by id (the same on every device).
     return {}; // the starting state (plain JSON)
   },
   actions: {
@@ -50,6 +50,10 @@ nova.defineGame({
   selectView(state, viewer, context) {
     return state; // what this one player may see
   },
+  // Optional: run like actions when a player joins after the start, or has
+  // been gone 20 seconds (a player who comes back sooner never leaves).
+  playerJoined(state, context, player) {},
+  playerLeft(state, context, player) {},
 });
 
 // --- Lifecycle ---
@@ -153,16 +157,22 @@ nova.defineGame({
   title: "Bumper Dots",
   apiVersion: 1,
   tickRate: 15,
-  createInitialState() {
-    return { dots: {}, timeLeft: 60 };
+  createInitialState(context) {
+    const dots = {};
+    for (const player of context.players) dots[player.id] = newDot();
+    return { dots, timeLeft: 60 };
+  },
+  playerJoined(state, context, player) {
+    state.dots[player.id] ??= newDot();
+  },
+  playerLeft(state, context, player) {
+    delete state.dots[player.id];
   },
   tick(state, context) {
     state.timeLeft = Math.max(0, state.timeLeft - context.dt); // timers live in state
-    const here = new Set(context.players.map((player) => player.id));
-    for (const id in state.dots) if (!here.has(id)) delete state.dots[id]; // left
-    for (const player of context.players) {
-      const dot = (state.dots[player.id] ??= { x: 50, y: 50, score: 0 });
-      const c = context.controls[player.id] ?? { dx: 0, dy: 0 };
+    for (const id in state.dots) {
+      const dot = state.dots[id];
+      const c = context.controls[id] ?? { dx: 0, dy: 0 }; // absent while reconnecting
       dot.x = round(clamp(dot.x + c.dx * 40 * context.dt, 0, 100));
       dot.y = round(clamp(dot.y + c.dy * 40 * context.dt, 0, 100));
     }
@@ -203,6 +213,9 @@ addEventListener("keyup", (e) => e.key === "ArrowLeft" && steer(0, held.dy));
 addEventListener("blur", () => steer(0, 0)); // a hidden tab never sees keyup
 boostButton.onclick = () => nova.dispatch({ type: "boost" }).catch(() => {});
 
+function newDot() {
+  return { x: 50, y: 50, score: 0 };
+}
 function round(n) {
   return Math.round(n * 10) / 10; // short numbers keep updates small
 }
@@ -234,12 +247,10 @@ What a real-time game must do:
   targets, `env(safe-area-inset-*)` margins. Desktop should still work.
 - **Players come and go.** A player's `id` stays the same when they reload
   or reconnect in the same browser, so key per-player state by `id` and give a
-  returning player their seat back. `onPlayerJoin` and `onPlayerLeave` run in
-  each player's browser, not in the handlers: to change the state when
-  players join or leave, compare `context.players` with the state in `tick`
-  (a turn-based game can use `tickRate: 1`; a tick that changes nothing sends
-  nothing). Recover from a rejected action, and show this player's
-  connection status.
+  returning player their seat back. Change the state for joins and leaves in
+  `playerJoined` and `playerLeft`; `onPlayerJoin` and `onPlayerLeave` only
+  update this player's screen. Recover from a rejected action, and show this
+  player's connection status.
 - **Show every phase**: before the start, waiting for others, playing, and the
   end, with a way to play again (an action that resets the state).
 - **Fail visibly.** If something the game needs is missing (camera, WebGL, a

@@ -128,6 +128,9 @@ export abstract class SessionLifecycle implements NovaClientBackend {
       ...(options.authority?.restoreWindowMs !== undefined
         ? { restoreWindowMs: options.authority.restoreWindowMs }
         : {}),
+      ...(options.authority?.playerLeaveGraceMs !== undefined
+        ? { playerLeaveGraceMs: options.authority.playerLeaveGraceMs }
+        : {}),
     });
   }
 
@@ -409,6 +412,7 @@ export abstract class SessionLifecycle implements NovaClientBackend {
     const joined = this.playersMap.get(peer.memberId);
     if (joined === undefined) return;
     this.emit({ type: "playerJoined", player: toNovaPlayer(joined) });
+    this.engine.reconcileRoster();
     // The authority dropped this player's controls when the link went down.
     if (peer.memberId === this.engine.getAuthorityMemberId()) this.flushControls(true);
     // Identity exchange: tell the new peer who we are, and (if we already
@@ -450,6 +454,7 @@ export abstract class SessionLifecycle implements NovaClientBackend {
         ...this.engine.actionHistory(),
         state: this.engine.getCanonicalState(),
         viewIsState: this.engine.viewsAreState(),
+        roster: this.engine.getRoster(),
       },
       memberId,
     );
@@ -465,6 +470,7 @@ export abstract class SessionLifecycle implements NovaClientBackend {
     this.playersMap.delete(peer.memberId);
     this.controlsByMember.delete(peer.memberId);
     this.emit({ type: "playerLeft", player: toNovaPlayer(player) });
+    this.engine.reconcileRoster();
     if (this.engine.getAuthorityMemberId() === peer.memberId) {
       // The authority left: wait for election before applying more actions.
       // Every shell keeps the last committed state (never corrupted).

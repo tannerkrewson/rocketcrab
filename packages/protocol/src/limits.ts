@@ -73,6 +73,15 @@ export const actionTimeoutMs = 10_000;
  */
 export const stateHistoryLimit = 256;
 
+/** Most players a state snapshot's roster lists (far above any real party). */
+export const stateRosterMax = 256;
+
+/**
+ * How long a player must stay gone before the game's `playerLeft` runs, so a
+ * phone that was briefly backgrounded or lost signal keeps its seat.
+ */
+export const playerLeaveGraceMs = 20_000;
+
 /**
  * Minimum spacing between state resync requests from one member. A receiver
  * keeps at most one request outstanding per interval, and the authority

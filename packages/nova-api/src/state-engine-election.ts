@@ -262,6 +262,7 @@ export abstract class StateEngineElection extends StateEngineSnapshots {
             revision: this.revision,
             stateHash: this.stateHash,
             history: new Map(this.history),
+            roster: this.roster,
           };
     this.host.emit({
       type: "authorityChanged",
@@ -313,6 +314,7 @@ export abstract class StateEngineElection extends StateEngineSnapshots {
         this.canonical = backup.canonical;
         this.revision = backup.revision;
         this.stateHash = backup.stateHash;
+        this.roster = backup.roster;
         this.history.clear();
         for (const [actionId, record] of backup.history) {
           this.history.set(actionId, record);
@@ -331,6 +333,7 @@ export abstract class StateEngineElection extends StateEngineSnapshots {
     if (this.canonical !== null) {
       this.broadcastSnapshot(false);
     }
+    this.reconcileRoster();
     void this.processQueue();
   }
 
@@ -561,8 +564,10 @@ export abstract class StateEngineElection extends StateEngineSnapshots {
     this.clearRestoreTimer();
     this.clearElectionTimer();
     this.clearWinnerWaitTimer();
+    this.clearRosterTimer();
   }
 
+  protected abstract clearRosterTimer(): void;
   protected abstract syncTickClock(): void;
   protected abstract processQueue(): void;
   protected abstract clearTickTimer(): void;

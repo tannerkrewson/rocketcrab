@@ -25,6 +25,7 @@ import {
   type StateSnapshotMessage,
 } from "@rocketcrab/protocol";
 import { newMessageId, nowSentAt } from "./ids";
+import type { NovaPlayer } from "./types";
 
 /** Envelope fields every peer message from this session carries. */
 export interface PeerMessageBase {
@@ -155,6 +156,7 @@ export function buildStateSnapshotMessage(
     actionRejections?: Readonly<NonNullable<StateSnapshotMessage["actionRejections"]>>;
     state?: unknown;
     viewIsState?: true;
+    roster?: readonly NovaPlayer[];
   },
 ): PeerMessage {
   return assertPeerMessage(
@@ -175,6 +177,7 @@ export function buildStateSnapshotMessage(
       ...(input.actionRejections ? { actionRejections: input.actionRejections } : {}),
       state: input.state,
       ...(input.viewIsState === true ? { viewIsState: true } : {}),
+      ...(input.roster !== undefined ? { roster: input.roster } : {}),
     }),
   );
 }

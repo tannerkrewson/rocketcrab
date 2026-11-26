@@ -72,6 +72,13 @@ export interface NovaStateExecutor {
     viewers: readonly NovaPlayer[];
   }): Promise<NovaStateStateResult>;
 
+  /**
+   * Run the game's `playerJoined` or `playerLeft` handler on `state`. A game
+   * without that handler (or an executor from before membership handlers)
+   * answers `unknown_action`: the change is still recorded, nothing commits.
+   */
+  applyMembership?(input: NovaMembershipInput): Promise<NovaStateStateResult>;
+
   /** Compute one player's view of `state` (late joiners). */
   computeView(input: {
     state: unknown;
@@ -79,6 +86,26 @@ export interface NovaStateExecutor {
     context: NovaGameContext;
   }): Promise<NovaStateViewResult>;
 }
+
+/** One membership change for {@link NovaStateExecutor.applyMembership}. */
+export interface NovaMembershipInput {
+  readonly kind: "joined" | "left";
+  readonly player: NovaPlayer;
+  readonly state: unknown;
+  readonly context: NovaGameContext;
+  readonly viewers: readonly NovaPlayer[];
+}
+
+/**
+ * Membership changes reach a frame as `applyAction` requests with these types
+ * and `context.membership` set, so the runtime wire format is unchanged. Only
+ * the engine builds a context, so a dispatched action can't pose as one; an
+ * older frame answers `unknown_action`.
+ */
+export const MEMBERSHIP_ACTION_TYPES = {
+  joined: "nova:playerJoined",
+  left: "nova:playerLeft",
+} as const;
 
 /** Wrap a throwing handler call into a rejected result with a stable code. */
 function failure(code: string, error: unknown): { ok: false; code: string; message: string } {
@@ -160,6 +187,27 @@ export class LocalGameExecutor implements NovaStateExecutor {
         next = await produce(next, (draft: unknown) => handler(draft, input.context));
       }
       assertStructuredCloneSafe(next, "tick result state");
+      return await this.withViews(next, input.viewers, input.context);
+    } catch (error) {
+      return failure("handler_error", error);
+    }
+  }
+
+  async applyMembership(input: NovaMembershipInput): Promise<NovaStateStateResult> {
+    const handler =
+      input.kind === "joined" ? this.handlers?.playerJoined : this.handlers?.playerLeft;
+    if (typeof handler !== "function") {
+      return {
+        ok: false,
+        code: "unknown_action",
+        message: `The game has no ${input.kind === "joined" ? "playerJoined" : "playerLeft"} handler.`,
+      };
+    }
+    try {
+      const next = await produce(input.state, (draft: unknown) =>
+        handler(draft, input.context, input.player),
+      );
+      assertStructuredCloneSafe(next, "membership result state");
       return await this.withViews(next, input.viewers, input.context);
     } catch (error) {
       return failure("handler_error", error);
