@@ -304,10 +304,12 @@ export class RuntimeHostClient {
   }
 
   /** Forward validated session events to the runtime; no-op when not running. */
-  pushApiEvent(event: GameApiEvent): void {
+  pushApiEvent(event: GameApiEvent, targetRuntimeInstanceId?: string): void {
     if (!this.port || this.runtimeInstanceId === null) {
       return;
     }
+    if (targetRuntimeInstanceId !== undefined && targetRuntimeInstanceId !== this.runtimeInstanceId)
+      return;
     const message = assertRuntimeMessage(
       gameApiEventMessageSchema.parse({
         version: PROTOCOL_VERSION,

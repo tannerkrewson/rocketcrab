@@ -15,7 +15,7 @@ interface FrameApiCallHandlers {
     message: string,
   ): void;
   onStateResponse(payload: FrameStateResponsePayload): void;
-  pushApiEvent(event: GameApiEvent): void;
+  pushApiEvent(event: GameApiEvent, targetRuntimeInstanceId?: string): void;
 }
 
 function describeFailure(
@@ -30,23 +30,22 @@ function describeFailure(
 
 /** Revalidate forwarded calls before they reach the host's session. */
 export function routeFrameApiCall(
-  { method, payload }: Pick<GameApiCallMessage, "method" | "payload">,
+  { method, payload, runtimeInstanceId }: GameApiCallMessage,
   session: Pick<NovaSession, "ready" | "dispatch" | "setControls" | "files">,
   handlers: FrameApiCallHandlers,
 ): void {
-  function replyToFile(requestId: string, run: () => Promise<FileResult>): void {
-    void run().then(
-      (result) => handlers.pushApiEvent({ kind: "fileResult", requestId, result }),
-      (error: unknown) => {
-        const { code, message } = describeFailure(error, handlers.formatError);
-        handlers.onFailure?.(method as "files.put" | "files.get", message);
-        handlers.pushApiEvent({
-          kind: "fileResult",
-          requestId,
-          result: { status: "error", code, message: message.slice(0, 512) },
-        });
-      },
-    );
+  function replyToFile(
+    method: "files.put" | "files.get",
+    requestId: string,
+    run: () => Promise<FileResult>,
+  ): void {
+    const reply = (result: FileResult) =>
+      handlers.pushApiEvent({ kind: "fileResult", requestId, result }, runtimeInstanceId);
+    void run().then(reply, (error: unknown) => {
+      const { code, message } = describeFailure(error, handlers.formatError);
+      handlers.onFailure?.(method, message);
+      reply({ status: "error", code, message: message.slice(0, 512) });
+    });
   }
   switch (method) {
     case "ready": {
@@ -96,7 +95,7 @@ export function routeFrameApiCall(
         return;
       }
       const { requestId, file } = parsed.data;
-      replyToFile(requestId, async () => ({
+      replyToFile(method, requestId, async () => ({
         status: "stored",
         ref: await session.files.put(file),
       }));
@@ -109,7 +108,7 @@ export function routeFrameApiCall(
         return;
       }
       const { requestId, ref } = parsed.data;
-      replyToFile(requestId, async () => ({
+      replyToFile(method, requestId, async () => ({
         status: "received",
         file: await session.files.get(ref),
       }));

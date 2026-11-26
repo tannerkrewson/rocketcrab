@@ -238,6 +238,21 @@ describe("RuntimeHostClient event forwarding", () => {
     expect(idle.port1.sent).toHaveLength(0);
   });
 
+  it("does not send file data owned by a replaced runtime instance", async () => {
+    const harness = createHarness();
+    await started(harness);
+    const sent = harness.port1.sent.length;
+    const event = {
+      kind: "fileResult",
+      requestId: "file-request",
+      result: { status: "received", file: { bytes: new ArrayBuffer(5), mimeType: "text/plain" } },
+    } as const;
+    harness.bridge.pushApiEvent(event, "previous-runtime-instance");
+    expect(harness.port1.sent).toHaveLength(sent);
+    harness.bridge.pushApiEvent(event, harness.bridge.diagnose().runtimeInstanceId!);
+    expect(harness.port1.sent.at(-1)).toMatchObject({ type: "game.apiEvent", event });
+  });
+
   it("rejects invalid apiEvent shapes before posting them", async () => {
     const harness = createHarness();
     await started(harness);

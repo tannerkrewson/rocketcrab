@@ -587,9 +587,9 @@ export class ArenaEngine {
     this.emit();
   }
 
-  private pushApiEvent(id: string, event: GameApiEvent): void {
+  private pushApiEvent(id: string, event: GameApiEvent, targetRuntimeInstanceId?: string): void {
     const client = this.players.get(id)?.client;
-    client?.pushApiEvent(event);
+    client?.pushApiEvent(event, targetRuntimeInstanceId);
   }
 
   private routeApiCall(runtime: PlayerRuntime, message: GameApiCallMessage): void {
@@ -614,7 +614,7 @@ export class ArenaEngine {
       },
       onFailure: (_method, message) => this.logPlayer(runtime.spec.id, "error", message),
       onStateResponse: (payload) => runtime.stateExecutor?.handleResponse(payload),
-      pushApiEvent: (event) => this.pushApiEvent(runtime.spec.id, event),
+      pushApiEvent: (event, instanceId) => this.pushApiEvent(runtime.spec.id, event, instanceId),
     });
   }
 

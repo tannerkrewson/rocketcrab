@@ -1900,7 +1900,7 @@ export class PartyEngine {
         }
       },
       onStateResponse: (payload) => this.state.stateExecutor?.handleResponse(payload),
-      pushApiEvent: (event) => this.state.runtime?.pushApiEvent(event),
+      pushApiEvent: (event, instanceId) => this.state.runtime?.pushApiEvent(event, instanceId),
     });
   }
 
