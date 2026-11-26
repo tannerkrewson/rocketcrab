@@ -1,4 +1,4 @@
-import type { ExternalPlayer, ExternalRoom } from "./types";
+import type { ExternalPlayer, ExternalRoom } from "./types.ts";
 
 /** Query parameter names a game may rename (Fishbowl uses `hideshare`). */
 type AutomaticParam = "rocketcrab" | "name" | "ishost";

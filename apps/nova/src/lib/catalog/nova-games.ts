@@ -1,4 +1,4 @@
-import type { NovaCatalogGame } from "./types";
+import type { NovaCatalogGame } from "./types.ts";
 
 /**
  * Hosted Nova games: one self-contained HTML file each, fetched by the host

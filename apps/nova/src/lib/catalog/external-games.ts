@@ -1,4 +1,4 @@
-import type { ExternalCatalogGame, ExternalPlay } from "./types";
+import type { ExternalCatalogGame, ExternalPlay } from "./types.ts";
 import { relayRequest, type RelayEndpointKey } from "./relay.ts";
 import { joinRoomUrl, postJson, randomRoomId, rocketcrabUrl, roomField } from "./join-url.ts";
 

@@ -1,10 +1,10 @@
 /** The built-in game list: external games plus hosted Nova games. */
 import { EXTERNAL_GAMES } from "./external-games.ts";
 import { NOVA_GAMES } from "./nova-games.ts";
-import type { CatalogGame, ExternalCatalogGame, GameListing } from "./types";
+import type { CatalogGame, ExternalCatalogGame, GameListing } from "./types.ts";
 import { formatPlayerRange } from "../party/player-limits.ts";
 
-export type * from "./types";
+export type * from "./types.ts";
 export { joinRoomUrl, randomRoomId, rocketcrabUrl, roomField } from "./join-url.ts";
 export { EXTERNAL_GAMES } from "./external-games.ts";
 export { NOVA_GAMES } from "./nova-games.ts";

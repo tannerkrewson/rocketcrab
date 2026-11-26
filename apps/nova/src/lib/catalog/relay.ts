@@ -1,7 +1,7 @@
 /** Room creation for games whose servers send no CORS headers. */
-import type { RelayEndpointKey } from "../../../../../deploy/nova/relay";
+import type { RelayEndpointKey } from "../../../../../deploy/nova/relay.ts";
 
-export type { RelayEndpointKey } from "../../../../../deploy/nova/relay";
+export type { RelayEndpointKey } from "../../../../../deploy/nova/relay.ts";
 
 export interface RelayRequestOptions {
   /** JSON payload forwarded to POST endpoints (defaults to {}). */
