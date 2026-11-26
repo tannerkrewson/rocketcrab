@@ -65,7 +65,7 @@ const tkSpyfall: NovaCatalogGame = {
 
 const traitors: NovaCatalogGame = {
   id: "traitors",
-  name: "Traitors",
+  name: "Traitors: Sabotage",
   author: "Tanner Krewson",
   basedOn: {
     game: "The Resistance",
@@ -75,7 +75,7 @@ const traitors: NovaCatalogGame = {
   },
   description: `Some of you are traitors. Nobody knows who.
 
-        Traitors (formerly Snakeout) is a game in which a team of faithful
+        Traitors: Sabotage (formerly Snakeout) is a game in which a team of faithful
         players is infiltrated by a group of traitors. The faithful must try
         to figure out who the traitors are, and the traitors must try to keep
         the faithful from figuring out their identity. Each mission's team is
@@ -99,6 +99,43 @@ const traitors: NovaCatalogGame = {
   play: { kind: "nova", url: "https://www.tannerkrewson.com/traitors/game.html" },
 };
 
+const traitorsBanishment: NovaCatalogGame = {
+  id: "traitors-banishment",
+  name: "Traitors: Banishment",
+  author: "Tanner Krewson",
+  basedOn: {
+    game: "Mafia",
+    author: "Dimitry Davidoff",
+    link: "https://en.wikipedia.org/wiki/Mafia_(party_game)",
+    bggId: 925,
+  },
+  description: `Banish the traitors before they murder everyone.
+
+        Each day, the round table votes to banish one player, and learns
+        whether they were faithful or a traitor. Each night, the traitors
+        murder a faithful player, or recruit one to their side after losing
+        one of their own. Once four or fewer remain, the table can vote to end
+        the game, but if a traitor is still among them, the traitors win.
+        No moderator needed: the game deals the roles and keeps the night
+        secret.`,
+  displayUrlHref: "https://www.tannerkrewson.com/traitors/banishment",
+  donationUrlText: "Buy Tanner a taco!",
+  donationUrlHref: "https://www.buymeacoffee.com/tannerkrewson",
+  guideUrl: "https://www.tannerkrewson.com/traitors/banishment",
+  pictures: [
+    "https://www.tannerkrewson.com/traitors/screenshots/banishment-roundtable.jpg",
+    "https://www.tannerkrewson.com/traitors/screenshots/banishment-banished.jpg",
+    "https://www.tannerkrewson.com/traitors/screenshots/banishment-night-traitor.jpg",
+    "https://www.tannerkrewson.com/traitors/screenshots/banishment-morning.jpg",
+  ],
+  difficulty: "medium",
+  genres: [],
+  players: "5-10",
+  minPlayers: 5,
+  maxPlayers: 10,
+  play: { kind: "nova", url: "https://www.tannerkrewson.com/traitors/game-banishment.html" },
+};
+
 /**
  * Hosted Nova games: one self-contained HTML file each, fetched by the host
  * when picked and shared with the party like any saved game. To port and
@@ -107,6 +144,7 @@ const traitors: NovaCatalogGame = {
 export const NOVA_GAMES: readonly NovaCatalogGame[] = [
   tkSpyfall,
   traitors,
+  traitorsBanishment,
   {
     ...drawphoneBase,
     id: "drawphone",

@@ -140,11 +140,15 @@ describe("external room creation", () => {
     });
   });
 
-  it("lists Traitors, formerly Snakeout, as a hosted Nova game", () => {
+  it("lists Traitors, formerly Snakeout, as two hosted Nova games", () => {
     expect(findExternalGame("snakeout")).toBeUndefined();
     expect(findCatalogGame("traitors")?.play).toEqual({
       kind: "nova",
       url: "https://www.tannerkrewson.com/traitors/game.html",
+    });
+    expect(findCatalogGame("traitors-banishment")?.play).toEqual({
+      kind: "nova",
+      url: "https://www.tannerkrewson.com/traitors/game-banishment.html",
     });
   });
 
