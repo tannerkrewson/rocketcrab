@@ -8,8 +8,8 @@ import {
   timestampSchema,
   titleSchema,
 } from "../ids";
-import { htmlSourceSchema, playerLimitMax, tickRateMax } from "../limits";
-import { novaActionSchema } from "../nova-api";
+import { gameFileBytes, htmlSourceSchema, playerLimitMax, tickRateMax } from "../limits";
+import { gameFileRefSchema, gameFileTypeSchema, novaActionSchema } from "../nova-api";
 import { gameEndReasonSchema } from "./shared";
 
 /**
@@ -118,6 +118,36 @@ export const stateResponseSchema = z.discriminatedUnion("kind", [
 ]);
 export type StateResponse = z.infer<typeof stateResponseSchema>;
 
+const arrayBufferByteLength = Object.getOwnPropertyDescriptor(
+  ArrayBuffer.prototype,
+  "byteLength",
+)!.get!;
+const gameFileDataSchema = z
+  .object({
+    bytes: z.custom<ArrayBuffer>((value) => {
+      try {
+        // The untrusted game and runtime bridge have different ArrayBuffer constructors.
+        return arrayBufferByteLength.call(value) <= gameFileBytes;
+      } catch {
+        return false;
+      }
+    }),
+    mimeType: gameFileTypeSchema,
+  })
+  .strict();
+const fileRequestId = z.string().min(1).max(64);
+
+export const fileResultSchema = z.discriminatedUnion("status", [
+  z.object({ status: z.literal("stored"), ref: gameFileRefSchema }),
+  z.object({ status: z.literal("received"), file: gameFileDataSchema }),
+  z.object({
+    status: z.literal("error"),
+    code: z.string().min(1).max(64),
+    message: z.string().min(1).max(512),
+  }),
+]);
+export type FileResult = z.infer<typeof fileResultSchema>;
+
 /** Bounded call payloads validated at both runtime and host boundaries. */
 export const novaApiCallSchemas = {
   ready: z.object({}).strict(),
@@ -130,6 +160,8 @@ export const novaApiCallSchemas = {
     })
     .strict(),
   "controls.set": z.object({ controls: z.unknown() }).strict(),
+  "files.put": z.object({ requestId: fileRequestId, file: gameFileDataSchema }).strict(),
+  "files.get": z.object({ requestId: fileRequestId, ref: gameFileRefSchema }).strict(),
   stateResponse: z
     .object({
       requestId: z.string().min(1).max(64),
@@ -195,6 +227,7 @@ export const gameApiEventSchema = z.discriminatedUnion("kind", [
     })
     .strict(),
   actionAckEventSchema,
+  z.object({ kind: z.literal("fileResult"), requestId: fileRequestId, result: fileResultSchema }),
 ]);
 export type GameApiEvent = z.infer<typeof gameApiEventSchema>;
 
@@ -230,6 +263,8 @@ export const runtimeBootstrapMessageSchema = z.object({
   gameId: gameIdSchema,
   gameTitle: titleSchema.optional(),
   gameSource: htmlSourceSchema,
+  // Older shells omit this and older runtimes ignore it.
+  sharedFiles: z.literal(true).optional(),
   player: z.object({
     memberId: memberIdSchema,
     displayName: displayNameSchema,

@@ -21,6 +21,7 @@ export const NOVA_API_SURFACE: readonly string[] = [
   "dispatch",
   "state",
   "controls",
+  "files",
 ] as const;
 
 /**

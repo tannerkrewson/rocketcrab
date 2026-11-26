@@ -15,11 +15,19 @@ import type {
   NovaTickContext,
 } from "@rocketcrab/nova-api";
 import { NOVA_API_VERSION } from "@rocketcrab/nova-api/version";
-import { PROTOCOL_VERSION } from "@rocketcrab/protocol";
+import {
+  PROTOCOL_VERSION,
+  gameFileTimeoutMs,
+  type FileResult,
+  type GameApiEvent,
+} from "@rocketcrab/protocol";
 
 declare global {
   interface Window {
-    __novaBootstrap?: { player?: { memberId?: string; displayName?: string } };
+    __novaBootstrap?: {
+      player?: { memberId?: string; displayName?: string };
+      sharedFiles?: true;
+    };
     __novaGameBridge?: { version: number; receive(kind: string, payload: unknown): void };
     nova?: unknown;
   }
@@ -91,11 +99,38 @@ function install(): void {
         }
       : null;
   const listeners = new Set<(event: NovaSessionEvent) => void>();
+  const fileRequests = new Map<string, (result: FileResult) => void>();
   let executor = new LocalGameExecutor(null);
 
   const emit = (event: NovaSessionEvent) => {
     for (const listener of listeners) listener(event);
   };
+
+  function requestFile(
+    method: "files.put" | "files.get",
+    payload: Record<string, unknown>,
+  ): Promise<FileResult> {
+    const requestId = crypto.randomUUID();
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => {
+        fileRequests.delete(requestId);
+        reject(
+          new NovaError(
+            "file_unavailable",
+            "Shared files did not respond. Check your connection and reload Nova to update.",
+          ),
+        );
+      }, gameFileTimeoutMs + 2000);
+      fileRequests.set(requestId, (result) => {
+        clearTimeout(timer);
+        fileRequests.delete(requestId);
+        if (result.status === "error")
+          reject(new NovaError(toErrorCode(result.code), result.message));
+        else resolve(result);
+      });
+      report(method, { requestId, ...payload });
+    });
+  }
 
   const client = createNovaClient({
     apiVersion: NOVA_API_VERSION,
@@ -120,6 +155,28 @@ function install(): void {
     ready: () => report("ready", {}),
     dispatch: async (action, actionId) => report("dispatch", { action, actionId }),
     setControls: (controls) => report("controls.set", { controls }),
+    ...(window.__novaBootstrap?.sharedFiles === true
+      ? {
+          files: {
+            async put(file) {
+              const result = await requestFile("files.put", { file });
+              if (result.status === "stored") return result.ref;
+              throw new NovaError(
+                "file_unavailable",
+                "The shared file upload received an invalid reply.",
+              );
+            },
+            async get(ref) {
+              const result = await requestFile("files.get", { ref });
+              if (result.status === "received") return result.file;
+              throw new NovaError(
+                "file_unavailable",
+                "The shared file download received an invalid reply.",
+              );
+            },
+          },
+        }
+      : {}),
     onEvent(listener) {
       listeners.add(listener);
       return () => listeners.delete(listener);
@@ -205,6 +262,11 @@ function install(): void {
       case "stateRequest":
         void answerStateRequest(String(p.requestId), p.request as Record<string, unknown>);
         return;
+      case "fileResult": {
+        const { requestId, result } = raw as Extract<GameApiEvent, { kind: "fileResult" }>;
+        fileRequests.get(requestId)?.(result);
+        return;
+      }
       case "actionAck":
         emit({
           type: "actionAck",

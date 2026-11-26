@@ -101,21 +101,23 @@ export abstract class StateEngineTicks extends StateEngineElection {
     const problem = !result.ok
       ? { code: result.code, message: result.message }
       : this.stateProblem(result.state, "tick");
-    if (problem !== null) {
+    const committed =
+      result.ok && problem === null ? await this.commit(result, undefined, true) : false;
+    const failure = typeof committed === "object" ? committed : problem;
+    if (failure !== null) {
       // A broken tick fails every step: report it once, not 20 times a second.
-      if (this.reportedTickProblem !== problem.code) {
-        this.reportedTickProblem = problem.code;
-        this.host.emit({ type: "stateError", ...problem });
+      if (this.reportedTickProblem !== failure.code) {
+        this.reportedTickProblem = failure.code;
+        this.host.emit({ type: "stateError", ...failure });
       }
       return;
     }
     this.reportedTickProblem = null;
-    if (result.ok) await this.commit(result, undefined, true);
   }
 
   protected abstract commit(
     result: { state: unknown; views: Record<string, unknown>; viewIsState?: true },
     actionId?: string,
     tick?: boolean,
-  ): Promise<boolean>;
+  ): Promise<boolean | { code: string; message: string }>;
 }

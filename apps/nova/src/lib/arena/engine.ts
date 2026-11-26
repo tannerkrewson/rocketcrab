@@ -383,6 +383,7 @@ export class ArenaEngine {
       await client.load({
         gameId: this.options.gameId,
         gameSource: this.source,
+        sharedFiles: true,
         player: { memberId: runtime.spec.memberId, displayName: runtime.spec.name },
         ...(this.options.gameTitle !== undefined ? { gameTitle: this.options.gameTitle } : {}),
         sessionId: this.sessionId,

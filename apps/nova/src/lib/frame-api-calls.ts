@@ -1,5 +1,6 @@
 import {
   novaApiCallSchemas,
+  type FileResult,
   type GameApiCallMessage,
   type GameApiEvent,
 } from "@rocketcrab/protocol";
@@ -9,7 +10,10 @@ import type { FrameStateResponsePayload } from "./arena/state-executor";
 interface FrameApiCallHandlers {
   formatError?(error: unknown): string;
   onInvalid?(method: GameApiCallMessage["method"]): void;
-  onFailure?(method: "dispatch" | "controls.set", message: string): void;
+  onFailure?(
+    method: "dispatch" | "controls.set" | "files.put" | "files.get",
+    message: string,
+  ): void;
   onStateResponse(payload: FrameStateResponsePayload): void;
   pushApiEvent(event: GameApiEvent): void;
 }
@@ -27,9 +31,23 @@ function describeFailure(
 /** Revalidate forwarded calls before they reach the host's session. */
 export function routeFrameApiCall(
   { method, payload }: Pick<GameApiCallMessage, "method" | "payload">,
-  session: Pick<NovaSession, "ready" | "dispatch" | "setControls">,
+  session: Pick<NovaSession, "ready" | "dispatch" | "setControls" | "files">,
   handlers: FrameApiCallHandlers,
 ): void {
+  function replyToFile(requestId: string, run: () => Promise<FileResult>): void {
+    void run().then(
+      (result) => handlers.pushApiEvent({ kind: "fileResult", requestId, result }),
+      (error: unknown) => {
+        const { code, message } = describeFailure(error, handlers.formatError);
+        handlers.onFailure?.(method as "files.put" | "files.get", message);
+        handlers.pushApiEvent({
+          kind: "fileResult",
+          requestId,
+          result: { status: "error", code, message: message.slice(0, 512) },
+        });
+      },
+    );
+  }
   switch (method) {
     case "ready": {
       if (!novaApiCallSchemas.ready.safeParse(payload).success) {
@@ -69,6 +87,32 @@ export function routeFrameApiCall(
         handlers.onFailure?.(method, message);
         handlers.pushApiEvent({ kind: "error", code, message });
       }
+      break;
+    }
+    case "files.put": {
+      const parsed = novaApiCallSchemas[method].safeParse(payload);
+      if (!parsed.success) {
+        handlers.onInvalid?.(method);
+        return;
+      }
+      const { requestId, file } = parsed.data;
+      replyToFile(requestId, async () => ({
+        status: "stored",
+        ref: await session.files.put(file),
+      }));
+      break;
+    }
+    case "files.get": {
+      const parsed = novaApiCallSchemas[method].safeParse(payload);
+      if (!parsed.success) {
+        handlers.onInvalid?.(method);
+        return;
+      }
+      const { requestId, ref } = parsed.data;
+      replyToFile(requestId, async () => ({
+        status: "received",
+        file: await session.files.get(ref),
+      }));
       break;
     }
     case "stateResponse": {

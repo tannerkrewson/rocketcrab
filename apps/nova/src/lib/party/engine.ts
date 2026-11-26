@@ -1772,6 +1772,7 @@ export class PartyEngine {
       await client.load({
         gameId: source.gameId,
         gameSource: source.source,
+        sharedFiles: true,
         player: {
           memberId: this.state.identity.memberId,
           displayName: this.state.identity.displayName,

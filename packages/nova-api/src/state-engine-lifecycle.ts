@@ -1,3 +1,4 @@
+import { recordGameFileRef } from "./game-files";
 import {
   actionTimeoutMs,
   authorityGracePeriodMs,
@@ -293,9 +294,10 @@ export abstract class StateEngineLifecycle {
    * The first such value is reported once, since it is almost always a bug
    * (a division by zero, a Map in the state).
    */
-  protected asReplicated(state: unknown): unknown {
+  protected asReplicated(state: unknown, refs?: Set<string>): unknown {
     let lossy: string | null = null;
     const json = JSON.stringify(state, (key, value: unknown) => {
+      if (refs !== undefined) recordGameFileRef(value, refs);
       if (lossy === null) {
         const where = key === "" ? "The state" : `State key "${key}"`;
         if (typeof value === "number" && !Number.isFinite(value)) {

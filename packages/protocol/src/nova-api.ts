@@ -38,3 +38,9 @@ export const novaActionSchema = z.object({
   payload: z.unknown().optional(),
   baseRevision: z.number().int().nonnegative().optional(),
 });
+
+export const gameFileRefSchema = z.string().regex(/^nova-file:[0-9a-f]{64}$/);
+export const gameFileTypeSchema = z
+  .string()
+  .max(127)
+  .regex(/^[\x20-\x7e]*$/);

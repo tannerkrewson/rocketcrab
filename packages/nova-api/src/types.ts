@@ -316,6 +316,15 @@ export interface NovaApi {
    * as `context.controls[playerId]`. Plain JSON, at most 1 KiB.
    */
   readonly controls: NovaControlsHandle;
+  /** Store and read immutable shared files by their content-addressed refs. */
+  readonly files: NovaFilesHandle;
+}
+
+export interface NovaFilesHandle {
+  put(blob: Blob): Promise<string>;
+  get(ref: string): Promise<Blob>;
+  /** The caller revokes the object URL when it no longer needs it. */
+  url(ref: string): Promise<string>;
 }
 
 /** The `nova.controls` handle. */

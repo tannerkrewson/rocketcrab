@@ -352,6 +352,7 @@ export class NovaSession extends SessionLifecycle {
         if (!fromAuthority && !this.isHost(peerMessage.senderMemberId)) break;
         if (!this.ended) {
           this.ended = true;
+          this.files.dispose();
           this.engine.endGame();
           this.emit({ type: "end", reason: peerMessage.reason });
         }
@@ -586,6 +587,7 @@ export class NovaSession extends SessionLifecycle {
           .filter((record) => record.authorityEligible)
           .map((record) => record.id),
       controls: () => this.connectedControls(),
+      files: this.files,
       sendAck: (targetMemberId, ack) => this.sendEngineAck(targetMemberId, ack),
       sendSnapshot: (snapshot, targetMemberId) => this.sendEngineSnapshot(snapshot, targetMemberId),
       sendView: (targetMemberId, view) => this.sendEngineView(targetMemberId, view),
@@ -760,6 +762,7 @@ export class NovaSession extends SessionLifecycle {
         this.emit({ type: "error", error: new NovaError(toErrorCode(event.code), event.message) });
         break;
       case "authorityChanged":
+        this.files.retryDownloads();
         // Flush buffered dispatches toward the new authority and re-send
         // in-flight ones (deduplication makes the re-sends exactly-once).
         this.flushDispatchBuffer();

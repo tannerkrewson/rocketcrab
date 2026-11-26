@@ -125,11 +125,14 @@ export class NovaStateEngine extends StateEngineTicks {
       this.host.emit({ type: "stateError", code: result.code, message: result.message });
       return false;
     }
-    if (!(await this.commit(result))) {
+    const committed = await this.commit(result);
+    if (committed !== true) {
       this.host.emit({
         type: "stateError",
-        code: "invalid_state",
-        message: "The initial state failed validation and was not committed.",
+        ...(committed || {
+          code: "invalid_state",
+          message: "The initial state failed validation and was not committed.",
+        }),
       });
       return false;
     }
@@ -273,7 +276,10 @@ export class NovaStateEngine extends StateEngineTicks {
       this.host.emit({ type: "stateError", ...problem });
       return;
     }
-    if (result.ok) await this.commit(result);
+    if (result.ok) {
+      const committed = await this.commit(result);
+      if (typeof committed === "object") this.host.emit({ type: "stateError", ...committed });
+    }
   }
 
   /**
@@ -514,7 +520,13 @@ export class NovaStateEngine extends StateEngineTicks {
       this.settleRejected(item, problem.code, problem.message);
       return true;
     }
-    if (!(await this.commit(result, item.actionId))) {
+    const committed = await this.commit(result, item.actionId);
+    if (typeof committed === "object") {
+      this.settleRejected(item, committed.code, committed.message);
+      this.host.emit({ type: "stateError", ...committed });
+      return true;
+    }
+    if (!committed) {
       // The authority changed (or the engine disposed) during the async
       // state-hash digest: drop the result silently, exactly like the
       // post-handler check above. The dispatcher re-sends once the new
@@ -542,20 +554,31 @@ export class NovaStateEngine extends StateEngineTicks {
     result: { state: unknown; views: Record<string, unknown>; viewIsState?: true },
     actionId?: string,
     tick = false,
-  ): Promise<boolean> {
+  ): Promise<boolean | { code: string; message: string }> {
     const { views } = result;
-    const state = this.asReplicated(result.state);
-    if (this.disposed) return false;
+    const files = this.host.files;
+    const refs = files === undefined ? undefined : new Set<string>();
+    const state = this.asReplicated(result.state, refs);
+    if (this.disposed || this.ended) return false;
     if (this.authorityMemberId !== this.selfMemberId || !this.restoreDone) return false;
     // Hash BEFORE mutating revision/canonical: a catch-up snapshot read
     // mid-commit must never observe the new revision with the old hash
     // (state envelopes carry consistent revision + hash).
     const stateHash = await this.stateHashImpl(state);
-    if (this.disposed) return false;
+    if (this.disposed || this.ended) return false;
     if (this.authorityMemberId !== this.selfMemberId || !this.restoreDone) return false;
     // A tick that changed nothing (a paused game) sends nothing, and one that
     // finished hashing after the tick stopped (leave, end) is dropped.
     if (tick && (stateHash === this.stateHash || !this.shouldTick())) return true;
+    if (files !== undefined && refs !== undefined) {
+      if (!files.canCommit(refs))
+        return {
+          code: "invalid_state",
+          message:
+            "The state references a shared file the authority does not have. Upload the file before committing its ref.",
+        };
+      files.updateRefs(refs);
+    }
     this.revision += 1;
     this.canonical = state;
     this.stateHash = stateHash;

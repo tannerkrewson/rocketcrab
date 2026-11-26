@@ -1,3 +1,4 @@
+import { referencedGameFiles } from "./game-files";
 import { stateHistoryLimit, stateResyncMinIntervalMs } from "@rocketcrab/protocol";
 import { applyJsonPatch, deltaFor, type JsonDeltaOp } from "./json-delta";
 import type { NovaPlayer } from "./types";
@@ -184,6 +185,7 @@ export abstract class StateEngineSnapshots extends StateEngineLifecycle {
     this.stateHash = message.stateHash;
     this.viewIsState = message.viewIsState === true;
     this.roster = message.roster ?? null;
+    this.host.files?.updateRefs(referencedGameFiles(this.canonical));
     if (this.viewIsState && message.authorityMemberId !== this.selfMemberId) {
       this.host.emit({ type: "viewFromState", state: this.canonical });
     }

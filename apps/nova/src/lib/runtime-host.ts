@@ -26,7 +26,7 @@ import {
 
 /** Minimal port surface the bridge drives (real MessagePorts satisfy it). */
 export interface ChannelPort {
-  postMessage(message: unknown): void;
+  postMessage(message: unknown, transfer?: Transferable[]): void;
   close(): void;
   onmessage: ((event: MessageEvent) => void) | null;
   onmessageerror: ((event: MessageEvent) => void) | null;
@@ -52,6 +52,7 @@ export interface LoadGameInput {
   gameSource: string;
   player: { memberId: string; displayName: string };
   gameTitle?: string;
+  sharedFiles?: true;
   permissions?: { allow: string[] };
   sessionId?: string;
 }
@@ -104,6 +105,7 @@ function buildBootstrapMessage(
     gameId: game.gameId,
     ...(game.gameTitle !== undefined ? { gameTitle: game.gameTitle } : {}),
     gameSource: game.gameSource,
+    ...(game.sharedFiles === true ? { sharedFiles: true } : {}),
     player: game.player,
     ...(game.permissions !== undefined ? { permissions: game.permissions } : {}),
   });
@@ -317,7 +319,12 @@ export class RuntimeHostClient {
         event,
       }),
     );
-    this.send(message);
+    this.send(
+      message,
+      event.kind === "fileResult" && event.result.status === "received"
+        ? [event.result.file.bytes]
+        : [],
+    );
   }
 
   /** Remove the frame and all listeners without sending further messages. */
@@ -479,10 +486,10 @@ export class RuntimeHostClient {
     return this.runtimeInstanceId;
   }
 
-  private send(message: RuntimeMessage): void {
+  private send(message: RuntimeMessage, transfer: Transferable[] = []): void {
     if (!this.port) return;
     try {
-      this.port.postMessage(message);
+      this.port.postMessage(message, transfer);
     } catch {
       // Port closed — runtime is gone.
     }

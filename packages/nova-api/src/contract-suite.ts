@@ -601,6 +601,99 @@ export function runNovaSessionContractTests(harnessFactory: () => NovaTransportH
       });
     });
 
+    it("uploads a guest's file before committing its ref and rejects a missing file", async () => {
+      const { harness, a, b } = await makePair(harnessFactory, {
+        handlers: {
+          createInitialState: () => ({ files: [] }),
+          actions: {
+            share(state: { files: unknown[] }, _context, ref) {
+              state.files.push({ ref });
+            },
+          },
+        },
+      });
+      try {
+        await startBoth({ harness, a, b });
+        const missing = a.client.dispatch({
+          type: "share",
+          payload: "nova-file:" + "0".repeat(64),
+        });
+        await expect(missing).rejects.toMatchObject({ name: "NovaError", code: "invalid_state" });
+        expect(canonicalOf(a)).toEqual({ files: [] });
+
+        const uploading = b.client.files.put(new Blob(["hello"], { type: "text/plain" }));
+        await settle(harness);
+        await settle(harness);
+        const ref = await uploading;
+        expect(ref).toBe(
+          "nova-file:2cf24dba5fb0a30e26e83b2ac5b9e29e1b161e5c1fa7425e73043362938b9824",
+        );
+        const file = await a.client.files.get(ref);
+        expect(file.type).toBe("text/plain");
+        expect(await file.text()).toBe("hello");
+        await a.client.dispatch({ type: "share", payload: ref });
+        await settle(harness);
+        expect(canonicalOf(b)).toEqual({ files: [{ ref }] });
+        const url = await b.client.files.url(ref);
+        try {
+          expect(await (await fetch(url)).text()).toBe("hello");
+        } finally {
+          URL.revokeObjectURL(url);
+        }
+      } finally {
+        a.dispose();
+        b.dispose();
+      }
+    });
+
+    it("serves a committed file to a late joiner after authority migration", async () => {
+      const harness = harnessFactory();
+      const sessions: NovaSession[] = [];
+      async function join(memberId: string) {
+        const session = createNovaSession({
+          transport: harness.createTransport({ memberId }),
+          room: ROOM,
+          sessionId: SESSION,
+          player: { memberId },
+          game: { gameId: "game-1" },
+          authority: { electionWindowMs: 30, restoreWindowMs: 30 },
+        });
+        sessions.push(session);
+        session.client.defineGame({
+          createInitialState: () => ({ ref: null }),
+          actions: { share: (_state, _context, ref) => ({ ref }) },
+        });
+        await session.join();
+        return session;
+      }
+      try {
+        const a = await join("member-a");
+        const b = await join("member-b");
+        await settle(harness);
+        await startBoth({ harness, a, b });
+        const ref = await a.client.files.put(new Blob(["retained"]));
+        await a.client.dispatch({ type: "share", payload: ref });
+        await settle(harness);
+        await settle(harness);
+        expect(await (await b.client.files.get(ref)).text()).toBe("retained");
+
+        await a.leave();
+        await waitForTicks(
+          harness,
+          () => b.getStateModeDiagnostics().authorityMemberId === "member-b",
+          "new file authority",
+        );
+        const c = await join("member-c");
+        await settle(harness);
+        expect(canonicalOf(c)).toEqual({ ref });
+        const download = c.client.files.get(ref);
+        await settle(harness);
+        expect(await (await download).text()).toBe("retained");
+      } finally {
+        for (const session of sessions) session.dispose();
+      }
+    });
+
     it("keeps the last committed state when the authority runtime fails", async () => {
       const harness = harnessFactory();
       const transportA = harness.createTransport({ memberId: "member-a", displayName: "Ada" });

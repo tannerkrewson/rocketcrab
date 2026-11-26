@@ -38,6 +38,13 @@ export const gameBytesPerSecond = 256 * 1024;
 export const gameBytesBurst = 1024 * 1024;
 export const gameBytesWarn = Math.floor(gameBytesBurst * LIMIT_WARN_FRACTION);
 
+/** Initial shared-file budgets. At 500 kbit/s, 1 MiB takes about 17 s before overhead. */
+export const gameFileBytes = 256 * 1024;
+export const gameFilesTotalBytes = 1024 * 1024;
+/** Bound requests and metadata even when files are empty or tiny. */
+export const gameFilesMax = 32;
+export const gameFileTimeoutMs = 30_000;
+
 /** Maximum actions dispatched per second per player. */
 export const actionRatePerSecond = 20;
 export const actionWarnRatePerSecond = Math.floor(actionRatePerSecond * LIMIT_WARN_FRACTION);
@@ -142,6 +149,10 @@ export const LIMITS = {
   gameBytesPerSecond,
   gameBytesBurst,
   gameBytesWarn,
+  gameFileBytes,
+  gameFilesTotalBytes,
+  gameFilesMax,
+  gameFileTimeoutMs,
   runtimeLogRatePerSecond,
   runtimeLogWarnRatePerSecond,
   errorReportRatePerSecond,

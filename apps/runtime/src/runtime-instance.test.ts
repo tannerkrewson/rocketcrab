@@ -417,6 +417,22 @@ describe("RuntimeInstance protocol boundary", () => {
     );
   });
 
+  it("forwards shared files with transfer ownership only when the shell supports them", () => {
+    const bytes = new ArrayBuffer(5);
+    const payload = { requestId: "file-1", file: { bytes, mimeType: "text/plain" } };
+    const legacy = setup();
+    hook().report("files.put", payload);
+    expect(runtimeMessage(legacy.port, "game.apiCall")).toBeUndefined();
+
+    const { port } = setup({ bootstrap: bootstrapMessage({ sharedFiles: true }) });
+    const postMessage = vi.spyOn(port, "postMessage");
+    hook().report("files.put", payload);
+    expect(postMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "game.apiCall", method: "files.put", payload }),
+      [bytes],
+    );
+  });
+
   it("forwards validated Nova API calls to the host session router (U6)", () => {
     const { port } = setup();
     hook().report("ready", {});

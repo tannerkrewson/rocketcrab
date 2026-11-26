@@ -1,3 +1,4 @@
+import { referencedGameFiles } from "./game-files";
 import {
   REVISION_VOTES_LIMIT,
   type ObservedStateEnvelope,
@@ -318,6 +319,7 @@ export abstract class StateEngineElection extends StateEngineSnapshots {
       if (this.canonical === verifiedState && actual !== expectedHash) {
         const backup = this.restoreBackup;
         this.canonical = backup.canonical;
+        this.host.files?.updateRefs(referencedGameFiles(this.canonical));
         this.revision = backup.revision;
         this.stateHash = backup.stateHash;
         this.roster = backup.roster;

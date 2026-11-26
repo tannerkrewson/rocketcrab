@@ -143,6 +143,10 @@ export interface StateEngineHost {
   leaderId(): string | null;
   /** Each connected player's latest controls (a ticking game's input). */
   controls(): Readonly<Record<string, unknown>>;
+  files?: {
+    canCommit(refs: ReadonlySet<string>): boolean;
+    updateRefs(refs: Set<string>): void;
+  };
   /** Send one action ack to a member (targeted). */
   sendAck(targetMemberId: string, ack: NovaActionAck): void;
   /** Broadcast a state snapshot, or target one member. */

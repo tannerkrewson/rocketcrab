@@ -39,7 +39,7 @@ const REGISTRATION_TIMEOUT_MS = 10_000;
 
 /** A port we can drive from tests (real MessagePorts satisfy this). */
 export interface PortLike {
-  postMessage(message: unknown): void;
+  postMessage(message: unknown, transfer?: Transferable[]): void;
   close(): void;
   onmessage: ((event: MessageEvent) => void) | null;
   onmessageerror?: ((event: MessageEvent) => void) | null;
@@ -213,11 +213,11 @@ export class RuntimeInstance {
     // Inject identity before the bridge so window.nova.player is correct immediately.
     // JSON string escaping alone does not stop HTML's script end-tag parser.
     // Names are player-controlled and may contain </script>.
-    const identity = JSON.stringify({
-      memberId: this.bootstrap.player.memberId,
-      displayName: this.bootstrap.player.displayName,
+    const bootstrap = JSON.stringify({
+      player: this.bootstrap.player,
+      sharedFiles: this.bootstrap.sharedFiles,
     }).replace(/</g, "\\u003c");
-    return `<script>window.__novaBootstrap = { player: ${identity} };</script>\n<script>\n${NOVA_BRIDGE_SCRIPT}\n</script>\n${html}`;
+    return `<script>window.__novaBootstrap = ${bootstrap};</script>\n<script>\n${NOVA_BRIDGE_SCRIPT}\n</script>\n${html}`;
   }
 
   private armRegistrationTimer(): void {
@@ -300,6 +300,10 @@ export class RuntimeInstance {
       case "stateResponse":
         this.handleApiCall(kind, payload);
         break;
+      case "files.put":
+      case "files.get":
+        if (this.bootstrap.sharedFiles) this.handleApiCall(kind, payload);
+        break;
       case "error":
         this.handleGameError(payload);
         break;
@@ -361,7 +365,18 @@ export class RuntimeInstance {
       this.sendError("runtime", `nova.${method}() call failed validation; ignored.`);
       return;
     }
-    this.send(buildApiCallMessage(this.runtimeInstanceId, method, parsed.data, this.sessionId));
+    const message = buildApiCallMessage(
+      this.runtimeInstanceId,
+      method,
+      parsed.data,
+      this.sessionId,
+    );
+    if (method === "files.put") {
+      const { file } = novaApiCallSchemas["files.put"].parse(parsed.data);
+      this.send(message, [file.bytes]);
+    } else {
+      this.send(message);
+    }
   }
 
   /**
@@ -459,10 +474,10 @@ export class RuntimeInstance {
     this.errorSink.send({ category, message, details });
   }
 
-  private send(message: RuntimeMessage): void {
+  private send(message: RuntimeMessage, transfer: Transferable[] = []): void {
     if (this.destroyed && message.type !== "game.lifecycle") return;
     try {
-      this.port.postMessage(message);
+      this.port.postMessage(message, transfer);
     } catch (error) {
       // Surface clone/send failures so dispatch promises cannot wait forever.
       // Do not recurse if reporting the failure also fails.

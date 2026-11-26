@@ -64,6 +64,10 @@ export const NOVA_ERROR_CODES = {
   execution_failed: "execution_failed",
   /** A restored replicated state failed its hash check. */
   invalid_snapshot: "invalid_snapshot",
+  /** Shared file contents could not be fetched from the party. */
+  file_unavailable: "file_unavailable",
+  /** Adding a shared file would exceed the session's storage budget. */
+  file_storage_full: "file_storage_full",
 } as const;
 
 export type NovaErrorCode = (typeof NOVA_ERROR_CODES)[keyof typeof NOVA_ERROR_CODES];

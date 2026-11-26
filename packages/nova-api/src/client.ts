@@ -18,6 +18,10 @@
  */
 import {
   controlsBytes,
+  gameFileBytes,
+  gameFileRefSchema,
+  gameFilesMax,
+  gameFileTypeSchema,
   tickRateDefault,
   novaActionSchema,
   novaGameDeclarationSchema,
@@ -33,6 +37,7 @@ import type {
   NovaApi,
   NovaConnectionStatus,
   NovaGameDeclaration,
+  NovaFilesHandle,
   NovaPlayer,
   NovaStateHandle,
   NovaStateHandlers,
@@ -122,6 +127,10 @@ export interface NovaClientBackend {
   dispatch(action: NovaAction, actionId: string): Promise<void>;
   /** Replace this player's controls (a ticking game's input). */
   setControls(value: unknown): void;
+  files?: {
+    put(file: { bytes: ArrayBuffer; mimeType: string }): Promise<string>;
+    get(ref: string): Promise<{ bytes: ArrayBuffer; mimeType: string }>;
+  };
   /** Subscribe to inbound events. Returns an unsubscribe function. */
   onEvent(handler: (event: NovaSessionEvent) => void): () => void;
 }
@@ -165,6 +174,7 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
   let readySent = false;
   let started = false;
   let ended = false;
+  let disposed = false;
   let stateValue: unknown | null = null;
   /** The latest state received before start (delivered on the start event). */
   let bufferedState: { has: boolean; value: unknown } = { has: false, value: null };
@@ -284,6 +294,49 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
     onChange(handler) {
       return addHandler(stateHandlers, handler);
     },
+  };
+
+  let fileCalls = 0;
+  async function useFiles<T>(run: (files: NonNullable<NovaClientBackend["files"]>) => Promise<T>) {
+    let active = false;
+    try {
+      if (ended || disposed) throw new NovaError("ended", "This game session has ended.");
+      if (backend.files === undefined)
+        throw new NovaError("unsupported", "Shared files are unavailable in this build.");
+      if (fileCalls >= gameFilesMax)
+        throw new NovaError("rate_limited", "Too many shared file requests are pending.");
+      fileCalls++;
+      active = true;
+      return await run(backend.files);
+    } catch (cause) {
+      const error =
+        cause instanceof NovaError ? cause : new NovaError("file_unavailable", String(cause));
+      callSafely(errorHandlers, error);
+      throw error;
+    } finally {
+      if (active) fileCalls--;
+    }
+  }
+
+  const filesHandle: NovaFilesHandle = {
+    put: (blob) =>
+      useFiles(async (files) => {
+        if (!(blob instanceof Blob))
+          throw new NovaError("invalid_options", "nova.files.put() expects a Blob.");
+        if (blob.size > gameFileBytes)
+          throw new NovaError("payload_too_large", "Shared files can be at most 256 KiB.");
+        if (!gameFileTypeSchema.safeParse(blob.type).success)
+          throw new NovaError("invalid_options", "The shared file's MIME type is too long.");
+        return files.put({ bytes: await blob.arrayBuffer(), mimeType: blob.type });
+      }),
+    get: (ref) =>
+      useFiles(async (files) => {
+        if (!gameFileRefSchema.safeParse(ref).success)
+          throw new NovaError("invalid_options", "nova.files.get() expects a shared file ref.");
+        const { bytes, mimeType } = await files.get(ref);
+        return new Blob([bytes], { type: mimeType });
+      }),
+    url: async (ref) => URL.createObjectURL(await filesHandle.get(ref)),
   };
 
   const client: NovaClient = {
@@ -427,7 +480,9 @@ export function createNovaClient(backend: NovaClientBackend): NovaClient {
         backend.setControls(value);
       },
     },
+    files: filesHandle,
     dispose() {
+      disposed = true;
       unsubscribeEvents();
       joinHandlers.clear();
       leaveHandlers.clear();

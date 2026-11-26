@@ -1,4 +1,5 @@
 import { GameByteBudget } from "./game-byte-budget";
+import { GameFiles } from "./game-files";
 import type {
   NovaTransport,
   TransportConnectionState,
@@ -50,6 +51,7 @@ export abstract class SessionLifecycle implements NovaClientBackend {
 
   /** The game-facing API object bound to this session. */
   readonly client: NovaClient;
+  readonly files: GameFiles;
 
   /** The schema-validated registration the game declared (informational). */
   declaration: NovaGameDeclaration | null = null;
@@ -111,6 +113,12 @@ export abstract class SessionLifecycle implements NovaClientBackend {
       joinedAt: Date.now(),
       authorityEligible: true,
     };
+    this.files = new GameFiles(
+      this.transport,
+      this.game.gameId,
+      () => this.engine.getAuthorityMemberId(),
+      (bytes) => this.gameByteBudget.consume(bytes, (event) => this.emit(event)),
+    );
     this.client = createNovaClient(this);
     this.engine = new NovaStateEngine({
       host: this.buildEngineHost(),
@@ -347,6 +355,7 @@ export abstract class SessionLifecycle implements NovaClientBackend {
   end(reason: GameEndReason): void {
     if (this.ended) return;
     this.ended = true;
+    this.files.dispose();
     this.engine.endGame();
     void this.sendProtocol((base) => buildGameEndMessage(base, reason)).catch((error: unknown) =>
       this.emitError(error),
@@ -358,6 +367,7 @@ export abstract class SessionLifecycle implements NovaClientBackend {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.files.dispose();
     this.engine.dispose();
     if (this.controlsTimer !== null) clearTimeout(this.controlsTimer);
     for (const unsubscribe of this.transportUnsubscribers) {
@@ -390,6 +400,7 @@ export abstract class SessionLifecycle implements NovaClientBackend {
   }
 
   private wireTransport(): void {
+    this.files.attach();
     this.transportUnsubscribers.push(
       this.transport.on("connection:state", (state) => this.handleConnectionState(state)),
       this.transport.on("peer:joined", (peer) => this.handlePeerJoined(peer)),
