@@ -112,68 +112,6 @@ const setwithfriends: ExternalCatalogGame = {
   },
 };
 
-const drawphoneBase: Omit<ExternalCatalogGame, "id" | "name" | "play"> = {
-  author: "Tanner Krewson",
-  description: `In Drawphone, there are no winners... only losers! Players
-        take turns drawing pictures and guessing what those pictures are. If
-        you guess correctly, nothing happens! If you guess wrong or draw like a
-        toddler and ruin the chain of drawings and guesses, rest assured that
-        you will be mercilessly mocked for your honest mistake (which
-        ultimately doesn't even matter in the grand scheme of the world).
-
-        Drawphone was inspired by Evan Brumley's 2015 online Spyfall
-        implementation, Jackbox Games's Drawful, and Telestrations.`,
-  displayUrlHref: "https://drawphone.tannerkrewson.com/",
-  donationUrlText: "Buy Tanner a taco!",
-  donationUrlHref: "https://www.buymeacoffee.com/tannerkrewson",
-  guideUrl: "https://drawphone.tannerkrewson.com/how-to-play",
-  pictures: [
-    "https://i.imgur.com/tHPfWpp.png",
-    "https://i.imgur.com/EFQiuyd.png",
-    "https://i.imgur.com/14aDZKn.png",
-    "https://i.imgur.com/CwsMi5k.png",
-  ],
-  difficulty: "easy",
-  genres: ["drawing"],
-  players: "1+",
-  minPlayers: 1,
-  maxPlayers: Number.POSITIVE_INFINITY,
-};
-
-const drawphoneOrigins = origins(
-  "https://drawphone.tannerkrewson.com/",
-  "https://dpk.tannerkrewson.com",
-);
-
-const drawphone: ExternalCatalogGame = {
-  ...drawphoneBase,
-  id: "drawphone",
-  name: "Drawphone",
-  play: relayCodeGame({
-    frameOrigins: drawphoneOrigins,
-    endpoint: "drawphone-new",
-    base: "https://drawphone.tannerkrewson.com/",
-    param: "code",
-    label: "Drawphone",
-  }),
-};
-
-const drawphoneKids: ExternalCatalogGame = {
-  ...drawphoneBase,
-  id: "drawphone-kids",
-  name: "Drawphone for Kids",
-  description:
-    drawphoneBase.description +
-    "\n\nNOTE: Age-restricted word packs are removed from Drawphone for Kids. Players can still draw and guess unrestricted.",
-  play: relayCodeGame({
-    frameOrigins: drawphoneOrigins,
-    endpoint: "dpk-new",
-    base: "https://dpk.tannerkrewson.com/",
-    param: "code",
-    label: "Drawphone",
-  }),
-};
-
 const fishbowl: ExternalCatalogGame = {
   id: "fishbowl",
   name: "Fishbowl",
@@ -831,8 +769,6 @@ const werewolfnight: ExternalCatalogGame = {
 export const EXTERNAL_GAMES: readonly ExternalCatalogGame[] = [
   protobowl,
   setwithfriends,
-  drawphone,
-  drawphoneKids,
   fishbowl,
   justone,
   longwave,

@@ -19,13 +19,13 @@ describe("relayRequest", () => {
   it("POSTs the endpoint envelope to the same-origin room API and parses the JSON", async () => {
     const fetchMock = stubFetch(true, 200, { gameCode: "ABC123" });
 
-    expect(await relayRequest("drawphone-new")).toEqual({ gameCode: "ABC123" });
+    expect(await relayRequest("snakeout-new")).toEqual({ gameCode: "ABC123" });
     await relayRequest("netgamesio-new", { urlId: "avalon" });
     await relayRequest("ooc-rocketcrab", { body: { game: "story" } });
 
     expect(fetchMock.mock.calls[0]![0]).toBe("/api/relay");
     expect(fetchMock.mock.calls.map(([, init]) => JSON.parse(String(init?.body)))).toEqual([
-      { endpoint: "drawphone-new" },
+      { endpoint: "snakeout-new" },
       { endpoint: "netgamesio-new", urlId: "avalon" },
       { endpoint: "ooc-rocketcrab", body: { game: "story" } },
     ]);

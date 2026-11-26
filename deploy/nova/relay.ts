@@ -14,8 +14,6 @@ interface RelayEndpoint {
 }
 
 const RELAY_ENDPOINTS = {
-  "drawphone-new": { url: "https://drawphone.tannerkrewson.com/new", method: "POST" },
-  "dpk-new": { url: "https://dpk.tannerkrewson.com/new", method: "POST" },
   "netgamesio-new": { url: "https://netgames.io/games/{urlId}/new", method: "GET" },
   "ooc-rocketcrab": { url: "https://outofcontext.party/api/v1/rocketcrab", method: "POST" },
   "secret-hitler-netlify": {

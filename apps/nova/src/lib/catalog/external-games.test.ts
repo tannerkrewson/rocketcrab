@@ -9,6 +9,7 @@ import {
   displayUrlText,
   externalFrameUrl,
   findExternalGame,
+  findCatalogGame,
   playerCountText,
 } from ".";
 import { randomRoomId, rocketcrabUrl, roomField } from "./join-url";
@@ -22,13 +23,11 @@ function game(id: string) {
 }
 
 describe("external games data", () => {
-  it("lists every external game (22) with unique ids", () => {
-    expect(EXTERNAL_GAMES.length).toBe(22);
+  it("lists every external game (20) with unique ids", () => {
+    expect(EXTERNAL_GAMES.length).toBe(20);
     const ids = EXTERNAL_GAMES.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
-    expect(ids).toEqual(
-      expect.arrayContaining(["protobowl", "drawphone", "netgamesio-avalon", "ooc-story"]),
-    );
+    expect(ids).toEqual(expect.arrayContaining(["protobowl", "netgamesio-avalon", "ooc-story"]));
   });
 
   it("has complete metadata, valid URLs, and a difficulty for every game", () => {
@@ -46,14 +45,14 @@ describe("external games data", () => {
 
   it("derives link text from the website and the player count from limits", () => {
     expect(displayUrlText(game("qwiqwit"))).toBe("qwiqwit.com");
-    expect(displayUrlText(game("drawphone"))).toBe("drawphone.tannerkrewson.com");
+    expect(displayUrlText(findCatalogGame("drawphone")!)).toBe("drawphone.tannerkrewson.com");
     expect(playerCountText(game("werewolfnight"))).toBe("5-16");
     expect(playerCountText({ ...game("werewolfnight"), players: undefined })).toBe("5–16");
   });
 
   it("files games under difficulty and genre, with no provider category", () => {
     expect(BROWSE_CATEGORIES.map((category) => category.id)).not.toContain("netgamesio");
-    expect(categoriesOf(game("drawphone")).map((category) => category.id)).toEqual([
+    expect(categoriesOf(findCatalogGame("drawphone")!).map((category) => category.id)).toEqual([
       "easy",
       "drawing",
     ]);
@@ -64,7 +63,8 @@ describe("external games data", () => {
 
   it("collects unique frame, image, and connect origins for the CSP", () => {
     expect(new Set(EXTERNAL_FRAME_ORIGINS).size).toBe(EXTERNAL_FRAME_ORIGINS.length);
-    expect(EXTERNAL_FRAME_ORIGINS).toContain("https://dpk.tannerkrewson.com");
+    expect(EXTERNAL_FRAME_ORIGINS).not.toContain("https://dpk.tannerkrewson.com");
+    expect(CATALOG_CONNECT_ORIGINS).toContain("https://drawphone.tannerkrewson.com");
     expect(EXTERNAL_FRAME_ORIGINS).toContain("https://netgames.io");
     for (const entry of EXTERNAL_GAMES) {
       for (const url of entry.pictures ?? []) {
@@ -126,21 +126,18 @@ describe("external room creation", () => {
       "fetch",
       vi.fn(async () => ({ ok: false, status: 503 })),
     );
-    await expect(game("drawphone").play.createRoom()).rejects.toThrow(
+    await expect(game("snakeout").play.createRoom()).rejects.toThrow(
       /relay request failed \(HTTP 503\)/,
     );
   });
 
-  it("drawphone creates a code room through the relay and joins with ?code", async () => {
-    const fetchMock = relayReturning({ gameCode: "ABC123" });
-    const room = await game("drawphone").play.createRoom();
-    expect(room).toEqual({ code: "ABC123" });
-    expect(JSON.parse(String(fetchMock.mock.calls[0]![1]?.body))).toEqual({
-      endpoint: "drawphone-new",
+  it("lists Drawphone as a hosted Nova game", () => {
+    expect(findExternalGame("drawphone")).toBeUndefined();
+    expect(findCatalogGame("drawphone-kids")).toBeUndefined();
+    expect(findCatalogGame("drawphone")?.play).toEqual({
+      kind: "nova",
+      url: "https://drawphone.tannerkrewson.com/drawphone.html",
     });
-    expect(game("drawphone").play.joinUrl(room, MARY)).toBe(
-      "https://drawphone.tannerkrewson.com/?rocketcrab=true&name=Mary&ishost=false&code=ABC123",
-    );
   });
 
   it("outofcontext.party and netgames.io return URL rooms from the relay", async () => {
@@ -203,7 +200,7 @@ describe("join URLs", () => {
 
   it("fails clearly when a room is missing a field", () => {
     expect(() => roomField({}, "code")).toThrow("The game room is missing its code.");
-    expect(() => game("drawphone").play.joinUrl({}, MARY)).toThrow(/missing its code/);
+    expect(() => game("snakeout").play.joinUrl({}, MARY)).toThrow(/missing its code/);
   });
 
   it("refuses a room that points outside the game's site", () => {
