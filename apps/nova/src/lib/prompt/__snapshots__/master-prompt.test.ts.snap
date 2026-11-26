@@ -123,7 +123,11 @@ nova.defineGame({
 });
 
 // --- Lifecycle ---
-nova.ready(); // once, when your game has loaded
+try {
+  nova.ready(); // once, when your game has loaded
+} catch (error) {
+  if (error?.code !== "already_started") throw error;
+}
 nova.onStart(() => {
   // Dispatch resolves once applied, or rejects with { code, message }.
   nova.dispatch({ type: "playCard", payload: { card: "ace" } }).catch((error) => {
@@ -156,6 +160,11 @@ nova.onError((error) => {}); // { code, message }
 
 1. **\`nova.defineGame\` first, exactly once; \`nova.ready()\` once after
    loading.** The game starts when the party starts it; \`onStart\` tells you.
+   A reloaded frame in a running party can start before async setup finishes.
+   If \`ready()\` throws \`already_started\`, continue rendering and keep your
+   subscriptions. Render \`nova.state.get()\` on mount as well as subscribing
+   to \`nova.state.onChange\`; \`onStart\` may already have fired. Handle other
+   readiness errors normally. Test **Reload all** during an active round.
 2. **Dispatch only after \`onStart\`.** \`dispatch\` throws
    \`not_started\` before it and \`ended\` after \`onEnd\`. \`controls.set\` works
    any time.
