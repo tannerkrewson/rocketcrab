@@ -499,11 +499,14 @@ describe("/$code", () => {
 });
 
 describe("external-game links", () => {
-  it("/transfer/snakeout starts a party with Snakeout picked", async () => {
+  it("/transfer/werewolfnight starts a party with werewolf-night.com picked", async () => {
     updatePartyDisplayName("Ada");
-    const router = renderParty("/transfer/snakeout");
+    const router = renderParty("/transfer/werewolfnight");
     await waitFor(() =>
-      expect(stubEngine.selectGame).toHaveBeenCalledWith({ kind: "external", gameId: "snakeout" }),
+      expect(stubEngine.selectGame).toHaveBeenCalledWith({
+        kind: "external",
+        gameId: "werewolfnight",
+      }),
     );
     expect(stubEngine.createParty).toHaveBeenCalledWith();
     await waitFor(() => expect(router.state.location.href).toBe("/party"));

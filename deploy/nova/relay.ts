@@ -20,7 +20,6 @@ const RELAY_ENDPOINTS = {
     url: "https://inspiring-hugle-c583a0.netlify.app/.netlify/functions/secretHitler",
     method: "POST",
   },
-  "snakeout-new": { url: "https://snakeout.tannerkrewson.com/new", method: "POST" },
   "spyfall-new": { url: "https://spyfall.tannerkrewson.com/new", method: "POST" },
   "werewolf-newroom": { url: "https://werewolf.uber.space/newRoom", method: "POST" },
 } satisfies Record<string, RelayEndpoint>;

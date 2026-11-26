@@ -189,13 +189,16 @@ describe("/game/:gameId — saved games and party selection", () => {
 
   it("selects an external game for the active party", async () => {
     stubs.mode = "lobby";
-    const router = renderAt("/game/snakeout");
+    const router = renderAt("/game/werewolfnight");
 
     const select = await screen.findByRole("button", { name: /select game/i });
     await userEvent.click(select);
 
     await vi.waitFor(() =>
-      expect(stubEngine.selectGame).toHaveBeenCalledWith({ kind: "external", gameId: "snakeout" }),
+      expect(stubEngine.selectGame).toHaveBeenCalledWith({
+        kind: "external",
+        gameId: "werewolfnight",
+      }),
     );
     await vi.waitFor(() => expect(router.state.location.pathname).toBe("/party"));
   });
@@ -205,13 +208,13 @@ describe("/game/:gameId — saved games and party selection", () => {
     const notify = vi.spyOn(toast, "danger").mockImplementation(() => "");
     stubEngine.selectGame.mockRejectedValueOnce(new Error("The game service is unavailable."));
     try {
-      const router = renderAt("/game/snakeout?from=party-browse");
+      const router = renderAt("/game/werewolfnight?from=party-browse");
       const select = await screen.findByRole("button", { name: "Select game" });
       await userEvent.click(select);
       expect(notify).toHaveBeenCalledWith(
         "Couldn't select that game: The game service is unavailable.",
       );
-      expect(router.state.location.pathname).toBe("/game/snakeout");
+      expect(router.state.location.pathname).toBe("/game/werewolfnight");
       expect(select).toBeEnabled();
       expect(screen.getByRole("link", { name: "Back to category" })).toBeInTheDocument();
     } finally {
@@ -284,7 +287,7 @@ describe("/game/:gameId — saved games and party selection", () => {
   });
 
   it("offers a same-size primary Start-party CTA for external games outside a party", async () => {
-    renderAt("/game/snakeout");
+    renderAt("/game/werewolfnight");
 
     const start = await screen.findByRole("link", { name: "Start party" });
     expect(start.className).toContain("button--primary");

@@ -63,6 +63,42 @@ const tkSpyfall: NovaCatalogGame = {
   play: { kind: "nova", url: "https://www.tannerkrewson.com/spyfall/game.html" },
 };
 
+const traitors: NovaCatalogGame = {
+  id: "traitors",
+  name: "Traitors",
+  author: "Tanner Krewson",
+  basedOn: {
+    game: "The Resistance",
+    author: "Don Eskridge",
+    link: "https://indieboardsandcards.com/index.php/our-games/the-resistance/",
+    bggId: 41114,
+  },
+  description: `Some of you are traitors. Nobody knows who.
+
+        Traitors (formerly Snakeout) is a game in which a team of faithful
+        players is infiltrated by a group of traitors. The faithful must try
+        to figure out who the traitors are, and the traitors must try to keep
+        the faithful from figuring out their identity. Each mission's team is
+        voted on in the open, but missions are passed or sabotaged in secret.
+        The first team to win three of the five missions wins the game.`,
+  displayUrlHref: "https://www.tannerkrewson.com/traitors/",
+  donationUrlText: "Buy Tanner a taco!",
+  donationUrlHref: "https://www.buymeacoffee.com/tannerkrewson",
+  guideUrl: "https://www.tannerkrewson.com/traitors/how-to-play",
+  pictures: [
+    "https://www.tannerkrewson.com/traitors/screenshots/role.jpg",
+    "https://www.tannerkrewson.com/traitors/screenshots/captain.jpg",
+    "https://www.tannerkrewson.com/traitors/screenshots/vote.jpg",
+    "https://www.tannerkrewson.com/traitors/screenshots/results.jpg",
+  ],
+  difficulty: "medium",
+  genres: [],
+  players: "5-10",
+  minPlayers: 5,
+  maxPlayers: 10,
+  play: { kind: "nova", url: "https://www.tannerkrewson.com/traitors/game.html" },
+};
+
 /**
  * Hosted Nova games: one self-contained HTML file each, fetched by the host
  * when picked and shared with the party like any saved game. To port and
@@ -70,6 +106,7 @@ const tkSpyfall: NovaCatalogGame = {
  */
 export const NOVA_GAMES: readonly NovaCatalogGame[] = [
   tkSpyfall,
+  traitors,
   {
     ...drawphoneBase,
     id: "drawphone",

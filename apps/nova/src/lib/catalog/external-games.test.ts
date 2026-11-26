@@ -23,8 +23,8 @@ function game(id: string) {
 }
 
 describe("external games data", () => {
-  it("lists every external game (19) with unique ids", () => {
-    expect(EXTERNAL_GAMES.length).toBe(19);
+  it("lists every external game (18) with unique ids", () => {
+    expect(EXTERNAL_GAMES.length).toBe(18);
     const ids = EXTERNAL_GAMES.map((entry) => entry.id);
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids).toEqual(expect.arrayContaining(["protobowl", "netgamesio-avalon", "ooc-story"]));
@@ -126,7 +126,7 @@ describe("external room creation", () => {
       "fetch",
       vi.fn(async () => ({ ok: false, status: 503 })),
     );
-    await expect(game("snakeout").play.createRoom()).rejects.toThrow(
+    await expect(game("werewolfnight").play.createRoom()).rejects.toThrow(
       /relay request failed \(HTTP 503\)/,
     );
   });
@@ -137,6 +137,14 @@ describe("external room creation", () => {
     expect(findCatalogGame("drawphone")?.play).toEqual({
       kind: "nova",
       url: "https://drawphone.tannerkrewson.com/drawphone.html",
+    });
+  });
+
+  it("lists Traitors, formerly Snakeout, as a hosted Nova game", () => {
+    expect(findExternalGame("snakeout")).toBeUndefined();
+    expect(findCatalogGame("traitors")?.play).toEqual({
+      kind: "nova",
+      url: "https://www.tannerkrewson.com/traitors/game.html",
     });
   });
 
@@ -175,9 +183,6 @@ describe("external room creation", () => {
     expect(await join("werewolfnight")).toBe(
       "https://werewolf-night.com/game?rocketcrab=true&name=Al&ishost=true&roomId=XYZ9",
     );
-    expect(await join("snakeout")).toBe(
-      "https://snakeout.tannerkrewson.com/?rocketcrab=true&name=Al&ishost=true&code=XYZ9",
-    );
     expect(await join("secrethitler-duc")).toBe(
       "https://secret-hitler.com/?rocketcrab=true&name=Al&ishost=true&roomId=XYZ9",
     );
@@ -206,7 +211,7 @@ describe("join URLs", () => {
 
   it("fails clearly when a room is missing a field", () => {
     expect(() => roomField({}, "code")).toThrow("The game room is missing its code.");
-    expect(() => game("snakeout").play.joinUrl({}, MARY)).toThrow(/missing its code/);
+    expect(() => game("werewolfnight").play.joinUrl({}, MARY)).toThrow(/missing its code/);
   });
 
   it("refuses a room that points outside the game's site", () => {
