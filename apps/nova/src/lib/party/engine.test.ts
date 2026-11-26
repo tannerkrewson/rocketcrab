@@ -1822,6 +1822,53 @@ describe("party engine — M1 lifecycle: backgrounding, resume, and F11 rejoin",
   });
 });
 
+describe("party engine — joining a game in progress", () => {
+  /** Let the authority's heartbeat (real time, once a second) reach a new game session. */
+  async function untilPlaying(player: Player, world: World): Promise<void> {
+    for (let i = 0; i < 4 && player.engine.getState().phase !== "playing"; i += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      await settle(world);
+    }
+    expect(player.engine.getState().phase).toBe("playing");
+  }
+
+  it("a player who joins mid-game, or reloads mid-game, plays the running game", async () => {
+    const world = makeWorld();
+    const a = makePlayer(world, "a");
+    const b = makePlayer(world, "b");
+    const secret = await runCreate(a, world);
+    await registerLocalGame(a, world);
+    const { join, settled } = startJoin(b, world, secret);
+    await settled;
+    await join;
+    await settle(world);
+    await registerLocalGame(b, world);
+    a.engine.startGame();
+    await settle(world);
+    expect(b.engine.getState().phase).toBe("playing");
+
+    // A new session for the running game learns its authority from a heartbeat.
+    const late = makePlayer(world, "c");
+    const lateJoin = startJoin(late, world, secret);
+    await lateJoin.settled;
+    await lateJoin.join;
+    await settle(world);
+    await registerLocalGame(late, world);
+    await untilPlaying(late, world);
+
+    // b's page reloads: its old link is still up when the new page joins.
+    const reloaded = makePlayer(world, "reload", {
+      identity: { memberId: b.memberId, displayName: "b" },
+    });
+    const rejoin = startJoin(reloaded, world, secret);
+    await rejoin.settled;
+    await rejoin.join;
+    await settle(world);
+    await registerLocalGame(reloaded, world);
+    await untilPlaying(reloaded, world);
+  });
+});
+
 describe("party engine — M1 local recovery record", () => {
   it("persists a recovery record on create and clears it on a clean leave", async () => {
     const world = makeWorld();
@@ -3383,6 +3430,7 @@ describe("party engine — lifecycle cleanup", () => {
     const a = makePlayer(world, "a");
     const b = makePlayer(world, "b", { lifecycle: lifecycle.source });
     const secret = await runCreate(a, world);
+    await registerLocalGame(a, world);
     const { join, settled } = startJoin(b, world, secret);
     await settled;
     await join;

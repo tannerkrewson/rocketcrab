@@ -843,6 +843,7 @@ export class PartyEngine {
     this.state.clearGame();
     this.state.notices = [];
     this.state.removedMemberIds.clear();
+    this.state.recoveryWithOthers = false;
     this.state.peerLink.clear();
     this.state.lastError = this.state.teardownFailed ? UNSAFE_TEARDOWN_MESSAGE : null;
     this.state.lastSetup = null;
@@ -1144,10 +1145,13 @@ export class PartyEngine {
     if (party === null) {
       return;
     }
+    // Never cleared by a leave: this tab's own unload can look like everyone leaving.
+    this.state.recoveryWithOthers ||= party.members.length > 1;
     savePartyRecovery({
       role: party.role,
       secret: party.secret,
       displayName: this.state.identity.displayName,
+      withOthers: this.state.recoveryWithOthers,
       game:
         this.state.game === null
           ? null
@@ -1467,6 +1471,7 @@ export class PartyEngine {
     switch (event.type) {
       case "memberJoined":
         this.dropLeftNotice(event.displayName);
+        if (!this.state.recoveryWithOthers) this.saveRecovery();
         this.emit();
         break;
       case "memberLeft":

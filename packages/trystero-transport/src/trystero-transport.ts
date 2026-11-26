@@ -925,11 +925,13 @@ export class TrysteroTransport implements NovaTransport {
         );
         return;
       }
-      if (
-        userId === this.selfMemberId ||
-        [...this.identityByPeerId.values()].some((peer) => peer.memberId === userId) ||
-        this.connectionToPeerId.has(identity.connectionId)
-      ) {
+      // Trystero names this peer as the user's current connection (checked
+      // above), so an older one for the same verified user is stale: a reload
+      // or a new tab. It leaves now instead of after its link times out.
+      for (const [otherPeerId, other] of this.identityByPeerId) {
+        if (otherPeerId !== peerId && other.memberId === userId) this.handlePeerLeave(otherPeerId);
+      }
+      if (userId === this.selfMemberId || this.connectionToPeerId.has(identity.connectionId)) {
         rejectIdentity(peerId, false);
         return;
       }

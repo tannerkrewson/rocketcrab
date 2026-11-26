@@ -13,6 +13,7 @@ import { primeChallenge } from "../lib/party/turnstile";
 import { usePartyEngine } from "../lib/party/use-party";
 import { takePartySource } from "../lib/party/source-handoff";
 import { getSavedPlayerName } from "../lib/party/identity";
+import { partyToRejoinAfterReload } from "../lib/party/party-recovery";
 import {
   importInviteFromLocation,
   invitePending,
@@ -80,6 +81,12 @@ function PartyPage() {
       return;
     }
     const gameId = search.gameId;
+    const reloaded = gameId === undefined ? partyToRejoinAfterReload() : null;
+    if (reloaded !== null) {
+      startedRef.current = true;
+      void engine.joinByInvite({ secret: reloaded.secret });
+      return;
+    }
     if (gameId === undefined) {
       startedRef.current = true;
       const savedName = getSavedPlayerName();

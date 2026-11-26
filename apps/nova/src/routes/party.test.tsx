@@ -170,7 +170,15 @@ function renderParty(entry: string) {
 
 const SAVED_HTML = "<!doctype html><html><body><p>rockets</p></body></html>";
 
+/** Make the next page load look like a reload of this tab. */
+function reloadNavigation(): void {
+  vi.spyOn(performance, "getEntriesByType").mockReturnValue([
+    { type: "reload" } as PerformanceNavigationTiming,
+  ]);
+}
+
 beforeEach(async () => {
+  vi.mocked(performance.getEntriesByType).mockRestore?.();
   vi.clearAllMocks();
   stubs.started = false;
   stubs.state = null;
@@ -270,6 +278,7 @@ describe("/party", () => {
       secret,
       displayName: "Player A",
       game: { gameId: "game-1", title: "Rocket Rumble" },
+      withOthers: true,
     });
     renderParty("/party");
     expect(await screen.findByTestId("party-resume-banner")).toBeInTheDocument();
@@ -278,12 +287,44 @@ describe("/party", () => {
     await waitFor(() => expect(stubEngine.joinByInvite).toHaveBeenCalledWith({ secret }));
   });
 
+  it("returns a reloaded tab to its party when anyone else was in it", async () => {
+    updatePartyDisplayName("Ada");
+    const secret = "D".repeat(43);
+    savePartyRecovery({
+      role: "creator",
+      secret,
+      displayName: "Ada",
+      game: null,
+      withOthers: true,
+    });
+    reloadNavigation();
+    renderParty("/party");
+    await waitFor(() => expect(stubEngine.joinByInvite).toHaveBeenCalledWith({ secret }));
+    expect(stubEngine.createParty).not.toHaveBeenCalled();
+  });
+
+  it("starts a new party on reload when nobody else had joined", async () => {
+    updatePartyDisplayName("Ada");
+    savePartyRecovery({
+      role: "creator",
+      secret: "F".repeat(43),
+      displayName: "Ada",
+      game: null,
+      withOthers: false,
+    });
+    reloadNavigation();
+    renderParty("/party");
+    await waitFor(() => expect(stubEngine.createParty).toHaveBeenCalledTimes(1));
+    expect(stubEngine.joinByInvite).not.toHaveBeenCalled();
+  });
+
   it("dismissing the resume banner clears the recovery record", async () => {
     savePartyRecovery({
       role: "joiner",
       secret: "C".repeat(43),
       displayName: "Player A",
       game: null,
+      withOthers: false,
     });
     renderParty("/party");
     fireEvent.click(await screen.findByRole("button", { name: /not now/i }));

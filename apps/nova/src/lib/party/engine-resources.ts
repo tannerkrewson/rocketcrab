@@ -72,6 +72,8 @@ export class PartyResources extends PartyEngineModel {
   readonly removedMemberIds = new Set<MemberId>();
 
   party: PartySession | null = null;
+  /** Someone else has joined this party (recorded for reload rejoin). */
+  recoveryWithOthers = false;
   signalingOutageVisible = false;
   readonly signalingOutage: SignalingOutage;
   readonly partyCode: PartyCodeLease;

@@ -992,7 +992,7 @@ describe("TrysteroTransport peer mapping", () => {
     expect(adapter.peers[0]!.memberId).toBe("member-b");
   });
 
-  it("keeps the first connection for a verified user ID and ignores claimed member IDs", async () => {
+  it("replaces an older connection for a verified user ID and ignores claimed member IDs", async () => {
     const onJoinError = vi.fn();
     const { adapter, clock } = setup({ onJoinError });
     const room = makeFakeRoom();
@@ -1011,9 +1011,14 @@ describe("TrysteroTransport peer mapping", () => {
       memberId: "member-c",
       connectionId: "conn-c",
     };
+    // Trystero now names peer-2 as member-b's connection (a reload): peer-1 is stale.
     room.joinHandler!({ peerId: "peer-2", userId: "member-b" });
-    expect(adapter.peers.map((peer) => peer.memberId)).toEqual(["member-b"]);
-    expect(onJoinError).toHaveBeenCalledWith(expect.objectContaining({ category: "rejected" }));
+    room.acknowledgement.onMessage!({ connectionId: mocks.selfId }, { peerId: "peer-2" });
+    await flushSetup();
+    expect(adapter.peers.map((peer) => [peer.memberId, peer.connectionId])).toEqual([
+      ["member-b", "conn-c"],
+    ]);
+    expect(onJoinError).not.toHaveBeenCalled();
 
     room.peers["peer-3"] = { userId: "member-d" };
     room.metas["member-d"] = { peerId: "peer-3", userId: "member-d", online: true };

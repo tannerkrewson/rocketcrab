@@ -18,6 +18,8 @@ export interface PartyRecoveryRecord {
     readonly gameId: string;
     readonly title: string;
   } | null;
+  /** Someone else was in the party, so a reload rejoins it instead of starting a new one. */
+  readonly withOthers: boolean;
 }
 
 export type PartyRecoveryInput = Omit<PartyRecoveryRecord, "version" | "savedAt">;
@@ -59,6 +61,20 @@ export function readPartyRecovery(now: () => number = Date.now): PartyRecoveryRe
   } catch {
     return null;
   }
+}
+
+/**
+ * The party this tab was in when it was reloaded, if anyone else was in it:
+ * a reload returns to the party (and the same game seat) instead of starting
+ * a new one.
+ */
+export function partyToRejoinAfterReload(): PartyRecoveryRecord | null {
+  const navigation = globalThis.performance?.getEntriesByType?.("navigation")[0] as
+    | PerformanceNavigationTiming
+    | undefined;
+  if (navigation?.type !== "reload") return null;
+  const record = readPartyRecovery();
+  return record?.withOthers === true ? record : null;
 }
 
 export function clearPartyRecovery(): void {
@@ -110,5 +126,6 @@ export function parsePartyRecovery(raw: string): PartyRecoveryRecord | null {
     secret: record.secret,
     displayName: record.displayName,
     game,
+    withOthers: record.withOthers === true,
   };
 }

@@ -16,6 +16,15 @@
 - As you work through the codebase, stay alert for issues, concerns, or insights you uncover, even if unrelated to the current task. Record anything worth revisiting in the PLAN and bring it to the user's attention at the end of the conversation.
 - Ensure that items in the plan are comprehensive enough to be built by an AI without needing context that only existed when the plan was written. But, don't add obvious and unnecessary language to the plan either; keep it succinct.
 
+## Compatibility
+
+- Nova is in production and people's own games run on it: keep the game API
+  additive (optional handlers and fields; existing behavior unchanged). A
+  breaking change needs a new `apiVersion` that keeps the old behavior.
+- Parties mix builds during a deploy, and the runtime deploys before the app:
+  new peer-message fields must be optional, and old shells and frames must
+  ignore what they don't understand.
+
 ## Testing
 
 - Avoid running test suites that are slow. Prefer to run slow tests when they provide good "value" for the time spent, ie. running the individual e2e tests relevant to the change.

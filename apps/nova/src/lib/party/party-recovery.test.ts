@@ -19,6 +19,7 @@ function input(overrides: Partial<PartyRecoveryInput> = {}): PartyRecoveryInput 
     secret: SECRET,
     displayName: "Player A",
     game: { gameId: "game-1", title: "Rocket Rumble" },
+    withOthers: false,
     ...overrides,
   };
 }

@@ -76,6 +76,17 @@ export abstract class StateEngineElection extends StateEngineSnapshots {
     if (!this.acceptsAuthorityClaim(message.term, message.authorityMemberId)) return;
     if (this.adoptHigherTerm(message.term, message.authorityMemberId, message.stateRevision)) {
       this.lastHeartbeatAt = this.now();
+    } else if (
+      this.authorityMemberId === null &&
+      this.election === null &&
+      message.authorityMemberId !== this.selfMemberId
+    ) {
+      // A shell that has not seen this term's authority (a session created
+      // after the game started, such as a player joining or reloading
+      // mid-game) adopts it here and catches up below.
+      this.adoptTerm(message.term, message.authorityMemberId);
+      this.authorityStateRevision = Math.max(this.authorityStateRevision, message.stateRevision);
+      this.lastHeartbeatAt = this.now();
     } else if (message.authorityMemberId === this.authorityMemberId) {
       this.authorityStateRevision = Math.max(this.authorityStateRevision, message.stateRevision);
       this.lastHeartbeatAt = this.now();

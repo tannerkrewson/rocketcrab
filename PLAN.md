@@ -25,18 +25,6 @@ churn on upgrade), and need no paid always-on server.
       loads, and parties work without analytics or Turnstile.
 - [ ] Watch a Clarity recording of a party from an eligible region and
       confirm names, game titles and the invite QR code are masked.
-- [ ] Game API additions. Nova is in production and people's saved games
-      run on it, so every change must be additive: optional handlers and
-      fields that existing `apiVersion: 1` games never see, existing
-      `context.players`/`onPlayerJoin`/`onPlayerLeave` behavior unchanged,
-      and no new peer message or history entry that an older shell in the same
-      party rejects or fails to replay (gate on what peers support, or keep
-      the wire format). A breaking change needs `apiVersion: 2` with v1
-      behavior kept. Update `nova-api-reference.md` (and the master prompt
-      snapshot) with each addition.
-  - Player ids already survive reloads (Trystero's persistent `userId`);
-    add an e2e that reloads a player mid-game and checks the same id comes
-    back and `playerLeft` never runs for them.
 - [ ] `packages/nova-api/src/examples.ts` says its strings are the examples in
       `nova-api-reference.md`, but they have drifted (different games, no
       `apiVersion`). Run the reference's own code blocks against the API in a
@@ -104,6 +92,12 @@ the README for local devices.
 
 ## Known limits
 
+- One browser profile has one party identity (Trystero's `userId`). A second
+  tab joining the same party takes over that player's seat from the first,
+  which stops hearing from the party.
+- A reloaded tab rejoins its party when anyone else had joined it. A creator
+  whose friends have all left gets the "couldn't reach the party" error after
+  the 15 s peer wait instead of a fresh party.
 - Signaling allows 128 concurrent sockets per room. Games can set smaller
   player limits. Local browser runs reached 50 players.
 - Peer-link messages are generic ("Connecting to a player…"): Trystero
