@@ -23,7 +23,7 @@ export default defineConfig({
   expect: { timeout: 15_000 },
   use: {
     baseURL: "http://localhost:2722",
-    trace: "on-first-retry",
+    trace: "retain-on-failure",
     navigationTimeout: 30_000,
   },
   // Error and outage handling is app logic over the same signaling socket,
@@ -47,6 +47,7 @@ export default defineConfig({
   workers: 3,
   webServer: {
     command: "npm run dev",
+    env: { VITE_NOVA_LOCAL_ICE: "1" },
     url: "http://localhost:2722",
     reuseExistingServer: !process.env.CI,
     timeout: 120_000,

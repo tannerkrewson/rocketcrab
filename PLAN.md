@@ -48,9 +48,11 @@ beside the state. No server stores them.
    time by state size; fetch time and memory by total file bytes. Then:
    - The state limit is the largest state that meets the commit and resend
      budgets.
-   - An action carries an intent, never content, so its payload limit is
-     what fits one message below `messageBytesBeforeChunking` with the
-     envelope, not a separate number.
+   - Fit an action and its envelope in one Trystero inline action frame.
+     The pinned 0.27 transport uses a 16 KiB inline frame budget including
+     framing and metadata. The unused Nova `messageBytesBeforeChunking`
+     constant is 64 KiB and does not control this. Keep the 16 KiB payload
+     cap for API v1, where a full-size action can already be chunked.
    - The per-file and per-session file limits come from memory on the
      weakest phone (every device holds every referenced file) and the
      late-join fetch budget. The byte bucket must admit one maximum-size
@@ -148,13 +150,13 @@ the README for local devices.
 
 ## Maintenance
 
-- CI's Playwright job fails on GitHub runners although every test passes
-  locally, so it doesn't gate deploys. On 2026-11-25: Chromium's
-  `signaling-outage.spec.ts` never shows the outage warning, Firefox peers
-  never connect (`party-lobby`, both `party-tunnel` tests stay at one
-  member), WebKit's 3-player tunnel game and `game-detail` arrow scroll
-  fail. Make them pass on CI (likely runner networking for WebRTC and the
-  `routeWebSocket` block), then add `e2e` to the deploy job's `needs`.
+- Verify Playwright on GitHub Actions before adding `e2e` to deploy's
+  `needs`. The 2026-11-26 main run (45840178627) left Firefox parties at
+  one member, missed Chromium's signaling warning, and interrupted
+  WebKit's party reload setup. The same runner configuration needs a fresh
+  run with host-only ICE in the local test stack, a rejected signaling
+  upgrade, and one-navigation game seeding. Failed cases now retain traces,
+  including the party specs with retries disabled.
 - On a real iPhone, scroll a long page (home with "Get the app", the lobby)
   to the bottom and confirm the animated background reaches the bottom edge.
   It used to stop short with a hard edge into black; the fixed background

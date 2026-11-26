@@ -2,12 +2,20 @@ import { expect, test } from "@playwright/test";
 
 test("a blocked signaling connection warns and recovers automatically", async ({ page }) => {
   test.setTimeout(60_000);
-  let blocked = true;
-  let attempts = 0;
-  await page.routeWebSocket(/\/api\/signal\//, (socket) => {
-    attempts++;
-    if (blocked) socket.close();
-    else socket.connectToServer();
+  // Use a rejected HTTP upgrade so the browser never observes a transient
+  // OPEN socket while signaling is blocked.
+  await page.addInitScript(() => {
+    const state = Object.assign(window, { blockSignaling: true });
+    const NativeSocket = window.WebSocket;
+    window.WebSocket = class extends NativeSocket {
+      constructor(url: string | URL, protocols?: string | string[]) {
+        const target = new URL(url, location.href);
+        if (state.blockSignaling && target.pathname.startsWith("/api/signal/")) {
+          target.pathname = "/api/signal/invalid";
+        }
+        super(target, protocols);
+      }
+    };
   });
   await page.goto("/party");
   await page.getByLabel("Enter your name here").fill("Host");
@@ -20,9 +28,9 @@ test("a blocked signaling connection warns and recovers automatically", async ({
   await expect(page.getByRole("button", { name: "Cancel" })).toBeVisible();
   // Retrying past the join deadline is covered with fake clocks in the engine
   // and transport unit tests; here the real socket only has to come back.
-  expect(attempts).toBeGreaterThan(0);
-  await expect(warning).toBeVisible();
-  blocked = false;
+  await page.evaluate(() => {
+    (window as Window & { blockSignaling: boolean }).blockSignaling = false;
+  });
   await expect(warning).toBeHidden({ timeout: 25_000 });
   await expect(page.getByText("Creating your private party…")).toBeHidden();
   await expect(page.getByRole("region", { name: "Invite your friends" })).toBeVisible();

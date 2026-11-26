@@ -15,6 +15,7 @@ import {
   expectPlayViewOnAll,
   recordConsole,
   recordCopiedInvites,
+  seedPartySource,
   seedPlayerName,
 } from "./party-debug";
 import { findRuntimeFrame } from "./runtime-helpers";
@@ -93,15 +94,7 @@ test("a player who reloads mid-game keeps their id and seat", async ({ browser }
   recordConsole(host, "host");
   recordConsole(joiner, "joiner");
   try {
-    await host.goto("/");
-    await host.evaluate(
-      ([gameId, source]) =>
-        sessionStorage.setItem(
-          "nova:party-source:v1",
-          JSON.stringify({ gameId, source, updatedAt: Date.now() }),
-        ),
-      [GAME_ID, SEATS_HTML] as const,
-    );
+    await seedPartySource(host, GAME_ID, SEATS_HTML);
     await host.goto(`/party?gameId=${GAME_ID}&title=Seats`);
     await expect(host.getByRole("button", { name: "Copy URL" })).toBeEnabled({ timeout: 120_000 });
     await host.getByRole("button", { name: "Copy URL" }).click();

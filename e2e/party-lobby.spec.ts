@@ -8,6 +8,7 @@ import {
   expectPlayViewOnAll,
   recordConsole,
   recordCopiedInvites,
+  seedPartySource,
   seedPlayerName,
 } from "./party-debug";
 import { NOVA_QUIZ_HTML } from "./quiz-frame-helpers";
@@ -42,15 +43,7 @@ test("three players reach the lobby and start the game on every browser", async 
   players.forEach((player, index) => recordConsole(player.page, labels[index]!));
   const pages = [host, joiner, third].map((page, index) => ({ page, label: labels[index]! }));
   try {
-    await host.goto("/");
-    await host.evaluate(
-      ([gameId, source]) =>
-        sessionStorage.setItem(
-          "nova:party-source:v1",
-          JSON.stringify({ gameId, source, updatedAt: Date.now() }),
-        ),
-      [GAME_ID, NOVA_QUIZ_HTML] as const,
-    );
+    await seedPartySource(host, GAME_ID, NOVA_QUIZ_HTML);
     await host.goto(`/party?gameId=${GAME_ID}&title=Lobby%20Quiz`);
 
     await expect(host.getByRole("button", { name: "Copy URL" })).toBeEnabled({ timeout: 120_000 });

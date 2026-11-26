@@ -1,3 +1,4 @@
+import { fileURLToPath } from "node:url";
 import { expect, test } from "@playwright/test";
 
 /**
@@ -30,6 +31,8 @@ test("screenshot row keeps a sane width as assets load and on resize", async ({ 
 });
 
 test("arrow buttons scroll the screenshot row on wide screens", async ({ page }) => {
+  const image = fileURLToPath(new URL("../apps/nova/public/icon-512.png", import.meta.url));
+  await page.route("https://i.imgur.com/*.png", (route) => route.fulfill({ path: image }));
   await page.setViewportSize({ width: 1280, height: 800 });
   await page.goto("/game/drawphone");
   const row = page.getByTestId("screenshot-row");

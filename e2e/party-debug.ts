@@ -22,6 +22,20 @@ export async function seedPlayerName(context: BrowserContext, name: string): Pro
   }, name);
 }
 
+/** Seed the editor handoff before the party route boots. */
+export async function seedPartySource(page: Page, gameId: string, source: string): Promise<void> {
+  await page.addInitScript(
+    ([id, html]) => {
+      if (new URLSearchParams(location.search).get("gameId") !== id) return;
+      sessionStorage.setItem(
+        "nova:party-source:v1",
+        JSON.stringify({ gameId: id, source: html, updatedAt: Date.now() }),
+      );
+    },
+    [gameId, source] as const,
+  );
+}
+
 /**
  * Record the invite each page copies, instead of reading the clipboard:
  * Firefox and WebKit do not grant clipboard permissions in Playwright. A page

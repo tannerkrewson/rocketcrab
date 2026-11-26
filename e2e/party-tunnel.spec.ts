@@ -17,6 +17,7 @@ import {
   expectPlayViewOnAll,
   recordConsole,
   recordCopiedInvites,
+  seedPartySource,
   seedPlayerName,
 } from "./party-debug";
 import { clickInGame, gameState, NOVA_QUIZ_HTML, waitForGameState } from "./quiz-frame-helpers";
@@ -187,15 +188,7 @@ test("a 3-player party with one tunnelled player plays a state-mode game", async
   try {
     // Host starts a party with the sample game; the source is handed over
     // through sessionStorage exactly as the editor does it.
-    await host.page.goto("/");
-    await host.page.evaluate(
-      ([gameId, source]) =>
-        sessionStorage.setItem(
-          "nova:party-source:v1",
-          JSON.stringify({ gameId, source, updatedAt: Date.now() }),
-        ),
-      [GAME_ID, NOVA_QUIZ_HTML] as const,
-    );
+    await seedPartySource(host.page, GAME_ID, NOVA_QUIZ_HTML);
     await host.page.goto(`/party?gameId=${GAME_ID}&title=Nova%20Quiz`);
 
     await expect(host.page.getByRole("button", { name: "Copy URL" })).toBeEnabled({

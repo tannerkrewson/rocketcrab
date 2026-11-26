@@ -60,6 +60,11 @@ export function createTrysteroPartyTransportFactory(
       ...("password" in identity ? { password: identity.password } : {}),
       partySecret: identity.secret,
       forceRelayOnlyNoServers: forceTunnelForTests(),
+      // Browser tests run both peers on one machine. Gather host candidates
+      // without waiting for public STUN servers on the CI runner's network.
+      ...(import.meta.env.DEV && import.meta.env.VITE_NOVA_LOCAL_ICE === "1"
+        ? { rtcConfig: { iceServers: [] } }
+        : {}),
       ...(turnConfig !== undefined ? { turnConfig } : {}),
       ...(onJoinError !== undefined ? { onJoinError } : {}),
       ...(onTunnel !== undefined ? { onTunnel } : {}),
