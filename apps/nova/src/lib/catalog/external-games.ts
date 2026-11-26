@@ -1,6 +1,6 @@
 import type { ExternalCatalogGame, ExternalPlay } from "./types";
-import { relayRequest, type RelayEndpointKey } from "./relay";
-import { joinRoomUrl, postJson, randomRoomId, rocketcrabUrl, roomField } from "./join-url";
+import { relayRequest, type RelayEndpointKey } from "./relay.ts";
+import { joinRoomUrl, postJson, randomRoomId, rocketcrabUrl, roomField } from "./join-url.ts";
 
 /**
  * External games: each runs on its own server. Room creation runs in the

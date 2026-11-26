@@ -159,8 +159,6 @@ the README for local devices.
   member), WebKit's 3-player tunnel game and `game-detail` arrow scroll
   fail. Make them pass on CI (likely runner networking for WebRTC and the
   `routeWebSocket` block), then add `e2e` to the deploy job's `needs`.
-- Make Nova's Vite config import graph compatible with the native config loader
-  before upgrading to a Vite release that defaults to it.
 - On a real iPhone, scroll a long page (home with "Get the app", the lobby)
   to the bottom and confirm the animated background reaches the bottom edge.
   It used to stop short with a hard edge into black; the fixed background

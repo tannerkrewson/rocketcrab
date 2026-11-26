@@ -1,13 +1,13 @@
 /** The built-in game list: external games plus hosted Nova games. */
-import { EXTERNAL_GAMES } from "./external-games";
-import { NOVA_GAMES } from "./nova-games";
+import { EXTERNAL_GAMES } from "./external-games.ts";
+import { NOVA_GAMES } from "./nova-games.ts";
 import type { CatalogGame, ExternalCatalogGame, GameListing } from "./types";
-import { formatPlayerRange } from "../party/player-limits";
+import { formatPlayerRange } from "../party/player-limits.ts";
 
 export type * from "./types";
-export { joinRoomUrl, randomRoomId, rocketcrabUrl, roomField } from "./join-url";
-export { EXTERNAL_GAMES } from "./external-games";
-export { NOVA_GAMES } from "./nova-games";
+export { joinRoomUrl, randomRoomId, rocketcrabUrl, roomField } from "./join-url.ts";
+export { EXTERNAL_GAMES } from "./external-games.ts";
+export { NOVA_GAMES } from "./nova-games.ts";
 
 export const CATALOG_GAMES: readonly CatalogGame[] = [...EXTERNAL_GAMES, ...NOVA_GAMES];
 

@@ -10,7 +10,7 @@ import {
   CATALOG_CONNECT_ORIGINS,
   CATALOG_IMAGE_ORIGINS,
   EXTERNAL_FRAME_ORIGINS,
-} from "./src/lib/catalog";
+} from "./src/lib/catalog/index.ts";
 
 // Local HTTPS dev certs (scripts/gen-certs.mjs). `npm run dev:https` starts
 // the dev server with `--mode https`; the server uses HTTPS only then, so
