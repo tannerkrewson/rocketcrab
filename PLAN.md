@@ -47,14 +47,8 @@ the README for local devices.
       tunnel. Note whether that network blocks `*.workers.dev`, which hosts
       the production runtime (Nova-made games).
 - [ ] Four mixed devices; a phone leaves and rejoins.
-- [ ] A 2 MiB game source over cellular and over the tunnel.
-- [ ] Validate Nova's state and shared-file budgets on the weakest supported
-      phone over cellular TURN and the tunnel. Measure commit cost, snapshot
-      resend, file fetch time and peak memory on reload and late join. The
-      initial shared-file caps are 256 KiB per file and 1 MiB per session.
-      Keep API v1 state and action limits if measurements call for smaller
-      limits in a future API version. For an inline action in Trystero 0.27,
-      budget 16 KiB including framing and metadata.
+- [ ] A 2 MiB game source, and a reload into a game holding 2 MiB of shared
+      files, over cellular and over the tunnel.
 - [ ] iPhone Safari backgrounded for 1–3 minutes recovers; a locked phone
       and a tab switch recover too.
 - [ ] Exiting a broken game on iPhone returns to a usable lobby.
