@@ -33,6 +33,86 @@ churn on upgrade), and need no paid always-on server.
       runtime frame's sandbox allows both. Check on real devices and correct
       the reference or the sandbox.
 
+## Shared files for games
+
+Canonical state is serialized on every commit and resent whole on late
+join, reload, resync and authority handover, so it is the wrong home for
+large, write-once data like pictures or recordings. Today a game has nowhere
+else to put it, and no single state limit suits both that and a ticking
+game. Add immutable, content-addressed files that travel peer to peer
+beside the state. No server stores them.
+
+1. **Measure first; derive limits from budgets.** None of the current byte
+   limits in `packages/protocol/src/limits.ts` (state, action payload, the
+   per-player byte bucket in `game-byte-budget.ts`) comes from a stated
+   budget. Choose the budgets: the weakest supported phone, the slowest
+   supported link (cellular over TURN and over the tunnel) and how long a
+   reload or late join may take. Measure on those devices and links:
+   commit cost (serialize, delta, frame round trip) and full-snapshot resend
+   time by state size; fetch time and memory by total file bytes. Then:
+   - The state limit is the largest state that meets the commit and resend
+     budgets.
+   - An action carries an intent, never content, so its payload limit is
+     what fits one message below `messageBytesBeforeChunking` with the
+     envelope, not a separate number.
+   - The per-file and per-session file limits come from memory on the
+     weakest phone (every device holds every referenced file) and the
+     late-join fetch budget. The byte bucket must admit one maximum-size
+     file.
+
+   Write each budget beside its limit in `limits.ts`, and add tests that
+   check the limits stay within the budgets where that's measurable in CI.
+   If a measured limit is lower than today's, keep the old limit for
+   `apiVersion: 1` games (see Compatibility in `AGENTS.md`).
+
+2. **API (additive):**
+   - `nova.files.put(blob) → Promise<ref>` resolves once the authority holds
+     the bytes.
+   - `nova.files.get(ref) → Promise<Blob>` and `nova.files.url(ref) →
+     Promise<string>` (an object URL) wait for the local copy, and reject
+     with a visible `NovaError` if it can't be fetched.
+   - A ref is the string `nova-file:<sha256 hex>` of the bytes. Games store
+     refs in state through ordinary actions.
+   - Add `files` to `NOVA_API_SURFACE` and the contract suite.
+3. **Transfer:**
+   - Reuse the transport's binary request channel and checks that already
+     serve game HTML by `sourceSha256` (`packages/party/src/game-source.ts`).
+   - Every receiver checks the SHA-256 (`crypto.subtle`). Uploads are
+     charged to the sender's byte budget.
+   - The frame passes the bytes to the shell as a transferred `ArrayBuffer`,
+     and the shell hashes and sends them.
+4. **Lifecycle (state decides which files exist):**
+   - The engine finds refs by scanning the canonical state for the
+     `nova-file:` prefix.
+   - The authority keeps an upload unreferenced for `actionTimeoutMs`, then
+     drops it.
+   - A commit whose state references a file the authority doesn't hold
+     fails with a `stateError`. The canonical state never references a
+     missing file.
+   - On each snapshot, every device fetches the referenced files it lacks,
+     from the authority first and then any other peer, and drops files no
+     longer referenced.
+   - Late joiners, reloads and a new authority fetch the same way. A new
+     authority serves what it has, and its peers fetch the rest from
+     others.
+5. **Every executor:**
+   - Party sessions, the editor arena (one in-memory store shared by its
+     players) and `LocalGameExecutor` tests.
+   - Older shells in a mixed party neither serve nor fetch files; their
+     `nova.files.url` rejects visibly and other peers serve the files
+     instead.
+6. **Docs:**
+   - In `nova-api-reference.md`, add the API, the limits, and one rule:
+     pictures, audio and other large write-once data go in files, and state
+     holds their refs.
+   - Note in Known limits that files, like canonical state, reach every
+     peer.
+7. **Tests:**
+   - Unit: put/get, hash rejection, unreferenced expiry, a commit
+     referencing a missing file, and fetch after authority handover.
+   - e2e: a two-player party where one player puts a file and the other
+     reloads and still shows it.
+
 ## Real-device checks requiring access or coordination
 
 Playwright WebKit doesn't replace physical iPhones. On this host, WebKit
