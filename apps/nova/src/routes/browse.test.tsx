@@ -124,18 +124,18 @@ describe("/browse", () => {
 });
 
 describe("/game/:gameId", () => {
-  it("shows the external game detail: author, players, categories, actions, description", async () => {
+  it("shows the hosted game detail: author, players, categories, actions, description", async () => {
     renderAt("/game/drawphone");
 
     expect(await screen.findByRole("heading", { name: "Drawphone" })).toBeInTheDocument();
     expect(screen.getByText("by Tanner Krewson")).toBeInTheDocument();
-    expect(screen.getByText("1+ players")).toBeInTheDocument();
+    expect(screen.getByText("1–64 players")).toBeInTheDocument();
     expect(screen.getByText("Drawing")).toBeInTheDocument();
     expect(screen.getByText("Very simple")).toBeInTheDocument();
     expect(screen.getByText(/In Drawphone, there are no winners/)).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /Play game/ })).not.toBeInTheDocument();
     const start = screen.getByRole("link", { name: /Start party/ });
-    expect(start.getAttribute("href")).toBe("/party");
+    expect(start.getAttribute("href")).toBe("/party?gameId=drawphone&title=Drawphone");
     const guide = screen.getByRole("link", { name: /How to play/ });
     expect(guide).toHaveAttribute("href", "https://drawphone.tannerkrewson.com/how-to-play");
     expect(guide).toHaveAttribute("target", "_blank");
