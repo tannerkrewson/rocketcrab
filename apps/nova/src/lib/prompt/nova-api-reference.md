@@ -61,7 +61,7 @@ nova.defineGame({
 // --- Lifecycle ---
 nova.ready(); // once, when your game has loaded
 nova.onStart(() => {
-  // the party started the game
+  // Dispatch resolves once applied, or rejects with { code, message }.
   nova.dispatch({ type: "playCard", payload: { card: "ace" } }).catch((error) => {
     nova.log(error.message);
   });
@@ -80,7 +80,6 @@ nova.onPlayerLeave((player) => {});
 // --- State ---
 nova.state.get(); // the latest state (or your view), or null before start
 nova.state.onChange((state) => {}); // a new state arrived
-// Resolves once applied; rejects with { code, message }.
 nova.controls.set({ left: true, right: false }); // any time; only changes are sent
 
 // --- Logging and errors ---

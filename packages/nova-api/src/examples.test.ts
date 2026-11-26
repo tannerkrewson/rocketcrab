@@ -79,7 +79,10 @@ describe("API reference examples", () => {
   it("registers and starts the whole API example", async () => {
     const { a, start, until } = setup("The whole API");
     await start();
-    await until(() => expect(a.session.getStateModeDiagnostics().revision).toBeGreaterThan(1));
+    await until(() => {
+      const state = a.session.client.state.get() as { plays: number };
+      expect(state.plays).toBeGreaterThan(0);
+    });
     expect(a.session.declaration?.apiVersion).toBe(1);
   });
 
