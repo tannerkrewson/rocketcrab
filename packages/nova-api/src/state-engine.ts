@@ -36,11 +36,10 @@
  *   the authority and starts an election.
  * - **Elections**: a suspecting peer increments its known term, broadcasts
  *   an `authority.election` message carrying its state observations, and
- *   collects candidates for `electionWindowMs`. Every connected eligible
- *   member is a candidate (a higher-term campaign makes followers join and a
- *   sitting authority step down), so the deterministic winner — the lowest
- *   connected eligible member id — is the same for every peer that sees the
- *   same membership. Conflicting same-term announcements reconcile by
+ *   waits `electionWindowMs` before choosing the lowest member eligible
+ *   at the start and end of the election. A higher-term campaign makes
+ *   followers join and a sitting authority step down. Conflicting same-term
+ *   announcements reconcile by
  *   (stateRevision, member id): higher revision wins, then the lower member
  *   id — on partition merge exactly one authority survives.
  * - **Restore**: the winner waits `restoreWindowMs` while peers whose state

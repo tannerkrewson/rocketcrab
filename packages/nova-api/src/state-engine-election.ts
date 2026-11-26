@@ -110,8 +110,7 @@ export abstract class StateEngineElection extends StateEngineSnapshots {
 
   /**
    * An `authority.election` arrived: a strictly higher term makes every
-   * connected member (including a sitting authority) join the campaign; the
-   * deterministic winner is the lowest connected eligible member id.
+   * connected game session (including a sitting authority) join the campaign.
    */
   handleElection(message: {
     term: number;
@@ -128,8 +127,6 @@ export abstract class StateEngineElection extends StateEngineSnapshots {
     }
     if (message.term > this.term) {
       this.startElectionAt(message.term);
-    } else if (this.election !== null && this.election.term === message.term) {
-      this.election.candidates.add(message.candidateMemberId);
     }
   }
 
@@ -189,10 +186,7 @@ export abstract class StateEngineElection extends StateEngineSnapshots {
   private startElectionAt(term: number): void {
     if (this.disposed || !this.started || this.ended) return;
     if (!this.host.selfConnected()) return; // campaigns need a live link
-    if (this.election !== null && this.election.term >= term) {
-      this.election.candidates.add(this.selfMemberId);
-      return;
-    }
+    if (this.election !== null && this.election.term >= term) return;
     this.term = Math.max(this.term, term);
     this.clearGraceTimer();
     this.clearRestoreTimer();
@@ -206,7 +200,7 @@ export abstract class StateEngineElection extends StateEngineSnapshots {
     this.authorityElect = null;
     const election: ElectionState = {
       term: this.term,
-      candidates: new Set([this.selfMemberId]),
+      eligibleAtStart: new Set(this.host.eligibleMemberIds()),
       timer: null,
     };
     this.election = election;
@@ -219,16 +213,17 @@ export abstract class StateEngineElection extends StateEngineSnapshots {
     election.timer = setTimeout(() => {
       if (this.election !== election) return; // superseded or settled
       this.election = null;
-      this.finalizeElection(election.term);
+      this.finalizeElection(election);
     }, this.electionWindowMs);
   }
 
-  /** Finalize a campaign: the lowest connected eligible member wins. */
-  private finalizeElection(term: number): void {
+  private finalizeElection({ term, eligibleAtStart }: ElectionState): void {
     if (this.disposed || !this.started || this.ended) return;
     if (!this.host.selfConnected()) return; // wait for reconnect, then re-arm
-    const winner = this.lowestEligibleMemberId();
-    if (winner === null) return;
+    // A shell joining mid-election may still be waiting for game state.
+    // Leave it out of this term while checking that the others are still eligible.
+    const winner = this.lowestEligibleMemberId(eligibleAtStart);
+    if (winner === null && this.lowestEligibleMemberId() === null) return;
     if (winner === this.selfMemberId) {
       this.becomeAuthority(term);
       return;

@@ -325,6 +325,18 @@ describe(
       expect(engine.getTerm()).toBe(2);
     });
 
+    it("elects a remaining peer when the old authority reloads during the election", async () => {
+      const { engine, host } = makeEngine("member-b");
+      await seedFollower(engine, 1, { count: 0 });
+
+      host.connected.delete("member-a");
+      engine.notifyAuthorityLeft();
+      host.connected.add("member-a");
+
+      await advance(150);
+      expect(engine.getAuthorityMemberId()).toBe("member-b");
+    });
+
     it("elects the lowest eligible member deterministically and the winner announces + restores", async () => {
       const { engine, host } = makeEngine("member-b");
       await seedFollower(engine, 1, { count: 0 });

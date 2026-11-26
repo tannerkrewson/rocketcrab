@@ -20,7 +20,12 @@ churn on upgrade), and need no paid always-on server.
       as the Nova connection ID and remove the connection generation from
       `nova.identity`. Trystero 0.27 reuses its endpoint ID across reconnects.
 - [ ] After the real-device checks below, evaluate room, link and game
-      recovery before consolidating any other retry paths.
+      recovery before consolidating any other retry paths. A reloaded party
+      creator can reclaim the host role and receive the running state while
+      remaining in the lobby without the game frame. Existing peers can
+      serve the HTML, but a new shell accepts initial source metadata only
+      from the current host. Recover the verified source without letting
+      a guest choose the party's game.
 - [ ] Check `rocketcrab.com` on iOS Safari with content blockers on: the app
       loads, and parties work without analytics or Turnstile.
 - [ ] Watch a Clarity recording of a party from an eligible region and

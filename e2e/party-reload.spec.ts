@@ -127,7 +127,7 @@ test("a player who reloads mid-game keeps their id and seat", async ({ browser }
       .toBe(true);
 
     await joiner.reload();
-    await expectPlayViewOnAll([{ page: joiner, label: "joiner" }]);
+    await expectPlayViewOnAll(pages);
     await expect.poll(async () => (await readGame(joiner))?.id, { timeout: 120_000 }).toBe(before);
     await expect
       .poll(async () => (await readGame(joiner))?.state?.seats.includes(before!), {

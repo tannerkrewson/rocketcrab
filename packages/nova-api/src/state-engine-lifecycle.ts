@@ -279,8 +279,9 @@ export abstract class StateEngineLifecycle {
     this.queue.length = 0;
   }
 
-  protected lowestEligibleMemberId(): string | null {
-    const ids = this.host.eligibleMemberIds();
+  protected lowestEligibleMemberId(among?: ReadonlySet<string>): string | null {
+    const eligible = this.host.eligibleMemberIds();
+    const ids = among === undefined ? eligible : eligible.filter((id) => among.has(id));
     if (ids.length === 0) return null;
     return ids.reduce((lowest, id) => (id < lowest ? id : lowest));
   }

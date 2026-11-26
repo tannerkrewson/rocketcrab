@@ -233,7 +233,7 @@ export interface ActionStats {
 
 export interface ElectionState {
   readonly term: number;
-  readonly candidates: Set<string>;
+  readonly eligibleAtStart: ReadonlySet<string>;
   timer: ReturnType<typeof setTimeout> | null;
 }
 
