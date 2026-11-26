@@ -5,7 +5,6 @@
  * authority, so every session still gets exactly one `start`.
  */
 import { describe, expect, it } from "vitest";
-import { MINIMAL_GAME_EXAMPLE, TICK_EXAMPLE } from "./examples";
 import { createInMemoryHarness } from "./harness";
 import { createNovaSession, type NovaSession } from "./session";
 
@@ -27,7 +26,7 @@ function join(
     game: { gameId: "game-start", title: "Start Game" },
     ...(acceptStartRequest !== undefined ? { acceptStartRequest } : {}),
   });
-  new Function("nova", game === "ticking" ? TICK_EXAMPLE : MINIMAL_GAME_EXAMPLE)(session.client);
+  session.client.defineGame({ title: "Start Game", ...(game === "ticking" && { tick() {} }) });
   const starts: number[] = [];
   session.client.onStart(() => starts.push(1));
   const errors: string[] = [];

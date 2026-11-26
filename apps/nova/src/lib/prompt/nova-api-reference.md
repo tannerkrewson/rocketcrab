@@ -32,13 +32,14 @@ nova.defineGame({
   maxPlayers: 8, // optional: the lobby says when too many players have joined
   createInitialState(context) {
     // context.players = everyone connected, sorted by id (the same on every device).
-    return {}; // the starting state (plain JSON)
+    return { plays: 0 }; // the starting state (plain JSON)
   },
   actions: {
     playCard(state, context, payload) {
       // Validate, then change `state` in place. context.actor = who acted;
       // context.leaderId = the party leader's id, or null.
       // Throw an Error to reject the action; nothing changes.
+      state.plays += 1;
     },
   },
   // Real-time games only:
@@ -59,7 +60,12 @@ nova.defineGame({
 
 // --- Lifecycle ---
 nova.ready(); // once, when your game has loaded
-nova.onStart(() => {}); // the party started the game
+nova.onStart(() => {
+  // the party started the game
+  nova.dispatch({ type: "playCard", payload: { card: "ace" } }).catch((error) => {
+    nova.log(error.message);
+  });
+});
 nova.onEnd((reason) => {}); // "user_exit" | "host_closed" | "error"
 nova.onConnectionChange((status) => {});
 // "connecting" | "connected" | "reconnecting" | "suspended" | "disconnected"
@@ -74,12 +80,11 @@ nova.onPlayerLeave((player) => {});
 // --- State ---
 nova.state.get(); // the latest state (or your view), or null before start
 nova.state.onChange((state) => {}); // a new state arrived
-nova.dispatch({ type: "playCard", payload: { card: "ace" } }); // Promise
 // Resolves once applied; rejects with { code, message }.
 nova.controls.set({ left: true, right: false }); // any time; only changes are sent
 
 // --- Logging and errors ---
-nova.log("anything", value); // shows in the editor's log panel
+nova.log("anything", 42); // shows in the editor's log panel
 nova.onError((error) => {}); // { code, message }
 ```
 
@@ -147,7 +152,7 @@ function draw() {
   nova.dispatch({ type: "drawCard" }).catch((error) => {
     // error.message is the Error your action threw, or a Nova reason such as
     // stale_revision (someone acted first) or timed_out.
-    showMessage(error.message);
+    nova.log(error.message); // Show this message in your game UI too.
   });
 }
 ```
@@ -198,10 +203,14 @@ nova.state.onChange((state) => {
 requestAnimationFrame(function frame() {
   if (latest) {
     const t = Math.min(1, (performance.now() - arrivedAt) / (1000 / 15));
-    draw(previous, latest, t); // position = a + (b - a) * t
+    draw(previous, latest, t);
   }
   requestAnimationFrame(frame);
 });
+
+function draw(previous, latest, t) {
+  // Render each dot at a + (b - a) * t between its previous and latest positions.
+}
 
 // Controls: report what is held. Calling set often is fine.
 const held = { dx: 0, dy: 0 };
@@ -213,6 +222,8 @@ function steer(dx, dy) {
 addEventListener("keydown", (e) => e.key === "ArrowLeft" && steer(-1, held.dy));
 addEventListener("keyup", (e) => e.key === "ArrowLeft" && steer(0, held.dy));
 addEventListener("blur", () => steer(0, 0)); // a hidden tab never sees keyup
+// Use a button with id="boost" in your HTML.
+const boostButton = document.getElementById("boost");
 boostButton.onclick = () => nova.dispatch({ type: "boost" }).catch(() => {});
 
 function newDot() {

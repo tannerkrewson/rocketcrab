@@ -1,152 +1,114 @@
-/**
- * Documentation check: the JavaScript examples in the API reference are the
- * canonical usage examples, and they must actually work against the real
- * API. Each example is executed with a session-backed `nova` client (the
- * same client the runtime frame bridge builds), and the minimal game is
- * asserted to stay under the ~30-line acceptance threshold.
- */
-import { describe, expect, it, vi } from "vitest";
-import { MINIMAL_GAME_EXAMPLE, TICK_EXAMPLE, STATE_EXAMPLE } from "./examples";
+import { readFileSync } from "node:fs";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { createInMemoryHarness } from "./harness";
 import { createNovaSession, type NovaSession } from "./session";
 
-const SESSION = "session-examples";
+const reference = readFileSync(
+  new URL("../../../apps/nova/src/lib/prompt/nova-api-reference.md", import.meta.url),
+  "utf8",
+);
+const examples = new Map(
+  [...reference.matchAll(/^## (.+)\r?\n(?:(?!^## )[\s\S])*?^```js\r?\n([\s\S]*?)^```/gm)].map(
+    ([, title, source]) => [title, source],
+  ),
+);
 
-function runExample(
-  harness: ReturnType<typeof createInMemoryHarness>,
-  source: string,
-  memberId: string,
-  displayName: string,
-): NovaSession {
-  const transport = harness.createTransport({ memberId, displayName });
-  const session = createNovaSession({
-    transport,
-    room: "arena",
-    sessionId: SESSION,
-    player: { memberId, displayName },
-    game: { gameId: "game-example", title: "Example Game" },
-  });
-  // Syntax + behavior: execute the documented source against the real API.
-  new Function("nova", source)(session.client);
-  return session;
+function example(title: string): string {
+  const source = examples.get(title);
+  if (!source) throw new Error(`No JavaScript example under "${title}"`);
+  return source;
 }
 
-async function twoPlayers(harness: ReturnType<typeof createInMemoryHarness>): Promise<{
-  a: NovaSession;
-  b: NovaSession;
-}> {
-  const a = runExample(harness, MINIMAL_GAME_EXAMPLE, "member-a", "Ada");
-  const b = runExample(harness, MINIMAL_GAME_EXAMPLE, "member-b", "Ben");
-  await a.join();
-  await b.join();
-  harness.drain();
-  return { a, b };
-}
+const sessions: NovaSession[] = [];
 
-function logs(): Array<unknown[]> {
-  const entries: Array<unknown[]> = [];
-  vi.spyOn(console, "log").mockImplementation((...args: unknown[]) => {
-    entries.push(args);
-  });
-  return entries;
-}
+afterEach(async () => {
+  await Promise.all(sessions.splice(0).map((session) => session.dispose()));
+});
 
-/** Drain + macrotask flush: the state engine's async apply and sha256 need
- * real event-loop turns (the hub only delivers on drain()). */
-async function flush(harness: ReturnType<typeof createInMemoryHarness>): Promise<void> {
-  for (let i = 0; i < 2; i += 1) {
-    for (let j = 0; j < 8; j += 1) {
-      await new Promise((resolve) => setTimeout(resolve, 0));
-    }
-    harness.drain();
+function setup(title: string) {
+  const harness = createInMemoryHarness();
+  function player(memberId: string) {
+    const session = createNovaSession({
+      transport: harness.createTransport({ memberId }),
+      room: "arena",
+      sessionId: "session-examples",
+      player: { memberId, displayName: memberId },
+      game: { gameId: "game-example", title: "Example Game" },
+    });
+    sessions.push(session);
+
+    // The real-time snippet expects a button and the page's event and animation APIs.
+    const events = new EventTarget();
+    const run = new Function(
+      "nova",
+      "addEventListener",
+      "requestAnimationFrame",
+      "document",
+      `${example(title)}\n${title === "Turn-based example" ? "return draw;" : ""}`,
+    );
+    const draw = run(session.client, events.addEventListener.bind(events), () => 0, {
+      getElementById: () => ({}),
+    });
+    const onStart = vi.fn();
+    session.client.onStart(onStart);
+    return { session, events, draw, onStart };
   }
-  await Promise.resolve();
+
+  const a = player("member-a");
+  const b = player("member-b");
+  async function until(assertion: () => void) {
+    await vi.waitFor(
+      () => {
+        harness.drain();
+        assertion();
+      },
+      { interval: 5 },
+    );
+  }
+  async function start() {
+    await a.session.join();
+    await b.session.join();
+    await until(() => expect(a.session.readyOf("member-b")).toBe(true));
+    a.session.start();
+    await until(() => expect(b.onStart).toHaveBeenCalledOnce());
+  }
+  return { a, b, start, until };
 }
 
-describe("documented examples", () => {
-  it("keeps the minimal game under the ~30-line acceptance threshold", () => {
-    const lines = MINIMAL_GAME_EXAMPLE.split("\n").filter((line) => line.trim().length > 0);
-    expect(lines.length).toBeLessThanOrEqual(30);
-    expect(lines.some((line) => line.includes("defineGame"))).toBe(true);
+describe("API reference examples", () => {
+  it("registers and starts the whole API example", async () => {
+    const { a, start, until } = setup("The whole API");
+    await start();
+    await until(() => expect(a.session.getStateModeDiagnostics().revision).toBeGreaterThan(1));
+    expect(a.session.declaration?.apiVersion).toBe(1);
   });
 
-  it("parses as valid JavaScript", () => {
-    for (const example of [MINIMAL_GAME_EXAMPLE, STATE_EXAMPLE, TICK_EXAMPLE]) {
-      expect(() => new Function("nova", example)).not.toThrow();
-    }
+  it("starts the smallest game in at most 30 lines", async () => {
+    const title = "Smallest game";
+    expect(example(title).trim().split("\n").length).toBeLessThanOrEqual(30);
+    const { a, start } = setup(title);
+    await start();
+    expect(a.session.declaration).toEqual({ title: "Hello Nova", apiVersion: 1 });
   });
 
-  it("minimal game registers, readies, and observes start", async () => {
-    const harness = createInMemoryHarness();
-    const { a, b } = await twoPlayers(harness);
-    const aStarted: number[] = [];
-    const bStarted: number[] = [];
-    a.client.onStart(() => aStarted.push(1));
-    b.client.onStart(() => bStarted.push(1));
-    expect(a.declaration).toEqual({ title: "Hello Nova" });
-    expect(b.readyOf("member-a")).toBe(true); // ready crossed the transport
-    a.start();
-    b.start();
-    await flush(harness);
-    expect(aStarted).toHaveLength(1);
-    expect(bStarted).toHaveLength(1);
-    // The default initial state {} committed even without declared handlers.
-    expect(a.getStateModeDiagnostics().revision).toBe(1);
+  it("draws a card through an action and keeps it out of the other player's view", async () => {
+    const { a, b, start, until } = setup("Turn-based example");
+    await start();
+    b.draw();
+    await until(() => {
+      expect(b.session.client.state.get()).toEqual({ hand: "queen", cardsLeft: 2 });
+      expect(a.session.client.state.get()).toEqual({ hand: null, cardsLeft: 2 });
+    });
   });
 
-  it("state-mode example dispatches actions that the authority applies", async () => {
-    const harness = createInMemoryHarness();
-    const a = runExample(harness, STATE_EXAMPLE, "member-a", "Ada");
-    const b = runExample(harness, STATE_EXAMPLE, "member-b", "Ben");
-    const entries = logs();
-    try {
-      await a.join();
-      await b.join();
-      await flush(harness);
-      a.start();
-      b.start();
-      await flush(harness);
-      // Both players' onStart dispatches ran; the authority applied them.
-      const diagnostics = a.getStateModeDiagnostics();
-      expect(diagnostics.revision).toBe(3); // initial + Ada's draw + Ben's draw
-      expect(diagnostics.appliedCount).toBe(3);
-      // Both frames received only their selected view (never the deck).
-      const stateLogs = entries.filter(
-        (args) => args[0] === "State changed:" && typeof args[1] === "object",
-      );
-      expect(stateLogs.length).toBeGreaterThanOrEqual(2);
-      const views = stateLogs.map((args) => args[1] as { hand?: string; cardsLeft?: number });
-      expect(views.every((view) => typeof view.cardsLeft === "number")).toBe(true);
-      expect(views.some((view) => typeof view.hand === "string")).toBe(true);
-      expect(a.getCanonicalState()?.state).toMatchObject({ deck: ["ace", "king"] });
-      // A stale race was rejected with a clear code (caught by the example).
-      const rejectionLogs = entries.filter((args) => args[0] === "Draw rejected:");
-      expect(rejectionLogs.length).toBeGreaterThanOrEqual(1);
-      expect(rejectionLogs[0]?.[1]).toBe("stale_revision");
-    } finally {
-      vi.restoreAllMocks();
-    }
-  });
-
-  it("tick example moves each player's paddle by their controls", async () => {
-    const harness = createInMemoryHarness();
-    const a = runExample(harness, TICK_EXAMPLE, "member-a", "Ada");
-    const b = runExample(harness, TICK_EXAMPLE, "member-b", "Ben");
-    await a.join();
-    await b.join();
-    await flush(harness);
-    a.start();
-    b.start();
-    const deadline = Date.now() + 5_000;
-    const paddleX = (session: NovaSession, id: string): number =>
-      (session.getCanonicalState()?.state as { paddles?: Record<string, { x: number }> })
-        ?.paddles?.[id]?.x ?? 0;
-    // Both players hold right from onStart; the authority's tick moves both
-    // paddles, and Ben's copy of the state follows.
-    while (paddleX(b, "member-b") <= 52 || paddleX(b, "member-a") <= 52) {
-      if (Date.now() > deadline) throw new Error("paddles never moved");
-      await flush(harness);
-      await new Promise((resolve) => setTimeout(resolve, 10));
-    }
+  it("moves a dot in response to controls sent to the authority", async () => {
+    const { b, start, until } = setup("Real-time example");
+    await start();
+    b.events.dispatchEvent(Object.assign(new Event("keydown"), { key: "ArrowLeft" }));
+    await until(() => {
+      const state = b.session.client.state.get() as { dots: Record<string, { x: number }> };
+      expect(state.dots["member-b"]?.x).toBeLessThan(50);
+      expect(state.dots["member-a"]?.x).toBe(50);
+    });
   });
 });

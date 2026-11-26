@@ -49,9 +49,6 @@ describe("nova-api package surface", () => {
       "NovaSession",
       "NovaStateEngine",
       "LocalGameExecutor",
-      "MINIMAL_GAME_EXAMPLE",
-      "STATE_EXAMPLE",
-      "TICK_EXAMPLE",
     ];
     for (const name of expected) {
       expect(api[name as keyof typeof api], `missing export ${name}`).toBeDefined();
