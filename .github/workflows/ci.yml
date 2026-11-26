@@ -60,14 +60,14 @@ jobs:
 
       # The two static origins are produced as separate artifacts.
       - name: Upload Nova bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: nova-dist
           path: apps/nova/dist
           if-no-files-found: error
 
       - name: Upload Runtime bundle
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: runtime-dist
           path: apps/runtime/dist
@@ -99,7 +99,7 @@ jobs:
 
       - name: Upload Playwright report on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: playwright-report
           path: |
