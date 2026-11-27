@@ -146,6 +146,21 @@ export const NOVA_GAMES: readonly NovaCatalogGame[] = [
   traitors,
   traitorsBanishment,
   {
+    id: "syncd-picks",
+    name: "SYNCd Picks",
+    author: "SYNCd",
+    description:
+      "What would you actually do with an hour together? Pick up to three outings in private, then see which ones your friends picked too.",
+    displayUrlHref: "https://syncd.my/picks/anywhere/",
+    difficulty: "easy",
+    genres: [],
+    minPlayers: 2,
+    play: {
+      kind: "nova",
+      url: "https://syncd-group-picks.bobobobo3.chatgpt.site/rocketcrab/picks",
+    },
+  },
+  {
     ...drawphoneBase,
     id: "drawphone",
     name: "Drawphone",
