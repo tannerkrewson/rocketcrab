@@ -6,6 +6,8 @@ file it gives back, test it with simulated players, and play it in a private
 party. Friends join from an invite link or QR code; there are no accounts or
 room codes. Nova also lists ready-made games.
 
+![rocketcrab — start a party, friends join from one link, and the game opens on every phone](https://raw.githubusercontent.com/yasirwhite/opendemo-media/main/tannerkrewson-rocketcrab/rocketcrab-demo.gif)
+
 Games run peer to peer. The Nova Worker serves the app and the party API
 for signaling, TURN credentials and encrypted fallback tunnels. A separate
 runtime site isolates untrusted game HTML. Saved games stay in the browser. See
